@@ -33,7 +33,9 @@ This repo combines the previously separate
 │   ├── export_ramp_summary.py         # PDF export loop
 │   ├── export_ramp_detail.py          # XLSX export loop
 │   ├── export_highway_sequence.py     # XLSX export loop
-│   └── consolidate_ramp_summary.py    # PDFs -> one XLSX (with audit columns)
+│   ├── consolidate_ramp_summary.py    # PDFs  -> one XLSX (with audit columns)
+│   ├── consolidate_ramp_detail.py     # XLSXs -> one XLSX (adds Route column)
+│   └── consolidate_highway_sequence.py # XLSXs -> one XLSX (adds Route column)
 ├── output/                            # folder structure tracked, contents ignored
 │   ├── ramp_summary/                  # PDFs land here
 │   ├── ramp_detail/                   # per-route XLSX files land here
@@ -97,7 +99,8 @@ in.
 runs no auth check (the consolidator reads local files, not TSMIS):
 
 - `1` → `python scripts\consolidate_ramp_summary.py`
-- `2`, `3` → "coming soon" (placeholders for future consolidators)
+- `2` → `python scripts\consolidate_ramp_detail.py`
+- `3` → `python scripts\consolidate_highway_sequence.py`
 - `Q` → quit
 
 To add a new report type, add a numbered branch to the export menu and

@@ -13,9 +13,9 @@ echo  "3. run_export (main script).bat" first.
 echo.
 echo  Which report do you want to consolidate?
 echo.
-echo     1.  TSAR: Ramp Summary       (PDFs   -^> XLSX)
-echo     2.  TSAR: Ramp Detail        (coming soon)
-echo     3.  Highway Sequence Listing (coming soon)
+echo     1.  TSAR: Ramp Summary       (PDFs -^> XLSX)
+echo     2.  TSAR: Ramp Detail        (XLSX -^> XLSX)
+echo     3.  Highway Sequence Listing (XLSX -^> XLSX)
 echo.
 echo     Q.  Quit
 echo.
@@ -25,8 +25,8 @@ set "choice="
 set /p choice="Enter your choice [1, 2, 3, Q]: "
 
 if /i "%choice%"=="1" goto ramp_summary
-if /i "%choice%"=="2" goto not_yet
-if /i "%choice%"=="3" goto not_yet
+if /i "%choice%"=="2" goto ramp_detail
+if /i "%choice%"=="3" goto highway_sequence
 if /i "%choice%"=="Q" exit /b 0
 if /i "%choice%"=="quit" exit /b 0
 echo.
@@ -40,9 +40,12 @@ python scripts\consolidate_ramp_summary.py
 pause
 exit /b 0
 
-:not_yet
-echo.
-echo That consolidator is not implemented yet.
-echo.
+:ramp_detail
+python scripts\consolidate_ramp_detail.py
 pause
-goto menu
+exit /b 0
+
+:highway_sequence
+python scripts\consolidate_highway_sequence.py
+pause
+exit /b 0
