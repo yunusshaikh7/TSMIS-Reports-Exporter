@@ -129,7 +129,7 @@ report type from breaking the other.
 
 | Constant | Default | Purpose |
 |---|---|---|
-| `REPORT_TIMEOUT_MS` | `300_000` (5 min) | Hard ceiling for a single report. Some routes (e.g. Route 5 Ramp Detail) legitimately take minutes. |
+| `REPORT_TIMEOUT_MS` | `360_000` (6 min) | Hard ceiling for a single report. Some routes (e.g. Route 5 Ramp Detail) legitimately take minutes. |
 | `SKIP_PROMPT_AFTER_MS` | `60_000` (1 min) | Soft timer: after this, the script prints a "still working" line and (on Windows) tells the user they can press `S` to skip the current route. |
 | `COUNTY_ENABLE_TIMEOUT_MS` | `60_000` (60 s) | Max wait for the county dropdown to enable |
 

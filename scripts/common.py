@@ -44,7 +44,7 @@ OUTPUT_ROOT = Path(__file__).parent.parent / "output"
 #                          "second timer" that opens the escape hatch.
 #   COUNTY_ENABLE_TIMEOUT_MS  Wait for the County dropdown to enable after
 #                          District is set.
-REPORT_TIMEOUT_MS = 300_000
+REPORT_TIMEOUT_MS = 360_000
 SKIP_PROMPT_AFTER_MS = 60_000
 COUNTY_ENABLE_TIMEOUT_MS = 60_000
 
