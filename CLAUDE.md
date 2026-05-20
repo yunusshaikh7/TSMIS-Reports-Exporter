@@ -23,41 +23,49 @@ This repo combines the previously separate
 
 ```
 .
-├── 1. setup (one time).bat            # pip install playwright + chromium
+├── 1. setup (one time).bat            # pip install playwright + parsers + chromium
 ├── 2. login (update login).bat        # captures auth session
 ├── 3. run_export (main script).bat    # auth check + menu + run chosen exporter
+├── 4. consolidate (combine reports).bat  # menu + run chosen consolidator
 ├── scripts/
 │   ├── common.py                      # URL, ROUTES, auth helpers, nav helpers
 │   ├── login.py                       # writes scripts/tsmis_auth.json
 │   ├── export_ramp_summary.py         # PDF export loop
 │   ├── export_ramp_detail.py          # XLSX export loop
-│   └── export_highway_sequence.py     # XLSX export loop
-├── output/                            # (git-ignored)
+│   ├── export_highway_sequence.py     # XLSX export loop
+│   └── consolidate_ramp_summary.py    # PDFs -> one XLSX (with audit columns)
+├── output/                            # folder structure tracked, contents ignored
 │   ├── ramp_summary/                  # PDFs land here
-│   ├── ramp_detail/                   # XLSX files land here
-│   └── highway_sequence/              # XLSX files land here
+│   ├── ramp_detail/                   # per-route XLSX files land here
+│   ├── highway_sequence/              # per-route XLSX files land here
+│   └── consolidated/                  # combined XLSX files land here
 ├── .gitignore
 └── CLAUDE.md
 ```
 
-`scripts/tsmis_auth.json` (auth cookies) and `output/` (generated files,
-potentially gigabytes) are both git-ignored.
+`scripts/tsmis_auth.json` (auth cookies) is git-ignored. The four
+`output/` subfolders are committed (via empty `.gitkeep` files) so the
+scripts always have a place to write, but the generated files inside
+them are git-ignored — they can be gigabytes and shouldn't be checked
+in.
 
 ## Technology Stack
 
 | Component | Detail |
 |---|---|
-| Language | Python 3 (standard library + Playwright) |
+| Language | Python 3 (standard library + Playwright + pdfplumber + openpyxl) |
 | Browser automation | `playwright` (sync API, Chromium) |
+| PDF parsing | `pdfplumber` (only used by consolidators) |
+| Excel writing | `openpyxl` (only used by consolidators) |
 | Target application | `https://rhansonrizing.github.io/tsmis_reports/index.html` |
 | Auth mechanism | ArcGIS / Caltrans Azure AD (SSO + MFA) |
 | Session persistence | Playwright `storage_state` → `scripts/tsmis_auth.json` |
 | OS | Windows (`.bat` launchers); Python scripts are OS-agnostic |
 
-## Workflow for End Users (3-Step Process)
+## Workflow for End Users (4-Step Process)
 
 1. **Setup (once per machine):** Double-click `1. setup (one time).bat`
-   — installs Playwright and downloads Chromium.
+   — installs Playwright + pdfplumber + openpyxl and downloads Chromium.
 2. **Login (once, or when the session expires):** Double-click
    `2. login (update login).bat` — opens a visible browser, the user
    completes SSO + MFA, then presses Enter to save the session into
@@ -67,6 +75,10 @@ potentially gigabytes) are both git-ignored.
    `3. run_export (main script).bat` — checks that the auth file
    exists, shows a menu, and runs the selected exporter headlessly
    over every route.
+4. **Consolidate (optional, repeatable):** Double-click
+   `4. consolidate (combine reports).bat` — shows a menu, picks one
+   report type, and combines every per-route export of that type into
+   a single workbook under `output/consolidated/`.
 
 ## How the Menu Works
 
@@ -77,11 +89,21 @@ potentially gigabytes) are both git-ignored.
 2. Shows a numbered menu:
    - `1` → `python scripts\export_ramp_summary.py`
    - `2` → `python scripts\export_ramp_detail.py`
+   - `3` → `python scripts\export_highway_sequence.py`
    - `Q` → quit
 3. Invalid choices loop back to the menu.
 
-To add a new report type, add a numbered branch to the menu and a
-matching `export_<name>.py` under `scripts/`.
+`4. consolidate (combine reports).bat` follows the same pattern but
+runs no auth check (the consolidator reads local files, not TSMIS):
+
+- `1` → `python scripts\consolidate_ramp_summary.py`
+- `2`, `3` → "coming soon" (placeholders for future consolidators)
+- `Q` → quit
+
+To add a new report type, add a numbered branch to the export menu and
+a matching `export_<name>.py` under `scripts/`. To add a new
+consolidator, add a numbered branch to the consolidate menu and a
+matching `consolidate_<name>.py` under `scripts/`.
 
 ## Shared vs. Report-Specific Code
 
@@ -166,7 +188,30 @@ option values in the TSMIS "Route" `<select>` element (zero-padded
      `page.expect_download` for downloads)
    - The output filename pattern
 2. Add a new numbered branch to `3. run_export (main script).bat`.
-3. Document it in the table at the top of this file.
+3. Add a `.gitkeep` to a new `output/<name>/` folder and whitelist it in
+   `.gitignore` so the folder stays in the repo.
+4. Document it in the table at the top of this file.
+
+## Adding a New Consolidator
+
+Each consolidator is self-contained — parsing logic and Excel writing
+live together in one `scripts/consolidate_<name>.py`. Don't try to
+share parser helpers between consolidators; each input format (PDF vs
+XLSX) and each report's quirks differ enough that sharing tends to
+introduce cross-report bugs.
+
+1. Create `scripts/consolidate_<name>.py`. Pattern:
+   - Read inputs from `OUTPUT_ROOT / "<name>"`.
+   - Write the combined file to
+     `OUTPUT_ROOT / "consolidated" / "<name>_consolidated.xlsx"`.
+   - Wrap third-party imports (`pdfplumber`, `openpyxl`) in
+     `try/except ImportError` and direct the user to re-run the setup
+     BAT if missing.
+   - Print a brief progress line per input file plus a summary at the end.
+2. Turn the placeholder branch in
+   `4. consolidate (combine reports).bat` into a real call:
+   `python scripts\consolidate_<name>.py`.
+3. Document it in this file.
 
 ## Error Handling Patterns
 
@@ -182,17 +227,20 @@ option values in the TSMIS "Route" `<select>` element (zero-padded
 
 ## Development Conventions
 
-- **No dependencies beyond Playwright** — keep it that way; the
-  audience is non-developers using numbered `.bat` files.
-- **Python 3 standard library** for everything except Playwright.
+- **Dependencies are pinned to the setup BAT** — Playwright for
+  exporters, plus `pdfplumber` + `openpyxl` for consolidators. Avoid
+  adding more; the audience is non-developers using numbered `.bat`
+  files and any new dep means a setup-BAT change.
+- **Python 3 standard library** for everything else.
 - **No virtual environment** is required or created by setup;
-  Playwright is installed globally via `pip`.
+  packages are installed globally via `pip`.
 - **Sync Playwright API** (not async) — simpler for a single
   sequential script.
 - **No logging framework** — `print()` to stdout is intentional;
   output is visible in the `.bat` console window.
 - **No tests** — the "test" is running an export against the live
-  site.
+  site (or, for a consolidator, running it over the existing
+  per-route files).
 
 ## Common Issues
 
@@ -207,7 +255,10 @@ option values in the TSMIS "Route" `<select>` element (zero-padded
 
 ## Git Conventions
 
-- **Never commit** `scripts/tsmis_auth.json` (live auth tokens) or
-  anything in `output/` — both are in `.gitignore`.
+- **Never commit** `scripts/tsmis_auth.json` (live auth tokens). It is
+  in `.gitignore`.
+- **Don't commit generated files** under `output/`. Only the four
+  `.gitkeep` stubs (one per subfolder) are tracked there; the
+  `.gitignore` rules are explicit about which paths are excluded.
 - Commit messages should be short and imperative (e.g.,
   `add route 395`, `add tsar ramp inventory exporter`).
