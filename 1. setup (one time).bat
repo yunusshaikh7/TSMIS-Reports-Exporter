@@ -1,7 +1,7 @@
 @echo off
-echo Installing Playwright...
+echo Installing Python packages...
 python -m pip install --upgrade pip
-python -m pip install playwright
+python -m pip install playwright pdfplumber openpyxl
 if errorlevel 1 (
     echo.
     echo ERROR: pip install failed. Is Python installed and on PATH?
