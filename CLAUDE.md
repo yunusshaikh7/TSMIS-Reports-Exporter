@@ -13,6 +13,7 @@ Currently supported reports:
 |---|---|---|---|
 | 1 | TSAR: Ramp Summary | PDF (Letter) | `output/ramp_summary/` |
 | 2 | TSAR: Ramp Detail | XLSX | `output/ramp_detail/` |
+| 3 | Highway Sequence Listing | XLSX | `output/highway_sequence/` |
 
 This repo combines the previously separate
 `TSMIS-Reports-Export-ALL-Ramp-Summary` and
@@ -29,10 +30,12 @@ This repo combines the previously separate
 │   ├── common.py                      # URL, ROUTES, auth helpers, nav helpers
 │   ├── login.py                       # writes scripts/tsmis_auth.json
 │   ├── export_ramp_summary.py         # PDF export loop
-│   └── export_ramp_detail.py          # XLSX export loop
+│   ├── export_ramp_detail.py          # XLSX export loop
+│   └── export_highway_sequence.py     # XLSX export loop
 ├── output/                            # (git-ignored)
 │   ├── ramp_summary/                  # PDFs land here
-│   └── ramp_detail/                   # XLSX files land here
+│   ├── ramp_detail/                   # XLSX files land here
+│   └── highway_sequence/              # XLSX files land here
 ├── .gitignore
 └── CLAUDE.md
 ```
