@@ -645,6 +645,24 @@ def build_workbook(records, out_path):
 # Entry point
 # =============================================================================
 
+def confirm_overwrite(path):
+    """Ask the user whether to overwrite an existing consolidated workbook.
+
+    Returns True if the user agreed (Y/yes), False otherwise. Exits early
+    via sys.exit(0) on EOF so double-clicking the BAT and immediately
+    closing the window doesn't look like a crash.
+    """
+    print()
+    print("A consolidated workbook already exists at:")
+    print(f"   {path}")
+    try:
+        ans = input("Overwrite it? [Y/N]: ").strip().lower()
+    except EOFError:
+        print("\nCancelled.")
+        sys.exit(0)
+    return ans in ("y", "yes")
+
+
 def main():
     if not INPUT_DIR.exists():
         print(f"ERROR: Input folder is missing: {INPUT_DIR}")
@@ -656,6 +674,14 @@ def main():
         print(f"ERROR: No PDFs found in {INPUT_DIR}")
         print('Run "3. run_export (main script).bat" and pick option 1 first.')
         sys.exit(1)
+
+    # Confirm overwrite *before* spending time parsing PDFs — and surface
+    # the "file is open in Excel" case as a clear message rather than a
+    # raw PermissionError from openpyxl.save().
+    if OUT_PATH.exists():
+        if not confirm_overwrite(OUT_PATH):
+            print("Cancelled. Existing file kept.")
+            sys.exit(0)
 
     print("=" * 60)
     print(f"TSAR Ramp Summary Consolidation - {len(pdfs)} file(s)")
@@ -675,7 +701,18 @@ def main():
 
     print()
     print("Writing consolidated workbook...")
-    build_workbook(records, OUT_PATH)
+    try:
+        build_workbook(records, OUT_PATH)
+    except PermissionError:
+        print()
+        print("=" * 60)
+        print(f"ERROR: Could not write {OUT_PATH.name}.")
+        print()
+        print("This usually means the file is open in Excel. Close it")
+        print("there and run this consolidator again. (None of the input")
+        print("PDFs were modified.)")
+        print("=" * 60)
+        sys.exit(1)
 
     print()
     print("=" * 60)
