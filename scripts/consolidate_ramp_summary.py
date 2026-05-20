@@ -11,9 +11,15 @@ orphan numbers) and is not reused by the other consolidators. Each
 report's consolidator gets its own file under scripts/ so a layout
 change in one report cannot break another.
 """
+import logging
 import re
 import sys
 from pathlib import Path
+
+# pdfplumber wraps pdfminer.six, which logs a "Could not get FontBBox from
+# font descriptor" warning for every font with a malformed bbox — these
+# PDFs hit it on nearly every page. Parsing is unaffected; just silence it.
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 try:
     import pdfplumber
