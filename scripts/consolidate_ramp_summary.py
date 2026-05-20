@@ -345,6 +345,188 @@ GROUP_FILLS = {
     "Audit":             "595959",
 }
 
+# Long-form labels for the Combined summary sheet — these match the
+# code descriptions printed on the source PDF.
+LONG_LABELS = {
+    "hwy_right":         "R - Right",
+    "hwy_divided":       "D - Divided",
+    "hwy_undivided":     "U - Undivided",
+    "hwy_unconstructed": "X - Unconstructed",
+    "hwy_left":          "L - Left",
+    "hwy_others":        "Others",
+    "onoff_on":          "ON - On",
+    "onoff_off":         "OFF - Off",
+    "onoff_other":       "OTH - Other",
+    "pop_rural_inside":  "R-RURAL -I INSIDE CITY",
+    "pop_rural_outside": "       -O OUTSIDE CITY",
+    "pop_urban_inside":  "U-URBAN -I INSIDE CITY",
+    "pop_urban_outside": "       -O OUTSIDE CITY",
+    "pop_invalid":       "       -INVALID DATA",
+    "ramp_A_frontage":     "A - Frontage Road",
+    "ramp_B_collector":    "B - Collector Road",
+    "ramp_C_connector_L":  "C - Direct or Semi-direct Connector (Left)",
+    "ramp_D_diamond":      "D - Diamond Type Ramp",
+    "ramp_E_slip":         "E - Slip Ramp",
+    "ramp_F_connector_R":  "F - Direct or Semi-direct Connector (Right)",
+    "ramp_G_loop_left":    "G - Loop (w/Left turn)",
+    "ramp_H_buttonhook":   "H - Buttonhook Ramp",
+    "ramp_J_scissors":     "J - Scissors",
+    "ramp_K_split":        "K - Split Ramp",
+    "ramp_L_loop_noleft":  "L - Loop without Left Turn",
+    "ramp_M_two_way":      "M - Two way Ramp Segment",
+    "ramp_R_rest_area":    "R - Rest Area, Vista Point, Truck Scale",
+    "ramp_Z_other":        "Z - Other",
+}
+
+SUMMARY_SHEET_NAME = "TSAR Ramps Summary"
+
+
+def build_combined_sheet(wb, records, col_letters):
+    """Insert a 'Combined' summary sheet at index 0 with formulas that
+    aggregate the per-route data on the TSAR Ramps Summary sheet.
+
+    Layout (matches the user-provided template):
+      row 1: blue title bar
+      row 2: gray subtitle ("Aggregated across N routes...")
+      row 4: section headers — "Highway Groups" (left) and "Ramp Types" (right)
+      rows 5-11: NUMBER/CODE header + 6 Highway Groups rows
+                 and rows 5-19 on the right: 14 Ramp Types rows
+      rows 13-17: On/Off Indicator section
+      rows 19-25: Population Groups section
+      rows 28-29: Total Number of Ramps + Ramp Points w/out linework
+    """
+    ws = wb.create_sheet("Combined", 0)
+
+    n_routes = len(records)
+    # Data on the summary sheet starts at row 3. Keep the range valid
+    # even when there are zero records so the formulas still evaluate.
+    last_data_row = max(3, 2 + n_routes)
+
+    # --- styles (match the uploaded template) ---
+    thin = Side(style="thin", color="BFBFBFBF")
+    box_border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    section_border = Border(left=thin, top=thin, bottom=thin)
+    section_fill = PatternFill("solid", start_color="0070C0")
+    title_fill = PatternFill("solid", start_color="0070C0")
+    f_title = Font(name="Arial", bold=True, color="FFFFFF", size=14)
+    f_subtitle = Font(name="Arial", color="595959", size=9)
+    f_section = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+    f_subhead = Font(name="Arial", bold=True, size=10)
+    f_data = Font(name="Arial", size=10)
+    f_total = Font(name="Arial", bold=True, size=12)
+    a_center = Alignment(horizontal="center", vertical="center")
+    a_left = Alignment(horizontal="left")
+    a_right = Alignment(horizontal="right")
+
+    # --- title + subtitle ---
+    ws["A1"] = "All Routes Combined — TSAR Ramp Summary"
+    ws.merge_cells("A1:H1")
+    ws["A1"].font = f_title
+    ws["A1"].fill = title_fill
+    ws["A1"].alignment = a_center
+
+    ws["A2"] = (
+        f"Aggregated across {n_routes} route(s) — "
+        f"live-linked to '{SUMMARY_SHEET_NAME}' sheet"
+    )
+    ws.merge_cells("A2:H2")
+    ws["A2"].font = f_subtitle
+    ws["A2"].alignment = Alignment(horizontal="center")
+
+    # --- helpers ---
+    def section_header(cell_range, text):
+        first = cell_range.split(":")[0]
+        ws[first] = text
+        ws.merge_cells(cell_range)
+        c = ws[first]
+        c.font = f_section
+        c.fill = section_fill
+        c.alignment = a_center
+        c.border = section_border
+
+    def subheader_pair(num_cell, code_cell):
+        ws[num_cell] = "NUMBER"
+        ws[code_cell] = "CODE"
+        for addr in (num_cell, code_cell):
+            ws[addr].font = f_subhead
+            ws[addr].alignment = a_left
+            ws[addr].border = box_border
+
+    def data_row(row, num_col, code_range, col_name):
+        summary_col = col_letters[col_name]
+        num_addr = f"{num_col}{row}"
+        ws[num_addr] = (
+            f"=SUM('{SUMMARY_SHEET_NAME}'!"
+            f"{summary_col}3:{summary_col}{last_data_row})"
+        )
+        ws[num_addr].font = f_data
+        ws[num_addr].alignment = a_right
+        ws[num_addr].border = box_border
+
+        first = code_range.split(":")[0]
+        ws[first] = LONG_LABELS[col_name]
+        ws.merge_cells(code_range)
+        ws[first].font = f_data
+        ws[first].alignment = a_left
+        ws[first].border = box_border
+
+    # --- section headers ---
+    section_header("A4:C4", "Highway Groups")
+    section_header("E4:G4", "Ramp Types")
+    section_header("A13:C13", "On/Off Indicator")
+    section_header("A19:C19", "Population Groups")
+
+    # --- NUMBER/CODE sub-headers ---
+    subheader_pair("A5", "B5")
+    subheader_pair("E5", "F5")
+    subheader_pair("A14", "B14")
+    subheader_pair("A20", "B20")
+
+    # --- data rows ---
+    for i, (col_name, _) in enumerate(HIGHWAY_GROUPS):
+        r = 6 + i
+        data_row(r, "A", f"B{r}:C{r}", col_name)
+
+    for i, (col_name, _) in enumerate(ONOFF):
+        r = 15 + i
+        data_row(r, "A", f"B{r}:C{r}", col_name)
+
+    for i, (col_name, _) in enumerate(POP_GROUPS):
+        r = 21 + i
+        data_row(r, "A", f"B{r}:C{r}", col_name)
+
+    for i, (col_name, _) in enumerate(RAMP_TYPES):
+        r = 6 + i
+        data_row(r, "E", f"F{r}:G{r}", col_name)
+
+    # --- totals (rows 28-29) ---
+    total_col = col_letters["total_ramps"]
+    nolw_col = col_letters["ramp_points_no_linework"]
+    totals = [
+        (28, "Total Number of Ramps:", total_col),
+        (29, "Ramp Points w/out linework:", nolw_col),
+    ]
+    for row, label, summary_col in totals:
+        ws[f"A{row}"] = label
+        ws.merge_cells(f"A{row}:B{row}")
+        ws[f"A{row}"].font = f_total
+        ws[f"A{row}"].alignment = a_right
+        ws[f"C{row}"] = (
+            f"=SUM('{SUMMARY_SHEET_NAME}'!"
+            f"{summary_col}3:{summary_col}{last_data_row})"
+        )
+        ws[f"C{row}"].font = f_total
+        ws[f"C{row}"].alignment = a_left
+
+    # --- column widths + row heights ---
+    widths = {"A": 10, "B": 12, "C": 18, "D": 3, "E": 10, "F": 8.43, "G": 38, "H": 3}
+    for letter, w in widths.items():
+        ws.column_dimensions[letter].width = w
+    ws.row_dimensions[1].height = 25.5
+
+    # Open the workbook on the Combined sheet by default
+    wb.active = wb.index(ws)
+
 
 def build_workbook(records, out_path):
     """Write a styled, audited workbook with one row per record."""
@@ -450,6 +632,10 @@ def build_workbook(records, out_path):
     ws.row_dimensions[1].height = 22
     ws.row_dimensions[2].height = 34
     ws.freeze_panes = "C3"  # freeze headers + first two id columns
+
+    # Combined summary sheet on top, with live formulas referencing
+    # the per-route rows on this sheet.
+    build_combined_sheet(wb, records, col_letters)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(out_path)
