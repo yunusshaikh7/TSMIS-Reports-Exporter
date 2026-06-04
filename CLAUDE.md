@@ -94,6 +94,7 @@ is raised before any browser launches).
 │   ├── common.py                      # URL, ROUTES, timeouts, auth + nav helpers, AuthError, preflight
 │   ├── events.py                      # Events sink + RunResult + ConsolidateResult (engine <-> UI seam)
 │   ├── exporter.py                    # shared export engine + ReportSpec + save strategies
+│   ├── run_report.py                  # per-route run report (CSV; auto-saved each run)
 │   ├── cli.py                         # console adapter (keeps the .bat flow working)
 │   ├── login.py                       # writes the auth file (headed browser)
 │   ├── export_ramp_summary.py         # thin: a ReportSpec (PDF) + run_cli
@@ -115,6 +116,7 @@ is raised before any browser launches).
 ├── dist/                              # build output: dist/TSMIS Exporter/ (git-ignored)
 ├── output/                            # folder structure tracked, contents ignored
 │   ├── ramp_summary/  ramp_detail/  highway_sequence/  consolidated/
+│   └── run_reports/                   # auto-saved per-route CSV reports (created on demand)
 ├── .gitignore
 └── CLAUDE.md
 ```
@@ -401,6 +403,17 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
   before any browser launches; the driver clears the file and guides re-login.
 - **Session expiry mid-run:** `_recover()` raises `AuthError` if the session is
   gone, stopping the run cleanly (browser closed in a `finally`).
+
+## Run Report (per-route outcomes)
+
+Each export records every route's outcome (`saved` / `empty` / `skipped` /
+`failed` / `exists`) in `RunResult.per_route` (via `exporter._record`, which
+also notifies the UI). At the end of a run the engine **auto-saves** a CSV to
+`output/run_reports/<report>_run_<ts>.csv` (`run_report.write_run_report`); the
+path is stored in `RunResult.report_path` and logged. The GUI's **"Save run
+report…"** button (Export tab, enabled once a run has completed) writes a copy
+wherever the user picks. Columns: `Report, Route, Status` (friendly label),
+`Run At` — CSV so it opens in Excel and aggregates easily across runs.
 
 ## Development Conventions
 

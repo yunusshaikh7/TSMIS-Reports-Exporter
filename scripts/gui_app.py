@@ -7,13 +7,16 @@ of the same Events seam used by the .bat flow.
 """
 import os
 import threading
+import time
+from pathlib import Path
 from queue import Empty, Queue
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 
 import gui_theme as theme
+import run_report
 from gui_theme import DOT, PALETTE
 from gui_worker import ConsolidateWorker, ExportWorker, LoginWorker
 
@@ -67,6 +70,10 @@ class App(tk.Tk):
         self.export_choice = tk.IntVar(value=0)
         self.cons_choice = tk.IntVar(value=0)
 
+        self._active_spec = None        # spec of the run in progress
+        self._last_spec = None          # spec of the last completed export
+        self._last_result = None        # its RunResult (enables "Save run report")
+
         self.columnconfigure(0, weight=1)
         self.rowconfigure(3, weight=1)         # log row expands
 
@@ -81,8 +88,9 @@ class App(tk.Tk):
             self.btn_export_start, self.btn_cons_start,
             *self.export_radios, *self.cons_radios,
         ]
-        # Run-only controls start disabled (no task is running yet).
-        for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel):
+        # Run-only controls start disabled (no task is running, no result yet).
+        for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel,
+                  self.btn_save_report):
             w.state(["disabled"])
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -137,6 +145,9 @@ class App(tk.Tk):
         self.btn_export_skip.grid(row=0, column=1, padx=(8, 0))
         self.btn_export_cancel = ttk.Button(actions, text="Cancel", command=self.cancel_current)
         self.btn_export_cancel.grid(row=0, column=2, padx=(8, 0))
+        self.btn_save_report = ttk.Button(actions, text="Save run report…",
+                                          command=self.save_report)
+        self.btn_save_report.grid(row=0, column=3, padx=(8, 0))
         nb.add(ex, text="Export")
 
         # Consolidate tab
@@ -249,7 +260,8 @@ class App(tk.Tk):
         self.task = task
         for w in self._inputs:
             w.state(["disabled"])
-        for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel):
+        for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel,
+                  self.btn_save_report):
             w.state(["disabled"])
         if task == "export":
             self.btn_export_skip.state(["!disabled"])
@@ -269,6 +281,8 @@ class App(tk.Tk):
             w.state(["!disabled"])
         for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel):
             w.state(["disabled"])
+        # "Save run report" stays available between runs while a result exists.
+        self.btn_save_report.state(["!disabled"] if self._last_result else ["disabled"])
         self.btn_login.config(text=self._login_label(), command=self.start_login)
         self.btn_login_cancel.grid_remove()
         self.progress_route.config(text="Idle")
@@ -280,6 +294,7 @@ class App(tk.Tk):
             messagebox.showinfo("Login needed", "Please log in first, then start the export.")
             return
         spec = EXPORT_REPORTS[self.export_choice.get()][2]
+        self._active_spec = spec
         self.cancel_event.clear()
         self.skip_event.clear()
         self._clear_progress()
@@ -346,6 +361,26 @@ class App(tk.Tk):
     def _open_logs_folder(self):
         self._open_folder(LOG_DIR)
 
+    def save_report(self):
+        """Save a copy of the last run's per-route report to a chosen location.
+        (Every run is also auto-saved under output/run_reports/.)"""
+        if not self._last_result or not self._last_spec:
+            return
+        default = f"run_report_{self._last_spec.subdir}_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+        path = filedialog.asksaveasfilename(
+            title="Save run report",
+            defaultextension=".csv",
+            initialfile=default,
+            filetypes=[("CSV file", "*.csv")],
+        )
+        if not path:
+            return
+        try:
+            run_report.write_run_report(self._last_result, self._last_spec.label, Path(path))
+            self.log(f"Run report saved: {path}")
+        except Exception as e:
+            messagebox.showerror("Could not save report", str(e))
+
     def _open_folder(self, folder):
         try:
             folder.mkdir(parents=True, exist_ok=True)
@@ -391,11 +426,15 @@ class App(tk.Tk):
                                  f"skipped {d['skipped']}    failed {d['failed']}"))
 
     def _finish_export(self, result):
+        self._last_result = result
+        self._last_spec = self._active_spec
         self.log("")
         self.log(f"Done. Saved {result.saved}, empty {len(result.empty)}, "
                  f"skipped {len(result.user_skipped)}, failed {len(result.failed)}.")
         if result.failed:
             self.log(f"Failed routes: {result.failed}")
+        if result.report_path:
+            self.log(f"Run report auto-saved: {result.report_path}")
         self.set_dot("ok", "Session ready")
         self._end_task()
 

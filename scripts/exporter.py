@@ -34,6 +34,7 @@ from common import (
 )
 from events import Events, RunResult
 from paths import FAILURES_DIR, OUTPUT_ROOT
+from run_report import auto_report_path, write_run_report
 
 log = logging.getLogger("tsmis.export")
 
@@ -70,6 +71,12 @@ def save_via_export_button(page, out_path):
 
 
 # --- the engine ---------------------------------------------------------------
+
+def _record(result, events, route, status):
+    """Record a route's final outcome (for the run report) and notify the UI."""
+    result.per_route.append((route, status))
+    events.on_route(route, status)
+
 
 def _recover(page, spec):
     """Re-navigate and re-arm the form after a skip or per-route error.
@@ -144,7 +151,7 @@ def _process_route(page, spec, route, prefix, out_path, events, result):
             log.warning("%s timed out", prefix)
             _capture_failure(page, spec, route, events)
             result.failed.append(route)
-            events.on_route(route, "failed")
+            _record(result, events, route, "failed")
             return _recover_or_stop(page, spec, events)
         except Exception as e:
             log.exception("%s attempt %d/%d failed", prefix, attempt + 1, 1 + RETRY_COUNT)
@@ -156,23 +163,23 @@ def _process_route(page, spec, route, prefix, out_path, events, result):
             events.on_log(f"{prefix} FAILED ({type(e).__name__})")
             _capture_failure(page, spec, route, events)
             result.failed.append(route)
-            events.on_route(route, "failed")
+            _record(result, events, route, "failed")
             return _recover_or_stop(page, spec, events)
         else:
             if outcome == "skipped":
                 result.user_skipped.append(route)
-                events.on_route(route, "skipped")
+                _record(result, events, route, "skipped")
                 log.info("%s skipped by user", prefix)
                 return _recover_or_stop(page, spec, events)
             if outcome == "empty":
                 events.on_log(f"{prefix} empty, skip")
                 result.empty.append(route)
-                events.on_route(route, "empty")
+                _record(result, events, route, "empty")
                 log.info("%s empty", prefix)
                 return True
             result.saved += 1                      # outcome == "saved"
             events.on_log(f"{prefix} saved")
-            events.on_route(route, "saved")
+            _record(result, events, route, "saved")
             log.info("%s saved", prefix)
             return True
     return True
@@ -220,7 +227,7 @@ def run_export(spec, events=None, *, routes=ROUTES):
 
                 if out_path.exists():
                     events.on_log(f"{prefix} already exists, skip")
-                    events.on_route(route, "exists")
+                    _record(result, events, route, "exists")
                     continue
 
                 if not _process_route(page, spec, route, prefix, out_path, events, result):
@@ -230,4 +237,16 @@ def run_export(spec, events=None, *, routes=ROUTES):
 
     log.info("export done: saved=%d empty=%d skipped=%d failed=%d",
              result.saved, len(result.empty), len(result.user_skipped), len(result.failed))
+
+    # Auto-save the per-route run report so the data point is never lost. The
+    # GUI can also save a copy elsewhere; a write failure here is non-fatal.
+    if result.per_route:
+        try:
+            report_path = write_run_report(result, spec.label, auto_report_path(spec.subdir))
+            result.report_path = str(report_path)
+            events.on_log(f"Run report saved: {report_path}")
+            log.info("run report saved: %s", report_path)
+        except Exception as e:
+            log.warning("could not write run report: %s", e)
+
     return result
