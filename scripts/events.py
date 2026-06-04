@@ -48,6 +48,7 @@ class RunResult:
     empty: List[str] = field(default_factory=list)
     user_skipped: List[str] = field(default_factory=list)
     failed: List[str] = field(default_factory=list)
+    exists: List[str] = field(default_factory=list)   # already on disk from a previous run
     output_dir: str = ""
     # Ordered (route, status) for every route processed this run -- the data
     # behind the saved run report. status is one of:

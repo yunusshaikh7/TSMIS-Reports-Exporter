@@ -98,12 +98,16 @@ def run_cli(spec, title):
         print("=" * 60)
         sys.exit(1)
 
+    already = len(result.exists)
+    total = result.saved + already + len(result.empty) + len(result.user_skipped) + len(result.failed)
     print()
     print("=" * 60)
     print(f"Saved this run:  {result.saved}")
-    print(f"Empty (skipped): {len(result.empty)} {result.empty if result.empty else ''}")
+    print(f"Already had:     {already} (saved in a previous run)")
+    print(f"Empty (no data): {len(result.empty)} {result.empty if result.empty else ''}")
     print(f"Skipped by user: {len(result.user_skipped)} {result.user_skipped if result.user_skipped else ''}")
     print(f"Failed:          {len(result.failed)} {result.failed if result.failed else ''}")
+    print(f"Routes handled:  {total} of {len(ROUTES)}")
     print(f"Output folder:   {result.output_dir}")
     print("=" * 60)
 

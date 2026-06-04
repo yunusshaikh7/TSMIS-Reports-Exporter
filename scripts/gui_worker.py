@@ -32,13 +32,13 @@ class ExportWorker(threading.Thread):
         self.cancel = cancel_event
         self.skip = skip_event
         self.workers = workers              # >1 -> experimental parallel "fast mode"
-        self._tally = {"done": 0, "saved": 0, "empty": 0, "skipped": 0, "failed": 0}
+        self._tally = {"done": 0, "saved": 0, "empty": 0, "skipped": 0, "failed": 0, "exists": 0}
         self._tally_lock = threading.Lock()  # fast mode: several threads call _on_route
 
     def _on_route(self, route, status):
         with self._tally_lock:              # in fast mode this fires from many threads
             self._tally["done"] += 1
-            if status in self._tally:       # saved/empty/skipped/failed ("exists" only advances done)
+            if status in self._tally:       # saved/empty/skipped/failed/exists
                 self._tally[status] += 1
             msg = dict(self._tally)
         msg["total"] = len(ROUTES)

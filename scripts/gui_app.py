@@ -497,14 +497,17 @@ class App(tk.Tk):
     def _update_progress(self, d):
         self.progress.config(maximum=d["total"], value=d["done"])
         self.progress_route.config(text=f"Route {d['route']}   ·   {d['done']}/{d['total']}")
-        self.counts.config(text=(f"saved {d['saved']}    empty {d['empty']}    "
-                                 f"skipped {d['skipped']}    failed {d['failed']}"))
+        self.counts.config(text=(f"saved {d['saved']}   already had {d['exists']}   "
+                                 f"empty {d['empty']}   skipped {d['skipped']}   failed {d['failed']}"))
 
     def _finish_export(self, result):
         self._last_result = result
         self._last_spec = self._active_spec
+        handled = (result.saved + len(result.exists) + len(result.empty)
+                   + len(result.user_skipped) + len(result.failed))
         self.log("")
-        self.log(f"Done. Saved {result.saved}, empty {len(result.empty)}, "
+        self.log(f"Done. {handled} routes handled: saved {result.saved}, "
+                 f"already had {len(result.exists)}, empty {len(result.empty)}, "
                  f"skipped {len(result.user_skipped)}, failed {len(result.failed)}.")
         if result.failed:
             self.log(f"Failed routes: {result.failed}")

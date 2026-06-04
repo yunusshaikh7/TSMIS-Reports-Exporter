@@ -172,6 +172,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES):
                         out_path = out_dir / spec.filename(route)
                         if out_path.exists():
                             wevents.on_log(f"{prefix} already exists, skip")
+                            wr.exists.append(route)
                             _record(wr, wevents, route, "exists")
                             continue
                         # Reuse the proven per-route loop (retry/recover/record).
@@ -213,6 +214,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES):
         result.empty.extend(wr.empty)
         result.user_skipped.extend(wr.user_skipped)
         result.failed.extend(wr.failed)
+        result.exists.extend(wr.exists)
         result.per_route.extend(wr.per_route)
 
     log.info("parallel export done: saved=%d empty=%d skipped=%d failed=%d",

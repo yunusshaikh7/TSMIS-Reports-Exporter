@@ -227,6 +227,7 @@ def run_export(spec, events=None, *, routes=ROUTES):
 
                 if out_path.exists():
                     events.on_log(f"{prefix} already exists, skip")
+                    result.exists.append(route)
                     _record(result, events, route, "exists")
                     continue
 
