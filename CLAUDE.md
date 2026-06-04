@@ -86,6 +86,7 @@ launching a window. See **Build & Packaging** for details and gotchas.
 ├── 2. login (update login).bat        # captures auth session
 ├── 3. run_export (main script).bat    # auth check + menu + run chosen exporter
 ├── 4. consolidate (combine reports).bat  # menu + run chosen consolidator
+├── 5. fast export (experimental).bat  # parallel multi-browser export (sets TSMIS_FAST_WORKERS)
 ├── run app (GUI preview).bat          # dev launcher for the desktop GUI (Phase 4)
 ├── requirements.txt                   # pinned runtime deps (playwright, pdfplumber, openpyxl)
 ├── requirements-build.txt             # build deps (-r requirements.txt + pyinstaller)
@@ -96,6 +97,7 @@ launching a window. See **Build & Packaging** for details and gotchas.
 │   ├── common.py                      # URL, ROUTES, timeouts, auth + nav helpers, AuthError, preflight
 │   ├── events.py                      # Events sink + RunResult + ConsolidateResult (engine <-> UI seam)
 │   ├── exporter.py                    # shared export engine + ReportSpec + save strategies
+│   ├── exporter_parallel.py           # EXPERIMENTAL fast mode: N browsers in parallel; reuses exporter.py
 │   ├── run_report.py                  # per-route run report (CSV; auto-saved each run)
 │   ├── cli.py                         # console adapter (keeps the .bat flow working)
 │   ├── login.py                       # writes the auth file (headed browser)
@@ -286,6 +288,50 @@ Re-run later and the loop retries any routes without an output file.
 `run_export` checks `if out_path.exists(): continue` before each route, so
 re-running after an interruption safely skips already-downloaded files. Delete
 specific files from an `output/<report>/` folder to force a re-download.
+
+## Experimental Fast Mode (parallel browsers)
+
+`scripts/exporter_parallel.py` is an **experimental** speed mode that runs
+several headless browsers at once, each restoring the **same** saved session and
+pulling routes off a shared `queue.Queue` until it is empty. It is **additive**:
+the proven sequential engine (`exporter.run_export`) is untouched and remains the
+default. The per-route mechanics are **reused** from `exporter.py`
+(`_process_route`, `_record`, `_capture_failure`), so a per-report fix benefits
+both engines; only the concurrency/coordination is new.
+
+- **Self-balancing:** a shared work queue (not static shards) keeps fast workers
+  busy, so no single browser gets stuck with all the slow routes (5, 99, 101…).
+- **Same contract as the sequential engine:** returns a merged `RunResult`,
+  raises `AuthError`/`PreflightError` the same way, honors `is_cancelled()`
+  (checked between routes), skips routes whose output file already exists (so it
+  resumes), and auto-saves the run-report CSV. A single preflight runs **once**
+  before launching N browsers, so a bad session/changed site fails fast.
+- **Per-route Skip is disabled** in fast mode (ambiguous with several routes in
+  flight) — use **Cancel** to stop the whole run.
+- **Threading:** Playwright's sync API is thread-affine, so each worker owns its
+  own `sync_playwright()` + browser + context + page and never shares a
+  Playwright object across threads. Per-worker `RunResult`s are merged at the
+  end; the only locked hot-path state in the GUI is the progress tally
+  (`ExportWorker._tally_lock`).
+
+**How many browsers? (`DEFAULT_WORKERS=3`, `MAX_WORKERS=6` in
+`exporter_parallel.py`)** The bottleneck is the **shared TSMIS/Caltrans backend,
+not your PC**. Each worker is both one Chromium process (~300–500 MB under load)
+*and* one concurrent heavy report request against that one server. A modern PC
+can launch 8+ browsers, but past a handful of *concurrent reports* you hit
+diminishing returns (queries slow under contention) and more timeouts.
+Rule of thumb: **3 = polite/recommended (~2.5–3× faster), 4–5 = usually fine,
+6 = experimental cap, >6 = only if you've confirmed the server tolerates it**
+(raise `MAX_WORKERS` deliberately). Requested counts are clamped to
+`[1, MAX_WORKERS]`.
+
+**How to turn it on:**
+- **Console / .bat:** `5. fast export (experimental).bat` asks how many browsers,
+  sets the `TSMIS_FAST_WORKERS` env var, then shows the usual report menu. (Any
+  flow that runs an `export_*.py` honors `TSMIS_FAST_WORKERS`; `run_cli` routes
+  to the parallel engine when it is > 1 — the thin exporters are unchanged.)
+- **GUI:** an "⚡ Fast mode (experimental)" checkbox + worker-count spinner on the
+  Export tab; `start_export` passes the count to `ExportWorker(..., workers=N)`.
 
 ## Auth / Session Details
 

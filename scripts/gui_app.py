@@ -19,6 +19,7 @@ import gui_theme as theme
 import run_report
 from gui_theme import DOT, PALETTE
 from gui_worker import ConsolidateWorker, ExportWorker, LoginWorker
+from exporter_parallel import DEFAULT_WORKERS, MAX_WORKERS
 
 from paths import LOG_DIR, OUTPUT_ROOT
 from version import APP_NAME, __version__
@@ -69,6 +70,8 @@ class App(tk.Tk):
 
         self.export_choice = tk.IntVar(value=0)
         self.cons_choice = tk.IntVar(value=0)
+        self.fast_mode = tk.BooleanVar(value=False)        # experimental parallel export
+        self.fast_workers = tk.IntVar(value=DEFAULT_WORKERS)
 
         self._active_spec = None        # spec of the run in progress
         self._last_spec = None          # spec of the last completed export
@@ -86,12 +89,14 @@ class App(tk.Tk):
         self._inputs = [
             self.btn_login,
             self.btn_export_start, self.btn_cons_start,
+            self.fast_check,
             *self.export_radios, *self.cons_radios,
         ]
         # Run-only controls start disabled (no task is running, no result yet).
         for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel,
                   self.btn_save_report):
             w.state(["disabled"])
+        self._sync_fast_controls()             # spinner follows the fast-mode checkbox
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.refresh_auth()
@@ -136,8 +141,25 @@ class App(tk.Tk):
             rb = ttk.Radiobutton(ex, text=f"{label}   ·   {fmt}", value=i, variable=self.export_choice)
             rb.grid(row=1 + i, column=0, sticky="w")
             self.export_radios.append(rb)
+
+        # Experimental "fast mode": run several browsers at once.
+        fast = ttk.Frame(ex)
+        fast.grid(row=1 + len(EXPORT_REPORTS), column=0, sticky="w", pady=(PAD, 0))
+        self.fast_check = ttk.Checkbutton(
+            fast, text="⚡ Fast mode (experimental) — run", variable=self.fast_mode,
+            command=self._sync_fast_controls)
+        self.fast_check.grid(row=0, column=0, sticky="w")
+        self.fast_spin = ttk.Spinbox(fast, from_=2, to=MAX_WORKERS, width=3,
+                                     textvariable=self.fast_workers)
+        self.fast_spin.grid(row=0, column=1, padx=(6, 6))
+        ttk.Label(fast, text="browsers at once").grid(row=0, column=2, sticky="w")
+        ttk.Label(ex, text="Faster, but heavier on your PC and the TSMIS server. "
+                           "3–4 is recommended; per-route Skip is off in fast mode.",
+                  style="Muted.TLabel", wraplength=460, justify="left").grid(
+            row=2 + len(EXPORT_REPORTS), column=0, sticky="w", pady=(6, 0))
+
         actions = ttk.Frame(ex)
-        actions.grid(row=1 + len(EXPORT_REPORTS), column=0, sticky="w", pady=(PAD, 0))
+        actions.grid(row=3 + len(EXPORT_REPORTS), column=0, sticky="w", pady=(PAD, 0))
         self.btn_export_start = ttk.Button(actions, text="Start export", style="Accent.TButton",
                                            command=self.start_export)
         self.btn_export_start.grid(row=0, column=0)
@@ -244,6 +266,10 @@ class App(tk.Tk):
         self.counts.config(text="")
         self.progress_route.config(text="Working…")
 
+    def _sync_fast_controls(self):
+        """Enable the worker-count spinner only when fast mode is checked."""
+        self.fast_spin.state(["!disabled"] if self.fast_mode.get() else ["disabled"])
+
     def refresh_auth(self):
         try:
             require_valid_auth()
@@ -260,6 +286,7 @@ class App(tk.Tk):
         self.task = task
         for w in self._inputs:
             w.state(["disabled"])
+        self.fast_spin.state(["disabled"])     # not in _inputs; managed alongside its checkbox
         for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel,
                   self.btn_save_report):
             w.state(["disabled"])
@@ -279,6 +306,7 @@ class App(tk.Tk):
         self.task = None
         for w in self._inputs:
             w.state(["!disabled"])
+        self._sync_fast_controls()             # restore the spinner to match the checkbox
         for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel):
             w.state(["disabled"])
         # "Save run report" stays available between runs while a result exists.
@@ -294,14 +322,26 @@ class App(tk.Tk):
             messagebox.showinfo("Login needed", "Please log in first, then start the export.")
             return
         spec = EXPORT_REPORTS[self.export_choice.get()][2]
+        workers = 1
+        if self.fast_mode.get():
+            try:
+                workers = max(2, min(int(self.fast_workers.get()), MAX_WORKERS))
+            except (tk.TclError, ValueError):
+                workers = DEFAULT_WORKERS
         self._active_spec = spec
         self.cancel_event.clear()
         self.skip_event.clear()
         self._clear_progress()
-        self.log(f"Starting export: {spec.label}")
+        if workers > 1:
+            self.log(f"Starting export: {spec.label}   ·   FAST MODE ({workers} browsers)")
+        else:
+            self.log(f"Starting export: {spec.label}")
         self._set_running("export")
+        if workers > 1:
+            # Per-route Skip is meaningless with several routes in flight.
+            self.btn_export_skip.state(["disabled"])
         self.set_dot("busy", f"Exporting {spec.label}…")
-        ExportWorker(spec, self.q, self.cancel_event, self.skip_event).start()
+        ExportWorker(spec, self.q, self.cancel_event, self.skip_event, workers=workers).start()
 
     def start_consolidate(self):
         label, fn, out_path = CONSOLIDATE_REPORTS[self.cons_choice.get()]

@@ -25,19 +25,22 @@ from exporter import run_export
 class ExportWorker(threading.Thread):
     """Runs one bulk export, translating engine Events into GUI messages."""
 
-    def __init__(self, spec, queue, cancel_event, skip_event):
+    def __init__(self, spec, queue, cancel_event, skip_event, workers=1):
         super().__init__(daemon=True)
         self.spec = spec
         self.q = queue
         self.cancel = cancel_event
         self.skip = skip_event
+        self.workers = workers              # >1 -> experimental parallel "fast mode"
         self._tally = {"done": 0, "saved": 0, "empty": 0, "skipped": 0, "failed": 0}
+        self._tally_lock = threading.Lock()  # fast mode: several threads call _on_route
 
     def _on_route(self, route, status):
-        self._tally["done"] += 1
-        if status in self._tally:           # saved/empty/skipped/failed ("exists" only advances done)
-            self._tally[status] += 1
-        msg = dict(self._tally)
+        with self._tally_lock:              # in fast mode this fires from many threads
+            self._tally["done"] += 1
+            if status in self._tally:       # saved/empty/skipped/failed ("exists" only advances done)
+                self._tally[status] += 1
+            msg = dict(self._tally)
         msg["total"] = len(ROUTES)
         msg["route"] = route
         self.q.put(("progress", msg))
@@ -56,7 +59,11 @@ class ExportWorker(threading.Thread):
             is_cancelled=self.cancel.is_set,
         )
         try:
-            result = run_export(self.spec, events)
+            if self.workers and self.workers > 1:
+                from exporter_parallel import run_export_parallel  # lazy
+                result = run_export_parallel(self.spec, events, workers=self.workers)
+            else:
+                result = run_export(self.spec, events)
             self.q.put(("export_done", result))
         except AuthError as e:
             self.q.put(("error", ("auth", str(e))))
