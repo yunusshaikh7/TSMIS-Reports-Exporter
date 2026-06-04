@@ -42,6 +42,8 @@ import threading
 from playwright.sync_api import sync_playwright
 
 from common import (
+    FAST_REPORT_TIMEOUT_MS,
+    RETRY_REPORT_TIMEOUT_MS,
     ROUTES,
     AuthError,
     is_logged_in,
@@ -52,7 +54,9 @@ from common import (
     select_report,
 )
 from events import Events, RunResult
-from exporter import _capture_failure, _process_route, _record  # reuse proven mechanics
+# Reuse the proven per-route mechanics and the serial retry pass from the
+# sequential engine, so a per-report fix benefits both.
+from exporter import _capture_failure, _process_route, _record, _retry_failed_routes
 from paths import OUTPUT_ROOT
 from run_report import auto_report_path, write_run_report
 
@@ -116,7 +120,25 @@ def _preflight_once(spec, events):
             browser.close()
 
 
-def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES):
+def _retry_failed_sequential(spec, events, result, out_dir, timeout_ms):
+    """Retry the run's failed routes in a SINGLE fresh browser, one at a time.
+
+    Fast mode's failures are usually big reports that ran out of time while N
+    browsers hammered the server. Retrying them serially (no concurrent load,
+    generous timeout) is the most likely way to finally land them, and matches
+    the user's expectation that "failed reports run one at a time." Delegates the
+    per-route work to the sequential engine's shared retry helper.
+    """
+    with sync_playwright() as p:
+        browser, _ctx, page = new_authed_browser(p)
+        try:
+            _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms)
+        finally:
+            browser.close()
+
+
+def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
+                        timeout_ms=None, retry_timeout_ms=None):
     """Export `spec` for every route using several concurrent browsers.
 
     A drop-in alternative to exporter.run_export with the same contract: returns
@@ -124,10 +146,17 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES):
     events.is_cancelled() (checked between routes), and skips routes whose output
     file already exists -- so it resumes a previous run just like the sequential
     engine. Per-route SKIP is disabled in fast mode (see _worker_events).
+
+    Each worker uses a more generous per-route ceiling (FAST_REPORT_TIMEOUT_MS by
+    default) because the concurrent load slows the server. After all workers
+    finish, any routes that still failed get one serial retry in a single browser
+    (retry_timeout_ms), so a big report isn't competing with N others.
     """
     events = events or Events()
     n = resolve_worker_count(workers)
     require_valid_auth()
+    timeout_ms = timeout_ms or FAST_REPORT_TIMEOUT_MS
+    retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
 
     out_dir = OUTPUT_ROOT / spec.subdir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -176,7 +205,8 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES):
                             _record(wr, wevents, route, "exists")
                             continue
                         # Reuse the proven per-route loop (retry/recover/record).
-                        if not _process_route(page, spec, route, prefix, out_path, wevents, wr):
+                        if not _process_route(page, spec, route, prefix, out_path,
+                                              wevents, wr, timeout_ms):
                             stop.set()                       # unrecoverable -> wind down
                             break
                 finally:
@@ -219,6 +249,17 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES):
 
     log.info("parallel export done: saved=%d empty=%d skipped=%d failed=%d",
              result.saved, len(result.empty), len(result.user_skipped), len(result.failed))
+
+    # One serial, single-browser retry of whatever failed under concurrent load.
+    # Done before the run report so the CSV reflects the final outcomes.
+    if result.failed and not events.is_cancelled():
+        try:
+            _retry_failed_sequential(spec, events, result, out_dir, retry_timeout_ms)
+        except AuthError:
+            raise
+        except Exception:
+            log.exception("parallel retry pass failed")
+            events.on_log("Retry pass stopped unexpectedly (details in the log).")
 
     if result.per_route:
         try:

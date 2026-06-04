@@ -22,6 +22,7 @@ from playwright.sync_api import sync_playwright
 from common import (
     REPORT_TIMEOUT_MS,
     RETRY_COUNT,
+    RETRY_REPORT_TIMEOUT_MS,
     ROUTES,
     AuthError,
     is_logged_in,
@@ -47,13 +48,17 @@ class ReportSpec:
     filename: Callable[[str], str]          # route -> output file name
     wait_js: Callable[[str], str]           # route -> JS that resolves when ready OR empty
     is_empty: Callable[[object], bool]      # (page) -> True if the route has no data
-    save: Callable[[object, Path], None]    # (page, out_path) -> write the file
+    save: Callable[[object, Path, int], None]  # (page, out_path, timeout_ms) -> write the file
 
 
 # --- reusable save strategies -------------------------------------------------
+# All take a timeout_ms so the slower fast-mode / retry windows reach the actual
+# download wait, not just the report-generation wait.
 
-def save_pdf_letter(page, out_path):
-    """Render the current report to a Letter PDF (TSAR Ramp Summary)."""
+def save_pdf_letter(page, out_path, timeout_ms=None):
+    """Render the current report to a Letter PDF (TSAR Ramp Summary). The page is
+    already rendered, so timeout_ms is unused -- accepted for a uniform save
+    signature."""
     page.pdf(
         path=str(out_path),
         format="Letter",
@@ -62,10 +67,11 @@ def save_pdf_letter(page, out_path):
     )
 
 
-def save_via_export_button(page, out_path):
+def save_via_export_button(page, out_path, timeout_ms=None):
     """Click the report's Export button and save the resulting download
-    (TSAR Ramp Detail, Highway Sequence Listing)."""
-    with page.expect_download(timeout=REPORT_TIMEOUT_MS) as dl_info:
+    (TSAR Ramp Detail, Highway Sequence Listing). Big reports under heavy load
+    can take minutes to produce the download, so honor the caller's window."""
+    with page.expect_download(timeout=timeout_ms or REPORT_TIMEOUT_MS) as dl_info:
         page.locator("button.export-btn", has_text="Export").first.click()
     dl_info.value.save_as(str(out_path))
 
@@ -121,27 +127,30 @@ def _capture_failure(page, spec, route, events):
         log.warning("could not capture failure screenshot: %s", e)
 
 
-def _attempt_route(page, spec, route, prefix, out_path, events):
+def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     """One attempt at a route. Returns 'saved' | 'empty' | 'skipped'.
-    Raises on any failure; the caller decides whether to retry."""
+    Raises on any failure; the caller decides whether to retry. timeout_ms is the
+    hard ceiling for both the report-generation wait and the save/download."""
     page.get_by_label("Route", exact=True).select_option(route)
     page.get_by_role("button", name="Generate").click()
-    if not wait_with_skip_option(page, spec.wait_js(route), prefix, events):
+    if not wait_with_skip_option(page, spec.wait_js(route), prefix, events,
+                                 hard_timeout_ms=timeout_ms):
         return "skipped"
     if spec.is_empty(page):
         return "empty"
     page.wait_for_timeout(1000)
-    spec.save(page, out_path)
+    spec.save(page, out_path, timeout_ms)
     return "saved"
 
 
-def _process_route(page, spec, route, prefix, out_path, events, result):
+def _process_route(page, spec, route, prefix, out_path, events, result, timeout_ms):
     """Run one route, retrying once on a transient (non-timeout) error. Records
     the outcome in `result`. Returns True to keep going, False to stop the whole
-    run (unrecoverable). Raises AuthError to end the run cleanly."""
+    run (unrecoverable). Raises AuthError to end the run cleanly. timeout_ms is
+    the per-route hard ceiling (larger in fast mode and in the retry pass)."""
     for attempt in range(1 + RETRY_COUNT):
         try:
-            outcome = _attempt_route(page, spec, route, prefix, out_path, events)
+            outcome = _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms)
         except AuthError:
             raise
         except PlaywrightTimeoutError:
@@ -185,7 +194,61 @@ def _process_route(page, spec, route, prefix, out_path, events, result):
     return True
 
 
-def run_export(spec, events=None, *, routes=ROUTES):
+def _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms):
+    """Second-chance pass over routes that failed in the main run -- one at a
+    time, with a more generous per-route timeout.
+
+    Big reports under heavy server load (e.g. Highway Sequence in fast mode) can
+    blow the normal window; this gives the stragglers a slow, serial retry once
+    the rest are done. Reused by both engines (the parallel one runs it in a
+    single fresh browser, so fast-mode retries are sequential too).
+
+    Mutates `result` IN PLACE so each retried route reflects its *final* outcome:
+    the first-pass "failed" record is dropped before re-running, and a route that
+    now succeeds (or is finally empty) is re-recorded once -- no duplicate
+    run-report rows or double-counted progress. Honors is_cancelled(); raises
+    AuthError if the session dies, ending the run like the main loop.
+    """
+    to_retry = list(result.failed)
+    if not to_retry:
+        return
+
+    events.on_log(
+        f"Retrying {len(to_retry)} failed route(s) one at a time, up to "
+        f"{timeout_ms // 60_000} min each: {', '.join(to_retry)}"
+    )
+    log.info("retry pass: %d route(s): %s", len(to_retry), to_retry)
+
+    # Drop the first-pass 'failed' bookkeeping for these routes; _process_route
+    # re-records each route's final status below. Anything left unrecorded at the
+    # end (re-arm failure, cancel, unrecoverable stop) is reconciled back to
+    # 'failed' so every retried route is accounted for exactly once.
+    retry_set = set(to_retry)
+    result.failed = [r for r in result.failed if r not in retry_set]
+    result.per_route = [(r, s) for (r, s) in result.per_route if r not in retry_set]
+
+    if _recover_or_stop(page, spec, events):       # re-arm once; may raise AuthError
+        total = len(to_retry)
+        for i, route in enumerate(to_retry):
+            if events.is_cancelled():
+                break
+            prefix = f"[retry {i + 1}/{total}] Route {route}:"
+            out_path = out_dir / spec.filename(route)
+            if out_path.exists():
+                result.exists.append(route)
+                _record(result, events, route, "exists")
+                continue
+            if not _process_route(page, spec, route, prefix, out_path, events, result, timeout_ms):
+                break
+
+    recorded = {r for r, _ in result.per_route}
+    for route in to_retry:
+        if route not in recorded:
+            result.failed.append(route)
+            _record(result, events, route, "failed")
+
+
+def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeout_ms=None):
     """Export `spec` for every route. Console-free; returns a RunResult.
 
     Raises AuthError if the saved session is missing/expired, or PreflightError
@@ -194,10 +257,16 @@ def run_export(spec, events=None, *, routes=ROUTES):
     events.is_cancelled() between routes. Already-downloaded files are skipped,
     so re-running resumes where a previous run left off. A transient route error
     is retried once; a route that still fails is screenshotted to FAILURES_DIR
-    and recorded in result.failed.
+    and recorded in result.failed. After the main pass, any failed routes get one
+    slow, serial retry with `retry_timeout_ms` (see _retry_failed_routes).
+
+    timeout_ms / retry_timeout_ms override the per-route hard ceilings (defaults:
+    REPORT_TIMEOUT_MS for the main pass, RETRY_REPORT_TIMEOUT_MS for the retry).
     """
     events = events or Events()
     require_valid_auth()
+    timeout_ms = timeout_ms or REPORT_TIMEOUT_MS
+    retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
 
     out_dir = OUTPUT_ROOT / spec.subdir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -231,8 +300,18 @@ def run_export(spec, events=None, *, routes=ROUTES):
                     _record(result, events, route, "exists")
                     continue
 
-                if not _process_route(page, spec, route, prefix, out_path, events, result):
+                if not _process_route(page, spec, route, prefix, out_path, events, result, timeout_ms):
                     break
+
+            # Give routes that failed the main pass one slow, serial retry.
+            if not events.is_cancelled():
+                try:
+                    _retry_failed_routes(page, spec, events, result, out_dir, retry_timeout_ms)
+                except AuthError:
+                    raise
+                except Exception:
+                    log.exception("retry pass failed")
+                    events.on_log("Retry pass stopped unexpectedly (details in the log).")
         finally:
             browser.close()
 

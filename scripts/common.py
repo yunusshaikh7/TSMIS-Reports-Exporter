@@ -11,6 +11,7 @@ reported through an Events sink, so the same helpers back both the console
 shim (cli.py) and the future GUI.
 """
 import json
+import re
 import time
 
 try:
@@ -57,6 +58,17 @@ REPORT_TIMEOUT_MS = 360_000
 SKIP_PROMPT_AFTER_MS = 60_000
 COUNTY_ENABLE_TIMEOUT_MS = 60_000
 
+# Fast mode runs several browsers at once, so the shared TSMIS server is under a
+# heavier load and big reports (e.g. Highway Sequence) take noticeably longer to
+# render/download. Give each route a more generous ceiling there than in the
+# one-browser flow, or they time out purely because of the concurrency.
+FAST_REPORT_TIMEOUT_MS = 600_000          # 10 min per route under parallel load
+
+# Routes that still failed after the main run get one slow, serial second chance
+# (see the retry pass in exporter.py). It runs one route at a time -- so the
+# server isn't loaded by other browsers -- with the most generous window.
+RETRY_REPORT_TIMEOUT_MS = 900_000         # 15 min per route in the retry pass
+
 # Extra attempts per route after a transient (non-timeout) failure. 1 = retry
 # once before recording the route as failed. A hard timeout is NOT retried (the
 # user already had a skip window during the wait).
@@ -84,6 +96,52 @@ ROUTES = [
     "284","299","330","371","380","395","405","505","580","605","680","710","780",
     "805","880","880S","905","980",
 ]
+
+_ROUTES_SET = set(ROUTES)
+
+
+def normalize_route(token):
+    """Normalize one user-typed route token to its canonical ROUTES form.
+
+    Accepts loose input -- any casing or zero-padding, with an optional letter
+    suffix -- so '5', '05', '005', '5s', and '005S' all map to their canonical
+    spelling ('005', '005S'). Returns the canonical route string if it matches a
+    known route, else None.
+    """
+    t = token.strip().upper()
+    m = re.fullmatch(r"(\d+)([A-Z]*)", t)
+    if not m:
+        return None
+    digits, suffix = m.groups()
+    candidate = f"{int(digits):03d}{suffix}"
+    return candidate if candidate in _ROUTES_SET else None
+
+
+def parse_routes(text):
+    """Parse free-text into a validated route list in canonical ROUTES order.
+
+    Routes may be separated by commas, spaces, semicolons, or newlines, in any
+    casing or zero-padding ('5', '005', '5s', '005S'). Returns the matched
+    routes de-duplicated and ordered as in ROUTES (so export order stays stable
+    regardless of how the user typed them).
+
+    Raises ValueError -- with a user-safe, UI-neutral message -- if no routes
+    were given or if any token doesn't match a known route. Callers decide
+    whether "no input" should instead mean "all routes" before calling this.
+    """
+    tokens = [t for t in re.split(r"[\s,;]+", text.strip()) if t]
+    if not tokens:
+        raise ValueError("No routes entered.")
+    chosen, unknown = set(), []
+    for tok in tokens:
+        norm = normalize_route(tok)
+        if norm is None:
+            unknown.append(tok)
+        else:
+            chosen.add(norm)
+    if unknown:
+        raise ValueError("Not valid route(s): " + ", ".join(unknown))
+    return [r for r in ROUTES if r in chosen]
 
 
 def clear_auth():

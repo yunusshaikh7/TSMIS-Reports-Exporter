@@ -54,7 +54,8 @@ echo ================================================================
 echo      TSMIS Reports - FAST MODE  (%TSMIS_FAST_WORKERS% browsers at once)
 echo ================================================================
 echo.
-echo  Which report do you want to export for ALL routes?
+echo  Which report do you want to export?
+echo  After choosing, you'll pick which routes - all, or just some.
 echo.
 echo     1.  TSAR: Ramp Summary        (PDF  -^> output\ramp_summary\)
 echo     2.  TSAR: Ramp Detail         (XLSX -^> output\ramp_detail\)
