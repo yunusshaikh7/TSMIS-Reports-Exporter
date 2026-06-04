@@ -20,3 +20,17 @@ output/consolidated/*
 __pycache__/
 *.pyc
 .venv/
+
+# Build artifacts (portable onefolder packaging). Keep build\*.spec, build.ps1
+# and build\smoke_entry.py tracked; ignore the heavy generated pieces.
+/dist/
+build/ms-playwright/
+build/pyi-work/
+
+# Phase 1 packaging spike (throwaway -- superseded by build/)
+spike/
+
+# Runtime diagnostics written next to the app (dev: repo root). The rotating
+# log and per-failure screenshots/HTML are local artifacts, never committed.
+/logs/
+/failures/

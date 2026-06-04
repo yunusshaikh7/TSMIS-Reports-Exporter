@@ -2,51 +2,65 @@
 
 Keeps one copy of: the report URL, the route list, auth file location,
 auth validation, and the Playwright navigation helpers. Report-specific
-logic (which report to pick, how to save the result) lives in the
-individual export_*.py scripts so bugs in one report do not affect the
+logic (which report to pick, how to save the result) lives in ReportSpec
+objects (see exporter.py) so a change to one report does not affect the
 others.
+
+This module is console-free: auth problems raise AuthError and progress is
+reported through an Events sink, so the same helpers back both the console
+shim (cli.py) and the future GUI.
 """
 import json
-import sys
 import time
-from pathlib import Path
 
 try:
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 except ImportError:
     PlaywrightTimeoutError = Exception  # only hit if Playwright isn't installed yet
 
-try:
-    import msvcrt  # Windows: lets us read keystrokes without blocking
-    _HAS_KEYBOARD = True
-except ImportError:
-    _HAS_KEYBOARD = False
+
+class AuthError(Exception):
+    """Raised when the saved TSMIS session is missing, expired, or corrupt.
+
+    The core raises this; the caller (the console shim in cli.py, or the GUI)
+    decides how to tell the user and whether to clear the stale file.
+    """
+
+
+class PreflightError(Exception):
+    """Raised when the TSMIS page doesn't look as expected before a run (likely
+    a site change). Its message is user-safe and UI-neutral, so callers can show
+    it as-is."""
+
 
 URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
 
-# All export scripts share this auth file. login.py writes it; the
-# export scripts read it. Lives in scripts/ so it stays next to the
-# code that uses it and is easy to .gitignore.
-AUTH = Path(__file__).parent / "tsmis_auth.json"
-
-# Output root. Each report writes into its own subfolder under here
-# (e.g. output/ramp_summary/, output/ramp_detail/).
-OUTPUT_ROOT = Path(__file__).parent.parent / "output"
+# The shared auth file path is resolved by paths.py, which is frozen-aware: in
+# the packaged build it lives next to the .exe (auto-falling back to
+# %LOCALAPPDATA% if that folder is read-only); in the dev / .bat workflow it
+# stays at scripts/tsmis_auth.json. Re-exported here for login.py and cli.py.
+# (Output paths also come from paths.py, imported directly by the exporter and
+# consolidators.)
+from paths import AUTH
 
 # Timeouts (milliseconds). Increase these if reports are timing out.
 #
 #   REPORT_TIMEOUT_MS      Hard ceiling for a single route to render or
 #                          download. Some routes (e.g. Route 5 Ramp Detail)
 #                          legitimately take minutes, so this is generous.
-#   SKIP_PROMPT_AFTER_MS   How long to wait before telling the user they
-#                          can press 'S' to skip a slow route. The hard
-#                          timeout still applies; this is just the soft
-#                          "second timer" that opens the escape hatch.
+#   SKIP_PROMPT_AFTER_MS   How long to wait before the soft "still working"
+#                          status fires and the skip escape-hatch opens. The
+#                          hard timeout still applies independently.
 #   COUNTY_ENABLE_TIMEOUT_MS  Wait for the County dropdown to enable after
 #                          District is set.
 REPORT_TIMEOUT_MS = 360_000
 SKIP_PROMPT_AFTER_MS = 60_000
 COUNTY_ENABLE_TIMEOUT_MS = 60_000
+
+# Extra attempts per route after a transient (non-timeout) failure. 1 = retry
+# once before recording the route as failed. A hard timeout is NOT retried (the
+# user already had a skip window during the wait).
+RETRY_COUNT = 1
 
 ROUTES = [
     "001","002","003","004","005","005S","006","007","008","008U","009","010","010S",
@@ -72,37 +86,26 @@ ROUTES = [
 ]
 
 
-def handle_bad_auth(reason):
-    """Delete stale auth file and tell the user what to do."""
-    print()
-    print("=" * 60)
-    print("LOGIN PROBLEM")
-    print("=" * 60)
-    print(f"Reason: {reason}")
-    print()
+def clear_auth():
+    """Delete the stale auth file. Returns True if a file was removed."""
     if AUTH.exists():
         try:
             AUTH.unlink()
-            print(f"Deleted stale session file: {AUTH.name}")
-        except Exception as e:
-            print(f"Could not delete {AUTH.name}: {e}")
-            print("Please delete it manually.")
-    print()
-    print('Next step:  Close this window, then run  "2. login (update login).bat"')
-    print("=" * 60)
-    input("\nPress Enter to exit...")
-    sys.exit(1)
+            return True
+        except OSError:
+            return False
+    return False
 
 
 def require_valid_auth():
-    """Exit with guidance if the auth file is missing or corrupt."""
+    """Raise AuthError if the saved session is missing or corrupt."""
     if not AUTH.exists():
-        handle_bad_auth("No saved session file found.")
+        raise AuthError("No saved session file found.")
     try:
         with open(AUTH, "r", encoding="utf-8") as f:
             json.load(f)
     except (json.JSONDecodeError, OSError) as e:
-        handle_bad_auth(f"Session file is corrupted ({type(e).__name__}).")
+        raise AuthError(f"Session file is corrupted ({type(e).__name__}).")
 
 
 def navigate_with_auth(page):
@@ -139,37 +142,43 @@ def select_report(page, report_label):
     page.locator("#districtCountySelect").select_option(label="-- ALL --")
 
 
-def _drain_skip_key():
-    """Return True if any pending keystroke is 'S' (case-insensitive).
+def preflight(page, report_label):
+    """Confirm the report form looks as expected before a long run.
 
-    Windows-only via msvcrt. On other platforms always returns False —
-    the user can still Ctrl+C, just not soft-skip a route.
+    Selects the report, then verifies the Route control and Generate button are
+    present. Raises PreflightError (UI-neutral message) if anything is missing,
+    so a TSMIS change fails fast with one clear error instead of every route
+    failing cryptically.
     """
-    if not _HAS_KEYBOARD:
-        return False
-    pressed_s = False
-    while msvcrt.kbhit():
-        try:
-            ch = msvcrt.getwch()
-        except Exception:
-            ch = ""
-        if ch and ch.lower() == "s":
-            pressed_s = True
-    return pressed_s
+    if page.locator("#customReport").count() == 0:
+        raise PreflightError(
+            "The TSMIS report list didn't load as expected — the page may have "
+            "changed. Please contact the maintainer."
+        )
+    try:
+        select_report(page, report_label)
+        page.get_by_label("Route", exact=True).wait_for(state="attached", timeout=15000)
+        page.get_by_role("button", name="Generate").wait_for(state="attached", timeout=15000)
+    except Exception as e:
+        raise PreflightError(
+            "The TSMIS page looks different than expected — it may have changed. "
+            "Please contact the maintainer."
+        ) from e
 
 
-def wait_with_skip_option(page, js_condition, prefix,
+def wait_with_skip_option(page, js_condition, prefix, events,
                           hard_timeout_ms=None,
                           skip_prompt_after_ms=None):
     """Wait for a JS condition with a hard ceiling and a user-skip escape.
 
     Polls page.wait_for_function in short chunks so we can:
-      - check for a keyboard skip request ('S' on Windows),
-      - print a "still working" status once the soft timer fires,
-      - and enforce a hard timeout that is independent of the skip prompt.
+      - honor a skip request (events.should_skip() -> 'S' in the console,
+        a Skip button in the GUI),
+      - emit a "still working" status (events.on_log) once the soft timer fires,
+      - and enforce a hard timeout independent of the skip prompt.
 
-    Returns True when the condition matched, False if the user pressed 'S'
-    to skip. Raises PlaywrightTimeoutError when the hard timeout elapses.
+    Returns True when the condition matched, False if the user asked to skip.
+    Raises PlaywrightTimeoutError when the hard timeout elapses.
     """
     if hard_timeout_ms is None:
         hard_timeout_ms = REPORT_TIMEOUT_MS
@@ -184,8 +193,8 @@ def wait_with_skip_option(page, js_condition, prefix,
     next_status = 0.0
 
     while True:
-        if _drain_skip_key():
-            print(f"  {prefix} skipped (user pressed 'S')")
+        if events.should_skip():
+            events.on_log(f"  {prefix} skipped by user")
             return False
 
         now = time.monotonic()
@@ -199,36 +208,33 @@ def wait_with_skip_option(page, js_condition, prefix,
             page.wait_for_function(js_condition, timeout=chunk)
             return True
         except PlaywrightTimeoutError:
-            pass  # not done yet — fall through and re-check skip / deadline
+            pass  # not done yet -- fall through and re-check skip / deadline
 
         now = time.monotonic()
         if not prompted and now >= prompt_at:
             elapsed = int(now - start)
             remaining = int(hard_deadline - now)
-            if _HAS_KEYBOARD:
-                print(
-                    f"  {prefix} still working ({elapsed}s elapsed; "
-                    f"up to {remaining}s left). Press 'S' to skip this route."
-                )
-            else:
-                print(
-                    f"  {prefix} still working ({elapsed}s elapsed; "
-                    f"up to {remaining}s left)."
-                )
+            events.on_log(
+                f"  {prefix} still working ({elapsed}s elapsed; "
+                f"up to {remaining}s left) -- you can skip this route"
+            )
             prompted = True
             next_status = now + 30
         elif prompted and now >= next_status:
-            print(f"  {prefix} still working ({int(now - start)}s)...")
+            events.on_log(f"  {prefix} still working ({int(now - start)}s)...")
             next_status = now + 30
 
 
 def new_authed_browser(p):
     """Launch a headless Chromium with the saved auth restored.
 
-    Returns (browser, context, page). Caller is responsible for browser.close().
+    Uses channel="chromium" (full Chromium, new headless mode) so the packaged
+    build does not need to bundle a separate chrome-headless-shell. Returns
+    (browser, context, page). Caller is responsible for browser.close().
     """
     browser = p.chromium.launch(
         headless=True,
+        channel="chromium",
         args=[
             "--disable-features=LocalNetworkAccessChecksWarnings",
             "--enable-features=LocalNetworkAccessChecks",

@@ -1,0 +1,9 @@
+# Runtime dependencies for TSMIS Reports Exporter (pinned for reproducible builds).
+#
+# IMPORTANT: Playwright's bundled Chromium revision is tied to the Playwright
+# version. 1.60.0 -> Chromium rev 1223 (Chrome for Testing 148.0.7778.96).
+# When you bump Playwright, re-bundle the matching Chromium -- build\build.ps1
+# does this automatically.
+playwright==1.60.0
+pdfplumber==0.11.9
+openpyxl==3.1.5

@@ -13,7 +13,6 @@ change in one report cannot break another.
 """
 import logging
 import re
-import sys
 from pathlib import Path
 
 # pdfplumber wraps pdfminer.six, which logs a "Could not get FontBBox from
@@ -23,24 +22,24 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 try:
     import pdfplumber
-except ImportError:
-    print('ERROR: pdfplumber is not installed. Run "1. setup (one time).bat" first.')
-    sys.exit(1)
-
-try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
     from openpyxl.formatting.rule import CellIsRule
+    _DEPS_OK = True
 except ImportError:
-    print('ERROR: openpyxl is not installed. Run "1. setup (one time).bat" first.')
-    sys.exit(1)
+    _DEPS_OK = False
 
-from common import OUTPUT_ROOT
+from paths import OUTPUT_ROOT
+from events import Events, ConsolidateResult
 
 INPUT_DIR = OUTPUT_ROOT / "ramp_summary"
 OUT_DIR = OUTPUT_ROOT / "consolidated"
 OUT_PATH = OUT_DIR / "tsar_ramp_summary_consolidated.xlsx"
+
+# Friendly report name for user-facing messages (shown in both the GUI and
+# the console, so keep these UI-neutral -- no ".bat" / "menu option" wording).
+REPORT_NAME = "Ramp Summary"
 
 
 # =============================================================================
@@ -332,9 +331,9 @@ GROUPS = [
     ]),
 ]
 
-THIN = Side(style="thin", color="CCCCCC")
-BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
-HEADER_FILL = PatternFill("solid", start_color="305496")
+# NOTE: openpyxl style objects (THIN/BORDER/HEADER_FILL) are built inside
+# build_workbook, not here, so importing this module never touches openpyxl --
+# the GUI can import it even if a dep is missing and get a clean error result.
 GROUP_FILLS = {
     "Source":            "4472C4",
     "Highway Groups":    "70AD47",
@@ -530,6 +529,10 @@ def build_combined_sheet(wb, records, col_letters):
 
 def build_workbook(records, out_path):
     """Write a styled, audited workbook with one row per record."""
+    THIN = Side(style="thin", color="CCCCCC")
+    BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+    HEADER_FILL = PatternFill("solid", start_color="305496")
+
     wb = Workbook()
     ws = wb.active
     ws.title = "TSAR Ramps Summary"
@@ -645,82 +648,82 @@ def build_workbook(records, out_path):
 # Entry point
 # =============================================================================
 
-def confirm_overwrite(path):
-    """Ask the user whether to overwrite an existing consolidated workbook.
+def consolidate(events=None, confirm_overwrite=None):
+    """Parse every per-route Ramp Summary PDF into one audited workbook.
 
-    Returns True if the user agreed (Y/yes), False otherwise. Exits early
-    via sys.exit(0) on EOF so double-clicking the BAT and immediately
-    closing the window doesn't look like a crash.
+    Console-free: reports progress via events.on_log, asks before overwriting
+    through the confirm_overwrite(path)->bool callback, and returns a
+    ConsolidateResult. Honors events.is_cancelled() between files.
     """
-    print()
-    print("A consolidated workbook already exists at:")
-    print(f"   {path}")
-    try:
-        ans = input("Overwrite it? [Y/N]: ").strip().lower()
-    except EOFError:
-        print("\nCancelled.")
-        sys.exit(0)
-    return ans in ("y", "yes")
+    events = events or Events()
+    if not _DEPS_OK:
+        return ConsolidateResult(
+            status="error",
+            message="Required components are missing (pdfplumber, openpyxl).",
+        )
+    confirm = confirm_overwrite or (lambda _p: True)
 
-
-def main():
     if not INPUT_DIR.exists():
-        print(f"ERROR: Input folder is missing: {INPUT_DIR}")
-        print('Run "3. run_export (main script).bat" and pick option 1 first.')
-        sys.exit(1)
+        return ConsolidateResult(
+            status="error",
+            message=(f"The {REPORT_NAME} output folder doesn't exist yet:\n{INPUT_DIR}\n\n"
+                     f"Export the {REPORT_NAME} report first, then consolidate."),
+        )
 
     pdfs = sorted(INPUT_DIR.glob("*.pdf"))
     if not pdfs:
-        print(f"ERROR: No PDFs found in {INPUT_DIR}")
-        print('Run "3. run_export (main script).bat" and pick option 1 first.')
-        sys.exit(1)
+        return ConsolidateResult(
+            status="error",
+            message=(f"No {REPORT_NAME} files were found in:\n{INPUT_DIR}\n\n"
+                     f"Export the {REPORT_NAME} report first, then consolidate."),
+        )
 
-    # Confirm overwrite *before* spending time parsing PDFs — and surface
-    # the "file is open in Excel" case as a clear message rather than a
-    # raw PermissionError from openpyxl.save().
-    if OUT_PATH.exists():
-        if not confirm_overwrite(OUT_PATH):
-            print("Cancelled. Existing file kept.")
-            sys.exit(0)
+    # Confirm overwrite *before* spending time parsing PDFs.
+    if OUT_PATH.exists() and not confirm(OUT_PATH):
+        return ConsolidateResult(status="cancelled",
+                                 message="Cancelled. Existing file kept.")
 
-    print("=" * 60)
-    print(f"TSAR Ramp Summary Consolidation - {len(pdfs)} file(s)")
-    print("=" * 60)
-    print()
+    events.on_log("=" * 60)
+    events.on_log(f"TSAR Ramp Summary Consolidation - {len(pdfs)} file(s)")
+    events.on_log("=" * 60)
+    events.on_log("")
 
     records = []
     failed = []
     for i, p in enumerate(pdfs, 1):
+        if events.is_cancelled():
+            return ConsolidateResult(status="cancelled", message="Cancelled by user.")
         prefix = f"[{i:>3}/{len(pdfs)}] {p.name}"
         try:
             records.append(parse_pdf(str(p)))
-            print(f"{prefix} parsed")
+            events.on_log(f"{prefix} parsed")
         except Exception as e:
-            print(f"{prefix} FAILED ({type(e).__name__}): {e}")
+            events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
             failed.append(p.name)
 
-    print()
-    print("Writing consolidated workbook...")
+    events.on_log("")
+    events.on_log("Writing consolidated workbook...")
     try:
         build_workbook(records, OUT_PATH)
     except PermissionError:
-        print()
-        print("=" * 60)
-        print(f"ERROR: Could not write {OUT_PATH.name}.")
-        print()
-        print("This usually means the file is open in Excel. Close it")
-        print("there and run this consolidator again. (None of the input")
-        print("PDFs were modified.)")
-        print("=" * 60)
-        sys.exit(1)
+        return ConsolidateResult(
+            status="error",
+            message=(f"Could not save {OUT_PATH.name}.\n\n"
+                     "The file is probably open in Excel. Close it and try again.\n"
+                     "(Your exported files were not changed.)"),
+        )
 
-    print()
-    print("=" * 60)
-    print(f"Parsed:      {len(records)}")
-    print(f"Failed:      {len(failed)} {failed if failed else ''}")
-    print(f"Output file: {OUT_PATH}")
-    print("=" * 60)
+    return ConsolidateResult(
+        status="ok",
+        output_path=str(OUT_PATH),
+        summary_lines=[
+            f"Parsed:      {len(records)}",
+            f"Failed:      {len(failed)} {failed if failed else ''}",
+            f"Output file: {OUT_PATH}",
+        ],
+    )
 
 
 if __name__ == "__main__":
-    main()
+    from cli import run_consolidate_cli
+    run_consolidate_cli(consolidate)
