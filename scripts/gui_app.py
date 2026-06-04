@@ -319,7 +319,6 @@ class App(tk.Tk):
         dlg = tk.Toplevel(self)
         dlg.title("Choose routes")
         dlg.transient(self)
-        dlg.geometry("300x440")
         dlg.columnconfigure(0, weight=1)
         dlg.rowconfigure(1, weight=1)
 
@@ -328,7 +327,7 @@ class App(tk.Tk):
                   wraplength=280, justify="left").grid(
             row=0, column=0, columnspan=2, sticky="w", padx=PAD, pady=(PAD, 6))
 
-        lb = tk.Listbox(dlg, selectmode="extended", activestyle="none",
+        lb = tk.Listbox(dlg, selectmode="extended", activestyle="none", height=18,
                         bg=PALETTE["log_bg"], fg=PALETTE["log_fg"], font=self.fonts["mono"],
                         highlightthickness=0, borderwidth=1, relief="solid")
         lb.grid(row=1, column=0, sticky="nsew", padx=(PAD, 0))
@@ -366,6 +365,11 @@ class App(tk.Tk):
         ttk.Button(bar, text="OK", style="Accent.TButton",
                    command=apply_and_close).grid(row=0, column=3, padx=(6, 0))
 
+        # Open at the size the content needs -- the four-button bar is wider than
+        # the list -- and keep that as the minimum so the buttons can't be
+        # clipped or shrunk out of view.
+        dlg.update_idletasks()
+        dlg.minsize(dlg.winfo_reqwidth(), dlg.winfo_reqheight())
         dlg.grab_set()
 
     # ---- elapsed-run timer (shown beneath the progress bar) ------------------
