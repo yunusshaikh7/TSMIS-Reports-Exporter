@@ -59,18 +59,18 @@ This repo combines the previously separate
 | A | Trim bundle to full-Chromium-only (~581 MB onefolder) | ✅ done |
 | 0 | Reproducible build infra (`build/`, pinned reqs, `version.py`) | ✅ done |
 | 2 | Frozen-aware paths (`scripts/paths.py`, option A) | ✅ done |
-| 3a | Decouple export engine from console (`events`/`exporter`/`cli`) | ✅ done — **live TSMIS test pending** |
+| 3a | Decouple export engine from console (`events`/`exporter`/`cli`) | ✅ done — **live-verified** |
 | 3b | Make the 3 consolidators importable (return results, no `print`/`exit`) | ⬜ **next** |
 | 4 | Build the GUI on the decoupled core | ⬜ |
 | 5 | Reliability (logging, failure screenshots, preflight, retry) | ⬜ |
 | 6 | Package the real GUI app + zip; optional code-signing | ⬜ |
 
-**⚠ Pending verification:** Phase 3a was checked by unit-level tests (every
-module imports; generated `wait_js`/filenames are byte-identical to the
-originals; `AuthError` is raised before any browser launches) but **NOT** by a
-live export against TSMIS, which needs an SSO+MFA login. Before trusting 3a,
-run `3. run_export (main script).bat`, log in, and confirm a few routes export
-for each report type.
+**✓ Live-verified:** Phase 3a passed a live export against TSMIS — logged in via
+SSO+MFA through `2. login (update login).bat`, then ran
+`3. run_export (main script).bat` and confirmed routes export for each report
+type. This is in addition to the unit-level checks (every module imports;
+generated `wait_js`/filenames are byte-identical to the originals; `AuthError`
+is raised before any browser launches).
 
 **Build the portable app:** from the repo root run
 `powershell -ExecutionPolicy Bypass -File build\build.ps1`. See the
