@@ -76,6 +76,8 @@ class App(tk.Tk):
         self._active_spec = None        # spec of the run in progress
         self._last_spec = None          # spec of the last completed export
         self._last_result = None        # its RunResult (enables "Save run report")
+        self._run_start = None          # monotonic start of the current run (elapsed timer)
+        self._timer_job = None          # after() id for the 1 Hz elapsed-time ticker
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(3, weight=1)         # log row expands
@@ -213,6 +215,8 @@ class App(tk.Tk):
         self.counts.grid(row=0, column=1, sticky="e")
         self.progress = ttk.Progressbar(f, mode="determinate")
         self.progress.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self.elapsed = ttk.Label(f, text="", style="Muted.TLabel")
+        self.elapsed.grid(row=2, column=0, columnspan=2, sticky="w", pady=(2, 0))
 
     def _build_log(self):
         f = ttk.Frame(self, padding=(PAD, PAD))
@@ -270,6 +274,35 @@ class App(tk.Tk):
         """Enable the worker-count spinner only when fast mode is checked."""
         self.fast_spin.state(["!disabled"] if self.fast_mode.get() else ["disabled"])
 
+    # ---- elapsed-run timer (shown beneath the progress bar) ------------------
+
+    @staticmethod
+    def _fmt_elapsed(seconds):
+        seconds = int(seconds)
+        h, rem = divmod(seconds, 3600)
+        m, s = divmod(rem, 60)
+        return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+    def _start_timer(self):
+        self._run_start = time.monotonic()
+        self.elapsed.config(text="Elapsed  00:00")
+        self._tick_timer()
+
+    def _tick_timer(self):
+        if self._run_start is None:
+            return
+        self.elapsed.config(text=f"Elapsed  {self._fmt_elapsed(time.monotonic() - self._run_start)}")
+        self._timer_job = self.after(1000, self._tick_timer)   # re-schedule each second
+
+    def _stop_timer(self):
+        """Cancel the ticker and freeze the label on the final elapsed time."""
+        if self._timer_job is not None:
+            self.after_cancel(self._timer_job)
+            self._timer_job = None
+        if self._run_start is not None:
+            self.elapsed.config(text=f"Elapsed  {self._fmt_elapsed(time.monotonic() - self._run_start)}")
+            self._run_start = None
+
     def refresh_auth(self):
         try:
             require_valid_auth()
@@ -298,8 +331,10 @@ class App(tk.Tk):
             self.btn_cons_cancel.state(["!disabled"])
             self.progress.config(mode="indeterminate")
             self.progress.start(12)
+        self._start_timer()
 
     def _end_task(self):
+        self._stop_timer()
         if str(self.progress.cget("mode")) == "indeterminate":
             self.progress.stop()
         self.progress.config(mode="determinate", value=0)
@@ -522,4 +557,5 @@ class App(tk.Tk):
         self.cancel_event.set()
         self.login_cancel.set()
         self.login_done.set()
+        self._stop_timer()                     # cancel the pending ticker before teardown
         self.destroy()
