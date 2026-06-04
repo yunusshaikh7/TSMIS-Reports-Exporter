@@ -61,8 +61,8 @@ This repo combines the previously separate
 | 2 | Frozen-aware paths (`scripts/paths.py`, option A) | ✅ done |
 | 3a | Decouple export engine from console (`events`/`exporter`/`cli`) | ✅ done — **live-verified** |
 | 3b | Make the 3 consolidators importable (return results, no `print`/`exit`) | ✅ done |
-| 4 | Build the GUI on the decoupled core | ⬜ **next** |
-| 5 | Reliability (logging, failure screenshots, preflight, retry) | ⬜ |
+| 4 | Build the GUI on the decoupled core | 🟡 built — **visual/live test pending** |
+| 5 | Reliability (logging, failure screenshots, preflight, retry) | ⬜ **next** |
 | 6 | Package the real GUI app + zip; optional code-signing | ⬜ |
 
 **✓ Live-verified:** Phase 3a passed a live export against TSMIS — logged in via
@@ -84,6 +84,7 @@ is raised before any browser launches).
 ├── 2. login (update login).bat        # captures auth session
 ├── 3. run_export (main script).bat    # auth check + menu + run chosen exporter
 ├── 4. consolidate (combine reports).bat  # menu + run chosen consolidator
+├── run app (GUI preview).bat          # dev launcher for the desktop GUI (Phase 4)
 ├── requirements.txt                   # pinned runtime deps (playwright, pdfplumber, openpyxl)
 ├── requirements-build.txt             # build deps (-r requirements.txt + pyinstaller)
 ├── version.py                         # app name/version + pinned Playwright/Chromium rev
@@ -99,7 +100,11 @@ is raised before any browser launches).
 │   ├── export_highway_sequence.py     # thin: a ReportSpec (XLSX download) + run_cli
 │   ├── consolidate_ramp_summary.py    # PDFs  -> one XLSX (audit cols); importable consolidate()
 │   ├── consolidate_ramp_detail.py     # XLSXs -> one XLSX (adds Route);  importable consolidate()
-│   └── consolidate_highway_sequence.py # XLSXs -> one XLSX (adds Route);  importable consolidate()
+│   ├── consolidate_highway_sequence.py # XLSXs -> one XLSX (adds Route);  importable consolidate()
+│   ├── gui_main.py                    # GUI entry point (sets browser path, launches App)
+│   ├── gui_app.py                     # main window (Tk): header, Export/Consolidate tabs, log
+│   ├── gui_worker.py                  # worker threads: Export/Consolidate/Login (Events -> queue)
+│   └── gui_theme.py                   # palette/fonts/ttk styles (clam base)
 ├── build/                             # portable-build infra (Phase 0)
 │   ├── build.ps1                      # one-command reproducible onefolder build
 │   ├── app.spec                       # PyInstaller spec (bundles Chromium + pdf/excel)
@@ -215,6 +220,25 @@ and raises `AuthError` on session problems.
   dependency is missing — the GUI gets a clean error `ConsolidateResult` instead
   of a fatal `ImportError`. Still one self-contained file per report (no shared
   parser helpers).
+
+**GUI (Phase 4) — `scripts/gui_*.py`** (built on the same console-free core):
+- `gui_main.py` — entry point. Sets `PLAYWRIGHT_BROWSERS_PATH` when frozen and
+  the dev import paths, then runs `App().mainloop()`.
+- `gui_app.py` — the `App(tk.Tk)` window: header (session dot + Log in button),
+  an Export/Consolidate **notebook**, a shared progress bar + counts + log pane,
+  and a footer (output path + Open folder). Drains the worker queue via
+  `after(100)`; it never does browser/file work itself.
+- `gui_worker.py` — `ExportWorker` / `ConsolidateWorker` / `LoginWorker` threads.
+  They drive the engines through `Events`, posting `(kind, payload)` messages to
+  a `queue.Queue`. Skip/Cancel are `threading.Event`s; login waits on a `done`
+  event set by the "I've finished logging in" button (replacing `login.py`'s
+  console `input()`s).
+- `gui_theme.py` — palette, fonts, ttk styles (clam base). One place to restyle.
+
+**Threading rule:** Playwright's sync API is thread-affine, so *all* browser work
+runs on a worker thread; only the main thread touches Tk. Workers talk to the UI
+exclusively through the queue. Launch the GUI in dev with
+`run app (GUI preview).bat` (or `python scripts\gui_main.py`).
 
 **Why a shared loop now?** The old design kept a full copy of the loop in each
 `export_*.py` to isolate report bugs. The refactor preserves that isolation by
@@ -342,8 +366,11 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
   `chromium-*` folder exists. After bumping the Playwright pin, **delete
   `build\ms-playwright`** so the matching Chromium re-downloads. (Hardening
   idea: key the check on `version.py`'s `CHROMIUM_REVISION`.)
-- **Entry point:** currently `TSMIS_ENTRY=build\smoke_entry.py` (a self-test).
-  Phase 4 will point it at the GUI entry and set `TSMIS_CONSOLE=0` (windowed).
+- **Entry point (Phase 6):** switch `build.ps1` to
+  `TSMIS_ENTRY=scripts\gui_main.py` and `TSMIS_CONSOLE=0` (windowed). The GUI
+  imports the flat `scripts/` modules **and** the repo-root `version.py`, so add
+  **both** `scripts\` and the repo root to the spec's `pathex` (or PyInstaller
+  won't find `version`). Tkinter is collected by PyInstaller automatically.
 - **AV / SmartScreen:** the unsigned `.exe` will trip SmartScreen on first run.
   Code-signing (Phase 6) is the fix; otherwise tell users to "unblock" the
   downloaded zip (right-click → Properties → Unblock) before extracting.
