@@ -1,0 +1,75 @@
+"""Frozen-aware filesystem paths for TSMIS Reports Exporter.
+
+One place that decides WHERE the app reads and writes, so the rest of the
+code never has to care whether it is running as a dev script or as the
+packaged portable .exe.
+
+Policy ("portable by default, never break"):
+  * Packaged build (sys.frozen): write next to the .exe -- the intuitive
+    "my reports are right here in the folder" model. If that folder is not
+    writable (e.g. unzipped into Program Files or a read-only network share),
+    fall back automatically to %LOCALAPPDATA%\\TSMIS Exporter so the app
+    still runs. Callers should surface DATA_ROOT in the UI so the rare
+    fallback is never a mystery.
+  * Dev / .bat workflow (not frozen): keep the original locations
+    (./output and scripts/tsmis_auth.json) so the existing scripts and
+    batch files behave exactly as before.
+"""
+import os
+import sys
+from pathlib import Path
+
+APP_NAME = "TSMIS Exporter"
+
+
+def is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def _writable(directory: Path) -> bool:
+    """True if we can create a file in `directory` (creating it if needed)."""
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        probe = directory / ".write_test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _localappdata_dir() -> Path:
+    base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
+    return Path(base) / APP_NAME
+
+
+def _resolve_data_root() -> Path:
+    """Base directory for everything the app writes."""
+    if is_frozen():
+        exe_dir = Path(sys.executable).resolve().parent   # the onefolder app dir
+        if _writable(exe_dir):
+            return exe_dir
+        fallback = _localappdata_dir()                     # read-only location
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+    # Dev: repo root (this file lives in scripts/), preserving today's layout.
+    return Path(__file__).resolve().parent.parent
+
+
+# Resolved once at import time.
+DATA_ROOT = _resolve_data_root()
+
+# Exported reports: each report writes into its own subfolder under here.
+OUTPUT_ROOT = DATA_ROOT / "output"
+
+# App-private data (auth token, logs, config).
+if is_frozen():
+    _PRIVATE = DATA_ROOT / "data"
+    AUTH = _PRIVATE / "tsmis_auth.json"
+else:
+    # Keep the original dev auth location so the .bat workflow is unchanged.
+    _PRIVATE = DATA_ROOT
+    AUTH = Path(__file__).resolve().parent / "tsmis_auth.json"   # scripts/tsmis_auth.json
+
+LOG_DIR = _PRIVATE / "logs"
+CONFIG_FILE = _PRIVATE / "config.json"
