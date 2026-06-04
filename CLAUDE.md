@@ -187,8 +187,8 @@ and raises `AuthError` on session problems.
   timeout constants, `AuthError`, `clear_auth()`, `require_valid_auth()`
   (raises `AuthError`), `navigate_with_auth`, `is_logged_in`, `select_report`,
   `wait_with_skip_option(page, js, prefix, events, ...)`, `new_authed_browser`
-  (launches Chromium with `channel="chromium"`). Re-exports `AUTH`/`OUTPUT_ROOT`
-  from `paths.py`.
+  (launches Chromium with `channel="chromium"`). Re-exports `AUTH` from
+  `paths.py` (output paths come from `paths.py` directly).
 - **`scripts/events.py`** — `Events` (callbacks `on_log`, `on_route`,
   `should_skip`, `is_cancelled`; all default to no-ops), `RunResult` (export),
   and `ConsolidateResult` (consolidation: `status` ok/cancelled/error,

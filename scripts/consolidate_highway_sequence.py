@@ -15,7 +15,6 @@ The console UX lives in cli.run_consolidate_cli, used by the __main__ entry
 (and therefore by "4. consolidate (combine reports).bat").
 """
 import re
-from pathlib import Path
 
 try:
     from openpyxl import Workbook, load_workbook

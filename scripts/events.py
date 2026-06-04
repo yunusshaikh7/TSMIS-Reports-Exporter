@@ -6,7 +6,7 @@ Events sink and returns a RunResult. The console shim wires these callbacks to
 print()/msvcrt; the GUI will wire them to a queue + widgets.
 """
 from dataclasses import dataclass, field
-from typing import Callable, List
+from typing import List
 
 
 def _noop_log(message):

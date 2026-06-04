@@ -29,12 +29,13 @@ class AuthError(Exception):
 
 URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
 
-# Writable paths (shared auth file + output root) are resolved by paths.py,
-# which is frozen-aware: in the packaged portable build they live next to the
-# .exe (auto-falling back to %LOCALAPPDATA% if that folder is read-only),
-# while in the dev / .bat workflow they keep their original locations
-# (scripts/tsmis_auth.json and ./output) so nothing here changes.
-from paths import AUTH, OUTPUT_ROOT  # re-exported for the export/consolidate scripts
+# The shared auth file path is resolved by paths.py, which is frozen-aware: in
+# the packaged build it lives next to the .exe (auto-falling back to
+# %LOCALAPPDATA% if that folder is read-only); in the dev / .bat workflow it
+# stays at scripts/tsmis_auth.json. Re-exported here for login.py and cli.py.
+# (Output paths also come from paths.py, imported directly by the exporter and
+# consolidators.)
+from paths import AUTH
 
 # Timeouts (milliseconds). Increase these if reports are timing out.
 #
