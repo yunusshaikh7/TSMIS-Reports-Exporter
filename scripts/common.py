@@ -27,6 +27,12 @@ class AuthError(Exception):
     """
 
 
+class PreflightError(Exception):
+    """Raised when the TSMIS page doesn't look as expected before a run (likely
+    a site change). Its message is user-safe and UI-neutral, so callers can show
+    it as-is."""
+
+
 URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
 
 # The shared auth file path is resolved by paths.py, which is frozen-aware: in
@@ -50,6 +56,11 @@ from paths import AUTH
 REPORT_TIMEOUT_MS = 360_000
 SKIP_PROMPT_AFTER_MS = 60_000
 COUNTY_ENABLE_TIMEOUT_MS = 60_000
+
+# Extra attempts per route after a transient (non-timeout) failure. 1 = retry
+# once before recording the route as failed. A hard timeout is NOT retried (the
+# user already had a skip window during the wait).
+RETRY_COUNT = 1
 
 ROUTES = [
     "001","002","003","004","005","005S","006","007","008","008U","009","010","010S",
@@ -129,6 +140,30 @@ def select_report(page, report_label):
         timeout=COUNTY_ENABLE_TIMEOUT_MS,
     )
     page.locator("#districtCountySelect").select_option(label="-- ALL --")
+
+
+def preflight(page, report_label):
+    """Confirm the report form looks as expected before a long run.
+
+    Selects the report, then verifies the Route control and Generate button are
+    present. Raises PreflightError (UI-neutral message) if anything is missing,
+    so a TSMIS change fails fast with one clear error instead of every route
+    failing cryptically.
+    """
+    if page.locator("#customReport").count() == 0:
+        raise PreflightError(
+            "The TSMIS report list didn't load as expected — the page may have "
+            "changed. Please contact the maintainer."
+        )
+    try:
+        select_report(page, report_label)
+        page.get_by_label("Route", exact=True).wait_for(state="attached", timeout=15000)
+        page.get_by_role("button", name="Generate").wait_for(state="attached", timeout=15000)
+    except Exception as e:
+        raise PreflightError(
+            "The TSMIS page looks different than expected — it may have changed. "
+            "Please contact the maintainer."
+        ) from e
 
 
 def wait_with_skip_option(page, js_condition, prefix, events,

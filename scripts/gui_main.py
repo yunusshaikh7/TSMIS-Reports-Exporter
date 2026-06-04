@@ -33,6 +33,8 @@ from gui_app import App  # noqa: E402  (must follow _bootstrap)
 
 
 def main():
+    from logging_setup import setup_logging
+    setup_logging()
     App().mainloop()
 
 

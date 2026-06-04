@@ -62,8 +62,8 @@ This repo combines the previously separate
 | 3a | Decouple export engine from console (`events`/`exporter`/`cli`) | ✅ done — **live-verified** |
 | 3b | Make the 3 consolidators importable (return results, no `print`/`exit`) | ✅ done |
 | 4 | Build the GUI on the decoupled core | 🟡 built — **visual/live test pending** |
-| 5 | Reliability (logging, failure screenshots, preflight, retry) | ⬜ **next** |
-| 6 | Package the real GUI app + zip; optional code-signing | ⬜ |
+| 5 | Reliability (logging, failure screenshots, preflight, retry) | 🟡 built — live test pending |
+| 6 | Package the real GUI app + zip; optional code-signing | ⬜ **next** |
 
 **✓ Live-verified:** Phase 3a passed a live export against TSMIS — logged in via
 SSO+MFA through `2. login (update login).bat`, then ran
@@ -89,8 +89,9 @@ is raised before any browser launches).
 ├── requirements-build.txt             # build deps (-r requirements.txt + pyinstaller)
 ├── version.py                         # app name/version + pinned Playwright/Chromium rev
 ├── scripts/
-│   ├── paths.py                       # frozen-aware paths (output/auth/logs/config); option A
-│   ├── common.py                      # URL, ROUTES, timeouts, auth + nav helpers, AuthError
+│   ├── paths.py                       # frozen-aware paths (output/auth/logs/failures/config); option A
+│   ├── logging_setup.py               # rotating file log under LOG_DIR (all entry points call it)
+│   ├── common.py                      # URL, ROUTES, timeouts, auth + nav helpers, AuthError, preflight
 │   ├── events.py                      # Events sink + RunResult + ConsolidateResult (engine <-> UI seam)
 │   ├── exporter.py                    # shared export engine + ReportSpec + save strategies
 │   ├── cli.py                         # console adapter (keeps the .bat flow working)
@@ -185,7 +186,7 @@ and raises `AuthError` on session problems.
 
 - **`scripts/paths.py`** — single source of truth for *where* files live
   (frozen-aware; option A). Exposes `DATA_ROOT`, `OUTPUT_ROOT`, `AUTH`,
-  `LOG_DIR`, `CONFIG_FILE`. In dev it preserves the original layout
+  `LOG_DIR`, `FAILURES_DIR`, `CONFIG_FILE`. In dev it preserves the original layout
   (`./output`, `scripts/tsmis_auth.json`); when frozen it resolves next to the
   `.exe` with a `%LOCALAPPDATA%` fallback.
 - **`scripts/common.py`** — shared, console-free helpers: `URL`, `ROUTES`,
@@ -254,6 +255,7 @@ logic live in one place so the GUI can call a single function.
 | `REPORT_TIMEOUT_MS` | `360_000` (6 min) | Hard ceiling for a single report. Some routes (e.g. Route 5 Ramp Detail) legitimately take minutes. |
 | `SKIP_PROMPT_AFTER_MS` | `60_000` (1 min) | Soft timer: after this, a "still working" status is emitted and the skip escape-hatch opens. |
 | `COUNTY_ENABLE_TIMEOUT_MS` | `60_000` (60 s) | Max wait for the county dropdown to enable. |
+| `RETRY_COUNT` | `1` | Extra attempts per route after a transient (non-timeout) failure. A hard timeout is never retried. |
 
 Increase these if the TSMIS server is slow.
 
@@ -375,17 +377,30 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
   Code-signing (Phase 6) is the fix; otherwise tell users to "unblock" the
   downloaded zip (right-click → Properties → Unblock) before extracting.
 
-## Error Handling Patterns
+## Error Handling & Reliability (Phase 5)
 
+- **File logging:** `logging_setup.setup_logging()` — called by every entry
+  point (`gui_main`, `cli.run_cli`/`run_consolidate_cli`, `login`) — installs a
+  rotating handler at `LOG_DIR/tsmis.log` (5 × 2 MB). File-only, so it never
+  interferes with the console flow or the windowed GUI. The export engine logs
+  lifecycle, per-route outcomes, and full tracebacks (`log.exception`).
+- **Preflight check:** `common.preflight(page, label)` runs after login and
+  before the route loop; it selects the report and confirms the Route control +
+  Generate button exist, raising **`PreflightError`** (UI-neutral message) if
+  TSMIS appears to have changed — so the run fails fast with one clear error
+  instead of every route failing cryptically. Surfaced by `cli.py` and the GUI
+  like `AuthError`.
+- **Auto-retry once:** a transient (non-timeout) route error is retried a single
+  time after `_recover()` re-arms the form (`RETRY_COUNT`, default 1). A hard
+  **timeout is not retried** (the user already had a skip window during it).
+- **Failure screenshots:** when a route ultimately fails, `_capture_failure()`
+  writes `<report>_route_<route>_<ts>.png` + `.html` to `FAILURES_DIR`
+  (best-effort; a capture error never masks the real one). Invaluable when a
+  selector breaks.
 - **Missing/corrupted auth file:** `require_valid_auth()` raises `AuthError`
-  (before any browser launches); `cli.py` clears the file and prints next
-  steps.
-- **Per-route timeout or DOM error:** the route is added to
-  `RunResult.failed`; `_recover()` re-navigates and re-arms the form so later
-  routes still run.
-- **Session expiry mid-run:** `_recover()` checks `is_logged_in()` and raises
-  `AuthError` if the session is gone, stopping the run cleanly (browser closed
-  in a `finally`).
+  before any browser launches; the driver clears the file and guides re-login.
+- **Session expiry mid-run:** `_recover()` raises `AuthError` if the session is
+  gone, stopping the run cleanly (browser closed in a `finally`).
 
 ## Development Conventions
 
@@ -421,6 +436,7 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
 | Route keeps timing out | TSMIS server slow | Increase `REPORT_TIMEOUT_MS` in `common.py` |
 | County dropdown timeout | Slow network | Increase `COUNTY_ENABLE_TIMEOUT_MS` in `common.py` |
 | Output looks wrong for one report only | That report's selector changed | Edit only that report's `ReportSpec` in its `export_*.py` |
+| "TSMIS page looks different than expected" | Preflight failed — site likely changed | Check `LOG_DIR` + `FAILURES_DIR`; update selectors in `common.py`/the `ReportSpec` |
 | Packaged `.exe`: "Executable doesn't exist ... chrome-headless-shell" | Launched without `channel="chromium"` | Ensure `new_authed_browser` uses `channel="chromium"` |
 | Packaged build bundles wrong Chromium after a Playwright bump | `build\ms-playwright` was cached | Delete `build\ms-playwright` and rebuild |
 

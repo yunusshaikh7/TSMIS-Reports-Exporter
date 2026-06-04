@@ -7,8 +7,9 @@ touch the console -- only this module does.
 """
 import sys
 
-from common import AUTH, ROUTES, AuthError, clear_auth
+from common import AUTH, ROUTES, AuthError, PreflightError, clear_auth
 from events import Events
+from logging_setup import setup_logging
 
 try:
     import msvcrt  # Windows: read keystrokes without blocking
@@ -60,6 +61,7 @@ def run_cli(spec, title):
     entry points and therefore by '3. run_export (main script).bat'."""
     from exporter import run_export  # lazy: avoids importing Playwright for consolidation
 
+    setup_logging()
     print("=" * 60)
     print(f"{title} -- {len(ROUTES)} routes")
     print("=" * 60)
@@ -72,6 +74,12 @@ def run_cli(spec, title):
     except AuthError as e:
         _report_bad_auth(str(e))
         return
+    except PreflightError as e:
+        print()
+        print("=" * 60)
+        print(f"PROBLEM: {e}")
+        print("=" * 60)
+        sys.exit(1)
 
     print()
     print("=" * 60)
@@ -105,6 +113,7 @@ def run_consolidate_cli(consolidate_fn):
     The consolidator logs its own progress through Events.on_log and returns a
     ConsolidateResult; this shim renders the outcome and sets the exit code.
     """
+    setup_logging()
     result = consolidate_fn(
         events=Events(on_log=print),
         confirm_overwrite=_confirm_overwrite_console,

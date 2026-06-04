@@ -29,3 +29,8 @@ build/pyi-work/
 
 # Phase 1 packaging spike (throwaway -- superseded by build/)
 spike/
+
+# Runtime diagnostics written next to the app (dev: repo root). The rotating
+# log and per-failure screenshots/HTML are local artifacts, never committed.
+/logs/
+/failures/

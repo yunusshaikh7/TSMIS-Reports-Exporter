@@ -72,4 +72,5 @@ else:
     AUTH = Path(__file__).resolve().parent / "tsmis_auth.json"   # scripts/tsmis_auth.json
 
 LOG_DIR = _PRIVATE / "logs"
+FAILURES_DIR = _PRIVATE / "failures"   # screenshot + page HTML captured when a route fails
 CONFIG_FILE = _PRIVATE / "config.json"

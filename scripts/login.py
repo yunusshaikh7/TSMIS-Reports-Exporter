@@ -20,6 +20,8 @@ from common import AUTH, URL
 
 
 def main():
+    from logging_setup import setup_logging
+    setup_logging()
     print()
     print("#" * 64)
     print("#" + " " * 62 + "#")

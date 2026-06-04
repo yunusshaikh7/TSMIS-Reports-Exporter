@@ -17,7 +17,7 @@ Message protocol (all are (kind, payload) tuples):
 """
 import threading
 
-from common import AUTH, ROUTES, URL, AuthError
+from common import AUTH, ROUTES, URL, AuthError, PreflightError
 from events import Events
 from exporter import run_export
 
@@ -60,6 +60,8 @@ class ExportWorker(threading.Thread):
             self.q.put(("export_done", result))
         except AuthError as e:
             self.q.put(("error", ("auth", str(e))))
+        except PreflightError as e:
+            self.q.put(("error", ("general", str(e))))      # message is already user-safe
         except Exception as e:
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
 

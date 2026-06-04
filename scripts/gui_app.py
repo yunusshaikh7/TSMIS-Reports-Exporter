@@ -17,7 +17,7 @@ import gui_theme as theme
 from gui_theme import DOT, PALETTE
 from gui_worker import ConsolidateWorker, ExportWorker, LoginWorker
 
-from paths import OUTPUT_ROOT
+from paths import LOG_DIR, OUTPUT_ROOT
 from version import APP_NAME, __version__
 from common import AuthError, clear_auth, require_valid_auth
 
@@ -201,7 +201,11 @@ class App(tk.Tk):
         f.columnconfigure(0, weight=1)
         ttk.Label(f, text=f"All files are saved under:  {OUTPUT_ROOT}",
                   style="Muted.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Button(f, text="Open output folder", command=self._open_output_folder).grid(row=0, column=1, sticky="e")
+        btns = ttk.Frame(f)
+        btns.grid(row=0, column=1, sticky="e")
+        ttk.Button(btns, text="Open output folder",
+                   command=self._open_output_folder).grid(row=0, column=0)
+        ttk.Button(btns, text="Logs", command=self._open_logs_folder).grid(row=0, column=1, padx=(8, 0))
 
     # ---- small helpers ------------------------------------------------------
 
@@ -339,6 +343,9 @@ class App(tk.Tk):
     def _open_consolidated_folder(self):
         self._open_folder(CONSOLIDATED_DIR)
 
+    def _open_logs_folder(self):
+        self._open_folder(LOG_DIR)
+
     def _open_folder(self, folder):
         try:
             folder.mkdir(parents=True, exist_ok=True)
@@ -428,7 +435,7 @@ class App(tk.Tk):
                                    f"{message}\n\nClick 'Log in' to sign in again.")
         else:
             self.set_dot("bad", "Error")
-            messagebox.showerror("Error", message)
+            messagebox.showerror("Error", f"{message}\n\nMore details are in the log file.")
         self._end_task()
 
     def _on_close(self):
