@@ -389,11 +389,18 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
 
 ## Development Conventions
 
-- **Two run modes share one core.** The `.bat` console flow and the (planned)
-  GUI both call the same console-free engine; only `cli.py` (and later the
-  GUI) touch `print`/`input`/`msvcrt`. Keep new core code console-free —
+- **Two run modes share one core.** The `.bat` console flow and the GUI both
+  call the same console-free engine; only `cli.py` and the GUI (`gui_*.py`)
+  touch `print`/`input`/`msvcrt`/widgets. Keep new core code console-free —
   report via `Events`, raise exceptions; never `print`/`input`/`sys.exit` in
   `common.py`/`exporter.py`/consolidator cores.
+- **User-facing messages must be UI-neutral.** Strings the core returns or
+  raises (`ConsolidateResult.message`, `AuthError` reasons) are shown in *both*
+  the console and the GUI, so they must not assume one UI — no ".bat" filenames,
+  "menu option N", or "this window" wording. State the problem plus a neutral
+  next step ("Export the X report first, then consolidate."). UI-specific
+  guidance ("click Log in" vs. running the login BAT) belongs in the driver
+  (`cli.py` or the GUI), not the core.
 - **Runtime deps are pinned** in `requirements.txt` (and the setup BAT for the
   end-user flow). Playwright ↔ Chromium revision must move together.
 - **End-user setup uses no venv** (global `pip` via the setup BAT). The

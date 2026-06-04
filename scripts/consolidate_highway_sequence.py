@@ -35,6 +35,10 @@ OUT_PATH = OUT_DIR / "highway_sequence_consolidated.xlsx"
 # Sheet name produced by the TSMIS export — must match exactly.
 SHEET_NAME = "Highway Locations"
 
+# Friendly report name for user-facing messages (shown in both the GUI and
+# the console, so keep these UI-neutral -- no ".bat" / "menu option" wording).
+REPORT_NAME = "Highway Sequence"
+
 # Pull the route token out of "highway_sequence_route_<ROUTE>.xlsx".
 ROUTE_FROM_NAME = re.compile(r"_route_(\w+)\.xlsx$", re.IGNORECASE)
 
@@ -81,23 +85,23 @@ def consolidate(events=None, confirm_overwrite=None):
     if not _DEPS_OK:
         return ConsolidateResult(
             status="error",
-            message='openpyxl is not installed. Run "1. setup (one time).bat" first.',
+            message="Required components are missing (openpyxl).",
         )
     confirm = confirm_overwrite or (lambda _p: True)
 
     if not INPUT_DIR.exists():
         return ConsolidateResult(
             status="error",
-            message=(f"Input folder is missing: {INPUT_DIR}\n"
-                     'Run "3. run_export (main script).bat" and pick option 3 first.'),
+            message=(f"The {REPORT_NAME} output folder doesn't exist yet:\n{INPUT_DIR}\n\n"
+                     f"Export the {REPORT_NAME} report first, then consolidate."),
         )
 
     files = sorted(INPUT_DIR.glob("*.xlsx"))
     if not files:
         return ConsolidateResult(
             status="error",
-            message=(f"No XLSX files found in {INPUT_DIR}\n"
-                     'Run "3. run_export (main script).bat" and pick option 3 first.'),
+            message=(f"No {REPORT_NAME} files were found in:\n{INPUT_DIR}\n\n"
+                     f"Export the {REPORT_NAME} report first, then consolidate."),
         )
 
     # Confirm overwrite before reading any inputs.
@@ -130,7 +134,7 @@ def consolidate(events=None, confirm_overwrite=None):
 
     if canonical_header is None:
         return ConsolidateResult(status="error",
-                                 message=f"No readable XLSX files in {INPUT_DIR}.")
+                                 message=f"No readable {REPORT_NAME} files were found in:\n{INPUT_DIR}.")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -207,10 +211,9 @@ def consolidate(events=None, confirm_overwrite=None):
     except PermissionError:
         return ConsolidateResult(
             status="error",
-            message=(f"Could not write {OUT_PATH.name}.\n\n"
-                     "This usually means the file is open in Excel. Close it there\n"
-                     "and run this consolidator again. (None of the input XLSX files\n"
-                     "were modified.)"),
+            message=(f"Could not save {OUT_PATH.name}.\n\n"
+                     "The file is probably open in Excel. Close it and try again.\n"
+                     "(Your exported files were not changed.)"),
         )
 
     return ConsolidateResult(

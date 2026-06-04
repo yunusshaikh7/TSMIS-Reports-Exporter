@@ -37,6 +37,10 @@ INPUT_DIR = OUTPUT_ROOT / "ramp_summary"
 OUT_DIR = OUTPUT_ROOT / "consolidated"
 OUT_PATH = OUT_DIR / "tsar_ramp_summary_consolidated.xlsx"
 
+# Friendly report name for user-facing messages (shown in both the GUI and
+# the console, so keep these UI-neutral -- no ".bat" / "menu option" wording).
+REPORT_NAME = "Ramp Summary"
+
 
 # =============================================================================
 # Schema — (column_name, label_match_regex), in report order
@@ -655,23 +659,23 @@ def consolidate(events=None, confirm_overwrite=None):
     if not _DEPS_OK:
         return ConsolidateResult(
             status="error",
-            message='pdfplumber/openpyxl not installed. Run "1. setup (one time).bat" first.',
+            message="Required components are missing (pdfplumber, openpyxl).",
         )
     confirm = confirm_overwrite or (lambda _p: True)
 
     if not INPUT_DIR.exists():
         return ConsolidateResult(
             status="error",
-            message=(f"Input folder is missing: {INPUT_DIR}\n"
-                     'Run "3. run_export (main script).bat" and pick option 1 first.'),
+            message=(f"The {REPORT_NAME} output folder doesn't exist yet:\n{INPUT_DIR}\n\n"
+                     f"Export the {REPORT_NAME} report first, then consolidate."),
         )
 
     pdfs = sorted(INPUT_DIR.glob("*.pdf"))
     if not pdfs:
         return ConsolidateResult(
             status="error",
-            message=(f"No PDFs found in {INPUT_DIR}\n"
-                     'Run "3. run_export (main script).bat" and pick option 1 first.'),
+            message=(f"No {REPORT_NAME} files were found in:\n{INPUT_DIR}\n\n"
+                     f"Export the {REPORT_NAME} report first, then consolidate."),
         )
 
     # Confirm overwrite *before* spending time parsing PDFs.
@@ -704,10 +708,9 @@ def consolidate(events=None, confirm_overwrite=None):
     except PermissionError:
         return ConsolidateResult(
             status="error",
-            message=(f"Could not write {OUT_PATH.name}.\n\n"
-                     "This usually means the file is open in Excel. Close it there\n"
-                     "and run this consolidator again. (None of the input PDFs were\n"
-                     "modified.)"),
+            message=(f"Could not save {OUT_PATH.name}.\n\n"
+                     "The file is probably open in Excel. Close it and try again.\n"
+                     "(Your exported files were not changed.)"),
         )
 
     return ConsolidateResult(

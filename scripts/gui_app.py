@@ -41,6 +41,8 @@ CONSOLIDATE_REPORTS = [
     ("Highway Sequence Listing", c_highway.consolidate, c_highway.OUT_PATH),
 ]
 
+CONSOLIDATED_DIR = OUTPUT_ROOT / "consolidated"
+
 PAD = 14
 
 
@@ -150,8 +152,17 @@ class App(tk.Tk):
         ttk.Label(co, text="Combines the per-route files already in the output folder "
                            "into one workbook.", style="Muted.TLabel").grid(
             row=1 + len(CONSOLIDATE_REPORTS), column=0, sticky="w", pady=(8, 0))
+
+        dest = ttk.Frame(co)
+        dest.grid(row=2 + len(CONSOLIDATE_REPORTS), column=0, sticky="ew", pady=(10, 0))
+        dest.columnconfigure(0, weight=1)
+        ttk.Label(dest, text=f"Saved to:  {CONSOLIDATED_DIR}", style="Muted.TLabel",
+                  wraplength=440, justify="left").grid(row=0, column=0, sticky="w")
+        ttk.Button(dest, text="Open folder",
+                   command=self._open_consolidated_folder).grid(row=0, column=1, sticky="e", padx=(8, 0))
+
         actions = ttk.Frame(co)
-        actions.grid(row=2 + len(CONSOLIDATE_REPORTS), column=0, sticky="w", pady=(PAD, 0))
+        actions.grid(row=3 + len(CONSOLIDATE_REPORTS), column=0, sticky="w", pady=(PAD, 0))
         self.btn_cons_start = ttk.Button(actions, text="Start consolidation", style="Accent.TButton",
                                          command=self.start_consolidate)
         self.btn_cons_start.grid(row=0, column=0)
@@ -188,7 +199,8 @@ class App(tk.Tk):
         f = ttk.Frame(self, padding=(PAD, 0, PAD, PAD))
         f.grid(row=4, column=0, sticky="ew")
         f.columnconfigure(0, weight=1)
-        ttk.Label(f, text=f"Output: {OUTPUT_ROOT}", style="Muted.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(f, text=f"All files are saved under:  {OUTPUT_ROOT}",
+                  style="Muted.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Button(f, text="Open output folder", command=self._open_output_folder).grid(row=0, column=1, sticky="e")
 
     # ---- small helpers ------------------------------------------------------
@@ -322,9 +334,15 @@ class App(tk.Tk):
         self.btn_login_cancel.grid_remove()
 
     def _open_output_folder(self):
+        self._open_folder(OUTPUT_ROOT)
+
+    def _open_consolidated_folder(self):
+        self._open_folder(CONSOLIDATED_DIR)
+
+    def _open_folder(self, folder):
         try:
-            OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-            os.startfile(str(OUTPUT_ROOT))      # Windows
+            folder.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(folder))           # Windows
         except Exception as e:
             messagebox.showerror("Could not open folder", str(e))
 
