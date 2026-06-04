@@ -314,16 +314,14 @@ both engines; only the concurrency/coordination is new.
   end; the only locked hot-path state in the GUI is the progress tally
   (`ExportWorker._tally_lock`).
 
-**How many browsers? (`DEFAULT_WORKERS=3`, `MAX_WORKERS=6` in
-`exporter_parallel.py`)** The bottleneck is the **shared TSMIS/Caltrans backend,
-not your PC**. Each worker is both one Chromium process (~300–500 MB under load)
-*and* one concurrent heavy report request against that one server. A modern PC
-can launch 8+ browsers, but past a handful of *concurrent reports* you hit
-diminishing returns (queries slow under contention) and more timeouts.
-Rule of thumb: **3 = polite/recommended (~2.5–3× faster), 4–5 = usually fine,
-6 = experimental cap, >6 = only if you've confirmed the server tolerates it**
-(raise `MAX_WORKERS` deliberately). Requested counts are clamped to
-`[1, MAX_WORKERS]`.
+**How many browsers? (`DEFAULT_WORKERS=3`, `MAX_WORKERS=30` in
+`exporter_parallel.py`)** The TSMIS/Caltrans backend handles high concurrency
+fine (operator-tested), so the practical limit is the **client PC, not the
+server**: each worker is one Chromium process (~300–500 MB under load) plus a
+Playwright driver. Rule of thumb: **3 = safe default (~2.5–3× faster), 8–12 =
+big speedup on a healthy multi-core PC, 30 = hard cap** (~9–15 GB RAM for
+browsers alone — only on a well-resourced machine). Budget ~0.5 GB RAM per
+worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 **How to turn it on:**
 - **Console / .bat:** `5. fast export (experimental).bat` asks how many browsers,

@@ -3,14 +3,15 @@ cd /d "%~dp0"
 
 REM ===========================================================================
 REM  EXPERIMENTAL "fast mode": runs several headless browsers at once (each
-REM  using the SAME saved login) to export routes in parallel. Faster, but
-REM  heavier on your PC and on the TSMIS server. The normal one-browser flow is
+REM  using the SAME saved login) to export routes in parallel. Faster, but each
+REM  browser uses memory and CPU on THIS PC. The normal one-browser flow is
 REM  still "3. run_export (main script).bat" -- use that if anything misbehaves.
 REM
-REM  How many browsers? The limit is the TSMIS server, not your PC:
-REM     3       polite, ~2.5-3x faster, low risk  (recommended)
-REM     4 - 5   usually still fine
-REM     6       experimental maximum (the script caps higher numbers at 6)
+REM  How many browsers? The TSMIS server handles high concurrency fine, so the
+REM  limit is this PC's RAM/CPU (budget ~0.5 GB per browser):
+REM     3        safe default, ~2.5-3x faster
+REM     8 - 12   big speedup on a healthy multi-core PC
+REM     30       maximum (the script caps higher numbers at 30)
 REM ===========================================================================
 
 REM Auth check -- every export script reads scripts\tsmis_auth.json,
@@ -40,8 +41,8 @@ echo ================================================================
 echo.
 echo  How many browsers should run at the same time?
 echo.
-echo     More browsers = faster, but heavier on your PC and on the
-echo     TSMIS server. Recommended: 3 or 4.  Maximum: 6.
+echo     More browsers = faster, but each one uses memory and CPU on
+echo     THIS PC (roughly 0.5 GB each). Default 3.  Maximum: 30.
 echo.
 set "workers=3"
 set /p workers="Number of browsers [default 3]: "

@@ -16,17 +16,16 @@ draws fast routes immediately pulls another, so no single worker gets stuck with
 all the slow ones and finishes long after the rest.
 
 How many workers can we realistically use?
-  The bottleneck is almost never your PC -- it's the shared TSMIS / Caltrans
-  backend. Each worker is BOTH one Chromium process (~300-500 MB under load) AND
-  one concurrent heavy report request against that one server. A modern office
-  PC can launch 8+ browsers, but past a handful of *concurrent reports* you tend
-  to hit diminishing returns (each query slows under contention) and more
-  timeouts -- so the server, not the client, caps useful concurrency.
-    * 3 browsers  -- polite, ~2.5-3x faster, low added failure risk (DEFAULT)
-    * 4-5 browsers -- usually still fine; the sweet-spot ceiling
-    * 6 browsers  -- experimental cap (MAX_WORKERS); expect flatter gains
-    * >6          -- only if you have confirmed the server tolerates it; raise
-                     MAX_WORKERS deliberately, knowing failures/timeouts rise.
+  Operator testing shows the shared TSMIS / Caltrans backend handles high
+  concurrency fine, so the practical limit is now YOUR PC, not the server: each
+  worker is one Chromium process (~300-500 MB under load) plus a Playwright
+  driver, so RAM and CPU are what cap useful concurrency.
+    * 3 browsers    -- safe default, ~2.5-3x faster (DEFAULT_WORKERS)
+    * 8-12 browsers -- big speedup on a healthy multi-core PC with RAM to spare
+    * 30 browsers   -- hard cap (MAX_WORKERS); ~9-15 GB RAM for browsers alone,
+                       so only on a well-resourced machine
+  Pick by the machine running it: budget ~0.5 GB RAM per worker and leave
+  headroom. Requested counts are clamped to [1, MAX_WORKERS].
 
 Threading model: Playwright's sync API is thread-affine, so each worker owns its
 OWN sync_playwright() instance, browser, context and page, and never shares a
@@ -59,11 +58,11 @@ from run_report import auto_report_path, write_run_report
 
 log = logging.getLogger("tsmis.export.parallel")
 
-# Number of concurrent browsers. See the module docstring for the reasoning: the
-# limit is the shared TSMIS backend, not your PC. 3 is a polite, effective
-# default; raise MAX_WORKERS only if you know the server can take it.
+# Number of concurrent browsers. The TSMIS backend handles high concurrency fine
+# (operator-tested), so the real limit is client RAM/CPU -- budget ~0.5 GB per
+# worker. 3 is a safe default; the cap is generous for well-resourced PCs.
 DEFAULT_WORKERS = 3
-MAX_WORKERS = 6
+MAX_WORKERS = 30
 
 
 def resolve_worker_count(requested=None):
