@@ -5,6 +5,7 @@ console UX (AuthError messaging, the overwrite prompt) so the existing batch
 files keep working unchanged after the refactor. The engines themselves never
 touch the console -- only this module does.
 """
+import os
 import sys
 
 from common import AUTH, ROUTES, AuthError, PreflightError, clear_auth
@@ -58,19 +59,35 @@ def _report_bad_auth(reason):
 
 def run_cli(spec, title):
     """Run one report export as a console program. Used by the export_*.py
-    entry points and therefore by '3. run_export (main script).bat'."""
+    entry points and therefore by '3. run_export (main script).bat'.
+
+    If the TSMIS_FAST_WORKERS environment variable is set to a number > 1
+    (e.g. by '5. fast export (experimental).bat'), the experimental parallel
+    engine runs several browsers at once instead of the proven sequential one."""
     from exporter import run_export  # lazy: avoids importing Playwright for consolidation
 
     setup_logging()
+
+    workers = 1
+    if os.environ.get("TSMIS_FAST_WORKERS", "").strip():
+        from exporter_parallel import resolve_worker_count
+        workers = resolve_worker_count()
+
     print("=" * 60)
     print(f"{title} -- {len(ROUTES)} routes")
+    if workers > 1:
+        print(f"FAST MODE (experimental): {workers} browsers in parallel")
     print("=" * 60)
-    if _HAS_KEYBOARD:
+    if workers == 1 and _HAS_KEYBOARD:
         print("Tip: press 'S' to skip a route that is taking too long.")
     print()
 
     try:
-        result = run_export(spec, _console_events())
+        if workers > 1:
+            from exporter_parallel import run_export_parallel
+            result = run_export_parallel(spec, _console_events(), workers=workers)
+        else:
+            result = run_export(spec, _console_events())
     except AuthError as e:
         _report_bad_auth(str(e))
         return
