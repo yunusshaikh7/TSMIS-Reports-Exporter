@@ -23,7 +23,20 @@ APP_NAME = os.environ.get("TSMIS_APP_NAME", "TSMIS Exporter")
 BROWSERS = os.environ.get("TSMIS_BROWSERS", os.path.join(SPECPATH, "ms-playwright"))
 CONSOLE  = os.environ.get("TSMIS_CONSOLE", "1") == "1"
 
-datas, binaries, hiddenimports = [], [], []
+# The app uses flat modules in scripts/ (imported by bare name) plus version.py
+# at the repo root. Put both on pathex so PyInstaller resolves them, and list
+# them as hidden imports because several are imported lazily (inside functions).
+REPO_ROOT = os.path.dirname(SPECPATH)               # build/ -> repo root
+SCRIPTS   = os.path.join(REPO_ROOT, "scripts")
+APP_MODULES = [
+    "version", "paths", "common", "events", "exporter", "run_report",
+    "logging_setup", "cli", "login",
+    "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
+    "consolidate_ramp_summary", "consolidate_ramp_detail", "consolidate_highway_sequence",
+    "gui_main", "gui_app", "gui_worker", "gui_theme",
+]
+
+datas, binaries, hiddenimports = [], [], list(APP_MODULES)
 
 # Playwright: Node driver + package data + hidden imports.
 _d, _b, _h = collect_all("playwright")
@@ -40,7 +53,7 @@ datas += [(BROWSERS, "ms-playwright")]
 
 a = Analysis(
     [ENTRY],
-    pathex=[],
+    pathex=[SCRIPTS, REPO_ROOT],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,

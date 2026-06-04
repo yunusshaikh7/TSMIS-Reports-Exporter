@@ -63,7 +63,7 @@ This repo combines the previously separate
 | 3b | Make the 3 consolidators importable (return results, no `print`/`exit`) | ✅ done |
 | 4 | Build the GUI on the decoupled core | 🟡 built — **visual/live test pending** |
 | 5 | Reliability (logging, failure screenshots, preflight, retry) | 🟡 built — live test pending |
-| 6 | Package the real GUI app + zip; optional code-signing | ⬜ **next** |
+| 6 | Package the real GUI app + zip; optional code-signing | 🟡 built — **pending live launch** |
 
 **✓ Live-verified:** Phase 3a passed a live export against TSMIS — logged in via
 SSO+MFA through `2. login (update login).bat`, then ran
@@ -73,8 +73,10 @@ generated `wait_js`/filenames are byte-identical to the originals; `AuthError`
 is raised before any browser launches).
 
 **Build the portable app:** from the repo root run
-`powershell -ExecutionPolicy Bypass -File build\build.ps1`. See the
-**Build & Packaging** section for what it does and known gotchas.
+`powershell -ExecutionPolicy Bypass -File build\build.ps1` → windowed
+`dist\TSMIS Exporter\` (~589 MB; double-click `TSMIS Exporter.exe`). Add
+`-SelfTest` for a headless console build that verifies the frozen bundle without
+launching a window. See **Build & Packaging** for details and gotchas.
 
 ## Repository Layout
 
@@ -108,9 +110,12 @@ is raised before any browser launches).
 │   ├── gui_worker.py                  # worker threads: Export/Consolidate/Login (Events -> queue)
 │   └── gui_theme.py                   # palette/fonts/ttk styles (clam base)
 ├── build/                             # portable-build infra (Phase 0)
-│   ├── build.ps1                      # one-command reproducible onefolder build
-│   ├── app.spec                       # PyInstaller spec (bundles Chromium + pdf/excel)
-│   ├── smoke_entry.py                 # interim packaged entry / build self-test
+│   ├── build.ps1                      # one-command reproducible onefolder build (-SelfTest for headless verify)
+│   ├── app.spec                       # PyInstaller spec (Chromium + pdf/excel + flat app modules)
+│   ├── gui_main entry → scripts/gui_main.py  # the windowed app's real entry point
+│   ├── gui_smoke_entry.py             # headless frozen-GUI self-test (built by -SelfTest)
+│   ├── smoke_entry.py                 # standalone non-GUI bundle self-test (playwright/pdf/excel)
+│   ├── dist_readme.txt               # copied into the build as "Start Here.txt"
 │   ├── .venv/                         # build venv (git-ignored)
 │   └── ms-playwright/                 # bundled Chromium, downloaded by build.ps1 (git-ignored)
 ├── dist/                              # build output: dist/TSMIS Exporter/ (git-ignored)
@@ -352,8 +357,11 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
    already present), then **deletes** `chromium_headless_shell-*` and
    `ffmpeg-*` (the app runs headless via `channel="chromium"`).
 3. Runs PyInstaller with `build\app.spec` (driven by the `TSMIS_*` env vars the
-   script sets) → `dist\TSMIS Exporter\` (~581 MB onefolder). Zip it to
-   distribute.
+   script sets), entry = `scripts\gui_main.py`, **windowed** (`TSMIS_CONSOLE=0`),
+   and copies `dist_readme.txt` in as "Start Here.txt" → `dist\TSMIS Exporter\`
+   (~589 MB onefolder: just the `.exe` + `_internal\`). Zip it to distribute.
+   `build.ps1 -SelfTest` instead builds `gui_smoke_entry.py` with a console so
+   the frozen bundle can be verified headlessly (no window, no blocking).
 
 `build\app.spec` highlights:
 - `collect_all('playwright')` + Playwright's own bundled PyInstaller hooks →
@@ -370,11 +378,12 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
   `chromium-*` folder exists. After bumping the Playwright pin, **delete
   `build\ms-playwright`** so the matching Chromium re-downloads. (Hardening
   idea: key the check on `version.py`'s `CHROMIUM_REVISION`.)
-- **Entry point (Phase 6):** switch `build.ps1` to
-  `TSMIS_ENTRY=scripts\gui_main.py` and `TSMIS_CONSOLE=0` (windowed). The GUI
-  imports the flat `scripts/` modules **and** the repo-root `version.py`, so add
-  **both** `scripts\` and the repo root to the spec's `pathex` (or PyInstaller
-  won't find `version`). Tkinter is collected by PyInstaller automatically.
+- **Entry point (done):** `build.ps1` builds `scripts\gui_main.py` windowed;
+  `app.spec` puts `scripts\` + the repo root on `pathex` and lists the flat app
+  modules (`APP_MODULES`) as hidden imports (several are imported lazily, so
+  static analysis alone can miss them). Tkinter is collected automatically.
+  Verify a frozen build headlessly with `build.ps1 -SelfTest` (the frozen GUI
+  self-test passed; the live windowed launch is the remaining manual check).
 - **AV / SmartScreen:** the unsigned `.exe` will trip SmartScreen on first run.
   Code-signing (Phase 6) is the fix; otherwise tell users to "unblock" the
   downloaded zip (right-click → Properties → Unblock) before extracting.

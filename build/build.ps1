@@ -10,6 +10,8 @@
 # Proven on Windows + Python 3.11 in the Phase 1 spike. See build\app.spec for
 # the packaging recipe.
 
+param([switch]$SelfTest)   # -SelfTest builds a headless GUI self-test instead of the windowed app
+
 $ErrorActionPreference = "Stop"
 
 $BuildDir = $PSScriptRoot
@@ -45,10 +47,20 @@ Get-ChildItem $Browsers -Directory -Filter "chromium_headless_shell-*" -ErrorAct
 Get-ChildItem $Browsers -Directory -Filter "ffmpeg-*" -ErrorAction Ignore | Remove-Item -Recurse -Force
 
 # --- 3. Package as a portable onefolder -----------------------------------
-$env:TSMIS_ENTRY    = Join-Path $BuildDir "smoke_entry.py"   # TODO Phase 4: point at the GUI entry point
-$env:TSMIS_APP_NAME = "TSMIS Exporter"
+if ($SelfTest) {
+    # Headless self-test: constructs the GUI window withdrawn, prints OK, exits.
+    # Console so the result is visible -- verifies the frozen bundle (imports +
+    # Tk/ttk) without a visible window or a blocking mainloop.
+    $env:TSMIS_ENTRY    = Join-Path $BuildDir "gui_smoke_entry.py"
+    $env:TSMIS_APP_NAME = "TSMIS SelfTest"
+    $env:TSMIS_CONSOLE  = "1"
+} else {
+    # The real windowed deliverable.
+    $env:TSMIS_ENTRY    = Join-Path $RepoRoot "scripts\gui_main.py"
+    $env:TSMIS_APP_NAME = "TSMIS Exporter"
+    $env:TSMIS_CONSOLE  = "0"
+}
 $env:TSMIS_BROWSERS = $Browsers
-$env:TSMIS_CONSOLE  = "1"                                    # TODO Phase 4: set "0" for a windowed GUI
 
 Write-Host "==> Running PyInstaller"
 & $VenvPy -m PyInstaller (Join-Path $BuildDir "app.spec") `
@@ -57,6 +69,9 @@ Assert-LastExit "PyInstaller"
 
 # --- 4. Report ------------------------------------------------------------
 $AppDir = Join-Path $DistDir $env:TSMIS_APP_NAME
+if (-not $SelfTest) {
+    Copy-Item (Join-Path $BuildDir "dist_readme.txt") (Join-Path $AppDir "Start Here.txt") -Force
+}
 $SizeMB = (Get-ChildItem $AppDir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
 Write-Host ("`n==> Built {0}  ({1:N0} MB onefolder)" -f $AppDir, $SizeMB)
 Write-Host "    Zip this folder to distribute (right-click -> Send to -> Compressed folder)."
