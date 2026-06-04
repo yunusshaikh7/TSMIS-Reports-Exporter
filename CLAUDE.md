@@ -60,8 +60,8 @@ This repo combines the previously separate
 | 0 | Reproducible build infra (`build/`, pinned reqs, `version.py`) | ✅ done |
 | 2 | Frozen-aware paths (`scripts/paths.py`, option A) | ✅ done |
 | 3a | Decouple export engine from console (`events`/`exporter`/`cli`) | ✅ done — **live-verified** |
-| 3b | Make the 3 consolidators importable (return results, no `print`/`exit`) | ⬜ **next** |
-| 4 | Build the GUI on the decoupled core | ⬜ |
+| 3b | Make the 3 consolidators importable (return results, no `print`/`exit`) | ✅ done |
+| 4 | Build the GUI on the decoupled core | ⬜ **next** |
 | 5 | Reliability (logging, failure screenshots, preflight, retry) | ⬜ |
 | 6 | Package the real GUI app + zip; optional code-signing | ⬜ |
 
@@ -90,16 +90,16 @@ is raised before any browser launches).
 ├── scripts/
 │   ├── paths.py                       # frozen-aware paths (output/auth/logs/config); option A
 │   ├── common.py                      # URL, ROUTES, timeouts, auth + nav helpers, AuthError
-│   ├── events.py                      # Events sink + RunResult (engine <-> UI seam)
+│   ├── events.py                      # Events sink + RunResult + ConsolidateResult (engine <-> UI seam)
 │   ├── exporter.py                    # shared export engine + ReportSpec + save strategies
 │   ├── cli.py                         # console adapter (keeps the .bat flow working)
 │   ├── login.py                       # writes the auth file (headed browser)
 │   ├── export_ramp_summary.py         # thin: a ReportSpec (PDF) + run_cli
 │   ├── export_ramp_detail.py          # thin: a ReportSpec (XLSX download) + run_cli
 │   ├── export_highway_sequence.py     # thin: a ReportSpec (XLSX download) + run_cli
-│   ├── consolidate_ramp_summary.py    # PDFs  -> one XLSX (audit cols)  [not yet refactored — Phase 3b]
-│   ├── consolidate_ramp_detail.py     # XLSXs -> one XLSX (adds Route)  [not yet refactored — Phase 3b]
-│   └── consolidate_highway_sequence.py # XLSXs -> one XLSX (adds Route)  [not yet refactored — Phase 3b]
+│   ├── consolidate_ramp_summary.py    # PDFs  -> one XLSX (audit cols); importable consolidate()
+│   ├── consolidate_ramp_detail.py     # XLSXs -> one XLSX (adds Route);  importable consolidate()
+│   └── consolidate_highway_sequence.py # XLSXs -> one XLSX (adds Route);  importable consolidate()
 ├── build/                             # portable-build infra (Phase 0)
 │   ├── build.ps1                      # one-command reproducible onefolder build
 │   ├── app.spec                       # PyInstaller spec (bundles Chromium + pdf/excel)
@@ -190,16 +190,31 @@ and raises `AuthError` on session problems.
   (launches Chromium with `channel="chromium"`). Re-exports `AUTH`/`OUTPUT_ROOT`
   from `paths.py`.
 - **`scripts/events.py`** — `Events` (callbacks `on_log`, `on_route`,
-  `should_skip`, `is_cancelled`; all default to no-ops) and `RunResult`. The
-  seam between the engine and its driver (console or GUI).
+  `should_skip`, `is_cancelled`; all default to no-ops), `RunResult` (export),
+  and `ConsolidateResult` (consolidation: `status` ok/cancelled/error,
+  `message`, `output_path`, `summary_lines`). The seam between the engines and
+  their driver (console or GUI).
 - **`scripts/exporter.py`** — the **one** proven per-route loop,
   `run_export(spec, events)`, plus `ReportSpec`, the reusable save strategies
   `save_pdf_letter` / `save_via_export_button`, and `_recover()`.
-- **`scripts/cli.py`** — console adapter: `run_cli(spec, title)` wires `Events`
-  to `print()`/`msvcrt` and renders `AuthError` like the old `handle_bad_auth`
-  (message + clear file + exit). This is what keeps the `.bat` flow working.
+- **`scripts/cli.py`** — console adapters that keep both `.bat` flows working:
+  `run_cli(spec, title)` for exports (wires `Events` to `print()`/`msvcrt`,
+  renders `AuthError` like the old `handle_bad_auth`) and
+  `run_consolidate_cli(consolidate_fn)` for consolidators (wires `on_log` to
+  `print`, the overwrite prompt to `input()`, maps the `ConsolidateResult`
+  status to the exit code). Imports `exporter` lazily so consolidating never
+  pulls in Playwright.
 - **`scripts/export_*.py`** — now ~33-line files: each defines a `ReportSpec`
   and calls `run_cli`.
+- **`scripts/consolidate_*.py`** — each exposes `consolidate(events,
+  confirm_overwrite) -> ConsolidateResult` (console-free: logs via `Events`,
+  asks before overwrite via the callback, honors `is_cancelled()`, never
+  `print`/`input`/`exit`) plus a `__main__` that calls `run_consolidate_cli`.
+  Third-party imports are guarded with a `_DEPS_OK` flag and openpyxl style
+  objects are built inside functions, so the modules import cleanly even if a
+  dependency is missing — the GUI gets a clean error `ConsolidateResult` instead
+  of a fatal `ImportError`. Still one self-contained file per report (no shared
+  parser helpers).
 
 **Why a shared loop now?** The old design kept a full copy of the loop in each
 `export_*.py` to isolate report bugs. The refactor preserves that isolation by
@@ -276,21 +291,25 @@ Route strings must match the exact option values in the TSMIS "Route"
 
 ## Adding a New Consolidator
 
-> Phase 3b will convert the consolidators to be importable (return a result
-> object + a confirm callback instead of `print`/`input`/`sys.exit`) so the GUI
-> can drive them. Until then they remain self-contained console scripts.
-
 Each consolidator is self-contained — parsing logic and Excel writing live
 together in one `scripts/consolidate_<name>.py`. Don't share parser helpers
 between consolidators; each input format (PDF vs XLSX) and report's quirks
 differ enough that sharing introduces cross-report bugs.
 
-1. Create `scripts/consolidate_<name>.py`:
-   - Read inputs from `OUTPUT_ROOT / "<name>"`.
-   - Write to `OUTPUT_ROOT / "consolidated" / "<name>_consolidated.xlsx"`.
-   - Wrap third-party imports (`pdfplumber`, `openpyxl`) in
-     `try/except ImportError` directing the user to re-run setup.
-   - Print a brief progress line per file plus a summary.
+1. Create `scripts/consolidate_<name>.py` modeled on an existing one:
+   - Expose `consolidate(events=None, confirm_overwrite=None) -> ConsolidateResult`.
+     Read inputs from `OUTPUT_ROOT / "<name>"`, write to
+     `OUTPUT_ROOT / "consolidated" / "<name>_consolidated.xlsx"`.
+   - Keep it console-free: log progress via `events.on_log`, ask before
+     overwriting via `confirm_overwrite(path) -> bool`, honor
+     `events.is_cancelled()`, and return a `ConsolidateResult`. Never
+     `print`/`input`/`sys.exit` here.
+   - Guard third-party imports with a `_DEPS_OK` flag (don't `sys.exit` on
+     `ImportError`) and build any openpyxl style objects inside functions, so
+     the module stays importable when frozen or when a dep is missing.
+   - Surface the "file open in Excel" `PermissionError` as an `error` result.
+   - Add `if __name__ == "__main__": from cli import run_consolidate_cli;
+     run_consolidate_cli(consolidate)` so the `.bat` flow keeps working.
 2. Turn the placeholder branch in `4. consolidate (combine reports).bat` into
    a real call.
 3. Document it here.

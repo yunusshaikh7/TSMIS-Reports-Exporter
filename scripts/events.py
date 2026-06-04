@@ -49,3 +49,23 @@ class RunResult:
     user_skipped: List[str] = field(default_factory=list)
     failed: List[str] = field(default_factory=list)
     output_dir: str = ""
+
+
+@dataclass
+class ConsolidateResult:
+    """Outcome of one consolidation run.
+
+    status is one of:
+      "ok"        -- workbook written; summary_lines describe the result.
+      "cancelled" -- user declined (e.g. the overwrite prompt) or cancelled
+                     mid-run; message says why.
+      "error"     -- could not complete; message explains it and is safe to
+                     show to the user as-is.
+
+    The engine fills summary_lines with its own report-specific summary so the
+    console shim and the GUI can display results without re-deriving them.
+    """
+    status: str = "ok"
+    message: str = ""
+    output_path: str = ""
+    summary_lines: List[str] = field(default_factory=list)
