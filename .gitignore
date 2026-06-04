@@ -26,6 +26,7 @@ __pycache__/
 /dist/
 build/ms-playwright/
 build/pyi-work/
+/TSMIS-Exporter-*.zip          # the distributable zip (uploaded to GitHub Releases)
 
 # Phase 1 packaging spike (throwaway -- superseded by build/)
 spike/
