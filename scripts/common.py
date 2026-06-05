@@ -42,6 +42,13 @@ class BrowserNotFoundError(Exception):
     and UI-neutral."""
 
 
+class RunCancelled(Exception):
+    """Raised mid-route when the user cancels (events.is_cancelled() goes True
+    while we're waiting on a report). Lets Cancel interrupt the *current* route's
+    wait instead of only taking effect between routes. The engines catch it and
+    stop the run cleanly -- it is NOT a route failure or a worker crash."""
+
+
 URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
 
 # The shared auth file path is resolved by paths.py, which is frozen-aware: in
@@ -244,7 +251,9 @@ def wait_with_skip_option(page, js_condition, prefix, events,
       - and enforce a hard timeout independent of the skip prompt.
 
     Returns True when the condition matched, False if the user asked to skip.
-    Raises PlaywrightTimeoutError when the hard timeout elapses.
+    Raises RunCancelled immediately if the user cancels the whole run while we're
+    waiting (so Cancel interrupts the current route, not just between routes), and
+    PlaywrightTimeoutError when the hard timeout elapses.
     """
     if hard_timeout_ms is None:
         hard_timeout_ms = REPORT_TIMEOUT_MS
@@ -259,6 +268,10 @@ def wait_with_skip_option(page, js_condition, prefix, events,
     next_status = 0.0
 
     while True:
+        # Cancel wins over everything: stop waiting on this route right now rather
+        # than only checking between routes (the "Cancel is just a suggestion" bug).
+        if events.is_cancelled():
+            raise RunCancelled()
         if events.should_skip():
             events.on_log(f"  {prefix} skipped by user")
             return False
@@ -367,16 +380,19 @@ def _probe_channel(p, channel):
             pass
 
 
-def _resolve_channel(p):
+def _resolve_channel(p, exclude=()):
     """Pick a browser Playwright can drive -- Edge, then Chrome -- validating each
-    by probe. Cached for the process. Raises BrowserNotFoundError (UI-neutral)
-    with a message that distinguishes "none installed" from "installed but too
-    new for this tool"."""
+    by probe. Cached for the process. `exclude` skips channels already known to
+    fail a real launch (so the fallback doesn't re-pick the same broken one).
+    Raises BrowserNotFoundError (UI-neutral) with a message that distinguishes
+    "none installed" from "installed but too new for this tool"."""
     global _resolved_channel
-    if _resolved_channel:
+    if _resolved_channel and _resolved_channel not in exclude:
         return _resolved_channel
     statuses = {}
     for channel in _candidate_channels():
+        if channel in exclude:
+            continue
         status = _probe_channel(p, channel)
         statuses[channel] = status
         if status == "ok":
@@ -411,9 +427,14 @@ def launch_browser(p, *, headless=True, **kwargs):
     try:
         return p.chromium.launch(headless=headless, channel=channel, **kwargs)
     except Exception as first_err:
-        _resolved_channel = None                # forget it and try the whole chain again
+        # The probe passed but the real launch failed. Re-resolve EXCLUDING this
+        # channel so we actually fall through to the OTHER browser instead of
+        # re-picking the same broken one (a probe pass doesn't guarantee a real
+        # launch succeeds).
+        failed = channel
+        _resolved_channel = None
         try:
-            channel = _resolve_channel(p)
+            channel = _resolve_channel(p, exclude={failed})
             return p.chromium.launch(headless=headless, channel=channel, **kwargs)
         except BrowserNotFoundError:
             raise

@@ -4,8 +4,9 @@
 
 A unified Windows desktop tool that bulk-exports TSMIS (Caltrans
 Transportation System Management Information System) reports for every
-California state route. The user picks which report to export from a
-menu; one shared login serves every report type.
+California state route. The user picks which report(s) to export from a
+menu — one report type, several, or all at once — and one shared login serves
+every report type.
 
 Currently supported reports:
 
@@ -14,6 +15,11 @@ Currently supported reports:
 | 1 | TSAR: Ramp Summary | PDF (Letter) | `output/ramp_summary/` |
 | 2 | TSAR: Ramp Detail | XLSX | `output/ramp_detail/` |
 | 3 | Highway Sequence Listing | XLSX | `output/highway_sequence/` |
+| 4 | Highway Log | XLSX | `output/highway_log/` |
+
+The GUI exports any combination of these (tick checkboxes); the console menu
+adds an "A" option to pick several / all at once (see **Exporting Several Report
+Types at Once**).
 
 This repo combines the previously separate
 `TSMIS-Reports-Export-ALL-Ramp-Summary` and
@@ -47,9 +53,8 @@ This repo combines the previously separate
   writes `output/`, the auth token, logs, and config **next to the `.exe`**,
   auto-falling back to `%LOCALAPPDATA%\TSMIS Exporter` if that folder is
   read-only. Implemented in `scripts/paths.py`.
-- **GUI (planned, Phase 4):** Tkinter (+ optional theme). A worker thread owns
-  the Playwright session and talks to the UI through the `Events` callbacks
-  (`scripts/events.py`).
+- **GUI:** Tkinter (+ optional theme), built. A worker thread owns the Playwright
+  session and talks to the UI through the `Events` callbacks (`scripts/events.py`).
 
 **Pinned versions (see `version.py`):**
 - `playwright==1.60.0` — pins the bundled **Node driver** only; no Chromium is
@@ -90,31 +95,35 @@ launching a window. See **Build & Packaging** for details and gotchas.
 
 ```
 .
-├── 1. setup (one time).bat            # pip install playwright + parsers (no browser download; uses system Edge/Chrome)
+├── 1. setup (one time).bat            # pip install -r requirements.txt (no browser download; uses system Edge/Chrome)
 ├── 2. login (update login).bat        # captures auth session
-├── 3. run_export (main script).bat    # auth check + menu + run chosen exporter
+├── 3. run_export (main script).bat    # auth check + menu (single report, or A = several/all) + run
 ├── 4. consolidate (combine reports).bat  # menu + run chosen consolidator
 ├── 5. fast export (experimental).bat  # parallel multi-browser export (sets TSMIS_FAST_WORKERS)
-├── run app (GUI preview).bat          # dev launcher for the desktop GUI (Phase 4)
+├── run app (GUI preview).bat          # dev launcher for the desktop GUI
 ├── requirements.txt                   # pinned runtime deps (playwright, pdfplumber, openpyxl)
 ├── requirements-build.txt             # build deps (-r requirements.txt + pyinstaller)
 ├── version.py                         # app name/version + pinned Playwright (Node driver) version
 ├── scripts/
 │   ├── paths.py                       # frozen-aware paths (output/auth/logs/failures/config); option A
 │   ├── logging_setup.py               # rotating file log under LOG_DIR (all entry points call it)
-│   ├── common.py                      # URL, ROUTES, timeouts, auth + nav helpers, AuthError, preflight
+│   ├── common.py                      # URL, ROUTES, timeouts, auth + nav helpers, AuthError, RunCancelled, preflight
 │   ├── events.py                      # Events sink + RunResult + ConsolidateResult (engine <-> UI seam)
 │   ├── exporter.py                    # shared export engine + ReportSpec + save strategies
 │   ├── exporter_parallel.py           # EXPERIMENTAL fast mode: N browsers in parallel; reuses exporter.py
-│   ├── run_report.py                  # per-route run report (CSV; auto-saved each run)
-│   ├── cli.py                         # console adapter (keeps the .bat flow working)
+│   ├── run_report.py                  # per-route run report (CSV; auto-saved each run; +multi)
+│   ├── cli.py                         # console adapter: run_cli (one report) + run_cli_multi (several)
 │   ├── login.py                       # writes the auth file (headed browser)
 │   ├── export_ramp_summary.py         # thin: a ReportSpec (PDF) + run_cli
 │   ├── export_ramp_detail.py          # thin: a ReportSpec (XLSX download) + run_cli
 │   ├── export_highway_sequence.py     # thin: a ReportSpec (XLSX download) + run_cli
-│   ├── consolidate_ramp_summary.py    # PDFs  -> one XLSX (audit cols); importable consolidate()
-│   ├── consolidate_ramp_detail.py     # XLSXs -> one XLSX (adds Route);  importable consolidate()
-│   ├── consolidate_highway_sequence.py # XLSXs -> one XLSX (adds Route);  importable consolidate()
+│   ├── export_highway_log.py          # thin: a ReportSpec (XLSX download) + run_cli
+│   ├── export_multi.py                # entry point: pick several/all report types -> run_cli_multi
+│   ├── consolidate_xlsx_base.py       # shared XLSX consolidator core (detail/sequence/log use it)
+│   ├── consolidate_ramp_summary.py    # PDFs  -> one XLSX (audit cols); standalone (PDF parsing)
+│   ├── consolidate_ramp_detail.py     # thin wrapper over consolidate_xlsx_base
+│   ├── consolidate_highway_sequence.py # thin wrapper over consolidate_xlsx_base
+│   ├── consolidate_highway_log.py     # thin wrapper over consolidate_xlsx_base
 │   ├── gui_main.py                    # GUI entry point (dev import paths, launches App)
 │   ├── gui_app.py                     # main window (Tk): header, Export/Consolidate tabs, log
 │   ├── gui_worker.py                  # worker threads: Export/Consolidate/Login (Events -> queue)
@@ -129,17 +138,17 @@ launching a window. See **Build & Packaging** for details and gotchas.
 │   └── .venv/                         # build venv (git-ignored)
 ├── dist/                              # build output: dist/TSMIS Exporter/ (git-ignored)
 ├── output/                            # folder structure tracked, contents ignored
-│   ├── ramp_summary/  ramp_detail/  highway_sequence/  consolidated/
+│   ├── ramp_summary/  ramp_detail/  highway_sequence/  highway_log/  consolidated/
 │   └── run_reports/                   # auto-saved per-route CSV reports (created on demand)
 ├── .gitignore
 └── CLAUDE.md
 ```
 
-`scripts/tsmis_auth.json` (auth cookies) is git-ignored. The four `output/`
+`scripts/tsmis_auth.json` (auth cookies) is git-ignored. The five `output/`
 subfolders are committed (via empty `.gitkeep` files) so the scripts always
 have a place to write, but generated files inside them are git-ignored — they
-can be gigabytes. Build artifacts (`build/.venv`, `build/ms-playwright`,
-`build/pyi-work`, `dist/`) are git-ignored.
+can be gigabytes. The local `.claude/` permission state and build artifacts
+(`build/.venv`, `build/ms-playwright`, `build/pyi-work`, `dist/`) are git-ignored.
 
 ## Technology Stack
 
@@ -150,7 +159,7 @@ can be gigabytes. Build artifacts (`build/.venv`, `build/ms-playwright`,
 | PDF parsing | `pdfplumber` (consolidators only) |
 | Excel writing | `openpyxl` (consolidators only) |
 | Packaging | PyInstaller (onefolder, portable) |
-| GUI (planned) | Tkinter |
+| GUI | Tkinter |
 | Target application | `https://rhansonrizing.github.io/tsmis_reports/index.html` |
 | Auth mechanism | ArcGIS / Caltrans Azure AD (SSO + MFA) |
 | Session persistence | Playwright `storage_state` → `tsmis_auth.json` |
@@ -159,22 +168,23 @@ can be gigabytes. Build artifacts (`build/.venv`, `build/ms-playwright`,
 ## Workflow for End Users (current `.bat` flow)
 
 1. **Setup (once per machine):** Double-click `1. setup (one time).bat` —
-   installs Playwright + pdfplumber + openpyxl. No browser is downloaded; the
-   tool uses the Microsoft Edge / Chrome already on the machine.
+   runs `pip install -r requirements.txt` (the pinned Playwright + pdfplumber +
+   openpyxl, matching what the app is built against). No browser is downloaded;
+   the tool uses the Microsoft Edge / Chrome already on the machine.
 2. **Login (once, or when the session expires):** Double-click
    `2. login (update login).bat` — opens a visible browser, the user
    completes SSO + MFA, then presses Enter to save the session into
    `scripts/tsmis_auth.json`. The same file is used by every export script.
 3. **Export (repeatable):** Double-click `3. run_export (main script).bat` —
-   checks the auth file exists, shows a menu, asks which routes to export (press
-   Enter for all, or list specific ones), then runs the selected exporter
-   headlessly over those routes.
+   checks the auth file exists, shows a menu (pick one report, or `A` for
+   several / all), asks which routes to export (press Enter for all, or list
+   specific ones), then runs the selected report(s) headlessly over those routes.
 4. **Consolidate (optional, repeatable):** Double-click
    `4. consolidate (combine reports).bat` — pick one report type and combine
    every per-route export into a single workbook under `output/consolidated/`.
 
-> The packaged GUI app (Phase 4) will replace steps 2–4 with buttons, but the
-> `.bat` flow remains for development and as a fallback.
+> The packaged GUI app replaces steps 2–4 with buttons, but the `.bat` flow
+> remains for development and as a fallback.
 
 ## How the Menu Works
 
@@ -186,13 +196,16 @@ can be gigabytes. Build artifacts (`build/.venv`, `build/ms-playwright`,
    - `1` → `python scripts\export_ramp_summary.py`
    - `2` → `python scripts\export_ramp_detail.py`
    - `3` → `python scripts\export_highway_sequence.py`
+   - `4` → `python scripts\export_highway_log.py`
+   - `A` → `python scripts\export_multi.py` (pick several / all report types)
    - `Q` → quit
 3. Invalid choices loop back to the menu.
 4. After a report is chosen, the Python entry point (`run_cli`) prompts for the
    routes to export — Enter (or empty) means **all routes**; otherwise type a
    list like `5, 99, 101` (any casing / zero-padding, suffixes like `101U` ok).
-   The same prompt backs the fast-mode BAT. See **Selecting Which Routes to
-   Export**.
+   The same prompt backs the fast-mode BAT. The `A` option (`run_cli_multi`)
+   first asks which report types, then the same routes prompt. See **Selecting
+   Which Routes to Export** and **Exporting Several Report Types at Once**.
 
 `4. consolidate (combine reports).bat` follows the same pattern but runs no
 auth check (the consolidator reads local files, not TSMIS).
@@ -213,9 +226,12 @@ and raises `AuthError` on session problems.
   (`./output`, `scripts/tsmis_auth.json`); when frozen it resolves next to the
   `.exe` with a `%LOCALAPPDATA%` fallback.
 - **`scripts/common.py`** — shared, console-free helpers: `URL`, `ROUTES`,
-  timeout constants, `AuthError`, `clear_auth()`, `require_valid_auth()`
+  timeout constants, `AuthError`, `RunCancelled` (raised mid-wait so Cancel
+  interrupts the current route — see **Cancelling a Run**), `clear_auth()`,
+  `require_valid_auth()`
   (raises `AuthError`), `navigate_with_auth`, `is_logged_in`, `select_report`,
-  `wait_with_skip_option(page, js, prefix, events, ...)`, `launch_browser` /
+  `wait_with_skip_option(page, js, prefix, events, ...)` (honors both
+  `should_skip()` and `is_cancelled()`), `launch_browser` /
   `new_authed_browser` (drive the **system** browser — probe + launch
   `channel="msedge"`, fall back to `"chrome"` if Edge can't be driven,
   `TSMIS_BROWSER_CHANNEL` to override, raising `BrowserNotFoundError` if neither
@@ -234,34 +250,42 @@ and raises `AuthError` on session problems.
   `run_export(spec, events)`, plus `ReportSpec`, the reusable save strategies
   `save_pdf_letter` / `save_via_export_button`, and `_recover()`.
 - **`scripts/cli.py`** — console adapters that keep both `.bat` flows working:
-  `run_cli(spec, title)` for exports (wires `Events` to `print()`/`msvcrt`,
-  prompts for the route subset via `_resolve_routes_console` (Enter = all; also
-  honors the `TSMIS_ROUTES` env var) and passes `routes=` to the engine,
-  renders `AuthError` like the old `handle_bad_auth`) and
-  `run_consolidate_cli(consolidate_fn)` for consolidators (wires `on_log` to
-  `print`, the overwrite prompt to `input()`, maps the `ConsolidateResult`
-  status to the exit code). Imports `exporter` lazily so consolidating never
-  pulls in Playwright.
-- **`scripts/export_*.py`** — now ~33-line files: each defines a `ReportSpec`
-  and calls `run_cli`.
+  `run_cli(spec, title)` for one report and `run_cli_multi(report_options, title)`
+  for several (wires `Events` to `print()`/`msvcrt`, prompts for the route subset
+  via `_resolve_routes_console` (Enter = all; also honors the `TSMIS_ROUTES` env
+  var) and passes `routes=` to the engine, renders `AuthError` like the old
+  `handle_bad_auth`). Both share `_run_one_export` (dispatches sequential vs fast
+  by `TSMIS_FAST_WORKERS`); `run_cli_multi` adds `_select_reports_console`
+  (numbers / `A`, honoring `TSMIS_REPORTS`). `run_consolidate_cli(consolidate_fn)`
+  drives consolidators (wires `on_log` to `print`, the overwrite prompt to
+  `input()`, maps the `ConsolidateResult` status to the exit code). Imports
+  `exporter`/`exporter_parallel` lazily so consolidating never pulls in Playwright.
+- **`scripts/export_*.py`** — thin ~30-line files: each defines a `ReportSpec`
+  and calls `run_cli`. `export_multi.py` instead lists all the report `(label,
+  spec)`s and calls `run_cli_multi` (backs the menu's `A` option).
 - **`scripts/consolidate_*.py`** — each exposes `consolidate(events,
   confirm_overwrite) -> ConsolidateResult` (console-free: logs via `Events`,
   asks before overwrite via the callback, honors `is_cancelled()`, never
-  `print`/`input`/`exit`) plus a `__main__` that calls `run_consolidate_cli`.
-  Third-party imports are guarded with a `_DEPS_OK` flag and openpyxl style
-  objects are built inside functions, so the modules import cleanly even if a
+  `print`/`input`/`exit`) plus a `__main__` that calls `run_consolidate_cli`. The
+  three XLSX reports (Ramp Detail, Highway Sequence, Highway Log) are thin
+  wrappers over a shared `consolidate_xlsx_base.consolidate_xlsx`, parameterized
+  by input dir / sheet name / output name; Ramp Summary stays standalone (it
+  parses PDFs). Third-party imports are guarded with a `_DEPS_OK` flag and openpyxl
+  style objects are built inside functions, so the modules import cleanly even if a
   dependency is missing — the GUI gets a clean error `ConsolidateResult` instead
-  of a fatal `ImportError`. Still one self-contained file per report (no shared
-  parser helpers).
+  of a fatal `ImportError`. See **Adding a New Consolidator**.
 
-**GUI (Phase 4) — `scripts/gui_*.py`** (built on the same console-free core):
+**GUI — `scripts/gui_*.py`** (built on the same console-free core):
 - `gui_main.py` — entry point. Sets the dev import paths (frozen builds need
   nothing — the browser is the system one), then runs `App().mainloop()`.
 - `gui_app.py` — the `App(tk.Tk)` window: a header (session dot + Log in button +
   a compact **readiness strip**), an Export/Consolidate **notebook**, a shared
   progress bar + counts + log pane, and a footer (output path + Open folder). The
-  Export tab has a **Routes** entry (blank = all; or type/`Choose…` a subset via
-  `parse_routes`) passed to `ExportWorker(..., routes=...)`. The header strip has
+  Export tab has a **checkbox per report type** (tick one or more — selected types
+  run one after another) and a **Routes** entry (blank = all; or type/`Choose…` a
+  subset via `parse_routes`), both passed to `ExportWorker(specs, ..., routes=...)`.
+  The progress label shows `[i/n] <report>` while several run; **Cancel** stops
+  the current route promptly (`RunCancelled`). The header strip has
   a **Browser** dropdown (default Edge → `common.set_preferred_channel`), green/red
   **status dots** for Edge · Chrome · Output · Tools (hover = detail tooltip), and
   a **Re-check** button — all filled in on launch by a `CheckWorker` (login stays
@@ -271,7 +295,9 @@ and raises `AuthError` on session problems.
 - `gui_worker.py` — `ExportWorker` / `ConsolidateWorker` / `LoginWorker` /
   `CheckWorker` threads. They drive the engines through `Events` (or, for
   `CheckWorker`, run the readiness probes), posting `(kind, payload)` messages to
-  a `queue.Queue`. Skip/Cancel are `threading.Event`s; login waits on a `done`
+  a `queue.Queue`. `ExportWorker` takes a **list of specs** and runs them in turn,
+  resetting the per-report tally and posting `("export_done", [(spec, RunResult),
+  …])` at the end. Skip/Cancel are `threading.Event`s; login waits on a `done`
   event set by the "I've finished logging in" button (replacing `login.py`'s
   console `input()`s). `CheckWorker` posts `("check", (key, status, text))` per
   item then `("checks_done", {channel: status})`.
@@ -307,7 +333,7 @@ the report-generation wait and the export/download wait (so a big report whose
 ## Skipping a Slow Route Mid-Run
 
 While waiting on a slow route, the user can skip it. In the console flow
-(`cli.py`) this is the `S` key (Windows `msvcrt`); in the GUI it will be a Skip
+(`cli.py`) this is the `S` key (Windows `msvcrt`); in the GUI it is the Skip
 button. Mechanically, `wait_with_skip_option` polls `events.should_skip()`:
 
 1. Waits up to `SKIP_PROMPT_AFTER_MS` silently.
@@ -318,6 +344,27 @@ button. Mechanically, `wait_with_skip_option` polls `events.should_skip()`:
    to `failed` and the loop recovers as usual.
 
 Re-run later and the loop retries any routes without an output file.
+
+## Cancelling a Run
+
+Cancel stops the **current** export immediately, not just between routes. The
+driver sets `events.is_cancelled()` (the GUI **Cancel** button → `cancel_event`;
+on window close too), and `wait_with_skip_option` checks it at the top of every
+poll (~5 s), raising **`RunCancelled`** mid-wait. The engines treat that as a
+clean stop, *not* a route failure or a worker crash:
+
+- **Sequential (`exporter.py`):** `_attempt_route` also re-checks cancel just
+  before saving; `_process_route` re-raises `RunCancelled` (never records the
+  route as failed or retries it); the main loop and the retry pass catch it and
+  break. The end-of-run retry pass is skipped when cancelled.
+- **Fast mode (`exporter_parallel.py`):** the worker catches `RunCancelled` and
+  winds down; `is_cancelled()` (which also reflects the shared `stop` flag)
+  quiets the other workers between routes.
+
+Either way the run returns a *partial* `RunResult` (so the run report and the
+summary still reflect what completed), and re-running resumes — routes already on
+disk are skipped. This replaced the old behavior where Cancel only took effect
+after the in-flight route's full report-generation wait finished.
 
 ## Retrying Failed Routes (end-of-run pass)
 
@@ -381,6 +428,32 @@ to a specific subset; the default (all) is unchanged if you don't pick any.
 This is per-run selection. To change the route universe permanently (add/remove a
 route everywhere), edit the `ROUTES` list — see **Adding or Removing Routes**.
 
+## Exporting Several Report Types at Once
+
+A single run can export any combination of the report types (or all of them).
+Each selected report runs in turn through the **same** proven engine — there is
+no new export path — so route selection, fast mode, resume, retry, and the run
+report all behave exactly as for a single report.
+
+- **Engine:** unchanged. The drivers loop over the chosen `ReportSpec`s and call
+  `run_export` / `run_export_parallel` once per report; each report opens its own
+  browser + preflight and auto-saves its own run-report CSV. Running types
+  serially (not all at once) keeps fast mode honest — at most `workers` browsers
+  are ever open.
+- **Console (`cli.py` + `export_multi.py`):** `run_cli_multi(report_options)`
+  first asks which report types (numbers like `1,3`, or `A`/Enter for all; honors
+  the `TSMIS_REPORTS` env var via `_select_reports_console`), then the usual routes
+  prompt, then runs each and prints a per-report + combined summary. Backed by the
+  `A` menu option in `3. run_export` and `5. fast export`.
+- **GUI (`gui_app.py`):** the Export tab shows a **checkbox per report type** (tick
+  one or more; first ticked by default). `start_export` collects the ticked specs
+  and hands the list to `ExportWorker(specs, …)`, which runs them in turn, resets
+  the progress tally per report (the label shows `[i/n] <report>`), and posts one
+  combined `("export_done", [(spec, RunResult), …])`. **Save run report…** writes a
+  single combined CSV (`run_report.write_run_report_multi`) when several ran.
+- **Cancel** stops the whole multi-run — the current report's in-flight route ends
+  promptly and later reports don't start. See **Cancelling a Run**.
+
 ## Resume / Idempotency
 
 `run_export` checks `if out_path.exists(): continue` before each route, so
@@ -411,8 +484,17 @@ per-report fix benefits both engines; only the concurrency/coordination is new.
   **single-browser, one-at-a-time** retry (`_retry_failed_sequential` →
   `_retry_failed_routes`, `RETRY_REPORT_TIMEOUT_MS`), so a slow report finally
   lands without competing with N other browsers. See **Retrying Failed Routes**.
+- **A crashed worker never silently drops routes.** If a worker dies with an
+  unexpected error it sets a `worker_crashed` flag and exits, but the **other
+  workers keep draining the queue** (one dead browser no longer aborts the whole
+  run). After the join, any route with no recorded outcome and no file on disk —
+  the crashed worker's in-flight route plus anything left unstarted — is
+  **reconciled as `failed`**, so it shows up, gets the serial retry, and is counted
+  exactly once in the run report. (Reconciliation is skipped on user cancel: those
+  routes are just not-done, to be resumed, not failures.)
 - **Per-route Skip is disabled** during the parallel phase (ambiguous with
-  several routes in flight) — use **Cancel** to stop the whole run. (The serial
+  several routes in flight) — use **Cancel** to stop the whole run (it now
+  interrupts the in-flight wait too; see **Cancelling a Run**). (The serial
   retry phase is one-at-a-time, so the console `S` key works again there.)
 - **Threading:** Playwright's sync API is thread-affine, so each worker owns its
   own `sync_playwright()` + browser + context + page and never shares a
@@ -431,11 +513,14 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 **How to turn it on:**
 - **Console / .bat:** `5. fast export (experimental).bat` asks how many browsers,
-  sets the `TSMIS_FAST_WORKERS` env var, then shows the usual report menu. (Any
-  flow that runs an `export_*.py` honors `TSMIS_FAST_WORKERS`; `run_cli` routes
-  to the parallel engine when it is > 1 — the thin exporters are unchanged.)
+  sets the `TSMIS_FAST_WORKERS` env var, then shows the usual report menu (incl.
+  `A` for several / all). Any flow that runs an `export_*.py` (or `export_multi.py`)
+  honors `TSMIS_FAST_WORKERS`; `run_cli`/`run_cli_multi` route to the parallel
+  engine when it is > 1 — the thin exporters are unchanged.
 - **GUI:** an "⚡ Fast mode (experimental)" checkbox + worker-count spinner on the
   Export tab; `start_export` passes the count to `ExportWorker(..., workers=N)`.
+- **With multi-report export:** report types still run **sequentially** (one after
+  another), each using N browsers, so at most N browsers are ever open at once.
 
 ## Auth / Session Details
 
@@ -481,35 +566,46 @@ Route strings must match the exact option values in the TSMIS "Route"
    `wait_js`, `is_empty`, `save`) and call `run_cli(SPEC, title=...)`. Reuse
    `save_pdf_letter` or `save_via_export_button` from `exporter.py`, or write a
    new save strategy there.
-2. Add a numbered branch to `3. run_export (main script).bat`.
-3. Add a `.gitkeep` to a new `output/<name>/` folder and whitelist it in
+2. Add a numbered branch to `3. run_export (main script).bat` (and `5. fast
+   export (experimental).bat`).
+3. Add it to `export_multi.py`'s `REPORTS` list and `gui_app.EXPORT_REPORTS`, so
+   the several/all selectors and the GUI checkbox include it.
+4. List the new module(s) in `APP_MODULES` in `build/app.spec` (they're imported
+   by bare name, several lazily, so PyInstaller needs them as hidden imports).
+5. Add a `.gitkeep` to a new `output/<name>/` folder and whitelist it in
    `.gitignore`.
-4. Document it in the table at the top of this file.
+6. Document it in the table at the top of this file.
 
 ## Adding a New Consolidator
 
-Each consolidator is self-contained — parsing logic and Excel writing live
-together in one `scripts/consolidate_<name>.py`. Don't share parser helpers
-between consolidators; each input format (PDF vs XLSX) and report's quirks
-differ enough that sharing introduces cross-report bugs.
+Consolidators split two ways. The three **XLSX** reports (Ramp Detail, Highway
+Sequence, Highway Log) are near-identical — one sheet, a header row, then data —
+so they are thin wrappers over `consolidate_xlsx_base.consolidate_xlsx`,
+parameterized by input dir / sheet name / output name / friendly name (a fix to
+the combined layout benefits all three at once). The **Ramp Summary**
+consolidator stays standalone: it parses PDFs with report-specific column/wrap
+logic that must not leak into the others.
 
-1. Create `scripts/consolidate_<name>.py` modeled on an existing one:
-   - Expose `consolidate(events=None, confirm_overwrite=None) -> ConsolidateResult`.
-     Read inputs from `OUTPUT_ROOT / "<name>"`, write to
-     `OUTPUT_ROOT / "consolidated" / "<name>_consolidated.xlsx"`.
-   - Keep it console-free: log progress via `events.on_log`, ask before
-     overwriting via `confirm_overwrite(path) -> bool`, honor
-     `events.is_cancelled()`, and return a `ConsolidateResult`. Never
-     `print`/`input`/`sys.exit` here.
-   - Guard third-party imports with a `_DEPS_OK` flag (don't `sys.exit` on
-     `ImportError`) and build any openpyxl style objects inside functions, so
-     the module stays importable when frozen or when a dep is missing.
-   - Surface the "file open in Excel" `PermissionError` as an `error` result.
-   - Add `if __name__ == "__main__": from cli import run_consolidate_cli;
-     run_consolidate_cli(consolidate)` so the `.bat` flow keeps working.
-2. Turn the placeholder branch in `4. consolidate (combine reports).bat` into
-   a real call.
-3. Document it here.
+**For another XLSX report** (the common case): create
+`scripts/consolidate_<name>.py` like `consolidate_highway_log.py` — set
+`INPUT_DIR`, `OUT_PATH`, `SHEET_NAME` (exact export sheet name), `REPORT_NAME`,
+and a `consolidate(events, confirm_overwrite)` that calls `consolidate_xlsx(...)`
+with a `title`; keep the `OUT_PATH` module attribute (the GUI reads it).
+
+**For a genuinely different input format** (like the PDF Ramp Summary): write a
+standalone file exposing the same `consolidate(events=None, confirm_overwrite=
+None) -> ConsolidateResult` contract — console-free (log via `events.on_log`, ask
+before overwrite via `confirm_overwrite(path) -> bool`, honor
+`events.is_cancelled()`, never `print`/`input`/`sys.exit`), guard third-party
+imports with a `_DEPS_OK` flag, build openpyxl style objects inside functions,
+and surface the "open in Excel" `PermissionError` as an `error` result.
+
+Then, for either kind:
+1. Add `if __name__ == "__main__": from cli import run_consolidate_cli;
+   run_consolidate_cli(consolidate)` so the `.bat` flow keeps working.
+2. Turn the branch in `4. consolidate (combine reports).bat` into a real call.
+3. List the module(s) in `APP_MODULES` in `build/app.spec`, register it in
+   `gui_app.CONSOLIDATE_REPORTS`, and document it here.
 
 ## Build & Packaging (portable onefolder)
 
@@ -529,6 +625,10 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
 3. Runs `prune_bundle.ps1` on the built bundle (see **Bundle hygiene** below) to
    strip non-runtime files / DLP-blocked content and **fail the build** if any
    remains. Final bundle ~148 MB (was ~587 with bundled Chromium).
+4. **With `-SelfTest`, then actually RUNS the built self-test `.exe`** and fails
+   the build on a nonzero exit — so `-SelfTest` is a real release gate over the
+   *pruned, frozen* bundle, not just "it linked." (Building without running it
+   would never catch a prune/exclude that broke a runtime import.)
 
 `build\app.spec` highlights:
 - `collect_all('playwright')` + Playwright's own bundled PyInstaller hooks →
@@ -536,13 +636,15 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
   no `ms-playwright` data entry; the app drives system Edge/Chrome.
 - `collect_data_files('pdfminer')` + `collect_all('pdfplumber'/'openpyxl')` →
   pdf/excel work when frozen (pdfminer CMap data is the classic trap).
-- **`excludes=['PIL','pypdfium2','pypdfium2_raw']`** — image libraries pulled in
-  transitively (Pillow via openpyxl/pdfplumber/pdfminer image paths; pypdfium2
-  via `pdfplumber.to_image`) that the app NEVER uses (it only extracts
-  text/tables and writes plain workbooks). Those imports are all guarded
-  (try/except or lazy), so excluding them is **verified safe by
-  `build/full_smoke.py`** and trims ~20 MB + image codecs. `cryptography` is a
-  hard top-level `pdfminer` import (encrypted-PDF support) and **must stay**.
+- **`excludes=['PIL','pypdfium2','pypdfium2_raw']`** — image libraries the app
+  never needs at runtime. Note: openpyxl imports **Pillow eagerly**, so in a
+  normal install PIL *does* load — it is not "never imported" (`full_smoke.py`
+  reports `PIL: True` against the venv). What makes excluding it safe is that the
+  code paths the app uses (text/table extraction + plain workbooks, never image
+  insert or `pdfplumber.to_image`) don't need it and tolerate its absence — proven
+  not by the import being gone but by the **frozen self-test still passing with PIL
+  excluded** (`build.ps1 -SelfTest`). Trims ~20 MB + image codecs. `cryptography`
+  is a hard top-level `pdfminer` import (encrypted-PDF support) and **must stay**.
 - **Browser selection** lives in `scripts/common.launch_browser`: once per
   process it **probes** each channel — `msedge`, then `chrome` (override with the
   `TSMIS_BROWSER_CHANNEL` env var) — by launching it *headless and driving a
@@ -712,8 +814,9 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
   git-ignored.
 - **Don't commit generated files** under `output/`, nor build artifacts
   (`build/.venv`, `build/ms-playwright`, `build/pyi-work`, `dist/`). Only the
-  four `output/.gitkeep` stubs are tracked there.
+  five `output/.gitkeep` stubs are tracked there. The local `.claude/` permission
+  state is git-ignored too.
 - Track the build *infra* (`build/build.ps1`, `build/prune_bundle.ps1`,
-  `build/app.spec`, `build/smoke_entry.py`), `requirements*.txt`, and `version.py`.
+  `build/app.spec`, `build/full_smoke.py`), `requirements*.txt`, and `version.py`.
 - Commit messages should be short and imperative (e.g., `add route 395`,
   `decouple export engine from console`).

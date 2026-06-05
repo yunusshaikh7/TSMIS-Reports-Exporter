@@ -6,6 +6,7 @@ files keep working unchanged after the refactor. The engines themselves never
 touch the console -- only this module does.
 """
 import os
+import re
 import sys
 
 from common import AUTH, ROUTES, AuthError, BrowserNotFoundError, PreflightError, clear_auth, parse_routes
@@ -91,6 +92,40 @@ def _report_bad_auth(reason):
     sys.exit(1)
 
 
+def _resolve_workers():
+    """Worker count for the console flow: TSMIS_FAST_WORKERS if set (>1 -> the
+    experimental parallel engine), else 1 (the proven sequential engine)."""
+    if os.environ.get("TSMIS_FAST_WORKERS", "").strip():
+        from exporter_parallel import resolve_worker_count
+        return resolve_worker_count()
+    return 1
+
+
+def _run_one_export(spec, events, workers, run_routes):
+    """Run one report's export, dispatching to the parallel engine when
+    workers > 1 else the sequential one. Imports are lazy so consolidation never
+    pulls in Playwright. Raises AuthError / PreflightError / BrowserNotFoundError
+    like the engines."""
+    if workers > 1:
+        from exporter_parallel import run_export_parallel
+        return run_export_parallel(spec, events, workers=workers, routes=run_routes)
+    from exporter import run_export
+    return run_export(spec, events, routes=run_routes)
+
+
+def _print_export_summary(result, selected):
+    """Print the per-report outcome block shared by the single and multi flows."""
+    already = len(result.exists)
+    total = result.saved + already + len(result.empty) + len(result.user_skipped) + len(result.failed)
+    print(f"Saved this run:  {result.saved}")
+    print(f"Already had:     {already} (saved in a previous run)")
+    print(f"Empty (no data): {len(result.empty)} {result.empty if result.empty else ''}")
+    print(f"Skipped by user: {len(result.user_skipped)} {result.user_skipped if result.user_skipped else ''}")
+    print(f"Failed:          {len(result.failed)} {result.failed if result.failed else ''}")
+    print(f"Routes handled:  {total} of {selected}")
+    print(f"Output folder:   {result.output_dir}")
+
+
 def run_cli(spec, title):
     """Run one report export as a console program. Used by the export_*.py
     entry points and therefore by '3. run_export (main script).bat'.
@@ -98,14 +133,8 @@ def run_cli(spec, title):
     If the TSMIS_FAST_WORKERS environment variable is set to a number > 1
     (e.g. by '5. fast export (experimental).bat'), the experimental parallel
     engine runs several browsers at once instead of the proven sequential one."""
-    from exporter import run_export  # lazy: avoids importing Playwright for consolidation
-
     setup_logging()
-
-    workers = 1
-    if os.environ.get("TSMIS_FAST_WORKERS", "").strip():
-        from exporter_parallel import resolve_worker_count
-        workers = resolve_worker_count()
+    workers = _resolve_workers()
 
     routes = _resolve_routes_console()          # None = all routes
     run_routes = ROUTES if routes is None else routes
@@ -124,11 +153,7 @@ def run_cli(spec, title):
     print()
 
     try:
-        if workers > 1:
-            from exporter_parallel import run_export_parallel
-            result = run_export_parallel(spec, _console_events(), workers=workers, routes=run_routes)
-        else:
-            result = run_export(spec, _console_events(), routes=run_routes)
+        result = _run_one_export(spec, _console_events(), workers, run_routes)
     except AuthError as e:
         _report_bad_auth(str(e))
         return
@@ -140,17 +165,122 @@ def run_cli(spec, title):
         input("\nPress Enter to exit...")
         sys.exit(1)
 
-    already = len(result.exists)
-    total = result.saved + already + len(result.empty) + len(result.user_skipped) + len(result.failed)
     print()
     print("=" * 60)
-    print(f"Saved this run:  {result.saved}")
-    print(f"Already had:     {already} (saved in a previous run)")
-    print(f"Empty (no data): {len(result.empty)} {result.empty if result.empty else ''}")
-    print(f"Skipped by user: {len(result.user_skipped)} {result.user_skipped if result.user_skipped else ''}")
-    print(f"Failed:          {len(result.failed)} {result.failed if result.failed else ''}")
-    print(f"Routes handled:  {total} of {selected}")
-    print(f"Output folder:   {result.output_dir}")
+    _print_export_summary(result, selected)
+    print("=" * 60)
+
+
+def _select_reports_console(report_options):
+    """Choose which report types to export. report_options is an ordered list of
+    (label, spec); returns the chosen subset in menu order.
+
+    Enter / 'A' / 'all' (or EOF) = all; otherwise numbers like '1,3'. Honors the
+    TSMIS_REPORTS env var (numbers or 'all'). Re-prompts on invalid input."""
+    n = len(report_options)
+
+    def parse(sel):
+        sel = sel.strip().lower()
+        if sel in ("", "a", "all"):
+            return list(report_options)
+        chosen_idx, bad = set(), []
+        for tok in (t for t in re.split(r"[\s,;]+", sel) if t):
+            if tok.isdigit() and 1 <= int(tok) <= n:
+                chosen_idx.add(int(tok) - 1)
+            else:
+                bad.append(tok)
+        if bad:
+            raise ValueError("Not valid choice(s): " + ", ".join(bad))
+        return [opt for i, opt in enumerate(report_options) if i in chosen_idx]  # menu order
+
+    env = os.environ.get("TSMIS_REPORTS")
+    if env is not None and env.strip():
+        try:
+            return parse(env)
+        except ValueError as e:
+            print(f"TSMIS_REPORTS ignored: {e}")   # fall through to the prompt
+
+    print("Which report types do you want to export?")
+    for i, (label, _spec) in enumerate(report_options, 1):
+        print(f"   {i}. {label}")
+    while True:
+        try:
+            raw = input("Enter numbers (e.g. 1,3), or A for all: ").strip()
+        except EOFError:
+            return list(report_options)
+        try:
+            chosen = parse(raw)
+        except ValueError as e:
+            print(f"  {e}  Try again.")
+            continue
+        if chosen:
+            return chosen
+        print("  Please choose at least one report.")
+
+
+def run_cli_multi(report_options, title="TSMIS Multi-Report Export"):
+    """Export SEVERAL report types in one console run. report_options is an
+    ordered list of (label, spec). Prompts which reports + which routes once, then
+    runs each selected report with the proven engine (sequential, or fast mode if
+    TSMIS_FAST_WORKERS is set). Backs the 'Several / all report types' BAT option."""
+    setup_logging()
+    workers = _resolve_workers()
+
+    chosen = _select_reports_console(report_options)
+    if not chosen:
+        print("No reports selected.")
+        return
+
+    routes = _resolve_routes_console()          # None = all routes
+    run_routes = ROUTES if routes is None else routes
+    selected = len(run_routes)
+
+    print()
+    print("=" * 60)
+    print(f"{title}: {len(chosen)} report type(s)")
+    for label, _spec in chosen:
+        print(f"   - {label}")
+    if routes is None:
+        print(f"Routes: all ({selected})")
+    else:
+        print(f"Routes: {selected} of {len(ROUTES)}: {', '.join(run_routes)}")
+    if workers > 1:
+        print(f"FAST MODE (experimental): {workers} browsers in parallel")
+    print("=" * 60)
+    if workers == 1 and _HAS_KEYBOARD:
+        print("Tip: press 'S' to skip a route that is taking too long.")
+
+    results = []
+    for i, (label, spec) in enumerate(chosen, 1):
+        print()
+        print("#" * 60)
+        print(f"# Report {i} of {len(chosen)}:  {label}")
+        print("#" * 60)
+        try:
+            result = _run_one_export(spec, _console_events(), workers, run_routes)
+        except AuthError as e:
+            _report_bad_auth(str(e))             # a bad session breaks every report -> stop
+            return
+        except (PreflightError, BrowserNotFoundError) as e:
+            print()
+            print("=" * 60)
+            print(f"PROBLEM: {e}")
+            print("=" * 60)
+            input("\nPress Enter to exit...")
+            sys.exit(1)
+        results.append((label, result))
+        print()
+        _print_export_summary(result, selected)
+
+    print()
+    print("=" * 60)
+    print(f"ALL DONE -- {len(results)} report type(s)")
+    for label, r in results:
+        line = (f"  {label}: saved {r.saved}, already {len(r.exists)}, "
+                f"empty {len(r.empty)}, skipped {len(r.user_skipped)}, failed {len(r.failed)}")
+        print(line + (f"  -> {r.failed}" if r.failed else ""))
+    print(f"Total saved this run: {sum(r.saved for _, r in results)}; "
+          f"total failed: {sum(len(r.failed) for _, r in results)}")
     print("=" * 60)
 
 

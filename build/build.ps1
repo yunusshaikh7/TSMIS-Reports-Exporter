@@ -1,8 +1,9 @@
 # Reproducible portable build for TSMIS Reports Exporter.
 #
-# Produces a self-contained onefolder under dist\<AppName>\ that bundles Python,
-# every dependency, and Chromium -- no installer and no Python required on the
-# target machine. Zip that folder to distribute.
+# Produces a self-contained onefolder under dist\<AppName>\ that bundles Python
+# and every dependency -- no installer and no Python required on the target
+# machine. No browser is bundled: the app drives the machine's installed Edge /
+# Chrome (only Playwright's Node driver ships). Zip that folder to distribute.
 #
 # Usage (from the repo root):
 #   powershell -ExecutionPolicy Bypass -File build\build.ps1
@@ -70,6 +71,18 @@ Assert-LastExit "PyInstaller"
 $AppDir = Join-Path $DistDir $env:TSMIS_APP_NAME
 Write-Host "==> Pruning bundle to runtime-only files and scanning for DLP-blocked content"
 & (Join-Path $BuildDir "prune_bundle.ps1") -Target $AppDir
+
+# --- 3b. Run the frozen self-test (the real release gate) -----------------
+# Building the self-test exe only proves it links; RUN it so -SelfTest actually
+# verifies the PRUNED frozen bundle exercises every real code path (system
+# browser pdf+download, pdfplumber, openpyxl, GUI). A nonzero exit fails the build.
+if ($SelfTest) {
+    $SelfTestExe = Join-Path $AppDir ("{0}.exe" -f $env:TSMIS_APP_NAME)
+    Write-Host "==> Running frozen self-test: $SelfTestExe"
+    & $SelfTestExe
+    Assert-LastExit "frozen self-test"
+    Write-Host "==> Frozen self-test PASSED (pruned bundle runs every code path)."
+}
 
 # --- 4. Report ------------------------------------------------------------
 if (-not $SelfTest) {

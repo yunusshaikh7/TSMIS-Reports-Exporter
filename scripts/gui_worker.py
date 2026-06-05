@@ -29,11 +29,17 @@ from paths import OUTPUT_ROOT
 
 
 class ExportWorker(threading.Thread):
-    """Runs one bulk export, translating engine Events into GUI messages."""
+    """Runs one OR MORE bulk exports, translating engine Events into GUI messages.
 
-    def __init__(self, spec, queue, cancel_event, skip_event, workers=1, routes=None):
+    `specs` may be a single ReportSpec or a list. Multiple report types run one
+    after another (each reuses the proven engine), so in fast mode only `workers`
+    browsers are ever open at once. Posts ('export_done', [(spec, RunResult), ...])
+    when all selected reports finish (the list is partial if cancelled)."""
+
+    def __init__(self, specs, queue, cancel_event, skip_event, workers=1, routes=None):
         super().__init__(daemon=True)
-        self.spec = spec
+        # Accept a single spec or a list, so callers can't trip on the shape.
+        self.specs = list(specs) if isinstance(specs, (list, tuple)) else [specs]
         self.q = queue
         self.cancel = cancel_event
         self.skip = skip_event
@@ -44,9 +50,13 @@ class ExportWorker(threading.Thread):
         self._total = len(self.routes)
         # route -> latest status, so the end-of-run retry pass (which re-reports a
         # route, e.g. failed -> saved) updates counts in place rather than
-        # double-counting. Counts are derived from this map on each update.
+        # double-counting. Counts are derived from this map on each update. Reset
+        # per report type so each report's progress starts clean.
         self._route_status = {}
         self._tally_lock = threading.Lock()  # fast mode: several threads call _on_route
+        self._cur_label = ""               # report currently running (shown in progress)
+        self._report_i = 0                 # 1-based index of the current report
+        self._report_n = len(self.specs)   # how many reports this run will do
 
     def _on_route(self, route, status):
         with self._tally_lock:              # in fast mode this fires from many threads
@@ -58,6 +68,9 @@ class ExportWorker(threading.Thread):
             msg = {"done": len(self._route_status), **counts}
         msg["total"] = self._total
         msg["route"] = route
+        msg["report"] = self._cur_label
+        msg["report_i"] = self._report_i
+        msg["report_n"] = self._report_n
         self.q.put(("progress", msg))
 
     def _should_skip(self):
@@ -73,14 +86,33 @@ class ExportWorker(threading.Thread):
             should_skip=self._should_skip,
             is_cancelled=self.cancel.is_set,
         )
+        results = []
         try:
-            if self.workers and self.workers > 1:
-                from exporter_parallel import run_export_parallel  # lazy
-                result = run_export_parallel(self.spec, events, workers=self.workers,
-                                             routes=self.routes)
-            else:
-                result = run_export(self.spec, events, routes=self.routes)
-            self.q.put(("export_done", result))
+            for i, spec in enumerate(self.specs, 1):
+                if self.cancel.is_set():
+                    break
+                self._report_i = i
+                self._cur_label = spec.label
+                with self._tally_lock:
+                    self._route_status = {}         # fresh counts for this report
+                if self._report_n > 1:
+                    self.q.put(("log", ""))
+                    self.q.put(("log", f"===== Report {i} of {self._report_n}: {spec.label} ====="))
+                # Reset the progress bar/counts for this report so the GUI doesn't
+                # show the previous report's tally while this one spins up.
+                self.q.put(("progress", {
+                    "done": 0, "total": self._total, "route": "—",
+                    "saved": 0, "empty": 0, "skipped": 0, "failed": 0, "exists": 0,
+                    "report": spec.label, "report_i": i, "report_n": self._report_n,
+                }))
+                if self.workers and self.workers > 1:
+                    from exporter_parallel import run_export_parallel  # lazy
+                    result = run_export_parallel(spec, events, workers=self.workers,
+                                                 routes=self.routes)
+                else:
+                    result = run_export(spec, events, routes=self.routes)
+                results.append((spec, result))
+            self.q.put(("export_done", results))
         except AuthError as e:
             self.q.put(("error", ("auth", str(e))))
         except (PreflightError, BrowserNotFoundError) as e:
