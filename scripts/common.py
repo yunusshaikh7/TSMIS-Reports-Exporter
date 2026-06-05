@@ -49,6 +49,15 @@ class RunCancelled(Exception):
     stop the run cleanly -- it is NOT a route failure or a worker crash."""
 
 
+class ReportError(Exception):
+    """Raised when the TSMIS site itself renders a fatal error for a route -- its
+    #rampResults box goes into an `error` state (e.g. "Cannot read properties of
+    undefined (reading 'size')") instead of producing a report or a clean "no
+    results". Detected during the post-Generate wait so the route fails FAST with
+    the site's own message, instead of silently waiting out the whole per-route
+    timeout (and then the long retry) on something the site simply can't build."""
+
+
 URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
 
 # The shared auth file path is resolved by paths.py, which is frozen-aware: in
@@ -213,6 +222,33 @@ def select_report(page, report_label):
         timeout=COUNTY_ENABLE_TIMEOUT_MS,
     )
     page.locator("#districtCountySelect").select_option(label="-- ALL --")
+
+
+# Every report renders a fatal error into the shared #rampResults box by adding
+# the `error` class (e.g. highway_log/hsl: `box.className = 'ramp-results error'`;
+# ramp detail/summary via the shared showRampResults('error', ...)). clearResults()
+# resets that class on each Generate, so this only ever reflects the CURRENT
+# route -- no stale-error false positives. JS expression form for use inside the
+# post-Generate wait condition.
+ERROR_JS = "document.querySelector('#rampResults.error') !== null"
+
+
+def report_error_text(page):
+    """If the report rendered an error (the site's #rampResults is in its `error`
+    state), return the site's message; otherwise None.
+
+    The site shows fatal report errors here with NO Export button and NO "no
+    results" text, so without detecting this the export loop would wait out the
+    full per-route timeout (then the long retry) on a route the site can't build.
+    Best-effort: any lookup problem returns None (treat as "no error seen")."""
+    try:
+        loc = page.locator("#rampResults.error")
+        if loc.count() > 0:
+            text = (loc.first.inner_text() or "").strip()
+            return text or "The TSMIS site reported an error for this route."
+    except Exception:
+        return None
+    return None
 
 
 def preflight(page, report_label):

@@ -168,27 +168,36 @@ class LoginWorker(threading.Thread):
                 page.goto(URL)
                 self.q.put(("login_open", None))
 
-                # Notice the user closing the login window. We watch the PAGE, not
-                # the browser process: with system Edge, closing the window can
-                # leave a background process running, so browser.is_connected()
-                # stays True -- but the page closes.
-                window_closed = threading.Event()
-                page.on("close", lambda *a: window_closed.set())
-
-                # Wait for a button OR a window-close. Capture the session the
-                # instant a real TSMIS login appears, so a plain window-close after
-                # signing in still recovers it. A cheap round-trip each tick pumps
-                # Playwright events so the close is noticed promptly.
+                # Wait for the user to finish (the "I've finished" button sets
+                # self.done) OR to close the whole browser window. Capture the
+                # session the instant a real TSMIS login appears, so closing the
+                # window AFTER signing in still saves it.
+                #
+                # ROBUSTNESS (this is what was broken): the SSO/MFA sign-in
+                # navigates, can open a popup, and may replace the original tab,
+                # and a single Playwright call can blip mid-redirect. So we must
+                # NOT treat one ctx.cookies() error -- nor the *original* tab
+                # closing -- as "the user gave up." The old code did, which slammed
+                # the window shut the instant a password went through and reported
+                # "cancelled." The only reliable "user closed the window" signal is
+                # that NO tabs remain open in the context (the SSO dance always
+                # keeps >= 1 tab), with a long all-calls-failing streak as a
+                # backstop for a truly dead connection.
                 captured = None
                 closed = False
+                blips = 0
                 while not self.done.wait(0.3):
                     try:
-                        ctx.cookies()                       # pumps events; raises if gone
+                        ctx.cookies()                       # pump Playwright events
+                        blips = 0
                     except Exception:
-                        closed = True
-                        break
-                    if window_closed.is_set() or page.is_closed() or not browser.is_connected():
-                        closed = True
+                        blips += 1          # transient mid-redirect blip, or gone -- decided below
+                    try:
+                        open_pages = [pg for pg in ctx.pages if not pg.is_closed()]
+                    except Exception:
+                        open_pages = None   # context momentarily unavailable; re-check next tick
+                    if (open_pages is not None and len(open_pages) == 0) or blips >= 20:
+                        closed = True       # every tab gone (or ~6s unreachable) -> window closed
                         break
                     if captured is None:
                         try:

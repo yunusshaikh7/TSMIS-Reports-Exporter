@@ -531,15 +531,20 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
   detected (`is_logged_in` on any page in the context — SSO can land the report
   in a popup). This kills two old footguns: clicking "I've finished logging in"
   *without* signing in no longer saves a junk session + reports "ready". The GUI
-  worker also **watches the login window/tab closing** — it polls `page.is_closed()`
-  (NOT `browser.is_connected()`: with system Edge a closed window can leave a
-  background process connected) with a `page.on("close")` event and a per-tick
-  `ctx.cookies()` to pump Playwright events. Because the session is captured the
-  *instant* a login is detected, closing the window after signing in still saves
-  it; closing it *without* signing in resolves to **cancelled** (no window to
-  reopen, so the GUI never hangs on "Waiting…"), while clicking "I've finished"
-  without a login reports `login_failed`. On any non-save outcome no file is
-  written, so a previously-valid session is preserved.
+  worker also **watches the login window closing**, but the close signal must
+  survive the SSO/MFA dance — which navigates, can open a popup, and may replace
+  the original tab. So it does **not** treat the *original* page closing, a
+  `browser.is_connected()` blip, or a single transient `ctx.cookies()` error as
+  "closed" (an earlier version did, and that slammed the window shut the instant a
+  password went through, reporting a false **cancelled**). The reliable signal is
+  **no open tabs remain in the context** (the SSO flow always keeps ≥ 1 tab open),
+  with a long all-calls-failing streak as a backstop for a truly dead connection.
+  Because the session is captured the *instant* a login is detected (`is_logged_in`
+  on any page — SSO can land it in a popup), closing the window after signing in
+  still saves it; closing it *without* signing in resolves to **cancelled** (the
+  GUI never hangs on "Waiting…"), while clicking "I've finished" without a login
+  reports `login_failed`. On any non-save outcome no file is written, so a
+  previously-valid session is preserved.
 - The engine calls `require_valid_auth()` first (file exists + valid JSON),
   then `new_authed_browser()` restores the session via
   `browser.new_context(storage_state=...)`.
@@ -739,6 +744,17 @@ moves/renames the driver dirs, update `$killDirs` (the guard fails loudly first)
   TSMIS appears to have changed — so the run fails fast with one clear error
   instead of every route failing cryptically. Surfaced by `cli.py` and the GUI
   like `AuthError`.
+- **Site-error fast-fail:** the TSMIS site can render a fatal error for a single
+  route (its `#rampResults` gets an `error` class, e.g. *"Cannot read properties
+  of undefined (reading 'size')"*) with **no** Export button and **no** "no
+  results" text. The post-Generate wait now ORs in a shared error check
+  (`common.ERROR_JS`) so it resolves in seconds, and `_attempt_route` raises
+  **`ReportError`** with the site's message (`common.report_error_text`). The loop
+  records it `failed` immediately (with the message + a failure screenshot), no
+  in-loop retry — so such a route no longer silently burns the full per-route
+  timeout *and then* the long retry just "sitting" there. The end-of-run retry
+  still gives it one quick second chance in case it was transient. Detection is
+  generic (the `error` class is shared by every report), so it covers all of them.
 - **Auto-retry once (in-loop):** a transient (non-timeout) route error is retried
   a single time after `_recover()` re-arms the form (`RETRY_COUNT`, default 1). A
   hard **timeout is not retried in-loop** (the user already had a skip window
@@ -800,6 +816,7 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
 | `NO SAVED SESSION FOUND` in BAT menu | `tsmis_auth.json` missing | Run `2. login (update login).bat` |
 | `LOGIN PROBLEM — ...` | Session missing/expired/corrupt (`AuthError`) | Run `2. login (update login).bat` |
 | Route keeps timing out | TSMIS server slow | Increase `REPORT_TIMEOUT_MS` in `common.py` |
+| One route fails instantly with a "TSMIS site error" (e.g. "Cannot read properties of undefined") | The site itself can't build that route | Expected — the route is recorded `failed` with the message (see `FAILURES_DIR`); it's a TSMIS data/site issue, not the exporter |
 | County dropdown timeout | Slow network | Increase `COUNTY_ENABLE_TIMEOUT_MS` in `common.py` |
 | Output looks wrong for one report only | That report's selector changed | Edit only that report's `ReportSpec` in its `export_*.py` |
 | "TSMIS page looks different than expected" | Preflight failed — site likely changed | Check `LOG_DIR` + `FAILURES_DIR`; update selectors in `common.py`/the `ReportSpec` |
