@@ -545,14 +545,24 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
   `browser.is_connected()` blip, or a single transient `ctx.cookies()` error as
   "closed" (an earlier version did, and that slammed the window shut the instant a
   password went through, reporting a false **cancelled**). The reliable signal is
-  **no open tabs remain in the context** (the SSO flow always keeps ≥ 1 tab open),
-  with a long all-calls-failing streak as a backstop for a truly dead connection.
-  Because the session is captured the *instant* a login is detected (`is_logged_in`
-  on any page — SSO can land it in a popup), closing the window after signing in
-  still saves it; closing it *without* signing in resolves to **cancelled** (the
-  GUI never hangs on "Waiting…"), while clicking "I've finished" without a login
-  reports `login_failed`. On any non-save outcome no file is written, so a
-  previously-valid session is preserved.
+  **no open tabs remain in the context**, and only after a **debounce** (a few
+  consecutive no-tab ticks) so a brief gap during the redirect isn't a false
+  close, with a long all-calls-failing streak as a backstop for a truly dead
+  connection. Because the session is captured the *instant* a login is detected
+  (`is_logged_in` on any page — SSO can land it in a popup), closing the window
+  after signing in still saves it; closing it *without* signing in resolves to
+  **cancelled** (the GUI never hangs on "Waiting…"), while clicking "I've finished"
+  without a login reports `login_failed`. On any non-save outcome no file is
+  written, so a previously-valid session is preserved.
+- **Edge-specific:** Microsoft Edge can relaunch itself through a "compatibility
+  layer", and the relaunched process isn't the one Playwright drives — its context
+  silently disconnects, which looks exactly like the login window closing the
+  moment SSO completes (Chrome has no such relaunch). The headed login launch
+  passes **`--edge-skip-compat-layer-relaunch`** (`common._channel_launch_kwargs`,
+  Edge + headed only, so the headless export path is untouched). `LoginWorker`
+  also writes **token-free diagnostics** to `LOG_DIR/tsmis.log` (tab-count
+  changes, capture, disconnect, the close decision) so an Edge login failure is
+  debuggable from the user's `Logs`.
 - The engine calls `require_valid_auth()` first — it checks the file exists, is
   valid JSON, **and is shaped like a Playwright storage_state** (`cookies`/
   `origins` lists). That last check matters: a valid-JSON-but-not-storage_state

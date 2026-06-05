@@ -462,6 +462,24 @@ def _resolve_channel(p, exclude=()):
     )
 
 
+def _channel_launch_kwargs(channel, headless, kwargs):
+    """Merge channel-specific launch args.
+
+    Microsoft Edge can relaunch itself through a "compatibility layer"; the
+    relaunched process is NOT the one Playwright is driving, so Playwright's
+    context silently disconnects -- which looks exactly like the login window
+    closing the instant SSO completes (the Edge-only login bug; Chrome has no such
+    relaunch). --edge-skip-compat-layer-relaunch disables it. Applied only to a
+    HEADED Edge (i.e. the login window), so the proven headless export path is
+    untouched, and only to Edge (Chrome would show an 'unsupported flag' bar)."""
+    if channel != "msedge" or headless:
+        return kwargs
+    args = list(kwargs.get("args") or [])
+    if "--edge-skip-compat-layer-relaunch" not in args:
+        args = args + ["--edge-skip-compat-layer-relaunch"]
+    return {**kwargs, "args": args}
+
+
 def launch_browser(p, *, headless=True, **kwargs):
     """Launch the system browser Playwright can drive (Edge, then Chrome).
 
@@ -474,7 +492,8 @@ def launch_browser(p, *, headless=True, **kwargs):
     global _resolved_channel
     channel = _resolve_channel(p)               # may raise BrowserNotFoundError
     try:
-        return p.chromium.launch(headless=headless, channel=channel, **kwargs)
+        return p.chromium.launch(headless=headless, channel=channel,
+                                 **_channel_launch_kwargs(channel, headless, kwargs))
     except Exception as first_err:
         # The probe passed but the real launch failed. Re-resolve EXCLUDING this
         # channel so we actually fall through to the OTHER browser instead of
@@ -484,7 +503,8 @@ def launch_browser(p, *, headless=True, **kwargs):
         _resolved_channel = None
         try:
             channel = _resolve_channel(p, exclude={failed})
-            return p.chromium.launch(headless=headless, channel=channel, **kwargs)
+            return p.chromium.launch(headless=headless, channel=channel,
+                                     **_channel_launch_kwargs(channel, headless, kwargs))
         except BrowserNotFoundError:
             raise
         except Exception:
