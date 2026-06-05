@@ -11,15 +11,21 @@ Message protocol (all are (kind, payload) tuples):
     ("export_done", RunResult)
     ("consolidate_done", ConsolidateResult)
     ("login_open", None)               headed browser is up; user should finish SSO
-    ("login_saved", None)              session captured and written
+    ("login_saved", None)              a VALID session was captured and written
+    ("login_failed", None)             window closed/finished without a real login
     ("cancelled", None)                task stopped at user request
     ("error", (kind, message))         kind is "auth" or "general"
 """
+import json
 import threading
 
-from common import AUTH, ROUTES, URL, AuthError, PreflightError
+from common import (
+    AUTH, ROUTES, URL, AuthError, BrowserNotFoundError, PreflightError,
+    BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, is_logged_in, launch_browser,
+)
 from events import Events
 from exporter import run_export
+from paths import OUTPUT_ROOT
 
 
 class ExportWorker(threading.Thread):
@@ -77,7 +83,7 @@ class ExportWorker(threading.Thread):
             self.q.put(("export_done", result))
         except AuthError as e:
             self.q.put(("error", ("auth", str(e))))
-        except PreflightError as e:
+        except (PreflightError, BrowserNotFoundError) as e:
             self.q.put(("error", ("general", str(e))))      # message is already user-safe
         except Exception as e:
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
@@ -121,25 +127,151 @@ class LoginWorker(threading.Thread):
         self.cancel = cancel_event
 
     def run(self):
-        from playwright.sync_api import sync_playwright  # after PLAYWRIGHT_BROWSERS_PATH is set
+        from playwright.sync_api import sync_playwright
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=False)
-                try:
-                    ctx = browser.new_context()
-                    page = ctx.new_page()
-                    page.goto(URL)
-                    self.q.put(("login_open", None))
+                browser = launch_browser(p, headless=False)
+                ctx = browser.new_context()
+                page = ctx.new_page()
+                page.goto(URL)
+                self.q.put(("login_open", None))
 
-                    while not self.done.wait(0.2):
-                        pass                # wait until the user clicks "I've finished"
+                # Notice the user closing the login window. We watch the PAGE, not
+                # the browser process: with system Edge, closing the window can
+                # leave a background process running, so browser.is_connected()
+                # stays True -- but the page closes.
+                window_closed = threading.Event()
+                page.on("close", lambda *a: window_closed.set())
 
-                    if self.cancel.is_set():
-                        self.q.put(("cancelled", None))
-                    else:
-                        ctx.storage_state(path=str(AUTH))
-                        self.q.put(("login_saved", None))
-                finally:
-                    browser.close()
+                # Wait for a button OR a window-close. Capture the session the
+                # instant a real TSMIS login appears, so a plain window-close after
+                # signing in still recovers it. A cheap round-trip each tick pumps
+                # Playwright events so the close is noticed promptly.
+                captured = None
+                closed = False
+                while not self.done.wait(0.3):
+                    try:
+                        ctx.cookies()                       # pumps events; raises if gone
+                    except Exception:
+                        closed = True
+                        break
+                    if window_closed.is_set() or page.is_closed() or not browser.is_connected():
+                        closed = True
+                        break
+                    if captured is None:
+                        try:
+                            if self._any_logged_in(ctx):
+                                captured = ctx.storage_state()
+                        except Exception:
+                            pass            # mid-navigation; retry on the next tick
+
+                if closed:
+                    self.q.put(("log", "Login window closed — checking your sign-in…"))
+
+                if self.cancel.is_set():
+                    self._safe_close(browser)
+                    self.q.put(("cancelled", None))
+                    return
+
+                # "I've finished" clicked with the window still open -> last capture.
+                if not closed:
+                    try:
+                        if self._any_logged_in(ctx):
+                            captured = ctx.storage_state()
+                    except Exception:
+                        pass
+                self._safe_close(browser)
+
+                if captured:                                # a real login -> save it
+                    self._save_state(captured)
+                    self.q.put(("login_saved", None))
+                elif closed:                                # closed the window, never signed in
+                    self.q.put(("cancelled", None))         # -> just cancel (no window to reopen)
+                else:                                       # clicked "finished" without signing in
+                    self.q.put(("login_failed", None))
+        except BrowserNotFoundError as e:
+            self.q.put(("error", ("general", str(e))))
         except Exception as e:
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
+
+    @staticmethod
+    def _any_logged_in(ctx):
+        """True if ANY page in the context is the logged-in TSMIS report page
+        (SSO sometimes lands it in a popup / new tab, not the original page)."""
+        for pg in ctx.pages:
+            try:
+                if is_logged_in(pg):
+                    return True
+            except Exception:
+                continue
+        return False
+
+    @staticmethod
+    def _safe_close(browser):
+        try:
+            browser.close()
+        except Exception:
+            pass
+
+    @staticmethod
+    def _save_state(state):
+        AUTH.parent.mkdir(parents=True, exist_ok=True)
+        with open(AUTH, "w", encoding="utf-8") as f:
+            json.dump(state, f)
+
+
+# --- startup readiness checks -------------------------------------------------
+# (Login isn't checked here -- the header status row + Log in button own it.)
+
+def _check_output():
+    try:
+        OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+        probe = OUTPUT_ROOT / ".write_test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return ("ok", "Output folder: writable")
+    except Exception:
+        return ("bad", "Output folder: NOT writable")
+
+
+def _check_tools():
+    try:
+        import pdfplumber  # noqa: F401
+        import openpyxl    # noqa: F401
+        return ("ok", "Report tools (PDF/Excel): ready")
+    except Exception as e:
+        return ("bad", f"Report tools: missing ({type(e).__name__})")
+
+
+class CheckWorker(threading.Thread):
+    """Runs the launch-time readiness checks off the Tk thread, posting each
+    result as ('check', (key, status, text)) and a final ('checks_done', dict).
+
+    The instant checks (login, output folder, PDF/Excel tools) are posted first;
+    the browser probes are slower (each launches a headless browser) so they land
+    a couple seconds later. status is one of 'ok' | 'bad'.
+    """
+
+    def __init__(self, queue):
+        super().__init__(daemon=True)
+        self.q = queue
+
+    def run(self):
+        for key, fn in (("output", _check_output), ("tools", _check_tools)):
+            try:
+                status, text = fn()
+            except Exception as e:
+                status, text = "bad", f"{key}: error ({type(e).__name__})"
+            self.q.put(("check", (key, status, text)))
+
+        try:
+            results = check_browsers()           # {channel: ok|missing|broken}
+        except Exception:
+            results = {ch: "broken" for ch in BROWSER_CHANNELS}
+        detail = {"ok": "ready", "missing": "not installed",
+                  "broken": "found, but this tool can't control it (it may be too new)"}
+        for ch in BROWSER_CHANNELS:
+            status = results.get(ch, "broken")
+            self.q.put(("check", (f"browser_{ch}", "ok" if status == "ok" else "bad",
+                                   f"{CHANNEL_LABELS[ch]}: {detail[status]}")))
+        self.q.put(("checks_done", results))

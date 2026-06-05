@@ -11,6 +11,7 @@ reported through an Events sink, so the same helpers back both the console
 shim (cli.py) and the future GUI.
 """
 import json
+import os
 import re
 import time
 
@@ -32,6 +33,13 @@ class PreflightError(Exception):
     """Raised when the TSMIS page doesn't look as expected before a run (likely
     a site change). Its message is user-safe and UI-neutral, so callers can show
     it as-is."""
+
+
+class BrowserNotFoundError(Exception):
+    """Raised when no usable Chromium-based browser (Edge or Chrome) is installed
+    on the machine. The app drives the browser already present rather than
+    bundling one, so this is the "please install Edge" case. Message is user-safe
+    and UI-neutral."""
 
 
 URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
@@ -283,16 +291,161 @@ def wait_with_skip_option(page, js_condition, prefix, events,
             next_status = now + 30
 
 
-def new_authed_browser(p):
-    """Launch a headless Chromium with the saved auth restored.
+# The app drives a Chromium-based browser ALREADY on the machine instead of
+# bundling one (smaller download, nothing for AV/DLP to flag, auto-updated by the
+# OS). Microsoft Edge ships with Windows; Chrome is the common alternative. Both
+# are Chromium, so page.pdf() and downloads work.
+#
+# Forward-compatibility: launching a *system channel* (not a pinned bundled
+# Chromium) is intentionally version-tolerant -- Playwright talks CDP, which is
+# stable, so ordinary Edge auto-updates keep working without a rebuild. To be
+# safe anyway we (a) PROBE the browser before trusting it -- launch headless and
+# actually drive a page -- so a too-new Edge that Playwright can't control is
+# detected and we fall through to Chrome, and (b) fail with a clear, accurate
+# message that tells the user to update the tool (vs. "install a browser") only
+# when a browser is present but unusable. Only a very major Chromium-wide change
+# that breaks BOTH Edge and Chrome would require bumping Playwright.
+#
+# An admin can pin a channel with the TSMIS_BROWSER_CHANNEL environment variable.
+BROWSER_CHANNELS = ("msedge", "chrome")
+CHANNEL_LABELS = {"msedge": "Microsoft Edge", "chrome": "Google Chrome"}
 
-    Uses channel="chromium" (full Chromium, new headless mode) so the packaged
-    build does not need to bundle a separate chrome-headless-shell. Returns
-    (browser, context, page). Caller is responsible for browser.close().
+_resolved_channel = None        # validated channel, cached for the process
+_preferred_channel = None       # user's pick (tried first; the other stays a fallback)
+
+
+def set_preferred_channel(channel):
+    """Record the user's preferred browser (tried first; the other channel stays
+    a fallback). None resets to the default (Edge first). Clears the resolved
+    cache so the next launch honors the new preference. A hard
+    TSMIS_BROWSER_CHANNEL env override still wins over this."""
+    global _preferred_channel, _resolved_channel
+    _preferred_channel = channel if channel in BROWSER_CHANNELS else None
+    _resolved_channel = None
+
+
+def _candidate_channels():
+    forced = os.environ.get("TSMIS_BROWSER_CHANNEL", "").strip()
+    if forced:
+        return (forced,)
+    if _preferred_channel:
+        return (_preferred_channel,) + tuple(c for c in BROWSER_CHANNELS if c != _preferred_channel)
+    return BROWSER_CHANNELS
+
+
+def _looks_missing(err):
+    """True if the launch error means the browser isn't installed (vs. installed
+    but unusable). Used only to choose a better error message."""
+    m = str(err).lower()
+    return any(s in m for s in (
+        "executable doesn't exist", "is not installed", "no such file",
+        "cannot find", "was not found", "wasn't found", "could not find",
+    ))
+
+
+def _probe_channel(p, channel):
+    """Launch `channel` headless and confirm Playwright can actually DRIVE it
+    (not merely find it): open a page and run a trivial script over CDP. This is
+    what catches a future Edge that Playwright is too old to control. Returns
+    "ok" | "missing" | "broken"; always closes the probe browser.
     """
-    browser = p.chromium.launch(
+    browser = None
+    try:
+        browser = p.chromium.launch(headless=True, channel=channel)
+    except Exception as e:
+        return "missing" if _looks_missing(e) else "broken"
+    try:
+        page = browser.new_context().new_page()
+        page.goto("about:blank", timeout=15_000)
+        return "ok" if page.evaluate("1 + 1") == 2 else "broken"
+    except Exception:
+        return "broken"            # launches but can't be driven -> try the next one
+    finally:
+        try:
+            browser.close()
+        except Exception:
+            pass
+
+
+def _resolve_channel(p):
+    """Pick a browser Playwright can drive -- Edge, then Chrome -- validating each
+    by probe. Cached for the process. Raises BrowserNotFoundError (UI-neutral)
+    with a message that distinguishes "none installed" from "installed but too
+    new for this tool"."""
+    global _resolved_channel
+    if _resolved_channel:
+        return _resolved_channel
+    statuses = {}
+    for channel in _candidate_channels():
+        status = _probe_channel(p, channel)
+        statuses[channel] = status
+        if status == "ok":
+            _resolved_channel = channel
+            return channel
+    if any(s == "broken" for s in statuses.values()):
+        tried = ", ".join(f"{c} ({s})" for c, s in statuses.items())
+        raise BrowserNotFoundError(
+            "A web browser (Microsoft Edge / Google Chrome) was found but could "
+            "not be controlled -- it may have updated to a version this tool "
+            "doesn't support yet. Please update TSMIS Exporter, or contact the "
+            f"maintainer to refresh it. (Tried: {tried}.)"
+        )
+    raise BrowserNotFoundError(
+        "No compatible web browser was found. This app uses Microsoft Edge or "
+        "Google Chrome to reach TSMIS -- please install Microsoft Edge, then try "
+        "again."
+    )
+
+
+def launch_browser(p, *, headless=True, **kwargs):
+    """Launch the system browser Playwright can drive (Edge, then Chrome).
+
+    Resolves + validates the channel once per process (a headless probe, so no
+    window flashes during headed login), caches it, then launches for real. If a
+    previously-good channel unexpectedly fails an actual launch, the cache is
+    cleared and the chain is re-resolved so it can still fall back. All terminal
+    failures surface as BrowserNotFoundError with a user-safe message.
+    """
+    global _resolved_channel
+    channel = _resolve_channel(p)               # may raise BrowserNotFoundError
+    try:
+        return p.chromium.launch(headless=headless, channel=channel, **kwargs)
+    except Exception as first_err:
+        _resolved_channel = None                # forget it and try the whole chain again
+        try:
+            channel = _resolve_channel(p)
+            return p.chromium.launch(headless=headless, channel=channel, **kwargs)
+        except BrowserNotFoundError:
+            raise
+        except Exception:
+            raise BrowserNotFoundError(
+                "The web browser could not be started. It may have updated to a "
+                "version this tool doesn't support yet -- please update TSMIS "
+                "Exporter, or contact the maintainer."
+            ) from first_err
+
+
+def check_browsers():
+    """Probe each known browser channel for the readiness panel. Returns
+    {channel: "ok" | "missing" | "broken"} (see _probe_channel). Opens its own
+    Playwright, so call it from a worker thread -- never the Tk main thread."""
+    from playwright.sync_api import sync_playwright
+    results = {}
+    with sync_playwright() as p:
+        for channel in BROWSER_CHANNELS:
+            results[channel] = _probe_channel(p, channel)
+    return results
+
+
+def new_authed_browser(p):
+    """Launch the headless system browser with the saved auth restored.
+
+    Returns (browser, context, page). Caller is responsible for browser.close().
+    Raises BrowserNotFoundError if neither Edge nor Chrome is installed.
+    """
+    browser = launch_browser(
+        p,
         headless=True,
-        channel="chromium",
         args=[
             "--disable-features=LocalNetworkAccessChecksWarnings",
             "--enable-features=LocalNetworkAccessChecks",

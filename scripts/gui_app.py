@@ -18,12 +18,15 @@ from tkinter.scrolledtext import ScrolledText
 import gui_theme as theme
 import run_report
 from gui_theme import DOT, PALETTE
-from gui_worker import ConsolidateWorker, ExportWorker, LoginWorker
+from gui_worker import CheckWorker, ConsolidateWorker, ExportWorker, LoginWorker
 from exporter_parallel import DEFAULT_WORKERS, MAX_WORKERS
 
 from paths import LOG_DIR, OUTPUT_ROOT
 from version import APP_NAME, __version__
-from common import ROUTES, AuthError, clear_auth, parse_routes, require_valid_auth
+from common import (
+    BROWSER_CHANNELS, CHANNEL_LABELS, ROUTES, AuthError, clear_auth, parse_routes,
+    require_valid_auth, set_preferred_channel,
+)
 
 from export_ramp_summary import SPEC as SUMMARY_SPEC
 from export_ramp_detail import SPEC as DETAIL_SPEC
@@ -54,8 +57,8 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_NAME)
-        self.geometry("660x740")
-        self.minsize(580, 620)
+        # Window size is computed from the laid-out content at the end of __init__
+        # so the log pane is never squeezed to nothing (see the sizing block).
 
         self.fonts = theme.fonts()
         theme.apply(self)
@@ -78,11 +81,13 @@ class App(tk.Tk):
         self._last_result = None        # its RunResult (enables "Save run report")
         self._run_start = None          # monotonic start of the current run (elapsed timer)
         self._timer_job = None          # after() id for the 1 Hz elapsed-time ticker
+        self._check_detail = {}         # check key -> latest detail text (shown as a tooltip)
+        self._tip = None                # the active tooltip Toplevel, if any
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(3, weight=1)         # log row expands
 
-        self._build_header()
+        self._build_header()                   # header now hosts the compact readiness strip
         self._build_notebook()
         self._build_progress()
         self._build_log()
@@ -93,6 +98,7 @@ class App(tk.Tk):
             self.btn_export_start, self.btn_cons_start,
             self.fast_check,
             self.routes_entry, self.btn_choose_routes,
+            self.browser_combo, self.btn_recheck,
             *self.export_radios, *self.cons_radios,
         ]
         # Run-only controls start disabled (no task is running, no result yet).
@@ -101,9 +107,20 @@ class App(tk.Tk):
             w.state(["disabled"])
         self._sync_fast_controls()             # spinner follows the fast-mode checkbox
 
+        # Size to the laid-out content so EVERYTHING (incl. the log) shows at
+        # launch, and keep that as the floor so the weighted log row can't be
+        # squeezed to zero. Width is fixed (the footer path would otherwise force
+        # an absurdly wide window); height follows the content.
+        self.update_idletasks()
+        win_w = 680
+        win_h = self.winfo_reqheight()
+        self.geometry(f"{win_w}x{win_h}")
+        self.minsize(620, win_h)
+
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.refresh_auth()
         self.after(100, self._drain)
+        self.start_checks()                    # run the readiness checks on launch
 
     # ---- widget construction ------------------------------------------------
 
@@ -130,12 +147,82 @@ class App(tk.Tk):
         self.btn_login_cancel.grid(row=0, column=1, padx=(8, 0))
         self.btn_login_cancel.grid_remove()
 
+        # Compact readiness strip lives in the header (browser switcher + dots).
+        self._build_check_strip(h)
+
+    def _build_check_strip(self, parent):
+        """A small readiness row inside the header: a browser switcher (default
+        Edge) and a green/red dot for each browser + output folder + report
+        tools. Hovering a dot shows the detail. Filled in on launch by
+        CheckWorker (see start_checks)."""
+        strip = ttk.Frame(parent, style="Header.TFrame")
+        strip.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        strip.columnconfigure(3, weight=1)          # spacer pushes Re-check to the right
+
+        self._check_items = {}
+        self._label_to_channel = {CHANNEL_LABELS[c]: c for c in BROWSER_CHANNELS}
+
+        ttk.Label(strip, text="Browser", style="HeaderMuted.TLabel").grid(row=0, column=0, sticky="w")
+        self.browser_combo = ttk.Combobox(
+            strip, state="readonly", width=15,
+            values=[CHANNEL_LABELS[c] for c in BROWSER_CHANNELS])
+        self.browser_combo.set(CHANNEL_LABELS["msedge"])        # default: Edge
+        self.browser_combo.grid(row=0, column=1, sticky="w", padx=(6, 16))
+        self.browser_combo.bind("<<ComboboxSelected>>", self._on_browser_pick)
+
+        checks = ttk.Frame(strip, style="Header.TFrame")
+        checks.grid(row=0, column=2, sticky="w")
+        for i, (key, label) in enumerate(
+                [("browser_msedge", "Edge"), ("browser_chrome", "Chrome"),
+                 ("output", "Output"), ("tools", "Tools")]):
+            dot = ttk.Label(checks, text="●", style="Dot.TLabel", foreground=DOT["unknown"])
+            dot.grid(row=0, column=2 * i, padx=(14 if i else 0, 3))
+            lab = ttk.Label(checks, text=label, style="HeaderMuted.TLabel")
+            lab.grid(row=0, column=2 * i + 1)
+            self._check_items[key] = (dot, None, label)
+            self._check_detail[key] = f"{label}: checking…"
+            self._attach_tip(dot, key)
+            self._attach_tip(lab, key)
+
+        self.btn_recheck = ttk.Button(strip, text="Re-check", width=9, command=self.start_checks)
+        self.btn_recheck.grid(row=0, column=4, sticky="e")
+
+    # ---- tiny hover tooltip (for the compact check dots) --------------------
+
+    def _attach_tip(self, widget, key):
+        widget.bind("<Enter>", lambda _e, k=key, w=widget: self._show_tip(w, k))
+        widget.bind("<Leave>", lambda _e: self._hide_tip())
+
+    def _show_tip(self, widget, key):
+        self._hide_tip()
+        text = self._check_detail.get(key)
+        if not text:
+            return
+        self._tip = tw = tk.Toplevel(self)
+        tw.wm_overrideredirect(True)
+        try:
+            tw.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        tw.wm_geometry(f"+{widget.winfo_rootx()}+{widget.winfo_rooty() + widget.winfo_height() + 3}")
+        tk.Label(tw, text=text, bg=PALETTE["surface"], fg=PALETTE["text"],
+                 relief="solid", borderwidth=1, padx=6, pady=2,
+                 font=self.fonts["small"]).pack()
+
+    def _hide_tip(self):
+        if self._tip is not None:
+            try:
+                self._tip.destroy()
+            except Exception:
+                pass
+            self._tip = None
+
     def _build_notebook(self):
         nb = ttk.Notebook(self)
-        nb.grid(row=1, column=0, sticky="ew", padx=PAD, pady=(PAD, 8))
+        nb.grid(row=1, column=0, sticky="ew", padx=PAD, pady=(10, 8))
 
         # Export tab
-        ex = ttk.Frame(nb, padding=PAD)
+        ex = ttk.Frame(nb, padding=(PAD, 10))
         ex.columnconfigure(0, weight=1)
         row = 0
         ttk.Label(ex, text="REPORT TO EXPORT", style="Section.TLabel").grid(
@@ -151,7 +238,7 @@ class App(tk.Tk):
         # Route selection. Blank = all routes (the default); otherwise the chosen
         # subset, typed in or picked from the full list via "Choose…".
         ttk.Label(ex, text="ROUTES", style="Section.TLabel").grid(
-            row=row, column=0, sticky="w", pady=(PAD, 2))
+            row=row, column=0, sticky="w", pady=(10, 2))
         row += 1
         routes = ttk.Frame(ex)
         routes.grid(row=row, column=0, sticky="ew")
@@ -169,7 +256,7 @@ class App(tk.Tk):
 
         # Experimental "fast mode": run several browsers at once.
         fast = ttk.Frame(ex)
-        fast.grid(row=row, column=0, sticky="w", pady=(PAD, 0))
+        fast.grid(row=row, column=0, sticky="w", pady=(10, 0))
         row += 1
         self.fast_check = ttk.Checkbutton(
             fast, text="⚡ Fast mode (experimental) — run", variable=self.fast_mode,
@@ -179,14 +266,14 @@ class App(tk.Tk):
                                      textvariable=self.fast_workers)
         self.fast_spin.grid(row=0, column=1, padx=(6, 6))
         ttk.Label(fast, text="browsers at once").grid(row=0, column=2, sticky="w")
-        ttk.Label(ex, text="Faster, but heavier on your PC and the TSMIS server. "
-                           "3–4 is recommended; per-route Skip is off in fast mode.",
-                  style="Muted.TLabel", wraplength=460, justify="left").grid(
-            row=row, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(ex, text="Faster, but heavier on your PC; 3–4 recommended. "
+                           "Per-route Skip is off in fast mode.",
+                  style="Muted.TLabel", wraplength=600, justify="left").grid(
+            row=row, column=0, sticky="w", pady=(3, 0))
         row += 1
 
         actions = ttk.Frame(ex)
-        actions.grid(row=row, column=0, sticky="w", pady=(PAD, 0))
+        actions.grid(row=row, column=0, sticky="w", pady=(12, 0))
         self.btn_export_start = ttk.Button(actions, text="Start export", style="Accent.TButton",
                                            command=self.start_export)
         self.btn_export_start.grid(row=0, column=0)
@@ -200,7 +287,7 @@ class App(tk.Tk):
         nb.add(ex, text="Export")
 
         # Consolidate tab
-        co = ttk.Frame(nb, padding=PAD)
+        co = ttk.Frame(nb, padding=(PAD, 10))
         co.columnconfigure(0, weight=1)
         ttk.Label(co, text="REPORT TO CONSOLIDATE (combine downloaded files)",
                   style="Section.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 6))
@@ -244,11 +331,11 @@ class App(tk.Tk):
         self.elapsed.grid(row=2, column=0, columnspan=2, sticky="w", pady=(2, 0))
 
     def _build_log(self):
-        f = ttk.Frame(self, padding=(PAD, PAD))
+        f = ttk.Frame(self, padding=(PAD, 6))
         f.grid(row=3, column=0, sticky="nsew")
         f.rowconfigure(0, weight=1)
         f.columnconfigure(0, weight=1)
-        self.log_widget = ScrolledText(f, height=12, wrap="word",
+        self.log_widget = ScrolledText(f, height=6, wrap="word",
                                        bg=PALETTE["log_bg"], fg=PALETTE["log_fg"],
                                        relief="solid", borderwidth=1,
                                        font=self.fonts["mono"], padx=8, pady=6)
@@ -410,6 +497,53 @@ class App(tk.Tk):
             self._authed = False
             self.set_dot("bad", "No saved login — click Log in")
         self.btn_login.config(text=self._login_label())
+
+    # ---- startup readiness checks -------------------------------------------
+
+    def start_checks(self):
+        """Run the launch-time readiness checks on a worker thread (browser
+        probing is Playwright work and must not touch the Tk thread)."""
+        if self.task:                          # never probe mid export/login
+            return
+        for key, (dot, txt, short) in self._check_items.items():
+            dot.config(foreground=DOT["busy"])
+            self._check_detail[key] = f"{short}: checking…"
+            if txt is not None:
+                txt.config(text=f"{short}: checking…")
+        self.btn_recheck.state(["disabled"])
+        CheckWorker(self.q).start()
+
+    def _set_check(self, key, status, text=None):
+        item = self._check_items.get(key)
+        if not item:
+            return
+        dot, txt, _short = item
+        dot.config(foreground=DOT.get(status, DOT["unknown"]))
+        if text:
+            self._check_detail[key] = text          # shown as the hover tooltip
+        if txt is not None and text is not None:    # (header dots have no inline text label)
+            txt.config(text=text)
+
+    def _on_checks_done(self, results):
+        if not self.task:
+            self.btn_recheck.state(["!disabled"])
+        # If the *selected* browser isn't usable, tell the user what will happen.
+        sel = self._label_to_channel.get(self.browser_combo.get())
+        usable = [c for c in BROWSER_CHANNELS if results.get(c) == "ok"]
+        if sel and results.get(sel) != "ok":
+            if usable:
+                self.log(f"Note: {CHANNEL_LABELS[sel]} can't be used right now — "
+                         f"exports will use {CHANNEL_LABELS[usable[0]]} instead.")
+            else:
+                self.log("Warning: no usable web browser was found. Install Microsoft "
+                         "Edge (or Google Chrome) before running an export.")
+
+    def _on_browser_pick(self, _evt=None):
+        channel = self._label_to_channel.get(self.browser_combo.get())
+        if channel:
+            set_preferred_channel(channel)     # tried first; the other stays a fallback
+            self.log(f"Browser set to {self.browser_combo.get()} "
+                     "(the other is still used as a fallback if needed).")
 
     # ---- run-state toggling -------------------------------------------------
 
@@ -597,6 +731,12 @@ class App(tk.Tk):
             self._on_login_open()
         elif kind == "login_saved":
             self._on_login_saved()
+        elif kind == "login_failed":
+            self._on_login_failed()
+        elif kind == "check":
+            self._set_check(*payload)
+        elif kind == "checks_done":
+            self._on_checks_done(payload)
         elif kind == "cancelled":
             self.log("Cancelled.")
             self.set_dot("ok" if self._authed else "bad", "Idle")
@@ -651,6 +791,17 @@ class App(tk.Tk):
         self.refresh_auth()
         self._end_task()
 
+    def _on_login_failed(self):
+        self.log("Login wasn't completed — no new session was saved.")
+        messagebox.showinfo(
+            "Login not completed",
+            "It doesn't look like you finished signing in, so no session was saved.\n\n"
+            "Click 'Log in' and complete sign-in until the TSMIS report page loads — "
+            "then either click “I've finished logging in” or just close the "
+            "browser window, and your session will be saved.")
+        self.refresh_auth()                    # dot reflects whatever session we actually have
+        self._end_task()
+
     def _on_error(self, payload):
         kind, message = payload
         self.log(f"ERROR: {message}")
@@ -671,4 +822,5 @@ class App(tk.Tk):
         self.login_cancel.set()
         self.login_done.set()
         self._stop_timer()                     # cancel the pending ticker before teardown
+        self._hide_tip()
         self.destroy()

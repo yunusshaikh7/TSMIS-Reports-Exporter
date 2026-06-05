@@ -4,24 +4,18 @@ Run in dev:   python scripts\\gui_main.py
 Packaged:     this is the PyInstaller entry (Phase 6 sets TSMIS_ENTRY here and
               TSMIS_CONSOLE=0 for a windowed app).
 
-Sets PLAYWRIGHT_BROWSERS_PATH to the bundled browsers BEFORE importing anything
-that imports Playwright -- the same pattern proven in build/smoke_entry.py.
+The app drives the browser already installed on the machine (Edge/Chrome), so
+there is no bundled Chromium to point Playwright at -- the only bootstrap left is
+making the dev import paths work when run from source.
 """
-import os
 import sys
 from pathlib import Path
 
 
 def _bootstrap():
-    if getattr(sys, "frozen", False):
-        # onefolder: bundled browsers live under _internal (sys._MEIPASS).
-        os.environ.setdefault(
-            "PLAYWRIGHT_BROWSERS_PATH",
-            str(Path(sys._MEIPASS) / "ms-playwright"),
-        )
-    else:
-        # dev: make both the flat scripts/ modules and the repo-root version.py
-        # importable, regardless of the current working directory.
+    # Dev only: make the flat scripts/ modules and the repo-root version.py
+    # importable regardless of the working directory. Frozen builds bundle these.
+    if not getattr(sys, "frozen", False):
         here = Path(__file__).resolve().parent          # scripts/
         sys.path.insert(0, str(here))                   # common, exporter, gui_app, ...
         sys.path.insert(0, str(here.parent))            # version.py (repo root)
