@@ -16,7 +16,7 @@ except ImportError:
     print('ERROR: Playwright is not installed. Run "1. setup (one time).bat" first.')
     sys.exit(1)
 
-from common import AUTH, URL
+from common import AUTH, URL, BrowserNotFoundError, is_logged_in, launch_browser
 
 
 def main():
@@ -47,8 +47,20 @@ def main():
     print()
     input(">>> Press Enter NOW to open the browser... ")
 
+    try:
+        _run_login()
+    except BrowserNotFoundError as e:
+        print()
+        print("=" * 64)
+        print(f"PROBLEM: {e}")
+        print("=" * 64)
+        input("Press Enter to exit...")
+        sys.exit(1)
+
+
+def _run_login():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = launch_browser(p, headless=False)
         ctx = browser.new_context()
         page = ctx.new_page()
         page.goto(URL)
@@ -59,12 +71,28 @@ def main():
         print("=" * 64)
         input(">>> Press Enter once the TSMIS report page is loaded: ")
 
-        ctx.storage_state(path=str(AUTH))
+        # Only save if we can confirm a real login (the report page is loaded).
+        # If the browser was closed or sign-in wasn't finished, is_logged_in
+        # either returns False or raises -- either way, don't save a junk session.
+        try:
+            logged_in = is_logged_in(page)
+        except Exception:
+            logged_in = False
+
         print()
-        print(f"✓ Session saved to {AUTH.name}")
-        print('  You can close this window and run "3. run_export (main script).bat"')
+        if logged_in:
+            ctx.storage_state(path=str(AUTH))
+            print(f"✓ Session saved to {AUTH.name}")
+            print('  You can close this window and run "3. run_export (main script).bat"')
+        else:
+            print("✗ Sign-in wasn't completed — the TSMIS report page isn't loaded")
+            print("  (or the browser was closed). No session was saved. Please run this")
+            print("  login again and wait for the report page before pressing Enter.")
         print()
-        browser.close()
+        try:
+            browser.close()
+        except Exception:
+            pass
         input("Press Enter to exit...")
 
 

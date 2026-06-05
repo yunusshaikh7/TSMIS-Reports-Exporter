@@ -8,7 +8,7 @@ touch the console -- only this module does.
 import os
 import sys
 
-from common import AUTH, ROUTES, AuthError, PreflightError, clear_auth, parse_routes
+from common import AUTH, ROUTES, AuthError, BrowserNotFoundError, PreflightError, clear_auth, parse_routes
 from events import Events
 from logging_setup import setup_logging
 
@@ -132,11 +132,12 @@ def run_cli(spec, title):
     except AuthError as e:
         _report_bad_auth(str(e))
         return
-    except PreflightError as e:
+    except (PreflightError, BrowserNotFoundError) as e:
         print()
         print("=" * 60)
         print(f"PROBLEM: {e}")
         print("=" * 60)
+        input("\nPress Enter to exit...")
         sys.exit(1)
 
     already = len(result.exists)

@@ -23,8 +23,9 @@ This repo combines the previously separate
 
 > **This project is mid-conversion** from `.bat`-launched scripts into a
 > **portable, single-folder Windows desktop app** (bundled Python +
-> dependencies + Chromium, a GUI, **no installer**, no Python required on the
-> target PC). The conversion is **additive** — the original `.bat` workflow
+> dependencies + a GUI, **no installer**, no Python required on the target PC;
+> it drives the machine's installed Edge/Chrome rather than bundling a browser).
+> The conversion is **additive** — the original `.bat` workflow
 > still works at every step. **If you are a new session, read this section
 > first.**
 
@@ -34,9 +35,14 @@ This repo combines the previously separate
 **Locked decisions:**
 - **Packaging:** PyInstaller **onefolder** (not onefile), shipped as a
   **portable zip** (no installer).
-- **Browser:** bundle **full Chromium only** and launch headless via
-  `channel="chromium"` (new headless mode), so `chrome-headless-shell` need
-  not be bundled. Verified that `page.pdf()` (Ramp Summary) works this way.
+- **Browser:** **do NOT bundle a browser.** Drive the machine's installed
+  **Microsoft Edge** (then Chrome) via `channel="msedge"`/`"chrome"`
+  (`scripts/common.launch_browser`). Edge ships with Windows and is Chromium, so
+  `page.pdf()` (Ramp Summary) + downloads work — verified frozen. This drops
+  ~370 MB and removes the bundled-browser AV/DLP surface entirely (the bundle
+  went 587 → **148 MB**). Only Playwright's Node driver (`node.exe`) still ships.
+  *(Superseded the earlier "bundle full Chromium via `channel="chromium"`"
+  decision.)*
 - **Data location — "option A" (portable, never breaks):** the packaged app
   writes `output/`, the auth token, logs, and config **next to the `.exe`**,
   auto-falling back to `%LOCALAPPDATA%\TSMIS Exporter` if that folder is
@@ -45,8 +51,10 @@ This repo combines the previously separate
   the Playwright session and talks to the UI through the `Events` callbacks
   (`scripts/events.py`).
 
-**Pinned versions — must move together (see `version.py`):**
-- `playwright==1.60.0` ↔ **Chromium rev 1223** (Chrome for Testing 148.0.7778.96)
+**Pinned versions (see `version.py`):**
+- `playwright==1.60.0` — pins the bundled **Node driver** only; no Chromium is
+  bundled (the app uses system Edge/Chrome, and Playwright's CDP is compatible
+  across evergreen Edge/Chrome).
 - `pdfplumber==0.11.9` (pulls `pdfminer.six==20251230`), `openpyxl==3.1.5`
 - `pyinstaller==6.20.0`, `pyinstaller-hooks-contrib==2026.5`
 - Built/tested on **Python 3.11**.
@@ -74,7 +82,7 @@ is raised before any browser launches).
 
 **Build the portable app:** from the repo root run
 `powershell -ExecutionPolicy Bypass -File build\build.ps1` → windowed
-`dist\TSMIS Exporter\` (~589 MB; double-click `TSMIS Exporter.exe`). Add
+`dist\TSMIS Exporter\` (~148 MB; double-click `TSMIS Exporter.exe`). Add
 `-SelfTest` for a headless console build that verifies the frozen bundle without
 launching a window. See **Build & Packaging** for details and gotchas.
 
@@ -82,7 +90,7 @@ launching a window. See **Build & Packaging** for details and gotchas.
 
 ```
 .
-├── 1. setup (one time).bat            # pip install playwright + parsers + chromium
+├── 1. setup (one time).bat            # pip install playwright + parsers (no browser download; uses system Edge/Chrome)
 ├── 2. login (update login).bat        # captures auth session
 ├── 3. run_export (main script).bat    # auth check + menu + run chosen exporter
 ├── 4. consolidate (combine reports).bat  # menu + run chosen consolidator
@@ -90,7 +98,7 @@ launching a window. See **Build & Packaging** for details and gotchas.
 ├── run app (GUI preview).bat          # dev launcher for the desktop GUI (Phase 4)
 ├── requirements.txt                   # pinned runtime deps (playwright, pdfplumber, openpyxl)
 ├── requirements-build.txt             # build deps (-r requirements.txt + pyinstaller)
-├── version.py                         # app name/version + pinned Playwright/Chromium rev
+├── version.py                         # app name/version + pinned Playwright (Node driver) version
 ├── scripts/
 │   ├── paths.py                       # frozen-aware paths (output/auth/logs/failures/config); option A
 │   ├── logging_setup.py               # rotating file log under LOG_DIR (all entry points call it)
@@ -107,19 +115,18 @@ launching a window. See **Build & Packaging** for details and gotchas.
 │   ├── consolidate_ramp_summary.py    # PDFs  -> one XLSX (audit cols); importable consolidate()
 │   ├── consolidate_ramp_detail.py     # XLSXs -> one XLSX (adds Route);  importable consolidate()
 │   ├── consolidate_highway_sequence.py # XLSXs -> one XLSX (adds Route);  importable consolidate()
-│   ├── gui_main.py                    # GUI entry point (sets browser path, launches App)
+│   ├── gui_main.py                    # GUI entry point (dev import paths, launches App)
 │   ├── gui_app.py                     # main window (Tk): header, Export/Consolidate tabs, log
 │   ├── gui_worker.py                  # worker threads: Export/Consolidate/Login (Events -> queue)
 │   └── gui_theme.py                   # palette/fonts/ttk styles (clam base)
 ├── build/                             # portable-build infra (Phase 0)
 │   ├── build.ps1                      # one-command reproducible onefolder build (-SelfTest for headless verify)
-│   ├── app.spec                       # PyInstaller spec (Chromium + pdf/excel + flat app modules)
+│   ├── prune_bundle.ps1               # strip bundle to runtime-only files + DLP guard (run by build.ps1)
+│   ├── app.spec                       # PyInstaller spec (Node driver + pdf/excel; excludes unused image libs; no browser)
 │   ├── gui_main entry → scripts/gui_main.py  # the windowed app's real entry point
-│   ├── gui_smoke_entry.py             # headless frozen-GUI self-test (built by -SelfTest)
-│   ├── smoke_entry.py                 # standalone non-GUI bundle self-test (playwright/pdf/excel)
+│   ├── full_smoke.py                  # comprehensive frozen self-test: system-browser pdf+download, pdfplumber, openpyxl, GUI (the -SelfTest entry)
 │   ├── dist_readme.txt               # copied into the build as "Start Here.txt"
-│   ├── .venv/                         # build venv (git-ignored)
-│   └── ms-playwright/                 # bundled Chromium, downloaded by build.ps1 (git-ignored)
+│   └── .venv/                         # build venv (git-ignored)
 ├── dist/                              # build output: dist/TSMIS Exporter/ (git-ignored)
 ├── output/                            # folder structure tracked, contents ignored
 │   ├── ramp_summary/  ramp_detail/  highway_sequence/  consolidated/
@@ -139,7 +146,7 @@ can be gigabytes. Build artifacts (`build/.venv`, `build/ms-playwright`,
 | Component | Detail |
 |---|---|
 | Language | Python 3.11 (stdlib + Playwright + pdfplumber + openpyxl) |
-| Browser automation | `playwright` (sync API, Chromium, `channel="chromium"`) |
+| Browser automation | `playwright` (sync API) driving the **system** browser — `channel="msedge"`, then `"chrome"` (no bundled browser) |
 | PDF parsing | `pdfplumber` (consolidators only) |
 | Excel writing | `openpyxl` (consolidators only) |
 | Packaging | PyInstaller (onefolder, portable) |
@@ -152,7 +159,8 @@ can be gigabytes. Build artifacts (`build/.venv`, `build/ms-playwright`,
 ## Workflow for End Users (current `.bat` flow)
 
 1. **Setup (once per machine):** Double-click `1. setup (one time).bat` —
-   installs Playwright + pdfplumber + openpyxl and downloads Chromium.
+   installs Playwright + pdfplumber + openpyxl. No browser is downloaded; the
+   tool uses the Microsoft Edge / Chrome already on the machine.
 2. **Login (once, or when the session expires):** Double-click
    `2. login (update login).bat` — opens a visible browser, the user
    completes SSO + MFA, then presses Enter to save the session into
@@ -207,10 +215,15 @@ and raises `AuthError` on session problems.
 - **`scripts/common.py`** — shared, console-free helpers: `URL`, `ROUTES`,
   timeout constants, `AuthError`, `clear_auth()`, `require_valid_auth()`
   (raises `AuthError`), `navigate_with_auth`, `is_logged_in`, `select_report`,
-  `wait_with_skip_option(page, js, prefix, events, ...)`, `new_authed_browser`
-  (launches Chromium with `channel="chromium"`), and the route-selection
-  parsers `normalize_route` / `parse_routes` (free-text → validated route list
-  in `ROUTES` order; raise a UI-neutral `ValueError` on bad/empty input).
+  `wait_with_skip_option(page, js, prefix, events, ...)`, `launch_browser` /
+  `new_authed_browser` (drive the **system** browser — probe + launch
+  `channel="msedge"`, fall back to `"chrome"` if Edge can't be driven,
+  `TSMIS_BROWSER_CHANNEL` to override, raising `BrowserNotFoundError` if neither
+  works), `set_preferred_channel(ch)` (the GUI picker's choice; tried first, other
+  stays a fallback) and `check_browsers()` (probe both for the readiness panel →
+  `{channel: ok/missing/broken}`), and the route-selection parsers
+  `normalize_route` / `parse_routes` (free-text → validated route list in
+  `ROUTES` order; raise a UI-neutral `ValueError` on bad/empty input).
   Re-exports `AUTH` from `paths.py` (output paths come from `paths.py` directly).
 - **`scripts/events.py`** — `Events` (callbacks `on_log`, `on_route`,
   `should_skip`, `is_cancelled`; all default to no-ops), `RunResult` (export),
@@ -242,19 +255,26 @@ and raises `AuthError` on session problems.
   parser helpers).
 
 **GUI (Phase 4) — `scripts/gui_*.py`** (built on the same console-free core):
-- `gui_main.py` — entry point. Sets `PLAYWRIGHT_BROWSERS_PATH` when frozen and
-  the dev import paths, then runs `App().mainloop()`.
-- `gui_app.py` — the `App(tk.Tk)` window: header (session dot + Log in button),
-  an Export/Consolidate **notebook**, a shared progress bar + counts + log pane,
-  and a footer (output path + Open folder). The Export tab has a **Routes** entry
-  (blank = all; or type/`Choose…` a subset via `parse_routes`) passed to
-  `ExportWorker(..., routes=...)`. Drains the worker queue via `after(100)`; it
-  never does browser/file work itself.
-- `gui_worker.py` — `ExportWorker` / `ConsolidateWorker` / `LoginWorker` threads.
-  They drive the engines through `Events`, posting `(kind, payload)` messages to
+- `gui_main.py` — entry point. Sets the dev import paths (frozen builds need
+  nothing — the browser is the system one), then runs `App().mainloop()`.
+- `gui_app.py` — the `App(tk.Tk)` window: a header (session dot + Log in button +
+  a compact **readiness strip**), an Export/Consolidate **notebook**, a shared
+  progress bar + counts + log pane, and a footer (output path + Open folder). The
+  Export tab has a **Routes** entry (blank = all; or type/`Choose…` a subset via
+  `parse_routes`) passed to `ExportWorker(..., routes=...)`. The header strip has
+  a **Browser** dropdown (default Edge → `common.set_preferred_channel`), green/red
+  **status dots** for Edge · Chrome · Output · Tools (hover = detail tooltip), and
+  a **Re-check** button — all filled in on launch by a `CheckWorker` (login stays
+  in the header's status row). The window auto-sizes to its content so the log
+  pane can't be squeezed away. Drains the worker queue via `after(100)`; never
+  does browser/file work itself.
+- `gui_worker.py` — `ExportWorker` / `ConsolidateWorker` / `LoginWorker` /
+  `CheckWorker` threads. They drive the engines through `Events` (or, for
+  `CheckWorker`, run the readiness probes), posting `(kind, payload)` messages to
   a `queue.Queue`. Skip/Cancel are `threading.Event`s; login waits on a `done`
   event set by the "I've finished logging in" button (replacing `login.py`'s
-  console `input()`s).
+  console `input()`s). `CheckWorker` posts `("check", (key, status, text))` per
+  item then `("checks_done", {channel: status})`.
 - `gui_theme.py` — palette, fonts, ttk styles (clam base). One place to restyle.
 
 **Threading rule:** Playwright's sync API is thread-affine, so *all* browser work
@@ -403,8 +423,8 @@ per-report fix benefits both engines; only the concurrency/coordination is new.
 **How many browsers? (`DEFAULT_WORKERS=3`, `MAX_WORKERS=30` in
 `exporter_parallel.py`)** The TSMIS/Caltrans backend handles high concurrency
 fine (operator-tested), so the practical limit is the **client PC, not the
-server**: each worker is one Chromium process (~300–500 MB under load) plus a
-Playwright driver. Rule of thumb: **3 = safe default (~2.5–3× faster), 8–12 =
+server**: each worker drives one browser (Edge/Chrome) process (~300–500 MB under
+load) plus a Playwright driver. Rule of thumb: **3 = safe default (~2.5–3× faster), 8–12 =
 big speedup on a healthy multi-core PC, 30 = hard cap** (~9–15 GB RAM for
 browsers alone — only on a well-resourced machine). Budget ~0.5 GB RAM per
 worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
@@ -421,6 +441,20 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 - `scripts/login.py` writes the auth file via `ctx.storage_state(path=...)`
   (path from `paths.AUTH`).
+- **Login is validated before it's saved** (both the GUI `LoginWorker` and the
+  console `login.py`): the session is only written if a real TSMIS login is
+  detected (`is_logged_in` on any page in the context — SSO can land the report
+  in a popup). This kills two old footguns: clicking "I've finished logging in"
+  *without* signing in no longer saves a junk session + reports "ready". The GUI
+  worker also **watches the login window/tab closing** — it polls `page.is_closed()`
+  (NOT `browser.is_connected()`: with system Edge a closed window can leave a
+  background process connected) with a `page.on("close")` event and a per-tick
+  `ctx.cookies()` to pump Playwright events. Because the session is captured the
+  *instant* a login is detected, closing the window after signing in still saves
+  it; closing it *without* signing in resolves to **cancelled** (no window to
+  reopen, so the GUI never hangs on "Waiting…"), while clicking "I've finished"
+  without a login reports `login_failed`. On any non-save outcome no file is
+  written, so a previously-valid session is preserved.
 - The engine calls `require_valid_auth()` first (file exists + valid JSON),
   then `new_authed_browser()` restores the session via
   `browser.new_context(storage_state=...)`.
@@ -483,31 +517,103 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
 
 `build.ps1` is the single reproducible build:
 1. Creates `build\.venv` and installs `requirements-build.txt` (pinned).
-2. Downloads the **matching** Chromium into `build\ms-playwright` (skips if
-   already present), then **deletes** `chromium_headless_shell-*` and
-   `ffmpeg-*` (the app runs headless via `channel="chromium"`).
-3. Runs PyInstaller with `build\app.spec` (driven by the `TSMIS_*` env vars the
+2. Runs PyInstaller with `build\app.spec` (driven by the `TSMIS_*` env vars the
    script sets), entry = `scripts\gui_main.py`, **windowed** (`TSMIS_CONSOLE=0`),
    and copies `dist_readme.txt` in as "Start Here.txt" → `dist\TSMIS Exporter\`
-   (~589 MB onefolder: just the `.exe` + `_internal\`). Zip it to distribute.
-   `build.ps1 -SelfTest` instead builds `gui_smoke_entry.py` with a console so
-   the frozen bundle can be verified headlessly (no window, no blocking).
+   (~148 MB onefolder: just the `.exe` + `_internal\`). **No browser is
+   downloaded or bundled** — the app uses the machine's Edge/Chrome, so only the
+   Playwright Node driver ships. Zip the folder to distribute.
+   `build.ps1 -SelfTest` instead builds `full_smoke.py` with a console so the
+   frozen bundle can be verified headlessly (no window, no blocking) — it
+   exercises the **system browser** pdf+download, pdfplumber, openpyxl, and GUI.
+3. Runs `prune_bundle.ps1` on the built bundle (see **Bundle hygiene** below) to
+   strip non-runtime files / DLP-blocked content and **fail the build** if any
+   remains. Final bundle ~148 MB (was ~587 with bundled Chromium).
 
 `build\app.spec` highlights:
 - `collect_all('playwright')` + Playwright's own bundled PyInstaller hooks →
-  the Node driver is included.
+  the Node driver (`node.exe`) is included. **No browser is bundled** — there is
+  no `ms-playwright` data entry; the app drives system Edge/Chrome.
 - `collect_data_files('pdfminer')` + `collect_all('pdfplumber'/'openpyxl')` →
   pdf/excel work when frozen (pdfminer CMap data is the classic trap).
-- The `ms-playwright` folder is bundled as data → `_internal/ms-playwright`.
-- Entry points must set `PLAYWRIGHT_BROWSERS_PATH` to that folder **before**
-  importing Playwright. For onefolder, `sys._MEIPASS` is the `_internal` dir
-  (see `build/smoke_entry.py` and `scripts/paths.py` for the pattern).
+- **`excludes=['PIL','pypdfium2','pypdfium2_raw']`** — image libraries pulled in
+  transitively (Pillow via openpyxl/pdfplumber/pdfminer image paths; pypdfium2
+  via `pdfplumber.to_image`) that the app NEVER uses (it only extracts
+  text/tables and writes plain workbooks). Those imports are all guarded
+  (try/except or lazy), so excluding them is **verified safe by
+  `build/full_smoke.py`** and trims ~20 MB + image codecs. `cryptography` is a
+  hard top-level `pdfminer` import (encrypted-PDF support) and **must stay**.
+- **Browser selection** lives in `scripts/common.launch_browser`: once per
+  process it **probes** each channel — `msedge`, then `chrome` (override with the
+  `TSMIS_BROWSER_CHANNEL` env var) — by launching it *headless and driving a
+  page* (`_probe_channel`), so a too-new Edge that Playwright can't actually
+  control is detected and it **falls through to Chrome** rather than failing.
+  The validated channel is cached; if it later fails a real launch the cache is
+  cleared and the chain re-resolves. If nothing works it raises
+  `BrowserNotFoundError` (UI-neutral) with a message that **distinguishes
+  "none installed" from "found but too new — update the tool."** No
+  `PLAYWRIGHT_BROWSERS_PATH` is set — Playwright finds the Node driver relative
+  to its own package, and the browser is the system one.
+
+**Bundle hygiene (DLP + size) — `build/prune_bundle.ps1`:** two jobs — strip the
+bundle to runtime-only files (smaller + smaller DLP/security surface) and **fail
+the build** if anything DLP-blocked remains. Motivating case: the Playwright Node
+driver ships documentation / "agent skill" files whose examples contain **test
+credit-card numbers** (e.g. `driver\…\skill\references\tracing.md` →
+`4111111111111111`); corporate **DLP** (Microsoft 365 / SharePoint) detects
+"Credit Card Number" and **blocks** the file, so an uploaded release zip becomes
+partly inaccessible. We use none of that tooling (codegen agent, trace viewer,
+report dashboard) — only headless launch + `page.pdf()` and downloads.
+
+What it **deletes** (each verified runtime-safe by `build/full_smoke.py`):
+- **Playwright driver:** all `*.md` and `*.d.ts`, the `types/` dir, and the
+  `skill/`, `tools/trace/`, `tools/dashboard/`, `vite/` dirs (~5 MB; removes the
+  credit-card docs). Core files (`cli.js`, `lib/`, `node.exe`, …) are kept.
+- **Chromium locales (defensive no-op now):** would keep only `en-US.pak` and
+  drop the other ~219 language packs — but no browser is bundled, so this does
+  nothing today. Kept in case a browser is ever bundled again (was ~42 MB).
+- **Image libs (safety net for the spec excludes):** any `PIL`/`pypdfium2`/
+  `pypdfium2_raw` dir that slipped through (normally excluded at PyInstaller time).
+- **Generic dead weight:** `tests/`/`test/` dirs and `*.pyi` stubs in the bundled
+  Python packages (never imported at runtime). Chromium is skipped.
+
+What it **guards** afterward: fails if any `*.md` remains under the bundled
+driver, or if any text file in the bundle contains a credit-card-like number (IIN
+prefix + length + **Luhn**, like DLP — so random 16-digit hashes in JS bundles are
+*not* false-positives). (The Chromium-locale prune and `ms-playwright` scan-skip
+are kept as defensive no-ops now that no browser is bundled.)
+
+Runs automatically from `build.ps1`, and is **reusable on an already-built or
+extracted release** to clean it in place:
+`powershell -ExecutionPolicy Bypass -File build\prune_bundle.ps1 -Target "…\TSMIS Exporter"`
+(add `-GuardOnly` to audit a bundle without deleting anything). Idempotent.
+
+**The irreducible floor (~148 MB)** is the Playwright `node.exe` (~80 MB) + the
+Python runtime + Tcl/Tk + the required PDF/Excel libs (`pdfminer`+`cryptography`,
+`openpyxl`, `pdfplumber`). No browser ships — that was ~372 MB and is now the
+machine's installed Edge/Chrome. The Node driver is required by Playwright's
+Python API and can't be dropped without abandoning Playwright entirely.
+
+When adding a dependency, keep the bundle bare-bones: prefer the minimum that
+ships, add genuinely-unused transitive libs to `EXCLUDES` in `app.spec` (proving
+safety by extending `full_smoke.py`), extend the prune for any new non-runtime
+cruft, and let the guard catch DLP regressions. If a future Playwright bump
+moves/renames the driver dirs, update `$killDirs` (the guard fails loudly first).
 
 **Gotchas / TODO:**
-- **Version bump:** `build.ps1` reuses `build\ms-playwright` if any
-  `chromium-*` folder exists. After bumping the Playwright pin, **delete
-  `build\ms-playwright`** so the matching Chromium re-downloads. (Hardening
-  idea: key the check on `version.py`'s `CHROMIUM_REVISION`.)
+- **No bundled browser → test on a clean machine:** the app needs Edge or Chrome
+  installed. Target machines (Caltrans Windows) ship Edge, but if you support a
+  locked-down image without it, the app shows `BrowserNotFoundError`. There's no
+  Chromium download step anymore, so builds are much faster.
+- **Browser/Playwright compatibility (handled gracefully):** the browser is now
+  evergreen Edge/Chrome, not a pinned Chromium. CDP is stable so ordinary Edge
+  updates keep working, and `launch_browser` is defensive: it **probes** Edge
+  (launch headless + drive a page) and, if a too-new Edge can't be controlled,
+  **falls back to Chrome**; only if *both* fail does it raise
+  `BrowserNotFoundError` with a "your browser may be too new — update the tool"
+  message (vs. "install a browser"). So a routine Edge update won't break the
+  app; only a very major Chromium-wide change affecting **both** Edge and Chrome
+  would — at which point bump `playwright` in `requirements*.txt` and rebuild.
 - **Entry point (done):** `build.ps1` builds `scripts\gui_main.py` windowed;
   `app.spec` puts `scripts\` + the repo root on `pathex` and lists the flat app
   modules (`APP_MODULES`) as hidden imports (several are imported lazily, so
@@ -575,7 +681,7 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
   guidance ("click Log in" vs. running the login BAT) belongs in the driver
   (`cli.py` or the GUI), not the core.
 - **Runtime deps are pinned** in `requirements.txt` (and the setup BAT for the
-  end-user flow). Playwright ↔ Chromium revision must move together.
+  end-user flow). No browser is bundled — the app uses the system Edge/Chrome.
 - **End-user setup uses no venv** (global `pip` via the setup BAT). The
   **build** uses an isolated `build\.venv` created by `build.ps1`.
 - **Sync Playwright API** (not async) — one sequential worker.
@@ -595,8 +701,10 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
 | County dropdown timeout | Slow network | Increase `COUNTY_ENABLE_TIMEOUT_MS` in `common.py` |
 | Output looks wrong for one report only | That report's selector changed | Edit only that report's `ReportSpec` in its `export_*.py` |
 | "TSMIS page looks different than expected" | Preflight failed — site likely changed | Check `LOG_DIR` + `FAILURES_DIR`; update selectors in `common.py`/the `ReportSpec` |
-| Packaged `.exe`: "Executable doesn't exist ... chrome-headless-shell" | Launched without `channel="chromium"` | Ensure `new_authed_browser` uses `channel="chromium"` |
-| Packaged build bundles wrong Chromium after a Playwright bump | `build\ms-playwright` was cached | Delete `build\ms-playwright` and rebuild |
+| "No compatible web browser was found" (`BrowserNotFoundError`) | Neither Edge nor Chrome is installed/launchable | Install Microsoft Edge (or set `TSMIS_BROWSER_CHANNEL`); see `common.launch_browser` |
+| Browser launch fails only after an Edge/Chrome auto-update | Evergreen browser outran the pinned Playwright CDP | Bump `playwright` in `requirements*.txt` and rebuild |
+| DLP/SharePoint blocks a file in the release ("Credit Card Number") | Playwright driver docs (e.g. `tracing.md`) bundled | `build.ps1` now prunes them; clean an existing release with `build\prune_bundle.ps1 -Target "…\TSMIS Exporter"`, then re-zip |
+| Build fails: "GUARD FAILED: … credit-card-like number" | A bundled dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` to drop the offending non-runtime files |
 
 ## Git Conventions
 
@@ -605,7 +713,7 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
 - **Don't commit generated files** under `output/`, nor build artifacts
   (`build/.venv`, `build/ms-playwright`, `build/pyi-work`, `dist/`). Only the
   four `output/.gitkeep` stubs are tracked there.
-- Track the build *infra* (`build/build.ps1`, `build/app.spec`,
-  `build/smoke_entry.py`), `requirements*.txt`, and `version.py`.
+- Track the build *infra* (`build/build.ps1`, `build/prune_bundle.ps1`,
+  `build/app.spec`, `build/smoke_entry.py`), `requirements*.txt`, and `version.py`.
 - Commit messages should be short and imperative (e.g., `add route 395`,
   `decouple export engine from console`).

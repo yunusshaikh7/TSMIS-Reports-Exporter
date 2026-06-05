@@ -9,14 +9,8 @@ if errorlevel 1 (
     exit /b 1
 )
 echo.
-echo Downloading Chromium browser...
-python -m playwright install chromium
-if errorlevel 1 (
-    echo.
-    echo ERROR: Chromium download failed.
-    pause
-    exit /b 1
-)
+echo This tool uses the Microsoft Edge (or Chrome) already installed on this PC,
+echo so there is no browser to download.
 echo.
 echo Setup complete. You can now run "2. login (update login).bat".
 pause

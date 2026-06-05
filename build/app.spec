@@ -3,24 +3,22 @@
 # Driven by build\build.ps1, which sets these environment variables:
 #   TSMIS_ENTRY     path to the entry-point .py to package
 #   TSMIS_APP_NAME  output folder / exe name (e.g. "TSMIS Exporter")
-#   TSMIS_BROWSERS  path to the ms-playwright folder to bundle
 #   TSMIS_CONSOLE   "1" to show a console window, "0" for a windowed GUI app
 #
-# Proven recipe (Phase 1 spike):
+# Recipe:
 #   * collect_all('playwright') + Playwright's own bundled PyInstaller hooks
-#     make the Node driver importable when frozen.
-#   * The ms-playwright browser folder is bundled as data -> _internal/ms-playwright.
-#   * At runtime the app sets PLAYWRIGHT_BROWSERS_PATH to that folder BEFORE
-#     importing Playwright and launches headless via channel="chromium", so the
-#     full Chromium is used and chrome-headless-shell need not be bundled.
+#     make the Node driver importable when frozen. NOTE: no browser is bundled --
+#     the app drives the machine's installed Edge/Chrome via channel="msedge"/
+#     "chrome" (see scripts/common.launch_browser), so there is no ms-playwright
+#     folder and nothing to point PLAYWRIGHT_BROWSERS_PATH at. The Node driver
+#     (node.exe) is still required and comes in via collect_all('playwright').
 #   * pdfminer ships CMap data files that must be collected or pdfplumber text
 #     extraction breaks when frozen -> collect_data_files('pdfminer').
 import os
 from PyInstaller.utils.hooks import collect_all, collect_data_files
 
-ENTRY    = os.environ.get("TSMIS_ENTRY", os.path.join(SPECPATH, "smoke_entry.py"))
+ENTRY    = os.environ.get("TSMIS_ENTRY", os.path.join(SPECPATH, "full_smoke.py"))
 APP_NAME = os.environ.get("TSMIS_APP_NAME", "TSMIS Exporter")
-BROWSERS = os.environ.get("TSMIS_BROWSERS", os.path.join(SPECPATH, "ms-playwright"))
 CONSOLE  = os.environ.get("TSMIS_CONSOLE", "1") == "1"
 
 # The app uses flat modules in scripts/ (imported by bare name) plus version.py
@@ -48,8 +46,16 @@ for _pkg in ("pdfplumber", "openpyxl"):
     _d, _b, _h = collect_all(_pkg)
     datas += _d; binaries += _b; hiddenimports += _h
 
-# Bundle the Chromium browser folder -> _internal/ms-playwright at runtime.
-datas += [(BROWSERS, "ms-playwright")]
+# Drop optional image libraries pulled in transitively but NEVER used: Pillow
+# (openpyxl image insert + pdfplumber/pdfminer image paths) and pypdfium2
+# (pdfplumber.to_image). The app only extracts text/tables and writes plain
+# workbooks, and these imports are all guarded (try/except or lazy), so excluding
+# them is verified safe by build/full_smoke.py and trims ~20 MB + image codecs.
+EXCLUDES = ["PIL", "pypdfium2", "pypdfium2_raw"]
+_excl = set(EXCLUDES)
+hiddenimports = [h for h in hiddenimports if h.split(".")[0] not in _excl]
+
+# (No browser is bundled -- see the header. The app uses the machine's Edge/Chrome.)
 
 a = Analysis(
     [ENTRY],
@@ -60,7 +66,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=EXCLUDES,
     noarchive=False,
 )
 
