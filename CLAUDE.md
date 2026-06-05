@@ -158,8 +158,9 @@ can be gigabytes. Build artifacts (`build/.venv`, `build/ms-playwright`,
    completes SSO + MFA, then presses Enter to save the session into
    `scripts/tsmis_auth.json`. The same file is used by every export script.
 3. **Export (repeatable):** Double-click `3. run_export (main script).bat` —
-   checks the auth file exists, shows a menu, runs the selected exporter
-   headlessly over every route.
+   checks the auth file exists, shows a menu, asks which routes to export (press
+   Enter for all, or list specific ones), then runs the selected exporter
+   headlessly over those routes.
 4. **Consolidate (optional, repeatable):** Double-click
    `4. consolidate (combine reports).bat` — pick one report type and combine
    every per-route export into a single workbook under `output/consolidated/`.
@@ -179,6 +180,11 @@ can be gigabytes. Build artifacts (`build/.venv`, `build/ms-playwright`,
    - `3` → `python scripts\export_highway_sequence.py`
    - `Q` → quit
 3. Invalid choices loop back to the menu.
+4. After a report is chosen, the Python entry point (`run_cli`) prompts for the
+   routes to export — Enter (or empty) means **all routes**; otherwise type a
+   list like `5, 99, 101` (any casing / zero-padding, suffixes like `101U` ok).
+   The same prompt backs the fast-mode BAT. See **Selecting Which Routes to
+   Export**.
 
 `4. consolidate (combine reports).bat` follows the same pattern but runs no
 auth check (the consolidator reads local files, not TSMIS).
@@ -202,8 +208,10 @@ and raises `AuthError` on session problems.
   timeout constants, `AuthError`, `clear_auth()`, `require_valid_auth()`
   (raises `AuthError`), `navigate_with_auth`, `is_logged_in`, `select_report`,
   `wait_with_skip_option(page, js, prefix, events, ...)`, `new_authed_browser`
-  (launches Chromium with `channel="chromium"`). Re-exports `AUTH` from
-  `paths.py` (output paths come from `paths.py` directly).
+  (launches Chromium with `channel="chromium"`), and the route-selection
+  parsers `normalize_route` / `parse_routes` (free-text → validated route list
+  in `ROUTES` order; raise a UI-neutral `ValueError` on bad/empty input).
+  Re-exports `AUTH` from `paths.py` (output paths come from `paths.py` directly).
 - **`scripts/events.py`** — `Events` (callbacks `on_log`, `on_route`,
   `should_skip`, `is_cancelled`; all default to no-ops), `RunResult` (export),
   and `ConsolidateResult` (consolidation: `status` ok/cancelled/error,
@@ -214,6 +222,8 @@ and raises `AuthError` on session problems.
   `save_pdf_letter` / `save_via_export_button`, and `_recover()`.
 - **`scripts/cli.py`** — console adapters that keep both `.bat` flows working:
   `run_cli(spec, title)` for exports (wires `Events` to `print()`/`msvcrt`,
+  prompts for the route subset via `_resolve_routes_console` (Enter = all; also
+  honors the `TSMIS_ROUTES` env var) and passes `routes=` to the engine,
   renders `AuthError` like the old `handle_bad_auth`) and
   `run_consolidate_cli(consolidate_fn)` for consolidators (wires `on_log` to
   `print`, the overwrite prompt to `input()`, maps the `ConsolidateResult`
@@ -236,8 +246,10 @@ and raises `AuthError` on session problems.
   the dev import paths, then runs `App().mainloop()`.
 - `gui_app.py` — the `App(tk.Tk)` window: header (session dot + Log in button),
   an Export/Consolidate **notebook**, a shared progress bar + counts + log pane,
-  and a footer (output path + Open folder). Drains the worker queue via
-  `after(100)`; it never does browser/file work itself.
+  and a footer (output path + Open folder). The Export tab has a **Routes** entry
+  (blank = all; or type/`Choose…` a subset via `parse_routes`) passed to
+  `ExportWorker(..., routes=...)`. Drains the worker queue via `after(100)`; it
+  never does browser/file work itself.
 - `gui_worker.py` — `ExportWorker` / `ConsolidateWorker` / `LoginWorker` threads.
   They drive the engines through `Events`, posting `(kind, payload)` messages to
   a `queue.Queue`. Skip/Cancel are `threading.Event`s; login waits on a `done`
@@ -261,12 +273,16 @@ logic live in one place so the GUI can call a single function.
 
 | Constant | Default | Purpose |
 |---|---|---|
-| `REPORT_TIMEOUT_MS` | `360_000` (6 min) | Hard ceiling for a single report. Some routes (e.g. Route 5 Ramp Detail) legitimately take minutes. |
+| `REPORT_TIMEOUT_MS` | `360_000` (6 min) | Hard ceiling for a single report in the **sequential** (one-browser) flow. Some routes (e.g. Route 5 Ramp Detail) legitimately take minutes. |
+| `FAST_REPORT_TIMEOUT_MS` | `600_000` (10 min) | Per-route ceiling in **fast mode**. Larger because N concurrent browsers load the TSMIS server, so big reports (e.g. Highway Sequence) take longer. |
+| `RETRY_REPORT_TIMEOUT_MS` | `900_000` (15 min) | Per-route ceiling for the **end-of-run retry pass** (runs one route at a time, so the most generous window). |
 | `SKIP_PROMPT_AFTER_MS` | `60_000` (1 min) | Soft timer: after this, a "still working" status is emitted and the skip escape-hatch opens. |
 | `COUNTY_ENABLE_TIMEOUT_MS` | `60_000` (60 s) | Max wait for the county dropdown to enable. |
-| `RETRY_COUNT` | `1` | Extra attempts per route after a transient (non-timeout) failure. A hard timeout is never retried. |
+| `RETRY_COUNT` | `1` | Extra in-loop attempts per route after a transient (non-timeout) failure. A hard timeout is never retried in-loop (it gets the end-of-run retry pass instead). |
 
-Increase these if the TSMIS server is slow.
+Increase these if the TSMIS server is slow. The per-route timeout reaches both
+the report-generation wait and the export/download wait (so a big report whose
+*download* is slow under load is covered too).
 
 ## Skipping a Slow Route Mid-Run
 
@@ -283,6 +299,68 @@ button. Mechanically, `wait_with_skip_option` polls `events.should_skip()`:
 
 Re-run later and the loop retries any routes without an output file.
 
+## Retrying Failed Routes (end-of-run pass)
+
+After the main run finishes, both engines automatically give any **failed**
+routes one more, more patient attempt (`exporter._retry_failed_routes`):
+
+- **Why:** a big report (e.g. Highway Sequence) can blow the per-route window
+  not because it's broken but because the server was slow — especially in fast
+  mode, where several browsers compete for it. A second pass under lighter load
+  usually lands it.
+- **One at a time, generous timeout:** the retry pass is strictly **sequential**
+  and uses `RETRY_REPORT_TIMEOUT_MS` (15 min/route default). In **fast mode** the
+  parallel run finishes first, then a *single* fresh browser
+  (`exporter_parallel._retry_failed_sequential`) retries the stragglers serially
+  — so a slow report is no longer fighting N others for the server. (The same
+  helper backs both engines; the sequential engine just reuses its open browser.)
+- **Scope:** only `failed` routes are retried — not user-skipped (deliberate) or
+  empty (legitimately no data) ones. Routes already on disk are still skipped.
+- **Clean bookkeeping:** a route's first-pass `failed` record is dropped before
+  the retry, then re-recorded with its *final* status, so the run-report CSV has
+  one row per route and the GUI progress counts shift (failed → saved) in place
+  rather than double-counting. The auto-saved run report is written **after** the
+  retry pass, so it reflects final outcomes.
+- **Safety:** an `AuthError` during the pass ends the run like the main loop; any
+  other unexpected error is logged and swallowed so the run report still saves.
+  If the form can't be re-armed, or the user cancels, the un-retried routes stay
+  `failed`.
+
+Still failing after the retry pass usually means a genuine problem — check
+`FAILURES_DIR` (screenshot + HTML) and `LOG_DIR`. Re-running also resumes, since
+the missing output files are simply re-attempted.
+
+## Selecting Which Routes to Export
+
+By default every export covers **all** routes in `ROUTES`. A run can be narrowed
+to a specific subset; the default (all) is unchanged if you don't pick any.
+
+- **The engine was already route-aware:** `run_export(spec, events, *,
+  routes=ROUTES)` and `run_export_parallel(..., routes=ROUTES)` take the route
+  list. The feature is just plumbing a chosen subset to that parameter from each
+  driver, so sequential and fast mode both honor the selection identically.
+- **Parsing (one place):** `common.parse_routes(text)` turns free-text into a
+  validated list in `ROUTES` order. It accepts commas / spaces / semicolons /
+  newlines, any casing or zero-padding, and suffixes (`5`, `005`, `5s`, `101U`);
+  it de-dupes, and raises a UI-neutral `ValueError` (`"Not valid route(s): …"` /
+  `"No routes entered."`) listing unknown tokens. `normalize_route(token)` maps
+  one token to its canonical `ROUTES` spelling (or `None`).
+- **Console (`cli.py`):** `run_cli` calls `_resolve_routes_console()` — Enter /
+  empty / `all` (or EOF) → all routes; otherwise the typed list, re-prompting on
+  bad input. It also honors a `TSMIS_ROUTES` env var (a list, or `all`/empty),
+  which skips the prompt. The banner and the final "Routes handled: N of M"
+  summary reflect the chosen count.
+- **GUI (`gui_app.py`):** a **Routes** entry on the Export tab (blank = all) with
+  a live count/validation hint and a **Choose…** modal multi-select picker. The
+  selection is parsed on Start (a clear messagebox on error) and passed as
+  `ExportWorker(..., routes=…)`; the worker uses the subset size as the progress
+  total. Fast mode and route selection are independent and compose.
+- **Resume still applies:** routes already on disk are skipped, so re-exporting a
+  subset only fetches what's missing (delete a file to force a re-download).
+
+This is per-run selection. To change the route universe permanently (add/remove a
+route everywhere), edit the `ROUTES` list — see **Adding or Removing Routes**.
+
 ## Resume / Idempotency
 
 `run_export` checks `if out_path.exists(): continue` before each route, so
@@ -296,8 +374,8 @@ several headless browsers at once, each restoring the **same** saved session and
 pulling routes off a shared `queue.Queue` until it is empty. It is **additive**:
 the proven sequential engine (`exporter.run_export`) is untouched and remains the
 default. The per-route mechanics are **reused** from `exporter.py`
-(`_process_route`, `_record`, `_capture_failure`), so a per-report fix benefits
-both engines; only the concurrency/coordination is new.
+(`_process_route`, `_record`, `_capture_failure`, `_retry_failed_routes`), so a
+per-report fix benefits both engines; only the concurrency/coordination is new.
 
 - **Self-balancing:** a shared work queue (not static shards) keeps fast workers
   busy, so no single browser gets stuck with all the slow routes (5, 99, 101…).
@@ -306,8 +384,16 @@ both engines; only the concurrency/coordination is new.
   (checked between routes), skips routes whose output file already exists (so it
   resumes), and auto-saves the run-report CSV. A single preflight runs **once**
   before launching N browsers, so a bad session/changed site fails fast.
-- **Per-route Skip is disabled** in fast mode (ambiguous with several routes in
-  flight) — use **Cancel** to stop the whole run.
+- **Bigger per-route window:** workers use `FAST_REPORT_TIMEOUT_MS` (10 min vs
+  the sequential 6) because the concurrent load slows the server — otherwise big
+  reports time out purely from the parallelism, not a real problem.
+- **Serial retry of stragglers:** after all workers finish, failed routes get one
+  **single-browser, one-at-a-time** retry (`_retry_failed_sequential` →
+  `_retry_failed_routes`, `RETRY_REPORT_TIMEOUT_MS`), so a slow report finally
+  lands without competing with N other browsers. See **Retrying Failed Routes**.
+- **Per-route Skip is disabled** during the parallel phase (ambiguous with
+  several routes in flight) — use **Cancel** to stop the whole run. (The serial
+  retry phase is one-at-a-time, so the console `S` key works again there.)
 - **Threading:** Playwright's sync API is thread-affine, so each worker owns its
   own `sync_playwright()` + browser + context + page and never shares a
   Playwright object across threads. Per-worker `RunResult`s are merged at the
@@ -445,9 +531,15 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
   TSMIS appears to have changed — so the run fails fast with one clear error
   instead of every route failing cryptically. Surfaced by `cli.py` and the GUI
   like `AuthError`.
-- **Auto-retry once:** a transient (non-timeout) route error is retried a single
-  time after `_recover()` re-arms the form (`RETRY_COUNT`, default 1). A hard
-  **timeout is not retried** (the user already had a skip window during it).
+- **Auto-retry once (in-loop):** a transient (non-timeout) route error is retried
+  a single time after `_recover()` re-arms the form (`RETRY_COUNT`, default 1). A
+  hard **timeout is not retried in-loop** (the user already had a skip window
+  during it).
+- **End-of-run retry pass:** whatever is still in `result.failed` after the main
+  run gets one slow, **serial** retry with a generous timeout — including a
+  timed-out route, which the in-loop retry deliberately skips. See **Retrying
+  Failed Routes**. This is the catch-all for big reports that lost to server load
+  (especially in fast mode).
 - **Failure screenshots:** when a route ultimately fails, `_capture_failure()`
   writes `<report>_route_<route>_<ts>.png` + `.html` to `FAILURES_DIR`
   (best-effort; a capture error never masks the real one). Invaluable when a

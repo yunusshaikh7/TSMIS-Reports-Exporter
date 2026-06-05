@@ -23,7 +23,7 @@ from exporter_parallel import DEFAULT_WORKERS, MAX_WORKERS
 
 from paths import LOG_DIR, OUTPUT_ROOT
 from version import APP_NAME, __version__
-from common import AuthError, clear_auth, require_valid_auth
+from common import ROUTES, AuthError, clear_auth, parse_routes, require_valid_auth
 
 from export_ramp_summary import SPEC as SUMMARY_SPEC
 from export_ramp_detail import SPEC as DETAIL_SPEC
@@ -92,6 +92,7 @@ class App(tk.Tk):
             self.btn_login,
             self.btn_export_start, self.btn_cons_start,
             self.fast_check,
+            self.routes_entry, self.btn_choose_routes,
             *self.export_radios, *self.cons_radios,
         ]
         # Run-only controls start disabled (no task is running, no result yet).
@@ -136,17 +137,40 @@ class App(tk.Tk):
         # Export tab
         ex = ttk.Frame(nb, padding=PAD)
         ex.columnconfigure(0, weight=1)
-        ttk.Label(ex, text="REPORT TO EXPORT (all routes)", style="Section.TLabel").grid(
-            row=0, column=0, sticky="w", pady=(0, 6))
+        row = 0
+        ttk.Label(ex, text="REPORT TO EXPORT", style="Section.TLabel").grid(
+            row=row, column=0, sticky="w", pady=(0, 6))
+        row += 1
         self.export_radios = []
         for i, (label, fmt, _spec) in enumerate(EXPORT_REPORTS):
             rb = ttk.Radiobutton(ex, text=f"{label}   ·   {fmt}", value=i, variable=self.export_choice)
-            rb.grid(row=1 + i, column=0, sticky="w")
+            rb.grid(row=row, column=0, sticky="w")
             self.export_radios.append(rb)
+            row += 1
+
+        # Route selection. Blank = all routes (the default); otherwise the chosen
+        # subset, typed in or picked from the full list via "Choose…".
+        ttk.Label(ex, text="ROUTES", style="Section.TLabel").grid(
+            row=row, column=0, sticky="w", pady=(PAD, 2))
+        row += 1
+        routes = ttk.Frame(ex)
+        routes.grid(row=row, column=0, sticky="ew")
+        routes.columnconfigure(0, weight=1)
+        self.routes_entry = ttk.Entry(routes)
+        self.routes_entry.grid(row=0, column=0, sticky="ew")
+        self.routes_entry.bind("<KeyRelease>", self._update_route_feedback)
+        self.btn_choose_routes = ttk.Button(routes, text="Choose…", command=self._choose_routes)
+        self.btn_choose_routes.grid(row=0, column=1, padx=(8, 0))
+        row += 1
+        self.route_feedback = ttk.Label(ex, text="Leave blank to export all routes.",
+                                        style="Muted.TLabel", wraplength=460, justify="left")
+        self.route_feedback.grid(row=row, column=0, sticky="w", pady=(4, 0))
+        row += 1
 
         # Experimental "fast mode": run several browsers at once.
         fast = ttk.Frame(ex)
-        fast.grid(row=1 + len(EXPORT_REPORTS), column=0, sticky="w", pady=(PAD, 0))
+        fast.grid(row=row, column=0, sticky="w", pady=(PAD, 0))
+        row += 1
         self.fast_check = ttk.Checkbutton(
             fast, text="⚡ Fast mode (experimental) — run", variable=self.fast_mode,
             command=self._sync_fast_controls)
@@ -158,10 +182,11 @@ class App(tk.Tk):
         ttk.Label(ex, text="Faster, but heavier on your PC and the TSMIS server. "
                            "3–4 is recommended; per-route Skip is off in fast mode.",
                   style="Muted.TLabel", wraplength=460, justify="left").grid(
-            row=2 + len(EXPORT_REPORTS), column=0, sticky="w", pady=(6, 0))
+            row=row, column=0, sticky="w", pady=(6, 0))
+        row += 1
 
         actions = ttk.Frame(ex)
-        actions.grid(row=3 + len(EXPORT_REPORTS), column=0, sticky="w", pady=(PAD, 0))
+        actions.grid(row=row, column=0, sticky="w", pady=(PAD, 0))
         self.btn_export_start = ttk.Button(actions, text="Start export", style="Accent.TButton",
                                            command=self.start_export)
         self.btn_export_start.grid(row=0, column=0)
@@ -274,6 +299,79 @@ class App(tk.Tk):
         """Enable the worker-count spinner only when fast mode is checked."""
         self.fast_spin.state(["!disabled"] if self.fast_mode.get() else ["disabled"])
 
+    def _update_route_feedback(self, *_):
+        """Live hint under the Routes entry: blank = all routes, otherwise the
+        parsed count, or the validation error while the user is still typing."""
+        raw = self.routes_entry.get().strip()
+        if not raw:
+            self.route_feedback.config(text="Leave blank to export all routes.")
+            return
+        try:
+            chosen = parse_routes(raw)
+        except ValueError as e:
+            self.route_feedback.config(text=str(e))
+            return
+        self.route_feedback.config(text=f"{len(chosen)} route(s) selected.")
+
+    def _choose_routes(self):
+        """Modal picker: multi-select routes from the full list and write the
+        chosen set back into the Routes entry (blank entry = all routes)."""
+        dlg = tk.Toplevel(self)
+        dlg.title("Choose routes")
+        dlg.transient(self)
+        dlg.columnconfigure(0, weight=1)
+        dlg.rowconfigure(1, weight=1)
+
+        ttk.Label(dlg, text="Select one or more routes "
+                            "(Ctrl/Shift-click for multiple):",
+                  wraplength=280, justify="left").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=PAD, pady=(PAD, 6))
+
+        lb = tk.Listbox(dlg, selectmode="extended", activestyle="none", height=18,
+                        bg=PALETTE["log_bg"], fg=PALETTE["log_fg"], font=self.fonts["mono"],
+                        highlightthickness=0, borderwidth=1, relief="solid")
+        lb.grid(row=1, column=0, sticky="nsew", padx=(PAD, 0))
+        sb = ttk.Scrollbar(dlg, orient="vertical", command=lb.yview)
+        sb.grid(row=1, column=1, sticky="ns", padx=(0, PAD))
+        lb.configure(yscrollcommand=sb.set)
+        for r in ROUTES:
+            lb.insert("end", r)
+
+        try:                                    # pre-select whatever is in the entry
+            current = set(parse_routes(self.routes_entry.get()))
+        except ValueError:
+            current = set()
+        for i, r in enumerate(ROUTES):
+            if r in current:
+                lb.selection_set(i)
+        sel = lb.curselection()
+        if sel:
+            lb.see(sel[0])
+
+        def apply_and_close():
+            chosen = [ROUTES[i] for i in lb.curselection()]
+            self.routes_entry.delete(0, "end")
+            self.routes_entry.insert(0, ", ".join(chosen))
+            self._update_route_feedback()
+            dlg.destroy()
+
+        bar = ttk.Frame(dlg, padding=(PAD, 8))
+        bar.grid(row=2, column=0, columnspan=2, sticky="ew")
+        ttk.Button(bar, text="Select all",
+                   command=lambda: lb.selection_set(0, "end")).grid(row=0, column=0)
+        ttk.Button(bar, text="Clear",
+                   command=lambda: lb.selection_clear(0, "end")).grid(row=0, column=1, padx=(6, 0))
+        ttk.Button(bar, text="Cancel", command=dlg.destroy).grid(row=0, column=2, padx=(6, 0))
+        ttk.Button(bar, text="OK", style="Accent.TButton",
+                   command=apply_and_close).grid(row=0, column=3, padx=(6, 0))
+
+        # Open at the size the content needs -- the four-button bar is wider than
+        # the list -- and keep that as the minimum so the buttons can't be
+        # clipped or shrunk out of view.
+        dlg.update_idletasks()
+        dlg.minsize(dlg.winfo_reqwidth(), dlg.winfo_reqheight())
+        dlg.grab_set()
+
     # ---- elapsed-run timer (shown beneath the progress bar) ------------------
 
     @staticmethod
@@ -357,6 +455,15 @@ class App(tk.Tk):
             messagebox.showinfo("Login needed", "Please log in first, then start the export.")
             return
         spec = EXPORT_REPORTS[self.export_choice.get()][2]
+        raw = self.routes_entry.get().strip()
+        if raw:
+            try:
+                run_routes = parse_routes(raw)
+            except ValueError as e:
+                messagebox.showerror("Check routes", f"{e}\n\nExample: 5, 99, 101")
+                return
+        else:
+            run_routes = list(ROUTES)
         workers = 1
         if self.fast_mode.get():
             try:
@@ -367,16 +474,19 @@ class App(tk.Tk):
         self.cancel_event.clear()
         self.skip_event.clear()
         self._clear_progress()
+        msg = f"Starting export: {spec.label}"
+        if len(run_routes) != len(ROUTES):
+            msg += f"   ·   {len(run_routes)} routes"
         if workers > 1:
-            self.log(f"Starting export: {spec.label}   ·   FAST MODE ({workers} browsers)")
-        else:
-            self.log(f"Starting export: {spec.label}")
+            msg += f"   ·   FAST MODE ({workers} browsers)"
+        self.log(msg)
         self._set_running("export")
         if workers > 1:
             # Per-route Skip is meaningless with several routes in flight.
             self.btn_export_skip.state(["disabled"])
         self.set_dot("busy", f"Exporting {spec.label}…")
-        ExportWorker(spec, self.q, self.cancel_event, self.skip_event, workers=workers).start()
+        ExportWorker(spec, self.q, self.cancel_event, self.skip_event,
+                     workers=workers, routes=run_routes).start()
 
     def start_consolidate(self):
         label, fn, out_path = CONSOLIDATE_REPORTS[self.cons_choice.get()]

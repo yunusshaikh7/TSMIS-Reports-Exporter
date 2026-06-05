@@ -8,7 +8,7 @@ touch the console -- only this module does.
 import os
 import sys
 
-from common import AUTH, ROUTES, AuthError, PreflightError, clear_auth
+from common import AUTH, ROUTES, AuthError, PreflightError, clear_auth, parse_routes
 from events import Events
 from logging_setup import setup_logging
 
@@ -38,6 +38,40 @@ def _drain_skip_key():
 
 def _console_events():
     return Events(on_log=print, should_skip=_drain_skip_key)
+
+
+def _resolve_routes_console():
+    """Decide which routes to export in the console flow. Returns None for
+    "all routes", otherwise a validated route list.
+
+    Honors the TSMIS_ROUTES environment variable if set (a comma/space list, or
+    'all'/empty to mean all routes); otherwise prompts interactively, re-asking
+    on invalid input. Pressing Enter (or EOF, e.g. a non-interactive window)
+    means all routes, so the default behavior is unchanged.
+    """
+    env = os.environ.get("TSMIS_ROUTES")
+    if env is not None and env.strip():
+        if env.strip().lower() == "all":
+            return None
+        try:
+            return parse_routes(env)
+        except ValueError as e:
+            print(f"TSMIS_ROUTES ignored: {e}")   # fall through to the prompt
+
+    while True:
+        try:
+            raw = input(
+                "Routes to export -- press Enter for ALL, or list specific "
+                "routes (e.g. 5, 99, 101): "
+            ).strip()
+        except EOFError:
+            return None
+        if not raw or raw.lower() == "all":
+            return None
+        try:
+            return parse_routes(raw)
+        except ValueError as e:
+            print(f"  {e}  Try again, or press Enter to export all routes.")
 
 
 def _report_bad_auth(reason):
@@ -73,8 +107,15 @@ def run_cli(spec, title):
         from exporter_parallel import resolve_worker_count
         workers = resolve_worker_count()
 
+    routes = _resolve_routes_console()          # None = all routes
+    run_routes = ROUTES if routes is None else routes
+    selected = len(run_routes)
+
     print("=" * 60)
-    print(f"{title} -- {len(ROUTES)} routes")
+    if routes is None:
+        print(f"{title} -- {selected} routes")
+    else:
+        print(f"{title} -- {selected} of {len(ROUTES)} routes: {', '.join(run_routes)}")
     if workers > 1:
         print(f"FAST MODE (experimental): {workers} browsers in parallel")
     print("=" * 60)
@@ -85,9 +126,9 @@ def run_cli(spec, title):
     try:
         if workers > 1:
             from exporter_parallel import run_export_parallel
-            result = run_export_parallel(spec, _console_events(), workers=workers)
+            result = run_export_parallel(spec, _console_events(), workers=workers, routes=run_routes)
         else:
-            result = run_export(spec, _console_events())
+            result = run_export(spec, _console_events(), routes=run_routes)
     except AuthError as e:
         _report_bad_auth(str(e))
         return
@@ -107,7 +148,7 @@ def run_cli(spec, title):
     print(f"Empty (no data): {len(result.empty)} {result.empty if result.empty else ''}")
     print(f"Skipped by user: {len(result.user_skipped)} {result.user_skipped if result.user_skipped else ''}")
     print(f"Failed:          {len(result.failed)} {result.failed if result.failed else ''}")
-    print(f"Routes handled:  {total} of {len(ROUTES)}")
+    print(f"Routes handled:  {total} of {selected}")
     print(f"Output folder:   {result.output_dir}")
     print("=" * 60)
 
