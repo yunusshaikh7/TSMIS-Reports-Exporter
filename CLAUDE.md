@@ -699,22 +699,41 @@ partly inaccessible. We use none of that tooling (codegen agent, trace viewer,
 report dashboard) — only headless launch + `page.pdf()` and downloads.
 
 What it **deletes** (each verified runtime-safe by `build/full_smoke.py`):
-- **Playwright driver:** all `*.md` and `*.d.ts`, the `types/` dir, and the
-  `skill/`, `tools/trace/`, `tools/dashboard/`, `vite/` dirs (~5 MB; removes the
-  credit-card docs). Core files (`cli.js`, `lib/`, `node.exe`, …) are kept.
-- **Chromium locales (defensive no-op now):** would keep only `en-US.pak` and
-  drop the other ~219 language packs — but no browser is bundled, so this does
-  nothing today. Kept in case a browser is ever bundled again (was ~42 MB).
+- **All prose documentation, bundle-wide:** every `*.md` / `*.markdown` / `*.rst`
+  and stray `README` / `CHANGELOG` / `HISTORY` / `AUTHORS` / `CONTRIBUTING` / `NEWS`
+  text **anywhere** in the bundle — not just the Playwright driver. Docs are the
+  proven DLP surface (the driver's `tracing.md` carried a fake credit-card number).
+  **License / notice files are kept** (`LICENSE`/`LICENCE`/`COPYING`/`NOTICE`) — OSS
+  licenses legally require redistributing them, and they never carry flagged data.
+- **`dist-info` METADATA is sanitized, not deleted:** each embeds the package's
+  full README as its long-description body (pdfplumber's was 600+ lines). We keep
+  only the RFC822 headers (so `importlib.metadata.version()` still works) and drop
+  the body. Verified frozen-safe by the `-SelfTest` gate.
+- **Playwright driver extras:** `*.d.ts`, the `types/` dir, and the `skill/`,
+  `tools/trace/`, `tools/dashboard/`, `vite/` dirs (~5 MB). Core files (`cli.js`,
+  `lib/`, `node.exe`, …) are kept.
+- **Chromium locales (defensive no-op now):** would keep only `en-US.pak` — but no
+  browser is bundled, so this does nothing today. Kept in case one ever is again.
 - **Image libs (safety net for the spec excludes):** any `PIL`/`pypdfium2`/
   `pypdfium2_raw` dir that slipped through (normally excluded at PyInstaller time).
 - **Generic dead weight:** `tests/`/`test/` dirs and `*.pyi` stubs in the bundled
   Python packages (never imported at runtime). Chromium is skipped.
 
-What it **guards** afterward: fails if any `*.md` remains under the bundled
-driver, or if any text file in the bundle contains a credit-card-like number (IIN
-prefix + length + **Luhn**, like DLP — so random 16-digit hashes in JS bundles are
-*not* false-positives). (The Chromium-locale prune and `ms-playwright` scan-skip
-are kept as defensive no-ops now that no browser is bundled.)
+What it **guards** afterward — **fails the build** if any of these remain (each
+mirrors a corporate-DLP "sensitive information type", and each is tuned to avoid
+false positives that would wrongly block a release):
+- **Documentation:** any non-license `*.md` / `*.markdown` / `*.rst` anywhere.
+- **Credit cards:** IIN prefix + canonical length + **Luhn** (so random 16-digit
+  hashes in JS bundles are *not* false-positives).
+- **Private keys:** PEM `-----BEGIN … PRIVATE KEY-----` blocks.
+- **AWS keys:** `AKIA` + 16 base32.
+- **US SSNs:** dashed, with the invalid area/group/serial ranges excluded.
+
+The scan covers common text + source extensions (incl. `.py`, `.json`, `.js`,
+`METADATA`, certs); the `ms-playwright` Chromium folder is skipped (defensive
+no-op now that no browser is bundled). Re-runnable on any extracted release with
+`prune_bundle.ps1 -Target "…\TSMIS Exporter"` (add `-GuardOnly` to audit without
+deleting).
 
 Runs automatically from `build.ps1`, and is **reusable on an already-built or
 extracted release** to clean it in place:
