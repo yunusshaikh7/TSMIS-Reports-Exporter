@@ -49,6 +49,15 @@ class RunCancelled(Exception):
     stop the run cleanly -- it is NOT a route failure or a worker crash."""
 
 
+class ReportError(Exception):
+    """Raised when the TSMIS site itself renders a fatal error for a route -- its
+    #rampResults box goes into an `error` state (e.g. "Cannot read properties of
+    undefined (reading 'size')") instead of producing a report or a clean "no
+    results". Detected during the post-Generate wait so the route fails FAST with
+    the site's own message, instead of silently waiting out the whole per-route
+    timeout (and then the long retry) on something the site simply can't build."""
+
+
 URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
 
 # The shared auth file path is resolved by paths.py, which is frozen-aware: in
@@ -171,14 +180,27 @@ def clear_auth():
 
 
 def require_valid_auth():
-    """Raise AuthError if the saved session is missing or corrupt."""
+    """Raise AuthError if the saved session is missing, corrupt, or not shaped
+    like a Playwright storage_state.
+
+    Validating the SHAPE here (not just "is it JSON") matters: a valid-JSON file
+    that isn't a real storage_state would otherwise blow up later inside
+    `browser.new_context(storage_state=...)` as a raw, un-handled error (a
+    traceback in the console flow). Catching it here turns it into a clean
+    AuthError the drivers already know how to surface + guide a re-login for.
+    """
     if not AUTH.exists():
         raise AuthError("No saved session file found.")
     try:
         with open(AUTH, "r", encoding="utf-8") as f:
-            json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         raise AuthError(f"Session file is corrupted ({type(e).__name__}).")
+    # Playwright's storage_state is always {"cookies": [...], "origins": [...]}.
+    if (not isinstance(data, dict)
+            or not isinstance(data.get("cookies"), list)
+            or not isinstance(data.get("origins"), list)):
+        raise AuthError("Session file isn't a valid saved login.")
 
 
 def navigate_with_auth(page):
@@ -213,6 +235,33 @@ def select_report(page, report_label):
         timeout=COUNTY_ENABLE_TIMEOUT_MS,
     )
     page.locator("#districtCountySelect").select_option(label="-- ALL --")
+
+
+# Every report renders a fatal error into the shared #rampResults box by adding
+# the `error` class (e.g. highway_log/hsl: `box.className = 'ramp-results error'`;
+# ramp detail/summary via the shared showRampResults('error', ...)). clearResults()
+# resets that class on each Generate, so this only ever reflects the CURRENT
+# route -- no stale-error false positives. JS expression form for use inside the
+# post-Generate wait condition.
+ERROR_JS = "document.querySelector('#rampResults.error') !== null"
+
+
+def report_error_text(page):
+    """If the report rendered an error (the site's #rampResults is in its `error`
+    state), return the site's message; otherwise None.
+
+    The site shows fatal report errors here with NO Export button and NO "no
+    results" text, so without detecting this the export loop would wait out the
+    full per-route timeout (then the long retry) on a route the site can't build.
+    Best-effort: any lookup problem returns None (treat as "no error seen")."""
+    try:
+        loc = page.locator("#rampResults.error")
+        if loc.count() > 0:
+            text = (loc.first.inner_text() or "").strip()
+            return text or "The TSMIS site reported an error for this route."
+    except Exception:
+        return None
+    return None
 
 
 def preflight(page, report_label):
@@ -472,6 +521,9 @@ def new_authed_browser(p):
             "--enable-features=LocalNetworkAccessChecks",
         ],
     )
+    # The fallback drops only the optional permissions kwarg (older browsers may
+    # not grant "local-network-access"); the storage_state itself is already
+    # shape-validated by require_valid_auth(), so it isn't the thing that fails here.
     try:
         ctx = browser.new_context(
             storage_state=str(AUTH),

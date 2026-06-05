@@ -20,16 +20,19 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from common import (
+    ERROR_JS,
     REPORT_TIMEOUT_MS,
     RETRY_COUNT,
     RETRY_REPORT_TIMEOUT_MS,
     ROUTES,
     AuthError,
+    ReportError,
     RunCancelled,
     is_logged_in,
     navigate_with_auth,
     new_authed_browser,
     preflight,
+    report_error_text,
     require_valid_auth,
     select_report,
     wait_with_skip_option,
@@ -134,11 +137,20 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     hard ceiling for both the report-generation wait and the save/download."""
     page.get_by_label("Route", exact=True).select_option(route)
     page.get_by_role("button", name="Generate").click()
-    if not wait_with_skip_option(page, spec.wait_js(route), prefix, events,
+    # Wait for the report to be ready/empty OR for the site to render an error
+    # (so a route the site can't build fails in seconds instead of waiting out
+    # the whole timeout). spec.wait_js(route) is a full arrow function; invoke it
+    # and OR in the shared error check.
+    ready_js = spec.wait_js(route)
+    wait_js = f"() => (({ready_js}))() || ({ERROR_JS})"
+    if not wait_with_skip_option(page, wait_js, prefix, events,
                                  hard_timeout_ms=timeout_ms):
         return "skipped"
     if events.is_cancelled():        # cancel landed between the wait and the save
         raise RunCancelled()
+    err = report_error_text(page)    # site rendered a fatal error for this route
+    if err:
+        raise ReportError(err)
     if spec.is_empty(page):
         return "empty"
     page.wait_for_timeout(1000)
@@ -156,6 +168,17 @@ def _process_route(page, spec, route, prefix, out_path, events, result, timeout_
             outcome = _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms)
         except (AuthError, RunCancelled):
             raise                       # session loss / user cancel: never retry, never record as failed
+        except ReportError as e:
+            # The site rendered a fatal error for this route. Record it as failed
+            # right away (with the site's message) instead of burning an in-loop
+            # retry -- it's detected in seconds now, and the end-of-run retry pass
+            # still gives it one more (also-fast) attempt in case it was transient.
+            events.on_log(f"{prefix} TSMIS site error -- {e}")
+            log.warning("%s site error: %s", prefix, e)
+            _capture_failure(page, spec, route, events)
+            result.failed.append(route)
+            _record(result, events, route, "failed")
+            return _recover_or_stop(page, spec, events)
         except PlaywrightTimeoutError:
             # The hard timeout already gave the user a skip window; don't burn
             # another full timeout retrying -- record it and move on.

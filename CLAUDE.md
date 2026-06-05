@@ -114,6 +114,7 @@ launching a window. See **Build & Packaging** for details and gotchas.
 │   ├── run_report.py                  # per-route run report (CSV; auto-saved each run; +multi)
 │   ├── cli.py                         # console adapter: run_cli (one report) + run_cli_multi (several)
 │   ├── login.py                       # writes the auth file (headed browser)
+│   ├── reports.py                     # ONE registry of report types (GUI + export_multi read it)
 │   ├── export_ramp_summary.py         # thin: a ReportSpec (PDF) + run_cli
 │   ├── export_ramp_detail.py          # thin: a ReportSpec (XLSX download) + run_cli
 │   ├── export_highway_sequence.py     # thin: a ReportSpec (XLSX download) + run_cli
@@ -131,7 +132,9 @@ launching a window. See **Build & Packaging** for details and gotchas.
 ├── build/                             # portable-build infra (Phase 0)
 │   ├── build.ps1                      # one-command reproducible onefolder build (-SelfTest for headless verify)
 │   ├── prune_bundle.ps1               # strip bundle to runtime-only files + DLP guard (run by build.ps1)
-│   ├── app.spec                       # PyInstaller spec (Node driver + pdf/excel; excludes unused image libs; no browser)
+│   ├── app.spec                       # PyInstaller spec (Node driver + pdf/excel; excludes image libs; version-info + icon + manifest; no browser)
+│   ├── app.ico                        # app/.exe icon (neutral; how it was made is in Build & Packaging)
+│   ├── app.manifest                   # embedded in the .exe (asInvoker, Win10/11) — IT/Defender trust signal
 │   ├── gui_main entry → scripts/gui_main.py  # the windowed app's real entry point
 │   ├── full_smoke.py                  # comprehensive frozen self-test: system-browser pdf+download, pdfplumber, openpyxl, GUI (the -SelfTest entry)
 │   ├── dist_readme.txt               # copied into the build as "Start Here.txt"
@@ -261,8 +264,13 @@ and raises `AuthError` on session problems.
   `input()`, maps the `ConsolidateResult` status to the exit code). Imports
   `exporter`/`exporter_parallel` lazily so consolidating never pulls in Playwright.
 - **`scripts/export_*.py`** — thin ~30-line files: each defines a `ReportSpec`
-  and calls `run_cli`. `export_multi.py` instead lists all the report `(label,
-  spec)`s and calls `run_cli_multi` (backs the menu's `A` option).
+  and calls `run_cli`. `export_multi.py` derives its report list from `reports.py`
+  and calls `run_cli_multi` (backs the menu's `A` option).
+- **`scripts/reports.py`** — the **single registry** of report types:
+  `EXPORT_REPORTS = [(label, fmt, spec), …]` and
+  `CONSOLIDATE_REPORTS = [(label, fn, OUT_PATH), …]`. Both the GUI (`gui_app.py`)
+  and `export_multi.py` import from here, so the report list can't drift between
+  them. (The `.bat` menus are static text and are still edited by hand.)
 - **`scripts/consolidate_*.py`** — each exposes `consolidate(events,
   confirm_overwrite) -> ConsolidateResult` (console-free: logs via `Events`,
   asks before overwrite via the callback, honors `is_cancelled()`, never
@@ -531,18 +539,26 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
   detected (`is_logged_in` on any page in the context — SSO can land the report
   in a popup). This kills two old footguns: clicking "I've finished logging in"
   *without* signing in no longer saves a junk session + reports "ready". The GUI
-  worker also **watches the login window/tab closing** — it polls `page.is_closed()`
-  (NOT `browser.is_connected()`: with system Edge a closed window can leave a
-  background process connected) with a `page.on("close")` event and a per-tick
-  `ctx.cookies()` to pump Playwright events. Because the session is captured the
-  *instant* a login is detected, closing the window after signing in still saves
-  it; closing it *without* signing in resolves to **cancelled** (no window to
-  reopen, so the GUI never hangs on "Waiting…"), while clicking "I've finished"
-  without a login reports `login_failed`. On any non-save outcome no file is
-  written, so a previously-valid session is preserved.
-- The engine calls `require_valid_auth()` first (file exists + valid JSON),
-  then `new_authed_browser()` restores the session via
-  `browser.new_context(storage_state=...)`.
+  worker also **watches the login window closing**, but the close signal must
+  survive the SSO/MFA dance — which navigates, can open a popup, and may replace
+  the original tab. So it does **not** treat the *original* page closing, a
+  `browser.is_connected()` blip, or a single transient `ctx.cookies()` error as
+  "closed" (an earlier version did, and that slammed the window shut the instant a
+  password went through, reporting a false **cancelled**). The reliable signal is
+  **no open tabs remain in the context** (the SSO flow always keeps ≥ 1 tab open),
+  with a long all-calls-failing streak as a backstop for a truly dead connection.
+  Because the session is captured the *instant* a login is detected (`is_logged_in`
+  on any page — SSO can land it in a popup), closing the window after signing in
+  still saves it; closing it *without* signing in resolves to **cancelled** (the
+  GUI never hangs on "Waiting…"), while clicking "I've finished" without a login
+  reports `login_failed`. On any non-save outcome no file is written, so a
+  previously-valid session is preserved.
+- The engine calls `require_valid_auth()` first — it checks the file exists, is
+  valid JSON, **and is shaped like a Playwright storage_state** (`cookies`/
+  `origins` lists). That last check matters: a valid-JSON-but-not-storage_state
+  file would otherwise crash later inside `new_authed_browser()`'s
+  `browser.new_context(storage_state=...)` as a raw traceback; instead it raises
+  `AuthError` and the drivers guide a re-login.
 - If the session is missing, malformed, or expired, the core raises
   **`AuthError`**. The console adapter (`cli.py`) catches it, clears the stale
   file (`clear_auth()`), prints next steps, and exits; the GUI will catch it
@@ -568,8 +584,9 @@ Route strings must match the exact option values in the TSMIS "Route"
    new save strategy there.
 2. Add a numbered branch to `3. run_export (main script).bat` (and `5. fast
    export (experimental).bat`).
-3. Add it to `export_multi.py`'s `REPORTS` list and `gui_app.EXPORT_REPORTS`, so
-   the several/all selectors and the GUI checkbox include it.
+3. Add one entry to `EXPORT_REPORTS` in `scripts/reports.py` — that single list
+   feeds both the GUI checkboxes and `export_multi`'s several/all selector (no
+   per-file edits to `gui_app.py`/`export_multi.py`).
 4. List the new module(s) in `APP_MODULES` in `build/app.spec` (they're imported
    by bare name, several lazily, so PyInstaller needs them as hidden imports).
 5. Add a `.gitkeep` to a new `output/<name>/` folder and whitelist it in
@@ -604,8 +621,9 @@ Then, for either kind:
 1. Add `if __name__ == "__main__": from cli import run_consolidate_cli;
    run_consolidate_cli(consolidate)` so the `.bat` flow keeps working.
 2. Turn the branch in `4. consolidate (combine reports).bat` into a real call.
-3. List the module(s) in `APP_MODULES` in `build/app.spec`, register it in
-   `gui_app.CONSOLIDATE_REPORTS`, and document it here.
+3. List the module(s) in `APP_MODULES` in `build/app.spec`, add one entry to
+   `CONSOLIDATE_REPORTS` in `scripts/reports.py` (feeds the GUI Consolidate tab),
+   and document it here.
 
 ## Build & Packaging (portable onefolder)
 
@@ -645,6 +663,19 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
   not by the import being gone but by the **frozen self-test still passing with PIL
   excluded** (`build.ps1 -SelfTest`). Trims ~20 MB + image codecs. `cryptography`
   is a hard top-level `pdfminer` import (encrypted-PDF support) and **must stay**.
+- **`.exe` trust metadata (reduce IT/Defender/DLP false-positives).** An unsigned
+  PyInstaller `.exe` with no version resource, generic icon, and no manifest is
+  the classic heuristic-flag pattern. The spec adds all the non-signing signals:
+  a **version-info resource** built from `version.py` (CompanyName/ProductName/
+  FileVersion/…), the **`build\app.ico`** icon, and **`build\app.manifest`**
+  (`asInvoker` — declares *no admin* — + Win10/11 `supportedOS`). `upx=False` too
+  (UPX-packed exes are themselves a common false-positive). These **reduce, not
+  eliminate**, flags — **code-signing is the only complete fix** (next step when a
+  cert is available). The icon was generated once with Pillow (in the build venv):
+  a 256px rounded blue square + white "TS" + route-tick, saved multi-size via
+  `Image.save('build/app.ico', sizes=[(16,16)…(256,256)])`; regenerate the same
+  way to tweak it. The GUI also uses it as the window/taskbar icon
+  (`gui_app._app_icon_path`, bundled via the spec's `datas`, best-effort).
 - **Browser selection** lives in `scripts/common.launch_browser`: once per
   process it **probes** each channel — `msedge`, then `chrome` (override with the
   `TSMIS_BROWSER_CHANNEL` env var) — by launching it *headless and driving a
@@ -668,22 +699,41 @@ partly inaccessible. We use none of that tooling (codegen agent, trace viewer,
 report dashboard) — only headless launch + `page.pdf()` and downloads.
 
 What it **deletes** (each verified runtime-safe by `build/full_smoke.py`):
-- **Playwright driver:** all `*.md` and `*.d.ts`, the `types/` dir, and the
-  `skill/`, `tools/trace/`, `tools/dashboard/`, `vite/` dirs (~5 MB; removes the
-  credit-card docs). Core files (`cli.js`, `lib/`, `node.exe`, …) are kept.
-- **Chromium locales (defensive no-op now):** would keep only `en-US.pak` and
-  drop the other ~219 language packs — but no browser is bundled, so this does
-  nothing today. Kept in case a browser is ever bundled again (was ~42 MB).
+- **All prose documentation, bundle-wide:** every `*.md` / `*.markdown` / `*.rst`
+  and stray `README` / `CHANGELOG` / `HISTORY` / `AUTHORS` / `CONTRIBUTING` / `NEWS`
+  text **anywhere** in the bundle — not just the Playwright driver. Docs are the
+  proven DLP surface (the driver's `tracing.md` carried a fake credit-card number).
+  **License / notice files are kept** (`LICENSE`/`LICENCE`/`COPYING`/`NOTICE`) — OSS
+  licenses legally require redistributing them, and they never carry flagged data.
+- **`dist-info` METADATA is sanitized, not deleted:** each embeds the package's
+  full README as its long-description body (pdfplumber's was 600+ lines). We keep
+  only the RFC822 headers (so `importlib.metadata.version()` still works) and drop
+  the body. Verified frozen-safe by the `-SelfTest` gate.
+- **Playwright driver extras:** `*.d.ts`, the `types/` dir, and the `skill/`,
+  `tools/trace/`, `tools/dashboard/`, `vite/` dirs (~5 MB). Core files (`cli.js`,
+  `lib/`, `node.exe`, …) are kept.
+- **Chromium locales (defensive no-op now):** would keep only `en-US.pak` — but no
+  browser is bundled, so this does nothing today. Kept in case one ever is again.
 - **Image libs (safety net for the spec excludes):** any `PIL`/`pypdfium2`/
   `pypdfium2_raw` dir that slipped through (normally excluded at PyInstaller time).
 - **Generic dead weight:** `tests/`/`test/` dirs and `*.pyi` stubs in the bundled
   Python packages (never imported at runtime). Chromium is skipped.
 
-What it **guards** afterward: fails if any `*.md` remains under the bundled
-driver, or if any text file in the bundle contains a credit-card-like number (IIN
-prefix + length + **Luhn**, like DLP — so random 16-digit hashes in JS bundles are
-*not* false-positives). (The Chromium-locale prune and `ms-playwright` scan-skip
-are kept as defensive no-ops now that no browser is bundled.)
+What it **guards** afterward — **fails the build** if any of these remain (each
+mirrors a corporate-DLP "sensitive information type", and each is tuned to avoid
+false positives that would wrongly block a release):
+- **Documentation:** any non-license `*.md` / `*.markdown` / `*.rst` anywhere.
+- **Credit cards:** IIN prefix + canonical length + **Luhn** (so random 16-digit
+  hashes in JS bundles are *not* false-positives).
+- **Private keys:** PEM `-----BEGIN … PRIVATE KEY-----` blocks.
+- **AWS keys:** `AKIA` + 16 base32.
+- **US SSNs:** dashed, with the invalid area/group/serial ranges excluded.
+
+The scan covers common text + source extensions (incl. `.py`, `.json`, `.js`,
+`METADATA`, certs); the `ms-playwright` Chromium folder is skipped (defensive
+no-op now that no browser is bundled). Re-runnable on any extracted release with
+`prune_bundle.ps1 -Target "…\TSMIS Exporter"` (add `-GuardOnly` to audit without
+deleting).
 
 Runs automatically from `build.ps1`, and is **reusable on an already-built or
 extracted release** to clean it in place:
@@ -722,9 +772,14 @@ moves/renames the driver dirs, update `$killDirs` (the guard fails loudly first)
   static analysis alone can miss them). Tkinter is collected automatically.
   Verify a frozen build headlessly with `build.ps1 -SelfTest` (the frozen GUI
   self-test passed; the live windowed launch is the remaining manual check).
-- **AV / SmartScreen:** the unsigned `.exe` will trip SmartScreen on first run.
-  Code-signing (Phase 6) is the fix; otherwise tell users to "unblock" the
-  downloaded zip (right-click → Properties → Unblock) before extracting.
+- **AV / SmartScreen / IT data-protection:** the unsigned `.exe` can trip
+  SmartScreen / Defender / corporate DLP heuristics on first run. The build now
+  ships the non-signing trust signals that reduce this (version-info resource,
+  icon, `asInvoker` manifest, no UPX — see the `app.spec` highlights) and
+  `prune_bundle.ps1` strips DLP-blocked content. **Code-signing remains the only
+  complete fix** (Phase 6). Until then, tell users to "unblock" the downloaded
+  zip (right-click → Properties → Unblock) before extracting, and choose
+  "More info → Run anyway" on the first launch.
 
 ## Error Handling & Reliability (Phase 5)
 
@@ -739,6 +794,17 @@ moves/renames the driver dirs, update `$killDirs` (the guard fails loudly first)
   TSMIS appears to have changed — so the run fails fast with one clear error
   instead of every route failing cryptically. Surfaced by `cli.py` and the GUI
   like `AuthError`.
+- **Site-error fast-fail:** the TSMIS site can render a fatal error for a single
+  route (its `#rampResults` gets an `error` class, e.g. *"Cannot read properties
+  of undefined (reading 'size')"*) with **no** Export button and **no** "no
+  results" text. The post-Generate wait now ORs in a shared error check
+  (`common.ERROR_JS`) so it resolves in seconds, and `_attempt_route` raises
+  **`ReportError`** with the site's message (`common.report_error_text`). The loop
+  records it `failed` immediately (with the message + a failure screenshot), no
+  in-loop retry — so such a route no longer silently burns the full per-route
+  timeout *and then* the long retry just "sitting" there. The end-of-run retry
+  still gives it one quick second chance in case it was transient. Detection is
+  generic (the `error` class is shared by every report), so it covers all of them.
 - **Auto-retry once (in-loop):** a transient (non-timeout) route error is retried
   a single time after `_recover()` re-arms the form (`RETRY_COUNT`, default 1). A
   hard **timeout is not retried in-loop** (the user already had a skip window
@@ -800,6 +866,7 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
 | `NO SAVED SESSION FOUND` in BAT menu | `tsmis_auth.json` missing | Run `2. login (update login).bat` |
 | `LOGIN PROBLEM — ...` | Session missing/expired/corrupt (`AuthError`) | Run `2. login (update login).bat` |
 | Route keeps timing out | TSMIS server slow | Increase `REPORT_TIMEOUT_MS` in `common.py` |
+| One route fails instantly with a "TSMIS site error" (e.g. "Cannot read properties of undefined") | The site itself can't build that route | Expected — the route is recorded `failed` with the message (see `FAILURES_DIR`); it's a TSMIS data/site issue, not the exporter |
 | County dropdown timeout | Slow network | Increase `COUNTY_ENABLE_TIMEOUT_MS` in `common.py` |
 | Output looks wrong for one report only | That report's selector changed | Edit only that report's `ReportSpec` in its `export_*.py` |
 | "TSMIS page looks different than expected" | Preflight failed — site likely changed | Check `LOG_DIR` + `FAILURES_DIR`; update selectors in `common.py`/the `ReportSpec` |
@@ -817,6 +884,7 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
   five `output/.gitkeep` stubs are tracked there. The local `.claude/` permission
   state is git-ignored too.
 - Track the build *infra* (`build/build.ps1`, `build/prune_bundle.ps1`,
-  `build/app.spec`, `build/full_smoke.py`), `requirements*.txt`, and `version.py`.
+  `build/app.spec`, `build/full_smoke.py`, `build/app.ico`, `build/app.manifest`),
+  `requirements*.txt`, and `version.py`.
 - Commit messages should be short and imperative (e.g., `add route 395`,
   `decouple export engine from console`).

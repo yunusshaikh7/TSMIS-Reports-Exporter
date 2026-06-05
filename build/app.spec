@@ -14,7 +14,12 @@
 #     (node.exe) is still required and comes in via collect_all('playwright').
 #   * pdfminer ships CMap data files that must be collected or pdfplumber text
 #     extraction breaks when frozen -> collect_data_files('pdfminer').
+#   * The .exe carries a version-info resource (from version.py), an icon, and a
+#     manifest (asInvoker). Those are trust signals that reduce Windows Defender /
+#     corporate-IT (DLP/SmartScreen) false-positives on an unsigned build. Code
+#     signing is still the only complete fix (see CLAUDE.md).
 import os
+import sys
 from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 ENTRY    = os.environ.get("TSMIS_ENTRY", os.path.join(SPECPATH, "full_smoke.py"))
@@ -26,9 +31,42 @@ CONSOLE  = os.environ.get("TSMIS_CONSOLE", "1") == "1"
 # them as hidden imports because several are imported lazily (inside functions).
 REPO_ROOT = os.path.dirname(SPECPATH)               # build/ -> repo root
 SCRIPTS   = os.path.join(REPO_ROOT, "scripts")
+
+# --- Windows .exe metadata: version resource + icon + manifest ---------------
+# The single source of truth for the version is version.py.
+sys.path.insert(0, REPO_ROOT)
+from version import __version__ as APP_VERSION       # noqa: E402
+
+_parts  = (APP_VERSION.split(".") + ["0", "0", "0", "0"])[:4]
+_vtuple = tuple(int(p) if p.isdigit() else 0 for p in _parts)
+
+from PyInstaller.utils.win32.versioninfo import (   # noqa: E402
+    VSVersionInfo, FixedFileInfo, StringFileInfo, StringTable, StringStruct,
+    VarFileInfo, VarStruct,
+)
+VERSION_INFO = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=_vtuple, prodvers=_vtuple, mask=0x3F, flags=0x0,
+                      OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+    kids=[
+        StringFileInfo([StringTable("040904B0", [
+            StringStruct("CompanyName", "TSMIS Reports Exporter"),
+            StringStruct("FileDescription", "TSMIS Reports Bulk Exporter"),
+            StringStruct("FileVersion", APP_VERSION),
+            StringStruct("InternalName", APP_NAME),
+            StringStruct("LegalCopyright", "Internal tool. Provided as-is, no warranty."),
+            StringStruct("OriginalFilename", APP_NAME + ".exe"),
+            StringStruct("ProductName", "TSMIS Reports Exporter"),
+            StringStruct("ProductVersion", APP_VERSION),
+        ])]),
+        VarFileInfo([VarStruct("Translation", [0x0409, 1200])]),  # US English, Unicode
+    ],
+)
+
+ICON     = os.path.join(SPECPATH, "app.ico")        # built once with Pillow (see CLAUDE.md)
+MANIFEST = os.path.join(SPECPATH, "app.manifest")
 APP_MODULES = [
     "version", "paths", "common", "events", "exporter", "exporter_parallel",
-    "run_report", "logging_setup", "cli", "login",
+    "run_report", "logging_setup", "cli", "login", "reports",
     "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
     "export_highway_log", "export_multi",
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
@@ -37,6 +75,12 @@ APP_MODULES = [
 ]
 
 datas, binaries, hiddenimports = [], [], list(APP_MODULES)
+
+# Bundle the icon so the GUI can set the window/taskbar icon at runtime
+# (resolved via sys._MEIPASS -> _internal/app.ico). Binary, so the DLP text scan
+# in prune_bundle.ps1 skips it.
+if os.path.exists(ICON):
+    datas += [(ICON, ".")]
 
 # Playwright: Node driver + package data + hidden imports.
 _d, _b, _h = collect_all("playwright")
@@ -88,9 +132,12 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=False,                                       # UPX-packed exes are a classic AV false-positive trigger
     console=CONSOLE,
     disable_windowed_traceback=False,
+    icon=(ICON if os.path.exists(ICON) else None),
+    version=VERSION_INFO,
+    manifest=(MANIFEST if os.path.exists(MANIFEST) else None),
 )
 
 coll = COLLECT(

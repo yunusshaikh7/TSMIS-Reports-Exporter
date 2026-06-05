@@ -6,12 +6,13 @@
 #   (e.g. driver\package\lib\tools\cli-client\skill\references\tracing.md) whose
 #   examples contain test credit-card numbers like 4111111111111111. Microsoft
 #   365 / SharePoint DLP detects "Credit Card Number" and BLOCKS the file -- so a
-#   released zip becomes partly inaccessible. We do not use any of that tooling
-#   (codegen agent, trace viewer, report dashboard) -- only headless launch +
-#   page.pdf() and downloads -- so those files are pure dead weight. This script
-#   deletes them and then fails hard if any markdown doc or credit-card-like
-#   number remains, so a future Playwright bump can never silently reintroduce
-#   the problem.
+#   released zip becomes partly inaccessible. Rather than chase one file, this
+#   script strips ALL prose documentation from the bundle (third-party docs are
+#   the data-loss-prevention surface) and sanitizes dist-info METADATA to its
+#   headers, then GUARDS by failing the build if any non-license doc -- or any
+#   credit-card / private-key / AWS-key / US-SSN content -- remains. License and
+#   notice files are kept (legally required for OSS redistribution; never flagged).
+#   So a future dependency bump can't silently reintroduce blocked content.
 #
 # Usage
 #   Run automatically by build.ps1 on a fresh build. Also reusable on any
@@ -131,42 +132,93 @@ if (-not $GuardOnly) {
         Where-Object { $_.FullName -notmatch '\\ms-playwright\\' } |
         ForEach-Object { Remove-Item $_.FullName -Force; $removed++ }
 
+    # --- Documentation removal (the DLP surface) -----------------------------
+    # Third-party docs are the proven data-loss-prevention risk: an upstream
+    # markdown example once shipped a fake credit-card number that SharePoint
+    # blocked. Strip ALL prose docs bundle-wide -- *.md / *.markdown / *.rst and
+    # stray README/CHANGELOG/HISTORY/AUTHORS/CONTRIBUTING/NEWS text -- EXCEPT
+    # license/notice files, which OSS licenses legally require us to redistribute
+    # (and which never carry DLP-flagged content). Our own clean "Start Here.txt"
+    # is at the app root, not under _internal, so it is untouched.
+    $licenseLike = '(?i)^(license|licence|copying|notice|copyright|third.?party)'
+    Get-ChildItem $internal -Recurse -File -Include *.md, *.markdown, *.rst -ErrorAction Ignore |
+        Where-Object { $_.BaseName -notmatch $licenseLike } |
+        ForEach-Object { Remove-Item $_.FullName -Force; $removed++ }
+    Get-ChildItem $internal -Recurse -File -ErrorAction Ignore |
+        Where-Object { $_.Name -match '(?i)^(readme|changelog|changes|history|authors|contributing|news)(\.|$)' `
+                       -and $_.BaseName -notmatch $licenseLike } |
+        ForEach-Object { Remove-Item $_.FullName -Force; $removed++ }
+
+    # Sanitize dist-info/egg-info METADATA: each embeds the package's FULL README
+    # (pdfplumber's is 600+ lines) as the long-description body. Keep only the
+    # RFC822 headers (Name/Version/... so importlib.metadata.version still works)
+    # and drop everything after the first blank line -- removing the doc body
+    # without breaking runtime version lookups. RECORD hashes aren't re-verified
+    # at runtime, so a now-stale METADATA hash is harmless (we already delete
+    # other listed files, e.g. tests/).
+    Get-ChildItem $internal -Recurse -File -Filter "METADATA" -ErrorAction Ignore |
+        Where-Object { $_.Directory.Name -like "*.dist-info" -or $_.Directory.Name -like "*.egg-info" } |
+        ForEach-Object {
+            $lines = [System.IO.File]::ReadAllLines($_.FullName)
+            $end = [Array]::IndexOf($lines, "")     # first blank line ends the headers
+            if ($end -gt 0 -and $end -lt $lines.Length - 1) {
+                [System.IO.File]::WriteAllLines($_.FullName, $lines[0..($end - 1)])
+                $removed++
+            }
+        }
+
     $after = (Get-ChildItem $Target -Recurse -File -ErrorAction Ignore | Measure-Object Length -Sum).Sum
     Log ("==> Pruned {0} item(s), reclaimed {1:N1} MB" -f $removed, (($before - $after) / 1MB))
 }
 
 # --- 2. GUARD -------------------------------------------------------------
-# (a) No markdown docs may remain under the bundled Playwright driver -- that is
-#     the exact file type DLP blocked.
-$mds = Get-ChildItem $Playwright -Recurse -File -Filter *.md -ErrorAction Ignore
-if ($mds) {
-    throw "GUARD FAILED: markdown docs still bundled under playwright:`n  " + (($mds.FullName) -join "`n  ")
+# Fail the build if the bundle still carries documentation, or any high-confidence
+# sensitive data type a corporate DLP scanner flags. This is the backstop that
+# stops a future dependency bump from silently reintroducing the problem.
+
+# (a) No prose docs (markdown / rst) may remain anywhere -- except license/notice
+#     files, which we keep for legal redistribution. That was the file type DLP
+#     blocked, and we now strip it bundle-wide.
+$leftoverDocs = Get-ChildItem $Target -Recurse -File -Include *.md, *.markdown, *.rst -ErrorAction Ignore |
+    Where-Object { $_.BaseName -notmatch '(?i)^(license|licence|copying|notice|copyright|third.?party)' }
+if ($leftoverDocs) {
+    throw "GUARD FAILED: documentation still bundled:`n  " + (($leftoverDocs.FullName) -join "`n  ")
 }
 
-# (b) No credit-card-like number in any text file across the bundle, EXCEPT the
-#     upstream Chromium folder (unmodifiable; excluded to stay fast + false-
-#     positive-free). Scans common text extensions only; binaries are skipped.
+# (b) No high-confidence sensitive data in any text file across the bundle. The
+#     upstream Chromium folder is skipped (unmodifiable; not bundled today
+#     anyway). Patterns mirror the common DLP "sensitive information types", each
+#     chosen to avoid false positives that would wrongly block a release:
+#       credit cards : brand IIN prefix + canonical length + Luhn
+#       private keys : PEM "BEGIN ... PRIVATE KEY" blocks
+#       AWS keys     : AKIA + 16 base32
+#       US SSN       : dashed, with the invalid area/group/serial ranges excluded
 $msPlaywright = Join-Path $Target "_internal\ms-playwright"
-$textExt = @('.md', '.markdown', '.txt', '.text', '.json', '.yml', '.yaml',
-    '.js', '.mjs', '.cjs', '.ts', '.html', '.htm', '.css', '.xml', '.csv', '.cfg', '.ini')
-$rx = [regex]'(?<![0-9A-Za-z])[0-9](?:[ -]?[0-9]){12,18}(?![0-9A-Za-z])'
+$textExt = @('.md', '.markdown', '.rst', '.txt', '.text', '.json', '.yml', '.yaml',
+    '.js', '.mjs', '.cjs', '.ts', '.html', '.htm', '.css', '.xml', '.csv', '.cfg',
+    '.ini', '.toml', '.py', '.pem', '.crt', '.cer', '.key')
+$textName = @('METADATA')           # extension-less files worth scanning
+$rxCard = [regex]'(?<![0-9A-Za-z])[0-9](?:[ -]?[0-9]){12,18}(?![0-9A-Za-z])'
+$rxKey  = [regex]'-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----'
+$rxAws  = [regex]'\bAKIA[0-9A-Z]{16}\b'
+$rxSsn  = [regex]'(?<![0-9-])(?!000|666|9[0-9]{2})[0-9]{3}-(?!00)[0-9]{2}-(?!0000)[0-9]{4}(?![0-9-])'
 
 $hits = New-Object System.Collections.Generic.List[string]
 Get-ChildItem $Target -Recurse -File -ErrorAction Ignore | ForEach-Object {
     $f = $_
     if ($f.FullName.StartsWith($msPlaywright, [System.StringComparison]::OrdinalIgnoreCase)) { return }
-    if ($textExt -notcontains $f.Extension.ToLower()) { return }
+    if (-not (($textExt -contains $f.Extension.ToLower()) -or ($textName -contains $f.Name))) { return }
     try { $text = [System.IO.File]::ReadAllText($f.FullName) } catch { return }
-    foreach ($m in $rx.Matches($text)) {
-        $digits = ($m.Value -replace '[^0-9]', '')
-        if (Test-CreditCard $digits) {
-            $hits.Add(("  {0}  ->  {1}" -f $f.FullName.Substring($Target.Length + 1), $digits))
-            break
-        }
+    $rel = $f.FullName.Substring($Target.Length + 1)
+    foreach ($m in $rxCard.Matches($text)) {
+        if (Test-CreditCard ($m.Value -replace '[^0-9]', '')) { $hits.Add("  [credit-card] $rel"); break }
     }
+    if ($rxKey.IsMatch($text)) { $hits.Add("  [private-key] $rel") }
+    if ($rxAws.IsMatch($text)) { $hits.Add("  [aws-key]     $rel") }
+    if ($rxSsn.IsMatch($text)) { $hits.Add("  [us-ssn]      $rel") }
 }
 if ($hits.Count -gt 0) {
-    throw ("GUARD FAILED: credit-card-like number(s) found in the bundle:`n" + ($hits -join "`n"))
+    throw ("GUARD FAILED: sensitive data found in the bundle:`n" + (($hits | Select-Object -Unique) -join "`n"))
 }
 
-Log "==> Guard passed: no markdown docs and no credit-card-like content in the bundle."
+Log "==> Guard passed: no docs and no credit-card / private-key / AWS-key / SSN content in the bundle."
