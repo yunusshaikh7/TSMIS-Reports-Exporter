@@ -27,10 +27,12 @@ CONSOLE  = os.environ.get("TSMIS_CONSOLE", "1") == "1"
 REPO_ROOT = os.path.dirname(SPECPATH)               # build/ -> repo root
 SCRIPTS   = os.path.join(REPO_ROOT, "scripts")
 APP_MODULES = [
-    "version", "paths", "common", "events", "exporter", "run_report",
-    "logging_setup", "cli", "login",
+    "version", "paths", "common", "events", "exporter", "exporter_parallel",
+    "run_report", "logging_setup", "cli", "login",
     "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
-    "consolidate_ramp_summary", "consolidate_ramp_detail", "consolidate_highway_sequence",
+    "export_highway_log", "export_multi",
+    "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
+    "consolidate_highway_sequence", "consolidate_highway_log",
     "gui_main", "gui_app", "gui_worker", "gui_theme",
 ]
 
@@ -46,11 +48,16 @@ for _pkg in ("pdfplumber", "openpyxl"):
     _d, _b, _h = collect_all(_pkg)
     datas += _d; binaries += _b; hiddenimports += _h
 
-# Drop optional image libraries pulled in transitively but NEVER used: Pillow
-# (openpyxl image insert + pdfplumber/pdfminer image paths) and pypdfium2
-# (pdfplumber.to_image). The app only extracts text/tables and writes plain
-# workbooks, and these imports are all guarded (try/except or lazy), so excluding
-# them is verified safe by build/full_smoke.py and trims ~20 MB + image codecs.
+# Drop optional image libraries the app never needs at runtime: Pillow (PIL) and
+# pypdfium2 (pdfplumber.to_image). IMPORTANT: openpyxl imports Pillow EAGERLY at
+# import time, so in a normal install PIL *is* loaded -- it is not "never
+# imported" (build/full_smoke.py reports `PIL: True` against the venv). What makes
+# excluding it safe is that the code paths the app actually uses -- text/table
+# extraction and writing plain workbooks, never image insert or rasterizing a PDF
+# -- don't need it, and openpyxl tolerates a missing Pillow. The proof is not that
+# the import is absent but that the FROZEN self-test (build.ps1 -SelfTest runs
+# full_smoke.py) still passes every real code path with PIL excluded. pypdfium2 is
+# only touched by pdfplumber.to_image, which the app never calls. Trims ~20 MB.
 EXCLUDES = ["PIL", "pypdfium2", "pypdfium2_raw"]
 _excl = set(EXCLUDES)
 hiddenimports = [h for h in hiddenimports if h.split(".")[0] not in _excl]

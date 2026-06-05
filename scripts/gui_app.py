@@ -31,21 +31,25 @@ from common import (
 from export_ramp_summary import SPEC as SUMMARY_SPEC
 from export_ramp_detail import SPEC as DETAIL_SPEC
 from export_highway_sequence import SPEC as HIGHWAY_SPEC
+from export_highway_log import SPEC as HIGHWAY_LOG_SPEC
 import consolidate_ramp_summary as c_summary
 import consolidate_ramp_detail as c_detail
 import consolidate_highway_sequence as c_highway
+import consolidate_highway_log as c_hwy_log
 
 # (label, format hint, ReportSpec)
 EXPORT_REPORTS = [
     ("TSAR: Ramp Summary", "PDF", SUMMARY_SPEC),
     ("TSAR: Ramp Detail", "Excel", DETAIL_SPEC),
     ("Highway Sequence Listing", "Excel", HIGHWAY_SPEC),
+    ("Highway Log", "Excel", HIGHWAY_LOG_SPEC),
 ]
 # (label, consolidate_fn, OUT_PATH)
 CONSOLIDATE_REPORTS = [
     ("TSAR: Ramp Summary", c_summary.consolidate, c_summary.OUT_PATH),
     ("TSAR: Ramp Detail", c_detail.consolidate, c_detail.OUT_PATH),
     ("Highway Sequence Listing", c_highway.consolidate, c_highway.OUT_PATH),
+    ("Highway Log", c_hwy_log.consolidate, c_hwy_log.OUT_PATH),
 ]
 
 CONSOLIDATED_DIR = OUTPUT_ROOT / "consolidated"
@@ -71,14 +75,15 @@ class App(tk.Tk):
         self.login_done = threading.Event()
         self.login_cancel = threading.Event()
 
-        self.export_choice = tk.IntVar(value=0)
+        # One checkbox per report type so several can be exported at once. First
+        # report ticked by default so a selection always exists.
+        self.export_vars = [tk.BooleanVar(value=(i == 0)) for i in range(len(EXPORT_REPORTS))]
         self.cons_choice = tk.IntVar(value=0)
         self.fast_mode = tk.BooleanVar(value=False)        # experimental parallel export
         self.fast_workers = tk.IntVar(value=DEFAULT_WORKERS)
 
-        self._active_spec = None        # spec of the run in progress
-        self._last_spec = None          # spec of the last completed export
-        self._last_result = None        # its RunResult (enables "Save run report")
+        self._active_specs = []         # specs of the run in progress
+        self._last_results = []         # [(spec, RunResult), ...] of the last export (enables "Save run report")
         self._run_start = None          # monotonic start of the current run (elapsed timer)
         self._timer_job = None          # after() id for the 1 Hz elapsed-time ticker
         self._check_detail = {}         # check key -> latest detail text (shown as a tooltip)
@@ -99,7 +104,7 @@ class App(tk.Tk):
             self.fast_check,
             self.routes_entry, self.btn_choose_routes,
             self.browser_combo, self.btn_recheck,
-            *self.export_radios, *self.cons_radios,
+            *self.export_checks, *self.cons_radios,
         ]
         # Run-only controls start disabled (no task is running, no result yet).
         for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel,
@@ -225,14 +230,14 @@ class App(tk.Tk):
         ex = ttk.Frame(nb, padding=(PAD, 10))
         ex.columnconfigure(0, weight=1)
         row = 0
-        ttk.Label(ex, text="REPORT TO EXPORT", style="Section.TLabel").grid(
+        ttk.Label(ex, text="REPORTS TO EXPORT  (tick one or more)", style="Section.TLabel").grid(
             row=row, column=0, sticky="w", pady=(0, 6))
         row += 1
-        self.export_radios = []
+        self.export_checks = []
         for i, (label, fmt, _spec) in enumerate(EXPORT_REPORTS):
-            rb = ttk.Radiobutton(ex, text=f"{label}   ·   {fmt}", value=i, variable=self.export_choice)
-            rb.grid(row=row, column=0, sticky="w")
-            self.export_radios.append(rb)
+            cb = ttk.Checkbutton(ex, text=f"{label}   ·   {fmt}", variable=self.export_vars[i])
+            cb.grid(row=row, column=0, sticky="w")
+            self.export_checks.append(cb)
             row += 1
 
         # Route selection. Blank = all routes (the default); otherwise the chosen
@@ -577,7 +582,7 @@ class App(tk.Tk):
         for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel):
             w.state(["disabled"])
         # "Save run report" stays available between runs while a result exists.
-        self.btn_save_report.state(["!disabled"] if self._last_result else ["disabled"])
+        self.btn_save_report.state(["!disabled"] if self._last_results else ["disabled"])
         self.btn_login.config(text=self._login_label(), command=self.start_login)
         self.btn_login_cancel.grid_remove()
         self.progress_route.config(text="Idle")
@@ -588,7 +593,10 @@ class App(tk.Tk):
         if not self._authed:
             messagebox.showinfo("Login needed", "Please log in first, then start the export.")
             return
-        spec = EXPORT_REPORTS[self.export_choice.get()][2]
+        specs = [EXPORT_REPORTS[i][2] for i, v in enumerate(self.export_vars) if v.get()]
+        if not specs:
+            messagebox.showinfo("Pick a report", "Tick at least one report to export.")
+            return
         raw = self.routes_entry.get().strip()
         if raw:
             try:
@@ -604,11 +612,12 @@ class App(tk.Tk):
                 workers = max(2, min(int(self.fast_workers.get()), MAX_WORKERS))
             except (tk.TclError, ValueError):
                 workers = DEFAULT_WORKERS
-        self._active_spec = spec
+        self._active_specs = specs
         self.cancel_event.clear()
         self.skip_event.clear()
         self._clear_progress()
-        msg = f"Starting export: {spec.label}"
+        names = ", ".join(s.label for s in specs)
+        msg = f"Starting export: {names}"
         if len(run_routes) != len(ROUTES):
             msg += f"   ·   {len(run_routes)} routes"
         if workers > 1:
@@ -618,8 +627,10 @@ class App(tk.Tk):
         if workers > 1:
             # Per-route Skip is meaningless with several routes in flight.
             self.btn_export_skip.state(["disabled"])
-        self.set_dot("busy", f"Exporting {spec.label}…")
-        ExportWorker(spec, self.q, self.cancel_event, self.skip_event,
+        self.set_dot("busy",
+                     f"Exporting {len(specs)} report(s)…" if len(specs) > 1
+                     else f"Exporting {specs[0].label}…")
+        ExportWorker(specs, self.q, self.cancel_event, self.skip_event,
                      workers=workers, routes=run_routes).start()
 
     def start_consolidate(self):
@@ -682,10 +693,16 @@ class App(tk.Tk):
 
     def save_report(self):
         """Save a copy of the last run's per-route report to a chosen location.
-        (Every run is also auto-saved under output/run_reports/.)"""
-        if not self._last_result or not self._last_spec:
+        For a multi-report run this is one combined CSV (the Report column keeps
+        the rows distinguishable). Every run is also auto-saved per report under
+        output/run_reports/."""
+        if not self._last_results:
             return
-        default = f"run_report_{self._last_spec.subdir}_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+        if len(self._last_results) == 1:
+            spec, _result = self._last_results[0]
+            default = f"run_report_{spec.subdir}_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+        else:
+            default = f"run_report_multi_{time.strftime('%Y%m%d_%H%M%S')}.csv"
         path = filedialog.asksaveasfilename(
             title="Save run report",
             defaultextension=".csv",
@@ -695,7 +712,12 @@ class App(tk.Tk):
         if not path:
             return
         try:
-            run_report.write_run_report(self._last_result, self._last_spec.label, Path(path))
+            if len(self._last_results) == 1:
+                spec, result = self._last_results[0]
+                run_report.write_run_report(result, spec.label, Path(path))
+            else:
+                run_report.write_run_report_multi(
+                    [(spec.label, result) for spec, result in self._last_results], Path(path))
             self.log(f"Run report saved: {path}")
         except Exception as e:
             messagebox.showerror("Could not save report", str(e))
@@ -746,23 +768,42 @@ class App(tk.Tk):
 
     def _update_progress(self, d):
         self.progress.config(maximum=d["total"], value=d["done"])
-        self.progress_route.config(text=f"Route {d['route']}   ·   {d['done']}/{d['total']}")
+        label = d.get("report", "")
+        head = ""
+        if d.get("report_n", 1) > 1:                 # several report types this run
+            head = f"[{d.get('report_i', '?')}/{d['report_n']}] {label}  ·  "
+        elif label:
+            head = f"{label}  ·  "
+        self.progress_route.config(text=f"{head}Route {d['route']}   ·   {d['done']}/{d['total']}")
         self.counts.config(text=(f"saved {d['saved']}   already had {d['exists']}   "
                                  f"empty {d['empty']}   skipped {d['skipped']}   failed {d['failed']}"))
 
-    def _finish_export(self, result):
-        self._last_result = result
-        self._last_spec = self._active_spec
-        handled = (result.saved + len(result.exists) + len(result.empty)
-                   + len(result.user_skipped) + len(result.failed))
+    def _finish_export(self, results):
+        # results is [(spec, RunResult), ...] -- one entry per report type run
+        # (partial if cancelled before the later reports started).
+        self._last_results = results
         self.log("")
-        self.log(f"Done. {handled} routes handled: saved {result.saved}, "
-                 f"already had {len(result.exists)}, empty {len(result.empty)}, "
-                 f"skipped {len(result.user_skipped)}, failed {len(result.failed)}.")
-        if result.failed:
-            self.log(f"Failed routes: {result.failed}")
-        if result.report_path:
-            self.log(f"Run report auto-saved: {result.report_path}")
+        if not results:
+            self.log("No reports completed.")
+            self.set_dot("ok", "Session ready")
+            self._end_task()
+            return
+        total_saved = total_failed = 0
+        for spec, result in results:
+            handled = (result.saved + len(result.exists) + len(result.empty)
+                       + len(result.user_skipped) + len(result.failed))
+            total_saved += result.saved
+            total_failed += len(result.failed)
+            prefix = f"{spec.label}: " if len(results) > 1 else "Done. "
+            self.log(f"{prefix}{handled} routes handled — saved {result.saved}, "
+                     f"already had {len(result.exists)}, empty {len(result.empty)}, "
+                     f"skipped {len(result.user_skipped)}, failed {len(result.failed)}.")
+            if result.failed:
+                self.log(f"  Failed routes: {result.failed}")
+            if result.report_path:
+                self.log(f"  Run report auto-saved: {result.report_path}")
+        if len(results) > 1:
+            self.log(f"All reports done — total saved {total_saved}, total failed {total_failed}.")
         self.set_dot("ok", "Session ready")
         self._end_task()
 

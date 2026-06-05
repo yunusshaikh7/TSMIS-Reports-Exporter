@@ -60,23 +60,27 @@ echo.
 echo     1.  TSAR: Ramp Summary        (PDF  -^> output\ramp_summary\)
 echo     2.  TSAR: Ramp Detail         (XLSX -^> output\ramp_detail\)
 echo     3.  Highway Sequence Listing  (XLSX -^> output\highway_sequence\)
+echo     4.  Highway Log               (XLSX -^> output\highway_log\)
 echo.
+echo     A.  Several / all report types at once
 echo     C.  Change number of browsers (currently %TSMIS_FAST_WORKERS%)
 echo     Q.  Quit
 echo.
 echo ================================================================
 echo.
 set "choice="
-set /p choice="Enter your choice [1, 2, 3, C, Q]: "
+set /p choice="Enter your choice [1, 2, 3, 4, A, C, Q]: "
 
 if /i "%choice%"=="1" goto summary
 if /i "%choice%"=="2" goto detail
 if /i "%choice%"=="3" goto highway_sequence
+if /i "%choice%"=="4" goto highway_log
+if /i "%choice%"=="A" goto multi
 if /i "%choice%"=="C" goto workers
 if /i "%choice%"=="Q" exit /b 0
 if /i "%choice%"=="quit" exit /b 0
 echo.
-echo Invalid choice "%choice%". Please pick 1, 2, 3, C, or Q.
+echo Invalid choice "%choice%". Please pick 1, 2, 3, 4, A, C, or Q.
 echo.
 pause
 goto menu
@@ -93,5 +97,15 @@ exit /b 0
 
 :highway_sequence
 python scripts\export_highway_sequence.py
+pause
+exit /b 0
+
+:highway_log
+python scripts\export_highway_log.py
+pause
+exit /b 0
+
+:multi
+python scripts\export_multi.py
 pause
 exit /b 0

@@ -1,7 +1,10 @@
 @echo off
+cd /d "%~dp0"
 echo Installing Python packages...
 python -m pip install --upgrade pip
-python -m pip install playwright pdfplumber openpyxl
+REM Install the exact, pinned versions from requirements.txt so the end-user
+REM install matches what the app is built and tested against.
+python -m pip install -r requirements.txt
 if errorlevel 1 (
     echo.
     echo ERROR: pip install failed. Is Python installed and on PATH?

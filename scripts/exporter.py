@@ -25,6 +25,7 @@ from common import (
     RETRY_REPORT_TIMEOUT_MS,
     ROUTES,
     AuthError,
+    RunCancelled,
     is_logged_in,
     navigate_with_auth,
     new_authed_browser,
@@ -136,6 +137,8 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     if not wait_with_skip_option(page, spec.wait_js(route), prefix, events,
                                  hard_timeout_ms=timeout_ms):
         return "skipped"
+    if events.is_cancelled():        # cancel landed between the wait and the save
+        raise RunCancelled()
     if spec.is_empty(page):
         return "empty"
     page.wait_for_timeout(1000)
@@ -151,8 +154,8 @@ def _process_route(page, spec, route, prefix, out_path, events, result, timeout_
     for attempt in range(1 + RETRY_COUNT):
         try:
             outcome = _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms)
-        except AuthError:
-            raise
+        except (AuthError, RunCancelled):
+            raise                       # session loss / user cancel: never retry, never record as failed
         except PlaywrightTimeoutError:
             # The hard timeout already gave the user a skip window; don't burn
             # another full timeout retrying -- record it and move on.
@@ -238,8 +241,11 @@ def _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms):
                 result.exists.append(route)
                 _record(result, events, route, "exists")
                 continue
-            if not _process_route(page, spec, route, prefix, out_path, events, result, timeout_ms):
-                break
+            try:
+                if not _process_route(page, spec, route, prefix, out_path, events, result, timeout_ms):
+                    break
+            except RunCancelled:
+                break               # leave the rest reconciled back to 'failed' below
 
     recorded = {r for r, _ in result.per_route}
     for route in to_retry:
@@ -300,7 +306,12 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
                     _record(result, events, route, "exists")
                     continue
 
-                if not _process_route(page, spec, route, prefix, out_path, events, result, timeout_ms):
+                try:
+                    if not _process_route(page, spec, route, prefix, out_path, events, result, timeout_ms):
+                        break
+                except RunCancelled:
+                    events.on_log("Cancelled by user.")
+                    log.info("cancelled by user during route %s", route)
                     break
 
             # Give routes that failed the main pass one slow, serial retry.

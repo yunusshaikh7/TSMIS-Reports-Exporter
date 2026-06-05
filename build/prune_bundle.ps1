@@ -110,8 +110,11 @@ if (-not $GuardOnly) {
     }
 
     # Safety net for the PyInstaller `excludes` (Pillow / pypdfium2): if a hook
-    # re-bundled them, drop the package dir + its dist-info. The app never imports
-    # these -- verified by build/full_smoke.py.
+    # re-bundled them, drop the package dir + its dist-info. (openpyxl imports
+    # Pillow eagerly, so it loads when present -- but the app's used code paths,
+    # text/table extraction + plain workbooks, don't need it and tolerate its
+    # absence; excluding it is verified safe by the frozen self-test,
+    # build/full_smoke.py.)
     $internal = Join-Path $Target "_internal"
     foreach ($name in @("PIL", "Pillow", "pypdfium2", "pypdfium2_raw")) {
         Get-ChildItem $internal -Directory -ErrorAction Ignore |

@@ -46,6 +46,7 @@ from common import (
     RETRY_REPORT_TIMEOUT_MS,
     ROUTES,
     AuthError,
+    RunCancelled,
     is_logged_in,
     navigate_with_auth,
     new_authed_browser,
@@ -172,8 +173,9 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     for r in routes:
         work.put(r)
 
-    stop = threading.Event()            # set on cancel, auth loss, or a fatal error
+    stop = threading.Event()            # set on cancel, auth loss, or an unrecoverable per-route stop
     auth_failed = threading.Event()     # distinguishes auth loss -> re-raise AuthError
+    worker_crashed = threading.Event()  # a worker died with an unexpected error
     worker_results = [None] * n
 
     def worker(idx):
@@ -215,10 +217,17 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
             log.warning("%s lost the session", tag)
             auth_failed.set()
             stop.set()
+        except RunCancelled:
+            stop.set()                  # user cancelled mid-route: wind down, not a crash
         except Exception:
             log.exception("%s crashed", tag)
-            events.on_log(f"{tag} stopped unexpectedly (details in the log).")
-            stop.set()
+            events.on_log(f"{tag} stopped unexpectedly; the other browsers keep going "
+                          "(details in the log).")
+            worker_crashed.set()
+            # Deliberately do NOT stop the other workers -- they keep draining the
+            # queue so one dead browser doesn't abort the whole run. Any route this
+            # worker had in flight is reconciled as failed after the join (below)
+            # and gets the serial retry pass.
 
     threads = [
         threading.Thread(target=worker, args=(i,), daemon=True, name=f"export-w{i + 1}")
@@ -246,6 +255,25 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
         result.failed.extend(wr.failed)
         result.exists.extend(wr.exists)
         result.per_route.extend(wr.per_route)
+
+    # Reconcile: a crashed (or stopped) worker can leave routes with NO recorded
+    # outcome -- the one it had in flight, plus any it never reached. Without this
+    # those routes would be silently dropped from a "successful" run. Mark every
+    # such route failed (unless its file is already on disk) so nothing is lost:
+    # the serial retry pass below then gives them a fresh attempt, and the run
+    # report + counts account for every route exactly once. Skip when the user
+    # cancelled -- those routes are simply not-done (resume later), not failures.
+    if not events.is_cancelled():
+        accounted = {r for r, _ in result.per_route}
+        missing = [r for r in routes
+                   if r not in accounted and not (out_dir / spec.filename(r)).exists()]
+        if missing:
+            if worker_crashed.is_set():
+                events.on_log(f"{len(missing)} route(s) weren't completed because a browser "
+                              "stopped unexpectedly -- marking them failed to retry.")
+            for r in missing:
+                result.failed.append(r)
+                _record(result, events, r, "failed")
 
     log.info("parallel export done: saved=%d empty=%d skipped=%d failed=%d",
              result.saved, len(result.empty), len(result.user_skipped), len(result.failed))

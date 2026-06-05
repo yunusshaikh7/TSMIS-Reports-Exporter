@@ -43,3 +43,22 @@ def write_run_report(result, label, path):
         for route, status in result.per_route:
             writer.writerow([label, route, FRIENDLY_STATUS.get(status, status), run_at])
     return path
+
+
+def write_run_report_multi(results_by_label, path):
+    """Write per-route rows for SEVERAL reports to one CSV (used when the GUI
+    exports several report types at once and the user saves a combined report).
+
+    results_by_label is a list of (label, RunResult). The `Report` column keeps
+    the rows distinguishable. Returns the Path written.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    run_at = time.strftime("%Y-%m-%d %H:%M:%S")
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Report", "Route", "Status", "Run At"])
+        for label, result in results_by_label:
+            for route, status in result.per_route:
+                writer.writerow([label, route, FRIENDLY_STATUS.get(status, status), run_at])
+    return path
