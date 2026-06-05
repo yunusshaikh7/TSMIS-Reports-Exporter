@@ -106,6 +106,14 @@ def apply(root):
               background=[("active", p["bg"])],
               foreground=[("disabled", p["muted"])])
 
+    # Checkbuttons (report multi-select + fast-mode toggle) -- match radios so the
+    # Export tab looks consistent instead of falling back to default clam styling.
+    style.configure("TCheckbutton", background=p["bg"], foreground=p["text"],
+                    padding=(2, 4))
+    style.map("TCheckbutton",
+              background=[("active", p["bg"])],
+              foreground=[("disabled", p["muted"])])
+
     # Progress bar
     style.configure("TProgressbar", background=p["accent"], troughcolor=p["border"],
                     bordercolor=p["border"], lightcolor=p["accent"],

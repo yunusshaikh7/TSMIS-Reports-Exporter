@@ -14,18 +14,11 @@ except ImportError:
     sys.exit(1)
 
 from cli import run_cli_multi
-from export_ramp_summary import SPEC as SUMMARY_SPEC
-from export_ramp_detail import SPEC as DETAIL_SPEC
-from export_highway_sequence import SPEC as HIGHWAY_SPEC
-from export_highway_log import SPEC as HIGHWAY_LOG_SPEC
+from reports import EXPORT_REPORTS
 
-# (label, ReportSpec) in menu order -- mirrors the single-report menu numbering.
-REPORTS = [
-    ("TSAR: Ramp Summary", SUMMARY_SPEC),
-    ("TSAR: Ramp Detail", DETAIL_SPEC),
-    ("Highway Sequence Listing", HIGHWAY_SPEC),
-    ("Highway Log", HIGHWAY_LOG_SPEC),
-]
+# (label, ReportSpec) in menu order, derived from the shared registry so it can't
+# drift from the GUI's report list.
+REPORTS = [(label, spec) for label, _fmt, spec in EXPORT_REPORTS]
 
 if __name__ == "__main__":
     run_cli_multi(REPORTS, title="TSMIS Multi-Report Export")

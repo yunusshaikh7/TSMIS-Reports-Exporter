@@ -180,14 +180,27 @@ def clear_auth():
 
 
 def require_valid_auth():
-    """Raise AuthError if the saved session is missing or corrupt."""
+    """Raise AuthError if the saved session is missing, corrupt, or not shaped
+    like a Playwright storage_state.
+
+    Validating the SHAPE here (not just "is it JSON") matters: a valid-JSON file
+    that isn't a real storage_state would otherwise blow up later inside
+    `browser.new_context(storage_state=...)` as a raw, un-handled error (a
+    traceback in the console flow). Catching it here turns it into a clean
+    AuthError the drivers already know how to surface + guide a re-login for.
+    """
     if not AUTH.exists():
         raise AuthError("No saved session file found.")
     try:
         with open(AUTH, "r", encoding="utf-8") as f:
-            json.load(f)
+            data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         raise AuthError(f"Session file is corrupted ({type(e).__name__}).")
+    # Playwright's storage_state is always {"cookies": [...], "origins": [...]}.
+    if (not isinstance(data, dict)
+            or not isinstance(data.get("cookies"), list)
+            or not isinstance(data.get("origins"), list)):
+        raise AuthError("Session file isn't a valid saved login.")
 
 
 def navigate_with_auth(page):
@@ -508,6 +521,9 @@ def new_authed_browser(p):
             "--enable-features=LocalNetworkAccessChecks",
         ],
     )
+    # The fallback drops only the optional permissions kwarg (older browsers may
+    # not grant "local-network-access"); the storage_state itself is already
+    # shape-validated by require_valid_auth(), so it isn't the thing that fails here.
     try:
         ctx = browser.new_context(
             storage_state=str(AUTH),

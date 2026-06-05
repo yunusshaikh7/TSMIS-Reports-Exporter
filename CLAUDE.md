@@ -114,6 +114,7 @@ launching a window. See **Build & Packaging** for details and gotchas.
 │   ├── run_report.py                  # per-route run report (CSV; auto-saved each run; +multi)
 │   ├── cli.py                         # console adapter: run_cli (one report) + run_cli_multi (several)
 │   ├── login.py                       # writes the auth file (headed browser)
+│   ├── reports.py                     # ONE registry of report types (GUI + export_multi read it)
 │   ├── export_ramp_summary.py         # thin: a ReportSpec (PDF) + run_cli
 │   ├── export_ramp_detail.py          # thin: a ReportSpec (XLSX download) + run_cli
 │   ├── export_highway_sequence.py     # thin: a ReportSpec (XLSX download) + run_cli
@@ -131,7 +132,9 @@ launching a window. See **Build & Packaging** for details and gotchas.
 ├── build/                             # portable-build infra (Phase 0)
 │   ├── build.ps1                      # one-command reproducible onefolder build (-SelfTest for headless verify)
 │   ├── prune_bundle.ps1               # strip bundle to runtime-only files + DLP guard (run by build.ps1)
-│   ├── app.spec                       # PyInstaller spec (Node driver + pdf/excel; excludes unused image libs; no browser)
+│   ├── app.spec                       # PyInstaller spec (Node driver + pdf/excel; excludes image libs; version-info + icon + manifest; no browser)
+│   ├── app.ico                        # app/.exe icon (neutral; how it was made is in Build & Packaging)
+│   ├── app.manifest                   # embedded in the .exe (asInvoker, Win10/11) — IT/Defender trust signal
 │   ├── gui_main entry → scripts/gui_main.py  # the windowed app's real entry point
 │   ├── full_smoke.py                  # comprehensive frozen self-test: system-browser pdf+download, pdfplumber, openpyxl, GUI (the -SelfTest entry)
 │   ├── dist_readme.txt               # copied into the build as "Start Here.txt"
@@ -261,8 +264,13 @@ and raises `AuthError` on session problems.
   `input()`, maps the `ConsolidateResult` status to the exit code). Imports
   `exporter`/`exporter_parallel` lazily so consolidating never pulls in Playwright.
 - **`scripts/export_*.py`** — thin ~30-line files: each defines a `ReportSpec`
-  and calls `run_cli`. `export_multi.py` instead lists all the report `(label,
-  spec)`s and calls `run_cli_multi` (backs the menu's `A` option).
+  and calls `run_cli`. `export_multi.py` derives its report list from `reports.py`
+  and calls `run_cli_multi` (backs the menu's `A` option).
+- **`scripts/reports.py`** — the **single registry** of report types:
+  `EXPORT_REPORTS = [(label, fmt, spec), …]` and
+  `CONSOLIDATE_REPORTS = [(label, fn, OUT_PATH), …]`. Both the GUI (`gui_app.py`)
+  and `export_multi.py` import from here, so the report list can't drift between
+  them. (The `.bat` menus are static text and are still edited by hand.)
 - **`scripts/consolidate_*.py`** — each exposes `consolidate(events,
   confirm_overwrite) -> ConsolidateResult` (console-free: logs via `Events`,
   asks before overwrite via the callback, honors `is_cancelled()`, never
@@ -545,9 +553,12 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
   GUI never hangs on "Waiting…"), while clicking "I've finished" without a login
   reports `login_failed`. On any non-save outcome no file is written, so a
   previously-valid session is preserved.
-- The engine calls `require_valid_auth()` first (file exists + valid JSON),
-  then `new_authed_browser()` restores the session via
-  `browser.new_context(storage_state=...)`.
+- The engine calls `require_valid_auth()` first — it checks the file exists, is
+  valid JSON, **and is shaped like a Playwright storage_state** (`cookies`/
+  `origins` lists). That last check matters: a valid-JSON-but-not-storage_state
+  file would otherwise crash later inside `new_authed_browser()`'s
+  `browser.new_context(storage_state=...)` as a raw traceback; instead it raises
+  `AuthError` and the drivers guide a re-login.
 - If the session is missing, malformed, or expired, the core raises
   **`AuthError`**. The console adapter (`cli.py`) catches it, clears the stale
   file (`clear_auth()`), prints next steps, and exits; the GUI will catch it
@@ -573,8 +584,9 @@ Route strings must match the exact option values in the TSMIS "Route"
    new save strategy there.
 2. Add a numbered branch to `3. run_export (main script).bat` (and `5. fast
    export (experimental).bat`).
-3. Add it to `export_multi.py`'s `REPORTS` list and `gui_app.EXPORT_REPORTS`, so
-   the several/all selectors and the GUI checkbox include it.
+3. Add one entry to `EXPORT_REPORTS` in `scripts/reports.py` — that single list
+   feeds both the GUI checkboxes and `export_multi`'s several/all selector (no
+   per-file edits to `gui_app.py`/`export_multi.py`).
 4. List the new module(s) in `APP_MODULES` in `build/app.spec` (they're imported
    by bare name, several lazily, so PyInstaller needs them as hidden imports).
 5. Add a `.gitkeep` to a new `output/<name>/` folder and whitelist it in
@@ -609,8 +621,9 @@ Then, for either kind:
 1. Add `if __name__ == "__main__": from cli import run_consolidate_cli;
    run_consolidate_cli(consolidate)` so the `.bat` flow keeps working.
 2. Turn the branch in `4. consolidate (combine reports).bat` into a real call.
-3. List the module(s) in `APP_MODULES` in `build/app.spec`, register it in
-   `gui_app.CONSOLIDATE_REPORTS`, and document it here.
+3. List the module(s) in `APP_MODULES` in `build/app.spec`, add one entry to
+   `CONSOLIDATE_REPORTS` in `scripts/reports.py` (feeds the GUI Consolidate tab),
+   and document it here.
 
 ## Build & Packaging (portable onefolder)
 
@@ -650,6 +663,19 @@ Run from the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps
   not by the import being gone but by the **frozen self-test still passing with PIL
   excluded** (`build.ps1 -SelfTest`). Trims ~20 MB + image codecs. `cryptography`
   is a hard top-level `pdfminer` import (encrypted-PDF support) and **must stay**.
+- **`.exe` trust metadata (reduce IT/Defender/DLP false-positives).** An unsigned
+  PyInstaller `.exe` with no version resource, generic icon, and no manifest is
+  the classic heuristic-flag pattern. The spec adds all the non-signing signals:
+  a **version-info resource** built from `version.py` (CompanyName/ProductName/
+  FileVersion/…), the **`build\app.ico`** icon, and **`build\app.manifest`**
+  (`asInvoker` — declares *no admin* — + Win10/11 `supportedOS`). `upx=False` too
+  (UPX-packed exes are themselves a common false-positive). These **reduce, not
+  eliminate**, flags — **code-signing is the only complete fix** (next step when a
+  cert is available). The icon was generated once with Pillow (in the build venv):
+  a 256px rounded blue square + white "TS" + route-tick, saved multi-size via
+  `Image.save('build/app.ico', sizes=[(16,16)…(256,256)])`; regenerate the same
+  way to tweak it. The GUI also uses it as the window/taskbar icon
+  (`gui_app._app_icon_path`, bundled via the spec's `datas`, best-effort).
 - **Browser selection** lives in `scripts/common.launch_browser`: once per
   process it **probes** each channel — `msedge`, then `chrome` (override with the
   `TSMIS_BROWSER_CHANNEL` env var) — by launching it *headless and driving a
@@ -727,9 +753,14 @@ moves/renames the driver dirs, update `$killDirs` (the guard fails loudly first)
   static analysis alone can miss them). Tkinter is collected automatically.
   Verify a frozen build headlessly with `build.ps1 -SelfTest` (the frozen GUI
   self-test passed; the live windowed launch is the remaining manual check).
-- **AV / SmartScreen:** the unsigned `.exe` will trip SmartScreen on first run.
-  Code-signing (Phase 6) is the fix; otherwise tell users to "unblock" the
-  downloaded zip (right-click → Properties → Unblock) before extracting.
+- **AV / SmartScreen / IT data-protection:** the unsigned `.exe` can trip
+  SmartScreen / Defender / corporate DLP heuristics on first run. The build now
+  ships the non-signing trust signals that reduce this (version-info resource,
+  icon, `asInvoker` manifest, no UPX — see the `app.spec` highlights) and
+  `prune_bundle.ps1` strips DLP-blocked content. **Code-signing remains the only
+  complete fix** (Phase 6). Until then, tell users to "unblock" the downloaded
+  zip (right-click → Properties → Unblock) before extracting, and choose
+  "More info → Run anyway" on the first launch.
 
 ## Error Handling & Reliability (Phase 5)
 
@@ -834,6 +865,7 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
   five `output/.gitkeep` stubs are tracked there. The local `.claude/` permission
   state is git-ignored too.
 - Track the build *infra* (`build/build.ps1`, `build/prune_bundle.ps1`,
-  `build/app.spec`, `build/full_smoke.py`), `requirements*.txt`, and `version.py`.
+  `build/app.spec`, `build/full_smoke.py`, `build/app.ico`, `build/app.manifest`),
+  `requirements*.txt`, and `version.py`.
 - Commit messages should be short and imperative (e.g., `add route 395`,
   `decouple export engine from console`).

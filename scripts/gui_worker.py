@@ -7,8 +7,9 @@ root.after(). Workers never touch Tk widgets.
 
 Message protocol (all are (kind, payload) tuples):
     ("log", str)                       one status line
-    ("progress", dict)                 {done,total,route,saved,empty,skipped,failed}
-    ("export_done", RunResult)
+    ("progress", dict)                 {done,total,route,report,report_i,report_n,saved,empty,skipped,failed,exists}
+    ("export_done", [(spec, RunResult), ...])   all selected reports finished
+    ("export_partial", [(spec, RunResult), ...]) reports done before an error (then an "error" follows)
     ("consolidate_done", ConsolidateResult)
     ("login_open", None)               headed browser is up; user should finish SSO
     ("login_saved", None)              a VALID session was captured and written
@@ -113,12 +114,19 @@ class ExportWorker(threading.Thread):
                     result = run_export(spec, events, routes=self.routes)
                 results.append((spec, result))
             self.q.put(("export_done", results))
+            return
         except AuthError as e:
-            self.q.put(("error", ("auth", str(e))))
+            err = ("auth", str(e))
         except (PreflightError, BrowserNotFoundError) as e:
-            self.q.put(("error", ("general", str(e))))      # message is already user-safe
+            err = ("general", str(e))               # message is already user-safe
         except Exception as e:
-            self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
+            err = ("general", f"{type(e).__name__}: {e}")
+        # An error aborted a multi-report run partway. Hand the GUI whatever
+        # reports DID finish so "Save run report…" still covers them (each is also
+        # auto-saved under output/run_reports/), then surface the error.
+        if results:
+            self.q.put(("export_partial", results))
+        self.q.put(("error", err))
 
 
 class ConsolidateWorker(threading.Thread):

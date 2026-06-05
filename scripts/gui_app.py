@@ -6,6 +6,7 @@ Tk main thread. The engines stay console-free -- the GUI is just another driver
 of the same Events seam used by the .bat flow.
 """
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -28,39 +29,39 @@ from common import (
     require_valid_auth, set_preferred_channel,
 )
 
-from export_ramp_summary import SPEC as SUMMARY_SPEC
-from export_ramp_detail import SPEC as DETAIL_SPEC
-from export_highway_sequence import SPEC as HIGHWAY_SPEC
-from export_highway_log import SPEC as HIGHWAY_LOG_SPEC
-import consolidate_ramp_summary as c_summary
-import consolidate_ramp_detail as c_detail
-import consolidate_highway_sequence as c_highway
-import consolidate_highway_log as c_hwy_log
-
-# (label, format hint, ReportSpec)
-EXPORT_REPORTS = [
-    ("TSAR: Ramp Summary", "PDF", SUMMARY_SPEC),
-    ("TSAR: Ramp Detail", "Excel", DETAIL_SPEC),
-    ("Highway Sequence Listing", "Excel", HIGHWAY_SPEC),
-    ("Highway Log", "Excel", HIGHWAY_LOG_SPEC),
-]
-# (label, consolidate_fn, OUT_PATH)
-CONSOLIDATE_REPORTS = [
-    ("TSAR: Ramp Summary", c_summary.consolidate, c_summary.OUT_PATH),
-    ("TSAR: Ramp Detail", c_detail.consolidate, c_detail.OUT_PATH),
-    ("Highway Sequence Listing", c_highway.consolidate, c_highway.OUT_PATH),
-    ("Highway Log", c_hwy_log.consolidate, c_hwy_log.OUT_PATH),
-]
+# The report list lives in one place (reports.py) so the GUI and the console
+# multi-exporter can't drift. EXPORT_REPORTS = [(label, fmt, spec)],
+# CONSOLIDATE_REPORTS = [(label, consolidate_fn, OUT_PATH)].
+from reports import EXPORT_REPORTS, CONSOLIDATE_REPORTS
 
 CONSOLIDATED_DIR = OUTPUT_ROOT / "consolidated"
 
 PAD = 14
 
 
+def _app_icon_path():
+    """Path to the bundled app icon (.ico), or None. Frozen: it's bundled into
+    _internal via sys._MEIPASS; in dev it's build/app.ico. Best-effort -- a
+    missing icon must never stop the GUI from launching."""
+    base = getattr(sys, "_MEIPASS", None)
+    candidates = []
+    if base:
+        candidates.append(Path(base) / "app.ico")
+    candidates.append(Path(__file__).resolve().parent.parent / "build" / "app.ico")
+    return next((c for c in candidates if c.exists()), None)
+
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_NAME)
+        # Window/taskbar icon (best-effort; default= so dialogs inherit it).
+        try:
+            _ico = _app_icon_path()
+            if _ico:
+                self.iconbitmap(default=str(_ico))
+        except Exception:
+            pass
         # Window size is computed from the laid-out content at the end of __init__
         # so the log pane is never squeezed to nothing (see the sizing block).
 
@@ -747,6 +748,11 @@ class App(tk.Tk):
             self._update_progress(payload)
         elif kind == "export_done":
             self._finish_export(payload)
+        elif kind == "export_partial":
+            # A multi-report run errored partway; keep the completed reports so
+            # "Save run report…" still covers them. The following "error" message
+            # handles the dialog + resets the run state.
+            self._last_results = payload
         elif kind == "consolidate_done":
             self._finish_consolidate(payload)
         elif kind == "login_open":
