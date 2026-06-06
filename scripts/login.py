@@ -16,7 +16,7 @@ except ImportError:
     print('ERROR: Playwright is not installed. Run "1. setup (one time).bat" first.')
     sys.exit(1)
 
-from common import AUTH, URL, BrowserNotFoundError, is_logged_in, launch_browser
+from common import AUTH, URL, BrowserNotFoundError, is_logged_in, open_login_browser
 
 
 def main():
@@ -58,42 +58,71 @@ def main():
         sys.exit(1)
 
 
+# Sign-in attempts, in order: Chrome first, Edge only as a last-resort fallback.
+# Managed Microsoft Edge relaunches itself into the work profile during the
+# Caltrans SSO and can't be automated (a known, unresolved limitation -- see
+# CLAUDE.md). The saved session is browser-agnostic, so exports still use the
+# browser the export scripts choose (Edge by default).
+_ATTEMPTS = [("chrome", False, "Google Chrome"),
+             ("msedge", False, "Microsoft Edge")]
+
+
 def _run_login():
     with sync_playwright() as p:
-        browser = launch_browser(p, headless=False)
-        ctx = browser.new_context()
-        page = ctx.new_page()
-        page.goto(URL)
-
-        print()
-        print("=" * 64)
-        print(">>> ALT-TAB BACK HERE after you finish logging in <<<")
-        print("=" * 64)
-        input(">>> Press Enter once the TSMIS report page is loaded: ")
-
-        # Only save if we can confirm a real login (the report page is loaded).
-        # If the browser was closed or sign-in wasn't finished, is_logged_in
-        # either returns False or raises -- either way, don't save a junk session.
-        try:
-            logged_in = is_logged_in(page)
-        except Exception:
+        opened_any = False
+        for i, (channel, inprivate, label) in enumerate(_ATTEMPTS):
+            browser = open_login_browser(p, channel, inprivate=inprivate)
+            if browser is None:
+                continue
+            opened_any = True
+            last = (i == len(_ATTEMPTS) - 1)
             logged_in = False
+            try:
+                ctx = browser.new_context()
+                page = ctx.new_page()
+                page.goto(URL)
+                print()
+                print("=" * 64)
+                print(f">>> Signing in with {label}.")
+                print(">>> ALT-TAB BACK HERE after you finish logging in <<<")
+                print("=" * 64)
+                input(">>> Press Enter once the TSMIS report page is loaded: ")
+                # Only save if we can confirm a real login. If managed Edge
+                # relaunched, the context is dead and is_logged_in raises -- treat
+                # that as "not signed in here" and try the next browser.
+                try:
+                    logged_in = is_logged_in(page)
+                    if logged_in:
+                        ctx.storage_state(path=str(AUTH))
+                except Exception:
+                    logged_in = False
+            finally:
+                try:
+                    browser.close()
+                except Exception:
+                    pass
 
-        print()
-        if logged_in:
-            ctx.storage_state(path=str(AUTH))
-            print(f"✓ Session saved to {AUTH.name}")
-            print('  You can close this window and run "3. run_export (main script).bat"')
-        else:
-            print("✗ Sign-in wasn't completed — the TSMIS report page isn't loaded")
-            print("  (or the browser was closed). No session was saved. Please run this")
-            print("  login again and wait for the report page before pressing Enter.")
-        print()
-        try:
-            browser.close()
-        except Exception:
-            pass
-        input("Press Enter to exit...")
+            print()
+            if logged_in:
+                print(f"✓ Session saved to {AUTH.name}  (signed in with {label})")
+                print('  You can close this window and run "3. run_export (main script).bat"')
+                input("Press Enter to exit...")
+                return
+            if not last:
+                print(f"  {label} sign-in wasn't detected (managed Edge may have relaunched).")
+                print("  Opening the next browser -- please sign in again.")
+            else:
+                print("✗ Sign-in wasn't completed in any browser. No session was saved.")
+                print("  Run this login again and wait for the TSMIS report page before")
+                print("  pressing Enter.")
+                input("Press Enter to exit...")
+                return
+
+        if not opened_any:
+            print()
+            print("PROBLEM: Couldn't open Google Chrome or Microsoft Edge for sign-in.")
+            print("  Please install Google Chrome, then run this login again.")
+            input("Press Enter to exit...")
 
 
 if __name__ == "__main__":

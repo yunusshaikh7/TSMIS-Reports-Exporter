@@ -495,6 +495,27 @@ def launch_browser(p, *, headless=True, **kwargs):
             ) from first_err
 
 
+def open_login_browser(p, channel, inprivate=False):
+    """Open ONE specific browser channel, HEADED, for interactive sign-in.
+
+    Returns the browser, or None if that channel isn't installed / can't launch
+    (the caller then tries the next one). The sign-in flow defaults to Chrome:
+    managed Microsoft Edge relaunches ITSELF into the work profile during the
+    Caltrans Azure AD sign-in, abandoning the Playwright-driven window
+    (TargetClosedError by the time the user finishes) -- a known limitation that
+    neither InPrivate nor --edge-skip-compat-layer-relaunch fixed (see the
+    `_ATTEMPTS` lists in gui_worker/login and the KNOWN LIMITATION note in
+    CLAUDE.md). Edge is only a last-resort fallback. The captured session is
+    browser-agnostic, so EXPORTS still run on the user's chosen browser (Edge by
+    default). `inprivate` is kept for the caller's use but no longer the default.
+    """
+    args = ["--inprivate"] if (inprivate and channel == "msedge") else []
+    try:
+        return p.chromium.launch(headless=False, channel=channel, args=args)
+    except Exception:
+        return None
+
+
 def check_browsers():
     """Probe each known browser channel for the readiness panel. Returns
     {channel: "ok" | "missing" | "broken"} (see _probe_channel). Opens its own

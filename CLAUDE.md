@@ -534,25 +534,39 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 - `scripts/login.py` writes the auth file via `ctx.storage_state(path=...)`
   (path from `paths.AUTH`).
-- **Login is validated before it's saved** (both the GUI `LoginWorker` and the
-  console `login.py`): the session is only written if a real TSMIS login is
-  detected (`is_logged_in` on any page in the context — SSO can land the report
-  in a popup). This kills two old footguns: clicking "I've finished logging in"
-  *without* signing in no longer saves a junk session + reports "ready". The GUI
-  worker also **watches the login window closing**, but the close signal must
-  survive the SSO/MFA dance — which navigates, can open a popup, and may replace
-  the original tab. So it does **not** treat the *original* page closing, a
-  `browser.is_connected()` blip, or a single transient `ctx.cookies()` error as
-  "closed" (an earlier version did, and that slammed the window shut the instant a
-  password went through, reporting a false **cancelled**). The reliable signal is
-  **no open tabs remain in the context** (the SSO flow always keeps ≥ 1 tab open),
-  with a long all-calls-failing streak as a backstop for a truly dead connection.
-  Because the session is captured the *instant* a login is detected (`is_logged_in`
-  on any page — SSO can land it in a popup), closing the window after signing in
-  still saves it; closing it *without* signing in resolves to **cancelled** (the
-  GUI never hangs on "Waiting…"), while clicking "I've finished" without a login
-  reports `login_failed`. On any non-save outcome no file is written, so a
-  previously-valid session is preserved.
+- **Sign-in defaults to Chrome (`common.open_login_browser` + the `_ATTEMPTS`
+  list), even though exports default to Edge.** The login worker tries Chrome
+  first and Edge only as a last-resort fallback. After the user clicks finish, one
+  `is_logged_in` check decides: if that browser survived and is logged in, save and
+  stop; otherwise close it and open the next, asking the user to sign in again. The
+  saved session is **browser-agnostic**, so every **export** still runs on the
+  user's chosen browser (Edge by default) — only the interactive sign-in is
+  Chrome. Both the GUI `LoginWorker` and the console `login.py` share this order;
+  the GUI logs which browser opened.
+
+  > **⚠️ KNOWN LIMITATION (unresolved) — sign-in needs Google Chrome.** Managed
+  > Caltrans Microsoft Edge **relaunches itself into the work profile** during the
+  > Azure AD sign-in, which kills the Playwright-driven window (confirmed: it fails
+  > with `TargetClosedError` even with **zero** interaction from us; neither Edge
+  > InPrivate nor `--edge-skip-compat-layer-relaunch` helped). So Edge sign-in
+  > can't be automated and login defaults to Chrome. **Not all Caltrans work PCs
+  > have Chrome** — those users can't sign in yet. This **needs a real fix**;
+  > candidates to investigate: (a) a persistent on-disk Edge profile read back
+  > after the window closes; (b) capturing the session without keeping the
+  > Playwright context alive (CDP re-attach to the relaunched Edge, or reading the
+  > work-profile cookies); (c) IT disabling Edge "automatic profile switching" or
+  > exempting the tool; (d) shipping a small portable Chromium just for sign-in.
+  > Exports are unaffected (they restore the saved session and run on Edge).
+- **The login worker is a "dumb wait."** Both `LoginWorker` and the console
+  `login.py` open the browser and then do **nothing** but wait for the user to
+  finish ("I've finished logging in" / press Enter), then save
+  `ctx.storage_state()` once — no polling, no page inspection, no close-watching
+  during sign-in. An earlier close-watcher polled the page every tick to auto-save
+  on window-close; it was fragile across the SSO/MFA redirects, so **do not
+  reintroduce mid-login polling.** Trade-off: no auto-save on a bare window-close,
+  and the save isn't gated on a login check, so clicking "finished" *without*
+  signing in writes a junk session (the next export then says login is needed —
+  just sign in again).
 - The engine calls `require_valid_auth()` first — it checks the file exists, is
   valid JSON, **and is shaped like a Playwright storage_state** (`cookies`/
   `origins` lists). That last check matters: a valid-JSON-but-not-storage_state
@@ -871,6 +885,7 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
 | Output looks wrong for one report only | That report's selector changed | Edit only that report's `ReportSpec` in its `export_*.py` |
 | "TSMIS page looks different than expected" | Preflight failed — site likely changed | Check `LOG_DIR` + `FAILURES_DIR`; update selectors in `common.py`/the `ReportSpec` |
 | "No compatible web browser was found" (`BrowserNotFoundError`) | Neither Edge nor Chrome is installed/launchable | Install Microsoft Edge (or set `TSMIS_BROWSER_CHANNEL`); see `common.launch_browser` |
+| Sign-in window closes itself / "wasn't completed" with Edge | Managed Edge relaunches into the work profile during the Caltrans SSO (unfixable from the app) | **Sign in needs Google Chrome** — install it. Exports still use Edge. See the **KNOWN LIMITATION** note in Auth / Session Details |
 | Browser launch fails only after an Edge/Chrome auto-update | Evergreen browser outran the pinned Playwright CDP | Bump `playwright` in `requirements*.txt` and rebuild |
 | DLP/SharePoint blocks a file in the release ("Credit Card Number") | Playwright driver docs (e.g. `tracing.md`) bundled | `build.ps1` now prunes them; clean an existing release with `build\prune_bundle.ps1 -Target "…\TSMIS Exporter"`, then re-zip |
 | Build fails: "GUARD FAILED: … credit-card-like number" | A bundled dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` to drop the offending non-runtime files |
