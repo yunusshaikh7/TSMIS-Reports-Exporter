@@ -532,6 +532,25 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 ## Auth / Session Details
 
+> **⚠️ OPEN ISSUE — Microsoft Edge sign-in is broken in the managed Caltrans
+> environment (fix later).** Managed Edge **relaunches itself into the work
+> profile** during the Azure AD sign-in, which kills the Playwright-driven window:
+> by the time the user clicks "I've finished," the context is already closed
+> (`TargetClosedError` on `storage_state`). Confirmed it happens with **zero** page
+> interaction from us, so it is Edge's own org-managed behavior, not our code.
+> Ruled out (none helped): removing all mid-login polling, the
+> `--edge-skip-compat-layer-relaunch` launch flag, and Edge **InPrivate** mode.
+> **Sign-in currently needs Google Chrome** (the captured session is
+> browser-agnostic, so exports still run on Edge) — but not all Caltrans PCs have
+> Chrome, so this still needs a real fix. Candidate approaches to try when picking
+> this back up: (a) a persistent on-disk Edge profile read back after the window
+> closes; (b) capturing the session without keeping the Playwright context alive
+> (CDP re-attach to the relaunched Edge, or reading the work-profile cookies);
+> (c) IT disabling Edge "automatic profile switching" or exempting the tool;
+> (d) a small portable Chromium bundled just for sign-in. (History: v0.4.2 tried
+> defaulting sign-in to Chrome but regressed Chrome too and was rolled back to
+> v0.4.1 — start the fix from a clean base and test against managed Edge.)
+
 - `scripts/login.py` writes the auth file via `ctx.storage_state(path=...)`
   (path from `paths.AUTH`).
 - **Login is validated before it's saved** (both the GUI `LoginWorker` and the
