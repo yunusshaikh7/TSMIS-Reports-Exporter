@@ -167,12 +167,14 @@ class LoginWorker(threading.Thread):
         self.done = done_event
         self.cancel = cancel_event
 
-    # Sign-in attempts, in order: Edge InPrivate first (profile-less, may dodge the
-    # managed work-profile relaunch that breaks normal Edge sign-in), then Chrome
-    # (no relaunch). The captured session is browser-agnostic, so exports still use
-    # the user's chosen browser either way.
-    _ATTEMPTS = [("msedge", True, "Microsoft Edge (InPrivate)"),
-                 ("chrome", False, "Google Chrome")]
+    # Sign-in attempts, in order: Chrome first, Edge only as a last-resort
+    # fallback. Managed Microsoft Edge relaunches itself into the work profile
+    # during the Caltrans SSO and kills the automated window -- confirmed
+    # unfixable from the app (InPrivate and --edge-skip-compat-layer-relaunch both
+    # failed). See the KNOWN LIMITATION note in CLAUDE.md. The captured session is
+    # browser-agnostic, so EXPORTS still run on the user's chosen browser (Edge).
+    _ATTEMPTS = [("chrome", False, "Google Chrome"),
+                 ("msedge", False, "Microsoft Edge")]
 
     def run(self):
         from playwright.sync_api import sync_playwright

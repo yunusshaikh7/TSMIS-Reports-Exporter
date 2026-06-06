@@ -534,22 +534,29 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 - `scripts/login.py` writes the auth file via `ctx.storage_state(path=...)`
   (path from `paths.AUTH`).
-- **Sign-in tries Edge InPrivate, then Chrome (`common.open_login_browser` +
-  the `_ATTEMPTS` list), even though exports default to Edge.** Managed Microsoft
-  Edge relaunches *itself* into the work profile during the Caltrans Azure AD
-  sign-in, abandoning the Playwright-driven window — by the time the user finishes,
-  that context is already closed (`TargetClosedError` on `storage_state`), even
-  with **zero** page interaction from us, and no launch flag overrides it. So the
-  login worker makes up to two attempts in order: **(1) Edge with `--inprivate`**
-  (InPrivate windows are profile-less and may dodge that relaunch), then **(2)
-  Chrome** (no relaunch). After the user clicks finish, one `is_logged_in` check
-  decides: if that browser survived and is logged in, save and stop; otherwise
-  close it and open the next, asking the user to sign in again. The saved session
-  is **browser-agnostic**, so every **export** still runs on the user's chosen
-  browser (Edge by default) — only the interactive sign-in varies. Both the GUI
-  `LoginWorker` and the console `login.py` share this order; the GUI logs which
-  browser opened. (Practical upshot: if Edge InPrivate dodges the relaunch you get
-  pure-Edge sign-in; if not, Chrome is the fallback, so machines need Chrome.)
+- **Sign-in defaults to Chrome (`common.open_login_browser` + the `_ATTEMPTS`
+  list), even though exports default to Edge.** The login worker tries Chrome
+  first and Edge only as a last-resort fallback. After the user clicks finish, one
+  `is_logged_in` check decides: if that browser survived and is logged in, save and
+  stop; otherwise close it and open the next, asking the user to sign in again. The
+  saved session is **browser-agnostic**, so every **export** still runs on the
+  user's chosen browser (Edge by default) — only the interactive sign-in is
+  Chrome. Both the GUI `LoginWorker` and the console `login.py` share this order;
+  the GUI logs which browser opened.
+
+  > **⚠️ KNOWN LIMITATION (unresolved) — sign-in needs Google Chrome.** Managed
+  > Caltrans Microsoft Edge **relaunches itself into the work profile** during the
+  > Azure AD sign-in, which kills the Playwright-driven window (confirmed: it fails
+  > with `TargetClosedError` even with **zero** interaction from us; neither Edge
+  > InPrivate nor `--edge-skip-compat-layer-relaunch` helped). So Edge sign-in
+  > can't be automated and login defaults to Chrome. **Not all Caltrans work PCs
+  > have Chrome** — those users can't sign in yet. This **needs a real fix**;
+  > candidates to investigate: (a) a persistent on-disk Edge profile read back
+  > after the window closes; (b) capturing the session without keeping the
+  > Playwright context alive (CDP re-attach to the relaunched Edge, or reading the
+  > work-profile cookies); (c) IT disabling Edge "automatic profile switching" or
+  > exempting the tool; (d) shipping a small portable Chromium just for sign-in.
+  > Exports are unaffected (they restore the saved session and run on Edge).
 - **The login worker is a "dumb wait."** Both `LoginWorker` and the console
   `login.py` open the browser and then do **nothing** but wait for the user to
   finish ("I've finished logging in" / press Enter), then save
@@ -878,6 +885,7 @@ wherever the user picks. Columns: `Report, Route, Status` (friendly label),
 | Output looks wrong for one report only | That report's selector changed | Edit only that report's `ReportSpec` in its `export_*.py` |
 | "TSMIS page looks different than expected" | Preflight failed — site likely changed | Check `LOG_DIR` + `FAILURES_DIR`; update selectors in `common.py`/the `ReportSpec` |
 | "No compatible web browser was found" (`BrowserNotFoundError`) | Neither Edge nor Chrome is installed/launchable | Install Microsoft Edge (or set `TSMIS_BROWSER_CHANNEL`); see `common.launch_browser` |
+| Sign-in window closes itself / "wasn't completed" with Edge | Managed Edge relaunches into the work profile during the Caltrans SSO (unfixable from the app) | **Sign in needs Google Chrome** — install it. Exports still use Edge. See the **KNOWN LIMITATION** note in Auth / Session Details |
 | Browser launch fails only after an Edge/Chrome auto-update | Evergreen browser outran the pinned Playwright CDP | Bump `playwright` in `requirements*.txt` and rebuild |
 | DLP/SharePoint blocks a file in the release ("Credit Card Number") | Playwright driver docs (e.g. `tracing.md`) bundled | `build.ps1` now prunes them; clean an existing release with `build\prune_bundle.ps1 -Target "…\TSMIS Exporter"`, then re-zip |
 | Build fails: "GUARD FAILED: … credit-card-like number" | A bundled dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` to drop the offending non-runtime files |

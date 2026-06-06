@@ -17,17 +17,16 @@ HOW TO RUN
   to download; you don't need Python.
 
 FIRST TIME (or whenever it shows "No saved login")
+  *** Sign-in needs Google Chrome installed on this PC. ***  (Microsoft Edge
+  can't be used for the Caltrans sign-in -- it relaunches itself and breaks the
+  automation. Your reports still EXPORT with Edge; only this sign-in step uses
+  Chrome. If this PC doesn't have Chrome, ask IT to install it.)
   1. Click  "Log in"  near the top.
-  2. A sign-in window opens -- sign in with your @dot.ca.gov account and complete
+  2. A Chrome window opens -- sign in with your @dot.ca.gov account and complete
      MFA, until the TSMIS report page loads.
-     (It opens Edge in InPrivate first; if managed Edge relaunches itself during
-     the Caltrans login, the app falls back to a Chrome window -- just sign in
-     there instead. Either way the saved sign-in works for Edge exports.)
   3. Come back to the app and click  "I've finished logging in".
-     (If it fell back to Chrome, sign in there and click the button again.
-     Closing the window without clicking the button won't save.)
-  Your reports still EXPORT with Edge. The dot turns green when you're signed in;
-  you only redo this when it expires.
+     (Closing the window without clicking the button won't save.)
+  The dot turns green when you're signed in; you only redo this when it expires.
 
 EXPORT REPORTS
   On the Export tab:

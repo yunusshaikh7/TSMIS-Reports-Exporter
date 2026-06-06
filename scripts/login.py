@@ -58,12 +58,13 @@ def main():
         sys.exit(1)
 
 
-# Sign-in attempts, in order: Edge InPrivate first (profile-less, may dodge the
-# managed work-profile relaunch that breaks normal Edge sign-in), then Chrome (no
-# relaunch). The saved session is browser-agnostic, so exports still use the
+# Sign-in attempts, in order: Chrome first, Edge only as a last-resort fallback.
+# Managed Microsoft Edge relaunches itself into the work profile during the
+# Caltrans SSO and can't be automated (a known, unresolved limitation -- see
+# CLAUDE.md). The saved session is browser-agnostic, so exports still use the
 # browser the export scripts choose (Edge by default).
-_ATTEMPTS = [("msedge", True, "Microsoft Edge (InPrivate)"),
-             ("chrome", False, "Google Chrome")]
+_ATTEMPTS = [("chrome", False, "Google Chrome"),
+             ("msedge", False, "Microsoft Edge")]
 
 
 def _run_login():
