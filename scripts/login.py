@@ -16,7 +16,7 @@ except ImportError:
     print('ERROR: Playwright is not installed. Run "1. setup (one time).bat" first.')
     sys.exit(1)
 
-from common import AUTH, URL, BrowserNotFoundError, is_logged_in, launch_browser
+from common import AUTH, URL, CHANNEL_LABELS, BrowserNotFoundError, is_logged_in, launch_login_browser
 
 
 def main():
@@ -60,7 +60,11 @@ def main():
 
 def _run_login():
     with sync_playwright() as p:
-        browser = launch_browser(p, headless=False)
+        # Sign-in prefers Chrome -- managed Edge relaunches itself during the
+        # Caltrans SSO and can't be automated. The saved session works for Edge
+        # exports anyway (it's browser-agnostic).
+        browser, channel = launch_login_browser(p)
+        print(f"  (Opening {CHANNEL_LABELS.get(channel, channel)} for sign-in.)")
         ctx = browser.new_context()
         page = ctx.new_page()
         page.goto(URL)

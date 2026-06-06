@@ -534,21 +534,29 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 - `scripts/login.py` writes the auth file via `ctx.storage_state(path=...)`
   (path from `paths.AUTH`).
-- **The GUI login is deliberately a "dumb wait."** `LoginWorker` opens the headed
-  browser, then does **nothing** but wait for the user to click "I've finished
-  logging in" (or Cancel); on the click it saves `ctx.storage_state()` once. It
-  does **not** poll, inspect pages, or watch for the window closing during
-  sign-in. *Why this matters:* an earlier version polled the page each tick
-  (`ctx.cookies()` / `is_logged_in` / close-watching) to auto-save when the window
-  was closed — but **poking the page during the SSO/MFA redirects made Microsoft
-  Edge relaunch itself and disconnect**, slamming the login window shut the moment
-  sign-in completed (Edge-only — Chrome was unaffected). Not touching the page
-  until the user is done is what keeps Edge working, so **do not reintroduce
-  mid-login polling/inspection in `LoginWorker`.** The console `login.py` follows
-  the same shape (it waits on Enter, then checks once). Trade-off: the GUI no
-  longer auto-saves on a bare window-close, and a save isn't gated on a login
-  check — if a user clicks "I've finished" without signing in, a junk session is
-  written and the next export fails with `AuthError` (re-login fixes it).
+- **Sign-in opens in Chrome (`common.launch_login_browser`), even though exports
+  default to Edge.** Managed Microsoft Edge relaunches *itself* into the work
+  profile during the Caltrans Azure AD sign-in, abandoning the Playwright-driven
+  window — by the time the user finishes, that context is already closed
+  (`TargetClosedError` on `storage_state`), so **Edge sign-in can't be automated
+  in this environment**, and no launch flag overrides it (verified: it fails even
+  with zero page interaction from us). Chrome has no such relaunch, so
+  `launch_login_browser` prefers Chrome, falling back to Edge only if Chrome isn't
+  installed. The saved session is **browser-agnostic**, so every **export** still
+  runs on the user's chosen browser (Edge by default) — only the interactive
+  sign-in prefers Chrome. The GUI logs which browser opened. (So: machines need
+  Chrome to sign in; or IT can disable Edge's "automatic profile switching" to let
+  Edge sign-in work.)
+- **The login worker is a "dumb wait."** Both `LoginWorker` and the console
+  `login.py` open the browser and then do **nothing** but wait for the user to
+  finish ("I've finished logging in" / press Enter), then save
+  `ctx.storage_state()` once — no polling, no page inspection, no close-watching
+  during sign-in. An earlier close-watcher polled the page every tick to auto-save
+  on window-close; it was fragile across the SSO/MFA redirects, so **do not
+  reintroduce mid-login polling.** Trade-off: no auto-save on a bare window-close,
+  and the save isn't gated on a login check, so clicking "finished" *without*
+  signing in writes a junk session (the next export then says login is needed —
+  just sign in again).
 - The engine calls `require_valid_auth()` first — it checks the file exists, is
   valid JSON, **and is shaped like a Playwright storage_state** (`cookies`/
   `origins` lists). That last check matters: a valid-JSON-but-not-storage_state

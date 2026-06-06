@@ -23,7 +23,7 @@ import threading
 
 from common import (
     AUTH, ROUTES, URL, AuthError, BrowserNotFoundError, PreflightError,
-    BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, is_logged_in, launch_browser,
+    BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, launch_login_browser,
 )
 from events import Events
 from exporter import run_export
@@ -172,13 +172,20 @@ class LoginWorker(threading.Thread):
         log = logging.getLogger("tsmis.login")
         try:
             with sync_playwright() as p:
-                browser = launch_browser(p, headless=False)   # system Edge/Chrome, headed
+                # Sign-in prefers Chrome: managed Edge relaunches itself during the
+                # Caltrans SSO and kills the automated window. Exports still use the
+                # user's chosen browser (the session is browser-agnostic).
+                browser, login_channel = launch_login_browser(p)
                 try:
                     ctx = browser.new_context()
                     page = ctx.new_page()
                     page.goto(URL)
                     self.q.put(("login_open", None))
-                    log.info("login: window opened; waiting for the user to finish")
+                    self.q.put(("log", f"Sign-in window opened in "
+                                       f"{CHANNEL_LABELS.get(login_channel, login_channel)}. "
+                                       "(Exports still use the browser selected in the header.)"))
+                    log.info("login: window opened in %s; waiting for the user to finish",
+                             login_channel)
 
                     # Simple, proven flow: just WAIT for the user to click "I've
                     # finished logging in" (or Cancel), then save. We deliberately
@@ -207,18 +214,6 @@ class LoginWorker(threading.Thread):
         except Exception as e:
             logging.getLogger("tsmis.login").exception("login worker crashed")
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
-
-    @staticmethod
-    def _any_logged_in(ctx):
-        """True if ANY page in the context is the logged-in TSMIS report page
-        (SSO sometimes lands it in a popup / new tab, not the original page)."""
-        for pg in ctx.pages:
-            try:
-                if is_logged_in(pg):
-                    return True
-            except Exception:
-                continue
-        return False
 
     @staticmethod
     def _safe_close(browser):
