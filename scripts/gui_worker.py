@@ -18,12 +18,11 @@ Message protocol (all are (kind, payload) tuples):
     ("error", (kind, message))         kind is "auth" or "general"
 """
 import json
-import logging
 import threading
 
 from common import (
     AUTH, ROUTES, URL, AuthError, BrowserNotFoundError, PreflightError,
-    BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, is_logged_in, open_login_browser,
+    BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, is_logged_in, launch_browser,
 )
 from events import Events
 from exporter import run_export
@@ -167,89 +166,87 @@ class LoginWorker(threading.Thread):
         self.done = done_event
         self.cancel = cancel_event
 
-    # Sign-in attempts, in order: Chrome first, Edge only as a last-resort
-    # fallback. Managed Microsoft Edge relaunches itself into the work profile
-    # during the Caltrans SSO and kills the automated window -- confirmed
-    # unfixable from the app (InPrivate and --edge-skip-compat-layer-relaunch both
-    # failed). See the KNOWN LIMITATION note in CLAUDE.md. The captured session is
-    # browser-agnostic, so EXPORTS still run on the user's chosen browser (Edge).
-    _ATTEMPTS = [("chrome", False, "Google Chrome"),
-                 ("msedge", False, "Microsoft Edge")]
-
     def run(self):
         from playwright.sync_api import sync_playwright
-        log = logging.getLogger("tsmis.login")
         try:
             with sync_playwright() as p:
-                opened_any = False
-                for i, (channel, inprivate, label) in enumerate(self._ATTEMPTS):
-                    browser = open_login_browser(p, channel, inprivate=inprivate)
-                    if browser is None:
-                        log.info("login: %s unavailable, skipping", label)
-                        continue
-                    opened_any = True
-                    last = (i == len(self._ATTEMPTS) - 1)
-                    ok = False
+                browser = launch_browser(p, headless=False)
+                ctx = browser.new_context()
+                page = ctx.new_page()
+                page.goto(URL)
+                self.q.put(("login_open", None))
+
+                # Wait for the user to finish (the "I've finished" button sets
+                # self.done) OR to close the whole browser window. Capture the
+                # session the instant a real TSMIS login appears, so closing the
+                # window AFTER signing in still saves it.
+                #
+                # ROBUSTNESS (this is what was broken): the SSO/MFA sign-in
+                # navigates, can open a popup, and may replace the original tab,
+                # and a single Playwright call can blip mid-redirect. So we must
+                # NOT treat one ctx.cookies() error -- nor the *original* tab
+                # closing -- as "the user gave up." The old code did, which slammed
+                # the window shut the instant a password went through and reported
+                # "cancelled." The only reliable "user closed the window" signal is
+                # that NO tabs remain open in the context (the SSO dance always
+                # keeps >= 1 tab), with a long all-calls-failing streak as a
+                # backstop for a truly dead connection.
+                captured = None
+                closed = False
+                blips = 0
+                while not self.done.wait(0.3):
                     try:
-                        ctx = browser.new_context()
-                        page = ctx.new_page()
-                        page.goto(URL)
-                        self.done.clear()                  # fresh wait for this attempt
-                        self.q.put(("login_open", None))
-                        self.q.put(("log", f"Sign-in window opened in {label}. "
-                                           "Finish signing in, then click "
-                                           "“I've finished logging in.”"))
-                        log.info("login: opened %s; waiting for the user to finish", label)
-
-                        # Dumb wait -- NO polling/page inspection during sign-in
-                        # (that's what made Edge relaunch). Just wait for the button.
-                        while not self.done.wait(0.2):
-                            pass
-
-                        if self.cancel.is_set():
-                            self.q.put(("cancelled", None))
-                            log.info("login: cancelled by user")
-                            return
-
-                        # One post-sign-in check (safe: any relaunch already
-                        # happened during the SSO, before the user clicked finish).
-                        # If this browser survived and is logged in, save it.
+                        ctx.cookies()                       # pump Playwright events
+                        blips = 0
+                    except Exception:
+                        blips += 1          # transient mid-redirect blip, or gone -- decided below
+                    try:
+                        open_pages = [pg for pg in ctx.pages if not pg.is_closed()]
+                    except Exception:
+                        open_pages = None   # context momentarily unavailable; re-check next tick
+                    if (open_pages is not None and len(open_pages) == 0) or blips >= 20:
+                        closed = True       # every tab gone (or ~6s unreachable) -> window closed
+                        break
+                    if captured is None:
                         try:
                             if self._any_logged_in(ctx):
-                                self._save_state(ctx.storage_state())
-                                ok = True
-                        except Exception as e:
-                            log.info("login: %s context unusable (%s) -- likely relaunched",
-                                     label, type(e).__name__)
-                    finally:
-                        self._safe_close(browser)
+                                captured = ctx.storage_state()
+                        except Exception:
+                            pass            # mid-navigation; retry on the next tick
 
-                    if ok:
-                        self.q.put(("login_saved", None))
-                        log.info("login: SAVED via %s", label)
-                        return
-                    if not last:
-                        self.q.put(("log", f"{label} didn't complete the sign-in (managed Edge "
-                                           "likely relaunched itself). Opening the next browser "
-                                           "— please sign in again."))
-                        log.info("login: %s captured nothing; trying next browser", label)
-                    else:
-                        self.q.put(("login_failed", None))
-                        log.info("login: failed (no browser captured a login)")
-                        return
+                if closed:
+                    self.q.put(("log", "Login window closed — checking your sign-in…"))
 
-                if not opened_any:
-                    self.q.put(("error", ("general",
-                        "Couldn't open a browser for sign-in. Please install Google Chrome "
-                        "(or Microsoft Edge), then try again.")))
+                if self.cancel.is_set():
+                    self._safe_close(browser)
+                    self.q.put(("cancelled", None))
+                    return
+
+                # "I've finished" clicked with the window still open -> last capture.
+                if not closed:
+                    try:
+                        if self._any_logged_in(ctx):
+                            captured = ctx.storage_state()
+                    except Exception:
+                        pass
+                self._safe_close(browser)
+
+                if captured:                                # a real login -> save it
+                    self._save_state(captured)
+                    self.q.put(("login_saved", None))
+                elif closed:                                # closed the window, never signed in
+                    self.q.put(("cancelled", None))         # -> just cancel (no window to reopen)
+                else:                                       # clicked "finished" without signing in
+                    self.q.put(("login_failed", None))
+        except BrowserNotFoundError as e:
+            self.q.put(("error", ("general", str(e))))
         except Exception as e:
-            logging.getLogger("tsmis.login").exception("login worker crashed")
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
 
     @staticmethod
     def _any_logged_in(ctx):
         """True if ANY page in the context is the logged-in TSMIS report page
-        (SSO can land it in a popup / new tab, not the original page)."""
+        (SSO sometimes lands it in a popup / new tab, not the original page)."""
         for pg in ctx.pages:
             try:
                 if is_logged_in(pg):
