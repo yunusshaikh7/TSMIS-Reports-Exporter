@@ -534,35 +534,21 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 - `scripts/login.py` writes the auth file via `ctx.storage_state(path=...)`
   (path from `paths.AUTH`).
-- **Login is validated before it's saved** (both the GUI `LoginWorker` and the
-  console `login.py`): the session is only written if a real TSMIS login is
-  detected (`is_logged_in` on any page in the context — SSO can land the report
-  in a popup). This kills two old footguns: clicking "I've finished logging in"
-  *without* signing in no longer saves a junk session + reports "ready". The GUI
-  worker also **watches the login window closing**, but the close signal must
-  survive the SSO/MFA dance — which navigates, can open a popup, and may replace
-  the original tab. So it does **not** treat the *original* page closing, a
-  `browser.is_connected()` blip, or a single transient `ctx.cookies()` error as
-  "closed" (an earlier version did, and that slammed the window shut the instant a
-  password went through, reporting a false **cancelled**). The reliable signal is
-  **no open tabs remain in the context**, and only after a **debounce** (a few
-  consecutive no-tab ticks) so a brief gap during the redirect isn't a false
-  close, with a long all-calls-failing streak as a backstop for a truly dead
-  connection. Because the session is captured the *instant* a login is detected
-  (`is_logged_in` on any page — SSO can land it in a popup), closing the window
-  after signing in still saves it; closing it *without* signing in resolves to
-  **cancelled** (the GUI never hangs on "Waiting…"), while clicking "I've finished"
-  without a login reports `login_failed`. On any non-save outcome no file is
-  written, so a previously-valid session is preserved.
-- **Edge-specific:** Microsoft Edge can relaunch itself through a "compatibility
-  layer", and the relaunched process isn't the one Playwright drives — its context
-  silently disconnects, which looks exactly like the login window closing the
-  moment SSO completes (Chrome has no such relaunch). The headed login launch
-  passes **`--edge-skip-compat-layer-relaunch`** (`common._channel_launch_kwargs`,
-  Edge + headed only, so the headless export path is untouched). `LoginWorker`
-  also writes **token-free diagnostics** to `LOG_DIR/tsmis.log` (tab-count
-  changes, capture, disconnect, the close decision) so an Edge login failure is
-  debuggable from the user's `Logs`.
+- **The GUI login is deliberately a "dumb wait."** `LoginWorker` opens the headed
+  browser, then does **nothing** but wait for the user to click "I've finished
+  logging in" (or Cancel); on the click it saves `ctx.storage_state()` once. It
+  does **not** poll, inspect pages, or watch for the window closing during
+  sign-in. *Why this matters:* an earlier version polled the page each tick
+  (`ctx.cookies()` / `is_logged_in` / close-watching) to auto-save when the window
+  was closed — but **poking the page during the SSO/MFA redirects made Microsoft
+  Edge relaunch itself and disconnect**, slamming the login window shut the moment
+  sign-in completed (Edge-only — Chrome was unaffected). Not touching the page
+  until the user is done is what keeps Edge working, so **do not reintroduce
+  mid-login polling/inspection in `LoginWorker`.** The console `login.py` follows
+  the same shape (it waits on Enter, then checks once). Trade-off: the GUI no
+  longer auto-saves on a bare window-close, and a save isn't gated on a login
+  check — if a user clicks "I've finished" without signing in, a junk session is
+  written and the next export fails with `AuthError` (re-login fixes it).
 - The engine calls `require_valid_auth()` first — it checks the file exists, is
   valid JSON, **and is shaped like a Playwright storage_state** (`cookies`/
   `origins` lists). That last check matters: a valid-JSON-but-not-storage_state

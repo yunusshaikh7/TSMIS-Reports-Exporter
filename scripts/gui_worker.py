@@ -172,91 +172,36 @@ class LoginWorker(threading.Thread):
         log = logging.getLogger("tsmis.login")
         try:
             with sync_playwright() as p:
-                browser = launch_browser(p, headless=False)   # Edge headed gets --edge-skip-compat-layer-relaunch
-                intentional = {"closing": False}
-                browser.on("disconnected", lambda *_: (
-                    None if intentional["closing"]
-                    else log.warning("login: browser DISCONNECTED unexpectedly "
-                                     "(Edge compat-layer relaunch / crash?)")))
-                ctx = browser.new_context()
-                page = ctx.new_page()
-                page.goto(URL)
-                self.q.put(("login_open", None))
-                log.info("login: window opened")
+                browser = launch_browser(p, headless=False)   # system Edge/Chrome, headed
+                try:
+                    ctx = browser.new_context()
+                    page = ctx.new_page()
+                    page.goto(URL)
+                    self.q.put(("login_open", None))
+                    log.info("login: window opened; waiting for the user to finish")
 
-                # Capture the saved session the INSTANT a real TSMIS login appears
-                # on ANY page (SSO can land it in a popup), so a window that closes
-                # right after sign-in is still saved.
-                captured = {"state": None}
+                    # Simple, proven flow: just WAIT for the user to click "I've
+                    # finished logging in" (or Cancel), then save. We deliberately
+                    # do NO polling / page inspection while they sign in. Poking the
+                    # page during the SSO/MFA redirects (the old close-watcher's
+                    # per-tick ctx.cookies()/page checks) made Microsoft Edge
+                    # relaunch itself and disconnect, closing the login window the
+                    # moment sign-in completed (Edge-only; Chrome was unaffected).
+                    # Not touching the page during sign-in is what keeps Edge happy.
+                    while not self.done.wait(0.2):
+                        pass
 
-                def try_capture(why):
-                    if captured["state"] is None:
-                        try:
-                            if self._any_logged_in(ctx):
-                                captured["state"] = ctx.storage_state()
-                                log.info("login: session captured (%s)", why)
-                        except Exception:
-                            pass            # mid-navigation; try again next tick
-
-                # Decide "the user closed the window" with DEBOUNCE. Edge's SSO
-                # flow navigates, can open a popup, and can briefly drop to zero
-                # controllable tabs (or relaunch itself); a SINGLE such blip must
-                # NOT be read as a close -- that was the bug that tore the window
-                # down the instant a password went through. Only a SUSTAINED
-                # no-tabs (or a sustained dead connection) counts. Detailed,
-                # token-free logging goes to the rotating log so an Edge failure is
-                # diagnosable from data\logs\tsmis.log.
-                closed = False
-                empties = 0          # consecutive ticks with zero open tabs
-                dead = 0             # consecutive ticks the context is unreachable
-                last_n = "?"
-                while not self.done.wait(0.25):
-                    reachable = True
-                    try:
-                        ctx.cookies()                       # pump Playwright events
-                    except Exception:
-                        reachable = False
-                    try:
-                        open_pages = [pg for pg in ctx.pages if not pg.is_closed()]
-                    except Exception:
-                        open_pages = None
-                    n = "gone" if open_pages is None else len(open_pages)
-                    if n != last_n:                         # log only on change (no spam)
-                        log.info("login: tabs=%s reachable=%s captured=%s",
-                                 n, reachable, captured["state"] is not None)
-                        last_n = n
-                    try_capture("poll")
-                    empties = empties + 1 if (open_pages is not None and len(open_pages) == 0) else 0
-                    dead = dead + 1 if (not reachable and open_pages is None) else 0
-                    if empties >= 4 or dead >= 40:          # ~1s with no tabs, or ~10s dead
-                        closed = True
-                        log.info("login: concluding closed (empties=%d dead=%d captured=%s)",
-                                 empties, dead, captured["state"] is not None)
-                        break
-
-                if closed:
-                    self.q.put(("log", "Login window closed — checking your sign-in…"))
-                if self.cancel.is_set():
-                    intentional["closing"] = True
+                    if self.cancel.is_set():
+                        self.q.put(("cancelled", None))
+                        log.info("login: cancelled by user")
+                    else:
+                        # Save whatever session the context now holds. (One capture,
+                        # after the user says they're done -- no mid-login probing.)
+                        self._save_state(ctx.storage_state())
+                        self.q.put(("login_saved", None))
+                        log.info("login: session saved")
+                finally:
                     self._safe_close(browser)
-                    self.q.put(("cancelled", None))
-                    log.info("login: cancelled by user")
-                    return
-
-                try_capture("final")        # "I've finished" clicked, or one last attempt
-                intentional["closing"] = True
-                self._safe_close(browser)
-
-                if captured["state"]:                       # a real login -> save it
-                    self._save_state(captured["state"])
-                    self.q.put(("login_saved", None))
-                    log.info("login: SAVED")
-                elif closed:                                # window gone, never captured a login
-                    self.q.put(("cancelled", None))
-                    log.info("login: cancelled (window closed, no session captured)")
-                else:                                       # clicked "finished" without signing in
-                    self.q.put(("login_failed", None))
-                    log.info("login: failed (finished without a detected login)")
         except BrowserNotFoundError as e:
             self.q.put(("error", ("general", str(e))))
         except Exception as e:
