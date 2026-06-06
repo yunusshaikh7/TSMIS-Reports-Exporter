@@ -18,14 +18,16 @@ HOW TO RUN
 
 FIRST TIME (or whenever it shows "No saved login")
   1. Click  "Log in"  near the top.
-  2. A CHROME window opens for sign-in -- sign in with your @dot.ca.gov account
-     and complete MFA, until the TSMIS report page loads.
-     (Sign-in uses Chrome on purpose: managed Microsoft Edge relaunches itself
-     during the Caltrans login and can't be automated. Your reports still export
-     with Edge -- the saved sign-in works for both.)
-  3. Come back to the app and click  "I've finished logging in".  (Important:
-     click the button -- closing the window without clicking it won't save.)
-  The dot turns green when you're signed in. You only redo this when it expires.
+  2. A sign-in window opens -- sign in with your @dot.ca.gov account and complete
+     MFA, until the TSMIS report page loads.
+     (It opens Edge in InPrivate first; if managed Edge relaunches itself during
+     the Caltrans login, the app falls back to a Chrome window -- just sign in
+     there instead. Either way the saved sign-in works for Edge exports.)
+  3. Come back to the app and click  "I've finished logging in".
+     (If it fell back to Chrome, sign in there and click the button again.
+     Closing the window without clicking the button won't save.)
+  Your reports still EXPORT with Edge. The dot turns green when you're signed in;
+  you only redo this when it expires.
 
 EXPORT REPORTS
   On the Export tab:

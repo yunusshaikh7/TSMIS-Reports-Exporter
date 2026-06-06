@@ -495,33 +495,23 @@ def launch_browser(p, *, headless=True, **kwargs):
             ) from first_err
 
 
-def launch_login_browser(p, **kwargs):
-    """Launch a HEADED browser for the interactive sign-in, preferring Chrome.
+def open_login_browser(p, channel, inprivate=False):
+    """Open ONE specific browser channel, HEADED, for interactive sign-in.
 
-    Microsoft Edge, when managed by a Caltrans / Microsoft Entra org, relaunches
-    ITSELF into the work profile during the Azure AD sign-in -- which abandons the
-    Playwright-controlled window, so the captured session is empty (its context is
-    already closed by the time the user finishes; you get a TargetClosedError).
-    Google Chrome has no such relaunch, so sign-in is driven there. The saved
-    session is browser-agnostic, so the actual EXPORTS still run on the user's
-    chosen browser (Edge by default) -- only this one interactive step prefers
-    Chrome. Falls back to Edge if Chrome isn't installed (some Edge installs aren't
-    managed), and raises BrowserNotFoundError (UI-neutral) if neither can open.
-
-    Returns (browser, channel) so the caller can tell the user which one opened.
+    Returns the browser, or None if that channel isn't installed / can't launch
+    (the caller then tries the next one). Managed Microsoft Edge relaunches ITSELF
+    into the work profile during the Caltrans Azure AD sign-in, abandoning the
+    Playwright-driven window (TargetClosedError by the time the user finishes), so
+    the sign-in flow tries Edge with `inprivate=True` first -- InPrivate windows
+    are profile-less and MAY dodge that relaunch -- then falls back to Chrome,
+    which has no such relaunch. The captured session is browser-agnostic, so the
+    actual EXPORTS still run on the user's chosen browser (Edge by default).
     """
-    tried = []
-    for channel in ("chrome", "msedge"):
-        try:
-            browser = p.chromium.launch(headless=False, channel=channel, **kwargs)
-            return browser, channel
-        except Exception as e:
-            tried.append(f"{CHANNEL_LABELS.get(channel, channel)} ({type(e).__name__})")
-    raise BrowserNotFoundError(
-        "Couldn't open a browser for sign-in. Sign-in needs Google Chrome "
-        "(recommended -- Microsoft Edge relaunches itself during the Caltrans "
-        "login and can't be automated) or Microsoft Edge. Please install Google "
-        f"Chrome, then try again. (Tried: {', '.join(tried)}.)")
+    args = ["--inprivate"] if (inprivate and channel == "msedge") else []
+    try:
+        return p.chromium.launch(headless=False, channel=channel, args=args)
+    except Exception:
+        return None
 
 
 def check_browsers():

@@ -534,19 +534,22 @@ worker and leave headroom; requested counts are clamped to `[1, MAX_WORKERS]`.
 
 - `scripts/login.py` writes the auth file via `ctx.storage_state(path=...)`
   (path from `paths.AUTH`).
-- **Sign-in opens in Chrome (`common.launch_login_browser`), even though exports
-  default to Edge.** Managed Microsoft Edge relaunches *itself* into the work
-  profile during the Caltrans Azure AD sign-in, abandoning the Playwright-driven
-  window — by the time the user finishes, that context is already closed
-  (`TargetClosedError` on `storage_state`), so **Edge sign-in can't be automated
-  in this environment**, and no launch flag overrides it (verified: it fails even
-  with zero page interaction from us). Chrome has no such relaunch, so
-  `launch_login_browser` prefers Chrome, falling back to Edge only if Chrome isn't
-  installed. The saved session is **browser-agnostic**, so every **export** still
-  runs on the user's chosen browser (Edge by default) — only the interactive
-  sign-in prefers Chrome. The GUI logs which browser opened. (So: machines need
-  Chrome to sign in; or IT can disable Edge's "automatic profile switching" to let
-  Edge sign-in work.)
+- **Sign-in tries Edge InPrivate, then Chrome (`common.open_login_browser` +
+  the `_ATTEMPTS` list), even though exports default to Edge.** Managed Microsoft
+  Edge relaunches *itself* into the work profile during the Caltrans Azure AD
+  sign-in, abandoning the Playwright-driven window — by the time the user finishes,
+  that context is already closed (`TargetClosedError` on `storage_state`), even
+  with **zero** page interaction from us, and no launch flag overrides it. So the
+  login worker makes up to two attempts in order: **(1) Edge with `--inprivate`**
+  (InPrivate windows are profile-less and may dodge that relaunch), then **(2)
+  Chrome** (no relaunch). After the user clicks finish, one `is_logged_in` check
+  decides: if that browser survived and is logged in, save and stop; otherwise
+  close it and open the next, asking the user to sign in again. The saved session
+  is **browser-agnostic**, so every **export** still runs on the user's chosen
+  browser (Edge by default) — only the interactive sign-in varies. Both the GUI
+  `LoginWorker` and the console `login.py` share this order; the GUI logs which
+  browser opened. (Practical upshot: if Edge InPrivate dodges the relaunch you get
+  pure-Edge sign-in; if not, Chrome is the fallback, so machines need Chrome.)
 - **The login worker is a "dumb wait."** Both `LoginWorker` and the console
   `login.py` open the browser and then do **nothing** but wait for the user to
   finish ("I've finished logging in" / press Enter), then save
