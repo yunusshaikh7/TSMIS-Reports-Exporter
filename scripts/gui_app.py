@@ -113,15 +113,26 @@ class App(tk.Tk):
             w.state(["disabled"])
         self._sync_fast_controls()             # spinner follows the fast-mode checkbox
 
-        # Size to the laid-out content so EVERYTHING (incl. the log) shows at
-        # launch, and keep that as the floor so the weighted log row can't be
-        # squeezed to zero. Width is fixed (the footer path would otherwise force
-        # an absurdly wide window); height follows the content.
+        # Size to content, cap to the screen, and allow vertical shrink. Only the
+        # log row expands (row 3); fixed chrome must fit, the log absorbs shrink
+        # and scrolls. Width stays fixed (footer path would otherwise widen it).
         self.update_idletasks()
+        min_win_w = 620
         win_w = 680
-        win_h = self.winfo_reqheight()
-        self.geometry(f"{win_w}x{win_h}")
-        self.minsize(620, win_h)
+        content_h = self.winfo_reqheight()
+        log_frame_h = self.log_widget.master.winfo_reqheight()
+        fixed_h = content_h - log_frame_h
+        min_win_h = fixed_h + 72          # fixed chrome + a short log strip
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        margin = 48
+        win_w = min(win_w, max(min_win_w, screen_w - margin))
+        win_h = min(content_h, max(min_win_h, screen_h - margin))
+        x = max(0, (screen_w - win_w) // 2)
+        y = max(0, (screen_h - win_h) // 2)
+        self.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        self.minsize(min_win_w, min(min_win_h, win_h))
+        self.resizable(True, True)
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.refresh_auth()
