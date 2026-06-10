@@ -12,8 +12,16 @@ if errorlevel 1 (
     exit /b 1
 )
 echo.
-echo This tool uses the Microsoft Edge (or Chrome) already installed on this PC,
-echo so there is no browser to download.
+echo Downloading the built-in Chromium browser. It becomes the default for
+echo sign-in and exports; the Microsoft Edge / Google Chrome already on this
+echo PC stay available as fallbacks.
+python -m playwright install chromium --no-shell
+if errorlevel 1 (
+    echo.
+    echo WARNING: the Chromium download failed. The tool still works using the
+    echo Microsoft Edge or Google Chrome already installed on this PC. Re-run
+    echo this setup later to add the built-in Chromium.
+)
 echo.
 echo Setup complete. You can now run "2. login (update login).bat".
 pause

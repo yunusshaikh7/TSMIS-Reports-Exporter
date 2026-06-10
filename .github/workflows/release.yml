@@ -1,0 +1,77 @@
+name: release
+
+# Builds the three Windows release variants and publishes them as a GitHub
+# release whenever a version tag (v*) is pushed. The -SelfTest builds run first
+# as the release gate: each builds AND runs the frozen smoke test (browser
+# launch + page.pdf + download, pdfplumber, openpyxl, GUI construction) over
+# the pruned bundle — once against the runner's system Edge/Chrome and once
+# against the bundled Chromium — so a broken bundle can never ship.
+#
+# Variants published:
+#   *-win64.zip               portable app; drives the machine's installed Edge/Chrome
+#   *-win64-with-browser.zip  portable app + its own Built-in Chromium (the default
+#                             channel; Edge/Chrome stay in the dropdown)
+#   *-batch-source.zip        the .bat console flow (requires Python; setup
+#                             downloads the libraries + Chromium)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.5.0); created at the chosen ref if it doesn't exist"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      # Tag push: the pushed tag. Manual dispatch: the typed tag (gh release
+      # create makes the tag at this commit if it doesn't exist yet).
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build + run frozen self-test, system browser (release gate)
+        run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
+
+      - name: Build + run frozen self-test, bundled Chromium (release gate)
+        run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest -BundleChromium
+
+      - name: Build the windowed app (system browser)
+        run: powershell -ExecutionPolicy Bypass -File build\build.ps1
+
+      - name: Zip the system-browser variant
+        run: Compress-Archive -Path "dist\TSMIS Exporter" -DestinationPath "TSMIS-Exporter-$env:TAG-win64.zip"
+
+      - name: Build the windowed app (bundled Chromium)
+        run: |
+          Remove-Item -Recurse -Force "dist\TSMIS Exporter"
+          powershell -ExecutionPolicy Bypass -File build\build.ps1 -BundleChromium
+
+      - name: Zip the bundled-Chromium variant
+        run: Compress-Archive -Path "dist\TSMIS Exporter" -DestinationPath "TSMIS-Exporter-$env:TAG-win64-with-browser.zip"
+
+      - name: Zip the batch/source variant
+        run: git archive --format=zip --prefix="TSMIS-Exporter-batch/" -o "TSMIS-Exporter-$env:TAG-batch-source.zip" HEAD
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$env:TAG"
+          "TSMIS-Exporter-$env:TAG-win64.zip"
+          "TSMIS-Exporter-$env:TAG-win64-with-browser.zip"
+          "TSMIS-Exporter-$env:TAG-batch-source.zip"
+          --target "${{ github.sha }}"
+          --title "TSMIS Exporter $env:TAG"
+          --notes-file build/release_notes.md

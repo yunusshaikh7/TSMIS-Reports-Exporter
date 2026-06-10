@@ -2,7 +2,7 @@
 
 > Bulk-export Caltrans TSMIS reports for every California state route — from a single click.
 
-[![Version](https://img.shields.io/badge/version-0.4.1-blue)](version.py)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue)](version.py)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](#)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](#)
 [![Automation](https://img.shields.io/badge/automation-Playwright-2EAD33?logo=microsoftedge&logoColor=white)](#)
@@ -14,10 +14,12 @@ California state route. Pick the report types you want, sign in once, and the
 tool walks every route for you — no copy-pasting route numbers, no babysitting
 the browser.
 
-It drives the copy of **Microsoft Edge or Google Chrome already on the machine**
-(nothing extra to install) and is distributed as a single zip: unzip, double-click,
-done. The same engine also runs from a set of `.bat` scripts for development and
-as a fallback.
+It is distributed as a single zip — unzip, double-click, done — in two flavors:
+the standard build drives the **Microsoft Edge or Google Chrome already on the
+machine** (nothing extra to install), and a *with-browser* build ships its own
+**Built-in Chromium** and uses it by default (Edge/Chrome stay selectable) for
+PCs where managed browsers get in the way. The same engine also runs from a set
+of `.bat` scripts for development and as a fallback.
 
 ---
 
@@ -53,8 +55,10 @@ as a fallback.
 - **Run reports.** Every run records a per-route outcome CSV (saved / empty /
   skipped / failed).
 - **Optional fast mode.** Run several browsers in parallel for a 2.5–3×+ speedup.
-- **No browser bundled.** Uses the machine's installed Edge/Chrome, keeping the
-  download small (~148 MB) and the security surface minimal.
+- **Browser, your way.** The standard download uses the machine's installed
+  Edge/Chrome, keeping it small (~148 MB); the with-browser download adds a
+  Built-in Chromium that works even where org-managed browsers interfere. A
+  header dropdown switches between whatever is available.
 
 ## Supported reports
 
@@ -71,11 +75,18 @@ as a fallback.
 
 ## Getting started (end users)
 
-> **Requirements:** Windows 10/11 with **Microsoft Edge or Google Chrome**
-> installed, and TSMIS credentials. No Python or other setup needed.
+> **Requirements:** Windows 10/11 and TSMIS credentials. No Python or other
+> setup needed. The standard download also needs **Microsoft Edge or Google
+> Chrome** installed; the with-browser download brings its own.
 
-1. **Download** the latest `TSMIS Exporter.zip` from the
-   [Releases page](https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases).
+1. **Download** the variant that fits from the
+   [Releases page](https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases):
+   - `…-win64.zip` — standard; uses the Edge/Chrome already on the PC (smallest).
+   - `…-win64-with-browser.zip` — ships its own Built-in Chromium and uses it by
+     default (best on managed PCs where Edge sign-in misbehaves and Chrome
+     isn't installed); Edge/Chrome remain in the header dropdown.
+   - `…-batch-source.zip` — the console/`.bat` flow for developers (see
+     [Developer setup](#developer-setup)).
 2. **Unblock it** before extracting: right-click the zip → **Properties** →
    tick **Unblock** → **OK**. (It's an unsigned app, so Windows marks downloads
    as untrusted — see [Known limitations](#known-limitations).)
@@ -119,16 +130,17 @@ equivalents directly (Python 3.11):
 
 | Step | `.bat` | Equivalent |
 |---|---|---|
-| Install deps | `1. setup (one time).bat` | `pip install -r requirements.txt` |
+| Install deps | `1. setup (one time).bat` | `pip install -r requirements.txt` + `playwright install chromium --no-shell` |
 | Sign in | `2. login (update login).bat` | `python scripts/login.py` |
 | Export | `3. run_export (main script).bat` | `python scripts/export_multi.py` |
 | Consolidate | `4. consolidate (combine reports).bat` | `python scripts/consolidate_*.py` |
 | Fast export | `5. fast export (experimental).bat` | set `TSMIS_FAST_WORKERS`, then export |
 | GUI (dev) | `run app (GUI preview).bat` | `python scripts/gui_main.py` |
 
-No browser download is needed — the tool uses the system Edge/Chrome. There are
-no automated tests; verification is a live export against TSMIS (requires login)
-or running a consolidator over existing per-route files.
+Setup downloads a Built-in Chromium that becomes the default browser; if that
+download is skipped or fails, the tool falls back to the system Edge/Chrome.
+There are no automated tests; verification is a live export against TSMIS
+(requires login) or running a consolidator over existing per-route files.
 
 ## Building the app
 
@@ -142,13 +154,19 @@ This creates an isolated build venv, runs PyInstaller (onefolder, windowed), and
 prunes the bundle to runtime-only files. The result is `dist\TSMIS Exporter\`
 (~148 MB) — zip it to distribute.
 
-Add `-SelfTest` to build and run a headless self-test that verifies the frozen
-bundle (system-browser PDF + download, PDF parsing, Excel, GUI) — a real release
-gate, not just "it compiled":
+Add `-BundleChromium` to build the with-browser variant (downloads Playwright's
+Chromium into the bundle, which then defaults to it). Add `-SelfTest` to build
+and run a headless self-test that verifies the frozen bundle (browser PDF +
+download, PDF parsing, Excel, GUI) — a real release gate, not just "it
+compiled":
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
 ```
+
+**Releases** are built and published by CI: push a `v*` tag (or run the
+`release` workflow manually) and `.github/workflows/release.yml` gates both
+variants with the frozen self-test, then publishes all three zips.
 
 See [`CLAUDE.md`](CLAUDE.md) for build internals, bundle hygiene, and the DLP guard.
 
@@ -177,7 +195,7 @@ multi-report selector, so the two never drift. For the full design — the
 
 - **Python 3.11** (standard library + three runtime deps)
 - **[Playwright](https://playwright.dev/python/)** — browser automation, driving
-  the system Edge/Chrome (no bundled browser)
+  the system Edge/Chrome or the optional Built-in Chromium
 - **[pdfplumber](https://github.com/jsvine/pdfplumber)** — PDF parsing (consolidation)
 - **[openpyxl](https://openpyxl.readthedocs.io/)** — Excel writing (consolidation)
 - **Tkinter** — desktop GUI
@@ -185,16 +203,12 @@ multi-report selector, so the two never drift. For the full design — the
 
 ## Known limitations
 
-- **Microsoft Edge sign-in is currently broken in managed Caltrans environments.**
-  Managed Edge relaunches into the work profile mid-sign-in, which closes the
-  automated window before the session can be saved. **Use Google Chrome to sign
-  in** — the saved session is browser-agnostic, so exports still run on Edge. A
-  proper fix is tracked in [`CLAUDE.md`](CLAUDE.md).
 - **The app is unsigned.** Windows SmartScreen / Defender and corporate DLP may
   flag it on first run. Unblock the zip before extracting (Properties → Unblock)
   and choose **More info → Run anyway**. Code-signing is the planned fix.
-- **A browser must be installed.** The tool needs Edge or Chrome on the machine;
-  it does not bundle one.
+- **The standard build needs a browser installed.** It drives the machine's Edge
+  or Chrome and does not bundle one — use the *with-browser* download for
+  machines where that's a problem.
 
 ## Contributing
 

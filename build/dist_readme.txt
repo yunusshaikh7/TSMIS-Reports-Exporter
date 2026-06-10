@@ -13,8 +13,10 @@ HOW TO RUN
   Double-click  "TSMIS Exporter.exe"  in this folder.
   Keep this whole folder together -- the app needs the "_internal" folder next
   to the .exe. Don't move the .exe out on its own.
-  It uses the Microsoft Edge (or Chrome) already installed on this PC. Nothing
-  to download; you don't need Python.
+  Nothing to install; you don't need Python. The standard download uses the
+  Microsoft Edge (or Chrome) already installed on this PC; the "with-browser"
+  download includes its own Built-in Chromium and uses that by default. The
+  Browser dropdown in the app's header shows what's available on your copy.
 
 FIRST TIME (or whenever it shows "No saved login")
   1. Click  "Log in"  near the top.
@@ -54,7 +56,8 @@ GOOD TO KNOW
     (Code-signing the .exe is the permanent fix; ask the maintainer.)
   * If you received this as a .zip, right-click the zip -> Properties -> tick
     "Unblock" -> OK, BEFORE extracting it. This also helps with IT/Defender.
-  * Browser: the header lets you pick Edge or Chrome and shows green/red dots for
-    what's ready. "Re-check" re-runs those checks.
+  * Browser: the header lets you pick which browser to use (Built-in Chromium
+    when included, plus Edge or Chrome) and shows green/red dots for what's
+    ready. "Re-check" re-runs those checks.
   * Logs are under  "data\logs"  (or click "Logs" in the app). Include them if
     you report a problem.
