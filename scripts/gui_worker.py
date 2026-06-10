@@ -194,10 +194,10 @@ class LoginWorker(threading.Thread):
                     self._run_standard_login(p, log)
                     return
 
-                # Silent first: on managed Caltrans PCs a fresh headless Edge
-                # context signs itself in via Windows device auth -- no window,
-                # no typing. Skipped when the user explicitly picked a
-                # non-Edge browser.
+                # Silent first: on managed Caltrans PCs the persistent Edge
+                # sign-in profile signs itself in via the one-click Windows
+                # sign-in -- no window, no typing. Skipped when the user
+                # explicitly picked a non-Edge browser.
                 if pref in (None, "msedge"):
                     self.q.put(("log", "Trying automatic sign-in (Microsoft Edge "
                                        "+ this PC's Windows account)..."))

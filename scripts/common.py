@@ -755,20 +755,75 @@ def _new_app_context(browser, storage_state=None):
         return browser.new_context(**kwargs)
 
 
+def open_edge_device_context(p, *, headless=True):
+    """Open the app-owned persistent Edge sign-in profile, logged in and ready.
+
+    The one-click Windows sign-in lives in the durable login profile
+    (EDGE_LOGIN_PROFILE_DIR, primed by the headed Edge login) -- a fresh
+    cookie-free Edge context does NOT get it. Managed Edge may have moved the
+    signed-in state into a work profile directory, so each known profile is
+    tried in turn: open it headless, navigate (the "Caltrans Azure AD" click
+    happens inside navigate_with_auth), and keep the first context that lands
+    logged in. A profile that was never primed -- or a PC without the silent
+    sign-in -- never reaches the report page, so this raises AuthError there.
+
+    Returns (ctx, page) with the context left OPEN; the caller owns closing it
+    (ctx.close() shuts the whole persistent browser down). NOTE: a persistent
+    profile can only be open in ONE browser at a time -- callers must not hold
+    two of these concurrently.
+    """
+    EDGE_LOGIN_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    for profile_name in _known_edge_profile_names():
+        ctx = None
+        try:
+            launch_kwargs = dict(
+                channel="msedge",
+                headless=headless,
+                args=_LNA_ARGS + [f"--profile-directory={profile_name}"],
+            )
+            # Pre-grant local-network-access like every other automated
+            # context; retry without it for browsers that don't know the name.
+            try:
+                ctx = p.chromium.launch_persistent_context(
+                    str(EDGE_LOGIN_PROFILE_DIR),
+                    permissions=["local-network-access"],
+                    **launch_kwargs,
+                )
+            except Exception:
+                ctx = p.chromium.launch_persistent_context(
+                    str(EDGE_LOGIN_PROFILE_DIR), **launch_kwargs,
+                )
+            page = _first_or_new_page(ctx)
+            navigate_with_auth(page)
+            if is_logged_in(page):
+                return ctx, page
+        except Exception:
+            pass
+        if ctx is not None:
+            try:
+                ctx.close()
+            except Exception:
+                pass
+    raise AuthError(
+        "Automatic sign-in could not complete on this PC. Please log in."
+    )
+
+
 def new_authed_browser(p):
     """Launch a headless browser ready to drive TSMIS.
 
     With a valid saved session, restores it into the user's preferred browser
     (the original flow). With NO usable saved session, runs in DEVICE SIGN-IN
-    mode instead: a fresh Microsoft Edge context with no cookies at all -- the
-    "Caltrans Azure AD" click in navigate_with_auth() then lets Windows device
-    auth sign the context in live, with no typed credentials. Edge is forced
-    there regardless of the channel preference because on managed Caltrans PCs
-    only Edge gets the silent Windows sign-in (Chrome asks for credentials).
-    A fresh cookie-free context matters too: stale Azure cookies make Azure AD
-    fall back to interactive prompts instead of attempting silent auth.
+    mode instead: it reopens the app-owned persistent Edge sign-in profile,
+    where the one-click Windows sign-in lives, and the "Caltrans Azure AD"
+    click signs the context in live with no typed credentials. Edge-only and
+    profile-bound by design: on managed Caltrans PCs Chrome asks for
+    credentials, and even a fresh Edge context without this profile doesn't
+    get the one-click sign-in.
 
-    Returns (browser, context, page). Caller is responsible for browser.close().
+    Returns (browser, context, page). Caller is responsible for browser.close()
+    -- in device mode the persistent context doubles as the browser handle, and
+    its .close() shuts the persistent browser down.
     """
     state = None
     try:
@@ -778,47 +833,35 @@ def new_authed_browser(p):
         state = None
 
     if state is None:
-        try:
-            browser = p.chromium.launch(headless=True, channel="msedge", args=_LNA_ARGS)
-        except Exception as e:
-            raise AuthError(
-                "No saved session, and Microsoft Edge isn't available for "
-                "automatic sign-in. Please log in."
-            ) from e
-    else:
-        browser = launch_browser(p, headless=True, args=_LNA_ARGS)
+        ctx, page = open_edge_device_context(p)   # raises AuthError if it can't sign in
+        return ctx, ctx, page
+
+    browser = launch_browser(p, headless=True, args=_LNA_ARGS)
     ctx = _new_app_context(browser, storage_state=state)
     page = ctx.new_page()
     return browser, ctx, page
 
 
 def try_device_sso_login(p):
-    """Attempt a fully silent TSMIS sign-in with NO saved session, in Edge.
+    """Attempt a fully silent TSMIS sign-in and capture its storage_state.
 
-    Opens a fresh headless Microsoft Edge context (no cookies -- stale Azure
-    cookies make Azure AD prompt interactively instead of trying silent auth),
-    lets the page redirect to the portal sign-in, and clicks "Caltrans Azure
-    AD" via the same navigate_with_auth() the engine uses. On managed Caltrans
-    PCs Windows device auth answers the Azure AD challenge, so the context
-    lands logged in with no typed credentials. Edge-only by design: Chrome
-    doesn't get the silent sign-in there. Anywhere else Azure AD wants
-    interactive input, which never completes headless -- returns None after
-    the wait. Returns a storage_state dict, or None."""
-    browser = None
+    Uses the app-owned persistent Edge profile (open_edge_device_context),
+    where the one-click Windows sign-in lives -- no window, no typing.
+    Edge-only by design: Chrome never gets the silent sign-in there. Returns
+    the captured storage_state dict, or None when silent sign-in isn't
+    available (callers fall back to a headed login window). NOTE: captures
+    from this profile are often device-bound -- callers must check
+    storage_state_is_portable before saving one."""
+    ctx = None
     try:
-        browser = p.chromium.launch(headless=True, channel="msedge", args=_LNA_ARGS)
-        ctx = _new_app_context(browser)
-        page = ctx.new_page()
-        navigate_with_auth(page)
-        if is_logged_in(page):
-            return ctx.storage_state()
-        return None
+        ctx, _page = open_edge_device_context(p)
+        return ctx.storage_state()
     except Exception:
         return None
     finally:
-        if browser is not None:
+        if ctx is not None:
             try:
-                browser.close()
+                ctx.close()
             except Exception:
                 pass
 

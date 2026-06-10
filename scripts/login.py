@@ -79,8 +79,9 @@ def _run_login():
             _run_standard_login(p)
             return
 
-        # Silent first: on managed Caltrans PCs a fresh headless Edge context
-        # signs itself in via Windows device auth -- no window, no typing.
+        # Silent first: on managed Caltrans PCs the persistent Edge sign-in
+        # profile signs itself in via the one-click Windows sign-in -- no
+        # window, no typing.
         if pref in (None, "msedge"):
             print()
             print("Trying automatic sign-in (Microsoft Edge + this PC's Windows account)...")

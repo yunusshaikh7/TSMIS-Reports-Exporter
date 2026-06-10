@@ -294,9 +294,10 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     """
     events = events or Events()
     # No saved session is no longer fatal: new_authed_browser falls back to
-    # DEVICE SIGN-IN mode (fresh Edge context; the Azure AD click during
-    # navigate_with_auth lets Windows sign it in live on managed Caltrans PCs).
-    # If neither works, the is_logged_in gate after navigation raises AuthError.
+    # DEVICE SIGN-IN mode (it reopens the persistent Edge sign-in profile,
+    # where the one-click Windows sign-in lives, and the Azure AD click signs
+    # it in live on managed Caltrans PCs). If that can't sign in either, it
+    # raises AuthError.
     if not has_valid_auth():
         events.on_log("No saved session - will try signing in automatically "
                       "using this PC's work account (Microsoft Edge).")

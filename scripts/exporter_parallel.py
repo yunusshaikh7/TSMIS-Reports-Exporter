@@ -158,13 +158,17 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     """
     events = events or Events()
     n = resolve_worker_count(workers)
-    # No saved session is no longer fatal: each browser's new_authed_browser
-    # falls back to DEVICE SIGN-IN mode (fresh Edge context signed in live by
-    # Windows on managed Caltrans PCs). _preflight_once proves it works before
-    # N browsers launch.
+    # No saved session is no longer fatal: new_authed_browser falls back to
+    # DEVICE SIGN-IN mode (the persistent Edge sign-in profile, signed in live
+    # by Windows on managed Caltrans PCs). That profile can only be open in ONE
+    # browser at a time, so device mode caps fast mode to a single worker.
     if not has_valid_auth():
         events.on_log("No saved session - will try signing in automatically "
                       "using this PC's work account (Microsoft Edge).")
+        if n > 1:
+            events.on_log("Automatic sign-in supports one browser at a time - "
+                          "running with 1 browser. Save a login to use fast mode.")
+            n = 1
     timeout_ms = timeout_ms or FAST_REPORT_TIMEOUT_MS
     retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
 
