@@ -71,6 +71,7 @@ class App(tk.Tk):
         self.q = Queue()
         self.task = None                       # None | "export" | "consolidate" | "login"
         self._authed = False
+        self._device_ok = False    # silent device sign-in proven to work (no file needed)
         self.cancel_event = threading.Event()
         self.skip_event = threading.Event()
         self.login_done = threading.Event()
@@ -507,7 +508,12 @@ class App(tk.Tk):
             self.set_dot("ok", "Session ready")
         except AuthError:
             self._authed = False
-            self.set_dot("bad", "No saved login — click Log in")
+            if self._device_ok:
+                # No saved file, but this PC signs exports in by itself
+                # (device sign-in mode) -- that's a ready state, not a problem.
+                self.set_dot("ok", "Automatic sign-in ready (no saved login needed)")
+            else:
+                self.set_dot("bad", "No saved login — click Log in")
         self.btn_login.config(text=self._login_label())
 
     # ---- startup readiness checks -------------------------------------------
@@ -597,9 +603,19 @@ class App(tk.Tk):
     # ---- actions ------------------------------------------------------------
 
     def start_export(self):
-        if not self._authed:
-            messagebox.showinfo("Login needed", "Please log in first, then start the export.")
-            return
+        if not self._authed and not self._device_ok:
+            # No saved login -- but the engine can sign itself in on managed
+            # Caltrans PCs (device sign-in mode), so offer to try rather than
+            # hard-blocking on the Log in button.
+            if not messagebox.askyesno(
+                    "No saved login",
+                    "There's no saved login yet.\n\n"
+                    "Start the export anyway? On Caltrans PCs it can sign in "
+                    "automatically using Microsoft Edge and this PC's Windows "
+                    "account.\n\n"
+                    "(If automatic sign-in isn't available, the export will stop "
+                    "and ask you to log in.)"):
+                return
         specs = [EXPORT_REPORTS[i][2] for i, v in enumerate(self.export_vars) if v.get()]
         if not specs:
             messagebox.showinfo("Pick a report", "Tick at least one report to export.")
@@ -669,10 +685,10 @@ class App(tk.Tk):
         self.login_cancel.clear()
         for w in self._inputs:
             w.state(["disabled"])
-        self.btn_login.config(text="Opening browser…")
-        self.set_dot("busy", "Opening browser…")
+        self.btn_login.config(text="Signing in…")
+        self.set_dot("busy", "Signing in…")
         self.task = "login"
-        self.log("Opening a browser window for sign-in…")
+        self.log("Starting sign-in…")
         LoginWorker(self.q, self.login_done, self.login_cancel).start()
 
     def finish_login(self):
@@ -765,6 +781,8 @@ class App(tk.Tk):
             self._on_login_open()
         elif kind == "login_saved":
             self._on_login_saved()
+        elif kind == "login_device_ok":
+            self._on_login_device_ok()
         elif kind == "login_failed":
             self._on_login_failed()
         elif kind == "check":
@@ -797,7 +815,7 @@ class App(tk.Tk):
         self.log("")
         if not results:
             self.log("No reports completed.")
-            self.set_dot("ok", "Session ready")
+            self.refresh_auth()
             self._end_task()
             return
         total_saved = total_failed = 0
@@ -816,7 +834,9 @@ class App(tk.Tk):
                 self.log(f"  Run report auto-saved: {result.report_path}")
         if len(results) > 1:
             self.log(f"All reports done — total saved {total_saved}, total failed {total_failed}.")
-        self.set_dot("ok", "Session ready")
+        if not self._authed:
+            self._device_ok = True       # the run signed itself in (device sign-in mode)
+        self.refresh_auth()
         self._end_task()
 
     def _finish_consolidate(self, result):
@@ -841,6 +861,15 @@ class App(tk.Tk):
 
     def _on_login_saved(self):
         self.log("Session saved.")
+        self.refresh_auth()
+        self._end_task()
+
+    def _on_login_device_ok(self):
+        # Silent device sign-in works, but the session is device-bound so no
+        # file was saved (and none is needed): each export signs itself in.
+        self._device_ok = True
+        self.log("This PC signs in automatically (Microsoft Edge + your Windows "
+                 "account). Nothing to save — exports will sign themselves in.")
         self.refresh_auth()
         self._end_task()
 

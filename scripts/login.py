@@ -21,7 +21,7 @@ from common import (
     AUTH, BROWSER_CHANNELS, URL, BrowserNotFoundError, is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
-    launch_edge_login_context, storage_state_is_portable,
+    launch_edge_login_context, storage_state_is_portable, try_device_sso_login,
 )
 
 
@@ -73,8 +73,35 @@ def _run_login():
         # experimental persistent-profile Edge flow with its Chrome fallback.
         pref = get_preferred_channel()
         if pref == "chrome":
+            # Explicit Chrome pick: the silent device sign-in never works in
+            # Chrome (it's an Edge/Windows integration), so go straight to the
+            # headed Chrome window.
             _run_standard_login(p)
             return
+
+        # Silent first: on managed Caltrans PCs a fresh headless Edge context
+        # signs itself in via Windows device auth -- no window, no typing.
+        if pref in (None, "msedge"):
+            print()
+            print("Trying automatic sign-in (Microsoft Edge + this PC's Windows account)...")
+            state = try_device_sso_login(p)
+            if state:
+                if storage_state_is_portable(p, state):
+                    _save_state(state)
+                    print()
+                    print(f"Session saved to {AUTH.name}  (automatic device sign-in)")
+                    print('  You can close this window and run "3. run_export (main script).bat"')
+                    input("Press Enter to exit...")
+                    return
+                # Signed in, but the cookies are device-bound. Do NOT save them
+                # (stale Azure stubs make later sign-ins prompt interactively).
+                print()
+                print("This PC signs in automatically, but that session can't be saved")
+                print("for reuse. That's fine: exports sign themselves in the same way,")
+                print('so you can run "3. run_export (main script).bat" directly.')
+                input("Press Enter to exit...")
+                return
+            print("Automatic sign-in isn't available here; opening a browser window...")
 
         if "chromium" in BROWSER_CHANNELS and pref in (None, "chromium"):
             browser = None

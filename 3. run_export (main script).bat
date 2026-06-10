@@ -1,23 +1,16 @@
 @echo off
 cd /d "%~dp0"
 
-REM Auth check — every export script reads scripts\tsmis_auth.json,
-REM which is created by "2. login (update login).bat".
+REM A saved session (scripts\tsmis_auth.json) is no longer required: without
+REM one, the export tries automatic sign-in using this PC's work account in
+REM Microsoft Edge (works on managed Caltrans PCs).
 if not exist "scripts\tsmis_auth.json" (
     echo.
-    echo ================================================================
-    echo  NO SAVED SESSION FOUND
-    echo ================================================================
-    echo.
-    echo  scripts\tsmis_auth.json is missing.
-    echo.
-    echo  Please run  "2. login (update login).bat"  first, then come
-    echo  back and run this file again.
-    echo.
-    echo ================================================================
+    echo  NOTE: no saved session found. The export will try automatic sign-in
+    echo  using this PC's work account in Microsoft Edge. If that does not
+    echo  work, run "2. login (update login).bat" first.
     echo.
     pause
-    exit /b 1
 )
 
 :menu
