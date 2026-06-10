@@ -53,9 +53,13 @@ retained as a development and fallback path, and runs the same core engine.
   - **`*-batch-source.zip`:** the `.bat` console flow; `1. setup…bat` pip-installs
     the libs **and** runs `playwright install chromium --no-shell`.
   The `chromium` channel only appears when a Playwright Chromium is actually
-  present (`common._chromium_available()`), so the default build's UI is
-  unchanged. `channel="chromium"` runs the full browser in new-headless mode —
-  one binary for headed sign-in and headless exports (no headless shell needed).
+  present (`common._chromium_available()`): for **packaged** builds that means
+  the bundle's own `_internal\ms-playwright` (or an explicit
+  `PLAYWRIGHT_BROWSERS_PATH`) — the machine's global Playwright cache is
+  deliberately ignored so the default build always defaults to Edge even on a
+  dev PC; dev/`.bat` runs use the default cache (where setup downloads it).
+  `channel="chromium"` runs the full browser in new-headless mode — one binary
+  for headed sign-in and headless exports (no headless shell needed).
 - **Data location (option A):** the packaged app writes `output/`, auth token,
   logs, and config **next to the `.exe`**, falling back to
   `%LOCALAPPDATA%\TSMIS Exporter` if read-only. See `scripts/paths.py`.
@@ -221,7 +225,10 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 
 ## Auth / Session
 
-- **Sign-in browser order** (`login.py` console / `gui_worker.LoginWorker`):
+- **Sign-in browser order** (`login.py` console / `gui_worker.LoginWorker`)
+  honors the user's pick first (`get_preferred_channel()` — the GUI Browser
+  dropdown / `TSMIS_BROWSER_CHANNEL`; picking Chrome goes straight to Chrome).
+  With no pick:
   1. **Built-in Chromium** when present — a normal headed sign-in; unmanaged, so
      org policy can't kill the window.
   2. **Persistent-profile Edge recapture** — Edge opens on the app-owned
@@ -230,6 +237,14 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
      managed Edge), else `capture_edge_login_state_from_profiles` (reopen the
      profile tree headless and read the session off disk).
   3. **Chrome fallback**, then any `launch_browser`-resolvable browser.
+- **Edge captures are portability-validated before saving**
+  (`common.storage_state_is_portable`): the state is restored into a fresh
+  headless context and must actually log in, exactly as the engine will use it.
+  Managed Edge work profiles can sign in via the Windows device broker (PRT) —
+  `amr: ["wia"]`, an `ESTSAUTH` stub with no payload — leaving cookies that look
+  captured but can't log in anywhere else; such captures are rejected with a
+  clear message and the flow falls back to another browser instead of saving a
+  dud auth file.
 - The auth file is written only **after** a real login is detected
   (`is_logged_in` on any page — SSO can land in a popup). The GUI `LoginWorker`
   also watches the window closing, but the reliable signal is **no open tabs
@@ -358,6 +373,7 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | One report's output wrong | That report's selector changed | Edit only its `ReportSpec` |
 | "page looks different than expected" | Preflight failed — site changed | Check `LOG_DIR`/`FAILURES_DIR`; update selectors |
 | `BrowserNotFoundError` | No usable browser found | Install Edge, re-run `1. setup…bat` (downloads Chromium), or use the with-browser zip |
+| Edge sign-in "works" but exports can't log in | Edge signed in via the Windows device broker (PRT) — session never reaches cookies | Expected & detected: the capture is rejected (`storage_state_is_portable`) and login falls back to Chrome / Built-in Chromium |
 | Browser launch fails after an Edge/Chrome update | Evergreen browser outran pinned Playwright CDP | Bump `playwright` in `requirements*.txt`, rebuild |
 | DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |
 | Build: "GUARD FAILED" | A dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` |
