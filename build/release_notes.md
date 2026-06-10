@@ -14,16 +14,21 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
-- **Managed-Edge sign-in fixed.** Sign-in now opens Edge with a durable
-  app-owned profile and recovers the session even when org-managed Edge
-  relaunches itself into the work profile mid-SSO (live capture, then CDP
-  re-attach, then on-disk profile recapture) — with a Google Chrome fallback if
-  nothing was captured.
+- **Managed-Edge sign-in fixed.** Sign-in opens Edge with a durable app-owned
+  profile and recovers the session even when org-managed Edge relaunches itself
+  into the work profile mid-SSO (live capture, then CDP re-attach, then on-disk
+  profile recapture) — with a Google Chrome fallback if nothing was captured.
+- **Captured sign-ins are now verified before saving.** If Edge signed you in
+  through the Windows work profile (device-bound, so the session can't be
+  reused by the export engine), the tool detects it, says so, and falls back to
+  another browser instead of saving a login that won't export.
+- **The Browser dropdown now applies to sign-in too** — pick Google Chrome and
+  the login window opens in Chrome.
 - **New "Built-in Chromium" browser option.** When a Playwright-managed
   Chromium is present (the with-browser zip, or downloaded by the `.bat`
   setup), it becomes the default for sign-in and exports — it's unmanaged, so
   org browser policy can't interfere — and Edge/Chrome remain selectable in the
-  header dropdown.
+  header dropdown. The standard `win64` build always defaults to Edge.
 - First run: if Windows warns about an unknown publisher, choose
   "More info" → "Run anyway" (in-house unsigned tool). If downloaded as a zip,
   right-click → Properties → Unblock before extracting.

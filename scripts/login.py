@@ -20,7 +20,8 @@ except ImportError:
 from common import (
     AUTH, BROWSER_CHANNELS, URL, BrowserNotFoundError, is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
-    capture_storage_state_if_logged_in, launch_edge_login_context,
+    capture_storage_state_if_logged_in, get_preferred_channel,
+    launch_edge_login_context, storage_state_is_portable,
 )
 
 
@@ -65,12 +66,17 @@ def main():
 
 def _run_login():
     with sync_playwright() as p:
-        # The Built-in Chromium (downloaded by setup, or bundled) is the most
-        # reliable sign-in window: it is unmanaged, so org policy can't relaunch
-        # it into a work profile mid-SSO (the managed-Edge failure). Use it when
-        # present; otherwise run the experimental persistent-profile Edge flow
-        # with its Chrome fallback.
-        if "chromium" in BROWSER_CHANNELS:
+        # Honor an explicit browser choice (TSMIS_BROWSER_CHANNEL) for sign-in
+        # too. With no explicit pick, the default order is: the Built-in
+        # Chromium when present (unmanaged, so org policy can't relaunch it
+        # into a work profile mid-SSO -- the managed-Edge failure), else the
+        # experimental persistent-profile Edge flow with its Chrome fallback.
+        pref = get_preferred_channel()
+        if pref == "chrome":
+            _run_standard_login(p)
+            return
+
+        if "chromium" in BROWSER_CHANNELS and pref in (None, "chromium"):
             browser = None
             try:
                 browser = p.chromium.launch(headless=False, channel="chromium")
@@ -84,16 +90,26 @@ def _run_login():
 
         edge_state = _try_edge_persistent_login(p)
         if edge_state:
-            _save_state(edge_state)
+            # A capture from the live Edge profile can still be useless: when
+            # Edge signed in through the Windows device broker (PRT) the session
+            # never reaches the cookie jar, so the saved file would not log in
+            # anywhere else. Prove the capture works before saving it.
+            print("Checking that the captured sign-in can be reused for exports...")
+            if storage_state_is_portable(p, edge_state):
+                _save_state(edge_state)
+                print()
+                print(f"Session saved to {AUTH.name}  (experimental Edge recapture)")
+                print('  You can close this window and run "3. run_export (main script).bat"')
+                input("Press Enter to exit...")
+                return
             print()
-            print(f"Session saved to {AUTH.name}  (experimental Edge recapture)")
-            print('  You can close this window and run "3. run_export (main script).bat"')
-            input("Press Enter to exit...")
-            return
-
-        print()
-        print("Experimental Edge sign-in was not captured.")
-        print("Opening Google Chrome fallback -- please sign in again.")
+            print("Microsoft Edge signed you in through the Windows work profile,")
+            print("so that session can't be reused for exports.")
+            print("Opening another browser -- please sign in once more.")
+        else:
+            print()
+            print("Experimental Edge sign-in was not captured.")
+            print("Opening Google Chrome fallback -- please sign in again.")
         _run_standard_login(p)
 
 

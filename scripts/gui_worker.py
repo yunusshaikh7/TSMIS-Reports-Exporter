@@ -25,7 +25,8 @@ from common import (
     AUTH, ROUTES, URL, AuthError, BrowserNotFoundError, PreflightError,
     BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
-    capture_storage_state_if_logged_in, launch_edge_login_context,
+    capture_storage_state_if_logged_in, get_preferred_channel,
+    launch_edge_login_context, storage_state_is_portable,
 )
 from events import Events
 from exporter import run_export
@@ -176,12 +177,18 @@ class LoginWorker(threading.Thread):
         log = logging.getLogger("tsmis.login")
         try:
             with sync_playwright() as p:
-                # The Built-in Chromium (bundled, or downloaded by setup) is the
-                # most reliable sign-in window: it is unmanaged, so org policy
-                # can't relaunch it into a work profile mid-SSO (the managed-Edge
-                # failure). Use it when present; otherwise run the experimental
-                # persistent-profile Edge flow with its Chrome fallback.
-                if "chromium" in BROWSER_CHANNELS:
+                # Honor the user's Browser pick for SIGN-IN too, not just for
+                # exports. With no explicit pick, the default order is: the
+                # Built-in Chromium when present (unmanaged, so org policy
+                # can't relaunch it into a work profile mid-SSO -- the
+                # managed-Edge failure), else the experimental persistent-
+                # profile Edge flow with its Chrome fallback.
+                pref = get_preferred_channel()
+                if pref == "chrome":
+                    self._run_standard_login(p, log)
+                    return
+
+                if "chromium" in BROWSER_CHANNELS and pref in (None, "chromium"):
                     browser = None
                     try:
                         browser = p.chromium.launch(headless=False, channel="chromium")
@@ -199,13 +206,27 @@ class LoginWorker(threading.Thread):
                     self.q.put(("cancelled", None))
                     return
                 if edge_state:
-                    self._save_state(edge_state)
-                    self.q.put(("login_saved", None))
-                    log.info("login: SAVED via experimental Edge recapture")
-                    return
-
-                self.q.put(("log", "Experimental Edge sign-in was not captured; "
-                                   "opening Google Chrome fallback."))
+                    # A capture from the live Edge profile can still be useless:
+                    # when Edge signed in through the Windows device broker (PRT)
+                    # the session never reaches the cookie jar, so the saved file
+                    # would not log in anywhere else. Prove the capture works the
+                    # way the engine will use it before saving it.
+                    self.q.put(("log", "Checking that the captured sign-in can be "
+                                       "reused for exports..."))
+                    if storage_state_is_portable(p, edge_state):
+                        self._save_state(edge_state)
+                        self.q.put(("login_saved", None))
+                        log.info("login: SAVED via experimental Edge recapture")
+                        return
+                    log.info("login: Edge capture rejected (device-bound session, "
+                             "not portable)")
+                    self.q.put(("log", "Microsoft Edge signed you in through the "
+                                       "Windows work profile, so that session can't "
+                                       "be reused for exports. Opening another "
+                                       "browser -- please sign in once more."))
+                else:
+                    self.q.put(("log", "Experimental Edge sign-in was not captured; "
+                                       "opening Google Chrome fallback."))
                 self._run_standard_login(p, log)
         except BrowserNotFoundError as e:
             self.q.put(("error", ("general", str(e))))

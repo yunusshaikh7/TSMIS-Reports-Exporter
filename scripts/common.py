@@ -384,12 +384,19 @@ def wait_with_skip_option(page, js_condition, prefix, events,
 
 
 def _playwright_browsers_dir():
-    """Folder where Playwright keeps its own browsers. PLAYWRIGHT_BROWSERS_PATH
-    wins (paths.py points it at the bundle's ms-playwright when one ships next
-    to the .exe); otherwise Playwright's per-OS default cache."""
+    """Folder where Playwright keeps its own browsers, or None when no private
+    Chromium should be considered. PLAYWRIGHT_BROWSERS_PATH wins (paths.py
+    points it at the bundle's ms-playwright when one ships next to the .exe).
+    PACKAGED builds otherwise return None: the machine may carry an unrelated
+    Playwright cache (e.g. from dev work) whose revision doesn't match this
+    app's driver -- the system-browser build must default to Edge, not to that.
+    Dev / .bat runs use Playwright's per-OS default cache, which is exactly
+    where `1. setup…bat`'s `playwright install chromium` puts it."""
     env = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "").strip()
     if env and env != "0":
         return Path(env)
+    if getattr(sys, "frozen", False):
+        return None
     home = Path.home()
     if sys.platform == "win32":
         base = os.environ.get("LOCALAPPDATA") or str(home / "AppData" / "Local")
@@ -403,8 +410,11 @@ def _chromium_available():
     """True if a Playwright-managed Chromium appears to be installed (bundled
     next to the .exe, or downloaded by `playwright install chromium`). A cheap
     folder check -- the launch-time probe still validates it actually runs."""
+    browsers_dir = _playwright_browsers_dir()
+    if browsers_dir is None:
+        return False
     try:
-        return any(_playwright_browsers_dir().glob("chromium-*"))
+        return any(browsers_dir.glob("chromium-*"))
     except OSError:
         return False
 
@@ -427,6 +437,17 @@ def set_preferred_channel(channel):
     global _preferred_channel, _resolved_channel
     _preferred_channel = channel if channel in BROWSER_CHANNELS else None
     _resolved_channel = None
+
+
+def get_preferred_channel():
+    """The channel the user explicitly pinned -- the TSMIS_BROWSER_CHANNEL env
+    override first, then the UI pick recorded by set_preferred_channel -- or
+    None when no explicit choice was made. Lets the sign-in flow honor the same
+    browser choice the exports use."""
+    forced = os.environ.get("TSMIS_BROWSER_CHANNEL", "").strip()
+    if forced:
+        return forced
+    return _preferred_channel
 
 
 def _candidate_channels():
@@ -720,3 +741,31 @@ def new_authed_browser(p):
         ctx = browser.new_context(storage_state=str(AUTH))
     page = ctx.new_page()
     return browser, ctx, page
+
+
+def storage_state_is_portable(p, state):
+    """True if `state` actually signs into TSMIS when restored into a FRESH
+    headless context -- the exact way the export engine will use it.
+
+    Why this exists: managed Edge can satisfy the Azure AD sign-in through the
+    Windows device broker (PRT) instead of cookies. A session captured from such
+    a work profile LOOKS valid -- the live profile is signed in -- but its cookie
+    jar carries only stub Azure tokens (an ESTSAUTH header with no payload), so
+    restoring it into any fresh context silently fails to log in. Saving a state
+    like that would strand the user with exports that can't sign in, so callers
+    must test a capture here before writing the auth file."""
+    browser = None
+    try:
+        browser = launch_browser(p, headless=True)
+        ctx = browser.new_context(storage_state=state)
+        page = ctx.new_page()
+        navigate_with_auth(page)
+        return is_logged_in(page)
+    except Exception:
+        return False
+    finally:
+        if browser is not None:
+            try:
+                browser.close()
+            except Exception:
+                pass
