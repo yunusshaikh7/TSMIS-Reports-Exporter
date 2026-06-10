@@ -227,25 +227,30 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 
 ## Auth / Session
 
-- **Silent device sign-in** (`common.try_device_sso_login`) is tried first: a
-  fresh headless **Edge** context — cookie-free on purpose, because stale Azure
-  stubs make Azure AD prompt interactively instead of attempting silent auth —
+- **Silent device sign-in** (`common.try_device_sso_login` →
+  `open_edge_device_context`) is tried first: it reopens the app-owned
+  **persistent Edge sign-in profile** (`EDGE_LOGIN_PROFILE_DIR`) headless and
   clicks "Caltrans Azure AD" (via the same `navigate_with_auth` the engine
-  uses) and lets **Windows device auth** answer. Edge-only by design: on these
-  PCs Chrome never gets the silent sign-in (manual credentials there). If the
-  minted state passes the portability check it is saved as the normal auth
-  file; if sign-in worked but the state is device-bound, **nothing is saved**
-  and the app enters **device sign-in mode** (GUI message `login_device_ok`,
-  `App._device_ok`): exports don't need a file — each context signs itself in
-  live the same way.
+  uses) — the **one-click Windows sign-in lives in that profile**; a fresh
+  cookie-free Edge context does NOT get it, and Chrome never does (manual
+  credentials there). Each known profile dir is tried (managed Edge may have
+  moved the session into a work profile). The profile is **primed by the headed
+  Edge login** — first-ever use still needs one headed sign-in. If the minted
+  state passes the portability check it is saved as the normal auth file; if
+  sign-in worked but the state is device-bound, **nothing is saved** and the
+  app enters **device sign-in mode** (GUI message `login_device_ok`,
+  `App._device_ok`): exports don't need a file — each run signs itself in live
+  the same way.
 - **Engines no longer hard-require the auth file.** They log a notice
   (`has_valid_auth`) instead of raising, and `new_authed_browser` restores the
-  saved session when one is valid, else launches **Edge (forced — a
-  Chrome/Chromium context can't device-auth)** with a cookie-free context that
-  the Azure click signs in live; `_recover()` re-auths the same way mid-run.
-  If sign-in still fails, the engine's `is_logged_in` gate raises `AuthError`
-  as before. The `.bat` export menus print a note instead of exiting when the
-  file is missing; the GUI offers to start anyway.
+  saved session when one is valid, else opens the persistent Edge profile via
+  `open_edge_device_context` (the context doubles as the browser handle;
+  `.close()` shuts the persistent browser down); `_recover()` re-auths the
+  same way mid-run. If sign-in still fails, `AuthError` is raised as before.
+  The profile can only be open in ONE browser at a time, so **device mode caps
+  fast mode to 1 worker** (a saved login is required for real parallelism).
+  The `.bat` export menus print a note instead of exiting when the file is
+  missing; the GUI offers to start anyway.
 - **Local Network Access:** the TSMIS page pulls report data from an intranet
   host, which Chromium's LNA checks would block behind a permission prompt no
   one can click headless. Every automated context launches with

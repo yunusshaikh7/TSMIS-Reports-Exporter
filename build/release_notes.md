@@ -14,13 +14,15 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
-- **Hands-free sign-in on managed Caltrans PCs.** The tool now signs in
-  **automatically** with Microsoft Edge and your Windows account — no password,
-  no browser window. The Log in button completes silently, and exports can even
-  start with **no saved login at all**: each headless browser clicks
-  "Caltrans Azure AD" itself and Windows signs it in (Edge only — Chrome stays
-  on the manual sign-in path). The local-network permission the TSMIS site
-  needs is pre-granted in every automated browser.
+- **Hands-free sign-in on managed Caltrans PCs.** After one normal Edge
+  sign-in (which primes the app's own Edge profile), the tool signs in
+  **automatically** — no password, no browser window. The Log in button
+  completes silently, and exports can even start with **no saved login at
+  all**: the export reopens that Edge profile, clicks "Caltrans Azure AD"
+  itself, and Windows signs it in (Edge only — Chrome stays on the manual
+  sign-in path; automatic sign-in runs one browser at a time, so save a login
+  to use fast mode). The local-network permission the TSMIS site needs is
+  pre-granted in every automated browser.
 - **Managed-Edge sign-in fixed.** Sign-in opens Edge with a durable app-owned
   profile and recovers the session even when org-managed Edge relaunches itself
   into the work profile mid-SSO (live capture, then CDP re-attach, then on-disk
