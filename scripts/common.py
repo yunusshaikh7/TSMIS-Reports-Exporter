@@ -13,6 +13,7 @@ shim (cli.py) and the future GUI.
 import json
 import os
 import re
+import socket
 import time
 
 try:
@@ -66,7 +67,7 @@ URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
 # stays at scripts/tsmis_auth.json. Re-exported here for login.py and cli.py.
 # (Output paths also come from paths.py, imported directly by the exporter and
 # consolidators.)
-from paths import AUTH
+from paths import AUTH, EDGE_LOGIN_PROFILE_DIR
 
 # Timeouts (milliseconds). Increase these if reports are timing out.
 #
@@ -493,6 +494,148 @@ def launch_browser(p, *, headless=True, **kwargs):
                 "version this tool doesn't support yet -- please update TSMIS "
                 "Exporter, or contact the maintainer."
             ) from first_err
+
+
+def _free_local_port():
+    sock = socket.socket()
+    try:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+    finally:
+        sock.close()
+
+
+def _first_or_new_page(ctx):
+    try:
+        pages = [pg for pg in ctx.pages if not pg.is_closed()]
+    except Exception:
+        pages = []
+    return pages[0] if pages else ctx.new_page()
+
+
+def capture_storage_state_if_logged_in(ctx, *, navigate=False, timeout_ms=15_000):
+    """Return Playwright storage_state from `ctx` only after a real TSMIS login.
+
+    `navigate=True` is for recapture attempts: reopen an Edge profile, navigate
+    to the report URL, and see whether the profile already carries the session.
+    """
+    try:
+        pages = [pg for pg in ctx.pages if not pg.is_closed()]
+    except Exception:
+        pages = []
+    for page in pages:
+        try:
+            if is_logged_in(page):
+                return ctx.storage_state()
+        except Exception:
+            continue
+    if not navigate:
+        return None
+    try:
+        page = _first_or_new_page(ctx)
+        page.goto(URL, timeout=timeout_ms)
+        page.wait_for_timeout(2_000)
+        if is_logged_in(page):
+            return ctx.storage_state()
+    except Exception:
+        return None
+    return None
+
+
+def launch_edge_login_context(p):
+    """Open headed Edge with an app-owned persistent profile for SSO.
+
+    Managed Edge can abandon Playwright's temporary profile when it switches into
+    a work profile. This launches Edge with a durable user data directory so a
+    later recapture pass can reopen the same profile tree and extract cookies.
+    A CDP port is also enabled; if Edge preserves it across the switch, callers
+    can attach to the live relaunched browser before falling back to disk.
+    """
+    EDGE_LOGIN_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    port = _free_local_port()
+    args = [
+        "--profile-directory=Default",
+        f"--remote-debugging-port={port}",
+    ]
+    ctx = p.chromium.launch_persistent_context(
+        str(EDGE_LOGIN_PROFILE_DIR),
+        channel="msedge",
+        headless=False,
+        args=args,
+    )
+    page = _first_or_new_page(ctx)
+    page.goto(URL)
+    return ctx, f"http://127.0.0.1:{port}"
+
+
+def _known_edge_profile_names():
+    names = ["Default"]
+    try:
+        for child in EDGE_LOGIN_PROFILE_DIR.iterdir():
+            if child.is_dir() and (child.name == "Default" or child.name.startswith("Profile ")):
+                names.append(child.name)
+    except OSError:
+        pass
+    return list(dict.fromkeys(names))
+
+
+def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000):
+    """Try to attach to a live relaunched Edge and capture its storage_state."""
+    deadline = time.monotonic() + (timeout_ms / 1000)
+    while time.monotonic() < deadline:
+        browser = None
+        try:
+            browser = p.chromium.connect_over_cdp(
+                cdp_url,
+                timeout=1_500,
+                is_local=True,
+                no_defaults=True,
+            )
+            for ctx in browser.contexts:
+                state = capture_storage_state_if_logged_in(ctx, navigate=True)
+                if state:
+                    return state
+        except Exception:
+            pass
+        finally:
+            if browser:
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+        time.sleep(0.5)
+    return None
+
+
+def capture_edge_login_state_from_profiles(p, *, timeout_ms=20_000):
+    """Reopen the app-owned Edge profile tree and look for a saved TSMIS login.
+
+    Returns `(state, profile_name)` or `(None, None)`.
+    """
+    deadline = time.monotonic() + (timeout_ms / 1000)
+    for profile_name in _known_edge_profile_names():
+        while time.monotonic() < deadline:
+            ctx = None
+            try:
+                ctx = p.chromium.launch_persistent_context(
+                    str(EDGE_LOGIN_PROFILE_DIR),
+                    channel="msedge",
+                    headless=True,
+                    args=[f"--profile-directory={profile_name}"],
+                )
+                state = capture_storage_state_if_logged_in(ctx, navigate=True)
+                if state:
+                    return state, profile_name
+                break
+            except Exception:
+                time.sleep(1)
+            finally:
+                if ctx:
+                    try:
+                        ctx.close()
+                    except Exception:
+                        pass
+    return None, None
 
 
 def check_browsers():

@@ -18,11 +18,14 @@ Message protocol (all are (kind, payload) tuples):
     ("error", (kind, message))         kind is "auth" or "general"
 """
 import json
+import logging
 import threading
 
 from common import (
     AUTH, ROUTES, URL, AuthError, BrowserNotFoundError, PreflightError,
     BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, is_logged_in, launch_browser,
+    capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
+    capture_storage_state_if_logged_in, launch_edge_login_context,
 )
 from events import Events
 from exporter import run_export
@@ -166,10 +169,28 @@ class LoginWorker(threading.Thread):
         self.done = done_event
         self.cancel = cancel_event
 
+    _CANCELLED = object()
+
     def run(self):
         from playwright.sync_api import sync_playwright
+        log = logging.getLogger("tsmis.login")
         try:
             with sync_playwright() as p:
+                edge_state = self._try_edge_persistent_login(p, log)
+                if edge_state is self._CANCELLED:
+                    self.q.put(("cancelled", None))
+                    return
+                if edge_state:
+                    self._save_state(edge_state)
+                    self.q.put(("login_saved", None))
+                    log.info("login: SAVED via experimental Edge recapture")
+                    return
+
+                self.q.put(("log", "Experimental Edge sign-in was not captured; "
+                                   "opening Google Chrome fallback."))
+                self._run_standard_login(p, log)
+                return
+
                 browser = launch_browser(p, headless=False)
                 ctx = browser.new_context()
                 page = ctx.new_page()
@@ -241,7 +262,128 @@ class LoginWorker(threading.Thread):
         except BrowserNotFoundError as e:
             self.q.put(("error", ("general", str(e))))
         except Exception as e:
+            log.exception("login worker crashed")
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
+
+    def _try_edge_persistent_login(self, p, log):
+        ctx = None
+        cdp_url = None
+        try:
+            ctx, cdp_url = launch_edge_login_context(p)
+        except Exception as e:
+            log.info("login: experimental Edge launch unavailable (%s)", type(e).__name__)
+            self.q.put(("log", "Experimental Edge sign-in could not open; "
+                               "using Google Chrome fallback."))
+            return None
+
+        self.done.clear()
+        self.q.put(("login_open", None))
+        self.q.put(("log", "Experimental Edge sign-in opened. Finish signing in, "
+                           "then click \"I've finished logging in.\""))
+        log.info("login: experimental Edge persistent profile opened")
+
+        while not self.done.wait(0.2):
+            pass
+
+        if self.cancel.is_set():
+            self._safe_close_context(ctx)
+            log.info("login: cancelled during experimental Edge sign-in")
+            return self._CANCELLED
+
+        try:
+            state = capture_storage_state_if_logged_in(ctx)
+            if state:
+                self._safe_close_context(ctx)
+                log.info("login: experimental Edge captured from live context")
+                return state
+        except Exception as e:
+            log.info("login: live Edge context capture failed (%s)", type(e).__name__)
+
+        self.q.put(("log", "Edge did not expose a live session; trying to recapture "
+                           "the work-profile state..."))
+        state = capture_edge_login_state_over_cdp(p, cdp_url)
+        if state:
+            self._safe_close_context(ctx)
+            log.info("login: experimental Edge captured over CDP")
+            return state
+
+        self._safe_close_context(ctx)
+        state, profile_name = capture_edge_login_state_from_profiles(p)
+        if state:
+            log.info("login: experimental Edge captured from profile %s", profile_name)
+            return state
+
+        log.info("login: experimental Edge capture failed")
+        return None
+
+    def _run_standard_login(self, p, log):
+        try:
+            browser = p.chromium.launch(headless=False, channel="chrome")
+            label = "Google Chrome"
+        except Exception as e:
+            log.info("login: Chrome launch failed (%s); trying selected browser", type(e).__name__)
+            browser = launch_browser(p, headless=False)
+            label = "selected browser"
+        self._run_login_in_browser(browser, label, log)
+
+    def _run_login_in_browser(self, browser, label, log):
+        ctx = browser.new_context()
+        page = ctx.new_page()
+        page.goto(URL)
+        self.done.clear()
+        self.q.put(("login_open", None))
+        self.q.put(("log", f"Sign-in window opened in {label}."))
+
+        captured = None
+        closed = False
+        blips = 0
+        while not self.done.wait(0.3):
+            try:
+                ctx.cookies()
+                blips = 0
+            except Exception:
+                blips += 1
+            try:
+                open_pages = [pg for pg in ctx.pages if not pg.is_closed()]
+            except Exception:
+                open_pages = None
+            if (open_pages is not None and len(open_pages) == 0) or blips >= 20:
+                closed = True
+                break
+            if captured is None:
+                try:
+                    if self._any_logged_in(ctx):
+                        captured = ctx.storage_state()
+                except Exception:
+                    pass
+
+        if closed:
+            self.q.put(("log", "Login window closed - checking your sign-in..."))
+
+        if self.cancel.is_set():
+            self._safe_close(browser)
+            self.q.put(("cancelled", None))
+            log.info("login: cancelled during %s sign-in", label)
+            return
+
+        if not closed:
+            try:
+                if self._any_logged_in(ctx):
+                    captured = ctx.storage_state()
+            except Exception:
+                pass
+        self._safe_close(browser)
+
+        if captured:
+            self._save_state(captured)
+            self.q.put(("login_saved", None))
+            log.info("login: SAVED via %s", label)
+        elif closed:
+            self.q.put(("cancelled", None))
+            log.info("login: %s window closed without capture", label)
+        else:
+            self.q.put(("login_failed", None))
+            log.info("login: %s finished without detected login", label)
 
     @staticmethod
     def _any_logged_in(ctx):
@@ -259,6 +401,13 @@ class LoginWorker(threading.Thread):
     def _safe_close(browser):
         try:
             browser.close()
+        except Exception:
+            pass
+
+    @staticmethod
+    def _safe_close_context(ctx):
+        try:
+            ctx.close()
         except Exception:
             pass
 

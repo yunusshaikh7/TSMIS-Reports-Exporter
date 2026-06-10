@@ -74,3 +74,4 @@ else:
 LOG_DIR = _PRIVATE / "logs"
 FAILURES_DIR = _PRIVATE / "failures"   # screenshot + page HTML captured when a route fails
 CONFIG_FILE = _PRIVATE / "config.json"
+EDGE_LOGIN_PROFILE_DIR = _PRIVATE / "edge_login_profile"
