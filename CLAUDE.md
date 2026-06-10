@@ -95,16 +95,18 @@ and are kept for development and as a fallback.
 1. **`1. setup (one time).bat`** — `pip install -r requirements.txt`, then
    `playwright install chromium --no-shell` (the Built-in Chromium; on download
    failure it warns and the tool falls back to the machine's Edge/Chrome).
-2. **`2. login (update login).bat`** — opens a visible browser (Built-in Chromium
-   when present, else the persistent-profile Edge flow with Chrome fallback);
-   user does SSO+MFA, then confirms to save the session to
-   `scripts/tsmis_auth.json` (shared by all exports). Login is **validated
-   before saving** (a real TSMIS login must be detected), so clicking "finished"
-   without signing in won't save a junk session.
-3. **`3. run_export (main script).bat`** — checks auth exists, shows a menu
-   (`1`–`4` single report, `A` = several/all → `export_multi.py`, `Q` quit), then
-   prompts for routes (Enter = all; or `5, 99, 101` — any casing/padding, suffixes
-   like `101U` ok), then runs headlessly.
+2. **`2. login (update login).bat`** — tries the silent Edge device sign-in
+   first (no window, no typing — managed Caltrans PCs); else opens a visible
+   browser (Built-in Chromium when present, else the persistent-profile Edge
+   flow with Chrome fallback); user does SSO+MFA, then confirms to save the
+   session to `scripts/tsmis_auth.json` (shared by all exports). Login is
+   **validated before saving** (a real TSMIS login must be detected), so
+   clicking "finished" without signing in won't save a junk session.
+3. **`3. run_export (main script).bat`** — shows a menu (`1`–`4` single report,
+   `A` = several/all → `export_multi.py`, `Q` quit), then prompts for routes
+   (Enter = all; or `5, 99, 101` — any casing/padding, suffixes like `101U`
+   ok), then runs headlessly. A missing saved session is just a note — the
+   engine tries the automatic device sign-in itself.
 4. **`4. consolidate (combine reports).bat`** — pick a report type, combine all
    per-route exports into one workbook in `output/consolidated/` (no auth check).
 5. **`5. fast export (experimental).bat`** — asks worker count (sets
@@ -225,10 +227,35 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 
 ## Auth / Session
 
-- **Sign-in browser order** (`login.py` console / `gui_worker.LoginWorker`)
+- **Silent device sign-in** (`common.try_device_sso_login`) is tried first: a
+  fresh headless **Edge** context — cookie-free on purpose, because stale Azure
+  stubs make Azure AD prompt interactively instead of attempting silent auth —
+  clicks "Caltrans Azure AD" (via the same `navigate_with_auth` the engine
+  uses) and lets **Windows device auth** answer. Edge-only by design: on these
+  PCs Chrome never gets the silent sign-in (manual credentials there). If the
+  minted state passes the portability check it is saved as the normal auth
+  file; if sign-in worked but the state is device-bound, **nothing is saved**
+  and the app enters **device sign-in mode** (GUI message `login_device_ok`,
+  `App._device_ok`): exports don't need a file — each context signs itself in
+  live the same way.
+- **Engines no longer hard-require the auth file.** They log a notice
+  (`has_valid_auth`) instead of raising, and `new_authed_browser` restores the
+  saved session when one is valid, else launches **Edge (forced — a
+  Chrome/Chromium context can't device-auth)** with a cookie-free context that
+  the Azure click signs in live; `_recover()` re-auths the same way mid-run.
+  If sign-in still fails, the engine's `is_logged_in` gate raises `AuthError`
+  as before. The `.bat` export menus print a note instead of exiting when the
+  file is missing; the GUI offers to start anyway.
+- **Local Network Access:** the TSMIS page pulls report data from an intranet
+  host, which Chromium's LNA checks would block behind a permission prompt no
+  one can click headless. Every automated context launches with
+  `common._LNA_ARGS` and pre-grants `local-network-access`
+  (`common._new_app_context`) — engine contexts, the device sign-in, and the
+  portability probe alike.
+- **Headed sign-in browser order** (`login.py` console / `gui_worker.LoginWorker`)
   honors the user's pick first (`get_preferred_channel()` — the GUI Browser
-  dropdown / `TSMIS_BROWSER_CHANNEL`; picking Chrome goes straight to Chrome).
-  With no pick:
+  dropdown / `TSMIS_BROWSER_CHANNEL`; picking Chrome goes straight to Chrome and
+  skips the silent attempt). With no pick, after the silent attempt:
   1. **Built-in Chromium** when present — a normal headed sign-in; unmanaged, so
      org policy can't kill the window.
   2. **Persistent-profile Edge recapture** — Edge opens on the app-owned
@@ -252,10 +279,10 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
   page closing, a connection blip, or a single transient `ctx.cookies()` error
   as "closed" (that caused false "cancelled"). On any non-save outcome no file
   is written, so a prior valid session is preserved.
-- The engine calls `require_valid_auth()` first — checks the file exists, is valid
-  JSON, **and is shaped like a storage_state** (`cookies`/`origins` lists) — else
-  raises `AuthError`. `cli.py` catches it, clears the stale file, guides re-login;
-  the GUI shows a re-login dialog. The `.bat` menu also gates on the file existing.
+- `require_valid_auth()` still validates the file shape (exists, valid JSON,
+  `cookies`/`origins` lists) and backs `has_valid_auth()` / the GUI status dot.
+  On `AuthError` from a run, `cli.py` clears the stale file and guides re-login;
+  the GUI shows a re-login dialog.
 
 ## Build & Packaging (portable onefolder)
 
@@ -366,7 +393,7 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | Symptom | Cause | Fix |
 |---|---|---|
 | `Playwright is not installed` | Setup not run | Run `1. setup…bat` |
-| `NO SAVED SESSION` / `LOGIN PROBLEM` (`AuthError`) | Session missing/expired/corrupt | Run `2. login…bat` |
+| `LOGIN PROBLEM` (`AuthError`) | Session missing/expired AND automatic device sign-in unavailable | Run `2. login…bat` |
 | Route keeps timing out | TSMIS server slow | Raise `REPORT_TIMEOUT_MS` |
 | Route fails instantly with a "TSMIS site error" | The site can't build that route | Expected — recorded `failed` (see `FAILURES_DIR`); a TSMIS issue |
 | County dropdown timeout | Slow network | Raise `COUNTY_ENABLE_TIMEOUT_MS` |

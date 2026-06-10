@@ -13,6 +13,9 @@ Message protocol (all are (kind, payload) tuples):
     ("consolidate_done", ConsolidateResult)
     ("login_open", None)               headed browser is up; user should finish SSO
     ("login_saved", None)              a VALID session was captured and written
+    ("login_device_ok", None)          silent device sign-in works on this PC, but the
+                                       session is device-bound: no file saved; exports
+                                       sign themselves in live (device sign-in mode)
     ("login_failed", None)             window closed/finished without a real login
     ("cancelled", None)                task stopped at user request
     ("error", (kind, message))         kind is "auth" or "general"
@@ -26,7 +29,7 @@ from common import (
     BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
-    launch_edge_login_context, storage_state_is_portable,
+    launch_edge_login_context, storage_state_is_portable, try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
@@ -185,8 +188,39 @@ class LoginWorker(threading.Thread):
                 # profile Edge flow with its Chrome fallback.
                 pref = get_preferred_channel()
                 if pref == "chrome":
+                    # Explicit Chrome pick: the silent device sign-in never
+                    # works in Chrome (it's an Edge/Windows integration), so go
+                    # straight to the headed Chrome window.
                     self._run_standard_login(p, log)
                     return
+
+                # Silent first: on managed Caltrans PCs a fresh headless Edge
+                # context signs itself in via Windows device auth -- no window,
+                # no typing. Skipped when the user explicitly picked a
+                # non-Edge browser.
+                if pref in (None, "msedge"):
+                    self.q.put(("log", "Trying automatic sign-in (Microsoft Edge "
+                                       "+ this PC's Windows account)..."))
+                    state = try_device_sso_login(p)
+                    if self.cancel.is_set():
+                        self.q.put(("cancelled", None))
+                        return
+                    if state:
+                        if storage_state_is_portable(p, state):
+                            self._save_state(state)
+                            self.q.put(("login_saved", None))
+                            log.info("login: SAVED via silent device sign-in")
+                            return
+                        # Signed in, but the cookies are device-bound. Do NOT
+                        # save them (stale Azure stubs make later sign-ins
+                        # prompt interactively) -- exports don't need a file:
+                        # each export context signs in live the same silent way.
+                        self.q.put(("login_device_ok", None))
+                        log.info("login: device sign-in works; exports will sign "
+                                 "in live (capture not portable, not saved)")
+                        return
+                    self.q.put(("log", "Automatic sign-in isn't available here; "
+                                       "opening a browser window..."))
 
                 if "chromium" in BROWSER_CHANNELS and pref in (None, "chromium"):
                     browser = None

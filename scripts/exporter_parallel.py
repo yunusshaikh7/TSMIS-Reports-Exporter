@@ -47,11 +47,11 @@ from common import (
     ROUTES,
     AuthError,
     RunCancelled,
+    has_valid_auth,
     is_logged_in,
     navigate_with_auth,
     new_authed_browser,
     preflight,
-    require_valid_auth,
     select_report,
 )
 from events import Events, RunResult
@@ -114,7 +114,10 @@ def _preflight_once(spec, events):
         try:
             navigate_with_auth(page)
             if not is_logged_in(page):
-                raise AuthError("Saved session is expired or invalid.")
+                raise AuthError(
+                    "Sign-in didn't complete - the saved session may be expired, "
+                    "or automatic sign-in isn't available on this PC. Please log in."
+                )
             events.on_log("Logged in. Checking the report form...")
             preflight(page, spec.label)
         finally:
@@ -155,7 +158,13 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     """
     events = events or Events()
     n = resolve_worker_count(workers)
-    require_valid_auth()
+    # No saved session is no longer fatal: each browser's new_authed_browser
+    # falls back to DEVICE SIGN-IN mode (fresh Edge context signed in live by
+    # Windows on managed Caltrans PCs). _preflight_once proves it works before
+    # N browsers launch.
+    if not has_valid_auth():
+        events.on_log("No saved session - will try signing in automatically "
+                      "using this PC's work account (Microsoft Edge).")
     timeout_ms = timeout_ms or FAST_REPORT_TIMEOUT_MS
     retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
 
@@ -189,7 +198,10 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                 try:
                     navigate_with_auth(page)
                     if not is_logged_in(page):
-                        raise AuthError("Session expired or invalid.")
+                        raise AuthError(
+                            "Sign-in didn't complete - the session may have "
+                            "expired. Please log in."
+                        )
                     select_report(page, spec.label)         # arm this worker's form
                     while not stop.is_set():
                         if events.is_cancelled():

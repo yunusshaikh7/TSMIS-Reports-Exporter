@@ -28,12 +28,12 @@ from common import (
     AuthError,
     ReportError,
     RunCancelled,
+    has_valid_auth,
     is_logged_in,
     navigate_with_auth,
     new_authed_browser,
     preflight,
     report_error_text,
-    require_valid_auth,
     select_report,
     wait_with_skip_option,
 )
@@ -293,7 +293,13 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     REPORT_TIMEOUT_MS for the main pass, RETRY_REPORT_TIMEOUT_MS for the retry).
     """
     events = events or Events()
-    require_valid_auth()
+    # No saved session is no longer fatal: new_authed_browser falls back to
+    # DEVICE SIGN-IN mode (fresh Edge context; the Azure AD click during
+    # navigate_with_auth lets Windows sign it in live on managed Caltrans PCs).
+    # If neither works, the is_logged_in gate after navigation raises AuthError.
+    if not has_valid_auth():
+        events.on_log("No saved session - will try signing in automatically "
+                      "using this PC's work account (Microsoft Edge).")
     timeout_ms = timeout_ms or REPORT_TIMEOUT_MS
     retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
 
@@ -308,7 +314,10 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
         try:
             navigate_with_auth(page)
             if not is_logged_in(page):
-                raise AuthError("Saved session is expired or invalid.")
+                raise AuthError(
+                    "Sign-in didn't complete - the saved session may be expired, "
+                    "or automatic sign-in isn't available on this PC. Please log in."
+                )
 
             events.on_log("Logged in. Checking the report form...")
             preflight(page, spec.label)

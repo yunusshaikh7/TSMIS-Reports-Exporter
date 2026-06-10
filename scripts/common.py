@@ -206,6 +206,22 @@ def require_valid_auth():
         raise AuthError("Session file isn't a valid saved login.")
 
 
+def has_valid_auth():
+    """True if a usable saved session file exists (require_valid_auth passes)."""
+    try:
+        require_valid_auth()
+        return True
+    except AuthError:
+        return False
+
+
+def save_auth_state(state):
+    """Write a Playwright storage_state (dict) to the shared auth file."""
+    AUTH.parent.mkdir(parents=True, exist_ok=True)
+    with open(AUTH, "w", encoding="utf-8") as f:
+        json.dump(state, f)
+
+
 def navigate_with_auth(page):
     """Open the TSMIS page and click through any leftover SSO redirect."""
     page.goto(URL)
@@ -715,32 +731,96 @@ def check_browsers():
     return results
 
 
+# The TSMIS page pulls report data from an intranet host, which Chromium's
+# Local Network Access checks would block behind an "allow this site to access
+# devices on your local network?" prompt no one can answer headless. Launch
+# with the checks in their non-warning form and pre-grant the permission on
+# every automated context (_new_app_context).
+_LNA_ARGS = [
+    "--disable-features=LocalNetworkAccessChecksWarnings",
+    "--enable-features=LocalNetworkAccessChecks",
+]
+
+
+def _new_app_context(browser, storage_state=None):
+    """New context with the local-network-access permission pre-granted (see
+    _LNA_ARGS). The fallback drops only the optional permissions kwarg (older
+    browsers may not know the permission name)."""
+    kwargs = {}
+    if storage_state is not None:
+        kwargs["storage_state"] = storage_state
+    try:
+        return browser.new_context(permissions=["local-network-access"], **kwargs)
+    except Exception:
+        return browser.new_context(**kwargs)
+
+
 def new_authed_browser(p):
-    """Launch the headless system browser with the saved auth restored.
+    """Launch a headless browser ready to drive TSMIS.
+
+    With a valid saved session, restores it into the user's preferred browser
+    (the original flow). With NO usable saved session, runs in DEVICE SIGN-IN
+    mode instead: a fresh Microsoft Edge context with no cookies at all -- the
+    "Caltrans Azure AD" click in navigate_with_auth() then lets Windows device
+    auth sign the context in live, with no typed credentials. Edge is forced
+    there regardless of the channel preference because on managed Caltrans PCs
+    only Edge gets the silent Windows sign-in (Chrome asks for credentials).
+    A fresh cookie-free context matters too: stale Azure cookies make Azure AD
+    fall back to interactive prompts instead of attempting silent auth.
 
     Returns (browser, context, page). Caller is responsible for browser.close().
-    Raises BrowserNotFoundError if neither Edge nor Chrome is installed.
     """
-    browser = launch_browser(
-        p,
-        headless=True,
-        args=[
-            "--disable-features=LocalNetworkAccessChecksWarnings",
-            "--enable-features=LocalNetworkAccessChecks",
-        ],
-    )
-    # The fallback drops only the optional permissions kwarg (older browsers may
-    # not grant "local-network-access"); the storage_state itself is already
-    # shape-validated by require_valid_auth(), so it isn't the thing that fails here.
+    state = None
     try:
-        ctx = browser.new_context(
-            storage_state=str(AUTH),
-            permissions=["local-network-access"],
-        )
-    except Exception:
-        ctx = browser.new_context(storage_state=str(AUTH))
+        require_valid_auth()
+        state = str(AUTH)
+    except AuthError:
+        state = None
+
+    if state is None:
+        try:
+            browser = p.chromium.launch(headless=True, channel="msedge", args=_LNA_ARGS)
+        except Exception as e:
+            raise AuthError(
+                "No saved session, and Microsoft Edge isn't available for "
+                "automatic sign-in. Please log in."
+            ) from e
+    else:
+        browser = launch_browser(p, headless=True, args=_LNA_ARGS)
+    ctx = _new_app_context(browser, storage_state=state)
     page = ctx.new_page()
     return browser, ctx, page
+
+
+def try_device_sso_login(p):
+    """Attempt a fully silent TSMIS sign-in with NO saved session, in Edge.
+
+    Opens a fresh headless Microsoft Edge context (no cookies -- stale Azure
+    cookies make Azure AD prompt interactively instead of trying silent auth),
+    lets the page redirect to the portal sign-in, and clicks "Caltrans Azure
+    AD" via the same navigate_with_auth() the engine uses. On managed Caltrans
+    PCs Windows device auth answers the Azure AD challenge, so the context
+    lands logged in with no typed credentials. Edge-only by design: Chrome
+    doesn't get the silent sign-in there. Anywhere else Azure AD wants
+    interactive input, which never completes headless -- returns None after
+    the wait. Returns a storage_state dict, or None."""
+    browser = None
+    try:
+        browser = p.chromium.launch(headless=True, channel="msedge", args=_LNA_ARGS)
+        ctx = _new_app_context(browser)
+        page = ctx.new_page()
+        navigate_with_auth(page)
+        if is_logged_in(page):
+            return ctx.storage_state()
+        return None
+    except Exception:
+        return None
+    finally:
+        if browser is not None:
+            try:
+                browser.close()
+            except Exception:
+                pass
 
 
 def storage_state_is_portable(p, state):
@@ -756,8 +836,8 @@ def storage_state_is_portable(p, state):
     must test a capture here before writing the auth file."""
     browser = None
     try:
-        browser = launch_browser(p, headless=True)
-        ctx = browser.new_context(storage_state=state)
+        browser = launch_browser(p, headless=True, args=_LNA_ARGS)
+        ctx = _new_app_context(browser, storage_state=state)
         page = ctx.new_page()
         navigate_with_auth(page)
         return is_logged_in(page)

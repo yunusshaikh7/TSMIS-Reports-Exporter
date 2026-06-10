@@ -2,7 +2,7 @@
 
 > Bulk-export Caltrans TSMIS reports for every California state route — from a single click.
 
-[![Version](https://img.shields.io/badge/version-0.5.1-blue)](version.py)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue)](version.py)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](#)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](#)
 [![Automation](https://img.shields.io/badge/automation-Playwright-2EAD33?logo=microsoftedge&logoColor=white)](#)
@@ -100,8 +100,11 @@ portable and leaves nothing behind on the system.
 
 ## Usage
 
-1. **Log in** — click **Log in**, complete SSO + MFA in the browser window that
-   opens, then confirm. Your session is saved and reused until it expires.
+1. **Log in** — click **Log in**. On managed Caltrans PCs the tool usually
+   signs in **automatically** using Microsoft Edge and your Windows account (no
+   password, no window) — and exports can even sign themselves in with no prior
+   login. Otherwise a browser window opens: complete SSO + MFA, then confirm;
+   your session is saved and reused until it expires.
 2. **Export** — tick the report types, optionally enter a subset of routes
    (blank = all), and click **Start**. Progress, counts, and a live log are shown;
    use **Skip** for a slow route or **Cancel** to stop.
