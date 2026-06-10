@@ -176,6 +176,24 @@ class LoginWorker(threading.Thread):
         log = logging.getLogger("tsmis.login")
         try:
             with sync_playwright() as p:
+                # The Built-in Chromium (bundled, or downloaded by setup) is the
+                # most reliable sign-in window: it is unmanaged, so org policy
+                # can't relaunch it into a work profile mid-SSO (the managed-Edge
+                # failure). Use it when present; otherwise run the experimental
+                # persistent-profile Edge flow with its Chrome fallback.
+                if "chromium" in BROWSER_CHANNELS:
+                    browser = None
+                    try:
+                        browser = p.chromium.launch(headless=False, channel="chromium")
+                    except Exception as e:
+                        log.info("login: Built-in Chromium launch failed (%s)",
+                                 type(e).__name__)
+                        self.q.put(("log", "The built-in browser could not open; "
+                                           "trying another browser."))
+                    if browser is not None:
+                        self._run_login_in_browser(browser, CHANNEL_LABELS["chromium"], log)
+                        return
+
                 edge_state = self._try_edge_persistent_login(p, log)
                 if edge_state is self._CANCELLED:
                     self.q.put(("cancelled", None))
@@ -189,76 +207,6 @@ class LoginWorker(threading.Thread):
                 self.q.put(("log", "Experimental Edge sign-in was not captured; "
                                    "opening Google Chrome fallback."))
                 self._run_standard_login(p, log)
-                return
-
-                browser = launch_browser(p, headless=False)
-                ctx = browser.new_context()
-                page = ctx.new_page()
-                page.goto(URL)
-                self.q.put(("login_open", None))
-
-                # Wait for the user to finish (the "I've finished" button sets
-                # self.done) OR to close the whole browser window. Capture the
-                # session the instant a real TSMIS login appears, so closing the
-                # window AFTER signing in still saves it.
-                #
-                # ROBUSTNESS (this is what was broken): the SSO/MFA sign-in
-                # navigates, can open a popup, and may replace the original tab,
-                # and a single Playwright call can blip mid-redirect. So we must
-                # NOT treat one ctx.cookies() error -- nor the *original* tab
-                # closing -- as "the user gave up." The old code did, which slammed
-                # the window shut the instant a password went through and reported
-                # "cancelled." The only reliable "user closed the window" signal is
-                # that NO tabs remain open in the context (the SSO dance always
-                # keeps >= 1 tab), with a long all-calls-failing streak as a
-                # backstop for a truly dead connection.
-                captured = None
-                closed = False
-                blips = 0
-                while not self.done.wait(0.3):
-                    try:
-                        ctx.cookies()                       # pump Playwright events
-                        blips = 0
-                    except Exception:
-                        blips += 1          # transient mid-redirect blip, or gone -- decided below
-                    try:
-                        open_pages = [pg for pg in ctx.pages if not pg.is_closed()]
-                    except Exception:
-                        open_pages = None   # context momentarily unavailable; re-check next tick
-                    if (open_pages is not None and len(open_pages) == 0) or blips >= 20:
-                        closed = True       # every tab gone (or ~6s unreachable) -> window closed
-                        break
-                    if captured is None:
-                        try:
-                            if self._any_logged_in(ctx):
-                                captured = ctx.storage_state()
-                        except Exception:
-                            pass            # mid-navigation; retry on the next tick
-
-                if closed:
-                    self.q.put(("log", "Login window closed — checking your sign-in…"))
-
-                if self.cancel.is_set():
-                    self._safe_close(browser)
-                    self.q.put(("cancelled", None))
-                    return
-
-                # "I've finished" clicked with the window still open -> last capture.
-                if not closed:
-                    try:
-                        if self._any_logged_in(ctx):
-                            captured = ctx.storage_state()
-                    except Exception:
-                        pass
-                self._safe_close(browser)
-
-                if captured:                                # a real login -> save it
-                    self._save_state(captured)
-                    self.q.put(("login_saved", None))
-                elif closed:                                # closed the window, never signed in
-                    self.q.put(("cancelled", None))         # -> just cancel (no window to reopen)
-                else:                                       # clicked "finished" without signing in
-                    self.q.put(("login_failed", None))
         except BrowserNotFoundError as e:
             self.q.put(("error", ("general", str(e))))
         except Exception as e:
@@ -327,6 +275,9 @@ class LoginWorker(threading.Thread):
         self._run_login_in_browser(browser, label, log)
 
     def _run_login_in_browser(self, browser, label, log):
+        """Drive a normal (non-persistent) headed sign-in in `browser` and save
+        the session once a real TSMIS login is seen. Used for the Built-in
+        Chromium path and the Chrome fallback."""
         ctx = browser.new_context()
         page = ctx.new_page()
         page.goto(URL)
@@ -334,28 +285,42 @@ class LoginWorker(threading.Thread):
         self.q.put(("login_open", None))
         self.q.put(("log", f"Sign-in window opened in {label}."))
 
+        # Wait for the user to finish (the "I've finished" button sets
+        # self.done) OR to close the whole browser window. Capture the session
+        # the instant a real TSMIS login appears, so closing the window AFTER
+        # signing in still saves it.
+        #
+        # ROBUSTNESS: the SSO/MFA sign-in navigates, can open a popup, and may
+        # replace the original tab, and a single Playwright call can blip
+        # mid-redirect. So we must NOT treat one ctx.cookies() error -- nor the
+        # *original* tab closing -- as "the user gave up" (that bug once slammed
+        # the window shut the instant a password went through and reported
+        # "cancelled"). The only reliable "user closed the window" signal is
+        # that NO tabs remain open in the context (the SSO dance always keeps
+        # >= 1 tab), with a long all-calls-failing streak as a backstop for a
+        # truly dead connection.
         captured = None
         closed = False
         blips = 0
         while not self.done.wait(0.3):
             try:
-                ctx.cookies()
+                ctx.cookies()                   # pump Playwright events
                 blips = 0
             except Exception:
-                blips += 1
+                blips += 1      # transient mid-redirect blip, or gone -- decided below
             try:
                 open_pages = [pg for pg in ctx.pages if not pg.is_closed()]
             except Exception:
-                open_pages = None
+                open_pages = None   # context momentarily unavailable; re-check next tick
             if (open_pages is not None and len(open_pages) == 0) or blips >= 20:
-                closed = True
+                closed = True   # every tab gone (or ~6s unreachable) -> window closed
                 break
             if captured is None:
                 try:
                     if self._any_logged_in(ctx):
                         captured = ctx.storage_state()
                 except Exception:
-                    pass
+                    pass        # mid-navigation; retry on the next tick
 
         if closed:
             self.q.put(("log", "Login window closed - checking your sign-in..."))

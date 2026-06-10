@@ -118,7 +118,9 @@ class App(tk.Tk):
         # squeezed to zero. Width is fixed (the footer path would otherwise force
         # an absurdly wide window); height follows the content.
         self.update_idletasks()
-        win_w = 680
+        # The header check strip grows a dot when the Built-in Chromium channel
+        # is present; give that variant a little more width.
+        win_w = 700 if len(BROWSER_CHANNELS) > 2 else 680
         win_h = self.winfo_reqheight()
         self.geometry(f"{win_w}x{win_h}")
         self.minsize(620, win_h)
@@ -170,17 +172,21 @@ class App(tk.Tk):
 
         ttk.Label(strip, text="Browser", style="HeaderMuted.TLabel").grid(row=0, column=0, sticky="w")
         self.browser_combo = ttk.Combobox(
-            strip, state="readonly", width=15,
+            strip, state="readonly", width=17,
             values=[CHANNEL_LABELS[c] for c in BROWSER_CHANNELS])
-        self.browser_combo.set(CHANNEL_LABELS["msedge"])        # default: Edge
+        # Default to the first channel launch_browser would resolve: the
+        # Built-in Chromium when this install carries one, otherwise Edge.
+        self.browser_combo.set(CHANNEL_LABELS[BROWSER_CHANNELS[0]])
         self.browser_combo.grid(row=0, column=1, sticky="w", padx=(6, 16))
         self.browser_combo.bind("<<ComboboxSelected>>", self._on_browser_pick)
 
         checks = ttk.Frame(strip, style="Header.TFrame")
         checks.grid(row=0, column=2, sticky="w")
-        for i, (key, label) in enumerate(
-                [("browser_msedge", "Edge"), ("browser_chrome", "Chrome"),
-                 ("output", "Output"), ("tools", "Tools")]):
+        _short = {"chromium": "Chromium", "msedge": "Edge", "chrome": "Chrome"}
+        check_dots = [(f"browser_{c}", _short.get(c, CHANNEL_LABELS[c]))
+                      for c in BROWSER_CHANNELS]
+        check_dots += [("output", "Output"), ("tools", "Tools")]
+        for i, (key, label) in enumerate(check_dots):
             dot = ttk.Label(checks, text="●", style="Dot.TLabel", foreground=DOT["unknown"])
             dot.grid(row=0, column=2 * i, padx=(14 if i else 0, 3))
             lab = ttk.Label(checks, text=label, style="HeaderMuted.TLabel")

@@ -11,7 +11,10 @@
 # Proven on Windows + Python 3.11 in the Phase 1 spike. See build\app.spec for
 # the packaging recipe.
 
-param([switch]$SelfTest)   # -SelfTest builds a headless GUI self-test instead of the windowed app
+param(
+    [switch]$SelfTest,        # builds a headless self-test instead of the windowed app
+    [switch]$BundleChromium   # ships Playwright's own Chromium inside the bundle (the with-browser variant)
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -35,11 +38,12 @@ Write-Host "==> Installing pinned build dependencies"
 & $VenvPy -m pip install --upgrade pip --quiet; Assert-LastExit "pip upgrade"
 & $VenvPy -m pip install -r (Join-Path $RepoRoot "requirements-build.txt"); Assert-LastExit "pip install"
 
-# NOTE: no Chromium is downloaded or bundled. The app drives the machine's
-# installed Microsoft Edge / Google Chrome (channel="msedge"/"chrome"), so only
-# the Playwright Node driver (node.exe, part of the pip package) ships. This is
-# what keeps the bundle small and free of a flagged browser. See app.spec and
-# scripts/common.launch_browser.
+# NOTE: by default no Chromium is downloaded or bundled. The app drives the
+# machine's installed Microsoft Edge / Google Chrome (channel="msedge"/
+# "chrome"), so only the Playwright Node driver (node.exe, part of the pip
+# package) ships -- this is what keeps the default bundle small and free of a
+# flagged browser. -BundleChromium builds the with-browser variant instead
+# (step 2b). See app.spec and scripts/common.launch_browser.
 
 # --- 2. Package as a portable onefolder -----------------------------------
 if ($SelfTest) {
@@ -63,12 +67,28 @@ Write-Host "==> Running PyInstaller"
     --distpath $DistDir --workpath $WorkDir --noconfirm
 Assert-LastExit "PyInstaller"
 
+# --- 2b. Optionally bundle the Built-in Chromium ---------------------------
+# The with-browser variant ships Playwright's own Chromium inside
+# _internal\ms-playwright. At runtime paths.py points PLAYWRIGHT_BROWSERS_PATH
+# at that folder, and common.py then lists "Built-in Chromium" as the default
+# channel (Edge/Chrome stay in the picker). --no-shell skips the separate
+# headless shell: channel="chromium" runs the full browser in new-headless
+# mode, so one binary serves headed sign-in AND headless exports. Done BEFORE
+# the prune so its locale trimming applies to the browser too.
+$AppDir = Join-Path $DistDir $env:TSMIS_APP_NAME
+if ($BundleChromium) {
+    Write-Host "==> Downloading the Built-in Chromium into the bundle"
+    $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $AppDir "_internal\ms-playwright"
+    & $VenvPy -m playwright install chromium --no-shell
+    Assert-LastExit "playwright install chromium"
+    Remove-Item Env:PLAYWRIGHT_BROWSERS_PATH
+}
+
 # --- 3. Trim to runtime-only files + DLP guard ----------------------------
 # The bundled Playwright driver ships docs / "agent skill" files whose examples
 # contain test credit-card numbers; corporate DLP blocks those. Strip the
 # non-runtime files and FAIL the build if any markdown doc or credit-card-like
 # number remains, so a release can never reintroduce the problem.
-$AppDir = Join-Path $DistDir $env:TSMIS_APP_NAME
 Write-Host "==> Pruning bundle to runtime-only files and scanning for DLP-blocked content"
 & (Join-Path $BuildDir "prune_bundle.ps1") -Target $AppDir
 

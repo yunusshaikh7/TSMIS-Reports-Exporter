@@ -23,8 +23,10 @@
 #
 # Safety: the prune set below is exactly what was verified to keep a real
 # Chromium launch + page.pdf() + downloads working. The Chromium browser folder
-# (_internal\ms-playwright) is an unmodified upstream distribution and is left
-# untouched and excluded from the content scan.
+# (_internal\ms-playwright, shipped only by the -BundleChromium variant) is an
+# upstream distribution: aside from dropping unused locale packs and prose docs
+# (neither is touched at runtime) it is left as-is, and it is excluded from the
+# content scan.
 
 param(
     [Parameter(Mandatory = $true)][string]$Target,
@@ -186,8 +188,9 @@ if ($leftoverDocs) {
 }
 
 # (b) No high-confidence sensitive data in any text file across the bundle. The
-#     upstream Chromium folder is skipped (unmodifiable; not bundled today
-#     anyway). Patterns mirror the common DLP "sensitive information types", each
+#     upstream Chromium folder is skipped (unmodifiable upstream binaries; only
+#     present in the -BundleChromium variant). Patterns mirror the common DLP
+#     "sensitive information types", each
 #     chosen to avoid false positives that would wrongly block a release:
 #       credit cards : brand IIN prefix + canonical length + Luhn
 #       private keys : PEM "BEGIN ... PRIVATE KEY" blocks

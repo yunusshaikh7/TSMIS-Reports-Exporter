@@ -42,9 +42,20 @@ retained as a development and fallback path, and runs the same core engine.
 
 **Design decisions (don't relitigate without reason):**
 - **Packaging:** PyInstaller **onefolder**, shipped as a portable zip (no installer).
-- **Browser:** do **NOT** bundle a browser. Drive the machine's installed Edge
-  (then Chrome) via `channel="msedge"`/`"chrome"`. Edge is Chromium, ships with
-  Windows, and supports `page.pdf()` + downloads. Bundle is ~148 MB (was ~587).
+- **Browser channels — three release variants, one codebase:**
+  - **`*-win64.zip` (default build):** no bundled browser. Drives the machine's
+    installed Edge (then Chrome) via `channel="msedge"`/`"chrome"`. Edge is
+    Chromium, ships with Windows, supports `page.pdf()` + downloads. ~148 MB.
+  - **`*-win64-with-browser.zip` (`build.ps1 -BundleChromium`):** additionally
+    ships Playwright's own Chromium in `_internal\ms-playwright`; `paths.py`
+    points `PLAYWRIGHT_BROWSERS_PATH` at it and `common.py` lists **Built-in
+    Chromium** as the *default* channel (Edge/Chrome stay in the dropdown).
+  - **`*-batch-source.zip`:** the `.bat` console flow; `1. setup…bat` pip-installs
+    the libs **and** runs `playwright install chromium --no-shell`.
+  The `chromium` channel only appears when a Playwright Chromium is actually
+  present (`common._chromium_available()`), so the default build's UI is
+  unchanged. `channel="chromium"` runs the full browser in new-headless mode —
+  one binary for headed sign-in and headless exports (no headless shell needed).
 - **Data location (option A):** the packaged app writes `output/`, auth token,
   logs, and config **next to the `.exe`**, falling back to
   `%LOCALAPPDATA%\TSMIS Exporter` if read-only. See `scripts/paths.py`.
@@ -55,30 +66,37 @@ retained as a development and fallback path, and runs the same core engine.
 `pyinstaller-hooks-contrib==2026.5`. Built/tested on **Python 3.11**. The export
 engine is live-verified against TSMIS.
 
-> **⚠️ OPEN ISSUE — Edge sign-in broken in the managed Caltrans environment.**
+> **✅ RESOLVED (v0.5.0) — Edge sign-in in the managed Caltrans environment.**
 > Managed Edge relaunches itself into the work profile mid-Azure-AD-login, killing
-> the Playwright window (`TargetClosedError` on `storage_state`). Confirmed with
-> zero page interaction from us — it's Edge's org-managed behavior. Ruled out (none
-> helped): removing mid-login polling, `--edge-skip-compat-layer-relaunch`,
-> InPrivate. **Sign-in currently needs Chrome** (captured session is
-> browser-agnostic, so exports still run on Edge), but not all Caltrans PCs have
-> Chrome — still needs a real fix. Candidates: persistent on-disk Edge profile read
-> back after close; CDP re-attach to the relaunched Edge; IT disabling Edge profile
-> auto-switching; a small portable Chromium just for sign-in. (v0.4.2 tried
-> defaulting sign-in to Chrome, regressed Chrome too, rolled back to v0.4.1 — start
-> the fix from a clean base and test against managed Edge.)
+> the Playwright window (`TargetClosedError` on `storage_state`) — Edge's
+> org-managed behavior, with zero interaction from us. Fixed two ways:
+> 1. **Persistent-profile Edge recapture** (`login.py` / `LoginWorker`): sign-in
+>    opens Edge on a durable app-owned profile (`EDGE_LOGIN_PROFILE_DIR`) with a
+>    CDP port; after the user finishes, the session is captured from the live
+>    context, else by CDP re-attach to the relaunched Edge, else by reopening the
+>    profile tree headless and reading the cookies back. Chrome remains the
+>    fallback when nothing was captured.
+> 2. **Built-in Chromium** (preferred when present): unmanaged, so org policy
+>    can't touch the sign-in window at all. Ships in the with-browser release
+>    variant and is downloaded by the `.bat` setup. See *Browser channels* below.
+> (Historical: removing mid-login polling, `--edge-skip-compat-layer-relaunch`,
+> and InPrivate did NOT help; v0.4.2's "default sign-in to Chrome" regressed
+> Chrome too and was rolled back.)
 
 ## `.bat` Console Flow (dev / fallback)
 
 The shipped GUI replaces steps 2–4 with buttons; these scripts run the same core
 and are kept for development and as a fallback.
 
-1. **`1. setup (one time).bat`** — `pip install -r requirements.txt`. No browser
-   download; uses the machine's Edge/Chrome.
-2. **`2. login (update login).bat`** — opens a visible browser; user does SSO+MFA,
-   then confirms to save the session to `scripts/tsmis_auth.json` (shared by all
-   exports). Login is **validated before saving** (a real TSMIS login must be
-   detected), so clicking "finished" without signing in won't save a junk session.
+1. **`1. setup (one time).bat`** — `pip install -r requirements.txt`, then
+   `playwright install chromium --no-shell` (the Built-in Chromium; on download
+   failure it warns and the tool falls back to the machine's Edge/Chrome).
+2. **`2. login (update login).bat`** — opens a visible browser (Built-in Chromium
+   when present, else the persistent-profile Edge flow with Chrome fallback);
+   user does SSO+MFA, then confirms to save the session to
+   `scripts/tsmis_auth.json` (shared by all exports). Login is **validated
+   before saving** (a real TSMIS login must be detected), so clicking "finished"
+   without signing in won't save a junk session.
 3. **`3. run_export (main script).bat`** — checks auth exists, shows a menu
    (`1`–`4` single report, `A` = several/all → `export_multi.py`, `Q` quit), then
    prompts for routes (Enter = all; or `5, 99, 101` — any casing/padding, suffixes
@@ -95,6 +113,8 @@ and are kept for development and as a fallback.
 run app (GUI preview).bat         # dev launcher for the GUI
 requirements.txt / -build.txt     # pinned runtime / build deps
 version.py                        # app name/version + pinned Playwright (Node driver)
+.github/workflows/release.yml     # tag push (or manual dispatch) -> self-test gate ->
+                                  #   builds + publishes the three release zips
 scripts/
   paths.py            # frozen-aware paths (option A): DATA_ROOT, OUTPUT_ROOT, AUTH, LOG_DIR, FAILURES_DIR, CONFIG_FILE
   logging_setup.py    # rotating file log under LOG_DIR (every entry point calls it)
@@ -113,9 +133,11 @@ scripts/
   consolidate_{ramp_detail,highway_sequence,highway_log}.py  # thin wrappers over the base
   gui_main.py / gui_app.py / gui_worker.py / gui_theme.py    # GUI entry / window / worker threads / styles
 build/
-  build.ps1           # one-command onefolder build (-SelfTest = headless verify gate)
+  build.ps1           # one-command onefolder build (-SelfTest = headless verify gate;
+                      #   -BundleChromium = ship the Built-in Chromium inside the bundle)
   prune_bundle.ps1    # strip to runtime-only files + DLP guard (run by build.ps1)
   app.spec            # PyInstaller spec (Node driver + pdf/excel; excludes image libs; version-info + icon + manifest; no browser)
+  release_notes.md    # body of the GitHub release (which zip to pick + highlights)
   app.ico / app.manifest / full_smoke.py / dist_readme.txt / .venv/ (git-ignored)
 dist/                 # build output: dist/TSMIS Exporter/ (git-ignored)
 output/               # folder structure tracked (.gitkeep); contents git-ignored
@@ -199,13 +221,22 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 
 ## Auth / Session
 
-- `login.py` writes the auth file via `ctx.storage_state(path=paths.AUTH)`, only
-  **after** a real login is detected (`is_logged_in` on any page — SSO can land in
-  a popup). The GUI `LoginWorker` also watches the window closing, but the reliable
-  signal is **no open tabs remain** (the SSO flow always keeps ≥1 tab) — it does
-  NOT treat the original page closing, a connection blip, or a single transient
-  `ctx.cookies()` error as "closed" (that caused false "cancelled"). On any
-  non-save outcome no file is written, so a prior valid session is preserved.
+- **Sign-in browser order** (`login.py` console / `gui_worker.LoginWorker`):
+  1. **Built-in Chromium** when present — a normal headed sign-in; unmanaged, so
+     org policy can't kill the window.
+  2. **Persistent-profile Edge recapture** — Edge opens on the app-owned
+     `EDGE_LOGIN_PROFILE_DIR` with a CDP port; capture from the live context,
+     else `capture_edge_login_state_over_cdp` (re-attach to the relaunched
+     managed Edge), else `capture_edge_login_state_from_profiles` (reopen the
+     profile tree headless and read the session off disk).
+  3. **Chrome fallback**, then any `launch_browser`-resolvable browser.
+- The auth file is written only **after** a real login is detected
+  (`is_logged_in` on any page — SSO can land in a popup). The GUI `LoginWorker`
+  also watches the window closing, but the reliable signal is **no open tabs
+  remain** (the SSO flow always keeps ≥1 tab) — it does NOT treat the original
+  page closing, a connection blip, or a single transient `ctx.cookies()` error
+  as "closed" (that caused false "cancelled"). On any non-save outcome no file
+  is written, so a prior valid session is preserved.
 - The engine calls `require_valid_auth()` first — checks the file exists, is valid
   JSON, **and is shaped like a storage_state** (`cookies`/`origins` lists) — else
   raises `AuthError`. `cli.py` catches it, clears the stale file, guides re-login;
@@ -215,14 +246,25 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 
 From the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps1`
 → windowed `dist\TSMIS Exporter\` (~148 MB; double-click `TSMIS Exporter.exe`).
-Add `-SelfTest` for a headless console build that **builds AND runs**
-`full_smoke.py` over the pruned frozen bundle (system-browser pdf+download,
-pdfplumber, openpyxl, GUI) — a real release gate.
+Add `-BundleChromium` for the with-browser variant (downloads Playwright's
+Chromium into `_internal\ms-playwright` before the prune). Add `-SelfTest` for a
+headless console build that **builds AND runs** `full_smoke.py` over the pruned
+frozen bundle (browser pdf+download, pdfplumber, openpyxl, GUI) — a real release
+gate (`-SelfTest -BundleChromium` gates the bundled-Chromium path).
 
 `build.ps1`: (1) creates `build\.venv` from `requirements-build.txt`; (2) runs
 PyInstaller with `app.spec`, entry `scripts\gui_main.py`, windowed, copies
-`dist_readme.txt` in as "Start Here.txt"; (3) runs `prune_bundle.ps1`; (4) with
-`-SelfTest`, runs the self-test exe and fails on nonzero exit.
+`dist_readme.txt` in as "Start Here.txt"; (2b) with `-BundleChromium`, runs
+`playwright install chromium --no-shell` with `PLAYWRIGHT_BROWSERS_PATH` aimed
+inside the bundle; (3) runs `prune_bundle.ps1`; (4) with `-SelfTest`, runs the
+self-test exe and fails on nonzero exit.
+
+**Releasing:** push a `v*` tag (or run the `release` workflow manually with a
+tag input — it creates the tag) and `.github/workflows/release.yml` runs both
+self-test gates on `windows-latest`, builds the three zips (`win64`,
+`win64-with-browser`, `batch-source` via `git archive`), and publishes the
+GitHub release with `build/release_notes.md` as the body. Bump `version.py`
+first; nothing is published if any gate fails.
 
 `app.spec` highlights:
 - `collect_all('playwright')` + Playwright's hooks → the Node driver ships. **No
@@ -237,10 +279,12 @@ PyInstaller with `app.spec`, entry `scripts\gui_main.py`, windowed, copies
   version-info resource from `version.py`, `app.ico`, `app.manifest` (`asInvoker` +
   Win10/11), `upx=False`. **Code-signing is the only complete fix** (not yet done).
 - **Browser selection** is in `common.launch_browser`: once per process it probes
-  each channel (msedge → chrome; override `TSMIS_BROWSER_CHANNEL`) by launching
-  headless and driving a page, so a too-new Edge falls through to Chrome. Raises
-  `BrowserNotFoundError` (distinguishing "none installed" from "too new — update
-  the tool") only if both fail. No `PLAYWRIGHT_BROWSERS_PATH` is set.
+  each channel (chromium when present → msedge → chrome; override
+  `TSMIS_BROWSER_CHANNEL`; GUI dropdown sets `set_preferred_channel`) by
+  launching headless and driving a page, so a too-new Edge falls through to the
+  next channel. Raises `BrowserNotFoundError` (distinguishing "none installed"
+  from "too new — update the tool") only if all fail. `PLAYWRIGHT_BROWSERS_PATH`
+  is set by `paths.py` only when the bundle ships `_internal\ms-playwright`.
 
 **Bundle hygiene / DLP (`prune_bundle.ps1`):** strips the bundle to runtime-only
 files and **fails the build** if DLP-blocked content remains. Motivating case: the
@@ -293,7 +337,8 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 ## Conventions
 
 - Keep core code console-free; messages UI-neutral (see *Two Run Modes*).
-- Sync Playwright API (not async). Runtime deps pinned; no browser bundled.
+- Sync Playwright API (not async). Runtime deps pinned; a browser is bundled
+  **only** in the `-BundleChromium` variant.
 - End-user setup uses global `pip` (no venv); the build uses `build\.venv`.
 - **No tests** — true verification is a live export against TSMIS (needs login) or
   running a consolidator over existing files. Import-level sanity checks can use
@@ -312,7 +357,7 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | County dropdown timeout | Slow network | Raise `COUNTY_ENABLE_TIMEOUT_MS` |
 | One report's output wrong | That report's selector changed | Edit only its `ReportSpec` |
 | "page looks different than expected" | Preflight failed — site changed | Check `LOG_DIR`/`FAILURES_DIR`; update selectors |
-| `BrowserNotFoundError` | Neither Edge nor Chrome installable | Install Edge or set `TSMIS_BROWSER_CHANNEL` |
+| `BrowserNotFoundError` | No usable browser found | Install Edge, re-run `1. setup…bat` (downloads Chromium), or use the with-browser zip |
 | Browser launch fails after an Edge/Chrome update | Evergreen browser outran pinned Playwright CDP | Bump `playwright` in `requirements*.txt`, rebuild |
 | DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |
 | Build: "GUARD FAILED" | A dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` |

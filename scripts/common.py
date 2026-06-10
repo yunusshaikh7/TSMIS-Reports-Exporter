@@ -14,7 +14,9 @@ import json
 import os
 import re
 import socket
+import sys
 import time
+from pathlib import Path
 
 try:
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -354,34 +356,74 @@ def wait_with_skip_option(page, js_condition, prefix, events,
             next_status = now + 30
 
 
-# The app drives a Chromium-based browser ALREADY on the machine instead of
-# bundling one (smaller download, nothing for AV/DLP to flag, auto-updated by the
-# OS). Microsoft Edge ships with Windows; Chrome is the common alternative. Both
-# are Chromium, so page.pdf() and downloads work.
+# The app normally drives a Chromium-based browser ALREADY on the machine
+# instead of bundling one (smaller download, nothing for AV/DLP to flag,
+# auto-updated by the OS). Microsoft Edge ships with Windows; Chrome is the
+# common alternative. Both are Chromium, so page.pdf() and downloads work.
 #
-# Forward-compatibility: launching a *system channel* (not a pinned bundled
-# Chromium) is intentionally version-tolerant -- Playwright talks CDP, which is
-# stable, so ordinary Edge auto-updates keep working without a rebuild. To be
-# safe anyway we (a) PROBE the browser before trusting it -- launch headless and
-# actually drive a page -- so a too-new Edge that Playwright can't control is
-# detected and we fall through to Chrome, and (b) fail with a clear, accurate
-# message that tells the user to update the tool (vs. "install a browser") only
-# when a browser is present but unusable. Only a very major Chromium-wide change
-# that breaks BOTH Edge and Chrome would require bumping Playwright.
+# Some installs ALSO carry a private "Built-in Chromium" for Playwright: the
+# with-browser release zip ships one inside _internal\ms-playwright (paths.py
+# points PLAYWRIGHT_BROWSERS_PATH at it), and the .bat setup downloads one via
+# `playwright install chromium`. When present it is listed first and becomes
+# the default: it is unmanaged -- org policy can't relaunch it into a work
+# profile mid-SSO, the failure that broke managed-Edge sign-in -- and its
+# revision is pinned to the Playwright driver. Edge and Chrome stay in the
+# picker as fallbacks. channel="chromium" runs the full browser in new-headless
+# mode, so the one binary serves both headed sign-in and headless exports.
+#
+# Forward-compatibility: launching a *system channel* is intentionally
+# version-tolerant -- Playwright talks CDP, which is stable, so ordinary Edge
+# auto-updates keep working without a rebuild. To be safe anyway we (a) PROBE
+# the browser before trusting it -- launch headless and actually drive a page --
+# so a too-new Edge that Playwright can't control is detected and we fall
+# through to the next channel, and (b) fail with a clear, accurate message that
+# tells the user to update the tool (vs. "install a browser") only when a
+# browser is present but unusable.
 #
 # An admin can pin a channel with the TSMIS_BROWSER_CHANNEL environment variable.
-BROWSER_CHANNELS = ("msedge", "chrome")
-CHANNEL_LABELS = {"msedge": "Microsoft Edge", "chrome": "Google Chrome"}
+
+
+def _playwright_browsers_dir():
+    """Folder where Playwright keeps its own browsers. PLAYWRIGHT_BROWSERS_PATH
+    wins (paths.py points it at the bundle's ms-playwright when one ships next
+    to the .exe); otherwise Playwright's per-OS default cache."""
+    env = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "").strip()
+    if env and env != "0":
+        return Path(env)
+    home = Path.home()
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or str(home / "AppData" / "Local")
+        return Path(base) / "ms-playwright"
+    if sys.platform == "darwin":
+        return home / "Library" / "Caches" / "ms-playwright"
+    return home / ".cache" / "ms-playwright"
+
+
+def _chromium_available():
+    """True if a Playwright-managed Chromium appears to be installed (bundled
+    next to the .exe, or downloaded by `playwright install chromium`). A cheap
+    folder check -- the launch-time probe still validates it actually runs."""
+    try:
+        return any(_playwright_browsers_dir().glob("chromium-*"))
+    except OSError:
+        return False
+
+
+BROWSER_CHANNELS = ((("chromium",) if _chromium_available() else ())
+                    + ("msedge", "chrome"))
+CHANNEL_LABELS = {"chromium": "Built-in Chromium", "msedge": "Microsoft Edge",
+                  "chrome": "Google Chrome"}
 
 _resolved_channel = None        # validated channel, cached for the process
 _preferred_channel = None       # user's pick (tried first; the other stays a fallback)
 
 
 def set_preferred_channel(channel):
-    """Record the user's preferred browser (tried first; the other channel stays
-    a fallback). None resets to the default (Edge first). Clears the resolved
-    cache so the next launch honors the new preference. A hard
-    TSMIS_BROWSER_CHANNEL env override still wins over this."""
+    """Record the user's preferred browser (tried first; the other channels stay
+    fallbacks). None resets to the default order (Built-in Chromium when present,
+    then Edge, then Chrome). Clears the resolved cache so the next launch honors
+    the new preference. A hard TSMIS_BROWSER_CHANNEL env override still wins
+    over this."""
     global _preferred_channel, _resolved_channel
     _preferred_channel = channel if channel in BROWSER_CHANNELS else None
     _resolved_channel = None
@@ -431,11 +473,12 @@ def _probe_channel(p, channel):
 
 
 def _resolve_channel(p, exclude=()):
-    """Pick a browser Playwright can drive -- Edge, then Chrome -- validating each
-    by probe. Cached for the process. `exclude` skips channels already known to
-    fail a real launch (so the fallback doesn't re-pick the same broken one).
-    Raises BrowserNotFoundError (UI-neutral) with a message that distinguishes
-    "none installed" from "installed but too new for this tool"."""
+    """Pick a browser Playwright can drive -- Built-in Chromium when present,
+    then Edge, then Chrome -- validating each by probe. Cached for the process.
+    `exclude` skips channels already known to fail a real launch (so the
+    fallback doesn't re-pick the same broken one). Raises BrowserNotFoundError
+    (UI-neutral) with a message that distinguishes "none installed" from
+    "installed but too new for this tool"."""
     global _resolved_channel
     if _resolved_channel and _resolved_channel not in exclude:
         return _resolved_channel
@@ -464,7 +507,8 @@ def _resolve_channel(p, exclude=()):
 
 
 def launch_browser(p, *, headless=True, **kwargs):
-    """Launch the system browser Playwright can drive (Edge, then Chrome).
+    """Launch the first browser Playwright can drive (Built-in Chromium when
+    present, then the system Edge, then Chrome).
 
     Resolves + validates the channel once per process (a headless probe, so no
     window flashes during headed login), caches it, then launches for real. If a

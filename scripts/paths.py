@@ -75,3 +75,16 @@ LOG_DIR = _PRIVATE / "logs"
 FAILURES_DIR = _PRIVATE / "failures"   # screenshot + page HTML captured when a route fails
 CONFIG_FILE = _PRIVATE / "config.json"
 EDGE_LOGIN_PROFILE_DIR = _PRIVATE / "edge_login_profile"
+
+# Built-in Chromium (the with-browser release variant): build.ps1 -BundleChromium
+# ships Playwright's ms-playwright folder inside _internal. Point Playwright at
+# it here -- this module is imported (via common) by every entry point before any
+# sync_playwright() starts -- unless the user already pinned
+# PLAYWRIGHT_BROWSERS_PATH themselves. The system-browser variant ships no such
+# folder, so nothing is set and the app keeps driving the machine's Edge/Chrome.
+# NOTE: next to the .exe, NOT under DATA_ROOT -- the browser is part of the
+# read-only bundle, never user data.
+if is_frozen() and not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+    _bundled_browsers = Path(sys.executable).resolve().parent / "_internal" / "ms-playwright"
+    if _bundled_browsers.is_dir():
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(_bundled_browsers)
