@@ -11,6 +11,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TSMIS Exporter</title>
+<script>
+  // Resolve the theme BEFORE the stylesheet paints (no flash). The saved
+  // preference is auto|light|dark; the html attribute always carries the
+  // EFFECTIVE light/dark (app.js keeps "auto" following the OS live).
+  (function () {
+    var pref = "auto";
+    try { pref = localStorage.getItem("tsmis-theme") || "auto"; } catch (e) { /* system default */ }
+    var dark = pref === "dark" || (pref !== "light"
+      && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  })();
+</script>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -73,6 +85,13 @@
       </label>
       <label class="tb-field">Browser
         <span class="tb-select"><select id="selBrowser"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+      </label>
+      <label class="tb-field">Theme
+        <span class="tb-select"><select id="selTheme">
+          <option value="auto">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
       </label>
       <div class="checks" id="checkStrip"></div>
       <button class="btn btn-titlebar" id="btnRecheck">
@@ -205,14 +224,20 @@
         </div>
       </div>
 
-      <!-- Compare pane (TSMIS vs TSN highway log) -->
+      <!-- Compare pane (TSMIS vs TSN) -->
       <div class="card pane hidden" id="paneCompare">
+        <div class="card-section">
+          <div class="section-head"><span class="section-label">Comparison type</span></div>
+          <div class="option-list" id="compareList"></div>
+        </div>
+
         <div class="card-section">
           <div class="section-head"><span class="section-label">Files to compare</span></div>
           <p class="hint" style="margin-bottom:10px">
-            Pick the two per-route Highway Log workbooks: the TSMIS export, and the
-            TSN file made by the TSN Highway Log consolidation (in
-            <span class="mono">output\tsn_highway_log</span>).
+            Pick the TSMIS file and the TSN file — either two per-route workbooks
+            (e.g. one route's export vs its TSN conversion from
+            <span class="mono">output\tsn_highway_log</span>) or two consolidated
+            workbooks (all routes).
           </p>
           <div class="file-pick-row">
             <span class="file-pick-label">TSMIS file</span>
@@ -235,8 +260,10 @@
           <p class="hint">
             One workbook with live formulas: a Summary, a cell-by-cell Comparison
             (matching values shown plainly, differences in red as
-            “TSMIS&nbsp;≠&nbsp;TSN”), and the two inputs side by side. You'll be
-            asked where to save it.
+            “TSMIS&nbsp;≠&nbsp;TSN”), and the two inputs side by side.
+            Consolidated comparisons also get a Routes sheet — which routes each
+            system covers, what's missing where, and how much differs per route.
+            You'll be asked where to save it.
           </p>
         </div>
 

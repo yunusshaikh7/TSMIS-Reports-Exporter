@@ -21,6 +21,8 @@ import consolidate_highway_sequence as _c_highway_seq
 import consolidate_highway_log as _c_highway_log
 import consolidate_tsn_highway_log as _c_tsn_highway_log
 
+import compare_highway_log as _cmp_highway_log
+
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
 # Order here is the display order in the GUI and the numbering in the console menu.
 EXPORT_REPORTS = [
@@ -44,4 +46,13 @@ CONSOLIDATE_REPORTS = [
     # snapshots, not dated exports) -- the module ignores the day picker and
     # exposes INPUT_NOTE/INPUT_DIR so the GUI can point users at the folder.
     ("TSN Highway Log", _c_tsn_highway_log),
+]
+
+# Compare tab: (menu label, module). Each module exposes
+# compare(tsmis_path, tsn_path, out_path, events, confirm_overwrite) ->
+# ConsolidateResult, plus suggest_name(tsmis_path) for the save dialog.
+# Highway Log is the first of several planned comparison types -- add new ones
+# here and they appear in the GUI automatically.
+COMPARE_REPORTS = [
+    ("Highway Log", _cmp_highway_log),
 ]

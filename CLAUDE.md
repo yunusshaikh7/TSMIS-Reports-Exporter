@@ -32,18 +32,30 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
   don't re-derive the windows. `day` is ignored (vendor snapshots aren't dated
   exports); the module exposes `INPUT_NOTE`/`INPUT_DIR` so the Consolidate
   pane shows where the PDFs go.
-- **Compare tab** (`compare_highway_log.py`): takes one per-route TSMIS export
-  + one per-route TSN conversion (file pickers) and writes a four-sheet
-  discrepancy workbook — Summary / Comparison / TSMIS / TSN — where EVERY
-  number is a live Excel formula (lookup keys, statuses, per-field diffs,
-  summary counts): edit a value on a data sheet and the report recalculates.
-  Matched cells show the matched value; differing cells show
-  "tsmis ≠ tsn" in red (diff detection keys on the " ≠ " marker — formulas,
-  conditional formatting and COUNTIFs all rely on it). Rows are keyed on
-  Location + occurrence; the union is a diff-style document-order merge with
-  first-position dedupe (a key can sit in both files at different sequence
-  positions — TSMIS prints some postmiles out of order). The format is locked
-  to the approved Route-1 sample; the generator is verified cell-for-cell
+- **Compare tab** (`compare_highway_log.py`, first entry of the
+  `COMPARE_REPORTS` registry in `reports.py` — see *Extending: new comparison
+  type*): takes a TSMIS and a TSN Highway Log — **either two per-route
+  workbooks or two consolidated ones** (`Route` + 31 columns; shapes
+  auto-detected, mixed shapes rejected with guidance) — and writes a
+  discrepancy workbook — Summary / Comparison / TSMIS / TSN, plus a **Routes
+  sheet in consolidated mode** (route coverage: Both/TSMIS-only/TSN-only with
+  live per-route row/diff counts; the Summary gains a ROUTE COVERAGE section
+  and the run log lists the missing routes) — where EVERY number is a live
+  Excel formula (lookup keys, statuses, per-field diffs, summary counts):
+  edit a value on a data sheet and the report recalculates (consolidated
+  workbooks make Excel's FIRST recalc slow for the same reason — a Summary
+  note warns). The workbook is written in openpyxl's STREAMING (write_only)
+  mode — the consolidated comparison carries ~2M formula cells, which the
+  normal in-memory mode cannot save in reasonable time (50+ min vs ~3 min;
+  same reason the consolidators stream). Matched cells show the matched
+  value; differing cells show "tsmis ≠ tsn" in red (diff detection keys on
+  the " ≠ " marker — formulas, conditional formatting and COUNTIFs all rely
+  on it). Rows are keyed on (Route +) Location + occurrence; the union is a
+  diff-style document-order merge PER ROUTE with first-position dedupe (a key
+  can sit in both files at different sequence positions — TSMIS prints some
+  postmiles out of order; per-route alignment keeps difflib fast on 50k+
+  rows). Column geometry for both shapes lives in `_Layout`. The per-route
+  format is locked to the approved Route-1 sample and verified cell-for-cell
   against it (same union order, same counts Excel cached: 299 both / 18 / 69 /
   221 diff rows / 971 diff cells) with one intended change — matched values
   shown instead of blank. Med Wid compares after zero-pad normalization
@@ -97,8 +109,10 @@ engine.
   Replaced the original Tkinter window: Tk could neither match the approved
   design (the `tsmis-exporter-ui-demo` Lovable mock — Windows-11 look, dark
   titlebar, two-column layout) nor stop cutting off on small screens; a web
-  layout solves both (responsive, stacks + scrolls below ~980px, dark mode via
-  `prefers-color-scheme`). WebView2 is a safe dependency here: it ships with
+  layout solves both (responsive, stacks + scrolls below ~980px; theme =
+  System/Light/Dark header toggle persisted in localStorage and resolved to
+  an effective `html[data-theme]` before first paint). WebView2 is a safe
+  dependency here: it ships with
   Windows 10/11 and evergreen Edge — the same Edge this tool already requires.
   No frontend framework/build step on purpose (static files ship in the
   bundle; end-user setup stays global-pip). `webview.start(gui="edgechromium")`
@@ -515,6 +529,14 @@ build openpyxl styles inside functions). For an XLSX report, wrap
 (like PDF Ramp Summary), write standalone. Then add the `__main__` →
 `run_consolidate_cli`, wire `4. consolidate…bat`, add to `APP_MODULES` and
 `CONSOLIDATE_REPORTS`, and document here.
+
+**New comparison type:** a module exposing
+`compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None)
+-> ConsolidateResult` (console-free, same rules as consolidators) plus
+`REPORT_NAME` and `suggest_name(tsmis_path)`; add one row to
+`COMPARE_REPORTS` in `reports.py` (the Compare tab's type list is generated
+from it) and the module to `APP_MODULES` in `build/app.spec`. Follow
+`compare_highway_log.py` for the approved live-formula workbook style.
 
 **Add/remove a route:** edit `ROUTES` in `common.py` (zero-padded 3-digit, optional
 suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option values).

@@ -27,7 +27,6 @@ import ctypes
 import json
 import logging
 import os
-import re
 import sys
 import threading
 import time
@@ -36,7 +35,6 @@ from queue import Empty, Queue
 
 import webview
 
-import compare_highway_log
 import run_report
 from gui_worker import CheckWorker, ConsolidateWorker, ExportWorker, LoginWorker
 from exporter_parallel import DEFAULT_WORKERS, MAX_WORKERS
@@ -48,7 +46,7 @@ from common import (
     ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError, clear_auth, get_site,
     parse_routes, require_valid_auth, set_preferred_channel, set_site,
 )
-from reports import EXPORT_REPORTS, CONSOLIDATE_REPORTS
+from reports import COMPARE_REPORTS, CONSOLIDATE_REPORTS, EXPORT_REPORTS
 
 log = logging.getLogger("tsmis.gui")
 # Everything shown in the GUI's log pane is mirrored here, so tsmis.log
@@ -443,6 +441,7 @@ class GuiApi:
             "log_dir": str(LOG_DIR),
             "reports": [{"label": label, "fmt": fmt} for label, fmt, _spec in EXPORT_REPORTS],
             "cons_reports": [label for label, _mod in CONSOLIDATE_REPORTS],
+            "compare_reports": [label for label, _mod in COMPARE_REPORTS],
             "routes": list(ROUTES),
             "channels": [{"id": c, "label": CHANNEL_LABELS[c],
                           "short": _CHANNEL_SHORT.get(c, CHANNEL_LABELS[c])}
@@ -680,27 +679,19 @@ class GuiApi:
         ui_log.info("compare: %s file picked: %s", side, path)
         return {"path": str(path)}
 
-    @staticmethod
-    def _suggest_compare_name(tsmis_path):
-        """Derive 'TSMIS_vs_TSN_Route<id>_Comparison.xlsx' from the picked
-        file's name when it carries a route token, else a generic name."""
-        m = re.search(r"route[ _-]*([0-9]+[A-Za-z]?)", Path(tsmis_path).stem,
-                      re.IGNORECASE)
-        route = f"Route{m.group(1).lstrip('0') or '0'}" if m else "Highway_Log"
-        return f"TSMIS_vs_TSN_{route}_Comparison.xlsx"
-
     @_api_method
-    def start_compare(self, tsmis_path, tsn_path):
+    def start_compare(self, report_idx, tsmis_path, tsn_path):
+        label, mod = COMPARE_REPORTS[int(report_idx)]
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
         if not tsmis_path or not tsn_path:
-            return {"error": "Pick both files first (a TSMIS and a TSN highway log)."}
+            return {"error": f"Pick both files first (a TSMIS and a TSN {label.lower()})."}
         # Where to save — the native dialog also owns the overwrite question.
         picked = self._window.create_file_dialog(
             webview.SAVE_DIALOG,
             directory=str(Path(tsmis_path).parent),
-            save_filename=self._suggest_compare_name(tsmis_path),
+            save_filename=mod.suggest_name(tsmis_path),
             file_types=("Excel workbook (*.xlsx)",))
         if not picked:
             ui_log.info("compare: save dialog cancelled")
@@ -710,16 +701,15 @@ class GuiApi:
         with self._lock:
             self._task = "compare"
         self.cancel_event.clear()
-        self._emit_log("Starting comparison: TSMIS vs TSN Highway Log")
-        self._set_dot("busy", "Comparing Highway Logs…")
+        self._emit_log(f"Starting comparison: TSMIS vs TSN {label}")
+        self._set_dot("busy", f"Comparing {label}s…")
         self._emit({"t": "run_started", "mode": "consolidate",
-                    "label": "Comparing Highway Logs…"})
+                    "label": f"Comparing {label}s…"})
         self._push_state()
         ConsolidateWorker(
             lambda events=None, confirm_overwrite=None, day=None:
-                compare_highway_log.compare(tsmis_path, tsn_path, out,
-                                            events=events,
-                                            confirm_overwrite=confirm_overwrite),
+                mod.compare(tsmis_path, tsn_path, out, events=events,
+                            confirm_overwrite=confirm_overwrite),
             self._q, self.cancel_event, lambda _p: True).start()
         return {"ok": True}
 

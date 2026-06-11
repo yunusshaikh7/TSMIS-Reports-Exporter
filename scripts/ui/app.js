@@ -46,6 +46,24 @@ function setDot(elm, state) {
   elm.className = "dot dot-" + (state || "unknown");
 }
 
+// ------------------------------------------------------------- theme -------
+// Preference: auto | light | dark (persisted). html[data-theme] always holds
+// the EFFECTIVE light/dark; "auto" follows the OS live via matchMedia.
+const THEME_KEY = "tsmis-theme";
+
+function themePref() {
+  try { return localStorage.getItem(THEME_KEY) || "auto"; } catch (_) { return "auto"; }
+}
+
+function applyTheme() {
+  const pref = themePref();
+  const dark = pref === "dark" || (pref !== "light"
+    && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+}
+
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+
 function icon(name, cls) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "ic" + (cls ? " " + cls : ""));
@@ -341,6 +359,24 @@ function buildStatic() {
     cl.appendChild(row);
   });
 
+  // comparison-type radios (one entry today; the registry grows)
+  const cl2 = $("compareList");
+  (init.compare_reports || []).forEach((label, i) => {
+    const row = document.createElement("label");
+    row.className = "option-row" + (i === 0 ? " checked" : "");
+    const rb = document.createElement("input");
+    rb.type = "radio"; rb.name = "compareReport"; rb.checked = i === 0; rb.dataset.idx = i;
+    const dot = document.createElement("span"); dot.className = "radio";
+    const name = document.createElement("span");
+    name.className = "option-name"; name.textContent = "TSMIS vs TSN — " + label;
+    row.append(rb, dot, name);
+    rb.addEventListener("change", () => {
+      cl2.querySelectorAll(".option-row").forEach((r) => r.classList.remove("checked"));
+      row.classList.add("checked");
+    });
+    cl2.appendChild(row);
+  });
+
   // titlebar selects
   const fill = (sel, items, currentId) => {
     items.forEach(({ id, label }) => {
@@ -383,6 +419,10 @@ function selectedReportIdxs() {
 }
 function consChoice() {
   const r = $("consList").querySelector("input:checked");
+  return r ? +r.dataset.idx : 0;
+}
+function compareChoice() {
+  const r = $("compareList").querySelector("input:checked");
   return r ? +r.dataset.idx : 0;
 }
 function selectedDay() {
@@ -446,6 +486,8 @@ function renderState() {
   $("btnCancelCons").disabled = st.task !== "consolidate";
   $("btnSaveReport").disabled = locked || !st.can_save_report;
   ["btnPickTsmis", "btnPickTsn", "btnOpenConsInput"].forEach((id) => { $(id).disabled = locked; });
+  $("compareList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+  $("compareList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
   $("btnCancelCompare").disabled = st.task !== "compare";
   syncCompareButton();
 
@@ -695,7 +737,7 @@ async function pickCompareFile(side) {
 }
 
 async function startCompare() {
-  const res = await api.start_compare(CMP.tsmis, CMP.tsn);
+  const res = await api.start_compare(compareChoice(), CMP.tsmis, CMP.tsn);
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 
@@ -720,6 +762,13 @@ function bindEvents() {
     $("panelSub").textContent = TABS[tab].sub;
   };
   Object.entries(TABS).forEach(([key, t]) => { $(t.btn).onclick = () => setTab(key); });
+
+  $("selTheme").value = themePref();
+  $("selTheme").onchange = () => {
+    try { localStorage.setItem(THEME_KEY, $("selTheme").value); } catch (_) { /* keep for session */ }
+    applyTheme();
+    api.ui_event("theme:" + $("selTheme").value);
+  };
 
   $("selBrowser").onchange = () => api.set_browser($("selBrowser").value);
   $("selSource").onchange = () => api.set_site($("selSource").value, $("selEnv").value);
@@ -917,6 +966,7 @@ function makeMockApi() {
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       reports: REPORTS,
       cons_reports: REPORTS.map((r) => r.label).concat(["TSN Highway Log"]),
+      compare_reports: ["Highway Log"],
       routes: ROUTES,
       channels: [
         { id: "msedge", label: "Microsoft Edge", short: "Edge" },
@@ -1016,7 +1066,7 @@ function makeMockApi() {
         ? "C:\\Users\\you\\Downloads\\tsmis_highway_log_route 1.xlsx"
         : "C:\\Users\\you\\Downloads\\tsn_highway_log_route 1.xlsx",
     }),
-    start_compare: async () => {
+    start_compare: async (_idx) => {
       st.task = "compare";
       st.auth_dot = "busy"; st.auth_text = "Comparing Highway Logs…";
       pushState();
@@ -1025,6 +1075,7 @@ function makeMockApi() {
       setTimeout(() => {
         push({ t: "log", text: "TSMIS rows: 317   TSN rows: 368   union: 386 locations" },
              { t: "log", text: "Matched rows with differences: 221 (971 differing cells); 78 fully identical" },
+             { t: "log", text: "Routes only in TSMIS (missing from TSN) (2): 254, 259" },
              { t: "log", text: "Output: TSMIS_vs_TSN_Route1_Comparison.xlsx" },
              { t: "run_ended" });
         st.task = null;
