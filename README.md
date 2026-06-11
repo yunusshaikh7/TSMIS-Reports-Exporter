@@ -2,7 +2,7 @@
 
 > Bulk-export Caltrans TSMIS reports for every California state route — from a single click.
 
-[![Version](https://img.shields.io/badge/version-0.6.1-blue)](version.py)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue)](version.py)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](#)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](#)
 [![Automation](https://img.shields.io/badge/automation-Playwright-2EAD33?logo=microsoftedge&logoColor=white)](#)
@@ -64,10 +64,10 @@ of `.bat` scripts for development and as a fallback.
 
 | Report | Output format | Output folder |
 |---|---|---|
-| TSAR: Ramp Summary | PDF (Letter) | `output/ramp_summary/` |
-| TSAR: Ramp Detail | XLSX | `output/ramp_detail/` |
-| Highway Sequence Listing | XLSX | `output/highway_sequence/` |
-| Highway Log | XLSX | `output/highway_log/` |
+| TSAR: Ramp Summary | PDF (Letter) | `output/<date>/ramp_summary/` |
+| TSAR: Ramp Detail | XLSX | `output/<date>/ramp_detail/` |
+| Highway Sequence Listing | XLSX | `output/<date>/highway_sequence/` |
+| Highway Log | XLSX | `output/<date>/highway_log/` |
 
 <!-- Tip: drop a screenshot of the GUI here once available, e.g. ![TSMIS Exporter](docs/screenshot.png) -->
 
@@ -106,10 +106,14 @@ portable and leaves nothing behind on the system.
    saved login. Otherwise a browser window opens: complete SSO + MFA, then
    confirm; your session is saved and reused until it expires.
 2. **Export** — tick the report types, optionally enter a subset of routes
-   (blank = all), and click **Start**. Progress, counts, and a live log are shown;
-   use **Skip** for a slow route or **Cancel** to stop.
-3. **Consolidate** *(optional)* — on the Consolidate tab, pick a report type to
-   combine all per-route files into one workbook under `output/consolidated/`.
+   (blank = all), and click **Start**. The header dropdowns choose the **data
+   source** (SSOR / ARS) and **environment** (Prod / Test / Dev) — defaults
+   SSOR + Prod. Each day's files land in their own `output/<date>/` folder.
+   Progress, counts, and a live log are shown; use **Skip** for a slow route or
+   **Cancel** to stop.
+3. **Consolidate** *(optional)* — on the Consolidate tab, pick a report type
+   (and which export day — newest by default) to combine that day's per-route
+   files into one workbook under `output/<date>/consolidated/`.
 4. **Save run report** *(optional)* — export a CSV of every route's outcome.
 
 **Fast mode** (experimental): tick **⚡ Fast mode** and choose a worker count to

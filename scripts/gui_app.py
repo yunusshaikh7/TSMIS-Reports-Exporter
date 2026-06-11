@@ -22,19 +22,18 @@ from gui_theme import DOT, PALETTE
 from gui_worker import CheckWorker, ConsolidateWorker, ExportWorker, LoginWorker
 from exporter_parallel import DEFAULT_WORKERS, MAX_WORKERS
 
-from paths import LOG_DIR, OUTPUT_ROOT
+from paths import LOG_DIR, OUTPUT_ROOT, list_output_days
 from version import APP_NAME, __version__
 from common import (
-    BROWSER_CHANNELS, CHANNEL_LABELS, ROUTES, AuthError, clear_auth, parse_routes,
-    require_valid_auth, set_preferred_channel,
+    BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES, DATA_SOURCE_LABELS,
+    ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError, clear_auth, get_site,
+    parse_routes, require_valid_auth, set_preferred_channel, set_site,
 )
 
 # The report list lives in one place (reports.py) so the GUI and the console
 # multi-exporter can't drift. EXPORT_REPORTS = [(label, fmt, spec)],
 # CONSOLIDATE_REPORTS = [(label, consolidate_fn, OUT_PATH)].
 from reports import EXPORT_REPORTS, CONSOLIDATE_REPORTS
-
-CONSOLIDATED_DIR = OUTPUT_ROOT / "consolidated"
 
 PAD = 14
 
@@ -92,7 +91,9 @@ class App(tk.Tk):
         self._tip = None                # the active tooltip Toplevel, if any
 
         self.columnconfigure(0, weight=1)
-        self.rowconfigure(3, weight=1)         # log row expands
+        # The log row both expands AND absorbs window shrinking (it scrolls, so
+        # squeezing it never hides controls); minsize keeps it readable.
+        self.rowconfigure(3, weight=1, minsize=110)
 
         self._build_header()                   # header now hosts the compact readiness strip
         self._build_notebook()
@@ -106,6 +107,7 @@ class App(tk.Tk):
             self.fast_check,
             self.routes_entry, self.btn_choose_routes,
             self.browser_combo, self.btn_recheck,
+            self.src_combo, self.env_combo, self.day_combo,
             *self.export_checks, *self.cons_radios,
         ]
         # Run-only controls start disabled (no task is running, no result yet).
@@ -122,9 +124,14 @@ class App(tk.Tk):
         # The header check strip grows a dot when the Built-in Chromium channel
         # is present; give that variant a little more width.
         win_w = 700 if len(BROWSER_CHANNELS) > 2 else 680
-        win_h = self.winfo_reqheight()
+        req_h = self.winfo_reqheight()
+        # Fit small screens: cap the initial height to the screen, and keep the
+        # window shrinkable below the full content height -- the weighted log
+        # row absorbs the squeeze (it has a minsize floor and scrolls), so
+        # controls are never pushed off the bottom without a way to recover.
+        win_h = min(req_h, int(self.winfo_screenheight() * 0.9))
         self.geometry(f"{win_w}x{win_h}")
-        self.minsize(620, win_h)
+        self.minsize(620, min(win_h, 520))
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.refresh_auth()
@@ -199,6 +206,24 @@ class App(tk.Tk):
 
         self.btn_recheck = ttk.Button(strip, text="Re-check", width=9, command=self.start_checks)
         self.btn_recheck.grid(row=0, column=4, sticky="e")
+
+        # Site row: which TSMIS data source / environment the runs hit.
+        # Defaults to SSOR + Prod (or the TSMIS_SRC / TSMIS_ENV env overrides).
+        site = ttk.Frame(strip, style="Header.TFrame")
+        site.grid(row=1, column=0, columnspan=5, sticky="w", pady=(8, 0))
+        cur_src, cur_env = get_site()
+        ttk.Label(site, text="Data source", style="HeaderMuted.TLabel").grid(row=0, column=0)
+        self.src_combo = ttk.Combobox(site, state="readonly", width=6,
+                                      values=[DATA_SOURCE_LABELS[s] for s in DATA_SOURCES])
+        self.src_combo.set(DATA_SOURCE_LABELS[cur_src])
+        self.src_combo.grid(row=0, column=1, padx=(6, 18))
+        self.src_combo.bind("<<ComboboxSelected>>", self._on_site_pick)
+        ttk.Label(site, text="Environment", style="HeaderMuted.TLabel").grid(row=0, column=2)
+        self.env_combo = ttk.Combobox(site, state="readonly", width=6,
+                                      values=[ENVIRONMENT_LABELS[e] for e in ENVIRONMENTS])
+        self.env_combo.set(ENVIRONMENT_LABELS[cur_env])
+        self.env_combo.grid(row=0, column=3, padx=(6, 0))
+        self.env_combo.bind("<<ComboboxSelected>>", self._on_site_pick)
 
     # ---- tiny hover tooltip (for the compact check dots) --------------------
 
@@ -279,10 +304,11 @@ class App(tk.Tk):
                                      textvariable=self.fast_workers)
         self.fast_spin.grid(row=0, column=1, padx=(6, 6))
         ttk.Label(fast, text="browsers at once").grid(row=0, column=2, sticky="w")
-        ttk.Label(ex, text="Faster, but heavier on your PC; 3–4 recommended. "
-                           "Per-route Skip is off in fast mode.",
-                  style="Muted.TLabel", wraplength=600, justify="left").grid(
-            row=row, column=0, sticky="w", pady=(3, 0))
+        self.fast_note = ttk.Label(
+            ex, text="Faster, but heavier on your PC; 3–4 recommended. "
+                     "Per-route Skip is off in fast mode.",
+            style="Muted.TLabel", wraplength=600, justify="left")
+        self.fast_note.grid(row=row, column=0, sticky="w", pady=(3, 0))
         row += 1
 
         actions = ttk.Frame(ex)
@@ -302,33 +328,53 @@ class App(tk.Tk):
         # Consolidate tab
         co = ttk.Frame(nb, padding=(PAD, 10))
         co.columnconfigure(0, weight=1)
+        crow = 0
         ttk.Label(co, text="REPORT TO CONSOLIDATE (combine downloaded files)",
-                  style="Section.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 6))
+                  style="Section.TLabel").grid(row=crow, column=0, sticky="w", pady=(0, 6))
+        crow += 1
         self.cons_radios = []
-        for i, (label, _fn, _out) in enumerate(CONSOLIDATE_REPORTS):
-            rb = ttk.Radiobutton(co, text=label, value=i, variable=self.cons_choice)
-            rb.grid(row=1 + i, column=0, sticky="w")
+        for i, (label, _mod) in enumerate(CONSOLIDATE_REPORTS):
+            rb = ttk.Radiobutton(co, text=label, value=i, variable=self.cons_choice,
+                                 command=self._update_cons_dest)
+            rb.grid(row=crow, column=0, sticky="w")
             self.cons_radios.append(rb)
+            crow += 1
         ttk.Label(co, text="Combines the per-route files already in the output folder "
                            "into one workbook.", style="Muted.TLabel").grid(
-            row=1 + len(CONSOLIDATE_REPORTS), column=0, sticky="w", pady=(8, 0))
+            row=crow, column=0, sticky="w", pady=(8, 0))
+        crow += 1
+
+        # Exports are grouped into output/<YYYY-MM-DD>/ folders; consolidate
+        # the newest day by default, or pick an earlier one.
+        dayrow = ttk.Frame(co)
+        dayrow.grid(row=crow, column=0, sticky="w", pady=(10, 0))
+        crow += 1
+        ttk.Label(dayrow, text="Export day").grid(row=0, column=0, sticky="w")
+        self.day_combo = ttk.Combobox(dayrow, state="readonly", width=14, values=[])
+        self.day_combo.grid(row=0, column=1, sticky="w", padx=(8, 6))
+        self.day_combo.bind("<<ComboboxSelected>>", self._update_cons_dest)
+        ttk.Label(dayrow, text="(newest first)", style="Muted.TLabel").grid(
+            row=0, column=2, sticky="w")
 
         dest = ttk.Frame(co)
-        dest.grid(row=2 + len(CONSOLIDATE_REPORTS), column=0, sticky="ew", pady=(10, 0))
+        dest.grid(row=crow, column=0, sticky="ew", pady=(10, 0))
+        crow += 1
         dest.columnconfigure(0, weight=1)
-        ttk.Label(dest, text=f"Saved to:  {CONSOLIDATED_DIR}", style="Muted.TLabel",
-                  wraplength=440, justify="left").grid(row=0, column=0, sticky="w")
+        self.cons_dest_label = ttk.Label(dest, text="", style="Muted.TLabel",
+                                         wraplength=440, justify="left")
+        self.cons_dest_label.grid(row=0, column=0, sticky="w")
         ttk.Button(dest, text="Open folder",
                    command=self._open_consolidated_folder).grid(row=0, column=1, sticky="e", padx=(8, 0))
 
         actions = ttk.Frame(co)
-        actions.grid(row=3 + len(CONSOLIDATE_REPORTS), column=0, sticky="w", pady=(PAD, 0))
+        actions.grid(row=crow, column=0, sticky="w", pady=(PAD, 0))
         self.btn_cons_start = ttk.Button(actions, text="Start consolidation", style="Accent.TButton",
                                          command=self.start_consolidate)
         self.btn_cons_start.grid(row=0, column=0)
         self.btn_cons_cancel = ttk.Button(actions, text="Cancel", command=self.cancel_current)
         self.btn_cons_cancel.grid(row=0, column=1, padx=(8, 0))
         nb.add(co, text="Consolidate")
+        self._refresh_days()                   # fill the day picker (newest first)
 
     def _build_progress(self):
         f = ttk.Frame(self, padding=(PAD, 0))
@@ -398,6 +444,23 @@ class App(tk.Tk):
     def _sync_fast_controls(self):
         """Enable the worker-count spinner only when fast mode is checked."""
         self.fast_spin.state(["!disabled"] if self.fast_mode.get() else ["disabled"])
+
+    def _sync_fast_mode_availability(self):
+        """Fast mode needs a saved login: device sign-in mode runs ONE browser
+        (the persistent Edge profile can't be opened by several at once), so
+        without an auth file the checkbox is greyed out with an explanation."""
+        if self._authed:
+            self.fast_check.state(["!disabled"])
+            self.fast_note.config(
+                text="Faster, but heavier on your PC; 3–4 recommended. "
+                     "Per-route Skip is off in fast mode.")
+        else:
+            self.fast_mode.set(False)
+            self.fast_check.state(["disabled"])
+            self.fast_note.config(
+                text="Fast mode needs a saved login — automatic sign-in runs one "
+                     "browser at a time. Log in first to enable it.")
+        self._sync_fast_controls()
 
     def _update_route_feedback(self, *_):
         """Live hint under the Routes entry: blank = all routes, otherwise the
@@ -515,6 +578,7 @@ class App(tk.Tk):
             else:
                 self.set_dot("bad", "No saved login — click Log in")
         self.btn_login.config(text=self._login_label())
+        self._sync_fast_mode_availability()
 
     # ---- startup readiness checks -------------------------------------------
 
@@ -563,6 +627,39 @@ class App(tk.Tk):
             self.log(f"Browser set to {self.browser_combo.get()} "
                      "(the other is still used as a fallback if needed).")
 
+    def _on_site_pick(self, _evt=None):
+        src = next((s for s in DATA_SOURCES
+                    if DATA_SOURCE_LABELS[s] == self.src_combo.get()), None)
+        env = next((e for e in ENVIRONMENTS
+                    if ENVIRONMENT_LABELS[e] == self.env_combo.get()), None)
+        set_site(source=src, environment=env)
+        self.log(f"Site set to {self.src_combo.get()} / {self.env_combo.get()} "
+                 "(used by the next sign-in or export).")
+
+    # ---- consolidate day picker ----------------------------------------------
+
+    _LEGACY_DAY = "(older exports)"    # shown when no dated output folders exist
+
+    def _refresh_days(self):
+        """Repopulate the Export-day picker from output/ (newest first), keeping
+        the current selection when it still exists."""
+        days = list_output_days()
+        values = days or [self._LEGACY_DAY]
+        current = self.day_combo.get()
+        self.day_combo.config(values=values)
+        self.day_combo.set(current if current in values else values[0])
+        self._update_cons_dest()
+
+    def _selected_day(self):
+        """The picked export day (YYYY-MM-DD), or None for the legacy layout."""
+        v = self.day_combo.get()
+        return v if v and v != self._LEGACY_DAY else None
+
+    def _update_cons_dest(self, *_):
+        _label, mod = CONSOLIDATE_REPORTS[self.cons_choice.get()]
+        out = mod.out_path_for(self._selected_day())
+        self.cons_dest_label.config(text=f"Saved to:  {out.parent}")
+
     # ---- run-state toggling -------------------------------------------------
 
     def _set_running(self, task):
@@ -591,7 +688,7 @@ class App(tk.Tk):
         self.task = None
         for w in self._inputs:
             w.state(["!disabled"])
-        self._sync_fast_controls()             # restore the spinner to match the checkbox
+        self._sync_fast_mode_availability()    # may re-grey fast mode (no saved login)
         for w in (self.btn_export_skip, self.btn_export_cancel, self.btn_cons_cancel):
             w.state(["disabled"])
         # "Save run report" stays available between runs while a result exists.
@@ -657,7 +754,9 @@ class App(tk.Tk):
                      workers=workers, routes=run_routes).start()
 
     def start_consolidate(self):
-        label, fn, out_path = CONSOLIDATE_REPORTS[self.cons_choice.get()]
+        label, mod = CONSOLIDATE_REPORTS[self.cons_choice.get()]
+        day = self._selected_day()
+        out_path = mod.out_path_for(day)
         if out_path.exists() and not messagebox.askyesno(
                 "Overwrite?",
                 f"A consolidated workbook already exists:\n\n{out_path}\n\nOverwrite it?"):
@@ -665,10 +764,11 @@ class App(tk.Tk):
             return
         self.cancel_event.clear()
         self._clear_progress()
-        self.log(f"Starting consolidation: {label}")
+        self.log(f"Starting consolidation: {label}" + (f"   ·   {day}" if day else ""))
         self._set_running("consolidate")
         self.set_dot("busy", f"Consolidating {label}…")
-        ConsolidateWorker(fn, self.q, self.cancel_event, lambda _p: True).start()
+        ConsolidateWorker(mod.consolidate, self.q, self.cancel_event,
+                          lambda _p: True, day=day).start()
 
     def skip_current(self):
         if self.task == "export":
@@ -709,7 +809,8 @@ class App(tk.Tk):
         self._open_folder(OUTPUT_ROOT)
 
     def _open_consolidated_folder(self):
-        self._open_folder(CONSOLIDATED_DIR)
+        _label, mod = CONSOLIDATE_REPORTS[self.cons_choice.get()]
+        self._open_folder(mod.out_path_for(self._selected_day()).parent)
 
     def _open_logs_folder(self):
         self._open_folder(LOG_DIR)
@@ -816,6 +917,7 @@ class App(tk.Tk):
         if not results:
             self.log("No reports completed.")
             self.refresh_auth()
+            self._refresh_days()
             self._end_task()
             return
         total_saved = total_failed = 0
@@ -837,6 +939,7 @@ class App(tk.Tk):
         if not self._authed:
             self._device_ok = True       # the run signed itself in (device sign-in mode)
         self.refresh_auth()
+        self._refresh_days()             # a new dated export folder may now exist
         self._end_task()
 
     def _finish_consolidate(self, result):
@@ -896,6 +999,7 @@ class App(tk.Tk):
         else:
             self.set_dot("bad", "Error")
             messagebox.showerror("Error", f"{message}\n\nMore details are in the log file.")
+        self._refresh_days()             # a partial run may have created a dated folder
         self._end_task()
 
     def _on_close(self):

@@ -14,30 +14,25 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
-- **Hands-free sign-in on managed Caltrans PCs.** After one normal Edge
-  sign-in (which primes the app's own Edge profile), the tool signs in
-  **automatically** — no password, no browser window. The Log in button
-  completes silently, and exports can even start with **no saved login at
-  all**: the export reopens that Edge profile, clicks "Caltrans Azure AD"
-  itself, and Windows signs it in (Edge only — Chrome stays on the manual
-  sign-in path; automatic sign-in runs one browser at a time, so save a login
-  to use fast mode). The local-network permission the TSMIS site needs is
-  pre-granted in every automated browser.
-- **Managed-Edge sign-in fixed.** Sign-in opens Edge with a durable app-owned
-  profile and recovers the session even when org-managed Edge relaunches itself
-  into the work profile mid-SSO (live capture, then CDP re-attach, then on-disk
-  profile recapture) — with a Google Chrome fallback if nothing was captured.
-- **Captured sign-ins are now verified before saving.** If Edge signed you in
-  through the Windows work profile (device-bound, so the session can't be
-  reused by the export engine), the tool detects it, says so, and falls back to
-  another browser instead of saving a login that won't export.
-- **The Browser dropdown now applies to sign-in too** — pick Google Chrome and
-  the login window opens in Chrome.
-- **New "Built-in Chromium" browser option.** When a Playwright-managed
-  Chromium is present (the with-browser zip, or downloaded by the `.bat`
-  setup), it becomes the default for sign-in and exports — it's unmanaged, so
-  org browser policy can't interfere — and Edge/Chrome remain selectable in the
-  header dropdown. The standard `win64` build always defaults to Edge.
+- **Pick the data source and environment.** Two new header dropdowns choose
+  **SSOR or ARS** and **Prod / Test / Dev** (defaults: SSOR + Prod) — the tool
+  now drives the new TSMIS site, one page for every combination. Console flow:
+  set `TSMIS_SRC` / `TSMIS_ENV`.
+- **Each day's exports get their own folder.** Files now land in
+  `output\<YYYY-MM-DD>\<report>\`, so tomorrow's run starts fresh instead of
+  skipping over today's files. The Consolidate tab gained an **Export day**
+  picker (newest first, newest by default; console prompts, Enter = newest),
+  and the combined workbook is saved in that day's `consolidated\` folder.
+  Exports made with older versions are still found when no dated folders exist.
+- **Fast mode is greyed out without a saved login**, with an explanation:
+  automatic Edge sign-in runs one browser at a time (the sign-in profile can't
+  be shared), so parallel runs need a saved session (e.g. sign in with Chrome).
+- **Fits small screens.** The window now caps its height to the screen and can
+  be shrunk — the log pane absorbs the difference instead of the bottom
+  buttons being cut off.
+- **Hands-free sign-in on managed Caltrans PCs** (since v0.6): after one normal
+  Edge sign-in, login and exports sign themselves in automatically — no
+  password, no window. Chrome stays on the manual sign-in path.
 - First run: if Windows warns about an unknown publisher, choose
   "More info" → "Run anyway" (in-house unsigned tool). If downloaded as a zip,
   right-click → Properties → Unblock before extracting.

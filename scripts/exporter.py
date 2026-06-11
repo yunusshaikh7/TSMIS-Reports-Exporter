@@ -38,7 +38,7 @@ from common import (
     wait_with_skip_option,
 )
 from events import Events, RunResult
-from paths import FAILURES_DIR, OUTPUT_ROOT
+from paths import FAILURES_DIR, output_day_dir
 from run_report import auto_report_path, write_run_report
 
 log = logging.getLogger("tsmis.export")
@@ -304,7 +304,9 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     timeout_ms = timeout_ms or REPORT_TIMEOUT_MS
     retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
 
-    out_dir = OUTPUT_ROOT / spec.subdir
+    # Exports are grouped by day (output/<YYYY-MM-DD>/<report>/), so a new
+    # day's run starts fresh instead of resuming over yesterday's files.
+    out_dir = output_day_dir() / spec.subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     result = RunResult(output_dir=str(out_dir))
     total = len(routes)

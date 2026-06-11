@@ -29,10 +29,14 @@ EXPORT_REPORTS = [
     ("Highway Log", "Excel", _HIGHWAY_LOG_SPEC),
 ]
 
-# Consolidate tab: (menu label, consolidate fn, OUT_PATH). Same order as above.
+# Consolidate tab: (menu label, module). Same order as above. Each module
+# exposes consolidate(events, confirm_overwrite, day=None) plus
+# input_dir_for(day) / out_path_for(day) — paths are day-dependent now that
+# exports are grouped into output/<YYYY-MM-DD>/ folders, so the registry hands
+# out the module rather than a single precomputed OUT_PATH.
 CONSOLIDATE_REPORTS = [
-    ("TSAR: Ramp Summary", _c_ramp_summary.consolidate, _c_ramp_summary.OUT_PATH),
-    ("TSAR: Ramp Detail", _c_ramp_detail.consolidate, _c_ramp_detail.OUT_PATH),
-    ("Highway Sequence Listing", _c_highway_seq.consolidate, _c_highway_seq.OUT_PATH),
-    ("Highway Log", _c_highway_log.consolidate, _c_highway_log.OUT_PATH),
+    ("TSAR: Ramp Summary", _c_ramp_summary),
+    ("TSAR: Ramp Detail", _c_ramp_detail),
+    ("Highway Sequence Listing", _c_highway_seq),
+    ("Highway Log", _c_highway_log),
 ]
