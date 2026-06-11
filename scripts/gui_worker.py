@@ -24,12 +24,12 @@ import logging
 import threading
 
 from common import (
-    ROUTES, AuthError, BrowserNotFoundError, PreflightError,
+    LOGIN_BROWSER_ARGS, ROUTES, AuthError, BrowserNotFoundError, PreflightError,
     BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, get_url, is_logged_in,
     launch_browser, capture_edge_login_state_from_profiles,
     capture_edge_login_state_over_cdp, capture_storage_state_if_logged_in,
-    get_preferred_channel, launch_edge_login_context, save_auth_state,
-    storage_state_is_portable, try_device_sso_login,
+    get_preferred_channel, launch_edge_login_context, new_login_context,
+    save_auth_state, storage_state_is_portable, try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
@@ -243,7 +243,8 @@ class LoginWorker(threading.Thread):
                 if "chromium" in BROWSER_CHANNELS and pref in (None, "chromium"):
                     browser = None
                     try:
-                        browser = p.chromium.launch(headless=False, channel="chromium")
+                        browser = p.chromium.launch(headless=False, channel="chromium",
+                                                    args=LOGIN_BROWSER_ARGS)
                     except Exception as e:
                         log.info("login: Built-in Chromium launch failed (%s)",
                                  type(e).__name__)
@@ -339,11 +340,12 @@ class LoginWorker(threading.Thread):
 
     def _run_standard_login(self, p, log):
         try:
-            browser = p.chromium.launch(headless=False, channel="chrome")
+            browser = p.chromium.launch(headless=False, channel="chrome",
+                                        args=LOGIN_BROWSER_ARGS)
             label = "Google Chrome"
         except Exception as e:
             log.info("login: Chrome launch failed (%s); trying selected browser", type(e).__name__)
-            browser = launch_browser(p, headless=False)
+            browser = launch_browser(p, headless=False, args=LOGIN_BROWSER_ARGS)
             label = "selected browser"
         self._run_login_in_browser(browser, label, log)
 
@@ -351,7 +353,10 @@ class LoginWorker(threading.Thread):
         """Drive a normal (non-persistent) headed sign-in in `browser` and save
         the session once a real TSMIS login is seen. Used for the Built-in
         Chromium path and the Chrome fallback."""
-        ctx = browser.new_context()
+        # Pre-granted local-network-access context: otherwise Chrome prompts
+        # per sign-in and an unanswered prompt blocks the signed-in UI, so the
+        # login is never detected (see common.LOGIN_BROWSER_ARGS).
+        ctx = new_login_context(browser)
         page = ctx.new_page()
         page.goto(get_url())
         self.done.clear()

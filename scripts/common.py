@@ -1105,6 +1105,22 @@ def _new_app_context(browser, storage_state=None):
         return browser.new_context(**kwargs)
 
 
+# Public face of the LNA setup for the HEADED sign-in flows (login.py /
+# gui_worker.LoginWorker). The headed windows need the exact same treatment as
+# the automated contexts: without it, Chrome gates the TSMIS page's intranet
+# data behind an "access devices on your local network?" prompt on EVERY
+# sign-in -- and while the prompt sits unanswered the signed-in UI never
+# appears, so a completed login is never detected and nothing is saved.
+# (The persistent-profile Edge flow has carried this since v0.5.)
+LOGIN_BROWSER_ARGS = _LNA_ARGS
+
+
+def new_login_context(browser):
+    """Context for a headed sign-in window, local-network-access pre-granted.
+    Pair with a launch that passed LOGIN_BROWSER_ARGS."""
+    return _new_app_context(browser)
+
+
 def open_edge_device_context(p, *, headless=True):
     """Open the app-owned persistent Edge sign-in profile, logged in and ready.
 

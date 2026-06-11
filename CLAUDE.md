@@ -362,7 +362,12 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
   one can click headless. Every automated context launches with
   `common._LNA_ARGS` and pre-grants `local-network-access`
   (`common._new_app_context`) — engine contexts, the device sign-in, and the
-  portability probe alike.
+  portability probe alike. The **headed sign-in windows need it too**
+  (`LOGIN_BROWSER_ARGS` + `new_login_context`, used by `login.py` and
+  `gui_worker.LoginWorker`): without the grant Chrome re-prompts on every
+  sign-in, and an unanswered prompt blocks the signed-in UI — so the login is
+  never detected and no session is saved (field bug, fixed v0.8.0; managed
+  Edge avoided it via enterprise policy, which is why only Chrome showed it).
 - **Headed sign-in browser order** (`login.py` console / `gui_worker.LoginWorker`)
   honors the user's pick first (`get_preferred_channel()` — the GUI Browser
   dropdown / `TSMIS_BROWSER_CHANNEL`; picking Chrome goes straight to Chrome and
