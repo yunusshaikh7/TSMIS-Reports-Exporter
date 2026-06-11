@@ -14,6 +14,13 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Sign-in works on the new TSMIS site (0.7.1).** The new report page shows
+  its own "Sign In with ArcGIS" button instead of redirecting, and renders the
+  report form even when signed out — both broke automatic sign-in (Edge AND
+  Chrome) in 0.7.0. The tool now clicks the full chain (app button → portal
+  page → "Caltrans Azure AD", popup-tolerant) and detects sign-in from the
+  app's own state, so saved Chrome sessions and the hands-free Edge sign-in
+  work again.
 - **Pick the data source and environment.** Two new header dropdowns choose
   **SSOR or ARS** and **Prod / Test / Dev** (defaults: SSOR + Prod) — the tool
   now drives the new TSMIS site, one page for every combination. Console flow:
