@@ -21,7 +21,7 @@ from pathlib import Path
 # them; dev/venv runs need the repo on sys.path).
 if not getattr(sys, "frozen", False):
     _repo = Path(__file__).resolve().parents[1]
-    sys.path.insert(0, str(_repo / "scripts"))      # common, gui_app, ...
+    sys.path.insert(0, str(_repo / "scripts"))      # common, gui_api, ...
     sys.path.insert(0, str(_repo))                  # version.py at repo root
 
 import openpyxl                                   # noqa: E402

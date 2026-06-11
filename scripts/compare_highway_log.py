@@ -477,7 +477,7 @@ def _route_coverage(keys_t, keys_n):
             [r for r in rn if r not in set_t])
 
 
-def _write_routes(wb, all_routes, lay, n_union):
+def _write_routes(wb, all_routes, lay):
     """Consolidated mode only: one row per route with LIVE coverage stats —
     which system has it, how many rows each side carries, and how much of it
     differs. The route ids are the row universe (literals, like the
@@ -563,6 +563,13 @@ def _write_summary(wb, tsmis_name, tsn_name, n_union, lay):
     scope = "Consolidated (all routes)" if lay.has_route else "Per-route"
     row[0] = 2
     line((2, f"TSMIS vs TSN — Highway Log — Discrepancy Report ({scope})", title_font))
+    if lay.has_route:
+        # The big workbook ships UNCALCULATED (manual mode): every cell shows
+        # blank/0 until F9. Without a loud banner that reads as broken data.
+        line((2, "▶ PRESS F9 TO CALCULATE — this workbook opens uncalculated "
+                 "(blank/0 cells). The first F9 takes a few minutes; let it "
+                 "finish, then save.",
+              Font(name="Arial", size=11, bold=True, color="C00000")))
     line((2, "Cell-by-cell comparison keyed on "
              + ("Route + Location" if lay.has_route else "Location")
              + " (+ occurrence for duplicates). All formulas are live: edits "
@@ -728,7 +735,7 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None)
         return ConsolidateResult(status="cancelled", message="Cancelled by user.")
     if has_route:
         all_routes, r_both, r_t_only, r_n_only = _route_coverage(keys_t, keys_n)
-        _write_routes(wb, all_routes, lay, len(union))
+        _write_routes(wb, all_routes, lay)
     if _write_data_sheet(wb, "TSMIS", rows_t, lay, events) is None:
         return ConsolidateResult(status="cancelled", message="Cancelled by user.")
     if _write_data_sheet(wb, "TSN", rows_n, lay, events) is None:

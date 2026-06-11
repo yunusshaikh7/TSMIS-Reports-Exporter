@@ -1,8 +1,9 @@
 """Single source of truth for the report registry.
 
 Every report type appears here exactly once, so adding one is a one-place change
-on the Python side: both the GUI (Export + Consolidate tabs, `gui_app.py`) and
-the console multi-exporter (`export_multi.py`) read these lists. (The `.bat`
+on the Python side: both the GUI (Export / Consolidate / Compare tabs,
+`gui_api.py`) and the console multi-exporter (`export_multi.py`) read these
+lists. (The `.bat`
 menus are static text and are still edited by hand — see CLAUDE.md "Adding a New
 Report Type".)
 

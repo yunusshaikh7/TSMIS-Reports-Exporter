@@ -54,12 +54,19 @@ COMBINE FILES
   "output\tsn_highway_log" and one combined workbook.
 
 COMPARE TSMIS vs TSN
-  The Compare tab builds a discrepancy workbook from two per-route Highway
-  Logs: pick the TSMIS file (from an export) and the TSN file (from
-  "output\tsn_highway_log"), then choose where to save. In the result,
+  The Compare tab builds a discrepancy workbook from two Highway Logs --
+  either two per-route files (a TSMIS export + its TSN conversion from
+  "output\tsn_highway_log") or two consolidated all-routes workbooks. Pick
+  the TSMIS file and the TSN file, then choose where to save. In the result,
   matching values are shown in plain text and differences appear in red as
   "TSMIS value <> TSN value" -- everything is a live Excel formula, so edits
-  on the TSMIS/TSN sheets recalculate the whole report.
+  on the TSMIS/TSN sheets recalculate the report.
+
+  Consolidated (all-routes) comparisons also include a Routes sheet (which
+  routes each system covers and how much differs per route) and open in
+  MANUAL calculation because of their size: the file appears instantly with
+  blank cells -- press F9 once in Excel to calculate (takes a few minutes),
+  let it finish, then save. After that it opens fast.
 
 GOOD TO KNOW
   * A route can occasionally fail with a "TSMIS site error" (e.g. "Cannot read
