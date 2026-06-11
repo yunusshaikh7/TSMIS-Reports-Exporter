@@ -141,6 +141,16 @@ engine.
      all threads mid-exception-dispatch — observed wedging init and spamming
      `crash.log` with dumps from healthy-looking runs. Console entry points
      never load the CLR and keep faulthandler's hard-crash dumps.
+  4. **Mark-of-the-Web kills the CLR** (field failure, v0.8.0's first
+     download): extracting the release zip without Unblock tags every file
+     with a `Zone.Identifier` stream and .NET Framework refuses to load
+     tagged assemblies → instant "Failed to resolve Python.Runtime.Loader.
+     Initialize". Dev runs and CI never go through a downloaded zip, so ONLY
+     releases hit it. `gui_main._unblock_dotnet_assemblies()` strips the
+     streams from the bundled .NET trees at startup, before the CLR loads;
+     the fatal box also explains the manual Unblock for read-only installs.
+     Repro for testing: `Set-Content <dll> -Stream Zone.Identifier` with
+     `ZoneId=3` on `_internal\pythonnet\**`.
 - **Browser channels — three release variants, one codebase:**
   - **`*-win64.zip` (default build):** no bundled browser. Drives the machine's
     installed Edge (then Chrome) via `channel="msedge"`/`"chrome"`. Edge is

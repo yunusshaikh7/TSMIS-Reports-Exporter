@@ -14,6 +14,13 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Fix: the downloaded app now starts without unblocking the zip (0.8.1).**
+  Extracting the release zip without right-click → Unblock tags every file
+  as "from the internet", and Windows then refuses to load parts of the new
+  interface — v0.8.0 died on launch with "Failed to resolve
+  Python.Runtime…". The app now removes that flag from its own files at
+  startup, so a plain download-extract-run works. (Unblocking the zip first
+  is still good practice for SmartScreen.)
 - **TSN Highway Log + comparison (0.8.0).** The Consolidate tab gains **TSN
   Highway Log**: drop TSN district PDFs into `input\tsn_highway_log` and it
   converts them into TSMIS-format per-route Excel files plus one combined

@@ -816,13 +816,19 @@ def run():
         webview.start(gui="edgechromium", debug=debug,
                       private_mode=False, storage_path=str(WEBVIEW_PROFILE_DIR))
     except Exception as e:
-        # Most likely cause on a clean PC: the WebView2 runtime is missing
-        # (ships with Windows 10/11 and Microsoft Edge).
+        # Most likely causes: the WebView2 runtime is missing (ships with
+        # Windows 10/11 and Edge), or the app folder came from a downloaded
+        # zip that wasn't unblocked AND sits somewhere read-only, so the
+        # startup self-unblock couldn't strip the Mark-of-the-Web either.
         log.critical("webview failed to start", exc_info=True)
         _fatal_box("The app window could not be created.\n\n"
                    "This tool displays its interface with Microsoft Edge "
                    "WebView2, which is part of Windows 10/11. Installing or "
                    "updating Microsoft Edge restores it.\n\n"
+                   "If this folder was extracted from a downloaded zip, the "
+                   "zip's 'blocked' flag can also cause this: right-click "
+                   "the zip → Properties → tick Unblock → extract again "
+                   "(into a folder you can write to, e.g. Desktop).\n\n"
                    f"Details: {type(e).__name__}: {e}\n"
                    f"Log file: {LOG_DIR}")
         raise SystemExit(1)
