@@ -334,8 +334,11 @@ def _medwid_ref(sheet, col, row_ref):
 def _field_formula(lay, r, field_idx):
     """Comparison cell formula for data field `field_idx` (1-based into
     EXPECTED_HEADER) on Comparison row `r`: the matched value when the two
-    systems agree, 'tsmis ≠ tsn' when they differ, blank when the row isn't
-    in both files."""
+    systems agree, 'tsmis ≠ tsn' when they differ, and on single-side rows
+    (TSMIS only / TSN only — tinted yellow/blue) that system's own value, so
+    the row's data is still readable instead of blank. Excel's IF evaluates
+    only the taken branch, so the absent side's INDEX (whose row ref is "")
+    is never computed on single-side rows."""
     col = lay.data_col(field_idx)
     ct, cs = f"${lay.c_trow}{r}", f"${lay.c_nrow}{r}"
     t, n = _trim_ref("TSMIS", col, ct), _trim_ref("TSN", col, cs)
@@ -345,8 +348,9 @@ def _field_formula(lay, r, field_idx):
         eq = f"{t}={n}"
     show_t = f'IF({t}="","(blank)",{t})'
     show_n = f'IF({n}="","(blank)",{n})'
-    return (f'=IF(${lay.c_status}{r}<>"Both","",IF({eq},{t},'
-            f'{show_t}&"{_DIFF_MARK}"&{show_n}))')
+    st = f"${lay.c_status}{r}"
+    return (f'=IF({st}="TSMIS only",{t},IF({st}="TSN only",{n},IF({eq},{t},'
+            f'{show_t}&"{_DIFF_MARK}"&{show_n})))')
 
 
 # The workbook is written in openpyxl's STREAMING (write_only) mode: the
@@ -618,7 +622,8 @@ def _write_summary(wb, tsmis_name, tsn_name, n_union, lay):
         '• "(blank)" means the cell is empty in that system. Filter the Diffs '
         "column (>0) to isolate rows needing review.",
         "• Yellow rows exist only in TSMIS; blue rows exist only in TSN "
-        "(mostly TSN segment splits and TSMIS realignment markers).",
+        "(mostly TSN segment splits and TSMIS realignment markers). Their "
+        "field cells show that system's own values.",
         "• Rows pair on " + ("Route plus " if lay.has_route else "")
         + "Location plus occurrence number (a postmile listed twice pairs "
         "first-with-first, second-with-second).",

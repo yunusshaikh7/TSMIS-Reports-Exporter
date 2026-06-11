@@ -14,6 +14,10 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Comparison: single-side rows now show their data (0.8.2).** Rows that
+  exist only in TSMIS (yellow) or only in TSN (blue) used to have blank
+  field cells; they now display that system's own values, so what's missing
+  from the other system is readable at a glance.
 - **Fix: the downloaded app now starts without unblocking the zip (0.8.1).**
   Extracting the release zip without right-click → Unblock tags every file
   as "from the internet", and Windows then refuses to load parts of the new
