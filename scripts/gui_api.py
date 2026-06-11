@@ -27,6 +27,7 @@ import ctypes
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -35,6 +36,7 @@ from queue import Empty, Queue
 
 import webview
 
+import compare_highway_log
 import run_report
 from gui_worker import CheckWorker, ConsolidateWorker, ExportWorker, LoginWorker
 from exporter_parallel import DEFAULT_WORKERS, MAX_WORKERS
@@ -573,7 +575,7 @@ class GuiApi:
 
     @_api_method
     def cancel_run(self):
-        if self._task in ("export", "consolidate"):
+        if self._task in ("export", "consolidate", "compare"):
             self.cancel_event.set()
             self._emit_log("Cancel requested…")
         return {"ok": True}
@@ -619,8 +621,24 @@ class GuiApi:
     def consolidate_info(self, report_idx, day):
         _label, mod = CONSOLIDATE_REPORTS[int(report_idx)]
         out = mod.out_path_for(day or None)
-        return {"dest_dir": str(out.parent), "out_path": str(out),
+        info = {"dest_dir": str(out.parent), "out_path": str(out),
                 "exists": out.exists()}
+        # Reports whose input is user-supplied (TSN PDFs) advertise it so the
+        # pane can say where the files go and offer to open that folder.
+        note = getattr(mod, "INPUT_NOTE", None)
+        if note:
+            info["input_note"] = note
+            info["input_dir"] = str(mod.input_dir_for(day or None))
+        return info
+
+    @_api_method
+    def open_consolidate_input(self, report_idx):
+        _label, mod = CONSOLIDATE_REPORTS[int(report_idx)]
+        in_dir = getattr(mod, "INPUT_DIR", None)
+        if in_dir is None:
+            return {"error": "This report has no input folder."}
+        self._open_folder(in_dir)
+        return {"ok": True}
 
     @_api_method
     def decline_overwrite(self):
@@ -645,6 +663,64 @@ class GuiApi:
         # confirm dialog), so the injected callback just says yes.
         ConsolidateWorker(mod.consolidate, self._q, self.cancel_event,
                           lambda _p: True, day=day).start()
+        return {"ok": True}
+
+    # ---- highway log comparison (TSMIS vs TSN) -------------------------------------
+
+    @_api_method
+    def pick_compare_file(self, side):
+        """Native open dialog for one comparison input. `side` is "TSMIS" or
+        "TSN" (display only). Returns {"path": ...} or {"cancelled": True}."""
+        picked = self._window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False,
+            file_types=("Excel workbook (*.xlsx)",))
+        if not picked:
+            return {"cancelled": True}
+        path = picked[0] if isinstance(picked, (list, tuple)) else picked
+        ui_log.info("compare: %s file picked: %s", side, path)
+        return {"path": str(path)}
+
+    @staticmethod
+    def _suggest_compare_name(tsmis_path):
+        """Derive 'TSMIS_vs_TSN_Route<id>_Comparison.xlsx' from the picked
+        file's name when it carries a route token, else a generic name."""
+        m = re.search(r"route[ _-]*([0-9]+[A-Za-z]?)", Path(tsmis_path).stem,
+                      re.IGNORECASE)
+        route = f"Route{m.group(1).lstrip('0') or '0'}" if m else "Highway_Log"
+        return f"TSMIS_vs_TSN_{route}_Comparison.xlsx"
+
+    @_api_method
+    def start_compare(self, tsmis_path, tsn_path):
+        with self._lock:
+            if self._task:
+                return {"error": "A task is already running."}
+        if not tsmis_path or not tsn_path:
+            return {"error": "Pick both files first (a TSMIS and a TSN highway log)."}
+        # Where to save — the native dialog also owns the overwrite question.
+        picked = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            directory=str(Path(tsmis_path).parent),
+            save_filename=self._suggest_compare_name(tsmis_path),
+            file_types=("Excel workbook (*.xlsx)",))
+        if not picked:
+            ui_log.info("compare: save dialog cancelled")
+            return {"cancelled": True}
+        out = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+
+        with self._lock:
+            self._task = "compare"
+        self.cancel_event.clear()
+        self._emit_log("Starting comparison: TSMIS vs TSN Highway Log")
+        self._set_dot("busy", "Comparing Highway Logs…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Comparing Highway Logs…"})
+        self._push_state()
+        ConsolidateWorker(
+            lambda events=None, confirm_overwrite=None, day=None:
+                compare_highway_log.compare(tsmis_path, tsn_path, out,
+                                            events=events,
+                                            confirm_overwrite=confirm_overwrite),
+            self._q, self.cancel_event, lambda _p: True).start()
         return {"ok": True}
 
     # ---- run report / folders -----------------------------------------------------

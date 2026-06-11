@@ -19,6 +19,7 @@ import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
 import consolidate_highway_sequence as _c_highway_seq
 import consolidate_highway_log as _c_highway_log
+import consolidate_tsn_highway_log as _c_tsn_highway_log
 
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
 # Order here is the display order in the GUI and the numbering in the console menu.
@@ -39,4 +40,8 @@ CONSOLIDATE_REPORTS = [
     ("TSAR: Ramp Detail", _c_ramp_detail),
     ("Highway Sequence Listing", _c_highway_seq),
     ("Highway Log", _c_highway_log),
+    # Input = TSN district PDFs dropped into input/tsn_highway_log (vendor
+    # snapshots, not dated exports) -- the module ignores the day picker and
+    # exposes INPUT_NOTE/INPUT_DIR so the GUI can point users at the folder.
+    ("TSN Highway Log", _c_tsn_highway_log),
 ]

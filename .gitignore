@@ -23,6 +23,13 @@ output/consolidated/*
 !output/highway_log/.gitkeep
 !output/consolidated/.gitkeep
 
+# input/ holds user-supplied source files (TSN district PDFs). Keep the folder
+# structure via .gitkeep, ignore the files themselves.
+input/*
+!input/tsn_highway_log/
+input/tsn_highway_log/*
+!input/tsn_highway_log/.gitkeep
+
 __pycache__/
 *.pyc
 .venv/

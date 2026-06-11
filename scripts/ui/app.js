@@ -445,6 +445,9 @@ function renderState() {
   $("btnCancelExport").disabled = st.task !== "export";
   $("btnCancelCons").disabled = st.task !== "consolidate";
   $("btnSaveReport").disabled = locked || !st.can_save_report;
+  ["btnPickTsmis", "btnPickTsn", "btnOpenConsInput"].forEach((id) => { $(id).disabled = locked; });
+  $("btnCancelCompare").disabled = st.task !== "compare";
+  syncCompareButton();
 
   renderDays(st.days || []);
 }
@@ -476,6 +479,16 @@ async function refreshConsDest() {
   if (seq !== consDestSeq) return;          // a newer request superseded this one
   $("consDest").textContent = info.dest_dir;
   $("consDest").title = info.dest_dir;
+  // Reports with user-supplied inputs (TSN PDFs) say where the files go.
+  const row = $("consInputRow");
+  if (info.input_note) {
+    $("consInputNote").textContent = info.input_note;
+    $("consInputDir").textContent = info.input_dir;
+    $("consInputDir").title = info.input_dir;
+    row.classList.remove("hidden");
+  } else {
+    row.classList.add("hidden");
+  }
 }
 
 // progress -------------------------------------------------------------
@@ -655,23 +668,58 @@ async function saveRunReport() {
   if (res && res.error) showMessage("error", "Could not save report", res.error);
 }
 
+// ---- TSMIS vs TSN comparison ----
+const CMP = { tsmis: null, tsn: null };
+
+function renderCompareFiles() {
+  for (const [side, id] of [["tsmis", "cmpTsmisPath"], ["tsn", "cmpTsnPath"]]) {
+    const el = $(id);
+    el.textContent = CMP[side] || "— not selected —";
+    el.title = CMP[side] || "";
+    el.classList.toggle("unset", !CMP[side]);
+  }
+  syncCompareButton();
+}
+
+function syncCompareButton() {
+  const locked = S.st && S.st.task != null;
+  $("btnStartCompare").disabled = locked || !(CMP.tsmis && CMP.tsn);
+}
+
+async function pickCompareFile(side) {
+  const res = await api.pick_compare_file(side.toUpperCase());
+  if (res && res.path) {
+    CMP[side] = res.path;
+    renderCompareFiles();
+  }
+}
+
+async function startCompare() {
+  const res = await api.start_compare(CMP.tsmis, CMP.tsn);
+  if (res && res.error) showMessage("error", "Could not start", res.error);
+}
+
 function bindEvents() {
   // tabs
+  const TABS = {
+    export: { btn: "tabExport", pane: "paneExport", title: "Export reports",
+              sub: "Select reports and routes, then run the batch export." },
+    consolidate: { btn: "tabConsolidate", pane: "paneConsolidate", title: "Consolidate output",
+                   sub: "Merge per-route files into a single workbook." },
+    compare: { btn: "tabCompare", pane: "paneCompare", title: "Compare TSMIS vs TSN",
+               sub: "Pick a TSMIS and a TSN highway log, then build a discrepancy workbook." },
+  };
   const setTab = (tab) => {
     S.tab = tab;
-    $("tabExport").classList.toggle("active", tab === "export");
-    $("tabConsolidate").classList.toggle("active", tab === "consolidate");
-    $("tabExport").setAttribute("aria-selected", String(tab === "export"));
-    $("tabConsolidate").setAttribute("aria-selected", String(tab === "consolidate"));
-    $("paneExport").classList.toggle("hidden", tab !== "export");
-    $("paneConsolidate").classList.toggle("hidden", tab !== "consolidate");
-    $("panelTitle").textContent = tab === "export" ? "Export reports" : "Consolidate output";
-    $("panelSub").textContent = tab === "export"
-      ? "Select reports and routes, then run the batch export."
-      : "Merge per-route files into a single workbook.";
+    Object.entries(TABS).forEach(([key, t]) => {
+      $(t.btn).classList.toggle("active", key === tab);
+      $(t.btn).setAttribute("aria-selected", String(key === tab));
+      $(t.pane).classList.toggle("hidden", key !== tab);
+    });
+    $("panelTitle").textContent = TABS[tab].title;
+    $("panelSub").textContent = TABS[tab].sub;
   };
-  $("tabExport").onclick = () => setTab("export");
-  $("tabConsolidate").onclick = () => setTab("consolidate");
+  Object.entries(TABS).forEach(([key, t]) => { $(t.btn).onclick = () => setTab(key); });
 
   $("selBrowser").onchange = () => api.set_browser($("selBrowser").value);
   $("selSource").onchange = () => api.set_site($("selSource").value, $("selEnv").value);
@@ -697,6 +745,13 @@ function bindEvents() {
   $("btnStartCons").onclick = startConsolidate;
   $("btnCancelCons").onclick = () => api.cancel_run();
   $("btnOpenConsFolder").onclick = () => api.open_consolidated_folder(consChoice(), selectedDay());
+  $("btnOpenConsInput").onclick = () => api.open_consolidate_input(consChoice());
+
+  $("btnPickTsmis").onclick = () => pickCompareFile("tsmis");
+  $("btnPickTsn").onclick = () => pickCompareFile("tsn");
+  $("btnStartCompare").onclick = startCompare;
+  $("btnCancelCompare").onclick = () => api.cancel_run();
+  renderCompareFiles();
 
   $("btnOpenOutput").onclick = () => api.open_output_folder();
   $("btnOpenLogs").onclick = () => api.open_logs_folder();
@@ -861,7 +916,7 @@ function makeMockApi() {
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       reports: REPORTS,
-      cons_reports: REPORTS.map((r) => r.label),
+      cons_reports: REPORTS.map((r) => r.label).concat(["TSN Highway Log"]),
       routes: ROUTES,
       channels: [
         { id: "msedge", label: "Microsoft Edge", short: "Edge" },
@@ -944,11 +999,40 @@ function makeMockApi() {
         push({ t: "log", text: "Cancelled." });
       }, 600);
     },
-    consolidate_info: async (idx, day) => ({
+    consolidate_info: async (idx, day) => (idx === 4 ? {
+      dest_dir: "C:\\Tools\\TSMIS Exporter\\output",
+      out_path: "C:\\Tools\\TSMIS Exporter\\output\\tsn_highway_log_consolidated.xlsx",
+      exists: false,
+      input_note: "Drop the TSN district Highway Log PDFs into the input folder first.",
+      input_dir: "C:\\Tools\\TSMIS Exporter\\input\\tsn_highway_log",
+    } : {
       dest_dir: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated`,
       out_path: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated\\${REPORTS[idx].label.replace(/[:\s]+/g, "_")}.xlsx`,
       exists: idx === 0 && day === "2026-06-10",
     }),
+    open_consolidate_input: async () => push({ t: "log", text: "(mock) would open the TSN input folder" }),
+    pick_compare_file: async (side) => ({
+      path: side === "TSMIS"
+        ? "C:\\Users\\you\\Downloads\\tsmis_highway_log_route 1.xlsx"
+        : "C:\\Users\\you\\Downloads\\tsn_highway_log_route 1.xlsx",
+    }),
+    start_compare: async () => {
+      st.task = "compare";
+      st.auth_dot = "busy"; st.auth_text = "Comparing Highway Logs…";
+      pushState();
+      push({ t: "log", text: "Starting comparison: TSMIS vs TSN Highway Log" },
+           { t: "run_started", mode: "consolidate", label: "Comparing Highway Logs…" });
+      setTimeout(() => {
+        push({ t: "log", text: "TSMIS rows: 317   TSN rows: 368   union: 386 locations" },
+             { t: "log", text: "Matched rows with differences: 221 (971 differing cells); 78 fully identical" },
+             { t: "log", text: "Output: TSMIS_vs_TSN_Route1_Comparison.xlsx" },
+             { t: "run_ended" });
+        st.task = null;
+        st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 2400);
+      return { ok: true };
+    },
     decline_overwrite: async () => push({ t: "log", text: "Consolidation cancelled (kept existing file)." }),
     start_consolidate: async (idx, day) => {
       st.task = "consolidate";

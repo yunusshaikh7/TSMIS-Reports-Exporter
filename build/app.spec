@@ -71,6 +71,7 @@ APP_MODULES = [
     "export_highway_log", "export_multi",
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
+    "consolidate_tsn_highway_log", "compare_highway_log",
     "gui_main", "gui_api", "gui_worker",
 ]
 

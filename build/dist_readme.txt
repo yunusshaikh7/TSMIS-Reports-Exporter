@@ -48,6 +48,19 @@ COMBINE FILES
   that day's "consolidated" folder (e.g. "output\2026-06-10\consolidated").
   The "Export day" picker chooses which day's exports to combine.
 
+  TSN Highway Log: drop the TSN district PDFs (e.g. D01_Highway_Log_TSN.pdf)
+  into the "input\tsn_highway_log" folder first (the pane has an "Input
+  folder" button). It converts them to per-route Excel files in
+  "output\tsn_highway_log" and one combined workbook.
+
+COMPARE TSMIS vs TSN
+  The Compare tab builds a discrepancy workbook from two per-route Highway
+  Logs: pick the TSMIS file (from an export) and the TSN file (from
+  "output\tsn_highway_log"), then choose where to save. In the result,
+  matching values are shown in plain text and differences appear in red as
+  "TSMIS value <> TSN value" -- everything is a live Excel formula, so edits
+  on the TSMIS/TSN sheets recalculate the whole report.
+
 GOOD TO KNOW
   * A route can occasionally fail with a "TSMIS site error" (e.g. "Cannot read
     properties of undefined"). That's a problem on the TSMIS website for that

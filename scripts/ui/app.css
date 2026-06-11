@@ -249,7 +249,7 @@ button, input, select { font-family: inherit; }
 .tabs {
   display: flex; gap: 4px;
   background: var(--secondary); border-radius: var(--radius-lg); padding: 4px;
-  width: 230px; flex-shrink: 0;
+  width: 340px; max-width: 100%; flex-shrink: 0;
 }
 .tab {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
@@ -362,6 +362,20 @@ button, input, select { font-family: inherit; }
 
 .dest-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .dest-text { min-width: 0; }
+
+/* TSN consolidate input-folder note + compare file pickers */
+.cons-input-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 10px; padding: 9px 12px;
+  border: 1px dashed var(--border); border-radius: var(--radius-lg);
+}
+.file-pick-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 0;
+}
+.file-pick-label { width: 78px; flex-shrink: 0; font-size: 13px; font-weight: 500; }
+.file-pick-path { flex: 1; min-width: 0; }
+.file-pick-path.unset { color: var(--muted-foreground); font-family: var(--font-sans); }
 .path { font-size: 12px; color: color-mix(in oklab, var(--foreground) 80%, transparent);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dest-text .path { margin-top: 2px; }

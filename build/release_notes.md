@@ -14,6 +14,13 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **TSN Highway Log + comparison (0.8.0).** The Consolidate tab gains **TSN
+  Highway Log**: drop TSN district PDFs into `input\tsn_highway_log` and it
+  converts them into TSMIS-format per-route Excel files plus one combined
+  workbook. A new **Compare tab** then builds a TSMIS-vs-TSN discrepancy
+  workbook from any two per-route Highway Logs — matching values shown
+  plainly, differences highlighted in red, with live Excel formulas
+  throughout (edit a value and the whole report recalculates).
 - **A brand-new interface (0.8.0).** The window was rebuilt from scratch:
   a cleaner two-column layout (settings on the left, live progress + activity
   log on the right), per-route progress with running counts, clearer sign-in

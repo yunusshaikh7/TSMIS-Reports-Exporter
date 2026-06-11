@@ -22,6 +22,33 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 `common.get_url()`. Defaults: **SSOR + Prod**; the GUI header has two dropdowns
 (`set_site`), the console flow honors `TSMIS_SRC` / `TSMIS_ENV`.
 
+**Beyond the TSMIS exports (v0.8.0, ported from TSMIS-Report-Consolidator):**
+- **TSN Highway Log** (consolidate-only): parses TSN district Highway Log PDFs
+  (report OTM52010) that the user drops into `input/tsn_highway_log/`, writes
+  TSMIS-format per-route workbooks to `output/tsn_highway_log/` and one
+  combined `output/tsn_highway_log_consolidated.xlsx`. The PDF parsing core
+  (`consolidate_tsn_highway_log.py`) is verbatim from the sibling repo —
+  x-position character-window parsing calibrated against real district PDFs;
+  don't re-derive the windows. `day` is ignored (vendor snapshots aren't dated
+  exports); the module exposes `INPUT_NOTE`/`INPUT_DIR` so the Consolidate
+  pane shows where the PDFs go.
+- **Compare tab** (`compare_highway_log.py`): takes one per-route TSMIS export
+  + one per-route TSN conversion (file pickers) and writes a four-sheet
+  discrepancy workbook — Summary / Comparison / TSMIS / TSN — where EVERY
+  number is a live Excel formula (lookup keys, statuses, per-field diffs,
+  summary counts): edit a value on a data sheet and the report recalculates.
+  Matched cells show the matched value; differing cells show
+  "tsmis ≠ tsn" in red (diff detection keys on the " ≠ " marker — formulas,
+  conditional formatting and COUNTIFs all rely on it). Rows are keyed on
+  Location + occurrence; the union is a diff-style document-order merge with
+  first-position dedupe (a key can sit in both files at different sequence
+  positions — TSMIS prints some postmiles out of order). The format is locked
+  to the approved Route-1 sample; the generator is verified cell-for-cell
+  against it (same union order, same counts Excel cached: 299 both / 18 / 69 /
+  221 diff rows / 971 diff cells) with one intended change — matched values
+  shown instead of blank. Med Wid compares after zero-pad normalization
+  (TSMIS `0Z` = TSN `00Z`).
+
 ## Two Run Modes, One Core
 
 The export engine is **console-free** and backs both:
@@ -173,7 +200,8 @@ and are kept for development and as a fallback.
 4. **`4. consolidate (combine reports).bat`** — pick a report type (and, when
    several dated export folders exist, which day — Enter = newest, or set
    `TSMIS_DAY`), combine that day's per-route exports into one workbook in
-   `output/<date>/consolidated/` (no auth check).
+   `output/<date>/consolidated/` (no auth check). Option 5 = TSN Highway Log
+   (reads `input/tsn_highway_log/*.pdf`; the day prompt is ignored).
 5. **`5. fast export (experimental).bat`** — asks worker count (sets
    `TSMIS_FAST_WORKERS`), then the usual menu.
 
@@ -203,6 +231,8 @@ scripts/
   consolidate_xlsx_base.py    # shared XLSX consolidator core
   consolidate_ramp_summary.py # standalone (parses PDFs)
   consolidate_{ramp_detail,highway_sequence,highway_log}.py  # thin wrappers over the base
+  consolidate_tsn_highway_log.py  # TSN district PDFs -> TSMIS-format XLSX + combined (input/ folder)
+  compare_highway_log.py      # TSMIS-vs-TSN discrepancy workbook (live formulas; Compare tab)
   gui_main.py / gui_api.py / gui_worker.py   # GUI entry / js_api bridge + state / worker threads
   ui/                 # the GUI itself: index.html + app.css + app.js (vanilla; design
                       #   tokens ported from the approved Lovable demo; mock API for browser preview)
