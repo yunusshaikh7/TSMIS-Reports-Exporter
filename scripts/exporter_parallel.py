@@ -52,6 +52,7 @@ from common import (
     navigate_with_auth,
     new_authed_browser,
     preflight,
+    require_signed_in,
     select_report,
 )
 from events import Events, RunResult
@@ -113,11 +114,11 @@ def _preflight_once(spec, events):
         browser, _ctx, page = new_authed_browser(p)
         try:
             navigate_with_auth(page)
-            if not is_logged_in(page):
-                raise AuthError(
-                    "Sign-in didn't complete - the saved session may be expired, "
-                    "or automatic sign-in isn't available on this PC. Please log in."
-                )
+            require_signed_in(
+                page,
+                "Sign-in didn't complete - the saved session may be expired, "
+                "or automatic sign-in isn't available on this PC. Please log in.",
+            )
             events.on_log("Logged in. Checking the report form...")
             preflight(page, spec.label)
         finally:
@@ -201,11 +202,11 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                 browser, _ctx, page = new_authed_browser(p)
                 try:
                     navigate_with_auth(page)
-                    if not is_logged_in(page):
-                        raise AuthError(
-                            "Sign-in didn't complete - the session may have "
-                            "expired. Please log in."
-                        )
+                    require_signed_in(
+                        page,
+                        "Sign-in didn't complete - the session may have "
+                        "expired. Please log in.",
+                    )
                     select_report(page, spec.label)         # arm this worker's form
                     while not stop.is_set():
                         if events.is_cancelled():

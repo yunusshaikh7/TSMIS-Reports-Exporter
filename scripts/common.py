@@ -11,6 +11,7 @@ reported through an Events sink, so the same helpers back both the console
 shim (cli.py) and the future GUI.
 """
 import json
+import logging
 import os
 import re
 import socket
@@ -107,7 +108,9 @@ def get_url():
 # stays at scripts/tsmis_auth.json. Re-exported here for login.py and cli.py.
 # (Output paths also come from paths.py, imported directly by the exporter and
 # consolidators.)
-from paths import AUTH, EDGE_LOGIN_PROFILE_DIR
+from paths import AUTH, EDGE_LOGIN_PROFILE_DIR, FAILURES_DIR
+
+log = logging.getLogger("tsmis.auth")
 
 # Timeouts (milliseconds). Increase these if reports are timing out.
 #
@@ -328,21 +331,38 @@ def navigate_with_auth(page):
             break
     page.wait_for_timeout(1000)
     _ensure_site_params(page)
+    signed = is_logged_in(page)
+    log.info("auth: navigate done signed_in=%s clicked_idp=%s url=%s",
+             signed, clicked_idp, auth_state(page).get("url"))
+    if not signed:
+        log.info("auth: signals after navigate: %s", auth_state(page).get("signals"))
 
 
 # Signed-in detection for the report page. The page ships its whole form
 # (#customReport included) in the static HTML even when signed out, and the
 # unauthenticated state is "you get redirected away" rather than any visible
-# prompt — so the ONLY trustworthy signal is the app's post-auth UI:
-# setAuthUI(true) shows #modeSelector (immediately for ARS; for SSOR after the
-# TSMIS_HI group check passes), and #accessDenied means authenticated but not
-# authorized — not usable for exports.
+# prompt — so the trustworthy signals are the app's post-auth UI: setAuthUI(true)
+# shows #modeSelector (immediately for ARS; for SSOR after the TSMIS_HI group
+# check passes), and the later stages show #controlsGrid / #generateRow /
+# #appForm / #versionCtrl. ANY of those visible counts as signed in, while
+# #accessDenied (authenticated but not in the TSMIS group) and #loginPrompt are
+# definitive "not usable". Visibility uses Element.checkVisibility() when the
+# browser has it — the offsetParent trick is wrong for fixed-position ancestors.
 _SIGNED_IN_JS = """(() => {
   const visible = (sel) => {
     const el = document.querySelector(sel);
-    return !!el && getComputedStyle(el).display !== 'none' && el.offsetParent !== null;
+    if (!el) return false;
+    if (el.checkVisibility) return el.checkVisibility();
+    let n = el;
+    while (n && n.nodeType === 1) {
+      if (getComputedStyle(n).display === 'none') return false;
+      n = n.parentElement;
+    }
+    return true;
   };
-  return visible('#modeSelector') && !visible('#accessDenied');
+  if (visible('#accessDenied') || visible('#loginPrompt')) return false;
+  return ['#modeSelector', '#controlsGrid', '#generateRow', '#appForm', '#versionCtrl']
+      .some(visible);
 })()"""
 
 
@@ -354,6 +374,68 @@ def is_logged_in(page):
         return bool(page.evaluate(_SIGNED_IN_JS))
     except Exception:
         return False
+
+
+# Diagnostic snapshot of every sign-in signal, logged whenever a sign-in gate
+# fails so the rotating log shows WHAT the page looked like — not just that it
+# "didn't complete". Each entry is "visible/<computed display>" or "absent".
+_AUTH_DIAG_JS = """(() => {
+  const st = (sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return 'absent';
+    const cs = getComputedStyle(el);
+    const vis = el.checkVisibility ? el.checkVisibility() : cs.display !== 'none';
+    return (vis ? 'visible' : 'hidden') + '/' + cs.display;
+  };
+  return {
+    title: document.title,
+    config: window.CONFIG ? [CONFIG.env, CONFIG.src] : null,
+    modeSelector: st('#modeSelector'), accessDenied: st('#accessDenied'),
+    loginPrompt: st('#loginPrompt'), controlsGrid: st('#controlsGrid'),
+    generateRow: st('#generateRow'), appForm: st('#appForm'),
+    versionCtrl: st('#versionCtrl'), customReport: st('#customReport'),
+  };
+})()"""
+
+
+def auth_state(page):
+    """Best-effort snapshot of the page's sign-in signals for diagnostics."""
+    info = {}
+    try:
+        info["url"] = page.url
+    except Exception:
+        info["url"] = "<unavailable>"
+    try:
+        info["signals"] = page.evaluate(_AUTH_DIAG_JS)
+    except Exception as e:
+        info["signals"] = f"<unavailable: {type(e).__name__}>"
+    return info
+
+
+def dump_auth_failure(page, note):
+    """Write a screenshot + page HTML to FAILURES_DIR and log the sign-in
+    signals, so a failed sign-in can be diagnosed from one run. Best-effort."""
+    log.warning("sign-in gate failed (%s): %s", note, auth_state(page))
+    try:
+        FAILURES_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        page.screenshot(path=str(FAILURES_DIR / f"auth_fail_{stamp}.png"),
+                        full_page=True)
+        (FAILURES_DIR / f"auth_fail_{stamp}.html").write_text(
+            page.content(), encoding="utf-8")
+        log.warning("sign-in failure page captured to %s (auth_fail_%s.*)",
+                    FAILURES_DIR, stamp)
+    except Exception:
+        pass
+
+
+def require_signed_in(page, message):
+    """Raise AuthError(message) unless the page is signed in — capturing full
+    diagnostics (signal snapshot + screenshot + HTML) first when it isn't."""
+    if is_logged_in(page):
+        return
+    dump_auth_failure(page, message)
+    raise AuthError(message)
 
 
 def select_report(page, report_label):
@@ -727,6 +809,13 @@ def capture_storage_state_if_logged_in(ctx, *, navigate=False, timeout_ms=15_000
                 return ctx.storage_state()
         except Exception:
             continue
+    # Nothing matched: record what each open page actually showed, so a failed
+    # capture in the headed login flow is diagnosable from the log.
+    for page in pages:
+        try:
+            log.info("auth: capture page not signed in: %s", auth_state(page))
+        except Exception:
+            pass
     if not navigate:
         return None
     try:
