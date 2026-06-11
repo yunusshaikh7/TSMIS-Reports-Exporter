@@ -14,6 +14,31 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **TSN Highway Log + comparison (0.8.0).** The Consolidate tab gains **TSN
+  Highway Log**: drop TSN district PDFs into `input\tsn_highway_log` and it
+  converts them into TSMIS-format per-route Excel files plus one combined
+  workbook. A new **Compare tab** then builds a TSMIS-vs-TSN discrepancy
+  workbook from two per-route Highway Logs **or two consolidated ones (all
+  routes)** — matching values shown plainly, differences highlighted in red,
+  with live Excel formulas throughout (edit a value and the report
+  recalculates). Consolidated comparisons add a **Routes sheet** (which
+  routes each system covers, what's missing where, per-route diff counts)
+  and open in **manual calculation** so the big workbook appears instantly —
+  press **F9** once to calculate, then save.
+- **A brand-new interface (0.8.0).** The window was rebuilt from scratch:
+  a cleaner two-column layout (settings on the left, live progress + activity
+  log on the right), per-route progress with running counts, clearer sign-in
+  status, a searchable route picker, and a **System / Light / Dark theme
+  toggle**. Most importantly it now **fits any screen** — on small or
+  low-resolution displays the layout stacks and scrolls instead of cutting
+  off the bottom buttons. (Under the hood the UI is rendered by Edge
+  WebView2, which is part of Windows 10/11 — nothing extra to install; all
+  export logic is unchanged.)
+- **Chrome sign-in no longer nags about local network access (0.8.0).**
+  Saving a login with Google Chrome used to require clicking "Allow" on the
+  "access devices on your local network?" prompt every single time — and
+  missing it meant the session silently didn't save. The sign-in windows now
+  pre-grant that permission, same as the exports always have.
 - **The log now tells the whole story (0.7.6).** Every run writes a detailed
   trail to `data\logs\tsmis.log`: which build/PC produced it, every sign-in
   step, which browser was picked and why a fallback happened, what was clicked
@@ -43,9 +68,6 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 - **Fast mode is greyed out without a saved login**, with an explanation:
   automatic Edge sign-in runs one browser at a time (the sign-in profile can't
   be shared), so parallel runs need a saved session (e.g. sign in with Chrome).
-- **Fits small screens.** The window now caps its height to the screen and can
-  be shrunk — the log pane absorbs the difference instead of the bottom
-  buttons being cut off.
 - **Hands-free sign-in on managed Caltrans PCs** (since v0.6): after one normal
   Edge sign-in, login and exports sign themselves in automatically — no
   password, no window. Chrome stays on the manual sign-in path.

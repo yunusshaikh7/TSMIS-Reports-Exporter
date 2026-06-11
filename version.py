@@ -4,7 +4,7 @@ Imported by the build tooling (and later the GUI About box). Keep this file
 dependency-free so it can be imported from anywhere, including the .spec.
 """
 
-__version__ = "0.7.6"          # semantic version MAJOR.MINOR.PATCH
+__version__ = "0.8.0"          # semantic version MAJOR.MINOR.PATCH
 APP_NAME = "TSMIS Exporter"    # onefolder / executable name
 
 # Playwright pins the bundled Node DRIVER (node.exe). The default build does NOT

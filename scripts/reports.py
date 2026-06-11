@@ -1,8 +1,9 @@
 """Single source of truth for the report registry.
 
 Every report type appears here exactly once, so adding one is a one-place change
-on the Python side: both the GUI (Export + Consolidate tabs, `gui_app.py`) and
-the console multi-exporter (`export_multi.py`) read these lists. (The `.bat`
+on the Python side: both the GUI (Export / Consolidate / Compare tabs,
+`gui_api.py`) and the console multi-exporter (`export_multi.py`) read these
+lists. (The `.bat`
 menus are static text and are still edited by hand — see CLAUDE.md "Adding a New
 Report Type".)
 
@@ -19,6 +20,9 @@ import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
 import consolidate_highway_sequence as _c_highway_seq
 import consolidate_highway_log as _c_highway_log
+import consolidate_tsn_highway_log as _c_tsn_highway_log
+
+import compare_highway_log as _cmp_highway_log
 
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
 # Order here is the display order in the GUI and the numbering in the console menu.
@@ -39,4 +43,17 @@ CONSOLIDATE_REPORTS = [
     ("TSAR: Ramp Detail", _c_ramp_detail),
     ("Highway Sequence Listing", _c_highway_seq),
     ("Highway Log", _c_highway_log),
+    # Input = TSN district PDFs dropped into input/tsn_highway_log (vendor
+    # snapshots, not dated exports) -- the module ignores the day picker and
+    # exposes INPUT_NOTE/INPUT_DIR so the GUI can point users at the folder.
+    ("TSN Highway Log", _c_tsn_highway_log),
+]
+
+# Compare tab: (menu label, module). Each module exposes
+# compare(tsmis_path, tsn_path, out_path, events, confirm_overwrite) ->
+# ConsolidateResult, plus suggest_name(tsmis_path) for the save dialog.
+# Highway Log is the first of several planned comparison types -- add new ones
+# here and they appear in the GUI automatically.
+COMPARE_REPORTS = [
+    ("Highway Log", _cmp_highway_log),
 ]

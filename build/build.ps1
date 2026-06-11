@@ -49,9 +49,9 @@ Write-Host "==> Installing pinned build dependencies"
 if ($SelfTest) {
     # Comprehensive headless self-test (console): launches the SYSTEM browser +
     # page.pdf() + a download, runs pdfplumber text/table extraction and an
-    # openpyxl round-trip, then constructs the GUI window withdrawn. Verifies the
-    # pruned bundle still runs every real code path -- without a visible window or
-    # a blocking mainloop.
+    # openpyxl round-trip, then cycles a hidden WebView window through the real
+    # JS bridge. Verifies the pruned bundle still runs every real code path
+    # without anything visible.
     $env:TSMIS_ENTRY    = Join-Path $BuildDir "full_smoke.py"
     $env:TSMIS_APP_NAME = "TSMIS SelfTest"
     $env:TSMIS_CONSOLE  = "1"

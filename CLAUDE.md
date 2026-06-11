@@ -22,31 +22,125 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 `common.get_url()`. Defaults: **SSOR + Prod**; the GUI header has two dropdowns
 (`set_site`), the console flow honors `TSMIS_SRC` / `TSMIS_ENV`.
 
+**Beyond the TSMIS exports (v0.8.0, ported from TSMIS-Report-Consolidator):**
+- **TSN Highway Log** (consolidate-only): parses TSN district Highway Log PDFs
+  (report OTM52010) that the user drops into `input/tsn_highway_log/`, writes
+  TSMIS-format per-route workbooks to `output/tsn_highway_log/` and one
+  combined `output/tsn_highway_log_consolidated.xlsx`. The PDF parsing core
+  (`consolidate_tsn_highway_log.py`) is verbatim from the sibling repo —
+  x-position character-window parsing calibrated against real district PDFs;
+  don't re-derive the windows. `day` is ignored (vendor snapshots aren't dated
+  exports); the module exposes `INPUT_NOTE`/`INPUT_DIR` so the Consolidate
+  pane shows where the PDFs go.
+- **Compare tab** (`compare_highway_log.py`, first entry of the
+  `COMPARE_REPORTS` registry in `reports.py` — see *Extending: new comparison
+  type*): takes a TSMIS and a TSN Highway Log — **either two per-route
+  workbooks or two consolidated ones** (`Route` + 31 columns; shapes
+  auto-detected, mixed shapes rejected with guidance) — and writes a
+  discrepancy workbook — Summary / Comparison / TSMIS / TSN, plus a **Routes
+  sheet in consolidated mode** (route coverage: Both/TSMIS-only/TSN-only with
+  live per-route row/diff counts; the Summary gains a ROUTE COVERAGE section
+  and the run log lists the missing routes) — where EVERY number is a live
+  Excel formula (lookup keys, statuses, per-field diffs, summary counts):
+  edit a value on a data sheet and the report recalculates. Consolidated
+  workbooks ship in **manual calculation mode** (`calcPr calcMode="manual"`,
+  calcOnSave off): ~2M live formulas would otherwise recalc for minutes on
+  open and after every edit — instead the file opens instantly showing
+  blank/0 and the user presses F9 once (Summary note + run log explain;
+  per-route files stay automatic). The workbook is written in openpyxl's STREAMING (write_only)
+  mode — the consolidated comparison carries ~2M formula cells, which the
+  normal in-memory mode cannot save in reasonable time (50+ min vs ~3 min;
+  same reason the consolidators stream). Matched cells show the matched
+  value; differing cells show "tsmis ≠ tsn" in red (diff detection keys on
+  the " ≠ " marker — formulas, conditional formatting and COUNTIFs all rely
+  on it). Rows are keyed on (Route +) Location + occurrence; the union is a
+  diff-style document-order merge PER ROUTE with first-position dedupe (a key
+  can sit in both files at different sequence positions — TSMIS prints some
+  postmiles out of order; per-route alignment keeps difflib fast on 50k+
+  rows). Column geometry for both shapes lives in `_Layout`. The per-route
+  format is locked to the approved Route-1 sample and verified cell-for-cell
+  against it (same union order, same counts Excel cached: 299 both / 18 / 69 /
+  221 diff rows / 971 diff cells) with one intended change — matched values
+  shown instead of blank. Med Wid compares after zero-pad normalization
+  (TSMIS `0Z` = TSN `00Z`).
+
 ## Two Run Modes, One Core
 
 The export engine is **console-free** and backs both:
 - **`.bat` console flow** (development + fallback) — see *User Workflow*.
-- **Packaged GUI** (`scripts/gui_*.py`, Tkinter) — the shipped desktop app.
+- **Packaged GUI** — a pywebview (**Edge WebView2**) window rendering
+  `scripts/ui/` (plain HTML/CSS/JS, no build step / no npm): `gui_main.py`
+  (entry) → `gui_api.py` (js_api bridge + state + queue pump) →
+  `gui_worker.py` (worker threads, unchanged across the Tk→WebView rewrite).
 
-Only `cli.py` and `gui_*.py` touch `print`/`input`/`msvcrt`/widgets. Core code
+Only `cli.py` and `gui_*.py` touch `print`/`input`/`msvcrt`/the window. Core code
 (`common.py`, `exporter.py`, consolidator cores) reports via the `Events` sink
 (`scripts/events.py`) and raises exceptions — never `print`/`input`/`sys.exit`.
 User-facing strings from the core must be **UI-neutral** (no ".bat" names, no
 "this window" / "menu option N" — that guidance lives in the driver).
 
-**Threading:** Playwright's sync API is thread-affine. All browser work runs on a
-worker thread; only the main thread touches Tk. Workers talk to the UI through a
-`queue.Queue`. In fast mode each worker owns its own Playwright/browser/context.
+**Threading:** Playwright's sync API is thread-affine. All browser work runs on
+worker threads, which post `(kind, payload)` messages to a `queue.Queue` (the
+protocol is documented in `gui_worker.py`). `gui_api` pumps that queue into its
+state machine, and ONE sender thread delivers ordered JSON event batches to JS
+via `evaluate_js` → `window.__tsmis.dispatch()`; JS calls back through
+`window.pywebview.api.<method>()` (the public `GuiApi` methods). In fast mode
+each worker owns its own Playwright/browser/context.
+
+**UI layering:** Python owns app state (auth, task, checks, days) and pushes
+full snapshots; `app.js` owns presentation + form fields and NEVER invents log
+lines — everything shown in the log pane originates in Python so the `tsmis.ui`
+file-log mirror stays complete. A built-in mock API can drive the whole UI,
+including simulated runs, without launching the app — **opt-in only**: open
+`scripts/ui/index.html#mock` in a browser (that's how the layout is
+screenshot-tested). The mock must never auto-start: a cold WebView2 can inject
+the real bridge later than any timeout, and a silent mock fallback would show
+convincing fake exports inside the real app. Without `#mock`, the page waits
+for the bridge and shows a fatal banner if it never arrives.
 
 ## The App
 
 The product is a **portable single-folder Windows desktop app** (bundled Python +
-deps + Tkinter GUI; no installer, no Python needed on target): non-technical staff
-unzip one folder and double-click the `.exe`. The `.bat` console flow (below) is
-retained as a development and fallback path, and runs the same core engine.
+deps + WebView2 GUI; no installer, no Python needed on target): non-technical
+staff unzip one folder and double-click the `.exe`. The `.bat` console flow
+(below) is retained as a development and fallback path, and runs the same core
+engine.
 
 **Design decisions (don't relitigate without reason):**
 - **Packaging:** PyInstaller **onefolder**, shipped as a portable zip (no installer).
+- **UI stack (v0.8.0): pywebview + Edge WebView2 rendering vanilla HTML/CSS/JS.**
+  Replaced the original Tkinter window: Tk could neither match the approved
+  design (the `tsmis-exporter-ui-demo` Lovable mock — Windows-11 look, dark
+  titlebar, two-column layout) nor stop cutting off on small screens; a web
+  layout solves both (responsive, stacks + scrolls below ~980px; theme =
+  System/Light/Dark header toggle persisted in localStorage and resolved to
+  an effective `html[data-theme]` before first paint). WebView2 is a safe
+  dependency here: it ships with
+  Windows 10/11 and evergreen Edge — the same Edge this tool already requires.
+  No frontend framework/build step on purpose (static files ship in the
+  bundle; end-user setup stays global-pip). `webview.start(gui="edgechromium")`
+  is forced so a missing runtime fails loudly (clear message box) instead of
+  silently degrading to MSHTML. tkinter is excluded from the bundle.
+  **THREE pywebview traps, all hit during the rewrite:**
+  1. pywebview detects "is `start()` already running" via the main thread's
+     NAME — `logging_setup` must never rename the main thread (it tags
+     `[main]` via a logging Filter instead); renaming it makes
+     `create_window` block forever running the GUI loop itself.
+  2. **Never do work in window-event handlers** (`shown` etc.): pywebview
+     fires them on the WinForms STA thread while WebView2 is still
+     initializing asynchronously on it — a handler that blocks (the original
+     icon-setter loaded a .NET assembly) starves the message pump and
+     INTERMITTENTLY deadlocks the window ("Not responding" + WER AppHangB1
+     before the page loads; ~6/8 launches at its worst, machine-state
+     dependent). The icon is set from a worker thread with pure Win32
+     (`FindWindowW` + `WM_SETICON`); only `closed` (fires after the loop
+     ends) is subscribed.
+  3. `faulthandler` is disabled in the GUI process
+     (`setup_logging(enable_faulthandler=False)`): its Windows handler sees
+     the CLR's routine first-chance access violations (pythonnet) and dumps
+     all threads mid-exception-dispatch — observed wedging init and spamming
+     `crash.log` with dumps from healthy-looking runs. Console entry points
+     never load the CLR and keep faulthandler's hard-crash dumps.
 - **Browser channels — three release variants, one codebase:**
   - **`*-win64.zip` (default build):** no bundled browser. Drives the machine's
     installed Edge (then Chrome) via `channel="msedge"`/`"chrome"`. Edge is
@@ -68,10 +162,18 @@ retained as a development and fallback path, and runs the same core engine.
 - **Data location (option A):** the packaged app writes `output/`, auth token,
   logs, and config **next to the `.exe`**, falling back to
   `%LOCALAPPDATA%\TSMIS Exporter` if read-only. See `scripts/paths.py`.
+- **WebView2 profile:** the GUI window uses a persistent app-owned user-data
+  folder (`paths.WEBVIEW_PROFILE_DIR`, `data\webview2`) via
+  `webview.start(private_mode=False, storage_path=...)`. pywebview's default
+  private mode writes a fresh Chromium profile into `%TEMP%` on EVERY launch
+  (tens of MB, leaked when the process is killed) and cold-starts the browser
+  each time; one stable folder avoids both, and the UI stores nothing
+  sensitive in it.
 
 **Pinned versions (`version.py` / `requirements*.txt`):** `playwright==1.60.0`
 (pins the bundled **Node driver** only — no Chromium ships), `pdfplumber==0.11.9`
-(→ `pdfminer.six==20251230`), `openpyxl==3.1.5`, `pyinstaller==6.20.0`,
+(→ `pdfminer.six==20251230`), `openpyxl==3.1.5`, `pywebview==6.2.1` (→
+`pythonnet`/`clr_loader` on Windows), `pyinstaller==6.20.0`,
 `pyinstaller-hooks-contrib==2026.5`. Built/tested on **Python 3.11**. The export
 engine is live-verified against TSMIS.
 
@@ -115,7 +217,8 @@ and are kept for development and as a fallback.
 4. **`4. consolidate (combine reports).bat`** — pick a report type (and, when
    several dated export folders exist, which day — Enter = newest, or set
    `TSMIS_DAY`), combine that day's per-route exports into one workbook in
-   `output/<date>/consolidated/` (no auth check).
+   `output/<date>/consolidated/` (no auth check). Option 5 = TSN Highway Log
+   (reads `input/tsn_highway_log/*.pdf`; the day prompt is ignored).
 5. **`5. fast export (experimental).bat`** — asks worker count (sets
    `TSMIS_FAST_WORKERS`), then the usual menu.
 
@@ -145,7 +248,11 @@ scripts/
   consolidate_xlsx_base.py    # shared XLSX consolidator core
   consolidate_ramp_summary.py # standalone (parses PDFs)
   consolidate_{ramp_detail,highway_sequence,highway_log}.py  # thin wrappers over the base
-  gui_main.py / gui_app.py / gui_worker.py / gui_theme.py    # GUI entry / window / worker threads / styles
+  consolidate_tsn_highway_log.py  # TSN district PDFs -> TSMIS-format XLSX + combined (input/ folder)
+  compare_highway_log.py      # TSMIS-vs-TSN discrepancy workbook (live formulas; Compare tab)
+  gui_main.py / gui_api.py / gui_worker.py   # GUI entry / js_api bridge + state / worker threads
+  ui/                 # the GUI itself: index.html + app.css + app.js (vanilla; design
+                      #   tokens ported from the approved Lovable demo; mock API for browser preview)
 build/
   build.ps1           # one-command onefolder build (-SelfTest = headless verify gate;
                       #   -BundleChromium = ship the Built-in Chromium inside the bundle)
@@ -302,7 +409,12 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
   one can click headless. Every automated context launches with
   `common._LNA_ARGS` and pre-grants `local-network-access`
   (`common._new_app_context`) — engine contexts, the device sign-in, and the
-  portability probe alike.
+  portability probe alike. The **headed sign-in windows need it too**
+  (`LOGIN_BROWSER_ARGS` + `new_login_context`, used by `login.py` and
+  `gui_worker.LoginWorker`): without the grant Chrome re-prompts on every
+  sign-in, and an unanswered prompt blocks the signed-in UI — so the login is
+  never detected and no session is saved (field bug, fixed v0.8.0; managed
+  Edge avoided it via enterprise policy, which is why only Chrome showed it).
 - **Headed sign-in browser order** (`login.py` console / `gui_worker.LoginWorker`)
   honors the user's pick first (`get_preferred_channel()` — the GUI Browser
   dropdown / `TSMIS_BROWSER_CHANNEL`; picking Chrome goes straight to Chrome and
@@ -362,12 +474,19 @@ first; nothing is published if any gate fails.
 `app.spec` highlights:
 - `collect_all('playwright')` + Playwright's hooks → the Node driver ships. **No
   browser bundled** (no `ms-playwright` data entry).
+- `collect_all('webview'/'pythonnet'/'clr_loader')` — the GUI shell. Their package
+  DATA is load-bearing when frozen: `webview/lib` (WebView2 .NET assemblies),
+  `pythonnet/runtime` (Python.Runtime.dll + netstandard facades),
+  `clr_loader/ffi/dlls` (ClrLoader natives). `hiddenimports += ['clr']`.
+- `scripts/ui/*` ships as data files under `_internal/ui/`
+  (`gui_api._ui_index_path()` resolves them via `sys._MEIPASS`).
 - `collect_data_files('pdfminer')` + `collect_all('pdfplumber'/'openpyxl')` — the
   pdfminer CMap data is the classic frozen trap. `cryptography` is a hard pdfminer
   import and **must stay**.
-- `excludes=['PIL','pypdfium2','pypdfium2_raw']` — image libs the runtime paths
-  (text/table extraction + plain workbooks) don't need; proven safe by the frozen
-  `-SelfTest` passing with PIL excluded.
+- `excludes=['PIL','pypdfium2','pypdfium2_raw','tkinter','_tkinter']` — image libs
+  the runtime paths (text/table extraction + plain workbooks) don't need, plus
+  Tk/Tcl (the UI is a WebView since 0.8.0); proven safe by the frozen `-SelfTest`
+  passing with them excluded.
 - **Trust metadata** (reduces IT/Defender/DLP false-positives on the unsigned exe):
   version-info resource from `version.py`, `app.ico`, `app.manifest` (`asInvoker` +
   Win10/11), `upx=False`. **Code-signing is the only complete fix** (not yet done).
@@ -389,7 +508,8 @@ only, Playwright driver extras (`*.d.ts`, `types/`, `skill/`, `tools/trace/`,
 slipped through. Guards (fail build if found): non-license docs, credit cards
 (IIN + length + Luhn), PEM private keys, AWS keys, US SSNs. Re-runnable on an
 extracted release: `prune_bundle.ps1 -Target "…\TSMIS Exporter"` (`-GuardOnly` to
-audit). The ~148 MB floor is `node.exe` (~80 MB) + Python + Tcl/Tk + pdf/excel libs.
+audit). The ~149 MB floor is `node.exe` (~80 MB) + Python + pythonnet/WebView2
+assemblies + pdf/excel libs.
 
 ## Extending
 
@@ -413,6 +533,14 @@ build openpyxl styles inside functions). For an XLSX report, wrap
 `run_consolidate_cli`, wire `4. consolidate…bat`, add to `APP_MODULES` and
 `CONSOLIDATE_REPORTS`, and document here.
 
+**New comparison type:** a module exposing
+`compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None)
+-> ConsolidateResult` (console-free, same rules as consolidators) plus
+`REPORT_NAME` and `suggest_name(tsmis_path)`; add one row to
+`COMPARE_REPORTS` in `reports.py` (the Compare tab's type list is generated
+from it) and the module to `APP_MODULES` in `build/app.spec`. Follow
+`compare_highway_log.py` for the approved live-formula workbook style.
+
 **Add/remove a route:** edit `ROUTES` in `common.py` (zero-padded 3-digit, optional
 suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option values).
 
@@ -431,9 +559,17 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
   happened, saved-session-vs-device-mode (with auth-file age), each Edge
   profile attempt, portability verdicts, preflight steps, per-route outcomes
   **with elapsed time and file size**. Crash safety nets: `sys.excepthook` +
-  `threading.excepthook` + Tk's `report_callback_exception` log full
-  tracebacks (a windowed .exe has no stderr); `faulthandler` writes hard
-  interpreter crashes to `LOG_DIR/crash.log`. **Error messages must name the
+  `threading.excepthook` log full tracebacks (a windowed .exe has no stderr);
+  every `GuiApi` method is wrapped (`_api_method`) so a bridge-call crash is
+  logged AND returned to JS as a structured error instead of a dead Promise;
+  uncaught JS errors come back through `api.log_js_error` into `tsmis.crash`;
+  `faulthandler` writes hard interpreter crashes to `LOG_DIR/crash.log` for
+  the **console entry points only** — it is incompatible with pythonnet and
+  disabled in the GUI process (see *Design decisions*, trap 3; the GUI's
+  native-crash trail is WER/Event Log).
+  NOTE: the `[main]` thread tag is applied by a logging **Filter** — never
+  rename the actual main thread (it breaks pywebview; see *Design decisions*).
+  **Error messages must name the
   failing step and stay UI-neutral; the WHY (exception text, probe status,
   profile name) always goes to the log** — when adding code, log every
   decision and every swallowed exception (`type(e).__name__` + first line at
@@ -472,6 +608,8 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | One report's output wrong | That report's selector changed | Edit only its `ReportSpec` |
 | "page looks different than expected" | Preflight failed — site changed | Check `LOG_DIR`/`FAILURES_DIR`; update selectors |
 | `BrowserNotFoundError` | No usable browser found | Install Edge, re-run `1. setup…bat` (downloads Chromium), or use the with-browser zip |
+| "The app window could not be created" box | WebView2 runtime missing/broken (very old or stripped Windows) | Install/update Microsoft Edge (ships the Evergreen WebView2 runtime); details in `LOG_DIR` |
+| GUI shows a blank window | UI assets missing or JS crashed | `tsmis.log` carries JS errors (`log_js_error`); run with `TSMIS_UI_DEBUG=1` for DevTools |
 | Edge sign-in "works" but exports can't log in | Edge signed in via the Windows device broker (PRT) — session never reaches cookies | Expected & detected: the capture is rejected (`storage_state_is_portable`) and login falls back to Chrome / Built-in Chromium |
 | Browser launch fails after an Edge/Chrome update | Evergreen browser outran pinned Playwright CDP | Bump `playwright` in `requirements*.txt`, rebuild |
 | DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |

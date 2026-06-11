@@ -2,7 +2,7 @@
 
 > Bulk-export Caltrans TSMIS reports for every California state route — from a single click.
 
-[![Version](https://img.shields.io/badge/version-0.7.6-blue)](version.py)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue)](version.py)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](#)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](#)
 [![Automation](https://img.shields.io/badge/automation-Playwright-2EAD33?logo=microsoftedge&logoColor=white)](#)
@@ -51,7 +51,12 @@ of `.bat` scripts for development and as a fallback.
   load, failure screenshots, and rotating logs.
 - **Skip & cancel.** Skip a slow route mid-run, or cancel the whole run — the
   current route stops promptly, not after a long wait.
-- **Consolidation.** Combine every per-route export into a single workbook.
+- **Consolidation.** Combine every per-route export into a single workbook —
+  including **TSN Highway Log** district PDFs, converted into TSMIS-format
+  Excel for side-by-side use.
+- **TSMIS vs TSN comparison.** Build a discrepancy workbook from two Highway
+  Logs (per-route or consolidated): matching values shown plainly, differences
+  in red, live Excel formulas throughout, plus per-route coverage stats.
 - **Run reports.** Every run records a per-route outcome CSV (saved / empty /
   skipped / failed).
 - **Optional fast mode.** Run several browsers in parallel for a 2.5–3×+ speedup.
@@ -68,6 +73,11 @@ of `.bat` scripts for development and as a fallback.
 | TSAR: Ramp Detail | XLSX | `output/<date>/ramp_detail/` |
 | Highway Sequence Listing | XLSX | `output/<date>/highway_sequence/` |
 | Highway Log | XLSX | `output/<date>/highway_log/` |
+
+Consolidate-only: **TSN Highway Log** (drop district PDFs into
+`input/tsn_highway_log/`; converted per-route files + one combined workbook
+land under `output/`). The **Compare** tab turns a TSMIS and a TSN Highway Log
+into a formula-driven discrepancy workbook.
 
 <!-- Tip: drop a screenshot of the GUI here once available, e.g. ![TSMIS Exporter](docs/screenshot.png) -->
 
@@ -113,8 +123,14 @@ portable and leaves nothing behind on the system.
    **Cancel** to stop.
 3. **Consolidate** *(optional)* — on the Consolidate tab, pick a report type
    (and which export day — newest by default) to combine that day's per-route
-   files into one workbook under `output/<date>/consolidated/`.
-4. **Save run report** *(optional)* — export a CSV of every route's outcome.
+   files into one workbook under `output/<date>/consolidated/`. **TSN Highway
+   Log** reads district PDFs from `input/tsn_highway_log/` instead (the pane
+   shows the folder).
+4. **Compare** *(optional)* — pick a TSMIS and a TSN Highway Log (per-route or
+   consolidated) and get a discrepancy workbook: red `value ≠ value` cells,
+   route coverage, all live formulas. Big consolidated comparisons open in
+   manual calculation — press **F9** once.
+5. **Save run report** *(optional)* — export a CSV of every route's outcome.
 
 **Fast mode** (experimental): tick **⚡ Fast mode** and choose a worker count to
 run several browsers in parallel. Each worker uses ~0.5 GB RAM — `3` is a safe
@@ -184,9 +200,12 @@ scripts/        Core engine (console-free) + console & GUI drivers
   common.py       URL, routes, timeouts, auth/nav helpers, browser launch
   exporter.py     The shared per-route export loop (+ parallel variant)
   cli.py          Console adapters backing the .bat flow
-  gui_*.py        Tkinter desktop app (window, worker threads, theme)
+  gui_main.py     Desktop app entry (pywebview / Edge WebView2 window)
+  gui_api.py      GUI state + the JS bridge; gui_worker.py = worker threads
+  ui/             The interface itself (plain HTML/CSS/JS, no build step)
   export_*.py     One thin file per report type (a ReportSpec)
   consolidate_*.py  Combine per-route exports into one workbook
+  compare_highway_log.py  TSMIS-vs-TSN discrepancy workbook (live formulas)
 build/          Reproducible PyInstaller build (build.ps1, app.spec, prune, self-test)
 output/         Per-report output folders + consolidated/ + run_reports/
 *.bat           Numbered launchers for the console workflow
@@ -200,12 +219,13 @@ multi-report selector, so the two never drift. For the full design — the
 
 ## Tech stack
 
-- **Python 3.11** (standard library + three runtime deps)
+- **Python 3.11** (standard library + four runtime deps)
 - **[Playwright](https://playwright.dev/python/)** — browser automation, driving
   the system Edge/Chrome or the optional Built-in Chromium
 - **[pdfplumber](https://github.com/jsvine/pdfplumber)** — PDF parsing (consolidation)
 - **[openpyxl](https://openpyxl.readthedocs.io/)** — Excel writing (consolidation)
-- **Tkinter** — desktop GUI
+- **[pywebview](https://pywebview.flowrl.com/)** — desktop GUI shell (Edge
+  WebView2 rendering a vanilla HTML/CSS/JS interface)
 - **[PyInstaller](https://pyinstaller.org/)** — portable onefolder packaging
 
 ## Known limitations

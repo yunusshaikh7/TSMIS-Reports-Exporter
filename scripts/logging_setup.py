@@ -84,22 +84,36 @@ def _log_banner(log):
         log.info("env: overrides %s", overrides)
 
 
-def setup_logging(level=logging.INFO):
+def setup_logging(level=logging.INFO, enable_faulthandler=True):
     """Configure the root logger's rotating file handler once. Returns the log
-    file path."""
+    file path.
+
+    enable_faulthandler=False is for the GUI process ONLY: faulthandler's
+    Windows handler intercepts access violations FIRST-chance, and the .NET CLR
+    (pythonnet, which pywebview's WebView2 backend runs on) raises + handles
+    such exceptions internally as routine control flow. faulthandler then dumps
+    all threads mid-CLR-exception-dispatch on the GUI thread and the window
+    deadlocks ("Not responding", WER AppHangB1) before the page ever loads.
+    Console entry points never load the CLR and keep the crash dumps."""
     global _configured
     if _configured:
         return LOG_FILE
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    # Thread names tag every line; rename the main thread from "MainThread" so
-    # the common case reads as [main] and worker threads stand out.
-    try:
-        threading.main_thread().name = "main"
-    except Exception:
-        pass
     handler = RotatingFileHandler(
         LOG_FILE, maxBytes=2_000_000, backupCount=5, encoding="utf-8"
     )
+    # Thread names tag every line; show the main thread as [main] so the common
+    # case reads cleanly. Rewrite it in the LOG RECORD only -- renaming the
+    # actual thread (threading.main_thread().name = ...) breaks libraries that
+    # use the name to detect the main thread (pywebview's create_window treats
+    # a renamed main thread as "the GUI loop is already running" and blocks).
+    class _MainThreadTag(logging.Filter):
+        def filter(self, record):
+            if record.threadName == "MainThread":
+                record.threadName = "main"
+            return True
+
+    handler.addFilter(_MainThreadTag())
     handler.setFormatter(logging.Formatter(
         "%(asctime)s %(levelname)-7s [%(threadName)s] %(name)s: %(message)s",
         "%Y-%m-%d %H:%M:%S"))
@@ -109,5 +123,10 @@ def setup_logging(level=logging.INFO):
     _configured = True
     _log_banner(logging.getLogger("tsmis"))
     _install_excepthooks()
-    _enable_faulthandler()
+    if enable_faulthandler:
+        _enable_faulthandler()
+    else:
+        logging.getLogger("tsmis").info(
+            "faulthandler disabled in this process (incompatible with the "
+            "CLR's first-chance exceptions; see setup_logging docstring)")
     return LOG_FILE

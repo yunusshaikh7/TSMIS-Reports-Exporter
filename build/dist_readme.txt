@@ -45,7 +45,28 @@ EXPORT REPORTS
 
 COMBINE FILES
   The Consolidate tab combines the per-route files into one workbook, saved in
-  "output\consolidated".
+  that day's "consolidated" folder (e.g. "output\2026-06-10\consolidated").
+  The "Export day" picker chooses which day's exports to combine.
+
+  TSN Highway Log: drop the TSN district PDFs (e.g. D01_Highway_Log_TSN.pdf)
+  into the "input\tsn_highway_log" folder first (the pane has an "Input
+  folder" button). It converts them to per-route Excel files in
+  "output\tsn_highway_log" and one combined workbook.
+
+COMPARE TSMIS vs TSN
+  The Compare tab builds a discrepancy workbook from two Highway Logs --
+  either two per-route files (a TSMIS export + its TSN conversion from
+  "output\tsn_highway_log") or two consolidated all-routes workbooks. Pick
+  the TSMIS file and the TSN file, then choose where to save. In the result,
+  matching values are shown in plain text and differences appear in red as
+  "TSMIS value <> TSN value" -- everything is a live Excel formula, so edits
+  on the TSMIS/TSN sheets recalculate the report.
+
+  Consolidated (all-routes) comparisons also include a Routes sheet (which
+  routes each system covers and how much differs per route) and open in
+  MANUAL calculation because of their size: the file appears instantly with
+  blank cells -- press F9 once in Excel to calculate (takes a few minutes),
+  let it finish, then save. After that it opens fast.
 
 GOOD TO KNOW
   * A route can occasionally fail with a "TSMIS site error" (e.g. "Cannot read

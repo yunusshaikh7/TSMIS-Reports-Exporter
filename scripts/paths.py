@@ -64,6 +64,11 @@ DATA_ROOT = _resolve_data_root()
 # Exported reports: each report writes into its own subfolder under here.
 OUTPUT_ROOT = DATA_ROOT / "output"
 
+# User-supplied input files (currently: TSN district Highway Log PDFs). The
+# TSMIS reports never read from here -- this exists for the report types whose
+# source data is NOT produced by this app's exports.
+INPUT_ROOT = DATA_ROOT / "input"
+
 # Exports are grouped by day: output/<YYYY-MM-DD>/<report subfolder>/...
 # so a new day's run never resumes over (or mixes with) yesterday's files.
 # The consolidators read the same dated layout (newest day by default).
@@ -110,6 +115,7 @@ LOG_DIR = _PRIVATE / "logs"
 FAILURES_DIR = _PRIVATE / "failures"   # screenshot + page HTML captured when a route fails
 CONFIG_FILE = _PRIVATE / "config.json"
 EDGE_LOGIN_PROFILE_DIR = _PRIVATE / "edge_login_profile"
+WEBVIEW_PROFILE_DIR = _PRIVATE / "webview2"   # the GUI window's WebView2 user-data folder
 
 # Built-in Chromium (the with-browser release variant): build.ps1 -BundleChromium
 # ships Playwright's ms-playwright folder inside _internal. Point Playwright at
