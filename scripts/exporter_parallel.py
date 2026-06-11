@@ -58,7 +58,7 @@ from events import Events, RunResult
 # Reuse the proven per-route mechanics and the serial retry pass from the
 # sequential engine, so a per-report fix benefits both.
 from exporter import _capture_failure, _process_route, _record, _retry_failed_routes
-from paths import OUTPUT_ROOT
+from paths import output_day_dir
 from run_report import auto_report_path, write_run_report
 
 log = logging.getLogger("tsmis.export.parallel")
@@ -172,7 +172,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     timeout_ms = timeout_ms or FAST_REPORT_TIMEOUT_MS
     retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
 
-    out_dir = OUTPUT_ROOT / spec.subdir
+    out_dir = output_day_dir() / spec.subdir   # dated layout, like the sequential engine
     out_dir.mkdir(parents=True, exist_ok=True)
     total = len(routes)
     n = min(n, total) or 1

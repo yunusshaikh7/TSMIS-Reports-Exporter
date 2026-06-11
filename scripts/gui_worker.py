@@ -25,11 +25,12 @@ import logging
 import threading
 
 from common import (
-    AUTH, ROUTES, URL, AuthError, BrowserNotFoundError, PreflightError,
-    BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, is_logged_in, launch_browser,
-    capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
-    capture_storage_state_if_logged_in, get_preferred_channel,
-    launch_edge_login_context, storage_state_is_portable, try_device_sso_login,
+    AUTH, ROUTES, AuthError, BrowserNotFoundError, PreflightError,
+    BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, get_url, is_logged_in,
+    launch_browser, capture_edge_login_state_from_profiles,
+    capture_edge_login_state_over_cdp, capture_storage_state_if_logged_in,
+    get_preferred_channel, launch_edge_login_context, storage_state_is_portable,
+    try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
@@ -138,14 +139,17 @@ class ExportWorker(threading.Thread):
 
 class ConsolidateWorker(threading.Thread):
     """Runs one consolidator. Overwrite is resolved by the GUI before start,
-    so the injected confirm callback just returns the pre-decided answer."""
+    so the injected confirm callback just returns the pre-decided answer.
+    `day` is the dated export folder to read (YYYY-MM-DD), or None for the
+    legacy flat layout."""
 
-    def __init__(self, consolidate_fn, queue, cancel_event, confirm):
+    def __init__(self, consolidate_fn, queue, cancel_event, confirm, day=None):
         super().__init__(daemon=True)
         self.consolidate_fn = consolidate_fn
         self.q = queue
         self.cancel = cancel_event
         self.confirm = confirm
+        self.day = day
 
     def run(self):
         events = Events(
@@ -153,7 +157,8 @@ class ConsolidateWorker(threading.Thread):
             is_cancelled=self.cancel.is_set,
         )
         try:
-            result = self.consolidate_fn(events=events, confirm_overwrite=self.confirm)
+            result = self.consolidate_fn(events=events, confirm_overwrite=self.confirm,
+                                         day=self.day)
             self.q.put(("consolidate_done", result))
         except Exception as e:
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
@@ -335,7 +340,7 @@ class LoginWorker(threading.Thread):
         Chromium path and the Chrome fallback."""
         ctx = browser.new_context()
         page = ctx.new_page()
-        page.goto(URL)
+        page.goto(get_url())
         self.done.clear()
         self.q.put(("login_open", None))
         self.q.put(("log", f"Sign-in window opened in {label}."))

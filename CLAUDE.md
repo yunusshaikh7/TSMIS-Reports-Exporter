@@ -12,10 +12,15 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 
 | # | Report | Output | Folder |
 |---|---|---|---|
-| 1 | TSAR: Ramp Summary | PDF (Letter) | `output/ramp_summary/` |
-| 2 | TSAR: Ramp Detail | XLSX | `output/ramp_detail/` |
-| 3 | Highway Sequence Listing | XLSX | `output/highway_sequence/` |
-| 4 | Highway Log | XLSX | `output/highway_log/` |
+| 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<date>/ramp_summary/` |
+| 2 | TSAR: Ramp Detail | XLSX | `output/<date>/ramp_detail/` |
+| 3 | Highway Sequence Listing | XLSX | `output/<date>/highway_sequence/` |
+| 4 | Highway Log | XLSX | `output/<date>/highway_log/` |
+
+One TSMIS page serves every combination of **data source** (SSOR / ARS) and
+**environment** (prod / test / dev) via query parameters — see
+`common.get_url()`. Defaults: **SSOR + Prod**; the GUI header has two dropdowns
+(`set_site`), the console flow honors `TSMIS_SRC` / `TSMIS_ENV`.
 
 ## Two Run Modes, One Core
 
@@ -107,8 +112,10 @@ and are kept for development and as a fallback.
    (Enter = all; or `5, 99, 101` — any casing/padding, suffixes like `101U`
    ok), then runs headlessly. A missing saved session is just a note — the
    engine tries the automatic device sign-in itself.
-4. **`4. consolidate (combine reports).bat`** — pick a report type, combine all
-   per-route exports into one workbook in `output/consolidated/` (no auth check).
+4. **`4. consolidate (combine reports).bat`** — pick a report type (and, when
+   several dated export folders exist, which day — Enter = newest, or set
+   `TSMIS_DAY`), combine that day's per-route exports into one workbook in
+   `output/<date>/consolidated/` (no auth check).
 5. **`5. fast export (experimental).bat`** — asks worker count (sets
    `TSMIS_FAST_WORKERS`), then the usual menu.
 
@@ -124,8 +131,9 @@ version.py                        # app name/version + pinned Playwright (Node d
 scripts/
   paths.py            # frozen-aware paths (option A): DATA_ROOT, OUTPUT_ROOT, AUTH, LOG_DIR, FAILURES_DIR, CONFIG_FILE
   logging_setup.py    # rotating file log under LOG_DIR (every entry point calls it)
-  common.py           # URL, ROUTES, timeouts, auth+nav helpers, AuthError/RunCancelled/PreflightError/ReportError/BrowserNotFoundError,
-                      #   launch_browser (probe msedge→chrome), set_preferred_channel, check_browsers, preflight, parse_routes/normalize_route
+  common.py           # site config (get_url/set_site: SSOR|ARS × prod|test|dev), ROUTES, timeouts, auth+nav helpers,
+                      #   AuthError/RunCancelled/PreflightError/ReportError/BrowserNotFoundError, launch_browser,
+                      #   set_preferred_channel, check_browsers, preflight, parse_routes/normalize_route
   events.py           # Events sink + RunResult (export) + ConsolidateResult
   exporter.py         # the one per-route loop: run_export(spec, events), ReportSpec, save_pdf_letter / save_via_export_button, _recover, _retry_failed_routes
   exporter_parallel.py# EXPERIMENTAL fast mode: N browsers off a shared queue; reuses exporter.py internals
@@ -146,8 +154,9 @@ build/
   release_notes.md    # body of the GitHub release (which zip to pick + highlights)
   app.ico / app.manifest / full_smoke.py / dist_readme.txt / .venv/ (git-ignored)
 dist/                 # build output: dist/TSMIS Exporter/ (git-ignored)
-output/               # folder structure tracked (.gitkeep); contents git-ignored
-  ramp_summary/ ramp_detail/ highway_sequence/ highway_log/ consolidated/ run_reports/
+output/               # contents git-ignored. Live layout: <YYYY-MM-DD>/{ramp_summary,
+  ...               #   ramp_detail,highway_sequence,highway_log,consolidated}/ + run_reports/
+                      #   (the tracked flat .gitkeep stubs are the legacy pre-dated layout)
 ```
 
 `scripts/tsmis_auth.json` is git-ignored — treat it as a credential. Don't commit
@@ -173,8 +182,17 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
 
 ## Key Behaviors
 
+- **Dated outputs:** every run writes into `output/<YYYY-MM-DD>/<report>/`
+  (`paths.output_day_dir`), so each day's exports live in their own folder.
+  The consolidators read the same layout: `day=None` means the **newest** dated
+  folder (`paths.latest_output_day`), the GUI has an "Export day" picker, the
+  console prompts (Enter = newest; `TSMIS_DAY` overrides), and the combined
+  workbook lands in `output/<date>/consolidated/`. When NO dated folders exist
+  the consolidators fall back to the legacy flat `output/<report>/` layout, so
+  pre-0.7 exports stay consolidatable.
 - **Resume / idempotency:** `run_export` skips a route whose output file already
-  exists. Delete a file to force re-download.
+  exists **in today's folder**. Delete a file to force re-download; a new day
+  always starts a fresh folder (yesterday's files never block today's run).
 - **Skip a slow route:** console `S` key / GUI Skip button →
   `events.should_skip()`. After `SKIP_PROMPT_AFTER_MS` a "still working" line
   appears and the skip hatch opens; skipped routes are recorded and the form
@@ -248,7 +266,8 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
   `.close()` shuts the persistent browser down); `_recover()` re-auths the
   same way mid-run. If sign-in still fails, `AuthError` is raised as before.
   The profile can only be open in ONE browser at a time, so **device mode caps
-  fast mode to 1 worker** (a saved login is required for real parallelism).
+  fast mode to 1 worker** (a saved login is required for real parallelism — the
+  GUI greys the Fast-mode checkbox out without one and says why).
   The `.bat` export menus print a note instead of exiting when the file is
   missing; the GUI offers to start anyway.
 - **Local Network Access:** the TSMIS page pulls report data from an intranet

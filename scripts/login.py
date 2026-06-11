@@ -18,7 +18,7 @@ except ImportError:
     sys.exit(1)
 
 from common import (
-    AUTH, BROWSER_CHANNELS, URL, BrowserNotFoundError, is_logged_in, launch_browser,
+    AUTH, BROWSER_CHANNELS, BrowserNotFoundError, get_url, is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, storage_state_is_portable, try_device_sso_login,
@@ -191,7 +191,7 @@ def _login_with_browser(browser, label):
     """Drive a normal headed sign-in in `browser`; save only on a real login."""
     ctx = browser.new_context()
     page = ctx.new_page()
-    page.goto(URL)
+    page.goto(get_url())
 
     print()
     print("=" * 64)

@@ -30,16 +30,31 @@ try:
 except ImportError:
     _DEPS_OK = False
 
-from paths import OUTPUT_ROOT
+from paths import OUTPUT_ROOT, latest_output_day, output_day_dir
 from events import Events, ConsolidateResult
 
-INPUT_DIR = OUTPUT_ROOT / "ramp_summary"
+SUBDIR = "ramp_summary"
+FILENAME = "tsar_ramp_summary_consolidated.xlsx"
+
+# Legacy flat-layout locations (pre-dated exports); still used when no dated
+# output/<YYYY-MM-DD>/ folders exist, so old exports stay consolidatable.
+INPUT_DIR = OUTPUT_ROOT / SUBDIR
 OUT_DIR = OUTPUT_ROOT / "consolidated"
-OUT_PATH = OUT_DIR / "tsar_ramp_summary_consolidated.xlsx"
+OUT_PATH = OUT_DIR / FILENAME
 
 # Friendly report name for user-facing messages (shown in both the GUI and
 # the console, so keep these UI-neutral -- no ".bat" / "menu option" wording).
 REPORT_NAME = "Ramp Summary"
+
+
+def input_dir_for(day):
+    """Per-route exports for `day` (YYYY-MM-DD); None = the legacy flat layout."""
+    return (output_day_dir(day) / SUBDIR) if day else INPUT_DIR
+
+
+def out_path_for(day):
+    """Consolidated workbook destination for `day`; None = the legacy location."""
+    return (output_day_dir(day) / "consolidated" / FILENAME) if day else OUT_PATH
 
 
 # =============================================================================
@@ -648,12 +663,16 @@ def build_workbook(records, out_path):
 # Entry point
 # =============================================================================
 
-def consolidate(events=None, confirm_overwrite=None):
+def consolidate(events=None, confirm_overwrite=None, day=None):
     """Parse every per-route Ramp Summary PDF into one audited workbook.
 
     Console-free: reports progress via events.on_log, asks before overwriting
     through the confirm_overwrite(path)->bool callback, and returns a
     ConsolidateResult. Honors events.is_cancelled() between files.
+
+    `day` picks which dated export folder (YYYY-MM-DD) to read; None means the
+    newest dated folder, falling back to the legacy flat layout when no dated
+    folders exist yet.
     """
     events = events or Events()
     if not _DEPS_OK:
@@ -662,24 +681,27 @@ def consolidate(events=None, confirm_overwrite=None):
             message="Required components are missing (pdfplumber, openpyxl).",
         )
     confirm = confirm_overwrite or (lambda _p: True)
+    day = day or latest_output_day()
+    input_dir = input_dir_for(day)
+    out_path = out_path_for(day)
 
-    if not INPUT_DIR.exists():
+    if not input_dir.exists():
         return ConsolidateResult(
             status="error",
-            message=(f"The {REPORT_NAME} output folder doesn't exist yet:\n{INPUT_DIR}\n\n"
+            message=(f"The {REPORT_NAME} output folder doesn't exist yet:\n{input_dir}\n\n"
                      f"Export the {REPORT_NAME} report first, then consolidate."),
         )
 
-    pdfs = sorted(INPUT_DIR.glob("*.pdf"))
+    pdfs = sorted(input_dir.glob("*.pdf"))
     if not pdfs:
         return ConsolidateResult(
             status="error",
-            message=(f"No {REPORT_NAME} files were found in:\n{INPUT_DIR}\n\n"
+            message=(f"No {REPORT_NAME} files were found in:\n{input_dir}\n\n"
                      f"Export the {REPORT_NAME} report first, then consolidate."),
         )
 
     # Confirm overwrite *before* spending time parsing PDFs.
-    if OUT_PATH.exists() and not confirm(OUT_PATH):
+    if out_path.exists() and not confirm(out_path):
         return ConsolidateResult(status="cancelled",
                                  message="Cancelled. Existing file kept.")
 
@@ -704,22 +726,22 @@ def consolidate(events=None, confirm_overwrite=None):
     events.on_log("")
     events.on_log("Writing consolidated workbook...")
     try:
-        build_workbook(records, OUT_PATH)
+        build_workbook(records, out_path)
     except PermissionError:
         return ConsolidateResult(
             status="error",
-            message=(f"Could not save {OUT_PATH.name}.\n\n"
+            message=(f"Could not save {out_path.name}.\n\n"
                      "The file is probably open in Excel. Close it and try again.\n"
                      "(Your exported files were not changed.)"),
         )
 
     return ConsolidateResult(
         status="ok",
-        output_path=str(OUT_PATH),
+        output_path=str(out_path),
         summary_lines=[
             f"Parsed:      {len(records)}",
             f"Failed:      {len(failed)} {failed if failed else ''}",
-            f"Output file: {OUT_PATH}",
+            f"Output file: {out_path}",
         ],
     )
 

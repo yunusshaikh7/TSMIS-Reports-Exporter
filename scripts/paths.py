@@ -16,7 +16,9 @@ Policy ("portable by default, never break"):
     batch files behave exactly as before.
 """
 import os
+import re
 import sys
+from datetime import date
 from pathlib import Path
 
 APP_NAME = "TSMIS Exporter"
@@ -61,6 +63,39 @@ DATA_ROOT = _resolve_data_root()
 
 # Exported reports: each report writes into its own subfolder under here.
 OUTPUT_ROOT = DATA_ROOT / "output"
+
+# Exports are grouped by day: output/<YYYY-MM-DD>/<report subfolder>/...
+# so a new day's run never resumes over (or mixes with) yesterday's files.
+# The consolidators read the same dated layout (newest day by default).
+_DAY_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def today_str():
+    return date.today().isoformat()
+
+
+def output_day_dir(day=None):
+    """output/<day>/ — `day` is a YYYY-MM-DD string; None means today."""
+    return OUTPUT_ROOT / (day or today_str())
+
+
+def list_output_days():
+    """Existing dated folders under output/, newest first."""
+    try:
+        return sorted(
+            (p.name for p in OUTPUT_ROOT.iterdir()
+             if p.is_dir() and _DAY_RE.fullmatch(p.name)),
+            reverse=True,
+        )
+    except OSError:
+        return []
+
+
+def latest_output_day():
+    """Newest dated export folder, or None when none exist yet (callers fall
+    back to the pre-dated flat layout so old exports stay consolidatable)."""
+    days = list_output_days()
+    return days[0] if days else None
 
 # App-private data (auth token, logs, config).
 if is_frozen():

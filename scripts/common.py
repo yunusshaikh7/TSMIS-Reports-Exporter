@@ -61,7 +61,45 @@ class ReportError(Exception):
     timeout (and then the long retry) on something the site simply can't build."""
 
 
-URL = "https://rhansonrizing.github.io/tsmis_reports/index.html"
+# The TSMIS report site. One page serves every combination of data source
+# (SSOR / ARS) and environment (prod / test / dev) via query parameters; the
+# user picks both in the GUI header (set_site) or via TSMIS_SRC / TSMIS_ENV in
+# the console flow. Defaults: SSOR + prod.
+TSMIS_HOST = "tsmis-dev.dot.ca.gov"
+DATA_SOURCES = ("ssor", "ars")
+ENVIRONMENTS = ("prod", "test", "dev")
+DATA_SOURCE_LABELS = {"ssor": "SSOR", "ars": "ARS"}
+ENVIRONMENT_LABELS = {"prod": "Prod", "test": "Test", "dev": "Dev"}
+
+
+def _env_choice(var, valid, default):
+    v = os.environ.get(var, "").strip().lower()
+    return v if v in valid else default
+
+
+_data_source = _env_choice("TSMIS_SRC", DATA_SOURCES, "ssor")
+_environment = _env_choice("TSMIS_ENV", ENVIRONMENTS, "prod")
+
+
+def set_site(source=None, environment=None):
+    """Record which data source / environment the next navigation should use.
+    Invalid values are ignored (the current choice is kept)."""
+    global _data_source, _environment
+    if source and source.lower() in DATA_SOURCES:
+        _data_source = source.lower()
+    if environment and environment.lower() in ENVIRONMENTS:
+        _environment = environment.lower()
+
+
+def get_site():
+    """The active (data_source, environment) pair."""
+    return _data_source, _environment
+
+
+def get_url():
+    """The full report-page URL for the active data source / environment."""
+    return f"https://{TSMIS_HOST}/index.html?env={_environment}&src={_data_source}"
+
 
 # The shared auth file path is resolved by paths.py, which is frozen-aware: in
 # the packaged build it lives next to the .exe (auto-falling back to
@@ -224,19 +262,29 @@ def save_auth_state(state):
 
 def navigate_with_auth(page):
     """Open the TSMIS page and click through any leftover SSO redirect."""
-    page.goto(URL)
+    url = get_url()
+    page.goto(url)
     page.wait_for_timeout(2000)
     try:
         page.get_by_text("Caltrans Azure AD").click(timeout=4000)
-        page.wait_for_url(URL, timeout=30000)
+        page.wait_for_url(f"https://{TSMIS_HOST}/**", timeout=30000)
     except Exception:
         pass
     page.wait_for_timeout(2000)
+    # The SSO round-trip can land back on the site without the env/src query
+    # parameters; reopen the exact target once authenticated so the selected
+    # data source / environment is the one actually active.
+    try:
+        if TSMIS_HOST in page.url and not page.url.startswith(url):
+            page.goto(url)
+            page.wait_for_timeout(2000)
+    except Exception:
+        pass
 
 
 def is_logged_in(page):
     """Quick check: are we on the report page, or stuck at a login screen?"""
-    return "tsmis_reports" in page.url and page.locator("#customReport").count() > 0
+    return TSMIS_HOST in page.url and page.locator("#customReport").count() > 0
 
 
 def select_report(page, report_label):
@@ -614,7 +662,7 @@ def capture_storage_state_if_logged_in(ctx, *, navigate=False, timeout_ms=15_000
         return None
     try:
         page = _first_or_new_page(ctx)
-        page.goto(URL, timeout=timeout_ms)
+        page.goto(get_url(), timeout=timeout_ms)
         page.wait_for_timeout(2_000)
         if is_logged_in(page):
             return ctx.storage_state()
@@ -645,7 +693,7 @@ def launch_edge_login_context(p):
         args=args,
     )
     page = _first_or_new_page(ctx)
-    page.goto(URL)
+    page.goto(get_url())
     return ctx, f"http://127.0.0.1:{port}"
 
 

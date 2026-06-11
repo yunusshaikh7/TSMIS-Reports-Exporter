@@ -299,6 +299,37 @@ def _confirm_overwrite_console(path):
     return ans in ("y", "yes")
 
 
+def _resolve_day_console():
+    """Pick which day's exports to consolidate.
+
+    Honors TSMIS_DAY (a YYYY-MM-DD string); otherwise prompts only when several
+    dated export folders exist (Enter / EOF = newest). Returns the chosen day,
+    or None when no dated folders exist yet (the consolidators then fall back
+    to the legacy flat layout)."""
+    from paths import list_output_days
+    env = os.environ.get("TSMIS_DAY", "").strip()
+    if env:
+        return env
+    days = list_output_days()
+    if not days:
+        return None
+    if len(days) == 1:
+        return days[0]
+    print()
+    print("Export days found:")
+    for i, d in enumerate(days, 1):
+        print(f"  {i}. {d}" + ("   (newest)" if i == 1 else ""))
+    try:
+        raw = input("Which day? [Enter = newest]: ").strip()
+    except EOFError:
+        raw = ""
+    if raw in days:
+        return raw
+    if raw.isdigit() and 1 <= int(raw) <= len(days):
+        return days[int(raw) - 1]
+    return days[0]
+
+
 def run_consolidate_cli(consolidate_fn):
     """Run one consolidator as a console program. Used by the consolidate_*.py
     entry points and therefore by '4. consolidate (combine reports).bat'.
@@ -307,9 +338,13 @@ def run_consolidate_cli(consolidate_fn):
     ConsolidateResult; this shim renders the outcome and sets the exit code.
     """
     setup_logging()
+    day = _resolve_day_console()
+    if day:
+        print(f"Consolidating the {day} exports.")
     result = consolidate_fn(
         events=Events(on_log=print),
         confirm_overwrite=_confirm_overwrite_console,
+        day=day,
     )
 
     if result.status == "cancelled":
