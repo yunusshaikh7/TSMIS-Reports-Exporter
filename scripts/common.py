@@ -260,89 +260,89 @@ def save_auth_state(state):
         json.dump(state, f)
 
 
-def _ensure_site_params(page, url):
-    """Reopen the exact target URL if SSO landed us on the site without the
-    env/src query parameters, so the selected data source / environment is the
-    one actually active. No-op when the URL already matches (or we're off-site)."""
+def _ensure_site_params(page):
+    """Make sure the app is running the selected data source / environment.
+
+    The OAuth redirect_uri is the bare index.html (no query), so the URL after
+    sign-in never matches ours — the app carries env/src across the round-trip
+    itself via sessionStorage. So compare the app's OWN config (window.CONFIG)
+    rather than the URL, and reload with the right parameters only on a real
+    mismatch (the reload re-runs the silent OAuth round-trip)."""
     try:
-        if TSMIS_HOST in page.url and not page.url.startswith(url):
-            page.goto(url)
+        if TSMIS_HOST not in page.url:
+            return
+        got = page.evaluate(
+            "[window.CONFIG && CONFIG.env || null, window.CONFIG && CONFIG.src || null]")
+        want_src, want_env = get_site()
+        if got != [want_env, want_src]:
+            page.goto(get_url())
             page.wait_for_timeout(2000)
     except Exception:
         pass
 
 
 def navigate_with_auth(page):
-    """Open the TSMIS page and click through the sign-in chain when shown.
+    """Open the TSMIS page and see the sign-in through.
 
-    The app does NOT auto-redirect when unauthenticated: it shows its own
-    "Sign In with ArcGIS" button (#loginPrompt). Clicking it leads to the
-    portal sign-in page — possibly in a POPUP — whose "Caltrans Azure AD"
-    button only appears once that page's scripts render (give it time). With
-    a live Azure session (saved cookies, or Windows device auth in the Edge
-    profile) the rest completes silently; we then poll for the app page to
-    reach the signed-in state (popup flows hand the token back without the
-    main page navigating). Already-authenticated pages skip every click.
+    The app NEVER shows a signed-out page: with no token it immediately
+    redirects itself into the portal OAuth flow (initAuth -> login(), same
+    tab). With a live portal session that round-trip completes silently;
+    otherwise the portal sign-in page (JS-rendered) appears and its
+    "Caltrans Azure AD" button must be clicked — after which saved Azure
+    cookies, Kerberos, or Windows device auth finish the job. The token comes
+    back in the URL hash and lives only in page memory, so every fresh
+    navigation re-runs this dance. We poll for the app's post-auth UI
+    (is_logged_in) and push the sign-in pages along whenever they show.
     """
-    url = get_url()
-    page.goto(url)
-    page.wait_for_timeout(2000)
-    if is_logged_in(page):
-        _ensure_site_params(page, url)
-        return
-
-    # Start the OAuth flow from the app's own button (visible only when the
-    # app has decided we're signed out). The portal page may open in a popup.
-    target = page
-    try:
-        btn = page.get_by_role("button", name="Sign In with ArcGIS")
-        if btn.count() > 0 and btn.first.is_visible():
-            try:
-                with page.context.expect_page(timeout=4000) as popup_info:
-                    btn.first.click()
-                target = popup_info.value
-                target.wait_for_load_state("domcontentloaded", timeout=15000)
-            except Exception:
-                target = page          # same-tab redirect (or no new window)
-    except Exception:
-        pass
-
-    # The portal sign-in page renders via JS; the IdP button shows up late.
-    try:
-        target.get_by_text("Caltrans Azure AD").click(timeout=10000)
-    except Exception:
-        pass
-
-    # Wait for the APP page to land signed in. Popup flows complete without
-    # the main page navigating, so poll state rather than waiting on a URL.
-    deadline = time.monotonic() + 30
+    page.goto(get_url())
+    deadline = time.monotonic() + 45
+    clicked_idp = False
     while time.monotonic() < deadline:
         try:
             if is_logged_in(page):
                 break
         except Exception:
             pass
+        if not clicked_idp:
+            # If the app ever lands on its (currently unused) signed-out
+            # screen, push the flow along from there too.
+            try:
+                btn = page.get_by_role("button", name="Sign In with ArcGIS")
+                if btn.count() > 0 and btn.first.is_visible():
+                    btn.first.click(timeout=2000)
+            except Exception:
+                pass
+            # The portal sign-in page renders via JS; click the IdP button
+            # the moment it exists. One click is enough — the SAML/Azure
+            # redirects take it from there.
+            try:
+                idp = page.get_by_text("Caltrans Azure AD")
+                if idp.count() > 0 and idp.first.is_visible():
+                    idp.first.click(timeout=2000)
+                    clicked_idp = True
+            except Exception:
+                pass
         try:
             page.wait_for_timeout(1000)
         except Exception:
             break
     page.wait_for_timeout(1000)
-    _ensure_site_params(page, url)
+    _ensure_site_params(page)
 
 
-# Signed-in detection for the report page. #customReport exists in the page's
-# STATIC HTML even when signed out, so its presence alone proves nothing (that
-# false positive once broke every sign-in path). The app's own decision is the
-# real signal: it shows #loginPrompt when unauthenticated and #accessDenied
-# when the account lacks the TSMIS group, and leaves both hidden once usable.
+# Signed-in detection for the report page. The page ships its whole form
+# (#customReport included) in the static HTML even when signed out, and the
+# unauthenticated state is "you get redirected away" rather than any visible
+# prompt — so the ONLY trustworthy signal is the app's post-auth UI:
+# setAuthUI(true) shows #modeSelector (immediately for ARS; for SSOR after the
+# TSMIS_HI group check passes), and #accessDenied means authenticated but not
+# authorized — not usable for exports.
 _SIGNED_IN_JS = """(() => {
   const visible = (sel) => {
     const el = document.querySelector(sel);
     return !!el && getComputedStyle(el).display !== 'none' && el.offsetParent !== null;
   };
-  return !!document.querySelector('#customReport')
-      && !visible('#loginPrompt')
-      && !visible('#accessDenied');
+  return visible('#modeSelector') && !visible('#accessDenied');
 })()"""
 
 
