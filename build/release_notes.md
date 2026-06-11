@@ -14,13 +14,16 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
-- **Sign-in works on the new TSMIS site (0.7.2).** The new app never shows a
-  signed-out page — it silently redirects itself through the portal OAuth flow
-  on every load and keeps its token in page memory only. The tool now rides
-  that flow: it polls for the app's real post-sign-in state and clicks
-  "Caltrans Azure AD" the moment the portal page renders it, so saved Chrome
-  sessions and the hands-free Edge sign-in work again (0.7.0/0.7.1 raced the
-  redirect or watched for the wrong signals).
+- **Sign-in works on the new TSMIS site (0.7.2–0.7.3).** The new app never
+  shows a signed-out page — it silently redirects itself through the portal
+  OAuth flow on every load and keeps its token in page memory only. The tool
+  now rides that flow: it polls for the app's real post-sign-in state and
+  clicks "Caltrans Azure AD" the moment the portal page renders it. 0.7.3
+  hardens the signed-in detection (several post-sign-in signals, robust
+  visibility checks) and adds deep sign-in diagnostics: the log records the
+  app version and every sign-in attempt's outcome, and a failed sign-in saves
+  a screenshot + page snapshot under `data\failures\` so problems can be
+  pinpointed from one run.
 - **Pick the data source and environment.** Two new header dropdowns choose
   **SSOR or ARS** and **Prod / Test / Dev** (defaults: SSOR + Prod) — the tool
   now drives the new TSMIS site, one page for every combination. Console flow:

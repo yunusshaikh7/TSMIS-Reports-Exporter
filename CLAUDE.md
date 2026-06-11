@@ -252,9 +252,14 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
   back in the URL hash and lives **only in page memory**, ~120 min TTL — so a
   storage_state never carries the app session, every fresh navigation re-runs
   the silent round-trip, and `_recover()` re-mints expired tokens mid-run).
-  The only trustworthy signal is the app's post-auth UI: `#modeSelector`
-  visible (ARS: immediately; SSOR: after the TSMIS_HI group check) and
-  `#accessDenied` hidden (`common._SIGNED_IN_JS`). `navigate_with_auth` polls
+  The only trustworthy signal is the app's post-auth UI: any of
+  `#modeSelector`/`#controlsGrid`/`#generateRow`/`#appForm`/`#versionCtrl`
+  visible (ARS: immediately; SSOR: after the TSMIS_HI group check) with
+  `#accessDenied`/`#loginPrompt` hidden (`common._SIGNED_IN_JS`; visibility via
+  `Element.checkVisibility()` — offsetParent is wrong for fixed-position
+  ancestors). Sign-in gate failures dump `auth_fail_<ts>.png/.html` to
+  `FAILURES_DIR` plus a per-signal snapshot to the log
+  (`common.require_signed_in` / `dump_auth_failure`). `navigate_with_auth` polls
   for that state (45 s budget), clicking "Caltrans Azure AD" on the
   JS-rendered portal page the moment it appears; the env/src choice survives
   the OAuth round-trip via the app's own sessionStorage handoff and is

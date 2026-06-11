@@ -31,5 +31,10 @@ def setup_logging(level=logging.INFO):
     root.setLevel(level)
     root.addHandler(handler)
     _configured = True
-    logging.getLogger("tsmis").info("=== logging started -> %s ===", LOG_FILE)
+    try:
+        from version import __version__ as app_version
+    except Exception:
+        app_version = "unknown"
+    logging.getLogger("tsmis").info(
+        "=== logging started (app v%s) -> %s ===", app_version, LOG_FILE)
     return LOG_FILE

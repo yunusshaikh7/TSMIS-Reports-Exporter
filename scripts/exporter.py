@@ -34,6 +34,7 @@ from common import (
     new_authed_browser,
     preflight,
     report_error_text,
+    require_signed_in,
     select_report,
     wait_with_skip_option,
 )
@@ -94,8 +95,7 @@ def _recover(page, spec):
     Raises AuthError if the session has died so the run stops cleanly.
     """
     navigate_with_auth(page)
-    if not is_logged_in(page):
-        raise AuthError("Session expired partway through the batch.")
+    require_signed_in(page, "Session expired partway through the batch.")
     select_report(page, spec.label)
 
 
@@ -316,11 +316,11 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
         browser, _ctx, page = new_authed_browser(p)
         try:
             navigate_with_auth(page)
-            if not is_logged_in(page):
-                raise AuthError(
-                    "Sign-in didn't complete - the saved session may be expired, "
-                    "or automatic sign-in isn't available on this PC. Please log in."
-                )
+            require_signed_in(
+                page,
+                "Sign-in didn't complete - the saved session may be expired, "
+                "or automatic sign-in isn't available on this PC. Please log in.",
+            )
 
             events.on_log("Logged in. Checking the report form...")
             preflight(page, spec.label)
