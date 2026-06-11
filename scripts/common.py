@@ -18,6 +18,7 @@ import socket
 import sys
 import time
 from pathlib import Path
+from urllib.parse import quote
 
 try:
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -299,32 +300,49 @@ def navigate_with_auth(page):
     """
     page.goto(get_url())
     deadline = time.monotonic() + 45
-    clicked_idp = False
+    idp_clicks = 0
+    forced_idp = False
     while time.monotonic() < deadline:
         try:
             if is_logged_in(page):
                 break
         except Exception:
             pass
-        if not clicked_idp:
-            # If the app ever lands on its (currently unused) signed-out
-            # screen, push the flow along from there too.
-            try:
-                btn = page.get_by_role("button", name="Sign In with ArcGIS")
-                if btn.count() > 0 and btn.first.is_visible():
-                    btn.first.click(timeout=2000)
-            except Exception:
-                pass
-            # The portal sign-in page renders via JS; click the IdP button
-            # the moment it exists. One click is enough — the SAML/Azure
-            # redirects take it from there.
-            try:
-                idp = page.get_by_text("Caltrans Azure AD")
-                if idp.count() > 0 and idp.first.is_visible():
+        # If the app ever lands on its (currently unused) signed-out screen,
+        # push the flow along from there too.
+        try:
+            btn = page.get_by_role("button", name="Sign In with ArcGIS")
+            if btn.count() > 0 and btn.first.is_visible():
+                btn.first.click(timeout=2000)
+        except Exception:
+            pass
+        # The portal sign-in page is SERVER-rendered, so the IdP button is
+        # visible immediately -- but its click handler is bound late by the
+        # portal's require.js bundle, and an early click lands on a dead
+        # element (observed in the field: parked on the sign-in page with one
+        # click recorded). So click on EVERY pass while the button is still
+        # showing -- it leaves the page once a click actually works...
+        try:
+            idp = page.get_by_text("Caltrans Azure AD")
+            if idp.count() > 0 and idp.first.is_visible():
+                if idp_clicks >= 6 and not forced_idp:
+                    # ...and if clicks keep landing dead, drive the IdP hop
+                    # directly: the SAML authorize URL is on the button, and
+                    # the portal ties it back to this OAuth flow through the
+                    # page's oauth_state value (same scheme as the page's own
+                    # links).
+                    forced_idp = True
+                    state_val = page.locator("#oauth_state").input_value(timeout=1000)
+                    idp_url = idp.first.get_attribute("data-url")
+                    if idp_url and state_val:
+                        log.info("auth: IdP clicks landing dead; navigating to the "
+                                 "SAML authorize URL directly")
+                        page.goto(f"{idp_url}?oauth_state={quote(state_val, safe='')}")
+                else:
                     idp.first.click(timeout=2000)
-                    clicked_idp = True
-            except Exception:
-                pass
+                    idp_clicks += 1
+        except Exception:
+            pass
         try:
             page.wait_for_timeout(1000)
         except Exception:
@@ -332,8 +350,8 @@ def navigate_with_auth(page):
     page.wait_for_timeout(1000)
     _ensure_site_params(page)
     signed = is_logged_in(page)
-    log.info("auth: navigate done signed_in=%s clicked_idp=%s url=%s",
-             signed, clicked_idp, auth_state(page).get("url"))
+    log.info("auth: navigate done signed_in=%s idp_clicks=%d forced_idp=%s url=%s",
+             signed, idp_clicks, forced_idp, auth_state(page).get("url"))
     if not signed:
         log.info("auth: signals after navigate: %s", auth_state(page).get("signals"))
 
@@ -843,16 +861,28 @@ def launch_edge_login_context(p):
     """
     EDGE_LOGIN_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
     port = _free_local_port()
-    args = [
+    args = _LNA_ARGS + [
         "--profile-directory=Default",
         f"--remote-debugging-port={port}",
     ]
-    ctx = p.chromium.launch_persistent_context(
-        str(EDGE_LOGIN_PROFILE_DIR),
-        channel="msedge",
-        headless=False,
-        args=args,
-    )
+    # Pre-grant local-network-access like every other automated context (the
+    # permission dialog otherwise opens as an extra tab in the sign-in window);
+    # fall back without the kwarg for browsers that don't know the name.
+    try:
+        ctx = p.chromium.launch_persistent_context(
+            str(EDGE_LOGIN_PROFILE_DIR),
+            channel="msedge",
+            headless=False,
+            args=args,
+            permissions=["local-network-access"],
+        )
+    except Exception:
+        ctx = p.chromium.launch_persistent_context(
+            str(EDGE_LOGIN_PROFILE_DIR),
+            channel="msedge",
+            headless=False,
+            args=args,
+        )
     page = _first_or_new_page(ctx)
     page.goto(get_url())
     return ctx, f"http://127.0.0.1:{port}"
