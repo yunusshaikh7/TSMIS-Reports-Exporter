@@ -629,9 +629,12 @@ def _write_summary(wb, tsmis_name, tsn_name, n_union, lay):
             "• The Routes sheet lists every route either system carries — "
             "which side covers it, row counts, and how much of it differs.")
         notes.append(
-            "• Large workbook: the first time Excel opens it, the live keys "
-            "and lookups take a while to calculate — let it finish once, then "
-            "save to keep the results.")
+            "• CALCULATION IS SET TO MANUAL (large workbook): cells show "
+            "blank/0 until you press F9. The first F9 takes a few minutes — "
+            "let it finish, then save to keep the results; edits afterwards "
+            "only recalculate when you press F9 again. (Excel keeps the "
+            "manual setting for other workbooks opened in the same session — "
+            "Formulas → Calculation Options switches it back.)")
     for note in notes:
         line((2, note, note_font))
 
@@ -709,6 +712,17 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None)
     # Streaming workbook (see the note above _styled): sheets are created in
     # display order; Summary first so it's the active sheet on open.
     wb = Workbook(write_only=True)
+    if has_route:
+        # ~2M live formulas: in automatic mode Excel would recalculate for
+        # minutes on open AND after every edit. Ship the workbook in MANUAL
+        # calculation mode instead — it opens instantly showing blanks/zeros,
+        # the user presses F9 once (the one unavoidable big calc), saves, and
+        # from then on opens are instant and edits don't hang. calcOnSave off
+        # so saving doesn't sneak the big calc back in. (Per-route files stay
+        # automatic: they calculate instantly and users expect live updates.)
+        wb.calculation.calcMode = "manual"
+        wb.calculation.calcOnSave = False
+        wb.calculation.fullCalcOnLoad = False
     _write_summary(wb, tsmis_path.name, tsn_path.name, len(union), lay)
     if _write_comparison(wb, union, lay, events) is None:
         return ConsolidateResult(status="cancelled", message="Cancelled by user.")
@@ -746,6 +760,8 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None)
             _route_list("Routes only in TSMIS (missing from TSN)", r_t_only),
             _route_list("Routes only in TSN (missing from TSMIS)", r_n_only),
             "Per-route breakdown: see the Routes sheet.",
+            "Note: the workbook opens in MANUAL calculation — press F9 in "
+            "Excel to calculate (first time takes a few minutes), then save.",
         ]
     lines.append(f"Output file: {out}")
     return ConsolidateResult(status="ok", output_path=str(out),

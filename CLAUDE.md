@@ -42,9 +42,12 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
   live per-route row/diff counts; the Summary gains a ROUTE COVERAGE section
   and the run log lists the missing routes) — where EVERY number is a live
   Excel formula (lookup keys, statuses, per-field diffs, summary counts):
-  edit a value on a data sheet and the report recalculates (consolidated
-  workbooks make Excel's FIRST recalc slow for the same reason — a Summary
-  note warns). The workbook is written in openpyxl's STREAMING (write_only)
+  edit a value on a data sheet and the report recalculates. Consolidated
+  workbooks ship in **manual calculation mode** (`calcPr calcMode="manual"`,
+  calcOnSave off): ~2M live formulas would otherwise recalc for minutes on
+  open and after every edit — instead the file opens instantly showing
+  blank/0 and the user presses F9 once (Summary note + run log explain;
+  per-route files stay automatic). The workbook is written in openpyxl's STREAMING (write_only)
   mode — the consolidated comparison carries ~2M formula cells, which the
   normal in-memory mode cannot save in reasonable time (50+ min vs ~3 min;
   same reason the consolidators stream). Matched cells show the matched
