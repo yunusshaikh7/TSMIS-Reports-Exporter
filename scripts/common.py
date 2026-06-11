@@ -260,20 +260,10 @@ def save_auth_state(state):
         json.dump(state, f)
 
 
-def navigate_with_auth(page):
-    """Open the TSMIS page and click through any leftover SSO redirect."""
-    url = get_url()
-    page.goto(url)
-    page.wait_for_timeout(2000)
-    try:
-        page.get_by_text("Caltrans Azure AD").click(timeout=4000)
-        page.wait_for_url(f"https://{TSMIS_HOST}/**", timeout=30000)
-    except Exception:
-        pass
-    page.wait_for_timeout(2000)
-    # The SSO round-trip can land back on the site without the env/src query
-    # parameters; reopen the exact target once authenticated so the selected
-    # data source / environment is the one actually active.
+def _ensure_site_params(page, url):
+    """Reopen the exact target URL if SSO landed us on the site without the
+    env/src query parameters, so the selected data source / environment is the
+    one actually active. No-op when the URL already matches (or we're off-site)."""
     try:
         if TSMIS_HOST in page.url and not page.url.startswith(url):
             page.goto(url)
@@ -282,9 +272,88 @@ def navigate_with_auth(page):
         pass
 
 
+def navigate_with_auth(page):
+    """Open the TSMIS page and click through the sign-in chain when shown.
+
+    The app does NOT auto-redirect when unauthenticated: it shows its own
+    "Sign In with ArcGIS" button (#loginPrompt). Clicking it leads to the
+    portal sign-in page — possibly in a POPUP — whose "Caltrans Azure AD"
+    button only appears once that page's scripts render (give it time). With
+    a live Azure session (saved cookies, or Windows device auth in the Edge
+    profile) the rest completes silently; we then poll for the app page to
+    reach the signed-in state (popup flows hand the token back without the
+    main page navigating). Already-authenticated pages skip every click.
+    """
+    url = get_url()
+    page.goto(url)
+    page.wait_for_timeout(2000)
+    if is_logged_in(page):
+        _ensure_site_params(page, url)
+        return
+
+    # Start the OAuth flow from the app's own button (visible only when the
+    # app has decided we're signed out). The portal page may open in a popup.
+    target = page
+    try:
+        btn = page.get_by_role("button", name="Sign In with ArcGIS")
+        if btn.count() > 0 and btn.first.is_visible():
+            try:
+                with page.context.expect_page(timeout=4000) as popup_info:
+                    btn.first.click()
+                target = popup_info.value
+                target.wait_for_load_state("domcontentloaded", timeout=15000)
+            except Exception:
+                target = page          # same-tab redirect (or no new window)
+    except Exception:
+        pass
+
+    # The portal sign-in page renders via JS; the IdP button shows up late.
+    try:
+        target.get_by_text("Caltrans Azure AD").click(timeout=10000)
+    except Exception:
+        pass
+
+    # Wait for the APP page to land signed in. Popup flows complete without
+    # the main page navigating, so poll state rather than waiting on a URL.
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        try:
+            if is_logged_in(page):
+                break
+        except Exception:
+            pass
+        try:
+            page.wait_for_timeout(1000)
+        except Exception:
+            break
+    page.wait_for_timeout(1000)
+    _ensure_site_params(page, url)
+
+
+# Signed-in detection for the report page. #customReport exists in the page's
+# STATIC HTML even when signed out, so its presence alone proves nothing (that
+# false positive once broke every sign-in path). The app's own decision is the
+# real signal: it shows #loginPrompt when unauthenticated and #accessDenied
+# when the account lacks the TSMIS group, and leaves both hidden once usable.
+_SIGNED_IN_JS = """(() => {
+  const visible = (sel) => {
+    const el = document.querySelector(sel);
+    return !!el && getComputedStyle(el).display !== 'none' && el.offsetParent !== null;
+  };
+  return !!document.querySelector('#customReport')
+      && !visible('#loginPrompt')
+      && !visible('#accessDenied');
+})()"""
+
+
 def is_logged_in(page):
-    """Quick check: are we on the report page, or stuck at a login screen?"""
-    return TSMIS_HOST in page.url and page.locator("#customReport").count() > 0
+    """Quick check: are we on the report page in a usable, signed-in state?"""
+    try:
+        if TSMIS_HOST not in page.url:
+            return False
+        return bool(page.evaluate(_SIGNED_IN_JS))
+    except Exception:
+        return False
 
 
 def select_report(page, report_label):
@@ -661,9 +730,12 @@ def capture_storage_state_if_logged_in(ctx, *, navigate=False, timeout_ms=15_000
     if not navigate:
         return None
     try:
+        # Full sign-in chain, not a bare goto: the app shows its own
+        # "Sign In with ArcGIS" button when the reopened profile has no live
+        # app token, and the profile's silent Azure session only helps if the
+        # chain is actually clicked through.
         page = _first_or_new_page(ctx)
-        page.goto(get_url(), timeout=timeout_ms)
-        page.wait_for_timeout(2_000)
+        navigate_with_auth(page)
         if is_logged_in(page):
             return ctx.storage_state()
     except Exception:

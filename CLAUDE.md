@@ -245,6 +245,15 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 
 ## Auth / Session
 
+- **Signed-in detection** (`common.is_logged_in`): the report page ships
+  `#customReport` in its **static HTML even when signed out**, so presence
+  alone proves nothing (that false positive once broke every sign-in path).
+  Detection keys on the app's own decision: `#loginPrompt` and `#accessDenied`
+  must both be hidden (`common._SIGNED_IN_JS`). `navigate_with_auth` drives the
+  full chain when needed: the app's "Sign In with ArcGIS" button → the portal
+  sign-in page (JS-rendered, popup-tolerant) → "Caltrans Azure AD" → then
+  polls the app page for the signed-in state (popup flows hand the token back
+  without the main page navigating).
 - **Silent device sign-in** (`common.try_device_sso_login` →
   `open_edge_device_context`) is tried first: it reopens the app-owned
   **persistent Edge sign-in profile** (`EDGE_LOGIN_PROFILE_DIR`) headless and
