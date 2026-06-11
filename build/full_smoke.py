@@ -13,6 +13,8 @@ Exit 0 = all good. Nonzero/raise = something the app needs is broken.
 """
 import sys
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 # Make the app modules importable before importing `common` (frozen builds bundle
@@ -85,23 +87,58 @@ def main() -> int:
     print(f"optional libs loaded: {opt}")
     print(f"cryptography loaded (required by pdfminer): {'cryptography' in sys.modules}")
 
-    # 5. GUI + app modules: construct the real window (withdrawn) and tear it
-    #    down, so the self-test also catches a prune/exclude that broke an import
-    #    the GUI needs. (Import paths were set up at module load.)
-    import tkinter as tk
+    # 5. GUI: the WebView shell. The import + bridge api MUST work (these catch
+    #    a prune/exclude that broke pywebview/pythonnet or lost the ui/ assets);
+    #    actually opening a window is attempted too, but tolerated as a skip in
+    #    environments that can't show one.
+    import webview
+    import gui_api
+
+    class _NoCheck:                 # don't spawn the background browser probe here
+        def __init__(self, q): pass
+        def start(self): pass
+    gui_api.CheckWorker = _NoCheck
+
+    api = gui_api.GuiApi()
+    state = api.get_initial_state()
+    assert state["reports"] and state["routes"], "GUI initial state incomplete"
+    ui_index = gui_api._ui_index_path()
+    assert ui_index.exists(), f"UI assets missing: {ui_index}"
+    print(f"gui: bridge api ok ({len(state['reports'])} reports, "
+          f"{len(state['routes'])} routes, ui={ui_index})")
+
+    res = {}
+
+    def _drive(w):
+        try:
+            deadline = time.time() + 30
+            while time.time() < deadline:                # wait for app.js to boot
+                if w.evaluate_js("typeof window.__tsmis !== 'undefined'"):
+                    break
+                time.sleep(0.25)
+            res["state"] = w.evaluate_js("window.__tsmis.test_state()")
+        except Exception as e:
+            res["err"] = f"{type(e).__name__}: {e}"
+        finally:
+            w.destroy()
+
+    window = webview.create_window("smoke", str(ui_index), js_api=api, hidden=True)
+    window.events.loaded += lambda: threading.Thread(
+        target=_drive, args=(window,), daemon=True).start()
+    watchdog = threading.Timer(60, lambda: (res.setdefault("err", "watchdog timeout"),
+                                            window.destroy()))
+    watchdog.daemon = True
+    watchdog.start()
     try:
-        import gui_app
-
-        class _NoCheck:                 # don't spawn the background browser probe here
-            def __init__(self, q): pass
-            def start(self): pass
-        gui_app.CheckWorker = _NoCheck
-
-        app = gui_app.App()
-        app.withdraw(); app.update_idletasks(); app.destroy()
-        print("gui: App window constructed + torn down ok")
-    except tk.TclError as e:
-        print(f"gui: skipped, no display ({e})")
+        webview.start(gui="edgechromium")
+    except Exception as e:
+        print(f"gui: window skipped, environment can't start WebView2 "
+              f"({type(e).__name__}: {e})")
+    else:
+        watchdog.cancel()
+        if not res.get("state"):
+            raise AssertionError(f"gui window cycle failed: {res.get('err', 'no JS state')}")
+        print(f"gui: WebView window + JS bridge ok ({res['state']})")
 
     import shutil
     shutil.rmtree(tmp, ignore_errors=True)

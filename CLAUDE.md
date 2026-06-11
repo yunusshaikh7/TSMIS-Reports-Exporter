@@ -26,27 +26,77 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 
 The export engine is **console-free** and backs both:
 - **`.bat` console flow** (development + fallback) — see *User Workflow*.
-- **Packaged GUI** (`scripts/gui_*.py`, Tkinter) — the shipped desktop app.
+- **Packaged GUI** — a pywebview (**Edge WebView2**) window rendering
+  `scripts/ui/` (plain HTML/CSS/JS, no build step / no npm): `gui_main.py`
+  (entry) → `gui_api.py` (js_api bridge + state + queue pump) →
+  `gui_worker.py` (worker threads, unchanged across the Tk→WebView rewrite).
 
-Only `cli.py` and `gui_*.py` touch `print`/`input`/`msvcrt`/widgets. Core code
+Only `cli.py` and `gui_*.py` touch `print`/`input`/`msvcrt`/the window. Core code
 (`common.py`, `exporter.py`, consolidator cores) reports via the `Events` sink
 (`scripts/events.py`) and raises exceptions — never `print`/`input`/`sys.exit`.
 User-facing strings from the core must be **UI-neutral** (no ".bat" names, no
 "this window" / "menu option N" — that guidance lives in the driver).
 
-**Threading:** Playwright's sync API is thread-affine. All browser work runs on a
-worker thread; only the main thread touches Tk. Workers talk to the UI through a
-`queue.Queue`. In fast mode each worker owns its own Playwright/browser/context.
+**Threading:** Playwright's sync API is thread-affine. All browser work runs on
+worker threads, which post `(kind, payload)` messages to a `queue.Queue` (the
+protocol is documented in `gui_worker.py`). `gui_api` pumps that queue into its
+state machine, and ONE sender thread delivers ordered JSON event batches to JS
+via `evaluate_js` → `window.__tsmis.dispatch()`; JS calls back through
+`window.pywebview.api.<method>()` (the public `GuiApi` methods). In fast mode
+each worker owns its own Playwright/browser/context.
+
+**UI layering:** Python owns app state (auth, task, checks, days) and pushes
+full snapshots; `app.js` owns presentation + form fields and NEVER invents log
+lines — everything shown in the log pane originates in Python so the `tsmis.ui`
+file-log mirror stays complete. A built-in mock API can drive the whole UI,
+including simulated runs, without launching the app — **opt-in only**: open
+`scripts/ui/index.html#mock` in a browser (that's how the layout is
+screenshot-tested). The mock must never auto-start: a cold WebView2 can inject
+the real bridge later than any timeout, and a silent mock fallback would show
+convincing fake exports inside the real app. Without `#mock`, the page waits
+for the bridge and shows a fatal banner if it never arrives.
 
 ## The App
 
 The product is a **portable single-folder Windows desktop app** (bundled Python +
-deps + Tkinter GUI; no installer, no Python needed on target): non-technical staff
-unzip one folder and double-click the `.exe`. The `.bat` console flow (below) is
-retained as a development and fallback path, and runs the same core engine.
+deps + WebView2 GUI; no installer, no Python needed on target): non-technical
+staff unzip one folder and double-click the `.exe`. The `.bat` console flow
+(below) is retained as a development and fallback path, and runs the same core
+engine.
 
 **Design decisions (don't relitigate without reason):**
 - **Packaging:** PyInstaller **onefolder**, shipped as a portable zip (no installer).
+- **UI stack (v0.8.0): pywebview + Edge WebView2 rendering vanilla HTML/CSS/JS.**
+  Replaced the original Tkinter window: Tk could neither match the approved
+  design (the `tsmis-exporter-ui-demo` Lovable mock — Windows-11 look, dark
+  titlebar, two-column layout) nor stop cutting off on small screens; a web
+  layout solves both (responsive, stacks + scrolls below ~980px, dark mode via
+  `prefers-color-scheme`). WebView2 is a safe dependency here: it ships with
+  Windows 10/11 and evergreen Edge — the same Edge this tool already requires.
+  No frontend framework/build step on purpose (static files ship in the
+  bundle; end-user setup stays global-pip). `webview.start(gui="edgechromium")`
+  is forced so a missing runtime fails loudly (clear message box) instead of
+  silently degrading to MSHTML. tkinter is excluded from the bundle.
+  **THREE pywebview traps, all hit during the rewrite:**
+  1. pywebview detects "is `start()` already running" via the main thread's
+     NAME — `logging_setup` must never rename the main thread (it tags
+     `[main]` via a logging Filter instead); renaming it makes
+     `create_window` block forever running the GUI loop itself.
+  2. **Never do work in window-event handlers** (`shown` etc.): pywebview
+     fires them on the WinForms STA thread while WebView2 is still
+     initializing asynchronously on it — a handler that blocks (the original
+     icon-setter loaded a .NET assembly) starves the message pump and
+     INTERMITTENTLY deadlocks the window ("Not responding" + WER AppHangB1
+     before the page loads; ~6/8 launches at its worst, machine-state
+     dependent). The icon is set from a worker thread with pure Win32
+     (`FindWindowW` + `WM_SETICON`); only `closed` (fires after the loop
+     ends) is subscribed.
+  3. `faulthandler` is disabled in the GUI process
+     (`setup_logging(enable_faulthandler=False)`): its Windows handler sees
+     the CLR's routine first-chance access violations (pythonnet) and dumps
+     all threads mid-exception-dispatch — observed wedging init and spamming
+     `crash.log` with dumps from healthy-looking runs. Console entry points
+     never load the CLR and keep faulthandler's hard-crash dumps.
 - **Browser channels — three release variants, one codebase:**
   - **`*-win64.zip` (default build):** no bundled browser. Drives the machine's
     installed Edge (then Chrome) via `channel="msedge"`/`"chrome"`. Edge is
@@ -68,10 +118,18 @@ retained as a development and fallback path, and runs the same core engine.
 - **Data location (option A):** the packaged app writes `output/`, auth token,
   logs, and config **next to the `.exe`**, falling back to
   `%LOCALAPPDATA%\TSMIS Exporter` if read-only. See `scripts/paths.py`.
+- **WebView2 profile:** the GUI window uses a persistent app-owned user-data
+  folder (`paths.WEBVIEW_PROFILE_DIR`, `data\webview2`) via
+  `webview.start(private_mode=False, storage_path=...)`. pywebview's default
+  private mode writes a fresh Chromium profile into `%TEMP%` on EVERY launch
+  (tens of MB, leaked when the process is killed) and cold-starts the browser
+  each time; one stable folder avoids both, and the UI stores nothing
+  sensitive in it.
 
 **Pinned versions (`version.py` / `requirements*.txt`):** `playwright==1.60.0`
 (pins the bundled **Node driver** only — no Chromium ships), `pdfplumber==0.11.9`
-(→ `pdfminer.six==20251230`), `openpyxl==3.1.5`, `pyinstaller==6.20.0`,
+(→ `pdfminer.six==20251230`), `openpyxl==3.1.5`, `pywebview==6.2.1` (→
+`pythonnet`/`clr_loader` on Windows), `pyinstaller==6.20.0`,
 `pyinstaller-hooks-contrib==2026.5`. Built/tested on **Python 3.11**. The export
 engine is live-verified against TSMIS.
 
@@ -145,7 +203,9 @@ scripts/
   consolidate_xlsx_base.py    # shared XLSX consolidator core
   consolidate_ramp_summary.py # standalone (parses PDFs)
   consolidate_{ramp_detail,highway_sequence,highway_log}.py  # thin wrappers over the base
-  gui_main.py / gui_app.py / gui_worker.py / gui_theme.py    # GUI entry / window / worker threads / styles
+  gui_main.py / gui_api.py / gui_worker.py   # GUI entry / js_api bridge + state / worker threads
+  ui/                 # the GUI itself: index.html + app.css + app.js (vanilla; design
+                      #   tokens ported from the approved Lovable demo; mock API for browser preview)
 build/
   build.ps1           # one-command onefolder build (-SelfTest = headless verify gate;
                       #   -BundleChromium = ship the Built-in Chromium inside the bundle)
@@ -362,12 +422,19 @@ first; nothing is published if any gate fails.
 `app.spec` highlights:
 - `collect_all('playwright')` + Playwright's hooks → the Node driver ships. **No
   browser bundled** (no `ms-playwright` data entry).
+- `collect_all('webview'/'pythonnet'/'clr_loader')` — the GUI shell. Their package
+  DATA is load-bearing when frozen: `webview/lib` (WebView2 .NET assemblies),
+  `pythonnet/runtime` (Python.Runtime.dll + netstandard facades),
+  `clr_loader/ffi/dlls` (ClrLoader natives). `hiddenimports += ['clr']`.
+- `scripts/ui/*` ships as data files under `_internal/ui/`
+  (`gui_api._ui_index_path()` resolves them via `sys._MEIPASS`).
 - `collect_data_files('pdfminer')` + `collect_all('pdfplumber'/'openpyxl')` — the
   pdfminer CMap data is the classic frozen trap. `cryptography` is a hard pdfminer
   import and **must stay**.
-- `excludes=['PIL','pypdfium2','pypdfium2_raw']` — image libs the runtime paths
-  (text/table extraction + plain workbooks) don't need; proven safe by the frozen
-  `-SelfTest` passing with PIL excluded.
+- `excludes=['PIL','pypdfium2','pypdfium2_raw','tkinter','_tkinter']` — image libs
+  the runtime paths (text/table extraction + plain workbooks) don't need, plus
+  Tk/Tcl (the UI is a WebView since 0.8.0); proven safe by the frozen `-SelfTest`
+  passing with them excluded.
 - **Trust metadata** (reduces IT/Defender/DLP false-positives on the unsigned exe):
   version-info resource from `version.py`, `app.ico`, `app.manifest` (`asInvoker` +
   Win10/11), `upx=False`. **Code-signing is the only complete fix** (not yet done).
@@ -389,7 +456,8 @@ only, Playwright driver extras (`*.d.ts`, `types/`, `skill/`, `tools/trace/`,
 slipped through. Guards (fail build if found): non-license docs, credit cards
 (IIN + length + Luhn), PEM private keys, AWS keys, US SSNs. Re-runnable on an
 extracted release: `prune_bundle.ps1 -Target "…\TSMIS Exporter"` (`-GuardOnly` to
-audit). The ~148 MB floor is `node.exe` (~80 MB) + Python + Tcl/Tk + pdf/excel libs.
+audit). The ~149 MB floor is `node.exe` (~80 MB) + Python + pythonnet/WebView2
+assemblies + pdf/excel libs.
 
 ## Extending
 
@@ -431,9 +499,17 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
   happened, saved-session-vs-device-mode (with auth-file age), each Edge
   profile attempt, portability verdicts, preflight steps, per-route outcomes
   **with elapsed time and file size**. Crash safety nets: `sys.excepthook` +
-  `threading.excepthook` + Tk's `report_callback_exception` log full
-  tracebacks (a windowed .exe has no stderr); `faulthandler` writes hard
-  interpreter crashes to `LOG_DIR/crash.log`. **Error messages must name the
+  `threading.excepthook` log full tracebacks (a windowed .exe has no stderr);
+  every `GuiApi` method is wrapped (`_api_method`) so a bridge-call crash is
+  logged AND returned to JS as a structured error instead of a dead Promise;
+  uncaught JS errors come back through `api.log_js_error` into `tsmis.crash`;
+  `faulthandler` writes hard interpreter crashes to `LOG_DIR/crash.log` for
+  the **console entry points only** — it is incompatible with pythonnet and
+  disabled in the GUI process (see *Design decisions*, trap 3; the GUI's
+  native-crash trail is WER/Event Log).
+  NOTE: the `[main]` thread tag is applied by a logging **Filter** — never
+  rename the actual main thread (it breaks pywebview; see *Design decisions*).
+  **Error messages must name the
   failing step and stay UI-neutral; the WHY (exception text, probe status,
   profile name) always goes to the log** — when adding code, log every
   decision and every swallowed exception (`type(e).__name__` + first line at
@@ -472,6 +548,8 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | One report's output wrong | That report's selector changed | Edit only its `ReportSpec` |
 | "page looks different than expected" | Preflight failed — site changed | Check `LOG_DIR`/`FAILURES_DIR`; update selectors |
 | `BrowserNotFoundError` | No usable browser found | Install Edge, re-run `1. setup…bat` (downloads Chromium), or use the with-browser zip |
+| "The app window could not be created" box | WebView2 runtime missing/broken (very old or stripped Windows) | Install/update Microsoft Edge (ships the Evergreen WebView2 runtime); details in `LOG_DIR` |
+| GUI shows a blank window | UI assets missing or JS crashed | `tsmis.log` carries JS errors (`log_js_error`); run with `TSMIS_UI_DEBUG=1` for DevTools |
 | Edge sign-in "works" but exports can't log in | Edge signed in via the Windows device broker (PRT) — session never reaches cookies | Expected & detected: the capture is rejected (`storage_state_is_portable`) and login falls back to Chrome / Built-in Chromium |
 | Browser launch fails after an Edge/Chrome update | Evergreen browser outran pinned Playwright CDP | Bump `playwright` in `requirements*.txt`, rebuild |
 | DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |

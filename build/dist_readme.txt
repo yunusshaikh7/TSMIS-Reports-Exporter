@@ -45,7 +45,8 @@ EXPORT REPORTS
 
 COMBINE FILES
   The Consolidate tab combines the per-route files into one workbook, saved in
-  "output\consolidated".
+  that day's "consolidated" folder (e.g. "output\2026-06-10\consolidated").
+  The "Export day" picker chooses which day's exports to combine.
 
 GOOD TO KNOW
   * A route can occasionally fail with a "TSMIS site error" (e.g. "Cannot read

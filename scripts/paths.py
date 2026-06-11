@@ -110,6 +110,7 @@ LOG_DIR = _PRIVATE / "logs"
 FAILURES_DIR = _PRIVATE / "failures"   # screenshot + page HTML captured when a route fails
 CONFIG_FILE = _PRIVATE / "config.json"
 EDGE_LOGIN_PROFILE_DIR = _PRIVATE / "edge_login_profile"
+WEBVIEW_PROFILE_DIR = _PRIVATE / "webview2"   # the GUI window's WebView2 user-data folder
 
 # Built-in Chromium (the with-browser release variant): build.ps1 -BundleChromium
 # ships Playwright's ms-playwright folder inside _internal. Point Playwright at

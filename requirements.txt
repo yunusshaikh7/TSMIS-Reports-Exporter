@@ -9,3 +9,7 @@
 playwright==1.60.0
 pdfplumber==0.11.9
 openpyxl==3.1.5
+# GUI shell: renders scripts/ui in an Edge WebView2 window (gui_main/gui_api).
+# Pulls pythonnet + clr_loader on Windows. The .bat console flow never imports
+# it, but it installs here so "run app (GUI preview).bat" works after setup.
+pywebview==6.2.1

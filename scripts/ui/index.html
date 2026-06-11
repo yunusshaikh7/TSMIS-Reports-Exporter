@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!-- TSMIS Reports Exporter — desktop UI (rendered by pywebview / Edge WebView2).
+
+     Plain HTML/CSS/JS on purpose: no build step, no framework, ships as static
+     files inside the PyInstaller bundle. app.js talks to Python through the
+     pywebview js_api bridge (gui_api.GuiApi); opened in a normal browser it
+     runs against a built-in mock so the UI can be previewed and styled without
+     launching the real app. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TSMIS Exporter</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- Inline icon sprite (lucide outline geometry, stroke-based). -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+  <symbol id="i-skip" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></symbol>
+  <symbol id="i-login" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol>
+</svg>
+
+<div class="app">
+
+  <!-- ============================== Title bar ============================ -->
+  <header class="titlebar">
+    <div class="titlebar-row">
+      <div class="brand">
+        <div class="brand-logo">TS</div>
+        <div class="brand-text">
+          <div class="brand-name">
+            <span id="appName">TSMIS Exporter</span>
+            <span class="version-chip" id="appVersion"></span>
+          </div>
+          <div class="brand-sub">Caltrans Transportation Report Toolkit</div>
+        </div>
+      </div>
+      <div class="auth-cluster">
+        <span class="auth-status">
+          <span class="dot dot-unknown" id="authDot"></span>
+          <span id="authText">Checking session…</span>
+        </span>
+        <button class="btn btn-accent" id="btnLogin">
+          <svg class="ic"><use href="#i-login"/></svg><span id="btnLoginLabel">Log in</span>
+        </button>
+        <button class="btn btn-titlebar hidden" id="btnLoginCancel">Cancel</button>
+      </div>
+    </div>
+
+    <div class="titlebar-row env-strip">
+      <label class="tb-field">Data source
+        <span class="tb-select"><select id="selSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+      </label>
+      <label class="tb-field">Environment
+        <span class="tb-select"><select id="selEnv"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+      </label>
+      <label class="tb-field">Browser
+        <span class="tb-select"><select id="selBrowser"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+      </label>
+      <div class="checks" id="checkStrip"></div>
+      <button class="btn btn-titlebar" id="btnRecheck">
+        <svg class="ic"><use href="#i-refresh"/></svg>Re-check
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================== Main ================================= -->
+  <main class="main">
+    <section class="col col-config">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h1 id="panelTitle">Export reports</h1>
+          <p id="panelSub">Select reports and routes, then run the batch export.</p>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" id="tabExport" role="tab" aria-selected="true">
+            <svg class="ic"><use href="#i-file-text"/></svg>Export
+          </button>
+          <button class="tab" id="tabConsolidate" role="tab" aria-selected="false">
+            <svg class="ic"><use href="#i-layers"/></svg>Consolidate
+          </button>
+        </div>
+      </div>
+
+      <!-- Export pane -->
+      <div class="card pane" id="paneExport">
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">Reports to export</span>
+            <span class="section-meta" id="reportCount">1 selected</span>
+          </div>
+          <div class="option-list" id="reportList"></div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-head"><span class="section-label">Routes</span></div>
+          <div class="routes-row">
+            <input type="text" class="input" id="routesInput" autocomplete="off"
+                   spellcheck="false" placeholder="e.g. 5, 99, 101 — leave blank for all">
+            <button class="btn btn-standard" id="btnChooseRoutes">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Choose…
+            </button>
+          </div>
+          <p class="hint" id="routesHint">Leave blank to export all routes.</p>
+        </div>
+
+        <div class="card-section">
+          <div class="fast-row">
+            <label class="fast-toggle">
+              <input type="checkbox" id="fastMode" hidden>
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <svg class="ic zap" id="fastZap"><use href="#i-zap"/></svg>
+              <span class="fast-label">Fast mode <span class="muted">(experimental)</span></span>
+            </label>
+            <div class="fast-workers">
+              <span class="muted">run</span>
+              <input type="number" class="input input-num" id="fastWorkers" min="2" value="3">
+              <span class="muted">browsers at once</span>
+            </div>
+          </div>
+          <p class="hint" id="fastHint">Faster, but heavier on your PC; 3–4 recommended. Per-route Skip is off in fast mode.</p>
+        </div>
+
+        <div class="card-section actions-row">
+          <button class="btn btn-accent" id="btnStartExport">
+            <svg class="ic"><use href="#i-play"/></svg>Start export
+          </button>
+          <button class="btn btn-subtle" id="btnSkip" disabled>
+            <svg class="ic"><use href="#i-skip"/></svg>Skip route
+          </button>
+          <button class="btn btn-subtle" id="btnCancelExport" disabled>
+            <svg class="ic"><use href="#i-x"/></svg>Cancel
+          </button>
+          <span class="spacer"></span>
+          <button class="btn btn-subtle" id="btnSaveReport" disabled>
+            <svg class="ic"><use href="#i-save"/></svg>Save run report…
+          </button>
+        </div>
+      </div>
+
+      <!-- Consolidate pane -->
+      <div class="card pane hidden" id="paneConsolidate">
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">Report to consolidate</span>
+          </div>
+          <p class="hint" style="margin-bottom:8px">Combine the per-route files already in the output folder into one workbook.</p>
+          <div class="option-list" id="consList"></div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-head"><span class="section-label">Export day</span></div>
+          <div class="day-row">
+            <span class="tb-select select-light"><select id="selDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+            <span class="hint">(newest first)</span>
+          </div>
+        </div>
+
+        <div class="card-section dest-row">
+          <div class="dest-text">
+            <div class="hint">Saved to</div>
+            <div class="mono path" id="consDest">—</div>
+          </div>
+          <button class="btn btn-standard" id="btnOpenConsFolder">
+            <svg class="ic"><use href="#i-folder-open"/></svg>Open folder
+          </button>
+        </div>
+
+        <div class="card-section actions-row">
+          <button class="btn btn-accent" id="btnStartCons">
+            <svg class="ic"><use href="#i-layers"/></svg>Start consolidation
+          </button>
+          <button class="btn btn-subtle" id="btnCancelCons" disabled>
+            <svg class="ic"><use href="#i-x"/></svg>Cancel
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="col col-activity">
+      <div class="card progress-card">
+        <div class="progress-head">
+          <span class="progress-status">
+            <svg class="ic" id="progressIcon"><use href="#i-shield"/></svg>
+            <span id="progressText">Idle — ready to export</span>
+          </span>
+          <span class="progress-meta">
+            <span id="progressElapsed" class="hidden"></span>
+            <span id="progressPct">0%</span>
+          </span>
+        </div>
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="count-chips hidden" id="countChips">
+          <span class="count-chip cc-saved">saved <b id="cSaved">0</b></span>
+          <span class="count-chip cc-exists">already had <b id="cExists">0</b></span>
+          <span class="count-chip cc-empty">empty <b id="cEmpty">0</b></span>
+          <span class="count-chip cc-skipped">skipped <b id="cSkipped">0</b></span>
+          <span class="count-chip cc-failed">failed <b id="cFailed">0</b></span>
+        </div>
+      </div>
+
+      <div class="card log-card">
+        <div class="log-head">
+          <span class="log-title"><svg class="ic"><use href="#i-scroll"/></svg>Activity log</span>
+          <button class="btn btn-subtle btn-small" id="btnClearLog">Clear</button>
+        </div>
+        <div class="log-body mono" id="logBody">
+          <div class="log-placeholder" id="logPlaceholder">Waiting for an action… export and consolidation activity will appear here.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================== Footer =============================== -->
+  <footer class="footer">
+    <div class="footer-path">
+      <span class="muted">All files are saved under</span>
+      <span class="mono path" id="outputRoot"></span>
+    </div>
+    <div class="footer-actions">
+      <button class="btn btn-standard" id="btnOpenOutput">
+        <svg class="ic"><use href="#i-folder-open"/></svg>Output folder
+      </button>
+      <button class="btn btn-standard" id="btnOpenLogs">
+        <svg class="ic"><use href="#i-scroll"/></svg>Logs
+      </button>
+    </div>
+  </footer>
+</div>
+
+<!-- Modal host: message / confirm / route picker dialogs are built here. -->
+<div class="modal-overlay hidden" id="modalOverlay"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

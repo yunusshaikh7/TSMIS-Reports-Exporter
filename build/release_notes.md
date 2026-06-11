@@ -14,6 +14,14 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **A brand-new interface (0.8.0).** The window was rebuilt from scratch:
+  a cleaner two-column layout (settings on the left, live progress + activity
+  log on the right), per-route progress with running counts, clearer sign-in
+  status, a searchable route picker, and dark mode that follows Windows.
+  Most importantly it now **fits any screen** — on small or low-resolution
+  displays the layout stacks and scrolls instead of cutting off the bottom
+  buttons. (Under the hood the UI is rendered by Edge WebView2, which is part
+  of Windows 10/11 — nothing extra to install; all export logic is unchanged.)
 - **The log now tells the whole story (0.7.6).** Every run writes a detailed
   trail to `data\logs\tsmis.log`: which build/PC produced it, every sign-in
   step, which browser was picked and why a fallback happened, what was clicked

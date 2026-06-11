@@ -71,7 +71,7 @@ APP_MODULES = [
     "export_highway_log", "export_multi",
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
-    "gui_main", "gui_app", "gui_worker", "gui_theme",
+    "gui_main", "gui_api", "gui_worker",
 ]
 
 datas, binaries, hiddenimports = [], [], list(APP_MODULES)
@@ -81,6 +81,20 @@ datas, binaries, hiddenimports = [], [], list(APP_MODULES)
 # in prune_bundle.ps1 skips it.
 if os.path.exists(ICON):
     datas += [(ICON, ".")]
+
+# The GUI's web assets (scripts/ui) ship as plain data files; gui_api resolves
+# them at runtime via sys._MEIPASS/ui/.
+UI_DIR = os.path.join(SCRIPTS, "ui")
+datas += [(os.path.join(UI_DIR, f), "ui") for f in os.listdir(UI_DIR)]
+
+# pywebview (Edge WebView2 GUI shell) + its Windows backend: pythonnet/clr need
+# their package data (Python.Runtime.dll, the netstandard facade DLLs, the
+# ClrLoader natives, webview/lib WebView2 assemblies) or the frozen window
+# can't open. collect_all carries each package's data + binaries + imports.
+for _pkg in ("webview", "pythonnet", "clr_loader"):
+    _d, _b, _h = collect_all(_pkg)
+    datas += _d; binaries += _b; hiddenimports += _h
+hiddenimports += ["clr"]            # pythonnet's import name
 
 # Playwright: Node driver + package data + hidden imports.
 _d, _b, _h = collect_all("playwright")
@@ -102,7 +116,9 @@ for _pkg in ("pdfplumber", "openpyxl"):
 # the import is absent but that the FROZEN self-test (build.ps1 -SelfTest runs
 # full_smoke.py) still passes every real code path with PIL excluded. pypdfium2 is
 # only touched by pdfplumber.to_image, which the app never calls. Trims ~20 MB.
-EXCLUDES = ["PIL", "pypdfium2", "pypdfium2_raw"]
+# tkinter went with the old Tk GUI (the UI is a WebView now) -- excluding it
+# also drops the Tcl/Tk runtime from the bundle.
+EXCLUDES = ["PIL", "pypdfium2", "pypdfium2_raw", "tkinter", "_tkinter"]
 _excl = set(EXCLUDES)
 hiddenimports = [h for h in hiddenimports if h.split(".")[0] not in _excl]
 
