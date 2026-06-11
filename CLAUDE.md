@@ -245,15 +245,20 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 
 ## Auth / Session
 
-- **Signed-in detection** (`common.is_logged_in`): the report page ships
-  `#customReport` in its **static HTML even when signed out**, so presence
-  alone proves nothing (that false positive once broke every sign-in path).
-  Detection keys on the app's own decision: `#loginPrompt` and `#accessDenied`
-  must both be hidden (`common._SIGNED_IN_JS`). `navigate_with_auth` drives the
-  full chain when needed: the app's "Sign In with ArcGIS" button → the portal
-  sign-in page (JS-rendered, popup-tolerant) → "Caltrans Azure AD" → then
-  polls the app page for the signed-in state (popup flows hand the token back
-  without the main page navigating).
+- **Signed-in detection** (`common.is_logged_in`): the report page ships its
+  whole form in static HTML even when signed out, and the app **never shows a
+  signed-out page** — `initAuth()` with no token immediately self-redirects
+  into the portal OAuth flow (same tab, `response_type=token`; the token comes
+  back in the URL hash and lives **only in page memory**, ~120 min TTL — so a
+  storage_state never carries the app session, every fresh navigation re-runs
+  the silent round-trip, and `_recover()` re-mints expired tokens mid-run).
+  The only trustworthy signal is the app's post-auth UI: `#modeSelector`
+  visible (ARS: immediately; SSOR: after the TSMIS_HI group check) and
+  `#accessDenied` hidden (`common._SIGNED_IN_JS`). `navigate_with_auth` polls
+  for that state (45 s budget), clicking "Caltrans Azure AD" on the
+  JS-rendered portal page the moment it appears; the env/src choice survives
+  the OAuth round-trip via the app's own sessionStorage handoff and is
+  verified against `window.CONFIG` afterwards (`_ensure_site_params`).
 - **Silent device sign-in** (`common.try_device_sso_login` →
   `open_edge_device_context`) is tried first: it reopens the app-owned
   **persistent Edge sign-in profile** (`EDGE_LOGIN_PROFILE_DIR`) headless and
