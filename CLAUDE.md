@@ -418,11 +418,32 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 
 ## Reliability
 
-- **File logging:** `logging_setup.setup_logging()` → rotating `LOG_DIR/tsmis.log`
-  (5 × 2 MB), file-only. The engine logs lifecycle, per-route outcomes, tracebacks.
+- **Heavy file logging (the "one log upload answers it" contract, v0.7.6):**
+  `logging_setup.setup_logging()` → rotating `LOG_DIR/tsmis.log` (5 × 2 MB),
+  file-only. Every line is thread-tagged (`[main]`, `[export-w2]`, `[login]` —
+  fast mode's interleaved browsers stay distinguishable); the startup banner
+  pins build (frozen/dev), Python/OS, resolved paths, and `TSMIS_*`/
+  `PLAYWRIGHT_BROWSERS_PATH` overrides. Everything shown in the GUI log pane
+  and every engine `on_log` line in the console flow is **mirrored** to the
+  `tsmis.ui` logger, so the file carries the user's view (what was clicked,
+  what was reported) alongside the engine's own diagnostics. Decision points
+  log themselves: site/browser picks, channel probe results + why a fallback
+  happened, saved-session-vs-device-mode (with auth-file age), each Edge
+  profile attempt, portability verdicts, preflight steps, per-route outcomes
+  **with elapsed time and file size**. Crash safety nets: `sys.excepthook` +
+  `threading.excepthook` + Tk's `report_callback_exception` log full
+  tracebacks (a windowed .exe has no stderr); `faulthandler` writes hard
+  interpreter crashes to `LOG_DIR/crash.log`. **Error messages must name the
+  failing step and stay UI-neutral; the WHY (exception text, probe status,
+  profile name) always goes to the log** — when adding code, log every
+  decision and every swallowed exception (`type(e).__name__` + first line at
+  minimum).
 - **Preflight** (`common.preflight`): after login, before the loop, confirms the
   report selects and the Route control + Generate button exist — else
-  `PreflightError`, so the run fails fast with one clear error.
+  `PreflightError` naming the failed step in the log + a `preflight_fail_*`
+  page dump, so the run fails fast with one clear error.
+  `SiteUnreachableError` (a `PreflightError`) covers "couldn't open the page
+  at all" (network/VPN) with a check-your-connection message.
 - **Failure screenshots:** on final failure, `_capture_failure()` writes
   `<report>_route_<route>_<ts>.png` + `.html` to `FAILURES_DIR` (best-effort).
 - **Session expiry mid-run:** `_recover()` raises `AuthError`, stopping cleanly.

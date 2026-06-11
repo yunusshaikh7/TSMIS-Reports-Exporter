@@ -5,6 +5,7 @@ console UX (AuthError messaging, the overwrite prompt) so the existing batch
 files keep working unchanged after the refactor. The engines themselves never
 touch the console -- only this module does.
 """
+import logging
 import os
 import re
 import sys
@@ -18,6 +19,18 @@ try:
     _HAS_KEYBOARD = True
 except ImportError:
     _HAS_KEYBOARD = False
+
+# Console status lines are mirrored into tsmis.log (like the GUI's log pane),
+# so a .bat run leaves the same diagnosable trail as the desktop app.
+ui_log = logging.getLogger("tsmis.ui")
+log = logging.getLogger("tsmis.cli")
+
+
+def _echo(line=""):
+    """print() that also lands in the file log (blank lines skipped there)."""
+    print(line)
+    if str(line).strip():
+        ui_log.info("%s", line)
 
 
 # --- export console flow ------------------------------------------------------
@@ -38,7 +51,7 @@ def _drain_skip_key():
 
 
 def _console_events():
-    return Events(on_log=print, should_skip=_drain_skip_key)
+    return Events(on_log=_echo, should_skip=_drain_skip_key)
 
 
 def _resolve_routes_console():
@@ -77,6 +90,7 @@ def _resolve_routes_console():
 
 def _report_bad_auth(reason):
     """Mirror the original handle_bad_auth console UX."""
+    log.warning("run stopped: AuthError: %s", reason)
     print()
     print("=" * 60)
     print("LOGIN PROBLEM")
@@ -117,13 +131,13 @@ def _print_export_summary(result, selected):
     """Print the per-report outcome block shared by the single and multi flows."""
     already = len(result.exists)
     total = result.saved + already + len(result.empty) + len(result.user_skipped) + len(result.failed)
-    print(f"Saved this run:  {result.saved}")
-    print(f"Already had:     {already} (saved in a previous run)")
-    print(f"Empty (no data): {len(result.empty)} {result.empty if result.empty else ''}")
-    print(f"Skipped by user: {len(result.user_skipped)} {result.user_skipped if result.user_skipped else ''}")
-    print(f"Failed:          {len(result.failed)} {result.failed if result.failed else ''}")
-    print(f"Routes handled:  {total} of {selected}")
-    print(f"Output folder:   {result.output_dir}")
+    _echo(f"Saved this run:  {result.saved}")
+    _echo(f"Already had:     {already} (saved in a previous run)")
+    _echo(f"Empty (no data): {len(result.empty)} {result.empty if result.empty else ''}")
+    _echo(f"Skipped by user: {len(result.user_skipped)} {result.user_skipped if result.user_skipped else ''}")
+    _echo(f"Failed:          {len(result.failed)} {result.failed if result.failed else ''}")
+    _echo(f"Routes handled:  {total} of {selected}")
+    _echo(f"Output folder:   {result.output_dir}")
 
 
 def run_cli(spec, title):
@@ -158,6 +172,7 @@ def run_cli(spec, title):
         _report_bad_auth(str(e))
         return
     except (PreflightError, BrowserNotFoundError) as e:
+        log.warning("run stopped: %s: %s", type(e).__name__, e)
         print()
         print("=" * 60)
         print(f"PROBLEM: {e}")
@@ -262,6 +277,7 @@ def run_cli_multi(report_options, title="TSMIS Multi-Report Export"):
             _report_bad_auth(str(e))             # a bad session breaks every report -> stop
             return
         except (PreflightError, BrowserNotFoundError) as e:
+            log.warning("run stopped: %s: %s", type(e).__name__, e)
             print()
             print("=" * 60)
             print(f"PROBLEM: {e}")
@@ -339,13 +355,18 @@ def run_consolidate_cli(consolidate_fn):
     """
     setup_logging()
     day = _resolve_day_console()
+    log.info("consolidate start: %s (day=%s)",
+             getattr(consolidate_fn, "__module__", consolidate_fn),
+             day or "legacy/newest")
     if day:
         print(f"Consolidating the {day} exports.")
     result = consolidate_fn(
-        events=Events(on_log=print),
+        events=Events(on_log=_echo),
         confirm_overwrite=_confirm_overwrite_console,
         day=day,
     )
+    log.info("consolidate done: status=%s output=%s message=%s",
+             result.status, result.output_path or "-", result.message or "-")
 
     if result.status == "cancelled":
         print(result.message or "Cancelled.")
@@ -360,5 +381,5 @@ def run_consolidate_cli(consolidate_fn):
     print()
     print("=" * 60)
     for line in result.summary_lines:
-        print(line)
+        _echo(line)
     print("=" * 60)

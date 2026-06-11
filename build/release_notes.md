@@ -14,6 +14,13 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **The log now tells the whole story (0.7.6).** Every run writes a detailed
+  trail to `data\logs\tsmis.log`: which build/PC produced it, every sign-in
+  step, which browser was picked and why a fallback happened, what was clicked
+  in the app, each route's outcome with timing and file size, and a full
+  traceback for any crash (even ones the window can't show). Errors name the
+  specific step that failed — so one log upload answers what used to take a
+  back-and-forth.
 - **Sign-in works on the new TSMIS site (0.7.5).** Field diagnostics finally
   showed the sign-in was SUCCEEDING — and the tool's own post-sign-in
   "right data source?" check was then reloading the page, which destroys the

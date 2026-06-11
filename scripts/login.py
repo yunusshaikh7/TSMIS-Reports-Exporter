@@ -8,7 +8,7 @@ The interactive flow lives in main() (guarded by __main__) so importing this
 module has no side effects -- the GUI (Phase 4) will replace the input()
 prompts with its own headed-login flow without launching a browser on import.
 """
-import json
+import logging
 import sys
 
 try:
@@ -21,8 +21,11 @@ from common import (
     AUTH, BROWSER_CHANNELS, BrowserNotFoundError, get_url, is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
-    launch_edge_login_context, storage_state_is_portable, try_device_sso_login,
+    launch_edge_login_context, save_auth_state, storage_state_is_portable,
+    try_device_sso_login,
 )
+
+log = logging.getLogger("tsmis.login")
 
 
 def main():
@@ -72,6 +75,7 @@ def _run_login():
         # into a work profile mid-SSO -- the managed-Edge failure), else the
         # experimental persistent-profile Edge flow with its Chrome fallback.
         pref = get_preferred_channel()
+        log.info("login: starting (preferred browser: %s)", pref or "none")
         if pref == "chrome":
             # Explicit Chrome pick: the silent device sign-in never works in
             # Chrome (it's an Edge/Windows integration), so go straight to the
@@ -89,6 +93,7 @@ def _run_login():
             if state:
                 if storage_state_is_portable(p, state):
                     _save_state(state)
+                    log.info("login: SAVED via silent device sign-in")
                     print()
                     print(f"Session saved to {AUTH.name}  (automatic device sign-in)")
                     print('  You can close this window and run "3. run_export (main script).bat"')
@@ -96,6 +101,8 @@ def _run_login():
                     return
                 # Signed in, but the cookies are device-bound. Do NOT save them
                 # (stale Azure stubs make later sign-ins prompt interactively).
+                log.info("login: device sign-in works; exports will sign in live "
+                         "(capture not portable, not saved)")
                 print()
                 print("This PC signs in automatically, but that session can't be saved")
                 print("for reuse. That's fine: exports sign themselves in the same way,")
@@ -109,6 +116,7 @@ def _run_login():
             try:
                 browser = p.chromium.launch(headless=False, channel="chromium")
             except Exception as e:
+                log.info("login: Built-in Chromium launch failed (%s)", type(e).__name__)
                 print()
                 print(f"The built-in browser could not open ({type(e).__name__});")
                 print("trying another browser.")
@@ -125,16 +133,19 @@ def _run_login():
             print("Checking that the captured sign-in can be reused for exports...")
             if storage_state_is_portable(p, edge_state):
                 _save_state(edge_state)
+                log.info("login: SAVED via experimental Edge recapture")
                 print()
                 print(f"Session saved to {AUTH.name}  (experimental Edge recapture)")
                 print('  You can close this window and run "3. run_export (main script).bat"')
                 input("Press Enter to exit...")
                 return
+            log.info("login: Edge capture rejected (device-bound session, not portable)")
             print()
             print("Microsoft Edge signed you in through the Windows work profile,")
             print("so that session can't be reused for exports.")
             print("Opening another browser -- please sign in once more.")
         else:
+            log.info("login: experimental Edge capture failed")
             print()
             print("Experimental Edge sign-in was not captured.")
             print("Opening Google Chrome fallback -- please sign in again.")
@@ -147,6 +158,7 @@ def _try_edge_persistent_login(p):
     try:
         ctx, cdp_url = launch_edge_login_context(p)
     except Exception as e:
+        log.info("login: experimental Edge launch unavailable (%s)", type(e).__name__)
         print()
         print(f"Experimental Edge sign-in could not open ({type(e).__name__}).")
         return None
@@ -181,7 +193,9 @@ def _run_standard_login(p):
     try:
         browser = p.chromium.launch(headless=False, channel="chrome")
         label = "Google Chrome"
-    except Exception:
+    except Exception as e:
+        log.info("login: Chrome launch failed (%s); trying selected browser",
+                 type(e).__name__)
         browser = launch_browser(p, headless=False)
         label = "the selected browser"
     _login_with_browser(browser, label)
@@ -192,6 +206,7 @@ def _login_with_browser(browser, label):
     ctx = browser.new_context()
     page = ctx.new_page()
     page.goto(get_url())
+    log.info("login: sign-in window opened in %s", label)
 
     print()
     print("=" * 64)
@@ -200,17 +215,25 @@ def _login_with_browser(browser, label):
     print("=" * 64)
     input(">>> Press Enter once the TSMIS report page is loaded: ")
 
-    try:
-        logged_in = is_logged_in(page)
-    except Exception:
-        logged_in = False
+    # SSO can land the signed-in report page in a popup/new tab, so check every
+    # open page -- not just the original one (which the IdP may have replaced).
+    logged_in = False
+    for pg in ctx.pages:
+        try:
+            if is_logged_in(pg):
+                logged_in = True
+                break
+        except Exception:
+            continue
 
     print()
     if logged_in:
-        ctx.storage_state(path=str(AUTH))
+        save_auth_state(ctx.storage_state())
+        log.info("login: SAVED via %s", label)
         print(f"Session saved to {AUTH.name}")
         print('  You can close this window and run "3. run_export (main script).bat"')
     else:
+        log.info("login: %s finished without a detected login; nothing saved", label)
         print("Sign-in was not completed. No session was saved.")
         print("Run this login again and wait for the report page before pressing Enter.")
     print()
@@ -229,9 +252,7 @@ def _safe_close_context(ctx):
 
 
 def _save_state(state):
-    AUTH.parent.mkdir(parents=True, exist_ok=True)
-    with open(AUTH, "w", encoding="utf-8") as f:
-        json.dump(state, f)
+    save_auth_state(state)              # logs path + cookie count
 
 
 if __name__ == "__main__":
