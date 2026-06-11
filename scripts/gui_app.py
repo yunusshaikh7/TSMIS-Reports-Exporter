@@ -5,6 +5,7 @@ threads (gui_worker); this module only reacts to the messages they post, on the
 Tk main thread. The engines stay console-free -- the GUI is just another driver
 of the same Events seam used by the .bat flow.
 """
+import logging
 import os
 import sys
 import threading
@@ -36,6 +37,11 @@ from common import (
 from reports import EXPORT_REPORTS, CONSOLIDATE_REPORTS
 
 PAD = 14
+
+# Everything shown in the GUI's log pane is mirrored here, so tsmis.log
+# carries the user's view of a run (what was clicked, what was reported)
+# alongside the engine's own diagnostics -- one file tells the whole story.
+ui_log = logging.getLogger("tsmis.ui")
 
 
 def _app_icon_path():
@@ -422,6 +428,8 @@ class App(tk.Tk):
         self.status_text.config(text=text)
 
     def log(self, text):
+        if text.strip():                       # skip the pane's blank spacer lines
+            ui_log.info("%s", text)
         tag = ""
         upper = text.upper()
         if "FAIL" in upper or "ERROR" in upper:
@@ -432,6 +440,17 @@ class App(tk.Tk):
         self.log_widget.insert("end", text + "\n", tag)
         self.log_widget.see("end")
         self.log_widget.configure(state="disabled")
+
+    def report_callback_exception(self, exc_type, exc, tb):
+        """Tk calls this for exceptions raised inside event callbacks. The
+        default prints to stderr -- which a windowed .exe doesn't have -- so
+        log the full traceback and tell the user something went wrong."""
+        logging.getLogger("tsmis.crash").critical(
+            "uncaught exception in a Tk callback", exc_info=(exc_type, exc, tb))
+        try:
+            self.log(f"ERROR: {exc_type.__name__}: {exc} (details in the log file)")
+        except Exception:
+            pass
 
     def _login_label(self):
         return "Re-login" if self._authed else "Log in"
@@ -1004,6 +1023,8 @@ class App(tk.Tk):
 
     def _on_close(self):
         # Unblock any worker so it can exit cleanly, then close.
+        ui_log.info("window closed by user%s",
+                    f" (task {self.task!r} still running)" if self.task else "")
         self.cancel_event.set()
         self.login_cancel.set()
         self.login_done.set()

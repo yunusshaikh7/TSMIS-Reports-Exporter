@@ -28,8 +28,8 @@ from common import (
     AuthError,
     ReportError,
     RunCancelled,
+    get_url,
     has_valid_auth,
-    is_logged_in,
     navigate_with_auth,
     new_authed_browser,
     preflight,
@@ -87,6 +87,20 @@ def _record(result, events, route, status):
     """Record a route's final outcome (for the run report) and notify the UI."""
     result.per_route.append((route, status))
     events.on_route(route, status)
+
+
+def _brief(e, limit=200):
+    """First line of an exception's message, truncated -- specific enough to
+    act on in a status line, with the full traceback in the log."""
+    text = str(e).splitlines()[0] if str(e) else ""
+    text = f"{type(e).__name__}: {text}" if text else type(e).__name__
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _fmt_size(n_bytes):
+    if n_bytes >= 1_000_000:
+        return f"{n_bytes / 1_000_000:.1f} MB"
+    return f"{n_bytes / 1_000:.0f} KB"
 
 
 def _recover(page, spec):
@@ -163,6 +177,11 @@ def _process_route(page, spec, route, prefix, out_path, events, result, timeout_
     the outcome in `result`. Returns True to keep going, False to stop the whole
     run (unrecoverable). Raises AuthError to end the run cleanly. timeout_ms is
     the per-route hard ceiling (larger in fast mode and in the retry pass)."""
+    t0 = time.monotonic()
+
+    def took():
+        return int(time.monotonic() - t0)
+
     for attempt in range(1 + RETRY_COUNT):
         try:
             outcome = _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms)
@@ -174,7 +193,7 @@ def _process_route(page, spec, route, prefix, out_path, events, result, timeout_
             # retry -- it's detected in seconds now, and the end-of-run retry pass
             # still gives it one more (also-fast) attempt in case it was transient.
             events.on_log(f"{prefix} TSMIS site error -- {e}")
-            log.warning("%s site error: %s", prefix, e)
+            log.warning("%s site error after %ds: %s", prefix, took(), e)
             _capture_failure(page, spec, route, events)
             result.failed.append(route)
             _record(result, events, route, "failed")
@@ -182,20 +201,23 @@ def _process_route(page, spec, route, prefix, out_path, events, result, timeout_
         except PlaywrightTimeoutError:
             # The hard timeout already gave the user a skip window; don't burn
             # another full timeout retrying -- record it and move on.
-            events.on_log(f"{prefix} timed out -- recording as failed")
-            log.warning("%s timed out", prefix)
+            events.on_log(f"{prefix} timed out after {took()}s "
+                          f"(limit {timeout_ms // 1000}s) -- recording as failed")
+            log.warning("%s timed out after %ds (limit %ds)",
+                        prefix, took(), timeout_ms // 1000)
             _capture_failure(page, spec, route, events)
             result.failed.append(route)
             _record(result, events, route, "failed")
             return _recover_or_stop(page, spec, events)
         except Exception as e:
-            log.exception("%s attempt %d/%d failed", prefix, attempt + 1, 1 + RETRY_COUNT)
+            log.exception("%s attempt %d/%d failed after %ds",
+                          prefix, attempt + 1, 1 + RETRY_COUNT, took())
             if attempt < RETRY_COUNT:
-                events.on_log(f"{prefix} error ({type(e).__name__}) -- retrying once")
+                events.on_log(f"{prefix} error -- {_brief(e)} -- retrying once")
                 if not _recover_or_stop(page, spec, events):
                     return False
                 continue
-            events.on_log(f"{prefix} FAILED ({type(e).__name__})")
+            events.on_log(f"{prefix} FAILED -- {_brief(e)}")
             _capture_failure(page, spec, route, events)
             result.failed.append(route)
             _record(result, events, route, "failed")
@@ -204,18 +226,22 @@ def _process_route(page, spec, route, prefix, out_path, events, result, timeout_
             if outcome == "skipped":
                 result.user_skipped.append(route)
                 _record(result, events, route, "skipped")
-                log.info("%s skipped by user", prefix)
+                log.info("%s skipped by user after %ds", prefix, took())
                 return _recover_or_stop(page, spec, events)
             if outcome == "empty":
                 events.on_log(f"{prefix} empty, skip")
                 result.empty.append(route)
                 _record(result, events, route, "empty")
-                log.info("%s empty", prefix)
+                log.info("%s empty (%ds)", prefix, took())
                 return True
             result.saved += 1                      # outcome == "saved"
-            events.on_log(f"{prefix} saved")
+            try:
+                size = f", {_fmt_size(out_path.stat().st_size)}"
+            except OSError:
+                size = ""
+            events.on_log(f"{prefix} saved ({took()}s{size})")
             _record(result, events, route, "saved")
-            log.info("%s saved", prefix)
+            log.info("%s saved (%ds%s)", prefix, took(), size)
             return True
     return True
 
@@ -275,6 +301,7 @@ def _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms):
         if route not in recorded:
             result.failed.append(route)
             _record(result, events, route, "failed")
+    log.info("retry pass done: still failed=%s", result.failed or "none")
 
 
 def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeout_ms=None):
@@ -310,7 +337,14 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     out_dir.mkdir(parents=True, exist_ok=True)
     result = RunResult(output_dir=str(out_dir))
     total = len(routes)
-    log.info("export start: %s (%d routes)", spec.label, total)
+    run_t0 = time.monotonic()
+    # The full run context in one block, so any uploaded log answers "what ran,
+    # against what, with which settings" without asking.
+    log.info("export start: %s (%d routes) -> %s", spec.label, total, out_dir)
+    log.info("export config: site=%s auth_file=%s timeout=%ds retry_timeout=%ds",
+             get_url(), has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
+    if total != len(ROUTES):
+        log.info("export routes (subset): %s", ", ".join(routes))
 
     with sync_playwright() as p:
         browser, _ctx, page = new_authed_browser(p)
@@ -361,8 +395,10 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
         finally:
             browser.close()
 
-    log.info("export done: saved=%d empty=%d skipped=%d failed=%d",
-             result.saved, len(result.empty), len(result.user_skipped), len(result.failed))
+    log.info("export done in %ds: saved=%d empty=%d skipped=%d failed=%d exists=%d%s",
+             int(time.monotonic() - run_t0), result.saved, len(result.empty),
+             len(result.user_skipped), len(result.failed), len(result.exists),
+             f" failed_routes={result.failed}" if result.failed else "")
 
     # Auto-save the per-route run report so the data point is never lost. The
     # GUI can also save a copy elsewhere; a write failure here is non-fatal.

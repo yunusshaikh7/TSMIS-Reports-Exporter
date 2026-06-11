@@ -20,21 +20,22 @@ Message protocol (all are (kind, payload) tuples):
     ("cancelled", None)                task stopped at user request
     ("error", (kind, message))         kind is "auth" or "general"
 """
-import json
 import logging
 import threading
 
 from common import (
-    AUTH, ROUTES, AuthError, BrowserNotFoundError, PreflightError,
+    ROUTES, AuthError, BrowserNotFoundError, PreflightError,
     BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, get_url, is_logged_in,
     launch_browser, capture_edge_login_state_from_profiles,
     capture_edge_login_state_over_cdp, capture_storage_state_if_logged_in,
-    get_preferred_channel, launch_edge_login_context, storage_state_is_portable,
-    try_device_sso_login,
+    get_preferred_channel, launch_edge_login_context, save_auth_state,
+    storage_state_is_portable, try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
 from paths import OUTPUT_ROOT
+
+log = logging.getLogger("tsmis.gui")
 
 
 class ExportWorker(threading.Thread):
@@ -46,7 +47,7 @@ class ExportWorker(threading.Thread):
     when all selected reports finish (the list is partial if cancelled)."""
 
     def __init__(self, specs, queue, cancel_event, skip_event, workers=1, routes=None):
-        super().__init__(daemon=True)
+        super().__init__(daemon=True, name="export")
         # Accept a single spec or a list, so callers can't trip on the shape.
         self.specs = list(specs) if isinstance(specs, (list, tuple)) else [specs]
         self.q = queue
@@ -124,10 +125,15 @@ class ExportWorker(threading.Thread):
             self.q.put(("export_done", results))
             return
         except AuthError as e:
+            log.warning("export worker stopped: AuthError: %s", e)
             err = ("auth", str(e))
         except (PreflightError, BrowserNotFoundError) as e:
+            log.warning("export worker stopped: %s: %s", type(e).__name__, e)
             err = ("general", str(e))               # message is already user-safe
         except Exception as e:
+            # The full traceback MUST land in the log -- the GUI can only show
+            # one line, and "TypeError: ..." with no context is undebuggable.
+            log.exception("export worker crashed")
             err = ("general", f"{type(e).__name__}: {e}")
         # An error aborted a multi-report run partway. Hand the GUI whatever
         # reports DID finish so "Save run report…" still covers them (each is also
@@ -144,7 +150,7 @@ class ConsolidateWorker(threading.Thread):
     legacy flat layout."""
 
     def __init__(self, consolidate_fn, queue, cancel_event, confirm, day=None):
-        super().__init__(daemon=True)
+        super().__init__(daemon=True, name="consolidate")
         self.consolidate_fn = consolidate_fn
         self.q = queue
         self.cancel = cancel_event
@@ -156,11 +162,17 @@ class ConsolidateWorker(threading.Thread):
             on_log=lambda t: self.q.put(("log", t)),
             is_cancelled=self.cancel.is_set,
         )
+        log.info("consolidate start: %s (day=%s)",
+                 getattr(self.consolidate_fn, "__module__", self.consolidate_fn),
+                 self.day or "legacy/newest")
         try:
             result = self.consolidate_fn(events=events, confirm_overwrite=self.confirm,
                                          day=self.day)
+            log.info("consolidate done: status=%s output=%s message=%s",
+                     result.status, result.output_path or "-", result.message or "-")
             self.q.put(("consolidate_done", result))
         except Exception as e:
+            log.exception("consolidate worker crashed")
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
 
 
@@ -173,7 +185,7 @@ class LoginWorker(threading.Thread):
     """
 
     def __init__(self, queue, done_event, cancel_event):
-        super().__init__(daemon=True)
+        super().__init__(daemon=True, name="login")
         self.q = queue
         self.done = done_event
         self.cancel = cancel_event
@@ -192,6 +204,7 @@ class LoginWorker(threading.Thread):
                 # managed-Edge failure), else the experimental persistent-
                 # profile Edge flow with its Chrome fallback.
                 pref = get_preferred_channel()
+                log.info("login: starting (preferred browser: %s)", pref or "none")
                 if pref == "chrome":
                     # Explicit Chrome pick: the silent device sign-in never
                     # works in Chrome (it's an Edge/Windows integration), so go
@@ -438,9 +451,7 @@ class LoginWorker(threading.Thread):
 
     @staticmethod
     def _save_state(state):
-        AUTH.parent.mkdir(parents=True, exist_ok=True)
-        with open(AUTH, "w", encoding="utf-8") as f:
-            json.dump(state, f)
+        save_auth_state(state)          # logs path + cookie count
 
 
 # --- startup readiness checks -------------------------------------------------
@@ -476,7 +487,7 @@ class CheckWorker(threading.Thread):
     """
 
     def __init__(self, queue):
-        super().__init__(daemon=True)
+        super().__init__(daemon=True, name="checks")
         self.q = queue
 
     def run(self):
@@ -485,11 +496,14 @@ class CheckWorker(threading.Thread):
                 status, text = fn()
             except Exception as e:
                 status, text = "bad", f"{key}: error ({type(e).__name__})"
+            if status != "ok":
+                log.warning("readiness check %s: %s", key, text)
             self.q.put(("check", (key, status, text)))
 
         try:
             results = check_browsers()           # {channel: ok|missing|broken}
         except Exception:
+            log.exception("browser readiness check crashed")
             results = {ch: "broken" for ch in BROWSER_CHANNELS}
         detail = {"ok": "ready", "missing": "not installed",
                   "broken": "found, but this tool can't control it (it may be too new)"}

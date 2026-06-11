@@ -5,14 +5,83 @@ A single rotating log under LOG_DIR captures diagnostics from every entry point
 fact. File-only -- no console/stream handler -- so it never interferes with the
 console flow's printed output or the windowed GUI. Call setup_logging() once at
 process startup; it is safe to call again.
+
+What lands in the log (the "no vague errors" contract):
+  * a startup banner with the app version, frozen/dev, Python + OS versions,
+    and every resolved path -- so any uploaded log says exactly which build
+    and environment produced it;
+  * every line is tagged with its thread name ([main], [export-w2], [login]),
+    so fast mode's interleaved browsers stay distinguishable;
+  * uncaught exceptions from ANY thread (sys.excepthook + threading.excepthook)
+    are logged with a full traceback before the process dies -- a windowed app
+    has no console for them to land in otherwise;
+  * hard interpreter crashes (access violations etc.) get a faulthandler
+    traceback in LOG_DIR/crash.log.
 """
+import faulthandler
 import logging
+import os
+import platform
+import sys
+import threading
 from logging.handlers import RotatingFileHandler
 
-from paths import LOG_DIR
+from paths import DATA_ROOT, LOG_DIR, OUTPUT_ROOT, is_frozen
 
 LOG_FILE = LOG_DIR / "tsmis.log"
+CRASH_FILE = LOG_DIR / "crash.log"
 _configured = False
+_crash_file_handle = None      # kept alive for faulthandler
+
+
+def _install_excepthooks():
+    """Log uncaught exceptions (any thread) with full tracebacks. A windowed
+    .exe has no stderr, so without this a crash leaves no trace at all."""
+    log = logging.getLogger("tsmis.crash")
+    prev_sys_hook = sys.excepthook
+
+    def sys_hook(exc_type, exc, tb):
+        log.critical("uncaught exception on the main thread",
+                     exc_info=(exc_type, exc, tb))
+        prev_sys_hook(exc_type, exc, tb)
+
+    def thread_hook(args):
+        log.critical("uncaught exception in thread %r",
+                     args.thread.name if args.thread else "?",
+                     exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+
+    sys.excepthook = sys_hook
+    threading.excepthook = thread_hook
+
+
+def _enable_faulthandler():
+    """Dump Python tracebacks on hard crashes (segfault/access violation) to
+    crash.log -- the rotating log can't catch those. Best-effort."""
+    global _crash_file_handle
+    try:
+        _crash_file_handle = open(CRASH_FILE, "a", encoding="utf-8")
+        faulthandler.enable(file=_crash_file_handle, all_threads=True)
+    except Exception:
+        pass
+
+
+def _log_banner(log):
+    """One block that pins down WHICH build ran WHERE -- the questions every
+    log-based diagnosis starts with."""
+    try:
+        from version import __version__ as app_version
+    except Exception:
+        app_version = "unknown"
+    log.info("=== logging started (app v%s) -> %s ===", app_version, LOG_FILE)
+    log.info("env: %s build | python %s | %s",
+             "frozen" if is_frozen() else "dev",
+             platform.python_version(), platform.platform())
+    log.info("env: exe=%s", sys.executable)
+    log.info("env: data_root=%s | output=%s", DATA_ROOT, OUTPUT_ROOT)
+    overrides = {k: v for k, v in os.environ.items()
+                 if k.startswith("TSMIS_") or k == "PLAYWRIGHT_BROWSERS_PATH"}
+    if overrides:
+        log.info("env: overrides %s", overrides)
 
 
 def setup_logging(level=logging.INFO):
@@ -22,19 +91,23 @@ def setup_logging(level=logging.INFO):
     if _configured:
         return LOG_FILE
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    # Thread names tag every line; rename the main thread from "MainThread" so
+    # the common case reads as [main] and worker threads stand out.
+    try:
+        threading.main_thread().name = "main"
+    except Exception:
+        pass
     handler = RotatingFileHandler(
         LOG_FILE, maxBytes=2_000_000, backupCount=5, encoding="utf-8"
     )
     handler.setFormatter(logging.Formatter(
-        "%(asctime)s %(levelname)-7s %(name)s: %(message)s", "%Y-%m-%d %H:%M:%S"))
+        "%(asctime)s %(levelname)-7s [%(threadName)s] %(name)s: %(message)s",
+        "%Y-%m-%d %H:%M:%S"))
     root = logging.getLogger()
     root.setLevel(level)
     root.addHandler(handler)
     _configured = True
-    try:
-        from version import __version__ as app_version
-    except Exception:
-        app_version = "unknown"
-    logging.getLogger("tsmis").info(
-        "=== logging started (app v%s) -> %s ===", app_version, LOG_FILE)
+    _log_banner(logging.getLogger("tsmis"))
+    _install_excepthooks()
+    _enable_faulthandler()
     return LOG_FILE

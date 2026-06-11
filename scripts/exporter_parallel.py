@@ -38,6 +38,7 @@ import logging
 import os
 import queue
 import threading
+import time
 
 from playwright.sync_api import sync_playwright
 
@@ -47,8 +48,8 @@ from common import (
     ROUTES,
     AuthError,
     RunCancelled,
+    get_url,
     has_valid_auth,
-    is_logged_in,
     navigate_with_auth,
     new_authed_browser,
     preflight,
@@ -169,6 +170,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
         if n > 1:
             events.on_log("Automatic sign-in supports one browser at a time - "
                           "running with 1 browser. Save a login to use fast mode.")
+            log.info("parallel: device sign-in mode caps workers %d -> 1", n)
             n = 1
     timeout_ms = timeout_ms or FAST_REPORT_TIMEOUT_MS
     retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
@@ -177,7 +179,11 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     out_dir.mkdir(parents=True, exist_ok=True)
     total = len(routes)
     n = min(n, total) or 1
-    log.info("parallel export start: %s (%d routes, %d workers)", spec.label, total, n)
+    run_t0 = time.monotonic()
+    log.info("parallel export start: %s (%d routes, %d workers) -> %s",
+             spec.label, total, n, out_dir)
+    log.info("parallel export config: site=%s auth_file=%s timeout=%ds retry_timeout=%ds",
+             get_url(), has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
     events.on_log(f"Fast mode (experimental): {n} browsers in parallel, {total} routes.")
 
     _preflight_once(spec, events)
@@ -197,6 +203,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
         worker_results[idx] = wr
         wevents = _worker_events(events, stop)
         tag = f"[browser {idx + 1}]"
+        log.info("%s starting", tag)
         try:
             with sync_playwright() as p:
                 browser, _ctx, page = new_authed_browser(p)
@@ -230,11 +237,13 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                             break
                 finally:
                     browser.close()
-        except AuthError:
-            log.warning("%s lost the session", tag)
+            log.info("%s done: %d route(s) handled", tag, len(wr.per_route))
+        except AuthError as e:
+            log.warning("%s lost the session: %s", tag, e)
             auth_failed.set()
             stop.set()
         except RunCancelled:
+            log.info("%s cancelled mid-route", tag)
             stop.set()                  # user cancelled mid-route: wind down, not a crash
         except Exception:
             log.exception("%s crashed", tag)
@@ -285,6 +294,9 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
         missing = [r for r in routes
                    if r not in accounted and not (out_dir / spec.filename(r)).exists()]
         if missing:
+            log.warning("parallel: %d route(s) had no recorded outcome "
+                        "(worker_crashed=%s); marking failed: %s",
+                        len(missing), worker_crashed.is_set(), missing)
             if worker_crashed.is_set():
                 events.on_log(f"{len(missing)} route(s) weren't completed because a browser "
                               "stopped unexpectedly -- marking them failed to retry.")
@@ -292,8 +304,10 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                 result.failed.append(r)
                 _record(result, events, r, "failed")
 
-    log.info("parallel export done: saved=%d empty=%d skipped=%d failed=%d",
-             result.saved, len(result.empty), len(result.user_skipped), len(result.failed))
+    log.info("parallel export done in %ds: saved=%d empty=%d skipped=%d failed=%d exists=%d%s",
+             int(time.monotonic() - run_t0), result.saved, len(result.empty),
+             len(result.user_skipped), len(result.failed), len(result.exists),
+             f" failed_routes={result.failed}" if result.failed else "")
 
     # One serial, single-browser retry of whatever failed under concurrent load.
     # Done before the run report so the CSV reflects the final outcomes.

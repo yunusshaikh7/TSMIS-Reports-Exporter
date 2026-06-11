@@ -40,6 +40,13 @@ class PreflightError(Exception):
     it as-is."""
 
 
+class SiteUnreachableError(PreflightError):
+    """Raised when the TSMIS page can't be opened at all (network/VPN/DNS), so
+    the user sees "check your connection" instead of a raw Playwright error.
+    Subclasses PreflightError because every driver already handles that as
+    "the run can't start; show the message as-is"."""
+
+
 class BrowserNotFoundError(Exception):
     """Raised when no usable Chromium-based browser (Edge or Chrome) is installed
     on the machine. The app drives the browser already present rather than
@@ -91,6 +98,7 @@ def set_site(source=None, environment=None):
         _data_source = source.lower()
     if environment and environment.lower() in ENVIRONMENTS:
         _environment = environment.lower()
+    log.info("site: set to src=%s env=%s", _data_source, _environment)
 
 
 def get_site():
@@ -218,8 +226,10 @@ def clear_auth():
     if AUTH.exists():
         try:
             AUTH.unlink()
+            log.info("auth: stale session file deleted (%s)", AUTH)
             return True
-        except OSError:
+        except OSError as e:
+            log.warning("auth: could not delete stale session file %s: %s", AUTH, e)
             return False
     return False
 
@@ -262,6 +272,19 @@ def save_auth_state(state):
     AUTH.parent.mkdir(parents=True, exist_ok=True)
     with open(AUTH, "w", encoding="utf-8") as f:
         json.dump(state, f)
+    try:
+        log.info("auth: session saved -> %s (%d cookies, %d origins)",
+                 AUTH, len(state.get("cookies", [])), len(state.get("origins", [])))
+    except Exception:
+        log.info("auth: session saved -> %s", AUTH)
+
+
+def _auth_file_age_hours():
+    """Age of the saved session file in hours, or None when unavailable."""
+    try:
+        return (time.time() - AUTH.stat().st_mtime) / 3600
+    except OSError:
+        return None
 
 
 def _page_host(page):
@@ -288,12 +311,18 @@ def _site_params_ok(page):
     and forces a whole new sign-in round-trip."""
     try:
         got = page.evaluate(_CONFIG_JS)
-    except Exception:
+    except Exception as e:
+        log.info("auth: site-params check unavailable (%s); treating as OK",
+                 type(e).__name__)
         return True
     if not got:
         return True
     want_src, want_env = get_site()
-    return got == [want_env, want_src]
+    if got != [want_env, want_src]:
+        log.info("auth: app is running env=%s src=%s but env=%s src=%s was "
+                 "selected", got[0], got[1], want_env, want_src)
+        return False
+    return True
 
 
 def navigate_with_auth(page):
@@ -313,7 +342,15 @@ def navigate_with_auth(page):
     """
     url = get_url()
     log.info("auth: navigate start -> %s", url)
-    page.goto(url)
+    try:
+        page.goto(url)
+    except Exception as e:
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.warning("auth: could not open %s: %s", url, reason)
+        raise SiteUnreachableError(
+            f"The TSMIS site could not be reached ({reason}). Check the "
+            "network / VPN connection, then try again."
+        ) from e
     start = time.monotonic()
     deadline = start + 60
     idp_drives = 0
@@ -340,8 +377,8 @@ def navigate_with_auth(page):
                 note("signed in on wrong site params; reloading with target URL")
                 page.goto(url)
                 continue
-        except Exception:
-            pass
+        except Exception as e:
+            note(f"signed-in check error: {type(e).__name__}")
         # The app's own (currently unused) signed-out screen.
         try:
             btn = page.get_by_role("button", name="Sign In with ArcGIS")
@@ -468,21 +505,22 @@ def auth_state(page):
     return info
 
 
-def dump_auth_failure(page, note):
-    """Write a screenshot + page HTML to FAILURES_DIR and log the sign-in
-    signals, so a failed sign-in can be diagnosed from one run. Best-effort."""
-    log.warning("sign-in gate failed (%s): %s", note, auth_state(page))
+def dump_auth_failure(page, note, *, stem="auth_fail"):
+    """Write a screenshot + page HTML to FAILURES_DIR and log the page's
+    sign-in signals, so a failed gate can be diagnosed from one run (no
+    back-and-forth for "what did the page look like?"). Best-effort."""
+    log.warning("page gate failed (%s): %s", note, auth_state(page))
     try:
         FAILURES_DIR.mkdir(parents=True, exist_ok=True)
         stamp = time.strftime("%Y%m%d_%H%M%S")
-        page.screenshot(path=str(FAILURES_DIR / f"auth_fail_{stamp}.png"),
+        page.screenshot(path=str(FAILURES_DIR / f"{stem}_{stamp}.png"),
                         full_page=True)
-        (FAILURES_DIR / f"auth_fail_{stamp}.html").write_text(
+        (FAILURES_DIR / f"{stem}_{stamp}.html").write_text(
             page.content(), encoding="utf-8")
-        log.warning("sign-in failure page captured to %s (auth_fail_%s.*)",
-                    FAILURES_DIR, stamp)
-    except Exception:
-        pass
+        log.warning("failure page captured to %s (%s_%s.*)",
+                    FAILURES_DIR, stem, stamp)
+    except Exception as e:
+        log.warning("could not capture failure page: %s", e)
 
 
 def require_signed_in(page, message):
@@ -547,15 +585,27 @@ def preflight(page, report_label):
     failing cryptically.
     """
     if page.locator("#customReport").count() == 0:
+        log.warning("preflight: #customReport (the report dropdown) is missing")
+        dump_auth_failure(page, "preflight: report dropdown missing",
+                          stem="preflight_fail")
         raise PreflightError(
             "The TSMIS report list didn't load as expected — the page may have "
             "changed. Please contact the maintainer."
         )
+    step = "selecting the report"
     try:
         select_report(page, report_label)
+        step = "finding the Route control"
         page.get_by_label("Route", exact=True).wait_for(state="attached", timeout=15000)
+        step = "finding the Generate button"
         page.get_by_role("button", name="Generate").wait_for(state="attached", timeout=15000)
+        log.info("preflight ok: %s", report_label)
     except Exception as e:
+        log.warning("preflight failed while %s for %r: %s: %s",
+                    step, report_label, type(e).__name__,
+                    str(e).splitlines()[0] if str(e) else "")
+        dump_auth_failure(page, f"preflight: {step} failed",
+                          stem="preflight_fail")
         raise PreflightError(
             "The TSMIS page looks different than expected — it may have changed. "
             "Please contact the maintainer."
@@ -708,6 +758,7 @@ def set_preferred_channel(channel):
     global _preferred_channel, _resolved_channel
     _preferred_channel = channel if channel in BROWSER_CHANNELS else None
     _resolved_channel = None
+    log.info("browser: preferred channel set to %s", _preferred_channel or "(default order)")
 
 
 def get_preferred_channel():
@@ -744,19 +795,27 @@ def _probe_channel(p, channel):
     """Launch `channel` headless and confirm Playwright can actually DRIVE it
     (not merely find it): open a page and run a trivial script over CDP. This is
     what catches a future Edge that Playwright is too old to control. Returns
-    "ok" | "missing" | "broken"; always closes the probe browser.
+    "ok" | "missing" | "broken"; always closes the probe browser. The reason a
+    probe fails is logged here -- it is deliberately not in the user-facing
+    message, so the log is the place that says WHY a channel was passed over.
     """
     browser = None
     try:
         browser = p.chromium.launch(headless=True, channel=channel)
     except Exception as e:
-        return "missing" if _looks_missing(e) else "broken"
+        status = "missing" if _looks_missing(e) else "broken"
+        log.info("browser: probe %s -> %s (%s: %s)", channel, status,
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        return status
     try:
         page = browser.new_context().new_page()
         page.goto("about:blank", timeout=15_000)
         return "ok" if page.evaluate("1 + 1") == 2 else "broken"
-    except Exception:
-        return "broken"            # launches but can't be driven -> try the next one
+    except Exception as e:
+        # Launches but can't be driven -> try the next one.
+        log.info("browser: probe %s -> broken driving a page (%s: %s)", channel,
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        return "broken"
     finally:
         try:
             browser.close()
@@ -782,7 +841,11 @@ def _resolve_channel(p, exclude=()):
         statuses[channel] = status
         if status == "ok":
             _resolved_channel = channel
+            log.info("browser: resolved channel %s (candidates %s, excluded %s)",
+                     channel, list(_candidate_channels()), list(exclude))
             return channel
+    log.warning("browser: no usable channel (probes: %s, excluded %s)",
+                statuses, list(exclude))
     if any(s == "broken" for s in statuses.values()):
         tried = ", ".join(f"{c} ({s})" for c, s in statuses.items())
         raise BrowserNotFoundError(
@@ -818,6 +881,9 @@ def launch_browser(p, *, headless=True, **kwargs):
         # re-picking the same broken one (a probe pass doesn't guarantee a real
         # launch succeeds).
         failed = channel
+        log.warning("browser: launch of %s failed (%s: %s); re-resolving without it",
+                    failed, type(first_err).__name__,
+                    str(first_err).splitlines()[0] if str(first_err) else "")
         _resolved_channel = None
         try:
             channel = _resolve_channel(p, exclude={failed})
@@ -825,6 +891,7 @@ def launch_browser(p, *, headless=True, **kwargs):
         except BrowserNotFoundError:
             raise
         except Exception:
+            log.exception("browser: fallback launch failed too")
             raise BrowserNotFoundError(
                 "The web browser could not be started. It may have updated to a "
                 "version this tool doesn't support yet -- please update TSMIS "
@@ -939,6 +1006,8 @@ def _known_edge_profile_names():
 
 def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000):
     """Try to attach to a live relaunched Edge and capture its storage_state."""
+    log.info("auth: trying CDP re-attach to Edge at %s (up to %ds)",
+             cdp_url, timeout_ms // 1000)
     deadline = time.monotonic() + (timeout_ms / 1000)
     while time.monotonic() < deadline:
         browser = None
@@ -972,6 +1041,7 @@ def capture_edge_login_state_from_profiles(p, *, timeout_ms=20_000):
     """
     deadline = time.monotonic() + (timeout_ms / 1000)
     for profile_name in _known_edge_profile_names():
+        log.info("auth: recapture: reopening Edge profile %r headless", profile_name)
         while time.monotonic() < deadline:
             ctx = None
             try:
@@ -985,7 +1055,9 @@ def capture_edge_login_state_from_profiles(p, *, timeout_ms=20_000):
                 if state:
                     return state, profile_name
                 break
-            except Exception:
+            except Exception as e:
+                log.info("auth: recapture: profile %r attempt failed (%s); retrying",
+                         profile_name, type(e).__name__)
                 time.sleep(1)
             finally:
                 if ctx:
@@ -1005,6 +1077,7 @@ def check_browsers():
     with sync_playwright() as p:
         for channel in BROWSER_CHANNELS:
             results[channel] = _probe_channel(p, channel)
+    log.info("browser: readiness check %s", results)
     return results
 
 
@@ -1050,8 +1123,12 @@ def open_edge_device_context(p, *, headless=True):
     two of these concurrently.
     """
     EDGE_LOGIN_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-    for profile_name in _known_edge_profile_names():
+    profiles = _known_edge_profile_names()
+    attempts = []
+    for profile_name in profiles:
         ctx = None
+        log.info("auth: device sign-in: opening Edge profile %r (headless=%s)",
+                 profile_name, headless)
         try:
             launch_kwargs = dict(
                 channel="msedge",
@@ -1073,16 +1150,29 @@ def open_edge_device_context(p, *, headless=True):
             page = _first_or_new_page(ctx)
             navigate_with_auth(page)
             if is_logged_in(page):
+                log.info("auth: device sign-in succeeded with Edge profile %r",
+                         profile_name)
                 return ctx, page
-        except Exception:
-            pass
+            attempts.append(f"{profile_name}: opened but did not sign in")
+            log.info("auth: device sign-in: profile %r opened but did not sign in",
+                     profile_name)
+        except Exception as e:
+            # The classic field failure here is "profile already in use" --
+            # the profile can only be open in ONE browser at a time.
+            reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+            attempts.append(f"{profile_name}: {type(e).__name__}: {reason}")
+            log.warning("auth: device sign-in: Edge profile %r failed: %s: %s",
+                        profile_name, type(e).__name__, reason)
         if ctx is not None:
             try:
                 ctx.close()
             except Exception:
                 pass
+    log.warning("auth: device sign-in failed; attempts: %s", attempts or "none")
     raise AuthError(
-        "Automatic sign-in could not complete on this PC. Please log in."
+        "Automatic sign-in could not complete on this PC "
+        f"(tried {len(profiles)} Edge profile(s); details in the log). "
+        "Please log in."
     )
 
 
@@ -1106,13 +1196,18 @@ def new_authed_browser(p):
     try:
         require_valid_auth()
         state = str(AUTH)
-    except AuthError:
+    except AuthError as e:
+        log.info("auth: no usable saved session (%s)", e)
         state = None
 
     if state is None:
+        log.info("auth: DEVICE SIGN-IN mode (persistent Edge profile, no auth file)")
         ctx, page = open_edge_device_context(p)   # raises AuthError if it can't sign in
         return ctx, ctx, page
 
+    age = _auth_file_age_hours()
+    log.info("auth: using saved session %s%s", AUTH,
+             f" (saved {age:.1f} h ago)" if age is not None else "")
     browser = launch_browser(p, headless=True, args=_LNA_ARGS)
     ctx = _new_app_context(browser, storage_state=state)
     page = ctx.new_page()
@@ -1132,8 +1227,11 @@ def try_device_sso_login(p):
     ctx = None
     try:
         ctx, _page = open_edge_device_context(p)
+        log.info("auth: silent device sign-in succeeded; capturing state")
         return ctx.storage_state()
-    except Exception:
+    except Exception as e:
+        log.info("auth: silent device sign-in not available (%s: %s)",
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
         return None
     finally:
         if ctx is not None:
@@ -1156,12 +1254,21 @@ def storage_state_is_portable(p, state):
     must test a capture here before writing the auth file."""
     browser = None
     try:
+        log.info("auth: portability check: restoring capture into a fresh "
+                 "headless context")
         browser = launch_browser(p, headless=True, args=_LNA_ARGS)
         ctx = _new_app_context(browser, storage_state=state)
         page = ctx.new_page()
         navigate_with_auth(page)
-        return is_logged_in(page)
-    except Exception:
+        portable = is_logged_in(page)
+        log.info("auth: portability check: %s",
+                 "PORTABLE (safe to save)" if portable
+                 else "NOT portable (device-bound capture; will not be saved)")
+        return portable
+    except Exception as e:
+        log.warning("auth: portability check errored (%s: %s); treating capture "
+                    "as not portable", type(e).__name__,
+                    str(e).splitlines()[0] if str(e) else "")
         return False
     finally:
         if browser is not None:
