@@ -18,7 +18,7 @@ import socket
 import sys
 import time
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 try:
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -264,96 +264,134 @@ def save_auth_state(state):
         json.dump(state, f)
 
 
-def _ensure_site_params(page):
-    """Make sure the app is running the selected data source / environment.
-
-    The OAuth redirect_uri is the bare index.html (no query), so the URL after
-    sign-in never matches ours — the app carries env/src across the round-trip
-    itself via sessionStorage. So compare the app's OWN config (window.CONFIG)
-    rather than the URL, and reload with the right parameters only on a real
-    mismatch (the reload re-runs the silent OAuth round-trip)."""
+def _page_host(page):
+    """Hostname of the page's current URL ('' when unavailable). Substring
+    checks against page.url are WRONG here: the portal's authorize URL carries
+    the app host inside its redirect_uri parameter."""
     try:
-        if TSMIS_HOST not in page.url:
-            return
-        got = page.evaluate(
-            "[window.CONFIG && CONFIG.env || null, window.CONFIG && CONFIG.src || null]")
-        want_src, want_env = get_site()
-        if got != [want_env, want_src]:
-            page.goto(get_url())
-            page.wait_for_timeout(2000)
+        return urlsplit(page.url).hostname or ""
     except Exception:
-        pass
+        return ""
+
+
+# CONFIG is a top-level `const` in the app's config.js -- a lexical global, NOT
+# a window property -- so it must be read by bare identifier inside try/catch.
+# (Reading window.CONFIG always yields undefined; acting on that once caused
+# every successful sign-in to be reloaded away.)
+_CONFIG_JS = "() => { try { return [CONFIG.env || null, CONFIG.src || null]; } catch (e) { return null; } }"
+
+
+def _site_params_ok(page):
+    """True when the app is running the selected data source / environment --
+    or when that can't be determined. Callers must NEVER reload on 'unknown':
+    the app's token lives only in page memory, so a reload destroys the session
+    and forces a whole new sign-in round-trip."""
+    try:
+        got = page.evaluate(_CONFIG_JS)
+    except Exception:
+        return True
+    if not got:
+        return True
+    want_src, want_env = get_site()
+    return got == [want_env, want_src]
 
 
 def navigate_with_auth(page):
     """Open the TSMIS page and see the sign-in through.
 
     The app NEVER shows a signed-out page: with no token it immediately
-    redirects itself into the portal OAuth flow (initAuth -> login(), same
-    tab). With a live portal session that round-trip completes silently;
-    otherwise the portal sign-in page (JS-rendered) appears and its
-    "Caltrans Azure AD" button must be clicked — after which saved Azure
-    cookies, Kerberos, or Windows device auth finish the job. The token comes
-    back in the URL hash and lives only in page memory, so every fresh
-    navigation re-runs this dance. We poll for the app's post-auth UI
-    (is_logged_in) and push the sign-in pages along whenever they show.
+    redirects itself into the portal OAuth flow (same tab). The portal keeps
+    NO session cookie, so each round-trip needs the IdP hop; we drive it
+    directly off the sign-in page's own data (the SAML authorize URL on the
+    IdP button + the page's oauth_state), with a plain click as fallback. With
+    a live Azure session (saved cookies, Kerberos, or Windows device auth in
+    the Edge profile) the rest completes silently and the app comes back
+    signed in -- the token in the URL hash, kept only in page memory. Because
+    a reload destroys that token, the wrong-site check runs INSIDE the loop
+    (at most one corrective reload, then a fresh sign-in pass) and never after
+    success. Every state change is breadcrumbed to the log.
     """
-    page.goto(get_url())
-    deadline = time.monotonic() + 45
-    idp_clicks = 0
-    forced_idp = False
+    url = get_url()
+    log.info("auth: navigate start -> %s", url)
+    page.goto(url)
+    start = time.monotonic()
+    deadline = start + 60
+    idp_drives = 0
+    reloaded_for_params = False
+    last_note = None
+
+    def note(msg):
+        nonlocal last_note
+        if msg != last_note:               # breadcrumb state CHANGES only
+            log.info("auth: +%ds %s", int(time.monotonic() - start), msg)
+            last_note = msg
+
     while time.monotonic() < deadline:
         try:
             if is_logged_in(page):
-                break
+                if _site_params_ok(page) or reloaded_for_params:
+                    note("signed in")
+                    break
+                # Signed in, but on the wrong data source / environment:
+                # reload with the right parameters ONCE. The reload destroys
+                # the in-memory token, so keep looping to sign in again (the
+                # app re-stores our env/src via its own sessionStorage handoff).
+                reloaded_for_params = True
+                note("signed in on wrong site params; reloading with target URL")
+                page.goto(url)
+                continue
         except Exception:
             pass
-        # If the app ever lands on its (currently unused) signed-out screen,
-        # push the flow along from there too.
+        # The app's own (currently unused) signed-out screen.
         try:
             btn = page.get_by_role("button", name="Sign In with ArcGIS")
             if btn.count() > 0 and btn.first.is_visible():
+                note("clicking 'Sign In with ArcGIS'")
                 btn.first.click(timeout=2000)
         except Exception:
             pass
-        # The portal sign-in page is SERVER-rendered, so the IdP button is
-        # visible immediately -- but its click handler is bound late by the
-        # portal's require.js bundle, and an early click lands on a dead
-        # element (observed in the field: parked on the sign-in page with one
-        # click recorded). So click on EVERY pass while the button is still
-        # showing -- it leaves the page once a click actually works...
+        # The portal sign-in page.
         try:
             idp = page.get_by_text("Caltrans Azure AD")
             if idp.count() > 0 and idp.first.is_visible():
-                if idp_clicks >= 6 and not forced_idp:
-                    # ...and if clicks keep landing dead, drive the IdP hop
-                    # directly: the SAML authorize URL is on the button, and
-                    # the portal ties it back to this OAuth flow through the
-                    # page's oauth_state value (same scheme as the page's own
-                    # links).
-                    forced_idp = True
-                    state_val = page.locator("#oauth_state").input_value(timeout=1000)
+                if idp_drives < 3:
+                    idp_drives += 1
                     idp_url = idp.first.get_attribute("data-url")
+                    state_loc = page.locator("#oauth_state")
+                    state_val = (state_loc.input_value(timeout=1000)
+                                 if state_loc.count() > 0 else None)
                     if idp_url and state_val:
-                        log.info("auth: IdP clicks landing dead; navigating to the "
-                                 "SAML authorize URL directly")
+                        note(f"portal sign-in page; driving SAML authorize "
+                             f"(attempt {idp_drives})")
                         page.goto(f"{idp_url}?oauth_state={quote(state_val, safe='')}")
+                    else:
+                        note(f"portal sign-in page; clicking IdP button "
+                             f"(attempt {idp_drives})")
+                        idp.first.click(timeout=2000)
                 else:
-                    idp.first.click(timeout=2000)
-                    idp_clicks += 1
+                    note("portal sign-in page keeps returning; waiting")
+        except Exception as e:
+            note(f"idp step error: {type(e).__name__}")
+        # Off-site breadcrumb (e.g. parked at an Azure interactive page).
+        try:
+            host = _page_host(page)
+            if host and host != TSMIS_HOST:
+                note(f"waiting at {host} ({page.title()!r})")
         except Exception:
             pass
         try:
             page.wait_for_timeout(1000)
-        except Exception:
+        except Exception as e:
+            note(f"wait aborted: {type(e).__name__}")
             break
     page.wait_for_timeout(1000)
-    _ensure_site_params(page)
     signed = is_logged_in(page)
-    log.info("auth: navigate done signed_in=%s idp_clicks=%d forced_idp=%s url=%s",
-             signed, idp_clicks, forced_idp, auth_state(page).get("url"))
+    log.info("auth: navigate done signed_in=%s idp_drives=%d reloaded_for_params=%s "
+             "elapsed=%ds url=%s", signed, idp_drives, reloaded_for_params,
+             int(time.monotonic() - start), auth_state(page).get("url"))
     if not signed:
         log.info("auth: signals after navigate: %s", auth_state(page).get("signals"))
+
 
 
 # Signed-in detection for the report page. The page ships its whole form
@@ -387,7 +425,7 @@ _SIGNED_IN_JS = """(() => {
 def is_logged_in(page):
     """Quick check: are we on the report page in a usable, signed-in state?"""
     try:
-        if TSMIS_HOST not in page.url:
+        if _page_host(page) != TSMIS_HOST:
             return False
         return bool(page.evaluate(_SIGNED_IN_JS))
     except Exception:
@@ -407,7 +445,7 @@ _AUTH_DIAG_JS = """(() => {
   };
   return {
     title: document.title,
-    config: window.CONFIG ? [CONFIG.env, CONFIG.src] : null,
+    config: (() => { try { return [CONFIG.env, CONFIG.src]; } catch (e) { return null; } })(),
     modeSelector: st('#modeSelector'), accessDenied: st('#accessDenied'),
     loginPrompt: st('#loginPrompt'), controlsGrid: st('#controlsGrid'),
     generateRow: st('#generateRow'), appForm: st('#appForm'),

@@ -259,11 +259,19 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
   `Element.checkVisibility()` — offsetParent is wrong for fixed-position
   ancestors). Sign-in gate failures dump `auth_fail_<ts>.png/.html` to
   `FAILURES_DIR` plus a per-signal snapshot to the log
-  (`common.require_signed_in` / `dump_auth_failure`). `navigate_with_auth` polls
-  for that state (45 s budget), clicking "Caltrans Azure AD" on the
-  JS-rendered portal page the moment it appears; the env/src choice survives
-  the OAuth round-trip via the app's own sessionStorage handoff and is
-  verified against `window.CONFIG` afterwards (`_ensure_site_params`).
+  (`common.require_signed_in` / `dump_auth_failure`). `navigate_with_auth`
+  (60 s budget, state-change breadcrumbs in the log) drives the portal
+  sign-in page's IdP hop **directly** — `goto` of the button's `data-url` +
+  the page's `oauth_state` — then polls for the signed-in state. THREE traps,
+  all hit in the field: (1) the portal keeps **no session cookie**, so every
+  recovery is a full silent SAML round-trip; (2) the app's `CONFIG` is a
+  top-level `const` — a lexical global, NOT `window.CONFIG` — readable only by
+  bare identifier in a try/catch (`_CONFIG_JS`); (3) reloading the page
+  destroys the memory-only token, so the wrong-env/src check
+  (`_site_params_ok`) runs INSIDE the sign-in loop (one corrective reload,
+  then a fresh sign-in pass) and NEVER after success — and host checks must
+  parse the hostname (`_page_host`), because the portal's authorize URL
+  contains the app host inside its `redirect_uri` parameter.
 - **Silent device sign-in** (`common.try_device_sso_login` →
   `open_edge_device_context`) is tried first: it reopens the app-owned
   **persistent Edge sign-in profile** (`EDGE_LOGIN_PROFILE_DIR`) headless and

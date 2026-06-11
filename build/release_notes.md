@@ -14,14 +14,15 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
-- **Sign-in works on the new TSMIS site (0.7.4).** Root cause finally pinned
-  by field diagnostics: the portal sign-in page shows its "Caltrans Azure AD"
-  button before the button's click handler is wired up, so the tool's early
-  click landed dead and nothing happened. The tool now keeps clicking each
-  second until the page actually moves, and after several dead clicks drives
-  the sign-in hop directly via the portal's own SAML URL. The headed Edge
-  sign-in window also pre-grants the local-network permission (its prompt
-  used to open as an extra tab).
+- **Sign-in works on the new TSMIS site (0.7.5).** Field diagnostics finally
+  showed the sign-in was SUCCEEDING — and the tool's own post-sign-in
+  "right data source?" check was then reloading the page, which destroys the
+  app's memory-only session and strands the browser at the portal sign-in
+  page. That check misread the app's config (it's not a `window` property)
+  so it reloaded every time. Fixed: the config is read correctly, a reload
+  happens only on a real env/src mismatch and is followed by a fresh sign-in
+  pass, the IdP hop is driven directly via the portal's own SAML URL, and the
+  log breadcrumbs every step of each sign-in attempt.
 - **Pick the data source and environment.** Two new header dropdowns choose
   **SSOR or ARS** and **Prod / Test / Dev** (defaults: SSOR + Prod) — the tool
   now drives the new TSMIS site, one page for every combination. Console flow:
