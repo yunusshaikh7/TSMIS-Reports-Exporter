@@ -107,8 +107,14 @@ class ConsolidateResult:
 
     The engine fills summary_lines with its own report-specific summary so the
     console shim and the GUI can display results without re-deriving them.
+
+    Comparisons additionally set `verdict`: "match" when the two sides are
+    identical (no differing cells, no one-sided rows), "diff" otherwise —
+    summary_lines[0] is then the human verdict line. The GUI keys its
+    quick-result dialog on this; consolidators leave it None.
     """
     status: str = "ok"
     message: str = ""
     output_path: str = ""
     summary_lines: List[str] = field(default_factory=list)
+    verdict: str = None            # None | "match" | "diff" (comparisons only)

@@ -163,15 +163,32 @@ UPDATE_DIR = _PRIVATE / "update"       # self-update download/staging area (see 
 EDGE_LOGIN_PROFILE_DIR = _PRIVATE / "edge_login_profile"
 WEBVIEW_PROFILE_DIR = _PRIVATE / "webview2"   # the GUI window's WebView2 user-data folder
 
-# Built-in Chromium (the with-browser release variant): build.ps1 -BundleChromium
-# ships Playwright's ms-playwright folder inside _internal. Point Playwright at
-# it here -- this module is imported (via common) by every entry point before any
-# sync_playwright() starts -- unless the user already pinned
-# PLAYWRIGHT_BROWSERS_PATH themselves. The system-browser variant ships no such
-# folder, so nothing is set and the app keeps driving the machine's Edge/Chrome.
-# NOTE: next to the .exe, NOT under DATA_ROOT -- the browser is part of the
-# read-only bundle, never user data.
-if is_frozen() and not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
-    _bundled_browsers = Path(sys.executable).resolve().parent / "_internal" / "ms-playwright"
-    if _bundled_browsers.is_dir():
-        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(_bundled_browsers)
+# Built-in Chromium. Two places one can live, probed in order; this module is
+# imported (via common) by every entry point before any sync_playwright()
+# starts, and an explicit PLAYWRIGHT_BROWSERS_PATH always wins:
+#   1. The with-browser release variant (build.ps1 -BundleChromium) ships
+#      Playwright's ms-playwright folder inside _internal -- next to the .exe,
+#      NOT under DATA_ROOT: part of the read-only bundle, never user data.
+#   2. The Settings tab can DOWNLOAD one into the app's own data folder
+#      (DOWNLOADED_BROWSERS_DIR, v0.10.0) -- user data, so it survives
+#      one-click updates and is deletable from the same Settings section.
+# The system-browser variant with neither ships keeps driving the machine's
+# Edge/Chrome. (common._chromium_available() follows whatever is set here.)
+DOWNLOADED_BROWSERS_DIR = _PRIVATE / "ms-playwright"
+
+
+def _has_chromium(directory):
+    try:
+        return any(directory.glob("chromium-*"))
+    except OSError:
+        return False
+
+
+BUNDLED_BROWSERS_DIR = (Path(sys.executable).resolve().parent / "_internal"
+                        / "ms-playwright") if is_frozen() else None
+
+if not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+    if BUNDLED_BROWSERS_DIR is not None and BUNDLED_BROWSERS_DIR.is_dir():
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(BUNDLED_BROWSERS_DIR)
+    elif _has_chromium(DOWNLOADED_BROWSERS_DIR):
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(DOWNLOADED_BROWSERS_DIR)

@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import tempfile
+from urllib.parse import urlsplit
 
 from paths import CONFIG_FILE
 
@@ -143,6 +144,75 @@ def update(changes):
     _cache, _cache_mtime = None, None       # next get() re-reads
     log.info("settings: saved %s -> %s", dict(changes or {}), CONFIG_FILE)
     return all_settings()
+
+
+# ---- per-site URL overrides -------------------------------------------------
+# Stored under the "site_urls" key as {"<src>-<env>": "https://…", ...} —
+# a stopgap for "the site moved before an app update shipped". common.get_url()
+# consults these on every navigation, so a change applies immediately. NOT part
+# of DEFAULTS/all_settings (those stay scalar); the Settings tab edits these
+# through gui_api.set_site_url.
+
+def _valid_url(url):
+    try:
+        parts = urlsplit(url)
+        return parts.scheme in ("http", "https") and bool(parts.netloc)
+    except (TypeError, ValueError):
+        return False
+
+
+def get_site_url(src, env):
+    """The override URL for one (src, env), or None when unset/unusable."""
+    urls = _read_file().get("site_urls")
+    if not isinstance(urls, dict):
+        return None
+    url = urls.get(f"{src}-{env}")
+    return url if isinstance(url, str) and _valid_url(url) else None
+
+
+def all_site_urls():
+    """Every VALID saved override, {"src-env": url}."""
+    urls = _read_file().get("site_urls")
+    if not isinstance(urls, dict):
+        return {}
+    return {k: v for k, v in urls.items()
+            if isinstance(v, str) and _valid_url(v)}
+
+
+def set_site_url(src, env, url):
+    """Save (or, with an empty url, clear) one site's URL override.
+    Raises ValueError with a user-safe message for an unusable URL."""
+    global _cache, _cache_mtime
+    key = f"{src}-{env}"
+    url = (url or "").strip()
+    if url and not _valid_url(url):
+        raise ValueError("That doesn't look like a usable web address — it "
+                         "needs to start with https:// (or http://).")
+    data = dict(_read_file())
+    urls = dict(data.get("site_urls") or {})
+    if url:
+        urls[key] = url
+    else:
+        urls.pop(key, None)
+    if urls:
+        data["site_urls"] = urls
+    else:
+        data.pop("site_urls", None)
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp, CONFIG_FILE)
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    _cache, _cache_mtime = None, None
+    log.info("settings: site url %s -> %s", key, url or "(default)")
+    return all_site_urls()
 
 
 def reset():

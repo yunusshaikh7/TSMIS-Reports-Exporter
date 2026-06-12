@@ -19,6 +19,9 @@ Message protocol (all are (kind, payload) tuples):
                                         matches, url, error}
     ("reset_done", dict)               outcome of "Delete all reports":
                                        {files, mb, errors: [str, ...]}
+    ("chromium_done", dict)            outcome of the Built-in Chromium
+                                       download/delete: {ok, action,
+                                       cancelled, error}
     ("export_done", [(spec, RunResult), ...])   all selected reports finished
     ("export_partial", [(spec, RunResult), ...]) reports done before an error (then an "error" follows)
     ("consolidate_done", ConsolidateResult)
@@ -36,6 +39,7 @@ Message protocol (all are (kind, payload) tuples):
 """
 import base64
 import logging
+import re
 import threading
 
 from common import (
@@ -50,7 +54,8 @@ from common import (
 )
 from events import Events
 from exporter import run_export
-from paths import FAILURES_DIR, INPUT_ROOT, OUTPUT_ROOT, parse_run_folder
+from paths import (DOWNLOADED_BROWSERS_DIR, FAILURES_DIR, INPUT_ROOT,
+                   OUTPUT_ROOT, parse_run_folder)
 
 log = logging.getLogger("tsmis.gui")
 
@@ -320,6 +325,123 @@ class ResetWorker(threading.Thread):
                 self.q.put(("log", f"  Deleted {label}."))
         self.q.put(("reset_done", {"files": files, "mb": round(size / 1e6, 1),
                                    "errors": errors}))
+
+
+class ChromiumWorker(threading.Thread):
+    """Download or delete the app-owned Built-in Chromium (Settings tab).
+
+    Download drives the BUNDLED Playwright Node driver exactly the way
+    `playwright install chromium --no-shell` would — that works in the frozen
+    app (where there is no `python -m playwright`) and in dev runs alike —
+    aimed at paths.DOWNLOADED_BROWSERS_DIR via PLAYWRIGHT_BROWSERS_PATH, so
+    the browser lands in the app's own data folder (survives one-click
+    updates, removable from the same Settings section). Installer progress is
+    forwarded to the log (throttled); no console window is flashed. Delete
+    removes ONLY that folder — never the with-browser bundle's
+    `_internal\\ms-playwright`. Cancel (the shared cancel_event) kills the
+    download; Playwright downloads to a temp name first, so a killed install
+    can simply be retried.
+
+    Posts ("log", …) progress + one ("chromium_done",
+    {ok, action, cancelled, error})."""
+
+    def __init__(self, queue, action, cancel_event):
+        super().__init__(daemon=True, name="chromium")
+        self.q = queue
+        self.action = action            # "download" | "delete"
+        self.cancel = cancel_event
+
+    def run(self):
+        out = {"ok": False, "action": self.action, "cancelled": False,
+               "error": None}
+        try:
+            if self.action == "download":
+                out["cancelled"] = not self._download()
+                out["ok"] = not out["cancelled"]
+            else:
+                self._delete()
+                out["ok"] = True
+        except Exception as e:
+            log.exception("chromium %s failed", self.action)
+            reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+            out["error"] = reason
+        self.q.put(("chromium_done", out))
+
+    def _download(self):
+        """Run the bundled driver's installer. Returns False when cancelled."""
+        import os
+        import subprocess
+        import time
+
+        from playwright._impl._driver import compute_driver_executable
+        try:
+            from playwright._impl._driver import get_driver_env
+            env = dict(get_driver_env())
+        except ImportError:
+            env = dict(os.environ)
+        cmd = compute_driver_executable()
+        cmd = list(cmd) if isinstance(cmd, (list, tuple)) else [str(cmd)]
+        DOWNLOADED_BROWSERS_DIR.mkdir(parents=True, exist_ok=True)
+        env["PLAYWRIGHT_BROWSERS_PATH"] = str(DOWNLOADED_BROWSERS_DIR)
+        log.info("chromium: download starting -> %s (driver %s)",
+                 DOWNLOADED_BROWSERS_DIR, cmd[0])
+        self.q.put(("log", "Downloading the Built-in Chromium (~170 MB)…"))
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        proc = subprocess.Popen(
+            cmd + ["install", "chromium", "--no-shell"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace",
+            env=env, creationflags=creationflags)
+        last_emit = 0.0
+        last_line = ""
+        try:
+            for line in proc.stdout:
+                if self.cancel.is_set():
+                    proc.kill()
+                    proc.wait()
+                    log.info("chromium: download cancelled by user")
+                    self.q.put(("log", "Download cancelled."))
+                    return False
+                # The installer colors its output; ANSI codes would land in
+                # the log pane as "[2m" noise.
+                line = re.sub(r"\x1b\[[0-9;]*m", "", line).strip()
+                if not line:
+                    continue
+                last_line = line
+                now = time.monotonic()
+                if now - last_emit >= 2.0:        # the installer is chatty
+                    self.q.put(("log", f"  {line}"))
+                    last_emit = now
+        finally:
+            proc.stdout.close()
+        rc = proc.wait()
+        if rc != 0:
+            log.warning("chromium: installer exited %s (last: %s)", rc, last_line)
+            raise RuntimeError(
+                "The browser download didn't complete (check the network / "
+                "VPN connection and try again).")
+        if not any(DOWNLOADED_BROWSERS_DIR.glob("chromium-*")):
+            raise RuntimeError("The download finished but no browser was "
+                               "found afterwards (details in the log).")
+        log.info("chromium: download complete")
+        return True
+
+    def _delete(self):
+        import shutil
+        if not DOWNLOADED_BROWSERS_DIR.is_dir():
+            self.q.put(("log", "There was no downloaded browser to remove."))
+            return
+        failures = []
+        shutil.rmtree(DOWNLOADED_BROWSERS_DIR,
+                      onerror=lambda _fn, p, _exc: failures.append(str(p)))
+        if failures or DOWNLOADED_BROWSERS_DIR.exists():
+            log.warning("chromium: delete left %d item(s): %s",
+                        len(failures), failures[:5])
+            raise RuntimeError(
+                "Some browser files couldn't be removed — close the app and "
+                "delete the data\\ms-playwright folder by hand, or restart "
+                "and try again.")
+        log.info("chromium: downloaded browser deleted")
 
 
 class EnvCheckWorker(threading.Thread):

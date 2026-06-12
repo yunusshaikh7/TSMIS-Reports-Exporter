@@ -82,9 +82,12 @@ function appendLog(text) {
   line.className = "log-line";
   // Colorize like the old GUI, but don't paint a SUCCESS summary red just
   // because it says "failed 0": strip zero-count mentions before testing.
+  // Comparison verdict lines lead with ✓/✗ and win outright.
   const scrubbed = text.replace(/\bfailed:?\s+0\b/gi, "");
   const upper = scrubbed.toUpperCase();
-  if (upper.includes("FAIL") || upper.includes("ERROR")) line.classList.add("err");
+  if (text.startsWith("✓")) line.classList.add("ok");
+  else if (text.startsWith("✗")) line.classList.add("err");
+  else if (upper.includes("FAIL") || upper.includes("ERROR")) line.classList.add("err");
   else if (text.includes("saved") || text.includes("Output file") || text.includes("Output:")) line.classList.add("ok");
   line.textContent = text === "" ? " " : text;
   body.appendChild(line);
@@ -604,6 +607,10 @@ function renderState() {
     $(id).disabled = locked;
     $(id).closest(".option-row").classList.toggle("disabled", locked);
   });
+  $("setSiteUrls").querySelectorAll("input").forEach((i) => { i.disabled = locked; });
+  $("btnChromiumDownload").disabled = locked;
+  $("btnChromiumDelete").disabled = locked;
+  $("btnChromiumCancel").classList.toggle("hidden", st.task !== "chromium");
   $("reportList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
   $("reportList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
   $("consList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
@@ -814,6 +821,10 @@ function dispatch(events) {
     try {
       switch (ev.t) {
         case "state": S.st = ev.s; renderState(); break;
+        case "settings":
+          S.init.settings = ev.s;
+          fillSettings();
+          break;
         case "log": appendLog(ev.text); sawLog = true; break;
         case "progress": if (S.runMode === "export") renderProgress(ev.p); break;
         case "wstatus": updateWorkerStatus(ev.w, ev.text); break;
@@ -1069,6 +1080,9 @@ function fillSettings() {
       paths.appendChild(line);
     });
 
+  renderSiteUrls(s.site_urls || []);
+  renderChromium(s.chromium || {});
+
   const about = $("setAbout");
   about.textContent = "";
   [["Version", `v${meta.version || S.init.version}`],
@@ -1082,6 +1096,86 @@ function fillSettings() {
       line.append(l, Object.assign(document.createElement("span"), { textContent: value }));
       about.appendChild(line);
     });
+}
+
+// ---- Settings: per-environment site addresses ----
+function renderSiteUrls(rows) {
+  const box = $("setSiteUrls");
+  box.textContent = "";
+  rows.forEach((row) => {
+    const line = document.createElement("div");
+    line.className = "url-row";
+    const label = document.createElement("span");
+    label.className = "url-label"; label.textContent = row.label;
+    const input = document.createElement("input");
+    input.className = "input" + (row.custom ? " custom" : "");
+    input.value = row.url;
+    input.placeholder = row.default;
+    input.title = "Default: " + row.default;
+    input.spellcheck = false;
+    const chip = document.createElement("span");
+    chip.className = "url-custom-chip" + (row.custom ? " on" : "");
+    chip.textContent = "custom";
+    input.addEventListener("change", async () => {
+      const res = await api.set_site_url(row.source, row.environment, input.value.trim());
+      if (res && res.error) showMessage("error", "Address not saved", res.error);
+      if (res && res.site_urls) {
+        S.init.settings.site_urls = res.site_urls;
+        renderSiteUrls(res.site_urls);
+      }
+    });
+    line.append(label, input, chip);
+    box.appendChild(line);
+  });
+}
+
+// ---- Settings: Built-in Chromium ----
+function renderChromium(c) {
+  const state = $("chromiumState");
+  let text;
+  if (c.bundled) {
+    text = "Ships with this app (the “with-browser” download) — nothing to manage.";
+  } else if (c.downloaded) {
+    text = `Downloaded (${c.downloaded_mb} MB)` + (c.active
+      ? " and available in the Browser dropdown."
+      : " — restart the app to use it.");
+  } else {
+    text = "Not installed — exports use the PC's Microsoft Edge / Google Chrome.";
+  }
+  state.textContent = text;
+  state.title = c.dir || "";
+  $("btnChromiumDownload").classList.toggle("hidden", !!(c.bundled || c.downloaded));
+  $("btnChromiumDelete").classList.toggle("hidden", !c.downloaded);
+  const downloading = S.st && S.st.task === "chromium";
+  $("btnChromiumCancel").classList.toggle("hidden", !downloading);
+}
+
+async function downloadChromium() {
+  const ok = await showConfirm({
+    title: "Download the Built-in Chromium?",
+    message: "About 170 MB will be downloaded into the app's data folder "
+      + "(data\\ms-playwright).\n\nAfter it finishes, restart the app and "
+      + "“Built-in Chromium” appears in the Browser dropdown.",
+    confirmLabel: "Download",
+  });
+  if (!ok) return;
+  const res = await api.download_chromium();
+  if (res && res.error) showMessage("error", "Could not start", res.error);
+  else renderChromium((S.init.settings || {}).chromium || {});
+}
+
+async function deleteChromium() {
+  const ok = await showConfirm({
+    title: "Remove the downloaded browser?",
+    message: "The downloaded Built-in Chromium will be deleted from the app's "
+      + "data folder. Exports go back to the PC's Edge / Chrome (restart to "
+      + "finish the switch if it's currently selected).",
+    confirmLabel: "Remove",
+    danger: true,
+  });
+  if (!ok) return;
+  const res = await api.delete_chromium();
+  if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 
 async function onSettingInput(id) {
@@ -1251,6 +1345,9 @@ function bindEvents() {
   };
   $("btnDeleteReports").onclick = deleteAllReports;
   $("btnVerifyEnv").onclick = verifyEnvironment;
+  $("btnChromiumDownload").onclick = downloadChromium;
+  $("btnChromiumDelete").onclick = deleteChromium;
+  $("btnChromiumCancel").onclick = () => api.cancel_run();
 
   $("btnPickTsmis").onclick = () => pickCompareFile("tsmis");
   $("btnPickTsn").onclick = () => pickCompareFile("tsn");
@@ -1383,6 +1480,38 @@ function makeMockApi() {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
     county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
   };
+  const mockUrlOverrides = {};
+  const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,
+                         active: false, dir: "C:\\Tools\\TSMIS Exporter\\data\\ms-playwright" };
+  function mockSiteUrlRows() {
+    const rows = [];
+    for (const src of ["ssor", "ars"]) {
+      for (const env of ["prod", "test", "dev"]) {
+        const key = `${src}-${env}`;
+        const dflt = `https://tsmis-dev.dot.ca.gov/index.html?env=${env}&src=${src}`;
+        rows.push({ key, source: src, environment: env,
+                    label: `${src.toUpperCase()} · ${env[0].toUpperCase()}${env.slice(1)}`,
+                    default: dflt, url: mockUrlOverrides[key] || dflt,
+                    custom: !!mockUrlOverrides[key] });
+      }
+    }
+    return rows;
+  }
+  function mockSettingsPayload() {
+    return {
+      values: { ...mockSettings }, defaults: { ...mockSettings },
+      site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
+      meta: {
+        version: "0.10.0 (preview)", build: "portable app",
+        variant: "system browser",
+        data_root: "C:\\Tools\\TSMIS Exporter",
+        output_root: "C:\\Tools\\TSMIS Exporter\\output",
+        log_file: "C:\\Tools\\TSMIS Exporter\\data\\logs\\tsmis.log",
+        failures_dir: "C:\\Tools\\TSMIS Exporter\\data\\failures",
+        auth_state: "none", max_workers: 30,
+      },
+    };
+  }
   let timer = null;
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
@@ -1491,21 +1620,57 @@ function makeMockApi() {
       envs: [{ id: "prod", label: "Prod" }, { id: "test", label: "Test" }, { id: "dev", label: "Dev" }],
       site: { source: "ssor", environment: "prod" },
       fast: { default: 3, max: 30 },
-      settings: {
-        values: { ...mockSettings },
-        defaults: { ...mockSettings },
-        meta: {
-          version: "0.10.0 (preview)", build: "portable app",
-          variant: "system browser",
-          data_root: "C:\\Tools\\TSMIS Exporter",
-          output_root: "C:\\Tools\\TSMIS Exporter\\output",
-          log_file: "C:\\Tools\\TSMIS Exporter\\data\\logs\\tsmis.log",
-          failures_dir: "C:\\Tools\\TSMIS Exporter\\data\\failures",
-          auth_state: "none", max_workers: 30,
-        },
-      },
+      settings: mockSettingsPayload(),
       state: JSON.parse(JSON.stringify(st)),
     }),
+    set_site_url: async (src, env, url) => {
+      const key = `${src}-${env}`;
+      if (url && !/^https?:\/\/.+/.test(url)) {
+        return { error: "That doesn't look like a usable web address — it needs to start with https:// (or http://).",
+                 site_urls: mockSiteUrlRows() };
+      }
+      const dflt = `https://tsmis-dev.dot.ca.gov/index.html?env=${env}&src=${src}`;
+      if (!url || url === dflt) delete mockUrlOverrides[key];
+      else mockUrlOverrides[key] = url;
+      push({ t: "log", text: url && url !== dflt
+        ? `Site address for ${key} changed to ${url} (used from the next sign-in or export on).`
+        : `Site address for ${key} reset to the default.` });
+      return { ok: true, site_urls: mockSiteUrlRows() };
+    },
+    download_chromium: async () => {
+      st.task = "chromium"; st.auth_dot = "busy"; st.auth_text = "Downloading…";
+      pushState();
+      push({ t: "log", text: "Downloading the Built-in Chromium (~170 MB)…" },
+           { t: "run_started", mode: "consolidate", label: "Downloading the Built-in Chromium…" });
+      let pct = 0;
+      const t2 = setInterval(() => {
+        pct += 18;
+        if (pct < 100) { push({ t: "log", text: `  Chromium 142.0.7444.52 (playwright build) — ${pct}% of 168 MiB` }); return; }
+        clearInterval(t2);
+        mockChromium.downloaded = true; mockChromium.downloaded_mb = 471;
+        push({ t: "log", text: "Built-in Chromium downloaded. Restart the app to see it in the Browser dropdown (browsers are probed at startup)." },
+             { t: "settings", s: mockSettingsPayload() },
+             { t: "run_ended" },
+             { t: "modal", kind: "info", title: "Built-in Chromium downloaded",
+               message: "The browser is in place. Restart the app and it will appear in the Browser dropdown as 'Built-in Chromium'." });
+        st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 500);
+      return { ok: true };
+    },
+    delete_chromium: async () => {
+      st.task = "chromium"; pushState();
+      push({ t: "log", text: "Removing the downloaded Built-in Chromium…" },
+           { t: "run_started", mode: "consolidate", label: "Removing the Built-in Chromium…" });
+      setTimeout(() => {
+        mockChromium.downloaded = false; mockChromium.downloaded_mb = 0;
+        push({ t: "log", text: "Downloaded Built-in Chromium removed." },
+             { t: "settings", s: mockSettingsPayload() },
+             { t: "run_ended" });
+        st.task = null; pushState();
+      }, 1200);
+      return { ok: true };
+    },
     request_preview: async (w) => {
       setTimeout(() => {
         push({ t: "preview", w, img: mockShotB64("SSOR PROD", `Browser ${w} — Route 005 — Highway Log`), note: `Route 005` });
@@ -1669,10 +1834,21 @@ function makeMockApi() {
       push({ t: "log", text: `Starting comparison: ${dirA} vs ${dirB}` },
            { t: "run_started", mode: "consolidate", label: "Comparing — environments…" });
       setTimeout(() => {
-        push({ t: "log", text: "SSOR-PROD rows: 48,112   ARS-PROD rows: 48,090   union: 48,201 locations across 280 routes" },
-             { t: "log", text: "Matched rows with differences: 312 (1,204 differing cells); 47,654 fully identical" },
-             { t: "log", text: "Routes only in SSOR-PROD (missing from ARS-PROD) (1): 254" },
-             { t: "run_ended" });
+        const match = Math.random() < 0.5;   // exercise both verdict paths
+        if (match) {
+          push({ t: "log", text: "SSOR-PROD rows: 48,112   ARS-PROD rows: 48,112   union: 48,112 locations across 280 routes" },
+               { t: "log", text: "✓ EVERYTHING MATCHES — all 48,112 locations are identical in both environments." },
+               { t: "run_ended" },
+               { t: "modal", kind: "info", title: "Everything matches",
+                 message: "✓ EVERYTHING MATCHES — all 48,112 locations are identical in both environments.\n\nThe saved workbook has the full breakdown and self-checks." });
+        } else {
+          push({ t: "log", text: "SSOR-PROD rows: 48,112   ARS-PROD rows: 48,090   union: 48,201 locations across 280 routes" },
+               { t: "log", text: "✗ DIFFERENCES FOUND — 1,204 differing cell(s) on 312 matched row(s); 89 row(s) only in SSOR-PROD, 22 only in ARS-PROD." },
+               { t: "log", text: "Routes only in SSOR-PROD (missing from ARS-PROD) (1): 254" },
+               { t: "run_ended" },
+               { t: "modal", kind: "warning", title: "Differences found",
+                 message: "✗ DIFFERENCES FOUND — 1,204 differing cell(s) on 312 matched row(s).\n\nOpen the saved workbook for the cell-by-cell breakdown (Summary → Comparison → Only-in sheets)." });
+        }
         st.task = null;
         st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
         pushState();

@@ -106,9 +106,36 @@ def get_site():
     return _data_source, _environment
 
 
+def default_site_url(source, environment):
+    """The built-in report-page URL for one data source / environment."""
+    return f"https://{TSMIS_HOST}/index.html?env={environment}&src={source}"
+
+
 def get_url():
-    """The full report-page URL for the active data source / environment."""
-    return f"https://{TSMIS_HOST}/index.html?env={_environment}&src={_data_source}"
+    """The full report-page URL for the active data source / environment.
+    A Settings-tab override (settings.get_site_url — the "site moved before
+    an app update shipped" stopgap) wins over the built-in pattern and
+    applies to the very next navigation."""
+    try:
+        import settings
+        override = settings.get_site_url(_data_source, _environment)
+    except Exception:                    # settings must never stop a run
+        override = None
+    if override:
+        log.info("site: using custom URL for %s-%s: %s",
+                 _data_source, _environment, override)
+        return override
+    return default_site_url(_data_source, _environment)
+
+
+def expected_host():
+    """Hostname the ACTIVE site URL points at. The signed-in detector and the
+    navigation breadcrumbs compare page hosts against this (not the built-in
+    TSMIS_HOST), so a custom URL override moves them along with it."""
+    try:
+        return urlsplit(get_url()).hostname or TSMIS_HOST
+    except (ValueError, TypeError):
+        return TSMIS_HOST
 
 
 # The shared auth file path is resolved by paths.py, which is frozen-aware: in
@@ -446,7 +473,7 @@ def navigate_with_auth(page):
         # Off-site breadcrumb (e.g. parked at an Azure interactive page).
         try:
             host = _page_host(page)
-            if host and host != TSMIS_HOST:
+            if host and host != expected_host():
                 note(f"waiting at {host} ({page.title()!r})")
         except Exception:
             pass
@@ -496,7 +523,7 @@ _SIGNED_IN_JS = """(() => {
 def is_logged_in(page):
     """Quick check: are we on the report page in a usable, signed-in state?"""
     try:
-        if _page_host(page) != TSMIS_HOST:
+        if _page_host(page) != expected_host():
             return False
         return bool(page.evaluate(_SIGNED_IN_JS))
     except Exception:

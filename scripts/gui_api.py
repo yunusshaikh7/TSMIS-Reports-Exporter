@@ -39,20 +39,21 @@ import webview
 import run_report
 import settings
 import updater
-from gui_worker import (CheckWorker, ConsolidateWorker, EnvCheckWorker,
-                        ExportWorker, LoginWorker, ResetWorker, UpdateWorker,
-                        measure_targets, reset_targets)
+from gui_worker import (CheckWorker, ChromiumWorker, ConsolidateWorker,
+                        EnvCheckWorker, ExportWorker, LoginWorker, ResetWorker,
+                        UpdateWorker, measure_targets, reset_targets)
 from exporter_parallel import MAX_WORKERS, default_worker_count
 from logging_setup import LOG_FILE, set_debug_logging
 
-from paths import (DATA_ROOT, FAILURES_DIR, LOG_DIR, OUTPUT_ROOT,
-                   WEBVIEW_PROFILE_DIR, is_frozen, list_output_days)
+from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
+                   FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, WEBVIEW_PROFILE_DIR,
+                   is_frozen, list_output_days)
 from version import APP_NAME, __version__
 from common import (
     BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES, DATA_SOURCE_LABELS,
-    ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError, clear_auth, get_site,
-    has_valid_auth, parse_routes, require_valid_auth, set_preferred_channel,
-    set_site,
+    ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError, clear_auth,
+    default_site_url, get_site, has_valid_auth, parse_routes,
+    require_valid_auth, set_preferred_channel, set_site,
 )
 from reports import COMPARE_REPORTS, CONSOLIDATE_REPORTS, EXPORT_REPORTS
 
@@ -313,6 +314,8 @@ class GuiApi:
             self._on_env_shot(payload)
         elif kind == "reset_done":
             self._on_reset_done(payload)
+        elif kind == "chromium_done":
+            self._on_chromium_done(payload)
         elif kind == "export_done":
             self._finish_export(payload)
         elif kind == "export_partial":
@@ -418,6 +421,21 @@ class GuiApi:
             for line in result.summary_lines:
                 self._emit_log(line)
             self._set_dot("ok" if self._authed else "bad", "Done")
+            # Comparisons carry a verdict: surface the quick answer in a
+            # dialog too — "everything matches" is the expected outcome
+            # between environments, so it deserves more than a log line.
+            if result.verdict and result.summary_lines:
+                if result.verdict == "match":
+                    self._emit_modal("info", "Everything matches",
+                                     result.summary_lines[0] + "\n\n"
+                                     "The saved workbook has the full "
+                                     "breakdown and self-checks.")
+                else:
+                    self._emit_modal("warning", "Differences found",
+                                     result.summary_lines[0] + "\n\n"
+                                     "Open the saved workbook for the "
+                                     "cell-by-cell breakdown (Summary → "
+                                     "Comparison → Only-in sheets).")
         elif result.status == "cancelled":
             self._emit_log(result.message or "Cancelled.")
         else:
@@ -753,7 +771,7 @@ class GuiApi:
 
     @_api_method
     def cancel_run(self):
-        if self._task in ("export", "consolidate", "compare"):
+        if self._task in ("export", "consolidate", "compare", "chromium"):
             self.cancel_event.set()
             self._emit_log("Cancel requested…")
         return {"ok": True}
@@ -1015,6 +1033,50 @@ class GuiApi:
 
     # ---- settings & maintenance -----------------------------------------------
 
+    def _site_url_rows(self):
+        """All six (src, env) combos with their effective / default URLs —
+        the Settings tab's editable "site addresses" list."""
+        overrides = settings.all_site_urls()
+        rows = []
+        for src in DATA_SOURCES:
+            for env in ENVIRONMENTS:
+                key = f"{src}-{env}"
+                default = default_site_url(src, env)
+                custom = overrides.get(key)
+                rows.append({
+                    "key": key, "source": src, "environment": env,
+                    "label": f"{DATA_SOURCE_LABELS[src]} · {ENVIRONMENT_LABELS[env]}",
+                    "default": default,
+                    "url": custom or default,
+                    "custom": bool(custom),
+                })
+        return rows
+
+    def _chromium_state(self):
+        """What the Settings tab's Built-in Chromium section shows."""
+        bundled = bool(BUNDLED_BROWSERS_DIR and BUNDLED_BROWSERS_DIR.is_dir())
+        downloaded = False
+        size_mb = 0
+        try:
+            if DOWNLOADED_BROWSERS_DIR.is_dir():
+                downloaded = any(DOWNLOADED_BROWSERS_DIR.glob("chromium-*"))
+                if downloaded:
+                    size_mb = round(sum(
+                        f.stat().st_size
+                        for f in DOWNLOADED_BROWSERS_DIR.rglob("*") if f.is_file()
+                    ) / 1e6)
+        except OSError:
+            pass
+        return {
+            "bundled": bundled,
+            "downloaded": downloaded,
+            "downloaded_mb": size_mb,
+            # whether THIS process can already use a Built-in Chromium
+            # (channels are probed at startup; changes need a restart)
+            "active": "chromium" in BROWSER_CHANNELS,
+            "dir": str(DOWNLOADED_BROWSERS_DIR),
+        }
+
     @_api_method
     def get_settings(self):
         """Everything the Settings tab shows: the saved knobs plus read-only
@@ -1024,6 +1086,8 @@ class GuiApi:
         return {
             "values": settings.all_settings(),
             "defaults": dict(settings.DEFAULTS),
+            "site_urls": self._site_url_rows(),
+            "chromium": self._chromium_state(),
             "meta": {
                 "version": __version__,
                 "build": "portable app" if is_frozen() else "development run",
@@ -1037,6 +1101,92 @@ class GuiApi:
                 "max_workers": MAX_WORKERS,
             },
         }
+
+    @_api_method
+    def set_site_url(self, source, environment, url):
+        """Save (or clear, with an empty value) one environment's TSMIS
+        address. Applies to the very next sign-in / export / verify — the
+        stopgap for "the site moved before an app update shipped"."""
+        url = (url or "").strip()
+        if url == default_site_url(source, environment):
+            url = ""                      # typing the default back = no override
+        try:
+            settings.set_site_url(source, environment, url)
+        except ValueError as e:
+            return {"error": str(e), "site_urls": self._site_url_rows()}
+        label = f"{DATA_SOURCE_LABELS.get(source, source)} / " \
+                f"{ENVIRONMENT_LABELS.get(environment, environment)}"
+        if url:
+            self._emit_log(f"Site address for {label} changed to {url} "
+                           "(used from the next sign-in or export on).")
+        else:
+            self._emit_log(f"Site address for {label} reset to the default.")
+        return {"ok": True, "site_urls": self._site_url_rows()}
+
+    # ---- Built-in Chromium download / delete -----------------------------------
+
+    def _start_chromium(self, action, start_log):
+        with self._lock:
+            if self._task:
+                return {"error": "A task is already running."}
+            self._task = "chromium"
+        self.cancel_event.clear()
+        self._emit_log(start_log)
+        self._set_dot("busy", "Working on the Built-in Chromium…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": ("Downloading the Built-in Chromium…"
+                              if action == "download" else
+                              "Removing the Built-in Chromium…")})
+        self._push_state()
+        ChromiumWorker(self._q, action, self.cancel_event).start()
+        return {"ok": True}
+
+    @_api_method
+    def download_chromium(self):
+        """Download the Built-in Chromium into the app's data folder (the
+        same browser the with-browser variant ships; ~170 MB). Restart to
+        select it — browsers are probed at startup."""
+        if self._chromium_state()["downloaded"]:
+            return {"error": "A downloaded Built-in Chromium is already here. "
+                             "Delete it first to re-download."}
+        ui_log.info("chromium: user started download")
+        return self._start_chromium(
+            "download", "Downloading the Built-in Chromium (~170 MB)…")
+
+    @_api_method
+    def delete_chromium(self):
+        """Remove the DOWNLOADED Built-in Chromium (the with-browser bundle's
+        own copy is part of the app and is never touched)."""
+        if not self._chromium_state()["downloaded"]:
+            return {"error": "There is no downloaded Built-in Chromium to remove."}
+        ui_log.info("chromium: user started delete")
+        return self._start_chromium(
+            "delete", "Removing the downloaded Built-in Chromium…")
+
+    def _on_chromium_done(self, payload):
+        if payload.get("cancelled"):
+            self._emit_log("Built-in Chromium download cancelled.")
+        elif not payload.get("ok"):
+            msg = payload.get("error") or "Something went wrong (see the log)."
+            self._emit_log(f"ERROR: {msg}")
+            self._emit_modal("error", "Built-in Chromium", msg)
+        elif payload.get("action") == "download":
+            self._emit_log("Built-in Chromium downloaded. Restart the app to "
+                           "see it in the Browser dropdown (browsers are "
+                           "probed at startup).")
+            self._emit_modal("info", "Built-in Chromium downloaded",
+                             "The browser is in place. Restart the app and it "
+                             "will appear in the Browser dropdown as "
+                             "'Built-in Chromium'.")
+        else:
+            self._emit_log("Downloaded Built-in Chromium removed."
+                           + (" Restart the app to finish switching back to "
+                              "Edge/Chrome." if self._chromium_state()["active"]
+                              else ""))
+        self._set_dot("ok" if self._authed else "bad", "Done")
+        # Refresh the Settings tab's section (JS swaps in the new state).
+        self._emit({"t": "settings", "s": self.get_settings()})
+        self._end_task()
 
     @_api_method
     def set_setting(self, key, value):

@@ -393,6 +393,41 @@
         </div>
 
         <div class="card-section">
+          <div class="section-head"><span class="section-label">TSMIS site addresses</span></div>
+          <p class="hint" style="margin-bottom:8px">
+            The page each data source / environment lives at. Edit one if the site
+            moves before an app update ships — it's used by the very next sign-in,
+            export or Verify. Clear a box to go back to the built-in address
+            (keep the <span class="mono">?env=</span> and <span class="mono">?src=</span>
+            parameters unless the new site drops them).
+          </p>
+          <div class="set-urls" id="setSiteUrls"></div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-head"><span class="section-label">Built-in Chromium</span></div>
+          <p class="hint" style="margin-bottom:8px">
+            An unmanaged browser of the app's own (the one the “with-browser”
+            download ships): org policy can't interfere with its sign-in window,
+            and its version always matches this app. ~170&nbsp;MB; it lives in the
+            app's data folder and survives updates.
+          </p>
+          <div class="chromium-row">
+            <span class="chromium-state" id="chromiumState">—</span>
+            <span class="spacer"></span>
+            <button class="btn btn-standard" id="btnChromiumDownload">
+              <svg class="ic"><use href="#i-package"/></svg>Download (~170 MB)
+            </button>
+            <button class="btn btn-standard hidden" id="btnChromiumDelete">
+              <svg class="ic"><use href="#i-trash"/></svg>Remove
+            </button>
+            <button class="btn btn-subtle hidden" id="btnChromiumCancel">
+              <svg class="ic"><use href="#i-x"/></svg>Cancel download
+            </button>
+          </div>
+        </div>
+
+        <div class="card-section">
           <div class="section-head"><span class="section-label">Data &amp; storage</span></div>
           <div class="set-paths mono" id="setPaths"></div>
           <div class="actions-row" style="margin-top:10px">

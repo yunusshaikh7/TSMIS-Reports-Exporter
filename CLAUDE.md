@@ -27,7 +27,13 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 page headless exactly like an export, reads the page's own CONFIG env/src via
 `_CONFIG_JS`, screenshots it, and the modal says whether it matches the
 selection — the user's "am I really on SSOR DEV?" answer without exporting),
-the console flow honors `TSMIS_SRC` / `TSMIS_ENV`.
+the console flow honors `TSMIS_SRC` / `TSMIS_ENV`. **Per-env URL overrides**
+(v0.10.0): the Settings tab can rewrite any combo's address
+(`settings.get_site_url` → consulted by `common.get_url()` on every
+navigation; `common.expected_host()` follows the effective URL, and
+`is_logged_in` + the navigate breadcrumbs compare hosts against IT, not the
+built-in TSMIS_HOST) — the stopgap for "the site moved before an app update
+shipped". Console flows honor the same overrides automatically.
 
 **Beyond the TSMIS exports (v0.8.0, ported from TSMIS-Report-Consolidator):**
 - **TSN Highway Log** (consolidate-only): parses TSN district Highway Log PDFs
@@ -65,6 +71,15 @@ the console flow honors `TSMIS_SRC` / `TSMIS_ENV`.
     (baseline defaults to newest ssor-prod) + Browse; saves default to
     `output/comparisons/`. Verified with planted-difference fixtures and a
     real-Excel COM recalc (all SELF-CHECK rows OK).
+  **Every comparison leads with a VERDICT** (v0.10.0): summary_lines[0] is
+  "✓ EVERYTHING MATCHES …" / "✗ DIFFERENCES FOUND …",
+  `ConsolidateResult.verdict` is "match"/"diff" (the GUI keys a green/amber
+  result dialog on it; consolidators leave it None), and the workbook's
+  Summary carries the same verdict as a big banner cell right under the
+  title (B3, or B4 under the manual-calc F9 banner) — a LIVE formula in the
+  formulas flavor (CF green/red keyed on the ✓/✗ first character), a
+  literal in the values flavor. Match ⟺ zero differing cells AND zero
+  one-sided rows.
   The TSMIS-vs-TSN flavor takes a TSMIS and a TSN Highway Log — **either two
   per-route workbooks or two consolidated ones** (`Route` + 31 columns; shapes
   auto-detected, mixed shapes rejected with guidance) — and writes a
@@ -233,10 +248,18 @@ engine.
     the libs **and** runs `playwright install chromium --no-shell`.
   The `chromium` channel only appears when a Playwright Chromium is actually
   present (`common._chromium_available()`): for **packaged** builds that means
-  the bundle's own `_internal\ms-playwright` (or an explicit
-  `PLAYWRIGHT_BROWSERS_PATH`) — the machine's global Playwright cache is
-  deliberately ignored so the default build always defaults to Edge even on a
-  dev PC; dev/`.bat` runs use the default cache (where setup downloads it).
+  the bundle's own `_internal\ms-playwright`, an explicit
+  `PLAYWRIGHT_BROWSERS_PATH`, **or the Settings-tab download** (v0.10.0:
+  `paths.DOWNLOADED_BROWSERS_DIR` = `data\ms-playwright` — user data, so it
+  survives one-click updates; `gui_worker.ChromiumWorker` drives the BUNDLED
+  Playwright Node driver like `playwright install chromium --no-shell` with
+  PLAYWRIGHT_BROWSERS_PATH aimed there — works frozen, streams progress to
+  the log, cancellable, no console window; delete rmtree's ONLY that folder,
+  never the bundle's. Channels are probed at startup, so download/delete
+  says "restart the app"). The machine's global Playwright cache is
+  deliberately ignored so the default build defaults to Edge even on a
+  dev PC; dev/`.bat` runs use the default cache (where setup downloads it),
+  and a Settings-tab download wins over the cache in dev too.
   `channel="chromium"` runs the full browser in new-headless mode — one binary
   for headed sign-in and headless exports (no headless shell needed).
 - **Data location (option A):** the packaged app writes `output/`, auth token,
@@ -411,7 +434,10 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   `common.*_timeout_ms()` accessors / `exporter_parallel.default_worker_count()`
   (next run picks them up; env vars still win where one exists); verbose
   logging applies live (`logging_setup.set_debug_logging`); DevTools applies
-  next launch. Also: support-bundle zip (logs + run reports + manifest —
+  next launch. **Per-env TSMIS addresses** (six editable rows; custom ones
+  chip-marked; clearing restores the default — see *Supported Reports*) and
+  the **Built-in Chromium download/remove** (see *Browser channels*) live
+  here too. Also: support-bundle zip (logs + run reports + manifest —
   NEVER the auth file/profiles), forget-saved-login, open-folder shortcuts,
   and **Delete all reports** (`gui_worker.reset_targets`/`ResetWorker`):
   removes run folders, legacy flat report folders, consolidated/comparisons,

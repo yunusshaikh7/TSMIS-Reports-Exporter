@@ -1040,9 +1040,39 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
     c = None if vals is None else vals["counts"]
     scope = (sc.scope_consolidated if lay.has_route else sc.scope_flat) \
         + ("" if vals is None else " — VALUES copy")
+    manual_banner = lay.has_route and vals is None
+    # THE VERDICT — the one-line answer most comparisons exist for ("did
+    # anything change between the two sides?"). Live in the formulas flavor
+    # (recomputes with edits / after F9; blank until then in manual mode), a
+    # literal in the values flavor. Green/red via CF keyed on the ✓/✗ glyph.
+    verdict_row = 4 if manual_banner else 3
+    verdict_font = Font(name="Arial", size=12, bold=True)
+    ws.conditional_formatting.add(f"B{verdict_row}", FormulaRule(
+        formula=[f'LEFT($B${verdict_row},1)="✓"'],
+        fill=PatternFill(bgColor="C6EFCE"), font=Font(color="2E7D32", bold=True)))
+    ws.conditional_formatting.add(f"B{verdict_row}", FormulaRule(
+        formula=[f'LEFT($B${verdict_row},1)="✗"'],
+        fill=PatternFill(bgColor="FFC7CE"), font=Font(color="9C0006", bold=True)))
+    match_text = (f"✓ EVERYTHING MATCHES — all {n_union:,} {nouns} are "
+                  f"identical in both {sc.sides_noun}.")
+    if vals is None:
+        diff_cells_ref = f"SUM(Comparison!{df}2:{df}{last})"
+        one_sided_ref = (f'COUNTIF(Comparison!{st}:{st},"{lay.only_a}")'
+                         f'+COUNTIF(Comparison!{st}:{st},"{lay.only_b}")')
+        verdict_cell = (
+            f'=IF(AND({diff_cells_ref}=0,{one_sided_ref}=0),"{match_text}",'
+            f'"✗ DIFFERENCES FOUND — "&TEXT({diff_cells_ref},"#,##0")&'
+            f'" differing cell(s), "&TEXT({one_sided_ref},"#,##0")&'
+            f'" one-sided row(s) — details below.")')
+    else:
+        one_sided = c["t_only"] + c["n_only"]
+        verdict_cell = (match_text if c["diff_cells"] == 0 and one_sided == 0
+                        else f"✗ DIFFERENCES FOUND — {c['diff_cells']:,} "
+                             f"differing cell(s), {one_sided:,} one-sided "
+                             "row(s) — details below.")
     row[0] = 2
     line((2, f"{a} vs {b} — {sc.report_name} — Discrepancy Report ({scope})", title_font))
-    if lay.has_route and vals is None:
+    if manual_banner:
         # The big formulas workbook ships UNCALCULATED (manual mode): every
         # cell shows blank/0 until F9. Without a loud banner that reads as
         # broken data. (The values copy calculates nothing — no banner.)
@@ -1050,6 +1080,8 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
                  "(blank/0 cells). The first F9 takes a few minutes; let it "
                  "finish, then save.",
               Font(name="Arial", size=11, bold=True, color="C00000")))
+    assert row[0] == verdict_row            # the CF above targets this cell
+    line((2, verdict_cell, verdict_font))
     line((2, "Cell-by-cell comparison keyed on "
              + (f"Route + {sc.header[0]}" if lay.has_route else sc.header[0])
              + " (+ occurrence for duplicates). "
@@ -1383,8 +1415,24 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         shown = ", ".join(routes[:15]) + (", …" if len(routes) > 15 else "")
         return f"{label} ({len(routes)}): {shown}" if routes else f"{label}: none"
 
+    # The quick answer first: most comparisons exist to confirm "nothing
+    # changed", so say so in one loud line (mirrored by the workbook's
+    # Summary verdict; the GUI also keys its result dialog on `verdict`).
+    one_sided = counts["t_only"] + counts["n_only"]
+    matches = counts["diff_cells"] == 0 and one_sided == 0
+    if matches:
+        verdict_line = (f"✓ EVERYTHING MATCHES — all {len(union):,} "
+                        f"{sc.id_noun_plural} are identical in both "
+                        f"{sc.sides_noun}.")
+    else:
+        verdict_line = (f"✗ DIFFERENCES FOUND — {counts['diff_cells']:,} "
+                        f"differing cell(s) on {counts['diff_rows']:,} "
+                        f"matched row(s); {counts['t_only']:,} row(s) only "
+                        f"in {a}, {counts['n_only']:,} only in {b}.")
+
     Nouns = sc.id_noun_plural.capitalize()
     lines = [
+        verdict_line,
         f"{Nouns} in both {sc.sides_noun}:   {counts['both']:,}",
         f"In {a} only / in {b} only: {counts['t_only']:,} / {counts['n_only']:,} "
         "(each listed on its own 'Only in …' sheet)",
@@ -1413,4 +1461,5 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         lines.append(f"Values file: {out_paths['values']}")
     primary = out_paths["formulas" if "formulas" in modes else "values"]
     return ConsolidateResult(status="ok", output_path=str(primary),
-                             summary_lines=lines)
+                             summary_lines=lines,
+                             verdict="match" if matches else "diff")
