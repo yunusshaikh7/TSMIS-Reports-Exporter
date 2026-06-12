@@ -30,13 +30,16 @@ import os
 import sys
 import threading
 import time
+import webbrowser
 from pathlib import Path
 from queue import Empty, Queue
 
 import webview
 
 import run_report
-from gui_worker import CheckWorker, ConsolidateWorker, ExportWorker, LoginWorker
+import updater
+from gui_worker import (CheckWorker, ConsolidateWorker, ExportWorker,
+                        LoginWorker, UpdateWorker)
 from exporter_parallel import DEFAULT_WORKERS, MAX_WORKERS
 
 from paths import LOG_DIR, OUTPUT_ROOT, WEBVIEW_PROFILE_DIR, list_output_days
@@ -124,6 +127,13 @@ class GuiApi:
         self._checks["output"] = {"status": "busy", "text": "Output folder: checking…"}
         self._checks["tools"] = {"status": "busy", "text": "Report tools: checking…"}
 
+        # One-click update state, mirrored into every snapshot for the title-bar
+        # pill. phase: idle|checking|none|available|downloading|staged|applying|
+        # failed; can_apply False = read-only install (pill opens the release
+        # page instead). The UpdateInfo itself stays Python-side.
+        self._update = {"phase": "idle"}
+        self._update_info = None
+
         self._last_results = []      # [(spec, RunResult), ...] of the last export
         self.cancel_event = threading.Event()
         self.skip_event = threading.Event()
@@ -175,6 +185,7 @@ class GuiApi:
                 "checks_running": self._checks_running,
                 "days": list_output_days(),
                 "can_save_report": bool(self._last_results),
+                "update": dict(self._update),
             }
 
     def _push_state(self):
@@ -339,6 +350,8 @@ class GuiApi:
             self._emit_log("Cancelled.")
             self._set_dot("ok" if self._authed else "bad", "Idle")
             self._end_task()
+        elif kind == "update_status":
+            self._on_update_status(payload)
         elif kind == "error":
             self._on_error(payload)
 
@@ -410,6 +423,55 @@ class GuiApi:
                                "Edge (or Google Chrome) before running an export.")
         self._push_state()
 
+    def _on_update_status(self, payload):
+        """UpdateWorker's whole-state posts. `manual` (user clicked) decides
+        whether quiet outcomes (up to date / a failed launch check) reach the
+        log pane; tsmis.log always has the full story from updater.py."""
+        manual = payload.pop("manual", False)
+        info = payload.pop("_info", None)
+        with self._lock:
+            if info is not None:
+                self._update_info = info
+            self._update = payload
+        phase = payload.get("phase")
+        ver = payload.get("version")
+        if phase == "available":
+            if payload.get("can_apply"):
+                size = f" ({payload['size_mb']} MB)" if payload.get("size_mb") else ""
+                self._emit_log(f"Update available: v{ver}{size} — click "
+                               f"‘Update to v{ver}’ in the title bar to install it.")
+            else:
+                self._emit_log(f"Update available: v{ver}. This app folder isn't "
+                               "writable, so the title-bar button opens the download "
+                               "page instead — extract the new zip into a folder you "
+                               "can write to.")
+        elif phase == "none" and manual:
+            self._emit_log(f"You're on the latest version (v{__version__}).")
+        elif phase == "staged":
+            self._emit_log(f"Update v{ver} is downloaded and ready — click "
+                           "‘Restart to update’ when you're done working "
+                           "(the app closes, updates itself, and reopens).")
+        elif phase == "failed" and manual:
+            self._emit_log(f"Update problem: {payload.get('note')} "
+                           "(details are in the log file)")
+        self._push_state()
+
+    def _start_update_check(self, manual=False):
+        mode, why = updater.update_support()
+        if mode == "off":
+            log.info("update check skipped: %s", why)
+            if manual:
+                self._emit_log("Update check: not available in a development run.")
+            return
+        if mode == "link":
+            log.info("update: link-only mode (%s)", why)
+        with self._lock:
+            self._update = {"phase": "checking"}
+        if manual:
+            self._emit_log("Checking for updates…")
+        self._push_state()
+        UpdateWorker(self._q, "check", manual=manual).start()
+
     def _on_error(self, payload):
         kind, message = payload
         self._emit_log(f"ERROR: {message}")
@@ -434,6 +496,7 @@ class GuiApi:
             self._started = True
             self._refresh_auth()
             self._start_checks_locked()
+            self._start_update_check()       # quiet unless an update exists
         return {
             "app_name": APP_NAME,
             "version": __version__,
@@ -505,6 +568,84 @@ class GuiApi:
             return {"error": "busy"}
         self._start_checks_locked()
         self._push_state()
+        return {"ok": True}
+
+    # ---- one-click update ------------------------------------------------------
+
+    @_api_method
+    def check_updates(self):
+        """Manual re-check (clicking the version chip)."""
+        with self._lock:
+            phase = self._update.get("phase")
+        if phase in ("checking", "downloading", "applying"):
+            return {"ok": True}              # already busy with update work
+        if phase == "staged":
+            self._emit_log("An update is already downloaded — click "
+                           "‘Restart to update’ in the title bar to install it.")
+            return {"ok": True}
+        self._start_update_check(manual=True)
+        return {"ok": True}
+
+    @_api_method
+    def update_start(self):
+        """Download + stage the offered update. Allowed during a run (network
+        and disk only); the restart itself is gated on no task running."""
+        with self._lock:
+            if self._update.get("phase") != "available" or not self._update.get("can_apply"):
+                return {"error": "No update is ready to install."}
+            info = self._update_info
+            if info is None:
+                return {"error": "No update is ready to install."}
+            self._update = {"phase": "downloading", "progress": 0,
+                            "version": info.version, "url": info.release_url,
+                            "can_apply": True}
+        size = f" ({round(info.asset_size / 1e6)} MB)" if info.asset_size else ""
+        self._emit_log(f"Downloading update v{info.version}{size}…")
+        self._push_state()
+        UpdateWorker(self._q, "download", info=info).start()
+        return {"ok": True}
+
+    @_api_method
+    def update_apply(self):
+        """Restart into the staged update: launch the swap helper, then close
+        this window (the helper waits for our PID before touching files)."""
+        with self._lock:
+            if self._task:
+                return {"error": "Finish or cancel the running task first."}
+            if self._update.get("phase") != "staged":
+                return {"error": "No downloaded update is ready."}
+            staged = self._update.get("staged")
+            self._update = dict(self._update, phase="applying")
+        ui_log.info("update: user chose Restart to update")
+        try:
+            updater.apply_update_and_restart(staged)
+        except updater.UpdateError as e:
+            with self._lock:
+                self._update = {"phase": "failed", "note": str(e)}
+            self._emit_log(f"Update problem: {e} (details are in the log file)")
+            self._push_state()
+            return {"error": str(e)}
+        self._emit_log("Restarting to finish the update — the app will close "
+                       "and reopen by itself…")
+        self._push_state()
+        threading.Thread(target=self._close_for_update, daemon=True,
+                         name="update-restart").start()
+        return {"ok": True}
+
+    def _close_for_update(self):
+        time.sleep(1.2)                  # let the sender flush the goodbye line
+        try:
+            self._window.destroy()       # webview.start() returns; process exits
+        except Exception:
+            log.warning("window destroy failed; force-exiting so the update "
+                        "helper can proceed", exc_info=True)
+            os._exit(0)
+
+    @_api_method
+    def open_release_page(self):
+        url = self._update.get("url") or updater.RELEASES_PAGE
+        ui_log.info("opening release page: %s", url)
+        webbrowser.open(url)
         return {"ok": True}
 
     # ---- routes ---------------------------------------------------------------
@@ -680,13 +821,18 @@ class GuiApi:
         return {"path": str(path)}
 
     @_api_method
-    def start_compare(self, report_idx, tsmis_path, tsn_path):
+    def start_compare(self, report_idx, tsmis_path, tsn_path,
+                      want_formulas=True, want_values=False):
         label, mod = COMPARE_REPORTS[int(report_idx)]
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
         if not tsmis_path or not tsn_path:
             return {"error": f"Pick both files first (a TSMIS and a TSN {label.lower()})."}
+        if not want_formulas and not want_values:
+            return {"error": "Tick at least one output (values and/or live formulas)."}
+        mode = ("both" if want_formulas and want_values
+                else "formulas" if want_formulas else "values")
         # Where to save — the native dialog also owns the overwrite question.
         picked = self._window.create_file_dialog(
             webview.SAVE_DIALOG,
@@ -701,7 +847,10 @@ class GuiApi:
         with self._lock:
             self._task = "compare"
         self.cancel_event.clear()
-        self._emit_log(f"Starting comparison: TSMIS vs TSN {label}")
+        kinds = {"both": "values + live formulas", "formulas": "live formulas",
+                 "values": "values"}[mode]
+        self._emit_log(f"Starting comparison: TSMIS vs TSN {label} ({kinds})")
+        ui_log.info("compare: mode=%s out=%s", mode, out)
         self._set_dot("busy", f"Comparing {label}s…")
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": f"Comparing {label}s…"})
@@ -709,7 +858,7 @@ class GuiApi:
         ConsolidateWorker(
             lambda events=None, confirm_overwrite=None, day=None:
                 mod.compare(tsmis_path, tsn_path, out, events=events,
-                            confirm_overwrite=confirm_overwrite),
+                            confirm_overwrite=confirm_overwrite, mode=mode),
             self._q, self.cancel_event, lambda _p: True).start()
         return {"ok": True}
 

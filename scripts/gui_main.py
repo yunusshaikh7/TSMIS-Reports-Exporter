@@ -73,6 +73,15 @@ def main():
     setup_logging(enable_faulthandler=False)
     _unblock_dotnet_assemblies()           # must run BEFORE the CLR loads
     try:
+        # Finish any one-click update: drop the *.old bundle pieces the swap
+        # helper couldn't delete while this (new) app was already starting,
+        # and any stale download staging. No-op in dev runs.
+        import updater
+        updater.cleanup_leftovers()
+    except Exception:
+        logging.getLogger("tsmis.gui").warning(
+            "update leftover cleanup failed", exc_info=True)
+    try:
         import gui_api
     except ImportError as e:
         # Dev runs hit this when pywebview isn't installed yet; the packaged

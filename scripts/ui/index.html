@@ -65,6 +65,7 @@
         </div>
       </div>
       <div class="auth-cluster">
+        <button class="btn btn-update hidden" id="btnUpdate"></button>
         <span class="auth-status">
           <span class="dot dot-unknown" id="authDot"></span>
           <span id="authText">Checking session…</span>
@@ -256,13 +257,35 @@
         </div>
 
         <div class="card-section">
+          <div class="section-head"><span class="section-label">Output</span></div>
+          <div class="option-list" id="cmpOutList">
+            <label class="option-row checked">
+              <input type="checkbox" id="cmpWantValues" checked>
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="option-name">Values workbook <span class="muted">— plain results, opens instantly (no F9)</span></span>
+            </label>
+            <label class="option-row checked">
+              <input type="checkbox" id="cmpWantFormulas" checked>
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="option-name">Live-formulas workbook <span class="muted">— auditable, recalculates with edits</span></span>
+            </label>
+          </div>
+          <p class="hint" id="cmpOutHint">Pick one or both. With both, the values copy is saved
+            next to the other as “…&nbsp;(values).xlsx”.</p>
+        </div>
+
+        <div class="card-section">
           <div class="section-head"><span class="section-label">What you get</span></div>
           <p class="hint">
-            One workbook with live formulas: a Summary, a cell-by-cell Comparison
-            (matching values shown plainly, differences in red as
-            “TSMIS&nbsp;≠&nbsp;TSN”), and the two inputs side by side.
+            A Summary (with self-check rows that prove the numbers line up),
+            a cell-by-cell Comparison (matching values shown plainly,
+            differences in red as “TSMIS&nbsp;≠&nbsp;TSN”), a Spot Check sheet
+            to audit any single location, “Only in TSMIS” / “Only in TSN”
+            sheets collecting every one-sided row, and the two inputs side by
+            side — row numbers link between sheets throughout.
             Consolidated comparisons also get a Routes sheet — which routes each
-            system covers, what's missing where, and how much differs per route.
+            system covers, what's missing where (whole-missing routes are
+            flagged “entire route”), and how much differs per route.
             You'll be asked where to save it.
           </p>
         </div>

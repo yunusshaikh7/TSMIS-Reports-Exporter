@@ -94,10 +94,11 @@ def main() -> int:
     import webview
     import gui_api
 
-    class _NoCheck:                 # don't spawn the background browser probe here
-        def __init__(self, q): pass
-        def start(self): pass
-    gui_api.CheckWorker = _NoCheck
+    class _NoWorker:                # no background browser probe / GitHub update
+        def __init__(self, *a, **k): pass     # check here: the gate must be
+        def start(self): pass                 # deterministic and offline-safe
+    gui_api.CheckWorker = _NoWorker
+    gui_api.UpdateWorker = _NoWorker
 
     api = gui_api.GuiApi()
     state = api.get_initial_state()

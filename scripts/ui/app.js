@@ -307,6 +307,7 @@ function buildStatic() {
   const init = S.init;
   $("appName").textContent = init.app_name;
   $("appVersion").textContent = "v" + init.version;
+  $("appVersion").title = "Check for updates";
   $("outputRoot").textContent = init.output_root;
   document.title = init.app_name;
 
@@ -486,12 +487,75 @@ function renderState() {
   $("btnCancelCons").disabled = st.task !== "consolidate";
   $("btnSaveReport").disabled = locked || !st.can_save_report;
   ["btnPickTsmis", "btnPickTsn", "btnOpenConsInput"].forEach((id) => { $(id).disabled = locked; });
-  $("compareList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
-  $("compareList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
+  ["compareList", "cmpOutList"].forEach((id) => {
+    $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+    $(id).querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
+  });
   $("btnCancelCompare").disabled = st.task !== "compare";
   syncCompareButton();
 
+  renderUpdate(st.update);
   renderDays(st.days || []);
+}
+
+// One-click update pill (title bar). Python owns the whole update state; this
+// only decides the pill's label/visibility for the current phase.
+function renderUpdate(up) {
+  const b = $("btnUpdate");
+  up = up || { phase: "idle" };
+  const locked = S.st && S.st.task != null;
+  let show = true, label = "", disabled = false, title = "";
+  switch (up.phase) {
+    case "available":
+      if (up.can_apply) {
+        label = `Update to v${up.version}`;
+        title = "Download and install the new version";
+      } else {
+        label = `v${up.version} available`;
+        title = "Open the download page (this app folder is read-only, so the app can't update itself)";
+      }
+      break;
+    case "downloading":
+      label = `Downloading… ${up.progress || 0}%`;
+      disabled = true;
+      break;
+    case "staged":
+      label = "Restart to update";
+      disabled = locked;
+      title = locked ? "Finish or cancel the running task first"
+                     : `Install v${up.version} — the app closes and reopens by itself`;
+      break;
+    case "applying":
+      label = "Restarting…";
+      disabled = true;
+      break;
+    default:
+      show = false;
+  }
+  b.classList.toggle("hidden", !show);
+  b.textContent = label;
+  b.disabled = disabled;
+  b.title = title;
+}
+
+async function onUpdateClick() {
+  const up = (S.st && S.st.update) || {};
+  if (up.phase === "available" && !up.can_apply) { api.open_release_page(); return; }
+  if (up.phase === "available") {
+    const res = await api.update_start();
+    if (res && res.error) showMessage("error", "Could not start the update", res.error);
+    return;
+  }
+  if (up.phase === "staged") {
+    const ok = await showConfirm({
+      title: "Restart and update?",
+      message: `The app will close, install v${up.version} (takes a few seconds), and reopen by itself.\n\nYour reports, login and settings stay where they are.`,
+      confirmLabel: "Restart now",
+    });
+    if (!ok) return;
+    const res = await api.update_apply();
+    if (res && res.error) showMessage("error", "Could not update", res.error);
+  }
 }
 
 const LEGACY_DAY_LABEL = "(older exports)";
@@ -725,7 +789,11 @@ function renderCompareFiles() {
 
 function syncCompareButton() {
   const locked = S.st && S.st.task != null;
-  $("btnStartCompare").disabled = locked || !(CMP.tsmis && CMP.tsn);
+  const anyOut = $("cmpWantValues").checked || $("cmpWantFormulas").checked;
+  $("btnStartCompare").disabled = locked || !(CMP.tsmis && CMP.tsn) || !anyOut;
+  $("cmpOutHint").textContent = anyOut
+    ? "Pick one or both. With both, the values copy is saved next to the other as “… (values).xlsx”."
+    : "Tick at least one output to enable the comparison.";
 }
 
 async function pickCompareFile(side) {
@@ -737,7 +805,9 @@ async function pickCompareFile(side) {
 }
 
 async function startCompare() {
-  const res = await api.start_compare(compareChoice(), CMP.tsmis, CMP.tsn);
+  const res = await api.start_compare(compareChoice(), CMP.tsmis, CMP.tsn,
+                                      $("cmpWantFormulas").checked,
+                                      $("cmpWantValues").checked);
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 
@@ -780,6 +850,8 @@ function bindEvents() {
     else api.start_login();
   };
   $("btnLoginCancel").onclick = () => api.cancel_login();
+  $("btnUpdate").onclick = onUpdateClick;
+  $("appVersion").onclick = () => api.check_updates();
 
   $("routesInput").addEventListener("input", onRoutesInput);
   $("btnChooseRoutes").onclick = chooseRoutes;
@@ -798,6 +870,14 @@ function bindEvents() {
 
   $("btnPickTsmis").onclick = () => pickCompareFile("tsmis");
   $("btnPickTsn").onclick = () => pickCompareFile("tsn");
+  ["cmpWantValues", "cmpWantFormulas"].forEach((id) => {
+    const cb = $(id);
+    cb.addEventListener("change", () => {
+      cb.closest(".option-row").classList.toggle("checked", cb.checked);
+      syncCompareButton();
+      api.ui_event(`compare_out:${id}=${cb.checked}`);
+    });
+  });
   $("btnStartCompare").onclick = startCompare;
   $("btnCancelCompare").onclick = () => api.cancel_run();
   renderCompareFiles();
@@ -907,6 +987,7 @@ function makeMockApi() {
     checks_running: true,
     days: ["2026-06-10", "2026-06-08", "2026-06-02"],
     can_save_report: false,
+    update: { phase: "idle" },
   };
   let timer = null;
   const push = (...evs) => dispatch(evs);
@@ -918,7 +999,10 @@ function makeMockApi() {
     st.checks.browser_msedge = { status: "ok", text: "Microsoft Edge: ready" };
     st.checks.browser_chrome = { status: "bad", text: "Google Chrome: not installed" };
     st.checks_running = false;
+    // simulate the launch update check finding a new release
+    st.update = { phase: "available", version: "9.9.9", url: "#", size_mb: 148, can_apply: true };
     pushState();
+    push({ t: "log", text: "Update available: v9.9.9 (148 MB) — click ‘Update to v9.9.9’ in the title bar to install it." });
   }
 
   function runMockExport(reports, routes, fast, workers) {
@@ -1066,18 +1150,24 @@ function makeMockApi() {
         ? "C:\\Users\\you\\Downloads\\tsmis_highway_log_route 1.xlsx"
         : "C:\\Users\\you\\Downloads\\tsn_highway_log_route 1.xlsx",
     }),
-    start_compare: async (_idx) => {
+    start_compare: async (_idx, _t, _n, wantFormulas, wantValues) => {
+      if (!wantFormulas && !wantValues) {
+        return { error: "Tick at least one output (values and/or live formulas)." };
+      }
+      const kinds = wantFormulas && wantValues ? "values + live formulas"
+        : wantFormulas ? "live formulas" : "values";
       st.task = "compare";
       st.auth_dot = "busy"; st.auth_text = "Comparing Highway Logs…";
       pushState();
-      push({ t: "log", text: "Starting comparison: TSMIS vs TSN Highway Log" },
+      push({ t: "log", text: `Starting comparison: TSMIS vs TSN Highway Log (${kinds})` },
            { t: "run_started", mode: "consolidate", label: "Comparing Highway Logs…" });
       setTimeout(() => {
         push({ t: "log", text: "TSMIS rows: 317   TSN rows: 368   union: 386 locations" },
              { t: "log", text: "Matched rows with differences: 221 (971 differing cells); 78 fully identical" },
-             { t: "log", text: "Routes only in TSMIS (missing from TSN) (2): 254, 259" },
-             { t: "log", text: "Output: TSMIS_vs_TSN_Route1_Comparison.xlsx" },
-             { t: "run_ended" });
+             { t: "log", text: "Routes only in TSMIS (missing from TSN) (2): 254, 259" });
+        if (wantFormulas) push({ t: "log", text: "Live-formulas file: TSMIS_vs_TSN_Route1_Comparison.xlsx" });
+        if (wantValues) push({ t: "log", text: "Values file: TSMIS_vs_TSN_Route1_Comparison" + (wantFormulas ? " (values)" : "") + ".xlsx" });
+        push({ t: "run_ended" });
         st.task = null;
         st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
         pushState();
@@ -1106,5 +1196,38 @@ function makeMockApi() {
     open_output_folder: async () => push({ t: "log", text: "(mock) would open the output folder" }),
     open_logs_folder: async () => push({ t: "log", text: "(mock) would open the logs folder" }),
     open_consolidated_folder: async () => push({ t: "log", text: "(mock) would open the consolidated folder" }),
+    check_updates: async () => {
+      if (st.update.phase === "available") {
+        push({ t: "log", text: "An update is already waiting — see the title bar." });
+      } else if (st.update.phase === "staged") {
+        push({ t: "log", text: "An update is already downloaded — click ‘Restart to update’ in the title bar to install it." });
+      } else {
+        push({ t: "log", text: "Checking for updates…" });
+        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.8.0 preview)." }), 600);
+      }
+      return { ok: true };
+    },
+    update_start: async () => {
+      st.update = { phase: "downloading", progress: 0, version: "9.9.9", url: "#", can_apply: true };
+      push({ t: "log", text: "Downloading update v9.9.9 (148 MB)…" });
+      pushState();
+      const t2 = setInterval(() => {
+        st.update.progress = Math.min(100, (st.update.progress || 0) + 6);
+        if (st.update.progress >= 100) {
+          clearInterval(t2);
+          st.update = { phase: "staged", version: "9.9.9", url: "#", can_apply: true };
+          push({ t: "log", text: "Update v9.9.9 is downloaded and ready — click ‘Restart to update’ when you're done working (the app closes, updates itself, and reopens)." });
+        }
+        pushState();
+      }, 130);
+      return { ok: true };
+    },
+    update_apply: async () => {
+      st.update = { ...st.update, phase: "applying" };
+      push({ t: "log", text: "Restarting to finish the update — (mock) the app would close, update itself, and reopen." });
+      pushState();
+      return { ok: true };
+    },
+    open_release_page: async () => push({ t: "log", text: "(mock) would open the GitHub releases page" }),
   };
 }
