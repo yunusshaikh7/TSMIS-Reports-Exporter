@@ -475,11 +475,22 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   If newer, a title-bar pill offers **Update** → downloads the
   variant-matching zip (`-with-browser` when `_internal\ms-playwright` ships;
   same probe as `paths.py`) into `data\update\`, extracts + verifies it, then
-  **Restart to update** writes a PowerShell helper to `%TEMP%` and exits: the
-  helper waits on the app's PID, swaps exe/`_internal`/`Start Here.txt` via
-  `*.old` renames (same volume; user data folders are never in the staged
-  tree), relaunches, and **rolls back** if any move fails
-  (`LOG_DIR\update_helper.log`). `updater.cleanup_leftovers()` (gui_main
+  **Restart to update** launches the STAGED NEW EXE in swap mode
+  (`updater.SWAP_FLAG` / `run_swap_mode`; gui_main branches into it FIRST,
+  before logging/paths/CLR — the process runs from the staged tree, so
+  normal path resolution would aim at the wrong folder) and exits: the swap
+  process waits on the app's PID, renames old bundle pieces
+  (exe/`_internal`/`Start Here.txt`) to `*.old`, **copies** itself into
+  place (it cannot move the tree it runs from), relaunches, and **rolls
+  back** if any step fails (`LOG_DIR\update_helper.log`); user data folders
+  are never in the staged tree. A swap process that dies instantly is
+  detected BEFORE the window closes (UpdateError; the app stays open on the
+  old version). **Why an exe, not a script (v0.10.1, field failure):**
+  v0.9.0 ran a PowerShell helper from `%TEMP%`; locked-down PCs that block
+  PowerShell entirely killed it silently — the app closed, nothing swapped,
+  and the staged download just sat in `data\update`. The swap-mode design
+  needs only "exes run from user folders", which is proven anywhere the app
+  itself runs. `updater.cleanup_leftovers()` (gui_main
   startup, before the CLR loads) removes `*.old` + stale staging — including
   a staged-but-never-applied download, deliberately, so stale versions are
   re-offered fresh. In-app downloads never carry the Mark-of-the-Web
@@ -799,4 +810,5 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |
 | Build: "GUARD FAILED" | A dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` |
 | Update pill opens a web page instead of installing | App folder is read-only (data fell back to `%LOCALAPPDATA%`) | Expected (`update_support()` = "link") — move the app somewhere writable, or extract the new zip manually |
-| Update applied but the old version came back | A swap move failed; the helper rolled back | See `data\logs\update_helper.log`; close anything holding `_internal` open and update again |
+| Update applied but the old version came back | A swap step failed; the swap rolled back | See `data\logs\update_helper.log`; close anything holding `_internal` open and update again |
+| Update downloaded, app closed, but nothing was installed (≤ v0.10.0) | The old PowerShell swap helper was silently blocked (locked-down PCs with no PowerShell) | Fixed in v0.10.1 (the staged exe swaps itself; no scripts). One manual install of ≥ 0.10.1 — the new version sits intact in `data\update\staged`, or download the zip — then auto-update works |

@@ -20,14 +20,22 @@ How an update happens (and why each step):
      bytes ourselves means NO Mark-of-the-Web is ever applied (browsers add
      it; zipfile does not), so the CLR-blocking field failure that motivated
      gui_main._unblock_dotnet_assemblies() cannot happen on this path.
-  3. apply_update_and_restart() writes a small PowerShell helper to %TEMP%
-     and the caller exits the app: Windows locks a running exe and its
-     loaded DLLs, so the swap must happen from outside the process. The
-     helper waits for the app PID to exit, moves the old bundle pieces to
-     *.old, moves the staged ones in (same volume -- instant renames),
-     relaunches the app, and rolls everything back if any move fails. Only
-     bundle items are touched: the user's output/, input/ and data/ sit next
-     to them and are never in the staged tree.
+  3. apply_update_and_restart() launches the STAGED NEW EXE in a tiny
+     "apply" mode (--apply-update) and the caller exits the app: Windows
+     locks a running exe's loaded DLLs, so the swap must happen from outside
+     the process -- and the staged tree IS a complete copy of the app, so
+     the new app applies itself. It waits for the old PID to exit, renames
+     the old bundle pieces to *.old, COPIES itself into place (it is running
+     from the staged tree, so it cannot move itself), relaunches the app,
+     and rolls everything back if any step fails. Only bundle items are
+     touched: the user's output/, input/ and data/ sit next to them and are
+     never in the staged tree.
+     WHY an exe and not a script (v0.10.1, field failure): v0.9.0 used a
+     PowerShell helper in %TEMP% -- on locked-down PCs (no PowerShell at
+     all for standard users) it was blocked silently, the app closed, and
+     nothing was swapped. The one capability this design needs is "exes run
+     from user-writable folders", which is already proven anywhere the app
+     itself runs.
   4. cleanup_leftovers() (GUI startup) removes *.old trees and any stale
      data\\update from a previous or abandoned update.
 
@@ -282,177 +290,214 @@ def _bundle_root(extract_dir):
 
 
 # ------------------------------------------------------------- the swap -----
+# v0.10.1: the swap "helper" is the STAGED NEW APP itself, launched with
+# SWAP_FLAG (gui_main branches into run_swap_mode before anything heavy
+# loads). v0.9.0 used a PowerShell script in %TEMP%; locked-down PCs that
+# block PowerShell outright killed it silently — the app closed, nothing was
+# swapped, and the staged download just sat in data\update. The replacement
+# needs no PowerShell/cmd/scripts/admin: only "exes run from user folders",
+# which is proven anywhere the app itself runs.
 
-# Tokens (@NAME@) are substituted by build_helper_script — a template instead
-# of an f-string because the PowerShell is full of braces. PS 5.1 compatible.
-_HELPER_TEMPLATE = r"""# TSMIS Exporter self-update helper (auto-generated; deletes itself when done).
-# Waits for the app to exit, swaps the staged new version into the app folder
-# (user data folders are not touched), relaunches the app, and rolls back if
-# any move fails.
-$ErrorActionPreference = 'Stop'
-$appDir  = @APP_DIR@
-$staged  = @STAGED@
-$exeName = @EXE_NAME@
-$appPid  = @PID@
-$logFile = @LOG_FILE@
-
-function Log([string]$m) {
-    try {
-        Add-Content -LiteralPath $logFile -Value ("{0}  {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $m)
-    } catch { }
-}
-function Move-WithRetry([string]$from, [string]$to) {
-    # Defender / slow handle release can hold a file briefly after exit.
-    for ($i = 0; $i -lt 12; $i++) {
-        try { Move-Item -LiteralPath $from -Destination $to -Force; return }
-        catch { Start-Sleep -Milliseconds 500 }
-    }
-    Move-Item -LiteralPath $from -Destination $to -Force
-}
-function Rename-WithRetry([string]$path, [string]$newName) {
-    # A PURE rename (atomic; fails clean). Move-Item must not be used to put
-    # the old bundle aside: when a rename fails on a locked file it falls
-    # back to copy+delete, which can leave a stray or half-deleted tree.
-    for ($i = 0; $i -lt 12; $i++) {
-        try { Rename-Item -LiteralPath $path -NewName $newName -Force; return }
-        catch { Start-Sleep -Milliseconds 500 }
-    }
-    Rename-Item -LiteralPath $path -NewName $newName -Force
-}
-
-Log ('helper started: waiting for the app (pid {0}) to exit' -f $appPid)
-$exeBase  = [System.IO.Path]::GetFileNameWithoutExtension($exeName)
-$deadline = (Get-Date).AddSeconds(120)
-while ((Get-Date) -lt $deadline) {
-    $p = Get-Process -Id $appPid -ErrorAction SilentlyContinue
-    if (-not $p -or $p.ProcessName -ne $exeBase) { break }   # exited (or pid reused)
-    Start-Sleep -Milliseconds 400
-}
-$p = Get-Process -Id $appPid -ErrorAction SilentlyContinue
-if ($p -and $p.ProcessName -eq $exeBase) {
-    Log 'app still running after 120s - update NOT applied'
-    exit 1
-}
-Start-Sleep -Milliseconds 600    # let file handles settle
-
-if (-not (Test-Path -LiteralPath (Join-Path $staged $exeName))) {
-    Log ('staged update is incomplete (no {0}) - update NOT applied' -f $exeName)
-    exit 1
-}
-
-# Swap: each old bundle piece -> *.old (pure rename), staged piece -> in
-# place (tracked so a failure can roll everything back). Same volume.
-$moved  = @()
-$failed = $false
-foreach ($item in (Get-ChildItem -LiteralPath $staged)) {
-    $dest = Join-Path $appDir $item.Name
-    $bak  = $dest + '.old'
-    try {
-        if (Test-Path -LiteralPath $bak)  { Remove-Item -LiteralPath $bak -Recurse -Force }
-        if (Test-Path -LiteralPath $dest) {
-            Rename-WithRetry $dest ($item.Name + '.old')
-            $moved += @{ dest = $dest; bak = $bak; name = $item.Name }
-        }
-        Move-WithRetry $item.FullName $dest
-        Log ('installed: ' + $item.Name)
-    } catch {
-        Log ('swap FAILED on ' + $item.Name + ': ' + $_.Exception.Message)
-        $failed = $true
-        break
-    }
-}
-
-if ($failed) {
-    foreach ($m in $moved) {
-        try {
-            if (Test-Path -LiteralPath $m.dest) { Remove-Item -LiteralPath $m.dest -Recurse -Force }
-            Rename-WithRetry $m.bak $m.name
-        } catch { Log ('rollback of ' + $m.dest + ' FAILED: ' + $_.Exception.Message) }
-    }
-    Log 'previous version restored'
-    try {
-        Add-Type -AssemblyName System.Windows.Forms
-        [void][System.Windows.Forms.MessageBox]::Show(
-            ('The update could not be applied, so the previous version was kept.' +
-             [Environment]::NewLine + 'Details: ' + $logFile),
-            'TSMIS Exporter', 'OK', 'Warning')
-    } catch { }
-}
-
-try {
-    Start-Process -FilePath (Join-Path $appDir $exeName) -WorkingDirectory $appDir
-    Log 'app relaunched'
-} catch {
-    Log ('relaunch FAILED: ' + $_.Exception.Message + ' - start the app manually')
-}
-
-if (-not $failed) {
-    # Best-effort cleanup; anything still locked is removed at next startup.
-    foreach ($m in $moved) {
-        try { Remove-Item -LiteralPath $m.bak -Recurse -Force } catch { Log ('cleanup: left ' + $m.bak) }
-    }
-    try { Remove-Item -LiteralPath (Split-Path -Parent $staged) -Recurse -Force } catch { }
-}
-Log 'helper done'
-try { Remove-Item -LiteralPath $PSCommandPath -Force } catch { }
-"""
-
-
-def _ps_quote(value):
-    """A PowerShell single-quoted string literal."""
-    return "'" + str(value).replace("'", "''") + "'"
-
-
-def build_helper_script(app_dir, staged_dir, exe_name, pid, log_file):
-    """The swap helper's PowerShell source (pure function, so it's testable
-    against a sandbox install tree)."""
-    script = _HELPER_TEMPLATE
-    for token, value in (
-        ("@APP_DIR@", _ps_quote(app_dir)),
-        ("@STAGED@", _ps_quote(staged_dir)),
-        ("@EXE_NAME@", _ps_quote(exe_name)),
-        ("@PID@", str(int(pid))),
-        ("@LOG_FILE@", _ps_quote(log_file)),
-    ):
-        script = script.replace(token, value)
-    return script
-
-
-def _powershell_exe():
-    ps = (Path(os.environ.get("SystemRoot", r"C:\Windows"))
-          / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe")
-    return str(ps) if ps.is_file() else "powershell.exe"
+SWAP_FLAG = "--apply-update"
+_SWAP_TIMEOUT_S = 120        # max wait for the old app's PID to exit
+_RETRY_ATTEMPTS = 12         # Defender / slow handle release after exit
+_RETRY_DELAY_S = 0.5
 
 
 def apply_update_and_restart(staged_dir):
-    """Write the swap helper to %TEMP% and launch it detached. The CALLER must
-    then close the app promptly — the helper waits on this process's PID
-    (up to 120 s) before touching anything. Returns the helper script path."""
+    """Launch the staged new exe in swap mode, detached. The CALLER must then
+    close the app promptly — the swap process waits on this PID (up to 120 s)
+    before touching anything. Returns the swap process's exe path.
+
+    Raises UpdateError if the swap process can't start or dies immediately
+    (e.g. a policy blocks running it) — the app then STAYS OPEN with the old
+    version still intact."""
     mode, why = update_support()
     if mode != "ok":
         raise UpdateError(f"this installation cannot update itself ({why})")
     staged = Path(staged_dir)
-    if not (staged / _EXE_NAME).is_file():
+    new_exe = staged / _EXE_NAME
+    if not new_exe.is_file():
         raise UpdateError("the downloaded update is no longer on disk — "
                           "download it again")
 
-    helper = (Path(tempfile.gettempdir())
-              / f"tsmis_update_{os.getpid()}_{int(time.time())}.ps1")
-    helper.write_text(
-        build_helper_script(install_dir(), staged, _EXE_NAME, os.getpid(),
-                            LOG_DIR / "update_helper.log"),
-        encoding="utf-8-sig")           # BOM so PowerShell 5.1 reads it as UTF-8
-
+    helper_log = LOG_DIR / "update_helper.log"
     flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
-    subprocess.Popen(
-        [_powershell_exe(), "-NoProfile", "-NonInteractive",
-         "-ExecutionPolicy", "Bypass", "-File", str(helper)],
-        creationflags=flags, close_fds=True, cwd=tempfile.gettempdir(),
-        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL)
-    log.info("update helper launched: %s (waits for pid %d, staged %s)",
-             helper, os.getpid(), staged)
-    return helper
+    try:
+        proc = subprocess.Popen(
+            [str(new_exe), SWAP_FLAG, str(install_dir()), str(os.getpid()),
+             str(helper_log)],
+            creationflags=flags, close_fds=True, cwd=str(staged),
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+    except OSError as e:
+        log.warning("swap process failed to start: %s: %s", type(e).__name__, e)
+        raise UpdateError("the update process could not be started — "
+                          "install the new version manually from the "
+                          "releases page") from e
+    # A blocked/broken exe dies within moments; catch that while the app is
+    # still open instead of closing into a swap that never happens (the
+    # silent-failure mode the PowerShell helper had).
+    time.sleep(1.5)
+    rc = proc.poll()
+    if rc is not None:
+        log.warning("swap process exited immediately (code %s)", rc)
+        raise UpdateError("the update process exited before it could start "
+                          "— install the new version manually from the "
+                          "releases page")
+    log.info("swap process launched: %s (waits for pid %d, installs into %s)",
+             new_exe, os.getpid(), install_dir())
+    return str(new_exe)
+
+
+# ---- swap mode (runs inside the STAGED exe; never returns) -----------------
+
+def run_swap_mode(argv):
+    """Entry for `TSMIS Exporter.exe --apply-update <app_dir> <pid> <log>`.
+
+    Called by gui_main BEFORE logging/paths/CLR setup: this process runs from
+    the staged tree under the install's data\\update\\, so paths.py-derived
+    locations would point at the WRONG (staged) tree — everything here takes
+    explicit paths and logs by direct appends to <log>. Never returns."""
+    try:
+        i = argv.index(SWAP_FLAG)
+        app_dir = Path(argv[i + 1])
+        pid = int(argv[i + 2])
+        log_file = Path(argv[i + 3])
+    except (ValueError, IndexError):
+        os._exit(2)
+    staged = Path(sys.executable).resolve().parent
+    ok = perform_swap(staged, app_dir, pid, log_file)
+    os._exit(0 if ok else 1)
+
+
+def _swap_log(log_file, message):
+    try:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {message}\n")
+    except OSError:
+        pass
+
+
+def _wait_pid_exit(pid, timeout_s):
+    """True once `pid` has exited (or never existed); False on timeout.
+    ctypes only — no psutil in the bundle."""
+    import ctypes
+    SYNCHRONIZE = 0x00100000
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(SYNCHRONIZE, False, int(pid))
+    if not handle:
+        return True                      # already gone (or pid was recycled)
+    try:
+        WAIT_TIMEOUT = 0x00000102
+        rc = kernel32.WaitForSingleObject(handle, int(timeout_s * 1000))
+        return rc != WAIT_TIMEOUT
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _retry(fn):
+    """Run `fn` with the helper's retry cadence (Defender / slow handle
+    release can hold files briefly after the app exits)."""
+    for attempt in range(_RETRY_ATTEMPTS - 1):
+        try:
+            return fn()
+        except OSError:
+            time.sleep(_RETRY_DELAY_S)
+    return fn()                          # last attempt: let the error surface
+
+
+def _remove_tree(path):
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
+
+
+def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
+                 wait_timeout_s=_SWAP_TIMEOUT_S, show_dialog=True):
+    """The swap itself (separated from run_swap_mode so a sandbox test can
+    drive it against fake trees). Waits for `pid` to exit, renames each old
+    bundle piece in `app_dir` to *.old, COPIES the staged piece in (this
+    process runs FROM `staged`, so it cannot move itself), relaunches the
+    app, and rolls everything back if any step fails. User data (data\\,
+    output\\, input\\) is never in the staged tree and is never touched.
+    Returns True when the new version is in place."""
+    _swap_log(log_file, f"swap started: waiting for the app (pid {pid}) to exit")
+    if not _wait_pid_exit(pid, wait_timeout_s):
+        _swap_log(log_file, f"app still running after {wait_timeout_s}s - "
+                            "update NOT applied")
+        return False
+    time.sleep(0.6)                      # let file handles settle
+
+    if not (staged / _EXE_NAME).is_file():
+        _swap_log(log_file, f"staged update is incomplete (no {_EXE_NAME}) - "
+                            "update NOT applied")
+        return False
+
+    # Old piece -> *.old (pure rename: atomic, fails clean), staged piece ->
+    # COPIED into place. Tracked so a failure rolls everything back.
+    moved = []                           # (dest, bak) pairs that were renamed
+    failed = None
+    for item in sorted(staged.iterdir()):
+        dest = app_dir / item.name
+        bak = app_dir / (item.name + ".old")
+        try:
+            if bak.exists():
+                _retry(lambda b=bak: _remove_tree(b))
+            if dest.exists():
+                _retry(lambda d=dest, b=bak: d.rename(b))
+                moved.append((dest, bak))
+            if item.is_dir():
+                shutil.copytree(item, dest)
+            else:
+                shutil.copy2(item, dest)
+            _swap_log(log_file, f"installed: {item.name}")
+        except OSError as e:
+            failed = f"{item.name}: {type(e).__name__}: {e}"
+            _swap_log(log_file, f"swap FAILED on {failed}")
+            break
+
+    if failed:
+        for dest, bak in moved:
+            try:
+                _remove_tree(dest)
+                _retry(lambda b=bak, d=dest: b.rename(d))
+            except OSError as e:
+                _swap_log(log_file, f"rollback of {dest} FAILED: "
+                                    f"{type(e).__name__}: {e}")
+        _swap_log(log_file, "previous version restored")
+        if show_dialog:
+            _message_box("The update could not be applied, so the previous "
+                         f"version was kept.\nDetails: {log_file}")
+
+    if relaunch:
+        try:
+            subprocess.Popen(
+                [str(app_dir / _EXE_NAME)], cwd=str(app_dir), close_fds=True,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL)
+            _swap_log(log_file, "app relaunched")
+        except OSError as e:
+            _swap_log(log_file, f"relaunch FAILED: {type(e).__name__}: {e} - "
+                                "start the app manually")
+
+    # Leftover *.old pieces and the staged tree THIS process runs from are
+    # removed by cleanup_leftovers() at the relaunched app's next startup
+    # (this process exits immediately, releasing its own files).
+    _swap_log(log_file, "swap done" if not failed else "swap failed")
+    return failed is None
+
+
+def _message_box(text):
+    """Last-resort user surface for a swap failure (the app is closed)."""
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, text, APP_NAME, 0x30)  # MB_ICONWARNING
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------- cleanup ----
