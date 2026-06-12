@@ -40,6 +40,13 @@ DEFAULTS = {
     "fast_workers": 3,           # default fast-mode browser count
     "debug_logging": False,      # verbose (DEBUG) file logging
     "ui_devtools": False,        # open WebView2 DevTools on the next launch
+    "update_channel": "stable",  # one-click update source: stable | dev
+}
+
+# Validation: allowed values for the choice knobs; anything else reads as the
+# default and is refused on write.
+_CHOICES = {
+    "update_channel": ("stable", "dev"),
 }
 
 # Validation: (min, max) for the numeric knobs; values outside are clamped.
@@ -100,6 +107,8 @@ def get(key):
     if key in _RANGES:
         v = _clamp(key, raw)
         return default if v is None else v
+    if key in _CHOICES:
+        return raw if raw in _CHOICES[key] else default
     return bool(raw) if isinstance(default, bool) else raw
 
 
@@ -125,6 +134,11 @@ def update(changes):
                 log.info("settings: ignoring unusable value %r for %s", value, key)
                 continue
             data[key] = v
+        elif key in _CHOICES:
+            if value not in _CHOICES[key]:
+                log.info("settings: ignoring unusable value %r for %s", value, key)
+                continue
+            data[key] = value
         elif isinstance(DEFAULTS[key], bool):
             data[key] = bool(value)
         else:

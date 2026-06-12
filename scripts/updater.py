@@ -60,13 +60,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from paths import DATA_ROOT, LOG_DIR, UPDATE_DIR, is_frozen
-from version import APP_NAME, __version__
+from version import APP_NAME, __build__, __version__
 
 log = logging.getLogger("tsmis.update")
 
 GITHUB_REPO = "yunusshaikh7/TSMIS-Reports-Exporter"
 RELEASES_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
 _API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+# The dev channel looks at the whole release list (newest first) because
+# prereleases never appear in /releases/latest — that's exactly what keeps
+# the stable channel blind to dev builds.
+_API_RELEASES = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=15"
 _EXE_NAME = APP_NAME + ".exe"
 # Bundle items the swap replaces / cleanup removes. Everything else next to
 # the exe (output/, input/, data/) is user data and is never touched.
@@ -83,12 +87,13 @@ class UpdateError(Exception):
 @dataclass
 class UpdateInfo:
     """One available update, as resolved by check_for_update()."""
-    version: str        # "0.9.0"
-    tag: str            # "v0.9.0"
+    version: str        # "0.9.0" — or the dev tag itself ("dev-7")
+    tag: str            # "v0.9.0" / "dev-7"
     asset_name: str     # "TSMIS-Exporter-v0.9.0-win64.zip"
     asset_url: str      # direct browser_download_url
     asset_size: int     # bytes (0 if the API omitted it)
     release_url: str    # human release page ("what's new")
+    dev: bool = False   # a prerelease from the dev channel (label it so)
 
 
 # ------------------------------------------------------------ environment ---
@@ -131,6 +136,14 @@ def parse_version(text):
     return tuple(int(p) for p in m.group(1).split("."))
 
 
+def installed_tag(build=None):
+    """THIS build's identity as a release tag: a dev build carries the
+    prerelease tag the dev-release workflow stamped into version.__build__
+    ("dev-7"); a stable build is its version tag ("v0.10.1")."""
+    b = __build__ if build is None else build
+    return b or f"v{__version__}"
+
+
 def is_newer(remote, current):
     if not remote or not current:
         return False
@@ -151,17 +164,33 @@ def _http_get(url, timeout):
                                   context=ssl.create_default_context())
 
 
-def check_for_update(current_version=None, variant=None):
-    """Return an UpdateInfo when a newer release exists, else None.
-    Raises UpdateError when the check itself cannot be completed.
-    `current_version` / `variant` exist for testing; defaults are this build.
+def check_for_update(current_version=None, variant=None, channel="stable",
+                     build=None):
+    """Return an UpdateInfo when the channel offers something this install
+    doesn't run yet, else None. Raises UpdateError when the check itself
+    cannot be completed.
+
+    stable: the latest full release (prereleases never appear in
+            /releases/latest), offered when strictly newer — or
+            equal-versioned when THIS install is a dev build (the exit ramp
+            off the dev channel).
+    dev:    the newest release of ANY kind (prereleases included), offered
+            whenever its tag differs from this build's identity — dev builds
+            iterate without version bumps, so the test is "different", not
+            "newer", and a stable release published after the dev builds
+            takes the install back to stable automatically.
+
+    `current_version` / `variant` / `build` exist for testing; defaults are
+    this build.
     """
     cur = parse_version(current_version or __version__)
+    bld = __build__ if build is None else build
     want = variant or current_variant()
-    log.info("update check: current v%s, variant %s -> %s",
-             current_version or __version__, want, _API_LATEST)
+    url = _API_RELEASES if channel == "dev" else _API_LATEST
+    log.info("update check: current %s, variant %s, channel %s -> %s",
+             installed_tag(bld), want, channel, url)
     try:
-        with _http_get(_API_LATEST, _API_TIMEOUT_S) as resp:
+        with _http_get(url, _API_TIMEOUT_S) as resp:
             data = json.load(resp)
     except urllib.error.HTTPError as e:
         if e.code == 404:               # repo exists but has no releases yet
@@ -174,14 +203,34 @@ def check_for_update(current_version=None, variant=None):
         raise UpdateError("could not reach github.com to check for updates "
                           "— check the internet connection") from e
 
-    tag = data.get("tag_name") or ""
-    remote = parse_version(tag)
-    if remote is None:
-        log.warning("update check: unrecognized release tag %r", tag)
-        return None
-    if not is_newer(remote, cur):
-        log.info("update check: up to date (latest release is %s)", tag)
-        return None
+    if channel == "dev":
+        releases = [r for r in (data if isinstance(data, list) else [])
+                    if isinstance(r, dict) and not r.get("draft")]
+        if not releases:
+            log.info("update check: the dev channel has no releases")
+            return None
+        data = releases[0]              # the API lists newest first
+        tag = data.get("tag_name") or ""
+        if not tag or tag == installed_tag(bld):
+            log.info("update check: up to date (dev channel newest is %s)", tag)
+            return None
+        remote = parse_version(tag)
+        version = ".".join(str(p) for p in remote) if remote else tag
+        dev = bool(data.get("prerelease")) or remote is None
+    else:
+        tag = data.get("tag_name") or ""
+        remote = parse_version(tag)
+        if remote is None:
+            log.warning("update check: unrecognized release tag %r", tag)
+            return None
+        same = remote and cur and not is_newer(remote, cur) and not is_newer(cur, remote)
+        if not is_newer(remote, cur) and not (bld and same):
+            # A dev-build install treats the SAME stable version as an
+            # update — switching the channel back must have an exit ramp.
+            log.info("update check: up to date (latest release is %s)", tag)
+            return None
+        version = ".".join(str(p) for p in remote)
+        dev = False
 
     suffix = f"-{want}.zip"
     assets = data.get("assets") or []
@@ -193,15 +242,17 @@ def check_for_update(current_version=None, variant=None):
         raise UpdateError(f"version {tag} is out, but its download package "
                           "isn't available yet — try again later")
     info = UpdateInfo(
-        version=".".join(str(p) for p in remote),
+        version=version,
         tag=tag,
         asset_name=asset.get("name") or "",
         asset_url=asset.get("browser_download_url") or "",
         asset_size=int(asset.get("size") or 0),
         release_url=data.get("html_url") or RELEASES_PAGE,
+        dev=dev,
     )
-    log.info("update available: %s -> %s (%s, %.0f MB)",
-             __version__, info.tag, info.asset_name, info.asset_size / 1e6)
+    log.info("update available: %s -> %s (%s, %.0f MB%s)",
+             installed_tag(bld), info.tag, info.asset_name,
+             info.asset_size / 1e6, ", dev" if dev else "")
     return info
 
 

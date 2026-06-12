@@ -40,15 +40,16 @@ import run_report
 import settings
 import updater
 from gui_worker import (CheckWorker, ChromiumWorker, ConsolidateWorker,
-                        EnvCheckWorker, ExportWorker, LoginWorker, ResetWorker,
-                        UpdateWorker, measure_targets, reset_targets)
+                        EnvCheckWorker, EnvScanWorker, ExportWorker,
+                        LoginWorker, ResetWorker, UpdateWorker,
+                        measure_targets, reset_targets)
 from exporter_parallel import MAX_WORKERS, default_worker_count
 from logging_setup import LOG_FILE, set_debug_logging
 
 from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
                    FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, WEBVIEW_PROFILE_DIR,
                    is_frozen, list_output_days)
-from version import APP_NAME, __version__
+from version import APP_NAME, __build__, __version__
 from common import (
     BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES, DATA_SOURCE_LABELS,
     ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError, clear_auth,
@@ -133,6 +134,13 @@ class GuiApi:
         self._checks["output"] = {"status": "busy", "text": "Output folder: checking…"}
         self._checks["tools"] = {"status": "busy", "text": "Report tools: checking…"}
 
+        # Per-environment access verdicts from the Settings "Check all
+        # environments" scan, keyed "src-env". Session-only on purpose (access
+        # is server-side state that changes under us): every launch starts at
+        # "not checked". Mirrored into each snapshot for the Settings rows +
+        # the title-bar access chip.
+        self._env_access = {}
+
         # One-click update state, mirrored into every snapshot for the title-bar
         # pill. phase: idle|checking|none|available|downloading|staged|applying|
         # failed; can_apply False = read-only install (pill opens the release
@@ -193,6 +201,7 @@ class GuiApi:
                 "days": list_output_days(),
                 "can_save_report": bool(self._last_results),
                 "update": dict(self._update),
+                "env_access": {k: dict(v) for k, v in self._env_access.items()},
             }
 
     def _push_state(self):
@@ -308,10 +317,15 @@ class GuiApi:
             worker, text = payload
             self._emit({"t": "wstatus", "w": worker, "text": text})
         elif kind == "preview_shot":
-            worker, b64, note = payload
-            self._emit({"t": "preview", "w": worker, "img": b64, "note": note})
+            worker, b64, note, url = payload
+            self._emit({"t": "preview", "w": worker, "img": b64, "note": note,
+                        "url": url})
         elif kind == "env_shot":
             self._on_env_shot(payload)
+        elif kind == "env_access":
+            self._on_env_access(payload)
+        elif kind == "env_access_done":
+            self._on_env_scan_done(payload)
         elif kind == "reset_done":
             self._on_reset_done(payload)
         elif kind == "chromium_done":
@@ -470,20 +484,25 @@ class GuiApi:
             self._update = payload
         phase = payload.get("phase")
         ver = payload.get("version")
+        # Dev-channel builds are named by their tag ("dev-7"), not "vdev-7".
+        disp = ver if payload.get("dev") else f"v{ver}"
+        dev_note = " — a DEV build for testing" if payload.get("dev") else ""
         if phase == "available":
             if payload.get("can_apply"):
                 size = f" ({payload['size_mb']} MB)" if payload.get("size_mb") else ""
-                self._emit_log(f"Update available: v{ver}{size} — click "
-                               f"‘Update to v{ver}’ in the title bar to install it.")
+                self._emit_log(f"Update available: {disp}{size}{dev_note} — click "
+                               f"‘Update to {disp}’ in the title bar to install it.")
             else:
-                self._emit_log(f"Update available: v{ver}. This app folder isn't "
+                self._emit_log(f"Update available: {disp}.{dev_note} This app folder isn't "
                                "writable, so the title-bar button opens the download "
                                "page instead — extract the new zip into a folder you "
                                "can write to.")
         elif phase == "none" and manual:
-            self._emit_log(f"You're on the latest version (v{__version__}).")
+            self._emit_log("You're on the latest version "
+                           f"({updater.installed_tag()}, "
+                           f"{settings.get('update_channel')} channel).")
         elif phase == "staged":
-            self._emit_log(f"Update v{ver} is downloaded and ready — click "
+            self._emit_log(f"Update {disp} is downloaded and ready — click "
                            "‘Restart to update’ when you're done working "
                            "(the app closes, updates itself, and reopens).")
         elif phase == "failed" and manual:
@@ -535,6 +554,7 @@ class GuiApi:
         return {
             "app_name": APP_NAME,
             "version": __version__,
+            "build": __build__,        # dev-build tag ("dev-7"); "" on stable
             "output_root": str(OUTPUT_ROOT),
             "log_dir": str(LOG_DIR),
             "reports": [{"label": label, "fmt": fmt} for label, fmt, _spec in EXPORT_REPORTS],
@@ -585,6 +605,13 @@ class GuiApi:
 
     @_api_method
     def set_site(self, source, environment):
+        with self._lock:
+            if self._task == "envscan":
+                # The scan retargets the site selection combo by combo; a
+                # user change now would be stomped by its restore.
+                return {"error": "The environment check is using the site "
+                                 "selection — wait for it to finish (or "
+                                 "cancel it), then change the site."}
         set_site(source=source, environment=environment)
         src, env = get_site()
         self._emit_log(f"Site set to {DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]} "
@@ -634,10 +661,12 @@ class GuiApi:
             if info is None:
                 return {"error": "No update is ready to install."}
             self._update = {"phase": "downloading", "progress": 0,
-                            "version": info.version, "url": info.release_url,
-                            "can_apply": True}
+                            "version": info.version,
+                            "dev": getattr(info, "dev", False),
+                            "url": info.release_url, "can_apply": True}
         size = f" ({round(info.asset_size / 1e6)} MB)" if info.asset_size else ""
-        self._emit_log(f"Downloading update v{info.version}{size}…")
+        disp = info.version if getattr(info, "dev", False) else f"v{info.version}"
+        self._emit_log(f"Downloading update {disp}{size}…")
         self._push_state()
         UpdateWorker(self._q, "download", info=info).start()
         return {"ok": True}
@@ -771,7 +800,8 @@ class GuiApi:
 
     @_api_method
     def cancel_run(self):
-        if self._task in ("export", "consolidate", "compare", "chromium"):
+        if self._task in ("export", "consolidate", "compare", "chromium",
+                          "envscan"):
             self.cancel_event.set()
             self._emit_log("Cancel requested…")
         return {"ok": True}
@@ -854,11 +884,74 @@ class GuiApi:
                            "report which site it loaded (screenshot attached).")
         if payload.get("img") or payload.get("error") is None:
             self._emit({"t": "preview", "w": 0, "img": payload.get("img"),
-                        "note": "Verify environment", "env_info": {
+                        "note": "Verify environment",
+                        "url": payload.get("url"), "env_info": {
                             "ok": payload.get("ok"),
                             "env": payload.get("env"), "src": payload.get("src"),
                             "matches": payload.get("matches"),
-                            "wanted": want, "url": payload.get("url")}})
+                            "wanted": want}})
+        self._end_task()
+
+    # ---- environment access scan (Settings + title-bar chip) -------------------
+
+    @_api_method
+    def check_environments(self):
+        """Probe EVERY data source / environment combination headless, like an
+        export would: does sign-in complete, does the page load the right
+        site, and can the report form pull data. Verdicts stream into the
+        Settings rows and the title-bar access chip as each site finishes.
+        Needs a login (saved or automatic), like an export."""
+        with self._lock:
+            if self._task:
+                return {"error": "A task is already running."}
+            self._task = "envscan"
+            for src in DATA_SOURCES:
+                for env in ENVIRONMENTS:
+                    key = f"{src}-{env}"
+                    self._env_access[key] = {
+                        "key": key, "source": src, "environment": env,
+                        "label": f"{DATA_SOURCE_LABELS[src]} / "
+                                 f"{ENVIRONMENT_LABELS[env]}",
+                        "status": "checking", "detail": "Checking…",
+                        "url": "", "checked_at": ""}
+        self.cancel_event.clear()
+        self._emit_log("Checking sign-in and report access for every "
+                       "environment (six sites — this can take a few minutes)…")
+        self._set_dot("busy", "Checking environments…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Checking all environments…"})
+        self._push_state()
+        EnvScanWorker(self._q, self.cancel_event).start()
+        return {"ok": True}
+
+    def _on_env_access(self, payload):
+        """One site's verdict from the scan → state snapshot + a log line."""
+        entry = dict(payload)
+        entry["checked_at"] = time.strftime("%H:%M")
+        with self._lock:
+            self._env_access[entry["key"]] = entry
+        mark = "OK" if entry["status"] == "ok" else "PROBLEM"
+        self._emit_log(f"  {entry['label']}: {mark} — {entry['detail']}")
+        self._push_state()
+
+    def _on_env_scan_done(self, payload):
+        with self._lock:
+            # A cancelled scan leaves later sites untouched — back to "not
+            # checked", never a stale spinner.
+            for key in [k for k, v in self._env_access.items()
+                        if v.get("status") == "checking"]:
+                del self._env_access[key]
+        if payload.get("error"):
+            self._emit_log(f"Environment check stopped: {payload['error']}")
+        elif payload.get("cancelled"):
+            self._emit_log("Environment check cancelled.")
+        else:
+            ok, total = payload.get("ok", 0), payload.get("total", 0)
+            if ok == total:
+                self._emit_log(f"Environment check done: all {total} sites OK.")
+            else:
+                self._emit_log(f"Environment check done: {ok} of {total} sites "
+                               "OK — details next to each address in Settings.")
         self._end_task()
 
     # ---- consolidate -------------------------------------------------------------
@@ -1090,6 +1183,7 @@ class GuiApi:
             "chromium": self._chromium_state(),
             "meta": {
                 "version": __version__,
+                "build_tag": __build__,
                 "build": "portable app" if is_frozen() else "development run",
                 "variant": ("with built-in browser"
                             if "chromium" in BROWSER_CHANNELS else "system browser"),

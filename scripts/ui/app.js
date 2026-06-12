@@ -364,6 +364,13 @@ function showPreviewEvent(ev) {
     banner.textContent = text;
     preview.body.appendChild(banner);
   }
+  if (ev.url) {
+    // The page's address at capture time — an address bar over the screenshot.
+    const addr = document.createElement("div");
+    addr.className = "preview-url";
+    addr.textContent = ev.url;
+    preview.body.appendChild(addr);
+  }
   if (ev.img) {
     const img = document.createElement("img");
     img.className = "preview-img";
@@ -443,7 +450,8 @@ document.addEventListener("contextmenu", (e) => e.preventDefault());
 function buildStatic() {
   const init = S.init;
   $("appName").textContent = init.app_name;
-  $("appVersion").textContent = "v" + init.version;
+  $("appVersion").textContent = "v" + init.version
+    + (init.build ? " · " + init.build : "");
   $("appVersion").title = "Check for updates";
   $("outputRoot").textContent = init.output_root;
   document.title = init.app_name;
@@ -600,7 +608,8 @@ function renderState() {
   // config inputs lock while any task runs
   const locked = st.task != null;
   ["selSource", "selEnv", "selBrowser", "routesInput", "btnChooseRoutes", "selDay",
-   "btnVerifyEnv", "btnDeleteReports", "btnClearLogin", "btnSupportBundle"]
+   "btnVerifyEnv", "btnDeleteReports", "btnClearLogin", "btnSupportBundle",
+   "btnCheckEnvs"]
     .forEach((id) => { $(id).disabled = locked; });
   Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
   ["setDebugLog", "setDevtools"].forEach((id) => {
@@ -643,12 +652,84 @@ function renderState() {
   $("btnCancelCompare").disabled = st.task !== "compare";
   syncCompareButton();
 
+  $("btnCheckEnvsCancel").classList.toggle("hidden", st.task !== "envscan");
+
   renderUpdate(st.update);
   renderDays(st.days || []);
+  renderEnvAccess();
+}
+
+// ----------------------------------- environment access (scan results) -----
+// Python owns the verdicts (state.env_access, keyed "src-env", from the
+// Settings "Check all environments" scan); this renders them twice: a status
+// chip on each Settings address row, and the title-bar aggregate.
+const ENV_ACCESS_BADGE = {
+  ok:          { dot: "ok",   text: "OK" },
+  reports_off: { dot: "warn", text: "Reports limited" },
+  no_reports:  { dot: "bad",  text: "No report data" },
+  denied:      { dot: "bad",  text: "Access denied" },
+  no_signin:   { dot: "bad",  text: "Sign-in failed" },
+  wrong_site:  { dot: "bad",  text: "Wrong site" },
+  unreachable: { dot: "bad",  text: "Unreachable" },
+  error:       { dot: "bad",  text: "Check failed" },
+  checking:    { dot: "busy", text: "Checking…" },
+};
+
+function renderEnvAccess() {
+  const acc = (S.st && S.st.env_access) || {};
+  document.querySelectorAll("[data-envstat]").forEach((el) => {
+    const e = acc[el.dataset.envstat];
+    const badge = e && (ENV_ACCESS_BADGE[e.status] || ENV_ACCESS_BADGE.error);
+    setDot(el.querySelector(".dot"), badge ? badge.dot : "unknown");
+    el.lastElementChild.textContent = badge ? badge.text : "Not checked";
+    el.classList.toggle("env-bad", !!badge && badge.dot === "bad");
+    el.classList.toggle("env-warn", !!badge && badge.dot === "warn");
+    if (e) {
+      let tip = e.detail + (e.url ? "\n" + e.url : "");
+      const reps = Object.entries(e.reports || {}).map(([lbl, state]) =>
+        `${lbl}: ${state === "ok" ? "OK" : state === "greyed" ? "greyed out" : "missing"}`);
+      if (reps.length) tip += "\n" + reps.join("\n");
+      if (e.checked_at) tip += `\nChecked ${e.checked_at}`;
+      el.title = tip;
+    } else {
+      el.title = "Not checked yet — click “Check all environments”.";
+    }
+  });
+  const entries = Object.values(acc);
+  const total = (((S.init || {}).sources || []).length || 2)
+              * (((S.init || {}).envs || []).length || 3);
+  const dot = $("envAccessDot"), txt = $("envAccessText"), btn = $("btnEnvAccess");
+  if (!entries.length) {
+    setDot(dot, "unknown");
+    txt.textContent = "Env access";
+    btn.title = "Sign-in + report access across all six environments — run "
+      + "the check from Settings ▸ TSMIS site addresses";
+  } else if (entries.some((e) => e.status === "checking")) {
+    setDot(dot, "busy");
+    const done = entries.filter((e) => e.status !== "checking").length;
+    txt.textContent = `Checking ${done}/${total}…`;
+    btn.title = "Environment check running — verdicts land next to each address in Settings";
+  } else {
+    const ok = entries.filter((e) => e.status === "ok").length;
+    const onlyLimited = entries.every((e) => e.status === "ok" || e.status === "reports_off");
+    setDot(dot, ok === total ? "ok" : onlyLimited ? "warn" : "bad");
+    txt.textContent = `Envs ${ok}/${total}`;
+    const lines = entries.filter((e) => e.status !== "ok")
+      .map((e) => `${e.label}: ${(ENV_ACCESS_BADGE[e.status] || ENV_ACCESS_BADGE.error).text}`);
+    if (entries.length < total) lines.push(`${total - entries.length} not checked`);
+    btn.title = lines.length ? lines.join("\n")
+      : "Sign-in and report data verified on every environment";
+  }
+  const last = entries.map((e) => e.checked_at).filter(Boolean).sort().pop();
+  $("envScanStamp").textContent = last ? `Last checked ${last}`
+                                       : "Not checked yet this session.";
 }
 
 // One-click update pill (title bar). Python owns the whole update state; this
 // only decides the pill's label/visibility for the current phase.
+// Dev-channel builds are named by their tag ("dev-7"), stable ones "v0.10.1".
+const updName = (up) => (up.dev ? up.version : "v" + up.version);
+
 function renderUpdate(up) {
   const b = $("btnUpdate");
   up = up || { phase: "idle" };
@@ -657,10 +738,11 @@ function renderUpdate(up) {
   switch (up.phase) {
     case "available":
       if (up.can_apply) {
-        label = `Update to v${up.version}`;
-        title = "Download and install the new version";
+        label = `Update to ${updName(up)}`;
+        title = up.dev ? "Download and install this DEV build (a quick test version)"
+                       : "Download and install the new version";
       } else {
-        label = `v${up.version} available`;
+        label = `${updName(up)} available`;
         title = "Open the download page (this app folder is read-only, so the app can't update itself)";
       }
       break;
@@ -672,7 +754,7 @@ function renderUpdate(up) {
       label = "Restart to update";
       disabled = locked;
       title = locked ? "Finish or cancel the running task first"
-                     : `Install v${up.version} — the app closes and reopens by itself`;
+                     : `Install ${updName(up)} — the app closes and reopens by itself`;
       break;
     case "applying":
       label = "Restarting…";
@@ -698,7 +780,7 @@ async function onUpdateClick() {
   if (up.phase === "staged") {
     const ok = await showConfirm({
       title: "Restart and update?",
-      message: `The app will close, install v${up.version} (takes a few seconds), and reopen by itself.\n\nYour reports, login and settings stay where they are.`,
+      message: `The app will close, install ${updName(up)} (takes a few seconds), and reopen by itself.\n\nYour reports, login and settings stay where they are.`,
       confirmLabel: "Restart now",
     });
     if (!ok) return;
@@ -1049,6 +1131,7 @@ const SETTING_INPUTS = {
   setRetryTimeout: "retry_timeout_min",
   setCountyTimeout: "county_timeout_s",
   setFastWorkers: "fast_workers",
+  setUpdateChannel: "update_channel",
 };
 
 function fillSettings() {
@@ -1085,7 +1168,8 @@ function fillSettings() {
 
   const about = $("setAbout");
   about.textContent = "";
-  [["Version", `v${meta.version || S.init.version}`],
+  [["Version", `v${meta.version || S.init.version}`
+                + ((meta.build_tag || S.init.build) ? ` · ${meta.build_tag || S.init.build} (dev build)` : "")],
    ["Build", `${meta.build || "?"} · ${meta.variant || "?"}`],
    ["Sign-in", meta.auth_state || "?"],
    ["Settings file", "config.json in the data folder (safe to delete — defaults return)"]]
@@ -1124,9 +1208,19 @@ function renderSiteUrls(rows) {
         renderSiteUrls(res.site_urls);
       }
     });
-    line.append(label, input, chip);
+    // Access-scan verdict slot; renderEnvAccess() fills it from state.
+    const stat = document.createElement("span");
+    stat.className = "url-status";
+    stat.dataset.envstat = row.key;
+    const statDot = document.createElement("span");
+    statDot.className = "dot dot-unknown";
+    const statText = document.createElement("span");
+    statText.textContent = "Not checked";
+    stat.append(statDot, statText);
+    line.append(label, input, chip, stat);
     box.appendChild(line);
   });
+  renderEnvAccess();
 }
 
 // ---- Settings: Built-in Chromium ----
@@ -1189,6 +1283,7 @@ async function onSettingInput(id) {
       $("fastWorkers").value = res.values[key];   // reseed the Export pane default
     }
   }
+  if (key === "update_channel") api.check_updates();  // the new channel answers now
 }
 
 async function onSettingToggle(id, key) {
@@ -1333,6 +1428,15 @@ function bindEvents() {
   };
   $("btnOpenFailures").onclick = () => api.open_failures_folder();
   $("btnCheckUpdates2").onclick = () => api.check_updates();
+  $("btnCheckEnvs").onclick = async () => {
+    const res = await api.check_environments();
+    if (res && res.error) showMessage("info", "Can't check right now", res.error);
+  };
+  $("btnCheckEnvsCancel").onclick = () => api.cancel_run();
+  $("btnEnvAccess").onclick = () => {
+    $("tabSettings").click();
+    $("setSiteUrls").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   $("btnOpenOutput2").onclick = () => api.open_output_folder();
   $("btnClearLogin").onclick = async () => {
     const ok = await showConfirm({
@@ -1475,10 +1579,12 @@ function makeMockApi() {
     days: ["2026-06-11 ssor-prod", "2026-06-11 ars-prod", "2026-06-08 ssor-dev", "2026-06-02"],
     can_save_report: false,
     update: { phase: "idle" },
+    env_access: {},
   };
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
     county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
+    update_channel: "stable",
   };
   const mockUrlOverrides = {};
   const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,
@@ -1488,7 +1594,7 @@ function makeMockApi() {
     for (const src of ["ssor", "ars"]) {
       for (const env of ["prod", "test", "dev"]) {
         const key = `${src}-${env}`;
-        const dflt = `https://tsmis-dev.dot.ca.gov/index.html?env=${env}&src=${src}`;
+        const dflt = `https://tsmis.dot.ca.gov/index.html?env=${env}&src=${src}`;
         rows.push({ key, source: src, environment: env,
                     label: `${src.toUpperCase()} · ${env[0].toUpperCase()}${env.slice(1)}`,
                     default: dflt, url: mockUrlOverrides[key] || dflt,
@@ -1629,7 +1735,7 @@ function makeMockApi() {
         return { error: "That doesn't look like a usable web address — it needs to start with https:// (or http://).",
                  site_urls: mockSiteUrlRows() };
       }
-      const dflt = `https://tsmis-dev.dot.ca.gov/index.html?env=${env}&src=${src}`;
+      const dflt = `https://tsmis.dot.ca.gov/index.html?env=${env}&src=${src}`;
       if (!url || url === dflt) delete mockUrlOverrides[key];
       else mockUrlOverrides[key] = url;
       push({ t: "log", text: url && url !== dflt
@@ -1673,7 +1779,8 @@ function makeMockApi() {
     },
     request_preview: async (w) => {
       setTimeout(() => {
-        push({ t: "preview", w, img: mockShotB64("SSOR PROD", `Browser ${w} — Route 005 — Highway Log`), note: `Route 005` });
+        push({ t: "preview", w, img: mockShotB64("SSOR PROD", `Browser ${w} — Route 005 — Highway Log`), note: `Route 005`,
+               url: "https://tsmis.dot.ca.gov/index.html?env=prod&src=ssor" });
       }, 900);
       return { ok: true };
     },
@@ -1688,6 +1795,7 @@ function makeMockApi() {
                                      : "WARNING: the page is running SSOR / Dev, but SSOR / Prod is selected. Exports would hit SSOR / Dev." },
              { t: "preview", w: 0, img: mockShotB64(match ? "SSOR PROD" : "SSOR DEV", "Verify environment"),
                note: "Verify environment",
+               url: `https://tsmis.dot.ca.gov/index.html?env=${match ? "prod" : "dev"}&src=ssor`,
                env_info: { ok: true, env: match ? "prod" : "dev", src: "ssor", matches: match, wanted: "SSOR / Prod" } },
              { t: "run_ended" });
         st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
@@ -1695,10 +1803,58 @@ function makeMockApi() {
       }, 1600);
       return { ok: true };
     },
+    check_environments: async () => {
+      if (st.task) return { error: "A task is already running." };
+      st.task = "envscan"; st.auth_dot = "busy"; st.auth_text = "Checking environments…";
+      const combos = [];
+      for (const s of ["ssor", "ars"]) for (const e of ["prod", "test", "dev"]) combos.push([s, e]);
+      const entry = (s, e, status, detail, reports) => ({
+        key: `${s}-${e}`, source: s, environment: e,
+        label: `${s.toUpperCase()} / ${e[0].toUpperCase()}${e.slice(1)}`,
+        status, detail, reports: reports || {},
+        url: `https://tsmis.dot.ca.gov/index.html?env=${e}&src=${s}`,
+        checked_at: new Date().toTimeString().slice(0, 5),
+      });
+      const allReports = (over) => Object.fromEntries(
+        REPORTS.map((r) => [r.label, (over || {})[r.label] || "ok"]));
+      st.env_access = {};
+      combos.forEach(([s, e]) => { st.env_access[`${s}-${e}`] = entry(s, e, "checking", "Checking…"); });
+      pushState();
+      push({ t: "log", text: "Checking sign-in and report access for every environment (six sites — this can take a few minutes)…" },
+           { t: "run_started", mode: "consolidate", label: "Checking all environments…" });
+      combos.forEach(([s, e], i) => setTimeout(() => {
+        const broken = s === "ssor" && e === "test";   // the demo's bad site
+        const greyed = s === "ars" && e === "dev";     // …and its greyed report
+        let it;
+        if (broken) {
+          it = entry(s, e, "no_reports",
+            "Signs in, but the report form couldn't load its data — reports would fail here.",
+            allReports());
+        } else if (greyed) {
+          it = entry(s, e, "reports_off",
+            "Sign-in and report data OK, but unavailable here: TSAR: Ramp Detail.",
+            allReports({ "TSAR: Ramp Detail": "greyed" }));
+        } else {
+          it = entry(s, e, "ok", "Sign-in and report data OK.", allReports());
+        }
+        st.env_access[it.key] = it;
+        push({ t: "log", text: `  ${it.label}: ${it.status === "ok" ? "OK" : "PROBLEM"} — ${it.detail}` });
+        pushState();
+        if (i === combos.length - 1) {
+          push({ t: "log", text: "Environment check done: 4 of 6 sites OK — details next to each address in Settings." },
+               { t: "run_ended" });
+          st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+          pushState();
+        }
+      }, 650 * (i + 1)));
+      return { ok: true };
+    },
     get_settings: async () => ({ values: { ...mockSettings }, defaults: { ...mockSettings }, meta: {} }),
     set_setting: async (key, value) => {
       const numeric = typeof mockSettings[key] === "number";
-      mockSettings[key] = numeric ? Math.max(1, parseInt(value, 10) || mockSettings[key]) : !!value;
+      const boolish = typeof mockSettings[key] === "boolean";
+      mockSettings[key] = numeric ? Math.max(1, parseInt(value, 10) || mockSettings[key])
+                        : boolish ? !!value : value;
       push({ t: "log", text: `(mock) setting ${key} = ${mockSettings[key]}` });
       return { ok: true, values: { ...mockSettings } };
     },

@@ -10,13 +10,29 @@ Message protocol (all are (kind, payload) tuples):
     ("progress", dict)                 {done,total,route,report,report_i,report_n,saved,empty,skipped,failed,exists}
     ("worker_status", (worker, text))  what browser `worker` (1-based) is doing
                                        right now (statuses replace each other)
-    ("preview_shot", (worker, b64, note))  an on-demand page screenshot for
-                                       browser `worker` — b64 is a base64 JPEG
-                                       string, or None when the capture failed
-                                       (note then says why)
+    ("preview_shot", (worker, b64, note, url))  an on-demand page screenshot
+                                       for browser `worker` — b64 is a base64
+                                       JPEG string, or None when the capture
+                                       failed (note then says why); url is the
+                                       page's address at capture time
     ("env_shot", dict)                 the idle "Verify environment" result:
                                        {ok, img (b64 JPEG|None), env, src,
-                                        matches, url, error}
+                                        matches, url, error} — url is the
+                                       page's address at screenshot time (the
+                                       intended one when it never opened)
+    ("env_access", dict)               one combo's verdict from the Settings
+                                       "Check all environments" scan, posted
+                                       as it finishes: {key, source,
+                                       environment, label, status, detail,
+                                       url, reports} — status is one of ok |
+                                       reports_off | no_reports | denied |
+                                       no_signin | wrong_site | unreachable |
+                                       error; reports maps each report
+                                       type's dropdown label to
+                                       ok | greyed | missing (empty when the
+                                       dropdown couldn't be read)
+    ("env_access_done", dict)          the scan ended:
+                                       {ok, done, total, cancelled, error}
     ("reset_done", dict)               outcome of "Delete all reports":
                                        {files, mb, errors: [str, ...]}
     ("chromium_done", dict)            outcome of the Built-in Chromium
@@ -41,16 +57,18 @@ import base64
 import logging
 import re
 import threading
+import time
 
 from common import (
     _CONFIG_JS, LOGIN_BROWSER_ARGS, ROUTES, AuthError, BrowserNotFoundError,
-    PreflightError, BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, get_site,
-    get_url, is_logged_in, launch_browser,
+    PreflightError, SiteUnreachableError, BROWSER_CHANNELS, CHANNEL_LABELS,
+    DATA_SOURCES, DATA_SOURCE_LABELS, ENVIRONMENTS, ENVIRONMENT_LABELS,
+    auth_state, check_browsers, get_site, get_url, is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, navigate_with_auth, new_authed_browser,
-    new_login_context, save_auth_state, storage_state_is_portable,
-    try_device_sso_login,
+    new_login_context, page_url_for_display, preflight, save_auth_state,
+    set_site, storage_state_is_portable, try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
@@ -166,9 +184,9 @@ class ExportWorker(threading.Thread):
                 return True
             return False
 
-    def _on_screenshot(self, worker_no, image, note):
+    def _on_screenshot(self, worker_no, image, note, url=""):
         b64 = base64.b64encode(image).decode("ascii") if image else None
-        self.q.put(("preview_shot", (worker_no, b64, note)))
+        self.q.put(("preview_shot", (worker_no, b64, note, url)))
 
     def _on_route(self, route, status):
         with self._tally_lock:              # in fast mode this fires from many threads
@@ -469,6 +487,9 @@ class EnvCheckWorker(threading.Thread):
                 browser, _ctx, page = new_authed_browser(p)
                 try:
                     navigate_with_auth(page)
+                    # The address the screenshot will show: the page's REAL
+                    # URL (token fragment stripped), not just the intended one.
+                    out["url"] = page_url_for_display(page) or out["url"]
                     if not is_logged_in(page):
                         out["error"] = ("Sign-in didn't complete, so the report "
                                         "page couldn't be checked. Log in, then "
@@ -494,10 +515,213 @@ class EnvCheckWorker(threading.Thread):
         except Exception as e:
             log.exception("env check crashed")
             out["error"] = f"{type(e).__name__}: {e}"
-        log.info("env check: done ok=%s page env=%s src=%s matches=%s error=%s",
-                 out["ok"], out["env"], out["src"], out["matches"],
-                 out["error"] or "-")
+        log.info("env check: done ok=%s page env=%s src=%s matches=%s url=%s "
+                 "error=%s", out["ok"], out["env"], out["src"], out["matches"],
+                 out["url"], out["error"] or "-")
         self.q.put(("env_shot", out))
+
+
+# Availability of each report type in the #customReport dropdown, WITHOUT
+# clicking anything (the li.cs-option items are in the DOM whether the list is
+# open or not). The site sometimes greys single report types out; the exact
+# disable convention isn't pinned, so every common signal counts — a class
+# containing "disabled", the disabled/data-disabled attributes, aria-disabled,
+# or pointer-events:none — and each non-ok option's class string goes to the
+# log so a different convention shows up in one upload. Returns null when the
+# option list can't be read at all (callers must treat that as "unknown",
+# never as "everything is missing").
+_REPORT_OPTIONS_JS = """(labels) => {
+  const items = Array.from(document.querySelectorAll('#customReport li.cs-option'));
+  if (!items.length) return null;
+  const out = {};
+  for (const label of labels) {
+    const el = items.find((li) => (li.textContent || '').trim() === label)
+            || items.find((li) => (li.textContent || '').includes(label));
+    if (!el) { out[label] = { state: 'missing' }; continue; }
+    const cls = el.className || '';
+    const greyed = /(^|[\\s_-])disabled([\\s_-]|$)/i.test(cls)
+      || el.hasAttribute('disabled')
+      || el.getAttribute('aria-disabled') === 'true'
+      || el.hasAttribute('data-disabled')
+      || getComputedStyle(el).pointerEvents === 'none';
+    out[label] = { state: greyed ? 'greyed' : 'ok', cls };
+  }
+  return out;
+}"""
+
+
+class EnvScanWorker(threading.Thread):
+    """The Settings tab's "Check all environments": probe EVERY data source /
+    environment combination headless, the way an export would (saved session,
+    else device sign-in) — does sign-in complete, does the page load the
+    requested site, and can the report form pull data? The page ships its
+    whole form in static HTML even signed out, so form presence proves
+    nothing; only a real preflight (report picked, District fanned out, the
+    site's own data round-trip enabling the County dropdown) shows report
+    access — "signs in fine but can't actually pull reports" is exactly the
+    failure this exists to surface.
+
+    Posts one ("env_access", dict) per combo AS IT FINISHES (the Settings
+    rows and the title-bar chip update live), then ("env_access_done", dict).
+    Cancel is honored BETWEEN combos — each combo is already bounded by the
+    sign-in budget and the preflight/county timeouts. The scan retargets
+    common.set_site for each combo (so get_url / expected_host / the
+    wrong-site check all follow it, custom URL overrides included — gui_api
+    refuses site changes while the scan runs) and ALWAYS restores the user's
+    selection."""
+
+    def __init__(self, queue, cancel_event):
+        super().__init__(daemon=True, name="envscan")
+        self.q = queue
+        self.cancel = cancel_event
+
+    def run(self):
+        from playwright.sync_api import sync_playwright
+        from reports import EXPORT_REPORTS
+        labels = [label for label, _fmt, _spec in EXPORT_REPORTS]
+        keep_src, keep_env = get_site()
+        combos = [(s, e) for s in DATA_SOURCES for e in ENVIRONMENTS]
+        ok = done = 0
+        cancelled = False
+        fatal = None
+        log.info("env scan: starting (%d combos, report types %s)",
+                 len(combos), labels)
+        try:
+            with sync_playwright() as p:
+                browser = page = None
+                try:
+                    for src, env in combos:
+                        if self.cancel.is_set():
+                            cancelled = True
+                            break
+                        set_site(src, env)
+                        if browser is None:   # one browser serves the whole scan
+                            browser, _ctx, page = new_authed_browser(p)
+                        out = self._check_one(page, src, env, labels)
+                        done += 1
+                        ok += out["status"] == "ok"
+                        self.q.put(("env_access", out))
+                finally:
+                    if browser is not None:
+                        try:
+                            browser.close()
+                        except Exception:
+                            pass
+        except (AuthError, BrowserNotFoundError) as e:
+            fatal = str(e)                   # messages are already user-safe
+            log.warning("env scan: stopped (%s: %s)", type(e).__name__, fatal)
+        except Exception as e:
+            log.exception("env scan crashed")
+            fatal = f"{type(e).__name__}: {e}"
+        finally:
+            set_site(keep_src, keep_env)     # the scan never moves the user's pick
+        if fatal:
+            # Fill the unchecked combos so no row is left saying "checking".
+            for src, env in combos[done:]:
+                self.q.put(("env_access", {
+                    "key": f"{src}-{env}", "source": src, "environment": env,
+                    "label": f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}",
+                    "status": "error", "detail": fatal, "url": ""}))
+        log.info("env scan: done ok=%d/%d cancelled=%s fatal=%s",
+                 ok, done, cancelled, fatal or "-")
+        self.q.put(("env_access_done",
+                    {"ok": ok, "done": done, "total": len(combos),
+                     "cancelled": cancelled, "error": fatal}))
+
+    def _check_one(self, page, src, env, report_labels):
+        """One combo's verdict. Never raises — the answer (crashes included)
+        rides in the returned dict's status/detail; the WHY is in the log and
+        the auth/preflight dumps the shared gates already write."""
+        label = f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}"
+        out = {"key": f"{src}-{env}", "source": src, "environment": env,
+               "label": label, "status": "error", "detail": "", "url": "",
+               "reports": {}}
+        t0 = time.monotonic()
+        try:
+            try:
+                navigate_with_auth(page)
+            except SiteUnreachableError as e:
+                # Don't read page.url here: the failed goto leaves the page
+                # parked on the PREVIOUS combo's address.
+                out["status"], out["detail"] = "unreachable", str(e)
+                return out
+            out["url"] = page_url_for_display(page)
+            if not is_logged_in(page):
+                signals = auth_state(page).get("signals")
+                denied = (isinstance(signals, dict) and
+                          str(signals.get("accessDenied", "")).startswith("visible"))
+                if denied:
+                    out["status"] = "denied"
+                    out["detail"] = ("Signs in, but TSMIS reports access "
+                                     "denied on this site.")
+                else:
+                    out["status"] = "no_signin"
+                    out["detail"] = "Sign-in didn't complete on this site."
+                return out
+            got = None
+            try:
+                got = page.evaluate(_CONFIG_JS)          # [env, src] or None
+            except Exception:
+                pass
+            if got and got != [env, src]:
+                out["status"] = "wrong_site"
+                out["detail"] = (f"The page loaded {(got[1] or '?').upper()} / "
+                                 f"{(got[0] or '?').upper()} instead — check "
+                                 "this row's address.")
+                return out
+            # Which of the report types is actually offered? The site
+            # sometimes greys single types out. None readable = unknown
+            # (keep the old first-report probe), never "all missing".
+            options = None
+            try:
+                options = page.evaluate(_REPORT_OPTIONS_JS, list(report_labels))
+            except Exception as e:
+                log.info("env scan: %s report dropdown read failed (%s)",
+                         out["key"], type(e).__name__)
+            if options:
+                out["reports"] = {lbl: options.get(lbl, {}).get("state", "missing")
+                                  for lbl in report_labels}
+                for lbl, state in out["reports"].items():
+                    if state != "ok":
+                        log.info("env scan: %s report %r is %s (class=%r)",
+                                 out["key"], lbl, state,
+                                 options.get(lbl, {}).get("cls", ""))
+            avail = [lbl for lbl in report_labels
+                     if out["reports"].get(lbl) == "ok"]
+            off = [lbl for lbl, state in out["reports"].items()
+                   if state != "ok"]
+            if options and not avail:
+                out["status"] = "no_reports"
+                out["detail"] = ("Signs in, but every report type is greyed "
+                                 "out or missing here.")
+                return out
+            try:
+                # The data probe, on the first AVAILABLE report type: County
+                # only enables once the site's own route/county round-trip
+                # answers (the form itself is static).
+                preflight(page, avail[0] if avail else report_labels[0])
+            except PreflightError:
+                out["status"] = "no_reports"
+                out["detail"] = ("Signs in, but the report form couldn't load "
+                                 "its data — reports would fail here.")
+                return out
+            if off:
+                out["status"] = "reports_off"
+                out["detail"] = ("Sign-in and report data OK, but unavailable "
+                                 "here: " + ", ".join(off) + ".")
+                return out
+            out["status"] = "ok"
+            out["detail"] = "Sign-in and report data OK."
+            return out
+        except Exception as e:
+            reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+            log.warning("env scan: %s check crashed (%s: %s)", out["key"],
+                        type(e).__name__, reason)
+            out["detail"] = f"The check failed unexpectedly ({reason})."
+            return out
+        finally:
+            log.info("env scan: %s -> %s in %.1fs (%s)", out["key"],
+                     out["status"], time.monotonic() - t0, out["detail"] or "-")
 
 
 class LoginWorker(threading.Thread):
@@ -803,9 +1027,11 @@ class UpdateWorker(threading.Thread):
 
     def run(self):
         import updater                  # lazy; stdlib-only module
+        import settings
         try:
             if self.action == "check":
-                info = updater.check_for_update()
+                info = updater.check_for_update(
+                    channel=settings.get("update_channel"))
                 if info is None:
                     self.q.put(("update_status", {"phase": "none",
                                                   "manual": self.manual}))
@@ -813,6 +1039,7 @@ class UpdateWorker(threading.Thread):
                 self.q.put(("update_status", {
                     "phase": "available",
                     "version": info.version,
+                    "dev": info.dev,
                     "url": info.release_url,
                     "size_mb": round(info.asset_size / 1e6) or None,
                     "can_apply": updater.update_support()[0] == "ok",
@@ -831,11 +1058,13 @@ class UpdateWorker(threading.Thread):
                     self.q.put(("update_status", {
                         "phase": "downloading", "progress": pct,
                         "version": self.info.version,
+                        "dev": getattr(self.info, "dev", False),
                         "url": self.info.release_url, "can_apply": True}))
 
             staged = updater.download_and_stage(self.info, on_progress=on_progress)
             self.q.put(("update_status", {
                 "phase": "staged", "version": self.info.version,
+                "dev": getattr(self.info, "dev", False),
                 "url": self.info.release_url, "can_apply": True,
                 "staged": str(staged)}))
         except updater.UpdateError as e:

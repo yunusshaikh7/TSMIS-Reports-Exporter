@@ -29,7 +29,7 @@ def _never_shot(worker):
     return False
 
 
-def _noop_screenshot(worker, image, note):
+def _noop_screenshot(worker, image, note, url=""):
     pass
 
 
@@ -58,9 +58,10 @@ class Events:
                         own thread (Playwright is thread-affine); True means
                         "snap the page now". Implementations must clear the
                         request before returning True (one request = one shot).
-    on_screenshot(worker, image, note):
+    on_screenshot(worker, image, note, url):
                         the requested capture — `image` is JPEG bytes (or None
-                        when the capture failed; `note` then says why).
+                        when the capture failed; `note` then says why), `url`
+                        the page's address at capture time ("" when unknown).
 
     All default to harmless no-ops, so Events() is a valid silent sink.
     """

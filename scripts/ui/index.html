@@ -92,6 +92,10 @@
               title="Open TSMIS on the selected source/environment (signs in in the background) and show a screenshot — proof exports hit the right site">
         <svg class="ic"><use href="#i-camera"/></svg>Verify
       </button>
+      <button class="btn btn-titlebar" id="btnEnvAccess"
+              title="Sign-in + report access across all six environments — run the check from Settings ▸ TSMIS site addresses">
+        <span class="dot dot-unknown" id="envAccessDot"></span><span id="envAccessText">Env access</span>
+      </button>
       <label class="tb-field">Browser
         <span class="tb-select"><select id="selBrowser"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
       </label>
@@ -390,6 +394,16 @@
           </div>
           <p class="hint">The support bundle is a zip of the logs, run reports and settings —
             everything a maintainer needs and <b>never your login</b>.</p>
+          <label class="set-row" style="margin-top:6px">Update channel
+            <span class="set-input"><select class="input" id="setUpdateChannel">
+              <option value="stable">Stable releases</option>
+              <option value="dev">Dev / testing builds</option>
+            </select></span>
+          </label>
+          <p class="hint">Dev builds are quick prerelease test versions pushed between
+            releases — expect rough edges. Pick <b>Dev / testing builds</b> only when
+            asked to try a fix; the title-bar pill then offers the newest dev build,
+            and the next stable release returns this install to normal automatically.</p>
         </div>
 
         <div class="card-section">
@@ -401,6 +415,14 @@
             (keep the <span class="mono">?env=</span> and <span class="mono">?src=</span>
             parameters unless the new site drops them).
           </p>
+          <div class="actions-row" style="margin-bottom:8px">
+            <button class="btn btn-standard" id="btnCheckEnvs"
+                    title="Open each of the six sites headless (signs in like an export) and verify the report form can load its data — takes a few minutes">
+              <svg class="ic"><use href="#i-refresh"/></svg>Check all environments
+            </button>
+            <button class="btn btn-subtle hidden" id="btnCheckEnvsCancel">Cancel</button>
+            <span class="env-scan-stamp" id="envScanStamp"></span>
+          </div>
           <div class="set-urls" id="setSiteUrls"></div>
         </div>
 

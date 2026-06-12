@@ -426,9 +426,12 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   at its next safe poll point via `common.maybe_screenshot` (Playwright is
   thread-affine — only the owning thread may touch the page; a blocking
   download wait answers at the next route), and the JPEG comes back as a
-  `("preview_shot", (worker, b64, note))` message → a closeable modal. The
-  Events seam (`worker_no`, `on_status`, `screenshot_wanted`,
-  `on_screenshot`) is no-op in the console flow.
+  `("preview_shot", (worker, b64, note, url))` message → a closeable modal
+  showing the page's address over the screenshot (likewise the Verify-env
+  modal; `common.page_url_for_display` strips the URL fragment — the OAuth
+  token rides in the hash and must never reach the screen). The Events seam
+  (`worker_no`, `on_status`, `screenshot_wanted`, `on_screenshot`) is no-op
+  in the console flow.
 - **Settings tab (v0.10.0, GUI):** persisted via `settings.py` →
   `data/config.json`. Timeout/worker overrides are read at RUN time through
   `common.*_timeout_ms()` accessors / `exporter_parallel.default_worker_count()`
@@ -437,7 +440,27 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   next launch. **Per-env TSMIS addresses** (six editable rows; custom ones
   chip-marked; clearing restores the default — see *Supported Reports*) and
   the **Built-in Chromium download/remove** (see *Browser channels*) live
-  here too. Also: support-bundle zip (logs + run reports + manifest —
+  here too. **Check all environments** (v0.10.1, `EnvScanWorker`): probes
+  every src×env combo headless like an export — sign-in completes, the page
+  reports the requested env/src, AND a real preflight passes (the
+  County-enable data round-trip; the form itself is static HTML even signed
+  out, so form presence proves nothing) — catching "signs in fine but can't
+  pull reports". It also reads the dropdown's per-report availability
+  (`_REPORT_OPTIONS_JS`: the site sometimes greys single report types out;
+  every common disable convention counts, classes are logged, an unreadable
+  list = unknown — never "all missing") — the preflight probes the first
+  AVAILABLE type, ≥1 unavailable ⇒ amber `reports_off` naming them (per-type
+  states in the row tooltip), all four ⇒ `no_reports`. Verdicts (ok /
+  reports_off / no_reports / denied / no_signin / wrong_site / unreachable /
+  error) stream onto each address row as they
+  land (`("env_access", dict)` per combo → snapshot `env_access`), with a
+  title-bar **Env access chip** showing the aggregate ("Envs 5/6"; click =
+  jump to the Settings rows). Results are session-only on purpose (access
+  is server-side state that changes under us). The scan retargets
+  `common.set_site` per combo so every helper (custom URL overrides
+  included) behaves exactly as an export would — `gui_api.set_site` refuses
+  changes while it runs, the user's selection is always restored, and
+  Cancel lands between combos. Also: support-bundle zip (logs + run reports + manifest —
   NEVER the auth file/profiles), forget-saved-login, open-folder shortcuts,
   and **Delete all reports** (`gui_worker.reset_targets`/`ResetWorker`):
   removes run folders, legacy flat report folders, consolidated/comparisons,
@@ -501,6 +524,22 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   isn't. Update state is pushed in every snapshot (`update:{phase,…}`);
   worker protocol message is `("update_status", dict)`. `full_smoke.py` stubs
   `UpdateWorker` so the release gate never touches the network.
+  **Update channels (v0.10.2):** Settings ▸ Update channel = `stable`
+  (default: `/releases/latest`, so prereleases are invisible; offered when
+  strictly newer — or equal-versioned when the install IS a dev build, the
+  exit ramp off the channel) | `dev` (newest release of ANY kind incl.
+  prereleases, offered whenever its tag differs from
+  `updater.installed_tag()` = `version.__build__` — stamped `"dev-N"` by the
+  workflow — else `"v<version>"`; dev builds iterate without version bumps,
+  so the test is "different", not "newer", and a stable release published
+  after the dev builds returns the install to normal automatically). **Cut a
+  dev build with the `dev-release` workflow** (manual dispatch on ANY
+  branch): stamps `__build__`, SKIPS the self-test gate by default (tick
+  `selftest` for the full gate), builds win64 + with-browser (untick
+  `with_browser` to skip — but with-browser installs need that asset or
+  their check errors), publishes prerelease `dev-<run_number>`, and prunes
+  older dev prereleases so the channel points at exactly one dev build. The
+  pill/log/About label dev builds; the version chip shows "v0.10.1 · dev-7".
 
 ## Timeouts (`scripts/common.py`)
 

@@ -174,6 +174,7 @@ button, input, select { font-family: inherit; }
 .dot-ok { background: var(--success); }
 .dot-bad { background: var(--destructive); }
 .dot-busy { background: var(--warning); animation: dot-pulse 1.2s ease-in-out infinite; }
+.dot-warn { background: var(--warning); }
 .dot-unknown { background: var(--titlebar-muted); }
 @keyframes dot-pulse { 50% { opacity: 0.35; } }
 
@@ -531,6 +532,10 @@ button, input, select { font-family: inherit; }
 }
 .preview-wait .ic { animation: spin 1s linear infinite; }
 .preview-note { font-size: 12px; color: var(--muted-foreground); text-align: center; }
+.preview-url {
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted-foreground);
+  text-align: center; overflow-wrap: anywhere;
+}
 .env-verdict {
   display: flex; align-items: center; gap: 8px; justify-content: center;
   padding: 8px 12px; border-radius: var(--radius-md);
@@ -559,7 +564,14 @@ button, input, select { font-family: inherit; }
 
 /* settings: site addresses + built-in chromium */
 .set-urls { display: grid; gap: 6px; }
-.url-row { display: flex; align-items: center; gap: 10px; }
+.url-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.url-status {
+  flex-shrink: 0; min-width: 112px; display: inline-flex; align-items: center;
+  gap: 6px; font-size: 11.5px; color: var(--muted-foreground);
+}
+.url-status.env-bad { color: var(--destructive); font-weight: 600; }
+.url-status.env-warn { color: var(--warning); font-weight: 600; }
+.env-scan-stamp { font-size: 12px; color: var(--muted-foreground); }
 .url-label { width: 110px; flex-shrink: 0; font-size: 12.5px; font-weight: 600; }
 .url-row .input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px; }
 .url-row .input.custom {
