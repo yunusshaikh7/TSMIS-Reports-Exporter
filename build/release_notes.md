@@ -14,6 +14,33 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **The new TSMIS address is built in (0.10.2).** The report site moved to
+  `tsmis.dot.ca.gov`; this version points there out of the box for all six
+  source/environment combinations. If you had entered the new address in
+  Settings as a stopgap, that custom entry keeps working — clear the box to
+  fall back to the (now identical) built-in default.
+- **Check sign-in + report access for every environment (0.10.2).**
+  Settings ▸ **Check all environments** opens each of the six sites
+  (SSOR/ARS × Prod/Test/Dev) in the background exactly like an export and
+  verifies that sign-in completes, the right site loaded, the report form
+  can actually pull data, and **all four report types are offered** (the
+  site sometimes greys one out). Verdicts land next to each address as they
+  finish — green OK, amber "Reports limited" naming the unavailable report
+  types, red for sign-in/data/site failures, full detail in the tooltip —
+  and a title-bar chip ("Envs 5/6") shows the overall picture; click it to
+  jump to the rows. Built for the "signs in fine but can't pull reports"
+  situation, so a broken environment is a 2-minute check instead of a
+  wasted export run.
+- **Screenshots show their address (0.10.2).** The per-browser Preview and
+  the Verify-environment screenshot now display the page's web address above
+  the image, so which site/environment the browser is really on is readable
+  in plain text (sign-in tokens never appear).
+- **A Dev / testing update channel (0.10.2).** Settings ▸ Update channel —
+  leave it on **Stable releases** (the default; nothing changes for you).
+  Pick **Dev / testing builds** only when asked to try a fix: the title-bar
+  update button then offers quick prerelease test builds, clearly labeled
+  everywhere, and the next stable release returns the install to normal
+  automatically.
 - **The one-click update now works on locked-down PCs (0.10.1).** On machines
   where PowerShell is blocked for standard users (common on managed work
   PCs), the previous updater downloaded the new version and then silently
