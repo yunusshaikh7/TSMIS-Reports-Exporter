@@ -1092,11 +1092,9 @@ class UpdateWorker(threading.Thread):
 
     def run(self):
         import updater                  # lazy; stdlib-only module
-        import settings
         try:
             if self.action == "check":
-                info = updater.check_for_update(
-                    channel=settings.get("update_channel"))
+                info = updater.check_for_update()
                 if info is None:
                     self.q.put(("update_status", {"phase": "none",
                                                   "manual": self.manual}))
@@ -1104,7 +1102,6 @@ class UpdateWorker(threading.Thread):
                 self.q.put(("update_status", {
                     "phase": "available",
                     "version": info.version,
-                    "dev": info.dev,
                     "url": info.release_url,
                     "size_mb": round(info.asset_size / 1e6) or None,
                     "can_apply": updater.update_support()[0] == "ok",
@@ -1123,13 +1120,11 @@ class UpdateWorker(threading.Thread):
                     self.q.put(("update_status", {
                         "phase": "downloading", "progress": pct,
                         "version": self.info.version,
-                        "dev": getattr(self.info, "dev", False),
                         "url": self.info.release_url, "can_apply": True}))
 
             staged = updater.download_and_stage(self.info, on_progress=on_progress)
             self.q.put(("update_status", {
                 "phase": "staged", "version": self.info.version,
-                "dev": getattr(self.info, "dev", False),
                 "url": self.info.release_url, "can_apply": True,
                 "staged": str(staged)}))
         except updater.UpdateError as e:

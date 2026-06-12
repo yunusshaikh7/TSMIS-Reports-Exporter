@@ -26,8 +26,8 @@ echo     1.  TSAR: Ramp Summary        (PDF  -^> output\ramp_summary\)
 echo     2.  TSAR: Ramp Detail         (XLSX -^> output\ramp_detail\)
 echo     3.  Highway Sequence Listing  (XLSX -^> output\highway_sequence\)
 echo     4.  Highway Log               (XLSX -^> output\highway_log\)
-echo     5.  TSAR: Intersection Summary (PDF  -^> output\intersection_summary\)
-echo     6.  TSAR: Intersection Detail  (XLSX -^> output\intersection_detail\)
+echo     5.  Intersection Summary      (XLSX -^> output\intersection_summary\)
+echo     6.  Intersection Detail       (XLSX -^> output\intersection_detail\)
 echo.
 echo     A.  Several / all report types at once
 echo     Q.  Quit

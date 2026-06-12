@@ -34,11 +34,12 @@ EXPORT_REPORTS = [
     ("TSAR: Ramp Detail", "Excel", _RAMP_DETAIL_SPEC),
     ("Highway Sequence Listing", "Excel", _HIGHWAY_SEQ_SPEC),
     ("Highway Log", "Excel", _HIGHWAY_LOG_SPEC),
-    # Export-only for now (no consolidation/comparison support yet). The env
-    # check reads the dropdown for every row here, so it verifies these
-    # labels against the live site for free.
-    ("TSAR: Intersection Summary", "PDF", _INT_SUMMARY_SPEC),
-    ("TSAR: Intersection Detail", "Excel", _INT_DETAIL_SPEC),
+    # Export-only for now (no consolidation/comparison support yet). Labels
+    # verified against the live page source: NO "TSAR:" prefix, and Summary
+    # is an Excel export like Detail. The env check reads the dropdown for
+    # every row here, so a label drift shows up there as "missing".
+    ("Intersection Summary", "Excel", _INT_SUMMARY_SPEC),
+    ("Intersection Detail", "Excel", _INT_DETAIL_SPEC),
 ]
 
 # Consolidate tab: (menu label, module). Same order as above. Each module

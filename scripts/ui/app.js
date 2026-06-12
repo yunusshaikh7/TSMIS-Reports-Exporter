@@ -450,8 +450,7 @@ document.addEventListener("contextmenu", (e) => e.preventDefault());
 function buildStatic() {
   const init = S.init;
   $("appName").textContent = init.app_name;
-  $("appVersion").textContent = "v" + init.version
-    + (init.build ? " · " + init.build : "");
+  $("appVersion").textContent = "v" + init.version;
   $("appVersion").title = "Check for updates";
   $("outputRoot").textContent = init.output_root;
   document.title = init.app_name;
@@ -583,6 +582,23 @@ function renderState() {
   // auth status + login button
   setDot($("authDot"), st.auth_dot);
   $("authText").textContent = st.auth_text;
+
+  // the two sign-in paths, separately (saved file vs Edge one-click)
+  const lg = st.logins || {};
+  const file = lg.file || {};
+  setDot($("loginFile").querySelector(".dot"), file.valid ? "ok" : "unknown");
+  $("loginFile").title = file.valid
+    ? "Saved login file: valid" + (file.age_h != null ? ` (saved ${file.age_h} h ago)` : "")
+      + ". Captured via Chrome / Built-in Chromium; used by exports and required for fast mode."
+    : "No saved login file. Sign in (Chrome / Built-in Chromium) to save one — required for fast mode.";
+  const dev = lg.device || {};
+  setDot($("loginEdge").querySelector(".dot"),
+         dev.ok ? "ok" : dev.primed ? "warn" : "unknown");
+  $("loginEdge").title = dev.ok
+    ? "Edge one-click sign-in: working (proven this session). Exports can sign themselves in without a saved file."
+    : dev.primed
+      ? "Edge one-click sign-in: set up (the Edge sign-in profile exists) — it's verified the first time something signs in this session."
+      : "Edge one-click sign-in: not set up. Sign in once with Microsoft Edge to enable hands-free sign-in on this PC.";
   const bl = $("btnLogin"), blc = $("btnLoginCancel");
   const phase = st.login_phase;
   const labels = { starting: "Signing in…", saving: "Saving…", cancelling: "Cancelling…" };
@@ -743,9 +759,6 @@ function renderEnvAccess() {
 
 // One-click update pill (title bar). Python owns the whole update state; this
 // only decides the pill's label/visibility for the current phase.
-// Dev-channel builds are named by their tag ("dev-7"), stable ones "v0.10.1".
-const updName = (up) => (up.dev ? up.version : "v" + up.version);
-
 function renderUpdate(up) {
   const b = $("btnUpdate");
   up = up || { phase: "idle" };
@@ -754,11 +767,10 @@ function renderUpdate(up) {
   switch (up.phase) {
     case "available":
       if (up.can_apply) {
-        label = `Update to ${updName(up)}`;
-        title = up.dev ? "Download and install this DEV build (a quick test version)"
-                       : "Download and install the new version";
+        label = `Update to v${up.version}`;
+        title = "Download and install the new version";
       } else {
-        label = `${updName(up)} available`;
+        label = `v${up.version} available`;
         title = "Open the download page (this app folder is read-only, so the app can't update itself)";
       }
       break;
@@ -770,7 +782,7 @@ function renderUpdate(up) {
       label = "Restart to update";
       disabled = locked;
       title = locked ? "Finish or cancel the running task first"
-                     : `Install ${updName(up)} — the app closes and reopens by itself`;
+                     : `Install v${up.version} — the app closes and reopens by itself`;
       break;
     case "applying":
       label = "Restarting…";
@@ -796,7 +808,7 @@ async function onUpdateClick() {
   if (up.phase === "staged") {
     const ok = await showConfirm({
       title: "Restart and update?",
-      message: `The app will close, install ${updName(up)} (takes a few seconds), and reopen by itself.\n\nYour reports, login and settings stay where they are.`,
+      message: `The app will close, install v${up.version} (takes a few seconds), and reopen by itself.\n\nYour reports, login and settings stay where they are.`,
       confirmLabel: "Restart now",
     });
     if (!ok) return;
@@ -1147,7 +1159,6 @@ const SETTING_INPUTS = {
   setRetryTimeout: "retry_timeout_min",
   setCountyTimeout: "county_timeout_s",
   setFastWorkers: "fast_workers",
-  setUpdateChannel: "update_channel",
 };
 
 function fillSettings() {
@@ -1185,8 +1196,7 @@ function fillSettings() {
 
   const about = $("setAbout");
   about.textContent = "";
-  [["Version", `v${meta.version || S.init.version}`
-                + ((meta.build_tag || S.init.build) ? ` · ${meta.build_tag || S.init.build} (dev build)` : "")],
+  [["Version", `v${meta.version || S.init.version}`],
    ["Build", `${meta.build || "?"} · ${meta.variant || "?"}`],
    ["Sign-in", meta.auth_state || "?"],
    ["Settings file", "config.json in the data folder (safe to delete — defaults return)"]]
@@ -1300,7 +1310,6 @@ async function onSettingInput(id) {
       $("fastWorkers").value = res.values[key];   // reseed the Export pane default
     }
   }
-  if (key === "update_channel") api.check_updates();  // the new channel answers now
 }
 
 async function onSettingToggle(id, key) {
@@ -1628,6 +1637,8 @@ function makeMockApi() {
   const st = {
     task: null, fast_run: false,
     authed: false, device_ok: false,
+    logins: { file: { valid: false, age_h: null },
+              device: { ok: false, primed: true } },
     auth_dot: "bad", auth_text: "No saved login — click Log in",
     login_phase: null, login_label: "Log in",
     checks: {
@@ -1645,7 +1656,7 @@ function makeMockApi() {
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
     county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
-    update_channel: "stable", env_check_on_start: true,
+    env_check_on_start: true,
   };
   const mockUrlOverrides = {};
   const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,
@@ -1946,6 +1957,7 @@ function makeMockApi() {
     },
     clear_saved_login: async () => {
       st.authed = false; st.auth_dot = "bad"; st.auth_text = "No saved login — click Log in";
+      st.logins.file = { valid: false, age_h: null };
       push({ t: "log", text: "Saved login deleted — click 'Log in' to sign in again." });
       pushState();
       return { ok: true, removed: true };
@@ -2008,6 +2020,7 @@ function makeMockApi() {
         st.task = null; st.login_phase = null;
         st.authed = true; st.login_label = "Re-login";
         st.auth_dot = "ok"; st.auth_text = "Session ready";
+        st.logins.file = { valid: true, age_h: 0.1 };
         pushState();
         push({ t: "log", text: "Session saved." });
       }, 1100);
