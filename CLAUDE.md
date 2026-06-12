@@ -19,7 +19,7 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 
-Reports 5–6 (v0.10.2) are **export-only** for now (no consolidator/comparison).
+Reports 5–6 (v0.10.3) are **export-only** for now (no consolidator/comparison).
 Labels + formats verified against the live page source (v0.10.4): NO "TSAR:"
 prefix (unlike the ramp pair), both Excel via the shared Export button; only
 the empty-marker text ("no intersections") remains best-guess. The site greys
@@ -461,7 +461,7 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   next launch. **Per-env TSMIS addresses** (six editable rows; custom ones
   chip-marked; clearing restores the default — see *Supported Reports*) and
   the **Built-in Chromium download/remove** (see *Browser channels*) live
-  here too. **Check all environments** (v0.10.1, `EnvScanWorker`): probes
+  here too. **Check all environments** (v0.10.2, `EnvScanWorker`): probes
   every src×env combo headless like an export — sign-in completes, the page
   reports the requested env/src, AND a real preflight passes (the
   County-enable data round-trip; the form itself is static HTML even signed
@@ -479,7 +479,7 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   jump to the Settings rows), and the Export tab tints report types the
   ACTIVE combo's scan found unavailable. Results are session-only on
   purpose (access is server-side state that changes under us).
-  **Fast + automatic (v0.10.2):** combos drain from a shared queue into up
+  **Fast + automatic (v0.10.3):** combos drain from a shared queue into up
   to 3 scanner threads, each owning its own Playwright/browser (fast-mode
   idiom; `parallel=True`, so the scanners use the Chromium/Chrome parallel
   channel — see *Fast Mode* — and when only managed Edge is usable the scan
@@ -604,7 +604,7 @@ healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 (`TSMIS_FAST_WORKERS`) or the GUI "⚡ Fast mode" checkbox + spinner.
 `run_cli`/`run_cli_multi` route to the parallel engine when workers > 1.
 
-**Parallel browsers avoid managed Edge (v0.10.2, field failure):** N
+**Parallel browsers avoid managed Edge (v0.10.3, field failure):** N
 concurrent headless Edge instances restoring the same saved session timed
 out (org-managed Edge misbehaves under concurrency — the same management
 that breaks its headed sign-in). Every saved-session browser that runs
