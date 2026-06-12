@@ -4,7 +4,7 @@ Imported by the build tooling (and later the GUI About box). Keep this file
 dependency-free so it can be imported from anywhere, including the .spec.
 """
 
-__version__ = "0.10.2"         # semantic version MAJOR.MINOR.PATCH
+__version__ = "0.10.3"         # semantic version MAJOR.MINOR.PATCH
 APP_NAME = "TSMIS Exporter"    # onefolder / executable name
 
 # Dev-build identity. "" in the repo and in stable releases; the dev-release

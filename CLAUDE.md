@@ -16,6 +16,14 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
+| 5 | TSAR: Intersection Summary | PDF (Letter) | `output/<run>/intersection_summary/` |
+| 6 | TSAR: Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
+
+Reports 5–6 (v0.10.2) are **export-only** for now (no consolidator/comparison);
+their specs mirror the ramp pair and their dropdown labels + empty-marker
+text ("no intersections") are best-guess until verified live — the env-access
+scan reads the dropdown for every `EXPORT_REPORTS` row, so a wrong label
+shows up there as "missing" without running an export.
 
 `<run>` is a **run folder**, `"<YYYY-MM-DD> <src>-<env>"` (e.g.
 `2026-06-11 ssor-prod`, v0.10.0) — see *Key Behaviors: run folders*.
@@ -206,7 +214,7 @@ engine.
   bundle; end-user setup stays global-pip). `webview.start(gui="edgechromium")`
   is forced so a missing runtime fails loudly (clear message box) instead of
   silently degrading to MSHTML. tkinter is excluded from the bundle.
-  **THREE pywebview traps, all hit during the rewrite:**
+  **FIVE pywebview traps, all hit in the field:**
   1. pywebview detects "is `start()` already running" via the main thread's
      NAME — `logging_setup` must never rename the main thread (it tags
      `[main]` via a logging Filter instead); renaming it makes
@@ -236,6 +244,17 @@ engine.
      the fatal box also explains the manual Unblock for read-only installs.
      Repro for testing: `Set-Content <dll> -Stream Zone.Identifier` with
      `ZoneId=3` on `_internal\pythonnet\**`.
+  5. **The js_api OBJECT appears before its method stubs** (field failure,
+     first launch after the v0.10.2 update): on a cold WebView2,
+     `window.pywebview.api` can exist while pywebview is still injecting the
+     method functions into it — calling one throws "is not a function" and a
+     one-shot boot died on it permanently. `app.js` gates boot on
+     `bridgeReady()` (the method itself must be a function, not just the api
+     object) AND retries `get_initial_state` ~6 times re-grabbing the bridge
+     each round; the 8 s banner is a reassuring "Still starting…" (the poll
+     keeps running and a late bridge still boots), with the real failure
+     banner only at 60 s. The first launch after an update is the coldest
+     start there is — Windows scans every fresh file.
 - **Browser channels — three release variants, one codebase:**
   - **`*-win64.zip` (default build):** no bundled browser. Drives the machine's
     installed Edge (then Chrome) via `channel="msedge"`/`"chrome"`. Edge is
@@ -450,17 +469,30 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   every common disable convention counts, classes are logged, an unreadable
   list = unknown — never "all missing") — the preflight probes the first
   AVAILABLE type, ≥1 unavailable ⇒ amber `reports_off` naming them (per-type
-  states in the row tooltip), all four ⇒ `no_reports`. Verdicts (ok /
+  states in the row tooltip), all ⇒ `no_reports`. Verdicts (ok /
   reports_off / no_reports / denied / no_signin / wrong_site / unreachable /
   error) stream onto each address row as they
   land (`("env_access", dict)` per combo → snapshot `env_access`), with a
   title-bar **Env access chip** showing the aggregate ("Envs 5/6"; click =
-  jump to the Settings rows). Results are session-only on purpose (access
-  is server-side state that changes under us). The scan retargets
-  `common.set_site` per combo so every helper (custom URL overrides
-  included) behaves exactly as an export would — `gui_api.set_site` refuses
-  changes while it runs, the user's selection is always restored, and
-  Cancel lands between combos. Also: support-bundle zip (logs + run reports + manifest —
+  jump to the Settings rows), and the Export tab tints report types the
+  ACTIVE combo's scan found unavailable. Results are session-only on
+  purpose (access is server-side state that changes under us).
+  **Fast + automatic (v0.10.2):** combos drain from a shared queue into up
+  to 3 scanner threads, each owning its own Playwright/browser (fast-mode
+  idiom; `parallel=True`, so the scanners use the Chromium/Chrome parallel
+  channel — see *Fast Mode* — and when only managed Edge is usable the scan
+  drops to ONE browser, `_parallel_scanners` /
+  `common.resolve_parallel_channel`, instead of risking concurrent Edge
+  sessions) and pinning its target via
+  `common.set_thread_site` — a
+  threading.local consulted by `get_site()`, so every site-aware helper
+  (get_url/expected_host/_site_params_ok, custom URL overrides included)
+  follows the pin for that thread only and the user's header selection is
+  never touched (engine/login threads never pin). Device sign-in mode caps
+  the scan to 1 thread (the Edge profile opens in ONE browser — fast mode's
+  rule). The scan auto-runs once per session after startup/sign-in when a
+  login is available (`gui_api._maybe_autoscan`; Settings toggle
+  `env_check_on_start`, default on); Cancel lands between combos. Also: support-bundle zip (logs + run reports + manifest —
   NEVER the auth file/profiles), forget-saved-login, open-folder shortcuts,
   and **Delete all reports** (`gui_worker.reset_targets`/`ResetWorker`):
   removes run folders, legacy flat report folders, consolidated/comparisons,
@@ -502,10 +534,19 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   (`updater.SWAP_FLAG` / `run_swap_mode`; gui_main branches into it FIRST,
   before logging/paths/CLR — the process runs from the staged tree, so
   normal path resolution would aim at the wrong folder) and exits: the swap
-  process waits on the app's PID, renames old bundle pieces
-  (exe/`_internal`/`Start Here.txt`) to `*.old`, **copies** itself into
-  place (it cannot move the tree it runs from), relaunches, and **rolls
-  back** if any step fails (`LOG_DIR\update_helper.log`); user data folders
+  process waits on the app's PID and installs in **two phases (v0.10.3,
+  field failure)** — phase 1 COPIES every staged piece to `*.new` (the big
+  failure-prone copytree happens while the installed app is untouched; a
+  failure = clean abort), phase 2 swaps by pure RENAMES (`live→.old`,
+  `.new→live`; rollback is renames too). The v0.10.2 one-phase copy could
+  die mid-`_internal` and its delete-based rollback could fail on a
+  Defender-held file, relaunching a MIXED tree ("says 0.10.2, features
+  missing"). A rolled-back update announces itself when the update is
+  re-offered (`updater.last_swap_failure` reads `update_helper.log`'s
+  tail), and `_clear_webview_caches()` (every launch, in
+  cleanup_leftovers) drops the WebView2 HTTP caches so the UI on screen is
+  always the one on disk (the persistent profile could serve a cached
+  app.js after an update; Local Storage/theme untouched); user data folders
   are never in the staged tree. A swap process that dies instantly is
   detected BEFORE the window closes (UpdateError; the app stays open on the
   old version). **Why an exe, not a script (v0.10.1, field failure):**
@@ -571,6 +612,20 @@ server** (~0.5 GB RAM/worker): 3 = safe (~2.5–3× faster), 8–12 = big speedu
 healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 (`TSMIS_FAST_WORKERS`) or the GUI "⚡ Fast mode" checkbox + spinner.
 `run_cli`/`run_cli_multi` route to the parallel engine when workers > 1.
+
+**Parallel browsers avoid managed Edge (v0.10.2, field failure):** N
+concurrent headless Edge instances restoring the same saved session timed
+out (org-managed Edge misbehaves under concurrency — the same management
+that breaks its headed sign-in). Every saved-session browser that runs
+ALONGSIDE OTHERS — fast mode's workers, its preflight + serial retry pass,
+and the env scan's scanners — launches with
+`new_authed_browser(p, parallel=True)` → `launch_browser(..., parallel=True)`
+→ `common._parallel_candidates()`: Built-in Chromium, then Chrome, **Edge
+only as a warned last resort**. A UI pick of Edge is deliberately not
+honored for these (it caused the failure; `TSMIS_BROWSER_CHANNEL` still
+hard-overrides for debugging), the parallel channel keeps its own
+process cache, and Edge keeps its one-click device sign-in role untouched.
+The sequential single-browser engine keeps the normal channel order.
 
 ## Auth / Session
 
@@ -849,5 +904,6 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |
 | Build: "GUARD FAILED" | A dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` |
 | Update pill opens a web page instead of installing | App folder is read-only (data fell back to `%LOCALAPPDATA%`) | Expected (`update_support()` = "link") — move the app somewhere writable, or extract the new zip manually |
-| Update applied but the old version came back | A swap step failed; the swap rolled back | See `data\logs\update_helper.log`; close anything holding `_internal` open and update again |
+| Update applied but the old version came back | A swap step failed; the swap rolled back | See `data\logs\update_helper.log`; close anything holding `_internal` open and update again. Since v0.10.3 the app says so itself when it re-offers the update (`updater.last_swap_failure`) |
+| "The app couldn't load its settings" right after an update (≤ v0.10.2) | Cold-WebView2 bridge race — the api object landed before its method stubs (pywebview trap 5) | Fixed (boot gates on the method + retries); on old builds just relaunch |
 | Update downloaded, app closed, but nothing was installed (≤ v0.10.0) | The old PowerShell swap helper was silently blocked (locked-down PCs with no PowerShell) | Fixed in v0.10.1 (the staged exe swaps itself; no scripts). One manual install of ≥ 0.10.1 — the new version sits intact in `data\update\staged`, or download the zip — then auto-update works |

@@ -612,7 +612,7 @@ function renderState() {
    "btnCheckEnvs"]
     .forEach((id) => { $(id).disabled = locked; });
   Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
-  ["setDebugLog", "setDevtools"].forEach((id) => {
+  ["setDebugLog", "setDevtools", "setEnvAutoCheck"].forEach((id) => {
     $(id).disabled = locked;
     $(id).closest(".option-row").classList.toggle("disabled", locked);
   });
@@ -633,7 +633,8 @@ function renderState() {
   fastCb.closest(".fast-toggle").classList.toggle("disabled", !fastAllowed);
   $("fastWorkers").disabled = !fastAllowed || !fastCb.checked;
   $("fastHint").textContent = st.authed
-    ? "Faster, but heavier on your PC; 3–4 recommended. Per-route Skip is off in fast mode."
+    ? "Faster, but heavier on your PC; 3–4 recommended. Per-route Skip is off in fast mode. "
+      + "Runs in the Built-in Chromium / Google Chrome (not Microsoft Edge)."
     : "Fast mode needs a saved login — automatic sign-in runs one browser at a time. Log in first to enable it.";
 
   // action buttons
@@ -723,6 +724,21 @@ function renderEnvAccess() {
   const last = entries.map((e) => e.checked_at).filter(Boolean).sort().pop();
   $("envScanStamp").textContent = last ? `Last checked ${last}`
                                        : "Not checked yet this session.";
+
+  // Export tab: flag report types the ACTIVE site's scan found unavailable
+  // (warning only — the site may have changed since; the run will tell).
+  const active = acc[`${$("selSource").value}-${$("selEnv").value}`];
+  const reps = (active && active.reports) || {};
+  $("reportList").querySelectorAll(".option-row").forEach((row, i) => {
+    const label = ((S.init.reports || [])[i] || {}).label;
+    const state = label && reps[label];
+    const off = state && state !== "ok";
+    row.classList.toggle("report-off", !!off);
+    row.title = off
+      ? `The last environment check found this report ${state === "greyed"
+          ? "greyed out" : "missing"} on ${active.label} — the export may fail.`
+      : "";
+  });
 }
 
 // One-click update pill (title bar). Python owns the whole update state; this
@@ -1146,6 +1162,7 @@ function fillSettings() {
   };
   setToggle("setDebugLog", v.debug_logging);
   setToggle("setDevtools", v.ui_devtools);
+  setToggle("setEnvAutoCheck", v.env_check_on_start);
 
   const meta = s.meta || {};
   const paths = $("setPaths");
@@ -1389,8 +1406,14 @@ function bindEvents() {
   };
 
   $("selBrowser").onchange = () => api.set_browser($("selBrowser").value);
-  $("selSource").onchange = () => api.set_site($("selSource").value, $("selEnv").value);
-  $("selEnv").onchange = () => api.set_site($("selSource").value, $("selEnv").value);
+  $("selSource").onchange = () => {
+    api.set_site($("selSource").value, $("selEnv").value);
+    renderEnvAccess();          // re-aim the Export tab's availability flags
+  };
+  $("selEnv").onchange = () => {
+    api.set_site($("selSource").value, $("selEnv").value);
+    renderEnvAccess();
+  };
   $("btnRecheck").onclick = () => api.start_checks();
 
   $("btnLogin").onclick = () => {
@@ -1422,6 +1445,7 @@ function bindEvents() {
   });
   $("setDebugLog").addEventListener("change", () => onSettingToggle("setDebugLog", "debug_logging"));
   $("setDevtools").addEventListener("change", () => onSettingToggle("setDevtools", "ui_devtools"));
+  $("setEnvAutoCheck").addEventListener("change", () => onSettingToggle("setEnvAutoCheck", "env_check_on_start"));
   $("btnSupportBundle").onclick = async () => {
     const res = await api.save_support_bundle();
     if (res && res.error) showMessage("error", "Could not save the bundle", res.error);
@@ -1492,12 +1516,28 @@ async function boot(realApi) {
   if (booted) return;
   booted = true;
   api = realApi;
+  // The first call can race a cold WebView2: pywebview's api OBJECT appears
+  // before its method stubs are injected into it, so the call right after an
+  // update (the coldest start — Windows is still scanning the new files)
+  // could throw "get_initial_state is not a function" and a one-shot boot
+  // died on it (field failure, v0.10.2 update). Retry patiently, re-grabbing
+  // the bridge object each round, before declaring the engine dead.
   let init = null;
-  try {
-    init = await api.get_initial_state();
-  } catch (e) {
-    init = { error: String(e) };
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      init = await api.get_initial_state();
+      lastErr = null;
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (!WANT_MOCK && window.pywebview && window.pywebview.api) {
+        api = window.pywebview.api;       // stubs may have landed by now
+      }
+      await new Promise((r) => setTimeout(r, Math.min(1000 * attempt, 3000)));
+    }
   }
+  if (lastErr) init = { error: String(lastErr) };
   if (!init || init.error) {
     // The bridge answered but the engine is broken — building a half-dead UI
     // would only hide it. Fail loudly; the log file has the traceback.
@@ -1528,7 +1568,16 @@ async function boot(realApi) {
 // the real app would show convincing fake exports.
 const WANT_MOCK = /[?#&]mock\b/.test(location.search + location.hash);
 
-window.addEventListener("pywebviewready", () => boot(window.pywebview.api));
+// The bridge is only usable once its method STUBS are injected — the bare
+// api object shows up a beat earlier on a cold WebView2 (boot() also retries,
+// as the second line of defense).
+const bridgeReady = () =>
+  !!(window.pywebview && window.pywebview.api
+     && typeof window.pywebview.api.get_initial_state === "function");
+
+window.addEventListener("pywebviewready", () => {
+  if (bridgeReady()) boot(window.pywebview.api);   // else the poll catches it
+});
 if (WANT_MOCK) {
   boot(makeMockApi());
 } else {
@@ -1536,15 +1585,27 @@ if (WANT_MOCK) {
   // re-check periodically instead of guessing one magic delay.
   const poll = setInterval(() => {
     if (booted) { clearInterval(poll); return; }
-    if (window.pywebview && window.pywebview.api) { clearInterval(poll); boot(window.pywebview.api); }
+    if (bridgeReady()) { clearInterval(poll); boot(window.pywebview.api); }
   }, 150);
+  // Cold starts (especially the FIRST launch after an update, while Windows
+  // scans the fresh files) can outlast any reasonable timeout — reassure
+  // first, declare failure only much later. The poll keeps running either
+  // way, and a late bridge still boots + clears the banner.
+  setTimeout(() => {
+    if (!booted) {
+      showFatal("Still starting…",
+                "The interface is waiting for the app engine. The first launch after an "
+                + "update can take noticeably longer while Windows checks the new files — "
+                + "this screen goes away by itself when the app is ready.");
+    }
+  }, 8000);
   setTimeout(() => {
     if (!booted) {
       showFatal("The app's interface couldn't connect to its engine",
                 "The page loaded but the pywebview bridge never arrived. Close the app and try again; "
                 + "details are in the log file. (For a browser-only design preview, open index.html#mock.)");
     }
-  }, 8000);
+  }, 60000);
 }
 
 // ============================ mock API (browser preview) ====================
@@ -1584,7 +1645,7 @@ function makeMockApi() {
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
     county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
-    update_channel: "stable",
+    update_channel: "stable", env_check_on_start: true,
   };
   const mockUrlOverrides = {};
   const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,

@@ -128,9 +128,11 @@ def _preflight_once(spec, events):
     """Validate auth + the report form a single time, before launching N
     browsers, so a bad session or a changed site fails fast with one clear
     error instead of N. Raises AuthError / PreflightError like the sequential
-    engine."""
+    engine. Uses the PARALLEL browser channel (Chrome / Built-in Chromium —
+    never managed Edge unless nothing else runs), so the session is validated
+    in the same browser the workers will use."""
     with sync_playwright() as p:
-        browser, _ctx, page = new_authed_browser(p)
+        browser, _ctx, page = new_authed_browser(p, parallel=True)
         try:
             navigate_with_auth(page)
             require_signed_in(
@@ -154,7 +156,9 @@ def _retry_failed_sequential(spec, events, result, out_dir, timeout_ms):
     per-route work to the sequential engine's shared retry helper.
     """
     with sync_playwright() as p:
-        browser, _ctx, page = new_authed_browser(p)
+        # Same parallel channel as the workers (already validated by the
+        # preflight) — not managed Edge.
+        browser, _ctx, page = new_authed_browser(p, parallel=True)
         try:
             _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms)
         finally:
@@ -204,6 +208,13 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     log.info("parallel export config: site=%s auth_file=%s timeout=%ds retry_timeout=%ds",
              get_url(), has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
     events.on_log(f"Fast mode (experimental): {n} browsers in parallel, {total} routes.")
+    if has_valid_auth():
+        # Field failure: managed Edge timed out N concurrent saved-session
+        # workers. Parallel browsers prefer an unmanaged Chromium; Edge keeps
+        # the one-click sign-in and is only a (warned) last resort here.
+        events.on_log("Fast mode runs its browsers in the Built-in Chromium / "
+                      "Google Chrome (Microsoft Edge only if neither is "
+                      "available; it keeps the one-click sign-in).")
 
     _preflight_once(spec, events)
     events.on_log("Ready. Starting export.")
@@ -226,7 +237,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
         try:
             wevents.on_status(wevents.worker_no, "Starting browser…")
             with sync_playwright() as p:
-                browser, _ctx, page = new_authed_browser(p)
+                browser, _ctx, page = new_authed_browser(p, parallel=True)
                 try:
                     wevents.on_status(wevents.worker_no, "Opening TSMIS + signing in…")
                     navigate_with_auth(page)

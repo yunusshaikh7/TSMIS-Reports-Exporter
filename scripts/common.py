@@ -16,6 +16,7 @@ import os
 import re
 import socket
 import sys
+import threading
 import time
 from pathlib import Path
 from urllib.parse import quote, urlsplit
@@ -101,9 +102,29 @@ def set_site(source=None, environment=None):
     log.info("site: set to src=%s env=%s", _data_source, _environment)
 
 
+# The env-access scan probes several src/env combos in PARALLEL worker
+# threads; a process-wide set_site would race (and fight the user's header
+# selection). A scanner thread pins its own target here instead — every
+# site-aware helper (get_url, expected_host, _site_params_ok, the signed-in
+# host check) flows through get_site(), so the pin retargets all of them for
+# that thread only. Engine/export/login threads never set this and keep
+# following the global selection.
+_thread_site = threading.local()
+
+
+def set_thread_site(source=None, environment=None):
+    """Pin THIS thread's site target (both None = clear the pin)."""
+    if source is None and environment is None:
+        _thread_site.pair = None
+    else:
+        _thread_site.pair = (source.lower(), environment.lower())
+
+
 def get_site():
-    """The active (data_source, environment) pair."""
-    return _data_source, _environment
+    """The active (data_source, environment) pair — this thread's pin when
+    one is set (env-access scan workers), else the global selection."""
+    pair = getattr(_thread_site, "pair", None)
+    return pair if pair else (_data_source, _environment)
 
 
 def default_site_url(source, environment):
@@ -112,20 +133,21 @@ def default_site_url(source, environment):
 
 
 def get_url():
-    """The full report-page URL for the active data source / environment.
-    A Settings-tab override (settings.get_site_url — the "site moved before
-    an app update shipped" stopgap) wins over the built-in pattern and
-    applies to the very next navigation."""
+    """The full report-page URL for the active data source / environment
+    (this thread's pin when set — see set_thread_site). A Settings-tab
+    override (settings.get_site_url — the "site moved before an app update
+    shipped" stopgap) wins over the built-in pattern and applies to the very
+    next navigation."""
+    src, env = get_site()
     try:
         import settings
-        override = settings.get_site_url(_data_source, _environment)
+        override = settings.get_site_url(src, env)
     except Exception:                    # settings must never stop a run
         override = None
     if override:
-        log.info("site: using custom URL for %s-%s: %s",
-                 _data_source, _environment, override)
+        log.info("site: using custom URL for %s-%s: %s", src, env, override)
         return override
-    return default_site_url(_data_source, _environment)
+    return default_site_url(src, env)
 
 
 def expected_host():
@@ -855,18 +877,20 @@ CHANNEL_LABELS = {"chromium": "Built-in Chromium", "msedge": "Microsoft Edge",
                   "chrome": "Google Chrome"}
 
 _resolved_channel = None        # validated channel, cached for the process
+_resolved_parallel = None       # validated channel for PARALLEL workers (see below)
 _preferred_channel = None       # user's pick (tried first; the other stays a fallback)
 
 
 def set_preferred_channel(channel):
     """Record the user's preferred browser (tried first; the other channels stay
     fallbacks). None resets to the default order (Built-in Chromium when present,
-    then Edge, then Chrome). Clears the resolved cache so the next launch honors
+    then Edge, then Chrome). Clears the resolved caches so the next launch honors
     the new preference. A hard TSMIS_BROWSER_CHANNEL env override still wins
     over this."""
-    global _preferred_channel, _resolved_channel
+    global _preferred_channel, _resolved_channel, _resolved_parallel
     _preferred_channel = channel if channel in BROWSER_CHANNELS else None
     _resolved_channel = None
+    _resolved_parallel = None
     log.info("browser: preferred channel set to %s", _preferred_channel or "(default order)")
 
 
@@ -888,6 +912,29 @@ def _candidate_channels():
     if _preferred_channel:
         return (_preferred_channel,) + tuple(c for c in BROWSER_CHANNELS if c != _preferred_channel)
     return BROWSER_CHANNELS
+
+
+def _parallel_candidates():
+    """Channel order for PARALLEL saved-session browsers (fast mode's workers,
+    the env scan's scanners). Managed Edge is a bad host for several
+    concurrent headless instances restoring a storage_state — field failure:
+    org-managed Edge timed fast-mode workers out on a Chrome-captured session
+    — so parallel work prefers an unmanaged Chromium (Built-in Chromium, then
+    Chrome) and takes Edge only as a warned LAST resort. Edge keeps its
+    one-click device sign-in role untouched (that flow is sequential by
+    design). A UI pick of Edge is deliberately NOT honored here — honoring it
+    is what caused the failure; the hard TSMIS_BROWSER_CHANNEL override still
+    wins for debugging."""
+    forced = os.environ.get("TSMIS_BROWSER_CHANNEL", "").strip()
+    if forced:
+        return (forced,)
+    order = [c for c in BROWSER_CHANNELS if c != "msedge"]
+    if _preferred_channel and _preferred_channel != "msedge":
+        order = ([_preferred_channel]
+                 + [c for c in order if c != _preferred_channel])
+    if "msedge" in BROWSER_CHANNELS:
+        order.append("msedge")
+    return tuple(order)
 
 
 def _looks_missing(err):
@@ -932,26 +979,38 @@ def _probe_channel(p, channel):
             pass
 
 
-def _resolve_channel(p, exclude=()):
+def _resolve_channel(p, exclude=(), parallel=False):
     """Pick a browser Playwright can drive -- Built-in Chromium when present,
-    then Edge, then Chrome -- validating each by probe. Cached for the process.
+    then Edge, then Chrome -- validating each by probe. Cached for the process
+    (parallel work keeps its own cache + order — see _parallel_candidates).
     `exclude` skips channels already known to fail a real launch (so the
     fallback doesn't re-pick the same broken one). Raises BrowserNotFoundError
     (UI-neutral) with a message that distinguishes "none installed" from
     "installed but too new for this tool"."""
-    global _resolved_channel
-    if _resolved_channel and _resolved_channel not in exclude:
-        return _resolved_channel
+    global _resolved_channel, _resolved_parallel
+    cached = _resolved_parallel if parallel else _resolved_channel
+    if cached and cached not in exclude:
+        return cached
+    candidates = _parallel_candidates() if parallel else _candidate_channels()
     statuses = {}
-    for channel in _candidate_channels():
+    for channel in candidates:
         if channel in exclude:
             continue
         status = _probe_channel(p, channel)
         statuses[channel] = status
         if status == "ok":
-            _resolved_channel = channel
-            log.info("browser: resolved channel %s (candidates %s, excluded %s)",
-                     channel, list(_candidate_channels()), list(exclude))
+            if parallel:
+                _resolved_parallel = channel
+                if channel == "msedge":
+                    log.warning("browser: parallel workers fall back to "
+                                "Microsoft Edge (no Chromium/Chrome usable) — "
+                                "managed Edge can be unreliable with several "
+                                "concurrent sessions")
+            else:
+                _resolved_channel = channel
+            log.info("browser: resolved %schannel %s (candidates %s, excluded %s)",
+                     "parallel " if parallel else "", channel,
+                     list(candidates), list(exclude))
             return channel
     log.warning("browser: no usable channel (probes: %s, excluded %s)",
                 statuses, list(exclude))
@@ -970,9 +1029,23 @@ def _resolve_channel(p, exclude=()):
     )
 
 
-def launch_browser(p, *, headless=True, **kwargs):
+def resolve_parallel_channel(p):
+    """The channel parallel saved-session browsers would use (probed +
+    cached). Lets callers decide whether running several at once is wise:
+    "msedge" here means nothing but managed Edge is usable — the env scan
+    then drops to ONE browser instead of risking three concurrent Edge
+    sessions (the fast-mode field failure). Raises BrowserNotFoundError when
+    no browser works at all."""
+    return _resolve_channel(p, parallel=True)
+
+
+def launch_browser(p, *, headless=True, parallel=False, **kwargs):
     """Launch the first browser Playwright can drive (Built-in Chromium when
     present, then the system Edge, then Chrome).
+
+    `parallel=True` is for saved-session browsers that run SEVERAL AT ONCE
+    (fast mode's workers, the env scan's scanners): the order then prefers an
+    unmanaged Chromium and takes Edge only last — see _parallel_candidates.
 
     Resolves + validates the channel once per process (a headless probe, so no
     window flashes during headed login), caches it, then launches for real. If a
@@ -980,8 +1053,8 @@ def launch_browser(p, *, headless=True, **kwargs):
     cleared and the chain is re-resolved so it can still fall back. All terminal
     failures surface as BrowserNotFoundError with a user-safe message.
     """
-    global _resolved_channel
-    channel = _resolve_channel(p)               # may raise BrowserNotFoundError
+    global _resolved_channel, _resolved_parallel
+    channel = _resolve_channel(p, parallel=parallel)   # may raise BrowserNotFoundError
     try:
         return p.chromium.launch(headless=headless, channel=channel, **kwargs)
     except Exception as first_err:
@@ -993,9 +1066,12 @@ def launch_browser(p, *, headless=True, **kwargs):
         log.warning("browser: launch of %s failed (%s: %s); re-resolving without it",
                     failed, type(first_err).__name__,
                     str(first_err).splitlines()[0] if str(first_err) else "")
-        _resolved_channel = None
+        if parallel:
+            _resolved_parallel = None
+        else:
+            _resolved_channel = None
         try:
-            channel = _resolve_channel(p, exclude={failed})
+            channel = _resolve_channel(p, exclude={failed}, parallel=parallel)
             return p.chromium.launch(headless=headless, channel=channel, **kwargs)
         except BrowserNotFoundError:
             raise
@@ -1301,17 +1377,21 @@ def open_edge_device_context(p, *, headless=True):
     )
 
 
-def new_authed_browser(p):
+def new_authed_browser(p, parallel=False):
     """Launch a headless browser ready to drive TSMIS.
 
     With a valid saved session, restores it into the user's preferred browser
-    (the original flow). With NO usable saved session, runs in DEVICE SIGN-IN
-    mode instead: it reopens the app-owned persistent Edge sign-in profile,
-    where the one-click Windows sign-in lives, and the "Caltrans Azure AD"
-    click signs the context in live with no typed credentials. Edge-only and
-    profile-bound by design: on managed Caltrans PCs Chrome asks for
-    credentials, and even a fresh Edge context without this profile doesn't
-    get the one-click sign-in.
+    (the original flow). `parallel=True` marks a browser that runs alongside
+    OTHERS restoring the same session (fast mode's workers, the env scan's
+    scanners): the channel order then avoids managed Edge — see
+    _parallel_candidates. With NO usable saved session, runs in DEVICE
+    SIGN-IN mode instead: it reopens the app-owned persistent Edge sign-in
+    profile, where the one-click Windows sign-in lives, and the "Caltrans
+    Azure AD" click signs the context in live with no typed credentials.
+    Edge-only and profile-bound by design: on managed Caltrans PCs Chrome
+    asks for credentials, and even a fresh Edge context without this profile
+    doesn't get the one-click sign-in (device mode is single-browser, so
+    `parallel` is moot there).
 
     Returns (browser, context, page). Caller is responsible for browser.close()
     -- in device mode the persistent context doubles as the browser handle, and
@@ -1331,9 +1411,10 @@ def new_authed_browser(p):
         return ctx, ctx, page
 
     age = _auth_file_age_hours()
-    log.info("auth: using saved session %s%s", AUTH,
-             f" (saved {age:.1f} h ago)" if age is not None else "")
-    browser = launch_browser(p, headless=True, args=_LNA_ARGS)
+    log.info("auth: using saved session %s%s%s", AUTH,
+             f" (saved {age:.1f} h ago)" if age is not None else "",
+             " [parallel worker]" if parallel else "")
+    browser = launch_browser(p, headless=True, parallel=parallel, args=_LNA_ARGS)
     ctx = _new_app_context(browser, storage_state=state)
     page = ctx.new_page()
     return browser, ctx, page

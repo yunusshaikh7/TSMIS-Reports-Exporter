@@ -11,16 +11,22 @@ output/*
 !output/ramp_detail/
 !output/highway_sequence/
 !output/highway_log/
+!output/intersection_summary/
+!output/intersection_detail/
 !output/consolidated/
 output/ramp_summary/*
 output/ramp_detail/*
 output/highway_sequence/*
 output/highway_log/*
+output/intersection_summary/*
+output/intersection_detail/*
 output/consolidated/*
 !output/ramp_summary/.gitkeep
 !output/ramp_detail/.gitkeep
 !output/highway_sequence/.gitkeep
 !output/highway_log/.gitkeep
+!output/intersection_summary/.gitkeep
+!output/intersection_detail/.gitkeep
 !output/consolidated/.gitkeep
 
 # input/ holds user-supplied source files (TSN district PDFs). Keep the folder

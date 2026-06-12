@@ -15,6 +15,8 @@ from export_ramp_summary import SPEC as _RAMP_SUMMARY_SPEC
 from export_ramp_detail import SPEC as _RAMP_DETAIL_SPEC
 from export_highway_sequence import SPEC as _HIGHWAY_SEQ_SPEC
 from export_highway_log import SPEC as _HIGHWAY_LOG_SPEC
+from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
+from export_intersection_detail import SPEC as _INT_DETAIL_SPEC
 
 import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
@@ -32,6 +34,11 @@ EXPORT_REPORTS = [
     ("TSAR: Ramp Detail", "Excel", _RAMP_DETAIL_SPEC),
     ("Highway Sequence Listing", "Excel", _HIGHWAY_SEQ_SPEC),
     ("Highway Log", "Excel", _HIGHWAY_LOG_SPEC),
+    # Export-only for now (no consolidation/comparison support yet). The env
+    # check reads the dropdown for every row here, so it verifies these
+    # labels against the live site for free.
+    ("TSAR: Intersection Summary", "PDF", _INT_SUMMARY_SPEC),
+    ("TSAR: Intersection Detail", "Excel", _INT_DETAIL_SPEC),
 ]
 
 # Consolidate tab: (menu label, module). Same order as above. Each module

@@ -209,7 +209,13 @@ def check_for_update(current_version=None, variant=None, channel="stable",
         if not releases:
             log.info("update check: the dev channel has no releases")
             return None
-        data = releases[0]              # the API lists newest first
+        # Never trust the list ORDER: pick the most recently PUBLISHED
+        # release ourselves. Field failure: the API listed the stable
+        # release first, its tag matched the install, and the dev channel
+        # answered "up to date" while a newer dev build existed.
+        data = max(releases,
+                   key=lambda r: str(r.get("published_at")
+                                     or r.get("created_at") or ""))
         tag = data.get("tag_name") or ""
         if not tag or tag == installed_tag(bld):
             log.info("update check: up to date (dev channel newest is %s)", tag)
@@ -469,12 +475,25 @@ def _remove_tree(path):
 def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
                  wait_timeout_s=_SWAP_TIMEOUT_S, show_dialog=True):
     """The swap itself (separated from run_swap_mode so a sandbox test can
-    drive it against fake trees). Waits for `pid` to exit, renames each old
-    bundle piece in `app_dir` to *.old, COPIES the staged piece in (this
-    process runs FROM `staged`, so it cannot move itself), relaunches the
-    app, and rolls everything back if any step fails. User data (data\\,
-    output\\, input\\) is never in the staged tree and is never touched.
-    Returns True when the new version is in place."""
+    drive it against fake trees). Waits for `pid` to exit, then installs in
+    TWO PHASES so a half-installed (mixed-version) tree is impossible:
+
+      1. COPY every staged piece to `<name>.new` next to its target (this
+         process runs FROM `staged`, so it cannot move itself). The big,
+         slow, failure-prone work (a ~150 MB copytree under live Defender
+         scanning) happens while the installed app is completely untouched —
+         any failure here is a clean abort with the old version intact.
+      2. Pure RENAMES: live -> `.old`, `.new` -> live. Instant on the same
+         volume, and a failure rolls back with renames too — never by
+         deleting a half-copied tree (v0.10.2 field failure: the one-phase
+         copy could fail mid-`_internal`, the delete-based rollback could
+         fail on a Defender-held file, and the app relaunched as a NEW exe
+         with PARTIAL/old internals — "says 0.10.2 but features missing").
+
+    User data (data\\, output\\, input\\) is never in the staged tree and is
+    never touched. Leftover `.old`/`.new` pieces are removed by
+    cleanup_leftovers() on the next launch. Returns True when the new
+    version is in place."""
     _swap_log(log_file, f"swap started: waiting for the app (pid {pid}) to exit")
     if not _wait_pid_exit(pid, wait_timeout_s):
         _swap_log(log_file, f"app still running after {wait_timeout_s}s - "
@@ -487,59 +506,99 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
                             "update NOT applied")
         return False
 
-    # Old piece -> *.old (pure rename: atomic, fails clean), staged piece ->
-    # COPIED into place. Tracked so a failure rolls everything back.
-    moved = []                           # (dest, bak) pairs that were renamed
+    # ---- phase 1: copy everything in as *.new (old app untouched) ----------
+    items = sorted(staged.iterdir())
+    news = []                            # (name, new_path) ready to rename in
+    for item in items:
+        new = app_dir / (item.name + ".new")
+        try:
+            _retry(lambda n=new: _remove_tree(n))
+            if item.is_dir():
+                shutil.copytree(item, new)
+            else:
+                shutil.copy2(item, new)
+            news.append((item.name, new))
+            _swap_log(log_file, f"prepared: {item.name}.new")
+        except OSError as e:
+            _swap_log(log_file, f"swap ABORTED preparing {item.name}.new: "
+                                f"{type(e).__name__}: {e}")
+            for _name, n in news:
+                try:
+                    _remove_tree(n)
+                except OSError:
+                    pass
+            _swap_log(log_file, "nothing was changed - the installed version "
+                                "is untouched; update NOT applied")
+            if show_dialog:
+                _message_box("The update could not be prepared, so nothing "
+                             f"was changed.\nDetails: {log_file}")
+            if relaunch:
+                _relaunch(app_dir, log_file)
+            return False
+
+    # ---- phase 2: rename-swap each piece (instant; rollback = renames) -----
+    moved = []                           # (dest, bak) pairs renamed to .old
     failed = None
-    for item in sorted(staged.iterdir()):
-        dest = app_dir / item.name
-        bak = app_dir / (item.name + ".old")
+    for name, new in news:
+        dest = app_dir / name
+        bak = app_dir / (name + ".old")
         try:
             if bak.exists():
                 _retry(lambda b=bak: _remove_tree(b))
             if dest.exists():
                 _retry(lambda d=dest, b=bak: d.rename(b))
                 moved.append((dest, bak))
-            if item.is_dir():
-                shutil.copytree(item, dest)
-            else:
-                shutil.copy2(item, dest)
-            _swap_log(log_file, f"installed: {item.name}")
+            _retry(lambda n=new, d=dest: n.rename(d))
+            _swap_log(log_file, f"installed: {name}")
         except OSError as e:
-            failed = f"{item.name}: {type(e).__name__}: {e}"
+            failed = f"{name}: {type(e).__name__}: {e}"
             _swap_log(log_file, f"swap FAILED on {failed}")
             break
 
     if failed:
-        for dest, bak in moved:
+        # Undo with renames only: each installed piece goes back to .new,
+        # its .old back into place. No deletes of fresh trees involved.
+        _swap_log(log_file, "rolling back (renames only)")
+        restored = True
+        for dest, bak in reversed(moved):
             try:
-                _remove_tree(dest)
+                if dest.exists():
+                    _retry(lambda d=dest: d.rename(
+                        d.with_name(d.name + ".new")))
                 _retry(lambda b=bak, d=dest: b.rename(d))
             except OSError as e:
-                _swap_log(log_file, f"rollback of {dest} FAILED: "
+                restored = False
+                _swap_log(log_file, f"rollback of {dest.name} FAILED: "
                                     f"{type(e).__name__}: {e}")
-        _swap_log(log_file, "previous version restored")
+        _swap_log(log_file, "previous version restored" if restored else
+                            "previous version PARTIALLY restored - reinstall "
+                            "the app from the releases page")
         if show_dialog:
             _message_box("The update could not be applied, so the previous "
                          f"version was kept.\nDetails: {log_file}")
 
     if relaunch:
-        try:
-            subprocess.Popen(
-                [str(app_dir / _EXE_NAME)], cwd=str(app_dir), close_fds=True,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL)
-            _swap_log(log_file, "app relaunched")
-        except OSError as e:
-            _swap_log(log_file, f"relaunch FAILED: {type(e).__name__}: {e} - "
-                                "start the app manually")
+        _relaunch(app_dir, log_file)
 
-    # Leftover *.old pieces and the staged tree THIS process runs from are
-    # removed by cleanup_leftovers() at the relaunched app's next startup
+    # Leftover *.old/*.new pieces and the staged tree THIS process runs from
+    # are removed by cleanup_leftovers() at the relaunched app's next startup
     # (this process exits immediately, releasing its own files).
     _swap_log(log_file, "swap done" if not failed else "swap failed")
     return failed is None
+
+
+def _relaunch(app_dir, log_file):
+    """Start the app in `app_dir` detached (whichever version sits there)."""
+    try:
+        subprocess.Popen(
+            [str(app_dir / _EXE_NAME)], cwd=str(app_dir), close_fds=True,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+        _swap_log(log_file, "app relaunched")
+    except OSError as e:
+        _swap_log(log_file, f"relaunch FAILED: {type(e).__name__}: {e} - "
+                            "start the app manually")
 
 
 def _message_box(text):
@@ -551,16 +610,74 @@ def _message_box(text):
         pass
 
 
+def last_swap_failure(max_age_hours=48):
+    """One line describing a RECENT failed swap from update_helper.log, or
+    None. The swap helper runs after the app has closed, so a rollback can
+    only leave a file behind — the next launch reads it back and tells the
+    user the update rolled back instead of leaving a silent mystery (field
+    report: an update "applied", the app reopened on the old version, and
+    nothing said why). Only the LAST helper run counts: a failure followed by
+    a successful swap is history."""
+    path = LOG_DIR / "update_helper.log"
+    try:
+        if not path.is_file():
+            return None
+        if time.time() - path.stat().st_mtime > max_age_hours * 3600:
+            return None
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines[-60:]):
+        if "swap done" in line:
+            return None
+        if "swap FAILED" in line or "update NOT applied" in line:
+            return line.strip()
+    return None
+
+
 # --------------------------------------------------------------- cleanup ----
+
+def _clear_webview_caches():
+    """Drop the GUI's WebView2 HTTP caches (NEVER Local Storage — the theme
+    choice lives there). The persistent profile (data\\webview2) can serve a
+    CACHED app.js/index.html after the files on disk changed: a just-updated
+    app then shows the OLD interface under the NEW version number (field
+    report, v0.10.2 update — "says 0.10.2 but features missing"). The caches
+    only ever hold the app's own three UI files, so clearing on every launch
+    is cheap and kills the whole staleness class (manual zip-overwrite
+    installs included)."""
+    try:
+        from paths import WEBVIEW_PROFILE_DIR
+        profile = Path(WEBVIEW_PROFILE_DIR)
+        if not profile.is_dir():
+            return
+        removed = []
+        for pattern in ("Cache", "Code Cache", "GPUCache", "Service Worker",
+                        "*/Cache", "*/Code Cache", "*/GPUCache",
+                        "*/*/Cache", "*/*/Code Cache", "*/*/GPUCache",
+                        "*/*/Service Worker"):
+            for hit in profile.glob(pattern):
+                if hit.is_dir():
+                    shutil.rmtree(hit, ignore_errors=True)
+                    removed.append(str(hit.relative_to(profile)))
+        if removed:
+            log.info("webview cache cleared: %s", ", ".join(removed))
+    except Exception as e:                  # never block startup over a cache
+        log.info("webview cache clear skipped (%s)", type(e).__name__)
+
 
 def cleanup_leftovers():
     """Remove what a finished (or abandoned) update leaves behind: the
-    data\\update staging area and any *.old bundle pieces the helper couldn't
-    delete while the new app was already starting. Best-effort and cheap (a
-    handful of stats); called on every GUI launch, before the CLR loads."""
+    data\\update staging area and any *.old / *.new bundle pieces the helper
+    couldn't delete while the new app was already starting — and the WebView2
+    HTTP caches, so the interface on screen is always the one on disk.
+    Best-effort and cheap; called on every GUI launch, before the CLR loads."""
+    _clear_webview_caches()
     if not is_frozen():
         return
-    targets = [UPDATE_DIR] + [install_dir() / (name + ".old") for name in _BUNDLE_ITEMS]
+    targets = [UPDATE_DIR] + [install_dir() / (name + suffix)
+                              for name in _BUNDLE_ITEMS
+                              for suffix in (".old", ".new")]
     removed, failed = [], []
     for t in targets:
         try:

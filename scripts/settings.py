@@ -41,6 +41,7 @@ DEFAULTS = {
     "debug_logging": False,      # verbose (DEBUG) file logging
     "ui_devtools": False,        # open WebView2 DevTools on the next launch
     "update_channel": "stable",  # one-click update source: stable | dev
+    "env_check_on_start": True,  # auto-run the env-access scan after start/sign-in
 }
 
 # Validation: allowed values for the choice knobs; anything else reads as the

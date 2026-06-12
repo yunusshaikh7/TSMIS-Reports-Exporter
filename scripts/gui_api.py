@@ -351,6 +351,7 @@ class GuiApi:
             self._emit_log("Session saved.")
             self._refresh_auth()
             self._end_task()
+            self._maybe_autoscan("login")
         elif kind == "login_device_ok":
             # Silent device sign-in works, but the session is device-bound so no
             # file was saved (and none is needed): each export signs itself in.
@@ -361,6 +362,7 @@ class GuiApi:
                            "themselves in.")
             self._refresh_auth()
             self._end_task()
+            self._maybe_autoscan("login")
         elif kind == "login_failed":
             self._emit_log("Login wasn't completed — no new session was saved.")
             self._emit_modal(
@@ -471,6 +473,29 @@ class GuiApi:
                 self._emit_log("Warning: no usable web browser was found. Install Microsoft "
                                "Edge (or Google Chrome) before running an export.")
         self._push_state()
+        # Browsers are probed and the saved login (if any) is known: the right
+        # moment for the automatic environment check.
+        self._maybe_autoscan("startup")
+
+    def _maybe_autoscan(self, reason):
+        """Start the env-access scan unprompted — once per session, only when
+        a login is available (a no-login scan would just log six failures at
+        every launch), never preempting other work, and only when the
+        Settings toggle allows it."""
+        try:
+            if not settings.get("env_check_on_start"):
+                return
+        except Exception:
+            return
+        with self._lock:
+            if self._task or self._env_access:
+                return
+            if not (self._authed or self._device_ok):
+                return
+        log.info("env scan: automatic start (%s)", reason)
+        self._emit_log("Checking access to all environments in the background "
+                       "(automatic — turn off in Settings)…")
+        self.check_environments()
 
     def _on_update_status(self, payload):
         """UpdateWorker's whole-state posts. `manual` (user clicked) decides
@@ -492,6 +517,18 @@ class GuiApi:
                 size = f" ({payload['size_mb']} MB)" if payload.get("size_mb") else ""
                 self._emit_log(f"Update available: {disp}{size}{dev_note} — click "
                                f"‘Update to {disp}’ in the title bar to install it.")
+                # An update being offered WHILE the helper log ends in a
+                # failure means the last attempt rolled back — say so instead
+                # of looking like nothing ever happened.
+                fail = updater.last_swap_failure()
+                if fail:
+                    log.warning("update: previous swap rolled back: %s", fail)
+                    self._emit_log("Heads-up: the previous update attempt could "
+                                   "not be applied and the old version was "
+                                   "restored. Trying again usually works — "
+                                   "close any window showing the app's folder "
+                                   "first. (Details: update_helper.log in the "
+                                   "logs folder.)")
             else:
                 self._emit_log(f"Update available: {disp}.{dev_note} This app folder isn't "
                                "writable, so the title-bar button opens the download "
@@ -605,13 +642,8 @@ class GuiApi:
 
     @_api_method
     def set_site(self, source, environment):
-        with self._lock:
-            if self._task == "envscan":
-                # The scan retargets the site selection combo by combo; a
-                # user change now would be stomped by its restore.
-                return {"error": "The environment check is using the site "
-                                 "selection — wait for it to finish (or "
-                                 "cancel it), then change the site."}
+        # Safe even while the env scan runs: scanner threads pin their own
+        # targets via common.set_thread_site and never touch this selection.
         set_site(source=source, environment=environment)
         src, env = get_site()
         self._emit_log(f"Site set to {DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]} "
