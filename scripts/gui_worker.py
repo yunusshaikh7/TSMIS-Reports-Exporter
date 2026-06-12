@@ -55,6 +55,7 @@ Message protocol (all are (kind, payload) tuples):
 """
 import base64
 import logging
+import queue as queue_mod
 import re
 import threading
 import time
@@ -63,12 +64,13 @@ from common import (
     _CONFIG_JS, LOGIN_BROWSER_ARGS, ROUTES, AuthError, BrowserNotFoundError,
     PreflightError, SiteUnreachableError, BROWSER_CHANNELS, CHANNEL_LABELS,
     DATA_SOURCES, DATA_SOURCE_LABELS, ENVIRONMENTS, ENVIRONMENT_LABELS,
-    auth_state, check_browsers, get_site, get_url, is_logged_in, launch_browser,
+    auth_state, check_browsers, get_site, get_url, has_valid_auth,
+    is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, navigate_with_auth, new_authed_browser,
     new_login_context, page_url_for_display, preflight, save_auth_state,
-    set_site, storage_state_is_portable, try_device_sso_login,
+    set_thread_site, storage_state_is_portable, try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
@@ -551,24 +553,32 @@ _REPORT_OPTIONS_JS = """(labels) => {
 
 
 class EnvScanWorker(threading.Thread):
-    """The Settings tab's "Check all environments": probe EVERY data source /
-    environment combination headless, the way an export would (saved session,
-    else device sign-in) — does sign-in complete, does the page load the
-    requested site, and can the report form pull data? The page ships its
-    whole form in static HTML even signed out, so form presence proves
-    nothing; only a real preflight (report picked, District fanned out, the
-    site's own data round-trip enabling the County dropdown) shows report
-    access — "signs in fine but can't actually pull reports" is exactly the
-    failure this exists to surface.
+    """The "Check all environments" scan (Settings button + the automatic
+    run after startup/sign-in): probe EVERY data source / environment
+    combination headless, the way an export would — does sign-in complete,
+    does the page load the requested site, can the report form pull data,
+    and is every report type offered? The page ships its whole form in
+    static HTML even signed out, so form presence proves nothing; only a
+    real preflight (report picked, District fanned out, the site's own data
+    round-trip enabling the County dropdown) shows report access — "signs in
+    fine but can't actually pull reports" is exactly the failure this exists
+    to surface.
+
+    FAST on purpose (it runs unprompted after startup): combos are drained
+    from a shared queue by up to 3 scanner threads, each owning its own
+    Playwright/browser (the fast-mode idiom — the sync API is thread-affine)
+    and pinning its target via common.set_thread_site, so the user's header
+    selection is never touched and parallel combos can't race each other.
+    Device sign-in mode (no saved auth file) caps the scan to ONE thread:
+    the persistent Edge profile can only be open in one browser — the same
+    rule fast mode applies.
 
     Posts one ("env_access", dict) per combo AS IT FINISHES (the Settings
     rows and the title-bar chip update live), then ("env_access_done", dict).
     Cancel is honored BETWEEN combos — each combo is already bounded by the
-    sign-in budget and the preflight/county timeouts. The scan retargets
-    common.set_site for each combo (so get_url / expected_host / the
-    wrong-site check all follow it, custom URL overrides included — gui_api
-    refuses site changes while the scan runs) and ALWAYS restores the user's
-    selection."""
+    sign-in budget and the preflight/county timeouts."""
+
+    MAX_SCANNERS = 3
 
     def __init__(self, queue, cancel_event):
         super().__init__(daemon=True, name="envscan")
@@ -576,56 +586,84 @@ class EnvScanWorker(threading.Thread):
         self.cancel = cancel_event
 
     def run(self):
-        from playwright.sync_api import sync_playwright
         from reports import EXPORT_REPORTS
         labels = [label for label, _fmt, _spec in EXPORT_REPORTS]
-        keep_src, keep_env = get_site()
         combos = [(s, e) for s in DATA_SOURCES for e in ENVIRONMENTS]
-        ok = done = 0
-        cancelled = False
-        fatal = None
-        log.info("env scan: starting (%d combos, report types %s)",
-                 len(combos), labels)
-        try:
-            with sync_playwright() as p:
-                browser = page = None
-                try:
-                    for src, env in combos:
-                        if self.cancel.is_set():
-                            cancelled = True
-                            break
-                        set_site(src, env)
-                        if browser is None:   # one browser serves the whole scan
-                            browser, _ctx, page = new_authed_browser(p)
-                        out = self._check_one(page, src, env, labels)
-                        done += 1
-                        ok += out["status"] == "ok"
-                        self.q.put(("env_access", out))
-                finally:
-                    if browser is not None:
-                        try:
-                            browser.close()
-                        except Exception:
-                            pass
-        except (AuthError, BrowserNotFoundError) as e:
-            fatal = str(e)                   # messages are already user-safe
-            log.warning("env scan: stopped (%s: %s)", type(e).__name__, fatal)
-        except Exception as e:
-            log.exception("env scan crashed")
-            fatal = f"{type(e).__name__}: {e}"
-        finally:
-            set_site(keep_src, keep_env)     # the scan never moves the user's pick
-        if fatal:
-            # Fill the unchecked combos so no row is left saying "checking".
-            for src, env in combos[done:]:
-                self.q.put(("env_access", {
-                    "key": f"{src}-{env}", "source": src, "environment": env,
-                    "label": f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}",
-                    "status": "error", "detail": fatal, "url": ""}))
+        n = min(self.MAX_SCANNERS, len(combos)) if has_valid_auth() else 1
+        log.info("env scan: starting (%d combos, %d scanner browser(s), "
+                 "report types %s)", len(combos), n, labels)
+        work = queue_mod.Queue()
+        for combo in combos:
+            work.put(combo)
+        results = {}                      # key -> result dict (lock-protected)
+        fatals = []
+        lock = threading.Lock()
+
+        def scanner(worker_no):
+            from playwright.sync_api import sync_playwright
+            try:
+                with sync_playwright() as p:
+                    browser = page = None
+                    try:
+                        while not self.cancel.is_set():
+                            try:
+                                src, env = work.get_nowait()
+                            except queue_mod.Empty:
+                                break
+                            set_thread_site(src, env)
+                            if browser is None:
+                                browser, _ctx, page = new_authed_browser(p)
+                            out = self._check_one(page, src, env, labels)
+                            with lock:
+                                results[out["key"]] = out
+                            self.q.put(("env_access", out))
+                    finally:
+                        set_thread_site(None, None)
+                        if browser is not None:
+                            try:
+                                browser.close()
+                            except Exception:
+                                pass
+            except (AuthError, BrowserNotFoundError) as e:
+                # This scanner is out; the others keep draining the queue.
+                log.warning("env scan: scanner %d stopped (%s: %s)",
+                            worker_no, type(e).__name__, e)
+                with lock:
+                    fatals.append(str(e))    # messages are already user-safe
+            except Exception as e:
+                log.exception("env scan: scanner %d crashed", worker_no)
+                with lock:
+                    fatals.append(f"{type(e).__name__}: {e}")
+
+        threads = [threading.Thread(target=scanner, args=(i + 1,),
+                                    daemon=True, name=f"envscan-w{i + 1}")
+                   for i in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        cancelled = self.cancel.is_set()
+        fatal = fatals[0] if fatals and len(fatals) == n else None
+        if fatal and not cancelled:
+            # EVERY scanner died (e.g. no usable login at all): fill the
+            # unchecked combos so no row is left saying "checking".
+            for src, env in combos:
+                key = f"{src}-{env}"
+                if key in results:
+                    continue
+                out = {"key": key, "source": src, "environment": env,
+                       "label": f"{DATA_SOURCE_LABELS[src]} / "
+                                f"{ENVIRONMENT_LABELS[env]}",
+                       "status": "error", "detail": fatal, "url": "",
+                       "reports": {}}
+                results[key] = out
+                self.q.put(("env_access", out))
+        ok = sum(1 for r in results.values() if r["status"] == "ok")
         log.info("env scan: done ok=%d/%d cancelled=%s fatal=%s",
-                 ok, done, cancelled, fatal or "-")
+                 ok, len(results), cancelled, fatal or "-")
         self.q.put(("env_access_done",
-                    {"ok": ok, "done": done, "total": len(combos),
+                    {"ok": ok, "done": len(results), "total": len(combos),
                      "cancelled": cancelled, "error": fatal}))
 
     def _check_one(self, page, src, env, report_labels):

@@ -612,7 +612,7 @@ function renderState() {
    "btnCheckEnvs"]
     .forEach((id) => { $(id).disabled = locked; });
   Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
-  ["setDebugLog", "setDevtools"].forEach((id) => {
+  ["setDebugLog", "setDevtools", "setEnvAutoCheck"].forEach((id) => {
     $(id).disabled = locked;
     $(id).closest(".option-row").classList.toggle("disabled", locked);
   });
@@ -723,6 +723,21 @@ function renderEnvAccess() {
   const last = entries.map((e) => e.checked_at).filter(Boolean).sort().pop();
   $("envScanStamp").textContent = last ? `Last checked ${last}`
                                        : "Not checked yet this session.";
+
+  // Export tab: flag report types the ACTIVE site's scan found unavailable
+  // (warning only — the site may have changed since; the run will tell).
+  const active = acc[`${$("selSource").value}-${$("selEnv").value}`];
+  const reps = (active && active.reports) || {};
+  $("reportList").querySelectorAll(".option-row").forEach((row, i) => {
+    const label = ((S.init.reports || [])[i] || {}).label;
+    const state = label && reps[label];
+    const off = state && state !== "ok";
+    row.classList.toggle("report-off", !!off);
+    row.title = off
+      ? `The last environment check found this report ${state === "greyed"
+          ? "greyed out" : "missing"} on ${active.label} — the export may fail.`
+      : "";
+  });
 }
 
 // One-click update pill (title bar). Python owns the whole update state; this
@@ -1146,6 +1161,7 @@ function fillSettings() {
   };
   setToggle("setDebugLog", v.debug_logging);
   setToggle("setDevtools", v.ui_devtools);
+  setToggle("setEnvAutoCheck", v.env_check_on_start);
 
   const meta = s.meta || {};
   const paths = $("setPaths");
@@ -1389,8 +1405,14 @@ function bindEvents() {
   };
 
   $("selBrowser").onchange = () => api.set_browser($("selBrowser").value);
-  $("selSource").onchange = () => api.set_site($("selSource").value, $("selEnv").value);
-  $("selEnv").onchange = () => api.set_site($("selSource").value, $("selEnv").value);
+  $("selSource").onchange = () => {
+    api.set_site($("selSource").value, $("selEnv").value);
+    renderEnvAccess();          // re-aim the Export tab's availability flags
+  };
+  $("selEnv").onchange = () => {
+    api.set_site($("selSource").value, $("selEnv").value);
+    renderEnvAccess();
+  };
   $("btnRecheck").onclick = () => api.start_checks();
 
   $("btnLogin").onclick = () => {
@@ -1422,6 +1444,7 @@ function bindEvents() {
   });
   $("setDebugLog").addEventListener("change", () => onSettingToggle("setDebugLog", "debug_logging"));
   $("setDevtools").addEventListener("change", () => onSettingToggle("setDevtools", "ui_devtools"));
+  $("setEnvAutoCheck").addEventListener("change", () => onSettingToggle("setEnvAutoCheck", "env_check_on_start"));
   $("btnSupportBundle").onclick = async () => {
     const res = await api.save_support_bundle();
     if (res && res.error) showMessage("error", "Could not save the bundle", res.error);
@@ -1584,7 +1607,7 @@ function makeMockApi() {
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
     county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
-    update_channel: "stable",
+    update_channel: "stable", env_check_on_start: true,
   };
   const mockUrlOverrides = {};
   const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,

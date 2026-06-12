@@ -16,6 +16,14 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
+| 5 | TSAR: Intersection Summary | PDF (Letter) | `output/<run>/intersection_summary/` |
+| 6 | TSAR: Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
+
+Reports 5–6 (v0.10.2) are **export-only** for now (no consolidator/comparison);
+their specs mirror the ramp pair and their dropdown labels + empty-marker
+text ("no intersections") are best-guess until verified live — the env-access
+scan reads the dropdown for every `EXPORT_REPORTS` row, so a wrong label
+shows up there as "missing" without running an export.
 
 `<run>` is a **run folder**, `"<YYYY-MM-DD> <src>-<env>"` (e.g.
 `2026-06-11 ssor-prod`, v0.10.0) — see *Key Behaviors: run folders*.
@@ -450,17 +458,25 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   every common disable convention counts, classes are logged, an unreadable
   list = unknown — never "all missing") — the preflight probes the first
   AVAILABLE type, ≥1 unavailable ⇒ amber `reports_off` naming them (per-type
-  states in the row tooltip), all four ⇒ `no_reports`. Verdicts (ok /
+  states in the row tooltip), all ⇒ `no_reports`. Verdicts (ok /
   reports_off / no_reports / denied / no_signin / wrong_site / unreachable /
   error) stream onto each address row as they
   land (`("env_access", dict)` per combo → snapshot `env_access`), with a
   title-bar **Env access chip** showing the aggregate ("Envs 5/6"; click =
-  jump to the Settings rows). Results are session-only on purpose (access
-  is server-side state that changes under us). The scan retargets
-  `common.set_site` per combo so every helper (custom URL overrides
-  included) behaves exactly as an export would — `gui_api.set_site` refuses
-  changes while it runs, the user's selection is always restored, and
-  Cancel lands between combos. Also: support-bundle zip (logs + run reports + manifest —
+  jump to the Settings rows), and the Export tab tints report types the
+  ACTIVE combo's scan found unavailable. Results are session-only on
+  purpose (access is server-side state that changes under us).
+  **Fast + automatic (v0.10.2):** combos drain from a shared queue into up
+  to 3 scanner threads, each owning its own Playwright/browser (fast-mode
+  idiom) and pinning its target via `common.set_thread_site` — a
+  threading.local consulted by `get_site()`, so every site-aware helper
+  (get_url/expected_host/_site_params_ok, custom URL overrides included)
+  follows the pin for that thread only and the user's header selection is
+  never touched (engine/login threads never pin). Device sign-in mode caps
+  the scan to 1 thread (the Edge profile opens in ONE browser — fast mode's
+  rule). The scan auto-runs once per session after startup/sign-in when a
+  login is available (`gui_api._maybe_autoscan`; Settings toggle
+  `env_check_on_start`, default on); Cancel lands between combos. Also: support-bundle zip (logs + run reports + manifest —
   NEVER the auth file/profiles), forget-saved-login, open-folder shortcuts,
   and **Delete all reports** (`gui_worker.reset_targets`/`ResetWorker`):
   removes run folders, legacy flat report folders, consolidated/comparisons,

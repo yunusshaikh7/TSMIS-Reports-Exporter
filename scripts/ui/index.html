@@ -417,11 +417,19 @@
           </p>
           <div class="actions-row" style="margin-bottom:8px">
             <button class="btn btn-standard" id="btnCheckEnvs"
-                    title="Open each of the six sites headless (signs in like an export) and verify the report form can load its data — takes a few minutes">
+                    title="Open each of the six sites headless (signs in like an export) and verify the report form can load its data and every report type is offered">
               <svg class="ic"><use href="#i-refresh"/></svg>Check all environments
             </button>
             <button class="btn btn-subtle hidden" id="btnCheckEnvsCancel">Cancel</button>
             <span class="env-scan-stamp" id="envScanStamp"></span>
+          </div>
+          <div class="option-list" style="margin-bottom:8px">
+            <label class="option-row" id="rowEnvAutoCheck">
+              <input type="checkbox" id="setEnvAutoCheck">
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="option-name">Check automatically after start / sign-in
+                <span class="muted">— runs in the background once a login is available</span></span>
+            </label>
           </div>
           <div class="set-urls" id="setSiteUrls"></div>
         </div>

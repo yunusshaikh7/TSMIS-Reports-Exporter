@@ -16,6 +16,7 @@ import os
 import re
 import socket
 import sys
+import threading
 import time
 from pathlib import Path
 from urllib.parse import quote, urlsplit
@@ -101,9 +102,29 @@ def set_site(source=None, environment=None):
     log.info("site: set to src=%s env=%s", _data_source, _environment)
 
 
+# The env-access scan probes several src/env combos in PARALLEL worker
+# threads; a process-wide set_site would race (and fight the user's header
+# selection). A scanner thread pins its own target here instead — every
+# site-aware helper (get_url, expected_host, _site_params_ok, the signed-in
+# host check) flows through get_site(), so the pin retargets all of them for
+# that thread only. Engine/export/login threads never set this and keep
+# following the global selection.
+_thread_site = threading.local()
+
+
+def set_thread_site(source=None, environment=None):
+    """Pin THIS thread's site target (both None = clear the pin)."""
+    if source is None and environment is None:
+        _thread_site.pair = None
+    else:
+        _thread_site.pair = (source.lower(), environment.lower())
+
+
 def get_site():
-    """The active (data_source, environment) pair."""
-    return _data_source, _environment
+    """The active (data_source, environment) pair — this thread's pin when
+    one is set (env-access scan workers), else the global selection."""
+    pair = getattr(_thread_site, "pair", None)
+    return pair if pair else (_data_source, _environment)
 
 
 def default_site_url(source, environment):
@@ -112,20 +133,21 @@ def default_site_url(source, environment):
 
 
 def get_url():
-    """The full report-page URL for the active data source / environment.
-    A Settings-tab override (settings.get_site_url — the "site moved before
-    an app update shipped" stopgap) wins over the built-in pattern and
-    applies to the very next navigation."""
+    """The full report-page URL for the active data source / environment
+    (this thread's pin when set — see set_thread_site). A Settings-tab
+    override (settings.get_site_url — the "site moved before an app update
+    shipped" stopgap) wins over the built-in pattern and applies to the very
+    next navigation."""
+    src, env = get_site()
     try:
         import settings
-        override = settings.get_site_url(_data_source, _environment)
+        override = settings.get_site_url(src, env)
     except Exception:                    # settings must never stop a run
         override = None
     if override:
-        log.info("site: using custom URL for %s-%s: %s",
-                 _data_source, _environment, override)
+        log.info("site: using custom URL for %s-%s: %s", src, env, override)
         return override
-    return default_site_url(_data_source, _environment)
+    return default_site_url(src, env)
 
 
 def expected_host():
