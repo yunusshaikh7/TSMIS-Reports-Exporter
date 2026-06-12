@@ -19,6 +19,9 @@ Message protocol (all are (kind, payload) tuples):
     ("login_failed", None)             window closed/finished without a real login
     ("cancelled", None)                task stopped at user request
     ("error", (kind, message))         kind is "auth" or "general"
+    ("update_status", dict)            one-click update progress; the dict is the
+                                       GUI's whole update state (phase, version,
+                                       progress, ...) -- see gui_api._on_update_status
 """
 import logging
 import threading
@@ -457,6 +460,73 @@ class LoginWorker(threading.Thread):
     @staticmethod
     def _save_state(state):
         save_auth_state(state)          # logs path + cookie count
+
+
+class UpdateWorker(threading.Thread):
+    """Drives the one-click update (updater.py) off the GUI thread: action
+    "check" compares the latest GitHub release tag to this build; action
+    "download" streams + stages the matching release zip. Network + disk
+    only, no Playwright. Posts ('update_status', {phase, ...}) — the dict is
+    the GUI's whole update state; see gui_api._on_update_status.
+
+    `manual` marks a user-initiated check (the outcome is shown in the log
+    pane; the automatic launch check stays quiet unless an update exists).
+    """
+
+    def __init__(self, queue, action, manual=False, info=None):
+        super().__init__(daemon=True, name="update")
+        self.q = queue
+        self.action = action            # "check" | "download"
+        self.manual = manual
+        self.info = info                # UpdateInfo (required for "download")
+
+    def run(self):
+        import updater                  # lazy; stdlib-only module
+        try:
+            if self.action == "check":
+                info = updater.check_for_update()
+                if info is None:
+                    self.q.put(("update_status", {"phase": "none",
+                                                  "manual": self.manual}))
+                    return
+                self.q.put(("update_status", {
+                    "phase": "available",
+                    "version": info.version,
+                    "url": info.release_url,
+                    "size_mb": round(info.asset_size / 1e6) or None,
+                    "can_apply": updater.update_support()[0] == "ok",
+                    "manual": self.manual,
+                    "_info": info,      # kept Python-side; stripped before JS
+                }))
+                return
+
+            last_pct = -1               # "download"
+
+            def on_progress(done, total):
+                nonlocal last_pct
+                pct = min(100, int(done * 100 / total)) if total else 0
+                if pct != last_pct:
+                    last_pct = pct
+                    self.q.put(("update_status", {
+                        "phase": "downloading", "progress": pct,
+                        "version": self.info.version,
+                        "url": self.info.release_url, "can_apply": True}))
+
+            staged = updater.download_and_stage(self.info, on_progress=on_progress)
+            self.q.put(("update_status", {
+                "phase": "staged", "version": self.info.version,
+                "url": self.info.release_url, "can_apply": True,
+                "staged": str(staged)}))
+        except updater.UpdateError as e:
+            log.warning("update %s failed: %s", self.action, e)
+            self.q.put(("update_status", {
+                "phase": "failed", "note": str(e),
+                "manual": self.manual or self.action == "download"}))
+        except Exception as e:
+            log.exception("update worker crashed (%s)", self.action)
+            self.q.put(("update_status", {
+                "phase": "failed", "note": f"{type(e).__name__}: {e}",
+                "manual": self.manual or self.action == "download"}))
 
 
 # --- startup readiness checks -------------------------------------------------

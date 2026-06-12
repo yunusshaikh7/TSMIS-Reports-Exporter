@@ -37,10 +37,48 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
   type*): takes a TSMIS and a TSN Highway Log — **either two per-route
   workbooks or two consolidated ones** (`Route` + 31 columns; shapes
   auto-detected, mixed shapes rejected with guidance) — and writes a
-  discrepancy workbook — Summary / Comparison / TSMIS / TSN, plus a **Routes
-  sheet in consolidated mode** (route coverage: Both/TSMIS-only/TSN-only with
-  live per-route row/diff counts; the Summary gains a ROUTE COVERAGE section
-  and the run log lists the missing routes) — where EVERY number is a live
+  discrepancy workbook — Summary / Comparison / **Only in TSMIS / Only in
+  TSN** (every one-sided row pulled onto its own tab in union order, fields
+  pulled live from that system's data sheet; consolidated mode adds a
+  "Missing from <other>" column — "entire route" rows tinted — so
+  wholly-missing routes are impossible to overlook, v0.9.0) / TSMIS / TSN,
+  plus a **Routes sheet in consolidated mode** (route coverage:
+  Both/TSMIS-only/TSN-only with live per-route row/diff counts; the Summary
+  gains a ROUTE COVERAGE section and the run log lists the missing routes).
+  NOTE: one-sided routes' rows have ALWAYS been in the Comparison sheet
+  (yellow/blue, via `_union_keys`' single-side emit) — the tabs exist
+  because 65k-row sheets buried them. The Summary also carries a live
+  **SELF-CHECK section** (v0.9.0): each headline number recomputed a second
+  independent way (status totals vs union count, MATCH-hit counts, Only-in
+  tab row counts, per-field diff sums, Routes-sheet row sums) — every row
+  must read OK after F9; a CHECK means formulas no longer point at the right
+  rows. **Trust aids for formula skeptics (v0.9.0):** the TSMIS/TSN Row
+  numbers on Comparison + Only-in sheets are HYPERLINK jumps that target the
+  source row as a WHOLE-ROW reference ("57:57"), so Excel SELECTS the entire
+  row on arrival — a temporary highlight that clears on the next click —
+  without scrolling; a bounded range (A57:AH57) made Excel scroll to the
+  range's RIGHT edge (COM-measured on real Excel) — don't regress to one
+  (`_row_link`: the MATCH is computed three times — range start/end +
+  display — so the cell value stays NUMERIC; the COUNT self-check depends
+  on that); each data-sheet row
+  carries a "Comparison row" link back in its LEADING column — column A, so
+  Route/Location/fields and the key helper all sit one column right of the
+  input layout (literal target — the row universe is build-time-static, only
+  values are live); and a **Spot Check sheet** audits
+  one location at a time — raw stored values from both sheets next to an
+  independently recomputed per-field verdict (same TRIM/Med-Wid rules,
+  never reading the Comparison's answer) with an Agree? OK/CHECK column that
+  stays meaningful on one-sided rows (verdict column echoes the status,
+  tinted, plus a loud callout), a TSMIS-first ≠ legend, and a bold press-F9
+  reminder in consolidated mode. **Two output flavors (v0.9.0):**
+  `compare(..., mode="formulas"|"values"|"both")` — the Compare tab has two
+  checkboxes (both ticked by default; ≥1 required). "values" writes the SAME
+  sheets/CF/links but the bulk as plain computed results via the
+  `_count_diffs`/`_field_value` mirror (so the flavors can't disagree):
+  opens instantly, automatic calc, no F9 banner, ~⅓ the size; only the Spot
+  Check sheet and SELF-CHECK rows stay live (they recount the literal
+  sheets). "both" writes the picked name (formulas) + `<name> (values).xlsx`.
+  In the formulas flavor, EVERY number is a live
   Excel formula (lookup keys, statuses, per-field diffs, summary counts):
   edit a value on a data sheet and the report recalculates. Consolidated
   workbooks ship in **manual calculation mode** (`calcPr calcMode="manual"`,
@@ -60,9 +98,10 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
   rows). Column geometry for both shapes lives in `_Layout`. The per-route
   format is locked to the approved Route-1 sample and verified cell-for-cell
   against it (same union order, same counts Excel cached: 299 both / 18 / 69 /
-  221 diff rows / 971 diff cells) with one intended change — matched values
-  shown instead of blank. Med Wid compares after zero-pad normalization
-  (TSMIS `0Z` = TSN `00Z`).
+  221 diff rows / 971 diff cells) with intended changes — matched values
+  shown instead of blank, row numbers rendered as clickable links, and the
+  additive Spot Check / Only-in tabs. Med Wid compares after zero-pad
+  normalization (TSMIS `0Z` = TSN `00Z`).
 
 ## Two Run Modes, One Core
 
@@ -254,6 +293,7 @@ scripts/
   cli.py              # console adapters: run_cli / run_cli_multi / run_consolidate_cli
   login.py            # writes the auth file (headed browser)
   reports.py          # SINGLE registry: EXPORT_REPORTS + CONSOLIDATE_REPORTS (GUI + export_multi read it)
+  updater.py          # one-click self-update (GUI only): GitHub release check/download/stage + PowerShell swap helper
   export_*.py         # thin (~30 lines): a ReportSpec + run_cli; export_multi.py = several/all
   consolidate_xlsx_base.py    # shared XLSX consolidator core
   consolidate_ramp_summary.py # standalone (parses PDFs)
@@ -332,6 +372,29 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
 - **Run report:** every route's outcome (`saved`/`empty`/`skipped`/`failed`/
   `exists`) is recorded and auto-saved to `output/run_reports/<report>_run_<ts>.csv`.
   GUI "Save run report…" copies it (combined CSV when several ran).
+- **One-click update (v0.9.0, GUI only — `updater.py`):** at launch (quiet
+  unless something is found) and on clicking the version chip, the app asks
+  the GitHub Releases API for the latest tag and compares it to `version.py`
+  (public repo, stdlib urllib; TLS trusts the **Windows cert store** so
+  corporate TLS inspection works — never switch this to requests/certifi).
+  If newer, a title-bar pill offers **Update** → downloads the
+  variant-matching zip (`-with-browser` when `_internal\ms-playwright` ships;
+  same probe as `paths.py`) into `data\update\`, extracts + verifies it, then
+  **Restart to update** writes a PowerShell helper to `%TEMP%` and exits: the
+  helper waits on the app's PID, swaps exe/`_internal`/`Start Here.txt` via
+  `*.old` renames (same volume; user data folders are never in the staged
+  tree), relaunches, and **rolls back** if any move fails
+  (`LOG_DIR\update_helper.log`). `updater.cleanup_leftovers()` (gui_main
+  startup, before the CLR loads) removes `*.old` + stale staging — including
+  a staged-but-never-applied download, deliberately, so stale versions are
+  re-offered fresh. In-app downloads never carry the Mark-of-the-Web
+  (zipfile writes raw bytes), so the v0.8.1 CLR failure can't happen on this
+  path. Read-only installs (`update_support()` = "link": DATA_ROOT fell back
+  to %LOCALAPPDATA%) get a pill that opens the release page instead; dev runs
+  skip the check ("off"). Restart is gated on no task running; the download
+  isn't. Update state is pushed in every snapshot (`update:{phase,…}`);
+  worker protocol message is `("update_status", dict)`. `full_smoke.py` stubs
+  `UpdateWorker` so the release gate never touches the network.
 
 ## Timeouts (`scripts/common.py`)
 
@@ -544,8 +607,10 @@ build openpyxl styles inside functions). For an XLSX report, wrap
 `CONSOLIDATE_REPORTS`, and document here.
 
 **New comparison type:** a module exposing
-`compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None)
--> ConsolidateResult` (console-free, same rules as consolidators) plus
+`compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
+mode="formulas") -> ConsolidateResult` (console-free, same rules as
+consolidators; the GUI passes `mode` from its values/formulas checkboxes —
+accept it even if only one flavor is implemented) plus
 `REPORT_NAME` and `suggest_name(tsmis_path)`; add one row to
 `COMPARE_REPORTS` in `reports.py` (the Compare tab's type list is generated
 from it) and the module to `APP_MODULES` in `build/app.spec`. Follow
@@ -624,3 +689,5 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | Browser launch fails after an Edge/Chrome update | Evergreen browser outran pinned Playwright CDP | Bump `playwright` in `requirements*.txt`, rebuild |
 | DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |
 | Build: "GUARD FAILED" | A dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` |
+| Update pill opens a web page instead of installing | App folder is read-only (data fell back to `%LOCALAPPDATA%`) | Expected (`update_support()` = "link") — move the app somewhere writable, or extract the new zip manually |
+| Update applied but the old version came back | A swap move failed; the helper rolled back | See `data\logs\update_helper.log`; close anything holding `_internal` open and update again |

@@ -14,6 +14,46 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Comparison: a fast values copy (0.9.0).** The Compare tab now offers two
+  outputs — tick one or both. The **values workbook** holds plain computed
+  results: it opens instantly with everything already filled in (no F9, no
+  manual-calculation mode, about a third the size) and keeps all the
+  navigation links, colors, the Spot Check sheet and the live self-checks.
+  The **live-formulas workbook** stays the fully auditable version where
+  every cell recalculates. With both ticked, the values copy is saved next
+  to the other as "… (values).xlsx". Both are built from the same comparison
+  pass, so they can never disagree.
+- **Comparison: missing routes front and center + self-checks (0.9.0).** The
+  TSMIS-vs-TSN workbook gains two new sheets — **Only in TSMIS** and **Only
+  in TSN** — collecting every one-sided row in one place instead of leaving
+  them scattered through the 50k-row Comparison sheet. Routes one system
+  lacks entirely are flagged **"entire route"** and tinted, so missing-route
+  coverage is impossible to overlook (filter the "Missing from …" column to
+  separate whole-route gaps from single locations). The Summary also gains a
+  **SELF-CHECK section**: each headline number is recomputed a second,
+  independent way and shows OK/CHECK after you press F9 — proof that every
+  formula still points at the right rows.
+- **Comparison: built for skeptics (0.9.0).** Don't trust a red cell? The
+  row numbers in the TSMIS Row / TSN Row columns are now **clickable** —
+  they jump to the data sheet and **select the whole source row** so it
+  stands out until you click elsewhere, and every data-sheet row links back
+  to its Comparison row the same way. A new **Spot Check** sheet audits any
+  single location end to end: type a row number (or find one by route +
+  location) and every field shows the raw stored values from both systems
+  next to an **independently recomputed verdict** — calculated straight from
+  the data sheets, never reading the Comparison's answer — with an Agree?
+  column that flags any disagreement. One-sided rows announce themselves on
+  every field line (not just the status cell), difference cells are labeled
+  **TSMIS first, TSN second**, and consolidated workbooks show a bold
+  press-F9 reminder.
+- **The app updates itself (0.9.0).** When a new version is published here, a
+  green **Update to vX.Y.Z** button appears in the app's title bar: one click
+  downloads it (picking the right variant automatically), then **Restart to
+  update** swaps it in and reopens the app — reports, login and settings stay
+  exactly where they are, and a failed swap rolls back to the old version.
+  The version chip next to the app name re-checks on demand. PCs where the
+  app folder is read-only get a button that opens this download page instead.
+  (In-app updates also skip the zip "Unblock" problem entirely.)
 - **Comparison: single-side rows now show their data (0.8.2).** Rows that
   exist only in TSMIS (yellow) or only in TSN (blue) used to have blank
   field cells; they now display that system's own values, so what's missing
