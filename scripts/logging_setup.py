@@ -84,9 +84,18 @@ def _log_banner(log):
         log.info("env: overrides %s", overrides)
 
 
+def set_debug_logging(on):
+    """Switch the root logger between DEBUG and INFO live (the Settings tab's
+    'verbose logging' toggle; also applied at startup from the saved setting)."""
+    logging.getLogger().setLevel(logging.DEBUG if on else logging.INFO)
+    logging.getLogger("tsmis").info("file logging level set to %s",
+                                    "DEBUG" if on else "INFO")
+
+
 def setup_logging(level=logging.INFO, enable_faulthandler=True):
     """Configure the root logger's rotating file handler once. Returns the log
-    file path.
+    file path. The saved 'verbose logging' setting (settings.py) upgrades the
+    level to DEBUG.
 
     enable_faulthandler=False is for the GUI process ONLY: faulthandler's
     Windows handler intercepts access violations FIRST-chance, and the .NET CLR
@@ -98,6 +107,12 @@ def setup_logging(level=logging.INFO, enable_faulthandler=True):
     global _configured
     if _configured:
         return LOG_FILE
+    try:
+        import settings
+        if settings.get("debug_logging"):
+            level = logging.DEBUG
+    except Exception:
+        pass                       # settings must never block logging setup
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     handler = RotatingFileHandler(
         LOG_FILE, maxBytes=2_000_000, backupCount=5, encoding="utf-8"

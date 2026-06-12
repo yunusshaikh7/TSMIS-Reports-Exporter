@@ -66,12 +66,14 @@ ICON     = os.path.join(SPECPATH, "app.ico")        # built once with Pillow (se
 MANIFEST = os.path.join(SPECPATH, "app.manifest")
 APP_MODULES = [
     "version", "paths", "common", "events", "exporter", "exporter_parallel",
-    "run_report", "logging_setup", "cli", "login", "reports", "updater",
+    "run_report", "logging_setup", "settings", "cli", "login", "reports",
+    "updater",
     "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
     "export_highway_log", "export_multi",
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
-    "consolidate_tsn_highway_log", "compare_highway_log",
+    "consolidate_tsn_highway_log",
+    "compare_core", "compare_highway_log", "compare_env",
     "gui_main", "gui_api", "gui_worker",
 ]
 

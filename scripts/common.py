@@ -106,9 +106,36 @@ def get_site():
     return _data_source, _environment
 
 
+def default_site_url(source, environment):
+    """The built-in report-page URL for one data source / environment."""
+    return f"https://{TSMIS_HOST}/index.html?env={environment}&src={source}"
+
+
 def get_url():
-    """The full report-page URL for the active data source / environment."""
-    return f"https://{TSMIS_HOST}/index.html?env={_environment}&src={_data_source}"
+    """The full report-page URL for the active data source / environment.
+    A Settings-tab override (settings.get_site_url — the "site moved before
+    an app update shipped" stopgap) wins over the built-in pattern and
+    applies to the very next navigation."""
+    try:
+        import settings
+        override = settings.get_site_url(_data_source, _environment)
+    except Exception:                    # settings must never stop a run
+        override = None
+    if override:
+        log.info("site: using custom URL for %s-%s: %s",
+                 _data_source, _environment, override)
+        return override
+    return default_site_url(_data_source, _environment)
+
+
+def expected_host():
+    """Hostname the ACTIVE site URL points at. The signed-in detector and the
+    navigation breadcrumbs compare page hosts against this (not the built-in
+    TSMIS_HOST), so a custom URL override moves them along with it."""
+    try:
+        return urlsplit(get_url()).hostname or TSMIS_HOST
+    except (ValueError, TypeError):
+        return TSMIS_HOST
 
 
 # The shared auth file path is resolved by paths.py, which is frozen-aware: in
@@ -150,6 +177,40 @@ RETRY_REPORT_TIMEOUT_MS = 900_000         # 15 min per route in the retry pass
 # once before recording the route as failed. A hard timeout is NOT retried (the
 # user already had a skip window during the wait).
 RETRY_COUNT = 1
+
+
+# The constants above are the DEFAULTS; the Settings tab can override the
+# ceilings (persisted via settings.py). Engines call these accessors at RUN
+# time, so a changed setting applies to the next run without a restart.
+def _settings_ms(key, default_ms, unit_ms):
+    try:
+        import settings
+        return settings.get(key) * unit_ms
+    except Exception as e:                       # settings must never stop a run
+        log.warning("settings read failed for %s (%s: %s); using default",
+                    key, type(e).__name__, e)
+        return default_ms
+
+
+def report_timeout_ms():
+    """Effective per-route ceiling for the sequential flow (Settings tab can
+    raise it; default REPORT_TIMEOUT_MS)."""
+    return _settings_ms("report_timeout_min", REPORT_TIMEOUT_MS, 60_000)
+
+
+def fast_report_timeout_ms():
+    """Effective per-route ceiling under fast mode's concurrent load."""
+    return _settings_ms("fast_timeout_min", FAST_REPORT_TIMEOUT_MS, 60_000)
+
+
+def retry_report_timeout_ms():
+    """Effective per-route ceiling for the end-of-run serial retry pass."""
+    return _settings_ms("retry_timeout_min", RETRY_REPORT_TIMEOUT_MS, 60_000)
+
+
+def county_enable_timeout_ms():
+    """Effective wait for the County dropdown to enable."""
+    return _settings_ms("county_timeout_s", COUNTY_ENABLE_TIMEOUT_MS, 1_000)
 
 ROUTES = [
     "001","002","003","004","005","005S","006","007","008","008U","009","010","010S",
@@ -412,7 +473,7 @@ def navigate_with_auth(page):
         # Off-site breadcrumb (e.g. parked at an Azure interactive page).
         try:
             host = _page_host(page)
-            if host and host != TSMIS_HOST:
+            if host and host != expected_host():
                 note(f"waiting at {host} ({page.title()!r})")
         except Exception:
             pass
@@ -462,7 +523,7 @@ _SIGNED_IN_JS = """(() => {
 def is_logged_in(page):
     """Quick check: are we on the report page in a usable, signed-in state?"""
     try:
-        if _page_host(page) != TSMIS_HOST:
+        if _page_host(page) != expected_host():
             return False
         return bool(page.evaluate(_SIGNED_IN_JS))
     except Exception:
@@ -544,7 +605,7 @@ def select_report(page, report_label):
     page.get_by_label("District").select_option(label="-- ALL --")
     page.wait_for_function(
         "() => !document.querySelector('#districtCountySelect').disabled",
-        timeout=COUNTY_ENABLE_TIMEOUT_MS,
+        timeout=county_enable_timeout_ms(),
     )
     page.locator("#districtCountySelect").select_option(label="-- ALL --")
 
@@ -612,6 +673,37 @@ def preflight(page, report_label):
         ) from e
 
 
+def maybe_screenshot(page, events, note=""):
+    """Answer a pending live-preview request for this worker's browser.
+
+    The GUI's Preview button sets a flag (events.screenshot_wanted); engines
+    call this at safe poll points ON THE WORKER'S OWN THREAD (Playwright is
+    thread-affine, so the GUI can never screenshot a page directly). Captures
+    the current viewport as JPEG bytes and hands them to events.on_screenshot.
+    Best-effort: a capture problem reports a None image with the reason in
+    `note` (so the GUI stops waiting) and never disturbs the run."""
+    try:
+        if not events.screenshot_wanted(events.worker_no):
+            return
+    except Exception:
+        return
+    try:
+        data = page.screenshot(type="jpeg", quality=70)   # viewport, not full page
+        log.info("preview screenshot captured for browser %d (%d bytes)",
+                 events.worker_no, len(data))
+        events.on_screenshot(events.worker_no, data, note)
+    except Exception as e:
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.info("preview screenshot failed for browser %d (%s: %s)",
+                 events.worker_no, type(e).__name__, reason)
+        try:
+            events.on_screenshot(events.worker_no, None,
+                                 "The screenshot couldn't be taken right now "
+                                 "(the browser was busy) — try again.")
+        except Exception:
+            pass
+
+
 def wait_with_skip_option(page, js_condition, prefix, events,
                           hard_timeout_ms=None,
                           skip_prompt_after_ms=None):
@@ -629,7 +721,7 @@ def wait_with_skip_option(page, js_condition, prefix, events,
     PlaywrightTimeoutError when the hard timeout elapses.
     """
     if hard_timeout_ms is None:
-        hard_timeout_ms = REPORT_TIMEOUT_MS
+        hard_timeout_ms = report_timeout_ms()
     if skip_prompt_after_ms is None:
         skip_prompt_after_ms = SKIP_PROMPT_AFTER_MS
 
@@ -648,6 +740,11 @@ def wait_with_skip_option(page, js_condition, prefix, events,
         if events.should_skip():
             events.on_log(f"  {prefix} skipped by user")
             return False
+        # Live view for the GUI: answer a pending Preview request (≤ one poll
+        # chunk of latency) and keep the worker's status row current.
+        maybe_screenshot(page, events, note=prefix.strip())
+        events.on_status(events.worker_no,
+                         f"{prefix} working… ({int(time.monotonic() - start)}s)")
 
         now = time.monotonic()
         if now >= hard_deadline:

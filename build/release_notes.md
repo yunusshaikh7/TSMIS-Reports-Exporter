@@ -14,6 +14,61 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Comparisons answer the real question first (0.10.0).** Every comparison
+  now leads with a verdict — **“✓ EVERYTHING MATCHES”** in green when the two
+  sides are identical (the expected outcome between environments), or
+  **“✗ DIFFERENCES FOUND — N differing cells, M one-sided rows”**. It shows
+  three ways: a dialog the moment the comparison finishes, the first line of
+  the run log, and a big colored banner at the top of the workbook's Summary
+  (live formula in the formulas flavor, so it stays current after edits and F9).
+- **Change a TSMIS address without waiting for an update (0.10.0).** Settings
+  lists the page address for all six source/environment combinations; edit
+  one if a site moves and it's used by the very next sign-in, export or
+  Verify. Custom addresses are marked; clearing the box restores the
+  built-in default.
+- **Download the Built-in Chromium from Settings (0.10.0).** The standard
+  (smaller) app can now fetch the same unmanaged browser the “with-browser”
+  download ships (~170 MB, into the app's data folder — it survives updates)
+  and remove it again later. Handy when managed-Edge sign-in misbehaves and
+  installing Chrome isn't an option; restart the app after and “Built-in
+  Chromium” appears in the Browser dropdown.
+- **Compare environments against each other (0.10.0).** The Compare tab now
+  also compares the SAME report exported from two different places — SSOR vs
+  ARS, prod vs dev/test, or today vs an older run. Pick the report type and
+  two export folders (e.g. `2026-06-11 ssor-prod` vs `2026-06-11 ars-prod`);
+  the per-route files are read straight from both — **no consolidation step
+  needed** — and you get the same trusted discrepancy workbook as the
+  TSMIS-vs-TSN comparison, with the environment names as the two sides.
+  Works for all four reports: Ramp Detail, Highway Sequence and Highway Log
+  compare their Excel exports; **Ramp Summary compares its PDFs** (parsed
+  with the same engine the consolidator uses), one row per route. Routes
+  missing from one environment are flagged "entire route", and the live
+  SELF-CHECK rows prove the numbers in Excel itself.
+- **Exports are labeled by environment (0.10.0).** Runs now land in
+  `output\<date> <source>-<environment>\` (e.g. `2026-06-11 ssor-prod`), so
+  exports from different sites never mix or overwrite — that's what makes
+  the environment comparison possible. Older bare-date folders are read as
+  ssor-prod everywhere (consolidation included); run-report CSVs carry the
+  same tag.
+- **See what every browser is doing (0.10.0).** During an export, the
+  progress card shows one live status row per browser (current route, phase,
+  elapsed) — fast mode shows all of them. Each row has a **Preview** button
+  that pops an actual screenshot of that browser's page, so you can see the
+  sign-in state, the report being built, and the site's own **SSOR / ARS +
+  environment label** with your own eyes.
+- **Verify the environment without exporting (0.10.0).** A **Verify** button
+  next to the environment dropdowns opens TSMIS in the background exactly
+  like an export would (signed in), reads which data source / environment
+  the page ACTUALLY loaded, and shows a screenshot with a clear
+  matches-your-selection verdict — catch a wrong-environment setup before
+  spending hours exporting.
+- **A Settings tab (0.10.0).** Reliability knobs (per-route time limits,
+  county wait, default fast-mode browser count — raise them when the server
+  is slow), debugging tools (verbose logging, DevTools, a one-click
+  **support bundle** zip with logs + run reports and **never your login**),
+  quick folder shortcuts, forget-saved-login, and **Delete all reports** —
+  one button clears every generated file for a fresh start after showing
+  exactly what will be removed; logs, login and settings always survive.
 - **Comparison: a fast values copy (0.9.0).** The Compare tab now offers two
   outputs — tick one or both. The **values workbook** holds plain computed
   results: it opens instantly with everything already filled in (no F9, no

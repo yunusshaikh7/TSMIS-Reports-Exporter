@@ -12,15 +12,28 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 
 | # | Report | Output | Folder |
 |---|---|---|---|
-| 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<date>/ramp_summary/` |
-| 2 | TSAR: Ramp Detail | XLSX | `output/<date>/ramp_detail/` |
-| 3 | Highway Sequence Listing | XLSX | `output/<date>/highway_sequence/` |
-| 4 | Highway Log | XLSX | `output/<date>/highway_log/` |
+| 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<run>/ramp_summary/` |
+| 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
+| 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
+| 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
+
+`<run>` is a **run folder**, `"<YYYY-MM-DD> <src>-<env>"` (e.g.
+`2026-06-11 ssor-prod`, v0.10.0) — see *Key Behaviors: run folders*.
 
 One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 **environment** (prod / test / dev) via query parameters — see
 `common.get_url()`. Defaults: **SSOR + Prod**; the GUI header has two dropdowns
-(`set_site`), the console flow honors `TSMIS_SRC` / `TSMIS_ENV`.
+(`set_site`) plus a **Verify env button** (v0.10.0, `EnvCheckWorker`: opens the
+page headless exactly like an export, reads the page's own CONFIG env/src via
+`_CONFIG_JS`, screenshots it, and the modal says whether it matches the
+selection — the user's "am I really on SSOR DEV?" answer without exporting),
+the console flow honors `TSMIS_SRC` / `TSMIS_ENV`. **Per-env URL overrides**
+(v0.10.0): the Settings tab can rewrite any combo's address
+(`settings.get_site_url` → consulted by `common.get_url()` on every
+navigation; `common.expected_host()` follows the effective URL, and
+`is_logged_in` + the navigate breadcrumbs compare hosts against IT, not the
+built-in TSMIS_HOST) — the stopgap for "the site moved before an app update
+shipped". Console flows honor the same overrides automatically.
 
 **Beyond the TSMIS exports (v0.8.0, ported from TSMIS-Report-Consolidator):**
 - **TSN Highway Log** (consolidate-only): parses TSN district Highway Log PDFs
@@ -32,10 +45,43 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
   don't re-derive the windows. `day` is ignored (vendor snapshots aren't dated
   exports); the module exposes `INPUT_NOTE`/`INPUT_DIR` so the Consolidate
   pane shows where the PDFs go.
-- **Compare tab** (`compare_highway_log.py`, first entry of the
-  `COMPARE_REPORTS` registry in `reports.py` — see *Extending: new comparison
-  type*): takes a TSMIS and a TSN Highway Log — **either two per-route
-  workbooks or two consolidated ones** (`Route` + 31 columns; shapes
+- **Compare tab** — two comparison families since v0.10.0, both built by ONE
+  engine: `compare_core.py` (extracted verbatim-then-parameterized from
+  compare_highway_log; a `CompareSchema` carries side names — emitted into
+  formulas through the quoting-aware `_sref` so `TSMIS!A:A` stays unquoted but
+  `'SSOR-PROD'!A:A` quotes — header, normalizer/date fields, label nouns,
+  widths, note fragments. The extraction is **regression-verified
+  cell-for-cell** — values, formulas, styles, CF, calc mode — against the
+  pre-extraction output on the real Route-1 + consolidated pairs; do NOT
+  change formula/label text in the core without re-running such a check).
+  - **TSMIS vs TSN Highway Log** (`compare_highway_log.py` = schema + loaders
+    + `suggest_name`; `"files"` kind in `COMPARE_REPORTS`).
+  - **Cross-environment** (`compare_env.py`; `"folders"` kind, v0.10.0): the
+    SAME report from two run folders (ssor-prod vs ars-prod, or one env on
+    two dates) — per-route files are read straight from both folders (NO
+    consolidation step; merged in memory the way the consolidators would,
+    Route column prepended, header locked from the first file) and compared
+    with the environment names as the sides (`side_label`; same-env sides get
+    the date appended so sheet names differ). Ramp Detail / Highway Sequence
+    lock their layout from the files (both folders must agree); Highway Log
+    pins EXPECTED_HEADER + the Med Wid rule; **Ramp Summary parses the PDFs**
+    via consolidate_ramp_summary.parse_pdf, one row per route (per-route
+    shape — the route IS the row key; fields = the consolidator's GROUPS
+    minus Source/Audit). GUI: folder dropdowns list the run folders
+    (baseline defaults to newest ssor-prod) + Browse; saves default to
+    `output/comparisons/`. Verified with planted-difference fixtures and a
+    real-Excel COM recalc (all SELF-CHECK rows OK).
+  **Every comparison leads with a VERDICT** (v0.10.0): summary_lines[0] is
+  "✓ EVERYTHING MATCHES …" / "✗ DIFFERENCES FOUND …",
+  `ConsolidateResult.verdict` is "match"/"diff" (the GUI keys a green/amber
+  result dialog on it; consolidators leave it None), and the workbook's
+  Summary carries the same verdict as a big banner cell right under the
+  title (B3, or B4 under the manual-calc F9 banner) — a LIVE formula in the
+  formulas flavor (CF green/red keyed on the ✓/✗ first character), a
+  literal in the values flavor. Match ⟺ zero differing cells AND zero
+  one-sided rows.
+  The TSMIS-vs-TSN flavor takes a TSMIS and a TSN Highway Log — **either two
+  per-route workbooks or two consolidated ones** (`Route` + 31 columns; shapes
   auto-detected, mixed shapes rejected with guidance) — and writes a
   discrepancy workbook — Summary / Comparison / **Only in TSMIS / Only in
   TSN** (every one-sided row pulled onto its own tab in union order, fields
@@ -95,7 +141,7 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
   diff-style document-order merge PER ROUTE with first-position dedupe (a key
   can sit in both files at different sequence positions — TSMIS prints some
   postmiles out of order; per-route alignment keeps difflib fast on 50k+
-  rows). Column geometry for both shapes lives in `_Layout`. The per-route
+  rows). Column geometry for both shapes lives in compare_core's `_Layout`. The per-route
   format is locked to the approved Route-1 sample and verified cell-for-cell
   against it (same union order, same counts Excel cached: 299 both / 18 / 69 /
   221 diff rows / 971 diff cells) with intended changes — matched values
@@ -202,10 +248,18 @@ engine.
     the libs **and** runs `playwright install chromium --no-shell`.
   The `chromium` channel only appears when a Playwright Chromium is actually
   present (`common._chromium_available()`): for **packaged** builds that means
-  the bundle's own `_internal\ms-playwright` (or an explicit
-  `PLAYWRIGHT_BROWSERS_PATH`) — the machine's global Playwright cache is
-  deliberately ignored so the default build always defaults to Edge even on a
-  dev PC; dev/`.bat` runs use the default cache (where setup downloads it).
+  the bundle's own `_internal\ms-playwright`, an explicit
+  `PLAYWRIGHT_BROWSERS_PATH`, **or the Settings-tab download** (v0.10.0:
+  `paths.DOWNLOADED_BROWSERS_DIR` = `data\ms-playwright` — user data, so it
+  survives one-click updates; `gui_worker.ChromiumWorker` drives the BUNDLED
+  Playwright Node driver like `playwright install chromium --no-shell` with
+  PLAYWRIGHT_BROWSERS_PATH aimed there — works frozen, streams progress to
+  the log, cancellable, no console window; delete rmtree's ONLY that folder,
+  never the bundle's. Channels are probed at startup, so download/delete
+  says "restart the app"). The machine's global Playwright cache is
+  deliberately ignored so the default build defaults to Edge even on a
+  dev PC; dev/`.bat` runs use the default cache (where setup downloads it),
+  and a Settings-tab download wins over the cache in dev too.
   `channel="chromium"` runs the full browser in new-headless mode — one binary
   for headed sign-in and headless exports (no headless shell needed).
 - **Data location (option A):** the packaged app writes `output/`, auth token,
@@ -281,25 +335,30 @@ version.py                        # app name/version + pinned Playwright (Node d
 .github/workflows/release.yml     # tag push (or manual dispatch) -> self-test gate ->
                                   #   builds + publishes the three release zips
 scripts/
-  paths.py            # frozen-aware paths (option A): DATA_ROOT, OUTPUT_ROOT, AUTH, LOG_DIR, FAILURES_DIR, CONFIG_FILE
-  logging_setup.py    # rotating file log under LOG_DIR (every entry point calls it)
-  common.py           # site config (get_url/set_site: SSOR|ARS × prod|test|dev), ROUTES, timeouts, auth+nav helpers,
+  paths.py            # frozen-aware paths (option A): DATA_ROOT, OUTPUT_ROOT, AUTH, LOG_DIR, FAILURES_DIR, CONFIG_FILE;
+                      #   run folders: run_folder_name/output_run_dir/parse_run_folder/list_output_days/resolve_day_choice
+  logging_setup.py    # rotating file log under LOG_DIR (every entry point calls it); set_debug_logging (Settings toggle)
+  settings.py         # persisted user settings (config.json): timeout/worker overrides, debug toggles
+  common.py           # site config (get_url/set_site: SSOR|ARS × prod|test|dev), ROUTES, timeouts (+ settings-aware
+                      #   *_timeout_ms() accessors), auth+nav helpers, maybe_screenshot (live preview seam),
                       #   AuthError/RunCancelled/PreflightError/ReportError/BrowserNotFoundError, launch_browser,
                       #   set_preferred_channel, check_browsers, preflight, parse_routes/normalize_route
-  events.py           # Events sink + RunResult (export) + ConsolidateResult
+  events.py           # Events sink (+ worker_no / on_status / screenshot seam) + RunResult + ConsolidateResult
   exporter.py         # the one per-route loop: run_export(spec, events), ReportSpec, save_pdf_letter / save_via_export_button, _recover, _retry_failed_routes
   exporter_parallel.py# EXPERIMENTAL fast mode: N browsers off a shared queue; reuses exporter.py internals
-  run_report.py       # per-route outcome CSV (auto-saved each run; + multi)
+  run_report.py       # per-route outcome CSV (auto-saved each run, site-tagged; + multi)
   cli.py              # console adapters: run_cli / run_cli_multi / run_consolidate_cli
   login.py            # writes the auth file (headed browser)
-  reports.py          # SINGLE registry: EXPORT_REPORTS + CONSOLIDATE_REPORTS (GUI + export_multi read it)
+  reports.py          # SINGLE registry: EXPORT_REPORTS + CONSOLIDATE_REPORTS + COMPARE_REPORTS (GUI + export_multi read it)
   updater.py          # one-click self-update (GUI only): GitHub release check/download/stage + PowerShell swap helper
   export_*.py         # thin (~30 lines): a ReportSpec + run_cli; export_multi.py = several/all
   consolidate_xlsx_base.py    # shared XLSX consolidator core
   consolidate_ramp_summary.py # standalone (parses PDFs)
   consolidate_{ramp_detail,highway_sequence,highway_log}.py  # thin wrappers over the base
   consolidate_tsn_highway_log.py  # TSN district PDFs -> TSMIS-format XLSX + combined (input/ folder)
-  compare_highway_log.py      # TSMIS-vs-TSN discrepancy workbook (live formulas; Compare tab)
+  compare_core.py     # THE discrepancy-workbook engine (schema-parameterized; regression-locked — see Compare tab notes)
+  compare_highway_log.py      # TSMIS-vs-TSN Highway Log: schema + loaders over compare_core ("files" kind)
+  compare_env.py      # cross-environment comparison: two run folders, all four reports ("folders" kind)
   gui_main.py / gui_api.py / gui_worker.py   # GUI entry / js_api bridge + state / worker threads
   ui/                 # the GUI itself: index.html + app.css + app.js (vanilla; design
                       #   tokens ported from the approved Lovable demo; mock API for browser preview)
@@ -311,9 +370,10 @@ build/
   release_notes.md    # body of the GitHub release (which zip to pick + highlights)
   app.ico / app.manifest / full_smoke.py / dist_readme.txt / .venv/ (git-ignored)
 dist/                 # build output: dist/TSMIS Exporter/ (git-ignored)
-output/               # contents git-ignored. Live layout: <YYYY-MM-DD>/{ramp_summary,
-  ...               #   ramp_detail,highway_sequence,highway_log,consolidated}/ + run_reports/
-                      #   (the tracked flat .gitkeep stubs are the legacy pre-dated layout)
+output/               # contents git-ignored. Live layout: "<YYYY-MM-DD> <src>-<env>"/{ramp_summary,
+  ...               #   ramp_detail,highway_sequence,highway_log,consolidated}/ + run_reports/ + comparisons/
+                      #   (the tracked flat .gitkeep stubs are the legacy pre-dated layout; bare-date
+                      #   folders from v0.7–0.9 read as ssor-prod)
 ```
 
 `scripts/tsmis_auth.json` is git-ignored — treat it as a credential. Don't commit
@@ -339,17 +399,52 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
 
 ## Key Behaviors
 
-- **Dated outputs:** every run writes into `output/<YYYY-MM-DD>/<report>/`
-  (`paths.output_day_dir`), so each day's exports live in their own folder.
-  The consolidators read the same layout: `day=None` means the **newest** dated
-  folder (`paths.latest_output_day`), the GUI has an "Export day" picker, the
-  console prompts (Enter = newest; `TSMIS_DAY` overrides), and the combined
-  workbook lands in `output/<date>/consolidated/`. When NO dated folders exist
-  the consolidators fall back to the legacy flat `output/<report>/` layout, so
-  pre-0.7 exports stay consolidatable.
+- **Run folders (v0.10.0; replaces bare dated outputs):** every run writes into
+  `output/<YYYY-MM-DD src-env>/<report>/` (`paths.output_run_dir`, src/env from
+  `common.get_site()` at run start), so each day's exports live in their own
+  folder AND different source/environment combinations never mix — the folder
+  name says exactly what's inside (this labeling is what the cross-environment
+  comparison keys on). Legacy bare-date folders read as **ssor-prod**
+  (`paths.parse_run_folder`). The consolidators take the run-folder NAME as
+  their `day` argument (opaque to them): `day=None` means the **newest** run
+  folder (`paths.latest_output_day`), the GUI picker lists run folders, the
+  console prompts (Enter = newest; `TSMIS_DAY` accepts a folder name or a bare
+  date — `paths.resolve_day_choice` picks that date's newest run folder), and
+  the combined workbook lands in `output/<run>/consolidated/`. When NO run
+  folders exist the consolidators fall back to the legacy flat
+  `output/<report>/` layout, so pre-0.7 exports stay consolidatable.
 - **Resume / idempotency:** `run_export` skips a route whose output file already
-  exists **in today's folder**. Delete a file to force re-download; a new day
-  always starts a fresh folder (yesterday's files never block today's run).
+  exists **in today's run folder for the active src/env**. Delete a file to
+  force re-download; a new day (or a different environment) always starts a
+  fresh folder (yesterday's files never block today's run).
+- **Live browser status + previews (v0.10.0, GUI):** the engines emit a
+  one-line per-browser status through `events.on_status(worker_no, text)`
+  (phase changes + a ~5 s heartbeat with elapsed time inside
+  `wait_with_skip_option`), shown as one row per browser in the progress card.
+  Each row's **Preview** button requests a screenshot: GUI →
+  `ExportWorker.request_screenshot(worker_no)` sets a flag the worker drains
+  at its next safe poll point via `common.maybe_screenshot` (Playwright is
+  thread-affine — only the owning thread may touch the page; a blocking
+  download wait answers at the next route), and the JPEG comes back as a
+  `("preview_shot", (worker, b64, note))` message → a closeable modal. The
+  Events seam (`worker_no`, `on_status`, `screenshot_wanted`,
+  `on_screenshot`) is no-op in the console flow.
+- **Settings tab (v0.10.0, GUI):** persisted via `settings.py` →
+  `data/config.json`. Timeout/worker overrides are read at RUN time through
+  `common.*_timeout_ms()` accessors / `exporter_parallel.default_worker_count()`
+  (next run picks them up; env vars still win where one exists); verbose
+  logging applies live (`logging_setup.set_debug_logging`); DevTools applies
+  next launch. **Per-env TSMIS addresses** (six editable rows; custom ones
+  chip-marked; clearing restores the default — see *Supported Reports*) and
+  the **Built-in Chromium download/remove** (see *Browser channels*) live
+  here too. Also: support-bundle zip (logs + run reports + manifest —
+  NEVER the auth file/profiles), forget-saved-login, open-folder shortcuts,
+  and **Delete all reports** (`gui_worker.reset_targets`/`ResetWorker`):
+  removes run folders, legacy flat report folders, consolidated/comparisons,
+  run_reports, failure dumps, TSN outputs (+ optionally the TSN input PDFs)
+  after a confirm dialog listing the concrete targets with file count + size
+  (`reset_preview`); logs, login, Edge profile and settings are NEVER
+  deleted; Excel-locked files are reported, not silently skipped.
 - **Skip a slow route:** console `S` key / GUI Skip button →
   `events.should_skip()`. After `SKIP_PROMPT_AFTER_MS` a "still working" line
   appears and the skip hatch opens; skipped routes are recorded and the form
@@ -407,7 +502,11 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
 | `COUNTY_ENABLE_TIMEOUT_MS` | 60_000 (60 s) | Max wait for the county dropdown to enable |
 | `RETRY_COUNT` | 1 | In-loop retries after a transient (non-timeout) failure |
 
-Increase these if the TSMIS server is slow.
+Increase these if the TSMIS server is slow. The constants are the DEFAULTS;
+since v0.10.0 the GUI's Settings tab overrides the four ceilings via
+`settings.py`, and engines read them at run time through the accessor
+functions (`report_timeout_ms()` etc.) — when editing engine code, call the
+accessors, don't import the constants.
 
 ## Fast Mode (experimental, `exporter_parallel.py`)
 
@@ -606,15 +705,25 @@ build openpyxl styles inside functions). For an XLSX report, wrap
 `run_consolidate_cli`, wire `4. consolidate…bat`, add to `APP_MODULES` and
 `CONSOLIDATE_REPORTS`, and document here.
 
-**New comparison type:** a module exposing
-`compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-mode="formulas") -> ConsolidateResult` (console-free, same rules as
-consolidators; the GUI passes `mode` from its values/formulas checkboxes —
-accept it even if only one flavor is implemented) plus
-`REPORT_NAME` and `suggest_name(tsmis_path)`; add one row to
-`COMPARE_REPORTS` in `reports.py` (the Compare tab's type list is generated
-from it) and the module to `APP_MODULES` in `build/app.spec`. Follow
-`compare_highway_log.py` for the approved live-formula workbook style.
+**New comparison type:** add one row to `COMPARE_REPORTS` in `reports.py`
+(the Compare tab's type list is generated from it; rows are
+`(label, module_or_adapter, kind)`) and the module to `APP_MODULES` in
+`build/app.spec`. Two input kinds:
+- `"files"` — a module exposing
+  `compare(path_a, path_b, out_path, events=None, confirm_overwrite=None,
+  mode="formulas") -> ConsolidateResult` (console-free, same rules as
+  consolidators; the GUI passes `mode` from its values/formulas checkboxes —
+  accept it even if only one flavor is implemented) plus `REPORT_NAME` and
+  `suggest_name(path_a)`.
+- `"folders"` — an adapter exposing
+  `compare_folders(dir_a, dir_b, out_path, events=None,
+  confirm_overwrite=None, mode="formulas") -> ConsolidateResult` plus
+  `REPORT_NAME` and `suggest_name(dir_a, dir_b)` — usually just another
+  `compare_env.EnvCompare(...)` instance (give it the report's subdir, sheet
+  name, and optionally a pinned header / base `CompareSchema`).
+Don't hand-roll workbook output: build a `CompareSchema` and call
+`compare_core.run_compare` — that's the approved workbook style for free
+(and the core's text/formulas are regression-locked; see *Compare tab*).
 
 **Add/remove a route:** edit `ROUTES` in `common.py` (zero-padded 3-digit, optional
 suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option values).

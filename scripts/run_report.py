@@ -26,10 +26,13 @@ FRIENDLY_STATUS = {
 }
 
 
-def auto_report_path(subdir):
-    """Default timestamped path for the auto-saved report of one report type."""
+def auto_report_path(subdir, site_tag=None):
+    """Default timestamped path for the auto-saved report of one report type.
+    `site_tag` (e.g. "ssor-prod") marks which data source / environment the
+    run hit, so reports from different sites stay distinguishable."""
     stamp = time.strftime("%Y%m%d_%H%M%S")
-    return RUN_REPORTS_DIR / f"{subdir}_run_{stamp}.csv"
+    tag = f"_{site_tag}" if site_tag else ""
+    return RUN_REPORTS_DIR / f"{subdir}{tag}_run_{stamp}.csv"
 
 
 def write_run_report(result, label, path):

@@ -54,3 +54,12 @@ spike/
 /data/edge_login_profile/
 /webview2/
 /data/webview2/
+
+# Built-in Chromium downloaded from the Settings tab (paths.DOWNLOADED_BROWSERS_DIR;
+# dev: repo root, packaged app: data\ms-playwright). Never committed.
+/ms-playwright/
+/data/ms-playwright/
+
+# Persisted user settings (timeouts, URL overrides — local state, never committed)
+/config.json
+/data/config.json
