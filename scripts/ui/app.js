@@ -664,6 +664,7 @@ function renderState() {
 // chip on each Settings address row, and the title-bar aggregate.
 const ENV_ACCESS_BADGE = {
   ok:          { dot: "ok",   text: "OK" },
+  reports_off: { dot: "warn", text: "Reports limited" },
   no_reports:  { dot: "bad",  text: "No report data" },
   denied:      { dot: "bad",  text: "Access denied" },
   no_signin:   { dot: "bad",  text: "Sign-in failed" },
@@ -681,10 +682,17 @@ function renderEnvAccess() {
     setDot(el.querySelector(".dot"), badge ? badge.dot : "unknown");
     el.lastElementChild.textContent = badge ? badge.text : "Not checked";
     el.classList.toggle("env-bad", !!badge && badge.dot === "bad");
-    el.title = e
-      ? e.detail + (e.url ? "\n" + e.url : "")
-        + (e.checked_at ? `\nChecked ${e.checked_at}` : "")
-      : "Not checked yet — click “Check all environments”.";
+    el.classList.toggle("env-warn", !!badge && badge.dot === "warn");
+    if (e) {
+      let tip = e.detail + (e.url ? "\n" + e.url : "");
+      const reps = Object.entries(e.reports || {}).map(([lbl, state]) =>
+        `${lbl}: ${state === "ok" ? "OK" : state === "greyed" ? "greyed out" : "missing"}`);
+      if (reps.length) tip += "\n" + reps.join("\n");
+      if (e.checked_at) tip += `\nChecked ${e.checked_at}`;
+      el.title = tip;
+    } else {
+      el.title = "Not checked yet — click “Check all environments”.";
+    }
   });
   const entries = Object.values(acc);
   const total = (((S.init || {}).sources || []).length || 2)
@@ -702,7 +710,8 @@ function renderEnvAccess() {
     btn.title = "Environment check running — verdicts land next to each address in Settings";
   } else {
     const ok = entries.filter((e) => e.status === "ok").length;
-    setDot(dot, ok === total ? "ok" : "bad");
+    const onlyLimited = entries.every((e) => e.status === "ok" || e.status === "reports_off");
+    setDot(dot, ok === total ? "ok" : onlyLimited ? "warn" : "bad");
     txt.textContent = `Envs ${ok}/${total}`;
     const lines = entries.filter((e) => e.status !== "ok")
       .map((e) => `${e.label}: ${(ENV_ACCESS_BADGE[e.status] || ENV_ACCESS_BADGE.error).text}`);
@@ -1790,13 +1799,15 @@ function makeMockApi() {
       st.task = "envscan"; st.auth_dot = "busy"; st.auth_text = "Checking environments…";
       const combos = [];
       for (const s of ["ssor", "ars"]) for (const e of ["prod", "test", "dev"]) combos.push([s, e]);
-      const entry = (s, e, status, detail) => ({
+      const entry = (s, e, status, detail, reports) => ({
         key: `${s}-${e}`, source: s, environment: e,
         label: `${s.toUpperCase()} / ${e[0].toUpperCase()}${e.slice(1)}`,
-        status, detail,
+        status, detail, reports: reports || {},
         url: `https://tsmis.dot.ca.gov/index.html?env=${e}&src=${s}`,
         checked_at: new Date().toTimeString().slice(0, 5),
       });
+      const allReports = (over) => Object.fromEntries(
+        REPORTS.map((r) => [r.label, (over || {})[r.label] || "ok"]));
       st.env_access = {};
       combos.forEach(([s, e]) => { st.env_access[`${s}-${e}`] = entry(s, e, "checking", "Checking…"); });
       pushState();
@@ -1804,14 +1815,24 @@ function makeMockApi() {
            { t: "run_started", mode: "consolidate", label: "Checking all environments…" });
       combos.forEach(([s, e], i) => setTimeout(() => {
         const broken = s === "ssor" && e === "test";   // the demo's bad site
-        const it = entry(s, e, broken ? "no_reports" : "ok",
-          broken ? "Signs in, but the report form couldn't load its data — reports would fail here."
-                 : "Sign-in and report data OK.");
+        const greyed = s === "ars" && e === "dev";     // …and its greyed report
+        let it;
+        if (broken) {
+          it = entry(s, e, "no_reports",
+            "Signs in, but the report form couldn't load its data — reports would fail here.",
+            allReports());
+        } else if (greyed) {
+          it = entry(s, e, "reports_off",
+            "Sign-in and report data OK, but unavailable here: TSAR: Ramp Detail.",
+            allReports({ "TSAR: Ramp Detail": "greyed" }));
+        } else {
+          it = entry(s, e, "ok", "Sign-in and report data OK.", allReports());
+        }
         st.env_access[it.key] = it;
-        push({ t: "log", text: `  ${it.label}: ${broken ? "PROBLEM" : "OK"} — ${it.detail}` });
+        push({ t: "log", text: `  ${it.label}: ${it.status === "ok" ? "OK" : "PROBLEM"} — ${it.detail}` });
         pushState();
         if (i === combos.length - 1) {
-          push({ t: "log", text: "Environment check done: 5 of 6 sites OK — details next to each address in Settings." },
+          push({ t: "log", text: "Environment check done: 4 of 6 sites OK — details next to each address in Settings." },
                { t: "run_ended" });
           st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
           pushState();

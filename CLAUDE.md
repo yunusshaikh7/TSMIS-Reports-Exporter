@@ -445,8 +445,14 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   reports the requested env/src, AND a real preflight passes (the
   County-enable data round-trip; the form itself is static HTML even signed
   out, so form presence proves nothing) — catching "signs in fine but can't
-  pull reports". Verdicts (ok / no_reports / denied / no_signin /
-  wrong_site / unreachable / error) stream onto each address row as they
+  pull reports". It also reads the dropdown's per-report availability
+  (`_REPORT_OPTIONS_JS`: the site sometimes greys single report types out;
+  every common disable convention counts, classes are logged, an unreadable
+  list = unknown — never "all missing") — the preflight probes the first
+  AVAILABLE type, ≥1 unavailable ⇒ amber `reports_off` naming them (per-type
+  states in the row tooltip), all four ⇒ `no_reports`. Verdicts (ok /
+  reports_off / no_reports / denied / no_signin / wrong_site / unreachable /
+  error) stream onto each address row as they
   land (`("env_access", dict)` per combo → snapshot `env_access`), with a
   title-bar **Env access chip** showing the aggregate ("Envs 5/6"; click =
   jump to the Settings rows). Results are session-only on purpose (access

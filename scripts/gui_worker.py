@@ -24,9 +24,13 @@ Message protocol (all are (kind, payload) tuples):
                                        "Check all environments" scan, posted
                                        as it finishes: {key, source,
                                        environment, label, status, detail,
-                                       url} — status is one of ok |
-                                       no_reports | denied | no_signin |
-                                       wrong_site | unreachable | error
+                                       url, reports} — status is one of ok |
+                                       reports_off | no_reports | denied |
+                                       no_signin | wrong_site | unreachable |
+                                       error; reports maps each report
+                                       type's dropdown label to
+                                       ok | greyed | missing (empty when the
+                                       dropdown couldn't be read)
     ("env_access_done", dict)          the scan ended:
                                        {ok, done, total, cancelled, error}
     ("reset_done", dict)               outcome of "Delete all reports":
@@ -517,6 +521,35 @@ class EnvCheckWorker(threading.Thread):
         self.q.put(("env_shot", out))
 
 
+# Availability of each report type in the #customReport dropdown, WITHOUT
+# clicking anything (the li.cs-option items are in the DOM whether the list is
+# open or not). The site sometimes greys single report types out; the exact
+# disable convention isn't pinned, so every common signal counts — a class
+# containing "disabled", the disabled/data-disabled attributes, aria-disabled,
+# or pointer-events:none — and each non-ok option's class string goes to the
+# log so a different convention shows up in one upload. Returns null when the
+# option list can't be read at all (callers must treat that as "unknown",
+# never as "everything is missing").
+_REPORT_OPTIONS_JS = """(labels) => {
+  const items = Array.from(document.querySelectorAll('#customReport li.cs-option'));
+  if (!items.length) return null;
+  const out = {};
+  for (const label of labels) {
+    const el = items.find((li) => (li.textContent || '').trim() === label)
+            || items.find((li) => (li.textContent || '').includes(label));
+    if (!el) { out[label] = { state: 'missing' }; continue; }
+    const cls = el.className || '';
+    const greyed = /(^|[\\s_-])disabled([\\s_-]|$)/i.test(cls)
+      || el.hasAttribute('disabled')
+      || el.getAttribute('aria-disabled') === 'true'
+      || el.hasAttribute('data-disabled')
+      || getComputedStyle(el).pointerEvents === 'none';
+    out[label] = { state: greyed ? 'greyed' : 'ok', cls };
+  }
+  return out;
+}"""
+
+
 class EnvScanWorker(threading.Thread):
     """The Settings tab's "Check all environments": probe EVERY data source /
     environment combination headless, the way an export would (saved session,
@@ -545,14 +578,14 @@ class EnvScanWorker(threading.Thread):
     def run(self):
         from playwright.sync_api import sync_playwright
         from reports import EXPORT_REPORTS
-        probe = EXPORT_REPORTS[0][2].label   # any real report exercises the form
+        labels = [label for label, _fmt, _spec in EXPORT_REPORTS]
         keep_src, keep_env = get_site()
         combos = [(s, e) for s in DATA_SOURCES for e in ENVIRONMENTS]
         ok = done = 0
         cancelled = False
         fatal = None
-        log.info("env scan: starting (%d combos, probe report %r)",
-                 len(combos), probe)
+        log.info("env scan: starting (%d combos, report types %s)",
+                 len(combos), labels)
         try:
             with sync_playwright() as p:
                 browser = page = None
@@ -564,7 +597,7 @@ class EnvScanWorker(threading.Thread):
                         set_site(src, env)
                         if browser is None:   # one browser serves the whole scan
                             browser, _ctx, page = new_authed_browser(p)
-                        out = self._check_one(page, src, env, probe)
+                        out = self._check_one(page, src, env, labels)
                         done += 1
                         ok += out["status"] == "ok"
                         self.q.put(("env_access", out))
@@ -595,13 +628,14 @@ class EnvScanWorker(threading.Thread):
                     {"ok": ok, "done": done, "total": len(combos),
                      "cancelled": cancelled, "error": fatal}))
 
-    def _check_one(self, page, src, env, probe_label):
+    def _check_one(self, page, src, env, report_labels):
         """One combo's verdict. Never raises — the answer (crashes included)
         rides in the returned dict's status/detail; the WHY is in the log and
         the auth/preflight dumps the shared gates already write."""
         label = f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}"
         out = {"key": f"{src}-{env}", "source": src, "environment": env,
-               "label": label, "status": "error", "detail": "", "url": ""}
+               "label": label, "status": "error", "detail": "", "url": "",
+               "reports": {}}
         t0 = time.monotonic()
         try:
             try:
@@ -635,14 +669,46 @@ class EnvScanWorker(threading.Thread):
                                  f"{(got[0] or '?').upper()} instead — check "
                                  "this row's address.")
                 return out
+            # Which of the report types is actually offered? The site
+            # sometimes greys single types out. None readable = unknown
+            # (keep the old first-report probe), never "all missing".
+            options = None
             try:
-                # The data probe: County only enables once the site's own
-                # route/county round-trip answers (the form itself is static).
-                preflight(page, probe_label)
+                options = page.evaluate(_REPORT_OPTIONS_JS, list(report_labels))
+            except Exception as e:
+                log.info("env scan: %s report dropdown read failed (%s)",
+                         out["key"], type(e).__name__)
+            if options:
+                out["reports"] = {lbl: options.get(lbl, {}).get("state", "missing")
+                                  for lbl in report_labels}
+                for lbl, state in out["reports"].items():
+                    if state != "ok":
+                        log.info("env scan: %s report %r is %s (class=%r)",
+                                 out["key"], lbl, state,
+                                 options.get(lbl, {}).get("cls", ""))
+            avail = [lbl for lbl in report_labels
+                     if out["reports"].get(lbl) == "ok"]
+            off = [lbl for lbl, state in out["reports"].items()
+                   if state != "ok"]
+            if options and not avail:
+                out["status"] = "no_reports"
+                out["detail"] = ("Signs in, but every report type is greyed "
+                                 "out or missing here.")
+                return out
+            try:
+                # The data probe, on the first AVAILABLE report type: County
+                # only enables once the site's own route/county round-trip
+                # answers (the form itself is static).
+                preflight(page, avail[0] if avail else report_labels[0])
             except PreflightError:
                 out["status"] = "no_reports"
                 out["detail"] = ("Signs in, but the report form couldn't load "
                                  "its data — reports would fail here.")
+                return out
+            if off:
+                out["status"] = "reports_off"
+                out["detail"] = ("Sign-in and report data OK, but unavailable "
+                                 "here: " + ", ".join(off) + ".")
                 return out
             out["status"] = "ok"
             out["detail"] = "Sign-in and report data OK."
