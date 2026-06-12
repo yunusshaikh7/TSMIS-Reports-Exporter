@@ -1488,7 +1488,7 @@ function makeMockApi() {
     for (const src of ["ssor", "ars"]) {
       for (const env of ["prod", "test", "dev"]) {
         const key = `${src}-${env}`;
-        const dflt = `https://tsmis-dev.dot.ca.gov/index.html?env=${env}&src=${src}`;
+        const dflt = `https://tsmis.dot.ca.gov/index.html?env=${env}&src=${src}`;
         rows.push({ key, source: src, environment: env,
                     label: `${src.toUpperCase()} · ${env[0].toUpperCase()}${env.slice(1)}`,
                     default: dflt, url: mockUrlOverrides[key] || dflt,
@@ -1629,7 +1629,7 @@ function makeMockApi() {
         return { error: "That doesn't look like a usable web address — it needs to start with https:// (or http://).",
                  site_urls: mockSiteUrlRows() };
       }
-      const dflt = `https://tsmis-dev.dot.ca.gov/index.html?env=${env}&src=${src}`;
+      const dflt = `https://tsmis.dot.ca.gov/index.html?env=${env}&src=${src}`;
       if (!url || url === dflt) delete mockUrlOverrides[key];
       else mockUrlOverrides[key] = url;
       push({ t: "log", text: url && url !== dflt

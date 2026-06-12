@@ -74,7 +74,7 @@ class ReportError(Exception):
 # (SSOR / ARS) and environment (prod / test / dev) via query parameters; the
 # user picks both in the GUI header (set_site) or via TSMIS_SRC / TSMIS_ENV in
 # the console flow. Defaults: SSOR + prod.
-TSMIS_HOST = "tsmis-dev.dot.ca.gov"
+TSMIS_HOST = "tsmis.dot.ca.gov"
 DATA_SOURCES = ("ssor", "ars")
 ENVIRONMENTS = ("prod", "test", "dev")
 DATA_SOURCE_LABELS = {"ssor": "SSOR", "ars": "ARS"}
