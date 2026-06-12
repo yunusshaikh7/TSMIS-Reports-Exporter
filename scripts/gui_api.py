@@ -517,6 +517,18 @@ class GuiApi:
                 size = f" ({payload['size_mb']} MB)" if payload.get("size_mb") else ""
                 self._emit_log(f"Update available: {disp}{size}{dev_note} — click "
                                f"‘Update to {disp}’ in the title bar to install it.")
+                # An update being offered WHILE the helper log ends in a
+                # failure means the last attempt rolled back — say so instead
+                # of looking like nothing ever happened.
+                fail = updater.last_swap_failure()
+                if fail:
+                    log.warning("update: previous swap rolled back: %s", fail)
+                    self._emit_log("Heads-up: the previous update attempt could "
+                                   "not be applied and the old version was "
+                                   "restored. Trying again usually works — "
+                                   "close any window showing the app's folder "
+                                   "first. (Details: update_helper.log in the "
+                                   "logs folder.)")
             else:
                 self._emit_log(f"Update available: {disp}.{dev_note} This app folder isn't "
                                "writable, so the title-bar button opens the download "

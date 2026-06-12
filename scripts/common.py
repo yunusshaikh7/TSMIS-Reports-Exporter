@@ -1029,6 +1029,16 @@ def _resolve_channel(p, exclude=(), parallel=False):
     )
 
 
+def resolve_parallel_channel(p):
+    """The channel parallel saved-session browsers would use (probed +
+    cached). Lets callers decide whether running several at once is wise:
+    "msedge" here means nothing but managed Edge is usable — the env scan
+    then drops to ONE browser instead of risking three concurrent Edge
+    sessions (the fast-mode field failure). Raises BrowserNotFoundError when
+    no browser works at all."""
+    return _resolve_channel(p, parallel=True)
+
+
 def launch_browser(p, *, headless=True, parallel=False, **kwargs):
     """Launch the first browser Playwright can drive (Built-in Chromium when
     present, then the system Edge, then Chrome).

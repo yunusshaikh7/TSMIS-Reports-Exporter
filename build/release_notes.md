@@ -14,6 +14,29 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Updates install reliably now (0.10.3).** The 0.10.2 update could fail
+  halfway on some PCs and leave a confusing half-installed app ("says 0.10.2
+  but features are missing") or quietly fall back to the old version. The
+  install now prepares the whole new version next to the old one first and
+  swaps it in with instant renames — it either fully installs or fully
+  doesn't, a failed attempt says so the next time the update is offered, and
+  the interface shown is always the one actually installed (no more stale
+  screens after an update). The first launch after an update is also more
+  patient: instead of a scary error while Windows checks the new files, it
+  shows "Still starting…" and finishes by itself.
+- **The environment check runs by itself (0.10.3).** After the app starts (or
+  you sign in), it quietly verifies sign-in + report access on all six sites
+  in the background — several at once when Google Chrome / the Built-in
+  Chromium and a saved login are available, one at a time otherwise — and
+  the title-bar chip + Settings rows fill in. Turn it off in Settings. The
+  Export tab also flags any report type the current site has greyed out.
+- **Two new reports: TSAR Intersection Summary & Detail (0.10.3).** Exported
+  like the ramp pair (Summary → PDF, Detail → Excel) into their own folders.
+  Consolidation/comparison for them comes later.
+- **Fast mode no longer trips over managed Edge (0.10.3).** Parallel browsers
+  (fast mode and the environment check) now run in the Built-in Chromium /
+  Google Chrome; Microsoft Edge keeps the one-click sign-in and is only used
+  for parallel work when nothing else is available.
 - **The new TSMIS address is built in (0.10.2).** The report site moved to
   `tsmis.dot.ca.gov`; this version points there out of the box for all six
   source/environment combinations. If you had entered the new address in

@@ -1516,12 +1516,28 @@ async function boot(realApi) {
   if (booted) return;
   booted = true;
   api = realApi;
+  // The first call can race a cold WebView2: pywebview's api OBJECT appears
+  // before its method stubs are injected into it, so the call right after an
+  // update (the coldest start — Windows is still scanning the new files)
+  // could throw "get_initial_state is not a function" and a one-shot boot
+  // died on it (field failure, v0.10.2 update). Retry patiently, re-grabbing
+  // the bridge object each round, before declaring the engine dead.
   let init = null;
-  try {
-    init = await api.get_initial_state();
-  } catch (e) {
-    init = { error: String(e) };
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      init = await api.get_initial_state();
+      lastErr = null;
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (!WANT_MOCK && window.pywebview && window.pywebview.api) {
+        api = window.pywebview.api;       // stubs may have landed by now
+      }
+      await new Promise((r) => setTimeout(r, Math.min(1000 * attempt, 3000)));
+    }
   }
+  if (lastErr) init = { error: String(lastErr) };
   if (!init || init.error) {
     // The bridge answered but the engine is broken — building a half-dead UI
     // would only hide it. Fail loudly; the log file has the traceback.
@@ -1552,7 +1568,16 @@ async function boot(realApi) {
 // the real app would show convincing fake exports.
 const WANT_MOCK = /[?#&]mock\b/.test(location.search + location.hash);
 
-window.addEventListener("pywebviewready", () => boot(window.pywebview.api));
+// The bridge is only usable once its method STUBS are injected — the bare
+// api object shows up a beat earlier on a cold WebView2 (boot() also retries,
+// as the second line of defense).
+const bridgeReady = () =>
+  !!(window.pywebview && window.pywebview.api
+     && typeof window.pywebview.api.get_initial_state === "function");
+
+window.addEventListener("pywebviewready", () => {
+  if (bridgeReady()) boot(window.pywebview.api);   // else the poll catches it
+});
 if (WANT_MOCK) {
   boot(makeMockApi());
 } else {
@@ -1560,15 +1585,27 @@ if (WANT_MOCK) {
   // re-check periodically instead of guessing one magic delay.
   const poll = setInterval(() => {
     if (booted) { clearInterval(poll); return; }
-    if (window.pywebview && window.pywebview.api) { clearInterval(poll); boot(window.pywebview.api); }
+    if (bridgeReady()) { clearInterval(poll); boot(window.pywebview.api); }
   }, 150);
+  // Cold starts (especially the FIRST launch after an update, while Windows
+  // scans the fresh files) can outlast any reasonable timeout — reassure
+  // first, declare failure only much later. The poll keeps running either
+  // way, and a late bridge still boots + clears the banner.
+  setTimeout(() => {
+    if (!booted) {
+      showFatal("Still starting…",
+                "The interface is waiting for the app engine. The first launch after an "
+                + "update can take noticeably longer while Windows checks the new files — "
+                + "this screen goes away by itself when the app is ready.");
+    }
+  }, 8000);
   setTimeout(() => {
     if (!booted) {
       showFatal("The app's interface couldn't connect to its engine",
                 "The page loaded but the pywebview bridge never arrived. Close the app and try again; "
                 + "details are in the log file. (For a browser-only design preview, open index.html#mock.)");
     }
-  }, 8000);
+  }, 60000);
 }
 
 // ============================ mock API (browser preview) ====================

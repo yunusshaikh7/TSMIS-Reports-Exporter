@@ -69,8 +69,9 @@ from common import (
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, navigate_with_auth, new_authed_browser,
-    new_login_context, page_url_for_display, preflight, save_auth_state,
-    set_thread_site, storage_state_is_portable, try_device_sso_login,
+    new_login_context, page_url_for_display, preflight,
+    resolve_parallel_channel, save_auth_state, set_thread_site,
+    storage_state_is_portable, try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
@@ -590,6 +591,8 @@ class EnvScanWorker(threading.Thread):
         labels = [label for label, _fmt, _spec in EXPORT_REPORTS]
         combos = [(s, e) for s in DATA_SOURCES for e in ENVIRONMENTS]
         n = min(self.MAX_SCANNERS, len(combos)) if has_valid_auth() else 1
+        if n > 1:
+            n = self._parallel_scanners(n)
         log.info("env scan: starting (%d combos, %d scanner browser(s), "
                  "report types %s)", len(combos), n, labels)
         work = queue_mod.Queue()
@@ -668,6 +671,27 @@ class EnvScanWorker(threading.Thread):
         self.q.put(("env_access_done",
                     {"ok": ok, "done": len(results), "total": len(combos),
                      "cancelled": cancelled, "error": fatal}))
+
+    def _parallel_scanners(self, n):
+        """Parallel scanning only when the parallel channel is an unmanaged
+        Chromium (Built-in Chromium / Chrome + a saved login): if the only
+        usable browser is managed Edge, three concurrent sessions are the
+        exact failure fast mode hit in the field — scan serially instead.
+        The resolution is probed once and cached, so this costs ~a second
+        the first time and nothing after."""
+        from playwright.sync_api import sync_playwright
+        try:
+            with sync_playwright() as p:
+                channel = resolve_parallel_channel(p)
+        except Exception as e:
+            log.info("env scan: parallel channel pre-check failed (%s) — "
+                     "scanning serially", type(e).__name__)
+            return 1
+        if channel == "msedge":
+            log.info("env scan: only managed Edge is usable — scanning "
+                     "serially (no concurrent Edge sessions)")
+            return 1
+        return n
 
     def _check_one(self, page, src, env, report_labels):
         """One combo's verdict. Never raises — the answer (crashes included)

@@ -214,7 +214,7 @@ engine.
   bundle; end-user setup stays global-pip). `webview.start(gui="edgechromium")`
   is forced so a missing runtime fails loudly (clear message box) instead of
   silently degrading to MSHTML. tkinter is excluded from the bundle.
-  **THREE pywebview traps, all hit during the rewrite:**
+  **FIVE pywebview traps, all hit in the field:**
   1. pywebview detects "is `start()` already running" via the main thread's
      NAME — `logging_setup` must never rename the main thread (it tags
      `[main]` via a logging Filter instead); renaming it makes
@@ -244,6 +244,17 @@ engine.
      the fatal box also explains the manual Unblock for read-only installs.
      Repro for testing: `Set-Content <dll> -Stream Zone.Identifier` with
      `ZoneId=3` on `_internal\pythonnet\**`.
+  5. **The js_api OBJECT appears before its method stubs** (field failure,
+     first launch after the v0.10.2 update): on a cold WebView2,
+     `window.pywebview.api` can exist while pywebview is still injecting the
+     method functions into it — calling one throws "is not a function" and a
+     one-shot boot died on it permanently. `app.js` gates boot on
+     `bridgeReady()` (the method itself must be a function, not just the api
+     object) AND retries `get_initial_state` ~6 times re-grabbing the bridge
+     each round; the 8 s banner is a reassuring "Still starting…" (the poll
+     keeps running and a late bridge still boots), with the real failure
+     banner only at 60 s. The first launch after an update is the coldest
+     start there is — Windows scans every fresh file.
 - **Browser channels — three release variants, one codebase:**
   - **`*-win64.zip` (default build):** no bundled browser. Drives the machine's
     installed Edge (then Chrome) via `channel="msedge"`/`"chrome"`. Edge is
@@ -469,7 +480,10 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   **Fast + automatic (v0.10.2):** combos drain from a shared queue into up
   to 3 scanner threads, each owning its own Playwright/browser (fast-mode
   idiom; `parallel=True`, so the scanners use the Chromium/Chrome parallel
-  channel — see *Fast Mode*) and pinning its target via
+  channel — see *Fast Mode* — and when only managed Edge is usable the scan
+  drops to ONE browser, `_parallel_scanners` /
+  `common.resolve_parallel_channel`, instead of risking concurrent Edge
+  sessions) and pinning its target via
   `common.set_thread_site` — a
   threading.local consulted by `get_site()`, so every site-aware helper
   (get_url/expected_host/_site_params_ok, custom URL overrides included)
@@ -520,10 +534,19 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   (`updater.SWAP_FLAG` / `run_swap_mode`; gui_main branches into it FIRST,
   before logging/paths/CLR — the process runs from the staged tree, so
   normal path resolution would aim at the wrong folder) and exits: the swap
-  process waits on the app's PID, renames old bundle pieces
-  (exe/`_internal`/`Start Here.txt`) to `*.old`, **copies** itself into
-  place (it cannot move the tree it runs from), relaunches, and **rolls
-  back** if any step fails (`LOG_DIR\update_helper.log`); user data folders
+  process waits on the app's PID and installs in **two phases (v0.10.3,
+  field failure)** — phase 1 COPIES every staged piece to `*.new` (the big
+  failure-prone copytree happens while the installed app is untouched; a
+  failure = clean abort), phase 2 swaps by pure RENAMES (`live→.old`,
+  `.new→live`; rollback is renames too). The v0.10.2 one-phase copy could
+  die mid-`_internal` and its delete-based rollback could fail on a
+  Defender-held file, relaunching a MIXED tree ("says 0.10.2, features
+  missing"). A rolled-back update announces itself when the update is
+  re-offered (`updater.last_swap_failure` reads `update_helper.log`'s
+  tail), and `_clear_webview_caches()` (every launch, in
+  cleanup_leftovers) drops the WebView2 HTTP caches so the UI on screen is
+  always the one on disk (the persistent profile could serve a cached
+  app.js after an update; Local Storage/theme untouched); user data folders
   are never in the staged tree. A swap process that dies instantly is
   detected BEFORE the window closes (UpdateError; the app stays open on the
   old version). **Why an exe, not a script (v0.10.1, field failure):**
@@ -881,5 +904,6 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 | DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |
 | Build: "GUARD FAILED" | A dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` |
 | Update pill opens a web page instead of installing | App folder is read-only (data fell back to `%LOCALAPPDATA%`) | Expected (`update_support()` = "link") — move the app somewhere writable, or extract the new zip manually |
-| Update applied but the old version came back | A swap step failed; the swap rolled back | See `data\logs\update_helper.log`; close anything holding `_internal` open and update again |
+| Update applied but the old version came back | A swap step failed; the swap rolled back | See `data\logs\update_helper.log`; close anything holding `_internal` open and update again. Since v0.10.3 the app says so itself when it re-offers the update (`updater.last_swap_failure`) |
+| "The app couldn't load its settings" right after an update (≤ v0.10.2) | Cold-WebView2 bridge race — the api object landed before its method stubs (pywebview trap 5) | Fixed (boot gates on the method + retries); on old builds just relaunch |
 | Update downloaded, app closed, but nothing was installed (≤ v0.10.0) | The old PowerShell swap helper was silently blocked (locked-down PCs with no PowerShell) | Fixed in v0.10.1 (the staged exe swaps itself; no scripts). One manual install of ≥ 0.10.1 — the new version sits intact in `data\update\staged`, or download the zip — then auto-update works |
