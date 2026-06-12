@@ -35,9 +35,12 @@ jobs:
       # create makes the tag at this commit if it doesn't exist yet).
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      # v5/v6 run on Node 24 — GitHub runners force Node 24 from June 16, 2026
+      # and remove Node 20 on September 16, 2026 (the v0.10.0 run warned on
+      # the older checkout@v4 / setup-python@v5).
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
