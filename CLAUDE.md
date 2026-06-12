@@ -426,9 +426,12 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   at its next safe poll point via `common.maybe_screenshot` (Playwright is
   thread-affine — only the owning thread may touch the page; a blocking
   download wait answers at the next route), and the JPEG comes back as a
-  `("preview_shot", (worker, b64, note))` message → a closeable modal. The
-  Events seam (`worker_no`, `on_status`, `screenshot_wanted`,
-  `on_screenshot`) is no-op in the console flow.
+  `("preview_shot", (worker, b64, note, url))` message → a closeable modal
+  showing the page's address over the screenshot (likewise the Verify-env
+  modal; `common.page_url_for_display` strips the URL fragment — the OAuth
+  token rides in the hash and must never reach the screen). The Events seam
+  (`worker_no`, `on_status`, `screenshot_wanted`, `on_screenshot`) is no-op
+  in the console flow.
 - **Settings tab (v0.10.0, GUI):** persisted via `settings.py` →
   `data/config.json`. Timeout/worker overrides are read at RUN time through
   `common.*_timeout_ms()` accessors / `exporter_parallel.default_worker_count()`

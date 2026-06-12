@@ -308,8 +308,9 @@ class GuiApi:
             worker, text = payload
             self._emit({"t": "wstatus", "w": worker, "text": text})
         elif kind == "preview_shot":
-            worker, b64, note = payload
-            self._emit({"t": "preview", "w": worker, "img": b64, "note": note})
+            worker, b64, note, url = payload
+            self._emit({"t": "preview", "w": worker, "img": b64, "note": note,
+                        "url": url})
         elif kind == "env_shot":
             self._on_env_shot(payload)
         elif kind == "reset_done":
@@ -854,11 +855,12 @@ class GuiApi:
                            "report which site it loaded (screenshot attached).")
         if payload.get("img") or payload.get("error") is None:
             self._emit({"t": "preview", "w": 0, "img": payload.get("img"),
-                        "note": "Verify environment", "env_info": {
+                        "note": "Verify environment",
+                        "url": payload.get("url"), "env_info": {
                             "ok": payload.get("ok"),
                             "env": payload.get("env"), "src": payload.get("src"),
                             "matches": payload.get("matches"),
-                            "wanted": want, "url": payload.get("url")}})
+                            "wanted": want}})
         self._end_task()
 
     # ---- consolidate -------------------------------------------------------------

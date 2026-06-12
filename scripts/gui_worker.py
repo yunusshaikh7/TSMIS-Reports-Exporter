@@ -10,13 +10,16 @@ Message protocol (all are (kind, payload) tuples):
     ("progress", dict)                 {done,total,route,report,report_i,report_n,saved,empty,skipped,failed,exists}
     ("worker_status", (worker, text))  what browser `worker` (1-based) is doing
                                        right now (statuses replace each other)
-    ("preview_shot", (worker, b64, note))  an on-demand page screenshot for
-                                       browser `worker` — b64 is a base64 JPEG
-                                       string, or None when the capture failed
-                                       (note then says why)
+    ("preview_shot", (worker, b64, note, url))  an on-demand page screenshot
+                                       for browser `worker` — b64 is a base64
+                                       JPEG string, or None when the capture
+                                       failed (note then says why); url is the
+                                       page's address at capture time
     ("env_shot", dict)                 the idle "Verify environment" result:
                                        {ok, img (b64 JPEG|None), env, src,
-                                        matches, url, error}
+                                        matches, url, error} — url is the
+                                       page's address at screenshot time (the
+                                       intended one when it never opened)
     ("reset_done", dict)               outcome of "Delete all reports":
                                        {files, mb, errors: [str, ...]}
     ("chromium_done", dict)            outcome of the Built-in Chromium
@@ -49,8 +52,8 @@ from common import (
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, navigate_with_auth, new_authed_browser,
-    new_login_context, save_auth_state, storage_state_is_portable,
-    try_device_sso_login,
+    new_login_context, page_url_for_display, save_auth_state,
+    storage_state_is_portable, try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
@@ -166,9 +169,9 @@ class ExportWorker(threading.Thread):
                 return True
             return False
 
-    def _on_screenshot(self, worker_no, image, note):
+    def _on_screenshot(self, worker_no, image, note, url=""):
         b64 = base64.b64encode(image).decode("ascii") if image else None
-        self.q.put(("preview_shot", (worker_no, b64, note)))
+        self.q.put(("preview_shot", (worker_no, b64, note, url)))
 
     def _on_route(self, route, status):
         with self._tally_lock:              # in fast mode this fires from many threads
@@ -469,6 +472,9 @@ class EnvCheckWorker(threading.Thread):
                 browser, _ctx, page = new_authed_browser(p)
                 try:
                     navigate_with_auth(page)
+                    # The address the screenshot will show: the page's REAL
+                    # URL (token fragment stripped), not just the intended one.
+                    out["url"] = page_url_for_display(page) or out["url"]
                     if not is_logged_in(page):
                         out["error"] = ("Sign-in didn't complete, so the report "
                                         "page couldn't be checked. Log in, then "
@@ -494,9 +500,9 @@ class EnvCheckWorker(threading.Thread):
         except Exception as e:
             log.exception("env check crashed")
             out["error"] = f"{type(e).__name__}: {e}"
-        log.info("env check: done ok=%s page env=%s src=%s matches=%s error=%s",
-                 out["ok"], out["env"], out["src"], out["matches"],
-                 out["error"] or "-")
+        log.info("env check: done ok=%s page env=%s src=%s matches=%s url=%s "
+                 "error=%s", out["ok"], out["env"], out["src"], out["matches"],
+                 out["url"], out["error"] or "-")
         self.q.put(("env_shot", out))
 
 

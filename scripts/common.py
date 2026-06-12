@@ -673,25 +673,37 @@ def preflight(page, report_label):
         ) from e
 
 
+def page_url_for_display(page):
+    """The page's current address, safe to show in the UI: the URL fragment is
+    stripped (the app's sign-in returns the access token in the hash — it must
+    never reach the screen). Best-effort: "" when the page can't say."""
+    try:
+        return urlsplit(page.url)._replace(fragment="").geturl()
+    except Exception:
+        return ""
+
+
 def maybe_screenshot(page, events, note=""):
     """Answer a pending live-preview request for this worker's browser.
 
     The GUI's Preview button sets a flag (events.screenshot_wanted); engines
     call this at safe poll points ON THE WORKER'S OWN THREAD (Playwright is
     thread-affine, so the GUI can never screenshot a page directly). Captures
-    the current viewport as JPEG bytes and hands them to events.on_screenshot.
-    Best-effort: a capture problem reports a None image with the reason in
-    `note` (so the GUI stops waiting) and never disturbs the run."""
+    the current viewport as JPEG bytes and hands them to events.on_screenshot
+    along with the page's address. Best-effort: a capture problem reports a
+    None image with the reason in `note` (so the GUI stops waiting) and never
+    disturbs the run."""
     try:
         if not events.screenshot_wanted(events.worker_no):
             return
     except Exception:
         return
+    url = page_url_for_display(page)
     try:
         data = page.screenshot(type="jpeg", quality=70)   # viewport, not full page
-        log.info("preview screenshot captured for browser %d (%d bytes)",
-                 events.worker_no, len(data))
-        events.on_screenshot(events.worker_no, data, note)
+        log.info("preview screenshot captured for browser %d (%d bytes, %s)",
+                 events.worker_no, len(data), url or "url unknown")
+        events.on_screenshot(events.worker_no, data, note, url)
     except Exception as e:
         reason = str(e).splitlines()[0] if str(e) else type(e).__name__
         log.info("preview screenshot failed for browser %d (%s: %s)",
@@ -699,7 +711,7 @@ def maybe_screenshot(page, events, note=""):
         try:
             events.on_screenshot(events.worker_no, None,
                                  "The screenshot couldn't be taken right now "
-                                 "(the browser was busy) — try again.")
+                                 "(the browser was busy) — try again.", url)
         except Exception:
             pass
 

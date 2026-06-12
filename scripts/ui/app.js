@@ -364,6 +364,13 @@ function showPreviewEvent(ev) {
     banner.textContent = text;
     preview.body.appendChild(banner);
   }
+  if (ev.url) {
+    // The page's address at capture time — an address bar over the screenshot.
+    const addr = document.createElement("div");
+    addr.className = "preview-url";
+    addr.textContent = ev.url;
+    preview.body.appendChild(addr);
+  }
   if (ev.img) {
     const img = document.createElement("img");
     img.className = "preview-img";
@@ -1673,7 +1680,8 @@ function makeMockApi() {
     },
     request_preview: async (w) => {
       setTimeout(() => {
-        push({ t: "preview", w, img: mockShotB64("SSOR PROD", `Browser ${w} — Route 005 — Highway Log`), note: `Route 005` });
+        push({ t: "preview", w, img: mockShotB64("SSOR PROD", `Browser ${w} — Route 005 — Highway Log`), note: `Route 005`,
+               url: "https://tsmis.dot.ca.gov/index.html?env=prod&src=ssor" });
       }, 900);
       return { ok: true };
     },
@@ -1688,6 +1696,7 @@ function makeMockApi() {
                                      : "WARNING: the page is running SSOR / Dev, but SSOR / Prod is selected. Exports would hit SSOR / Dev." },
              { t: "preview", w: 0, img: mockShotB64(match ? "SSOR PROD" : "SSOR DEV", "Verify environment"),
                note: "Verify environment",
+               url: `https://tsmis.dot.ca.gov/index.html?env=${match ? "prod" : "dev"}&src=ssor`,
                env_info: { ok: true, env: match ? "prod" : "dev", src: "ssor", matches: match, wanted: "SSOR / Prod" } },
              { t: "run_ended" });
         st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
