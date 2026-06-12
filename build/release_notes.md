@@ -14,6 +14,20 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Intersection reports fixed (0.10.4).** The two new report types now match
+  the site exactly: the menu entries are **Intersection Summary** and
+  **Intersection Detail** (the site doesn't use a "TSAR:" prefix for them),
+  and Summary exports as an **Excel** file like Detail. The environment check
+  no longer reports them missing.
+- **See both sign-in paths at a glance (0.10.4).** The title bar now shows
+  two small indicators: **Saved login** (the session file captured via
+  Chrome / Built-in Chromium — what exports use, required for fast mode;
+  age in the tooltip) and **Edge one-click** (green once the hands-free
+  Windows sign-in has worked this session, amber when it's set up but not
+  yet used, grey when never set up).
+- **The Dev / testing update channel was removed (0.10.4).** Updates come
+  only from full releases on this page. The Update channel switch is gone
+  from Settings; nothing else changes.
 - **Updates install reliably now (0.10.3).** The 0.10.2 update could fail
   halfway on some PCs and leave a confusing half-installed app ("says 0.10.2
   but features are missing") or quietly fall back to the old version. The

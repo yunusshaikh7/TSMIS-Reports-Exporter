@@ -49,13 +49,15 @@ from logging_setup import LOG_FILE, set_debug_logging
 from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
                    FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, WEBVIEW_PROFILE_DIR,
                    is_frozen, list_output_days)
-from version import APP_NAME, __build__, __version__
+from version import APP_NAME, __version__
 from common import (
     BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES, DATA_SOURCE_LABELS,
-    ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError, clear_auth,
-    default_site_url, get_site, has_valid_auth, parse_routes,
-    require_valid_auth, set_preferred_channel, set_site,
+    ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError,
+    _auth_file_age_hours, clear_auth, default_site_url, get_site,
+    has_valid_auth, parse_routes, require_valid_auth, set_preferred_channel,
+    set_site,
 )
+from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import COMPARE_REPORTS, CONSOLIDATE_REPORTS, EXPORT_REPORTS
 
 log = logging.getLogger("tsmis.gui")
@@ -202,10 +204,29 @@ class GuiApi:
                 "can_save_report": bool(self._last_results),
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},
+                "logins": self._login_states(),
             }
 
     def _push_state(self):
         self._emit({"t": "state", "s": self._state_snapshot()})
+
+    def _login_states(self):
+        """The TWO sign-in paths, separately, for the title-bar indicators:
+        the SAVED LOGIN file (captured via Chrome / Built-in Chromium; what
+        exports restore and fast mode requires) and the EDGE ONE-CLICK
+        (the persistent Edge sign-in profile — `primed` means the profile
+        exists from a past headed Edge sign-in, `ok` means a silent sign-in
+        actually worked this session). Cheap stat calls only."""
+        valid = has_valid_auth()
+        age = _auth_file_age_hours() if valid else None
+        try:
+            primed = EDGE_LOGIN_PROFILE_DIR.is_dir() and any(
+                EDGE_LOGIN_PROFILE_DIR.iterdir())
+        except OSError:
+            primed = False
+        return {"file": {"valid": valid,
+                         "age_h": round(age, 1) if age is not None else None},
+                "device": {"ok": self._device_ok, "primed": primed}}
 
     def _sender(self):
         """Single ordered path to JS: batch whatever is queued and dispatch."""
@@ -509,14 +530,11 @@ class GuiApi:
             self._update = payload
         phase = payload.get("phase")
         ver = payload.get("version")
-        # Dev-channel builds are named by their tag ("dev-7"), not "vdev-7".
-        disp = ver if payload.get("dev") else f"v{ver}"
-        dev_note = " — a DEV build for testing" if payload.get("dev") else ""
         if phase == "available":
             if payload.get("can_apply"):
                 size = f" ({payload['size_mb']} MB)" if payload.get("size_mb") else ""
-                self._emit_log(f"Update available: {disp}{size}{dev_note} — click "
-                               f"‘Update to {disp}’ in the title bar to install it.")
+                self._emit_log(f"Update available: v{ver}{size} — click "
+                               f"‘Update to v{ver}’ in the title bar to install it.")
                 # An update being offered WHILE the helper log ends in a
                 # failure means the last attempt rolled back — say so instead
                 # of looking like nothing ever happened.
@@ -530,16 +548,14 @@ class GuiApi:
                                    "first. (Details: update_helper.log in the "
                                    "logs folder.)")
             else:
-                self._emit_log(f"Update available: {disp}.{dev_note} This app folder isn't "
+                self._emit_log(f"Update available: v{ver}. This app folder isn't "
                                "writable, so the title-bar button opens the download "
                                "page instead — extract the new zip into a folder you "
                                "can write to.")
         elif phase == "none" and manual:
-            self._emit_log("You're on the latest version "
-                           f"({updater.installed_tag()}, "
-                           f"{settings.get('update_channel')} channel).")
+            self._emit_log(f"You're on the latest version (v{__version__}).")
         elif phase == "staged":
-            self._emit_log(f"Update {disp} is downloaded and ready — click "
+            self._emit_log(f"Update v{ver} is downloaded and ready — click "
                            "‘Restart to update’ when you're done working "
                            "(the app closes, updates itself, and reopens).")
         elif phase == "failed" and manual:
@@ -591,7 +607,6 @@ class GuiApi:
         return {
             "app_name": APP_NAME,
             "version": __version__,
-            "build": __build__,        # dev-build tag ("dev-7"); "" on stable
             "output_root": str(OUTPUT_ROOT),
             "log_dir": str(LOG_DIR),
             "reports": [{"label": label, "fmt": fmt} for label, fmt, _spec in EXPORT_REPORTS],
@@ -693,12 +708,10 @@ class GuiApi:
             if info is None:
                 return {"error": "No update is ready to install."}
             self._update = {"phase": "downloading", "progress": 0,
-                            "version": info.version,
-                            "dev": getattr(info, "dev", False),
-                            "url": info.release_url, "can_apply": True}
+                            "version": info.version, "url": info.release_url,
+                            "can_apply": True}
         size = f" ({round(info.asset_size / 1e6)} MB)" if info.asset_size else ""
-        disp = info.version if getattr(info, "dev", False) else f"v{info.version}"
-        self._emit_log(f"Downloading update {disp}{size}…")
+        self._emit_log(f"Downloading update v{info.version}{size}…")
         self._push_state()
         UpdateWorker(self._q, "download", info=info).start()
         return {"ok": True}
@@ -1215,7 +1228,6 @@ class GuiApi:
             "chromium": self._chromium_state(),
             "meta": {
                 "version": __version__,
-                "build_tag": __build__,
                 "build": "portable app" if is_frozen() else "development run",
                 "variant": ("with built-in browser"
                             if "chromium" in BROWSER_CHANNELS else "system browser"),

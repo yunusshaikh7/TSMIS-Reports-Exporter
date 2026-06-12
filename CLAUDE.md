@@ -16,14 +16,16 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
-| 5 | TSAR: Intersection Summary | PDF (Letter) | `output/<run>/intersection_summary/` |
-| 6 | TSAR: Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
+| 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
+| 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 
-Reports 5–6 (v0.10.2) are **export-only** for now (no consolidator/comparison);
-their specs mirror the ramp pair and their dropdown labels + empty-marker
-text ("no intersections") are best-guess until verified live — the env-access
-scan reads the dropdown for every `EXPORT_REPORTS` row, so a wrong label
-shows up there as "missing" without running an export.
+Reports 5–6 (v0.10.2) are **export-only** for now (no consolidator/comparison).
+Labels + formats verified against the live page source (v0.10.4): NO "TSAR:"
+prefix (unlike the ramp pair), both Excel via the shared Export button; only
+the empty-marker text ("no intersections") remains best-guess. The site greys
+options with a `cs-disabled` class; the env-access scan reads the dropdown for
+every `EXPORT_REPORTS` row, so any label drift shows up there as "missing"
+without running an export.
 
 `<run>` is a **run folder**, `"<YYYY-MM-DD> <src>-<env>"` (e.g.
 `2026-06-11 ssor-prod`, v0.10.0) — see *Key Behaviors: run folders*.
@@ -565,22 +567,11 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   isn't. Update state is pushed in every snapshot (`update:{phase,…}`);
   worker protocol message is `("update_status", dict)`. `full_smoke.py` stubs
   `UpdateWorker` so the release gate never touches the network.
-  **Update channels (v0.10.2):** Settings ▸ Update channel = `stable`
-  (default: `/releases/latest`, so prereleases are invisible; offered when
-  strictly newer — or equal-versioned when the install IS a dev build, the
-  exit ramp off the channel) | `dev` (newest release of ANY kind incl.
-  prereleases, offered whenever its tag differs from
-  `updater.installed_tag()` = `version.__build__` — stamped `"dev-N"` by the
-  workflow — else `"v<version>"`; dev builds iterate without version bumps,
-  so the test is "different", not "newer", and a stable release published
-  after the dev builds returns the install to normal automatically). **Cut a
-  dev build with the `dev-release` workflow** (manual dispatch on ANY
-  branch): stamps `__build__`, SKIPS the self-test gate by default (tick
-  `selftest` for the full gate), builds win64 + with-browser (untick
-  `with_browser` to skip — but with-browser installs need that asset or
-  their check errors), publishes prerelease `dev-<run_number>`, and prunes
-  older dev prereleases so the channel points at exactly one dev build. The
-  pill/log/About label dev builds; the version chip shows "v0.10.1 · dev-7".
+  (A "dev update channel" + dev-release workflow existed briefly in
+  v0.10.2–0.10.3 and was removed in v0.10.4 — only full releases from
+  `/releases/latest` are ever offered. Don't resurrect it casually; if it
+  returns, releases must be picked by newest `published_at`, never list
+  order — that ordering bug is why it never worked in the field.)
 
 ## Timeouts (`scripts/common.py`)
 
@@ -719,6 +710,13 @@ The sequential single-browser engine keeps the normal channel order.
   page closing, a connection blip, or a single transient `ctx.cookies()` error
   as "closed" (that caused false "cancelled"). On any non-save outcome no file
   is written, so a prior valid session is preserved.
+- **The title bar shows the two sign-in paths separately (v0.10.4):** a
+  "Saved login" chip (the auth file — valid/missing, age in the tooltip;
+  what exports restore, required for fast mode) and an "Edge one-click" chip
+  (green = silent device sign-in proven this session, amber = the Edge
+  sign-in profile exists but is unproven, grey = never set up).
+  `gui_api._login_states()` → snapshot `logins`; cheap stat calls only — the
+  device path is only ever PROVEN by an actual sign-in, never probed eagerly.
 - `require_valid_auth()` still validates the file shape (exists, valid JSON,
   `cookies`/`origins` lists) and backs `has_valid_auth()` / the GUI status dot.
   On `AuthError` from a run, `cli.py` clears the stale file and guides re-login;

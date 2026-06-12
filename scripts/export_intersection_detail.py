@@ -1,11 +1,11 @@
-"""Bulk-export TSAR: Intersection Detail Excel files for every California state route.
+"""Bulk-export Intersection Detail Excel files for every California state route.
 
-Output: output/intersection_detail/tsar_intersection_detail_route_<ROUTE>.xlsx
+Output: output/intersection_detail/intersection_detail_route_<ROUTE>.xlsx
 
-Mirrors export_ramp_detail.py (Export-button download). The label must match
-the #customReport dropdown text exactly — the Settings env check reads the
-dropdown for every registered report, so a mismatch shows up there as
-"missing" without running an export.
+Label verified against the live page source (v0.10.4): the dropdown text is
+exactly "Intersection Detail" — no "TSAR:" prefix, unlike the ramp pair. The
+empty-marker text ("no intersections") is still best-guess — the shared
+ERROR_JS catch and the per-route timeout cover a different wording.
 """
 import sys
 
@@ -19,9 +19,9 @@ from cli import run_cli
 from exporter import ReportSpec, save_via_export_button
 
 SPEC = ReportSpec(
-    label="TSAR: Intersection Detail",
+    label="Intersection Detail",
     subdir="intersection_detail",
-    filename=lambda route: f"tsar_intersection_detail_route_{route}.xlsx",
+    filename=lambda route: f"intersection_detail_route_{route}.xlsx",
     # Ready when the Export (download) button appears, or the report's own
     # "no intersections" notice.
     wait_js=lambda route: (
