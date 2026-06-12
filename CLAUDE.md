@@ -524,6 +524,22 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   isn't. Update state is pushed in every snapshot (`update:{phase,…}`);
   worker protocol message is `("update_status", dict)`. `full_smoke.py` stubs
   `UpdateWorker` so the release gate never touches the network.
+  **Update channels (v0.10.2):** Settings ▸ Update channel = `stable`
+  (default: `/releases/latest`, so prereleases are invisible; offered when
+  strictly newer — or equal-versioned when the install IS a dev build, the
+  exit ramp off the channel) | `dev` (newest release of ANY kind incl.
+  prereleases, offered whenever its tag differs from
+  `updater.installed_tag()` = `version.__build__` — stamped `"dev-N"` by the
+  workflow — else `"v<version>"`; dev builds iterate without version bumps,
+  so the test is "different", not "newer", and a stable release published
+  after the dev builds returns the install to normal automatically). **Cut a
+  dev build with the `dev-release` workflow** (manual dispatch on ANY
+  branch): stamps `__build__`, SKIPS the self-test gate by default (tick
+  `selftest` for the full gate), builds win64 + with-browser (untick
+  `with_browser` to skip — but with-browser installs need that asset or
+  their check errors), publishes prerelease `dev-<run_number>`, and prunes
+  older dev prereleases so the channel points at exactly one dev build. The
+  pill/log/About label dev builds; the version chip shows "v0.10.1 · dev-7".
 
 ## Timeouts (`scripts/common.py`)
 

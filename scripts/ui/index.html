@@ -394,6 +394,16 @@
           </div>
           <p class="hint">The support bundle is a zip of the logs, run reports and settings —
             everything a maintainer needs and <b>never your login</b>.</p>
+          <label class="set-row" style="margin-top:6px">Update channel
+            <span class="set-input"><select class="input" id="setUpdateChannel">
+              <option value="stable">Stable releases</option>
+              <option value="dev">Dev / testing builds</option>
+            </select></span>
+          </label>
+          <p class="hint">Dev builds are quick prerelease test versions pushed between
+            releases — expect rough edges. Pick <b>Dev / testing builds</b> only when
+            asked to try a fix; the title-bar pill then offers the newest dev build,
+            and the next stable release returns this install to normal automatically.</p>
         </div>
 
         <div class="card-section">

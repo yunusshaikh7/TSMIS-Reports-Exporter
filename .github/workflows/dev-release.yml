@@ -1,0 +1,101 @@
+# Quick prerelease builds for the Settings "Dev / testing" update channel.
+#
+# Run this workflow manually (Actions ▸ dev-release ▸ Run workflow) on ANY
+# branch to put that branch's current state into testers' hands fast: it
+# builds the portable app, publishes it as a PRERELEASE tagged dev-<run>, and
+# the app's one-click updater offers it to installs whose Settings ▸ Update
+# channel is "Dev / testing builds". Stable installs never see these:
+# /releases/latest (the stable channel's source) excludes prereleases.
+#
+# Speed over ceremony — BY DEFAULT THE SELF-TEST GATE IS SKIPPED (the dev
+# channel's audience is the tester); tick `selftest` for the full gate.
+# version.py is stamped with __build__ = "dev-<run>" before building, so the
+# installed app knows exactly which dev build it runs (shown next to the
+# version, keys the next update offer). Older dev-* prereleases are pruned
+# after publishing — the channel always points at exactly one dev build.
+#
+# Stable releases are untouched: release.yml (v* tags) remains the only path
+# that publishes full releases, with both self-test gates.
+
+name: dev-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      with_browser:
+        description: "Also build the -with-browser variant (required by with-browser installs)"
+        type: boolean
+        default: true
+      selftest:
+        description: "Run the frozen self-test gate first (slower)"
+        type: boolean
+        default: false
+      notes:
+        description: "One-line note shown on the prerelease (what to test)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  dev-build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      TAG: dev-${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Stamp the dev-build identity into version.py
+        run: |
+          (Get-Content version.py) -replace '^__build__ = .*', "__build__ = `"$env:TAG`"" | Set-Content version.py
+          Select-String -Path version.py -Pattern '^__build__'
+
+      - name: Frozen self-test gate (optional)
+        if: inputs.selftest
+        run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
+
+      - name: Build the windowed app (system browser)
+        run: powershell -ExecutionPolicy Bypass -File build\build.ps1
+
+      - name: Zip the system-browser variant
+        run: Compress-Archive -Path "dist\TSMIS Exporter" -DestinationPath "TSMIS-Exporter-$env:TAG-win64.zip"
+
+      - name: Build the windowed app (bundled Chromium)
+        if: inputs.with_browser
+        run: |
+          Remove-Item -Recurse -Force "dist\TSMIS Exporter"
+          powershell -ExecutionPolicy Bypass -File build\build.ps1 -BundleChromium
+
+      - name: Zip the bundled-Chromium variant
+        if: inputs.with_browser
+        run: Compress-Archive -Path "dist\TSMIS Exporter" -DestinationPath "TSMIS-Exporter-$env:TAG-win64-with-browser.zip"
+
+      - name: Publish the prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WITH_BROWSER: ${{ inputs.with_browser }}
+          NOTES_IN: ${{ inputs.notes }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          $assets = @("TSMIS-Exporter-$env:TAG-win64.zip")
+          if ($env:WITH_BROWSER -eq "true") { $assets += "TSMIS-Exporter-$env:TAG-win64-with-browser.zip" }
+          $notes = "Dev build from branch $env:BRANCH @ ${{ github.sha }} - a quick test version for the Settings 'Dev / testing builds' update channel. Not a release; the self-test gate may have been skipped."
+          if ($env:NOTES_IN) { $notes = "$env:NOTES_IN`n`n$notes" }
+          gh release create "$env:TAG" @assets --prerelease --target "${{ github.sha }}" --title "Dev build $env:TAG ($env:BRANCH)" --notes "$notes"
+
+      - name: Prune older dev prereleases (the channel points at ONE dev build)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $old = gh release list --limit 100 --json tagName,isPrerelease | ConvertFrom-Json |
+            Where-Object { $_.isPrerelease -and $_.tagName -like 'dev-*' -and $_.tagName -ne $env:TAG }
+          foreach ($r in $old) {
+            Write-Host "deleting old dev prerelease $($r.tagName)"
+            gh release delete $r.tagName --cleanup-tag --yes
+          }

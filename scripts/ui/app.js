@@ -450,7 +450,8 @@ document.addEventListener("contextmenu", (e) => e.preventDefault());
 function buildStatic() {
   const init = S.init;
   $("appName").textContent = init.app_name;
-  $("appVersion").textContent = "v" + init.version;
+  $("appVersion").textContent = "v" + init.version
+    + (init.build ? " · " + init.build : "");
   $("appVersion").title = "Check for updates";
   $("outputRoot").textContent = init.output_root;
   document.title = init.app_name;
@@ -726,6 +727,9 @@ function renderEnvAccess() {
 
 // One-click update pill (title bar). Python owns the whole update state; this
 // only decides the pill's label/visibility for the current phase.
+// Dev-channel builds are named by their tag ("dev-7"), stable ones "v0.10.1".
+const updName = (up) => (up.dev ? up.version : "v" + up.version);
+
 function renderUpdate(up) {
   const b = $("btnUpdate");
   up = up || { phase: "idle" };
@@ -734,10 +738,11 @@ function renderUpdate(up) {
   switch (up.phase) {
     case "available":
       if (up.can_apply) {
-        label = `Update to v${up.version}`;
-        title = "Download and install the new version";
+        label = `Update to ${updName(up)}`;
+        title = up.dev ? "Download and install this DEV build (a quick test version)"
+                       : "Download and install the new version";
       } else {
-        label = `v${up.version} available`;
+        label = `${updName(up)} available`;
         title = "Open the download page (this app folder is read-only, so the app can't update itself)";
       }
       break;
@@ -749,7 +754,7 @@ function renderUpdate(up) {
       label = "Restart to update";
       disabled = locked;
       title = locked ? "Finish or cancel the running task first"
-                     : `Install v${up.version} — the app closes and reopens by itself`;
+                     : `Install ${updName(up)} — the app closes and reopens by itself`;
       break;
     case "applying":
       label = "Restarting…";
@@ -775,7 +780,7 @@ async function onUpdateClick() {
   if (up.phase === "staged") {
     const ok = await showConfirm({
       title: "Restart and update?",
-      message: `The app will close, install v${up.version} (takes a few seconds), and reopen by itself.\n\nYour reports, login and settings stay where they are.`,
+      message: `The app will close, install ${updName(up)} (takes a few seconds), and reopen by itself.\n\nYour reports, login and settings stay where they are.`,
       confirmLabel: "Restart now",
     });
     if (!ok) return;
@@ -1126,6 +1131,7 @@ const SETTING_INPUTS = {
   setRetryTimeout: "retry_timeout_min",
   setCountyTimeout: "county_timeout_s",
   setFastWorkers: "fast_workers",
+  setUpdateChannel: "update_channel",
 };
 
 function fillSettings() {
@@ -1162,7 +1168,8 @@ function fillSettings() {
 
   const about = $("setAbout");
   about.textContent = "";
-  [["Version", `v${meta.version || S.init.version}`],
+  [["Version", `v${meta.version || S.init.version}`
+                + ((meta.build_tag || S.init.build) ? ` · ${meta.build_tag || S.init.build} (dev build)` : "")],
    ["Build", `${meta.build || "?"} · ${meta.variant || "?"}`],
    ["Sign-in", meta.auth_state || "?"],
    ["Settings file", "config.json in the data folder (safe to delete — defaults return)"]]
@@ -1276,6 +1283,7 @@ async function onSettingInput(id) {
       $("fastWorkers").value = res.values[key];   // reseed the Export pane default
     }
   }
+  if (key === "update_channel") api.check_updates();  // the new channel answers now
 }
 
 async function onSettingToggle(id, key) {
@@ -1576,6 +1584,7 @@ function makeMockApi() {
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
     county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
+    update_channel: "stable",
   };
   const mockUrlOverrides = {};
   const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,
@@ -1843,7 +1852,9 @@ function makeMockApi() {
     get_settings: async () => ({ values: { ...mockSettings }, defaults: { ...mockSettings }, meta: {} }),
     set_setting: async (key, value) => {
       const numeric = typeof mockSettings[key] === "number";
-      mockSettings[key] = numeric ? Math.max(1, parseInt(value, 10) || mockSettings[key]) : !!value;
+      const boolish = typeof mockSettings[key] === "boolean";
+      mockSettings[key] = numeric ? Math.max(1, parseInt(value, 10) || mockSettings[key])
+                        : boolish ? !!value : value;
       push({ t: "log", text: `(mock) setting ${key} = ${mockSettings[key]}` });
       return { ok: true, values: { ...mockSettings } };
     },

@@ -7,6 +7,12 @@ dependency-free so it can be imported from anywhere, including the .spec.
 __version__ = "0.10.1"         # semantic version MAJOR.MINOR.PATCH
 APP_NAME = "TSMIS Exporter"    # onefolder / executable name
 
+# Dev-build identity. "" in the repo and in stable releases; the dev-release
+# workflow stamps the prerelease tag in (e.g. "dev-7") before building, so a
+# dev-channel install knows exactly which build it runs (updater.installed_tag
+# keys update offers on it; the GUI shows it next to the version).
+__build__ = ""
+
 # Playwright pins the bundled Node DRIVER (node.exe). The default build does NOT
 # bundle a browser -- it drives the machine's installed Microsoft Edge / Google
 # Chrome via channel="msedge"/"chrome" (Playwright's CDP works across evergreen
