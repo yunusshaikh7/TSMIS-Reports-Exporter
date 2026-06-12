@@ -243,7 +243,7 @@
           <div class="option-list" id="compareList"></div>
         </div>
 
-        <div class="card-section">
+        <div class="card-section" id="cmpFilesSection">
           <div class="section-head"><span class="section-label">Files to compare</span></div>
           <p class="hint" style="margin-bottom:10px">
             Pick the TSMIS file and the TSN file — either two per-route workbooks
@@ -262,6 +262,33 @@
             <span class="file-pick-label">TSN file</span>
             <span class="mono path file-pick-path" id="cmpTsnPath">— not selected —</span>
             <button class="btn btn-standard" id="btnPickTsn">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Browse…
+            </button>
+          </div>
+        </div>
+
+        <div class="card-section hidden" id="cmpFoldersSection">
+          <div class="section-head"><span class="section-label">Export folders to compare</span></div>
+          <p class="hint" style="margin-bottom:10px">
+            Pick the two export run folders (e.g. <span class="mono">2026-06-11 ssor-prod</span>
+            vs <span class="mono">2026-06-11 ars-prod</span>). The report's per-route files are
+            read straight from both — no consolidation needed first. Baseline goes on the left.
+          </p>
+          <div class="file-pick-row">
+            <span class="file-pick-label">Baseline</span>
+            <span class="tb-select select-light" style="flex:1; min-width:0">
+              <select id="cmpDirA" style="width:100%"></select><svg class="ic"><use href="#i-chevron-down"/></svg>
+            </span>
+            <button class="btn btn-standard" id="btnPickDirA" title="Pick a folder outside output\">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Browse…
+            </button>
+          </div>
+          <div class="file-pick-row">
+            <span class="file-pick-label">Compare to</span>
+            <span class="tb-select select-light" style="flex:1; min-width:0">
+              <select id="cmpDirB" style="width:100%"></select><svg class="ic"><use href="#i-chevron-down"/></svg>
+            </span>
+            <button class="btn btn-standard" id="btnPickDirB" title="Pick a folder outside output\">
               <svg class="ic"><use href="#i-folder-open"/></svg>Browse…
             </button>
           </div>
@@ -290,12 +317,12 @@
           <p class="hint">
             A Summary (with self-check rows that prove the numbers line up),
             a cell-by-cell Comparison (matching values shown plainly,
-            differences in red as “TSMIS&nbsp;≠&nbsp;TSN”), a Spot Check sheet
-            to audit any single location, “Only in TSMIS” / “Only in TSN”
-            sheets collecting every one-sided row, and the two inputs side by
-            side — row numbers link between sheets throughout.
-            Consolidated comparisons also get a Routes sheet — which routes each
-            system covers, what's missing where (whole-missing routes are
+            differences in red as “first&nbsp;value&nbsp;≠&nbsp;second value”),
+            a Spot Check sheet to audit any single row, “Only in …” sheets
+            collecting every one-sided row for each side, and the two inputs
+            side by side — row numbers link between sheets throughout.
+            All-routes comparisons also get a Routes sheet — which routes each
+            side covers, what's missing where (whole-missing routes are
             flagged “entire route”), and how much differs per route.
             You'll be asked where to save it.
           </p>

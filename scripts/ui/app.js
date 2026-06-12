@@ -494,20 +494,21 @@ function buildStatic() {
     cl.appendChild(row);
   });
 
-  // comparison-type radios (one entry today; the registry grows)
+  // comparison-type radios ({label, kind} rows; kind decides files vs folders)
   const cl2 = $("compareList");
-  (init.compare_reports || []).forEach((label, i) => {
+  (init.compare_reports || []).forEach((rep, i) => {
     const row = document.createElement("label");
     row.className = "option-row" + (i === 0 ? " checked" : "");
     const rb = document.createElement("input");
     rb.type = "radio"; rb.name = "compareReport"; rb.checked = i === 0; rb.dataset.idx = i;
     const dot = document.createElement("span"); dot.className = "radio";
     const name = document.createElement("span");
-    name.className = "option-name"; name.textContent = "TSMIS vs TSN — " + label;
+    name.className = "option-name"; name.textContent = rep.label;
     row.append(rb, dot, name);
     rb.addEventListener("change", () => {
       cl2.querySelectorAll(".option-row").forEach((r) => r.classList.remove("checked"));
       row.classList.add("checked");
+      renderCompareKind();
     });
     cl2.appendChild(row);
   });
@@ -626,7 +627,8 @@ function renderState() {
   $("btnCancelExport").disabled = st.task !== "export";
   $("btnCancelCons").disabled = st.task !== "consolidate";
   $("btnSaveReport").disabled = locked || !st.can_save_report;
-  ["btnPickTsmis", "btnPickTsn", "btnOpenConsInput"].forEach((id) => { $(id).disabled = locked; });
+  ["btnPickTsmis", "btnPickTsn", "btnPickDirA", "btnPickDirB",
+   "cmpDirA", "cmpDirB", "btnOpenConsInput"].forEach((id) => { $(id).disabled = locked; });
   ["compareList", "cmpOutList"].forEach((id) => {
     $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked; });
     $(id).querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
@@ -716,6 +718,7 @@ function renderDays(days) {
   });
   sel.value = [...sel.options].some((o) => o.value === prev) ? prev : values[0];
   refreshConsDest();
+  if (compareKind() === "folders") renderCompareDirs();
 }
 
 let consDestSeq = 0;
@@ -918,8 +921,13 @@ async function saveRunReport() {
   if (res && res.error) showMessage("error", "Could not save report", res.error);
 }
 
-// ---- TSMIS vs TSN comparison ----
+// ---- comparisons (files kind = TSMIS vs TSN; folders kind = env vs env) ----
 const CMP = { tsmis: null, tsn: null };
+
+function compareKind() {
+  const rep = (S.init.compare_reports || [])[compareChoice()];
+  return (rep && rep.kind) || "files";
+}
 
 function renderCompareFiles() {
   for (const [side, id] of [["tsmis", "cmpTsmisPath"], ["tsn", "cmpTsnPath"]]) {
@@ -931,10 +939,62 @@ function renderCompareFiles() {
   syncCompareButton();
 }
 
+// Folder dropdowns: the known run folders (newest first) plus any custom
+// path picked via Browse… (kept as an extra option per side).
+const CMP_DIRS = { a: null, b: null };   // custom absolute paths from Browse…
+
+function fillCompareDirSelect(sel, custom, preferred) {
+  const days = (S.st && S.st.days) || [];
+  const prev = sel.value;
+  sel.textContent = "";
+  if (custom) {
+    const o = document.createElement("option");
+    o.value = custom; o.textContent = custom;
+    sel.appendChild(o);
+  }
+  days.forEach((d) => {
+    const o = document.createElement("option");
+    o.value = d; o.textContent = d;
+    sel.appendChild(o);
+  });
+  if (!days.length && !custom) {
+    const o = document.createElement("option");
+    o.value = ""; o.textContent = "— no export folders yet —";
+    sel.appendChild(o);
+  }
+  const options = [...sel.options].map((o) => o.value);
+  if (custom) sel.value = custom;
+  else if (prev && options.includes(prev)) sel.value = prev;
+  else if (preferred) sel.value = preferred;
+}
+
+function renderCompareDirs() {
+  const days = (S.st && S.st.days) || [];
+  // sensible defaults: baseline = newest ssor-prod run, other side = the
+  // newest folder that differs from the baseline
+  const baseline = days.find((d) => /ssor-prod$/.test(d)) || days[0] || "";
+  fillCompareDirSelect($("cmpDirA"), CMP_DIRS.a, baseline);
+  const other = days.find((d) => d !== $("cmpDirA").value) || days[0] || "";
+  fillCompareDirSelect($("cmpDirB"), CMP_DIRS.b, other);
+  syncCompareButton();
+}
+
+function renderCompareKind() {
+  const folders = compareKind() === "folders";
+  $("cmpFilesSection").classList.toggle("hidden", folders);
+  $("cmpFoldersSection").classList.toggle("hidden", !folders);
+  if (folders) renderCompareDirs();
+  syncCompareButton();
+}
+
 function syncCompareButton() {
   const locked = S.st && S.st.task != null;
   const anyOut = $("cmpWantValues").checked || $("cmpWantFormulas").checked;
-  $("btnStartCompare").disabled = locked || !(CMP.tsmis && CMP.tsn) || !anyOut;
+  const ready = compareKind() === "folders"
+    ? ($("cmpDirA").value && $("cmpDirB").value
+       && $("cmpDirA").value !== $("cmpDirB").value)
+    : (CMP.tsmis && CMP.tsn);
+  $("btnStartCompare").disabled = locked || !ready || !anyOut;
   $("cmpOutHint").textContent = anyOut
     ? "Pick one or both. With both, the values copy is saved next to the other as “… (values).xlsx”."
     : "Tick at least one output to enable the comparison.";
@@ -948,10 +1008,26 @@ async function pickCompareFile(side) {
   }
 }
 
+async function pickCompareFolder(side) {
+  const res = await api.pick_compare_folder(side.toUpperCase());
+  if (res && res.path) {
+    CMP_DIRS[side] = res.path;
+    renderCompareDirs();
+  }
+}
+
 async function startCompare() {
-  const res = await api.start_compare(compareChoice(), CMP.tsmis, CMP.tsn,
+  let res;
+  if (compareKind() === "folders") {
+    res = await api.start_compare_env(compareChoice(),
+                                      $("cmpDirA").value, $("cmpDirB").value,
                                       $("cmpWantFormulas").checked,
                                       $("cmpWantValues").checked);
+  } else {
+    res = await api.start_compare(compareChoice(), CMP.tsmis, CMP.tsn,
+                                  $("cmpWantFormulas").checked,
+                                  $("cmpWantValues").checked);
+  }
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 
@@ -1178,6 +1254,10 @@ function bindEvents() {
 
   $("btnPickTsmis").onclick = () => pickCompareFile("tsmis");
   $("btnPickTsn").onclick = () => pickCompareFile("tsn");
+  $("btnPickDirA").onclick = () => pickCompareFolder("a");
+  $("btnPickDirB").onclick = () => pickCompareFolder("b");
+  $("cmpDirA").onchange = syncCompareButton;
+  $("cmpDirB").onchange = syncCompareButton;
   ["cmpWantValues", "cmpWantFormulas"].forEach((id) => {
     const cb = $(id);
     cb.addEventListener("change", () => {
@@ -1189,6 +1269,7 @@ function bindEvents() {
   $("btnStartCompare").onclick = startCompare;
   $("btnCancelCompare").onclick = () => api.cancel_run();
   renderCompareFiles();
+  renderCompareKind();
 
   $("btnOpenOutput").onclick = () => api.open_output_folder();
   $("btnOpenLogs").onclick = () => api.open_logs_folder();
@@ -1393,7 +1474,13 @@ function makeMockApi() {
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       reports: REPORTS,
       cons_reports: REPORTS.map((r) => r.label).concat(["TSN Highway Log"]),
-      compare_reports: ["Highway Log"],
+      compare_reports: [
+        { label: "Highway Log — TSMIS vs TSN", kind: "files" },
+        { label: "TSAR: Ramp Summary — between environments", kind: "folders" },
+        { label: "TSAR: Ramp Detail — between environments", kind: "folders" },
+        { label: "Highway Sequence Listing — between environments", kind: "folders" },
+        { label: "Highway Log — between environments", kind: "folders" },
+      ],
       routes: ROUTES,
       channels: [
         { id: "msedge", label: "Microsoft Edge", short: "Edge" },
@@ -1569,6 +1656,29 @@ function makeMockApi() {
         ? "C:\\Users\\you\\Downloads\\tsmis_highway_log_route 1.xlsx"
         : "C:\\Users\\you\\Downloads\\tsn_highway_log_route 1.xlsx",
     }),
+    pick_compare_folder: async () => ({
+      path: "D:\\Archive\\2026-05-02 ssor-prod",
+    }),
+    start_compare_env: async (_idx, dirA, dirB, wantFormulas, wantValues) => {
+      if (!wantFormulas && !wantValues) {
+        return { error: "Tick at least one output (values and/or live formulas)." };
+      }
+      st.task = "compare";
+      st.auth_dot = "busy"; st.auth_text = "Comparing…";
+      pushState();
+      push({ t: "log", text: `Starting comparison: ${dirA} vs ${dirB}` },
+           { t: "run_started", mode: "consolidate", label: "Comparing — environments…" });
+      setTimeout(() => {
+        push({ t: "log", text: "SSOR-PROD rows: 48,112   ARS-PROD rows: 48,090   union: 48,201 locations across 280 routes" },
+             { t: "log", text: "Matched rows with differences: 312 (1,204 differing cells); 47,654 fully identical" },
+             { t: "log", text: "Routes only in SSOR-PROD (missing from ARS-PROD) (1): 254" },
+             { t: "run_ended" });
+        st.task = null;
+        st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 2400);
+      return { ok: true };
+    },
     start_compare: async (_idx, _t, _n, wantFormulas, wantValues) => {
       if (!wantFormulas && !wantValues) {
         return { error: "Tick at least one output (values and/or live formulas)." };

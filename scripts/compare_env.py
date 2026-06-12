@@ -1,0 +1,346 @@
+"""Cross-environment comparison: the same report exported from two different
+data source / environment combinations (e.g. SSOR-prod vs ARS-prod, or
+SSOR-prod today vs SSOR-prod last month), compared cell-for-cell.
+
+Inputs are two RUN FOLDERS (output/<YYYY-MM-DD src-env>/ — or a report
+subfolder picked directly). No consolidation step is needed first: the
+per-route files of the chosen report are read straight from both folders
+and merged in memory exactly the way the consolidators would (Route column
+prepended, header locked from the first readable file), then handed to the
+proven compare_core engine — so the output is the same approved discrepancy
+workbook the TSMIS-vs-TSN comparison produces, with the environment names
+("SSOR-PROD", "ARS-DEV", …) as the two sides.
+
+One adapter per report type (REPORTS / the per-report constants below):
+  * Ramp Detail / Highway Sequence / Highway Log — per-route XLSX exports,
+    compared in the consolidated shape (Route + the report's own columns;
+    the column layout is locked from the files and must match between the
+    two folders). Highway Log keeps its Med Wid zero-pad normalization.
+  * Ramp Summary — per-route PDFs, parsed with the consolidator's own parser
+    (consolidate_ramp_summary.parse_pdf) into one row per route, compared
+    route-by-route (the route is the row key).
+
+Console-free, same contract as the other comparison modules: progress via
+events.on_log, overwrite via confirm_overwrite, cancel honored per file and
+inside the engine, ConsolidateResult returned. The GUI's Compare tab drives
+this through the COMPARE_REPORTS registry ("folders" input kind).
+"""
+import logging
+import re
+from dataclasses import replace
+from pathlib import Path
+
+try:
+    from openpyxl import load_workbook
+    _XLSX_OK = True
+except ImportError:
+    _XLSX_OK = False
+
+import compare_highway_log as _hl
+import consolidate_ramp_summary as _rs
+from compare_core import CompareSchema, run_compare
+from events import ConsolidateResult, Events
+from paths import OUTPUT_ROOT, parse_run_folder
+
+log = logging.getLogger("tsmis.compare")
+
+# Pull the route token out of "<prefix>_route_<ROUTE>.<ext>" (same rule as
+# consolidate_xlsx_base, extended to PDFs for the Ramp Summary).
+_ROUTE_FROM_NAME = re.compile(r"_route_(\w+)\.(?:xlsx|pdf)$", re.IGNORECASE)
+
+
+def _route_from_name(path):
+    m = _ROUTE_FROM_NAME.search(path.name)
+    return m.group(1).upper() if m else path.stem
+
+
+def side_label(folder):
+    """A short side name for one input folder, used as that side's sheet/tab
+    name and in every label: run folders become "SSOR-PROD" style; anything
+    else falls back to a sanitized folder name."""
+    folder = Path(folder)
+    parsed = parse_run_folder(folder.name)
+    if parsed is None and folder.parent != folder:
+        parsed = parse_run_folder(folder.parent.name)   # report subdir picked
+    if parsed:
+        _day, src, env = parsed
+        return f"{src}-{env}".upper()
+    clean = re.sub(r"[\[\]\*\?:/\\']+", " ", folder.name).strip()
+    return (clean or "FOLDER")[:20]
+
+
+def _side_labels(dir_a, dir_b):
+    """Distinct side names for the two folders. Same src-env on both sides
+    (e.g. prod today vs prod last month) gets the run date appended; still
+    identical falls back to A/B suffixes (sheet names must differ)."""
+    la, lb = side_label(dir_a), side_label(dir_b)
+    if la == lb:
+        for folder, label in ((dir_a, la), (dir_b, lb)):
+            parsed = parse_run_folder(Path(folder).name) \
+                or parse_run_folder(Path(folder).parent.name)
+            if parsed:
+                day = parsed[0]
+                if folder is dir_a:
+                    la = f"{label} {day}"
+                else:
+                    lb = f"{label} {day}"
+    if la == lb:
+        la, lb = f"{la} (A)", f"{lb} (B)"
+    return la, lb
+
+
+def _find_input_dir(base, subdir, pattern):
+    """The folder actually holding the report files: <base>/<subdir> when the
+    user picked a run folder, else <base> itself (they browsed straight to a
+    report folder). Returns (dir, files) — files possibly empty."""
+    base = Path(base)
+    for candidate in (base / subdir, base):
+        files = sorted(candidate.glob(pattern)) if candidate.is_dir() else []
+        if files:
+            return candidate, files
+    return base / subdir, []
+
+
+# ---------------------------------------------------------------------------
+# Input loaders
+# ---------------------------------------------------------------------------
+
+def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
+                    expected_header=None):
+    """Read every per-route XLSX under one side into consolidated-shape rows
+    ([route, *row]) the way the consolidators do: the header is locked from
+    the first readable file (or must equal `expected_header` when the report
+    pins one); files that disagree are skipped LOUDLY. Returns
+    (rows, header) or raises ValueError with a user-safe message."""
+    in_dir, files = _find_input_dir(folder, subdir, "*.xlsx")
+    if not files:
+        raise ValueError(
+            f"No {report_name} files were found for the {label} side:\n{in_dir}\n\n"
+            f"Export the {report_name} report on that environment first.")
+    header = list(expected_header) if expected_header else None
+    rows = []
+    used = skipped = 0
+    for i, p in enumerate(files, 1):
+        if events.is_cancelled():
+            raise ValueError("Cancelled by user.")
+        try:
+            wb = load_workbook(p, read_only=True, data_only=True)
+        except Exception as e:
+            events.on_log(f"  [{label}] {p.name}: could not open "
+                          f"({type(e).__name__}); skipping")
+            skipped += 1
+            continue
+        try:
+            if sheet_name not in wb.sheetnames:
+                events.on_log(f"  [{label}] {p.name}: sheet '{sheet_name}' "
+                              "missing; skipping")
+                skipped += 1
+                continue
+            rows_iter = wb[sheet_name].iter_rows(values_only=True)
+            h = [v for v in next(rows_iter, [])]
+            while h and h[-1] in (None, ""):
+                h.pop()
+            if header is None:
+                header = h
+            if h != header:
+                events.on_log(f"  [{label}] {p.name}: column layout differs; "
+                              "skipping")
+                skipped += 1
+                continue
+            route = _route_from_name(p)
+            n = len(header)
+            count = 0
+            for r in rows_iter:
+                r = list(r)[:n] + [None] * max(0, n - len(r))
+                if any(v is not None and str(v).strip() != "" for v in r):
+                    rows.append([route] + r)
+                    count += 1
+            used += 1
+            events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
+                          f"+{count} rows")
+        finally:
+            wb.close()
+    if not rows:
+        raise ValueError(
+            f"No readable {report_name} files were found for the {label} "
+            f"side in:\n{in_dir}")
+    if skipped:
+        events.on_log(f"  [{label}] note: {skipped} file(s) skipped "
+                      "(details above).")
+    return rows, header
+
+
+# The Ramp Summary's comparison columns: the consolidator's own field order
+# and display labels (Source + the formula-only Audit columns excluded — the
+# comparison recomputes everything itself).
+_RS_FIELDS = [(col, disp) for group, cols in _rs.GROUPS
+              for col, disp in cols
+              if group not in ("Source", "Audit")]
+RS_HEADER = ["Route"] + [disp for _col, disp in _RS_FIELDS]
+
+
+def _load_ramp_summary_side(folder, label, events):
+    """Parse every per-route Ramp Summary PDF on one side into per-route-shape
+    rows ([route, *numeric fields] — the route IS the row key). Slow-ish
+    (~1-2 s per PDF), so progress is logged per file and cancel is honored."""
+    in_dir, files = _find_input_dir(folder, "ramp_summary", "*.pdf")
+    if not files:
+        raise ValueError(
+            f"No Ramp Summary PDFs were found for the {label} side:\n{in_dir}\n\n"
+            "Export the Ramp Summary report on that environment first.")
+    rows = []
+    skipped = 0
+    for i, p in enumerate(files, 1):
+        if events.is_cancelled():
+            raise ValueError("Cancelled by user.")
+        try:
+            record = _rs.parse_pdf(p)
+        except Exception as e:
+            events.on_log(f"  [{label}] {p.name}: could not parse "
+                          f"({type(e).__name__}); skipping")
+            log.warning("env compare: %s parse failed", p, exc_info=True)
+            skipped += 1
+            continue
+        route = record.get("route") or _route_from_name(p)
+        rows.append([route] + [record.get(col) for col, _disp in _RS_FIELDS])
+        events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
+                      f"(route {route})")
+    if not rows:
+        raise ValueError(
+            f"No readable Ramp Summary PDFs were found for the {label} side "
+            f"in:\n{in_dir}")
+    if skipped:
+        events.on_log(f"  [{label}] note: {skipped} PDF(s) skipped "
+                      "(details above).")
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Per-report adapters
+# ---------------------------------------------------------------------------
+
+class EnvCompare:
+    """One report type's cross-environment comparison (a COMPARE_REPORTS
+    "folders" entry): compare_folders(dir_a, dir_b, out_path, …) +
+    suggest_name(dir_a, dir_b)."""
+
+    def __init__(self, key, report_name, subdir, sheet_name=None,
+                 expected_header=None, base_schema=None):
+        self.key = key                        # "ramp_summary" | "ramp_detail" | …
+        self.REPORT_NAME = report_name
+        self.subdir = subdir
+        self.sheet_name = sheet_name          # None = the PDF (Ramp Summary) path
+        self.expected_header = expected_header
+        self.base_schema = base_schema        # report-specific schema extras
+
+    def suggest_name(self, dir_a, dir_b):
+        la, lb = _side_labels(Path(dir_a), Path(dir_b))
+        safe = lambda s: re.sub(r"[^\w\-]+", "_", s).strip("_")
+        return (f"{safe(la)}_vs_{safe(lb)}_"
+                f"{safe(self.REPORT_NAME)}_Comparison.xlsx")
+
+    def _schema(self, header, la, lb):
+        base = self.base_schema or CompareSchema(
+            report_name=self.REPORT_NAME, header=header,
+            id_noun="row", id_noun_plural="rows")
+        widths = dict(base.data_widths) or {header[0]: 12}
+        if "Description" in header and "Description" not in widths:
+            widths["Description"] = 26
+        cmp_widths = dict(base.cmp_widths)
+        if "Description" in header and "Description" not in cmp_widths:
+            cmp_widths["Description"] = 30
+        return replace(base, header=header, side_a=la, side_b=lb,
+                       sides_noun="environments",
+                       data_widths=widths, cmp_widths=cmp_widths,
+                       one_sided_note_extra="", trim_note_extra="")
+
+    def compare_folders(self, dir_a, dir_b, out_path, events=None,
+                        confirm_overwrite=None, mode="formulas"):
+        """Compare the report's per-route files in run folder `dir_a` against
+        `dir_b` and write the discrepancy workbook(s) to `out_path`. Returns
+        a ConsolidateResult (same contract as the consolidators)."""
+        events = events or Events()
+        if not _XLSX_OK:
+            return ConsolidateResult(
+                status="error",
+                message="Required components are missing (openpyxl).")
+        if self.sheet_name is None and not getattr(_rs, "_DEPS_OK", False):
+            return ConsolidateResult(
+                status="error",
+                message="Required components are missing (pdfplumber).")
+        dir_a, dir_b = Path(dir_a), Path(dir_b)
+        for side, d in (("first", dir_a), ("second", dir_b)):
+            if not d.is_dir():
+                return ConsolidateResult(
+                    status="error",
+                    message=f"The {side} folder doesn't exist:\n{d}")
+        if dir_a.resolve() == dir_b.resolve():
+            return ConsolidateResult(
+                status="error",
+                message="Pick two DIFFERENT folders — both sides point at "
+                        f"the same one:\n{dir_a}")
+        la, lb = _side_labels(dir_a, dir_b)
+
+        events.on_log("=" * 60)
+        events.on_log(f"{self.REPORT_NAME} Comparison — {la} vs {lb}")
+        events.on_log("=" * 60)
+        events.on_log(f"{la}: {dir_a}")
+        events.on_log(f"{lb}: {dir_b}")
+        events.on_log("")
+
+        try:
+            if self.sheet_name is None:       # Ramp Summary: PDFs, route-keyed
+                rows_a = _load_ramp_summary_side(dir_a, la, events)
+                rows_b = _load_ramp_summary_side(dir_b, lb, events)
+                header, has_route = RS_HEADER, False
+            else:
+                rows_a, header = _load_xlsx_side(
+                    dir_a, la, self.subdir, self.sheet_name, self.REPORT_NAME,
+                    events, expected_header=self.expected_header)
+                rows_b, header_b = _load_xlsx_side(
+                    dir_b, lb, self.subdir, self.sheet_name, self.REPORT_NAME,
+                    events, expected_header=self.expected_header)
+                if header != header_b:
+                    return ConsolidateResult(
+                        status="error",
+                        message=(f"The two folders' {self.REPORT_NAME} files "
+                                 "have different column layouts — compare "
+                                 "exports made by the same app version."))
+                # rows are consolidated-shape ([route, *row]); the schema
+                # header stays the per-route column list (the engine adds
+                # the Route column itself in the has_route layout).
+                has_route = True
+        except ValueError as e:
+            msg = str(e)
+            status = "cancelled" if msg == "Cancelled by user." else "error"
+            return ConsolidateResult(status=status, message=msg)
+
+        events.on_log("")
+        sc = self._schema(header, la, lb)
+        return run_compare(sc, rows_a, rows_b, has_route, out_path,
+                           events=events, confirm_overwrite=confirm_overwrite,
+                           mode=mode, name_a=str(dir_a.name), name_b=str(dir_b.name))
+
+
+# Highway Log: pin the known layout + keep the Med Wid rule and the sample's
+# widths; the other XLSX reports lock their layout from the files themselves.
+_HL_BASE = replace(_hl._SCHEMA, one_sided_note_extra="", trim_note_extra="")
+
+RAMP_SUMMARY = EnvCompare(
+    "ramp_summary", "Ramp Summary", "ramp_summary",
+    base_schema=CompareSchema(
+        report_name="Ramp Summary", header=RS_HEADER,
+        id_noun="route", id_noun_plural="routes",
+        scope_flat="All routes (one row per route)"))
+RAMP_DETAIL = EnvCompare(
+    "ramp_detail", "Ramp Detail", "ramp_detail", sheet_name="TSAR - Ramp Detail")
+HIGHWAY_SEQUENCE = EnvCompare(
+    "highway_sequence", "Highway Sequence", "highway_sequence",
+    sheet_name="Highway Locations")
+HIGHWAY_LOG = EnvCompare(
+    "highway_log", "Highway Log", "highway_log", sheet_name=_hl.SHEET_NAME,
+    expected_header=_hl.EXPECTED_HEADER, base_schema=_HL_BASE)
+
+# Default save location for cross-environment comparison workbooks (the GUI
+# aims its save dialog here; "Delete all reports" clears it).
+DEFAULT_OUT_DIR = OUTPUT_ROOT / "comparisons"

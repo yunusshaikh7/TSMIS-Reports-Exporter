@@ -22,6 +22,7 @@ import consolidate_highway_sequence as _c_highway_seq
 import consolidate_highway_log as _c_highway_log
 import consolidate_tsn_highway_log as _c_tsn_highway_log
 
+import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
 
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
@@ -49,11 +50,22 @@ CONSOLIDATE_REPORTS = [
     ("TSN Highway Log", _c_tsn_highway_log),
 ]
 
-# Compare tab: (menu label, module). Each module exposes
-# compare(tsmis_path, tsn_path, out_path, events, confirm_overwrite) ->
-# ConsolidateResult, plus suggest_name(tsmis_path) for the save dialog.
-# Highway Log is the first of several planned comparison types -- add new ones
-# here and they appear in the GUI automatically.
+# Compare tab: (menu label, module/adapter, input kind). The GUI's type list
+# is generated from this; the kind decides which inputs the pane asks for:
+#   "files"   -- two workbooks; the module exposes
+#                compare(path_a, path_b, out_path, events, confirm_overwrite,
+#                mode) -> ConsolidateResult and suggest_name(path_a).
+#   "folders" -- two export run folders; the adapter exposes
+#                compare_folders(dir_a, dir_b, out_path, events,
+#                confirm_overwrite, mode) -> ConsolidateResult and
+#                suggest_name(dir_a, dir_b). Used by the cross-environment
+#                comparisons (compare_env.py) -- no consolidation needed
+#                first; the per-route files are read straight from both
+#                run folders.
 COMPARE_REPORTS = [
-    ("Highway Log", _cmp_highway_log),
+    ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files"),
+    ("TSAR: Ramp Summary — between environments", _cmp_env.RAMP_SUMMARY, "folders"),
+    ("TSAR: Ramp Detail — between environments", _cmp_env.RAMP_DETAIL, "folders"),
+    ("Highway Sequence Listing — between environments", _cmp_env.HIGHWAY_SEQUENCE, "folders"),
+    ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders"),
 ]

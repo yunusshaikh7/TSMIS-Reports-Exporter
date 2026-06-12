@@ -521,7 +521,8 @@ class GuiApi:
             "log_dir": str(LOG_DIR),
             "reports": [{"label": label, "fmt": fmt} for label, fmt, _spec in EXPORT_REPORTS],
             "cons_reports": [label for label, _mod in CONSOLIDATE_REPORTS],
-            "compare_reports": [label for label, _mod in COMPARE_REPORTS],
+            "compare_reports": [{"label": label, "kind": kind}
+                                for label, _mod, kind in COMPARE_REPORTS],
             "routes": list(ROUTES),
             "channels": [{"id": c, "label": CHANNEL_LABELS[c],
                           "short": _CHANNEL_SHORT.get(c, CHANNEL_LABELS[c])}
@@ -892,7 +893,7 @@ class GuiApi:
                           lambda _p: True, day=day).start()
         return {"ok": True}
 
-    # ---- highway log comparison (TSMIS vs TSN) -------------------------------------
+    # ---- comparisons (TSMIS vs TSN files / env vs env run folders) -----------------
 
     @_api_method
     def pick_compare_file(self, side):
@@ -908,46 +909,109 @@ class GuiApi:
         return {"path": str(path)}
 
     @_api_method
-    def start_compare(self, report_idx, tsmis_path, tsn_path,
-                      want_formulas=True, want_values=False):
-        label, mod = COMPARE_REPORTS[int(report_idx)]
-        with self._lock:
-            if self._task:
-                return {"error": "A task is already running."}
-        if not tsmis_path or not tsn_path:
-            return {"error": f"Pick both files first (a TSMIS and a TSN {label.lower()})."}
-        if not want_formulas and not want_values:
-            return {"error": "Tick at least one output (values and/or live formulas)."}
-        mode = ("both" if want_formulas and want_values
-                else "formulas" if want_formulas else "values")
-        # Where to save — the native dialog also owns the overwrite question.
+    def pick_compare_folder(self, side):
+        """Native folder dialog for one cross-environment comparison side
+        (for folders outside output/ — the dropdowns list the run folders)."""
         picked = self._window.create_file_dialog(
-            webview.SAVE_DIALOG,
-            directory=str(Path(tsmis_path).parent),
-            save_filename=mod.suggest_name(tsmis_path),
+            webview.FOLDER_DIALOG, directory=str(OUTPUT_ROOT))
+        if not picked:
+            return {"cancelled": True}
+        path = picked[0] if isinstance(picked, (list, tuple)) else picked
+        ui_log.info("compare: side %s folder picked: %s", side, path)
+        return {"path": str(path)}
+
+    def _save_dialog_for_compare(self, directory, suggested):
+        """Shared save dialog — the native dialog also owns the overwrite
+        question. Returns a Path or None (cancelled)."""
+        picked = self._window.create_file_dialog(
+            webview.SAVE_DIALOG, directory=str(directory),
+            save_filename=suggested,
             file_types=("Excel workbook (*.xlsx)",))
         if not picked:
             ui_log.info("compare: save dialog cancelled")
-            return {"cancelled": True}
-        out = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+            return None
+        return Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
 
+    @staticmethod
+    def _compare_mode(want_formulas, want_values):
+        if not want_formulas and not want_values:
+            return None
+        return ("both" if want_formulas and want_values
+                else "formulas" if want_formulas else "values")
+
+    def _launch_compare(self, label, mode, out, run_fn):
         with self._lock:
             self._task = "compare"
         self.cancel_event.clear()
         kinds = {"both": "values + live formulas", "formulas": "live formulas",
                  "values": "values"}[mode]
-        self._emit_log(f"Starting comparison: TSMIS vs TSN {label} ({kinds})")
-        ui_log.info("compare: mode=%s out=%s", mode, out)
-        self._set_dot("busy", f"Comparing {label}s…")
+        self._emit_log(f"Starting comparison: {label} ({kinds})")
+        ui_log.info("compare: %s mode=%s out=%s", label, mode, out)
+        self._set_dot("busy", "Comparing…")
         self._emit({"t": "run_started", "mode": "consolidate",
-                    "label": f"Comparing {label}s…"})
+                    "label": f"Comparing — {label}…"})
         self._push_state()
-        ConsolidateWorker(
+        ConsolidateWorker(run_fn, self._q, self.cancel_event,
+                          lambda _p: True).start()
+        return {"ok": True}
+
+    @_api_method
+    def start_compare(self, report_idx, tsmis_path, tsn_path,
+                      want_formulas=True, want_values=False):
+        label, mod, kind = COMPARE_REPORTS[int(report_idx)]
+        if kind != "files":
+            return {"error": "This comparison type takes folders, not files."}
+        with self._lock:
+            if self._task:
+                return {"error": "A task is already running."}
+        if not tsmis_path or not tsn_path:
+            return {"error": "Pick both files first (a TSMIS and a TSN workbook)."}
+        mode = self._compare_mode(want_formulas, want_values)
+        if mode is None:
+            return {"error": "Tick at least one output (values and/or live formulas)."}
+        out = self._save_dialog_for_compare(Path(tsmis_path).parent,
+                                            mod.suggest_name(tsmis_path))
+        if out is None:
+            return {"cancelled": True}
+        return self._launch_compare(
+            label, mode, out,
             lambda events=None, confirm_overwrite=None, day=None:
                 mod.compare(tsmis_path, tsn_path, out, events=events,
-                            confirm_overwrite=confirm_overwrite, mode=mode),
-            self._q, self.cancel_event, lambda _p: True).start()
-        return {"ok": True}
+                            confirm_overwrite=confirm_overwrite, mode=mode))
+
+    @_api_method
+    def start_compare_env(self, report_idx, dir_a, dir_b,
+                          want_formulas=True, want_values=False):
+        """Cross-environment comparison: two run folders (names from the
+        dropdowns resolve under output/; Browse… hands in absolute paths)."""
+        label, adapter, kind = COMPARE_REPORTS[int(report_idx)]
+        if kind != "folders":
+            return {"error": "This comparison type takes files, not folders."}
+        with self._lock:
+            if self._task:
+                return {"error": "A task is already running."}
+        if not dir_a or not dir_b:
+            return {"error": "Pick both export folders first."}
+        pa, pb = Path(dir_a), Path(dir_b)
+        if not pa.is_absolute():
+            pa = OUTPUT_ROOT / dir_a
+        if not pb.is_absolute():
+            pb = OUTPUT_ROOT / dir_b
+        mode = self._compare_mode(want_formulas, want_values)
+        if mode is None:
+            return {"error": "Tick at least one output (values and/or live formulas)."}
+        import compare_env
+        compare_env.DEFAULT_OUT_DIR.mkdir(parents=True, exist_ok=True)
+        out = self._save_dialog_for_compare(compare_env.DEFAULT_OUT_DIR,
+                                            adapter.suggest_name(pa, pb))
+        if out is None:
+            return {"cancelled": True}
+        return self._launch_compare(
+            label, mode, out,
+            lambda events=None, confirm_overwrite=None, day=None:
+                adapter.compare_folders(pa, pb, out, events=events,
+                                        confirm_overwrite=confirm_overwrite,
+                                        mode=mode))
 
     # ---- settings & maintenance -----------------------------------------------
 

@@ -859,9 +859,11 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None):
     ws.column_dimensions[c_occ].width = 4
     ws.column_dimensions[c_row].width = 9
     _apply_field_widths(ws, sc.cmp_widths, fcol, lay)
-    if lay.has_route:
+    if lay.has_route and keys:
         # Whole-route gaps stand out; single-location gaps stay plain. Colors
-        # mirror the Comparison sheet's one-sided row tints.
+        # mirror the Comparison sheet's one-sided row tints. (`keys` can be
+        # EMPTY when the two sides match perfectly — common between
+        # environments — and an empty tab's CF range "A2:..1" is invalid.)
         tint = "FFE699" if side == sc.side_a else "BDD7EE"
         ws.conditional_formatting.add(f"A2:{last_field}{last}", FormulaRule(
             formula=[f'${c_why}2="entire route"'], fill=PatternFill(bgColor=tint)))
