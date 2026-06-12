@@ -36,20 +36,20 @@ REPORT_NAME = "Ramp Detail"
 
 
 def input_dir_for(day):
-    """Per-route exports for `day` (YYYY-MM-DD); None = the legacy flat layout."""
+    """Per-route exports for `day` (a run-folder name); None = the legacy flat layout."""
     return (output_day_dir(day) / SUBDIR) if day else INPUT_DIR
 
 
 def out_path_for(day):
-    """Consolidated workbook destination for `day`; None = the legacy location."""
+    """Consolidated workbook destination for `day` (a run-folder name); None = the legacy location."""
     return (output_day_dir(day) / "consolidated" / FILENAME) if day else OUT_PATH
 
 
 def consolidate(events=None, confirm_overwrite=None, day=None):
     """Combine every per-route Ramp Detail XLSX into one workbook.
 
-    `day` picks which dated export folder (YYYY-MM-DD) to read; None means the
-    newest dated folder, falling back to the legacy flat layout when no dated
+    `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") to read; None means
+    the newest run folder, falling back to the legacy flat layout when no run
     folders exist yet."""
     day = day or latest_output_day()
     return consolidate_xlsx(

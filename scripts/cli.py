@@ -316,27 +316,29 @@ def _confirm_overwrite_console(path):
 
 
 def _resolve_day_console():
-    """Pick which day's exports to consolidate.
+    """Pick which export run folder to consolidate.
 
-    Honors TSMIS_DAY (a YYYY-MM-DD string); otherwise prompts only when several
-    dated export folders exist (Enter / EOF = newest). Returns the chosen day,
-    or None when no dated folders exist yet (the consolidators then fall back
-    to the legacy flat layout)."""
-    from paths import list_output_days
+    Run folders are named "<YYYY-MM-DD> <src>-<env>" (legacy bare-date folders
+    read as ssor-prod). Honors TSMIS_DAY (a folder name, or a bare date — the
+    newest run folder of that date wins); otherwise prompts only when several
+    run folders exist (Enter / EOF = newest). Returns the chosen folder name,
+    or None when none exist yet (the consolidators then fall back to the
+    legacy flat layout)."""
+    from paths import list_output_days, resolve_day_choice
     env = os.environ.get("TSMIS_DAY", "").strip()
     if env:
-        return env
+        return resolve_day_choice(env)
     days = list_output_days()
     if not days:
         return None
     if len(days) == 1:
         return days[0]
     print()
-    print("Export days found:")
+    print("Export folders found:")
     for i, d in enumerate(days, 1):
         print(f"  {i}. {d}" + ("   (newest)" if i == 1 else ""))
     try:
-        raw = input("Which day? [Enter = newest]: ").strip()
+        raw = input("Which one? [Enter = newest]: ").strip()
     except EOFError:
         raw = ""
     if raw in days:

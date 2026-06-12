@@ -8,6 +8,17 @@ root.after(). Workers never touch Tk widgets.
 Message protocol (all are (kind, payload) tuples):
     ("log", str)                       one status line
     ("progress", dict)                 {done,total,route,report,report_i,report_n,saved,empty,skipped,failed,exists}
+    ("worker_status", (worker, text))  what browser `worker` (1-based) is doing
+                                       right now (statuses replace each other)
+    ("preview_shot", (worker, b64, note))  an on-demand page screenshot for
+                                       browser `worker` — b64 is a base64 JPEG
+                                       string, or None when the capture failed
+                                       (note then says why)
+    ("env_shot", dict)                 the idle "Verify environment" result:
+                                       {ok, img (b64 JPEG|None), env, src,
+                                        matches, url, error}
+    ("reset_done", dict)               outcome of "Delete all reports":
+                                       {files, mb, errors: [str, ...]}
     ("export_done", [(spec, RunResult), ...])   all selected reports finished
     ("export_partial", [(spec, RunResult), ...]) reports done before an error (then an "error" follows)
     ("consolidate_done", ConsolidateResult)
@@ -23,22 +34,81 @@ Message protocol (all are (kind, payload) tuples):
                                        GUI's whole update state (phase, version,
                                        progress, ...) -- see gui_api._on_update_status
 """
+import base64
 import logging
 import threading
 
 from common import (
-    LOGIN_BROWSER_ARGS, ROUTES, AuthError, BrowserNotFoundError, PreflightError,
-    BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, get_url, is_logged_in,
-    launch_browser, capture_edge_login_state_from_profiles,
-    capture_edge_login_state_over_cdp, capture_storage_state_if_logged_in,
-    get_preferred_channel, launch_edge_login_context, new_login_context,
-    save_auth_state, storage_state_is_portable, try_device_sso_login,
+    _CONFIG_JS, LOGIN_BROWSER_ARGS, ROUTES, AuthError, BrowserNotFoundError,
+    PreflightError, BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, get_site,
+    get_url, is_logged_in, launch_browser,
+    capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
+    capture_storage_state_if_logged_in, get_preferred_channel,
+    launch_edge_login_context, navigate_with_auth, new_authed_browser,
+    new_login_context, save_auth_state, storage_state_is_portable,
+    try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
-from paths import OUTPUT_ROOT
+from paths import FAILURES_DIR, INPUT_ROOT, OUTPUT_ROOT, parse_run_folder
 
 log = logging.getLogger("tsmis.gui")
+
+# Legacy flat-layout folders (pre-dated exports) that "Delete all reports"
+# also clears. Everything else directly under output/ that isn't a run folder
+# is left alone — only content this app generates is ever deleted.
+_LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_detail", "highway_sequence",
+                       "highway_log", "consolidated", "tsn_highway_log",
+                       "run_reports", "comparisons")
+
+
+def reset_targets(include_input=False):
+    """The folders/files "Delete all reports" removes, as (label, Path) pairs
+    that currently exist. Reports only — logs, the saved login, the Edge
+    sign-in profile and the app's settings are NEVER in this list."""
+    targets = []
+    try:
+        for p in sorted(OUTPUT_ROOT.iterdir()):
+            if p.is_dir() and parse_run_folder(p.name):
+                targets.append((f"export run folder '{p.name}'", p))
+    except OSError:
+        pass
+    for name in _LEGACY_OUTPUT_DIRS:
+        p = OUTPUT_ROOT / name
+        if p.is_dir():
+            targets.append((f"output folder '{name}'", p))
+    p = OUTPUT_ROOT / "tsn_highway_log_consolidated.xlsx"
+    if p.is_file():
+        targets.append(("TSN consolidated workbook", p))
+    if FAILURES_DIR.is_dir():
+        targets.append(("failure screenshots", FAILURES_DIR))
+    if include_input:
+        p = INPUT_ROOT / "tsn_highway_log"
+        if p.is_dir():
+            targets.append(("TSN input PDFs", p))
+    return targets
+
+
+def measure_targets(targets):
+    """(file_count, total_bytes) across the target list. Best-effort."""
+    files = 0
+    size = 0
+    for _label, path in targets:
+        try:
+            if path.is_file():
+                files += 1
+                size += path.stat().st_size
+                continue
+            for f in path.rglob("*"):
+                if f.is_file():
+                    files += 1
+                    try:
+                        size += f.stat().st_size
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+    return files, size
 
 
 class ExportWorker(threading.Thread):
@@ -70,6 +140,30 @@ class ExportWorker(threading.Thread):
         self._cur_label = ""               # report currently running (shown in progress)
         self._report_i = 0                 # 1-based index of the current report
         self._report_n = len(self.specs)   # how many reports this run will do
+        # Live-preview requests: worker numbers whose browser should be
+        # screenshotted at its next safe poll point. Set from the GUI thread
+        # (request_screenshot), drained by the engine threads — hence the lock.
+        self._shot_lock = threading.Lock()
+        self._shot_requests = set()
+
+    def request_screenshot(self, worker_no):
+        """GUI thread: ask browser `worker_no` (1-based) for a live screenshot.
+        Answered via a ('preview_shot', ...) message at the worker's next safe
+        poll point (≤ ~5 s during a report wait)."""
+        with self._shot_lock:
+            self._shot_requests.add(int(worker_no))
+
+    def _shot_wanted(self, worker_no):
+        """Engine threads: one request = one screenshot."""
+        with self._shot_lock:
+            if worker_no in self._shot_requests:
+                self._shot_requests.discard(worker_no)
+                return True
+            return False
+
+    def _on_screenshot(self, worker_no, image, note):
+        b64 = base64.b64encode(image).decode("ascii") if image else None
+        self.q.put(("preview_shot", (worker_no, b64, note)))
 
     def _on_route(self, route, status):
         with self._tally_lock:              # in fast mode this fires from many threads
@@ -98,6 +192,9 @@ class ExportWorker(threading.Thread):
             on_route=self._on_route,
             should_skip=self._should_skip,
             is_cancelled=self.cancel.is_set,
+            on_status=lambda w, t: self.q.put(("worker_status", (w, t))),
+            screenshot_wanted=self._shot_wanted,
+            on_screenshot=self._on_screenshot,
         )
         results = []
         try:
@@ -177,6 +274,108 @@ class ConsolidateWorker(threading.Thread):
         except Exception as e:
             log.exception("consolidate worker crashed")
             self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))
+
+
+class ResetWorker(threading.Thread):
+    """"Delete all reports": removes every generated report (run folders,
+    legacy flat folders, consolidated/comparison output, run reports, failure
+    screenshots, TSN conversions — and the TSN input PDFs only when asked).
+    Logs, the saved login and the app settings always survive. Files an open
+    Excel still holds are reported, never silently skipped. Posts progress as
+    ('log', ...) lines and one final ('reset_done', {files, mb, errors})."""
+
+    def __init__(self, queue, include_input=False):
+        super().__init__(daemon=True, name="reset")
+        self.q = queue
+        self.include_input = include_input
+
+    def run(self):
+        import shutil
+        targets = reset_targets(self.include_input)
+        files, size = measure_targets(targets)
+        errors = []
+        ui = logging.getLogger("tsmis.ui")
+        log.info("reset: deleting %d target(s), %d file(s), %.1f MB (input=%s)",
+                 len(targets), files, size / 1e6, self.include_input)
+        for label, path in targets:
+            failures = []
+
+            def on_error(_fn, p, _exc):
+                failures.append(str(p))
+
+            try:
+                if path.is_file():
+                    path.unlink()
+                else:
+                    shutil.rmtree(path, onerror=on_error)
+            except OSError as e:
+                failures.append(f"{path} ({type(e).__name__})")
+            if failures:
+                msg = (f"Could not delete {len(failures)} item(s) from {label} — "
+                       "a file is probably open in Excel.")
+                errors.append(msg)
+                ui.info("reset: %s: %s", msg, failures[:5])
+                self.q.put(("log", f"  {msg}"))
+            else:
+                self.q.put(("log", f"  Deleted {label}."))
+        self.q.put(("reset_done", {"files": files, "mb": round(size / 1e6, 1),
+                                   "errors": errors}))
+
+
+class EnvCheckWorker(threading.Thread):
+    """The idle "Verify environment" action: open TSMIS headless exactly the
+    way an export would (saved session, else device sign-in), read which data
+    source / environment the app ACTUALLY loaded (the page's CONFIG — the
+    same source _site_params_ok trusts), and screenshot the page so the user
+    can see the site's own SSOR/ARS + env label with their own eyes.
+
+    Always posts one ('env_shot', dict) message — also on failure (with
+    `error` set) — so the GUI task state can never wedge."""
+
+    def __init__(self, queue):
+        super().__init__(daemon=True, name="envcheck")
+        self.q = queue
+
+    def run(self):
+        from playwright.sync_api import sync_playwright
+        out = {"ok": False, "img": None, "env": None, "src": None,
+               "matches": None, "url": get_url(), "error": None}
+        want_src, want_env = get_site()
+        log.info("env check: starting (selected src=%s env=%s)", want_src, want_env)
+        try:
+            with sync_playwright() as p:
+                browser, _ctx, page = new_authed_browser(p)
+                try:
+                    navigate_with_auth(page)
+                    if not is_logged_in(page):
+                        out["error"] = ("Sign-in didn't complete, so the report "
+                                        "page couldn't be checked. Log in, then "
+                                        "try again.")
+                    else:
+                        out["ok"] = True
+                        try:
+                            got = page.evaluate(_CONFIG_JS)   # [env, src] or None
+                        except Exception:
+                            got = None
+                        if got:
+                            out["env"], out["src"] = got[0], got[1]
+                            out["matches"] = (got == [want_env, want_src])
+                    try:
+                        out["img"] = base64.b64encode(
+                            page.screenshot(type="jpeg", quality=70)).decode("ascii")
+                    except Exception as e:
+                        log.info("env check: screenshot failed (%s)", type(e).__name__)
+                finally:
+                    browser.close()
+        except (AuthError, BrowserNotFoundError, PreflightError) as e:
+            out["error"] = str(e)            # messages are already user-safe
+        except Exception as e:
+            log.exception("env check crashed")
+            out["error"] = f"{type(e).__name__}: {e}"
+        log.info("env check: done ok=%s page env=%s src=%s matches=%s error=%s",
+                 out["ok"], out["env"], out["src"], out["matches"],
+                 out["error"] or "-")
+        self.q.put(("env_shot", out))
 
 
 class LoginWorker(threading.Thread):

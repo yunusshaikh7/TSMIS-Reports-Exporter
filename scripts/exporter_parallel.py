@@ -43,12 +43,13 @@ import time
 from playwright.sync_api import sync_playwright
 
 from common import (
-    FAST_REPORT_TIMEOUT_MS,
-    RETRY_REPORT_TIMEOUT_MS,
     ROUTES,
     AuthError,
     RunCancelled,
+    fast_report_timeout_ms,
+    get_site,
     get_url,
+    retry_report_timeout_ms,
     has_valid_auth,
     navigate_with_auth,
     new_authed_browser,
@@ -60,7 +61,7 @@ from events import Events, RunResult
 # Reuse the proven per-route mechanics and the serial retry pass from the
 # sequential engine, so a per-report fix benefits both.
 from exporter import _capture_failure, _process_route, _record, _retry_failed_routes
-from paths import output_day_dir
+from paths import output_run_dir
 from run_report import auto_report_path, write_run_report
 
 log = logging.getLogger("tsmis.export.parallel")
@@ -72,24 +73,35 @@ DEFAULT_WORKERS = 3
 MAX_WORKERS = 30
 
 
+def default_worker_count():
+    """The default fast-mode worker count: the Settings-tab value when one is
+    saved, else DEFAULT_WORKERS. Read at call time so a settings change
+    applies to the next run."""
+    try:
+        import settings
+        return max(1, min(settings.get("fast_workers"), MAX_WORKERS))
+    except Exception:
+        return DEFAULT_WORKERS
+
+
 def resolve_worker_count(requested=None):
     """Clamp a requested worker count into [1, MAX_WORKERS].
 
     requested=None falls back to the TSMIS_FAST_WORKERS environment variable,
-    then DEFAULT_WORKERS. Garbage in (None, "", non-numeric) -> DEFAULT_WORKERS.
-    Always returns a sane int >= 1.
+    then the saved Settings default. Garbage in (None, "", non-numeric) ->
+    the default. Always returns a sane int >= 1.
     """
     if requested is None:
         env = os.environ.get("TSMIS_FAST_WORKERS", "").strip()
-        requested = int(env) if env.isdigit() else DEFAULT_WORKERS
+        requested = int(env) if env.isdigit() else default_worker_count()
     try:
         requested = int(requested)
     except (TypeError, ValueError):
-        requested = DEFAULT_WORKERS
+        requested = default_worker_count()
     return max(1, min(requested, MAX_WORKERS))
 
 
-def _worker_events(real, stop):
+def _worker_events(real, stop, worker_no):
     """A per-worker Events sink.
 
     Forwards on_log / on_route / is_cancelled to the shared sink, but makes
@@ -97,12 +109,18 @@ def _worker_events(real, stop):
     waited on" is ambiguous, so per-route Skip is intentionally disabled in fast
     mode (use Cancel to stop the whole run). is_cancelled also reflects the
     shared stop flag so a fatal error in one worker quiets the others.
+    `worker_no` (1-based) tags this worker's status line / screenshot requests
+    so the GUI's per-browser rows stay distinguishable.
     """
     return Events(
         on_log=real.on_log,
         on_route=real.on_route,
         should_skip=lambda: False,
         is_cancelled=lambda: stop.is_set() or real.is_cancelled(),
+        on_status=real.on_status,
+        screenshot_wanted=real.screenshot_wanted,
+        on_screenshot=real.on_screenshot,
+        worker_no=worker_no,
     )
 
 
@@ -172,10 +190,11 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                           "running with 1 browser. Save a login to use fast mode.")
             log.info("parallel: device sign-in mode caps workers %d -> 1", n)
             n = 1
-    timeout_ms = timeout_ms or FAST_REPORT_TIMEOUT_MS
-    retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
+    timeout_ms = timeout_ms or fast_report_timeout_ms()
+    retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
 
-    out_dir = output_day_dir() / spec.subdir   # dated layout, like the sequential engine
+    src, env = get_site()
+    out_dir = output_run_dir(src, env) / spec.subdir   # env-labeled run folder, like the sequential engine
     out_dir.mkdir(parents=True, exist_ok=True)
     total = len(routes)
     n = min(n, total) or 1
@@ -201,13 +220,15 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     def worker(idx):
         wr = RunResult(output_dir=str(out_dir))
         worker_results[idx] = wr
-        wevents = _worker_events(events, stop)
+        wevents = _worker_events(events, stop, idx + 1)
         tag = f"[browser {idx + 1}]"
         log.info("%s starting", tag)
         try:
+            wevents.on_status(wevents.worker_no, "Starting browser…")
             with sync_playwright() as p:
                 browser, _ctx, page = new_authed_browser(p)
                 try:
+                    wevents.on_status(wevents.worker_no, "Opening TSMIS + signing in…")
                     navigate_with_auth(page)
                     require_signed_in(
                         page,
@@ -237,6 +258,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                             break
                 finally:
                     browser.close()
+            wevents.on_status(wevents.worker_no, "Done")
             log.info("%s done: %d route(s) handled", tag, len(wr.per_route))
         except AuthError as e:
             log.warning("%s lost the session: %s", tag, e)
@@ -322,7 +344,8 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
 
     if result.per_route:
         try:
-            report_path = write_run_report(result, spec.label, auto_report_path(spec.subdir))
+            report_path = write_run_report(
+                result, spec.label, auto_report_path(spec.subdir, f"{src}-{env}"))
             result.report_path = str(report_path)
             events.on_log(f"Run report saved: {report_path}")
             log.info("run report saved: %s", report_path)

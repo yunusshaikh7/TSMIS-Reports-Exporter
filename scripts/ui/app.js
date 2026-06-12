@@ -25,6 +25,7 @@ const S = {
   tab: "export",
   progress: null,      // latest export progress payload
   runMode: null,       // "export" | "consolidate" while the bar is live
+  workers: 0,          // browser-status rows currently shown (export runs)
   elapsedStart: null,
   elapsedTimer: null,
   logPinned: true,
@@ -289,6 +290,139 @@ function showRoutePicker(current) {
   return p;   // resolves: array of routes, or null (cancelled)
 }
 
+// ------------------------------------------------- screenshot previews -----
+// One modal for both flavors: a worker's on-demand page screenshot during an
+// export, and the idle "Verify environment" check (worker 0). Python answers
+// with a {t:"preview"} event; until it arrives the modal shows a wait note.
+let preview = null;   // {worker, body, note, timer} while the modal is open
+
+function openPreviewModal(worker, title, waitText) {
+  const m = buildModal({ title, iconName: "i-camera" });
+  m.classList.add("modal-preview");
+  const body = document.createElement("div");
+  body.className = "preview-body";
+  const wait = document.createElement("div");
+  wait.className = "preview-wait";
+  wait.appendChild(icon("i-loader"));
+  wait.appendChild(Object.assign(document.createElement("span"), { textContent: waitText }));
+  body.appendChild(wait);
+  m.appendChild(body);
+  const note = document.createElement("div");
+  note.className = "preview-note";
+  m.appendChild(note);
+  const actions = document.createElement("div");
+  actions.className = "modal-actions";
+  const refresh = document.createElement("button");
+  refresh.className = "btn btn-subtle";
+  refresh.appendChild(icon("i-refresh"));
+  refresh.appendChild(Object.assign(document.createElement("span"), { textContent: "Take another" }));
+  refresh.onclick = () => { if (worker > 0) { requestPreview(worker, true); } };
+  if (worker > 0) actions.appendChild(refresh);
+  const close = document.createElement("button");
+  close.className = "btn btn-accent"; close.textContent = "Close";
+  close.onclick = () => closeModal(true);
+  actions.appendChild(close);
+  m.appendChild(actions);
+
+  preview = { worker, body, note, timer: null };
+  if (worker > 0) {
+    preview.timer = setTimeout(() => {
+      if (preview && preview.worker === worker) {
+        note.textContent = "Still waiting — the browser may be mid-download; "
+          + "the screenshot arrives at its next safe moment.";
+      }
+    }, 30000);
+  }
+  openModal(m).then(() => {
+    if (preview) { clearTimeout(preview.timer); preview = null; }
+  });
+  close.focus();
+}
+
+function showPreviewEvent(ev) {
+  // Screenshot (or failure note) arrived. Fill the open modal; if the user
+  // already closed it, drop the image silently (they can click again).
+  if (!preview || preview.worker !== ev.w) return;
+  clearTimeout(preview.timer);
+  preview.body.textContent = "";
+  if (ev.env_info) {
+    const v = ev.env_info;
+    const banner = document.createElement("div");
+    let cls = "unknown";
+    let text = "The page didn't report which data source / environment it loaded — check the screenshot's own label.";
+    if (v.env) {
+      const got = `${(v.src || "?").toUpperCase()} · ${(v.env || "?").toUpperCase()}`;
+      if (v.matches) { cls = "ok"; text = `The page is running ${got} — matches your selection (${v.wanted}).`; }
+      else { cls = "bad"; text = `The page is running ${got}, but ${v.wanted} is selected!`; }
+    } else if (v.ok === false) {
+      cls = "bad"; text = "Sign-in didn't complete — the screenshot shows where it stopped.";
+    }
+    banner.className = "env-verdict " + cls;
+    banner.textContent = text;
+    preview.body.appendChild(banner);
+  }
+  if (ev.img) {
+    const img = document.createElement("img");
+    img.className = "preview-img";
+    img.src = "data:image/jpeg;base64," + ev.img;
+    img.alt = "Browser screenshot";
+    preview.body.appendChild(img);
+    preview.note.textContent = (ev.note ? ev.note + " — " : "")
+      + "taken " + new Date().toLocaleTimeString();
+  } else {
+    const fail = document.createElement("div");
+    fail.className = "preview-wait";
+    fail.textContent = ev.note || "No screenshot was captured.";
+    preview.body.appendChild(fail);
+  }
+}
+
+function requestPreview(worker, isRefresh) {
+  api.request_preview(worker).then((res) => {
+    if (res && res.error) {
+      closeModal(null);
+      showMessage("info", "No screenshot available", res.error);
+    }
+  });
+  if (!isRefresh) {
+    openPreviewModal(worker, `Browser ${worker} — live screenshot`,
+      "Asking the browser for a screenshot… it answers at its next safe moment (usually under 5 s).");
+  } else if (preview) {
+    preview.note.textContent = "Taking another…";
+  }
+}
+
+// ------------------------------------------------ worker status rows -------
+function buildWorkerStrip(n) {
+  const strip = $("workerStrip");
+  strip.textContent = "";
+  S.workers = n;
+  for (let w = 1; w <= n; w++) {
+    const row = document.createElement("div");
+    row.className = "worker-row";
+    const name = document.createElement("span");
+    name.className = "w-name";
+    name.textContent = n > 1 ? `Browser ${w}` : "Browser";
+    const status = document.createElement("span");
+    status.className = "w-status"; status.id = `workerStatus_${w}`;
+    status.textContent = "starting…";
+    const btn = document.createElement("button");
+    btn.className = "btn btn-subtle btn-small w-shot";
+    btn.title = "Show a live screenshot of this browser's page (auth state, environment label, report progress)";
+    btn.appendChild(icon("i-camera"));
+    btn.appendChild(Object.assign(document.createElement("span"), { textContent: "Preview" }));
+    btn.onclick = () => requestPreview(w, false);
+    row.append(name, status, btn);
+    strip.appendChild(row);
+  }
+  strip.classList.toggle("hidden", n < 1);
+}
+
+function updateWorkerStatus(w, text) {
+  const el = $(`workerStatus_${w}`);
+  if (el) { el.textContent = text; el.title = text; }
+}
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && modalResolve) closeModal(null);
   // Block page reloads: WebView2 honors F5/Ctrl+R, and reloading mid-run
@@ -461,8 +595,14 @@ function renderState() {
 
   // config inputs lock while any task runs
   const locked = st.task != null;
-  ["selSource", "selEnv", "selBrowser", "routesInput", "btnChooseRoutes", "selDay"]
+  ["selSource", "selEnv", "selBrowser", "routesInput", "btnChooseRoutes", "selDay",
+   "btnVerifyEnv", "btnDeleteReports", "btnClearLogin", "btnSupportBundle"]
     .forEach((id) => { $(id).disabled = locked; });
+  Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
+  ["setDebugLog", "setDevtools"].forEach((id) => {
+    $(id).disabled = locked;
+    $(id).closest(".option-row").classList.toggle("disabled", locked);
+  });
   $("reportList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
   $("reportList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
   $("consList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
@@ -614,8 +754,9 @@ function renderProgress(p) {
   });
 }
 
-function startRunUi(mode, label) {
+function startRunUi(mode, label, workers) {
   S.runMode = mode;
+  buildWorkerStrip(mode === "export" ? (workers || 1) : 0);
   S.elapsedStart = Date.now();
   $("progressElapsed").classList.remove("hidden");
   $("progressElapsed").textContent = "00:00";
@@ -649,6 +790,7 @@ function endRunUi() {
   if (S.elapsedStart) $("progressElapsed").textContent = fmtElapsed(Date.now() - S.elapsedStart);
   S.elapsedStart = null;
   S.runMode = null;
+  buildWorkerStrip(0);
   document.querySelector(".progress-card").classList.remove("running");
   $("progressIcon").querySelector("use").setAttribute("href", "#i-shield");
   $("progressIcon").classList.remove("spin");
@@ -671,7 +813,9 @@ function dispatch(events) {
         case "state": S.st = ev.s; renderState(); break;
         case "log": appendLog(ev.text); sawLog = true; break;
         case "progress": if (S.runMode === "export") renderProgress(ev.p); break;
-        case "run_started": startRunUi(ev.mode, ev.label); break;
+        case "wstatus": updateWorkerStatus(ev.w, ev.text); break;
+        case "preview": showPreviewEvent(ev); break;
+        case "run_started": startRunUi(ev.mode, ev.label, ev.workers); break;
         case "run_ended": endRunUi(); break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default: break;
@@ -811,6 +955,143 @@ async function startCompare() {
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 
+// ---- Settings tab ----
+const SETTING_INPUTS = {
+  setReportTimeout: "report_timeout_min",
+  setFastTimeout: "fast_timeout_min",
+  setRetryTimeout: "retry_timeout_min",
+  setCountyTimeout: "county_timeout_s",
+  setFastWorkers: "fast_workers",
+};
+
+function fillSettings() {
+  const s = S.init.settings || {};
+  const v = s.values || {};
+  Object.entries(SETTING_INPUTS).forEach(([id, key]) => {
+    if (v[key] != null) $(id).value = v[key];
+  });
+  const setToggle = (id, on) => {
+    $(id).checked = !!on;
+    $(id).closest(".option-row").classList.toggle("checked", !!on);
+  };
+  setToggle("setDebugLog", v.debug_logging);
+  setToggle("setDevtools", v.ui_devtools);
+
+  const meta = s.meta || {};
+  const paths = $("setPaths");
+  paths.textContent = "";
+  [["Data folder", meta.data_root], ["Output folder", meta.output_root],
+   ["Log file", meta.log_file], ["Failure shots", meta.failures_dir]]
+    .forEach(([label, value]) => {
+      const line = document.createElement("div");
+      line.className = "path-line";
+      const l = document.createElement("span");
+      l.className = "path-label"; l.textContent = label;
+      const p = document.createElement("span");
+      p.className = "path"; p.textContent = value || "—"; p.title = value || "";
+      line.append(l, p);
+      paths.appendChild(line);
+    });
+
+  const about = $("setAbout");
+  about.textContent = "";
+  [["Version", `v${meta.version || S.init.version}`],
+   ["Build", `${meta.build || "?"} · ${meta.variant || "?"}`],
+   ["Sign-in", meta.auth_state || "?"],
+   ["Settings file", "config.json in the data folder (safe to delete — defaults return)"]]
+    .forEach(([label, value]) => {
+      const line = document.createElement("div");
+      const l = document.createElement("span");
+      l.className = "muted"; l.textContent = label + ":";
+      line.append(l, Object.assign(document.createElement("span"), { textContent: value }));
+      about.appendChild(line);
+    });
+}
+
+async function onSettingInput(id) {
+  const key = SETTING_INPUTS[id];
+  const res = await api.set_setting(key, $(id).value);
+  if (res && res.error) { showMessage("error", "Could not save the setting", res.error); return; }
+  if (res && res.values) {
+    S.init.settings.values = res.values;
+    $(id).value = res.values[key];          // reflect clamping
+    if (key === "fast_workers" && !(S.st && S.st.task)) {
+      $("fastWorkers").value = res.values[key];   // reseed the Export pane default
+    }
+  }
+}
+
+async function onSettingToggle(id, key) {
+  const cb = $(id);
+  cb.closest(".option-row").classList.toggle("checked", cb.checked);
+  const res = await api.set_setting(key, cb.checked);
+  if (res && res.values) S.init.settings.values = res.values;
+}
+
+async function deleteAllReports() {
+  let includeInput = false;
+  let prev = await api.reset_preview(false);
+  if (prev.error) { showMessage("error", "Could not check the output folder", prev.error); return; }
+
+  const m = buildModal({ title: "Delete all reports?", iconName: "i-warn", headClass: "error", wide: true });
+  const body = document.createElement("div");
+  body.className = "modal-body";
+  const summary = document.createElement("p");
+  const list = document.createElement("div");
+  list.className = "mono";
+  list.style.cssText = "max-height:180px; overflow-y:auto; margin:8px 0; padding:8px 10px;"
+    + "border:1px solid var(--border); border-radius:6px; font-size:12px; line-height:1.6;"
+    + "white-space:pre-wrap;";
+  const render = () => {
+    summary.textContent = prev.targets.length
+      ? `This permanently deletes ${prev.files.toLocaleString()} file(s) (${prev.mb} MB):`
+      : "Nothing to delete — no generated reports were found.";
+    list.textContent = prev.targets.length ? prev.targets.join("\n") : "";
+    list.style.display = prev.targets.length ? "" : "none";
+  };
+  render();
+  const keep = document.createElement("p");
+  keep.textContent = "Logs, your saved login and these settings are always kept.";
+  const inputRow = document.createElement("label");
+  inputRow.style.cssText = "display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer;";
+  const inputCb = document.createElement("input");
+  inputCb.type = "checkbox";
+  inputRow.appendChild(inputCb);
+  inputRow.appendChild(Object.assign(document.createElement("span"),
+    { textContent: "Also delete the TSN input PDFs (input\\tsn_highway_log)" }));
+  inputCb.onchange = async () => {
+    includeInput = inputCb.checked;
+    prev = await api.reset_preview(includeInput);
+    render();
+  };
+  body.append(summary, list, keep, inputRow);
+  m.appendChild(body);
+  const actions = document.createElement("div");
+  actions.className = "modal-actions";
+  const cancel = document.createElement("button");
+  cancel.className = "btn btn-subtle"; cancel.textContent = "Cancel";
+  cancel.onclick = () => closeModal(false);
+  const ok = document.createElement("button");
+  ok.className = "btn btn-danger"; ok.textContent = "Delete everything";
+  ok.disabled = !prev.targets.length;
+  ok.onclick = () => closeModal(true);
+  actions.append(cancel, ok);
+  m.appendChild(actions);
+  const confirmed = await openModal(m);
+  if (!confirmed) return;
+  const res = await api.start_reset(includeInput);
+  if (res && res.error) showMessage("error", "Could not start", res.error);
+}
+
+async function verifyEnvironment() {
+  const res = await api.verify_environment();
+  if (res && res.error) { showMessage("info", "Can't check right now", res.error); return; }
+  const src = $("selSource").selectedOptions[0]?.textContent || "";
+  const env = $("selEnv").selectedOptions[0]?.textContent || "";
+  openPreviewModal(0, `Verify environment — ${src} / ${env}`,
+    "Opening TSMIS in the background and signing in — this can take 15–60 seconds…");
+}
+
 function bindEvents() {
   // tabs
   const TABS = {
@@ -818,8 +1099,10 @@ function bindEvents() {
               sub: "Select reports and routes, then run the batch export." },
     consolidate: { btn: "tabConsolidate", pane: "paneConsolidate", title: "Consolidate output",
                    sub: "Merge per-route files into a single workbook." },
-    compare: { btn: "tabCompare", pane: "paneCompare", title: "Compare TSMIS vs TSN",
-               sub: "Pick a TSMIS and a TSN highway log, then build a discrepancy workbook." },
+    compare: { btn: "tabCompare", pane: "paneCompare", title: "Compare reports",
+               sub: "Build a discrepancy workbook from two report sources." },
+    settings: { btn: "tabSettings", pane: "paneSettings", title: "Settings",
+                sub: "Reliability, debugging and storage options." },
   };
   const setTab = (tab) => {
     S.tab = tab;
@@ -867,6 +1150,31 @@ function bindEvents() {
   $("btnCancelCons").onclick = () => api.cancel_run();
   $("btnOpenConsFolder").onclick = () => api.open_consolidated_folder(consChoice(), selectedDay());
   $("btnOpenConsInput").onclick = () => api.open_consolidate_input(consChoice());
+
+  // settings tab
+  Object.keys(SETTING_INPUTS).forEach((id) => {
+    $(id).addEventListener("change", () => onSettingInput(id));
+  });
+  $("setDebugLog").addEventListener("change", () => onSettingToggle("setDebugLog", "debug_logging"));
+  $("setDevtools").addEventListener("change", () => onSettingToggle("setDevtools", "ui_devtools"));
+  $("btnSupportBundle").onclick = async () => {
+    const res = await api.save_support_bundle();
+    if (res && res.error) showMessage("error", "Could not save the bundle", res.error);
+  };
+  $("btnOpenFailures").onclick = () => api.open_failures_folder();
+  $("btnCheckUpdates2").onclick = () => api.check_updates();
+  $("btnOpenOutput2").onclick = () => api.open_output_folder();
+  $("btnClearLogin").onclick = async () => {
+    const ok = await showConfirm({
+      title: "Forget the saved login?",
+      message: "The saved session file will be deleted; the next export will need "
+        + "a fresh sign-in (or automatic device sign-in, where available).",
+      confirmLabel: "Forget login",
+    });
+    if (ok) api.clear_saved_login();
+  };
+  $("btnDeleteReports").onclick = deleteAllReports;
+  $("btnVerifyEnv").onclick = verifyEnvironment;
 
   $("btnPickTsmis").onclick = () => pickCompareFile("tsmis");
   $("btnPickTsn").onclick = () => pickCompareFile("tsn");
@@ -919,6 +1227,7 @@ async function boot(realApi) {
   hideFatal();
   S.init = init;
   buildStatic();
+  fillSettings();
   bindEvents();
   S.st = S.init.state;
   renderState();
@@ -985,13 +1294,38 @@ function makeMockApi() {
       tools: { status: "busy", text: "Report tools: checking…" },
     },
     checks_running: true,
-    days: ["2026-06-10", "2026-06-08", "2026-06-02"],
+    days: ["2026-06-11 ssor-prod", "2026-06-11 ars-prod", "2026-06-08 ssor-dev", "2026-06-02"],
     can_save_report: false,
     update: { phase: "idle" },
+  };
+  const mockSettings = {
+    report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
+    county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
   };
   let timer = null;
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
+
+  // A fake TSMIS page screenshot (canvas → JPEG base64) so the preview modal
+  // can be styled without the real app.
+  function mockShotB64(envLabel, detail) {
+    const c = document.createElement("canvas");
+    c.width = 1280; c.height = 720;
+    const g = c.getContext("2d");
+    g.fillStyle = "#f4f6f9"; g.fillRect(0, 0, 1280, 720);
+    g.fillStyle = "#1f3864"; g.fillRect(0, 0, 1280, 64);
+    g.fillStyle = "#ffffff"; g.font = "bold 26px Segoe UI";
+    g.fillText("TSMIS — Transportation System Management", 24, 42);
+    g.fillStyle = "#c00000"; g.font = "bold 30px Segoe UI";
+    g.fillText(envLabel, 1020, 44);
+    g.fillStyle = "#222"; g.font = "20px Segoe UI";
+    g.fillText("(mock screenshot) " + detail, 24, 120);
+    g.strokeStyle = "#bbb";
+    for (let i = 0; i < 14; i++) {
+      g.strokeRect(24, 150 + i * 38, 1230, 38);
+    }
+    return c.toDataURL("image/jpeg", 0.75).split(",")[1];
+  }
 
   function finishChecks() {
     st.checks.output = { status: "ok", text: "Output folder: writable" };
@@ -1012,15 +1346,22 @@ function makeMockApi() {
                                       : `Exporting ${REPORTS[reports[0]].label}…`;
     pushState();
     const names = reports.map((i) => REPORTS[i].label).join(", ");
+    const nWorkers = fast ? workers : 1;
     let msg = `Starting export: ${names}`;
     if (routes.length !== ROUTES.length) msg += `   ·   ${routes.length} routes`;
     if (fast) msg += `   ·   FAST MODE (${workers} browsers)`;
-    push({ t: "log", text: msg }, { t: "run_started", mode: "export", label: "Working…" });
+    push({ t: "log", text: msg },
+         { t: "run_started", mode: "export", label: "Working…", workers: nWorkers });
+    for (let w = 1; w <= nWorkers; w++) {
+      push({ t: "wstatus", w, text: "Starting browser…" });
+    }
 
     const total = routes.length;
     let done = 0;
+    let tick = 0;
     const counts = { saved: 0, empty: 0, skipped: 0, failed: 0, exists: 0 };
     timer = setInterval(() => {
+      tick++;
       if (done >= total) {
         clearInterval(timer); timer = null;
         push({ t: "log", text: "" },
@@ -1037,6 +1378,8 @@ function makeMockApi() {
       const status = r < 0.82 ? "saved" : r < 0.88 ? "exists" : r < 0.94 ? "empty" : r < 0.97 ? "skipped" : "failed";
       counts[status === "exists" ? "exists" : status === "saved" ? "saved" : status === "empty" ? "empty" : status === "skipped" ? "skipped" : "failed"]++;
       done++;
+      const w = 1 + (tick % nWorkers);
+      push({ t: "wstatus", w, text: `[${String(done).padStart(3)}/${total}] Route ${route}: working… (${(Math.random() * 60 + 3).toFixed(0)}s)` });
       if (status === "saved") push({ t: "log", text: `Route ${route}: saved (${(Math.random() * 3 + 0.4).toFixed(1)} MB, ${(Math.random() * 40 + 8).toFixed(0)}s)` });
       if (status === "failed") push({ t: "log", text: `Route ${route}: FAILED — TSMIS site error (see failures folder)` });
       push({ t: "progress", p: { done, total, route, report: REPORTS[reports[0]].label, report_i: 1, report_n: reports.length, ...counts } });
@@ -1045,7 +1388,7 @@ function makeMockApi() {
 
   return {
     get_initial_state: async () => ({
-      app_name: "TSMIS Exporter", version: "0.8.0 (preview)",
+      app_name: "TSMIS Exporter", version: "0.10.0 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       reports: REPORTS,
@@ -1061,8 +1404,84 @@ function makeMockApi() {
       envs: [{ id: "prod", label: "Prod" }, { id: "test", label: "Test" }, { id: "dev", label: "Dev" }],
       site: { source: "ssor", environment: "prod" },
       fast: { default: 3, max: 30 },
+      settings: {
+        values: { ...mockSettings },
+        defaults: { ...mockSettings },
+        meta: {
+          version: "0.10.0 (preview)", build: "portable app",
+          variant: "system browser",
+          data_root: "C:\\Tools\\TSMIS Exporter",
+          output_root: "C:\\Tools\\TSMIS Exporter\\output",
+          log_file: "C:\\Tools\\TSMIS Exporter\\data\\logs\\tsmis.log",
+          failures_dir: "C:\\Tools\\TSMIS Exporter\\data\\failures",
+          auth_state: "none", max_workers: 30,
+        },
+      },
       state: JSON.parse(JSON.stringify(st)),
     }),
+    request_preview: async (w) => {
+      setTimeout(() => {
+        push({ t: "preview", w, img: mockShotB64("SSOR PROD", `Browser ${w} — Route 005 — Highway Log`), note: `Route 005` });
+      }, 900);
+      return { ok: true };
+    },
+    verify_environment: async () => {
+      st.task = "envcheck"; st.auth_dot = "busy"; st.auth_text = "Checking SSOR / Prod…";
+      pushState();
+      push({ t: "log", text: "Verifying environment: opening TSMIS on SSOR / Prod…" },
+           { t: "run_started", mode: "consolidate", label: "Checking SSOR / Prod…" });
+      setTimeout(() => {
+        const match = Math.random() > 0.3;
+        push({ t: "log", text: match ? "Environment check: the page is running SSOR / Prod — matches your selection."
+                                     : "WARNING: the page is running SSOR / Dev, but SSOR / Prod is selected. Exports would hit SSOR / Dev." },
+             { t: "preview", w: 0, img: mockShotB64(match ? "SSOR PROD" : "SSOR DEV", "Verify environment"),
+               note: "Verify environment",
+               env_info: { ok: true, env: match ? "prod" : "dev", src: "ssor", matches: match, wanted: "SSOR / Prod" } },
+             { t: "run_ended" });
+        st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 1600);
+      return { ok: true };
+    },
+    get_settings: async () => ({ values: { ...mockSettings }, defaults: { ...mockSettings }, meta: {} }),
+    set_setting: async (key, value) => {
+      const numeric = typeof mockSettings[key] === "number";
+      mockSettings[key] = numeric ? Math.max(1, parseInt(value, 10) || mockSettings[key]) : !!value;
+      push({ t: "log", text: `(mock) setting ${key} = ${mockSettings[key]}` });
+      return { ok: true, values: { ...mockSettings } };
+    },
+    reset_preview: async (includeInput) => ({
+      targets: ["export run folder '2026-06-11 ssor-prod'", "export run folder '2026-06-11 ars-prod'",
+                "output folder 'consolidated'", "output folder 'run_reports'", "failure screenshots"]
+        .concat(includeInput ? ["TSN input PDFs"] : []),
+      files: includeInput ? 1480 : 1398, mb: includeInput ? 612.4 : 540.1,
+    }),
+    start_reset: async () => {
+      st.task = "reset"; st.auth_dot = "busy"; st.auth_text = "Deleting reports…";
+      pushState();
+      push({ t: "log", text: "Deleting all reports…" },
+           { t: "run_started", mode: "consolidate", label: "Deleting reports…" });
+      setTimeout(() => {
+        push({ t: "log", text: "  Deleted export run folder '2026-06-11 ssor-prod'." },
+             { t: "log", text: "  Deleted failure screenshots." },
+             { t: "log", text: "Done — deleted 1,398 file(s), freed 540.1 MB. Logs, your login and settings were kept." },
+             { t: "run_ended" });
+        st.task = null; st.days = []; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 1800);
+      return { ok: true };
+    },
+    save_support_bundle: async () => {
+      push({ t: "log", text: "Support bundle saved (12 files): C:\\Users\\you\\Desktop\\tsmis_support.zip" });
+      return { saved: true };
+    },
+    clear_saved_login: async () => {
+      st.authed = false; st.auth_dot = "bad"; st.auth_text = "No saved login — click Log in";
+      push({ t: "log", text: "Saved login deleted — click 'Log in' to sign in again." });
+      pushState();
+      return { ok: true, removed: true };
+    },
+    open_failures_folder: async () => push({ t: "log", text: "(mock) would open the failures folder" }),
     ui_ready: async () => { setTimeout(finishChecks, 900); },
     ui_event: async () => {},
     log_js_error: async (m) => console.error("js error:", m),

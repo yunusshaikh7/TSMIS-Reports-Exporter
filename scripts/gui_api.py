@@ -37,17 +37,22 @@ from queue import Empty, Queue
 import webview
 
 import run_report
+import settings
 import updater
-from gui_worker import (CheckWorker, ConsolidateWorker, ExportWorker,
-                        LoginWorker, UpdateWorker)
-from exporter_parallel import DEFAULT_WORKERS, MAX_WORKERS
+from gui_worker import (CheckWorker, ConsolidateWorker, EnvCheckWorker,
+                        ExportWorker, LoginWorker, ResetWorker, UpdateWorker,
+                        measure_targets, reset_targets)
+from exporter_parallel import MAX_WORKERS, default_worker_count
+from logging_setup import LOG_FILE, set_debug_logging
 
-from paths import LOG_DIR, OUTPUT_ROOT, WEBVIEW_PROFILE_DIR, list_output_days
+from paths import (DATA_ROOT, FAILURES_DIR, LOG_DIR, OUTPUT_ROOT,
+                   WEBVIEW_PROFILE_DIR, is_frozen, list_output_days)
 from version import APP_NAME, __version__
 from common import (
     BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES, DATA_SOURCE_LABELS,
     ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError, clear_auth, get_site,
-    parse_routes, require_valid_auth, set_preferred_channel, set_site,
+    has_valid_auth, parse_routes, require_valid_auth, set_preferred_channel,
+    set_site,
 )
 from reports import COMPARE_REPORTS, CONSOLIDATE_REPORTS, EXPORT_REPORTS
 
@@ -135,6 +140,7 @@ class GuiApi:
         self._update_info = None
 
         self._last_results = []      # [(spec, RunResult), ...] of the last export
+        self._export_worker = None   # live ExportWorker (screenshot requests)
         self.cancel_event = threading.Event()
         self.skip_event = threading.Event()
         self.login_done = threading.Event()
@@ -297,6 +303,16 @@ class GuiApi:
             self._emit_log(payload)
         elif kind == "progress":
             self._emit({"t": "progress", "p": payload})
+        elif kind == "worker_status":
+            worker, text = payload
+            self._emit({"t": "wstatus", "w": worker, "text": text})
+        elif kind == "preview_shot":
+            worker, b64, note = payload
+            self._emit({"t": "preview", "w": worker, "img": b64, "note": note})
+        elif kind == "env_shot":
+            self._on_env_shot(payload)
+        elif kind == "reset_done":
+            self._on_reset_done(payload)
         elif kind == "export_done":
             self._finish_export(payload)
         elif kind == "export_partial":
@@ -360,6 +376,7 @@ class GuiApi:
             self._task = None
             self._fast_run = False
             self._login_phase = None
+            self._export_worker = None
         self._refresh_auth()
         self._emit({"t": "run_ended"})
         self._push_state()
@@ -513,7 +530,8 @@ class GuiApi:
             "sources": [{"id": s, "label": DATA_SOURCE_LABELS[s]} for s in DATA_SOURCES],
             "envs": [{"id": e, "label": ENVIRONMENT_LABELS[e]} for e in ENVIRONMENTS],
             "site": dict(zip(("source", "environment"), get_site())),
-            "fast": {"default": DEFAULT_WORKERS, "max": MAX_WORKERS},
+            "fast": {"default": default_worker_count(), "max": MAX_WORKERS},
+            "settings": self.get_settings(),
             "state": self._state_snapshot(),
         }
 
@@ -682,7 +700,7 @@ class GuiApi:
             try:
                 n_workers = max(2, min(int(workers), MAX_WORKERS))
             except (TypeError, ValueError):
-                n_workers = DEFAULT_WORKERS
+                n_workers = max(2, default_worker_count())
 
         with self._lock:
             self._task = "export"
@@ -700,10 +718,29 @@ class GuiApi:
         self._set_dot("busy",
                       f"Exporting {len(specs)} report(s)…" if len(specs) > 1
                       else f"Exporting {specs[0].label}…")
-        self._emit({"t": "run_started", "mode": "export", "label": "Working…"})
+        # `workers` tells the UI how many live browser-status rows to show.
+        self._emit({"t": "run_started", "mode": "export", "label": "Working…",
+                    "workers": n_workers})
         self._push_state()
-        ExportWorker(specs, self._q, self.cancel_event, self.skip_event,
-                     workers=n_workers, routes=run_routes).start()
+        worker = ExportWorker(specs, self._q, self.cancel_event, self.skip_event,
+                              workers=n_workers, routes=run_routes)
+        with self._lock:
+            self._export_worker = worker
+        worker.start()
+        return {"ok": True}
+
+    @_api_method
+    def request_preview(self, worker_no):
+        """Ask browser `worker_no` (1-based) for a live screenshot; it answers
+        with a 'preview' event at its next safe poll point (≤ ~5 s during a
+        report wait; a long download can delay it until the next route)."""
+        with self._lock:
+            worker = self._export_worker
+            running = self._task == "export"
+        if not running or worker is None:
+            return {"error": "No export is running."}
+        worker.request_screenshot(worker_no)
+        ui_log.info("preview requested for browser %s", worker_no)
         return {"ok": True}
 
     @_api_method
@@ -754,6 +791,56 @@ class GuiApi:
         self.login_done.set()
         self._push_state()
         return {"ok": True}
+
+    # ---- verify environment (idle screenshot) ---------------------------------
+
+    @_api_method
+    def verify_environment(self):
+        """Open TSMIS headless exactly like an export would, read which data
+        source / environment the page ACTUALLY loaded, and screenshot it —
+        proof the automation lands on the selected site without running an
+        export. Needs a login (saved or automatic), like an export."""
+        with self._lock:
+            if self._task:
+                return {"error": "A task is already running."}
+            self._task = "envcheck"
+        src, env = get_site()
+        label = f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}"
+        self._emit_log(f"Verifying environment: opening TSMIS on {label}…")
+        self._set_dot("busy", f"Checking {label}…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": f"Checking {label}…"})
+        self._push_state()
+        EnvCheckWorker(self._q).start()
+        return {"ok": True}
+
+    def _on_env_shot(self, payload):
+        """EnvCheckWorker's single result message → log + preview modal."""
+        src, env = get_site()
+        want = f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}"
+        if payload.get("error"):
+            self._emit_log(f"Environment check failed: {payload['error']}")
+            self._emit_modal("warning", "Environment check failed", payload["error"])
+        elif payload.get("env"):
+            got = (f"{DATA_SOURCE_LABELS.get(payload['src'], payload['src'])} / "
+                   f"{ENVIRONMENT_LABELS.get(payload['env'], payload['env'])}")
+            if payload.get("matches"):
+                self._emit_log(f"Environment check: the page is running {got} "
+                               "— matches your selection.")
+            else:
+                self._emit_log(f"WARNING: the page is running {got}, but "
+                               f"{want} is selected. Exports would hit {got}.")
+        else:
+            self._emit_log("Environment check: signed in, but the page didn't "
+                           "report which site it loaded (screenshot attached).")
+        if payload.get("img") or payload.get("error") is None:
+            self._emit({"t": "preview", "w": 0, "img": payload.get("img"),
+                        "note": "Verify environment", "env_info": {
+                            "ok": payload.get("ok"),
+                            "env": payload.get("env"), "src": payload.get("src"),
+                            "matches": payload.get("matches"),
+                            "wanted": want, "url": payload.get("url")}})
+        self._end_task()
 
     # ---- consolidate -------------------------------------------------------------
 
@@ -862,6 +949,164 @@ class GuiApi:
             self._q, self.cancel_event, lambda _p: True).start()
         return {"ok": True}
 
+    # ---- settings & maintenance -----------------------------------------------
+
+    @_api_method
+    def get_settings(self):
+        """Everything the Settings tab shows: the saved knobs plus read-only
+        build/paths facts (so problems are diagnosable from the screen)."""
+        auth_state = "saved login" if has_valid_auth() else (
+            "automatic sign-in" if self._device_ok else "none")
+        return {
+            "values": settings.all_settings(),
+            "defaults": dict(settings.DEFAULTS),
+            "meta": {
+                "version": __version__,
+                "build": "portable app" if is_frozen() else "development run",
+                "variant": ("with built-in browser"
+                            if "chromium" in BROWSER_CHANNELS else "system browser"),
+                "data_root": str(DATA_ROOT),
+                "output_root": str(OUTPUT_ROOT),
+                "log_file": str(LOG_FILE),
+                "failures_dir": str(FAILURES_DIR),
+                "auth_state": auth_state,
+                "max_workers": MAX_WORKERS,
+            },
+        }
+
+    @_api_method
+    def set_setting(self, key, value):
+        """Persist one setting and apply any live side effect. Timeouts and
+        the worker default are read at run start, so they apply to the next
+        run; verbose logging switches immediately; DevTools applies on the
+        next launch."""
+        new = settings.update({key: value})
+        if key == "debug_logging":
+            set_debug_logging(new["debug_logging"])
+        ui_log.info("settings: %s = %r", key, new.get(key))
+        return {"ok": True, "values": new}
+
+    @_api_method
+    def reset_preview(self, include_input=False):
+        """What "Delete all reports" would remove right now — shown in the
+        confirm dialog so the user approves a concrete list, not a vibe."""
+        targets = reset_targets(bool(include_input))
+        files, size = measure_targets(targets)
+        return {"targets": [label for label, _p in targets],
+                "files": files, "mb": round(size / 1e6, 1)}
+
+    @_api_method
+    def start_reset(self, include_input=False):
+        """Delete all generated reports (the confirm dialog already ran in the
+        UI, listing reset_preview's concrete targets). Logs, the saved login
+        and the settings always survive."""
+        with self._lock:
+            if self._task:
+                return {"error": "A task is already running."}
+            self._task = "reset"
+        ui_log.info("reset: user confirmed delete-all-reports (input=%s)",
+                    bool(include_input))
+        self._emit_log("Deleting all reports…")
+        self._set_dot("busy", "Deleting reports…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Deleting reports…"})
+        self._push_state()
+        ResetWorker(self._q, include_input=bool(include_input)).start()
+        return {"ok": True}
+
+    def _on_reset_done(self, payload):
+        if payload.get("errors"):
+            self._emit_log(f"Deleted {payload['files']} file(s) "
+                           f"({payload['mb']} MB), but some items couldn't be "
+                           "removed:")
+            for line in payload["errors"]:
+                self._emit_log(f"  {line}")
+            self._emit_modal("warning", "Some files couldn't be deleted",
+                             "Close any report files still open in Excel, "
+                             "then run 'Delete all reports' again.")
+        else:
+            self._emit_log(f"Done — deleted {payload['files']} file(s), "
+                           f"freed {payload['mb']} MB. Logs, your login and "
+                           "settings were kept.")
+        self._set_dot("ok" if self._authed else "bad", "Done")
+        self._end_task()
+
+    @_api_method
+    def save_support_bundle(self):
+        """Zip the diagnostics a maintainer needs (rotating logs, run reports,
+        settings, a manifest) to a user-chosen location. The saved login and
+        browser profiles are NEVER included — the bundle is safe to share."""
+        import io
+        import platform
+        import zipfile
+
+        default = f"tsmis_support_{time.strftime('%Y%m%d_%H%M%S')}.zip"
+        picked = self._window.create_file_dialog(
+            webview.SAVE_DIALOG, save_filename=default,
+            file_types=("Zip archive (*.zip)",))
+        if not picked:
+            return {"cancelled": True}
+        out = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+
+        manifest = io.StringIO()
+        src, env = get_site()
+        manifest.write(f"TSMIS Exporter support bundle\n"
+                       f"created:    {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                       f"version:    {__version__}\n"
+                       f"build:      {'frozen' if is_frozen() else 'dev'}\n"
+                       f"python:     {platform.python_version()}\n"
+                       f"os:         {platform.platform()}\n"
+                       f"data_root:  {DATA_ROOT}\n"
+                       f"output:     {OUTPUT_ROOT}\n"
+                       f"site:       src={src} env={env}\n"
+                       f"browsers:   {list(BROWSER_CHANNELS)} (picked: {self._channel})\n"
+                       f"login:      {'saved file' if has_valid_auth() else 'none'}"
+                       f"{' + device sign-in' if self._device_ok else ''}\n"
+                       f"settings:   {settings.all_settings()}\n"
+                       f"run folders: {list_output_days() or '(none)'}\n")
+        added = 0
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("manifest.txt", manifest.getvalue())
+            for pattern, arc in (("tsmis.log*", "logs"), ("crash.log", "logs"),
+                                 ("update_helper.log", "logs")):
+                for f in sorted(LOG_DIR.glob(pattern)):
+                    try:
+                        zf.write(f, f"{arc}/{f.name}")
+                        added += 1
+                    except OSError:
+                        pass
+            reports = sorted((OUTPUT_ROOT / "run_reports").glob("*.csv"),
+                             key=lambda p: p.stat().st_mtime, reverse=True)[:50]
+            for f in reports:
+                try:
+                    zf.write(f, f"run_reports/{f.name}")
+                    added += 1
+                except OSError:
+                    pass
+        ui_log.info("support bundle saved: %s (%d files)", out, added)
+        self._emit_log(f"Support bundle saved ({added} files): {out}")
+        self._emit_log("  It contains logs, run reports and settings — never "
+                       "your login.")
+        return {"saved": str(out)}
+
+    @_api_method
+    def clear_saved_login(self):
+        """Settings-tab action: forget the saved session (the file is deleted;
+        automatic device sign-in, when available, is unaffected)."""
+        removed = clear_auth()
+        with self._lock:
+            self._authed = False
+        self._refresh_auth()
+        self._emit_log("Saved login deleted — click 'Log in' to sign in again."
+                       if removed else "There was no saved login to delete.")
+        self._push_state()
+        return {"ok": True, "removed": removed}
+
+    @_api_method
+    def open_failures_folder(self):
+        self._open_folder(FAILURES_DIR)
+        return {"ok": True}
+
     # ---- run report / folders -----------------------------------------------------
 
     @_api_method
@@ -959,6 +1204,11 @@ def run():
     # One stable folder under the app's data dir avoids both; the UI stores
     # nothing sensitive in it.
     debug = os.environ.get("TSMIS_UI_DEBUG", "").strip().lower() in ("1", "true", "yes")
+    if not debug:
+        try:
+            debug = bool(settings.get("ui_devtools"))   # Settings-tab toggle
+        except Exception:
+            pass
     log.info("starting webview (window %dx%d, ui=%s, profile=%s%s)",
              width, height, index, WEBVIEW_PROFILE_DIR, ", debug" if debug else "")
     try:

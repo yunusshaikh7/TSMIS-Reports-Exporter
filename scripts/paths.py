@@ -69,38 +69,83 @@ OUTPUT_ROOT = DATA_ROOT / "output"
 # source data is NOT produced by this app's exports.
 INPUT_ROOT = DATA_ROOT / "input"
 
-# Exports are grouped by day: output/<YYYY-MM-DD>/<report subfolder>/...
-# so a new day's run never resumes over (or mixes with) yesterday's files.
-# The consolidators read the same dated layout (newest day by default).
-_DAY_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# Exports are grouped into RUN FOLDERS: output/<YYYY-MM-DD src-env>/<report>/
+# (e.g. "2026-06-11 ssor-prod"), so a new day's run never resumes over (or
+# mixes with) yesterday's files AND different data source / environment
+# combinations never overwrite each other — the folder name says exactly what
+# is inside, which the cross-environment comparison relies on. Folders from
+# before v0.10 are bare dates ("2026-06-11"); those always meant the defaults,
+# so they read as ssor-prod. The consolidators take the run-folder NAME as
+# their `day` argument (an opaque string to them; newest by default).
+_RUN_RE = re.compile(r"(\d{4}-\d{2}-\d{2})(?: (\w+)-(\w+))?$")
 
 
 def today_str():
     return date.today().isoformat()
 
 
+def run_folder_name(src, env, day=None):
+    """The run-folder name for one (data source, environment) on one day."""
+    return f"{day or today_str()} {src}-{env}"
+
+
+def output_run_dir(src, env, day=None):
+    """output/<day src-env>/ — where an export run writes. `day` is a
+    YYYY-MM-DD string; None means today."""
+    return OUTPUT_ROOT / run_folder_name(src, env, day)
+
+
+def parse_run_folder(name):
+    """(date, src, env) for a run-folder name, or None if `name` isn't one.
+    Legacy bare-date folders (pre-v0.10) read as the old defaults, ssor-prod."""
+    m = _RUN_RE.fullmatch(name)
+    if not m:
+        return None
+    day, src, env = m.groups()
+    return (day, src or "ssor", env or "prod")
+
+
 def output_day_dir(day=None):
-    """output/<day>/ — `day` is a YYYY-MM-DD string; None means today."""
+    """output/<day>/ — `day` is a run-folder name (or a legacy bare date);
+    None means today's bare date. Kept for the consolidators, which treat the
+    chosen folder name as opaque."""
     return OUTPUT_ROOT / (day or today_str())
 
 
 def list_output_days():
-    """Existing dated folders under output/, newest first."""
+    """Existing run folders (and legacy bare-date folders) under output/,
+    newest first. The names are what the GUI day picker and the consolidators'
+    `day` argument carry."""
     try:
-        return sorted(
-            (p.name for p in OUTPUT_ROOT.iterdir()
-             if p.is_dir() and _DAY_RE.fullmatch(p.name)),
-            reverse=True,
-        )
+        named = [(parse_run_folder(p.name), p.name)
+                 for p in OUTPUT_ROOT.iterdir() if p.is_dir()]
+        return [name for parsed, name in
+                sorted(((pr, n) for pr, n in named if pr), reverse=True)]
     except OSError:
         return []
 
 
 def latest_output_day():
-    """Newest dated export folder, or None when none exist yet (callers fall
+    """Newest run folder name, or None when none exist yet (callers fall
     back to the pre-dated flat layout so old exports stay consolidatable)."""
     days = list_output_days()
     return days[0] if days else None
+
+
+def resolve_day_choice(raw):
+    """Map a user-supplied TSMIS_DAY value to an existing run folder: an exact
+    folder name passes through; a bare date picks the newest run folder of
+    that date when one exists. Anything else is returned as-is (the
+    consolidators will simply find the folder empty/missing and say so)."""
+    raw = (raw or "").strip()
+    if not raw:
+        return raw
+    matches = [d for d in list_output_days() if d == raw]
+    if matches:
+        return matches[0]
+    by_date = [d for d in list_output_days()
+               if (parse_run_folder(d) or ("",))[0] == raw]
+    return by_date[0] if by_date else raw
 
 # App-private data (auth token, logs, config).
 if is_frozen():

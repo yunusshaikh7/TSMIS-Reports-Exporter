@@ -21,25 +21,27 @@ from playwright.sync_api import sync_playwright
 
 from common import (
     ERROR_JS,
-    REPORT_TIMEOUT_MS,
     RETRY_COUNT,
-    RETRY_REPORT_TIMEOUT_MS,
     ROUTES,
     AuthError,
     ReportError,
     RunCancelled,
+    get_site,
     get_url,
     has_valid_auth,
+    maybe_screenshot,
     navigate_with_auth,
     new_authed_browser,
     preflight,
     report_error_text,
+    report_timeout_ms,
     require_signed_in,
+    retry_report_timeout_ms,
     select_report,
     wait_with_skip_option,
 )
 from events import Events, RunResult
-from paths import FAILURES_DIR, output_day_dir
+from paths import FAILURES_DIR, output_run_dir
 from run_report import auto_report_path, write_run_report
 
 log = logging.getLogger("tsmis.export")
@@ -76,7 +78,7 @@ def save_via_export_button(page, out_path, timeout_ms=None):
     """Click the report's Export button and save the resulting download
     (TSAR Ramp Detail, Highway Sequence Listing). Big reports under heavy load
     can take minutes to produce the download, so honor the caller's window."""
-    with page.expect_download(timeout=timeout_ms or REPORT_TIMEOUT_MS) as dl_info:
+    with page.expect_download(timeout=timeout_ms or report_timeout_ms()) as dl_info:
         page.locator("button.export-btn", has_text="Export").first.click()
     dl_info.value.save_as(str(out_path))
 
@@ -117,6 +119,7 @@ def _recover_or_stop(page, spec, events):
     """Re-arm the form. Returns True to keep going, False to stop the whole run.
     Re-raises AuthError so the run ends cleanly."""
     try:
+        events.on_status(events.worker_no, "Recovering (reloading the report page)…")
         _recover(page, spec)
         return True
     except AuthError:
@@ -149,6 +152,7 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     """One attempt at a route. Returns 'saved' | 'empty' | 'skipped'.
     Raises on any failure; the caller decides whether to retry. timeout_ms is the
     hard ceiling for both the report-generation wait and the save/download."""
+    events.on_status(events.worker_no, f"{prefix} generating…")
     page.get_by_label("Route", exact=True).select_option(route)
     page.get_by_role("button", name="Generate").click()
     # Wait for the report to be ready/empty OR for the site to render an error
@@ -168,6 +172,10 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     if spec.is_empty(page):
         return "empty"
     page.wait_for_timeout(1000)
+    # One last look before the save grabs the page (a download wait can't
+    # answer preview requests until it returns).
+    maybe_screenshot(page, events, note=prefix.strip())
+    events.on_status(events.worker_no, f"{prefix} saving…")
     spec.save(page, out_path, timeout_ms)
     return "saved"
 
@@ -328,12 +336,15 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     if not has_valid_auth():
         events.on_log("No saved session - will try signing in automatically "
                       "using this PC's work account (Microsoft Edge).")
-    timeout_ms = timeout_ms or REPORT_TIMEOUT_MS
-    retry_timeout_ms = retry_timeout_ms or RETRY_REPORT_TIMEOUT_MS
+    timeout_ms = timeout_ms or report_timeout_ms()
+    retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
 
-    # Exports are grouped by day (output/<YYYY-MM-DD>/<report>/), so a new
-    # day's run starts fresh instead of resuming over yesterday's files.
-    out_dir = output_day_dir() / spec.subdir
+    # Exports are grouped into run folders (output/<YYYY-MM-DD src-env>/
+    # <report>/), so a new day starts fresh instead of resuming over
+    # yesterday's files AND different source/environment runs never mix —
+    # the folder name says exactly which site the files came from.
+    src, env = get_site()
+    out_dir = output_run_dir(src, env) / spec.subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     result = RunResult(output_dir=str(out_dir))
     total = len(routes)
@@ -346,9 +357,11 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     if total != len(ROUTES):
         log.info("export routes (subset): %s", ", ".join(routes))
 
+    events.on_status(events.worker_no, "Starting browser…")
     with sync_playwright() as p:
         browser, _ctx, page = new_authed_browser(p)
         try:
+            events.on_status(events.worker_no, "Opening TSMIS + signing in…")
             navigate_with_auth(page)
             require_signed_in(
                 page,
@@ -357,6 +370,7 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
             )
 
             events.on_log("Logged in. Checking the report form...")
+            events.on_status(events.worker_no, "Checking the report form…")
             preflight(page, spec.label)
             events.on_log("Ready. Starting export.")
 
@@ -368,6 +382,9 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
 
                 prefix = f"[{i:>3}/{total}] Route {route}:"
                 out_path = out_dir / spec.filename(route)
+                # Between-route poll point so a Preview click during a long
+                # stretch of already-exists skips still gets answered.
+                maybe_screenshot(page, events, note=f"Route {route}")
 
                 if out_path.exists():
                     events.on_log(f"{prefix} already exists, skip")
@@ -383,6 +400,7 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
                     log.info("cancelled by user during route %s", route)
                     break
 
+            events.on_status(events.worker_no, "Finishing up…")
             # Give routes that failed the main pass one slow, serial retry.
             if not events.is_cancelled():
                 try:
@@ -404,7 +422,8 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     # GUI can also save a copy elsewhere; a write failure here is non-fatal.
     if result.per_route:
         try:
-            report_path = write_run_report(result, spec.label, auto_report_path(spec.subdir))
+            report_path = write_run_report(
+                result, spec.label, auto_report_path(spec.subdir, f"{src}-{env}"))
             result.report_path = str(report_path)
             events.on_log(f"Run report saved: {report_path}")
             log.info("run report saved: %s", report_path)

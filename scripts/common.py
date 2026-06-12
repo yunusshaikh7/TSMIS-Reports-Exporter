@@ -151,6 +151,40 @@ RETRY_REPORT_TIMEOUT_MS = 900_000         # 15 min per route in the retry pass
 # user already had a skip window during the wait).
 RETRY_COUNT = 1
 
+
+# The constants above are the DEFAULTS; the Settings tab can override the
+# ceilings (persisted via settings.py). Engines call these accessors at RUN
+# time, so a changed setting applies to the next run without a restart.
+def _settings_ms(key, default_ms, unit_ms):
+    try:
+        import settings
+        return settings.get(key) * unit_ms
+    except Exception as e:                       # settings must never stop a run
+        log.warning("settings read failed for %s (%s: %s); using default",
+                    key, type(e).__name__, e)
+        return default_ms
+
+
+def report_timeout_ms():
+    """Effective per-route ceiling for the sequential flow (Settings tab can
+    raise it; default REPORT_TIMEOUT_MS)."""
+    return _settings_ms("report_timeout_min", REPORT_TIMEOUT_MS, 60_000)
+
+
+def fast_report_timeout_ms():
+    """Effective per-route ceiling under fast mode's concurrent load."""
+    return _settings_ms("fast_timeout_min", FAST_REPORT_TIMEOUT_MS, 60_000)
+
+
+def retry_report_timeout_ms():
+    """Effective per-route ceiling for the end-of-run serial retry pass."""
+    return _settings_ms("retry_timeout_min", RETRY_REPORT_TIMEOUT_MS, 60_000)
+
+
+def county_enable_timeout_ms():
+    """Effective wait for the County dropdown to enable."""
+    return _settings_ms("county_timeout_s", COUNTY_ENABLE_TIMEOUT_MS, 1_000)
+
 ROUTES = [
     "001","002","003","004","005","005S","006","007","008","008U","009","010","010S",
     "011","012","013","014","014U","015","015S","016","017","018","020","022","023",
@@ -544,7 +578,7 @@ def select_report(page, report_label):
     page.get_by_label("District").select_option(label="-- ALL --")
     page.wait_for_function(
         "() => !document.querySelector('#districtCountySelect').disabled",
-        timeout=COUNTY_ENABLE_TIMEOUT_MS,
+        timeout=county_enable_timeout_ms(),
     )
     page.locator("#districtCountySelect").select_option(label="-- ALL --")
 
@@ -612,6 +646,37 @@ def preflight(page, report_label):
         ) from e
 
 
+def maybe_screenshot(page, events, note=""):
+    """Answer a pending live-preview request for this worker's browser.
+
+    The GUI's Preview button sets a flag (events.screenshot_wanted); engines
+    call this at safe poll points ON THE WORKER'S OWN THREAD (Playwright is
+    thread-affine, so the GUI can never screenshot a page directly). Captures
+    the current viewport as JPEG bytes and hands them to events.on_screenshot.
+    Best-effort: a capture problem reports a None image with the reason in
+    `note` (so the GUI stops waiting) and never disturbs the run."""
+    try:
+        if not events.screenshot_wanted(events.worker_no):
+            return
+    except Exception:
+        return
+    try:
+        data = page.screenshot(type="jpeg", quality=70)   # viewport, not full page
+        log.info("preview screenshot captured for browser %d (%d bytes)",
+                 events.worker_no, len(data))
+        events.on_screenshot(events.worker_no, data, note)
+    except Exception as e:
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.info("preview screenshot failed for browser %d (%s: %s)",
+                 events.worker_no, type(e).__name__, reason)
+        try:
+            events.on_screenshot(events.worker_no, None,
+                                 "The screenshot couldn't be taken right now "
+                                 "(the browser was busy) — try again.")
+        except Exception:
+            pass
+
+
 def wait_with_skip_option(page, js_condition, prefix, events,
                           hard_timeout_ms=None,
                           skip_prompt_after_ms=None):
@@ -629,7 +694,7 @@ def wait_with_skip_option(page, js_condition, prefix, events,
     PlaywrightTimeoutError when the hard timeout elapses.
     """
     if hard_timeout_ms is None:
-        hard_timeout_ms = REPORT_TIMEOUT_MS
+        hard_timeout_ms = report_timeout_ms()
     if skip_prompt_after_ms is None:
         skip_prompt_after_ms = SKIP_PROMPT_AFTER_MS
 
@@ -648,6 +713,11 @@ def wait_with_skip_option(page, js_condition, prefix, events,
         if events.should_skip():
             events.on_log(f"  {prefix} skipped by user")
             return False
+        # Live view for the GUI: answer a pending Preview request (≤ one poll
+        # chunk of latency) and keep the worker's status row current.
+        maybe_screenshot(page, events, note=prefix.strip())
+        events.on_status(events.worker_no,
+                         f"{prefix} working… ({int(time.monotonic() - start)}s)")
 
         now = time.monotonic()
         if now >= hard_deadline:
