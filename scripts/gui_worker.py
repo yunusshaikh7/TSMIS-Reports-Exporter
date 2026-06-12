@@ -612,7 +612,10 @@ class EnvScanWorker(threading.Thread):
                                 break
                             set_thread_site(src, env)
                             if browser is None:
-                                browser, _ctx, page = new_authed_browser(p)
+                                # Scanners run several saved-session browsers
+                                # at once -> the parallel channel (not Edge).
+                                browser, _ctx, page = new_authed_browser(
+                                    p, parallel=True)
                             out = self._check_one(page, src, env, labels)
                             with lock:
                                 results[out["key"]] = out

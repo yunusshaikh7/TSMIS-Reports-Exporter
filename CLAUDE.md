@@ -468,7 +468,9 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   purpose (access is server-side state that changes under us).
   **Fast + automatic (v0.10.2):** combos drain from a shared queue into up
   to 3 scanner threads, each owning its own Playwright/browser (fast-mode
-  idiom) and pinning its target via `common.set_thread_site` — a
+  idiom; `parallel=True`, so the scanners use the Chromium/Chrome parallel
+  channel — see *Fast Mode*) and pinning its target via
+  `common.set_thread_site` — a
   threading.local consulted by `get_site()`, so every site-aware helper
   (get_url/expected_host/_site_params_ok, custom URL overrides included)
   follows the pin for that thread only and the user's header selection is
@@ -587,6 +589,20 @@ server** (~0.5 GB RAM/worker): 3 = safe (~2.5–3× faster), 8–12 = big speedu
 healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
 (`TSMIS_FAST_WORKERS`) or the GUI "⚡ Fast mode" checkbox + spinner.
 `run_cli`/`run_cli_multi` route to the parallel engine when workers > 1.
+
+**Parallel browsers avoid managed Edge (v0.10.2, field failure):** N
+concurrent headless Edge instances restoring the same saved session timed
+out (org-managed Edge misbehaves under concurrency — the same management
+that breaks its headed sign-in). Every saved-session browser that runs
+ALONGSIDE OTHERS — fast mode's workers, its preflight + serial retry pass,
+and the env scan's scanners — launches with
+`new_authed_browser(p, parallel=True)` → `launch_browser(..., parallel=True)`
+→ `common._parallel_candidates()`: Built-in Chromium, then Chrome, **Edge
+only as a warned last resort**. A UI pick of Edge is deliberately not
+honored for these (it caused the failure; `TSMIS_BROWSER_CHANNEL` still
+hard-overrides for debugging), the parallel channel keeps its own
+process cache, and Edge keeps its one-click device sign-in role untouched.
+The sequential single-browser engine keeps the normal channel order.
 
 ## Auth / Session
 

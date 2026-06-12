@@ -633,7 +633,8 @@ function renderState() {
   fastCb.closest(".fast-toggle").classList.toggle("disabled", !fastAllowed);
   $("fastWorkers").disabled = !fastAllowed || !fastCb.checked;
   $("fastHint").textContent = st.authed
-    ? "Faster, but heavier on your PC; 3–4 recommended. Per-route Skip is off in fast mode."
+    ? "Faster, but heavier on your PC; 3–4 recommended. Per-route Skip is off in fast mode. "
+      + "Runs in the Built-in Chromium / Google Chrome (not Microsoft Edge)."
     : "Fast mode needs a saved login — automatic sign-in runs one browser at a time. Log in first to enable it.";
 
   // action buttons
