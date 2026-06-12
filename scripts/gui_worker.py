@@ -20,6 +20,15 @@ Message protocol (all are (kind, payload) tuples):
                                         matches, url, error} — url is the
                                        page's address at screenshot time (the
                                        intended one when it never opened)
+    ("env_access", dict)               one combo's verdict from the Settings
+                                       "Check all environments" scan, posted
+                                       as it finishes: {key, source,
+                                       environment, label, status, detail,
+                                       url} — status is one of ok |
+                                       no_reports | denied | no_signin |
+                                       wrong_site | unreachable | error
+    ("env_access_done", dict)          the scan ended:
+                                       {ok, done, total, cancelled, error}
     ("reset_done", dict)               outcome of "Delete all reports":
                                        {files, mb, errors: [str, ...]}
     ("chromium_done", dict)            outcome of the Built-in Chromium
@@ -44,16 +53,18 @@ import base64
 import logging
 import re
 import threading
+import time
 
 from common import (
     _CONFIG_JS, LOGIN_BROWSER_ARGS, ROUTES, AuthError, BrowserNotFoundError,
-    PreflightError, BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers, get_site,
-    get_url, is_logged_in, launch_browser,
+    PreflightError, SiteUnreachableError, BROWSER_CHANNELS, CHANNEL_LABELS,
+    DATA_SOURCES, DATA_SOURCE_LABELS, ENVIRONMENTS, ENVIRONMENT_LABELS,
+    auth_state, check_browsers, get_site, get_url, is_logged_in, launch_browser,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, navigate_with_auth, new_authed_browser,
-    new_login_context, page_url_for_display, save_auth_state,
-    storage_state_is_portable, try_device_sso_login,
+    new_login_context, page_url_for_display, preflight, save_auth_state,
+    set_site, storage_state_is_portable, try_device_sso_login,
 )
 from events import Events
 from exporter import run_export
@@ -504,6 +515,147 @@ class EnvCheckWorker(threading.Thread):
                  "error=%s", out["ok"], out["env"], out["src"], out["matches"],
                  out["url"], out["error"] or "-")
         self.q.put(("env_shot", out))
+
+
+class EnvScanWorker(threading.Thread):
+    """The Settings tab's "Check all environments": probe EVERY data source /
+    environment combination headless, the way an export would (saved session,
+    else device sign-in) — does sign-in complete, does the page load the
+    requested site, and can the report form pull data? The page ships its
+    whole form in static HTML even signed out, so form presence proves
+    nothing; only a real preflight (report picked, District fanned out, the
+    site's own data round-trip enabling the County dropdown) shows report
+    access — "signs in fine but can't actually pull reports" is exactly the
+    failure this exists to surface.
+
+    Posts one ("env_access", dict) per combo AS IT FINISHES (the Settings
+    rows and the title-bar chip update live), then ("env_access_done", dict).
+    Cancel is honored BETWEEN combos — each combo is already bounded by the
+    sign-in budget and the preflight/county timeouts. The scan retargets
+    common.set_site for each combo (so get_url / expected_host / the
+    wrong-site check all follow it, custom URL overrides included — gui_api
+    refuses site changes while the scan runs) and ALWAYS restores the user's
+    selection."""
+
+    def __init__(self, queue, cancel_event):
+        super().__init__(daemon=True, name="envscan")
+        self.q = queue
+        self.cancel = cancel_event
+
+    def run(self):
+        from playwright.sync_api import sync_playwright
+        from reports import EXPORT_REPORTS
+        probe = EXPORT_REPORTS[0][2].label   # any real report exercises the form
+        keep_src, keep_env = get_site()
+        combos = [(s, e) for s in DATA_SOURCES for e in ENVIRONMENTS]
+        ok = done = 0
+        cancelled = False
+        fatal = None
+        log.info("env scan: starting (%d combos, probe report %r)",
+                 len(combos), probe)
+        try:
+            with sync_playwright() as p:
+                browser = page = None
+                try:
+                    for src, env in combos:
+                        if self.cancel.is_set():
+                            cancelled = True
+                            break
+                        set_site(src, env)
+                        if browser is None:   # one browser serves the whole scan
+                            browser, _ctx, page = new_authed_browser(p)
+                        out = self._check_one(page, src, env, probe)
+                        done += 1
+                        ok += out["status"] == "ok"
+                        self.q.put(("env_access", out))
+                finally:
+                    if browser is not None:
+                        try:
+                            browser.close()
+                        except Exception:
+                            pass
+        except (AuthError, BrowserNotFoundError) as e:
+            fatal = str(e)                   # messages are already user-safe
+            log.warning("env scan: stopped (%s: %s)", type(e).__name__, fatal)
+        except Exception as e:
+            log.exception("env scan crashed")
+            fatal = f"{type(e).__name__}: {e}"
+        finally:
+            set_site(keep_src, keep_env)     # the scan never moves the user's pick
+        if fatal:
+            # Fill the unchecked combos so no row is left saying "checking".
+            for src, env in combos[done:]:
+                self.q.put(("env_access", {
+                    "key": f"{src}-{env}", "source": src, "environment": env,
+                    "label": f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}",
+                    "status": "error", "detail": fatal, "url": ""}))
+        log.info("env scan: done ok=%d/%d cancelled=%s fatal=%s",
+                 ok, done, cancelled, fatal or "-")
+        self.q.put(("env_access_done",
+                    {"ok": ok, "done": done, "total": len(combos),
+                     "cancelled": cancelled, "error": fatal}))
+
+    def _check_one(self, page, src, env, probe_label):
+        """One combo's verdict. Never raises — the answer (crashes included)
+        rides in the returned dict's status/detail; the WHY is in the log and
+        the auth/preflight dumps the shared gates already write."""
+        label = f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}"
+        out = {"key": f"{src}-{env}", "source": src, "environment": env,
+               "label": label, "status": "error", "detail": "", "url": ""}
+        t0 = time.monotonic()
+        try:
+            try:
+                navigate_with_auth(page)
+            except SiteUnreachableError as e:
+                # Don't read page.url here: the failed goto leaves the page
+                # parked on the PREVIOUS combo's address.
+                out["status"], out["detail"] = "unreachable", str(e)
+                return out
+            out["url"] = page_url_for_display(page)
+            if not is_logged_in(page):
+                signals = auth_state(page).get("signals")
+                denied = (isinstance(signals, dict) and
+                          str(signals.get("accessDenied", "")).startswith("visible"))
+                if denied:
+                    out["status"] = "denied"
+                    out["detail"] = ("Signs in, but TSMIS reports access "
+                                     "denied on this site.")
+                else:
+                    out["status"] = "no_signin"
+                    out["detail"] = "Sign-in didn't complete on this site."
+                return out
+            got = None
+            try:
+                got = page.evaluate(_CONFIG_JS)          # [env, src] or None
+            except Exception:
+                pass
+            if got and got != [env, src]:
+                out["status"] = "wrong_site"
+                out["detail"] = (f"The page loaded {(got[1] or '?').upper()} / "
+                                 f"{(got[0] or '?').upper()} instead — check "
+                                 "this row's address.")
+                return out
+            try:
+                # The data probe: County only enables once the site's own
+                # route/county round-trip answers (the form itself is static).
+                preflight(page, probe_label)
+            except PreflightError:
+                out["status"] = "no_reports"
+                out["detail"] = ("Signs in, but the report form couldn't load "
+                                 "its data — reports would fail here.")
+                return out
+            out["status"] = "ok"
+            out["detail"] = "Sign-in and report data OK."
+            return out
+        except Exception as e:
+            reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+            log.warning("env scan: %s check crashed (%s: %s)", out["key"],
+                        type(e).__name__, reason)
+            out["detail"] = f"The check failed unexpectedly ({reason})."
+            return out
+        finally:
+            log.info("env scan: %s -> %s in %.1fs (%s)", out["key"],
+                     out["status"], time.monotonic() - t0, out["detail"] or "-")
 
 
 class LoginWorker(threading.Thread):

@@ -440,7 +440,21 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   next launch. **Per-env TSMIS addresses** (six editable rows; custom ones
   chip-marked; clearing restores the default — see *Supported Reports*) and
   the **Built-in Chromium download/remove** (see *Browser channels*) live
-  here too. Also: support-bundle zip (logs + run reports + manifest —
+  here too. **Check all environments** (v0.10.1, `EnvScanWorker`): probes
+  every src×env combo headless like an export — sign-in completes, the page
+  reports the requested env/src, AND a real preflight passes (the
+  County-enable data round-trip; the form itself is static HTML even signed
+  out, so form presence proves nothing) — catching "signs in fine but can't
+  pull reports". Verdicts (ok / no_reports / denied / no_signin /
+  wrong_site / unreachable / error) stream onto each address row as they
+  land (`("env_access", dict)` per combo → snapshot `env_access`), with a
+  title-bar **Env access chip** showing the aggregate ("Envs 5/6"; click =
+  jump to the Settings rows). Results are session-only on purpose (access
+  is server-side state that changes under us). The scan retargets
+  `common.set_site` per combo so every helper (custom URL overrides
+  included) behaves exactly as an export would — `gui_api.set_site` refuses
+  changes while it runs, the user's selection is always restored, and
+  Cancel lands between combos. Also: support-bundle zip (logs + run reports + manifest —
   NEVER the auth file/profiles), forget-saved-login, open-folder shortcuts,
   and **Delete all reports** (`gui_worker.reset_targets`/`ResetWorker`):
   removes run folders, legacy flat report folders, consolidated/comparisons,

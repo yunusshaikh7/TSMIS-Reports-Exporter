@@ -40,8 +40,9 @@ import run_report
 import settings
 import updater
 from gui_worker import (CheckWorker, ChromiumWorker, ConsolidateWorker,
-                        EnvCheckWorker, ExportWorker, LoginWorker, ResetWorker,
-                        UpdateWorker, measure_targets, reset_targets)
+                        EnvCheckWorker, EnvScanWorker, ExportWorker,
+                        LoginWorker, ResetWorker, UpdateWorker,
+                        measure_targets, reset_targets)
 from exporter_parallel import MAX_WORKERS, default_worker_count
 from logging_setup import LOG_FILE, set_debug_logging
 
@@ -133,6 +134,13 @@ class GuiApi:
         self._checks["output"] = {"status": "busy", "text": "Output folder: checking…"}
         self._checks["tools"] = {"status": "busy", "text": "Report tools: checking…"}
 
+        # Per-environment access verdicts from the Settings "Check all
+        # environments" scan, keyed "src-env". Session-only on purpose (access
+        # is server-side state that changes under us): every launch starts at
+        # "not checked". Mirrored into each snapshot for the Settings rows +
+        # the title-bar access chip.
+        self._env_access = {}
+
         # One-click update state, mirrored into every snapshot for the title-bar
         # pill. phase: idle|checking|none|available|downloading|staged|applying|
         # failed; can_apply False = read-only install (pill opens the release
@@ -193,6 +201,7 @@ class GuiApi:
                 "days": list_output_days(),
                 "can_save_report": bool(self._last_results),
                 "update": dict(self._update),
+                "env_access": {k: dict(v) for k, v in self._env_access.items()},
             }
 
     def _push_state(self):
@@ -313,6 +322,10 @@ class GuiApi:
                         "url": url})
         elif kind == "env_shot":
             self._on_env_shot(payload)
+        elif kind == "env_access":
+            self._on_env_access(payload)
+        elif kind == "env_access_done":
+            self._on_env_scan_done(payload)
         elif kind == "reset_done":
             self._on_reset_done(payload)
         elif kind == "chromium_done":
@@ -586,6 +599,13 @@ class GuiApi:
 
     @_api_method
     def set_site(self, source, environment):
+        with self._lock:
+            if self._task == "envscan":
+                # The scan retargets the site selection combo by combo; a
+                # user change now would be stomped by its restore.
+                return {"error": "The environment check is using the site "
+                                 "selection — wait for it to finish (or "
+                                 "cancel it), then change the site."}
         set_site(source=source, environment=environment)
         src, env = get_site()
         self._emit_log(f"Site set to {DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]} "
@@ -772,7 +792,8 @@ class GuiApi:
 
     @_api_method
     def cancel_run(self):
-        if self._task in ("export", "consolidate", "compare", "chromium"):
+        if self._task in ("export", "consolidate", "compare", "chromium",
+                          "envscan"):
             self.cancel_event.set()
             self._emit_log("Cancel requested…")
         return {"ok": True}
@@ -861,6 +882,68 @@ class GuiApi:
                             "env": payload.get("env"), "src": payload.get("src"),
                             "matches": payload.get("matches"),
                             "wanted": want}})
+        self._end_task()
+
+    # ---- environment access scan (Settings + title-bar chip) -------------------
+
+    @_api_method
+    def check_environments(self):
+        """Probe EVERY data source / environment combination headless, like an
+        export would: does sign-in complete, does the page load the right
+        site, and can the report form pull data. Verdicts stream into the
+        Settings rows and the title-bar access chip as each site finishes.
+        Needs a login (saved or automatic), like an export."""
+        with self._lock:
+            if self._task:
+                return {"error": "A task is already running."}
+            self._task = "envscan"
+            for src in DATA_SOURCES:
+                for env in ENVIRONMENTS:
+                    key = f"{src}-{env}"
+                    self._env_access[key] = {
+                        "key": key, "source": src, "environment": env,
+                        "label": f"{DATA_SOURCE_LABELS[src]} / "
+                                 f"{ENVIRONMENT_LABELS[env]}",
+                        "status": "checking", "detail": "Checking…",
+                        "url": "", "checked_at": ""}
+        self.cancel_event.clear()
+        self._emit_log("Checking sign-in and report access for every "
+                       "environment (six sites — this can take a few minutes)…")
+        self._set_dot("busy", "Checking environments…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Checking all environments…"})
+        self._push_state()
+        EnvScanWorker(self._q, self.cancel_event).start()
+        return {"ok": True}
+
+    def _on_env_access(self, payload):
+        """One site's verdict from the scan → state snapshot + a log line."""
+        entry = dict(payload)
+        entry["checked_at"] = time.strftime("%H:%M")
+        with self._lock:
+            self._env_access[entry["key"]] = entry
+        mark = "OK" if entry["status"] == "ok" else "PROBLEM"
+        self._emit_log(f"  {entry['label']}: {mark} — {entry['detail']}")
+        self._push_state()
+
+    def _on_env_scan_done(self, payload):
+        with self._lock:
+            # A cancelled scan leaves later sites untouched — back to "not
+            # checked", never a stale spinner.
+            for key in [k for k, v in self._env_access.items()
+                        if v.get("status") == "checking"]:
+                del self._env_access[key]
+        if payload.get("error"):
+            self._emit_log(f"Environment check stopped: {payload['error']}")
+        elif payload.get("cancelled"):
+            self._emit_log("Environment check cancelled.")
+        else:
+            ok, total = payload.get("ok", 0), payload.get("total", 0)
+            if ok == total:
+                self._emit_log(f"Environment check done: all {total} sites OK.")
+            else:
+                self._emit_log(f"Environment check done: {ok} of {total} sites "
+                               "OK — details next to each address in Settings.")
         self._end_task()
 
     # ---- consolidate -------------------------------------------------------------
