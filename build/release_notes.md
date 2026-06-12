@@ -14,6 +14,18 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **The one-click update now works on locked-down PCs (0.10.1).** On machines
+  where PowerShell is blocked for standard users (common on managed work
+  PCs), the previous updater downloaded the new version and then silently
+  failed to install it — the app closed and the download just sat in
+  `data\update`. The install step no longer uses PowerShell, cmd, scripts or
+  admin rights at all: the downloaded new version installs itself. It also
+  fails LOUDLY now — if the install step can't even start, the app stays
+  open on the old version and says so instead of closing into nothing.
+  **If an update left you stranded before:** install this version manually
+  once (download the zip, replace the app's `TSMIS Exporter.exe`,
+  `_internal` and `Start Here.txt` — your `data\` and `output\` stay put);
+  from then on the green Update button does the whole job.
 - **Comparisons answer the real question first (0.10.0).** Every comparison
   now leads with a verdict — **“✓ EVERYTHING MATCHES”** in green when the two
   sides are identical (the expected outcome between environments), or

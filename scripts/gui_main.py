@@ -65,6 +65,16 @@ def _unblock_dotnet_assemblies():
 
 
 def main():
+    # Self-update swap mode (v0.10.1): the one-click update launches the
+    # STAGED new exe with this flag; it swaps itself into the install folder
+    # and exits. Branch BEFORE logging/paths setup — this process runs from
+    # data\update\staged, so the normal path resolution would aim logs at
+    # the staged tree instead of the install — and before the CLR loads
+    # (no window is ever created in this mode). Never returns.
+    import updater
+    if updater.SWAP_FLAG in sys.argv:
+        updater.run_swap_mode(sys.argv)
+
     from logging_setup import setup_logging
     # No faulthandler here: it intercepts the CLR's routine first-chance
     # access violations (pythonnet/WebView2) and deadlocks the window -- see
