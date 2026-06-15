@@ -75,3 +75,5 @@ spike/
 code-review/AUDIT-claude-*.md
 code-review/AUDIT-codex-*.md
 code-review/RECONCILED-FINDINGS.md
+code-review/SOURCE-VERIFY-claude-*.md
+code-review/SOURCE-VERIFY-codex-*.md
