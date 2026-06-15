@@ -69,3 +69,8 @@ spike/
 # Persisted user settings (timeouts, URL overrides — local state, never committed)
 /config.json
 /data/config.json
+
+# Two-agent code-review reports. The prompt + README are tracked; the generated
+# per-agent reports (quoted snippets, internal URLs) are local-only, never committed.
+code-review/AUDIT-claude-*.md
+code-review/AUDIT-codex-*.md
