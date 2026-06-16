@@ -78,27 +78,30 @@ class ReportSpec:
 # bytes (cheap, no third-party deps): an .xlsx is a ZIP container (PK\x03\x04),
 # a .pdf starts with %PDF. Unknown extensions only need to be non-empty.
 
-def _file_looks_complete(path):
-    """True if `path` looks like a fully-written report file (not 0-byte or
-    truncated). Used both to verify a fresh save and to decide whether an
-    existing file may be trusted on resume. The magic-byte checks inherently
-    reject anything too short to be a real workbook/PDF; unknown extensions
-    only need to be non-empty."""
-    try:
-        size = path.stat().st_size
-    except OSError:
-        return False
-    try:
-        with open(path, "rb") as f:
-            head = f.read(4)
-    except OSError:
-        return False
-    suffix = path.suffix.lower()
+def _head_is_complete(suffix, head, size):
+    """Does a file's first bytes look like a complete report of `suffix`?
+    .xlsx is a ZIP (PK\\x03\\x04), .pdf starts with %PDF; unknown types only need
+    to be non-empty. The magic checks inherently reject anything too short."""
+    suffix = suffix.lower()
     if suffix == ".xlsx":
         return head == b"PK\x03\x04"
     if suffix == ".pdf":
         return head == b"%PDF"
     return size > 0
+
+
+def _file_looks_complete(path):
+    """True if `path` looks like a fully-written report file (not 0-byte or
+    truncated). Used to verify a FRESH save (where the file is readable because
+    we just wrote it) -- a read failure here is a real problem, so it returns
+    False. Resume uses _can_resume, which is lock-tolerant instead."""
+    try:
+        size = path.stat().st_size
+        with open(path, "rb") as f:
+            head = f.read(4)
+    except OSError:
+        return False
+    return _head_is_complete(path.suffix, head, size)
 
 
 def _verify_saved_file(out_path):
@@ -123,14 +126,25 @@ def _verify_saved_file(out_path):
 
 
 def _can_resume(out_path):
-    """True if `out_path` is an existing, COMPLETE file that resume may trust to
-    skip the route. An existing-but-incomplete file (0-byte / truncated from an
-    interrupted run) returns False and is removed, so the route is re-pulled
-    instead of being masked as finished forever. Used by both engines' resume
-    checks."""
+    """True if `out_path` is an existing file resume may trust to skip the route.
+
+    Only a file we can READ and that is definitively truncated/0-byte is deleted
+    and re-pulled (so a partial download from an interrupted run isn't masked as
+    finished). A file that EXISTS but can't be read is almost always a finished
+    export the user has open in Excel (a sharing-deny lock) -- it is trusted and
+    skipped, never deleted, so resume can't turn a done route into a spurious
+    failure by trying to re-download over a locked file. Used by both engines."""
     if not out_path.exists():
         return False
-    if _file_looks_complete(out_path):
+    try:
+        size = out_path.stat().st_size
+        with open(out_path, "rb") as f:
+            head = f.read(4)
+    except OSError:
+        log.info("resume: existing file is locked/unreadable; trusting it: %s",
+                 out_path)
+        return True
+    if _head_is_complete(out_path.suffix, head, size):
         return True
     log.warning("resume: existing file is incomplete; re-pulling: %s", out_path)
     try:

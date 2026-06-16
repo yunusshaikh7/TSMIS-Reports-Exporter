@@ -109,6 +109,26 @@ def test_integrity(tmp):
     check("can_resume removed the partial", not partial.exists())
     check("can_resume False for missing", not _can_resume(tmp / "absent.xlsx"))
 
+    # A complete file that can't be READ (e.g. open in Excel, sharing-deny) must
+    # be TRUSTED and skipped -- never deleted + re-pulled (would spuriously fail).
+    import builtins
+    locked = tmp / "locked.xlsx"
+    _write_xlsx(locked)
+    real_open = builtins.open
+
+    def _deny(path, *a, **k):
+        if str(path) == str(locked):
+            raise PermissionError("file is open in Excel")
+        return real_open(path, *a, **k)
+
+    builtins.open = _deny
+    try:
+        trusted = _can_resume(locked)
+    finally:
+        builtins.open = real_open
+    check("can_resume trusts a locked (unreadable) existing file", trusted)
+    check("can_resume did NOT delete the locked file", locked.exists())
+
 
 # --- fake page for save_via_export_button ------------------------------------
 
