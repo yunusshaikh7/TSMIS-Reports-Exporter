@@ -25,7 +25,7 @@ try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
-    from openpyxl.formatting.rule import CellIsRule
+    from openpyxl.formatting.rule import CellIsRule, FormulaRule
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
@@ -627,37 +627,54 @@ def build_workbook(records, out_path):
             cell.border = BORDER
             cell.alignment = Alignment(horizontal="center")
 
-        chk_cells = [f"{col_letters[c]}{r}" for c in
-                     ("_chk_hwy", "_chk_onoff", "_chk_pop", "_chk_ramp")]
-        audit_f = "=AND(" + ",".join(f"{c}={total}" for c in chk_cells) + ")"
+        h, o, pp, rt = (f"{col_letters[c]}{r}" for c in
+                        ("_chk_hwy", "_chk_onoff", "_chk_pop", "_chk_ramp"))
+        # Self-explaining audit: "OK" when every section's parsed sub-total
+        # reconciles to the route's stated Total Number of Ramps, else a message
+        # naming the section(s) that don't add up. A red cell here means the
+        # SOURCE PDF's own breakdown is short of its own total (a TSMIS data quirk
+        # seen on dense routes, e.g. the Ramp Types list omitting a few ramps) --
+        # NOT a parsing error -- so the reader knows to check the source, not
+        # suspect the tool.
+        audit_f = (
+            f'=IF(AND({h}={total},{o}={total},{pp}={total},{rt}={total}),"OK",'
+            f'"⚠ Source ≠ total: "&'
+            f'IF({h}<>{total},"Hwy ","")&IF({o}<>{total},"On/Off ","")&'
+            f'IF({pp}<>{total},"Pop ","")&IF({rt}<>{total},"Ramp Types ",""))'
+        )
         cell = ws.cell(row=r, column=col_idx_by_name["_audit_ok"], value=audit_f)
         cell.font = Font(name="Arial", size=10, bold=True)
         cell.border = BORDER
-        cell.alignment = Alignment(horizontal="center")
+        cell.alignment = Alignment(horizontal="left", vertical="center")
 
     # ---- conditional formatting on audit_ok ----
     if records:
         audit_col_letter = col_letters["_audit_ok"]
         last_row = 2 + len(records)
         audit_range = f"{audit_col_letter}3:{audit_col_letter}{last_row}"
+        # Formula-based (text "OK" vs a message) — a cellIs string rule did not
+        # apply reliably; EXACT() on the relative first-cell ref adjusts per row.
+        first = f"${audit_col_letter}3"
+        # CF differential (dxf) fills must set bgColor, not fgColor/start_color
+        # (the openpyxl CF gotcha — same pattern compare_core uses for its banner).
         ws.conditional_formatting.add(
             audit_range,
-            CellIsRule(operator="equal", formula=["TRUE"],
-                       fill=PatternFill("solid", start_color="C6EFCE"))
+            FormulaRule(formula=[f'EXACT({first},"OK")'],
+                        fill=PatternFill(bgColor="C6EFCE"))
         )
         ws.conditional_formatting.add(
             audit_range,
-            CellIsRule(operator="equal", formula=["FALSE"],
-                       fill=PatternFill("solid", start_color="FFC7CE"))
+            FormulaRule(formula=[f'NOT(EXACT({first},"OK"))'],
+                        fill=PatternFill(bgColor="FFC7CE"))
         )
 
     # ---- column widths & freeze ----
-    width_overrides = {"source_file": 34, "route": 7}
+    width_overrides = {"source_file": 34, "route": 7, "_audit_ok": 30}
     for col_name, c_idx in flat_columns:
         letter = get_column_letter(c_idx)
         if col_name in width_overrides:
             ws.column_dimensions[letter].width = width_overrides[col_name]
-        elif col_name.startswith("_chk_") or col_name == "_audit_ok":
+        elif col_name.startswith("_chk_"):
             ws.column_dimensions[letter].width = 11
         elif col_name in ("total_ramps", "ramp_points_no_linework"):
             ws.column_dimensions[letter].width = 11
