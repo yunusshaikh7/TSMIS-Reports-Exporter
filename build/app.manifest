@@ -2,8 +2,11 @@
 <!-- TSMIS Reports Exporter manifest. Embedded into the .exe by build/app.spec as
      a trust signal for Windows / Defender / corporate IT: it declares the app
      runs as the normal user (asInvoker, no elevation) and supports modern
-     Windows. DPI awareness is intentionally left unset so Windows keeps its
-     default scaling and the Tk UI stays correctly sized on high-DPI screens. The
+     Windows. DPI awareness is intentionally left UNSET in the manifest because
+     pywebview's WinForms/WebView2 backend sets it itself at runtime
+     (user32.SetProcessDPIAware -> system-DPI-aware) and its window-sizing math
+     assumes that mode; declaring a different awareness here would fight that
+     runtime call. (The UI has been WebView2, not Tkinter, since v0.8.0.) The
      assemblyIdentity version is cosmetic (SxS); the user-visible version comes
      from the version-info resource that app.spec builds from version.py. -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">

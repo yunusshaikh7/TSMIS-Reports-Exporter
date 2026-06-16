@@ -379,7 +379,12 @@ def has_valid_auth():
 
 
 def save_auth_state(state):
-    """Write a Playwright storage_state (dict) to the shared auth file."""
+    """Write a Playwright storage_state (dict) to the shared auth file.
+
+    AT REST: this is plaintext JSON (the session cookies), protected only by NTFS
+    permissions in the user's own app folder, and is git-ignored + never added to
+    the support bundle. Windows DPAPI (CryptProtectData) at-rest encryption is the
+    candidate hardening if a future review requires it -- see build/IT-NOTES.md."""
     AUTH.parent.mkdir(parents=True, exist_ok=True)
     with open(AUTH, "w", encoding="utf-8") as f:
         json.dump(state, f)

@@ -76,12 +76,32 @@ def _read_file():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         _cache = data if isinstance(data, dict) else {}
-    except (json.JSONDecodeError, OSError) as e:
+    except json.JSONDecodeError as e:
+        # Corrupt CONTENT: don't silently fall back to defaults and then let the
+        # next write overwrite (and lose) the user's site_urls / overrides. Move
+        # the bad file aside first so it can be recovered, and log it loudly.
+        log.warning("settings: %s is corrupt (%s); preserving it as a backup and "
+                    "falling back to defaults", CONFIG_FILE, e)
+        _backup_corrupt_config()
+        _cache = {}
+    except OSError as e:                 # transient read error: keep the file
         log.warning("settings: could not read %s (%s: %s); using defaults",
                     CONFIG_FILE, type(e).__name__, e)
         _cache = {}
     _cache_mtime = mtime
     return _cache
+
+
+def _backup_corrupt_config():
+    """Move a corrupt config.json aside to config.json.corrupt (recoverable),
+    so a fresh write doesn't silently destroy the user's saved overrides."""
+    bad = CONFIG_FILE.parent / (CONFIG_FILE.name + ".corrupt")
+    try:
+        os.replace(CONFIG_FILE, bad)
+        log.warning("settings: corrupt config moved to %s for recovery", bad)
+    except OSError as e:
+        log.warning("settings: could not back up corrupt config (%s: %s)",
+                    type(e).__name__, e)
 
 
 def _clamp(key, value):

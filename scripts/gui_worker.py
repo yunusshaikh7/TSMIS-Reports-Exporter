@@ -310,20 +310,28 @@ class ResetWorker(threading.Thread):
     Excel still holds are reported, never silently skipped. Posts progress as
     ('log', ...) lines and one final ('reset_done', {files, mb, errors})."""
 
-    def __init__(self, queue, include_input=False):
+    def __init__(self, queue, include_input=False, cancel_event=None):
         super().__init__(daemon=True, name="reset")
         self.q = queue
         self.include_input = include_input
+        self.cancel = cancel_event
 
     def run(self):
         import shutil
         targets = reset_targets(self.include_input)
         files, size = measure_targets(targets)
         errors = []
+        cancelled = False
         ui = logging.getLogger("tsmis.ui")
         log.info("reset: deleting %d target(s), %d file(s), %.1f MB (input=%s)",
                  len(targets), files, size / 1e6, self.include_input)
         for label, path in targets:
+            # Cancellable between targets (a partial delete is harmless -- a
+            # re-run removes the rest). The current folder finishes first.
+            if self.cancel is not None and self.cancel.is_set():
+                cancelled = True
+                self.q.put(("log", "  Cancelled — stopped after the current item."))
+                break
             failures = []
 
             def on_error(_fn, p, _exc):
@@ -344,8 +352,14 @@ class ResetWorker(threading.Thread):
                 self.q.put(("log", f"  {msg}"))
             else:
                 self.q.put(("log", f"  Deleted {label}."))
-        self.q.put(("reset_done", {"files": files, "mb": round(size / 1e6, 1),
-                                   "errors": errors}))
+        # Report what was ACTUALLY freed (before − what remains), so files held
+        # open in Excel (or skipped by a cancel) aren't counted as deleted.
+        remaining_files, remaining_size = measure_targets(targets)
+        freed_files = max(0, files - remaining_files)
+        freed_size = max(0, size - remaining_size)
+        self.q.put(("reset_done", {"files": freed_files,
+                                   "mb": round(freed_size / 1e6, 1),
+                                   "errors": errors, "cancelled": cancelled}))
 
 
 class ChromiumWorker(threading.Thread):

@@ -263,6 +263,38 @@ class GuiApi:
 
     # ---- window lifecycle ----------------------------------------------------
 
+    def _find_own_window(self, title):
+        """The top-level window owned by THIS process with `title`, or None.
+
+        FindWindowW(None, title) matches the FIRST window with that title across
+        ALL processes -- another app, another instance, even an Explorer window
+        named 'TSMIS Exporter' -- so it could WM_SETICON the wrong process's
+        window. Enumerating and matching on our own PID fixes that."""
+        from ctypes import wintypes
+        u32 = ctypes.windll.user32
+        u32.GetWindowThreadProcessId.restype = wintypes.DWORD
+        u32.GetWindowThreadProcessId.argtypes = [wintypes.HWND,
+                                                 ctypes.POINTER(wintypes.DWORD)]
+        my_pid = os.getpid()
+        found = []
+
+        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def _cb(hwnd, _lparam):
+            pid = wintypes.DWORD(0)
+            u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value != my_pid:
+                return True
+            n = u32.GetWindowTextLengthW(hwnd)
+            buf = ctypes.create_unicode_buffer(n + 1)
+            u32.GetWindowTextW(hwnd, buf, n + 1)
+            if buf.value == title:
+                found.append(hwnd)
+                return False                          # stop enumerating
+            return True
+
+        u32.EnumWindows(_cb, 0)
+        return found[0] if found else None
+
     def _set_window_icon_late(self):
         """Give the window the app icon (the packaged exe icon does not
         transfer to the runtime window by itself). Pure ctypes/Win32 from a
@@ -270,18 +302,23 @@ class GuiApi:
         marshals WM_SETICON safely. Best-effort: a missing icon must never
         affect the app."""
         try:
+            from ctypes import wintypes
             ico = _app_icon_path()
             if not ico:
                 return
             u32 = ctypes.windll.user32
-            hwnd = 0
+            u32.LoadImageW.restype = wintypes.HANDLE
+            u32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT,
+                                         wintypes.WPARAM, wintypes.LPARAM]
+            hwnd = None
             deadline = time.monotonic() + 20            # window appears ~1-2s in
             while time.monotonic() < deadline and not hwnd:
-                hwnd = u32.FindWindowW(None, APP_NAME)
+                hwnd = self._find_own_window(APP_NAME)
                 if not hwnd:
                     time.sleep(0.5)
             if not hwnd:
-                log.info("window icon not set (window %r not found)", APP_NAME)
+                log.info("window icon not set (this process's %r window not found)",
+                         APP_NAME)
                 return
             LR_LOADFROMFILE, IMAGE_ICON, WM_SETICON = 0x10, 1, 0x80
             for which, size in ((0, 16), (1, 32)):      # ICON_SMALL, ICON_BIG
@@ -913,10 +950,15 @@ class GuiApi:
 
     @_api_method
     def cancel_run(self):
+        # Tasks that honor cancel_event between steps. (login has its own cancel;
+        # envcheck is a single short headless verify that can't stop partway.)
         if self._task in ("export", "consolidate", "compare", "chromium",
-                          "envscan"):
+                          "envscan", "reset"):
             self.cancel_event.set()
             self._emit_log("Cancel requested…")
+        elif self._task == "envcheck":
+            self._emit_log("The environment check can't be stopped partway — "
+                           "it'll finish in a moment.")
         return {"ok": True}
 
     # ---- login -----------------------------------------------------------------
@@ -1469,12 +1511,14 @@ class GuiApi:
             return {"error": "A task is already running."}
         ui_log.info("reset: user confirmed delete-all-reports (input=%s)",
                     include_input)
+        self.cancel_event.clear()
         self._emit_log("Deleting all reports…")
         self._set_dot("busy", "Deleting reports…")
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": "Deleting reports…"})
         self._push_state()
-        ResetWorker(self._q, include_input=bool(include_input)).start()
+        ResetWorker(self._q, include_input=include_input,
+                    cancel_event=self.cancel_event).start()
         return {"ok": True}
 
     def _on_reset_done(self, payload):
@@ -1487,6 +1531,10 @@ class GuiApi:
             self._emit_modal("warning", "Some files couldn't be deleted",
                              "Close any report files still open in Excel, "
                              "then run 'Delete all reports' again.")
+        elif payload.get("cancelled"):
+            self._emit_log(f"Cancelled — deleted {payload['files']} file(s) "
+                           f"({payload['mb']} MB) before stopping. Logs, your "
+                           "login and settings were kept.")
         else:
             self._emit_log(f"Done — deleted {payload['files']} file(s), "
                            f"freed {payload['mb']} MB. Logs, your login and "
