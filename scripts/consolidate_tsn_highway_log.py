@@ -167,6 +167,29 @@ GROUP_RE = (re.compile(r"^\d{2}$"), re.compile(r"^[A-Z]{2,4}$"),
 DISTRICT_LINE_RE = re.compile(r"^District\s+0?(\d{1,2})$", re.IGNORECASE)
 DISTRICT_FROM_NAME = re.compile(r"D(\d{1,2})", re.IGNORECASE)
 
+# City/County/District totals blocks (cumulative mileage + DVMS/DVMT volume)
+# print BELOW the last data row of a group and WRAP onto their own lines. The
+# first line starts with "*" (already skipped), but the wrapped continuations
+# ("(DVMS) 3,391", "CUMULATIVE (MILEAGE) TOTAL …", "TOTAL CONST UNCONST",
+# "County Cumulative DVM 123,414", bare mileage fragments) do not — and were
+# being appended to the preceding row's Description, manufacturing false
+# discrepancies in the TSMIS-vs-TSN comparison. These markers never occur in a
+# real highway-feature description; \b on UNCONST keeps "UNCONSTRUCTED" safe.
+# Verified across D01-D03: catches every totals continuation, drops no
+# legitimate description.
+_TOTALS_RE = re.compile(
+    r"\(DVM|\bDVM[ST]?\b|\bCUMULATIVE\b|\bUNCONST\b"
+    r"|\b(?:CITY|COUNTY|DISTRICT|STATE)\s+TOTALS?\b|TOTALS?\s*\(MILEAGE\)",
+    re.IGNORECASE)
+_TOTALS_NUMERIC_RE = re.compile(r"[\d.,()$ +-]+")
+
+
+def _is_totals_line(text):
+    """True for a totals-block continuation line that must NOT be treated as a
+    segment description (see _TOTALS_RE)."""
+    return bool(_TOTALS_RE.search(text)) or \
+        bool(_TOTALS_NUMERIC_RE.fullmatch(text.strip()))
+
 
 def _lines(page):
     """Cluster the page's characters into logical lines (tolerating the 1pt
@@ -297,9 +320,14 @@ def parse_pdf(path, events, pdf_name=""):
                     continue
 
                 # Anything else below the band is a description for the
-                # previous segment (TSN prints them on their own lines).
+                # previous segment (TSN prints them on their own lines) — EXCEPT
+                # the wrapped continuation lines of a totals block, which would
+                # otherwise corrupt that segment's Description with volume/
+                # cumulative-mileage figures.
                 if last_row is not None:
                     text = " ".join(texts)
+                    if _is_totals_line(text):
+                        continue
                     last_row["description"] = (
                         text if not last_row["description"]
                         else last_row["description"] + ", " + text)
