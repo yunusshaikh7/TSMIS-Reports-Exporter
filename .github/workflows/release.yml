@@ -44,6 +44,18 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Verify the tag matches version.py
+        shell: pwsh
+        run: |
+          $m = Select-String -Path version.py -Pattern '__version__\s*=\s*"([^"]+)"'
+          if (-not $m) { throw "Could not read __version__ from version.py" }
+          $v = $m.Matches[0].Groups[1].Value
+          $expected = "v$v"
+          if ($env:TAG -ne $expected) {
+            throw "Release tag '$env:TAG' does not match version.py ('$expected'). Bump version.py or fix the tag before releasing."
+          }
+          Write-Host "OK: tag $env:TAG matches version.py ($v)."
+
       - name: Build + run frozen self-test, system browser (release gate)
         run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
 
@@ -67,14 +79,29 @@ jobs:
       - name: Zip the batch/source variant
         run: git archive --format=zip --prefix="TSMIS-Exporter-batch/" -o "TSMIS-Exporter-$env:TAG-batch-source.zip" HEAD
 
+      - name: Publish SHA-256 checksums
+        shell: pwsh
+        # One <asset>.sha256 per zip (sha256sum format: "<hash>  <name>"), so the
+        # one-click updater can verify a download before installing it, and a
+        # user can verify by hand. ASCII = no BOM (a BOM would corrupt the hash).
+        run: |
+          Get-ChildItem "TSMIS-Exporter-$env:TAG-*.zip" | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Out-File "$($_.FullName).sha256" -Encoding ascii
+            Write-Host "$hash  $($_.Name)"
+          }
+
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
           gh release create "$env:TAG"
           "TSMIS-Exporter-$env:TAG-win64.zip"
+          "TSMIS-Exporter-$env:TAG-win64.zip.sha256"
           "TSMIS-Exporter-$env:TAG-win64-with-browser.zip"
+          "TSMIS-Exporter-$env:TAG-win64-with-browser.zip.sha256"
           "TSMIS-Exporter-$env:TAG-batch-source.zip"
+          "TSMIS-Exporter-$env:TAG-batch-source.zip.sha256"
           --target "${{ github.sha }}"
           --title "TSMIS Exporter $env:TAG"
           --notes-file build/release_notes.md

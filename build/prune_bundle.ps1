@@ -25,8 +25,11 @@
 # Chromium launch + page.pdf() + downloads working. The Chromium browser folder
 # (_internal\ms-playwright, shipped only by the -BundleChromium variant) is an
 # upstream distribution: aside from dropping unused locale packs and prose docs
-# (neither is touched at runtime) it is left as-is, and it is excluded from the
-# content scan.
+# (neither is touched at runtime) it is left as-is. Its TEXT files ARE scanned by
+# the content guard now -- a corporate DLP scanner doesn't exempt "upstream"
+# files, so neither do we (a flagged Chromium text file would block the release
+# zip just the same). If a runtime-needed Chromium file ever trips the guard,
+# add a targeted prune for it rather than re-exempting the whole tree.
 
 param(
     [Parameter(Mandatory = $true)][string]$Target,
@@ -187,16 +190,15 @@ if ($leftoverDocs) {
     throw "GUARD FAILED: documentation still bundled:`n  " + (($leftoverDocs.FullName) -join "`n  ")
 }
 
-# (b) No high-confidence sensitive data in any text file across the bundle. The
-#     upstream Chromium folder is skipped (unmodifiable upstream binaries; only
-#     present in the -BundleChromium variant). Patterns mirror the common DLP
-#     "sensitive information types", each
-#     chosen to avoid false positives that would wrongly block a release:
+# (b) No high-confidence sensitive data in any text file across the bundle --
+#     INCLUDING the bundled Chromium tree (a DLP scanner won't exempt it, so
+#     neither do we; binaries are skipped by the text-extension filter anyway).
+#     Patterns mirror the common DLP "sensitive information types", each chosen
+#     to avoid false positives that would wrongly block a release:
 #       credit cards : brand IIN prefix + canonical length + Luhn
 #       private keys : PEM "BEGIN ... PRIVATE KEY" blocks
 #       AWS keys     : AKIA + 16 base32
 #       US SSN       : dashed, with the invalid area/group/serial ranges excluded
-$msPlaywright = Join-Path $Target "_internal\ms-playwright"
 $textExt = @('.md', '.markdown', '.rst', '.txt', '.text', '.json', '.yml', '.yaml',
     '.js', '.mjs', '.cjs', '.ts', '.html', '.htm', '.css', '.xml', '.csv', '.cfg',
     '.ini', '.toml', '.py', '.pem', '.crt', '.cer', '.key')
@@ -209,7 +211,6 @@ $rxSsn  = [regex]'(?<![0-9-])(?!000|666|9[0-9]{2})[0-9]{3}-(?!00)[0-9]{2}-(?!000
 $hits = New-Object System.Collections.Generic.List[string]
 Get-ChildItem $Target -Recurse -File -ErrorAction Ignore | ForEach-Object {
     $f = $_
-    if ($f.FullName.StartsWith($msPlaywright, [System.StringComparison]::OrdinalIgnoreCase)) { return }
     if (-not (($textExt -contains $f.Extension.ToLower()) -or ($textName -contains $f.Name))) { return }
     try { $text = [System.IO.File]::ReadAllText($f.FullName) } catch { return }
     $rel = $f.FullName.Substring($Target.Length + 1)

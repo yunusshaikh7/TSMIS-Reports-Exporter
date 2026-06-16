@@ -1,0 +1,57 @@
+name: checks
+
+# Lightweight static + regression checks on every push / PR (separate from the
+# release gate in release.yml, which builds + smoke-tests the frozen bundle).
+#
+# Blocking: byte-compile everything, and run the pure-Python regression guards
+# (the WS1/WS3 export-engine + WS5 GUI-bridge audit-fix checks). Advisory
+# (surface findings, never block a push): ruff error rules, bandit, pip-audit.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install runtime deps + lint tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff bandit pip-audit
+
+      - name: Byte-compile all sources (blocking)
+        run: python -m compileall -q scripts build version.py
+
+      - name: Export-engine regression checks (blocking)
+        run: python build/check_export_engine.py
+
+      - name: GUI-bridge regression checks (blocking)
+        run: python build/check_gui_bridge.py
+
+      - name: Updater regression checks (blocking)
+        run: python build/check_updater.py
+
+      - name: ruff (error rules — advisory)
+        continue-on-error: true
+        run: ruff check scripts --select E9,F63,F7,F82 --output-format=github
+
+      - name: bandit (high severity / high confidence — advisory)
+        continue-on-error: true
+        run: bandit -r scripts -lll -iii
+
+      - name: pip-audit (known-vulnerable deps — advisory)
+        continue-on-error: true
+        run: pip-audit -r requirements.txt

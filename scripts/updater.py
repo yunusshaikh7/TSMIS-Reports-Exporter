@@ -43,6 +43,7 @@ Updates are only offered for packaged builds (sys.frozen) whose app folder
 is writable; a read-only install (paths.py fell back to %LOCALAPPDATA%) gets
 a "new version available" link instead -- see update_support().
 """
+import hashlib
 import json
 import logging
 import os
@@ -91,6 +92,8 @@ class UpdateInfo:
     asset_url: str      # direct browser_download_url
     asset_size: int     # bytes (0 if the API omitted it)
     release_url: str    # human release page ("what's new")
+    asset_digest: str = ""      # "sha256:HEX" the GitHub API reports, when present
+    asset_sha256_url: str = ""  # URL of the published <asset>.sha256, when present
 
 
 # ------------------------------------------------------------ environment ---
@@ -194,6 +197,11 @@ def check_for_update(current_version=None, variant=None):
                     tag, suffix, names)
         raise UpdateError(f"version {tag} is out, but its download package "
                           "isn't available yet — try again later")
+    # Companion checksum: the release publishes <asset>.sha256 next to each zip
+    # (see .github/workflows/release.yml); the API may also carry the asset's own
+    # digest. download_and_stage verifies the download against whichever exists.
+    sha_name = (asset.get("name") or "") + ".sha256"
+    sha_asset = next((a for a in assets if (a.get("name") or "") == sha_name), None)
     info = UpdateInfo(
         version=".".join(str(p) for p in remote),
         tag=tag,
@@ -201,6 +209,8 @@ def check_for_update(current_version=None, variant=None):
         asset_url=asset.get("browser_download_url") or "",
         asset_size=int(asset.get("size") or 0),
         release_url=data.get("html_url") or RELEASES_PAGE,
+        asset_digest=asset.get("digest") or "",
+        asset_sha256_url=(sha_asset.get("browser_download_url") if sha_asset else "") or "",
     )
     log.info("update available: %s -> %s (%s, %.0f MB)",
              __version__, info.tag, info.asset_name, info.asset_size / 1e6)
@@ -208,6 +218,32 @@ def check_for_update(current_version=None, variant=None):
 
 
 # ------------------------------------------------------- download + stage ---
+
+def _expected_sha256(info):
+    """The expected SHA-256 (lowercase hex) for info's asset, or None when none
+    is published. Prefers the companion <asset>.sha256 file (which we publish and
+    a user can verify by hand), then the GitHub API's own asset digest. Both
+    arrive over the same TLS as the rest of the check, so this guards against a
+    corrupted / truncated / wrong-asset download -- NOT against a forged release
+    (that is what code-signing, the planned next step, is for)."""
+    if info.asset_sha256_url:
+        try:
+            with _http_get(info.asset_sha256_url, _API_TIMEOUT_S) as resp:
+                text = resp.read(4096).decode("utf-8", "replace")
+            token = (text.strip().split() or [""])[0].lower()
+            if re.fullmatch(r"[0-9a-f]{64}", token):
+                return token
+            log.warning("update: published .sha256 content was unrecognized")
+        except (OSError, ValueError) as e:
+            log.warning("update: could not fetch the .sha256 file (%s: %s)",
+                        type(e).__name__, e)
+    digest = (info.asset_digest or "").strip().lower()
+    if digest.startswith("sha256:"):
+        token = digest.split(":", 1)[1]
+        if re.fullmatch(r"[0-9a-f]{64}", token):
+            return token
+    return None
+
 
 def download_and_stage(info, on_progress=None):
     """Download `info`'s zip and extract a verified bundle tree to
@@ -238,6 +274,7 @@ def download_and_stage(info, on_progress=None):
     zip_path = UPDATE_DIR / (info.asset_name or "update.zip")
     log.info("downloading %s (%d bytes) -> %s", info.asset_url, info.asset_size, zip_path)
     done = 0
+    hasher = hashlib.sha256()
     try:
         with _http_get(info.asset_url, _DL_TIMEOUT_S) as resp, open(zip_path, "wb") as out:
             total = info.asset_size or int(resp.headers.get("Content-Length") or 0)
@@ -246,6 +283,7 @@ def download_and_stage(info, on_progress=None):
                 if not chunk:
                     break
                 out.write(chunk)
+                hasher.update(chunk)
                 done += len(chunk)
                 if on_progress:
                     on_progress(done, total)
@@ -257,6 +295,23 @@ def download_and_stage(info, on_progress=None):
         raise UpdateError(f"the update download was incomplete "
                           f"({done // 1_000_000} of {info.asset_size // 1_000_000} MB) "
                           "— try again")
+
+    # Verify the download against its published SHA-256 before trusting it. A
+    # mismatch (corruption, a truncated/wrong asset) refuses the install rather
+    # than extracting and swapping in unverified bytes.
+    actual = hasher.hexdigest()
+    expected = _expected_sha256(info)
+    if expected:
+        if actual != expected:
+            zip_path.unlink(missing_ok=True)
+            log.warning("update: SHA-256 mismatch (expected %s, got %s)",
+                        expected, actual)
+            raise UpdateError("the downloaded update didn't match its published "
+                              "checksum (it may be corrupted) — please try again")
+        log.info("update: SHA-256 verified (%s)", actual)
+    else:
+        log.warning("update: no published checksum to verify against; proceeding "
+                    "on size only (download SHA-256 %s)", actual)
 
     extract_dir = UPDATE_DIR / "extract"
     log.info("extracting %s (%d bytes)", zip_path.name, done)
@@ -452,7 +507,17 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
         return False
 
     # ---- phase 1: copy everything in as *.new (old app untouched) ----------
-    items = sorted(staged.iterdir())
+    # Install ONLY the known bundle items (the same allowlist cleanup_leftovers
+    # uses), never whatever else happens to sit in the staged tree -- a tampered
+    # or mis-packaged extra top-level item can't ride into the install.
+    try:
+        present = {p.name for p in staged.iterdir()}
+    except OSError:
+        present = set()
+    extra = sorted(present - set(_BUNDLE_ITEMS))
+    if extra:
+        _swap_log(log_file, f"ignoring unexpected staged item(s): {extra}")
+    items = [staged / name for name in _BUNDLE_ITEMS if (staged / name).exists()]
     news = []                            # (name, new_path) ready to rename in
     for item in items:
         new = app_dir / (item.name + ".new")
