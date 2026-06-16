@@ -11,6 +11,7 @@ except ImportError:
     sys.exit(1)
 
 from cli import run_cli
+from common import EXPORT_READY_JS
 from exporter import ReportSpec, save_via_export_button
 
 SPEC = ReportSpec(
@@ -24,7 +25,7 @@ SPEC = ReportSpec(
     # message; match a no-results phrase too so the loop never stalls on one.)
     wait_js=lambda route: (
         "() => { const t = document.body.innerText; "
-        "return document.querySelector('button.export-btn') !== null "
+        f"return ({EXPORT_READY_JS}) "
         "|| /No results found/i.test(t); }"
     ),
     # Unlike the other Excel reports, the Export button is present even when a

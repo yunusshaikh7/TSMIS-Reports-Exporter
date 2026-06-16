@@ -11,6 +11,7 @@ except ImportError:
     sys.exit(1)
 
 from cli import run_cli
+from common import EXPORT_READY_JS
 from exporter import ReportSpec, save_via_export_button
 
 SPEC = ReportSpec(
@@ -20,7 +21,7 @@ SPEC = ReportSpec(
     # Ready when the Export (download) button appears, or "No ramps found".
     wait_js=lambda route: (
         "() => { const t = document.body.innerText; "
-        "return document.querySelector('button.export-btn') !== null "
+        f"return ({EXPORT_READY_JS}) "
         "|| t.includes('No ramps found'); }"
     ),
     is_empty=lambda page: "No ramps found" in page.inner_text("body"),

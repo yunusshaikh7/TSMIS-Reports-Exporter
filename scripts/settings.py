@@ -37,6 +37,7 @@ DEFAULTS = {
     "fast_timeout_min": 10,      # per-route ceiling, fast mode
     "retry_timeout_min": 15,     # per-route ceiling, end-of-run retry pass
     "county_timeout_s": 60,      # county dropdown enable wait
+    "download_start_timeout_s": 60,  # max wait for the Export download to START
     "fast_workers": 3,           # default fast-mode browser count
     "debug_logging": False,      # verbose (DEBUG) file logging
     "ui_devtools": False,        # open WebView2 DevTools on the next launch
@@ -51,6 +52,7 @@ _RANGES = {
     "fast_timeout_min": (1, 120),
     "retry_timeout_min": (1, 180),
     "county_timeout_s": (10, 600),
+    "download_start_timeout_s": (10, 600),
     "fast_workers": (1, 30),
 }
 

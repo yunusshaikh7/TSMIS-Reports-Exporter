@@ -60,7 +60,14 @@ from common import (
 from events import Events, RunResult
 # Reuse the proven per-route mechanics and the serial retry pass from the
 # sequential engine, so a per-report fix benefits both.
-from exporter import _capture_failure, _process_route, _record, _retry_failed_routes
+from exporter import (
+    _can_resume,
+    _capture_failure,
+    _file_looks_complete,
+    _process_route,
+    _record,
+    _retry_failed_routes,
+)
 from paths import output_run_dir
 from run_report import auto_report_path, write_run_report
 
@@ -257,7 +264,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                             break                            # no work left -> done
                         prefix = f"{tag} Route {route}:"
                         out_path = out_dir / spec.filename(route)
-                        if out_path.exists():
+                        if _can_resume(out_path):
                             wevents.on_log(f"{prefix} already exists, skip")
                             wr.exists.append(route)
                             _record(wr, wevents, route, "exists")
@@ -325,7 +332,8 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     if not events.is_cancelled():
         accounted = {r for r, _ in result.per_route}
         missing = [r for r in routes
-                   if r not in accounted and not (out_dir / spec.filename(r)).exists()]
+                   if r not in accounted
+                   and not _file_looks_complete(out_dir / spec.filename(r))]
         if missing:
             log.warning("parallel: %d route(s) had no recorded outcome "
                         "(worker_crashed=%s); marking failed: %s",

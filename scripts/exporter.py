@@ -26,6 +26,7 @@ from common import (
     AuthError,
     ReportError,
     RunCancelled,
+    download_start_timeout_ms,
     get_site,
     get_url,
     has_valid_auth,
@@ -47,6 +48,17 @@ from run_report import auto_report_path, write_run_report
 log = logging.getLogger("tsmis.export")
 
 
+class EmptyExport(Exception):
+    """Raised by a save strategy when the report rendered but produced NO
+    download -- the site's Export is a no-op for a route with no exportable rows
+    (e.g. an empty Intersection Detail: the button is present but
+    intd_exportToExcel early-returns). The engine records the route as `empty`
+    rather than waiting out the full per-route ceiling (and then the 15-min
+    retry) on a download that will never start. This is the general,
+    marker-independent guard against the ~21-min "empty route hangs" class --
+    it fires no matter how a report's empty-state text/DOM drifts."""
+
+
 @dataclass
 class ReportSpec:
     """Everything that makes one TSMIS report different from another."""
@@ -56,6 +68,76 @@ class ReportSpec:
     wait_js: Callable[[str], str]           # route -> JS that resolves when ready OR empty
     is_empty: Callable[[object], bool]      # (page) -> True if the route has no data
     save: Callable[[object, Path, int], None]  # (page, out_path, timeout_ms) -> write the file
+
+
+# --- saved-file integrity -----------------------------------------------------
+# A download interrupted partway, or a save onto a full / locked disk, can leave
+# a 0-byte or truncated file. Resume trusts "the file exists" to skip a route, so
+# without a content check a partial file would be masked as a finished export
+# forever. These verify the file is actually a complete workbook/PDF by its magic
+# bytes (cheap, no third-party deps): an .xlsx is a ZIP container (PK\x03\x04),
+# a .pdf starts with %PDF. Unknown extensions only need to be non-empty.
+
+def _file_looks_complete(path):
+    """True if `path` looks like a fully-written report file (not 0-byte or
+    truncated). Used both to verify a fresh save and to decide whether an
+    existing file may be trusted on resume. The magic-byte checks inherently
+    reject anything too short to be a real workbook/PDF; unknown extensions
+    only need to be non-empty."""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return False
+    try:
+        with open(path, "rb") as f:
+            head = f.read(4)
+    except OSError:
+        return False
+    suffix = path.suffix.lower()
+    if suffix == ".xlsx":
+        return head == b"PK\x03\x04"
+    if suffix == ".pdf":
+        return head == b"%PDF"
+    return size > 0
+
+
+def _verify_saved_file(out_path):
+    """Confirm a just-written file is complete; on failure delete the partial
+    file (so a later resume re-pulls it) and raise so the route records failed.
+    A truncated/empty download is a real failure, not an empty route."""
+    if _file_looks_complete(out_path):
+        return
+    try:
+        size = out_path.stat().st_size
+    except OSError:
+        size = -1
+    log.warning("saved file failed integrity check: %s (%d bytes)", out_path, size)
+    try:
+        out_path.unlink()
+    except OSError:
+        pass
+    raise RuntimeError(
+        "The downloaded file looked incomplete (it may have been interrupted) — "
+        "it was discarded so the route can be tried again."
+    )
+
+
+def _can_resume(out_path):
+    """True if `out_path` is an existing, COMPLETE file that resume may trust to
+    skip the route. An existing-but-incomplete file (0-byte / truncated from an
+    interrupted run) returns False and is removed, so the route is re-pulled
+    instead of being masked as finished forever. Used by both engines' resume
+    checks."""
+    if not out_path.exists():
+        return False
+    if _file_looks_complete(out_path):
+        return True
+    log.warning("resume: existing file is incomplete; re-pulling: %s", out_path)
+    try:
+        out_path.unlink()
+    except OSError:
+        pass
+    return False
 
 
 # --- reusable save strategies -------------------------------------------------
@@ -72,15 +154,40 @@ def save_pdf_letter(page, out_path, timeout_ms=None):
         print_background=True,
         margin={"top": "0.4in", "bottom": "0.4in", "left": "0.4in", "right": "0.4in"},
     )
+    _verify_saved_file(out_path)
 
 
 def save_via_export_button(page, out_path, timeout_ms=None):
     """Click the report's Export button and save the resulting download
-    (TSAR Ramp Detail, Highway Sequence Listing). Big reports under heavy load
-    can take minutes to produce the download, so honor the caller's window."""
-    with page.expect_download(timeout=timeout_ms or report_timeout_ms()) as dl_info:
-        page.locator("button.export-btn", has_text="Export").first.click()
+    (TSAR Ramp Detail, Highway Sequence Listing, Highway Log, Intersection
+    reports).
+
+    The report has already rendered by the time this runs (the post-Generate
+    wait resolved on the Export button), and the site builds the workbook
+    client-side, so a non-empty report's download starts within a second. Bound
+    the wait at download_start_timeout_ms() -- never more than the caller's
+    overall ceiling -- so a rendered route whose Export produces no download (the
+    site's no-op for "nothing to export") is recognised as EMPTY in seconds
+    instead of hanging out the full per-route timeout (and the 15-min retry).
+    """
+    ceiling = timeout_ms or report_timeout_ms()
+    download_ms = min(download_start_timeout_ms(), ceiling)
+    try:
+        with page.expect_download(timeout=download_ms) as dl_info:
+            page.locator("button.export-btn", has_text="Export").first.click()
+    except PlaywrightTimeoutError:
+        # No download started in the window. Distinguish a site error (record it
+        # so the route fails with the site's message) from "nothing to export"
+        # (the rendered-but-empty no-op -> record the route empty).
+        err = report_error_text(page)
+        if err:
+            raise ReportError(err)
+        log.warning("Export produced no download within %ds for %s; treating as "
+                    "empty (the site's 'nothing to export' no-op)",
+                    download_ms // 1000, out_path.name)
+        raise EmptyExport()
     dl_info.value.save_as(str(out_path))
+    _verify_saved_file(out_path)
 
 
 # --- the engine ---------------------------------------------------------------
@@ -176,7 +283,14 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     # answer preview requests until it returns).
     maybe_screenshot(page, events, note=prefix.strip())
     events.on_status(events.worker_no, f"{prefix} saving…")
-    spec.save(page, out_path, timeout_ms)
+    try:
+        spec.save(page, out_path, timeout_ms)
+    except EmptyExport:
+        # The report rendered but had nothing to export (the site's Export
+        # no-op). is_empty didn't catch it -- the empty marker may have drifted
+        # -- but the general no-download guard did, so treat the route as empty
+        # rather than burning the full timeout. (Marker-independent safety net.)
+        return "empty"
     return "saved"
 
 
@@ -294,7 +408,7 @@ def _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms):
                 break
             prefix = f"[retry {i + 1}/{total}] Route {route}:"
             out_path = out_dir / spec.filename(route)
-            if out_path.exists():
+            if _can_resume(out_path):
                 result.exists.append(route)
                 _record(result, events, route, "exists")
                 continue
@@ -386,7 +500,7 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
                 # stretch of already-exists skips still gets answered.
                 maybe_screenshot(page, events, note=f"Route {route}")
 
-                if out_path.exists():
+                if _can_resume(out_path):
                     events.on_log(f"{prefix} already exists, skip")
                     result.exists.append(route)
                     _record(result, events, route, "exists")

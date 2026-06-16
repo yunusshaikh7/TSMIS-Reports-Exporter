@@ -48,6 +48,15 @@ class SiteUnreachableError(PreflightError):
     "the run can't start; show the message as-is"."""
 
 
+class ReportUnavailableError(PreflightError):
+    """Raised when the chosen report is greyed out on the live site (the site
+    marks it `cs-disabled` -- TSMIS can temporarily disable a report from
+    exporting by design). Subclasses PreflightError so every driver shows the
+    message as-is, but says "this report is currently unavailable" rather than
+    the generic "the page looks different" -- and it's caught BEFORE the inert
+    dropdown click would stall ~30 s into a preflight failure."""
+
+
 class BrowserNotFoundError(Exception):
     """Raised when no usable Chromium-based browser (Edge or Chrome) is installed
     on the machine. The app drives the browser already present rather than
@@ -184,6 +193,18 @@ REPORT_TIMEOUT_MS = 360_000
 SKIP_PROMPT_AFTER_MS = 60_000
 COUNTY_ENABLE_TIMEOUT_MS = 60_000
 
+# How long to wait for the Export *download* to begin after the report has
+# already rendered. The site builds every Excel export client-side (SheetJS
+# serializes the already-fetched, already-rendered rows synchronously), so a
+# non-empty report's download fires within a second of the click -- the per-route
+# ceilings above size the report-GENERATION wait, not this. A rendered route
+# whose Export produces no download is the site's "nothing to export" no-op
+# (e.g. an empty Intersection Detail), so capping this window lets the engine
+# record the route as empty in seconds instead of waiting out the full ceiling
+# (and then the 15-min retry) on a download that will never start. Generous on
+# purpose; raise it via Settings only if a real report legitimately needs longer.
+DOWNLOAD_START_TIMEOUT_MS = 60_000
+
 # Fast mode runs several browsers at once, so the shared TSMIS server is under a
 # heavier load and big reports (e.g. Highway Sequence) take noticeably longer to
 # render/download. Give each route a more generous ceiling there than in the
@@ -233,6 +254,13 @@ def retry_report_timeout_ms():
 def county_enable_timeout_ms():
     """Effective wait for the County dropdown to enable."""
     return _settings_ms("county_timeout_s", COUNTY_ENABLE_TIMEOUT_MS, 1_000)
+
+
+def download_start_timeout_ms():
+    """Effective wait for the Export download to start after a rendered report
+    (Settings tab can raise it; default DOWNLOAD_START_TIMEOUT_MS). See the
+    constant's note: this bounds the download, NOT report generation."""
+    return _settings_ms("download_start_timeout_s", DOWNLOAD_START_TIMEOUT_MS, 1_000)
 
 ROUTES = [
     "001","002","003","004","005","005S","006","007","008","008U","009","010","010S",
@@ -620,9 +648,30 @@ def select_report(page, report_label):
     District/County/Route to -- ALL --.
 
     report_label is the exact dropdown text, e.g. "TSAR: Ramp Summary".
+
+    Raises ReportUnavailableError if the site has greyed the report out
+    (`cs-disabled`): TSMIS can temporarily disable a report from exporting, and
+    its disabled `<li>` has no `pointer-events:none`, so a Playwright click would
+    silently no-op and the run would stall ~30 s into a generic preflight error.
+    Detecting it here turns that into one clear "currently unavailable" message.
     """
     page.locator("#customReport").click()
-    page.locator("#customReport li.cs-option", has_text=report_label).first.click()
+    option = page.locator("#customReport li.cs-option", has_text=report_label).first
+    # The site greys a temporarily-disabled report with the cs-disabled class.
+    try:
+        classes = (option.get_attribute("class") or "").split()
+    except Exception as e:                       # never let the probe itself stop a run
+        log.info("select_report: could not read option classes (%s); proceeding",
+                 type(e).__name__)
+        classes = []
+    if "cs-disabled" in classes:
+        log.warning("select_report: report %r is cs-disabled on the site", report_label)
+        raise ReportUnavailableError(
+            f"\"{report_label}\" is currently unavailable on the TSMIS site "
+            "(the report is temporarily turned off there). Try another report, "
+            "or try this one again later."
+        )
+    option.click()
     page.get_by_role("button", name="District / County / Route").click()
     page.get_by_label("District").select_option(label="-- ALL --")
     page.wait_for_function(
@@ -639,6 +688,21 @@ def select_report(page, report_label):
 # route -- no stale-error false positives. JS expression form for use inside the
 # post-Generate wait condition.
 ERROR_JS = "document.querySelector('#rampResults.error') !== null"
+
+
+# Readiness signal for the Excel reports: the report's *Export* button has
+# rendered. The site's action bar (shared.js renderActionBar) gives BOTH the
+# Export and the Print buttons class `export-btn`, so a bare
+# `querySelector('button.export-btn')` matches a Print button too. Keying the
+# post-Generate wait on the Export button's TEXT (case-insensitive, matching how
+# the save locator filters `has_text="Export"`) keeps the readiness signal
+# precise -- no report ships a Print-only bar today, but the exact match costs
+# nothing and documents the contract. JS expression form, for use inside a
+# report's wait_js arrow function.
+EXPORT_READY_JS = (
+    "[...document.querySelectorAll('button.export-btn')]"
+    ".some(b => /export/i.test(b.textContent || ''))"
+)
 
 
 def report_error_text(page):
@@ -683,6 +747,11 @@ def preflight(page, report_label):
         step = "finding the Generate button"
         page.get_by_role("button", name="Generate").wait_for(state="attached", timeout=15000)
         log.info("preflight ok: %s", report_label)
+    except ReportUnavailableError:
+        # A greyed-out report is a clear, specific condition (select_report
+        # already logged + crafted the message) -- surface it as-is, not as the
+        # generic "page looks different".
+        raise
     except Exception as e:
         log.warning("preflight failed while %s for %r: %s: %s",
                     step, report_label, type(e).__name__,
