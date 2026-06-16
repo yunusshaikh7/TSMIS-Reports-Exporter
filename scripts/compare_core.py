@@ -1095,12 +1095,12 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
              f"created {date.today().isoformat()}", note_font), advance=2)
 
     banner("ROW COUNTS")
-    stat(f"{a} data rows", f"=COUNTA({sa}!{loc_col}:{loc_col})-1",
+    stat(f"{a} data rows", f"=COUNTA({sa}!{lay.back_col}:{lay.back_col})-1",
          None if vals is None else vals["n_t"])
-    stat(f"{b} data rows", f"=COUNTA({sb}!{loc_col}:{loc_col})-1",
+    stat(f"{b} data rows", f"=COUNTA({sb}!{lay.back_col}:{lay.back_col})-1",
          None if vals is None else vals["n_n"])
     stat(f"Union of {nouns} compared",
-         f"=COUNTA(Comparison!{lay.c_loc}:{lay.c_loc})-1", n_union)
+         f"=COUNT(Comparison!{lay.c_occ}:{lay.c_occ})", n_union)
     banner("MATCH STATUS")
     stat(f"{Nouns} in both {sc.sides_noun}", f'=COUNTIF(Comparison!{st}:{st},"Both")',
          c and c["both"])
@@ -1146,14 +1146,14 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
     # way. Any row reading CHECK means a formula no longer points where it
     # should (the classic cause: rows inserted/deleted on a data sheet).
     banner("SELF-CHECK (every row should read OK after calculation)")
-    only_loc = "B" if lay.has_route else "A"          # key col on Only-in tabs
+    only_occ = "C" if lay.has_route else "B"          # occurrence (#) col on Only-in tabs
     only_a_ref = _sref(f"Only in {a}")
     only_b_ref = _sref(f"Only in {b}")
 
     def check(label, cond):
         line((2, label), (3, f'=IF({cond},"OK","CHECK")', bold_font, None, center))
 
-    union_count = f"COUNTA(Comparison!{lay.c_loc}:{lay.c_loc})-1"
+    union_count = f"COUNT(Comparison!{lay.c_occ}:{lay.c_occ})"
     check(f"Every Comparison row has a status (Both + {lay.only_a} + {lay.only_b})",
           f'COUNTIF(Comparison!{st}:{st},"Both")'
           f'+COUNTIF(Comparison!{st}:{st},"{lay.only_a}")'
@@ -1167,18 +1167,18 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
           f'COUNTIF(Comparison!{st}:{st},"Both")'
           f'+COUNTIF(Comparison!{st}:{st},"{lay.only_b}")')
     check(f"'Only in {a}' sheet rows = {a}-only rows in the Comparison",
-          f"COUNTA({only_a_ref}!{only_loc}:{only_loc})-1="
+          f"COUNT({only_a_ref}!{only_occ}:{only_occ})="
           f'COUNTIF(Comparison!{st}:{st},"{lay.only_a}")')
     check(f"'Only in {b}' sheet rows = {b}-only rows in the Comparison",
-          f"COUNTA({only_b_ref}!{only_loc}:{only_loc})-1="
+          f"COUNT({only_b_ref}!{only_occ}:{only_occ})="
           f'COUNTIF(Comparison!{st}:{st},"{lay.only_b}")')
     check("Per-field difference counts add up to the total differing cells",
           f'SUM(D{f_start}:D{f_end})=SUM(Comparison!{df}2:{df}{last})')
     if lay.has_route:
         check(f"Routes sheet {a} row counts add up to the {a} sheet",
-              f"SUM(Routes!C:C)=COUNTA({sa}!{loc_col}:{loc_col})-1")
+              f"SUM(Routes!C:C)=COUNTA({sa}!{lay.back_col}:{lay.back_col})-1")
         check(f"Routes sheet {b} row counts add up to the {b} sheet",
-              f"SUM(Routes!D:D)=COUNTA({sb}!{loc_col}:{loc_col})-1")
+              f"SUM(Routes!D:D)=COUNTA({sb}!{lay.back_col}:{lay.back_col})-1")
         check(f"Routes sheet '{Nouns} compared' adds up to the Comparison",
               f"SUM(Routes!E:E)={union_count}")
     row[0] += 1
@@ -1362,7 +1362,18 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                     for k in keys_n]
             events.on_log(f"Writing the VALUES workbook: {path.name}")
         else:
-            vals, hk_t, hk_n = None, None, None
+            # The live-formulas flavor now ALSO writes literal lookup keys (the
+            # same ones the values flavor uses), not a live COUNTIFS occurrence.
+            # A blank key field made the COUNTIFS mis-number occurrences (Excel's
+            # blank-criterion quirk), so those rows' lookups failed and the
+            # SELF-CHECK read CHECK. Literal keys always match the Comparison
+            # sheet's literal occurrence #, and the row universe is build-time
+            # static by design anyway (only the field VALUES are live).
+            vals = None
+            hk_t = [f"{k[0]}|{k[1]}|{k[2]}" if has_route else f"{k[1]}|{k[2]}"
+                    for k in keys_t]
+            hk_n = [f"{k[0]}|{k[1]}|{k[2]}" if has_route else f"{k[1]}|{k[2]}"
+                    for k in keys_n]
             events.on_log(f"Writing the live-formulas workbook: {path.name}")
 
         # Streaming workbook (see the note above _styled): sheets are created
