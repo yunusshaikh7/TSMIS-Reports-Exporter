@@ -69,3 +69,8 @@ spike/
 # Persisted user settings (timeouts, URL overrides — local state, never committed)
 /config.json
 /data/config.json
+
+# Local scratch area for code-review audit runs. The reusable prompt is the
+# tracked CODE-REVIEW-PROMPT.md at repo root; per-run reports quote code +
+# internal detail, so they stay local (never committed).
+/code-review/
