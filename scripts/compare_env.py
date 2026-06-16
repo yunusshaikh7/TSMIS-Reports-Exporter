@@ -209,6 +209,14 @@ def _load_ramp_summary_side(folder, label, events):
             skipped.append(f"{label} {p.name}: could not parse "
                            f"({type(e).__name__})")
             continue
+        if not _rs.record_has_data(record):
+            # One-page / truncated PDF: a route but no ramp figures. Skip it
+            # (an all-blank route would otherwise compare as a phantom match).
+            events.on_log(f"  [{label}] {p.name}: no ramp data "
+                          "(one-page / truncated PDF?); skipping")
+            skipped.append(f"{label} {p.name}: no ramp data "
+                           "(one-page / truncated PDF?)")
+            continue
         route = record.get("route") or _route_from_name(p)
         rows.append([route] + [record.get(col) for col, _disp in _RS_FIELDS])
         events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "

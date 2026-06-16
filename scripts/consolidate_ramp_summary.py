@@ -32,6 +32,7 @@ except ImportError:
 
 from paths import OUTPUT_ROOT, latest_output_day, output_day_dir
 from events import Events, ConsolidateResult
+from compare_core import is_formula_injection   # shared formula-injection guard
 
 SUBDIR = "ramp_summary"
 FILENAME = "tsar_ramp_summary_consolidated.xlsx"
@@ -257,6 +258,19 @@ def match_schema(rows, schema, used_indices=None):
         else:
             result[col_name] = None
     return result
+
+
+def record_has_data(record):
+    """True if a parsed Ramp Summary record carries real ramp figures — not just
+    a route read off page 1. A one-page / truncated PDF yields a route-only
+    record (the figures live on page 2); such records must not be written as
+    blank rows, nor counted as a successful parse."""
+    for col_name, value in record.items():
+        if col_name in ("source_file", "route") or col_name.startswith("_"):
+            continue
+        if value is not None:
+            return True
+    return False
 
 
 def parse_pdf(path):
@@ -585,6 +599,8 @@ def build_workbook(records, out_path):
                 continue  # formulas added below
             v = rec.get(col_name)
             cell = ws.cell(row=r, column=c_idx, value=v)
+            if is_formula_injection(v):     # never let parsed text run as a formula
+                cell.data_type = "s"
             cell.font = Font(name="Arial", size=10)
             cell.border = BORDER
             if col_name in ("source_file", "route"):
@@ -712,16 +728,38 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
 
     records = []
     failed = []
+    blank = []
     for i, p in enumerate(pdfs, 1):
         if events.is_cancelled():
             return ConsolidateResult(status="cancelled", message="Cancelled by user.")
         prefix = f"[{i:>3}/{len(pdfs)}] {p.name}"
         try:
-            records.append(parse_pdf(str(p)))
-            events.on_log(f"{prefix} parsed")
+            rec = parse_pdf(str(p))
         except Exception as e:
             events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
             failed.append(p.name)
+            continue
+        # A one-page / truncated PDF parses without error but carries no ramp
+        # data (page 2 holds the figures) — don't write it as a blank route row,
+        # and don't let a folder full of them overwrite a good workbook.
+        if record_has_data(rec):
+            records.append(rec)
+            events.on_log(f"{prefix} parsed")
+        else:
+            events.on_log(f"{prefix} skipped: no ramp data "
+                          "(one-page / truncated PDF?)")
+            blank.append(p.name)
+
+    # Nothing usable parsed → do NOT write (a blank/header-only workbook would
+    # overwrite a good prior consolidation). Leave the existing file untouched.
+    if not records:
+        return ConsolidateResult(
+            status="error",
+            message=(f"None of the {len(pdfs)} {REPORT_NAME} PDF(s) yielded ramp "
+                     f"data ({len(failed)} failed to parse, {len(blank)} had no "
+                     f"data — truncated/one-page?). Nothing was written and the "
+                     f"existing file (if any) was left unchanged.\nRe-export the "
+                     f"{REPORT_NAME} report and try again."))
 
     events.on_log("")
     events.on_log("Writing consolidated workbook...")
@@ -735,15 +773,23 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
                      "(Your exported files were not changed.)"),
         )
 
-    return ConsolidateResult(
-        status="ok",
-        output_path=str(out_path),
-        summary_lines=[
-            f"Parsed:      {len(records)}",
-            f"Failed:      {len(failed)} {failed if failed else ''}",
-            f"Output file: {out_path}",
-        ],
-    )
+    # Loud incomplete banner when anything was left out, so a partial result is
+    # never mistaken for a full one.
+    incomplete = bool(failed or blank)
+    summary_lines = []
+    if incomplete:
+        summary_lines.append(
+            f"⚠ INCOMPLETE — {len(failed) + len(blank)} PDF(s) left OUT "
+            f"({len(failed)} failed, {len(blank)} had no data); the workbook "
+            f"does NOT contain their routes. Re-export them before relying on it.")
+    summary_lines += [
+        f"Parsed:      {len(records)}",
+        f"Failed:      {len(failed)} {failed if failed else ''}",
+        f"No data:     {len(blank)} {blank if blank else ''}",
+        f"Output file: {out_path}",
+    ]
+    return ConsolidateResult(status="ok", output_path=str(out_path),
+                             summary_lines=summary_lines)
 
 
 if __name__ == "__main__":
