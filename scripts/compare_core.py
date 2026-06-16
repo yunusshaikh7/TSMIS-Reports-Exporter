@@ -35,7 +35,7 @@ the usual cadence, ConsolidateResult returned.
 import difflib
 import re
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, time
 from pathlib import Path
 
 try:
@@ -236,6 +236,8 @@ def normalize_value(v):
         return v.isoformat(sep=" ")
     if isinstance(v, date):
         return v.isoformat()
+    if isinstance(v, time):       # a time-only cell would otherwise reach the
+        return v.isoformat()      # data sheet typed (Excel) vs str() (values)
     return v
 
 
@@ -526,13 +528,20 @@ def _header_row(ws, values):
 
 
 def _apply_field_widths(ws, widths, col_for, lay):
-    """Set column widths from a {field name -> width} schema dict."""
+    """Set column widths from a {field name -> width} schema dict. Applies to
+    EVERY column with that name (header.index would width only the first of a
+    duplicate name); skips a column only when col_for can't place it — the
+    Comparison/Only-in field_col raises for the key index, while the data
+    sheet's data_col places the key column fine (so its width is kept)."""
     for name, width in widths.items():
-        try:
-            idx = lay.sc.header.index(name)
-        except ValueError:
-            continue
-        ws.column_dimensions[col_for(idx)].width = width
+        for idx, h in enumerate(lay.sc.header):
+            if h != name:
+                continue
+            try:
+                col = col_for(idx)
+            except (KeyError, ValueError):
+                continue
+            ws.column_dimensions[col].width = width
 
 
 def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
@@ -572,7 +581,11 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         # Both flavors write a LITERAL key (the comparison's row universe is
         # build-time static): a live COUNTIFS mis-numbers blank key fields, and
         # the literal always matches the Comparison sheet's stored occurrence #.
-        cells.append(_styled(ws, helper_keys[r - 2], body_font))
+        # Guard the helper key too: a key like "=X" would otherwise become a
+        # live formula here, breaking the Comparison MATCH lookups (which search
+        # for the literal "=X|1") AND splitting the two flavors. Guarding stores
+        # the literal string the lookups expect.
+        cells.append(_styled(ws, helper_keys[r - 2], body_font, guard=True))
         ws.append(cells)
         if (r - 1) % _PROGRESS_EVERY == 0:
             events.on_log(f"  {name} sheet: {r - 1:,} rows…")
@@ -1090,7 +1103,11 @@ def _write_routes(wb, all_routes, lay, vals=None):
                 rs["t_rows"], rs["n_rows"], rs["locs"], rs["matched"],
                 rs["withdiffs"], rs["cells"],
             )
-        ws.append([_styled(ws, v, body_font) for v in cells])
+        # Guard only the route-id cell (cell 0): a route like "=X" would become
+        # a live formula. The other cells are our own =formulas (formulas flavor)
+        # or safe literals (values flavor) and must NOT be forced to text.
+        ws.append([_styled(ws, v, body_font, guard=(j == 0))
+                   for j, v in enumerate(cells)])
     return ws
 
 
@@ -1254,7 +1271,7 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=()):
     for f in lay.field_indices:
         col = lay.field_col(f)
         line((2, sc.header[f]), (3, col),
-             (4, f'=COUNTIF(Comparison!{col}2:{col}{last},"*{_DIFF_MARK.strip()}*")'
+             (4, f'=COUNTIF(Comparison!{col}2:{col}{last},"*{_DIFF_MARK}*")'
               if vals is None else c["field_diffs"][f],
               bold_font, None, center))
     f_end = row[0] - 1
@@ -1471,7 +1488,9 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     # Excel hard limits: openpyxl would raise mid-write past the row cap (losing
     # the partial file) and silently lose columns past the column cap.
     biggest = max(len(union), len(rows_t), len(rows_n)) + 1   # + header row
-    n_cols = len(lay.data_header) + 2          # back-link + columns + key helper
+    # Widest sheet actually written: the Comparison sheet (id cols + fields) is
+    # 3 wider than the data sheet (back-link + columns + key helper).
+    n_cols = max(len(lay.data_header) + 2, len(lay.id_headers) + lay.n_fields)
     limit_err = excel_limit_error(biggest, n_cols)
     if limit_err:
         return ConsolidateResult(status="error", message=limit_err)

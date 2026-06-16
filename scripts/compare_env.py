@@ -32,9 +32,20 @@ from pathlib import Path
 
 try:
     from openpyxl import load_workbook
+    from openpyxl.utils import get_column_letter
     _XLSX_OK = True
 except ImportError:
     _XLSX_OK = False
+
+# Route-key normalizer: the Ramp Summary route can come from the PDF title
+# (unpadded, "1") or the filename ("001"); zero-pad the numeric part so the two
+# sides key consistently and a route doesn't split into two one-sided rows.
+_ROUTE_KEY_RE = re.compile(r"^(\d+)(\w*)$")
+
+
+def _norm_route_key(token):
+    m = _ROUTE_KEY_RE.match(str(token).strip())
+    return m.group(1).zfill(3) + m.group(2).upper() if m else str(token).strip().upper()
 
 import compare_highway_log as _hl
 import consolidate_ramp_summary as _rs
@@ -86,6 +97,15 @@ def _side_labels(dir_a, dir_b):
                     lb = f"{label} {day}"
     if la == lb:
         la, lb = f"{la} (A)", f"{lb} (B)"
+    # Cap so the longest derived sheet name ("Only in <label>", 8 + label) fits
+    # Excel's 31-char limit — these labels are auto-derived from folder names
+    # with no user override, so an overflow would otherwise be an unsatisfiable
+    # error. Truncate the END (the date/(A)/(B) distinguisher stays at the edge,
+    # so the two labels remain distinct); fall back to Side A/B if they collide.
+    cap = lambda s: s if len(s) <= 23 else s[:23]
+    la, lb = cap(la), cap(lb)
+    if la == lb:
+        la, lb = "Side A", "Side B"
     return la, lb
 
 
@@ -144,6 +164,12 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
             h = [v for v in next(rows_iter, [])]
             while h and h[-1] in (None, ""):
                 h.pop()
+            # Give INTERNAL unnamed columns a stable, identifiable label (the
+            # Highway Sequence export has real but header-less columns) so they
+            # don't show as blank fields in the Summary/Comparison. Positional,
+            # so it's consistent across files (the h != header check still holds).
+            h = [v if (v is not None and str(v).strip() != "")
+                 else f"(col {get_column_letter(i + 1)})" for i, v in enumerate(h)]
             if header is None:
                 header = h
             if h != header:
@@ -217,7 +243,7 @@ def _load_ramp_summary_side(folder, label, events):
             skipped.append(f"{label} {p.name}: no ramp data "
                            "(one-page / truncated PDF?)")
             continue
-        route = record.get("route") or _route_from_name(p)
+        route = _norm_route_key(record.get("route") or _route_from_name(p))
         rows.append([route] + [record.get(col) for col, _disp in _RS_FIELDS])
         events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
                       f"(route {route})")
