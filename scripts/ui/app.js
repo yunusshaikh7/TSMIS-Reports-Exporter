@@ -1372,7 +1372,9 @@ async function deleteAllReports() {
   m.appendChild(actions);
   const confirmed = await openModal(m);
   if (!confirmed) return;
-  const res = await api.start_reset(includeInput);
+  // Pass back the single-use token from the latest preview — start_reset
+  // requires it (server-side confirmation that this preview was shown).
+  const res = await api.start_reset(includeInput, prev.token);
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 

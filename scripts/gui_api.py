@@ -27,6 +27,7 @@ import ctypes
 import json
 import logging
 import os
+import secrets
 import sys
 import threading
 import time
@@ -152,6 +153,11 @@ class GuiApi:
 
         self._last_results = []      # [(spec, RunResult), ...] of the last export
         self._export_worker = None   # live ExportWorker (screenshot requests)
+        # Server-side confirmation for the one destructive op (delete all
+        # reports): reset_preview issues a single-use token bound to the
+        # include_input flag; start_reset requires it back, so the delete can't
+        # run without a preview having been shown first. (token, include_input).
+        self._reset_token = None
         self.cancel_event = threading.Event()
         self.skip_event = threading.Event()
         self.login_done = threading.Event()
@@ -420,6 +426,64 @@ class GuiApi:
         self._refresh_auth()
         self._emit({"t": "run_ended"})
         self._push_state()
+
+    # ---- single-flight task gate + input validation (bridge hardening) --------
+
+    def _try_claim_task(self, name):
+        """Atomically claim the single task slot: returns True if claimed, False
+        if another task is already running. Use this instead of a separate
+        'check' then later 'set' -- those two race, so two quick clicks (or a
+        save dialog between them) could both pass the gate and start two
+        workers."""
+        with self._lock:
+            if self._task:
+                return False
+            self._task = name
+            return True
+
+    def _release_task(self):
+        """Drop a slot claimed by _try_claim_task before a worker actually
+        started (e.g. the user cancelled the save dialog), so the next action
+        isn't blocked by a phantom task."""
+        with self._lock:
+            self._task = None
+
+    @staticmethod
+    def _pick_report(registry, idx):
+        """Bounds-checked registry row for a UI-supplied index, or None for a
+        bad (out-of-range / non-numeric) index -- a malformed bridge call can't
+        IndexError its way to an unhandled state or leave a task slot stuck."""
+        try:
+            i = int(idx)
+        except (TypeError, ValueError):
+            return None
+        return registry[i] if 0 <= i < len(registry) else None
+
+    @staticmethod
+    def _safe_day(day):
+        """Validate a consolidate/compare 'day' (run-folder name) from the
+        bridge: None/empty (newest) or an EXISTING run folder. Anything else --
+        a traversal like '..\\..\\Windows' or a stale name -- is rejected, so a
+        crafted day can never resolve a path outside the output area. Returns
+        the validated day (or None); raises ValueError otherwise."""
+        day = (day or "").strip()
+        if not day:
+            return None
+        if day in list_output_days():
+            return day
+        raise ValueError("That export folder isn't available — pick one from "
+                         "the list.")
+
+    @staticmethod
+    def _resolve_under_output(name):
+        """Resolve a run-folder NAME (from a dropdown, not Browse…) to an
+        absolute path, rejecting any traversal that escapes OUTPUT_ROOT. Browse…
+        hands in absolute paths and is handled separately by the caller."""
+        root = OUTPUT_ROOT.resolve()
+        p = (OUTPUT_ROOT / name).resolve()
+        if p != root and root not in p.parents:
+            raise ValueError("That folder is outside the output area.")
+        return p
 
     def _finish_export(self, results):
         # results is [(spec, RunResult), ...] -- one entry per report type run
@@ -773,11 +837,14 @@ class GuiApi:
 
     @_api_method
     def start_export(self, report_idxs, routes_text, fast, workers):
-        with self._lock:
-            if self._task:
-                return {"error": "A task is already running."}
-        specs = [EXPORT_REPORTS[i][2] for i in report_idxs
-                 if 0 <= i < len(EXPORT_REPORTS)]
+        # Validate inputs BEFORE claiming the task slot (pure, no shared state),
+        # then claim atomically -- so two quick clicks can't both pass the gate
+        # and launch two export runs (the old check-then-set raced).
+        specs = []
+        for i in (report_idxs if isinstance(report_idxs, (list, tuple)) else []):
+            row = self._pick_report(EXPORT_REPORTS, i)
+            if row is not None:
+                specs.append(row[2])
         if not specs:
             return {"error": "Tick at least one report to export."}
         raw = (routes_text or "").strip()
@@ -795,8 +862,9 @@ class GuiApi:
             except (TypeError, ValueError):
                 n_workers = max(2, default_worker_count())
 
+        if not self._try_claim_task("export"):
+            return {"error": "A task is already running."}
         with self._lock:
-            self._task = "export"
             self._fast_run = n_workers > 1
         self.cancel_event.clear()
         self.skip_event.clear()
@@ -1003,8 +1071,15 @@ class GuiApi:
 
     @_api_method
     def consolidate_info(self, report_idx, day):
-        _label, mod = CONSOLIDATE_REPORTS[int(report_idx)]
-        out = mod.out_path_for(day or None)
+        row = self._pick_report(CONSOLIDATE_REPORTS, report_idx)
+        if row is None:
+            return {"error": "That report isn't available — please reopen the tab."}
+        try:
+            day = self._safe_day(day)
+        except ValueError as e:
+            return {"error": str(e)}
+        _label, mod = row
+        out = mod.out_path_for(day)
         info = {"dest_dir": str(out.parent), "out_path": str(out),
                 "exists": out.exists()}
         # Reports whose input is user-supplied (TSN PDFs) advertise it so the
@@ -1017,7 +1092,10 @@ class GuiApi:
 
     @_api_method
     def open_consolidate_input(self, report_idx):
-        _label, mod = CONSOLIDATE_REPORTS[int(report_idx)]
+        row = self._pick_report(CONSOLIDATE_REPORTS, report_idx)
+        if row is None:
+            return {"error": "That report isn't available — please reopen the tab."}
+        _label, mod = row
         in_dir = getattr(mod, "INPUT_DIR", None)
         if in_dir is None:
             return {"error": "This report has no input folder."}
@@ -1031,12 +1109,19 @@ class GuiApi:
 
     @_api_method
     def start_consolidate(self, report_idx, day):
-        with self._lock:
-            if self._task:
-                return {"error": "A task is already running."}
-            self._task = "consolidate"
-        day = day or None
-        label, mod = CONSOLIDATE_REPORTS[int(report_idx)]
+        # Validate the report index + day BEFORE claiming the slot -- otherwise a
+        # bad index would IndexError after self._task was set, wedging the task
+        # gate "consolidate" forever (every later action blocked until restart).
+        row = self._pick_report(CONSOLIDATE_REPORTS, report_idx)
+        if row is None:
+            return {"error": "That report isn't available — please reopen the tab."}
+        try:
+            day = self._safe_day(day)
+        except ValueError as e:
+            return {"error": str(e)}
+        label, mod = row
+        if not self._try_claim_task("consolidate"):
+            return {"error": "A task is already running."}
         self.cancel_event.clear()
         self._emit_log(f"Starting consolidation: {label}" + (f"   ·   {day}" if day else ""))
         self._set_dot("busy", f"Consolidating {label}…")
@@ -1096,8 +1181,8 @@ class GuiApi:
                 else "formulas" if want_formulas else "values")
 
     def _launch_compare(self, label, mode, out, run_fn):
-        with self._lock:
-            self._task = "compare"
+        # The task slot was already claimed by the caller (before the save
+        # dialog), so a second click can't slip in while the dialog is open.
         self.cancel_event.clear()
         kinds = {"both": "values + live formulas", "formulas": "live formulas",
                  "values": "values"}[mode]
@@ -1114,20 +1199,25 @@ class GuiApi:
     @_api_method
     def start_compare(self, report_idx, tsmis_path, tsn_path,
                       want_formulas=True, want_values=False):
-        label, mod, kind = COMPARE_REPORTS[int(report_idx)]
+        row = self._pick_report(COMPARE_REPORTS, report_idx)
+        if row is None:
+            return {"error": "That comparison isn't available — please reopen the tab."}
+        label, mod, kind = row
         if kind != "files":
             return {"error": "This comparison type takes folders, not files."}
-        with self._lock:
-            if self._task:
-                return {"error": "A task is already running."}
         if not tsmis_path or not tsn_path:
             return {"error": "Pick both files first (a TSMIS and a TSN workbook)."}
         mode = self._compare_mode(want_formulas, want_values)
         if mode is None:
             return {"error": "Tick at least one output (values and/or live formulas)."}
+        # Claim the slot BEFORE the (blocking) save dialog so a second click is
+        # rejected immediately; release it if the user cancels the dialog.
+        if not self._try_claim_task("compare"):
+            return {"error": "A task is already running."}
         out = self._save_dialog_for_compare(Path(tsmis_path).parent,
                                             mod.suggest_name(tsmis_path))
         if out is None:
+            self._release_task()
             return {"cancelled": True}
         return self._launch_compare(
             label, mode, out,
@@ -1140,27 +1230,33 @@ class GuiApi:
                           want_formulas=True, want_values=False):
         """Cross-environment comparison: two run folders (names from the
         dropdowns resolve under output/; Browse… hands in absolute paths)."""
-        label, adapter, kind = COMPARE_REPORTS[int(report_idx)]
+        row = self._pick_report(COMPARE_REPORTS, report_idx)
+        if row is None:
+            return {"error": "That comparison isn't available — please reopen the tab."}
+        label, adapter, kind = row
         if kind != "folders":
             return {"error": "This comparison type takes files, not folders."}
-        with self._lock:
-            if self._task:
-                return {"error": "A task is already running."}
         if not dir_a or not dir_b:
             return {"error": "Pick both export folders first."}
-        pa, pb = Path(dir_a), Path(dir_b)
-        if not pa.is_absolute():
-            pa = OUTPUT_ROOT / dir_a
-        if not pb.is_absolute():
-            pb = OUTPUT_ROOT / dir_b
+        # A dropdown hands in a run-folder NAME (resolved under output/, with
+        # traversal rejected); Browse… hands in an absolute path the user
+        # explicitly chose, used as-is.
+        try:
+            pa = Path(dir_a) if Path(dir_a).is_absolute() else self._resolve_under_output(dir_a)
+            pb = Path(dir_b) if Path(dir_b).is_absolute() else self._resolve_under_output(dir_b)
+        except ValueError as e:
+            return {"error": str(e)}
         mode = self._compare_mode(want_formulas, want_values)
         if mode is None:
             return {"error": "Tick at least one output (values and/or live formulas)."}
         import compare_env
         compare_env.DEFAULT_OUT_DIR.mkdir(parents=True, exist_ok=True)
+        if not self._try_claim_task("compare"):
+            return {"error": "A task is already running."}
         out = self._save_dialog_for_compare(compare_env.DEFAULT_OUT_DIR,
                                             adapter.suggest_name(pa, pb))
         if out is None:
+            self._release_task()
             return {"cancelled": True}
         return self._launch_compare(
             label, mode, out,
@@ -1341,23 +1437,38 @@ class GuiApi:
     @_api_method
     def reset_preview(self, include_input=False):
         """What "Delete all reports" would remove right now — shown in the
-        confirm dialog so the user approves a concrete list, not a vibe."""
-        targets = reset_targets(bool(include_input))
+        confirm dialog so the user approves a concrete list, not a vibe. Also
+        issues the single-use confirm token start_reset requires (server-side
+        gate: the delete can't run unless a preview was shown for the same
+        include_input)."""
+        include_input = bool(include_input)
+        targets = reset_targets(include_input)
         files, size = measure_targets(targets)
+        token = secrets.token_urlsafe(16)
+        with self._lock:
+            self._reset_token = (token, include_input)
         return {"targets": [label for label, _p in targets],
-                "files": files, "mb": round(size / 1e6, 1)}
+                "files": files, "mb": round(size / 1e6, 1), "token": token}
 
     @_api_method
-    def start_reset(self, include_input=False):
-        """Delete all generated reports (the confirm dialog already ran in the
-        UI, listing reset_preview's concrete targets). Logs, the saved login
-        and the settings always survive."""
+    def start_reset(self, include_input=False, confirm_token=None):
+        """Delete all generated reports. Server-side confirmation: requires the
+        single-use token reset_preview issued for the SAME include_input, so a
+        direct bridge call can't skip the preview the user approved. Logs, the
+        saved login and the settings always survive."""
+        include_input = bool(include_input)
         with self._lock:
-            if self._task:
-                return {"error": "A task is already running."}
-            self._task = "reset"
+            expected = self._reset_token
+            self._reset_token = None        # single-use: consume it either way
+        if not expected or confirm_token != expected[0] or expected[1] != include_input:
+            ui_log.warning("reset: refused — no matching confirmation (a preview "
+                           "must be shown first)")
+            return {"error": "Please confirm the delete from the dialog "
+                             "(open 'Delete all reports' again)."}
+        if not self._try_claim_task("reset"):
+            return {"error": "A task is already running."}
         ui_log.info("reset: user confirmed delete-all-reports (input=%s)",
-                    bool(include_input))
+                    include_input)
         self._emit_log("Deleting all reports…")
         self._set_dot("busy", "Deleting reports…")
         self._emit({"t": "run_started", "mode": "consolidate",
