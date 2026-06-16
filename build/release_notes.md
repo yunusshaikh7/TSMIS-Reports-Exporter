@@ -14,6 +14,19 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Flawless TSN Highway Log conversion (0.11.1).** The TSN district-PDF → Excel
+  converter now transcribes feature descriptions perfectly across all 12
+  districts — totals-block footer text and page furniture can no longer leak into
+  a segment's Description. This removes ~1,000 false-positive "differences" from
+  the TSMIS-vs-TSN Highway Log comparison (what remains is all genuine data
+  differences). Real descriptions that merely contain words like "UNCONST" or
+  "TOTAL" are now kept correctly.
+- **Ramp Summary audit cell explains itself (0.11.1).** When a route's parsed
+  section sub-totals don't add up to its stated total, the consolidated workbook's
+  Audit cell now names the section that's short (e.g. "⚠ Source ≠ total: Ramp
+  Types") instead of a bare red result — making clear it's a quirk in the source
+  PDF's own numbers on a few dense routes, not a tool error.
+
 - **Comparisons are far more accurate (0.11.0).** Comparing the same report
   across two environments used to flag large numbers of "differences" that were
   really just rows shifting position — one missing point near the top made

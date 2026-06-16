@@ -7,24 +7,40 @@ follow-ups. Fuller detail for most items lives in `code-review/`
 
 ---
 
-## Blocked on work-PC export access (real-data verification)
+## Ramp comparisons — VERIFIED on real data (2026-06-16 audit)
 
-- [ ] **Cross-env Ramp Detail comparison** — code is done (re-keyed on `PM` via
-  `CompareSchema.key_field`) but verified by synthetic fixtures only. When real
-  exports land (3 envs being built 2026-06-16): confirm the loaded header names
-  the postmile column **`PM`** exactly (after strip/casefold; else update
-  `key_col`); run `compare_env.RAMP_DETAIL` on each env pair; COM-recalc; the
-  Summary SELF-CHECK must read **9/9 OK**; confirm the diff/one-sided counts
-  collapse vs the coarse-key baseline. Add a mid-route-missing-row golden
-  fixture. (`scripts/compare_env.py`)
-- [ ] **Cross-env Ramp Summary comparison** — code is done (route-keyed,
-  blank/all-fail guard, route-key zero-pad normalize) but has **zero golden
-  coverage**. When real exports land: run `compare_env.RAMP_SUMMARY` per env
-  pair; COM-recalc; confirm SELF-CHECK OK. Add a synthetic per-route fixture
-  (planted numeric diff + a route present on only one side).
-- [ ] **Audit `consolidate_ramp_summary.parse_pdf`** for the same bug classes the
-  TSN parser had — page-furniture leaking into parsed fields, and a silent
-  all-parse-fail returning OK.
+Cross-env Ramp Detail + Ramp Summary were ruthlessly audited against real 3-env
+exports (ssor-prod / ssor-test / ars-prod, 126 routes each) — independent
+from-scratch recompute + Excel COM self-check/parity + v0.11.0 regeneration +
+adversarial refutation; all methods agreed.
+- ✅ **v0.11.0 PM re-key VALIDATED on real data.** Ramp Detail keyed on `PM`
+  (+occurrence#, since PM repeats within ~10 county-crossing routes) is correct.
+  The user's delivered files were made with the OLD v0.10.4 app (Location-keyed):
+  its Ramp Detail PROD-vs-TEST headline of **1,451 diff cells is ~99.4% positional
+  inflation**; the TRUE difference is **8 cells / 4 rows + 10 TEST-only ramps**
+  (reproduced by regenerating with v0.11.0).
+- ✅ **Cross-env Ramp Summary VALIDATED** (route-keyed): PROD-vs-TEST = 32 genuine
+  diff cells / 9 routes (confirmed vs raw PDF text); PROD==ARS. All 4 delivered
+  workbooks internally sound (SELF-CHECK all OK, parity clean, full coverage).
+- [ ] **STILL TODO — regression-lock it:** add golden fixtures (Ramp Detail
+  mid-route-insert misalignment → PM key collapses it; Ramp Summary planted-diff +
+  one-sided route) under `build/check_compare_*.py`.
+
+## Source-data finding (NOT a parser bug) — from the 2026-06-16 audit
+
+- **TSMIS Ramp Summary source data is internally inconsistent on 9 routes.** Routes
+  005, 008, 010, 094, 110, 134, 210, 280, 605 fail the Ramp-Types audit-sum (Σ ramp-type
+  counts + no-linework ≠ total_ramps) by 1–9 ramps, IDENTICALLY across all 3 envs — i.e.
+  the **source PDF's own Ramp Types breakdown sums short of its stated Total** (some ramps
+  in the total aren't itemized into a ramp-type code). **`parse_pdf` is CORRECT** — proven
+  against an independent geometric extraction across all 378 PDFs × 14 ramp types (0
+  mismatches) and the raw page-2 text. The `_audit_ok` cell correctly flags these routes RED
+  (working as designed). Do NOT "fix" the parser to force them green — that would hide a real
+  TSMIS data issue. Harmless to the cross-env comparison (the identical gap cancels on both sides).
+  - [ ] Optional UX: when ONLY the ramp-types audit check fails (hwy/onoff/pop reconcile),
+    label the red cell self-explanatorily ("source breakdown doesn't reconcile to total")
+    so users don't read it as a tool bug. (`consolidate_ramp_summary.build_workbook` audit col.)
+  - [ ] Optional: report the inconsistency upstream to the TSMIS team.
 
 ## Live-export verification (needs TSMIS access — this dev PC can't reach it)
 

@@ -109,6 +109,18 @@ Y_TOLERANCE = 3      # chars within this y-distance form one logical line
 HEADER_BAND = 56     # everything above this y on a page is page furniture
 WORD_GAP = 1.5       # x-gap that starts a new token; intra-value gaps are ~0pt
 
+# A real segment description prints LEFT-ALIGNED in the feature-name column at
+# x0 ~= 73.4 in the fixed OTM52010 layout. Measured across all 12 districts,
+# 99.8% of description lines sit at x0 73-75 and NOTHING legitimate prints
+# elsewhere in this band: the only other below-band, non-data, non-totals lines
+# are page furniture that occasionally dips past HEADER_BAND ("CALIFORNIA
+# DEPARTMENT OF TRANSPORTATION" x0~37, "California State Highway Log" x0~201,
+# "District NN" x0~256) and wrapped totals fragments ("TOTAL" / "TOTAL CONST"
+# x0~170). Gating descriptions to this band excludes ALL of them structurally,
+# independent of the totals-text pattern list — so a stray fragment or a header
+# that slips the band can never corrupt a Description.
+DESC_X0_MIN, DESC_X0_MAX = 60, 110
+
 # (column_key, x_min, x_max): a data word belongs to the column whose window
 # contains the word's horizontal CENTER. Order = TSMIS column order; the three
 # ADT columns exist in the TSN layout but have no TSMIS counterpart and are
@@ -174,21 +186,36 @@ DISTRICT_FROM_NAME = re.compile(r"D(\d{1,2})", re.IGNORECASE)
 # "County Cumulative DVM 123,414", bare mileage fragments) do not — and were
 # being appended to the preceding row's Description, manufacturing false
 # discrepancies in the TSMIS-vs-TSN comparison. These markers never occur in a
-# real highway-feature description; \b on UNCONST keeps "UNCONSTRUCTED" safe.
-# Verified across D01-D03: catches every totals continuation, drops no
-# legitimate description.
+# real highway-feature description.
 _TOTALS_RE = re.compile(
-    r"\(DVM|\bDVM[ST]?\b|\bCUMULATIVE\b|\bUNCONST\b"
+    r"\(DVM|\bDVM[ST]?\b|\bCUMULATIVE\b"
     r"|\b(?:CITY|COUNTY|DISTRICT|STATE)\s+TOTALS?\b|TOTALS?\s*\(MILEAGE\)",
     re.IGNORECASE)
+# "UNCONST" alone is a real abbreviation (UNCONSTRUCTED) in genuine descriptions
+# ("JCT UNCONST RTE 251", "BEG ST 14 UNCONST RD N") — so it marks a totals line
+# ONLY in its footer context: paired with its CONST counterpart (the
+# constructed/unconstructed mileage split "TOTAL CONST UNCONST" /
+# "CONST 089.826 UNCONST 000.000") or immediately followed by a mileage figure
+# ("UNCONST 000.000"). \bCONST\b / \bUNCONST\b word boundaries keep
+# "CONSTRUCTION" / "UNCONSTRUCTED" descriptions safe.
+_TOTALS_UNCONST_RE = re.compile(
+    r"\bCONST\b.*\bUNCONST\b|\bUNCONST\s+[\d.]", re.IGNORECASE)
+# A line that is ONLY digits/punctuation (bare cumulative-mileage / volume
+# fragments, separator dashes) — but never a lone hyphenated structure number
+# like "53-1075", which is a legitimate one-token bridge description.
 _TOTALS_NUMERIC_RE = re.compile(r"[\d.,()$ +-]+")
+_BRIDGE_NUMBER_RE = re.compile(r"^\d{2,3}-\d{2,4}[A-Z]?$")
 
 
 def _is_totals_line(text):
     """True for a totals-block continuation line that must NOT be treated as a
-    segment description (see _TOTALS_RE)."""
-    return bool(_TOTALS_RE.search(text)) or \
-        bool(_TOTALS_NUMERIC_RE.fullmatch(text.strip()))
+    segment description (see _TOTALS_RE / _TOTALS_UNCONST_RE)."""
+    stripped = text.strip()
+    if _BRIDGE_NUMBER_RE.match(stripped):
+        return False
+    return bool(_TOTALS_RE.search(text)) \
+        or bool(_TOTALS_UNCONST_RE.search(text)) \
+        or bool(_TOTALS_NUMERIC_RE.fullmatch(stripped))
 
 
 def _lines(page):
@@ -285,8 +312,14 @@ def parse_pdf(path, events, pdf_name=""):
                 texts = [w["text"] for w in words]
                 first = words[0]
 
-                # "* * Volume Location Totals ..." summary lines.
+                # "* * Volume Location Totals ..." summary lines. A totals line
+                # marks the END of the current segment's data + description, so
+                # it CLOSES the open row: any footer fragment that follows it (a
+                # stray wrapped "TOTAL", a "(DVMS) …" volume that didn't match
+                # _is_totals_line) must not attach to the preceding segment's
+                # Description. (Structural guard behind _is_totals_line.)
                 if texts[0].startswith("*"):
+                    last_row = None
                     continue
 
                 # Title page: "District 01" pins the district number.
@@ -320,11 +353,15 @@ def parse_pdf(path, events, pdf_name=""):
                     continue
 
                 # Anything else below the band is a description for the
-                # previous segment (TSN prints them on their own lines) — EXCEPT
-                # the wrapped continuation lines of a totals block, which would
-                # otherwise corrupt that segment's Description with volume/
-                # cumulative-mileage figures.
+                # previous segment (TSN prints them on their own lines). Two
+                # structural guards keep footer/furniture text out of the
+                # Description: (1) it must start in the feature-name column band
+                # (DESC_X0_MIN..MAX) — page furniture and wrapped totals
+                # fragments print well outside it; (2) totals-block continuations
+                # that DO land near the band are caught by pattern.
                 if last_row is not None:
+                    if not (DESC_X0_MIN <= first["x0"] <= DESC_X0_MAX):
+                        continue
                     text = " ".join(texts)
                     if _is_totals_line(text):
                         continue

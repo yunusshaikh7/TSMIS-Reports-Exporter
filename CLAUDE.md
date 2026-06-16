@@ -57,7 +57,21 @@ shipped". Console flows honor the same overrides automatically.
   x-position character-window parsing calibrated against real district PDFs;
   don't re-derive the windows. `day` is ignored (vendor snapshots aren't dated
   exports); the module exposes `INPUT_NOTE`/`INPUT_DIR` so the Consolidate
-  pane shows where the PDFs go.
+  pane shows where the PDFs go. **Column parsing is verified flawless** against
+  all 12 district PDFs (D01-D12): 0 character-conservation failures / 0 row-count
+  mismatches over 60,083 rows (every PDF data row → exactly one Excel row, every
+  kept char in the right column). **Description capture (v0.11.0)** carries THREE
+  structural guards so totals-footer / page-furniture text can never corrupt a
+  segment's Description: (1) an **x0-gate** — a real feature description prints in
+  the feature-name column at x0≈73 (`DESC_X0_MIN..MAX`), so wrapped totals
+  fragments ("TOTAL" at x0≈170) and header furniture ("CALIFORNIA DEPARTMENT…"
+  x0≈37, "District NN" x0≈256) are excluded by POSITION, independent of any text
+  pattern; (2) a `*` totals line **closes the open row** (`last_row=None`) so
+  trailing footer can't attach; (3) `_is_totals_line` pattern-matches the
+  `(DVMS)/CUMULATIVE/TOTAL CONST UNCONST/`bare-mileage continuations. `UNCONST`
+  alone is a real abbreviation (UNCONSTRUCTED) and is kept unless paired with its
+  CONST footer counterpart; a lone hyphenated bridge number (`53-1075`) is kept.
+  Locked by `build/check_tsn_description_leak.py`.
 - **Compare tab** — two comparison families since v0.10.0, both built by ONE
   engine: `compare_core.py` (extracted verbatim-then-parameterized from
   compare_highway_log; a `CompareSchema` carries side names — emitted into
@@ -157,7 +171,9 @@ shipped". Console flows honor the same overrides automatically.
   rows). Column geometry for both shapes lives in compare_core's `_Layout`. The per-route
   format is locked to the approved Route-1 sample and verified cell-for-cell
   against it (same union order, same counts Excel cached: 299 both / 18 / 69 /
-  221 diff rows / 971 diff cells) with intended changes — matched values
+  221 diff rows / 969 diff cells — was 971 before the v0.11.0 TSN totals-block
+  fix dropped Route-1's 2 leak-caused Description false positives) with
+  intended changes — matched values
   shown instead of blank, row numbers rendered as clickable links, and the
   additive Spot Check / Only-in tabs. Med Wid compares after zero-pad
   normalization (TSMIS `0Z` = TSN `00Z`).
