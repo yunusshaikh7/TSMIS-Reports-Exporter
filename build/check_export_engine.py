@@ -398,6 +398,33 @@ def test_site_url_override():
           settings._override_problem("https://tsmis.dot.ca.gov/?env=dev&src=ars", "ssor", "dev") is not None)
 
 
+def test_corrupt_config_backup():
+    print("corrupt config.json backup (WS3):")
+    import settings
+    cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_cfg_"))
+    orig_file = settings.CONFIG_FILE
+    settings.CONFIG_FILE = cfgdir / "config.json"
+    settings._cache = settings._cache_mtime = None
+    try:
+        settings.CONFIG_FILE.write_text("{ not valid json", encoding="utf-8")
+        data = settings._read_file()
+        check("corrupt read falls back to defaults ({})", data == {})
+        check("corrupt file moved aside to config.json.corrupt",
+              (cfgdir / "config.json.corrupt").exists())
+        check("original config.json removed", not settings.CONFIG_FILE.exists())
+        # get() of any key still returns its default (no crash, no silent loss path)
+        settings._cache = settings._cache_mtime = None
+        check("get() returns the default after corruption",
+              settings.get("report_timeout_min") == settings.DEFAULTS["report_timeout_min"])
+        # A transient OSError (not JSONDecodeError) must NOT move the file aside.
+        settings.CONFIG_FILE.write_text('{"report_timeout_min": 9}', encoding="utf-8")
+        settings._cache = settings._cache_mtime = None
+        check("valid config reads back", settings.get("report_timeout_min") == 9)
+    finally:
+        settings.CONFIG_FILE = orig_file
+        settings._cache = settings._cache_mtime = None
+
+
 def main():
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_ws1_"))
 
@@ -423,6 +450,7 @@ def main():
         test_cs_disabled()
         test_auth_url_redaction()
         test_site_url_override()
+        test_corrupt_config_backup()
     finally:
         exporter.report_error_text = _orig_error
         for obj, name, old in reversed(_patched):

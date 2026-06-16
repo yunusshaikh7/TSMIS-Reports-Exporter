@@ -33,6 +33,10 @@ jobs:
           pip install ruff bandit pip-audit
 
       - name: Install Chromium for the fake-site selector tests
+        # Best-effort: check_fake_site falls back to the runner's system Edge and
+        # skips cleanly if no browser is drivable, so a CDN/network blip on this
+        # download must not red the whole job.
+        continue-on-error: true
         run: python -m playwright install chromium
 
       - name: Byte-compile all sources (blocking)

@@ -567,6 +567,25 @@ _REPORT_OPTIONS_JS = """(labels) => {
 }"""
 
 
+def env_verdict(config_readable, reports_readable):
+    """Fail-closed verdict for a combo that signed in AND pulled report data:
+    returns (status, detail). If the site's CONFIG (the environment
+    confirmation) or its report-type list couldn't be read, report "unverified"
+    (a future contract change must never read as a silent green "ok") naming what
+    couldn't be confirmed; otherwise "ok". Pure -> unit-tested directly (the rest
+    of the scan needs a live browser)."""
+    unconfirmed = []
+    if not config_readable:
+        unconfirmed.append("the environment couldn't be confirmed from the site")
+    if not reports_readable:
+        unconfirmed.append("the report-type list couldn't be read "
+                           "(only one type was checked)")
+    if unconfirmed:
+        return "unverified", ("Signed in and pulled report data, but "
+                              + "; ".join(unconfirmed) + ".")
+    return "ok", "Sign-in and report data OK."
+
+
 class EnvScanWorker(threading.Thread):
     """The "Check all environments" scan (Settings button + the automatic
     run after startup/sign-in): probe EVERY data source / environment
@@ -792,24 +811,12 @@ class EnvScanWorker(threading.Thread):
                 out["detail"] = ("Sign-in and report data OK, but unavailable "
                                  "here: " + ", ".join(off) + ".")
                 return out
-            # Clean sign-in + working report data. But if the site's own config
-            # (the environment confirmation) or its report list couldn't be read,
-            # don't claim a verified OK -- a future contract change must never
-            # read as a silent green check (the scan would otherwise fail OPEN
-            # here). Report "unverified" and say what couldn't be confirmed.
-            unconfirmed = []
-            if not config_readable:
-                unconfirmed.append("the environment couldn't be confirmed from the site")
-            if options is None:
-                unconfirmed.append("the report-type list couldn't be read "
-                                   "(only one type was checked)")
-            if unconfirmed:
-                out["status"] = "unverified"
-                out["detail"] = ("Signed in and pulled report data, but "
-                                 + "; ".join(unconfirmed) + ".")
-                return out
-            out["status"] = "ok"
-            out["detail"] = "Sign-in and report data OK."
+            # Clean sign-in + working report data. The fail-closed verdict logic
+            # (don't claim a green "ok" when the site's CONFIG or report list
+            # couldn't be read) is a pure mapping, factored out so it's unit
+            # tested directly (the rest of this method needs a live browser).
+            out["status"], out["detail"] = env_verdict(config_readable,
+                                                        options is not None)
             return out
         except Exception as e:
             reason = str(e).splitlines()[0] if str(e) else type(e).__name__

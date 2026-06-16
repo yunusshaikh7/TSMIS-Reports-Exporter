@@ -202,6 +202,11 @@ def test_cs_disabled(page):
           isinstance(raised, ReportUnavailableError))
 
     page.goto(_fixture_url("dropdown.html"))
+    # The enabled selection clears the cs-disabled gate, then fails fast on the
+    # missing District/County/Route control. Cap the action timeout so that
+    # failure is ~2s, not Playwright's default 30s (the assertion only cares
+    # that ReportUnavailableError did NOT fire).
+    page.set_default_timeout(2000)
     gate = "passed"
     try:
         select_report(page, "Highway Log")
@@ -209,6 +214,8 @@ def test_cs_disabled(page):
         gate = "blocked"
     except Exception:  # noqa: BLE001
         gate = "passed"   # failed later (no Route control) -- gate was cleared
+    finally:
+        page.set_default_timeout(30000)
     check("select_report does NOT block an enabled report", gate == "passed")
 
 

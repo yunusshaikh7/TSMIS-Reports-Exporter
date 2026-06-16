@@ -275,6 +275,11 @@ class GuiApi:
         u32.GetWindowThreadProcessId.restype = wintypes.DWORD
         u32.GetWindowThreadProcessId.argtypes = [wintypes.HWND,
                                                  ctypes.POINTER(wintypes.DWORD)]
+        # Type the HWND-taking text calls too so a 64-bit handle is never
+        # default-marshalled as a 32-bit int.
+        u32.GetWindowTextLengthW.restype = ctypes.c_int
+        u32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+        u32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
         my_pid = os.getpid()
         found = []
 
@@ -1689,8 +1694,18 @@ class GuiApi:
 
     @_api_method
     def open_consolidated_folder(self, report_idx, day):
-        _label, mod = CONSOLIDATE_REPORTS[int(report_idx)]
-        self._open_folder(mod.out_path_for(day or None).parent)
+        # Same WS5 guards as its siblings: bounds-check the index and validate
+        # the day (no traversal into a folder outside OUTPUT_ROOT -- this method
+        # mkdir+opens the resolved path via _open_folder).
+        row = self._pick_report(CONSOLIDATE_REPORTS, report_idx)
+        if row is None:
+            return {"error": "That report isn't available — please reopen the tab."}
+        try:
+            day = self._safe_day(day)
+        except ValueError as e:
+            return {"error": str(e)}
+        _label, mod = row
+        self._open_folder(mod.out_path_for(day).parent)
         return {"ok": True}
 
 

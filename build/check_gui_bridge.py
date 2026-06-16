@@ -134,8 +134,26 @@ def test_compare_dialog_error_releases():
     a._release_task()
 
 
+def test_env_verdict():
+    print("env-scan fail-closed verdict (WS3):")
+    from gui_worker import env_verdict
+    ok_status, ok_detail = env_verdict(True, True)
+    check("both readable -> ok", ok_status == "ok")
+    uv1, d1 = env_verdict(False, True)
+    check("CONFIG unreadable -> unverified (not ok)", uv1 == "unverified")
+    check("CONFIG-unreadable detail names the environment",
+          "environment" in d1.lower())
+    uv2, d2 = env_verdict(True, False)
+    check("report-list unreadable -> unverified", uv2 == "unverified")
+    check("report-list-unreadable detail names the report list",
+          "report-type" in d2.lower() or "report" in d2.lower())
+    uv3, _ = env_verdict(False, False)
+    check("both unreadable -> unverified (never silent ok)", uv3 == "unverified")
+
+
 def main():
     test_pick_report()
+    test_env_verdict()
     test_path_validation()
     test_single_flight()
     test_reset_token()

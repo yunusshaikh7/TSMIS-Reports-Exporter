@@ -90,6 +90,71 @@ def test_staged_allowlist(monkeypatch_wait):
           (app / "data" / "config.json").read_text(encoding="utf-8") == "{}")
 
 
+def test_sha256_verify(monkeypatch_wait):
+    print("download_and_stage SHA-256 verification:")
+    import hashlib
+    DATA = b"these bytes are not a real zip, but we control their hash"
+    good = hashlib.sha256(DATA).hexdigest()
+
+    class _FakeResp:
+        def __init__(self, data):
+            self._data, self._pos = data, 0
+            self.headers = {"Content-Length": str(len(data))}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, n):
+            chunk = self._data[self._pos:self._pos + n]
+            self._pos += len(chunk)
+            return chunk
+
+    orig_http = updater._http_get
+    orig_support = updater.update_support
+    orig_update_dir = updater.UPDATE_DIR
+    updater._http_get = lambda url, timeout: _FakeResp(DATA)
+    updater.update_support = lambda: ("ok", None)
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_sha_"))
+    updater.UPDATE_DIR = tmp / "update"
+    Info = updater.UpdateInfo
+    try:
+        # Wrong published hash -> refuse, delete the zip, stage nothing.
+        bad_info = Info("1", "v1", "pkg.zip", "http://x/pkg.zip", 0, "",
+                        asset_digest="sha256:" + ("0" * 64))
+        err = None
+        try:
+            updater.download_and_stage(bad_info)
+        except updater.UpdateError as e:
+            err = str(e)
+        check("mismatch raises UpdateError", err is not None)
+        check("mismatch message mentions the checksum",
+              err is not None and "checksum" in err.lower())
+        check("mismatched download was deleted",
+              not (updater.UPDATE_DIR / "pkg.zip").exists())
+        check("nothing was staged on mismatch",
+              not (updater.UPDATE_DIR / "staged").exists())
+
+        # Correct hash -> PASSES verification (then fails later at extract,
+        # since DATA isn't a real zip -- a DIFFERENT error, proving the hash
+        # check was cleared rather than the cause).
+        good_info = Info("1", "v1", "pkg.zip", "http://x/pkg.zip", 0, "",
+                         asset_digest="sha256:" + good)
+        err2 = None
+        try:
+            updater.download_and_stage(good_info)
+        except updater.UpdateError as e:
+            err2 = str(e)
+        check("matching hash gets PAST verification (fails later at extract)",
+              err2 is not None and "checksum" not in err2.lower())
+    finally:
+        updater._http_get = orig_http
+        updater.update_support = orig_support
+        updater.UPDATE_DIR = orig_update_dir
+
+
 def test_missing_exe_aborts(monkeypatch_wait):
     print("swap aborts on an incomplete staged tree:")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_upd2_"))
@@ -116,6 +181,7 @@ def main():
     try:
         test_versions()
         test_expected_sha256()
+        test_sha256_verify(monkeypatch_wait)
         test_staged_allowlist(monkeypatch_wait)
         test_missing_exe_aborts(monkeypatch_wait)
     finally:

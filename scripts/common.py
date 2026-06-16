@@ -122,8 +122,10 @@ _thread_site = threading.local()
 
 
 def set_thread_site(source=None, environment=None):
-    """Pin THIS thread's site target (both None = clear the pin)."""
-    if source is None and environment is None:
+    """Pin THIS thread's site target (both None = clear the pin). A partial pin
+    (exactly one of source/environment given) is treated as "clear" rather than
+    crashing on a None.lower() -- callers always pass both or neither."""
+    if not source or not environment:
         _thread_site.pair = None
     else:
         _thread_site.pair = (source.lower(), environment.lower())
@@ -202,7 +204,9 @@ COUNTY_ENABLE_TIMEOUT_MS = 60_000
 # (e.g. an empty Intersection Detail), so capping this window lets the engine
 # record the route as empty in seconds instead of waiting out the full ceiling
 # (and then the 15-min retry) on a download that will never start. Generous on
-# purpose; raise it via Settings only if a real report legitimately needs longer.
+# purpose; settings-backed (download_start_timeout_s) but with no Settings-tab
+# control yet -- raise it by hand-editing data/config.json only if a real report
+# legitimately needs longer.
 DOWNLOAD_START_TIMEOUT_MS = 60_000
 
 # Fast mode runs several browsers at once, so the shared TSMIS server is under a
@@ -258,8 +262,9 @@ def county_enable_timeout_ms():
 
 def download_start_timeout_ms():
     """Effective wait for the Export download to start after a rendered report
-    (Settings tab can raise it; default DOWNLOAD_START_TIMEOUT_MS). See the
-    constant's note: this bounds the download, NOT report generation."""
+    (settings-backed via download_start_timeout_s — config.json only, no Settings
+    UI; default DOWNLOAD_START_TIMEOUT_MS). See the constant's note: this bounds
+    the download, NOT report generation."""
     return _settings_ms("download_start_timeout_s", DOWNLOAD_START_TIMEOUT_MS, 1_000)
 
 ROUTES = [
