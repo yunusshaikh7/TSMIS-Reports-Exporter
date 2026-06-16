@@ -48,22 +48,61 @@ Legend: ✅ done & verified · 🟡 code done, **verification pending data** · 
 
 ---
 
-## Hardening surfaced during the audit (not blocked)
+## Done this patch (next-patch-og)
 
-### TSN Highway Log PDF parser — Description-column pollution (feeds false diffs)
-- `consolidate_tsn_highway_log.py`: City/County **TOTALS** blocks wrap across
-  lines; continuation lines (`(DVMS) 3,391`, `CUMULATIVE (MILEAGE) …`,
-  `UNCONST 000.000`, bare mileage fragments) don't match the `*`-prefix skip and
-  fall through into the preceding data row's **Description**, producing
-  false-positive Description diffs in TSMIS-vs-TSN (48 / 70 / 150 leaked rows in
-  D01 / D02 / D03). Med Wid windows, the Location key, and dates audited clean.
-- Tracked as fix #6 on the main brief; landing on this branch.
+- ✅ **`COMPARE-KEY-IS-FIRST-COLUMN`** — `CompareSchema.key_field`; Highway
+  Sequence (+ Ramp Detail) key on **PM**, not the coarse first column.
+  Real-data: full 252-route PROD-vs-DEV HSL diff cells 15,797→5,070, 9/9
+  SELF-CHECK OK. Regression IDENTICAL. (`check_compare_keyfield.py`)
+- ✅ **`COMPARE-SKIPPED-FILES-MATCH` + `CONSOLIDATE-XLSX-PARTIAL-OK`** — skipped/
+  unreadable inputs force the verdict off "match", surface in the workbook +
+  summary; consolidator won't overwrite a good file on all-fail.
+  (`check_compare_skipwarn.py`)
+- ✅ **`SHEET-FORMULA-INJECTION`** — leading `= + - @` free text stored as TEXT
+  on every write path. (`check_compare_injection.py`)
+- ✅ **`RAMP-SUMMARY-FAILURES-OK` / `SHORT-PDF-BLANK`** — one-page/failed PDFs
+  dropped, never overwrite a good workbook. (`check_ramp_summary_partial.py`)
+- ✅ **`COMPARE-VALUE-COERCION`** — date/datetime canonicalized at load (flavor
+  parity); integer/number-vs-text already match. (`check_compare_coercion.py`)
+- ✅ **TSN Description leak** — totals-block continuations (`(DVMS)`,
+  `CUMULATIVE`, `TOTAL CONST UNCONST`, `County Cumulative DVM`, bare mileage)
+  no longer pollute Description. Real-data: 0 leaks remain (was 48/70/150);
+  TSMIS-vs-TSN Route-1 loses its 2 leak-caused false positives.
+  (`check_tsn_description_leak.py`)
+- ✅ **Excel row/column-limit guard + sheet-name collision** — fail cleanly
+  before writing. (`check_compare_limits.py`)
 
-### Lower-priority (from RECONCILED-FINDINGS WS2)
-- ⬜ Excel row-limit guard (union > ~1,048,575 rows).
-- ⬜ `CompareSchema.sheet_names()` collision if a side is literally named
-  "Summary"/"Comparison"/"Routes"/etc.
-- ⬜ `extractall`/junction safety review (only if relevant to comparison inputs).
+## Found in the full audit — open
+
+### ⬜ Med Wid flavor-parity gap (`compare_core.py`) — latent, dormant on real data
+`_medwid_norm` (Python mirror, ~`:251`, used by the VALUES flavor + run summary)
+and `_medwid_ref` (the Excel formula, ~`:440`, used by the FORMULAS flavor) can
+DISAGREE, because Excel `VALUE()` accepts far more strings as numeric than the
+Python regex `\d+(\.\d+)?`. Excel-COM-verified divergences (Python vs Excel):
+`".5"`→`.5`/`0.5`; `"5."`→`5.`/`5`; `"+5"`→`+5`/`5`; `"1 2"`→`1 2`/`12`
+(VALUE ignores internal spaces); `"0."`→`0.`/`0`; `"1e3"`→text/`1000`; `"$5"`,
+`"5%"`, `"1,234"`, `".1"` similar. These cause **verdict flips** (values flavor
+says DIFF, formulas says MATCH for the same cell) — a violation of the "the two
+flavors can never disagree" invariant.
+- **Currently DORMANT:** all 222 distinct Med Wid values across the real
+  consolidated TSMIS/TSN files are clean `<digits><letter>` codes (`0Z`,`06V`,
+  `99P`) plus `"+++"` (parity-safe). It only fires if a Med Wid ever contains a
+  space / sign / bare-or-trailing decimal point / sci-notation / separator.
+- **Why not fixed this round:** the fix must change either the regression-locked
+  `_medwid_ref` formula TEXT (re-prove cell-for-cell + COM that real results are
+  unchanged) or replicate Excel `VALUE()` exactly in Python (fragile). Safer
+  direction: gate the Excel `VALUE()` behind a strict `\d+(\.\d+)?`-equivalent
+  test so it matches the Python mirror, then re-run the regression lock.
+- AREA-1 audit (`compare_highway_log._load_input`: per-route vs consolidated
+  shape detection, mixed-shape rejection, date pass-through) came back SOLID;
+  `_xl_trim` vs Excel TRIM parity is sound (only sub-1e-4 sci-notation diverges,
+  impossible for Highway Log numeric fields).
+
+## Still open / lower-priority
+- ⬜ `extractall`/junction safety review (only if relevant to comparison inputs;
+  the comparison reads existing files, doesn't extract archives — likely N/A).
+- ⬜ Ramp Summary golden fixture from REAL exports (synthetic-only today).
+- ⬜ Ramp Detail real-data re-key verification (see above).
 
 ---
 
