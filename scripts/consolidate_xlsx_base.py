@@ -28,10 +28,22 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+from compare_core import is_formula_injection   # shared formula-injection guard
 from events import ConsolidateResult, Events
 
 # Pull the route token out of "<prefix>_route_<ROUTE>.xlsx".
 ROUTE_FROM_NAME = re.compile(r"_route_(\w+)\.xlsx$", re.IGNORECASE)
+
+
+def _safe_cell(ws, value):
+    """A WriteOnlyCell forced to text when `value` would be read by Excel as a
+    formula (injection guard); the plain value otherwise (openpyxl handles it).
+    The value is preserved exactly — only formula-looking text is neutralized."""
+    if is_formula_injection(value):
+        c = WriteOnlyCell(ws, value=value)
+        c.data_type = "s"
+        return c
+    return value
 
 
 def _extract_route(path):
@@ -187,7 +199,7 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
         try:
             count = 0
             for row in _stream_data_rows(p, sheet_name):
-                ws.append([route] + list(row))
+                ws.append([route] + [_safe_cell(ws, v) for v in row])
                 count += 1
             events.on_log(f"{prefix} +{count} rows  (route {route})")
             appended_rows += count

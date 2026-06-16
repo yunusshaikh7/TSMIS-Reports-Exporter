@@ -455,13 +455,30 @@ def _field_value(sc, rt, rn, off, f):
 # display order, freeze/widths/filter/CF are set before rows are appended,
 # and styled cells are WriteOnlyCells.
 
-def _styled(ws, value, font, fill=None, align=None):
+# Spreadsheet formula-injection guard. A free-text value beginning with one of
+# these would be interpreted by Excel as a formula (the classic CSV/XLSX
+# injection vector — a malicious Description like "=cmd|'/C calc'!A1" runs on
+# open). `guard=True` on a cell forces such a value to a STRING cell so Excel
+# shows it verbatim and never executes it. The value is kept byte-for-byte
+# (only the cell TYPE changes), so equal sides still compare equal and clean
+# data is written exactly as before — the regression lock is unaffected.
+_FORMULA_LEAD = ("=", "+", "-", "@")
+
+
+def is_formula_injection(value):
+    """True when `value` is text Excel might evaluate as a formula."""
+    return isinstance(value, str) and value[:1] in _FORMULA_LEAD
+
+
+def _styled(ws, value, font, fill=None, align=None, guard=False):
     c = WriteOnlyCell(ws, value=value)
     c.font = font
     if fill:
         c.fill = fill
     if align:
         c.alignment = align
+    if guard and is_formula_injection(value):
+        c.data_type = "s"          # never let user text become a live formula
     return c
 
 
@@ -512,7 +529,10 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         # (temporary highlight until the next click) WITHOUT scrolling
         # right, same as the forward row links.
         cells = [_styled(ws, f'=HYPERLINK("#Comparison!{u}:{u}",{u})', link_font)]
-        cells += [_styled(ws, v, body_font) for v in row]
+        # Raw input values are guarded: a Description like "=cmd…" stays text,
+        # never a live formula (the field FORMULAS read these via TRIM/INDEX, so
+        # guarding here protects both flavors at the source).
+        cells += [_styled(ws, v, body_font, guard=True) for v in row]
         # Both flavors write a LITERAL key (the comparison's row universe is
         # build-time static): a live COUNTIFS mis-numbers blank key fields, and
         # the literal always matches the Comparison sheet's stored occurrence #.
@@ -605,7 +625,18 @@ def _write_comparison(wb, union, lay, events, vals=None):
                 status,
                 ndiff if status == "Both" else None,
             ] + fields
-        ws.append([_styled(ws, v, link_font if j in link_cols else body_font)
+        # Guard literal cells against formula injection without touching our own
+        # formulas: in the formulas flavor only the key/route id cells are
+        # literals (everything else is an =formula or a HYPERLINK link); in the
+        # values flavor every non-link cell is a literal. (HYPERLINK cells must
+        # stay formulas, so they're never guarded.)
+        if vals is None:
+            guard_set = {0} if lay.has_route else set()
+            guard_set.add(1 if lay.has_route else 0)         # the key (loc) cell
+        else:
+            guard_set = set(range(len(row))) - link_cols
+        ws.append([_styled(ws, v, link_font if j in link_cols else body_font,
+                           guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
             events.on_log(f"  Comparison sheet: {i + 1:,} of {len(union):,} rows…")
@@ -934,7 +965,16 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None):
                            else f"this {sc.id_noun} only")
             row += [(_xl_trim(own[f + vals["off"]]) or None)
                     for f in lay.field_indices]
-        ws.append([_styled(ws, v, link_font if j == link_col else body_font)
+        # Same injection guard as the Comparison sheet: in the formulas flavor
+        # only the key/route id cells are literals; in the values flavor every
+        # non-link cell is. The "<side> Row" HYPERLINK must stay a formula.
+        if vals is None:
+            guard_set = {0} if lay.has_route else set()
+            guard_set.add(1 if lay.has_route else 0)         # the key (loc) cell
+        else:
+            guard_set = set(range(len(row))) - {link_col}
+        ws.append([_styled(ws, v, link_font if j == link_col else body_font,
+                           guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
             events.on_log(f"  {name} sheet: {i + 1:,} of {len(keys):,} rows…")

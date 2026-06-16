@@ -59,6 +59,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+from compare_core import is_formula_injection   # shared formula-injection guard
 from consolidate_xlsx_base import consolidate_xlsx
 from events import ConsolidateResult, Events
 from paths import INPUT_ROOT, OUTPUT_ROOT
@@ -331,6 +332,11 @@ def _write_route_workbook(rows, out_path):
 
     for row in rows:
         ws.append([row.get(k) for k in ROW_KEYS])
+        # Neutralize any formula-looking text (e.g. a Description that starts
+        # with "=") so it can't execute when the workbook is opened.
+        for cell in ws[ws.max_row]:
+            if is_formula_injection(cell.value):
+                cell.data_type = "s"
     wb.save(out_path)
 
 
