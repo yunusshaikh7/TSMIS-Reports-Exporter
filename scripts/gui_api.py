@@ -1386,8 +1386,14 @@ class GuiApi:
     @_api_method
     def save_support_bundle(self):
         """Zip the diagnostics a maintainer needs (rotating logs, run reports,
-        settings, a manifest) to a user-chosen location. The saved login and
-        browser profiles are NEVER included — the bundle is safe to share."""
+        settings, a manifest) to a user-chosen location.
+
+        What it does NOT contain: the saved login / browser profiles / failure
+        dumps (FAILURES_DIR) are never added. What it DOES contain, by design:
+        the rotating logs and the manifest, which include this PC's name in file
+        paths, the OS version, and the current settings — diagnostics need those.
+        So it's safe to send to the TSMIS maintainer, not "safe to post
+        publicly"; the user-facing wording below says so plainly."""
         import io
         import platform
         import zipfile
@@ -1403,6 +1409,10 @@ class GuiApi:
         manifest = io.StringIO()
         src, env = get_site()
         manifest.write(f"TSMIS Exporter support bundle\n"
+                       f"NOTE: includes this PC's name in file paths, the OS\n"
+                       f"  version and current settings (diagnostics need them);\n"
+                       f"  NO saved login, browser profile, or failure dumps.\n"
+                       f"  Send it to the TSMIS maintainer, not a public forum.\n"
                        f"created:    {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
                        f"version:    {__version__}\n"
                        f"build:      {'frozen' if is_frozen() else 'dev'}\n"
@@ -1437,8 +1447,9 @@ class GuiApi:
                     pass
         ui_log.info("support bundle saved: %s (%d files)", out, added)
         self._emit_log(f"Support bundle saved ({added} files): {out}")
-        self._emit_log("  It contains logs, run reports and settings — never "
-                       "your login.")
+        self._emit_log("  It has logs, run reports and settings (and this PC's "
+                       "name in paths) — never your password or saved login. "
+                       "Send it to the TSMIS maintainer.")
         return {"saved": str(out)}
 
     @_api_method

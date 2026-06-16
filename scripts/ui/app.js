@@ -682,6 +682,7 @@ function renderState() {
 // chip on each Settings address row, and the title-bar aggregate.
 const ENV_ACCESS_BADGE = {
   ok:          { dot: "ok",   text: "OK" },
+  unverified:  { dot: "warn", text: "Couldn't verify" },
   reports_off: { dot: "warn", text: "Reports limited" },
   no_reports:  { dot: "bad",  text: "No report data" },
   denied:      { dot: "bad",  text: "Access denied" },
@@ -728,7 +729,8 @@ function renderEnvAccess() {
     btn.title = "Environment check running — verdicts land next to each address in Settings";
   } else {
     const ok = entries.filter((e) => e.status === "ok").length;
-    const onlyLimited = entries.every((e) => e.status === "ok" || e.status === "reports_off");
+    const onlyLimited = entries.every((e) =>
+      e.status === "ok" || e.status === "reports_off" || e.status === "unverified");
     setDot(dot, ok === total ? "ok" : onlyLimited ? "warn" : "bad");
     txt.textContent = `Envs ${ok}/${total}`;
     const lines = entries.filter((e) => e.status !== "ok")

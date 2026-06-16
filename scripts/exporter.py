@@ -239,12 +239,19 @@ def _recover_or_stop(page, spec, events):
 
 def _capture_failure(page, spec, route, events):
     """Save a screenshot + page HTML for a failed route. Best-effort: never
-    raises, so a capture problem can't mask the original error."""
+    raises, so a capture problem can't mask the original error.
+
+    The screenshot is the VIEWPORT, not the full page: a failed route may have a
+    fully-rendered report behind it, and these diagnostics persist on disk under
+    FAILURES_DIR (a folder the user can open). The failure state worth capturing
+    -- the error box, the button state -- is above the fold, so the viewport
+    keeps the diagnostic value while not writing the whole report image to disk.
+    (FAILURES_DIR is deliberately NEVER added to the shareable support bundle.)"""
     try:
         FAILURES_DIR.mkdir(parents=True, exist_ok=True)
         stem = f"{spec.subdir}_route_{route}_{time.strftime('%Y%m%d_%H%M%S')}"
         png = FAILURES_DIR / f"{stem}.png"
-        page.screenshot(path=str(png), full_page=True)
+        page.screenshot(path=str(png), full_page=False)
         try:
             (FAILURES_DIR / f"{stem}.html").write_text(page.content(), encoding="utf-8")
         except Exception:

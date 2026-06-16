@@ -1,4 +1,4 @@
-"""Standalone regression checks for the WS1 export-engine hardening.
+"""Standalone regression checks for the WS1/WS3 audit-fix hardening.
 
 Pure Python, no login and no live browser -- run with the build venv:
 
@@ -14,6 +14,9 @@ Covers the v0.11 audit fixes that don't need the live site:
     Intersection Summary's "Total Intersections = 0", and the unchanged ramp/
     highway-log markers)
   * select_report raising ReportUnavailableError on a cs-disabled option
+  * auth_state stripping the token fragment from logged URLs (WS3)
+  * the custom site-URL override validation (https + *.ca.gov + matching
+    ?env=/?src= params) (WS3)
 
 The browser-coupled JS predicates (EXPORT_READY_JS, the wait_js arrow functions)
 are exercised by the fake-site harness; this file covers everything provable in
@@ -338,6 +341,43 @@ def test_cs_disabled():
         check(f"enabled report proceeds (raised {type(e).__name__})", False)
 
 
+def test_auth_url_redaction():
+    print("auth_state URL token redaction:")
+
+    class FakeAuthPage:
+        url = ("https://tsmis.dot.ca.gov/index.html?env=prod&src=ssor"
+               "#access_token=SECRET_TOKEN_VALUE&expires_in=7200")
+
+        def evaluate(self, js):
+            raise RuntimeError("signals unavailable")
+
+    st = common.auth_state(FakeAuthPage())
+    check("token fragment stripped from logged URL", "SECRET_TOKEN" not in st["url"])
+    check("clean URL preserved (query kept)",
+          st["url"] == "https://tsmis.dot.ca.gov/index.html?env=prod&src=ssor")
+
+
+def test_site_url_override():
+    print("custom site-URL override validation:")
+    import settings
+    ok = "https://tsmis.dot.ca.gov/index.html?env=dev&src=ssor"
+    check("valid override accepted", settings._override_problem(ok, "ssor", "dev") is None)
+    check("any *.ca.gov host accepted",
+          settings._override_problem("https://new.ca.gov/?env=dev&src=ssor", "ssor", "dev") is None)
+    check("http rejected",
+          settings._override_problem("http://tsmis.dot.ca.gov/?env=dev&src=ssor", "ssor", "dev") is not None)
+    check("non-ca.gov host rejected",
+          settings._override_problem("https://evil.com/?env=dev&src=ssor", "ssor", "dev") is not None)
+    check("suffix-spoof host rejected",
+          settings._override_problem("https://fake-ca.gov.evil.com/?env=dev&src=ssor", "ssor", "dev") is not None)
+    check("missing env/src params rejected",
+          settings._override_problem("https://tsmis.dot.ca.gov/index.html", "ssor", "dev") is not None)
+    check("mismatched env rejected",
+          settings._override_problem("https://tsmis.dot.ca.gov/?env=prod&src=ssor", "ssor", "dev") is not None)
+    check("mismatched src rejected",
+          settings._override_problem("https://tsmis.dot.ca.gov/?env=dev&src=ars", "ssor", "dev") is not None)
+
+
 def main():
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_ws1_"))
 
@@ -361,6 +401,8 @@ def main():
         test_attempt_route_empty(monkeypatch)
         test_markers()
         test_cs_disabled()
+        test_auth_url_redaction()
+        test_site_url_override()
     finally:
         exporter.report_error_text = _orig_error
         for obj, name, old in reversed(_patched):

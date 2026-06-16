@@ -603,10 +603,15 @@ _AUTH_DIAG_JS = """(() => {
 
 
 def auth_state(page):
-    """Best-effort snapshot of the page's sign-in signals for diagnostics."""
+    """Best-effort snapshot of the page's sign-in signals for diagnostics.
+
+    The URL is taken through page_url_for_display so the access token (which
+    rides in the URL fragment for the sub-second between the OAuth redirect
+    committing and the SPA's history.replaceState strip) can never reach a log
+    line or a failure dump -- this snapshot feeds both."""
     info = {}
     try:
-        info["url"] = page.url
+        info["url"] = page_url_for_display(page) or "<unavailable>"
     except Exception:
         info["url"] = "<unavailable>"
     try:

@@ -25,9 +25,9 @@ Message protocol (all are (kind, payload) tuples):
                                        as it finishes: {key, source,
                                        environment, label, status, detail,
                                        url, reports} — status is one of ok |
-                                       reports_off | no_reports | denied |
-                                       no_signin | wrong_site | unreachable |
-                                       error; reports maps each report
+                                       unverified | reports_off | no_reports |
+                                       denied | no_signin | wrong_site |
+                                       unreachable | error; reports maps each report
                                        type's dropdown label to
                                        ok | greyed | missing (empty when the
                                        dropdown couldn't be read)
@@ -728,6 +728,9 @@ class EnvScanWorker(threading.Thread):
                 got = page.evaluate(_CONFIG_JS)          # [env, src] or None
             except Exception:
                 pass
+            # _CONFIG_JS returns null when the site's CONFIG can't be read (a
+            # future rename), so None here = "couldn't confirm the environment".
+            config_readable = got is not None
             if got and got != [env, src]:
                 out["status"] = "wrong_site"
                 out["detail"] = (f"The page loaded {(got[1] or '?').upper()} / "
@@ -774,6 +777,22 @@ class EnvScanWorker(threading.Thread):
                 out["status"] = "reports_off"
                 out["detail"] = ("Sign-in and report data OK, but unavailable "
                                  "here: " + ", ".join(off) + ".")
+                return out
+            # Clean sign-in + working report data. But if the site's own config
+            # (the environment confirmation) or its report list couldn't be read,
+            # don't claim a verified OK -- a future contract change must never
+            # read as a silent green check (the scan would otherwise fail OPEN
+            # here). Report "unverified" and say what couldn't be confirmed.
+            unconfirmed = []
+            if not config_readable:
+                unconfirmed.append("the environment couldn't be confirmed from the site")
+            if options is None:
+                unconfirmed.append("the report-type list couldn't be read "
+                                   "(only one type was checked)")
+            if unconfirmed:
+                out["status"] = "unverified"
+                out["detail"] = ("Signed in and pulled report data, but "
+                                 + "; ".join(unconfirmed) + ".")
                 return out
             out["status"] = "ok"
             out["detail"] = "Sign-in and report data OK."

@@ -24,7 +24,7 @@ import json
 import logging
 import os
 import tempfile
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from paths import CONFIG_FILE
 
@@ -155,13 +155,45 @@ def update(changes):
 # consults these on every navigation, so a change applies immediately. NOT part
 # of DEFAULTS/all_settings (those stay scalar); the Settings tab edits these
 # through gui_api.set_site_url.
+#
+# An override is VALIDATED against the combo it overrides (not just "is it a
+# URL"): it must be https, point at a California state host (*.ca.gov), and carry
+# matching ?env=/?src= query params. Without the param check a custom address
+# missing ?env=/?src= would default the site to prod/ars and could silently
+# mislabel output as the wrong environment; the host + scheme limits keep a
+# typo / misdirection from pointing the app (with its saved session) at an
+# arbitrary off-network origin. An invalid stored value is ignored on read (the
+# app falls back to the built-in URL) rather than trusted.
 
-def _valid_url(url):
+
+def _host_is_ca_gov(host):
+    host = (host or "").lower()
+    return host == "ca.gov" or host.endswith(".ca.gov")
+
+
+def _override_problem(url, src, env):
+    """A user-safe reason `url` is unusable as the override for (src, env), or
+    None when it's valid. Enforces https + a *.ca.gov host + matching
+    ?env=/?src= params."""
     try:
         parts = urlsplit(url)
-        return parts.scheme in ("http", "https") and bool(parts.netloc)
     except (TypeError, ValueError):
-        return False
+        return "That doesn't look like a usable web address."
+    if not parts.netloc:
+        return "That doesn't look like a usable web address."
+    if parts.scheme != "https":
+        return "The address must start with https://."
+    if not _host_is_ca_gov(parts.hostname):
+        return ("The address must be a California state site "
+                "(a .ca.gov web address).")
+    q = parse_qs(parts.query)
+    got_env = (q.get("env") or [""])[0].lower()
+    got_src = (q.get("src") or [""])[0].lower()
+    if got_env != env or got_src != src:
+        return (f"The address must include ?env={env}&src={src} so it matches "
+                f"this environment (found env={got_env or '—'}, "
+                f"src={got_src or '—'}).")
+    return None
 
 
 def get_site_url(src, env):
@@ -170,16 +202,27 @@ def get_site_url(src, env):
     if not isinstance(urls, dict):
         return None
     url = urls.get(f"{src}-{env}")
-    return url if isinstance(url, str) and _valid_url(url) else None
+    if not isinstance(url, str) or _override_problem(url, src, env) is not None:
+        return None
+    return url
 
 
 def all_site_urls():
-    """Every VALID saved override, {"src-env": url}."""
+    """Every VALID saved override, {"src-env": url} (invalid ones omitted)."""
     urls = _read_file().get("site_urls")
     if not isinstance(urls, dict):
         return {}
-    return {k: v for k, v in urls.items()
-            if isinstance(v, str) and _valid_url(v)}
+    out = {}
+    for key, v in urls.items():
+        if not isinstance(v, str):
+            continue
+        try:
+            src, env = key.split("-", 1)
+        except ValueError:
+            continue
+        if _override_problem(v, src, env) is None:
+            out[key] = v
+    return out
 
 
 def set_site_url(src, env, url):
@@ -188,9 +231,10 @@ def set_site_url(src, env, url):
     global _cache, _cache_mtime
     key = f"{src}-{env}"
     url = (url or "").strip()
-    if url and not _valid_url(url):
-        raise ValueError("That doesn't look like a usable web address — it "
-                         "needs to start with https:// (or http://).")
+    if url:
+        problem = _override_problem(url, src, env)
+        if problem:
+            raise ValueError(problem)
     data = dict(_read_file())
     urls = dict(data.get("site_urls") or {})
     if url:
