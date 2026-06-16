@@ -334,14 +334,6 @@ class _Layout:
             return f"${self.c_route}{r}&\"|\"&${self.c_loc}{r}&\"|\"&${self.c_occ}{r}"
         return f"${self.c_loc}{r}&\"|\"&${self.c_occ}{r}"
 
-    def helper_formula(self, r):
-        """The data sheets' live key column (occurrence via COUNTIF[S]).
-        Route/key sit in B/C (B alone per-route) — column A is the
-        "Comparison row" back-link."""
-        if self.has_route:
-            return (f'=B{r}&"|"&C{r}&"|"&COUNTIFS($B$2:$B{r},$B{r},'
-                    f'$C$2:$C{r},$C{r})')
-        return f'=B{r}&"|"&COUNTIF($B$2:$B{r},$B{r})'
 
 
 # =============================================================================
@@ -491,9 +483,10 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         # right, same as the forward row links.
         cells = [_styled(ws, f'=HYPERLINK("#Comparison!{u}:{u}",{u})', link_font)]
         cells += [_styled(ws, v, body_font) for v in row]
-        # values workbook: the key is a literal string instead of the formula
-        cells.append(_styled(ws, helper_keys[r - 2] if helper_keys is not None
-                             else lay.helper_formula(r), body_font))
+        # Both flavors write a LITERAL key (the comparison's row universe is
+        # build-time static): a live COUNTIFS mis-numbers blank key fields, and
+        # the literal always matches the Comparison sheet's stored occurrence #.
+        cells.append(_styled(ws, helper_keys[r - 2], body_font))
         ws.append(cells)
         if (r - 1) % _PROGRESS_EVERY == 0:
             events.on_log(f"  {name} sheet: {r - 1:,} rows…")
