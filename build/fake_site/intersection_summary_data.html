@@ -1,0 +1,25 @@
+<!doctype html>
+<!--
+Intersection Summary, DATA state: ints_renderPage() ALWAYS renders the action
+bar (Export+Print) plus <div class="ints-total">Total Intersections = N</div>.
+wait_js = EXPORT_READY_JS || .ints-total present. is_empty keys on a ZERO total
+only (regex /total intersections\s*=\s*0\b/), so N=12 => non-empty.
+-->
+<html>
+<head><meta charset="utf-8"><title>intersection summary: data</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="ints_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">TASAS Selective Record Retrieval</div>
+        <div class="report-title-line2">TSAR - Intersection Summary</div>
+        <div class="report-title-line3">Route: 5</div>
+      </div>
+      <button class="export-btn" onclick="ints_printAll()">Print</button>
+    </div>
+    <div class="ints-total">Total Intersections = 12</div>
+    <div class="ints-grid"><div class="ints-col">HIGHWAY GROUP ...</div></div>
+  </div>
+</body>
+</html>

@@ -32,6 +32,9 @@ jobs:
           pip install -r requirements.txt
           pip install ruff bandit pip-audit
 
+      - name: Install Chromium for the fake-site selector tests
+        run: python -m playwright install chromium
+
       - name: Byte-compile all sources (blocking)
         run: python -m compileall -q scripts build version.py
 
@@ -43,6 +46,9 @@ jobs:
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py
+
+      - name: Fake-site selector-contract checks (blocking)
+        run: python build/check_fake_site.py
 
       - name: ruff (error rules — advisory)
         continue-on-error: true

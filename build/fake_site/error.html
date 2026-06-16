@@ -1,0 +1,15 @@
+<!doctype html>
+<!--
+Error state: every report renders a fatal error into the shared #rampResults
+box by adding the `error` class (box.className = 'ramp-results error') with the
+site's message as text and NO action bar. ERROR_JS matches
+'#rampResults.error'. The engine's wait_js OR-chains ERROR_JS, so the wait must
+ALSO resolve True here (so a route the site can't build fails fast with the
+site's own message instead of burning the full timeout).
+-->
+<html>
+<head><meta charset="utf-8"><title>error</title></head>
+<body>
+  <div id="rampResults" class="ramp-results error" style="display:block;">Cannot read properties of undefined (reading 'size')</div>
+</body>
+</html>

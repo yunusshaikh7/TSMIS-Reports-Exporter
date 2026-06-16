@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+Intersection Detail, EMPTY state: action bar (Export present) PLUS an empty
+table row <td colspan="26" class="hl-empty">No results found.</td> (note: NO
+"in this segment" suffix, unlike Highway Log). wait_js resolves (Export present
+AND td.hl-empty present); is_empty must be True (structural td.hl-empty).
+-->
+<html>
+<head><meta charset="utf-8"><title>intersection detail: empty</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="intd_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">TASAS Selective Record Retrieval</div>
+        <div class="report-title-line2">TSAR - Intersection Detail</div>
+        <div class="report-title-line3">Route: 5</div>
+      </div>
+      <button class="export-btn" onclick="intd_printAll()">Print</button>
+    </div>
+    <div class="hl-table-wrap">
+      <table class="hl-table intd-table">
+        <thead><tr><th>P</th><th>Post Mile</th><th>Location</th></tr></thead>
+        <tbody><tr><td colspan="26" class="hl-empty">No results found.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

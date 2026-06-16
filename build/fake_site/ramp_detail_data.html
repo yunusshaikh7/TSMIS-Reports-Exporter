@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+Ramp Detail, DATA state: renderPage() builds the action bar (Export+Print)
+plus the list of ramp items. wait_js = EXPORT_READY_JS || "No ramps found";
+is_empty = "No ramps found" in body. Data => ready True, empty False.
+-->
+<html>
+<head><meta charset="utf-8"><title>ramp detail: data</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">TASAS Selective Record Retrieval</div>
+        <div class="report-title-line2">TSAR - Ramp Detail</div>
+        <div class="report-title-line3">Route: 5</div>
+      </div>
+      <button class="export-btn" onclick="printAll()">Print</button>
+    </div>
+    <ul class="ramp-list">
+      <li class="ramp-item ramp-col-template">
+        <span>03-SAC-5</span><span>R</span><span>12.345</span><span>01/01/2020</span>
+        <span>A</span><span>Y</span><span></span><span></span><span>N</span><span>D</span>
+        <span style="text-align:left">SOME RAMP DESCRIPTION</span>
+      </li>
+    </ul>
+  </div>
+</body>
+</html>

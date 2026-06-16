@@ -1,0 +1,27 @@
+<!doctype html>
+<!--
+Highway Log, DATA state: hl_renderPage() always builds the action bar
+(Export+Print) plus the data table. wait_js = EXPORT_READY_JS ||
+/No results found/i. is_empty = "No results found" in body => False here.
+-->
+<html>
+<head><meta charset="utf-8"><title>highway log: data</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="hl_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">California Department of Transportation</div>
+        <div class="report-title-line2">California State Highway Log</div>
+      </div>
+      <button class="export-btn" onclick="hl_printAll()">Print</button>
+    </div>
+    <div class="hl-table-wrap">
+      <table class="hl-table">
+        <thead><tr><th>PM</th><th>Description</th></tr></thead>
+        <tbody><tr><td>12.34</td><td>some highway log row</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+Synthetic reconstruction of the TSMIS action bar in its DATA state.
+shared.js renderActionBar() gives BOTH buttons class="export-btn":
+the Export-labelled one FIRST, the Print-labelled one LAST.
+EXPORT_READY_JS must match (it tests button text for /export/i).
+-->
+<html>
+<head><meta charset="utf-8"><title>action bar: export + print</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">TASAS Selective Record Retrieval</div>
+        <div class="report-title-line2">TSAR - Ramp Detail</div>
+        <div class="report-title-line3">Route: 5</div>
+      </div>
+      <button class="export-btn" onclick="printAll()">Print</button>
+    </div>
+  </div>
+</body>
+</html>

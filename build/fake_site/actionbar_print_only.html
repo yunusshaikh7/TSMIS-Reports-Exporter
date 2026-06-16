@@ -1,0 +1,23 @@
+<!doctype html>
+<!--
+Adversarial case: an action bar that carries ONLY a Print button (still
+class="export-btn", per renderActionBar's shared class). No report ships a
+Print-only bar today, but EXPORT_READY_JS must return FALSE here -- proving
+it keys on the button's "Export" TEXT, not the bare .export-btn class. A
+plain querySelector('button.export-btn') would (wrongly) match this.
+-->
+<html>
+<head><meta charset="utf-8"><title>action bar: print only</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <div></div>
+      <div class="report-title">
+        <div class="report-title-line1">TASAS Selective Record Retrieval</div>
+        <div class="report-title-line2">TSAR - Ramp Detail</div>
+      </div>
+      <button class="export-btn" onclick="printAll()">Print</button>
+    </div>
+  </div>
+</body>
+</html>

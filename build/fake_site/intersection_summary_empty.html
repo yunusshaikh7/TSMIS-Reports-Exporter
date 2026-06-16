@@ -1,0 +1,26 @@
+<!doctype html>
+<!--
+Intersection Summary, EMPTY state: there is NO empty notice for this report --
+it always shows the action bar (working Export) and "Total Intersections = 0".
+wait_js resolves (Export present + .ints-total); is_empty must be True via the
+zero-total regex. (The "= 0" must NOT be confused with "= 10"/"= 20" -- the
+\b in the predicate guards that; data fixture uses 12 to exercise the contrast.)
+-->
+<html>
+<head><meta charset="utf-8"><title>intersection summary: empty</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="ints_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">TASAS Selective Record Retrieval</div>
+        <div class="report-title-line2">TSAR - Intersection Summary</div>
+        <div class="report-title-line3">Route: 5</div>
+      </div>
+      <button class="export-btn" onclick="ints_printAll()">Print</button>
+    </div>
+    <div class="ints-total">Total Intersections = 0</div>
+    <div class="ints-grid"><div class="ints-col">HIGHWAY GROUP ...</div></div>
+  </div>
+</body>
+</html>

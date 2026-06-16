@@ -1,0 +1,15 @@
+<!doctype html>
+<!--
+Blank / still-rendering state: #rampResults exists but is empty and hidden,
+exactly as index.html ships it before any Generate
+(<div id="rampResults" class="ramp-results" style="display:none;"></div>).
+NONE of the report wait_js conditions should resolve here, and ERROR_JS must
+be False (no .error class) -- this proves the waits don't fire prematurely on
+a page that hasn't produced a report yet.
+-->
+<html>
+<head><meta charset="utf-8"><title>blank</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:none;"></div>
+</body>
+</html>

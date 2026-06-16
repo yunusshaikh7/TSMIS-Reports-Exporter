@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+Intersection Detail, DATA state: intd_renderPage() always renders the action
+bar (Export+Print) plus the data table. wait_js = EXPORT_READY_JS ||
+td.hl-empty present. is_empty = td.hl-empty count > 0 OR "no results found" in
+body. Data => ready True, empty False.
+-->
+<html>
+<head><meta charset="utf-8"><title>intersection detail: data</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="intd_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">TASAS Selective Record Retrieval</div>
+        <div class="report-title-line2">TSAR - Intersection Detail</div>
+        <div class="report-title-line3">Route: 5</div>
+      </div>
+      <button class="export-btn" onclick="intd_printAll()">Print</button>
+    </div>
+    <div class="hl-table-wrap">
+      <table class="hl-table intd-table">
+        <thead><tr><th>P</th><th>Post Mile</th><th>Location</th></tr></thead>
+        <tbody><tr><td>P</td><td>1.23</td><td>MAIN ST</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<!--
+Ramp Summary, DATA state: renders inline (no Export button needed for
+readiness). wait_js = body includes "Route {route}" || "No ramps found",
+where {route} is the raw route token passed in. The harness calls
+spec.wait_js("005"), so the title text must literally contain "Route 005".
+is_empty = "No ramps found" => False here.
+-->
+<html>
+<head><meta charset="utf-8"><title>ramp summary: data</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="rs_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">TASAS Selective Record Retrieval</div>
+        <div class="report-title-line2">TSAR - Ramp Summary</div>
+        <div class="report-title-line3">Route 005</div>
+      </div>
+      <button class="export-btn" onclick="rs_printAll()">Print</button>
+    </div>
+    <div class="rs-body">Route 005 &mdash; District 03 &mdash; ramp summary rows...</div>
+  </div>
+</body>
+</html>

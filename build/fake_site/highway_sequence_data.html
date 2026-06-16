@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+Highway Sequence Listing, DATA state: the Export button only renders when the
+report has data. wait_js = EXPORT_READY_JS || /No \w+ found/i. is_empty =
+button.export-btn count == 0 (so an Export button present => non-empty).
+-->
+<html>
+<head><meta charset="utf-8"><title>highway sequence: data</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="hsl_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">California Department of Transportation</div>
+        <div class="report-title-line2">Highway Sequence Listing</div>
+      </div>
+      <button class="export-btn" onclick="hsl_printAll()">Print</button>
+    </div>
+    <div class="hsl-table-wrap">
+      <table class="hsl-table"><tbody><tr><td>1</td><td>row data</td></tr></tbody></table>
+    </div>
+  </div>
+</body>
+</html>
