@@ -35,7 +35,7 @@ the usual cadence, ConsolidateResult returned.
 import difflib
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 try:
@@ -59,6 +59,23 @@ _TAB_COLORS = {"summary": "808080", "spot": "7030A0", "comparison": "C00000",
 _DIFF_MARK = " ≠ "          # appears ONLY in differing cells; counts key on it
 
 _PROGRESS_EVERY = 10_000    # log + cancel-check cadence on big workbooks
+
+XL_MAX_ROWS, XL_MAX_COLS = 1_048_576, 16_384   # Excel worksheet hard limits
+
+
+def excel_limit_error(n_rows, n_cols):
+    """A user-safe message when a workbook would exceed Excel's worksheet
+    limits, else None. Checked before writing so a too-large comparison fails
+    cleanly instead of openpyxl raising mid-write (row cap) or silently
+    dropping columns (column cap)."""
+    if n_rows > XL_MAX_ROWS:
+        return (f"This comparison needs {n_rows:,} rows, past Excel's "
+                f"{XL_MAX_ROWS:,}-row limit. Compare a smaller scope (e.g. "
+                "per-route files, or one report at a time).")
+    if n_cols > XL_MAX_COLS:
+        return (f"This report has {n_cols:,} columns, past Excel's "
+                f"{XL_MAX_COLS:,}-column limit.")
+    return None
 
 
 @dataclass
@@ -202,6 +219,25 @@ def union_keys(keys_t, keys_n):
 # Python mirror of the workbook's comparison semantics (for the run summary;
 # the formulas workbook recomputes everything live)
 # =============================================================================
+
+def normalize_value(v):
+    """Canonicalize a freshly-LOADED cell so the comparison is type-stable and
+    the two output flavors can't disagree. A real date/datetime is rendered to a
+    fixed ISO string: Excel's TRIM of a live date is locale/number-format
+    dependent and would diverge from Python's str(datetime) (e.g. "2/25/1976"
+    vs "1976-02-25 00:00:00"), so the formulas flavor and the values flavor
+    would compute different results for the SAME cell. Stringifying at load time
+    means the engine only ever sees text — both flavors agree, and a date that
+    is genuinely equal on both sides compares equal. Everything else (numbers,
+    text) is returned unchanged. Callers (the loaders) apply this per cell."""
+    if isinstance(v, datetime):
+        if (v.hour, v.minute, v.second, v.microsecond) == (0, 0, 0, 0):
+            return v.date().isoformat()
+        return v.isoformat(sep=" ")
+    if isinstance(v, date):
+        return v.isoformat()
+    return v
+
 
 def _xl_trim(v):
     """Excel TRIM: text form, edge spaces stripped, internal runs collapsed."""
@@ -1384,12 +1420,27 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     out = Path(out_path)
     a, b = sc.side_a, sc.side_b
 
-    for sheet in sc.sheet_names(has_route):
+    sheets = sc.sheet_names(has_route)
+    for sheet in sheets:
         if len(sheet) > 31:
             return ConsolidateResult(
                 status="error",
                 message=(f"The sheet name '{sheet}' is longer than Excel's "
                          "31-character limit — shorten the side labels."))
+    # Excel sheet names must be unique case-insensitively. A side literally named
+    # like a fixed sheet ("Summary"/"Comparison"/"Routes"/"Only in …") would
+    # collide and openpyxl would raise mid-write; fail early with guidance.
+    seen_sheets = {}
+    for sheet in sheets:
+        low = sheet.casefold()
+        if low in seen_sheets:
+            return ConsolidateResult(
+                status="error",
+                message=(f"The side name '{sheet}' collides with another sheet "
+                         f"('{seen_sheets[low]}') — pick different side labels "
+                         "(avoid Summary / Comparison / Routes / Spot Check / "
+                         "'Only in …')."))
+        seen_sheets[low] = sheet
 
     modes = {"formulas": ("formulas",), "values": ("values",),
              "both": ("formulas", "values")}.get(mode)
@@ -1416,6 +1467,15 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     keys_t = keys_for(rows_t, has_route, sc.key_field)
     keys_n = keys_for(rows_n, has_route, sc.key_field)
     union = union_keys(keys_t, keys_n)
+
+    # Excel hard limits: openpyxl would raise mid-write past the row cap (losing
+    # the partial file) and silently lose columns past the column cap.
+    biggest = max(len(union), len(rows_t), len(rows_n)) + 1   # + header row
+    n_cols = len(lay.data_header) + 2          # back-link + columns + key helper
+    limit_err = excel_limit_error(biggest, n_cols)
+    if limit_err:
+        return ConsolidateResult(status="error", message=limit_err)
+
     counts = count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route)
     events.on_log(f"{a} rows: {len(rows_t):,}   {b} rows: {len(rows_n):,}   "
                   f"union: {len(union):,} {sc.id_noun_plural}"

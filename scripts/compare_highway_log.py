@@ -27,7 +27,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
-from compare_core import CompareSchema, run_compare
+from compare_core import CompareSchema, normalize_value, run_compare
 from events import ConsolidateResult, Events
 
 REPORT_NAME = "Highway Log"          # registry label (comparison type)
@@ -111,7 +111,7 @@ def _load_input(path):
         for r in rows_iter:
             r = list(r)[:n] + [None] * max(0, n - len(r))
             if any(v is not None and str(v).strip() != "" for v in r):
-                rows.append(r)
+                rows.append([normalize_value(v) for v in r])
         return rows, has_route
     finally:
         wb.close()

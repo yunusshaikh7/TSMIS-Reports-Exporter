@@ -38,7 +38,7 @@ except ImportError:
 
 import compare_highway_log as _hl
 import consolidate_ramp_summary as _rs
-from compare_core import CompareSchema, run_compare
+from compare_core import CompareSchema, normalize_value, run_compare
 from events import ConsolidateResult, Events
 from paths import OUTPUT_ROOT, parse_run_folder
 
@@ -158,7 +158,7 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
             for r in rows_iter:
                 r = list(r)[:n] + [None] * max(0, n - len(r))
                 if any(v is not None and str(v).strip() != "" for v in r):
-                    rows.append([route] + r)
+                    rows.append([route] + [normalize_value(v) for v in r])
                     count += 1
             events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
                           f"+{count} rows")
