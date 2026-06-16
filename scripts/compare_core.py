@@ -87,10 +87,25 @@ class CompareSchema:
     scope_consolidated: str = "Consolidated (all routes)"
     one_sided_note_extra: str = ""    # appended to the yellow/blue note
     trim_note_extra: str = ""         # appended to the TRIM note
+    # Which header column is the row-identity key (rows align/pair on it).
+    # Default 0 = the first column, the original behavior. Reports whose first
+    # column is coarse (e.g. cross-env Highway Sequence inherits County, which
+    # repeats for hundreds of rows) point this at a granular column (postmile)
+    # so rows align by identity instead of positionally within the coarse
+    # group. The column stays in its display position everywhere — only the
+    # identity used for alignment + the Comparison sheet's lead column change.
+    key_field: int = 0
 
     @property
     def n_fields(self):
         return len(self.header) - 1
+
+    @property
+    def field_indices(self):
+        """Header indices shown as data fields — every column except the key,
+        in display order. key_field == 0 gives [1, 2, …, n] (the original
+        behavior, so the default path is byte-identical)."""
+        return [i for i in range(len(self.header)) if i != self.key_field]
 
     def is_medwid(self, field_idx):
         return self.header[field_idx] in self.medwid_fields
@@ -118,18 +133,20 @@ def _sref(name):
 # Keys + union (document-order diff merge)
 # =============================================================================
 
-def keys_for(rows, has_route):
+def keys_for(rows, has_route, key_field=0):
     """[(route, key, occurrence), ...] in file order (route "" for the
     per-route shape). Occurrence repeats of the same (route, key) are
-    numbered 1.., exactly like the sheets' live helper column."""
+    numbered 1.., exactly like the sheets' live helper column.
+
+    `key_field` picks WHICH header column is the identity key (default 0 = the
+    first column, the original behavior). The raw row carries a leading Route
+    when has_route, so the key sits at r[(1 if has_route else 0) + key_field]."""
     seen = {}
     out = []
+    koff = (1 if has_route else 0) + key_field
     for r in rows:
-        if has_route:
-            route = "" if r[0] is None else str(r[0])
-            loc = "" if r[1] is None else str(r[1])
-        else:
-            route, loc = "", ("" if r[0] is None else str(r[0]))
+        route = "" if not has_route or r[0] is None else str(r[0])
+        loc = "" if r[koff] is None else str(r[koff])
         k = (route, loc)
         seen[k] = seen.get(k, 0) + 1
         out.append((route, loc, seen[k]))
@@ -226,7 +243,7 @@ def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route):
     by_n = {k: rows_n[i] for i, k in enumerate(keys_n)}
     both = t_only = n_only = diff_rows = identical = diff_cells = 0
     first_diff_row = None
-    field_diffs = {f: 0 for f in range(1, len(sc.header))}
+    field_diffs = {f: 0 for f in sc.field_indices}
     route = {}                           # consolidated: per-route aggregates
 
     def rstat(rid):
@@ -252,7 +269,7 @@ def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route):
         if rs is not None:
             rs["matched"] += 1
         row_diffs = 0
-        for f in range(1, len(sc.header)):       # every field but the key
+        for f in sc.field_indices:                # every column but the key
             va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
             if sc.is_medwid(f):
                 va, vb = _medwid_norm(va), _medwid_norm(vb)
@@ -294,21 +311,30 @@ class _Layout:
         self.has_route = has_route
         self.off = 1 if has_route else 0
         self.n_fields = sc.n_fields
+        # The identity key column (header index) + the fields shown on the
+        # Comparison sheet (every other column, in display order). key_field
+        # == 0 reproduces the original [1..n] field order exactly.
+        self.key_field = sc.key_field
+        self.field_indices = sc.field_indices
+        self._field_pos = {f: pos for pos, f in enumerate(self.field_indices)}
         # statuses as they appear in cells/formulas/CF
         self.only_a = f"{sc.side_a} only"
         self.only_b = f"{sc.side_b} only"
         # data sheets: a leading "Comparison row" back-link column, then the
-        # input's columns, then the live key helper
+        # input's columns (ALL of them, in their original order — the key
+        # column stays in place there), then the live key helper
         self.data_header = (["Route"] if has_route else []) + list(sc.header)
         self.back_col = "A"                                  # back-link column
         self.route_data_col = "B" if has_route else None     # Route on data sheets
         self.key_col = get_column_letter(len(self.data_header) + 2)
         self.data_last_col = get_column_letter(len(self.data_header) + 1)
-        # comparison sheet
+        # comparison sheet: the key column leads (pulled to the identity slot),
+        # the remaining columns follow as fields in display order
         self.id_headers = ((["Route"] if has_route else [])
-                           + [sc.header[0], "#", f"{sc.side_a} Row",
+                           + [sc.header[self.key_field], "#", f"{sc.side_a} Row",
                               f"{sc.side_b} Row", "Status", "Diffs"])
         self.f0 = len(self.id_headers) + 1            # first field column index
+        self.first_field_col = get_column_letter(self.f0)
         self.last_field_col = get_column_letter(self.f0 + self.n_fields - 1)
         c = [get_column_letter(i + 1) for i in range(len(self.id_headers))]
         if has_route:
@@ -324,9 +350,13 @@ class _Layout:
         carry a leading "Comparison row" link column)."""
         return get_column_letter(field_idx + 2 + self.off)
 
+    def field_pos(self, field_idx):
+        """0-based position of header[field_idx] among the displayed fields."""
+        return self._field_pos[field_idx]
+
     def field_col(self, field_idx):
         """Comparison-sheet column letter for header[field_idx]."""
-        return get_column_letter(self.f0 + field_idx - 1)
+        return get_column_letter(self.f0 + self._field_pos[field_idx])
 
     def key_expr(self, r):
         """The lookup key for Comparison row r (matches the helper column)."""
@@ -506,7 +536,7 @@ def _write_comparison(wb, union, lay, events, vals=None):
 
     last = len(union) + 1
     ws.row_dimensions[1].height = 45.75
-    ws.freeze_panes = f"{lay.field_col(1)}2"
+    ws.freeze_panes = f"{lay.first_field_col}2"
     ws.auto_filter.ref = f"A1:{lay.last_field_col}{last}"
     if lay.has_route:
         ws.column_dimensions["A"].width = 8
@@ -520,7 +550,7 @@ def _write_comparison(wb, union, lay, events, vals=None):
     # Conditional formatting (same look as the sample, diff detection keyed on
     # the ≠ marker): red diff cells, yellow A-only rows, blue B-only rows,
     # bold red Diffs count when > 0.
-    f1 = lay.field_col(1)
+    f1 = lay.first_field_col
     full = f"A2:{lay.last_field_col}{last}"
     fields = f"{f1}2:{lay.last_field_col}{last}"
     ws.conditional_formatting.add(fields, FormulaRule(
@@ -537,7 +567,8 @@ def _write_comparison(wb, union, lay, events, vals=None):
 
     link_font = _link_font()
     link_cols = {3, 4} if lay.has_route else {2, 3}   # trow / nrow positions
-    ws.append(_header_row(ws, lay.id_headers + list(sc.header[1:])))
+    ws.append(_header_row(ws, lay.id_headers
+                          + [sc.header[i] for i in lay.field_indices]))
     for i, (route, loc, occ) in enumerate(union):
         r = i + 2
         if vals is None:
@@ -551,10 +582,10 @@ def _write_comparison(wb, union, lay, events, vals=None):
                 # Diffs counts cells carrying the ≠ marker (matched cells show
                 # the value, so "non-blank" no longer means "different").
                 f'=IF({lay.c_status}{r}<>"Both","",SUMPRODUCT(--ISNUMBER(SEARCH('
-                f'"{_DIFF_MARK}",{lay.field_col(1)}{r}:{lay.last_field_col}{r}))))',
+                f'"{_DIFF_MARK}",{lay.first_field_col}{r}:{lay.last_field_col}{r}))))',
             ]
             row += [_field_formula(lay, r, f)
-                    for f in range(1, len(sc.header))]
+                    for f in lay.field_indices]
         else:
             k = (route, loc, occ)
             rt, rn = vals["by_t"].get(k), vals["by_n"].get(k)
@@ -562,7 +593,7 @@ def _write_comparison(wb, union, lay, events, vals=None):
             status = ("Both" if rt is not None and rn is not None
                       else lay.only_a if rt is not None else lay.only_b)
             fields, ndiff = [], 0
-            for f in range(1, len(sc.header)):
+            for f in lay.field_indices:
                 v = _field_value(sc, rt, rn, vals["off"], f)
                 if _DIFF_MARK in v:
                     ndiff += 1
@@ -672,7 +703,7 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
     put((6, 4), "← type a row number" + (", then press F9" if manual_calc
                                          else " (updates instantly)"), note_font)
     d_route, d_loc, d_occ = default_key
-    key_label = sc.header[0]
+    key_label = sc.header[lay.key_field]
     if lay.has_route:
         put((7, 2), "…or find one:", note_font)
         put((7, 3), "Route:", bold_font, None, right)
@@ -749,8 +780,8 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
         idx = f"INDEX({_sref(side)}!{col}:{col},{row_ref})"
         return (f'=IF({row_ref}="","",IFERROR(IF(ISBLANK({idx}),"",{idx}),""))')
 
-    for f in range(1, len(sc.header)):
-        r = F_FIRST + f - 1
+    for pos, f in enumerate(lay.field_indices):
+        r = F_FIRST + pos
         col = lay.data_col(f)
         fcol = lay.field_col(f)
         is_date = sc.header[f] in sc.date_fields
@@ -829,11 +860,15 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None):
     body_font = Font(name="Arial", size=10)
 
     id_headers = ((["Route"] if lay.has_route else [])
-                  + [sc.header[0], "#", f"{side} Row"]
+                  + [sc.header[lay.key_field], "#", f"{side} Row"]
                   + ([f"Missing from {other}"] if lay.has_route else []))
     n_id = len(id_headers)
-    fcol = lambda f: get_column_letter(n_id + f)      # comparison-field -> letter
-    last_field = fcol(lay.n_fields)
+    # fields follow the id columns in display order; a header index maps to its
+    # position among the displayed fields (key_field == 0 → n_id + field_idx,
+    # the original mapping).
+    fcol = lambda fi: get_column_letter(n_id + 1 + lay.field_pos(fi))
+    first_field = get_column_letter(n_id + 1)
+    last_field = get_column_letter(n_id + lay.n_fields)
     last = len(keys) + 1
     c = [get_column_letter(i + 1) for i in range(n_id)]
     if lay.has_route:
@@ -843,7 +878,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None):
         c_loc, c_occ, c_row = c
 
     ws.row_dimensions[1].height = 30
-    ws.freeze_panes = f"{fcol(1)}2"
+    ws.freeze_panes = f"{first_field}2"
     ws.auto_filter.ref = f"A1:{last_field}{last}"
     if lay.has_route:
         ws.column_dimensions[c_route].width = 8
@@ -867,7 +902,8 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None):
         own_rows = vals["row_t"] if side == sc.side_a else vals["row_n"]
         own_by = vals["by_t"] if side == sc.side_a else vals["by_n"]
         other_routes = vals["routes_n"] if side == sc.side_a else vals["routes_t"]
-    ws.append(_header_row(ws, id_headers + list(sc.header[1:])))
+    ws.append(_header_row(ws, id_headers
+                          + [sc.header[i] for i in lay.field_indices]))
     for i, (route, loc, occ) in enumerate(keys):
         r = i + 2
         if vals is None:
@@ -885,7 +921,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None):
                            f'"entire route","this {sc.id_noun} only")')
             rr = f"${c_row}{r}"
             row += [f'=IF({rr}="","",{_trim_ref(side, lay.data_col(f), rr)})'
-                    for f in range(1, len(sc.header))]
+                    for f in lay.field_indices]
         else:
             k = (route, loc, occ)
             own = own_by[k]
@@ -897,7 +933,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None):
                 row.append("entire route" if route not in other_routes
                            else f"this {sc.id_noun} only")
             row += [(_xl_trim(own[f + vals["off"]]) or None)
-                    for f in range(1, len(sc.header))]
+                    for f in lay.field_indices]
         ws.append([_styled(ws, v, link_font if j == link_col else body_font)
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -1006,7 +1042,7 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
     bold_font = Font(name="Arial", size=10, bold=True)
     center = Alignment(horizontal="center")
     last = n_union + 1                              # Comparison data end row
-    loc_col = lay.data_col(0)              # key column on the data sheets
+    loc_col = lay.data_col(lay.key_field)  # key column on the data sheets
     st, df = lay.c_status, lay.c_diffs
     sa, sb = _sref(a), _sref(b)
 
@@ -1076,7 +1112,8 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
     assert row[0] == verdict_row            # the CF above targets this cell
     line((2, verdict_cell, verdict_font))
     line((2, "Cell-by-cell comparison keyed on "
-             + (f"Route + {sc.header[0]}" if lay.has_route else sc.header[0])
+             + (f"Route + {sc.header[lay.key_field]}" if lay.has_route
+                else sc.header[lay.key_field])
              + " (+ occurrence for duplicates). "
              + (f"All formulas are live: edits on the {a} / {b} sheets "
                 "recalculate everything." if vals is None else
@@ -1126,7 +1163,7 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
     line((2, "Field", bold_font), (3, "Comparison col", bold_font),
          (4, "# of cells differing", bold_font))
     f_start = row[0]
-    for f in range(1, len(sc.header)):
+    for f in lay.field_indices:
         col = lay.field_col(f)
         line((2, sc.header[f]), (3, col),
              (4, f'=COUNTIF(Comparison!{col}2:{col}{last},"*{_DIFF_MARK.strip()}*")'
@@ -1180,7 +1217,7 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
     notes = [
         "• Comparison sheet: matching values are shown in plain text; a red "
         f"cell shows  {a} value{_DIFF_MARK}{b} value  where the two {sc.sides_noun} "
-        f"disagree for that {sc.header[0]} and field.",
+        f"disagree for that {sc.header[lay.key_field]} and field.",
         '• "(blank)" means the cell is empty in that system. Filter the Diffs '
         "column (>0) to isolate rows needing review.",
         f"• Yellow rows exist only in {a}; blue rows exist only in {b}"
@@ -1195,12 +1232,12 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
         + ". The Comparison sheet still contains the same rows in document "
         "order.",
         "• Rows pair on " + ("Route plus " if lay.has_route else "")
-        + f"{sc.header[0]} plus occurrence number (a {sc.pair_noun or noun} "
+        + f"{sc.header[lay.key_field]} plus occurrence number (a {sc.pair_noun or noun} "
         "listed twice pairs first-with-first, second-with-second).",
         f"• Leading/trailing spaces are ignored (TRIM){sc.trim_note_extra}.",
         f'• Lookups use the "Key (helper)" column ({lay.key_col}) on each '
         'data sheet: ' + ("Route, " if lay.has_route else "")
-        + f'{sc.header[0]} & "|" & occurrence #.',
+        + f'{sc.header[lay.key_field]} & "|" & occurrence #.',
     ]
     if sc.medwid_fields:
         notes.append(
@@ -1306,7 +1343,8 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         return ConsolidateResult(status="cancelled", message="Cancelled by user.")
 
     lay = _Layout(sc, has_route)
-    keys_t, keys_n = keys_for(rows_t, has_route), keys_for(rows_n, has_route)
+    keys_t = keys_for(rows_t, has_route, sc.key_field)
+    keys_n = keys_for(rows_n, has_route, sc.key_field)
     union = union_keys(keys_t, keys_n)
     counts = count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route)
     events.on_log(f"{a} rows: {len(rows_t):,}   {b} rows: {len(rows_n):,}   "

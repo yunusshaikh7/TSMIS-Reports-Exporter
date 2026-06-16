@@ -225,19 +225,42 @@ class EnvCompare:
     suggest_name(dir_a, dir_b)."""
 
     def __init__(self, key, report_name, subdir, sheet_name=None,
-                 expected_header=None, base_schema=None):
+                 expected_header=None, base_schema=None, key_col=None):
         self.key = key                        # "ramp_summary" | "ramp_detail" | …
         self.REPORT_NAME = report_name
         self.subdir = subdir
         self.sheet_name = sheet_name          # None = the PDF (Ramp Summary) path
         self.expected_header = expected_header
         self.base_schema = base_schema        # report-specific schema extras
+        # The column NAME to key rows on, when the report's FIRST column is too
+        # coarse to identify a row (e.g. Highway Sequence / Ramp Detail lead
+        # with County / a district-county-route Location that repeats for
+        # hundreds of rows; the postmile "PM" column is the real identity).
+        # Resolved to a header index per loaded layout; falls back to the first
+        # column (the original behavior) when the named column isn't present.
+        self.key_col = key_col
 
     def suggest_name(self, dir_a, dir_b):
         la, lb = _side_labels(Path(dir_a), Path(dir_b))
         safe = lambda s: re.sub(r"[^\w\-]+", "_", s).strip("_")
         return (f"{safe(la)}_vs_{safe(lb)}_"
                 f"{safe(self.REPORT_NAME)}_Comparison.xlsx")
+
+    def _resolve_key_field(self, header):
+        """Index of the configured key column in this loaded header, matched on
+        the stripped name; 0 (the first column) when none is configured or the
+        name isn't present (so layout drift degrades to the old behavior rather
+        than crashing)."""
+        if not self.key_col:
+            return 0
+        want = self.key_col.strip().casefold()
+        for i, name in enumerate(header):
+            if name is not None and str(name).strip().casefold() == want:
+                return i
+        log.warning("env compare %s: key column %r not found in header %r; "
+                    "falling back to the first column", self.key, self.key_col,
+                    header)
+        return 0
 
     def _schema(self, header, la, lb):
         base = self.base_schema or CompareSchema(
@@ -252,6 +275,7 @@ class EnvCompare:
         return replace(base, header=header, side_a=la, side_b=lb,
                        sides_noun="environments",
                        data_widths=widths, cmp_widths=cmp_widths,
+                       key_field=self._resolve_key_field(header),
                        one_sided_note_extra="", trim_note_extra="")
 
     def compare_folders(self, dir_a, dir_b, out_path, events=None,
@@ -333,10 +357,11 @@ RAMP_SUMMARY = EnvCompare(
         id_noun="route", id_noun_plural="routes",
         scope_flat="All routes (one row per route)"))
 RAMP_DETAIL = EnvCompare(
-    "ramp_detail", "Ramp Detail", "ramp_detail", sheet_name="TSAR - Ramp Detail")
+    "ramp_detail", "Ramp Detail", "ramp_detail", sheet_name="TSAR - Ramp Detail",
+    key_col="PM")
 HIGHWAY_SEQUENCE = EnvCompare(
     "highway_sequence", "Highway Sequence", "highway_sequence",
-    sheet_name="Highway Locations")
+    sheet_name="Highway Locations", key_col="PM")
 HIGHWAY_LOG = EnvCompare(
     "highway_log", "Highway Log", "highway_log", sheet_name=_hl.SHEET_NAME,
     expected_header=_hl.EXPECTED_HEADER, base_schema=_HL_BASE)
