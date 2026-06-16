@@ -568,14 +568,26 @@ class GuiApi:
             # dialog too — "everything matches" is the expected outcome
             # between environments, so it deserves more than a log line.
             if result.verdict and result.summary_lines:
+                head = result.summary_lines[0]
                 if result.verdict == "match":
                     self._emit_modal("info", "Everything matches",
-                                     result.summary_lines[0] + "\n\n"
+                                     head + "\n\n"
                                      "The saved workbook has the full "
                                      "breakdown and self-checks.")
+                elif head.lstrip().startswith("⚠") or "COULD NOT COMPARE" in head:
+                    # Some inputs were unreadable: the engine keeps status ok +
+                    # verdict "diff" but leads summary_lines[0] with the literal
+                    # "⚠ COULD NOT COMPARE EVERYTHING". The rows that WERE
+                    # compared may all match, so titling this "Differences
+                    # found" would misread — call it incomplete instead.
+                    self._emit_modal("warning", "Comparison incomplete",
+                                     head + "\n\n"
+                                     "Some input files could not be read, so the "
+                                     "comparison is not complete. The saved "
+                                     "workbook lists exactly what was skipped.")
                 else:
                     self._emit_modal("warning", "Differences found",
-                                     result.summary_lines[0] + "\n\n"
+                                     head + "\n\n"
                                      "Open the saved workbook for the "
                                      "cell-by-cell breakdown (Summary → "
                                      "Comparison → Only-in sheets).")

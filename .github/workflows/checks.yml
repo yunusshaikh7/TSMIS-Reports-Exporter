@@ -4,7 +4,8 @@ name: checks
 # release gate in release.yml, which builds + smoke-tests the frozen bundle).
 #
 # Blocking: byte-compile everything, and run the pure-Python regression guards
-# (the WS1/WS3 export-engine + WS5 GUI-bridge audit-fix checks). Advisory
+# (the export-engine / GUI-bridge / updater audit-fix checks AND the
+# regression-locked comparison-engine + consolidator checks). Advisory
 # (surface findings, never block a push): ruff error rules, bandit, pip-audit.
 
 on:
@@ -53,6 +54,22 @@ jobs:
 
       - name: Fake-site selector-contract checks (blocking)
         run: python build/check_fake_site.py
+
+      - name: Comparison-engine regression checks (blocking)
+        # The regression-locked compare_core + consolidators. Pure openpyxl /
+        # pdfplumber — no Excel, no browser, no network. `set -e` stops at the
+        # first failing check so a silent break in the comparison engine reds
+        # the job (matches the per-check blocking intent of the steps above).
+        shell: bash
+        run: |
+          set -e
+          for c in check_compare_blankkey check_compare_keyfield check_compare_skipwarn \
+                   check_compare_injection check_compare_coercion check_compare_limits \
+                   check_compare_audit check_ramp_summary_partial check_tsn_description_leak; do
+            echo "::group::$c"
+            python "build/$c.py"
+            echo "::endgroup::"
+          done
 
       - name: ruff (error rules — advisory)
         continue-on-error: true
