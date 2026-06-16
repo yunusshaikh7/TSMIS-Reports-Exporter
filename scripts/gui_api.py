@@ -1256,16 +1256,20 @@ class GuiApi:
         # rejected immediately; release it if the user cancels the dialog.
         if not self._try_claim_task("compare"):
             return {"error": "A task is already running."}
-        out = self._save_dialog_for_compare(Path(tsmis_path).parent,
-                                            mod.suggest_name(tsmis_path))
-        if out is None:
-            self._release_task()
-            return {"cancelled": True}
-        return self._launch_compare(
-            label, mode, out,
-            lambda events=None, confirm_overwrite=None, day=None:
-                mod.compare(tsmis_path, tsn_path, out, events=events,
-                            confirm_overwrite=confirm_overwrite, mode=mode))
+        try:
+            out = self._save_dialog_for_compare(Path(tsmis_path).parent,
+                                                mod.suggest_name(tsmis_path))
+            if out is None:
+                self._release_task()
+                return {"cancelled": True}
+            return self._launch_compare(
+                label, mode, out,
+                lambda events=None, confirm_overwrite=None, day=None:
+                    mod.compare(tsmis_path, tsn_path, out, events=events,
+                                confirm_overwrite=confirm_overwrite, mode=mode))
+        except Exception:
+            self._release_task()        # a dialog/suggest_name error must not wedge the gate
+            raise
 
     @_api_method
     def start_compare_env(self, report_idx, dir_a, dir_b,
@@ -1295,17 +1299,21 @@ class GuiApi:
         compare_env.DEFAULT_OUT_DIR.mkdir(parents=True, exist_ok=True)
         if not self._try_claim_task("compare"):
             return {"error": "A task is already running."}
-        out = self._save_dialog_for_compare(compare_env.DEFAULT_OUT_DIR,
-                                            adapter.suggest_name(pa, pb))
-        if out is None:
-            self._release_task()
-            return {"cancelled": True}
-        return self._launch_compare(
-            label, mode, out,
-            lambda events=None, confirm_overwrite=None, day=None:
-                adapter.compare_folders(pa, pb, out, events=events,
-                                        confirm_overwrite=confirm_overwrite,
-                                        mode=mode))
+        try:
+            out = self._save_dialog_for_compare(compare_env.DEFAULT_OUT_DIR,
+                                                adapter.suggest_name(pa, pb))
+            if out is None:
+                self._release_task()
+                return {"cancelled": True}
+            return self._launch_compare(
+                label, mode, out,
+                lambda events=None, confirm_overwrite=None, day=None:
+                    adapter.compare_folders(pa, pb, out, events=events,
+                                            confirm_overwrite=confirm_overwrite,
+                                            mode=mode))
+        except Exception:
+            self._release_task()        # a dialog/suggest_name error must not wedge the gate
+            raise
 
     # ---- settings & maintenance -----------------------------------------------
 

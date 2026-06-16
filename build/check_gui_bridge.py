@@ -113,12 +113,34 @@ def test_consolidate_index_before_claim():
     a._release_task()
 
 
+def test_compare_dialog_error_releases():
+    print("start_compare releases the slot if the save dialog errors:")
+    import reports
+    a = gui_api.GuiApi()
+    # Find a "files"-kind comparison index (start_compare's required kind).
+    files_idx = next((i for i, r in enumerate(reports.COMPARE_REPORTS)
+                      if r[2] == "files"), None)
+    if files_idx is None:
+        check("a files-kind comparison exists", False)
+        return
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("dialog blew up")
+
+    a._save_dialog_for_compare = _boom        # claim happens, then the dialog throws
+    res = a.start_compare(files_idx, "a.xlsx", "b.xlsx", True, False)
+    check("error surfaced to the caller", isinstance(res, dict) and res.get("error"))
+    check("task slot released after a dialog error", a._try_claim_task("x") is True)
+    a._release_task()
+
+
 def main():
     test_pick_report()
     test_path_validation()
     test_single_flight()
     test_reset_token()
     test_consolidate_index_before_claim()
+    test_compare_dialog_error_releases()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")
