@@ -59,7 +59,16 @@ follow-ups. Fuller detail for most items lives in `code-review/`
 
 ## Low priority
 
-- [ ] **`extractall` / junction safety review** — likely N/A (the comparison reads
-  existing files; it does not extract archives). Confirm and close.
-- [ ] **Distill `code-review/` into this list** and retire the working docs once
-  their remaining open items are all captured here.
+- [ ] **`extractall` / junction-traversal safety review** — likely N/A (the
+  comparison reads existing files; it does not extract archives), but confirm the
+  reset path can't follow a junction/symlink outside its targets, and close.
+- [ ] **Audit investigate-list residue** — a few low-confidence items from the code
+  review were never individually confirmed closed: values-flavor SELF-CHECK
+  independence (does it recompute independently, or share the mirror it checks?),
+  updater `_wait_pid_exit` PID-recycle, `open_release_page` URL provenance, env-scan
+  page-reuse CONFIG bleed. Spot-check each → close or fix.
+- [ ] **Auth file at rest** — `storage_state` is plaintext JSON (documented, not
+  encrypted). Defense-in-depth only: consider DPAPI if IT ever requires it.
+- [ ] **Report upstream to the TSMIS team** — the site hardcodes
+  `highway_sequence_listing.xlsx` as *Ramp Detail*'s export filename (a site
+  copy-paste bug; cosmetic for us since we rename via `save_as`).
