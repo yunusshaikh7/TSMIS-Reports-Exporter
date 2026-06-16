@@ -2,7 +2,7 @@
 
 > Bulk-export Caltrans TSMIS reports for every California state route — from a single click.
 
-[![Version](https://img.shields.io/badge/version-0.8.0-blue)](version.py)
+[![Version](https://img.shields.io/badge/version-0.11.0-blue)](version.py)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](#)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](#)
 [![Automation](https://img.shields.io/badge/automation-Playwright-2EAD33?logo=microsoftedge&logoColor=white)](#)
@@ -41,7 +41,7 @@ of `.bat` scripts for development and as a fallback.
 
 ## Features
 
-- **Four report types, any combination.** Export one, several, or all at once.
+- **Six report types, any combination.** Export one, several, or all at once.
 - **One login for everything.** A single SSO + MFA sign-in covers every report.
 - **Pick your routes.** Run all routes by default, or narrow to a subset
   (`5, 99, 101` — any casing/zero-padding, suffixes like `101U` accepted).
@@ -73,6 +73,11 @@ of `.bat` scripts for development and as a fallback.
 | TSAR: Ramp Detail | XLSX | `output/<date>/ramp_detail/` |
 | Highway Sequence Listing | XLSX | `output/<date>/highway_sequence/` |
 | Highway Log | XLSX | `output/<date>/highway_log/` |
+| Intersection Summary | XLSX | `output/<date>/intersection_summary/` |
+| Intersection Detail | XLSX | `output/<date>/intersection_detail/` |
+
+The two Intersection reports are **export-only** for now (no consolidate or
+compare support yet).
 
 Consolidate-only: **TSN Highway Log** (drop district PDFs into
 `input/tsn_highway_log/`; converted per-route files + one combined workbook

@@ -14,6 +14,43 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Comparisons are far more accurate (0.11.0).** Comparing the same report
+  across two environments used to flag large numbers of "differences" that were
+  really just rows shifting position — one missing point near the top made
+  everything below it look changed. Comparisons now line rows up by their
+  **postmile** (a row's real identity) instead of the coarser county, so a
+  Highway Sequence comparison that used to show ~15,800 differing cells now
+  shows ~5,000 genuine ones; only real differences remain.
+- **A comparison never claims "everything matches" when it couldn't read a
+  file (0.11.0).** If an input file is unreadable it's no longer silently
+  skipped: the result says **"Comparison incomplete"** and the workbook lists
+  exactly what was left out — instead of a misleading green "everything
+  matches" that quietly ignored the missing data.
+- **Cleaner TSN Highway Log conversion (0.11.0).** Totals-block text (running
+  mileage, "CUMULATIVE", "TOTAL CONST UNCONST", …) no longer leaks into the
+  Description column — which also removes the false differences it was causing
+  in the TSMIS-vs-TSN comparison.
+- **Empty routes no longer stall the export (0.11.0).** When a route has
+  nothing to download, the tool now moves on within about a minute instead of
+  waiting out the full multi-minute time limit, so a long run with many empty
+  routes finishes much sooner. Empty Intersection reports are recognized
+  correctly too.
+- **Damaged or locked output files are handled (0.11.0).** A half-written or
+  unreadable file left by an interrupted run is re-downloaded rather than
+  trusted as "already done", and a file you happen to have open in Excel during
+  a resume no longer breaks the run.
+- **A failed report can't overwrite a good one (0.11.0).** If a Ramp Summary
+  PDF fails to parse (or is a stub one-page file), the tool keeps the good
+  workbook you already had instead of replacing it with a blank one.
+- **Safer updates (0.11.0).** Before installing, the in-app update now verifies
+  the downloaded file with a checksum and installs only the expected files —
+  extra protection against a corrupted or tampered download. Sign-in tokens are
+  also scrubbed from the saved session and the logs.
+- **Spreadsheet safety (0.11.0).** Free-text fields that begin with `=`, `+`,
+  `-` or `@` are stored as plain text so they can't run as spreadsheet formulas,
+  and comparisons guard against Excel's row/column limits and duplicate sheet
+  names instead of failing partway through.
+
 - **Intersection reports fixed (0.10.4).** The two new report types now match
   the site exactly: the menu entries are **Intersection Summary** and
   **Intersection Detail** (the site doesn't use a "TSAR:" prefix for them),

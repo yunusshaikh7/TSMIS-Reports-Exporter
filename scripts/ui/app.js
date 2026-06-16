@@ -1637,6 +1637,8 @@ function makeMockApi() {
     { label: "TSAR: Ramp Detail", fmt: "Excel" },
     { label: "Highway Sequence Listing", fmt: "Excel" },
     { label: "Highway Log", fmt: "Excel" },
+    { label: "Intersection Summary", fmt: "Excel" },
+    { label: "Intersection Detail", fmt: "Excel" },
   ];
   const st = {
     task: null, fast_run: false,
@@ -1780,11 +1782,11 @@ function makeMockApi() {
 
   return {
     get_initial_state: async () => ({
-      app_name: "TSMIS Exporter", version: "0.10.0 (preview)",
+      app_name: "TSMIS Exporter", version: "0.11.0 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       reports: REPORTS,
-      cons_reports: REPORTS.map((r) => r.label).concat(["TSN Highway Log"]),
+      cons_reports: REPORTS.slice(0, 4).map((r) => r.label).concat(["TSN Highway Log"]),
       compare_reports: [
         { label: "Highway Log — TSMIS vs TSN", kind: "files" },
         { label: "TSAR: Ramp Summary — between environments", kind: "folders" },

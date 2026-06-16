@@ -21,8 +21,11 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 
 Reports 5–6 (v0.10.3) are **export-only** for now (no consolidator/comparison).
 Labels + formats verified against the live page source (v0.10.4): NO "TSAR:"
-prefix (unlike the ramp pair), both Excel via the shared Export button; only
-the empty-marker text ("no intersections") remains best-guess. The site greys
+prefix (unlike the ramp pair), both Excel via the shared Export button.
+Empty-data markers were wired v0.11.0 (Detail `td.hl-empty`, Summary
+`Total Intersections = 0`) but are no longer load-bearing — a general
+no-download fast-fail (`EmptyExport`, see *Reliability*) catches an empty export
+marker-independently, so marker text drifting can't hang a run. The site greys
 options with a `cs-disabled` class; the env-access scan reads the dropdown for
 every `EXPORT_REPORTS` row, so any label drift shows up there as "missing"
 without running an export.
@@ -147,7 +150,7 @@ shipped". Console flows honor the same overrides automatically.
   same reason the consolidators stream). Matched cells show the matched
   value; differing cells show "tsmis ≠ tsn" in red (diff detection keys on
   the " ≠ " marker — formulas, conditional formatting and COUNTIFs all rely
-  on it). Rows are keyed on (Route +) Location + occurrence; the union is a
+  on it). Rows are keyed on (Route +) the key field + occurrence; the union is a
   diff-style document-order merge PER ROUTE with first-position dedupe (a key
   can sit in both files at different sequence positions — TSMIS prints some
   postmiles out of order; per-route alignment keeps difflib fast on 50k+
@@ -158,6 +161,27 @@ shipped". Console flows honor the same overrides automatically.
   shown instead of blank, row numbers rendered as clickable links, and the
   additive Spot Check / Only-in tabs. Med Wid compares after zero-pad
   normalization (TSMIS `0Z` = TSN `00Z`).
+  - **Key field (v0.11.0):** a row's key is `CompareSchema.key_field`, the column
+    that IS its identity — NOT necessarily `header[0]`. Highway Log keys on
+    Location (its first column); cross-env **Highway Sequence and Ramp Detail key
+    on the granular `PM` (postmile)**, not their coarse first column (County /
+    `district-county-route`) — the coarse key aligned rows positionally within the
+    group and inflated diffs/one-sided rows (PROD-vs-DEV HSL 15,797 → 5,070 diff
+    cells). The resolver falls back to the first column (+ log warning) if the
+    named column is absent, so layout drift degrades, never crashes.
+  - **Incompleteness contract (v0.11.0):** an unreadable input is never silently
+    dropped — `run_compare(warnings=…)` keeps `status="ok"` but forces
+    `verdict="diff"` (a clean match can't be certified) and leads
+    `summary_lines[0]` with the literal **`⚠ COULD NOT COMPARE EVERYTHING`** (the
+    in-workbook Summary banner uses `✗` so the existing red CF still applies); the
+    GUI result dialog keys on that `⚠` prefix to title it "Comparison incomplete".
+    Match ⟺ zero diff cells AND zero one-sided rows AND zero skipped inputs.
+  - **Write-path safety (v0.11.0):** free text beginning `= + - @` is stored as
+    TEXT (formula-injection guard) on BOTH compare_core flavors AND the
+    consolidators; values are canonicalized at load (`normalize_value`, dates →
+    ISO) so the flavors can't disagree; and the engine fails cleanly before
+    writing on an Excel row/column-limit overflow or a side-name⇄sheet-name
+    collision.
 
 ## Two Run Modes, One Core
 
@@ -437,7 +461,11 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
 - **Resume / idempotency:** `run_export` skips a route whose output file already
   exists **in today's run folder for the active src/env**. Delete a file to
   force re-download; a new day (or a different environment) always starts a
-  fresh folder (yesterday's files never block today's run).
+  fresh folder (yesterday's files never block today's run). **Integrity gate
+  (v0.11.0):** a pre-existing file only counts as "done" if it passes a magic
+  check (XLSX `PK`, PDF `%PDF`) and is non-empty — a half-written/corrupt file
+  from an interrupted run is re-pulled; a file the user has locked open (e.g. in
+  Excel) is treated as present so resume tolerates the lock instead of failing.
 - **Live browser status + previews (v0.10.0, GUI):** the engines emit a
   one-line per-browser status through `events.on_status(worker_no, text)`
   (phase changes + a ~5 s heartbeat with elapsed time inside
@@ -521,6 +549,15 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   `error` class) is detected via `common.ERROR_JS` and raised as `ReportError` —
   recorded `failed` in seconds (with message + screenshot) instead of burning the
   full timeout.
+- **No-download fast-fail (v0.11.0):** an export that starts no download within
+  `DOWNLOAD_START_TIMEOUT_MS` raises `EmptyExport` → recorded `empty` in ~60 s
+  instead of hanging the full per-route ceiling (the old empty-route hang was
+  ~21 min). Marker-independent — it keys on "Export control ready, no download"
+  (`EXPORT_READY_JS` watches the Export button, not Print) — so a report-specific
+  empty marker drifting can't reintroduce the hang. A greyed-out report type
+  raises `ReportUnavailableError` (`cs-disabled`). Tradeoff: a non-`#rampResults.
+  error` transient inside the export-click window reads as `empty` (not retried
+  in-loop); resume re-pulls it next run.
 - **Run report:** every route's outcome (`saved`/`empty`/`skipped`/`failed`/
   `exists`) is recorded and auto-saved to `output/run_reports/<report>_run_<ts>.csv`.
   GUI "Save run report…" copies it (combined CSV when several ran).
@@ -531,7 +568,11 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
   corporate TLS inspection works — never switch this to requests/certifi).
   If newer, a title-bar pill offers **Update** → downloads the
   variant-matching zip (`-with-browser` when `_internal\ms-playwright` ships;
-  same probe as `paths.py`) into `data\update\`, extracts + verifies it, then
+  same probe as `paths.py`) into `data\update\`, **verifies its SHA-256 against
+  the release's published `.sha256` and aborts before extracting on mismatch,
+  and restricts the swap to an allowlist of expected staged items** (v0.11.0;
+  `release.yml` publishes the checksum and asserts the git tag == `version.py`),
+  extracts it, then
   **Restart to update** launches the STAGED NEW EXE in swap mode
   (`updater.SWAP_FLAG` / `run_swap_mode`; gui_main branches into it FIRST,
   before logging/paths/CLR — the process runs from the staged tree, so
@@ -582,13 +623,15 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
 | `RETRY_REPORT_TIMEOUT_MS` | 900_000 (15 min) | Per-route ceiling, end-of-run retry pass |
 | `SKIP_PROMPT_AFTER_MS` | 60_000 (1 min) | When the "still working" status + skip hatch open |
 | `COUNTY_ENABLE_TIMEOUT_MS` | 60_000 (60 s) | Max wait for the county dropdown to enable |
+| `DOWNLOAD_START_TIMEOUT_MS` | 60_000 (60 s) | Max wait for a download to START after Generate; elapsing ⇒ `EmptyExport` no-data fast-fail (capped at `min(60 s, ceiling)`) |
 | `RETRY_COUNT` | 1 | In-loop retries after a transient (non-timeout) failure |
 
 Increase these if the TSMIS server is slow. The constants are the DEFAULTS;
 since v0.10.0 the GUI's Settings tab overrides the four ceilings via
 `settings.py`, and engines read them at run time through the accessor
 functions (`report_timeout_ms()` etc.) — when editing engine code, call the
-accessors, don't import the constants.
+accessors, don't import the constants. `DOWNLOAD_START_TIMEOUT_MS` (v0.11.0) is
+config.json-only (no Settings UI) and read the same way.
 
 ## Fast Mode (experimental, `exporter_parallel.py`)
 
@@ -877,9 +920,17 @@ suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option value
 - Sync Playwright API (not async). Runtime deps pinned; a browser is bundled
   **only** in the `-BundleChromium` variant.
 - End-user setup uses global `pip` (no venv); the build uses `build\.venv`.
-- **No tests** — true verification is a live export against TSMIS (needs login) or
-  running a consolidator over existing files. Import-level sanity checks can use
-  `build\.venv\Scripts\python.exe` without a login.
+- **Regression checks (v0.11.0; no unit-test framework still).** True
+  verification remains a live export against TSMIS (needs login) or running a
+  consolidator/comparison over real files — but `build\check_*.py` are runnable
+  golden guards (plain `build\.venv\Scripts\python.exe`, no login): the
+  comparison set (`check_compare_*` + `check_ramp_summary_partial` +
+  `check_tsn_description_leak`) locks the regression-locked `compare_core`; the
+  og set (`check_export_engine` / `gui_bridge` / `updater` / `fake_site`, the
+  last driving a real headless Chromium over DOM fixtures) covers the engine /
+  GUI / updater. `.github/workflows/checks.yml` runs them all (blocking) on
+  every push/PR; the comparison value/formula flavors are additionally
+  COM-recalc-verified on real data (Excel required).
 - **Never commit** `scripts/tsmis_auth.json` or generated `output/`/build artifacts.
   Commit messages: short, imperative (`add route 395`).
 
