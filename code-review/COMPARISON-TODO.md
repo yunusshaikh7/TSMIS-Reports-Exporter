@@ -72,6 +72,25 @@ Legend: ✅ done & verified · 🟡 code done, **verification pending data** · 
 - ✅ **Excel row/column-limit guard + sheet-name collision** — fail cleanly
   before writing. (`check_compare_limits.py`)
 
+### Audit round (ruthless multi-agent audit + my COM backbone) — 8 latent gaps closed
+All latent on real data (engine proven correct: 252×4-env runs, TSMIS-vs-TSN
+per-route+consolidated, D01-D03; flavor parity 0 mismatches over 554k+
+COM-recalc'd cells). Fixtures in `check_compare_audit.py`. (commit `7ca43dc`)
+- ✅ **P1 — injection fix completed:** the data-sheet **Key-helper** cell and the
+  **Routes route-id** cell are now guarded (a `=`-leading key/route was still a
+  live formula → broke that row's MATCH lookups AND split the two flavors).
+- ✅ **P2 — per-field COUNTIF** keys on the spaced ` ≠ ` marker (was bare `≠`),
+  matching every other diff detector. (results-identical; COM 9/9)
+- ✅ **P2 — Excel column guard** measures the widest sheet (Comparison = data+3).
+- ✅ **P3 — cross-env side labels** capped to Excel's 31-char sheet limit.
+- ✅ **P3 — unnamed header columns** get an identifiable `(col X)` label (Highway
+  Sequence has real header-less columns). ← the one finding that showed on real
+  data (labeling only; counts always correct).
+- ✅ **P3 — Ramp Summary route key** zero-pad-normalized (PDF title `1` == file
+  `001`) so a route can't split into two one-sided rows.
+- ✅ **P4 — `normalize_value`** handles `datetime.time`; `_apply_field_widths`
+  widths every duplicate-named column and never raises on the key column.
+
 ## Found in the full audit — open
 
 ### ⬜ Med Wid flavor-parity gap (`compare_core.py`) — latent, dormant on real data
