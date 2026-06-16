@@ -196,6 +196,19 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
             events.on_log(f"{prefix} FAILED reading rows ({type(e).__name__}): {e}")
             failed.append(p.name)
 
+    # Nothing combined (every file failed/skipped past the header probe) → do
+    # NOT save: a header-only workbook claiming "ok" would silently overwrite a
+    # good prior consolidation. Report it as an error and leave the file alone.
+    if used_files == 0:
+        ws.close()
+        wb.close()
+        return ConsolidateResult(
+            status="error",
+            message=(f"None of the {len(files)} {report_name} file(s) could be "
+                     f"read ({len(skipped)} skipped, {len(failed)} failed) — "
+                     f"nothing was combined and the existing file (if any) was "
+                     f"left unchanged.\nSee the log for the per-file reasons."))
+
     events.on_log("")
     events.on_log("Writing consolidated workbook...")
     try:
@@ -208,14 +221,26 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
                      "(Your exported files were not changed.)"),
         )
 
-    return ConsolidateResult(
-        status="ok",
-        output_path=str(out_path),
-        summary_lines=[
-            f"Files combined: {used_files}",
-            f"Rows added:     {appended_rows}",
-            f"Files skipped:  {len(skipped)} {skipped if skipped else ''}",
-            f"Files failed:   {len(failed)} {failed if failed else ''}",
-            f"Output file:    {out_path}",
-        ],
-    )
+    # Skipped/failed inputs mean the combined workbook is INCOMPLETE — lead with
+    # a loud warning so a partial result is never mistaken for a full one. (The
+    # status stays "ok" so the GUI still offers the file that WAS produced; an
+    # explicit "partial" status would need matching consumer support — tracked
+    # in code-review/COMPARISON-TODO.md.)
+    incomplete = bool(skipped or failed)
+    summary_lines = []
+    if incomplete:
+        left_out = len(skipped) + len(failed)
+        summary_lines.append(
+            f"⚠ INCOMPLETE — {left_out} file(s) were left OUT "
+            f"({len(skipped)} skipped, {len(failed)} failed); the combined "
+            f"workbook does NOT contain their routes. See the per-file reasons "
+            f"above and re-export/repair them before relying on it.")
+    summary_lines += [
+        f"Files combined: {used_files}",
+        f"Rows added:     {appended_rows}",
+        f"Files skipped:  {len(skipped)} {skipped if skipped else ''}",
+        f"Files failed:   {len(failed)} {failed if failed else ''}",
+        f"Output file:    {out_path}",
+    ]
+    return ConsolidateResult(status="ok", output_path=str(out_path),
+                             summary_lines=summary_lines)

@@ -1018,11 +1018,16 @@ def _write_routes(wb, all_routes, lay, vals=None):
     return ws
 
 
-def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
+def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=()):
     """`vals` None = live-formula stats; else the values model and every
     stat is its literal number. The SELF-CHECK rows stay LIVE in both
     flavors — in the values workbook they recount the literal sheets, so
-    they still prove the written numbers are internally consistent."""
+    they still prove the written numbers are internally consistent.
+
+    `warnings` (input files that were unreadable/skipped on one or both sides)
+    makes the report honest about incompleteness: a clean "everything matches"
+    is downgraded to a loud "could not compare everything" banner and the skips
+    are listed in the notes. Empty warnings → byte-identical to before."""
     sc = lay.sc
     a, b = sc.side_a, sc.side_b
     noun, nouns = sc.id_noun, sc.id_noun_plural
@@ -1084,6 +1089,13 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
         fill=PatternFill(bgColor="FFC7CE"), font=Font(color="9C0006", bold=True)))
     match_text = (f"✓ EVERYTHING MATCHES — all {n_union:,} {nouns} are "
                   f"identical in both {sc.sides_noun}.")
+    if warnings:
+        # Some inputs couldn't be read — a clean "match" can't be certified.
+        # Leads with ✗ so the existing red conditional-format applies (no new
+        # CF rule, so the no-warnings path stays byte-identical).
+        match_text = (f"✗ COULD NOT COMPARE EVERYTHING — {len(warnings)} input "
+                      f"file(s) were unreadable and skipped; of the {n_union:,} "
+                      f"{nouns} that WERE compared, all match. See the notes.")
     if vals is None:
         diff_cells_ref = f"SUM(Comparison!{df}2:{df}{last})"
         one_sided_ref = (f'COUNTIF(Comparison!{st}:{st},"{lay.only_a}")'
@@ -1239,6 +1251,18 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
         'data sheet: ' + ("Route, " if lay.has_route else "")
         + f'{sc.header[lay.key_field]} & "|" & occurrence #.',
     ]
+    if warnings:
+        shown = warnings[:20]
+        notes.append(
+            f"• ⚠ INCOMPLETE COMPARISON — {len(warnings)} input file(s) could not "
+            "be read and were left OUT of this comparison, so anything in them "
+            "is neither matched nor flagged. Re-export/repair them and re-run "
+            "before trusting a clean result:")
+        for w in shown:
+            notes.append(f"     – {w}")
+        if len(warnings) > len(shown):
+            notes.append(f"     – …and {len(warnings) - len(shown)} more "
+                         "(see the run log).")
     if sc.medwid_fields:
         notes.append(
             "• Med Wid is compared after normalizing zero-padding in the numeric "
@@ -1295,7 +1319,7 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None):
 
 def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                 confirm_overwrite=None, mode="formulas",
-                name_a="", name_b=""):
+                name_a="", name_b="", warnings=()):
     """Build the comparison workbook(s) from two loaded row sets. Returns a
     ConsolidateResult (same contract as the consolidators, so the GUI/console
     drive it identically). The CALLER owns input loading + shape validation;
@@ -1305,7 +1329,13 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     "values" (same sheets and look, but the bulk is plain computed RESULTS —
     opens instantly, no F9; links, conditional formatting, the Spot Check
     sheet and the SELF-CHECK rows are kept), or "both" (two files: the picked
-    name for the formulas copy and '<name> (values).xlsx' next to it)."""
+    name for the formulas copy and '<name> (values).xlsx' next to it).
+
+    `warnings`: input files the caller couldn't read (one per string). When
+    non-empty the comparison is INCOMPLETE — the verdict can never be a clean
+    "match" (forced to "diff"), the workbook banner says so, and the skipped
+    files are listed. Empty → unchanged (the regression-locked default)."""
+    warnings = list(warnings)
     events = events or Events()
     if not _DEPS_OK:
         return ConsolidateResult(status="error",
@@ -1421,7 +1451,8 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
             wb.calculation.calcMode = "manual"
             wb.calculation.calcOnSave = False
             wb.calculation.fullCalcOnLoad = False
-        _write_summary(wb, name_a, name_b, len(union), lay, vals=vals)
+        _write_summary(wb, name_a, name_b, len(union), lay, vals=vals,
+                       warnings=warnings)
         _write_spot_check(wb, lay, len(union), spot_row, union[spot_row - 2],
                           manual_calc=(has_route and m == "formulas"))
         if _write_comparison(wb, union, lay, events, vals=vals) is None:
@@ -1462,10 +1493,17 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     # Summary verdict; the GUI also keys its result dialog on `verdict`).
     one_sided = counts["t_only"] + counts["n_only"]
     matches = counts["diff_cells"] == 0 and one_sided == 0
-    if matches:
+    # Unreadable inputs make the comparison INCOMPLETE: a clean match can't be
+    # certified, so the verdict is never "match" when files were skipped.
+    incomplete = bool(warnings)
+    if matches and not incomplete:
         verdict_line = (f"✓ EVERYTHING MATCHES — all {len(union):,} "
                         f"{sc.id_noun_plural} are identical in both "
                         f"{sc.sides_noun}.")
+    elif matches and incomplete:
+        verdict_line = (f"⚠ COULD NOT COMPARE EVERYTHING — {len(warnings)} input "
+                        f"file(s) were unreadable and skipped; the {len(union):,} "
+                        f"{sc.id_noun_plural} that WERE compared all match.")
     else:
         verdict_line = (f"✗ DIFFERENCES FOUND — {counts['diff_cells']:,} "
                         f"differing cell(s) on {counts['diff_rows']:,} "
@@ -1497,11 +1535,19 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                 "minutes), then save. The Summary's SELF-CHECK rows should "
                 "all read OK." + ("  The values copy opens ready — nothing "
                                   "to calculate." if "values" in modes else ""))
+    if incomplete:
+        lines.append(f"⚠ {len(warnings)} input file(s) skipped (unreadable) and "
+                     "left OUT of this comparison — re-export/repair and re-run:")
+        for w in warnings[:20]:
+            lines.append(f"    – {w}")
+        if len(warnings) > 20:
+            lines.append(f"    – …and {len(warnings) - 20} more (see the log).")
     if "formulas" in modes:
         lines.append(f"Live-formulas file: {out_paths['formulas']}")
     if "values" in modes:
         lines.append(f"Values file: {out_paths['values']}")
     primary = out_paths["formulas" if "formulas" in modes else "values"]
+    # Incomplete ⇒ never certify a clean match (GUI greens only on "match").
+    verdict = "diff" if (incomplete or not matches) else "match"
     return ConsolidateResult(status="ok", output_path=str(primary),
-                             summary_lines=lines,
-                             verdict="match" if matches else "diff")
+                             summary_lines=lines, verdict=verdict)

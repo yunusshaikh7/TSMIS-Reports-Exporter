@@ -111,7 +111,10 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
     ([route, *row]) the way the consolidators do: the header is locked from
     the first readable file (or must equal `expected_header` when the report
     pins one); files that disagree are skipped LOUDLY. Returns
-    (rows, header) or raises ValueError with a user-safe message."""
+    (rows, header, skipped) — `skipped` is the list of "<side> <file>: <reason>"
+    strings that the caller folds into the comparison's incompleteness warning,
+    so a route unreadable on a side can never masquerade as a clean match.
+    Raises ValueError with a user-safe message when nothing is readable."""
     in_dir, files = _find_input_dir(folder, subdir, "*.xlsx")
     if not files:
         raise ValueError(
@@ -119,7 +122,7 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
             f"Export the {report_name} report on that environment first.")
     header = list(expected_header) if expected_header else None
     rows = []
-    used = skipped = 0
+    skipped = []
     for i, p in enumerate(files, 1):
         if events.is_cancelled():
             raise ValueError("Cancelled by user.")
@@ -128,13 +131,14 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
         except Exception as e:
             events.on_log(f"  [{label}] {p.name}: could not open "
                           f"({type(e).__name__}); skipping")
-            skipped += 1
+            skipped.append(f"{label} {p.name}: could not open "
+                           f"({type(e).__name__})")
             continue
         try:
             if sheet_name not in wb.sheetnames:
                 events.on_log(f"  [{label}] {p.name}: sheet '{sheet_name}' "
                               "missing; skipping")
-                skipped += 1
+                skipped.append(f"{label} {p.name}: sheet '{sheet_name}' missing")
                 continue
             rows_iter = wb[sheet_name].iter_rows(values_only=True)
             h = [v for v in next(rows_iter, [])]
@@ -145,7 +149,8 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
             if h != header:
                 events.on_log(f"  [{label}] {p.name}: column layout differs; "
                               "skipping")
-                skipped += 1
+                skipped.append(f"{label} {p.name}: column layout differs from "
+                               "the other files")
                 continue
             route = _route_from_name(p)
             n = len(header)
@@ -155,7 +160,6 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
                 if any(v is not None and str(v).strip() != "" for v in r):
                     rows.append([route] + r)
                     count += 1
-            used += 1
             events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
                           f"+{count} rows")
         finally:
@@ -165,9 +169,9 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
             f"No readable {report_name} files were found for the {label} "
             f"side in:\n{in_dir}")
     if skipped:
-        events.on_log(f"  [{label}] note: {skipped} file(s) skipped "
+        events.on_log(f"  [{label}] note: {len(skipped)} file(s) skipped "
                       "(details above).")
-    return rows, header
+    return rows, header, skipped
 
 
 # The Ramp Summary's comparison columns: the consolidator's own field order
@@ -182,14 +186,17 @@ RS_HEADER = ["Route"] + [disp for _col, disp in _RS_FIELDS]
 def _load_ramp_summary_side(folder, label, events):
     """Parse every per-route Ramp Summary PDF on one side into per-route-shape
     rows ([route, *numeric fields] — the route IS the row key). Slow-ish
-    (~1-2 s per PDF), so progress is logged per file and cancel is honored."""
+    (~1-2 s per PDF), so progress is logged per file and cancel is honored.
+    Returns (rows, skipped) — `skipped` lists the PDFs that wouldn't parse, so
+    the caller can flag the comparison as incomplete rather than silently
+    dropping a route."""
     in_dir, files = _find_input_dir(folder, "ramp_summary", "*.pdf")
     if not files:
         raise ValueError(
             f"No Ramp Summary PDFs were found for the {label} side:\n{in_dir}\n\n"
             "Export the Ramp Summary report on that environment first.")
     rows = []
-    skipped = 0
+    skipped = []
     for i, p in enumerate(files, 1):
         if events.is_cancelled():
             raise ValueError("Cancelled by user.")
@@ -199,7 +206,8 @@ def _load_ramp_summary_side(folder, label, events):
             events.on_log(f"  [{label}] {p.name}: could not parse "
                           f"({type(e).__name__}); skipping")
             log.warning("env compare: %s parse failed", p, exc_info=True)
-            skipped += 1
+            skipped.append(f"{label} {p.name}: could not parse "
+                           f"({type(e).__name__})")
             continue
         route = record.get("route") or _route_from_name(p)
         rows.append([route] + [record.get(col) for col, _disp in _RS_FIELDS])
@@ -210,9 +218,9 @@ def _load_ramp_summary_side(folder, label, events):
             f"No readable Ramp Summary PDFs were found for the {label} side "
             f"in:\n{in_dir}")
     if skipped:
-        events.on_log(f"  [{label}] note: {skipped} PDF(s) skipped "
+        events.on_log(f"  [{label}] note: {len(skipped)} PDF(s) skipped "
                       "(details above).")
-    return rows
+    return rows, skipped
 
 
 # ---------------------------------------------------------------------------
@@ -314,14 +322,14 @@ class EnvCompare:
 
         try:
             if self.sheet_name is None:       # Ramp Summary: PDFs, route-keyed
-                rows_a = _load_ramp_summary_side(dir_a, la, events)
-                rows_b = _load_ramp_summary_side(dir_b, lb, events)
+                rows_a, skip_a = _load_ramp_summary_side(dir_a, la, events)
+                rows_b, skip_b = _load_ramp_summary_side(dir_b, lb, events)
                 header, has_route = RS_HEADER, False
             else:
-                rows_a, header = _load_xlsx_side(
+                rows_a, header, skip_a = _load_xlsx_side(
                     dir_a, la, self.subdir, self.sheet_name, self.REPORT_NAME,
                     events, expected_header=self.expected_header)
-                rows_b, header_b = _load_xlsx_side(
+                rows_b, header_b, skip_b = _load_xlsx_side(
                     dir_b, lb, self.subdir, self.sheet_name, self.REPORT_NAME,
                     events, expected_header=self.expected_header)
                 if header != header_b:
@@ -339,11 +347,20 @@ class EnvCompare:
             status = "cancelled" if msg == "Cancelled by user." else "error"
             return ConsolidateResult(status=status, message=msg)
 
+        # Files unreadable on EITHER side make the comparison incomplete — pass
+        # them through so the verdict can't certify a clean match and the
+        # workbook + summary list exactly what was left out.
+        warnings = skip_a + skip_b
+        if warnings:
+            events.on_log(f"⚠ {len(warnings)} input file(s) skipped across both "
+                          "sides — the comparison will be flagged incomplete.")
+
         events.on_log("")
         sc = self._schema(header, la, lb)
         return run_compare(sc, rows_a, rows_b, has_route, out_path,
                            events=events, confirm_overwrite=confirm_overwrite,
-                           mode=mode, name_a=str(dir_a.name), name_b=str(dir_b.name))
+                           mode=mode, name_a=str(dir_a.name), name_b=str(dir_b.name),
+                           warnings=warnings)
 
 
 # Highway Log: pin the known layout + keep the Med Wid rule and the sample's
