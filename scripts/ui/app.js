@@ -1066,8 +1066,8 @@ function renderCompareFiles() {
 // path picked via Browse… (kept as an extra option per side).
 const CMP_DIRS = { a: null, b: null };   // custom absolute paths from Browse…
 
-function fillCompareDirSelect(sel, custom, preferred) {
-  const days = (S.st && S.st.days) || [];
+function fillCompareDirSelect(sel, custom, preferred, days) {
+  days = days || [];
   const prev = sel.value;
   sel.textContent = "";
   if (custom) {
@@ -1091,14 +1091,21 @@ function fillCompareDirSelect(sel, custom, preferred) {
   else if (preferred) sel.value = preferred;
 }
 
-function renderCompareDirs() {
-  const days = (S.st && S.st.days) || [];
+async function renderCompareDirs() {
+  // A2: only offer run folders that actually contain the chosen report. Python
+  // owns the membership test (api.get_compare_folders); fall back to all known
+  // folders on any hiccup so the dropdowns are never empty by mistake.
+  let days = (S.st && S.st.days) || [];
+  try {
+    const res = await api.get_compare_folders(compareChoice());
+    if (res && Array.isArray(res.folders)) days = res.folders;
+  } catch (e) { /* keep the unfiltered list */ }
   // sensible defaults: baseline = newest ssor-prod run, other side = the
   // newest folder that differs from the baseline
   const baseline = days.find((d) => /ssor-prod$/.test(d)) || days[0] || "";
-  fillCompareDirSelect($("cmpDirA"), CMP_DIRS.a, baseline);
+  fillCompareDirSelect($("cmpDirA"), CMP_DIRS.a, baseline, days);
   const other = days.find((d) => d !== $("cmpDirA").value) || days[0] || "";
-  fillCompareDirSelect($("cmpDirB"), CMP_DIRS.b, other);
+  fillCompareDirSelect($("cmpDirB"), CMP_DIRS.b, other, days);
   syncCompareButton();
 }
 
@@ -2170,5 +2177,6 @@ function makeMockApi() {
       return { ok: true };
     },
     open_release_page: async () => push({ t: "log", text: "(mock) would open the GitHub releases page" }),
+    get_compare_folders: async () => ({ folders: (st.days || []) }),
   };
 }

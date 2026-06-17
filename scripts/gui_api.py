@@ -49,7 +49,7 @@ from logging_setup import LOG_FILE, set_debug_logging
 
 from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
                    FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, WEBVIEW_PROFILE_DIR,
-                   is_frozen, list_output_days)
+                   is_frozen, list_output_days, list_output_days_for_report)
 from version import APP_NAME, __version__
 from common import (
     BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES, DATA_SOURCE_LABELS,
@@ -729,7 +729,8 @@ class GuiApi:
             "log_dir": str(LOG_DIR),
             "reports": [{"label": label, "fmt": fmt} for label, fmt, _spec in EXPORT_REPORTS],
             "cons_reports": [label for label, _mod in CONSOLIDATE_REPORTS],
-            "compare_reports": [{"label": label, "kind": kind}
+            "compare_reports": [{"label": label, "kind": kind,
+                                 "subdir": getattr(_mod, "subdir", None)}
                                 for label, _mod, kind in COMPARE_REPORTS],
             "routes": list(ROUTES),
             "channels": [{"id": c, "label": CHANNEL_LABELS[c],
@@ -1292,6 +1293,22 @@ class GuiApi:
             raise
 
     @_api_method
+    def get_compare_folders(self, report_idx):
+        """Run folders that contain the chosen cross-env report (the compare
+        folder dropdowns call this on report-type change so only usable runs are
+        offered — A2). 'files'-kind comparisons and adapters without a subdir
+        return all folders (their dropdowns aren't shown). Pure filesystem stat;
+        no task lock, no browser."""
+        row = self._pick_report(COMPARE_REPORTS, report_idx)
+        if row is None:
+            return {"folders": list_output_days()}
+        _label, adapter, kind = row
+        subdir = getattr(adapter, "subdir", None)
+        if kind != "folders" or not subdir:
+            return {"folders": list_output_days()}
+        return {"folders": list_output_days_for_report(subdir)}
+
+    @_api_method
     def start_compare_env(self, report_idx, dir_a, dir_b,
                           want_formulas=True, want_values=False):
         """Cross-environment comparison: two run folders (names from the
@@ -1312,6 +1329,22 @@ class GuiApi:
             pb = Path(dir_b) if Path(dir_b).is_absolute() else self._resolve_under_output(dir_b)
         except ValueError as e:
             return {"error": str(e)}
+        # A2 server-side guard mirroring the filtered dropdowns: a run folder
+        # picked from the list must actually hold this report's export (Browse…
+        # absolute paths are the user's explicit choice and skip this).
+        subdir = getattr(adapter, "subdir", None)
+        if subdir:
+            for raw, p in ((dir_a, pa), (dir_b, pb)):
+                if Path(raw).is_absolute():
+                    continue
+                sub = p / subdir
+                try:
+                    present = sub.is_dir() and any(sub.iterdir())
+                except OSError:
+                    present = False
+                if not present:
+                    return {"error": f"The folder “{raw}” has no {label} export "
+                                     "to compare — pick one that does."}
         mode = self._compare_mode(want_formulas, want_values)
         if mode is None:
             return {"error": "Tick at least one output (values and/or live formulas)."}

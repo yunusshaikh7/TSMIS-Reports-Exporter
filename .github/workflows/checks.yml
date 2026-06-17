@@ -47,7 +47,11 @@ jobs:
         run: python build/check_export_engine.py
 
       - name: GUI-bridge regression checks (blocking)
-        run: python build/check_gui_bridge.py
+        shell: bash
+        run: |
+          set -e
+          python build/check_gui_bridge.py
+          python build/check_a2_compare_filter.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py

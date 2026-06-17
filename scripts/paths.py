@@ -148,6 +148,22 @@ def latest_output_day():
     return days[0] if days else None
 
 
+def list_output_days_for_report(subdir):
+    """Run folders (newest first) that actually contain non-empty <subdir>/
+    report files. The cross-environment compare dropdowns filter to these so a
+    run that never exported the chosen report isn't offered as a side to compare.
+    A missing/odd subdir simply yields fewer matches; never raises."""
+    out = []
+    for name in list_output_days():
+        d = OUTPUT_ROOT / name / subdir
+        try:
+            if d.is_dir() and any(d.iterdir()):
+                out.append(name)
+        except OSError:
+            continue
+    return out
+
+
 def resolve_day_choice(raw):
     """Map a user-supplied TSMIS_DAY value to an existing run folder: an exact
     folder name passes through; a bare date picks the newest run folder of
