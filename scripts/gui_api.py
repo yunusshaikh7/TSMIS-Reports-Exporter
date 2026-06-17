@@ -39,10 +39,11 @@ import webview
 
 import run_report
 import settings
+import batch_manifest
 import updater
-from gui_worker import (CheckWorker, ChromiumWorker, ConsolidateWorker,
-                        EnvCheckWorker, EnvScanWorker, ExportWorker,
-                        LoginWorker, ResetWorker, UpdateWorker,
+from gui_worker import (BatchWorker, CheckWorker, ChromiumWorker,
+                        ConsolidateWorker, EnvCheckWorker, EnvScanWorker,
+                        ExportWorker, LoginWorker, ResetWorker, UpdateWorker,
                         measure_targets, reset_targets)
 from exporter_parallel import MAX_WORKERS, default_worker_count
 from logging_setup import LOG_FILE, set_debug_logging
@@ -152,6 +153,8 @@ class GuiApi:
         self._update_info = None
 
         self._last_results = []      # [(spec, RunResult), ...] of the last export
+        self._batch = None           # B3: live Export-Everything progress {label,done,total}
+        self._batch_resume = None    # B3: a resumable manifest summary, or None
         self._export_worker = None   # live ExportWorker (screenshot requests)
         # Server-side confirmation for the one destructive op (delete all
         # reports): reset_preview issues a single-use token bound to the
@@ -210,6 +213,8 @@ class GuiApi:
                 "checks_running": self._checks_running,
                 "days": list_output_days(),
                 "can_save_report": bool(self._last_results),
+                "batch": self._batch,
+                "batch_resume": self._batch_resume,
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},
                 "logins": self._login_states(),
@@ -456,6 +461,10 @@ class GuiApi:
             self._emit_log("Cancelled.")
             self._set_dot("ok" if self._authed else "bad", "Idle")
             self._end_task()
+        elif kind == "batch_progress":
+            self._on_batch_progress(payload)
+        elif kind == "batch_done":
+            self._on_batch_done(payload)
         elif kind == "update_status":
             self._on_update_status(payload)
         elif kind == "error":
@@ -467,6 +476,7 @@ class GuiApi:
             self._fast_run = False
             self._login_phase = None
             self._export_worker = None
+            self._batch = None
             self.pause_event.clear()      # never leak a paused state across runs
         self._refresh_auth()
         self._emit({"t": "run_ended"})
@@ -725,6 +735,7 @@ class GuiApi:
             self._refresh_auth()
             self._start_checks_locked()
             self._start_update_check()       # quiet unless an update exists
+            self._batch_resume = self._pending_batch()   # offer to resume an interrupted batch
         return {
             "app_name": APP_NAME,
             "version": __version__,
@@ -745,6 +756,7 @@ class GuiApi:
             "site": dict(zip(("source", "environment"), get_site())),
             "fast": {"default": default_worker_count(), "max": MAX_WORKERS},
             "settings": self.get_settings(),
+            "batch_resume": self._batch_resume,
             "state": self._state_snapshot(),
         }
 
@@ -957,6 +969,136 @@ class GuiApi:
         worker.start()
         return {"ok": True}
 
+    # ---- batch: Export Everything (B3) ----------------------------------------
+
+    @staticmethod
+    def _parse_env_keys(env_keys):
+        """Validate JS-supplied 'src-env' keys into ordered, de-duped (src, env)
+        combos; unknown keys are dropped."""
+        out, seen = [], set()
+        for k in (env_keys if isinstance(env_keys, (list, tuple)) else []):
+            parts = str(k).split("-")
+            if (len(parts) == 2 and parts[0] in DATA_SOURCES
+                    and parts[1] in ENVIRONMENTS and (parts[0], parts[1]) not in seen):
+                seen.add((parts[0], parts[1]))
+                out.append((parts[0], parts[1]))
+        return out
+
+    def _pending_batch(self):
+        """A resumable batch (a saved manifest with pending environments) as a
+        small UI summary, or None."""
+        m = batch_manifest.load()
+        if m and batch_manifest.pending(m):
+            return {"reports": list(m.get("reports", [])),
+                    "pending": len(batch_manifest.pending(m)),
+                    "total": len(m.get("steps", []))}
+        return None
+
+    @_api_method
+    def start_batch_export(self, report_idxs, env_keys, fast, workers,
+                           auto_consolidate=False):
+        """B3 Export Everything: export the selected report types across the
+        selected environments, sequentially, with a persistent manifest so it can
+        resume across restarts."""
+        specs_idx = [i for i in (report_idxs if isinstance(report_idxs, (list, tuple))
+                                 else []) if self._pick_report(EXPORT_REPORTS, i)]
+        if not specs_idx:
+            return {"error": "Tick at least one report type to export."}
+        combos = self._parse_env_keys(env_keys)
+        if not combos:
+            return {"error": "Pick at least one environment."}
+        n_workers = 1
+        if fast:
+            try:
+                n_workers = max(2, min(int(workers), MAX_WORKERS))
+            except (TypeError, ValueError):
+                n_workers = max(2, default_worker_count())
+        if not self._try_claim_task("batch"):
+            return {"error": "A task is already running."}
+        self.cancel_event.clear()
+        self.skip_event.clear()
+        self.pause_event.clear()
+        manifest = batch_manifest.build(specs_idx, combos, bool(fast), n_workers,
+                                        bool(auto_consolidate))
+        batch_manifest.save(manifest)
+        with self._lock:
+            self._fast_run = n_workers > 1
+            self._batch_resume = None
+        msg = (f"Starting Export Everything: {len(specs_idx)} report type(s) "
+               f"across {len(combos)} environment(s)")
+        if n_workers > 1:
+            msg += f"   ·   FAST MODE ({n_workers} browsers)"
+        if auto_consolidate:
+            msg += "   ·   auto-consolidate"
+        self._emit_log(msg)
+        self._set_dot("busy", "Export Everything…")
+        self._emit({"t": "run_started", "mode": "batch", "label": "Working…",
+                    "workers": n_workers})
+        self._push_state()
+        BatchWorker(manifest, self._q, self.cancel_event, self.skip_event,
+                    self.pause_event).start()
+        return {"ok": True}
+
+    @_api_method
+    def resume_batch(self):
+        """Continue a saved, interrupted batch from its next pending environment."""
+        m = batch_manifest.load()
+        if not m or not batch_manifest.pending(m):
+            return {"error": "There's no saved batch to resume."}
+        if not self._try_claim_task("batch"):
+            return {"error": "A task is already running."}
+        self.cancel_event.clear()
+        self.skip_event.clear()
+        self.pause_event.clear()
+        with self._lock:
+            self._fast_run = bool(m.get("fast"))
+            self._batch_resume = None
+        pend, total = len(batch_manifest.pending(m)), len(m.get("steps", []))
+        self._emit_log(f"Resuming Export Everything — {pend} of {total} "
+                       "environment(s) left.")
+        self._set_dot("busy", "Export Everything…")
+        self._emit({"t": "run_started", "mode": "batch", "label": "Working…",
+                    "workers": m.get("workers", 1) if m.get("fast") else 1})
+        self._push_state()
+        BatchWorker(m, self._q, self.cancel_event, self.skip_event,
+                    self.pause_event).start()
+        return {"ok": True}
+
+    @_api_method
+    def discard_batch(self):
+        """Forget a saved, interrupted batch (the user doesn't want to resume)."""
+        batch_manifest.clear()
+        with self._lock:
+            self._batch_resume = None
+        self._emit_log("Discarded the saved Export Everything batch.")
+        self._push_state()
+        return {"ok": True}
+
+    def _on_batch_progress(self, payload):
+        with self._lock:
+            self._batch = {"label": payload.get("label", ""),
+                           "done": payload.get("done", 0),
+                           "total": payload.get("total", 0)}
+        self._push_state()
+
+    def _on_batch_done(self, payload):
+        done, total = payload.get("done", 0), payload.get("total", 0)
+        if payload.get("complete"):
+            batch_manifest.clear()
+            self._emit_log(f"Export Everything finished — all {total} "
+                           "environment(s) done.")
+        elif payload.get("cancelled"):
+            self._emit_log(f"Export Everything stopped — {done} of {total} "
+                           "environment(s) done. Re-open the app to resume the rest.")
+        else:
+            self._emit_log(f"Export Everything ended — {done} of {total} "
+                           "environment(s) done; some were left pending (see the log).")
+        resume = self._pending_batch()        # recompute outside the lock
+        with self._lock:
+            self._batch = None
+            self._batch_resume = resume
+        self._end_task()
+
     @_api_method
     def request_preview(self, worker_no):
         """Ask browser `worker_no` (1-based) for a live screenshot; it answers
@@ -982,7 +1124,7 @@ class GuiApi:
     def cancel_run(self):
         # Tasks that honor cancel_event between steps. (login has its own cancel;
         # envcheck is a single short headless verify that can't stop partway.)
-        if self._task in ("export", "consolidate", "compare", "chromium",
+        if self._task in ("export", "batch", "consolidate", "compare", "chromium",
                           "envscan", "reset"):
             self.cancel_event.set()
             self.pause_event.clear()      # unblock a paused run so cancel lands

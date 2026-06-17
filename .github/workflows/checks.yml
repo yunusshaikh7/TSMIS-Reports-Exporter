@@ -54,6 +54,7 @@ jobs:
           python build/check_a2_compare_filter.py
           python build/check_b1_pause.py
           python build/check_b2_autoconsolidate.py
+          python build/check_b3_batch.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py

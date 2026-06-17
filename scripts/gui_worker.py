@@ -70,11 +70,12 @@ from common import (
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, navigate_with_auth, new_authed_browser,
     new_login_context, page_url_for_display, preflight,
-    resolve_parallel_channel, save_auth_state, set_thread_site,
+    resolve_parallel_channel, save_auth_state, set_site, set_thread_site,
     storage_state_is_portable, try_device_sso_login,
 )
+import batch_manifest
 from events import Events
-from exporter import run_export
+from exporter import run_export, _wait_while_paused
 from paths import (DOWNLOADED_BROWSERS_DIR, FAILURES_DIR, INPUT_ROOT,
                    OUTPUT_ROOT, parse_run_folder)
 
@@ -247,8 +248,10 @@ class ExportWorker(threading.Thread):
             return True
         return False
 
-    def run(self):
-        events = Events(
+    def _build_events(self):
+        """The Events sink for this worker — shared by run() (one export) and by
+        BatchWorker, which reuses _run_specs once per environment (B3)."""
+        return Events(
             on_log=lambda t: self.q.put(("log", t)),
             on_route=self._on_route,
             should_skip=self._should_skip,
@@ -258,34 +261,46 @@ class ExportWorker(threading.Thread):
             on_screenshot=self._on_screenshot,
             is_paused=self.pause.is_set,
         )
+
+    def _run_specs(self, events, results):
+        """Run every selected report once against the CURRENT site, appending
+        (spec, RunResult) to `results`. Posts log/progress/worker_status and the
+        B2 auto-consolidate; does NOT post export_done/error — the caller owns the
+        run lifecycle (run() for one export; BatchWorker once per environment for
+        B3). Appends as it goes so a mid-run exception still leaves partials."""
+        for i, spec in enumerate(self.specs, 1):
+            if self.cancel.is_set():
+                break
+            self._report_i = i
+            self._cur_label = spec.label
+            with self._tally_lock:
+                self._route_status = {}         # fresh counts for this report
+            if self._report_n > 1:
+                self.q.put(("log", ""))
+                self.q.put(("log", f"===== Report {i} of {self._report_n}: {spec.label} ====="))
+            # Reset the progress bar/counts for this report so the GUI doesn't
+            # show the previous report's tally while this one spins up.
+            self.q.put(("progress", {
+                "done": 0, "total": self._total, "route": "—",
+                "saved": 0, "empty": 0, "skipped": 0, "failed": 0, "exists": 0,
+                "report": spec.label, "report_i": i, "report_n": self._report_n,
+            }))
+            if self.workers and self.workers > 1:
+                from exporter_parallel import run_export_parallel  # lazy
+                result = run_export_parallel(spec, events, workers=self.workers,
+                                             routes=self.routes)
+            else:
+                result = run_export(spec, events, routes=self.routes)
+            results.append((spec, result))
+            if self.auto_consolidate and not self.cancel.is_set():
+                self._auto_consolidate(spec, result, events)
+        return results
+
+    def run(self):
+        events = self._build_events()
         results = []
         try:
-            for i, spec in enumerate(self.specs, 1):
-                if self.cancel.is_set():
-                    break
-                self._report_i = i
-                self._cur_label = spec.label
-                with self._tally_lock:
-                    self._route_status = {}         # fresh counts for this report
-                if self._report_n > 1:
-                    self.q.put(("log", ""))
-                    self.q.put(("log", f"===== Report {i} of {self._report_n}: {spec.label} ====="))
-                # Reset the progress bar/counts for this report so the GUI doesn't
-                # show the previous report's tally while this one spins up.
-                self.q.put(("progress", {
-                    "done": 0, "total": self._total, "route": "—",
-                    "saved": 0, "empty": 0, "skipped": 0, "failed": 0, "exists": 0,
-                    "report": spec.label, "report_i": i, "report_n": self._report_n,
-                }))
-                if self.workers and self.workers > 1:
-                    from exporter_parallel import run_export_parallel  # lazy
-                    result = run_export_parallel(spec, events, workers=self.workers,
-                                                 routes=self.routes)
-                else:
-                    result = run_export(spec, events, routes=self.routes)
-                results.append((spec, result))
-                if self.auto_consolidate and not self.cancel.is_set():
-                    self._auto_consolidate(spec, result, events)
+            self._run_specs(events, results)
             self.q.put(("export_done", results))
             return
         except AuthError as e:
@@ -305,6 +320,105 @@ class ExportWorker(threading.Thread):
         if results:
             self.q.put(("export_partial", results))
         self.q.put(("error", err))
+
+
+class BatchWorker(threading.Thread):
+    """B3 "Export Everything": run selected report types across selected
+    environments, sequentially, reusing the proven export engine. Each
+    environment is exported into its normal run folder (output/<date src-env>/
+    <report>/) by reusing ExportWorker._run_specs, so resume/idempotency, fast
+    mode, pause (B1) and auto-consolidate (B2) all come for free.
+
+    Per-env targeting uses the PROCESS-GLOBAL common.set_site (NOT
+    set_thread_site): the batch is a single sequential orchestrator and the
+    single-task gate guarantees no other export runs, so mutating the global is
+    safe — and the user's original selection is restored when the batch ends.
+    (set_thread_site is only for the parallel env-scanner, where several browsers
+    target different environments at once.) Progress is persisted after every
+    environment, so a batch survives an app restart and resumes at the next
+    pending environment.
+
+    Posts ("batch_progress", dict) before each environment and ("batch_done",
+    dict) at the end; the per-report log/progress/worker_status come from the
+    reused ExportWorker. A fatal sign-in/browser problem ends the batch with an
+    ("error", …) and KEEPS the manifest so the cause can be fixed and resumed.
+    """
+
+    def __init__(self, manifest, queue, cancel_event, skip_event, pause_event):
+        super().__init__(daemon=True, name="batch")
+        self.manifest = manifest
+        self.q = queue
+        self.cancel = cancel_event
+        self.skip = skip_event
+        self.pause = pause_event
+
+    def _specs(self):
+        from reports import EXPORT_REPORTS
+        return [EXPORT_REPORTS[i][2] for i in self.manifest.get("reports", [])
+                if 0 <= i < len(EXPORT_REPORTS)]
+
+    def run(self):
+        specs = self._specs()
+        steps = self.manifest.get("steps", [])
+        fast = self.manifest.get("fast", False)
+        workers = self.manifest.get("workers", 1) if fast else 1
+        auto = self.manifest.get("auto_consolidate", False)
+        pause_sink = Events(is_paused=self.pause.is_set,
+                            is_cancelled=self.cancel.is_set)
+        total = len(steps)
+        done = sum(1 for s in steps if s.get("status") == "done")
+        original = get_site()
+        try:
+            for step in steps:
+                if step.get("status") == "done":
+                    continue
+                _wait_while_paused(pause_sink)          # B1: hold between envs
+                if self.cancel.is_set():
+                    break
+                src, env = step["src"], step["env"]
+                set_site(src, env)
+                self.q.put(("batch_progress", {
+                    "src": src, "env": env,
+                    "label": f"{DATA_SOURCE_LABELS.get(src, src)} / "
+                             f"{ENVIRONMENT_LABELS.get(env, env)}",
+                    "done": done, "total": total}))
+                self.q.put(("log", ""))
+                self.q.put(("log", f"========== {src.upper()}-{env.upper()}  "
+                                   f"({done + 1} of {total}) =========="))
+                ew = ExportWorker(specs, self.q, self.cancel, self.skip,
+                                  workers=workers, routes=None,
+                                  pause_event=self.pause, auto_consolidate=auto)
+                crashed = False
+                try:
+                    ew._run_specs(ew._build_events(), [])
+                except (AuthError, BrowserNotFoundError) as e:
+                    # Every environment would hit this — stop and keep the
+                    # manifest so the user can fix the cause and resume.
+                    log.warning("batch stopped on %s-%s: %s: %s", src, env,
+                                type(e).__name__, e)
+                    self.q.put(("error",
+                                ("auth" if isinstance(e, AuthError) else "general",
+                                 str(e))))
+                    return                              # finally restores the site
+                except Exception as e:
+                    crashed = True
+                    log.exception("batch: %s-%s crashed", src, env)
+                    self.q.put(("log", f"  {src}-{env} stopped unexpectedly "
+                                       f"({type(e).__name__}); leaving it pending and "
+                                       "moving on (details in the log)."))
+                if self.cancel.is_set():
+                    break
+                if crashed:
+                    continue                            # leave pending for a resume
+                step["status"] = "done"
+                batch_manifest.mark_done(self.manifest, src, env)
+                done += 1
+            self.q.put(("batch_done", {
+                "done": done, "total": total,
+                "cancelled": self.cancel.is_set(),
+                "complete": batch_manifest.is_complete(self.manifest)}))
+        finally:
+            set_site(*original)
 
 
 class ConsolidateWorker(threading.Thread):
