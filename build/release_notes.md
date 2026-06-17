@@ -17,7 +17,12 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 - **A clearer window, and it tells you what's happening (0.13.0).** The right
   side of the window now follows the whole run: before you start, a **summary of
   exactly what will happen** (which reports, how many routes, where it saves);
-  while it runs, progress with an **estimated time remaining**; and when it
+  while it runs, progress that spells out **exactly what's running** — for a
+  single export the report and route, and for **Export Everything** the
+  environment it's on (e.g. "Environment 2 of 6 · SSOR / Test"), the report
+  within it, the route, an **estimated time remaining**, and a row of
+  per-environment markers showing which are done, which is running, and which are
+  still queued (so it's finally easy to see where a big run is at); and when it
   finishes, a **completion summary** with one-click **Open folder** and **Retry
   failed routes** (just the ones that failed, not the whole run). The window also
   **flashes in the taskbar when a run finishes** so you can look away and come

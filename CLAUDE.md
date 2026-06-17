@@ -474,6 +474,21 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
     cleared at each start/resume/retry) with **Open run folder**
     (`open_run_folder`) and **Retry failed routes** (`retry_failed`; the failed
     list is de-duped). Covered by `build/check_gui_bridge.py`.
+  - **Progress reads as a hierarchy (says exactly what's running):** the progress
+    card shows a PRIMARY line (the environment for an Export Everything batch, the
+    report for a single/multi export) + a SECONDARY line (report+route for a
+    batch, route+count for an export), and **Export Everything adds a
+    per-environment stepper** — one pill per env (done / running / pending) — so a
+    long batch's position is obvious (the 0.12.0 pain point). The backend ships
+    the ordered per-env state list in the `batch_progress` message
+    (`gui_worker.BatchWorker._step_views`, read from the manifest so it's correct
+    across a resume) → `gui_api._on_batch_progress` carries `src`/`env`/`steps`
+    into the `batch` snapshot. The env headline + stepper refresh on batch state
+    pushes (`app.js syncBatchHeadline`, which arrive BETWEEN per-route `progress`
+    events) but deliberately NEVER move the bar — only a real route outcome does,
+    so the bar stays monotonic at env boundaries; a fresh env shows
+    `Preparing <env>…` until its first route, and `renderBatchSteps` rebuilds only
+    when a step's state changes (so the running spinner doesn't restart per route).
   - **Completion notification (default on):** a taskbar flash when a task
     finishes (`gui_api._flash_taskbar`, `FlashWindowEx` via ctypes — modeled on
     the late icon-setter, NOT a window-event handler; see pywebview trap 2),
