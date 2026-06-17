@@ -65,7 +65,8 @@ jobs:
           set -e
           for c in check_compare_blankkey check_compare_keyfield check_compare_skipwarn \
                    check_compare_injection check_compare_coercion check_compare_limits \
-                   check_compare_audit check_ramp_summary_partial check_tsn_description_leak; do
+                   check_compare_audit check_compare_ramp_detail check_compare_ramp_summary \
+                   check_ramp_summary_partial check_tsn_description_leak; do
             echo "::group::$c"
             python "build/$c.py"
             echo "::endgroup::"
