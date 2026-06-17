@@ -852,6 +852,13 @@ function updateActivityCards() {
   $("progressCard").classList.toggle("hidden", idle);
   $("completionCard").classList.toggle("hidden", !showCompletion);
   $("preflightCard").classList.toggle("hidden", !(idle && !showCompletion));
+  // A batch's "which environment" update arrives as a state push between the
+  // per-route "progress" events, so refresh just the headline + stepper here —
+  // NOT the bar (it only advances on a real route outcome; re-running the full
+  // renderProgress with the previous env's 100% progress would overshoot the
+  // bar a whole environment, then snap back). Without this the headline would
+  // lag a whole environment during sign-in/preflight at each env boundary.
+  if (!idle && S.runMode === "batch") syncBatchHeadline();
   renderPreflight();
   renderCompletion();
 }
@@ -1237,18 +1244,89 @@ function renderProgress(p) {
   const overall = (S.runMode === "batch" && b && b.total)
     ? Math.min(1, (b.done + withinRun) / b.total)
     : withinRun;
+  const isBatch = S.runMode === "batch" && b && b.total;
   const pct = Math.round(Math.max(0, Math.min(1, overall)) * 100);
   $("progressPct").textContent = pct + "%";
   $("progressFill").style.width = pct + "%";
   updateEta(overall);
-  let head = "";
-  if (p.report_n > 1) head = `[${p.report_i}/${p.report_n}] ${p.report}  ·  `;
-  else if (p.report) head = `${p.report}  ·  `;
-  $("progressText").textContent = `${head}Route ${p.route}   ·   ${p.done}/${p.total}`;
+
+  // Two-level readout so "what's running" and "where in progress" are both
+  // obvious: the PRIMARY line is the highest level (the environment for a batch,
+  // the report for a single/multi export); the SECONDARY line is the finer
+  // detail (report + route for a batch, route for an export).
+  const reportPart = (p.report_n > 1)
+    ? `Report ${p.report_i} of ${p.report_n} · ${p.report || "…"}`
+    : (p.report || "");
+  const routePart = (p.route && p.route !== "—")
+    ? `Route ${p.route} · ${p.done}/${p.total} routes`
+    : (p.total ? `${p.done}/${p.total} routes` : "Starting…");
+  let primary, secondary;
+  if (isBatch) {
+    primary = `Environment ${(b.done || 0) + 1} of ${b.total} · ${b.label || ""}`;
+    secondary = [reportPart, routePart].filter(Boolean).join("   ·   ");
+  } else {
+    primary = reportPart || "Exporting";
+    secondary = routePart;
+  }
+  $("progressText").textContent = primary;
+  const sub = $("progressSub");
+  if (sub) { sub.textContent = secondary; sub.classList.toggle("hidden", !secondary); }
+  renderBatchSteps(isBatch ? (b.steps || []) : null);
+
   const counts = { cSaved: p.saved, cExists: p.exists, cEmpty: p.empty, cSkipped: p.skipped, cFailed: p.failed };
   Object.entries(counts).forEach(([id, v]) => {
     $(id).textContent = v;
     $(id).closest(".count-chip").classList.toggle("lit", v > 0);
+  });
+}
+
+// Refresh ONLY the batch headline + env stepper from the latest batch state
+// (called on state pushes between progress events). Deliberately leaves the bar,
+// %, and route detail alone — those move on real per-route progress. When the
+// environment changes, neutralize the route line to "Preparing…" so it doesn't
+// keep showing the previous environment's last route during the new one's
+// sign-in/preflight.
+function syncBatchHeadline() {
+  const b = S.st && S.st.batch;
+  if (!b || !b.total) return;
+  $("progressText").textContent =
+    `Environment ${(b.done || 0) + 1} of ${b.total} · ${b.label || ""}`;
+  renderBatchSteps(b.steps || []);
+  const key = `${b.src || ""}-${b.env || ""}`;
+  if (key !== S.curEnvKey) {
+    S.curEnvKey = key;
+    const sub = $("progressSub");
+    if (sub) { sub.textContent = `Preparing ${b.label || "next environment"}…`; sub.classList.remove("hidden"); }
+  }
+}
+
+// Export Everything: a pill per environment showing the whole batch's position —
+// done (✓), running now (spinner, highlighted), or still pending. Labels are
+// compacted (e.g. "SSOR·Prod") so all six fit. Hidden for single exports.
+function renderBatchSteps(steps) {
+  const el = $("progressSteps");
+  if (!el) return;
+  // Rebuild only when the steps actually change (env boundaries) — renderProgress
+  // calls this on EVERY route event, and recreating the running pill's spinner
+  // each time would restart its CSS spin animation (a visible stutter).
+  const sig = (steps && steps.length) ? steps.map((s) => `${s.key}:${s.state}`).join("|") : "";
+  if (sig === S.stepsSig) return;
+  S.stepsSig = sig;
+  if (!sig) { el.classList.add("hidden"); el.textContent = ""; return; }
+  el.classList.remove("hidden");
+  el.textContent = "";
+  steps.forEach((s) => {
+    const state = s.state || "pending";
+    const pill = document.createElement("span");
+    pill.className = "pstep " + state;
+    pill.title = `${s.label} — ${state === "done" ? "done"
+                  : state === "running" ? "running now" : "pending"}`;
+    if (state === "running") { const i = icon("i-loader"); i.classList.add("spin"); pill.appendChild(i); }
+    else if (state === "done") pill.appendChild(icon("i-check"));
+    const t = document.createElement("span");
+    t.textContent = (s.label || s.key || "").replace(" / ", "·");
+    pill.appendChild(t);
+    el.appendChild(pill);
   });
 }
 
@@ -1272,6 +1350,8 @@ function updateEta(overall) {
 
 function startRunUi(mode, label, workers) {
   S.runMode = mode;
+  S.curEnvKey = null;                   // batch: forces the first env's "Preparing…"
+  S.stepsSig = null;                    // force the stepper to rebuild for this run
   buildWorkerStrip(mode === "export" || mode === "batch" ? (workers || 1) : 0);
   S.elapsedStart = Date.now();
   S.etaSmoothed = null;
@@ -1291,6 +1371,8 @@ function startRunUi(mode, label, workers) {
     $("progressBar").classList.add("indeterminate");
     $("progressPct").classList.add("hidden");
     $("countChips").classList.add("hidden");
+    $("progressSub").classList.add("hidden");
+    $("progressSteps").classList.add("hidden");
     $("progressText").textContent = label || "Working…";
   } else {
     $("progressBar").classList.remove("indeterminate");
@@ -1308,6 +1390,8 @@ function endRunUi() {
   if (S.elapsedStart) $("progressElapsed").textContent = fmtElapsed(Date.now() - S.elapsedStart);
   S.elapsedStart = null;
   S.runMode = null;
+  S.curEnvKey = null;
+  S.stepsSig = null;
   buildWorkerStrip(0);
   document.querySelector(".progress-card").classList.remove("running");
   $("progressIcon").querySelector("use").setAttribute("href", "#i-shield");
@@ -1317,6 +1401,8 @@ function endRunUi() {
   $("progressPct").textContent = "0%";
   $("progressFill").style.width = "0%";
   $("progressEta").classList.add("hidden");
+  $("progressSub").classList.add("hidden");
+  $("progressSteps").classList.add("hidden");
   $("progressText").textContent = "Idle — ready to export";
 }
 
@@ -2410,9 +2496,21 @@ function makeMockApi() {
             + (fast ? `   ·   FAST MODE (${workers} browsers)` : "")
             + (auto ? "   ·   auto-consolidate" : "") },
          { t: "run_started", mode: "batch", label: "Working…", workers: fast ? workers : 1 });
-    let i = 0;
-    const step = () => {
-      if (i >= envs.length) {
+    const envLabel = (key) => {
+      const [s, e] = key.split("-");
+      const sl = ((S.init.sources || []).find((x) => x.id === s) || {}).label || s.toUpperCase();
+      const el = ((S.init.envs || []).find((x) => x.id === e) || {}).label || e;
+      return `${sl} / ${el}`;
+    };
+    const stepViews = (curIdx) => envs.map((key, j) => ({
+      key, label: envLabel(key),
+      state: j < curIdx ? "done" : j === curIdx ? "running" : "pending",
+    }));
+    const reps = reports.map((r) => REPORTS[r]);
+    const ROUTES_DEMO = ["005", "010", "099", "101"];
+    let ei = 0;
+    const nextEnv = () => {
+      if (ei >= envs.length) {
         push({ t: "log", text: "" },
              { t: "log", text: `Export Everything finished — all ${envs.length} environment(s) done.` },
              { t: "run_ended" });
@@ -2422,20 +2520,37 @@ function makeMockApi() {
         pushState();
         return;
       }
-      const key = envs[i];
-      st.batch = { label: key.toUpperCase(), done: i, total: envs.length };
+      const key = envs[ei];
+      st.batch = { label: envLabel(key), done: ei, total: envs.length,
+                   src: key.split("-")[0], env: key.split("-")[1], steps: stepViews(ei) };
       pushState();
       push({ t: "log", text: "" },
-           { t: "log", text: `========== ${key.toUpperCase()}  (${i + 1} of ${envs.length}) ==========` });
-      reports.forEach((r) => push({ t: "log",
-        text: `  ${REPORTS[r].label}: exported${auto && r < 4 ? ", consolidated" : ""}` }));
-      push({ t: "progress", p: { done: 32, total: 32, route: "—", report: REPORTS[reports[0]].label,
-        report_i: reports.length, report_n: reports.length,
-        saved: 28, empty: 1, skipped: 2, failed: 1, exists: 0 } });
-      i++;
-      timer = setTimeout(step, 700);
+           { t: "log", text: `========== ${key.toUpperCase()}  (${ei + 1} of ${envs.length}) ==========` });
+      let ri = 0;
+      const nextReport = () => {
+        if (ri >= reps.length) { ei++; timer = setTimeout(nextEnv, 250); return; }
+        const rep = reps[ri];
+        let k = 0;
+        const tick = () => {
+          k++;
+          const done = Math.min(k, ROUTES_DEMO.length);
+          push({ t: "progress", p: {
+            done, total: ROUTES_DEMO.length,
+            route: ROUTES_DEMO[Math.min(k - 1, ROUTES_DEMO.length - 1)],
+            report: rep.label, report_i: ri + 1, report_n: reps.length,
+            saved: done, empty: 0, skipped: 0, failed: 0, exists: 0 } });
+          if (k >= ROUTES_DEMO.length) {
+            push({ t: "log", text: `  ${rep.label}: exported${auto && ri < 4 ? ", consolidated" : ""}` });
+            ri++; timer = setTimeout(nextReport, 160);
+          } else {
+            timer = setTimeout(tick, fast ? 80 : 170);
+          }
+        };
+        timer = setTimeout(tick, 110);
+      };
+      nextReport();
     };
-    timer = setTimeout(step, 400);
+    timer = setTimeout(nextEnv, 350);
   }
 
   return {

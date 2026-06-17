@@ -391,6 +391,29 @@ class BatchWorker(threading.Thread):
         return [EXPORT_REPORTS[i][2] for i in self.manifest.get("reports", [])
                 if 0 <= i < len(EXPORT_REPORTS)]
 
+    def _step_views(self, cur_src, cur_env):
+        """Ordered per-environment view for the progress stepper: each step's
+        friendly label + whether it's `done` / `running` now / still `pending`.
+        Read from the manifest (the source of truth across a resume), so the
+        already-finished envs read `done` and the (cur_src, cur_env) about to
+        export reads `running`."""
+        views = []
+        for s in self.manifest.get("steps", []):
+            ssrc, senv = s.get("src"), s.get("env")
+            if s.get("status") == "done":
+                state = "done"
+            elif ssrc == cur_src and senv == cur_env:
+                state = "running"
+            else:
+                state = "pending"
+            views.append({
+                "key": f"{ssrc}-{senv}",
+                "label": f"{DATA_SOURCE_LABELS.get(ssrc, ssrc)} / "
+                         f"{ENVIRONMENT_LABELS.get(senv, senv)}",
+                "state": state,
+            })
+        return views
+
     def run(self):
         specs = self._specs()
         steps = self.manifest.get("steps", [])
@@ -416,7 +439,8 @@ class BatchWorker(threading.Thread):
                     "src": src, "env": env,
                     "label": f"{DATA_SOURCE_LABELS.get(src, src)} / "
                              f"{ENVIRONMENT_LABELS.get(env, env)}",
-                    "done": done, "total": total}))
+                    "done": done, "total": total,
+                    "steps": self._step_views(src, env)}))
                 self.q.put(("log", ""))
                 self.q.put(("log", f"========== {src.upper()}-{env.upper()}  "
                                    f"({done + 1} of {total}) =========="))

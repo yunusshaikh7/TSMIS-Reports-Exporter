@@ -641,7 +641,13 @@
             <span id="progressPct">0%</span>
           </span>
         </div>
+        <!-- Secondary detail line: the finer level under the headline (the report
+             + route for a batch, the route for a single export). -->
+        <div class="progress-sub hidden" id="progressSub"></div>
         <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <!-- Export Everything: one pill per environment (done / running / pending),
+             so the whole batch's position is visible at a glance. -->
+        <div class="progress-steps hidden" id="progressSteps"></div>
         <div class="count-chips hidden" id="countChips">
           <span class="count-chip cc-saved">saved <b id="cSaved">0</b></span>
           <span class="count-chip cc-exists">already had <b id="cExists">0</b></span>

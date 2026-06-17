@@ -1283,7 +1283,10 @@ class GuiApi:
         with self._lock:
             self._batch = {"label": payload.get("label", ""),
                            "done": payload.get("done", 0),
-                           "total": payload.get("total", 0)}
+                           "total": payload.get("total", 0),
+                           "src": payload.get("src"),
+                           "env": payload.get("env"),
+                           "steps": payload.get("steps", [])}
         self._push_state()
 
     def _on_batch_done(self, payload):
