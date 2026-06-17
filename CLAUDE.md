@@ -16,8 +16,28 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
+| 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
+
+**Highway Log (PDF) (v0.13.1):** the SAME "Highway Log" dropdown option as #4,
+saved as a PDF via the page's own Print layout instead of the Excel Export
+button (`export_highway_log_pdf.py` → `exporter.save_highway_log_pdf`). The
+on-screen Highway Log is **paginated** (`hl_renderPage` shows one page of rows),
+so unlike the inline Ramp Summary a bare `page.pdf()` would capture a single
+page — the site's global `hl_printAll()` builds the full multi-page layout (cover
++ every page) into `#rampResults`, then calls `window.print()` and SYNCHRONOUSLY
+restores the on-screen view. The save **overrides `window.print` to raise first**,
+so that restore never runs and the complete layout stays in the DOM for
+`page.pdf()` (which emulates print media — the site's `@media print` hides every
+control and shows only `#rampResults`); 30 columns ⇒ landscape. Fails loudly with
+`ReportError` if the site's Print function is gone, rather than silently saving
+the one paginated page. Export-only (no consolidator — the consolidator reads the
+`.xlsx`); the registry uses a distinct menu label "Highway Log (PDF)" but the
+ReportSpec's `label` stays "Highway Log" (the dropdown text). Verified against the
+real site source + a headless `page.pdf()` fixture (`build/check_fake_site.py`).
+**Live-export verification against TSMIS is still pending** (this dev PC can't
+reach the site).
 
 Reports 5–6 (v0.10.3) are **export-only** for now (no consolidator/comparison).
 Labels + formats verified against the live page source (v0.10.4): NO "TSAR:"
@@ -168,7 +188,25 @@ shipped". Console flows honor the same overrides automatically.
   diff-style document-order merge PER ROUTE with first-position dedupe (a key
   can sit in both files at different sequence positions — TSMIS prints some
   postmiles out of order; per-route alignment keeps difflib fast on 50k+
-  rows). Column geometry for both shapes lives in compare_core's `_Layout`. The per-route
+  rows). **Duplicate-key pairing is by SIMILARITY, not file order (v0.13.1):**
+  when a key legitimately repeats (two segments at the same postmile), the
+  occurrence # used to be assigned in file order, so a row that matched the other
+  side's SECOND instance was flagged as a difference against its FIRST.
+  `pair_occurrences_by_similarity` (run after `keys_for`, before `union_keys`)
+  re-numbers the occurrence component of duplicate keys WITHIN each (route, key)
+  group present on both sides so the most-alike rows (fewest differing fields,
+  via the same `_xl_trim`/`_medwid_norm` as `count_diffs`) share an occurrence #;
+  the larger side's leftovers get higher, side-unique occ (stay one-sided). The
+  optimal min-cost assignment's total ≤ any positional one, so it can ONLY remove
+  phantom diffs, never add one (`_min_cost_pairs`: exact permutation search with
+  pruning up to 7! groups, greedy above; deterministic, file-order tie-break).
+  The KEY/identity is unchanged — only the duplicate pairing — and the
+  non-duplicate path is byte-identical (so the approved Route-1 sample's 969 is
+  untouched; the change is verified on real consolidated data to clear ~3,600
+  phantom diff cells). Occurrence is a build-time LITERAL every sheet MATCHes on,
+  so the reassignment flows through both flavors with no formula change. Locked by
+  `build/check_compare_dupmatch.py`. Column geometry for both shapes lives in
+  compare_core's `_Layout`. The per-route
   format is locked to the approved Route-1 sample and verified cell-for-cell
   against it (same union order, same counts Excel cached: 299 both / 18 / 69 /
   221 diff rows / 969 diff cells — was 971 before the v0.11.0 TSN totals-block

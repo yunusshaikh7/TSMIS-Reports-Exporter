@@ -14,6 +14,22 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Highway Log can now be exported as a PDF (0.13.1).** A new **Highway Log
+  (PDF)** report exports each route's Highway Log as a print-formatted PDF — the
+  same layout the site's Print button produces (cover page + every page) — into
+  `output/…/highway_log_pdf/`, alongside the existing Excel export. Tick it on the
+  Export tab like any other report.
+
+- **Comparisons match repeated locations correctly (0.13.1).** When a TSMIS-vs-TSN
+  or cross-environment comparison had two rows at the **same location** (e.g. two
+  `001 R000.129` segments), it used to pair them in the order they appear —
+  first-with-first, second-with-second — so a row that actually matched the other
+  side's *second* listing was wrongly flagged as different. It now pairs repeated
+  locations by **which rows are most alike** (the most fields matching), not by
+  order. The row's identity is unchanged (same Route + location); only the pairing
+  of repeats is smarter. This can only *remove* false differences, never add one —
+  on a full Highway Log comparison it cleared ~3,600 phantom differing cells.
+
 - **A clearer window, and it tells you what's happening (0.13.0).** The right
   side of the window now follows the whole run: before you start, a **summary of
   exactly what will happen** (which reports, how many routes, where it saves);
