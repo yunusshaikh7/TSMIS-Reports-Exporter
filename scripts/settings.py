@@ -42,6 +42,7 @@ DEFAULTS = {
     "debug_logging": False,      # verbose (DEBUG) file logging
     "ui_devtools": False,        # open WebView2 DevTools on the next launch
     "env_check_on_start": True,  # auto-run the env-access scan after start/sign-in
+    "notify_on_finish": True,    # flash the taskbar when a run/batch finishes
 }
 
 # Validation: (min, max) for the numeric knobs; values outside are clamped.

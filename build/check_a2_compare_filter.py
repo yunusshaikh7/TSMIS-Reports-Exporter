@@ -38,7 +38,7 @@ def _mk(tmp, run, subdir, with_file=True):
 
 
 def _folders_idx(subdir):
-    for i, (_l, m, k) in enumerate(reports.COMPARE_REPORTS):
+    for i, (_l, m, k, _g) in enumerate(reports.COMPARE_REPORTS):
         if k == "folders" and getattr(m, "subdir", None) == subdir:
             return i
     return None

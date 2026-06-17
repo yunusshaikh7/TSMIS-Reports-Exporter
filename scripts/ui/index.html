@@ -52,6 +52,9 @@
   <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></symbol>
   <symbol id="i-package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
 </svg>
 
 <div class="app">
@@ -71,16 +74,25 @@
       </div>
       <div class="auth-cluster">
         <button class="btn btn-update hidden" id="btnUpdate"></button>
-        <span class="login-mini" id="loginFile">
-          <span class="dot dot-unknown"></span>Saved login
-        </span>
-        <span class="login-mini" id="loginEdge">
-          <span class="dot dot-unknown"></span>Edge one-click
-        </span>
-        <span class="auth-status">
-          <span class="dot dot-unknown" id="authDot"></span>
-          <span id="authText">Checking session…</span>
-        </span>
+        <!-- Primary sign-in status; the two sign-in paths (saved file / Edge
+             one-click) live in the popover so the bar stays uncluttered. -->
+        <div class="popover-host">
+          <button class="status-chip" id="authChip" aria-haspopup="dialog" aria-expanded="false" aria-controls="authPop"
+                  title="Sign-in status — click for the saved-login and Edge one-click details">
+            <span class="dot dot-unknown" id="authDot"></span>
+            <span id="authText">Checking session…</span>
+            <svg class="ic chev"><use href="#i-chevron-down"/></svg>
+          </button>
+          <div class="popover hidden" id="authPop">
+            <div class="popover-title">Sign-in paths</div>
+            <span class="login-mini" id="loginFile">
+              <span class="dot dot-unknown"></span>Saved login
+            </span>
+            <span class="login-mini" id="loginEdge">
+              <span class="dot dot-unknown"></span>Edge one-click
+            </span>
+          </div>
+        </div>
         <button class="btn btn-accent" id="btnLogin">
           <svg class="ic"><use href="#i-login"/></svg><span id="btnLoginLabel">Log in</span>
         </button>
@@ -89,34 +101,49 @@
     </div>
 
     <div class="titlebar-row env-strip">
-      <label class="tb-field">Data source
-        <span class="tb-select"><select id="selSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
-      </label>
-      <label class="tb-field">Environment
-        <span class="tb-select"><select id="selEnv"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
-      </label>
-      <button class="btn btn-titlebar" id="btnVerifyEnv"
-              title="Open TSMIS on the selected source/environment (signs in in the background) and show a screenshot — proof exports hit the right site">
-        <svg class="ic"><use href="#i-camera"/></svg>Verify
-      </button>
-      <button class="btn btn-titlebar" id="btnEnvAccess"
-              title="Sign-in + report access across all six environments — run the check from Settings ▸ TSMIS site addresses">
-        <span class="dot dot-unknown" id="envAccessDot"></span><span id="envAccessText">Env access</span>
-      </button>
-      <label class="tb-field">Browser
-        <span class="tb-select"><select id="selBrowser"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
-      </label>
-      <label class="tb-field">Theme
-        <span class="tb-select"><select id="selTheme">
-          <option value="auto">System</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
-      </label>
-      <div class="checks" id="checkStrip"></div>
-      <button class="btn btn-titlebar" id="btnRecheck">
-        <svg class="ic"><use href="#i-refresh"/></svg>Re-check
-      </button>
+      <!-- Which site the export targets, and whether it's reachable -->
+      <div class="target-group">
+        <label class="tb-field">Data source
+          <span class="tb-select"><select id="selSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+        </label>
+        <label class="tb-field">Environment
+          <span class="tb-select"><select id="selEnv"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+        </label>
+        <button class="btn btn-titlebar" id="btnEnvAccess"
+                title="Sign-in + report access across all six environments — run the check from Settings ▸ TSMIS site addresses">
+          <span class="dot dot-unknown" id="envAccessDot"></span><span id="envAccessText">Env access</span>
+        </button>
+      </div>
+      <!-- Tools: browser choice, verify, readiness, theme -->
+      <div class="readiness-group">
+        <label class="tb-field">Browser
+          <span class="tb-select"><select id="selBrowser"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+        </label>
+        <!-- Aggregate app-readiness; the per-item checks + Re-check live in the popover. -->
+        <div class="popover-host">
+          <button class="status-chip" id="readyChip" aria-haspopup="dialog" aria-expanded="false" aria-controls="readyPop"
+                  title="App readiness — click for the browser, output and report-tools checks">
+            <span class="dot dot-unknown" id="readyDot"></span>
+            <span id="readyText">Checking…</span>
+            <svg class="ic chev"><use href="#i-chevron-down"/></svg>
+          </button>
+          <div class="popover hidden" id="readyPop">
+            <div class="popover-title">System checks</div>
+            <div class="checks" id="checkStrip"></div>
+            <button class="btn btn-standard btn-small" id="btnRecheck">
+              <svg class="ic"><use href="#i-refresh"/></svg>Re-check
+            </button>
+          </div>
+        </div>
+        <button class="btn-icon" id="btnVerifyEnv"
+                aria-label="Verify environment — open the selected site and show a screenshot"
+                title="Open TSMIS on the selected source/environment (signs in in the background) and show a screenshot — proof exports hit the right site">
+          <svg class="ic"><use href="#i-camera"/></svg>
+        </button>
+        <button class="btn-icon" id="btnTheme" aria-label="Theme — switch System / Light / Dark" title="Theme">
+          <svg class="ic"><use href="#i-monitor"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -141,7 +168,7 @@
           <button class="tab" id="tabEverything" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-zap"/></svg>Everything
           </button>
-          <button class="tab tab-icon" id="tabSettings" role="tab" aria-selected="false" title="Settings">
+          <button class="tab tab-icon" id="tabSettings" role="tab" aria-selected="false" aria-label="Settings" title="Settings">
             <svg class="ic"><use href="#i-settings"/></svg>
           </button>
         </div>
@@ -172,7 +199,7 @@
         <div class="card-section">
           <div class="fast-row">
             <label class="fast-toggle">
-              <input type="checkbox" id="fastMode" hidden>
+              <input type="checkbox" id="fastMode">
               <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
               <svg class="ic zap" id="fastZap"><use href="#i-zap"/></svg>
               <span class="fast-label">Fast mode <span class="muted">(experimental)</span></span>
@@ -188,7 +215,7 @@
 
         <div class="card-section">
           <label class="fast-toggle">
-            <input type="checkbox" id="autoConsolidate" hidden>
+            <input type="checkbox" id="autoConsolidate">
             <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
             <span class="fast-label">Consolidate each report when its export finishes</span>
           </label>
@@ -250,7 +277,7 @@
         <div class="card-section">
           <div class="fast-row">
             <label class="fast-toggle">
-              <input type="checkbox" id="batchFast" hidden>
+              <input type="checkbox" id="batchFast">
               <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
               <svg class="ic zap"><use href="#i-zap"/></svg>
               <span class="fast-label">Fast mode <span class="muted">(experimental)</span></span>
@@ -264,7 +291,7 @@
         </div>
         <div class="card-section">
           <label class="fast-toggle">
-            <input type="checkbox" id="batchAutoConsolidate" hidden checked>
+            <input type="checkbox" id="batchAutoConsolidate" checked>
             <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
             <span class="fast-label">Consolidate each report when its export finishes</span>
           </label>
@@ -332,8 +359,10 @@
         </div>
       </div>
 
-      <!-- Compare pane (TSMIS vs TSN) -->
+      <!-- Compare pane. Two families on sub-tabs: cross-environment (default)
+           and TSMIS vs TSN. #compareSubtabs is generated from compare_groups. -->
       <div class="card pane hidden" id="paneCompare">
+        <div class="subtabs" id="compareSubtabs" role="tablist"></div>
         <div class="card-section">
           <div class="section-head"><span class="section-label">Comparison type</span></div>
           <div class="option-list" id="compareList"></div>
@@ -409,7 +438,8 @@
         </div>
 
         <div class="card-section">
-          <div class="section-head"><span class="section-label">What you get</span></div>
+          <details class="disclosure">
+          <summary class="section-label">What you'll get</summary>
           <p class="hint">
             A Summary (with self-check rows that prove the numbers line up),
             a cell-by-cell Comparison (matching values shown plainly,
@@ -422,6 +452,7 @@
             flagged “entire route”), and how much differs per route.
             You'll be asked where to save it.
           </p>
+          </details>
         </div>
 
         <div class="card-section actions-row">
@@ -466,6 +497,11 @@
               <input type="checkbox" id="setDebugLog">
               <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
               <span class="option-name">Verbose file logging <span class="muted">— extra detail in tsmis.log (applies immediately)</span></span>
+            </label>
+            <label class="option-row" id="rowNotifyFinish">
+              <input type="checkbox" id="setNotifyFinish">
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="option-name">Notify when finished <span class="muted">— flash the taskbar when a run or batch completes</span></span>
             </label>
             <label class="option-row" id="rowDevtools">
               <input type="checkbox" id="setDevtools">
@@ -566,7 +602,22 @@
     </section>
 
     <section class="col col-activity">
-      <div class="card progress-card">
+      <!-- Pre-flight summary: a plain-words mirror of what the active tab is
+           about to do (report/scope, the resolved site target, where it saves).
+           Shown while idle; swapped for the progress card once a task starts. -->
+      <div class="card preflight-card" id="preflightCard">
+        <div class="preflight-head">
+          <svg class="ic"><use href="#i-play"/></svg>
+          <span id="preflightTitle">Ready to export</span>
+        </div>
+        <div class="preflight-target hidden" id="preflightTarget">
+          <span class="dot dot-unknown" id="preflightTargetDot"></span>
+          <span class="pf-target-text"></span>
+        </div>
+        <div class="preflight-rows" id="preflightRows"></div>
+      </div>
+
+      <div class="card progress-card hidden" id="progressCard">
         <div class="progress-head">
           <span class="progress-status">
             <svg class="ic" id="progressIcon"><use href="#i-shield"/></svg>
@@ -574,6 +625,7 @@
           </span>
           <span class="progress-meta">
             <span id="progressElapsed" class="hidden"></span>
+            <span id="progressEta" class="hidden"></span>
             <span id="progressPct">0%</span>
           </span>
         </div>
@@ -590,10 +642,39 @@
         <div class="worker-strip hidden" id="workerStrip"></div>
       </div>
 
+      <!-- Completion summary: persists after an export run with the outcome +
+           actions (open the run folder, save the report, retry failures), so a
+           result isn't lost the moment the run relaxes to idle. -->
+      <div class="card completion-card hidden" id="completionCard">
+        <div class="completion-head ok" id="completionHead">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span id="completionTitle">Export complete</span>
+        </div>
+        <div class="count-chips" id="completionChips"></div>
+        <p class="hint pf-warn hidden" id="completionFailed"></p>
+        <div class="actions-row">
+          <button class="btn btn-standard" id="btnOpenRunFolder">
+            <svg class="ic"><use href="#i-folder-open"/></svg>Open run folder
+          </button>
+          <button class="btn btn-standard" id="btnRetryFailed">
+            <svg class="ic"><use href="#i-refresh"/></svg>Retry failed
+          </button>
+          <span class="spacer"></span>
+          <button class="btn btn-subtle" id="btnSaveReportDone">
+            <svg class="ic"><use href="#i-save"/></svg>Save run report…
+          </button>
+        </div>
+      </div>
+
       <div class="card log-card">
         <div class="log-head">
           <span class="log-title"><svg class="ic"><use href="#i-scroll"/></svg>Activity log</span>
-          <button class="btn btn-subtle btn-small" id="btnClearLog">Clear</button>
+          <div class="log-actions">
+            <button class="btn btn-subtle btn-small" id="btnLogFailures" aria-pressed="false"
+                    title="Show only failures and errors">Failures only</button>
+            <button class="btn btn-subtle btn-small" id="btnCopyLog" title="Copy the log to the clipboard">Copy</button>
+            <button class="btn btn-subtle btn-small" id="btnClearLog">Clear</button>
+          </div>
         </div>
         <div class="log-body mono" id="logBody">
           <div class="log-placeholder" id="logPlaceholder">Waiting for an action… export and consolidation activity will appear here.</div>

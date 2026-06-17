@@ -916,8 +916,13 @@ build openpyxl styles inside functions). For an XLSX report, wrap
 
 **New comparison type:** add one row to `COMPARE_REPORTS` in `reports.py`
 (the Compare tab's type list is generated from it; rows are
-`(label, module_or_adapter, kind)`) and the module to `APP_MODULES` in
-`build/app.spec`. Two input kinds:
+`(label, module_or_adapter, kind, group)`) and the module to `APP_MODULES` in
+`build/app.spec`. `group` is one of `COMPARE_GROUPS`' ids — the Compare pane
+renders one **sub-tab per group** (first = default; currently `env`
+"Cross-environment" then `tsn` "TSMIS vs TSN"), and a row only shows under its
+group's sub-tab. `group` is independent of `kind` so a new family can get its
+own sub-tab without changing the files/folders input plumbing; add a brand-new
+sub-tab by appending to `COMPARE_GROUPS`. Two input kinds:
 - `"files"` — a module exposing
   `compare(path_a, path_b, out_path, events=None, confirm_overwrite=None,
   mode="formulas") -> ConsolidateResult` (console-free, same rules as

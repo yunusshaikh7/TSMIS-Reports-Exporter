@@ -47,6 +47,16 @@ function setDot(elm, state) {
   elm.className = "dot dot-" + (state || "unknown");
 }
 
+// System-check status as a shape+colour icon (not colour alone): ✓ ok, ✗ bad,
+// ! warn, spinner while checking — readable for colour-blind users.
+const CHECK_ICON = { ok: "i-check", bad: "i-x", warn: "i-warn", busy: "i-loader", unknown: "i-loader" };
+function setCheckIcon(el, status) {
+  const ic = el.querySelector(".check-ic");
+  if (!ic) return;
+  ic.querySelector("use").setAttribute("href", "#" + (CHECK_ICON[status] || "i-loader"));
+  ic.setAttribute("class", "ic check-ic ci-" + (status || "unknown"));
+}
+
 // ------------------------------------------------------------- theme -------
 // Preference: auto | light | dark (persisted). html[data-theme] always holds
 // the EFFECTIVE light/dark; "auto" follows the OS live via matchMedia.
@@ -64,6 +74,40 @@ function applyTheme() {
 }
 
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+
+// Theme toggle button (replaces the labeled dropdown): shows the current
+// preference as an icon and cycles System -> Light -> Dark on click.
+const THEME_ICONS = { auto: "i-monitor", light: "i-sun", dark: "i-moon" };
+function renderThemeButton() {
+  const btn = $("btnTheme");
+  if (!btn) return;
+  const pref = themePref();
+  btn.querySelector("use").setAttribute("href", "#" + (THEME_ICONS[pref] || THEME_ICONS.auto));
+  const word = pref === "auto" ? "System" : pref[0].toUpperCase() + pref.slice(1);
+  btn.title = `Theme: ${word} — click to switch`;
+}
+
+// Lightweight title-bar popovers (sign-in detail, system checks): one open at a
+// time, closing on outside-click or Esc. The trigger is a .status-chip; the
+// panel is a sibling .popover inside the same .popover-host.
+function closeAllPopovers() {
+  document.querySelectorAll(".popover").forEach((p) => p.classList.add("hidden"));
+  document.querySelectorAll(".status-chip").forEach((b) => b.setAttribute("aria-expanded", "false"));
+}
+function attachPopover(host) {
+  const btn = host.querySelector(".status-chip");
+  const pop = host.querySelector(".popover");
+  if (!btn || !pop) return;
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = pop.classList.contains("hidden");
+    closeAllPopovers();
+    if (willOpen) { pop.classList.remove("hidden"); btn.setAttribute("aria-expanded", "true"); }
+  });
+  pop.addEventListener("click", (e) => e.stopPropagation());   // clicks inside keep it open
+}
+document.addEventListener("click", closeAllPopovers);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAllPopovers(); });
 
 function icon(name, cls) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -543,13 +587,30 @@ function buildStatic() {
     cl.appendChild(row);
   });
 
-  // comparison-type radios ({label, kind} rows; kind decides files vs folders)
+  // comparison-type sub-tabs + radios. Each registry row carries a `group`
+  // (cross-env vs TSMIS-vs-TSN today); every group is a sub-tab, and the radio
+  // list shows only the active group's reports. A new comparison family is a
+  // registry add — the sub-tabs are generated here from init.compare_groups.
+  const subStrip = $("compareSubtabs");
+  subStrip.textContent = "";
+  (init.compare_groups || []).forEach((g, gi) => {
+    const b = document.createElement("button");
+    b.className = "subtab" + (gi === 0 ? " active" : "");
+    b.dataset.group = g.id;
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", String(gi === 0));
+    b.textContent = g.label;
+    b.addEventListener("click", () => selectCompareGroup(g.id));
+    subStrip.appendChild(b);
+  });
+
   const cl2 = $("compareList");
   (init.compare_reports || []).forEach((rep, i) => {
     const row = document.createElement("label");
-    row.className = "option-row" + (i === 0 ? " checked" : "");
+    row.className = "option-row";
+    row.dataset.group = rep.group || "";
     const rb = document.createElement("input");
-    rb.type = "radio"; rb.name = "compareReport"; rb.checked = i === 0; rb.dataset.idx = i;
+    rb.type = "radio"; rb.name = "compareReport"; rb.dataset.idx = i;
     const dot = document.createElement("span"); dot.className = "radio";
     const name = document.createElement("span");
     name.className = "option-name"; name.textContent = rep.label;
@@ -561,6 +622,10 @@ function buildStatic() {
     });
     cl2.appendChild(row);
   });
+  // default sub-tab = the first group (cross-environment); also seats the
+  // initial radio selection on a visible row.
+  const groups0 = init.compare_groups || [];
+  if (groups0.length) selectCompareGroup(groups0[0].id);
 
   // titlebar selects
   const fill = (sel, items, currentId) => {
@@ -582,8 +647,8 @@ function buildStatic() {
   items.forEach(({ key, label }) => {
     const it = document.createElement("span");
     it.className = "check-item"; it.id = "check_" + key;
-    const dot = document.createElement("span"); dot.className = "dot dot-unknown";
-    it.append(dot, Object.assign(document.createElement("span"), { textContent: label }));
+    const ic = icon("i-loader", "check-ic ci-unknown");   // shape + colour status cue
+    it.append(ic, Object.assign(document.createElement("span"), { textContent: label }));
     it.title = label + ": checking…";
     strip.appendChild(it);
   });
@@ -655,10 +720,30 @@ function renderState() {
   Object.entries(st.checks || {}).forEach(([key, c]) => {
     const it = $("check_" + key);
     if (!it) return;
-    setDot(it.querySelector(".dot"), c.status);
+    setCheckIcon(it, c.status);
     it.title = c.text;
   });
   $("btnRecheck").disabled = st.checks_running || st.task != null;
+
+  // aggregate readiness -> the title-bar "Ready" chip (per-item detail in its
+  // popover). "Ready" needs only ONE working browser (Edge alone is fine — a
+  // missing Chrome isn't a problem) plus output + report tools; busy while any
+  // check is pending; otherwise "Check setup" (something blocking failed).
+  const ckEntries = Object.entries(st.checks || {});
+  let rdot = "unknown", rtext = "Checking…";
+  if (ckEntries.length) {
+    const browsers = ckEntries.filter(([k]) => k.startsWith("browser_")).map(([, c]) => c.status);
+    const others = ckEntries.filter(([k]) => !k.startsWith("browser_")).map(([, c]) => c.status);
+    const anyPending = st.checks_running
+      || ckEntries.some(([, c]) => c.status === "busy" || c.status === "unknown");
+    const browserOk = browsers.length === 0 || browsers.some((s) => s === "ok");
+    const othersOk = others.every((s) => s === "ok");
+    if (anyPending) { rdot = "busy"; rtext = "Checking…"; }
+    else if (browserOk && othersOk) { rdot = "ok"; rtext = "Ready"; }
+    else { rdot = "bad"; rtext = "Check setup"; }
+  }
+  setDot($("readyDot"), rdot);
+  $("readyText").textContent = rtext;
 
   // config inputs lock while any task runs
   const locked = st.task != null;
@@ -667,7 +752,7 @@ function renderState() {
    "btnCheckEnvs"]
     .forEach((id) => { $(id).disabled = locked; });
   Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
-  ["setDebugLog", "setDevtools", "setEnvAutoCheck"].forEach((id) => {
+  ["setDebugLog", "setDevtools", "setEnvAutoCheck", "setNotifyFinish"].forEach((id) => {
     $(id).disabled = locked;
     $(id).closest(".option-row").classList.toggle("disabled", locked);
   });
@@ -738,6 +823,159 @@ function renderState() {
   renderUpdate(st.update);
   renderDays(st.days || []);
   renderEnvAccess();
+
+  // Right-column lifecycle: pre-flight while idle, progress while running, a
+  // persistent completion summary after an export finishes.
+  updateActivityCards();
+}
+
+// Pick which activity-column card is visible: progress while a task runs; on
+// the Export tab a finished run keeps its completion summary; otherwise the
+// per-tab pre-flight.
+function updateActivityCards() {
+  const st = S.st;
+  if (!st) return;
+  const idle = st.task == null;
+  const showCompletion = idle && !!st.last_summary && S.tab === "export";
+  $("progressCard").classList.toggle("hidden", idle);
+  $("completionCard").classList.toggle("hidden", !showCompletion);
+  $("preflightCard").classList.toggle("hidden", !(idle && !showCompletion));
+  renderPreflight();
+  renderCompletion();
+}
+
+// The persistent post-run summary: totals as count chips, the failed routes,
+// and Open-folder / Retry-failed / Save-report actions.
+function renderCompletion() {
+  const card = $("completionCard");
+  if (!card || card.classList.contains("hidden")) return;
+  const s = S.st && S.st.last_summary;
+  if (!s) return;
+  const t = s.totals || {};
+  const failed = s.failed_total || 0;
+  const head = $("completionHead"), use = head.querySelector("use");
+  if (s.cancelled) {
+    head.className = "completion-head warn"; use.setAttribute("href", "#i-warn");
+    $("completionTitle").textContent = "Run stopped";
+  } else if (failed > 0) {
+    head.className = "completion-head warn"; use.setAttribute("href", "#i-warn");
+    $("completionTitle").textContent = "Finished with failures";
+  } else {
+    head.className = "completion-head ok"; use.setAttribute("href", "#i-check");
+    $("completionTitle").textContent = "Export complete";
+  }
+  const chips = $("completionChips");
+  chips.textContent = "";
+  [["saved", "saved", "cc-saved"], ["exists", "already had", "cc-exists"],
+   ["empty", "empty", "cc-empty"], ["skipped", "skipped", "cc-skipped"],
+   ["failed", "failed", "cc-failed"]].forEach(([k, label, cls]) => {
+    const v = t[k] || 0;
+    const chip = document.createElement("span");
+    chip.className = "count-chip " + cls + (v > 0 ? " lit" : "");
+    chip.append(document.createTextNode(label + " "));
+    const b = document.createElement("b"); b.textContent = v; chip.append(b);
+    chips.append(chip);
+  });
+  const fr = $("completionFailed");
+  const routes = [...new Set((s.reports || []).flatMap((r) => r.failed_routes || []))];
+  if (routes.length) { fr.textContent = "Failed routes: " + routes.join(", "); fr.classList.remove("hidden"); }
+  else fr.classList.add("hidden");
+  $("btnRetryFailed").disabled = !(failed > 0) || (S.st.task != null);
+  $("btnOpenRunFolder").disabled = !s.run_folder;
+}
+
+// Pre-flight summary for the activity column: a plain-words "about to do X"
+// mirror of the active tab's pending action — the report/scope, the resolved
+// SSOR/ARS × environment target (answering the recurring "am I on the right
+// site?" worry), and where the file lands. Shown while idle; the progress card
+// replaces it on run. Built from live form state so it tracks every change.
+function pfTodayRunFolder() {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return `${date} ${$("selSource").value}-${$("selEnv").value}`;
+}
+function pfRoutesSummary() {
+  const raw = $("routesInput").value.trim();
+  const total = (S.init.routes || []).length;
+  if (!raw) return `All ${total} routes`;
+  const parts = raw.split(/[,\s]+/).filter(Boolean);
+  return `${parts.length} route${parts.length === 1 ? "" : "s"}: ${raw}`;
+}
+function renderPreflight() {
+  const card = $("preflightCard");
+  if (!card || card.classList.contains("hidden")) return;   // hidden while running
+  const tab = S.tab || "export";
+  const rows = $("preflightRows");
+  const targetEl = $("preflightTarget");
+  rows.textContent = "";
+  targetEl.classList.add("hidden");
+  const srcLabel = (id) => (((S.init || {}).sources || []).find((s) => s.id === id) || {}).label || id;
+  const envLabel = (id) => (((S.init || {}).envs || []).find((e) => e.id === id) || {}).label || id;
+
+  const addRow = (label, value, opts) => {
+    opts = opts || {};
+    const r = document.createElement("div"); r.className = "pf-row";
+    const l = document.createElement("span"); l.className = "pf-label"; l.textContent = label;
+    const v = document.createElement("span");
+    v.className = "pf-value" + (opts.path ? " path" : "") + (opts.warn ? " pf-warn" : "");
+    v.textContent = value;
+    if (opts.title) v.title = value;
+    r.append(l, v); rows.appendChild(r);
+  };
+  const showTarget = () => {
+    const src = $("selSource").value, env = $("selEnv").value;
+    targetEl.classList.remove("hidden");
+    targetEl.querySelector(".pf-target-text").textContent = `${srcLabel(src)} · ${envLabel(env)}`;
+    const acc = (S.st && S.st.env_access) || {};
+    const e = acc[`${src}-${env}`];
+    const badge = e && (ENV_ACCESS_BADGE[e.status] || ENV_ACCESS_BADGE.error);
+    setDot($("preflightTargetDot"), badge ? badge.dot : "unknown");
+  };
+
+  if (tab === "export") {
+    $("preflightTitle").textContent = "Ready to export";
+    showTarget();
+    const labels = selectedReportIdxs().map((i) => ((S.init.reports || [])[i] || {}).label).filter(Boolean);
+    if (!labels.length) addRow("Reports", "Nothing selected — pick a report on the left", { warn: true });
+    else addRow("Reports", labels.length === 1 ? labels[0] : `${labels.length} reports`, { title: true });
+    addRow("Routes", pfRoutesSummary());
+    addRow("Saves to", `output\\${pfTodayRunFolder()}\\`, { path: true, title: true });
+    if ($("fastMode").checked) addRow("Mode", `Fast — ${$("fastWorkers").value} browsers at once`);
+  } else if (tab === "everything") {
+    $("preflightTitle").textContent = "Ready to refresh";
+    const reps = $("batchReportList").querySelectorAll("input:checked").length;
+    const envs = $("batchEnvList").querySelectorAll("input:checked").length;
+    addRow("Reports", `${reps} report type${reps === 1 ? "" : "s"}`, { warn: reps === 0 });
+    addRow("Targets", `${envs} environment${envs === 1 ? "" : "s"}`, { warn: envs === 0 });
+    addRow("Saves to", $("batchDest").textContent || "—", { path: true, title: true });
+  } else if (tab === "consolidate") {
+    $("preflightTitle").textContent = "Ready to consolidate";
+    const r = $("consList").querySelector(".option-row.checked .option-name");
+    addRow("Report", r ? r.textContent : "—", { title: true });
+    addRow("From", $("selDay").value || "Newest run");
+    addRow("Saves to", $("consDest").textContent || "—", { path: true, title: true });
+  } else if (tab === "compare") {
+    $("preflightTitle").textContent = "Ready to compare";
+    const t = $("compareList").querySelector(".option-row.checked .option-name");
+    addRow("Type", t ? t.textContent : "—", { title: true });
+    if (compareKind() === "folders") {
+      addRow("Baseline", $("cmpDirA").value || "— not picked —", { title: true, warn: !$("cmpDirA").value });
+      addRow("Compare", $("cmpDirB").value || "— not picked —", { title: true, warn: !$("cmpDirB").value });
+    } else {
+      addRow("TSMIS", CMP.tsmis || "— not picked —", { path: !!CMP.tsmis, title: true, warn: !CMP.tsmis });
+      addRow("TSN", CMP.tsn || "— not picked —", { path: !!CMP.tsn, title: true, warn: !CMP.tsn });
+    }
+    const outs = [];
+    if ($("cmpWantValues").checked) outs.push("Values");
+    if ($("cmpWantFormulas").checked) outs.push("Live formulas");
+    addRow("Output", outs.join(" + ") || "Pick at least one", { warn: !outs.length });
+  } else {
+    $("preflightTitle").textContent = "Nothing queued";
+    const note = document.createElement("div");
+    note.className = "pf-value";
+    note.textContent = "Adjust settings on the left — exports run from the other tabs.";
+    rows.appendChild(note);
+  }
 }
 
 // ----------------------------------- environment access (scan results) -----
@@ -921,14 +1159,28 @@ async function refreshConsDest() {
   } else {
     row.classList.add("hidden");
   }
+  renderPreflight();
 }
 
 // progress -------------------------------------------------------------
 function renderProgress(p) {
   S.progress = p;
-  const pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
+  // The counter restarted (a new report, or the engine's end-of-run retry pass
+  // re-counting the failed routes) — drop the stale rate so the ETA can't carry
+  // a huge value across the reset.
+  if (p.done === 0 && p.total > 0) S.etaSmoothed = null;
+  // Overall fraction drives the bar so it stays monotonic: multi-report runs
+  // reset `done` per report, and a batch runs many environments — fold those in.
+  const within = p.total > 0 ? p.done / p.total : 0;
+  const withinRun = ((p.report_i || 1) - 1 + within) / (p.report_n || 1);
+  const b = S.st && S.st.batch;
+  const overall = (S.runMode === "batch" && b && b.total)
+    ? Math.min(1, (b.done + withinRun) / b.total)
+    : withinRun;
+  const pct = Math.round(Math.max(0, Math.min(1, overall)) * 100);
   $("progressPct").textContent = pct + "%";
   $("progressFill").style.width = pct + "%";
+  updateEta(overall);
   let head = "";
   if (p.report_n > 1) head = `[${p.report_i}/${p.report_n}] ${p.report}  ·  `;
   else if (p.report) head = `${p.report}  ·  `;
@@ -940,10 +1192,30 @@ function renderProgress(p) {
   });
 }
 
+// Time-remaining from overall progress + client elapsed, smoothed with an EMA
+// (the early/parallel route rate is noisy). Hidden until there's enough real
+// progress, near the very end, or while paused (wall-clock elapsed inflates it).
+function updateEta(overall) {
+  const eta = $("progressEta");
+  if (!eta) return;
+  const paused = S.st && S.st.paused;
+  if (overall < 0.03 || overall >= 0.999 || paused || !S.elapsedStart) {
+    eta.classList.add("hidden");
+    return;
+  }
+  const elapsed = Date.now() - S.elapsedStart;
+  const raw = elapsed * (1 - overall) / overall;
+  S.etaSmoothed = S.etaSmoothed == null ? raw : 0.3 * raw + 0.7 * S.etaSmoothed;
+  eta.textContent = "~" + fmtElapsed(S.etaSmoothed) + " left";
+  eta.classList.remove("hidden");
+}
+
 function startRunUi(mode, label, workers) {
   S.runMode = mode;
   buildWorkerStrip(mode === "export" || mode === "batch" ? (workers || 1) : 0);
   S.elapsedStart = Date.now();
+  S.etaSmoothed = null;
+  $("progressEta").classList.add("hidden");
   $("progressElapsed").classList.remove("hidden");
   $("progressElapsed").textContent = "00:00";
   if (S.elapsedTimer) clearInterval(S.elapsedTimer);
@@ -984,6 +1256,7 @@ function endRunUi() {
   $("progressPct").classList.remove("hidden");
   $("progressPct").textContent = "0%";
   $("progressFill").style.width = "0%";
+  $("progressEta").classList.add("hidden");
   $("progressText").textContent = "Idle — ready to export";
 }
 
@@ -1002,7 +1275,9 @@ function dispatch(events) {
           fillSettings();
           break;
         case "log": appendLog(ev.text); sawLog = true; break;
-        case "progress": if (S.runMode === "export") renderProgress(ev.p); break;
+        case "progress":
+          if (S.runMode === "export" || S.runMode === "batch") renderProgress(ev.p);
+          break;
         case "wstatus": updateWorkerStatus(ev.w, ev.text); break;
         case "preview": showPreviewEvent(ev); break;
         case "run_started": startRunUi(ev.mode, ev.label, ev.workers); break;
@@ -1051,7 +1326,11 @@ async function chooseRoutes() {
   }
   const picked = await showRoutePicker(current);
   if (picked == null) return;
-  $("routesInput").value = picked.join(", ");
+  // All or none both mean "every route" — keep the box blank (the documented
+  // "blank = all" convention) rather than stuffing it with all 283 numbers, so
+  // the box and the picker always represent the same selection cleanly.
+  const all = (S.init.routes || []).length;
+  $("routesInput").value = (picked.length === 0 || picked.length === all) ? "" : picked.join(", ");
   onRoutesInput();
 }
 
@@ -1157,6 +1436,7 @@ function fmtAge(s) {
 function setBatchDest(dest) {
   const el = $("batchDest");
   if (el && dest) { el.textContent = dest; el.title = dest; }
+  renderPreflight();
 }
 
 async function renderBatchLibrary() {
@@ -1186,7 +1466,7 @@ async function renderBatchLibrary() {
       if (stale) row.classList.add("stale");
     }
     const btn = document.createElement("button");
-    btn.className = "btn btn-subtle btn-sm";
+    btn.className = "btn btn-subtle btn-small";
     btn.textContent = r.present ? "Refresh" : "Export";
     btn.disabled = locked;
     btn.onclick = () => startBatch([i]);
@@ -1225,6 +1505,34 @@ const CMP = { tsmis: null, tsn: null };
 function compareKind() {
   const rep = (S.init.compare_reports || [])[compareChoice()];
   return (rep && rep.kind) || "files";
+}
+
+// Switch the Compare sub-tab: highlight the button, show only that group's
+// comparison-type rows, and keep exactly one VISIBLE row selected. Radios share
+// a name, so seating a new pick natively drops the now-hidden previous one;
+// renderCompareKind then swaps in the matching files/folders inputs.
+function selectCompareGroup(groupId) {
+  document.querySelectorAll("#compareSubtabs .subtab").forEach((b) => {
+    const on = b.dataset.group === groupId;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+  const rows = [...$("compareList").querySelectorAll(".option-row")];
+  let firstVisible = null, checkedVisible = false;
+  rows.forEach((r) => {
+    const on = r.dataset.group === groupId;
+    r.classList.toggle("hidden", !on);
+    if (on) {
+      firstVisible = firstVisible || r;
+      if (r.querySelector("input").checked) checkedVisible = true;
+    }
+  });
+  if (!checkedVisible && firstVisible) {
+    rows.forEach((r) => r.classList.remove("checked"));
+    firstVisible.querySelector("input").checked = true;
+    firstVisible.classList.add("checked");
+  }
+  renderCompareKind();
 }
 
 function renderCompareFiles() {
@@ -1303,6 +1611,7 @@ function syncCompareButton() {
   $("cmpOutHint").textContent = anyOut
     ? "Pick one or both. With both, the values copy is saved next to the other as “… (values).xlsx”."
     : "Tick at least one output to enable the comparison.";
+  renderPreflight();
 }
 
 async function pickCompareFile(side) {
@@ -1358,6 +1667,7 @@ function fillSettings() {
   setToggle("setDebugLog", v.debug_logging);
   setToggle("setDevtools", v.ui_devtools);
   setToggle("setEnvAutoCheck", v.env_check_on_start);
+  setToggle("setNotifyFinish", v.notify_on_finish);
 
   const meta = s.meta || {};
   const paths = $("setPaths");
@@ -1593,15 +1903,23 @@ function bindEvents() {
     $("panelTitle").textContent = TABS[tab].title;
     $("panelSub").textContent = TABS[tab].sub;
     if (tab === "everything") renderBatchLibrary();
+    updateActivityCards();
   };
   Object.entries(TABS).forEach(([key, t]) => { $(t.btn).onclick = () => setTab(key); });
 
-  $("selTheme").value = themePref();
-  $("selTheme").onchange = () => {
-    try { localStorage.setItem(THEME_KEY, $("selTheme").value); } catch (_) { /* keep for session */ }
+  renderThemeButton();
+  $("btnTheme").onclick = () => {
+    const order = ["auto", "light", "dark"];
+    const next = order[(order.indexOf(themePref()) + 1) % order.length];
+    try { localStorage.setItem(THEME_KEY, next); } catch (_) { /* keep for session */ }
     applyTheme();
-    api.ui_event("theme:" + $("selTheme").value);
+    renderThemeButton();
+    api.ui_event("theme:" + next);
   };
+  document.querySelectorAll(".popover-host").forEach(attachPopover);
+  // keep the pre-flight summary live as the user edits any control
+  document.body.addEventListener("change", renderPreflight);
+  document.body.addEventListener("input", renderPreflight);
 
   $("selBrowser").onchange = () => api.set_browser($("selBrowser").value);
   $("selSource").onchange = () => {
@@ -1639,6 +1957,12 @@ function bindEvents() {
   };
   $("batchFast").onchange = () => { renderState(); };
   $("btnSaveReport").onclick = saveRunReport;
+  $("btnSaveReportDone").onclick = saveRunReport;
+  $("btnOpenRunFolder").onclick = () => api.open_run_folder();
+  $("btnRetryFailed").onclick = async () => {
+    const res = await api.retry_failed();
+    if (res && res.error) showMessage("info", "Nothing to retry", res.error);
+  };
 
   $("selDay").onchange = refreshConsDest;
   $("btnStartCons").onclick = startConsolidate;
@@ -1653,6 +1977,7 @@ function bindEvents() {
   $("setDebugLog").addEventListener("change", () => onSettingToggle("setDebugLog", "debug_logging"));
   $("setDevtools").addEventListener("change", () => onSettingToggle("setDevtools", "ui_devtools"));
   $("setEnvAutoCheck").addEventListener("change", () => onSettingToggle("setEnvAutoCheck", "env_check_on_start"));
+  $("setNotifyFinish").addEventListener("change", () => onSettingToggle("setNotifyFinish", "notify_on_finish"));
   $("btnSupportBundle").onclick = async () => {
     const res = await api.save_support_bundle();
     if (res && res.error) showMessage("error", "Could not save the bundle", res.error);
@@ -1706,6 +2031,21 @@ function bindEvents() {
   $("btnOpenOutput").onclick = () => api.open_output_folder();
   $("btnOpenLogs").onclick = () => api.open_logs_folder();
   $("btnClearLog").onclick = clearLog;
+  $("btnLogFailures").onclick = () => {
+    const on = $("logBody").classList.toggle("filter-failures");
+    $("btnLogFailures").classList.toggle("active", on);
+    $("btnLogFailures").setAttribute("aria-pressed", String(on));
+    if (on) scrollLogToEnd();
+  };
+  $("btnCopyLog").onclick = async () => {
+    const text = [...$("logBody").querySelectorAll(".log-line")].map((l) => l.textContent).join("\n");
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      const b = $("btnCopyLog"); b.textContent = "Copied";
+      setTimeout(() => { b.textContent = "Copy"; }, 1200);
+    } catch (_) { /* clipboard can be blocked; nothing else to do */ }
+  };
 
   const logBody = $("logBody");
   logBody.addEventListener("scroll", () => {
@@ -1856,7 +2196,7 @@ function makeMockApi() {
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
     county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
-    env_check_on_start: true,
+    env_check_on_start: true, notify_on_finish: true,
   };
   const mockUrlOverrides = {};
   const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,
@@ -1928,7 +2268,7 @@ function makeMockApi() {
   }
 
   function runMockExport(reports, routes, fast, workers, autoConsolidate) {
-    st.task = "export"; st.fast_run = fast;
+    st.task = "export"; st.fast_run = fast; st.last_summary = null;
     st.auth_dot = "busy";
     st.auth_text = reports.length > 1 ? `Exporting ${reports.length} report(s)…`
                                       : `Exporting ${REPORTS[reports[0]].label}…`;
@@ -1960,6 +2300,13 @@ function makeMockApi() {
         }
         push({ t: "run_ended" });
         st.task = null; st.fast_run = false; st.can_save_report = true;
+        const failedRoutes = routes.slice(0, counts.failed);
+        st.last_summary = {
+          reports: reports.map((i, n) => ({ label: REPORTS[i].label, ...counts,
+            failed_routes: n === 0 ? failedRoutes : [] })),
+          totals: { ...counts }, failed_total: counts.failed, cancelled: false,
+          run_folder: "C:\\Tools\\TSMIS Exporter\\output\\2026-06-17 ssor-prod",
+        };
         st.auth_dot = st.authed ? "ok" : "bad";
         st.auth_text = st.authed ? "Session ready" : "No saved login — click Log in";
         pushState();
@@ -2022,12 +2369,16 @@ function makeMockApi() {
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       reports: REPORTS,
       cons_reports: REPORTS.slice(0, 4).map((r) => r.label).concat(["TSN Highway Log"]),
+      compare_groups: [
+        { id: "env", label: "Cross-environment" },
+        { id: "tsn", label: "TSMIS vs TSN" },
+      ],
       compare_reports: [
-        { label: "Highway Log — TSMIS vs TSN", kind: "files" },
-        { label: "TSAR: Ramp Summary — between environments", kind: "folders" },
-        { label: "TSAR: Ramp Detail — between environments", kind: "folders" },
-        { label: "Highway Sequence Listing — between environments", kind: "folders" },
-        { label: "Highway Log — between environments", kind: "folders" },
+        { label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env" },
+        { label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env" },
+        { label: "Highway Sequence Listing — between environments", kind: "folders", group: "env" },
+        { label: "Highway Log — between environments", kind: "folders", group: "env" },
+        { label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn" },
       ],
       batch_resume: null,
       batch_dest: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
@@ -2237,6 +2588,13 @@ function makeMockApi() {
       runMockBatch(reports, envs, fast, workers, auto);
       return { ok: true };
     },
+    retry_failed: async () => {
+      const s = st.last_summary;
+      if (!s || !s.failed_total) return { error: "There are no failed routes to retry." };
+      runMockExport([0], ROUTES.slice(0, Math.max(2, s.failed_total)), false, 1, false);
+      return { ok: true };
+    },
+    open_run_folder: async () => { push({ t: "log", text: "(mock) opened run folder" }); return { ok: true }; },
     resume_batch: async () => {
       const r = st.batch_resume || { pending: 1, reports: [] };
       st.batch_resume = null;

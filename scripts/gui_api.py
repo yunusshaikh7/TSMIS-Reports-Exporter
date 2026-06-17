@@ -61,7 +61,8 @@ from common import (
     set_site,
 )
 from paths import EDGE_LOGIN_PROFILE_DIR
-from reports import COMPARE_REPORTS, CONSOLIDATE_REPORTS, EXPORT_REPORTS
+from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
+                     EXPORT_REPORTS)
 
 log = logging.getLogger("tsmis.gui")
 # Everything shown in the GUI's log pane is mirrored here, so tsmis.log
@@ -154,6 +155,8 @@ class GuiApi:
         self._update_info = None
 
         self._last_results = []      # [(spec, RunResult), ...] of the last export
+        self._last_summary = None    # JSON-safe completion summary (persistent card)
+        self._last_run_folder = None # dated run-folder root of the last export
         self._batch = None           # B3: live Export-Everything progress {label,done,total}
         self._batch_resume = None    # B3: a resumable manifest summary, or None
         self._export_worker = None   # live ExportWorker (screenshot requests)
@@ -214,6 +217,7 @@ class GuiApi:
                 "checks_running": self._checks_running,
                 "days": list_output_days(),
                 "can_save_report": bool(self._last_results),
+                "last_summary": self._last_summary,
                 "batch": self._batch,
                 "batch_resume": self._batch_resume,
                 "update": dict(self._update),
@@ -413,8 +417,12 @@ class GuiApi:
             # A multi-report run errored partway; keep the completed reports so
             # "Save run report…" still covers them. The "error" message that
             # follows resets the run state.
+            summary = (self._build_export_summary(payload, self.cancel_event.is_set())
+                       if payload else None)
             with self._lock:
                 self._last_results = payload
+                self._last_summary = summary
+                self._last_run_folder = (summary or {}).get("run_folder")
         elif kind == "consolidate_done":
             self._finish_consolidate(payload)
         elif kind == "login_open":
@@ -544,8 +552,12 @@ class GuiApi:
     def _finish_export(self, results):
         # results is [(spec, RunResult), ...] -- one entry per report type run
         # (partial if cancelled before the later reports started).
+        cancelled = self.cancel_event.is_set()
+        summary = self._build_export_summary(results, cancelled) if results else None
         with self._lock:
             self._last_results = results
+            self._last_summary = summary
+            self._last_run_folder = (summary or {}).get("run_folder")
         self._emit_log("")
         if not results:
             self._emit_log("No reports completed.")
@@ -571,7 +583,62 @@ class GuiApi:
         with self._lock:
             if not self._authed:
                 self._device_ok = True   # the run signed itself in (device sign-in mode)
+        self._flash_taskbar()
         self._end_task()
+
+    def _build_export_summary(self, results, cancelled):
+        """JSON-safe per-report outcome of an export, kept in state so the GUI
+        can show a persistent completion card (counts, Open folder, Retry
+        failed) after the run instead of relaxing straight to idle."""
+        reports = []
+        totals = {"saved": 0, "exists": 0, "empty": 0, "skipped": 0, "failed": 0}
+        run_folder = None
+        for spec, result in results:
+            counts = {"saved": result.saved, "exists": len(result.exists),
+                      "empty": len(result.empty), "skipped": len(result.user_skipped),
+                      "failed": len(result.failed)}
+            for k, v in counts.items():
+                totals[k] += v
+            if result.output_dir and run_folder is None:
+                run_folder = str(Path(result.output_dir).parent)
+            reports.append({"label": spec.label, **counts,
+                            "failed_routes": list(result.failed),
+                            "output_dir": result.output_dir,
+                            "report_path": result.report_path})
+        return {"reports": reports, "totals": totals,
+                "failed_total": totals["failed"], "cancelled": bool(cancelled),
+                "run_folder": run_folder}
+
+    def _flash_taskbar(self):
+        """Flash the taskbar button when a run finishes and the window isn't in
+        front, so someone who switched away gets nudged back. Pure ctypes/Win32
+        from the gui-pump worker thread -- the same safe, off-STA pattern as the
+        icon setter (never the WinForms STA thread). Honors notify_on_finish;
+        best-effort, never affects the app."""
+        try:
+            if not settings.get("notify_on_finish"):
+                return
+            from ctypes import wintypes
+            u32 = ctypes.windll.user32
+            hwnd = self._find_own_window(APP_NAME)
+            if not hwnd:
+                return
+            u32.GetForegroundWindow.restype = wintypes.HWND
+            if u32.GetForegroundWindow() == hwnd:
+                return                                  # already in front -- no nudge
+
+            class FLASHWINFO(ctypes.Structure):
+                _fields_ = [("cbSize", wintypes.UINT), ("hwnd", wintypes.HWND),
+                            ("dwFlags", wintypes.DWORD), ("uCount", wintypes.UINT),
+                            ("dwTimeout", wintypes.DWORD)]
+            u32.FlashWindowEx.argtypes = [ctypes.POINTER(FLASHWINFO)]
+            u32.FlashWindowEx.restype = wintypes.BOOL
+            FLASHW_TRAY, FLASHW_TIMERNOFG = 0x2, 0xC      # taskbar; until focused
+            info = FLASHWINFO(ctypes.sizeof(FLASHWINFO), hwnd,
+                              FLASHW_TRAY | FLASHW_TIMERNOFG, 0, 0)
+            u32.FlashWindowEx(ctypes.byref(info))
+        except Exception as e:
+            log.info("taskbar flash skipped (%s: %s)", type(e).__name__, e)
 
     def _finish_consolidate(self, result):
         if result.status == "ok":
@@ -610,6 +677,7 @@ class GuiApi:
         else:
             self._emit_log(f"ERROR: {result.message}")
             self._emit_modal("error", "Consolidation failed", result.message)
+        self._flash_taskbar()
         self._end_task()
 
     def _on_checks_done(self, results):
@@ -725,6 +793,7 @@ class GuiApi:
             self._set_dot("bad", "Error")
             self._emit_modal("error", "Error",
                              f"{message}\n\nMore details are in the log file.")
+        self._flash_taskbar()        # a task ended (with an error) — nudge if away
         self._end_task()
 
     # ======================= JS-callable api methods ==========================
@@ -744,9 +813,11 @@ class GuiApi:
             "log_dir": str(LOG_DIR),
             "reports": [{"label": label, "fmt": fmt} for label, fmt, _spec in EXPORT_REPORTS],
             "cons_reports": [label for label, _mod in CONSOLIDATE_REPORTS],
-            "compare_reports": [{"label": label, "kind": kind,
+            "compare_groups": [{"id": gid, "label": glabel}
+                               for gid, glabel in COMPARE_GROUPS],
+            "compare_reports": [{"label": label, "kind": kind, "group": group,
                                  "subdir": getattr(_mod, "subdir", None)}
-                                for label, _mod, kind in COMPARE_REPORTS],
+                                for label, _mod, kind, group in COMPARE_REPORTS],
             "routes": list(ROUTES),
             "channels": [{"id": c, "label": CHANNEL_LABELS[c],
                           "short": _CHANNEL_SHORT.get(c, CHANNEL_LABELS[c])}
@@ -942,6 +1013,8 @@ class GuiApi:
             return {"error": "A task is already running."}
         with self._lock:
             self._fast_run = n_workers > 1
+            self._last_summary = None       # the previous run's card clears now
+            self._last_run_folder = None
         self.cancel_event.clear()
         self.skip_event.clear()
         self.pause_event.clear()
@@ -969,6 +1042,58 @@ class GuiApi:
         with self._lock:
             self._export_worker = worker
         worker.start()
+        return {"ok": True}
+
+    @_api_method
+    def retry_failed(self):
+        """Re-run only the routes that FAILED in the last export. Reuses the
+        normal export engine (resume skips routes already saved, so only the
+        genuinely-missing ones are re-pulled). Serial (workers=1) so it works
+        without a saved login, mirroring the engine's own end-of-run retry."""
+        with self._lock:
+            results = list(self._last_results or [])
+        failing = [(spec, list(result.failed)) for spec, result in results if result.failed]
+        if not failing:
+            return {"error": "There are no failed routes to retry."}
+        specs = [spec for spec, _ in failing]
+        # The union of every failing report's failed routes, run against all of
+        # them. Almost always one report (single-report runs are the norm); when
+        # several reports failed DIFFERENT routes, resume idempotency means each
+        # report re-pulls only its own still-missing files and skips the rest —
+        # so the retry stays complete without the engine needing per-spec lists.
+        routes = sorted({r for _, fr in failing for r in fr})
+
+        if not self._try_claim_task("export"):
+            return {"error": "A task is already running."}
+        with self._lock:
+            self._fast_run = False
+            self._last_summary = None
+            self._last_run_folder = None
+        self.cancel_event.clear()
+        self.skip_event.clear()
+        self.pause_event.clear()
+        self._emit_log(f"Retrying {len(routes)} failed route(s): {', '.join(routes)}")
+        self._set_dot("busy", "Retrying failed routes…")
+        self._emit({"t": "run_started", "mode": "export",
+                    "label": "Retrying failed routes…", "workers": 1})
+        self._push_state()
+        worker = ExportWorker(specs, self._q, self.cancel_event, self.skip_event,
+                              workers=1, routes=routes, pause_event=self.pause_event)
+        with self._lock:
+            self._export_worker = worker
+        worker.start()
+        return {"ok": True}
+
+    @_api_method
+    def open_run_folder(self):
+        """Open the output folder of the run that just finished (the dated
+        run-folder root). The path is engine-produced under OUTPUT_ROOT, so no
+        extra validation is needed."""
+        with self._lock:
+            folder = self._last_run_folder
+        if not folder:
+            return {"error": "No recent run to open."}
+        self._open_folder(Path(folder))
         return {"ok": True}
 
     # ---- batch: Export Everything (B3) ----------------------------------------
@@ -1027,6 +1152,8 @@ class GuiApi:
         with self._lock:
             self._fast_run = n_workers > 1
             self._batch_resume = None
+            self._last_summary = None     # a batch supersedes the last export card
+            self._last_run_folder = None
         msg = (f"Starting Export Everything: {len(specs_idx)} report type(s) "
                f"across {len(combos)} environment(s)")
         if n_workers > 1:
@@ -1087,6 +1214,8 @@ class GuiApi:
         with self._lock:
             self._fast_run = bool(m.get("fast"))
             self._batch_resume = None
+            self._last_summary = None
+            self._last_run_folder = None
         pend, total = len(batch_manifest.pending(m)), len(m.get("steps", []))
         self._emit_log(f"Resuming Export Everything — {pend} of {total} "
                        "environment(s) left.")
@@ -1131,6 +1260,7 @@ class GuiApi:
         with self._lock:
             self._batch = None
             self._batch_resume = resume
+        self._flash_taskbar()
         self._end_task()
 
     @_api_method
@@ -1470,7 +1600,7 @@ class GuiApi:
         row = self._pick_report(COMPARE_REPORTS, report_idx)
         if row is None:
             return {"error": "That comparison isn't available — please reopen the tab."}
-        label, mod, kind = row
+        label, mod, kind, _group = row
         if kind != "files":
             return {"error": "This comparison type takes folders, not files."}
         if not tsmis_path or not tsn_path:
@@ -1507,7 +1637,7 @@ class GuiApi:
         row = self._pick_report(COMPARE_REPORTS, report_idx)
         if row is None:
             return {"folders": list_output_days()}
-        _label, adapter, kind = row
+        _label, adapter, kind, _group = row
         subdir = getattr(adapter, "subdir", None)
         if kind != "folders" or not subdir:
             return {"folders": list_output_days()}
@@ -1521,7 +1651,7 @@ class GuiApi:
         row = self._pick_report(COMPARE_REPORTS, report_idx)
         if row is None:
             return {"error": "That comparison isn't available — please reopen the tab."}
-        label, adapter, kind = row
+        label, adapter, kind, _group = row
         if kind != "folders":
             return {"error": "This comparison type takes files, not folders."}
         if not dir_a or not dir_b:

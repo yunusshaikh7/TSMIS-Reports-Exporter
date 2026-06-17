@@ -58,8 +58,19 @@ CONSOLIDATE_REPORTS = [
     ("TSN Highway Log", _c_tsn_highway_log),
 ]
 
-# Compare tab: (menu label, module/adapter, input kind). The GUI's type list
-# is generated from this; the kind decides which inputs the pane asks for:
+# Compare tab sub-tabs (GUI): the comparison types are grouped into these
+# sub-tabs, shown in this order; the FIRST is the default. A report's `group`
+# (below) is kept independent of its input `kind` so a future family (say a
+# second "files"-kind comparison) can split into its own sub-tab without
+# touching the files/folders input plumbing.
+COMPARE_GROUPS = [
+    ("env", "Cross-environment"),
+    ("tsn", "TSMIS vs TSN"),
+]
+
+# Compare tab: (menu label, module/adapter, input kind, sub-tab group). The
+# GUI's type list is generated from this; the kind decides which inputs the
+# pane asks for:
 #   "files"   -- two workbooks; the module exposes
 #                compare(path_a, path_b, out_path, events, confirm_overwrite,
 #                mode) -> ConsolidateResult and suggest_name(path_a).
@@ -70,12 +81,15 @@ CONSOLIDATE_REPORTS = [
 #                comparisons (compare_env.py) -- no consolidation needed
 #                first; the per-route files are read straight from both
 #                run folders.
+# `group` is one of COMPARE_GROUPS' ids; the cross-env reports lead so the
+# default sub-tab's first radio is one. Selection is by index, so this order
+# (not the old one) is what the UI radios and start_compare* calls key on.
 COMPARE_REPORTS = [
-    ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files"),
-    ("TSAR: Ramp Summary — between environments", _cmp_env.RAMP_SUMMARY, "folders"),
-    ("TSAR: Ramp Detail — between environments", _cmp_env.RAMP_DETAIL, "folders"),
-    ("Highway Sequence Listing — between environments", _cmp_env.HIGHWAY_SEQUENCE, "folders"),
-    ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders"),
+    ("TSAR: Ramp Summary — between environments", _cmp_env.RAMP_SUMMARY, "folders", "env"),
+    ("TSAR: Ramp Detail — between environments", _cmp_env.RAMP_DETAIL, "folders", "env"),
+    ("Highway Sequence Listing — between environments", _cmp_env.HIGHWAY_SEQUENCE, "folders", "env"),
+    ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders", "env"),
+    ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "tsn"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each

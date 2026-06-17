@@ -199,8 +199,14 @@ button, input, select { font-family: inherit; }
 }
 @keyframes dot-pulse { 50% { opacity: 0.35; } }
 
-/* environment strip (second titlebar row) */
-.env-strip { row-gap: 10px; column-gap: 16px; }
+/* environment strip (second titlebar row): target controls on the left,
+   readiness/diagnostics on the right. */
+.env-strip { row-gap: 10px; column-gap: 16px; justify-content: space-between; }
+.target-group, .readiness-group {
+  display: flex; align-items: center; flex-wrap: wrap;
+  column-gap: 16px; row-gap: 10px; min-width: 0;
+}
+.readiness-group { column-gap: 8px; }
 .tb-field {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; color: var(--titlebar-muted); white-space: nowrap;
@@ -234,6 +240,54 @@ button, input, select { font-family: inherit; }
   font-size: 12px; color: var(--titlebar-muted);
   cursor: default;
 }
+.check-ic { width: 14px; height: 14px; }
+.check-ic.ci-ok { color: var(--success); }
+.check-ic.ci-bad { color: var(--destructive); }
+.check-ic.ci-warn { color: var(--warning); }
+.check-ic.ci-busy { color: var(--muted-foreground); animation: spin 1s linear infinite; }
+.check-ic.ci-unknown { color: var(--muted-foreground); }
+
+/* title-bar status chips (sign-in, readiness) + their detail popovers, and the
+   theme icon toggle — the declutter: verbose chips/strips collapse behind these. */
+.status-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 30px; padding: 0 10px; border-radius: var(--radius-md);
+  border: 1px solid var(--titlebar-border); background: oklch(1 0 0 / 4%);
+  color: var(--titlebar-foreground); font-size: 12.5px; font-weight: 500;
+  white-space: nowrap; cursor: pointer; transition: background-color 0.1s;
+}
+.status-chip:hover { background: oklch(1 0 0 / 10%); }
+.status-chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+.status-chip .chev { width: 13px; height: 13px; color: var(--titlebar-muted); }
+
+.btn-icon {
+  width: 30px; height: 30px; padding: 0; display: inline-grid; place-items: center;
+  border-radius: var(--radius-md); cursor: pointer;
+  border: 1px solid var(--titlebar-border); background: oklch(1 0 0 / 4%);
+  color: var(--titlebar-foreground); transition: background-color 0.1s;
+}
+.btn-icon:hover:not(:disabled) { background: oklch(1 0 0 / 10%); }
+.btn-icon:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+.btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-icon .ic { width: 16px; height: 16px; }
+
+.popover-host { position: relative; display: inline-flex; }
+.popover {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
+  min-width: 230px; padding: 12px;
+  background: var(--card); color: var(--foreground);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  box-shadow: 0 12px 34px -12px oklch(0 0 0 / 0.4);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.popover-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--muted-foreground);
+}
+/* on the light card surface the muted titlebar color is too faint */
+.popover .login-mini, .popover .check-item { color: var(--foreground); font-size: 12.5px; }
+.popover .checks { flex-direction: column; align-items: flex-start; gap: 10px; }
+.popover .btn-small { align-self: flex-start; }
 
 /* ------------------------------- buttons --------------------------------- */
 .btn {
@@ -275,9 +329,12 @@ button, input, select { font-family: inherit; }
 .btn-small { height: 26px; padding: 0 10px; font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
 
 /* ------------------------------ main panes ------------------------------- */
+/* Title block stacked ABOVE the tab bar, always — so the header never reflows
+   between tabs. (Previously a wrapping space-between row: the variable-width
+   subtitle tipped the fixed 560px tab bar inline-vs-below per tab.) */
 .panel-head {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap;
+  display: flex; flex-direction: column;
+  gap: 12px;
 }
 .panel-title h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
 .panel-title p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted-foreground); }
@@ -299,6 +356,23 @@ button, input, select { font-family: inherit; }
 .tab.active { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px oklch(0 0 0 / 0.08); }
 .tab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 
+/* sub-tabs inside a pane (e.g. Compare: Cross-environment vs TSMIS vs TSN) —
+   the same segmented control as the main tabs, full-width within the card. */
+.subtabs {
+  display: flex; gap: 4px; margin-bottom: 14px;
+  background: var(--secondary); border-radius: var(--radius-lg); padding: 4px;
+}
+.subtab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: none; border-radius: var(--radius-md); white-space: nowrap;
+  padding: 7px 12px; font-size: 12.5px; font-weight: 600;
+  background: transparent; color: var(--muted-foreground);
+  cursor: pointer; transition: color 0.1s, background-color 0.1s;
+}
+.subtab:hover { color: var(--foreground); }
+.subtab.active { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px oklch(0 0 0 / 0.08); }
+.subtab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -315,6 +389,21 @@ button, input, select { font-family: inherit; }
 }
 .section-meta { font-size: 12px; color: var(--muted-foreground); }
 .hint { margin: 6px 0 0; font-size: 12px; color: var(--muted-foreground); }
+
+/* collapsible disclosure (e.g. Compare "What you'll get") — native <details> */
+.disclosure > summary {
+  cursor: pointer; list-style: none; user-select: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::before {
+  content: ""; border: 4px solid transparent; border-left-color: currentColor;
+  transition: transform 0.15s;
+}
+.disclosure[open] > summary::before { transform: rotate(90deg); }
+.disclosure > summary:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px var(--ring); border-radius: var(--radius-sm);
+}
 
 /* report / consolidate option rows */
 .option-list { display: grid; gap: 4px; }
@@ -337,11 +426,23 @@ button, input, select { font-family: inherit; }
   border-radius: 999px; padding: 2px 8px;
   font-size: 11px; font-weight: 600; flex-shrink: 0;
 }
-.chip-pdf { background: color-mix(in oklab, var(--destructive) 10%, transparent); color: var(--destructive); }
+.chip-pdf { background: color-mix(in oklab, var(--primary) 12%, transparent); color: var(--primary); }
 .chip-excel { background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success); }
 
-/* custom checkbox / radio */
-.option-row input[type="checkbox"], .option-row input[type="radio"] { display: none; }
+/* custom checkbox / radio — the native input is visually hidden but stays
+   FOCUSABLE and in the accessibility tree (Tab reaches it, Space toggles it,
+   screen readers announce it). The styled box mirrors its state and shows a
+   focus ring when the input has keyboard focus. */
+.option-row input[type="checkbox"], .option-row input[type="radio"],
+.fast-toggle input[type="checkbox"] {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+.option-row input:focus-visible ~ .checkbox,
+.option-row input:focus-visible ~ .radio,
+.fast-toggle input:focus-visible ~ .checkbox {
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+}
 .checkbox {
   width: 16px; height: 16px; border-radius: var(--radius-sm);
   border: 1px solid var(--primary);
@@ -394,8 +495,8 @@ button, input, select { font-family: inherit; }
 
 .actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* B3 Export Everything: destination + saved-reports library */
-.dest-row { display: flex; align-items: center; gap: 10px; }
+/* B3 Export Everything: destination + saved-reports library.
+   (.dest-row itself is defined once, below, near the consolidate pane.) */
 .dest-path {
   flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px;
   color: var(--foreground); background: var(--muted);
@@ -412,7 +513,6 @@ button, input, select { font-family: inherit; }
 .lib-age { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
 .lib-row.stale .lib-age { color: var(--warning); font-weight: 600; }
 .lib-row.missing .lib-age { font-style: italic; }
-.btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
 
 .day-row { display: flex; align-items: center; gap: 10px; }
 .day-row select { min-width: 150px; height: 34px; font-size: 13px; }
@@ -436,6 +536,41 @@ button, input, select { font-family: inherit; }
 .path { font-size: 12px; color: color-mix(in oklab, var(--foreground) 80%, transparent);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dest-text .path { margin-top: 2px; }
+
+/* ---------------------------- pre-flight card ---------------------------- */
+.preflight-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+.preflight-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--foreground);
+}
+.preflight-head .ic { width: 15px; height: 15px; color: var(--primary); }
+.preflight-target {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 600; color: var(--foreground);
+}
+.preflight-target .dot { width: 9px; height: 9px; }
+.preflight-rows { display: grid; gap: 9px; }
+.pf-row { display: flex; gap: 12px; align-items: baseline; font-size: 13px; }
+.pf-label {
+  width: 76px; flex-shrink: 0;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--muted-foreground);
+}
+.pf-value { flex: 1; min-width: 0; color: var(--foreground); overflow-wrap: anywhere; }
+.pf-value.path {
+  font-family: var(--font-mono); font-size: 12px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pf-warn { color: var(--warning); }
+
+/* ---------------------------- completion card ---------------------------- */
+.completion-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+.completion-head { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.completion-head .ic { width: 17px; height: 17px; }
+.completion-head.ok, .completion-head.ok .ic { color: var(--success); }
+.completion-head.warn, .completion-head.warn .ic { color: var(--warning); }
+.completion-card .count-chips { margin: 0; }
+.completion-card #completionFailed { margin: 0; }
 
 /* ----------------------------- progress card ----------------------------- */
 .progress-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
@@ -519,6 +654,9 @@ button, input, select { font-family: inherit; }
 .log-line { white-space: pre-wrap; }
 .log-line.ok { color: var(--success); }
 .log-line.err { color: var(--destructive); }
+.log-actions { display: flex; gap: 4px; align-items: center; }
+#btnLogFailures.active { color: var(--destructive); background: color-mix(in oklab, var(--destructive) 10%, transparent); }
+.log-body.filter-failures .log-line:not(.err) { display: none; }
 .log-placeholder { color: color-mix(in oklab, var(--muted-foreground) 60%, transparent); }
 
 /* -------------------------------- footer --------------------------------- */
