@@ -16,7 +16,8 @@ console UX lives in cli.run_consolidate_cli, used by the __main__ entry (and
 therefore by "4. consolidate (combine reports).bat").
 """
 from consolidate_xlsx_base import consolidate_xlsx
-from paths import OUTPUT_ROOT, latest_output_day, output_day_dir
+from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
+                   stamped_consolidated_filename)
 
 SUBDIR = "highway_log"
 FILENAME = "highway_log_consolidated.xlsx"
@@ -41,8 +42,12 @@ def input_dir_for(day):
 
 
 def out_path_for(day):
-    """Consolidated workbook destination for `day` (a run-folder name); None = the legacy location."""
-    return (output_day_dir(day) / "consolidated" / FILENAME) if day else OUT_PATH
+    """Consolidated workbook destination for `day` (a run-folder name); None = the
+    legacy location. The filename carries the run's date + source/environment (A1)
+    so a copy lifted out of its folder keeps its provenance."""
+    if not day:
+        return OUT_PATH
+    return output_day_dir(day) / "consolidated" / stamped_consolidated_filename(FILENAME, day)
 
 
 def consolidate(events=None, confirm_overwrite=None, day=None):

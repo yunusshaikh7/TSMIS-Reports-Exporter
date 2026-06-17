@@ -105,6 +105,22 @@ def parse_run_folder(name):
     return (day, src or "ssor", env or "prod")
 
 
+def stamped_consolidated_filename(filename, day):
+    """A consolidated workbook's filename with the run's provenance stamped in:
+    'highway_log_consolidated.xlsx' + '2026-06-16 ssor-prod' ->
+    'highway_log_consolidated 2026-06-16 ssor-prod.xlsx'. So a copy lifted out of
+    its folder still says, by name, which export date + source/environment it came
+    from. When `day` isn't a real run-folder name (None / the legacy flat layout),
+    the filename is returned unchanged so the pre-dated layout keeps its fixed
+    name."""
+    if not day or parse_run_folder(day) is None:
+        return filename
+    stem, dot, ext = filename.rpartition(".")
+    if not dot:                          # no extension: stamp the whole name
+        return f"{filename} {day}"
+    return f"{stem} {day}.{ext}"
+
+
 def output_day_dir(day=None):
     """output/<day>/ — `day` is a run-folder name (or a legacy bare date);
     None means today's bare date. Kept for the consolidators, which treat the

@@ -30,7 +30,8 @@ try:
 except ImportError:
     _DEPS_OK = False
 
-from paths import OUTPUT_ROOT, latest_output_day, output_day_dir
+from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
+                   stamped_consolidated_filename)
 from events import Events, ConsolidateResult
 from compare_core import is_formula_injection   # shared formula-injection guard
 
@@ -54,8 +55,12 @@ def input_dir_for(day):
 
 
 def out_path_for(day):
-    """Consolidated workbook destination for `day` (a run-folder name); None = the legacy location."""
-    return (output_day_dir(day) / "consolidated" / FILENAME) if day else OUT_PATH
+    """Consolidated workbook destination for `day` (a run-folder name); None = the
+    legacy location. The filename carries the run's date + source/environment (A1)
+    so a copy lifted out of its folder keeps its provenance."""
+    if not day:
+        return OUT_PATH
+    return output_day_dir(day) / "consolidated" / stamped_consolidated_filename(FILENAME, day)
 
 
 # =============================================================================

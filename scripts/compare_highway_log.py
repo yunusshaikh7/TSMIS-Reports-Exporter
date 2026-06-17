@@ -29,6 +29,7 @@ except ImportError:
 
 from compare_core import CompareSchema, normalize_value, run_compare
 from events import ConsolidateResult, Events
+from paths import today_str
 
 REPORT_NAME = "Highway Log"          # registry label (comparison type)
 SHEET_NAME = "Highway Log"           # required sheet in both inputs
@@ -75,7 +76,8 @@ def suggest_name(tsmis_path):
         tag = "Consolidated"
     else:
         tag = "Highway_Log"
-    return f"TSMIS_vs_TSN_{tag}_Comparison.xlsx"
+    # Trailing generated-on date (A1): stamps when the comparison was built.
+    return f"TSMIS_vs_TSN_{tag}_Comparison {today_str()}.xlsx"
 
 
 def _load_input(path):

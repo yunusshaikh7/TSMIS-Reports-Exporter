@@ -51,7 +51,7 @@ import compare_highway_log as _hl
 import consolidate_ramp_summary as _rs
 from compare_core import CompareSchema, normalize_value, run_compare
 from events import ConsolidateResult, Events
-from paths import OUTPUT_ROOT, parse_run_folder
+from paths import OUTPUT_ROOT, parse_run_folder, today_str
 
 log = logging.getLogger("tsmis.compare")
 
@@ -285,8 +285,10 @@ class EnvCompare:
     def suggest_name(self, dir_a, dir_b):
         la, lb = _side_labels(Path(dir_a), Path(dir_b))
         safe = lambda s: re.sub(r"[^\w\-]+", "_", s).strip("_")
+        # The generated-on date (A1): the side labels already carry each side's
+        # export date + src-env, so this stamps WHEN the comparison was built.
         return (f"{safe(la)}_vs_{safe(lb)}_"
-                f"{safe(self.REPORT_NAME)}_Comparison.xlsx")
+                f"{safe(self.REPORT_NAME)}_Comparison {today_str()}.xlsx")
 
     def _resolve_key_field(self, header):
         """Index of the configured key column in this loaded header, matched on
