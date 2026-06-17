@@ -33,6 +33,8 @@ WriteOnlyCells. Console-free; progress via events.on_log, cancel honored at
 the usual cadence, ConsolidateResult returned.
 """
 import difflib
+import itertools
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
@@ -267,6 +269,129 @@ def _medwid_norm(t):
         if n is not None:
             return n + t[-1]
     return t
+
+
+# =============================================================================
+# Similarity pairing for duplicate keys
+# =============================================================================
+# Rows that share a key (same Route + key field) used to pair by FILE ORDER:
+# first-with-first, second-with-second. When a key legitimately repeats (two
+# segments at the same postmile), that mis-paired a row with the wrong twin and
+# reported phantom differences — the row that actually matched the OTHER side's
+# second instance looked like a difference. Instead, within each duplicate group
+# present on BOTH sides, pair the rows that are actually the MOST ALIKE (fewest
+# differing fields) and give matched pairs the same occurrence #. The optimal
+# assignment's total difference count is <= any positional assignment's (file
+# order is just one assignment), so this can only REMOVE phantom diffs, never add
+# one.
+
+_PAIR_GROUP_CAP = 100_000     # product len_t*len_n above which we keep file order
+_PAIR_EXACT_PERMS = 5040      # exact (brute-force) assignment up to 7! permutations
+
+
+def _row_diff_count(sc, rt, rn, off):
+    """Differing compared-fields between two rows, using the comparison's own
+    normalization (TRIM + Med Wid) — identical to the per-row diff the workbook
+    counts. This is the similarity cost: lower = more alike."""
+    d = 0
+    for f in sc.field_indices:
+        va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
+        if sc.is_medwid(f):
+            va, vb = _medwid_norm(va), _medwid_norm(vb)
+        if va != vb:
+            d += 1
+    return d
+
+
+def _min_cost_pairs(cost):
+    """Min-total-cost 1:1 assignment over a (rows x cols) cost matrix, returning
+    min(rows, cols) (row, col) pairs (every member of the smaller side matched).
+    Exact for small groups (the realistic case — a key repeats a handful of
+    times) via permutation search with pruning; a greedy fallback bounds the rare
+    pathological pile. Lexicographic search means the positional assignment is
+    tried first, so ties keep file order — deterministic, and both output flavors
+    plus the golden checks agree."""
+    nr = len(cost)
+    nc = len(cost[0]) if nr else 0
+    if nr == 0 or nc == 0:
+        return []
+    flip = nr > nc                          # work with rows = the smaller side
+    if flip:
+        cost = [[cost[r][c] for r in range(nr)] for c in range(nc)]
+        nr, nc = nc, nr
+    if math.perm(nc, nr) <= _PAIR_EXACT_PERMS:
+        best_total, best = None, None
+        for perm in itertools.permutations(range(nc), nr):
+            total = 0
+            for r in range(nr):
+                total += cost[r][perm[r]]
+                if best_total is not None and total >= best_total:
+                    break                   # prune: non-negative costs only grow
+            else:
+                best_total, best = total, [(r, perm[r]) for r in range(nr)]
+        pairs = best or []                  # defensive: there is always >=1 perm
+    else:                                   # greedy: lowest-cost pair first
+        order = sorted((cost[r][c], r, c) for r in range(nr) for c in range(nc))
+        used_r, used_c, pairs = set(), set(), []
+        for _, r, c in order:
+            if r in used_r or c in used_c:
+                continue
+            used_r.add(r); used_c.add(c); pairs.append((r, c))
+            if len(pairs) == nr:
+                break
+    return [(c, r) for (r, c) in pairs] if flip else pairs
+
+
+def pair_occurrences_by_similarity(sc, rows_t, rows_n, keys_t, keys_n,
+                                   has_route, events=None):
+    """Re-number the occurrence component of DUPLICATE keys so that, within each
+    (route, key) group present on BOTH sides, rows pair by data SIMILARITY (the
+    most-alike rows share an occurrence #) instead of by file order. Matched
+    pairs are numbered 1.. in side-A file order; the larger side's leftovers get
+    higher, side-unique occurrence numbers (so they stay one-sided). Groups with
+    no duplicate, or a key on only one side, are untouched (occurrence # = file
+    order, exactly as before). Returns new (keys_t, keys_n)."""
+    off = 1 if has_route else 0
+    grp_t, grp_n = {}, {}
+    for i, k in enumerate(keys_t):
+        grp_t.setdefault((k[0], k[1]), []).append(i)
+    for i, k in enumerate(keys_n):
+        grp_n.setdefault((k[0], k[1]), []).append(i)
+
+    out_t, out_n = list(keys_t), list(keys_n)
+    capped = 0
+    for grp, tis in grp_t.items():
+        nis = grp_n.get(grp)
+        if not nis or (len(tis) == 1 and len(nis) == 1):
+            continue                        # key on one side only, or no duplicate
+        if len(tis) * len(nis) > _PAIR_GROUP_CAP:
+            capped += 1                     # absurd pile — keep file order
+            continue
+        cost = [[_row_diff_count(sc, rows_t[ti], rows_n[ni], off) for ni in nis]
+                for ti in tis]
+        pairs = _min_cost_pairs(cost)       # (a, b) indices into tis / nis
+        route, loc = grp
+        matched_t = {a for a, _ in pairs}
+        matched_n = {b for _, b in pairs}
+        occ = 0
+        for a, b in sorted(pairs, key=lambda ab: tis[ab[0]]):   # side-A file order
+            occ += 1
+            out_t[tis[a]] = (route, loc, occ)
+            out_n[nis[b]] = (route, loc, occ)
+        extra = occ
+        for a in range(len(tis)):           # unmatched side-A rows, file order
+            if a not in matched_t:
+                extra += 1
+                out_t[tis[a]] = (route, loc, extra)
+        extra = occ
+        for b in range(len(nis)):           # unmatched side-B rows, file order
+            if b not in matched_n:
+                extra += 1
+                out_n[nis[b]] = (route, loc, extra)
+    if capped and events is not None:
+        events.on_log(f"  Note: {capped} key group(s) repeat too many times to "
+                      "similarity-pair; kept file order for those.")
+    return out_t, out_n
 
 
 def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route):
@@ -1337,8 +1462,11 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=()):
         + ". The Comparison sheet still contains the same rows in document "
         "order.",
         "• Rows pair on " + ("Route plus " if lay.has_route else "")
-        + f"{sc.header[lay.key_field]} plus occurrence number (a {sc.pair_noun or noun} "
-        "listed twice pairs first-with-first, second-with-second).",
+        + f"{sc.header[lay.key_field]} plus occurrence number. When a "
+        f"{sc.pair_noun or noun} is listed more than once, the matching "
+        "instances are paired by which are MOST ALIKE (fewest differing "
+        "fields), not by the order they appear — so a repeat that matches the "
+        "other side's second listing isn't flagged as a difference.",
         f"• Leading/trailing spaces are ignored (TRIM){sc.trim_note_extra}.",
         f'• Lookups use the "Key (helper)" column ({lay.key_col}) on each '
         'data sheet: ' + ("Route, " if lay.has_route else "")
@@ -1483,6 +1611,11 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     lay = _Layout(sc, has_route)
     keys_t = keys_for(rows_t, has_route, sc.key_field)
     keys_n = keys_for(rows_n, has_route, sc.key_field)
+    # Pair duplicate keys by data similarity, not file order, so a row that
+    # actually matches the other side's SECOND instance isn't reported as a
+    # difference against its FIRST (can only remove phantom diffs, never add).
+    keys_t, keys_n = pair_occurrences_by_similarity(
+        sc, rows_t, rows_n, keys_t, keys_n, has_route, events)
     union = union_keys(keys_t, keys_n)
 
     # Excel hard limits: openpyxl would raise mid-write past the row cap (losing
