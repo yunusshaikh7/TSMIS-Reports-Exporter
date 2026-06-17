@@ -22,6 +22,7 @@ line and exits 0 (the predicates are still partly covered by
 check_export_engine.py, which needs no browser).
 """
 import sys
+import tempfile
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parent.parent
@@ -35,6 +36,7 @@ import export_ramp_summary as ramp_summary  # noqa: E402
 import export_ramp_detail as ramp_detail  # noqa: E402
 import export_highway_sequence as highway_sequence  # noqa: E402
 import export_highway_log as highway_log  # noqa: E402
+import export_highway_log_pdf as highway_log_pdf  # noqa: E402
 import export_intersection_detail as intersection_detail  # noqa: E402
 import export_intersection_summary as intersection_summary  # noqa: E402
 
@@ -116,6 +118,10 @@ _REPORTS = [
     (highway_sequence.SPEC, "Highway Sequence",
      "highway_sequence_data.html", "highway_sequence_empty.html"),
     (highway_log.SPEC, "Highway Log",
+     "highway_log_data.html", "highway_log_empty.html"),
+    # The PDF variant renders the SAME way (same dropdown option), so its
+    # wait_js/is_empty must resolve on the very same fixtures as the Excel one.
+    (highway_log_pdf.SPEC, "Highway Log (PDF)",
      "highway_log_data.html", "highway_log_empty.html"),
     (intersection_detail.SPEC, "Intersection Detail",
      "intersection_detail_data.html", "intersection_detail_empty.html"),
@@ -219,6 +225,37 @@ def test_cs_disabled(page):
     check("select_report does NOT block an enabled report", gate == "passed")
 
 
+def test_highway_log_pdf_save(page):
+    print("Highway Log PDF save: invokes the Print layout and writes a real PDF:")
+    from exporter import save_highway_log_pdf
+    from common import ReportError
+    page.goto(_fixture_url("highway_log_print.html"))
+    out = Path(tempfile.gettempdir()) / "_hl_pdf_check.pdf"
+    if out.exists():
+        out.unlink()
+    save_highway_log_pdf(page, out)
+    data = out.read_bytes() if out.exists() else b""
+    check("a non-empty PDF was written", data[:4] == b"%PDF" and len(data) > 800)
+    # The FULL multi-page print layout (not the single paginated page) is in the
+    # DOM after save -- proof window.print() was neutralized so hl_printAll's
+    # synchronous restore didn't run.
+    n = page.evaluate("() => document.querySelectorAll('#rampResults .hl-print-section').length")
+    check("the full multi-page print layout was built (restore skipped)", n >= 2)
+    if out.exists():
+        out.unlink()
+
+    # Fails LOUDLY (ReportError) when the site's Print function is gone, rather
+    # than silently saving the one paginated on-screen page.
+    page.goto(_fixture_url("blank.html"))      # no hl_printAll
+    raised = None
+    try:
+        save_highway_log_pdf(page, Path(tempfile.gettempdir()) / "_hl_pdf_none.pdf")
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("missing hl_printAll -> ReportError (no silent truncated PDF)",
+          isinstance(raised, ReportError))
+
+
 def main():
     print("Fake-site selector-contract checks")
     print(f"fixtures: {FIXTURES}")
@@ -236,6 +273,7 @@ def main():
             test_is_empty(page)
             test_error_js(page)
             test_cs_disabled(page)
+            test_highway_log_pdf_save(page)
         finally:
             try:
                 browser.close()

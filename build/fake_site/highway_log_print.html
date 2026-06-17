@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- Synthetic reconstruction of the Highway Log PRINT contract (not a copy of
+     the Caltrans source). Carries only what save_highway_log_pdf depends on:
+       * a GLOBAL hl_printAll() that injects the full multi-page layout
+         (.hl-print-section blocks) into #rampResults, calls window.print(),
+         then SYNCHRONOUSLY restores the paginated on-screen view, and
+       * an @media print rule that hides the controls and shows #rampResults,
+     exactly like the live page (highway_log.js hl_printAll + styles.css). -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  #controls { color: #333; }
+  .hl-table-wrap { color: #666; }
+  @media print {
+    #controls { display: none !important; }
+    #rampResults { display: block !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="controls">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="hl_exportToExcel()">Export</button>
+      <button class="export-btn" onclick="hl_printAll()">Print</button>
+    </div>
+  </div>
+
+  <!-- On screen this holds ONE paginated page of rows (what page.pdf would grab
+       without invoking the print layout). -->
+  <div id="rampResults" class="ramp-results">
+    <div class="hl-table-wrap">Page 1 of N (paginated on-screen view)</div>
+  </div>
+
+  <script>
+    function hl_exportToExcel() { /* no-op for the fixture */ }
+
+    function hl_printAll() {
+      const box = document.getElementById('rampResults');
+      const saved = box.innerHTML;
+      // The full report: a cover page + every page (with page breaks).
+      let html = '<div class="hl-cover-page">California State Highway Log</div>';
+      for (let i = 0; i < 3; i++) {
+        html += '<div class="hl-print-section' + (i ? ' hl-page-break' : '') + '">'
+              + '<div class="hl-print-page-header"><span>Route 005</span><span>Page '
+              + (i + 2) + '</span></div>'
+              + '<table class="hl-table"><tbody><tr><td>full report rows ' + i + '</td></tr></tbody></table>'
+              + '</div>';
+      }
+      box.innerHTML = html;
+      window.print();          // real hl_printAll restores AFTER this line...
+      box.innerHTML = saved;   // ...so an overridden window.print() that throws skips this
+    }
+  </script>
+</body>
+</html>

@@ -11,6 +11,7 @@ output/*
 !output/ramp_detail/
 !output/highway_sequence/
 !output/highway_log/
+!output/highway_log_pdf/
 !output/intersection_summary/
 !output/intersection_detail/
 !output/consolidated/
@@ -18,6 +19,7 @@ output/ramp_summary/*
 output/ramp_detail/*
 output/highway_sequence/*
 output/highway_log/*
+output/highway_log_pdf/*
 output/intersection_summary/*
 output/intersection_detail/*
 output/consolidated/*
@@ -25,6 +27,7 @@ output/consolidated/*
 !output/ramp_detail/.gitkeep
 !output/highway_sequence/.gitkeep
 !output/highway_log/.gitkeep
+!output/highway_log_pdf/.gitkeep
 !output/intersection_summary/.gitkeep
 !output/intersection_detail/.gitkeep
 !output/consolidated/.gitkeep

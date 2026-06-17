@@ -15,6 +15,7 @@ from export_ramp_summary import SPEC as _RAMP_SUMMARY_SPEC
 from export_ramp_detail import SPEC as _RAMP_DETAIL_SPEC
 from export_highway_sequence import SPEC as _HIGHWAY_SEQ_SPEC
 from export_highway_log import SPEC as _HIGHWAY_LOG_SPEC
+from export_highway_log_pdf import SPEC as _HIGHWAY_LOG_PDF_SPEC
 from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
 from export_intersection_detail import SPEC as _INT_DETAIL_SPEC
 
@@ -34,6 +35,10 @@ EXPORT_REPORTS = [
     ("TSAR: Ramp Detail", "Excel", _RAMP_DETAIL_SPEC),
     ("Highway Sequence Listing", "Excel", _HIGHWAY_SEQ_SPEC),
     ("Highway Log", "Excel", _HIGHWAY_LOG_SPEC),
+    # Same "Highway Log" dropdown option, saved as a PDF via the page's Print
+    # layout (hl_printAll) instead of the Excel Export button. Export-only (the
+    # consolidator reads the .xlsx export; no consolidation for the PDF).
+    ("Highway Log (PDF)", "PDF", _HIGHWAY_LOG_PDF_SPEC),
     # Export-only for now (no consolidation/comparison support yet). Labels
     # verified against the live page source: NO "TSAR:" prefix, and Summary
     # is an Excel export like Detail. The env check reads the dropdown for
