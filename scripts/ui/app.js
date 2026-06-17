@@ -657,6 +657,12 @@ function renderState() {
   $("btnStartExport").disabled = locked;
   $("btnStartCons").disabled = locked;
   $("btnSkip").disabled = !(st.task === "export" && !st.fast_run);
+  // B1: Pause works in fast mode too (every browser parks between routes),
+  // unlike Skip. The button toggles label + icon from the Python-owned state.
+  $("btnPause").disabled = st.task !== "export";
+  const pauseUse = $("btnPause").querySelector("use");
+  if (pauseUse) pauseUse.setAttribute("href", st.paused ? "#i-play" : "#i-pause");
+  $("btnPauseLabel").textContent = st.paused ? "Resume" : "Pause";
   $("btnCancelExport").disabled = st.task !== "export";
   $("btnCancelCons").disabled = st.task !== "consolidate";
   $("btnSaveReport").disabled = locked || !st.can_save_report;
@@ -1450,6 +1456,7 @@ function bindEvents() {
 
   $("btnStartExport").onclick = startExport;
   $("btnSkip").onclick = () => api.skip_route();
+  $("btnPause").onclick = () => api.pause_or_resume();
   $("btnCancelExport").onclick = () => api.cancel_run();
   $("btnSaveReport").onclick = saveRunReport;
 
@@ -2178,5 +2185,13 @@ function makeMockApi() {
     },
     open_release_page: async () => push({ t: "log", text: "(mock) would open the GitHub releases page" }),
     get_compare_folders: async () => ({ folders: (st.days || []) }),
+    pause_or_resume: async () => {
+      st.paused = !st.paused;
+      push({ t: "log", text: st.paused
+        ? "Paused — finishing the current route(s), then holding. Click Resume to continue."
+        : "Resumed." });
+      pushState();
+      return { ok: true };
+    },
   };
 }

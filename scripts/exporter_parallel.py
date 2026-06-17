@@ -67,6 +67,7 @@ from exporter import (
     _process_route,
     _record,
     _retry_failed_routes,
+    _wait_while_paused,
 )
 from paths import output_run_dir
 from run_report import auto_report_path, write_run_report
@@ -127,6 +128,7 @@ def _worker_events(real, stop, worker_no):
         on_status=real.on_status,
         screenshot_wanted=real.screenshot_wanted,
         on_screenshot=real.on_screenshot,
+        is_paused=real.is_paused,
         worker_no=worker_no,
     )
 
@@ -255,6 +257,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                     )
                     select_report(page, spec.label)         # arm this worker's form
                     while not stop.is_set():
+                        _wait_while_paused(events)       # B1: hold between routes
                         if events.is_cancelled():
                             stop.set()
                             break

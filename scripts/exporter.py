@@ -425,6 +425,7 @@ def _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms):
     if _recover_or_stop(page, spec, events):       # re-arm once; may raise AuthError
         total = len(to_retry)
         for i, route in enumerate(to_retry):
+            _wait_while_paused(events)            # B1: hold between routes
             if events.is_cancelled():
                 break
             prefix = f"[retry {i + 1}/{total}] Route {route}:"
@@ -445,6 +446,19 @@ def _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms):
             result.failed.append(route)
             _record(result, events, route, "failed")
     log.info("retry pass done: still failed=%s", result.failed or "none")
+
+
+_PAUSE_POLL_S = 0.2          # between-route pause poll cadence (B1)
+
+
+def _wait_while_paused(events):
+    """Hold here while the run is paused, returning the moment it resumes OR is
+    cancelled (so a cancel during a pause still stops cleanly). Pause is honored
+    only BETWEEN routes — never inside a Playwright wait (thread-affine) — so the
+    browser sits idle holding no download in flight. Works in fast mode too: the
+    shared is_paused() makes every worker park at this point between its routes."""
+    while events.is_paused() and not events.is_cancelled():
+        time.sleep(_PAUSE_POLL_S)
 
 
 def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeout_ms=None):
@@ -510,6 +524,7 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
             events.on_log("Ready. Starting export.")
 
             for i, route in enumerate(routes, 1):
+                _wait_while_paused(events)        # B1: hold between routes
                 if events.is_cancelled():
                     events.on_log("Cancelled by user.")
                     log.info("cancelled by user at route %s", route)

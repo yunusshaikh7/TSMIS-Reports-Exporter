@@ -52,6 +52,7 @@ jobs:
           set -e
           python build/check_gui_bridge.py
           python build/check_a2_compare_filter.py
+          python build/check_b1_pause.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py

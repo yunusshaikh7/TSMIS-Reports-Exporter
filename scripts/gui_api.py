@@ -160,6 +160,7 @@ class GuiApi:
         self._reset_token = None
         self.cancel_event = threading.Event()
         self.skip_event = threading.Event()
+        self.pause_event = threading.Event()     # B1: between-route hold
         self.login_done = threading.Event()
         self.login_cancel = threading.Event()
 
@@ -198,6 +199,7 @@ class GuiApi:
             return {
                 "task": self._task,
                 "fast_run": self._fast_run,
+                "paused": self.pause_event.is_set(),
                 "authed": self._authed,
                 "device_ok": self._device_ok,
                 "auth_dot": self._auth_dot,
@@ -465,6 +467,7 @@ class GuiApi:
             self._fast_run = False
             self._login_phase = None
             self._export_worker = None
+            self.pause_event.clear()      # never leak a paused state across runs
         self._refresh_auth()
         self._emit({"t": "run_ended"})
         self._push_state()
@@ -926,6 +929,7 @@ class GuiApi:
             self._fast_run = n_workers > 1
         self.cancel_event.clear()
         self.skip_event.clear()
+        self.pause_event.clear()
 
         names = ", ".join(s.label for s in specs)
         msg = f"Starting export: {names}"
@@ -942,7 +946,8 @@ class GuiApi:
                     "workers": n_workers})
         self._push_state()
         worker = ExportWorker(specs, self._q, self.cancel_event, self.skip_event,
-                              workers=n_workers, routes=run_routes)
+                              workers=n_workers, routes=run_routes,
+                              pause_event=self.pause_event)
         with self._lock:
             self._export_worker = worker
         worker.start()
@@ -976,10 +981,29 @@ class GuiApi:
         if self._task in ("export", "consolidate", "compare", "chromium",
                           "envscan", "reset"):
             self.cancel_event.set()
+            self.pause_event.clear()      # unblock a paused run so cancel lands
             self._emit_log("Cancel requested…")
         elif self._task == "envcheck":
             self._emit_log("The environment check can't be stopped partway — "
                            "it'll finish in a moment.")
+        return {"ok": True}
+
+    @_api_method
+    def pause_or_resume(self):
+        """Toggle a between-routes hold on the running export (B1). The current
+        route(s) finish, then the run holds until Resume. Unlike Skip, pause is
+        well-defined in fast mode (every browser parks before its next route), so
+        it works there too. No-op unless an export is running."""
+        if self._task != "export":
+            return {"error": "No export is running."}
+        if self.pause_event.is_set():
+            self.pause_event.clear()
+            self._emit_log("Resumed.")
+        else:
+            self.pause_event.set()
+            self._emit_log("Paused — finishing the current route(s), then holding. "
+                           "Click Resume to continue.")
+        self._push_state()
         return {"ok": True}
 
     # ---- login -----------------------------------------------------------------

@@ -145,13 +145,15 @@ class ExportWorker(threading.Thread):
     browsers are ever open at once. Posts ('export_done', [(spec, RunResult), ...])
     when all selected reports finish (the list is partial if cancelled)."""
 
-    def __init__(self, specs, queue, cancel_event, skip_event, workers=1, routes=None):
+    def __init__(self, specs, queue, cancel_event, skip_event, workers=1, routes=None,
+                 pause_event=None):
         super().__init__(daemon=True, name="export")
         # Accept a single spec or a list, so callers can't trip on the shape.
         self.specs = list(specs) if isinstance(specs, (list, tuple)) else [specs]
         self.q = queue
         self.cancel = cancel_event
         self.skip = skip_event
+        self.pause = pause_event or threading.Event()    # B1: between-route hold
         self.workers = workers              # >1 -> experimental parallel "fast mode"
         # None means "all routes"; otherwise the chosen subset. Stored as a
         # concrete list so the engine and the progress total agree.
@@ -221,6 +223,7 @@ class ExportWorker(threading.Thread):
             on_status=lambda w, t: self.q.put(("worker_status", (w, t))),
             screenshot_wanted=self._shot_wanted,
             on_screenshot=self._on_screenshot,
+            is_paused=self.pause.is_set,
         )
         results = []
         try:

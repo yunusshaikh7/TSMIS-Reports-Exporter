@@ -42,6 +42,10 @@ class Events:
                   {"saved", "empty", "skipped", "failed", "exists"}.
     should_skip:  return True to skip the route currently being waited on.
     is_cancelled: return True to stop the whole run before the next route.
+    is_paused:    return True to HOLD the run between routes (B1 pause/resume);
+                  the engine spins at the between-route point until it clears or
+                  the run is cancelled. Honored in fast mode too (all workers
+                  park between their routes).
 
     Live browser-status / preview seam (GUI status rows; the console flow
     leaves these as no-ops):
@@ -68,7 +72,7 @@ class Events:
 
     def __init__(self, on_log=None, on_route=None, should_skip=None, is_cancelled=None,
                  on_status=None, screenshot_wanted=None, on_screenshot=None,
-                 worker_no=1):
+                 is_paused=None, worker_no=1):
         self.on_log = on_log or _noop_log
         self.on_route = on_route or _noop_route
         self.should_skip = should_skip or _never
@@ -76,6 +80,7 @@ class Events:
         self.on_status = on_status or _noop_status
         self.screenshot_wanted = screenshot_wanted or _never_shot
         self.on_screenshot = on_screenshot or _noop_screenshot
+        self.is_paused = is_paused or _never
         self.worker_no = worker_no
 
 
