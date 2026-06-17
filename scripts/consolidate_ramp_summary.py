@@ -701,7 +701,8 @@ def build_workbook(records, out_path):
 # Entry point
 # =============================================================================
 
-def consolidate(events=None, confirm_overwrite=None, day=None):
+def consolidate(events=None, confirm_overwrite=None, day=None,
+                input_dir=None, out_path=None):
     """Parse every per-route Ramp Summary PDF into one audited workbook.
 
     Console-free: reports progress via events.on_log, asks before overwriting
@@ -720,8 +721,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
         )
     confirm = confirm_overwrite or (lambda _p: True)
     day = day or latest_output_day()
-    input_dir = input_dir_for(day)
-    out_path = out_path_for(day)
+    input_dir = input_dir or input_dir_for(day)
+    out_path = out_path or out_path_for(day)
 
     if not input_dir.exists():
         return ConsolidateResult(

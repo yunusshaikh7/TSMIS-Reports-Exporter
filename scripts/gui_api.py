@@ -40,6 +40,7 @@ import webview
 import run_report
 import settings
 import batch_manifest
+import report_library
 import updater
 from gui_worker import (BatchWorker, CheckWorker, ChromiumWorker,
                         ConsolidateWorker, EnvCheckWorker, EnvScanWorker,
@@ -757,6 +758,7 @@ class GuiApi:
             "fast": {"default": default_worker_count(), "max": MAX_WORKERS},
             "settings": self.get_settings(),
             "batch_resume": self._batch_resume,
+            "batch_dest": settings.get_batch_dest(),
             "state": self._state_snapshot(),
         }
 
@@ -1018,8 +1020,9 @@ class GuiApi:
         self.cancel_event.clear()
         self.skip_event.clear()
         self.pause_event.clear()
+        dest = settings.get_batch_dest()
         manifest = batch_manifest.build(specs_idx, combos, bool(fast), n_workers,
-                                        bool(auto_consolidate))
+                                        bool(auto_consolidate), dest=dest)
         batch_manifest.save(manifest)
         with self._lock:
             self._fast_run = n_workers > 1
@@ -1031,6 +1034,7 @@ class GuiApi:
         if auto_consolidate:
             msg += "   ·   auto-consolidate"
         self._emit_log(msg)
+        self._emit_log(f"  Destination: {dest}")
         self._set_dot("busy", "Export Everything…")
         self._emit({"t": "run_started", "mode": "batch", "label": "Working…",
                     "workers": n_workers})
@@ -1038,6 +1042,36 @@ class GuiApi:
         BatchWorker(manifest, self._q, self.cancel_event, self.skip_event,
                     self.pause_event).start()
         return {"ok": True}
+
+    @_api_method
+    def report_library_info(self):
+        """The always-current destination + per-report freshness, for the
+        Export Everything tab's library view (B3). Pure filesystem stat."""
+        dest = settings.get_batch_dest()
+        reports = [(label, spec.subdir) for label, _fmt, spec in EXPORT_REPORTS]
+        return {"dest": dest, "reports": report_library.report_ages(dest, reports)}
+
+    @_api_method
+    def set_batch_dest(self, path):
+        """Set (or, with an empty path, reset) the Export Everything destination."""
+        dest = settings.set_batch_dest(path)
+        self._emit_log(f"Export Everything destination: {dest}")
+        self._push_state()
+        return {"dest": dest}
+
+    @_api_method
+    def pick_batch_dest(self):
+        """Native folder dialog to choose the always-current destination."""
+        cur = settings.get_batch_dest()
+        start = cur if Path(cur).is_dir() else str(OUTPUT_ROOT)
+        picked = self._window.create_file_dialog(webview.FOLDER_DIALOG, directory=start)
+        if not picked:
+            return {"cancelled": True}
+        path = picked[0] if isinstance(picked, (list, tuple)) else picked
+        dest = settings.set_batch_dest(str(path))
+        self._emit_log(f"Export Everything destination: {dest}")
+        self._push_state()
+        return {"dest": dest}
 
     @_api_method
     def resume_batch(self):

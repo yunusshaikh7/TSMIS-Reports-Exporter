@@ -73,7 +73,8 @@ def test_runs_with_day_and_overwrite():
     seen = {}
 
     class FakeMod:
-        def consolidate(self, events=None, confirm_overwrite=None, day=None):
+        def consolidate(self, events=None, confirm_overwrite=None, day=None,
+                        input_dir=None, out_path=None):
             seen["day"] = day
             seen["overwrite"] = confirm_overwrite("x.xlsx")
             return ConsolidateResult(status="ok",
@@ -142,10 +143,42 @@ def test_skips_and_is_nonfatal():
         reports.consolidator_for_spec = orig
 
 
+def test_auto_consolidate_into_dest():
+    print("_auto_consolidate targets the always-current destination (out_base):")
+    seen = {}
+
+    class FakeMod:
+        FILENAME = "highway_log_consolidated.xlsx"
+
+        def consolidate(self, events=None, confirm_overwrite=None, day=None,
+                        input_dir=None, out_path=None):
+            seen.update(day=day, input_dir=str(input_dir), out_path=str(out_path))
+            return ConsolidateResult(status="ok", summary_lines=["ok"])
+
+    orig = reports.consolidator_for_spec
+    reports.consolidator_for_spec = lambda spec: FakeMod()
+    try:
+        w = gui_worker.ExportWorker([], queue_mod.Queue(), threading.Event(),
+                                    threading.Event(), auto_consolidate=True,
+                                    out_base="Z:/x/All Reports (current)/ssor-prod")
+        w._auto_consolidate(_FakeSpec("Highway Log", "highway_log"),
+                            RunResult(output_dir="", saved=2), Events())
+        norm = lambda s: (s or "").replace("\\", "/")
+        check("dest mode uses day=None", seen.get("day") is None)
+        check("input_dir = <dest>/<src-env>/<subdir>",
+              norm(seen.get("input_dir")).endswith("/ssor-prod/highway_log"))
+        check("out_path = <dest>/<src-env>/consolidated/<FILENAME>",
+              norm(seen.get("out_path")).endswith(
+                  "/ssor-prod/consolidated/highway_log_consolidated.xlsx"))
+    finally:
+        reports.consolidator_for_spec = orig
+
+
 def main():
     test_mapping()
     test_runs_with_day_and_overwrite()
     test_skips_and_is_nonfatal()
+    test_auto_consolidate_into_dest()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

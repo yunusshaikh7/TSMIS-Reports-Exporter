@@ -74,6 +74,7 @@ from common import (
     storage_state_is_portable, try_device_sso_login,
 )
 import batch_manifest
+from pathlib import Path
 from events import Events
 from exporter import run_export, _wait_while_paused
 from paths import (DOWNLOADED_BROWSERS_DIR, FAILURES_DIR, INPUT_ROOT,
@@ -147,7 +148,7 @@ class ExportWorker(threading.Thread):
     when all selected reports finish (the list is partial if cancelled)."""
 
     def __init__(self, specs, queue, cancel_event, skip_event, workers=1, routes=None,
-                 pause_event=None, auto_consolidate=False):
+                 pause_event=None, auto_consolidate=False, out_base=None):
         super().__init__(daemon=True, name="export")
         # Accept a single spec or a list, so callers can't trip on the shape.
         self.specs = list(specs) if isinstance(specs, (list, tuple)) else [specs]
@@ -156,6 +157,7 @@ class ExportWorker(threading.Thread):
         self.skip = skip_event
         self.pause = pause_event or threading.Event()    # B1: between-route hold
         self.auto_consolidate = bool(auto_consolidate)   # B2: combine after each
+        self.out_base = Path(out_base) if out_base else None   # B3: always-current dest base
         self.workers = workers              # >1 -> experimental parallel "fast mode"
         # None means "all routes"; otherwise the chosen subset. Stored as a
         # concrete list so the engine and the progress total agree.
@@ -213,12 +215,17 @@ class ExportWorker(threading.Thread):
             self.q.put(("log", f"  Auto-consolidate: nothing to combine for "
                                f"{spec.label} — skipped."))
             return
-        day = Path(result.output_dir).parent.name if result.output_dir else None
+        if self.out_base is not None:
+            day, input_dir = None, self.out_base / spec.subdir
+            out_path = self.out_base / "consolidated" / mod.FILENAME
+        else:
+            day = Path(result.output_dir).parent.name if result.output_dir else None
+            input_dir = out_path = None
         self.q.put(("log", ""))
         self.q.put(("log", f"Auto-consolidating {spec.label}…"))
         try:
-            res = mod.consolidate(events=events,
-                                  confirm_overwrite=lambda _p: True, day=day)
+            res = mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                  day=day, input_dir=input_dir, out_path=out_path)
             lines = res.summary_lines or ([res.message] if res.message else [])
             for line in lines:
                 self.q.put(("log", f"  {line}"))
@@ -285,12 +292,19 @@ class ExportWorker(threading.Thread):
                 "saved": 0, "empty": 0, "skipped": 0, "failed": 0, "exists": 0,
                 "report": spec.label, "report_i": i, "report_n": self._report_n,
             }))
+            # B3: when an always-current destination is set, write each report
+            # straight into <dest>/<src-env>/<subdir>, clearing it first so the
+            # run re-pulls fresh (a refresh, not a resume-skip).
+            out_dir = (self.out_base / spec.subdir) if self.out_base else None
+            if out_dir is not None:
+                import shutil
+                shutil.rmtree(out_dir, ignore_errors=True)
             if self.workers and self.workers > 1:
                 from exporter_parallel import run_export_parallel  # lazy
                 result = run_export_parallel(spec, events, workers=self.workers,
-                                             routes=self.routes)
+                                             routes=self.routes, out_dir=out_dir)
             else:
-                result = run_export(spec, events, routes=self.routes)
+                result = run_export(spec, events, routes=self.routes, out_dir=out_dir)
             results.append((spec, result))
             if self.auto_consolidate and not self.cancel.is_set():
                 self._auto_consolidate(spec, result, events)
@@ -363,6 +377,7 @@ class BatchWorker(threading.Thread):
         fast = self.manifest.get("fast", False)
         workers = self.manifest.get("workers", 1) if fast else 1
         auto = self.manifest.get("auto_consolidate", False)
+        dest = self.manifest.get("dest")
         pause_sink = Events(is_paused=self.pause.is_set,
                             is_cancelled=self.cancel.is_set)
         total = len(steps)
@@ -385,9 +400,11 @@ class BatchWorker(threading.Thread):
                 self.q.put(("log", ""))
                 self.q.put(("log", f"========== {src.upper()}-{env.upper()}  "
                                    f"({done + 1} of {total}) =========="))
+                out_base = (Path(dest) / f"{src}-{env}") if dest else None
                 ew = ExportWorker(specs, self.q, self.cancel, self.skip,
                                   workers=workers, routes=None,
-                                  pause_event=self.pause, auto_consolidate=auto)
+                                  pause_event=self.pause, auto_consolidate=auto,
+                                  out_base=out_base)
                 crashed = False
                 try:
                     ew._run_specs(ew._build_events(), [])

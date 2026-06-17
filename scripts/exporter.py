@@ -461,7 +461,8 @@ def _wait_while_paused(events):
         time.sleep(_PAUSE_POLL_S)
 
 
-def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeout_ms=None):
+def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeout_ms=None,
+               out_dir=None):
     """Export `spec` for every route. Console-free; returns a RunResult.
 
     Raises AuthError if the saved session is missing/expired, or PreflightError
@@ -493,7 +494,9 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     # yesterday's files AND different source/environment runs never mix —
     # the folder name says exactly which site the files came from.
     src, env = get_site()
-    out_dir = output_run_dir(src, env) / spec.subdir
+    # out_dir override (B3 "always-current" destination): write straight into the
+    # caller's folder instead of the dated run folder. Default = the dated layout.
+    out_dir = Path(out_dir) if out_dir else output_run_dir(src, env) / spec.subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     result = RunResult(output_dir=str(out_dir))
     total = len(routes)

@@ -515,6 +515,7 @@ function buildStatic() {
     $("batchEnvList").appendChild(row);
   }));
   updateBatchCount();
+  if (S.init.batch_dest) setBatchDest(S.init.batch_dest);
 
   // consolidate radios
   const cl = $("consList");
@@ -1005,7 +1006,7 @@ function dispatch(events) {
         case "wstatus": updateWorkerStatus(ev.w, ev.text); break;
         case "preview": showPreviewEvent(ev); break;
         case "run_started": startRunUi(ev.mode, ev.label, ev.workers); break;
-        case "run_ended": endRunUi(); break;
+        case "run_ended": endRunUi(); if (S.tab === "everything") renderBatchLibrary(); break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default: break;
       }
@@ -1115,9 +1116,10 @@ function renderBatchResume(resume) {
   el.append(msg, row);
 }
 
-async function startBatch() {
-  const reports = [...$("batchReportList").querySelectorAll("input")]
-    .filter((c) => c.checked).map((c) => +c.dataset.idx);
+async function startBatch(onlyReports) {
+  const reports = (onlyReports && onlyReports.length) ? onlyReports
+    : [...$("batchReportList").querySelectorAll("input")]
+        .filter((c) => c.checked).map((c) => +c.dataset.idx);
   if (!reports.length) {
     showMessage("info", "Pick a report type", "Tick at least one report type."); return;
   }
@@ -1141,6 +1143,58 @@ async function startBatch() {
   const auto = $("batchAutoConsolidate").checked;
   const res = await api.start_batch_export(reports, envs, fast, workers, auto);
   if (res && res.error) showMessage("error", "Could not start", res.error);
+}
+
+function fmtAge(s) {
+  if (s == null) return "";
+  const d = Math.floor(s / 86400), h = Math.floor(s / 3600), m = Math.floor(s / 60);
+  if (d >= 1) return `${d} day${d > 1 ? "s" : ""} ago`;
+  if (h >= 1) return `${h} hour${h > 1 ? "s" : ""} ago`;
+  if (m >= 1) return `${m} min ago`;
+  return "just now";
+}
+
+function setBatchDest(dest) {
+  const el = $("batchDest");
+  if (el && dest) { el.textContent = dest; el.title = dest; }
+}
+
+async function renderBatchLibrary() {
+  let info;
+  try { info = await api.report_library_info(); } catch (e) { return; }
+  if (!info) return;
+  setBatchDest(info.dest);
+  const lib = $("batchLibrary");
+  if (!lib) return;
+  const rows = info.reports || [];
+  const present = rows.filter((r) => r.present);
+  const freshest = present.length ? Math.min(...present.map((r) => r.age_seconds)) : 0;
+  const locked = !!(S.st && S.st.task);
+  lib.textContent = "";
+  rows.forEach((r, i) => {
+    const row = document.createElement("div");
+    row.className = "lib-row" + (r.present ? "" : " missing");
+    const name = document.createElement("span");
+    name.className = "lib-name"; name.textContent = r.label;
+    const age = document.createElement("span");
+    age.className = "lib-age";
+    if (!r.present) {
+      age.textContent = "never exported";
+    } else {
+      const stale = (r.age_seconds - freshest) > 2 * 86400 && r.age_seconds > 86400;
+      age.textContent = fmtAge(r.age_seconds) + (stale ? " · stale" : "");
+      if (stale) row.classList.add("stale");
+    }
+    const btn = document.createElement("button");
+    btn.className = "btn btn-subtle btn-sm";
+    btn.textContent = r.present ? "Refresh" : "Export";
+    btn.disabled = locked;
+    btn.onclick = () => startBatch([i]);
+    row.append(name, age, btn);
+    lib.appendChild(row);
+  });
+  const meta = $("batchLibMeta");
+  if (meta) meta.textContent = `${present.length} of ${rows.length} present`;
 }
 
 async function startConsolidate() {
@@ -1538,6 +1592,7 @@ function bindEvents() {
     });
     $("panelTitle").textContent = TABS[tab].title;
     $("panelSub").textContent = TABS[tab].sub;
+    if (tab === "everything") renderBatchLibrary();
   };
   Object.entries(TABS).forEach(([key, t]) => { $(t.btn).onclick = () => setTab(key); });
 
@@ -1575,9 +1630,13 @@ function bindEvents() {
   $("btnSkip").onclick = () => api.skip_route();
   $("btnPause").onclick = () => api.pause_or_resume();
   $("btnCancelExport").onclick = () => api.cancel_run();
-  $("btnStartBatch").onclick = startBatch;
+  $("btnStartBatch").onclick = () => startBatch();
   $("btnPauseBatch").onclick = () => api.pause_or_resume();
   $("btnCancelBatch").onclick = () => api.cancel_run();
+  $("btnPickBatchDest").onclick = async () => {
+    const r = await api.pick_batch_dest();
+    if (r && r.dest) { setBatchDest(r.dest); renderBatchLibrary(); }
+  };
   $("batchFast").onchange = () => { renderState(); };
   $("btnSaveReport").onclick = saveRunReport;
 
@@ -1971,6 +2030,7 @@ function makeMockApi() {
         { label: "Highway Log — between environments", kind: "folders" },
       ],
       batch_resume: null,
+      batch_dest: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
       routes: ROUTES,
       channels: [
         { id: "msedge", label: "Microsoft Edge", short: "Edge" },
@@ -2186,6 +2246,25 @@ function makeMockApi() {
       return { ok: true };
     },
     discard_batch: async () => { st.batch_resume = null; pushState(); return { ok: true }; },
+    report_library_info: async () => ({
+      dest: st.batch_dest || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
+      reports: [
+        { label: "TSAR: Ramp Summary", subdir: "ramp_summary", present: true, age_seconds: 2 * 3600 },
+        { label: "TSAR: Ramp Detail", subdir: "ramp_detail", present: true, age_seconds: 2 * 3600 },
+        { label: "Highway Sequence Listing", subdir: "highway_sequence", present: true, age_seconds: 3 * 3600 },
+        { label: "Highway Log", subdir: "highway_log", present: true, age_seconds: 6 * 86400 },
+        { label: "Intersection Summary", subdir: "intersection_summary", present: false, age_seconds: null },
+        { label: "Intersection Detail", subdir: "intersection_detail", present: false, age_seconds: null },
+      ],
+    }),
+    set_batch_dest: async (p) => {
+      st.batch_dest = p || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)";
+      pushState(); return { dest: st.batch_dest };
+    },
+    pick_batch_dest: async () => {
+      st.batch_dest = "C:\\Users\\you\\Desktop\\All Reports";
+      pushState(); return { dest: st.batch_dest };
+    },
     skip_route: async () => push({ t: "log", text: "Skip requested — will move on once the current wait ends." }),
     cancel_run: async () => {
       push({ t: "log", text: "Cancel requested…" });

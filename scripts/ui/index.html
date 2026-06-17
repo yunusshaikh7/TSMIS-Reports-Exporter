@@ -219,6 +219,24 @@
       <div class="card pane hidden" id="paneEverything">
         <div class="card-section" id="batchResume" hidden></div>
         <div class="card-section">
+          <div class="section-head"><span class="section-label">Destination</span></div>
+          <div class="dest-row">
+            <span class="dest-path" id="batchDest" title="">—</span>
+            <button class="btn btn-standard" id="btnPickBatchDest">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Change…
+            </button>
+          </div>
+          <p class="hint">Every refresh overwrites this folder, so it always holds the
+            latest of each report. Files land in &lt;destination&gt;/&lt;source-env&gt;/&lt;report&gt;/.</p>
+        </div>
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">Saved reports</span>
+            <span class="section-meta" id="batchLibMeta"></span>
+          </div>
+          <div class="lib-list" id="batchLibrary"></div>
+        </div>
+        <div class="card-section">
           <div class="section-head">
             <span class="section-label">Report types</span>
             <span class="section-meta" id="batchReportCount"></span>
@@ -254,7 +272,7 @@
         </div>
         <div class="card-section actions-row">
           <button class="btn btn-accent" id="btnStartBatch">
-            <svg class="ic"><use href="#i-play"/></svg>Start everything
+            <svg class="ic"><use href="#i-refresh"/></svg>Refresh everything
           </button>
           <button class="btn btn-subtle" id="btnPauseBatch" disabled>
             <svg class="ic"><use href="#i-pause"/></svg><span id="btnPauseBatchLabel">Pause</span>

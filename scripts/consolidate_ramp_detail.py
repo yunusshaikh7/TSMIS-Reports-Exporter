@@ -50,7 +50,8 @@ def out_path_for(day):
     return output_day_dir(day) / "consolidated" / stamped_consolidated_filename(FILENAME, day)
 
 
-def consolidate(events=None, confirm_overwrite=None, day=None):
+def consolidate(events=None, confirm_overwrite=None, day=None,
+                input_dir=None, out_path=None):
     """Combine every per-route Ramp Detail XLSX into one workbook.
 
     `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") to read; None means
@@ -58,7 +59,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
     folders exist yet."""
     day = day or latest_output_day()
     return consolidate_xlsx(
-        input_dir=input_dir_for(day), out_path=out_path_for(day),
+        input_dir=input_dir or input_dir_for(day),
+        out_path=out_path or out_path_for(day),
         sheet_name=SHEET_NAME, report_name=REPORT_NAME,
         title="TSAR Ramp Detail Consolidation",
         events=events, confirm_overwrite=confirm_overwrite,

@@ -69,6 +69,7 @@ from exporter import (
     _retry_failed_routes,
     _wait_while_paused,
 )
+from pathlib import Path
 from paths import output_run_dir
 from run_report import auto_report_path, write_run_report
 
@@ -175,7 +176,7 @@ def _retry_failed_sequential(spec, events, result, out_dir, timeout_ms):
 
 
 def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
-                        timeout_ms=None, retry_timeout_ms=None):
+                        timeout_ms=None, retry_timeout_ms=None, out_dir=None):
     """Export `spec` for every route using several concurrent browsers.
 
     A drop-in alternative to exporter.run_export with the same contract: returns
@@ -207,7 +208,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
 
     src, env = get_site()
-    out_dir = output_run_dir(src, env) / spec.subdir   # env-labeled run folder, like the sequential engine
+    out_dir = Path(out_dir) if out_dir else output_run_dir(src, env) / spec.subdir   # default: env-labeled run folder
     out_dir.mkdir(parents=True, exist_ok=True)
     total = len(routes)
     n = min(n, total) or 1

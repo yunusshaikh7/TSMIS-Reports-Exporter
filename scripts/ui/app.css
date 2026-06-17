@@ -285,13 +285,13 @@ button, input, select { font-family: inherit; }
 .tabs {
   display: flex; gap: 4px;
   background: var(--secondary); border-radius: var(--radius-lg); padding: 4px;
-  width: 384px; max-width: 100%; flex-shrink: 0;
+  width: 100%; max-width: 560px; flex-shrink: 0;
 }
 .tab.tab-icon { flex: 0 0 auto; padding: 6px 10px; }
 .tab {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
-  border: none; border-radius: var(--radius-md);
-  padding: 6px 12px; font-size: 13px; font-weight: 600;
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: none; border-radius: var(--radius-md); white-space: nowrap;
+  padding: 6px 10px; font-size: 12.5px; font-weight: 600;
   background: transparent; color: var(--muted-foreground);
   cursor: pointer; transition: color 0.1s, background-color 0.1s;
 }
@@ -393,6 +393,26 @@ button, input, select { font-family: inherit; }
 .fast-workers { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
 
 .actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* B3 Export Everything: destination + saved-reports library */
+.dest-row { display: flex; align-items: center; gap: 10px; }
+.dest-path {
+  flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px;
+  color: var(--foreground); background: var(--muted);
+  border: 1px solid var(--input-border); border-radius: var(--radius-md);
+  padding: 7px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lib-list { display: flex; flex-direction: column; }
+.lib-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 2px; border-top: 1px solid var(--border); font-size: 13px;
+}
+.lib-row:first-child { border-top: none; }
+.lib-name { flex: 1; min-width: 0; }
+.lib-age { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
+.lib-row.stale .lib-age { color: var(--warning); font-weight: 600; }
+.lib-row.missing .lib-age { font-style: italic; }
+.btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
 
 .day-row { display: flex; align-items: center; gap: 10px; }
 .day-row select { min-width: 150px; height: 34px; font-size: 13px; }

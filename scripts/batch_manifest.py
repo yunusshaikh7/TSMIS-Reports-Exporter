@@ -22,15 +22,17 @@ MANIFEST_PATH = DATA_ROOT / "batch_job.json"
 _VERSION = 1
 
 
-def build(report_idxs, combos, fast, workers, auto_consolidate, created=""):
+def build(report_idxs, combos, fast, workers, auto_consolidate, dest="", created=""):
     """A fresh manifest: which reports, which (src, env) combos (all 'pending'),
-    and the run options. `combos` is an iterable of (src, env) pairs."""
+    the destination folder, and the run options. `combos` is an iterable of
+    (src, env) pairs; `dest` is the always-current folder to refresh into."""
     return {
         "version": _VERSION,
         "reports": [int(i) for i in report_idxs],
         "fast": bool(fast),
         "workers": int(workers),
         "auto_consolidate": bool(auto_consolidate),
+        "dest": dest or "",
         "created": created,
         "steps": [{"src": s, "env": e, "status": "pending"} for (s, e) in combos],
     }

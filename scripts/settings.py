@@ -26,7 +26,7 @@ import os
 import tempfile
 from urllib.parse import parse_qs, urlsplit
 
-from paths import CONFIG_FILE
+from paths import CONFIG_FILE, OUTPUT_ROOT
 
 log = logging.getLogger("tsmis.settings")
 
@@ -280,6 +280,50 @@ def set_site_url(src, env, url):
     _cache, _cache_mtime = None, None
     log.info("settings: site url %s -> %s", key, url or "(default)")
     return all_site_urls()
+
+
+# ---- Export Everything destination (B3) -------------------------------------
+# The always-current folder Export Everything refreshes into (a single string
+# path under the "batch_dest" key). Empty/unset -> the default below. A plain
+# local folder path the user picks from a dialog, so it isn't URL-validated.
+
+def default_batch_dest():
+    return str(OUTPUT_ROOT / "All Reports (current)")
+
+
+def get_batch_dest():
+    """The configured Export-Everything destination, or the default folder."""
+    raw = _read_file().get("batch_dest")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return default_batch_dest()
+
+
+def set_batch_dest(path):
+    """Save (or, with an empty path, reset to default) the Export-Everything
+    destination. Returns the new effective destination."""
+    global _cache, _cache_mtime
+    path = (path or "").strip()
+    data = dict(_read_file())
+    if path:
+        data["batch_dest"] = path
+    else:
+        data.pop("batch_dest", None)
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp, CONFIG_FILE)
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    _cache, _cache_mtime = None, None
+    log.info("settings: batch_dest -> %s", path or "(default)")
+    return get_batch_dest()
 
 
 def reset():
