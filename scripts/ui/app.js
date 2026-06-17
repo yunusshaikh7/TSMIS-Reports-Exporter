@@ -478,6 +478,44 @@ function buildStatic() {
   });
   updateReportCount();
 
+  // B3: Export Everything — report-type + environment checklists (all ticked).
+  init.reports.forEach((rep, i) => {
+    const row = document.createElement("label");
+    row.className = "option-row checked";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = true; cb.dataset.idx = i;
+    const box = document.createElement("span");
+    box.className = "checkbox"; box.appendChild(icon("i-check"));
+    const name = document.createElement("span");
+    name.className = "option-name"; name.textContent = rep.label;
+    const chip = document.createElement("span");
+    chip.className = "chip " + (rep.fmt === "PDF" ? "chip-pdf" : "chip-excel");
+    chip.textContent = rep.fmt;
+    row.append(cb, box, name, chip);
+    cb.addEventListener("change", () => {
+      row.classList.toggle("checked", cb.checked);
+      updateBatchCount();
+    });
+    $("batchReportList").appendChild(row);
+  });
+  (init.sources || []).forEach((s) => (init.envs || []).forEach((e) => {
+    const row = document.createElement("label");
+    row.className = "option-row checked";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = true; cb.dataset.key = `${s.id}-${e.id}`;
+    const box = document.createElement("span");
+    box.className = "checkbox"; box.appendChild(icon("i-check"));
+    const name = document.createElement("span");
+    name.className = "option-name"; name.textContent = `${s.label} / ${e.label}`;
+    row.append(cb, box, name);
+    cb.addEventListener("change", () => {
+      row.classList.toggle("checked", cb.checked);
+      updateBatchCount();
+    });
+    $("batchEnvList").appendChild(row);
+  }));
+  updateBatchCount();
+
   // consolidate radios
   const cl = $("consList");
   init.cons_reports.forEach((label, i) => {
@@ -666,6 +704,25 @@ function renderState() {
   $("btnCancelExport").disabled = st.task !== "export";
   $("btnCancelCons").disabled = st.task !== "consolidate";
   $("btnSaveReport").disabled = locked || !st.can_save_report;
+
+  // B3: Export Everything pane
+  $("btnStartBatch").disabled = locked;
+  $("btnPauseBatch").disabled = st.task !== "batch";
+  const pbUse = $("btnPauseBatch").querySelector("use");
+  if (pbUse) pbUse.setAttribute("href", st.paused ? "#i-play" : "#i-pause");
+  $("btnPauseBatchLabel").textContent = st.paused ? "Resume" : "Pause";
+  $("btnCancelBatch").disabled = st.task !== "batch";
+  $("batchReportList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+  $("batchEnvList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+  $("batchFast").disabled = locked;
+  $("batchWorkers").disabled = locked || !$("batchFast").checked;
+  $("batchAutoConsolidate").disabled = locked;
+  renderBatchResume(st.batch_resume);
+  const bp = $("batchProgress");
+  if (st.batch && st.batch.total) {
+    bp.hidden = false;
+    bp.textContent = `Environment ${(st.batch.done || 0) + 1} of ${st.batch.total}: ${st.batch.label || ""}`;
+  } else { bp.hidden = true; }
   ["btnPickTsmis", "btnPickTsn", "btnPickDirA", "btnPickDirB",
    "cmpDirA", "cmpDirB", "btnOpenConsInput"].forEach((id) => { $(id).disabled = locked; });
   ["compareList", "cmpOutList"].forEach((id) => {
@@ -884,7 +941,7 @@ function renderProgress(p) {
 
 function startRunUi(mode, label, workers) {
   S.runMode = mode;
-  buildWorkerStrip(mode === "export" ? (workers || 1) : 0);
+  buildWorkerStrip(mode === "export" || mode === "batch" ? (workers || 1) : 0);
   S.elapsedStart = Date.now();
   $("progressElapsed").classList.remove("hidden");
   $("progressElapsed").textContent = "00:00";
@@ -1026,6 +1083,63 @@ async function startExport() {
   const workers = fast ? parseInt($("fastWorkers").value, 10) || S.init.fast.default : 1;
   const autoConsolidate = $("autoConsolidate").checked;
   const res = await api.start_export(reports, raw, fast, workers, autoConsolidate);
+  if (res && res.error) showMessage("error", "Could not start", res.error);
+}
+
+// ---- Export Everything (B3) ----
+function updateBatchCount() {
+  const r = [...$("batchReportList").querySelectorAll("input")].filter((c) => c.checked).length;
+  const e = [...$("batchEnvList").querySelectorAll("input")].filter((c) => c.checked).length;
+  const el = $("batchReportCount");
+  if (el) el.textContent = `${r} report type(s) × ${e} env(s)`;
+}
+
+function renderBatchResume(resume) {
+  const el = $("batchResume");
+  if (!el) return;
+  if (!resume || !resume.pending) { el.hidden = true; el.textContent = ""; return; }
+  el.hidden = false; el.textContent = "";
+  const msg = document.createElement("p");
+  msg.className = "hint";
+  msg.textContent = `An unfinished Export Everything batch has ${resume.pending} of ${resume.total} environment(s) left.`;
+  const row = document.createElement("div");
+  row.className = "actions-row";
+  const locked = !!(S.st && S.st.task);
+  const rb = document.createElement("button");
+  rb.className = "btn btn-accent"; rb.textContent = "Resume batch";
+  rb.disabled = locked; rb.onclick = () => api.resume_batch();
+  const db = document.createElement("button");
+  db.className = "btn btn-subtle"; db.textContent = "Discard";
+  db.disabled = locked; db.onclick = () => api.discard_batch();
+  row.append(rb, db);
+  el.append(msg, row);
+}
+
+async function startBatch() {
+  const reports = [...$("batchReportList").querySelectorAll("input")]
+    .filter((c) => c.checked).map((c) => +c.dataset.idx);
+  if (!reports.length) {
+    showMessage("info", "Pick a report type", "Tick at least one report type."); return;
+  }
+  const envs = [...$("batchEnvList").querySelectorAll("input")]
+    .filter((c) => c.checked).map((c) => c.dataset.key);
+  if (!envs.length) {
+    showMessage("info", "Pick an environment", "Tick at least one environment."); return;
+  }
+  const st = S.st;
+  if (!st.authed && !st.device_ok) {
+    const go = await showConfirm({
+      title: "No saved login",
+      message: "There's no saved login yet.\n\nStart anyway? On Caltrans PCs it can sign in "
+        + "automatically using Microsoft Edge and this PC's Windows account.",
+      confirmLabel: "Start anyway",
+    });
+    if (!go) return;
+  }
+  const fast = $("batchFast").checked;
+  const workers = fast ? parseInt($("batchWorkers").value, 10) || S.init.fast.default : 1;
+  const auto = $("batchAutoConsolidate").checked;
+  const res = await api.start_batch_export(reports, envs, fast, workers, auto);
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 
@@ -1410,6 +1524,8 @@ function bindEvents() {
                    sub: "Merge per-route files into a single workbook." },
     compare: { btn: "tabCompare", pane: "paneCompare", title: "Compare reports",
                sub: "Build a discrepancy workbook from two report sources." },
+    everything: { btn: "tabEverything", pane: "paneEverything", title: "Export everything",
+                  sub: "Export selected report types across selected environments." },
     settings: { btn: "tabSettings", pane: "paneSettings", title: "Settings",
                 sub: "Reliability, debugging and storage options." },
   };
@@ -1459,6 +1575,10 @@ function bindEvents() {
   $("btnSkip").onclick = () => api.skip_route();
   $("btnPause").onclick = () => api.pause_or_resume();
   $("btnCancelExport").onclick = () => api.cancel_run();
+  $("btnStartBatch").onclick = startBatch;
+  $("btnPauseBatch").onclick = () => api.pause_or_resume();
+  $("btnCancelBatch").onclick = () => api.cancel_run();
+  $("batchFast").onchange = () => { renderState(); };
   $("btnSaveReport").onclick = saveRunReport;
 
   $("selDay").onchange = refreshConsDest;
@@ -1799,6 +1919,43 @@ function makeMockApi() {
     }, fast ? 120 : 350);
   }
 
+  function runMockBatch(reports, envs, fast, workers, auto) {
+    st.task = "batch"; st.fast_run = fast; st.auth_dot = "busy";
+    st.auth_text = "Export Everything…"; st.batch_resume = null;
+    pushState();
+    push({ t: "log", text: `Starting Export Everything: ${reports.length} report type(s) `
+            + `across ${envs.length} environment(s)`
+            + (fast ? `   ·   FAST MODE (${workers} browsers)` : "")
+            + (auto ? "   ·   auto-consolidate" : "") },
+         { t: "run_started", mode: "batch", label: "Working…", workers: fast ? workers : 1 });
+    let i = 0;
+    const step = () => {
+      if (i >= envs.length) {
+        push({ t: "log", text: "" },
+             { t: "log", text: `Export Everything finished — all ${envs.length} environment(s) done.` },
+             { t: "run_ended" });
+        st.task = null; st.fast_run = false; st.batch = null; st.batch_resume = null;
+        st.auth_dot = st.authed ? "ok" : "bad";
+        st.auth_text = st.authed ? "Session ready" : "No saved login — click Log in";
+        pushState();
+        return;
+      }
+      const key = envs[i];
+      st.batch = { label: key.toUpperCase(), done: i, total: envs.length };
+      pushState();
+      push({ t: "log", text: "" },
+           { t: "log", text: `========== ${key.toUpperCase()}  (${i + 1} of ${envs.length}) ==========` });
+      reports.forEach((r) => push({ t: "log",
+        text: `  ${REPORTS[r].label}: exported${auto && r < 4 ? ", consolidated" : ""}` }));
+      push({ t: "progress", p: { done: 32, total: 32, route: "—", report: REPORTS[reports[0]].label,
+        report_i: reports.length, report_n: reports.length,
+        saved: 28, empty: 1, skipped: 2, failed: 1, exists: 0 } });
+      i++;
+      timer = setTimeout(step, 700);
+    };
+    timer = setTimeout(step, 400);
+  }
+
   return {
     get_initial_state: async () => ({
       app_name: "TSMIS Exporter", version: "0.11.0 (preview)",
@@ -1813,6 +1970,7 @@ function makeMockApi() {
         { label: "Highway Sequence Listing — between environments", kind: "folders" },
         { label: "Highway Log — between environments", kind: "folders" },
       ],
+      batch_resume: null,
       routes: ROUTES,
       channels: [
         { id: "msedge", label: "Microsoft Edge", short: "Edge" },
@@ -2015,6 +2173,19 @@ function makeMockApi() {
       runMockExport(reports, routes, fast, workers, autoConsolidate);
       return { ok: true };
     },
+    start_batch_export: async (reports, envs, fast, workers, auto) => {
+      runMockBatch(reports, envs, fast, workers, auto);
+      return { ok: true };
+    },
+    resume_batch: async () => {
+      const r = st.batch_resume || { pending: 1, reports: [] };
+      st.batch_resume = null;
+      const reps = (r.reports && r.reports.length) ? r.reports : [0, 1, 2, 3];
+      const envs = Array.from({ length: r.pending || 1 }, (_, i) => `env-${i + 1}`);
+      runMockBatch(reps, envs, false, 1, true);
+      return { ok: true };
+    },
+    discard_batch: async () => { st.batch_resume = null; pushState(); return { ok: true }; },
     skip_route: async () => push({ t: "log", text: "Skip requested — will move on once the current wait ends." }),
     cancel_run: async () => {
       push({ t: "log", text: "Cancel requested…" });
@@ -2022,6 +2193,11 @@ function makeMockApi() {
         if (timer) { clearInterval(timer); timer = null; }
         push({ t: "log", text: "Cancelled." }, { t: "run_ended" });
         st.task = null; st.fast_run = false;
+        if (st.batch) {
+          st.batch_resume = { reports: [], total: st.batch.total,
+                              pending: Math.max(1, st.batch.total - st.batch.done) };
+          st.batch = null;
+        }
         st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Idle";
         pushState();
       }, 700);

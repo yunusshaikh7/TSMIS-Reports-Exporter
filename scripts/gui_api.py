@@ -1139,8 +1139,9 @@ class GuiApi:
         """Toggle a between-routes hold on the running export (B1). The current
         route(s) finish, then the run holds until Resume. Unlike Skip, pause is
         well-defined in fast mode (every browser parks before its next route), so
-        it works there too. No-op unless an export is running."""
-        if self._task != "export":
+        it works there too. Also pauses an Export Everything batch (between
+        routes, and between environments). No-op unless one is running."""
+        if self._task not in ("export", "batch"):
             return {"error": "No export is running."}
         if self.pause_event.is_set():
             self.pause_event.clear()

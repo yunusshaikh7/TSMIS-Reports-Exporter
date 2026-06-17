@@ -138,6 +138,9 @@
           <button class="tab" id="tabCompare" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-compare"/></svg>Compare
           </button>
+          <button class="tab" id="tabEverything" role="tab" aria-selected="false">
+            <svg class="ic"><use href="#i-zap"/></svg>Everything
+          </button>
           <button class="tab tab-icon" id="tabSettings" role="tab" aria-selected="false" title="Settings">
             <svg class="ic"><use href="#i-settings"/></svg>
           </button>
@@ -209,6 +212,58 @@
           <button class="btn btn-subtle" id="btnSaveReport" disabled>
             <svg class="ic"><use href="#i-save"/></svg>Save run report…
           </button>
+        </div>
+      </div>
+
+      <!-- Export Everything pane (B3) -->
+      <div class="card pane hidden" id="paneEverything">
+        <div class="card-section" id="batchResume" hidden></div>
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">Report types</span>
+            <span class="section-meta" id="batchReportCount"></span>
+          </div>
+          <div class="option-list" id="batchReportList"></div>
+        </div>
+        <div class="card-section">
+          <div class="section-head"><span class="section-label">Environments</span></div>
+          <div class="option-list" id="batchEnvList"></div>
+        </div>
+        <div class="card-section">
+          <div class="fast-row">
+            <label class="fast-toggle">
+              <input type="checkbox" id="batchFast" hidden>
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <svg class="ic zap"><use href="#i-zap"/></svg>
+              <span class="fast-label">Fast mode <span class="muted">(experimental)</span></span>
+            </label>
+            <div class="fast-workers">
+              <span class="muted">run</span>
+              <input type="number" class="input input-num" id="batchWorkers" min="2" value="3">
+              <span class="muted">browsers at once</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-section">
+          <label class="fast-toggle">
+            <input type="checkbox" id="batchAutoConsolidate" hidden checked>
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="fast-label">Consolidate each report when its export finishes</span>
+          </label>
+          <p class="hint">Exports every ticked report type for every ticked environment, one after another, into its dated run folder. The job is saved to disk, so you can pause and pick up later — even after closing the app.</p>
+        </div>
+        <div class="card-section actions-row">
+          <button class="btn btn-accent" id="btnStartBatch">
+            <svg class="ic"><use href="#i-play"/></svg>Start everything
+          </button>
+          <button class="btn btn-subtle" id="btnPauseBatch" disabled>
+            <svg class="ic"><use href="#i-pause"/></svg><span id="btnPauseBatchLabel">Pause</span>
+          </button>
+          <button class="btn btn-subtle" id="btnCancelBatch" disabled>
+            <svg class="ic"><use href="#i-x"/></svg>Cancel
+          </button>
+          <span class="spacer"></span>
+          <span class="hint" id="batchProgress" hidden></span>
         </div>
       </div>
 

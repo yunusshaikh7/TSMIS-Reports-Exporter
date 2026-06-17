@@ -83,6 +83,15 @@ def test_gui_api_pause_toggle():
     check("second toggle resumes", not a.pause_event.is_set())
     check("snapshot reports paused=False", a._state_snapshot()["paused"] is False)
 
+    # Pause also covers an Export Everything batch (B3).
+    a._task = "batch"
+    a.pause_event.clear()
+    a.pause_or_resume()
+    check("a batch can be paused", a.pause_event.is_set())
+    a.pause_or_resume()
+    check("a batch can be resumed", not a.pause_event.is_set())
+    a._task = "export"
+
     # Cancel while paused clears the hold so the worker unblocks and stops.
     a.pause_event.set()
     a.cancel_run()
