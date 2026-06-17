@@ -128,6 +128,21 @@ button, input, select { font-family: inherit; }
   .col { min-height: 0; }
   .col-config { overflow-y: auto; padding-right: 2px; }
   .col-activity .log-card { flex: 1; min-height: 160px; }
+
+  /* The config column scrolls internally on wide windows. Pin the tabs to the
+     top and the primary action bar to the bottom so the pane body scrolls
+     BETWEEN them — the Start button is never scrolled off-screen / "cut off". */
+  .col-config .panel-head {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--background); padding-bottom: 8px;
+  }
+  .col-config .pane .actions-row {
+    position: sticky; bottom: 0; z-index: 1;
+    background: var(--card); border-top: 1px solid var(--border);
+    border-bottom-left-radius: var(--radius-xl);
+    border-bottom-right-radius: var(--radius-xl);
+    box-shadow: 0 -4px 10px -8px oklch(0 0 0 / 0.18);
+  }
 }
 
 /* ------------------------------ title bar -------------------------------- */
