@@ -70,6 +70,11 @@ spike/
 /config.json
 /data/config.json
 
+# Export-Everything batch manifest (B3; paths.DATA_ROOT/batch_job.json — dev:
+# repo root, packaged app: data\batch_job.json). Local run state, never committed.
+/batch_job.json
+/data/batch_job.json
+
 # Local scratch area for code-review audit runs. The reusable prompt is the
 # tracked CODE-REVIEW-PROMPT.md at repo root; per-run reports quote code +
 # internal detail, so they stay local (never committed).
