@@ -14,6 +14,29 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Export Everything — one always-current set of reports (0.12.0).** A new
+  **Everything** tab exports the report types you tick across the environments you
+  tick into a single folder you choose (default **All Reports (current)**). Re-run
+  it any time to refresh: it overwrites that folder in place, so it always holds
+  the latest of every report. A **Saved reports** list shows how old each report
+  is and flags any that are lagging behind the rest, with a one-click **Refresh**
+  for just that report — plus pause/resume and resume-after-restart for the long
+  full runs.
+- **Pause / Resume a running export (0.12.0).** A new **Pause** button holds the
+  run between routes and **Resume** picks it back up — separate from Skip (one
+  route) and Cancel (stop the run). Works in fast mode too.
+- **Auto-consolidate when an export finishes (0.12.0).** An optional checkbox
+  builds the combined workbook automatically right after the export, so the
+  Consolidate step happens for you.
+- **Self-describing filenames (0.12.0).** Consolidated and comparison files now
+  carry the date + source/environment in the filename, so a file copied out of
+  its folder still says exactly which run it came from.
+- **Compare tab lists only relevant folders (0.12.0).** The cross-environment
+  folder pickers now show only export runs that actually contain the report type
+  you picked, instead of every run folder.
+- **Buttons never cut off (0.12.0).** The Start / Pause / Cancel bar stays pinned
+  and visible while the report list scrolls, and the tab row no longer crowds.
+
 - **Flawless TSN Highway Log conversion (0.11.1).** The TSN district-PDF → Excel
   converter now transcribes feature descriptions perfectly across all 12
   districts — totals-block footer text and page furniture can no longer leak into
