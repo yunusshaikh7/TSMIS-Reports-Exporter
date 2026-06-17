@@ -121,6 +121,22 @@ def stamped_consolidated_filename(filename, day):
     return f"{stem} {day}.{ext}"
 
 
+def env_tagged_filename(filename, tag):
+    """Prefix an Export-Everything output filename with its source-environment
+    tag (the always-current store's '<dest>/<src-env>/…' subfolder name), so a
+    file lifted out of the store still says, by name, which environment produced
+    it: 'ssor-prod' + 'tsar_ramp_detail_route_5.xlsx' ->
+    'ssor-prod tsar_ramp_detail_route_5.xlsx'. The tag goes in FRONT, NOT before
+    the extension, on purpose: the consolidators discover inputs with a '*.xlsx'/
+    '*.pdf' glob and pull the route out with '_route_(\\w+)\\.xlsx$' anchored at
+    the end — a trailing tag would break that match, a leading one can't. An
+    empty/None tag returns the name unchanged (the normal dated run folders are
+    already self-labeling by their path, so only the Everything store stamps)."""
+    if not tag:
+        return filename
+    return f"{tag} {filename}"
+
+
 def output_day_dir(day=None):
     """output/<day>/ — `day` is a run-folder name (or a legacy bare date);
     None means today's bare date. Kept for the consolidators, which treat the

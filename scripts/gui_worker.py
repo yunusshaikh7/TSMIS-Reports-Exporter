@@ -74,11 +74,12 @@ from common import (
     storage_state_is_portable, try_device_sso_login,
 )
 import batch_manifest
+import dataclasses
 from pathlib import Path
 from events import Events
 from exporter import run_export, _wait_while_paused
 from paths import (DOWNLOADED_BROWSERS_DIR, FAILURES_DIR, INPUT_ROOT,
-                   OUTPUT_ROOT, parse_run_folder)
+                   OUTPUT_ROOT, env_tagged_filename, parse_run_folder)
 
 log = logging.getLogger("tsmis.gui")
 
@@ -216,8 +217,14 @@ class ExportWorker(threading.Thread):
                                f"{spec.label} — skipped."))
             return
         if self.out_base is not None:
+            # The per-route files in input_dir carry an "<src-env> " name prefix
+            # (env_tagged_filename) — fine for the consolidators, which discover
+            # inputs by '*.xlsx'/'*.pdf' glob and pull the route from the END of
+            # the name (or, for Ramp Summary, from the PDF text). The combined
+            # workbook gets the same prefix so it self-labels in the store too.
             day, input_dir = None, self.out_base / spec.subdir
-            out_path = self.out_base / "consolidated" / mod.FILENAME
+            out_path = (self.out_base / "consolidated"
+                        / env_tagged_filename(mod.FILENAME, self.out_base.name))
         else:
             day = Path(result.output_dir).parent.name if result.output_dir else None
             input_dir = out_path = None
@@ -299,12 +306,25 @@ class ExportWorker(threading.Thread):
             if out_dir is not None:
                 import shutil
                 shutil.rmtree(out_dir, ignore_errors=True)
+            # B3: in the always-current store, prefix every output file with the
+            # src-env tag (the dest's <src-env> subfolder name) so a file lifted
+            # out still says which environment it came from. Wrapping spec.filename
+            # covers the sequential + parallel engines AND both retry passes in one
+            # place — they all name files via spec.filename(route). The original
+            # spec (label/subdir, consolidator mapping) is kept for results/auto-
+            # consolidate; only the per-route NAME changes.
+            run_spec = spec
+            if self.out_base is not None:
+                tag = self.out_base.name
+                run_spec = dataclasses.replace(
+                    spec,
+                    filename=lambda r, _f=spec.filename, _t=tag: env_tagged_filename(_f(r), _t))
             if self.workers and self.workers > 1:
                 from exporter_parallel import run_export_parallel  # lazy
-                result = run_export_parallel(spec, events, workers=self.workers,
+                result = run_export_parallel(run_spec, events, workers=self.workers,
                                              routes=self.routes, out_dir=out_dir)
             else:
-                result = run_export(spec, events, routes=self.routes, out_dir=out_dir)
+                result = run_export(run_spec, events, routes=self.routes, out_dir=out_dir)
             results.append((spec, result))
             if self.auto_consolidate and not self.cancel.is_set():
                 self._auto_consolidate(spec, result, events)

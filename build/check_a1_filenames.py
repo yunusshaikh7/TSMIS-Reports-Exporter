@@ -20,6 +20,7 @@ import consolidate_ramp_detail as crd
 import consolidate_highway_sequence as chs
 import consolidate_highway_log as chl
 import consolidate_tsn_highway_log as ctsn
+import consolidate_xlsx_base
 import compare_env
 import compare_highway_log
 
@@ -47,6 +48,27 @@ def test_stamp_helper():
           f("x.xlsx", "Downloads") == "x.xlsx")
     check("extensionless name stamps whole name",
           f("noext", RUN) == f"noext {RUN}")
+
+
+def test_env_tag_helper():
+    print("paths.env_tagged_filename (Export-Everything store labels):")
+    f = paths.env_tagged_filename
+    check("xlsx: src-env prefixed in front",
+          f("tsar_ramp_detail_route_5.xlsx", "ssor-prod")
+          == "ssor-prod tsar_ramp_detail_route_5.xlsx")
+    check("pdf: src-env prefixed in front",
+          f("tsar_ramp_summary_route_5.pdf", "ars-test")
+          == "ars-test tsar_ramp_summary_route_5.pdf")
+    check("empty tag -> unchanged", f("x_route_1.xlsx", "") == "x_route_1.xlsx")
+    check("None tag -> unchanged", f("x_route_1.xlsx", None) == "x_route_1.xlsx")
+    # The front-stamp MUST keep the consolidator's route parser + glob working
+    # (a trailing stamp would not) — this is why the tag goes in front.
+    tagged = f("highway_log_route_101U.xlsx", "ssor-dev")
+    m = consolidate_xlsx_base.ROUTE_FROM_NAME.search(tagged)
+    check("tagged name still yields its route via the consolidator regex",
+          m is not None and m.group(1) == "101U")
+    check("tagged name still ends .xlsx (matches the *.xlsx glob)",
+          tagged.endswith(".xlsx"))
 
 
 def test_consolidator_out_paths():
@@ -88,6 +110,7 @@ def test_compare_suggest_names_carry_date():
 
 def main():
     test_stamp_helper()
+    test_env_tag_helper()
     test_consolidator_out_paths()
     test_tsn_exempt()
     test_compare_suggest_names_carry_date()

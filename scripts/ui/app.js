@@ -555,6 +555,7 @@ function buildStatic() {
     cb.addEventListener("change", () => {
       row.classList.toggle("checked", cb.checked);
       updateBatchCount();
+      renderBatchAccess();      // selection moved -> re-flag error-prone reports
     });
     $("batchEnvList").appendChild(row);
   }));
@@ -1068,6 +1069,51 @@ function renderEnvAccess() {
     row.title = off
       ? `The last environment check found this report ${state === "greyed"
           ? "greyed out" : "missing"} on ${active.label} — the export may fail.`
+      : "";
+  });
+  renderBatchAccess();
+}
+
+// Everything tab: colour-code reports and environments the env-access scan
+// flagged, same convention as the Export tab. Each environment row maps 1:1 to
+// a scan verdict (amber = limited, red = will fail outright); a report-type row
+// is flagged amber when it's greyed/missing in any of the SELECTED environments
+// (so the warning tracks what this batch will actually export). Cleared when no
+// scan has run. Re-run from renderEnvAccess (state pushes) and on env-checkbox
+// changes (selection moves which envs a report is judged against).
+function renderBatchAccess() {
+  const acc = (S.st && S.st.env_access) || {};
+  const selectedKeys = [];
+  $("batchEnvList").querySelectorAll(".option-row").forEach((row) => {
+    const cb = row.querySelector("input");
+    if (cb.checked) selectedKeys.push(cb.dataset.key);
+    const e = acc[cb.dataset.key];
+    const badge = e && e.status !== "checking"
+      && (ENV_ACCESS_BADGE[e.status] || ENV_ACCESS_BADGE.error);
+    const bad = !!badge && badge.dot === "bad";
+    const warn = !!badge && badge.dot === "warn";
+    row.classList.toggle("env-error", bad);
+    row.classList.toggle("report-off", warn);
+    row.title = badge
+      ? `Last environment check: ${badge.text} on ${e.label}.`
+        + (bad ? " Exporting this environment will fail until it's fixed."
+               : warn ? " Some report types may be unavailable here." : "")
+      : "";
+  });
+  $("batchReportList").querySelectorAll(".option-row").forEach((row, i) => {
+    const label = ((S.init.reports || [])[i] || {}).label;
+    const hits = [];                          // envs where this report is unavailable
+    selectedKeys.forEach((key) => {
+      const e = acc[key];
+      const state = e && e.reports && e.reports[label];
+      if (state && state !== "ok") {
+        hits.push(`${e.label} (${state === "greyed" ? "greyed out" : "missing"})`);
+      }
+    });
+    row.classList.toggle("report-off", hits.length > 0);
+    row.title = hits.length
+      ? "The last environment check found this report unavailable on:\n"
+        + hits.join("\n") + "\nThe export may fail there."
       : "";
   });
 }

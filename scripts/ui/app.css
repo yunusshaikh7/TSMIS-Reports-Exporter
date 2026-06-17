@@ -750,8 +750,11 @@ button, input, select { font-family: inherit; }
 }
 .url-status.env-bad { color: var(--destructive); font-weight: 600; }
 .url-status.env-warn { color: var(--warning); font-weight: 600; }
-/* Export tab: report type the active site's scan found greyed/missing */
+/* Export + Everything tabs: a report type / environment the env-access scan
+   flagged. report-off (amber) = may cause errors (greyed/missing report, or a
+   limited env); env-error (red) = an environment that will fail outright. */
 .option-row.report-off .option-name { color: var(--warning); }
+.option-row.env-error .option-name { color: var(--destructive); }
 .env-scan-stamp { font-size: 12px; color: var(--muted-foreground); }
 .url-label { width: 110px; flex-shrink: 0; font-size: 12.5px; font-weight: 600; }
 .url-row .input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px; }
