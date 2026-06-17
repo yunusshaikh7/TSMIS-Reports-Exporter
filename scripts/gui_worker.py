@@ -1295,12 +1295,13 @@ class UpdateWorker(threading.Thread):
     def __init__(self, queue, action, manual=False, info=None):
         super().__init__(daemon=True, name="update")
         self.q = queue
-        self.action = action            # "check" | "download"
+        self.action = action            # "check" | "download" | "revert"
         self.manual = manual
         self.info = info                # UpdateInfo (required for "download")
 
     def run(self):
         import updater                  # lazy; stdlib-only module
+        revert = self.action == "revert"
         try:
             if self.action == "check":
                 info = updater.check_for_update()
@@ -1319,7 +1320,17 @@ class UpdateWorker(threading.Thread):
                 }))
                 return
 
-            last_pct = -1               # "download"
+            if revert:
+                # Resolve the newest full release older than this build, then
+                # stage it through the SAME proven download path as an update.
+                self.info = updater.resolve_previous_release()
+                if self.info is None:
+                    self.q.put(("update_status", {
+                        "phase": "none", "manual": True, "revert": True,
+                        "note": "no earlier version was found to revert to"}))
+                    return
+
+            last_pct = -1               # "download" / "revert"
 
             def on_progress(done, total):
                 nonlocal last_pct
@@ -1329,23 +1340,26 @@ class UpdateWorker(threading.Thread):
                     self.q.put(("update_status", {
                         "phase": "downloading", "progress": pct,
                         "version": self.info.version,
-                        "url": self.info.release_url, "can_apply": True}))
+                        "url": self.info.release_url, "can_apply": True,
+                        "revert": revert}))
 
             staged = updater.download_and_stage(self.info, on_progress=on_progress)
             self.q.put(("update_status", {
                 "phase": "staged", "version": self.info.version,
                 "url": self.info.release_url, "can_apply": True,
-                "staged": str(staged)}))
+                "staged": str(staged), "revert": revert}))
         except updater.UpdateError as e:
             log.warning("update %s failed: %s", self.action, e)
             self.q.put(("update_status", {
                 "phase": "failed", "note": str(e),
-                "manual": self.manual or self.action == "download"}))
+                "manual": self.manual or self.action in ("download", "revert"),
+                "revert": revert}))
         except Exception as e:
             log.exception("update worker crashed (%s)", self.action)
             self.q.put(("update_status", {
                 "phase": "failed", "note": f"{type(e).__name__}: {e}",
-                "manual": self.manual or self.action == "download"}))
+                "manual": self.manual or self.action in ("download", "revert"),
+                "revert": revert}))
 
 
 # --- startup readiness checks -------------------------------------------------

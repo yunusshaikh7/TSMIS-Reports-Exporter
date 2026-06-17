@@ -752,7 +752,7 @@ function renderState() {
    "btnCheckEnvs"]
     .forEach((id) => { $(id).disabled = locked; });
   Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
-  ["setDebugLog", "setDevtools", "setEnvAutoCheck", "setNotifyFinish"].forEach((id) => {
+  ["setDebugLog", "setDevtools", "setEnvCheckSignin", "setEnvCheckStart", "setNotifyFinish"].forEach((id) => {
     $(id).disabled = locked;
     $(id).closest(".option-row").classList.toggle("disabled", locked);
   });
@@ -1079,14 +1079,15 @@ function renderUpdate(up) {
       }
       break;
     case "downloading":
-      label = `Downloading… ${up.progress || 0}%`;
+      label = `${up.revert ? "Reverting" : "Downloading"}… ${up.progress || 0}%`;
       disabled = true;
       break;
     case "staged":
-      label = "Restart to update";
+      label = up.revert ? "Restart to revert" : "Restart to update";
       disabled = locked;
       title = locked ? "Finish or cancel the running task first"
-                     : `Install v${up.version} — the app closes and reopens by itself`;
+                     : `${up.revert ? "Reinstall" : "Install"} v${up.version} — `
+                       + "the app closes and reopens by itself";
       break;
     case "applying":
       label = "Restarting…";
@@ -1111,13 +1112,15 @@ async function onUpdateClick() {
   }
   if (up.phase === "staged") {
     const ok = await showConfirm({
-      title: "Restart and update?",
-      message: `The app will close, install v${up.version} (takes a few seconds), and reopen by itself.\n\nYour reports, login and settings stay where they are.`,
+      title: up.revert ? "Restart and revert?" : "Restart and update?",
+      message: `The app will close, ${up.revert ? "reinstall" : "install"} v${up.version} `
+        + "(takes a few seconds), and reopen by itself.\n\n"
+        + "Your reports, login and settings stay where they are.",
       confirmLabel: "Restart now",
     });
     if (!ok) return;
     const res = await api.update_apply();
-    if (res && res.error) showMessage("error", "Could not update", res.error);
+    if (res && res.error) showMessage("error", up.revert ? "Could not revert" : "Could not update", res.error);
   }
 }
 
@@ -1666,10 +1669,14 @@ function fillSettings() {
   };
   setToggle("setDebugLog", v.debug_logging);
   setToggle("setDevtools", v.ui_devtools);
-  setToggle("setEnvAutoCheck", v.env_check_on_start);
+  setToggle("setEnvCheckSignin", v.env_check_after_signin);
+  setToggle("setEnvCheckStart", v.env_check_after_start);
   setToggle("setNotifyFinish", v.notify_on_finish);
 
   const meta = s.meta || {};
+  // "Revert to previous version" only makes sense on a writable installed copy
+  // (a read-only / dev install can't self-swap).
+  $("btnRevert").classList.toggle("hidden", meta.update_support !== "ok");
   const paths = $("setPaths");
   paths.textContent = "";
   [["Data folder", meta.data_root], ["Output folder", meta.output_root],
@@ -1976,7 +1983,8 @@ function bindEvents() {
   });
   $("setDebugLog").addEventListener("change", () => onSettingToggle("setDebugLog", "debug_logging"));
   $("setDevtools").addEventListener("change", () => onSettingToggle("setDevtools", "ui_devtools"));
-  $("setEnvAutoCheck").addEventListener("change", () => onSettingToggle("setEnvAutoCheck", "env_check_on_start"));
+  $("setEnvCheckSignin").addEventListener("change", () => onSettingToggle("setEnvCheckSignin", "env_check_after_signin"));
+  $("setEnvCheckStart").addEventListener("change", () => onSettingToggle("setEnvCheckStart", "env_check_after_start"));
   $("setNotifyFinish").addEventListener("change", () => onSettingToggle("setNotifyFinish", "notify_on_finish"));
   $("btnSupportBundle").onclick = async () => {
     const res = await api.save_support_bundle();
@@ -1984,6 +1992,17 @@ function bindEvents() {
   };
   $("btnOpenFailures").onclick = () => api.open_failures_folder();
   $("btnCheckUpdates2").onclick = () => api.check_updates();
+  $("btnRevert").onclick = async () => {
+    const ok = await showConfirm({
+      title: "Revert to the previous version?",
+      message: "This downloads the release just before this one and restarts into it.\n\n"
+        + "Your reports, login and settings are kept, and you can update again afterwards.",
+      confirmLabel: "Revert",
+    });
+    if (!ok) return;
+    const res = await api.revert_to_previous();
+    if (res && res.error) showMessage("error", "Couldn't revert", res.error);
+  };
   $("btnCheckEnvs").onclick = async () => {
     const res = await api.check_environments();
     if (res && res.error) showMessage("info", "Can't check right now", res.error);
@@ -2196,7 +2215,7 @@ function makeMockApi() {
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
     county_timeout_s: 60, fast_workers: 3, debug_logging: false, ui_devtools: false,
-    env_check_on_start: true, notify_on_finish: true,
+    env_check_after_signin: true, env_check_after_start: false, notify_on_finish: true,
   };
   const mockUrlOverrides = {};
   const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,
@@ -2221,7 +2240,7 @@ function makeMockApi() {
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       meta: {
         version: "0.10.0 (preview)", build: "portable app",
-        variant: "system browser",
+        variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
         log_file: "C:\\Tools\\TSMIS Exporter\\data\\logs\\tsmis.log",
@@ -2515,7 +2534,7 @@ function makeMockApi() {
       }, 650 * (i + 1)));
       return { ok: true };
     },
-    get_settings: async () => ({ values: { ...mockSettings }, defaults: { ...mockSettings }, meta: {} }),
+    get_settings: async () => ({ values: { ...mockSettings }, defaults: { ...mockSettings }, meta: { update_support: "ok" } }),
     set_setting: async (key, value) => {
       const numeric = typeof mockSettings[key] === "number";
       const boolish = typeof mockSettings[key] === "boolean";
@@ -2802,6 +2821,21 @@ function makeMockApi() {
       return { ok: true };
     },
     open_release_page: async () => push({ t: "log", text: "(mock) would open the GitHub releases page" }),
+    revert_to_previous: async () => {
+      st.update = { phase: "downloading", progress: 0, version: "0.12.0", url: "#", can_apply: true, revert: true };
+      push({ t: "log", text: "Reverting to the previous version — finding it and downloading…" });
+      pushState();
+      const tr = setInterval(() => {
+        st.update.progress = Math.min(100, (st.update.progress || 0) + 8);
+        if (st.update.progress >= 100) {
+          clearInterval(tr);
+          st.update = { phase: "staged", version: "0.12.0", url: "#", can_apply: true, revert: true };
+          push({ t: "log", text: "Previous version v0.12.0 is downloaded and ready — click ‘Restart to revert’ in the title bar." });
+        }
+        pushState();
+      }, 130);
+      return { ok: true };
+    },
     get_compare_folders: async () => ({ folders: (st.days || []) }),
     pause_or_resume: async () => {
       st.paused = !st.paused;

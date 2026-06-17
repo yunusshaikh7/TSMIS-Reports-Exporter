@@ -701,10 +701,13 @@ class GuiApi:
     def _maybe_autoscan(self, reason):
         """Start the env-access scan unprompted — once per session, only when
         a login is available (a no-login scan would just log six failures at
-        every launch), never preempting other work, and only when the
-        Settings toggle allows it."""
+        every launch), never preempting other work, and only when the matching
+        Settings toggle allows it. The trigger has its own toggle: after app
+        start vs after a sign-in (the start one is off by default)."""
+        key = ("env_check_after_start" if reason == "startup"
+               else "env_check_after_signin")
         try:
-            if not settings.get("env_check_on_start"):
+            if not settings.get(key):
                 return
         except Exception:
             return
@@ -730,6 +733,7 @@ class GuiApi:
             self._update = payload
         phase = payload.get("phase")
         ver = payload.get("version")
+        revert = payload.get("revert", False)
         if phase == "available":
             if payload.get("can_apply"):
                 size = f" ({payload['size_mb']} MB)" if payload.get("size_mb") else ""
@@ -753,11 +757,19 @@ class GuiApi:
                                "page instead — extract the new zip into a folder you "
                                "can write to.")
         elif phase == "none" and manual:
-            self._emit_log(f"You're on the latest version (v{__version__}).")
+            if revert:
+                self._emit_log("Revert: no earlier version was found to go back to.")
+            else:
+                self._emit_log(f"You're on the latest version (v{__version__}).")
         elif phase == "staged":
-            self._emit_log(f"Update v{ver} is downloaded and ready — click "
-                           "‘Restart to update’ when you're done working "
-                           "(the app closes, updates itself, and reopens).")
+            if revert:
+                self._emit_log(f"Previous version v{ver} is downloaded and ready — "
+                               f"click ‘Restart to revert’ when you're done working "
+                               f"(the app closes, reinstalls v{ver}, and reopens).")
+            else:
+                self._emit_log(f"Update v{ver} is downloaded and ready — click "
+                               "‘Restart to update’ when you're done working "
+                               "(the app closes, updates itself, and reopens).")
         elif phase == "failed" and manual:
             self._emit_log(f"Update problem: {payload.get('note')} "
                            "(details are in the log file)")
@@ -895,11 +907,13 @@ class GuiApi:
         """Manual re-check (clicking the version chip)."""
         with self._lock:
             phase = self._update.get("phase")
+            revert = self._update.get("revert", False)
         if phase in ("checking", "downloading", "applying"):
             return {"ok": True}              # already busy with update work
         if phase == "staged":
-            self._emit_log("An update is already downloaded — click "
-                           "‘Restart to update’ in the title bar to install it.")
+            self._emit_log("A download is already ready — click "
+                           + ("‘Restart to revert’" if revert else "‘Restart to update’")
+                           + " in the title bar to install it.")
             return {"ok": True}
         self._start_update_check(manual=True)
         return {"ok": True}
@@ -967,6 +981,34 @@ class GuiApi:
         url = updater.safe_release_url(self._update.get("url"))
         ui_log.info("opening release page: %s", url)
         webbrowser.open(url)
+        return {"ok": True}
+
+    @_api_method
+    def revert_to_previous(self):
+        """Download + stage the PREVIOUS full release and (after the user clicks
+        Restart) swap to it — the Settings "revert to previous version" control.
+        Reuses the one-click update pipeline (resolve a specific older tag, then
+        the same verify/stage/swap), so the riskiest code is unchanged. Only a
+        writable packaged install can self-swap; a read-only / dev install must
+        download the older zip from the releases page instead. The download is
+        allowed mid-run (network + disk only, like a forward update); the restart
+        that applies it stays gated on no task (update_apply)."""
+        if updater.update_support()[0] != "ok":
+            return {"error": "This install can't revert itself — open the releases "
+                             "page and extract an earlier version into a writable folder."}
+        with self._lock:
+            phase = self._update.get("phase")
+            if phase in ("checking", "downloading", "applying"):
+                return {"error": "An update or revert is already in progress."}
+            if phase == "staged":
+                # Don't silently discard a download the user already staged.
+                return {"error": "A download is already staged — restart to apply it, "
+                                 "or reopen the app first, then revert."}
+            self._update = {"phase": "downloading", "progress": 0, "revert": True}
+        ui_log.info("revert: user chose 'Revert to previous version'")
+        self._emit_log("Reverting to the previous version — finding it and downloading…")
+        self._push_state()
+        UpdateWorker(self._q, "revert", manual=True).start()
         return {"ok": True}
 
     # ---- routes ---------------------------------------------------------------
@@ -1771,6 +1813,9 @@ class GuiApi:
                 "failures_dir": str(FAILURES_DIR),
                 "auth_state": auth_state,
                 "max_workers": MAX_WORKERS,
+                # "ok" = writable packaged install (can self-update/revert);
+                # "link" = read-only; "off" = dev run. Gates the Revert control.
+                "update_support": updater.update_support()[0],
             },
         }
 

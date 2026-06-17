@@ -41,7 +41,8 @@ DEFAULTS = {
     "fast_workers": 3,           # default fast-mode browser count
     "debug_logging": False,      # verbose (DEBUG) file logging
     "ui_devtools": False,        # open WebView2 DevTools on the next launch
-    "env_check_on_start": True,  # auto-run the env-access scan after start/sign-in
+    "env_check_after_signin": True,   # auto-run the env-access scan after sign-in
+    "env_check_after_start": False,    # ...and after app start (off by default)
     "notify_on_finish": True,    # flash the taskbar when a run/batch finishes
 }
 

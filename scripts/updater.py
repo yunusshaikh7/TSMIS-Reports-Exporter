@@ -71,6 +71,9 @@ RELEASES_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
 # /releases/latest never returns prereleases or drafts — only full releases
 # are ever offered.
 _API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+# Full release LIST (newest-first per GitHub, but we pick by version, not order)
+# -- used only to resolve the PREVIOUS release for the Settings "revert" control.
+_API_RELEASES = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=100"
 _EXE_NAME = APP_NAME + ".exe"
 # Bundle items the swap replaces / cleanup removes. Everything else next to
 # the exe (output/, input/, data/) is user data and is never touched.
@@ -211,13 +214,23 @@ def check_for_update(current_version=None, variant=None):
         log.info("update check: up to date (latest release is %s)", tag)
         return None
 
+    info = _asset_info_from_release(data, remote, tag, want)
+    log.info("update available: %s -> %s (%s, %.0f MB)",
+             __version__, info.tag, info.asset_name, info.asset_size / 1e6)
+    return info
+
+
+def _asset_info_from_release(release, remote, tag, want):
+    """Build an UpdateInfo for the `want` variant from a GitHub release object,
+    or raise UpdateError if that variant's zip isn't published on it. Shared by
+    the latest-update check and the revert resolver, so both pick the asset and
+    its companion checksum the same way."""
     suffix = f"-{want}.zip"
-    assets = data.get("assets") or []
+    assets = release.get("assets") or []
     asset = next((a for a in assets if (a.get("name") or "").endswith(suffix)), None)
     if asset is None:
         names = ", ".join(a.get("name") or "?" for a in assets) or "none"
-        log.warning("update check: release %s has no %s asset (assets: %s)",
-                    tag, suffix, names)
+        log.warning("release %s has no %s asset (assets: %s)", tag, suffix, names)
         raise UpdateError(f"version {tag} is out, but its download package "
                           "isn't available yet — try again later")
     # Companion checksum: the release publishes <asset>.sha256 next to each zip
@@ -225,19 +238,71 @@ def check_for_update(current_version=None, variant=None):
     # digest. download_and_stage verifies the download against whichever exists.
     sha_name = (asset.get("name") or "") + ".sha256"
     sha_asset = next((a for a in assets if (a.get("name") or "") == sha_name), None)
-    info = UpdateInfo(
+    return UpdateInfo(
         version=".".join(str(p) for p in remote),
         tag=tag,
         asset_name=asset.get("name") or "",
         asset_url=asset.get("browser_download_url") or "",
         asset_size=int(asset.get("size") or 0),
-        release_url=data.get("html_url") or RELEASES_PAGE,
+        release_url=release.get("html_url") or RELEASES_PAGE,
         asset_digest=asset.get("digest") or "",
         asset_sha256_url=(sha_asset.get("browser_download_url") if sha_asset else "") or "",
     )
-    log.info("update available: %s -> %s (%s, %.0f MB)",
-             __version__, info.tag, info.asset_name, info.asset_size / 1e6)
-    return info
+
+
+def resolve_previous_release(current_version=None, variant=None):
+    """The newest FULL release strictly OLDER than this build, as an UpdateInfo
+    for the current variant — the target of the Settings "revert to previous
+    version" control. Lists /releases (not /latest, which never returns older
+    tags), ignores drafts and prereleases, and picks by VERSION NUMBER, not
+    GitHub's list order (that ordering bug once broke the dev channel). Returns
+    None when there is no older release / no matching asset; raises UpdateError
+    when the list itself cannot be fetched.
+    `current_version` / `variant` exist for testing; defaults are this build.
+    """
+    cur = parse_version(current_version or __version__)
+    if cur is None:
+        return None
+    want = variant or current_variant()
+    log.info("revert: resolving newest release older than v%s, variant %s",
+             current_version or __version__, want)
+    try:
+        with _http_get(_API_RELEASES, _API_TIMEOUT_S) as resp:
+            data = json.load(resp)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        log.warning("revert: HTTP %s from the releases API", e.code)
+        raise UpdateError(f"the update service answered with an error (HTTP {e.code})") from e
+    except (OSError, ValueError) as e:   # URLError/SSL/timeout/bad JSON
+        log.warning("revert: release list fetch failed: %s: %s", type(e).__name__, e)
+        raise UpdateError("could not reach github.com to look up earlier versions "
+                          "— check the internet connection") from e
+    if not isinstance(data, list):
+        return None
+    candidates = []                      # (version_tuple, tag, release_obj)
+    for rel in data:
+        if not isinstance(rel, dict) or rel.get("draft") or rel.get("prerelease"):
+            continue
+        tag = rel.get("tag_name") or ""
+        ver = parse_version(tag)
+        if ver is None or not is_newer(cur, ver):     # keep only ver strictly < cur
+            continue
+        candidates.append((ver, tag, rel))
+    # Newest-version-first; return the first that actually has THIS variant's
+    # zip. A very old release may predate the with-browser variant, so skip to
+    # the next-older one rather than failing with the forward check's
+    # "try again later" message (which is wrong here — that release never had it).
+    for ver, tag, rel in sorted(candidates, key=lambda c: c[0], reverse=True):
+        try:
+            info = _asset_info_from_release(rel, ver, tag, want)
+        except UpdateError:
+            log.info("revert: release %s has no %s package; trying an older one", tag, want)
+            continue
+        log.info("revert target: v%s -> %s (%s)", __version__, info.tag, info.asset_name)
+        return info
+    log.info("revert: no full release older than v%s has a %s package", __version__, want)
+    return None
 
 
 # ------------------------------------------------------- download + stage ---

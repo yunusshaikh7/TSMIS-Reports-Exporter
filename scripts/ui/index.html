@@ -519,9 +519,15 @@
             <button class="btn btn-standard" id="btnCheckUpdates2">
               <svg class="ic"><use href="#i-refresh"/></svg>Check for updates
             </button>
+            <button class="btn btn-standard hidden" id="btnRevert"
+                    title="Download and reinstall the version before this one">
+              <svg class="ic"><use href="#i-refresh"/></svg>Revert to previous version…
+            </button>
           </div>
           <p class="hint">The support bundle is a zip of the logs, run reports and settings —
-            everything a maintainer needs and <b>never your login</b>.</p>
+            everything a maintainer needs and <b>never your login</b>.
+            “Revert” reinstalls the release before this one (your reports, login and
+            settings are kept); it appears only on a writable installed copy.</p>
         </div>
 
         <div class="card-section">
@@ -542,11 +548,17 @@
             <span class="env-scan-stamp" id="envScanStamp"></span>
           </div>
           <div class="option-list" style="margin-bottom:8px">
-            <label class="option-row" id="rowEnvAutoCheck">
-              <input type="checkbox" id="setEnvAutoCheck">
+            <label class="option-row" id="rowEnvCheckSignin">
+              <input type="checkbox" id="setEnvCheckSignin">
               <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="option-name">Check automatically after start / sign-in
-                <span class="muted">— runs in the background once a login is available</span></span>
+              <span class="option-name">Check automatically after sign-in
+                <span class="muted">— runs in the background once you've logged in</span></span>
+            </label>
+            <label class="option-row" id="rowEnvCheckStart">
+              <input type="checkbox" id="setEnvCheckStart">
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="option-name">Check automatically after app start
+                <span class="muted">— uses your saved login if there is one (off by default)</span></span>
             </label>
           </div>
           <div class="set-urls" id="setSiteUrls"></div>
