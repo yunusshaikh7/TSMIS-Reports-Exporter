@@ -798,11 +798,22 @@ function renderState() {
   if (pbUse) pbUse.setAttribute("href", st.paused ? "#i-play" : "#i-pause");
   $("btnPauseBatchLabel").textContent = st.paused ? "Resume" : "Pause";
   $("btnCancelBatch").disabled = st.task !== "batch";
-  $("batchReportList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
-  $("batchEnvList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+  // Lock AND grey the whole Everything pane while any task runs (incl. env
+  // check), matching the Export/Consolidate/Compare panes: option rows dim via
+  // .option-row.disabled, fast toggles via .fast-toggle.disabled. The Saved-
+  // reports Refresh buttons are re-synced here too — renderBatchLibrary only
+  // re-runs on tab-switch/run-end, so without this they'd stay clickable.
+  $("btnPickBatchDest").disabled = locked;
+  ["batchReportList", "batchEnvList"].forEach((id) => {
+    $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+    $(id).querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
+  });
+  $("batchLibrary").querySelectorAll("button").forEach((b) => { b.disabled = locked; });
   $("batchFast").disabled = locked;
+  $("batchFast").closest(".fast-toggle").classList.toggle("disabled", locked);
   $("batchWorkers").disabled = locked || !$("batchFast").checked;
   $("batchAutoConsolidate").disabled = locked;
+  $("batchAutoConsolidate").closest(".fast-toggle").classList.toggle("disabled", locked);
   renderBatchResume(st.batch_resume);
   const bp = $("batchProgress");
   if (st.batch && st.batch.total) {
