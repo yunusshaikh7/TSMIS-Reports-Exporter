@@ -67,7 +67,7 @@ MANIFEST = os.path.join(SPECPATH, "app.manifest")
 APP_MODULES = [
     "version", "paths", "common", "events", "exporter", "exporter_parallel",
     "run_report", "logging_setup", "settings", "cli", "login", "reports",
-    "updater",
+    "updater", "batch_manifest",
     "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
     "export_highway_log", "export_intersection_summary",
     "export_intersection_detail", "export_multi",

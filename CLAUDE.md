@@ -420,6 +420,7 @@ scripts/
   compare_core.py     # THE discrepancy-workbook engine (schema-parameterized; regression-locked — see Compare tab notes)
   compare_highway_log.py      # TSMIS-vs-TSN Highway Log: schema + loaders over compare_core ("files" kind)
   compare_env.py      # cross-environment comparison: two run folders, all four reports ("folders" kind)
+  batch_manifest.py   # persistent Export-Everything job manifest (B3; DATA_ROOT, atomic, resumable)
   gui_main.py / gui_api.py / gui_worker.py   # GUI entry / js_api bridge + state / worker threads
   ui/                 # the GUI itself: index.html + app.css + app.js (vanilla; design
                       #   tokens ported from the approved Lovable demo; mock API for browser preview)
@@ -460,6 +461,43 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
 
 ## Key Behaviors
 
+- **v0.12.0 — output labeling, run control & batch export (roadmap A+B; A3 deferred):**
+  - **A1 self-describing filenames:** consolidated workbooks stamp the run's
+    `<date> <src>-<env>` into the filename (`paths.stamped_consolidated_filename`,
+    used by every `consolidate_*.out_path_for`); both comparison families append a
+    generated-on date in `suggest_name`. TSN Highway Log is exempt (no src/env,
+    undated input); the legacy flat layout (`day=None`) keeps its fixed name.
+    compare_core/_SCHEMA text is untouched (regression-locked).
+    Locked by `build/check_a1_filenames.py`.
+  - **A2 compare-folder filter:** the cross-env compare folder dropdowns list only
+    runs that actually contain the chosen report
+    (`paths.list_output_days_for_report` + `GuiApi.get_compare_folders`, called by
+    `app.js` on report-type change; `start_compare_env` preflights it server-side;
+    Browse paths skip the filter). `build/check_a2_compare_filter.py`.
+  - **B1 Pause/Resume:** `Events.is_paused` (8th callback) + a shared
+    `exporter._wait_while_paused` hold BETWEEN routes (never inside a thread-affine
+    Playwright wait) in both the sequential and parallel engines — so it WORKS IN
+    FAST MODE too (all workers park), unlike Skip. `GuiApi.pause_or_resume` toggles
+    `pause_event` (covers export AND batch); cleared on cancel and at end-of-task.
+    `build/check_b1_pause.py`.
+  - **B2 auto-consolidate:** one Export-tab toggle; `ExportWorker` runs the matching
+    consolidator INLINE after each spec's export (reuses the held task slot + the
+    same Events sink; `reports.consolidator_for_spec` maps export→consolidate by
+    subdir; Intersection reports have none and are skipped; failures are logged,
+    never fatal). `build/check_b2_autoconsolidate.py`.
+  - **B3 Export Everything:** the **Everything** tab runs selected report types ×
+    selected environments SEQUENTIALLY (`gui_worker.BatchWorker`) into the normal
+    `output/<run>/<report>/` layout, reusing `ExportWorker._run_specs` per env — so
+    resume/idempotency, fast mode, pause (B1) and auto-consolidate (B2) all come
+    free. Per-env targeting uses the **process-global `common.set_site`** (NOT
+    `set_thread_site` — the batch is a single sequential orchestrator and the
+    single-task gate guarantees no concurrent export; the original selection is
+    restored at the end). Progress persists to `batch_manifest` (`DATA_ROOT/
+    batch_job.json`, atomic write, untouched by Delete-all-reports) after every
+    environment, so a batch resumes across app restarts; a startup resume banner
+    offers Resume/Discard (`GuiApi.start_batch_export`/`resume_batch`/
+    `discard_batch`). The physical report-first deliverable tree was DEFERRED (a
+    log/manifest summary instead). `build/check_b3_batch.py`.
 - **Run folders (v0.10.0; replaces bare dated outputs):** every run writes into
   `output/<YYYY-MM-DD src-env>/<report>/` (`paths.output_run_dir`, src/env from
   `common.get_site()` at run start), so each day's exports live in their own

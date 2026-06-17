@@ -131,44 +131,45 @@ into B1).
 
 | Version | Theme | Items |
 |---|---|---|
-| v0.12.0 | Output organization & discoverability | A1, A2, A3 |
-| v0.13.0 | Batch export & run control | B1, B2, B3 |
-| v0.14.0 | Performance & automation | D1 |
-| v0.15.0 | Selection scope & deeper trust | F1, C1 |
+| v0.12.0 ✅ SHIPPED | Output labeling, run control & batch export | A1, A2, B1, B2, B3 (A3 deferred) |
+| v0.13.0 | Discoverability & performance | A3, D1 |
+| v0.14.0 | Selection scope & deeper trust | F1, C1 |
 
-Suggested build order within/across versions: **A1 → A2 → B2 → B1 → A3 → B3 →
-D1 → F1 → C1**. A1 (labeling) is the low-risk foundation that makes A3 and B3
-worth building; B1 (pause) is a prerequisite for B3.
+**v0.12.0 shipped 2026-06-16** (commits `f0b7baf` A1 · `8d6820b` A2 · `16863eb`
+B1 · `4b8bbf1` B2 · `ba05bb0`+`5b9f2fd` B3). A3 (results tab) was deliberately
+moved out — lower priority. All five are golden-checked + mock-verified;
+**live-export verification on the work PC is still pending** (the B-series touches
+the real export engine).
 
 ## A. Output organization & discoverability
 
-- [ ] **A1 — Self-describing output filenames** [M] (#5, #6) — Stamp date +
+- [x] **A1 — Self-describing output filenames** [M] — ✅ SHIPPED v0.12.0 (#5, #6) — Stamp date +
   source/env (and "generated on" date) into the *filename* for consolidations
   and both comparison families, not just the parent folder. Today the
   date/env lives only in the run-folder name; consolidated files use a fixed
   `FILENAME` (`consolidate_*.py` `out_path_for`) and comparison outputs carry no
   date (`compare_env.suggest_name`, `compare_highway_log.suggest_name`), so a
   file copied out of its folder loses all provenance. Foundation for A3 and B3.
-- [ ] **A2 — Comparison selector lists only folders that have the report** [S]
+- [x] **A2 — Comparison selector lists only folders that have the report** [S] — ✅ SHIPPED v0.12.0
   (#2) — The cross-env folder dropdowns list *every* run folder
   (`gui_api` → `list_output_days()`) regardless of whether the chosen report
   exists inside. Filter to runs whose `<report>/` subdir is non-empty, ideally
   re-filtering as the selected report type changes. (`scripts/gui_api.py`)
-- [ ] **A3 — Results tab / in-app file browser** [M] (#9) — A tab to open the
+- [ ] **A3 — Results tab / in-app file browser** [M] — DEFERRED to v0.13.0 (#9) — A tab to open the
   latest per-route files, consolidated workbooks, comparison outputs, failure
   screenshots, and run reports without digging through folders. Much more useful
   after A1; shares a "what's been produced, where" index with A2.
 
 ## B. Batch export & run control
 
-- [ ] **B1 — Pause / Resume button** [M] (#7) — A true hold-then-continue
+- [x] **B1 — Pause / Resume button** [M] — ✅ SHIPPED v0.12.0 (#7) — A true hold-then-continue
   control (distinct from existing Skip = one route, Cancel = clean resumable
   stop). Enabling primitive for B3. **Decision:** pause-between-routes (simple,
   recommended) vs. pause-mid-route (must park a live browser).
-- [ ] **B2 — Auto-consolidate on export finish** [S/M] (#8) — Optional
+- [x] **B2 — Auto-consolidate on export finish** [S/M] — ✅ SHIPPED v0.12.0 (#8) — Optional
   per-report "consolidate when export finishes" checkbox; removes the manual
   step for the export-then-consolidate workflow. Pairs with B3.
-- [ ] **B3 — "Export Everything" batch job** [L] (#3) — All report types × all
+- [x] **B3 — "Export Everything" batch job** [L] — ✅ SHIPPED v0.12.0 (report-first physical tree deferred) (#3) — All report types × all
   environments, emitting a deliverable tree organized report-type-first:
   `All Reports / <report type> / <environment> / [per-route files + consolidated]`.
   Must support: selectable subset of report types, **fast mode**, full labeling
