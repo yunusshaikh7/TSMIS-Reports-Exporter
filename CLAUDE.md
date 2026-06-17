@@ -461,6 +461,65 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
 
 ## Key Behaviors
 
+- **v0.13.0 — interface declutter, run lifecycle, accessibility & self-revert
+  (a UI/UX + trust release; the planned A3/D1 roadmap bucket was pushed down to
+  v0.14.0 — see TODO.md):**
+  - **Right-column run lifecycle:** while idle the right column shows a
+    **pre-flight summary** of exactly what the active tab will do
+    (`app.js renderPreflight`/`updateActivityCards`); during a run a **progress
+    card** with a live **ETA** (`updateEta`, an EMA over per-item times, RESET
+    when `progress.done===0` so the end-of-run retry pass can't inflate it);
+    after a run a persistent **completion summary**
+    (`gui_api._build_export_summary` → snapshot `last_summary`/`last_run_folder`,
+    cleared at each start/resume/retry) with **Open run folder**
+    (`open_run_folder`) and **Retry failed routes** (`retry_failed`; the failed
+    list is de-duped). Covered by `build/check_gui_bridge.py`.
+  - **Completion notification (default on):** a taskbar flash when a task
+    finishes (`gui_api._flash_taskbar`, `FlashWindowEx` via ctypes — modeled on
+    the late icon-setter, NOT a window-event handler; see pywebview trap 2),
+    toggled by settings `notify_on_finish`.
+  - **Compare sub-tabs:** the Compare pane splits its two families onto sub-tabs
+    (cross-environment default, then TSMIS-vs-TSN) — see *New comparison type*
+    (`COMPARE_GROUPS`).
+  - **Revert to the previous version (Settings ▸ Debugging):**
+    `updater.resolve_previous_release` finds the newest FULL release strictly
+    OLDER than this build (lists `/releases`, ignores drafts/prereleases, picks
+    by VERSION NUMBER not list order, and **variant-skips** a release missing
+    this variant's zip rather than failing) and reinstalls it through the SAME
+    SHA-verified download→stage→swap pipeline as a forward update
+    (`gui_api.revert_to_previous` → `UpdateWorker("revert")`; the pill / restart
+    dialog read "Reverting…" / "Restart to revert"). Gated to a writable install
+    (`update_support()=="ok"` — hidden on dev/read-only); REFUSED while a forward
+    update is `staged` (it would clobber the staged download). Locked by
+    `build/check_updater.py` (`test_resolve_previous_release`).
+  - **Env-check setting split:** the single auto-scan toggle became
+    `env_check_after_signin` (default **ON**) + `env_check_after_start` (default
+    **OFF**); `gui_api._maybe_autoscan(reason)` keys off which event fired.
+  - **Everything tab brought to convention:** the pane now greys with the other
+    tabs while ANY task runs incl. env check (`.option-row.disabled` on both
+    batch lists, `.fast-toggle.disabled`, the dest + Saved-reports Refresh
+    buttons locked — `renderBatchLibrary` only re-runs on tab-switch/run-end, so
+    `renderState` re-syncs them). Its output files are **env-labeled**:
+    `paths.env_tagged_filename` FRONT-stamps the `<src-env>` (the dest subfolder
+    name) onto every per-route file AND the consolidated workbook in the
+    always-current store — FRONT on purpose, so the consolidators' `*.xlsx`/
+    `*.pdf` glob + end-anchored `_route_(\w+)\.xlsx$` route parser keep matching
+    (a trailing tag would break them; Ramp Summary reads its route from PDF text,
+    not the name). Wired by wrapping `spec.filename` in `ExportWorker._run_specs`
+    when `out_base` is set (covers the sequential + parallel engines + both retry
+    passes at once); the normal dated-run path is untouched (its folder already
+    self-labels). `build/check_a1_filenames.py` + `check_b2_autoconsolidate.py`.
+    Report types / environments the env-access scan flagged are **colour-coded**
+    in the Everything tab (`app.js renderBatchAccess`, same convention as the
+    Export tab's `.report-off`): each env row maps 1:1 to its verdict — amber
+    (`report-off`, "limited") or red (`option-row.env-error`, "will fail
+    outright") — and a report type goes amber when it's greyed/missing in any
+    SELECTED environment.
+  - **Accessibility:** report/env checkboxes are keyboard-focusable (sr-only
+    clipped input + visible focus ring, NOT `display:none`), status icons pair
+    colour with a glyph (`setCheckIcon`/`.check-ic`), and the icon-only controls
+    (Verify, theme, popovers) carry aria-labels.
+
 - **v0.12.0 — output labeling, run control & batch export (roadmap A+B; A3 deferred):**
   - **A1 self-describing filenames:** consolidated workbooks stamp the run's
     `<date> <src>-<env>` into the filename (`paths.stamped_consolidated_filename`,

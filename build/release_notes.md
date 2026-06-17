@@ -14,6 +14,36 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **A clearer window, and it tells you what's happening (0.13.0).** The right
+  side of the window now follows the whole run: before you start, a **summary of
+  exactly what will happen** (which reports, how many routes, where it saves);
+  while it runs, progress with an **estimated time remaining**; and when it
+  finishes, a **completion summary** with one-click **Open folder** and **Retry
+  failed routes** (just the ones that failed, not the whole run). The window also
+  **flashes in the taskbar when a run finishes** so you can look away and come
+  back — turn that off in Settings if you'd rather it didn't. The header was
+  tidied up and the report/environment checkboxes are now fully keyboard-friendly.
+- **Revert to the previous version (0.13.0).** Settings now has a **Revert to
+  previous version** button: if an update ever causes trouble, one click
+  reinstalls the release just before this one, through the exact same verified
+  download-and-swap the normal update uses (your reports, login and settings stay
+  put). It only appears on installs the app can update itself.
+- **Two separate "check environments automatically" switches (0.13.0).** The old
+  single setting is now two: **after sign-in** (on by default) and **after the
+  app starts** (off by default) — so the background environment check can run when
+  you sign in without also running every single launch.
+- **Compare tab is split into sub-tabs (0.13.0).** The two comparison kinds —
+  **Cross-environment** and **TSMIS vs TSN** — are now on their own sub-tabs
+  (cross-environment shown first), instead of sharing one long list.
+- **Export Everything labels every file by environment (0.13.0).** Files in the
+  always-current store are now named with their source/environment up front
+  (e.g. `ssor-prod tsar_ramp_detail_route_5.xlsx`, and the combined workbook the
+  same way), so a file copied out of the folder still says which environment it
+  came from. The Everything tab also **colour-codes** report types and
+  environments the last environment check flagged — amber for "may be limited",
+  red for "would fail" — and now greys out during an environment check like the
+  other tabs.
+
 - **Export Everything — one always-current set of reports (0.12.0).** A new
   **Everything** tab exports the report types you tick across the environments you
   tick into a single folder you choose (default **All Reports (current)**). Re-run

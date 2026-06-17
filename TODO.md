@@ -132,14 +132,29 @@ into B1).
 | Version | Theme | Items |
 |---|---|---|
 | v0.12.0 ✅ SHIPPED | Output labeling, run control & batch export | A1, A2, B1, B2, B3 (A3 deferred) |
-| v0.13.0 | Discoverability & performance | A3, D1 |
-| v0.14.0 | Selection scope & deeper trust | F1, C1 |
+| v0.13.0 ✅ SHIPPED | Interface declutter, run lifecycle, accessibility, self-revert | UI/UX batch + Compare sub-tabs + revert-to-previous + env-check split + Everything-store labeling/colour-coding (**A3 & D1 pushed down**) |
+| v0.14.0 | Discoverability & performance | A3, D1 |
+| v0.15.0 | Selection scope & deeper trust | F1, C1 |
 
 **v0.12.0 shipped 2026-06-16** (commits `f0b7baf` A1 · `8d6820b` A2 · `16863eb`
 B1 · `4b8bbf1` B2 · `ba05bb0`+`5b9f2fd` B3). A3 (results tab) was deliberately
 moved out — lower priority. All five are golden-checked + mock-verified;
 **live-export verification on the work PC is still pending** (the B-series touches
 the real export engine).
+
+**v0.13.0 became a UI/UX + trust release, NOT the planned A3/D1 bucket.** It
+shipped a header declutter, the right-column run lifecycle (pre-flight summary →
+progress with ETA → completion summary + retry-failed), a completion
+notification (toggleable, on by default), keyboard-accessible checkboxes +
+aria-labels, the Compare cross-env / TSMIS-vs-TSN **sub-tabs**, **revert to the
+previous version** from Settings, the **env-check setting split** (after sign-in
+on by default / after start off by default), the Everything pane greying with the
+other tabs during env check, **env-labeled filenames in the Everything store**,
+and **colour-coding error-prone reports/environments** in the Everything tab.
+**A3 (results tab) and D1 (adaptive fast mode) were pushed down to v0.14.0** —
+they were the original v0.13.0 draft bucket but lost priority to the interface
+work. Same caveat as the B-series: **live-export verification on the work PC is
+still pending** (the Everything-store filename change touches the export engine).
 
 ## A. Output organization & discoverability
 
@@ -155,10 +170,13 @@ the real export engine).
   (`gui_api` → `list_output_days()`) regardless of whether the chosen report
   exists inside. Filter to runs whose `<report>/` subdir is non-empty, ideally
   re-filtering as the selected report type changes. (`scripts/gui_api.py`)
-- [ ] **A3 — Results tab / in-app file browser** [M] — DEFERRED to v0.13.0 (#9) — A tab to open the
+- [ ] **A3 — Results tab / in-app file browser** [M] — DEFERRED to v0.14.0
+  (pushed down — v0.13.0 became a UI/UX release) (#9) — A tab to open the
   latest per-route files, consolidated workbooks, comparison outputs, failure
   screenshots, and run reports without digging through folders. Much more useful
-  after A1; shares a "what's been produced, where" index with A2.
+  after A1; shares a "what's been produced, where" index with A2. (The v0.13.0
+  Everything-tab **Saved reports** library + env-labeled filenames are a partial
+  down-payment on the "what's been produced, where" index this needs.)
 
 ## B. Batch export & run control
 
