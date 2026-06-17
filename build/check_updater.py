@@ -55,6 +55,31 @@ def test_expected_sha256():
           updater._expected_sha256(Info("1", "v1", "a.zip", "", 0, "")) is None)
 
 
+def test_safe_release_url():
+    print("safe_release_url (only our github repo is ever opened):")
+    repo = updater.GITHUB_REPO
+    page = updater.RELEASES_PAGE
+    good = f"https://github.com/{repo}/releases/tag/v0.11.1"
+    check("our repo's release URL passes through",
+          updater.safe_release_url(good) == good)
+    check("the constant fallback is itself valid (no downgrade loop)",
+          updater.safe_release_url(page) == page)
+    check("empty -> releases page", updater.safe_release_url("") == page)
+    check("None -> releases page", updater.safe_release_url(None) == page)
+    check("a different github repo -> releases page",
+          updater.safe_release_url("https://github.com/evil/repo/releases") == page)
+    check("look-alike host -> releases page",
+          updater.safe_release_url(f"https://github.com.evil.test/{repo}/x") == page)
+    check("userinfo @-trick host -> releases page",
+          updater.safe_release_url(f"https://github.com@evil.test/{repo}/x") == page)
+    check("http (not https) -> releases page",
+          updater.safe_release_url(f"http://github.com/{repo}/releases") == page)
+    check("file: scheme -> releases page",
+          updater.safe_release_url("file:///C:/Windows/System32/calc.exe") == page)
+    check("javascript: scheme -> releases page",
+          updater.safe_release_url("javascript:alert(1)") == page)
+
+
 def _make_tree(base, exe_bytes, internal_bytes, extras=None):
     base.mkdir(parents=True, exist_ok=True)
     (base / updater._EXE_NAME).write_bytes(exe_bytes)
@@ -181,6 +206,7 @@ def main():
     try:
         test_versions()
         test_expected_sha256()
+        test_safe_release_url()
         test_sha256_verify(monkeypatch_wait)
         test_staged_allowlist(monkeypatch_wait)
         test_missing_exe_aborts(monkeypatch_wait)

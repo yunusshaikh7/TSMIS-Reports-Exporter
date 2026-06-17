@@ -22,9 +22,15 @@ adversarial refutation; all methods agreed.
 - ✅ **Cross-env Ramp Summary VALIDATED** (route-keyed): PROD-vs-TEST = 32 genuine
   diff cells / 9 routes (confirmed vs raw PDF text); PROD==ARS. All 4 delivered
   workbooks internally sound (SELF-CHECK all OK, parity clean, full coverage).
-- [ ] **STILL TODO — regression-lock it:** add golden fixtures (Ramp Detail
+- [x] ~~**STILL TODO — regression-lock it:** add golden fixtures (Ramp Detail
   mid-route-insert misalignment → PM key collapses it; Ramp Summary planted-diff +
-  one-sided route) under `build/check_compare_*.py`.
+  one-sided route) under `build/check_compare_*.py`.~~ **Done (2026-06-16):**
+  `build/check_compare_ramp_detail.py` (a mid-route ramp insert that cascades into
+  5 spurious diff cells under coarse keying collapses to 1 one-sided ramp / 0 diff
+  cells under PM keying — driven end-to-end through `compare_folders`, plus the
+  adapter config `key_col="PM"` pinned) and `build/check_compare_ramp_summary.py`
+  (planted 1-cell diff + two one-sided routes + padded/unpadded route-key pairing).
+  Both wired into `.github/workflows/checks.yml` (blocking).
 
 ## Source-data finding (NOT a parser bug) — from the 2026-06-16 audit
 
@@ -37,9 +43,10 @@ adversarial refutation; all methods agreed.
   mismatches) and the raw page-2 text. The `_audit_ok` cell correctly flags these routes RED
   (working as designed). Do NOT "fix" the parser to force them green — that would hide a real
   TSMIS data issue. Harmless to the cross-env comparison (the identical gap cancels on both sides).
-  - [ ] Optional UX: when ONLY the ramp-types audit check fails (hwy/onoff/pop reconcile),
-    label the red cell self-explanatorily ("source breakdown doesn't reconcile to total")
-    so users don't read it as a tool bug. (`consolidate_ramp_summary.build_workbook` audit col.)
+  - [x] ~~Optional UX: when ONLY the ramp-types audit check fails (hwy/onoff/pop reconcile),
+    label the red cell self-explanatorily so users don't read it as a tool bug.~~
+    **Done (commit `59b0be6`):** the per-route Audit-OK cell now shows
+    `⚠ Source ≠ total: <section>` naming the unreconciled section(s).
   - [ ] Optional: report the inconsistency upstream to the TSMIS team.
 
 ## Live-export verification (needs TSMIS access — this dev PC can't reach it)
@@ -75,14 +82,35 @@ adversarial refutation; all methods agreed.
 
 ## Low priority
 
-- [ ] **`extractall` / junction-traversal safety review** — likely N/A (the
-  comparison reads existing files; it does not extract archives), but confirm the
-  reset path can't follow a junction/symlink outside its targets, and close.
-- [ ] **Audit investigate-list residue** — a few low-confidence items from the code
-  review were never individually confirmed closed: values-flavor SELF-CHECK
-  independence (does it recompute independently, or share the mirror it checks?),
-  updater `_wait_pid_exit` PID-recycle, `open_release_page` URL provenance, env-scan
-  page-reuse CONFIG bleed. Spot-check each → close or fix.
+- [x] ~~**`extractall` / junction-traversal safety review** — confirm the reset
+  path can't follow a junction/symlink outside its targets, and close.~~
+  **Done (2026-06-16):** empirically verified on the build's Python 3.11 +
+  Windows — `shutil.rmtree` REFUSES a top-level directory junction
+  (onerror/`islink`; the junction's target is left untouched) and does NOT
+  recurse into a nested junction (it removes the link only). `reset_targets`
+  builds its list solely from path constants (OUTPUT_ROOT run folders / fixed
+  legacy names / FAILURES_DIR / INPUT_ROOT), never user-supplied names. The
+  updater's `zipfile.extractall` is also safe: 3.11 sanitizes
+  `..`/absolute/drive members, and the zip is SHA-256-verified + self-produced.
+  (Probes kept in `code-review/_junction_probe*.py`.)
+- [x] ~~**Audit investigate-list residue** — values-flavor SELF-CHECK
+  independence, updater `_wait_pid_exit` PID-recycle, `open_release_page` URL
+  provenance, env-scan page-reuse CONFIG bleed. Spot-check each → close or fix.~~
+  **Done (2026-06-16):**
+  - *SELF-CHECK independence* — CLOSED: the values flavor's SELF-CHECK rows are
+    live Excel formulas over the written sheets (`compare_core._write_summary`
+    `check()`), never the Python `counts` mirror — a genuine internal cross-check.
+  - *`_wait_pid_exit` PID-recycle* — CLOSED (fail-safe): the swap takes the
+    process handle while the app is still alive, which reserves the PID; any
+    OpenProcess failure means the app already exited; the sole residual is a
+    fail-safe timeout that leaves the old version intact. Documented in the fn.
+  - *`open_release_page` URL provenance* — FIXED: `updater.safe_release_url`
+    constrains the opened URL to `https://github.com/<repo>/…`, else the constant
+    releases page (locked by `build/check_updater.py`).
+  - *env-scan CONFIG bleed* — CLOSED: a stale/mismatched CONFIG read can only
+    produce `wrong_site` (combos are unique; `got != [env, src]`), and a clean
+    "ok" is gated by the fail-closed `env_verdict`; the unreachable branch
+    already avoids reading the parked page URL.
 - [ ] **Auth file at rest** — `storage_state` is plaintext JSON (documented, not
   encrypted). Defense-in-depth only: consider DPAPI if IT ever requires it.
 - [ ] **Report upstream to the TSMIS team** — the site hardcodes

@@ -55,6 +55,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -124,6 +125,28 @@ def current_variant():
     if (install_dir() / "_internal" / "ms-playwright").is_dir():
         return "win64-with-browser"
     return "win64"
+
+
+def safe_release_url(url):
+    """Constrain a release URL to our own GitHub repo before it is handed to a
+    browser. UpdateInfo.release_url comes from the GitHub API's html_url —
+    delivered over TLS, but still EXTERNAL data: a forged or TLS-inspected /
+    MITM'd API response could put an arbitrary scheme or host there, and
+    webbrowser.open() on a non-https value (file:, javascript:, a custom
+    handler) can launch something unexpected. Return `url` only when it is an
+    https://github.com/<this repo>/… link; otherwise the releases page built
+    from the hardcoded GITHUB_REPO constant — which, since updates only ever
+    target the latest release, lands on the same page anyway."""
+    try:
+        parts = urllib.parse.urlsplit(str(url or ""))
+        if (parts.scheme == "https"
+                and (parts.hostname or "").lower() == "github.com"
+                and parts.path.lstrip("/").lower().startswith(
+                    GITHUB_REPO.lower() + "/")):
+            return url
+    except (ValueError, TypeError):
+        pass
+    return RELEASES_PAGE
 
 
 # ---------------------------------------------------------------- versions ---
@@ -439,7 +462,20 @@ def _swap_log(log_file, message):
 
 def _wait_pid_exit(pid, timeout_s):
     """True once `pid` has exited (or never existed); False on timeout.
-    ctypes only — no psutil in the bundle."""
+    ctypes only — no psutil in the bundle.
+
+    PID-recycle safety: apply_update_and_restart launches this swap process
+    while the app (pid) is STILL RUNNING (it stays alive ~1.5 s+ after the
+    launch), and OpenProcess below is the swap's very first action — so the
+    handle is taken against the live ORIGINAL process. A held process handle
+    keeps the kernel process object (and therefore the PID) reserved until the
+    handle is closed, so the PID can't be recycled out from under the wait. If
+    OpenProcess instead FAILS, the original has already exited (its PID is gone,
+    or was reused by a process we can't open) — either way our app is down, so
+    returning True to proceed is correct. The only residual case (the swap exe
+    so slow to start that the app exits AND the PID is reused by a live process
+    first) merely lets the wait time out, so the swap reports 'not applied' and
+    the old version is left intact and logged — fail-safe, never a half-swap."""
     import ctypes
     SYNCHRONIZE = 0x00100000
     kernel32 = ctypes.windll.kernel32

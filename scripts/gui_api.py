@@ -872,7 +872,10 @@ class GuiApi:
 
     @_api_method
     def open_release_page(self):
-        url = self._update.get("url") or updater.RELEASES_PAGE
+        # Constrain to our own GitHub repo: release_url is API-sourced (html_url),
+        # and webbrowser.open on an attacker-influenced value could launch an
+        # arbitrary handler. safe_release_url falls back to the constant page.
+        url = updater.safe_release_url(self._update.get("url"))
         ui_log.info("opening release page: %s", url)
         webbrowser.open(url)
         return {"ok": True}
