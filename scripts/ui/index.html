@@ -183,6 +183,15 @@
           <p class="hint" id="fastHint">Faster, but heavier on your PC; 3–4 recommended. Per-route Skip is off in fast mode.</p>
         </div>
 
+        <div class="card-section">
+          <label class="fast-toggle">
+            <input type="checkbox" id="autoConsolidate" hidden>
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="fast-label">Consolidate each report when its export finishes</span>
+          </label>
+          <p class="hint">Builds the combined workbook automatically after the export. Skipped for reports with no consolidator (Intersection Summary / Detail).</p>
+        </div>
+
         <div class="card-section actions-row">
           <button class="btn btn-accent" id="btnStartExport">
             <svg class="ic"><use href="#i-play"/></svg>Start export

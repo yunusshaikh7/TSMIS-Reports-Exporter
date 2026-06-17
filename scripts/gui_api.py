@@ -897,7 +897,8 @@ class GuiApi:
     # ---- export ----------------------------------------------------------------
 
     @_api_method
-    def start_export(self, report_idxs, routes_text, fast, workers):
+    def start_export(self, report_idxs, routes_text, fast, workers,
+                     auto_consolidate=False):
         # Validate inputs BEFORE claiming the task slot (pure, no shared state),
         # then claim atomically -- so two quick clicks can't both pass the gate
         # and launch two export runs (the old check-then-set raced).
@@ -937,6 +938,8 @@ class GuiApi:
             msg += f"   ·   {len(run_routes)} routes"
         if n_workers > 1:
             msg += f"   ·   FAST MODE ({n_workers} browsers)"
+        if auto_consolidate:
+            msg += "   ·   auto-consolidate"
         self._emit_log(msg)
         self._set_dot("busy",
                       f"Exporting {len(specs)} report(s)…" if len(specs) > 1
@@ -947,7 +950,8 @@ class GuiApi:
         self._push_state()
         worker = ExportWorker(specs, self._q, self.cancel_event, self.skip_event,
                               workers=n_workers, routes=run_routes,
-                              pause_event=self.pause_event)
+                              pause_event=self.pause_event,
+                              auto_consolidate=bool(auto_consolidate))
         with self._lock:
             self._export_worker = worker
         worker.start()

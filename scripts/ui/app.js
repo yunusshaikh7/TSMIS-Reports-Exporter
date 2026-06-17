@@ -1024,7 +1024,8 @@ async function startExport() {
   }
   const fast = $("fastMode").checked;
   const workers = fast ? parseInt($("fastWorkers").value, 10) || S.init.fast.default : 1;
-  const res = await api.start_export(reports, raw, fast, workers);
+  const autoConsolidate = $("autoConsolidate").checked;
+  const res = await api.start_export(reports, raw, fast, workers, autoConsolidate);
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 
@@ -1747,7 +1748,7 @@ function makeMockApi() {
     push({ t: "log", text: "Update available: v9.9.9 (148 MB) — click ‘Update to v9.9.9’ in the title bar to install it." });
   }
 
-  function runMockExport(reports, routes, fast, workers) {
+  function runMockExport(reports, routes, fast, workers, autoConsolidate) {
     st.task = "export"; st.fast_run = fast;
     st.auth_dot = "busy";
     st.auth_text = reports.length > 1 ? `Exporting ${reports.length} report(s)…`
@@ -1773,8 +1774,12 @@ function makeMockApi() {
       if (done >= total) {
         clearInterval(timer); timer = null;
         push({ t: "log", text: "" },
-             { t: "log", text: `Done. ${total} routes handled — saved ${counts.saved}, already had ${counts.exists}, empty ${counts.empty}, skipped ${counts.skipped}, failed ${counts.failed}.` },
-             { t: "run_ended" });
+             { t: "log", text: `Done. ${total} routes handled — saved ${counts.saved}, already had ${counts.exists}, empty ${counts.empty}, skipped ${counts.skipped}, failed ${counts.failed}.` });
+        if (autoConsolidate) {
+          reports.filter((i) => i < 4).forEach((i) =>
+            push({ t: "log", text: `Auto-consolidating ${REPORTS[i].label}… done.` }));
+        }
+        push({ t: "run_ended" });
         st.task = null; st.fast_run = false; st.can_save_report = true;
         st.auth_dot = st.authed ? "ok" : "bad";
         st.auth_text = st.authed ? "Session ready" : "No saved login — click Log in";
@@ -2004,10 +2009,10 @@ function makeMockApi() {
       }
       return { ok: true, count: out.length, routes: ROUTES.filter((r) => out.includes(r)) };
     },
-    start_export: async (reports, routesText, fast, workers) => {
+    start_export: async (reports, routesText, fast, workers, autoConsolidate) => {
       // Mock keeps runs short: a typed subset caps at 24 routes, "all" at 32.
       const routes = routesText ? ROUTES.slice(0, 24) : ROUTES.slice(0, 32);
-      runMockExport(reports, routes, fast, workers);
+      runMockExport(reports, routes, fast, workers, autoConsolidate);
       return { ok: true };
     },
     skip_route: async () => push({ t: "log", text: "Skip requested — will move on once the current wait ends." }),

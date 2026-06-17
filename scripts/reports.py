@@ -77,3 +77,21 @@ COMPARE_REPORTS = [
     ("Highway Sequence Listing — between environments", _cmp_env.HIGHWAY_SEQUENCE, "folders"),
     ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders"),
 ]
+
+# B2 (auto-consolidate on export finish): which consolidate module handles each
+# EXPORTABLE report, keyed by the export ReportSpec's output subdir so this can't
+# drift from the lists above. Intersection Summary / Detail are export-only and
+# have no consolidator (absent from the map -> None).
+_CONSOLIDATOR_BY_SUBDIR = {
+    _RAMP_SUMMARY_SPEC.subdir: _c_ramp_summary,
+    _RAMP_DETAIL_SPEC.subdir: _c_ramp_detail,
+    _HIGHWAY_SEQ_SPEC.subdir: _c_highway_seq,
+    _HIGHWAY_LOG_SPEC.subdir: _c_highway_log,
+}
+
+
+def consolidator_for_spec(spec):
+    """The consolidate module for an export ReportSpec, or None when the report
+    is export-only (Intersection Summary / Detail). Keyed on the spec's output
+    subdir."""
+    return _CONSOLIDATOR_BY_SUBDIR.get(getattr(spec, "subdir", None))

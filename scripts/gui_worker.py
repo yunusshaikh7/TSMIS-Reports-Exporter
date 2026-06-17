@@ -146,7 +146,7 @@ class ExportWorker(threading.Thread):
     when all selected reports finish (the list is partial if cancelled)."""
 
     def __init__(self, specs, queue, cancel_event, skip_event, workers=1, routes=None,
-                 pause_event=None):
+                 pause_event=None, auto_consolidate=False):
         super().__init__(daemon=True, name="export")
         # Accept a single spec or a list, so callers can't trip on the shape.
         self.specs = list(specs) if isinstance(specs, (list, tuple)) else [specs]
@@ -154,6 +154,7 @@ class ExportWorker(threading.Thread):
         self.cancel = cancel_event
         self.skip = skip_event
         self.pause = pause_event or threading.Event()    # B1: between-route hold
+        self.auto_consolidate = bool(auto_consolidate)   # B2: combine after each
         self.workers = workers              # >1 -> experimental parallel "fast mode"
         # None means "all routes"; otherwise the chosen subset. Stored as a
         # concrete list so the engine and the progress total agree.
@@ -192,6 +193,38 @@ class ExportWorker(threading.Thread):
     def _on_screenshot(self, worker_no, image, note, url=""):
         b64 = base64.b64encode(image).decode("ascii") if image else None
         self.q.put(("preview_shot", (worker_no, b64, note, url)))
+
+    def _auto_consolidate(self, spec, result, events):
+        """B2: build `spec`'s combined workbook right after its export, reusing
+        the same Events sink so progress flows into the log. Runs inline on this
+        worker thread (the single-task gate already holds the 'export' slot, so a
+        separate ConsolidateWorker would deadlock). Skipped for export-only
+        reports (no consolidator) and when nothing was saved. A consolidation
+        failure is logged, never fatal — the export itself already succeeded."""
+        from pathlib import Path
+        from reports import consolidator_for_spec
+        mod = consolidator_for_spec(spec)
+        if mod is None:
+            self.q.put(("log", f"  Auto-consolidate: {spec.label} has no "
+                               "consolidator — skipped."))
+            return
+        if not (result.saved or result.exists):
+            self.q.put(("log", f"  Auto-consolidate: nothing to combine for "
+                               f"{spec.label} — skipped."))
+            return
+        day = Path(result.output_dir).parent.name if result.output_dir else None
+        self.q.put(("log", ""))
+        self.q.put(("log", f"Auto-consolidating {spec.label}…"))
+        try:
+            res = mod.consolidate(events=events,
+                                  confirm_overwrite=lambda _p: True, day=day)
+            lines = res.summary_lines or ([res.message] if res.message else [])
+            for line in lines:
+                self.q.put(("log", f"  {line}"))
+        except Exception as e:
+            log.exception("auto-consolidate failed for %s", spec.label)
+            self.q.put(("log", f"  Auto-consolidate failed: {type(e).__name__} "
+                               "(details in the log)."))
 
     def _on_route(self, route, status):
         with self._tally_lock:              # in fast mode this fires from many threads
@@ -251,6 +284,8 @@ class ExportWorker(threading.Thread):
                 else:
                     result = run_export(spec, events, routes=self.routes)
                 results.append((spec, result))
+                if self.auto_consolidate and not self.cancel.is_set():
+                    self._auto_consolidate(spec, result, events)
             self.q.put(("export_done", results))
             return
         except AuthError as e:

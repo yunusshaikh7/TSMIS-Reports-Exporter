@@ -1,0 +1,158 @@
+"""Golden check for B2 — auto-consolidate on export finish (v0.12.0).
+
+Covers reports.consolidator_for_spec (the export-subdir -> consolidate-module map,
+None for the export-only Intersection reports) and ExportWorker._auto_consolidate
+(runs inline with the right run-folder day + silent overwrite, skips export-only
+reports and empty runs, and is non-fatal on a consolidator error).
+
+Run with the build venv:
+    build\\.venv\\Scripts\\python.exe build\\check_b2_autoconsolidate.py
+"""
+import queue as queue_mod
+import sys
+import threading
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
+
+import reports
+import gui_worker
+import consolidate_ramp_summary
+import consolidate_ramp_detail
+import consolidate_highway_sequence
+import consolidate_highway_log
+from events import Events, RunResult, ConsolidateResult
+
+_fail = []
+
+
+def check(name, cond):
+    print(f"  [{'OK ' if cond else 'FAIL'}] {name}")
+    if not cond:
+        _fail.append(name)
+
+
+class _FakeSpec:
+    def __init__(self, label, subdir):
+        self.label, self.subdir = label, subdir
+
+
+def _drain_log(q):
+    out = []
+    while not q.empty():
+        kind, payload = q.get()
+        if kind == "log":
+            out.append(payload)
+    return "\n".join(out)
+
+
+def test_mapping():
+    print("reports.consolidator_for_spec:")
+    expect = {
+        "ramp_summary": consolidate_ramp_summary,
+        "ramp_detail": consolidate_ramp_detail,
+        "highway_sequence": consolidate_highway_sequence,
+        "highway_log": consolidate_highway_log,
+    }
+    for _label, _fmt, spec in reports.EXPORT_REPORTS:
+        got = reports.consolidator_for_spec(spec)
+        if spec.subdir in expect:
+            check(f"{spec.subdir} -> its consolidator", got is expect[spec.subdir])
+        else:
+            check(f"{spec.subdir} (export-only) -> None", got is None)
+
+
+def _worker():
+    return gui_worker.ExportWorker([], queue_mod.Queue(), threading.Event(),
+                                   threading.Event(), auto_consolidate=True)
+
+
+def test_runs_with_day_and_overwrite():
+    print("_auto_consolidate runs the consolidator (day + silent overwrite):")
+    seen = {}
+
+    class FakeMod:
+        def consolidate(self, events=None, confirm_overwrite=None, day=None):
+            seen["day"] = day
+            seen["overwrite"] = confirm_overwrite("x.xlsx")
+            return ConsolidateResult(status="ok",
+                                     summary_lines=["FAKE: combined 5 routes"])
+
+    orig = reports.consolidator_for_spec
+    reports.consolidator_for_spec = lambda spec: FakeMod()
+    try:
+        w = _worker()
+        out_dir = str(Path("Z:/x/output/2026-06-16 ssor-prod/ramp_summary"))
+        res = RunResult(output_dir=out_dir, saved=3)
+        w._auto_consolidate(_FakeSpec("Ramp Summary", "ramp_summary"), res, Events())
+        logs = _drain_log(w.q)
+        check("day derived from the run folder", seen.get("day") == "2026-06-16 ssor-prod")
+        check("overwrites silently (confirm -> True)", seen.get("overwrite") is True)
+        check("announces the report", "Auto-consolidating Ramp Summary" in logs)
+        check("logs the consolidator summary", "combined 5 routes" in logs)
+    finally:
+        reports.consolidator_for_spec = orig
+
+
+def test_skips_and_is_nonfatal():
+    print("_auto_consolidate skips export-only / empty runs and survives errors:")
+    orig = reports.consolidator_for_spec
+
+    # Export-only report (no consolidator): skipped, nothing run.
+    reports.consolidator_for_spec = lambda spec: None
+    try:
+        w = _worker()
+        w._auto_consolidate(_FakeSpec("Intersection Detail", "intersection_detail"),
+                            RunResult(output_dir="x", saved=4), Events())
+        check("export-only report is skipped (logged)",
+              "no consolidator" in _drain_log(w.q).lower())
+
+        # Has a consolidator, but nothing was saved -> skipped.
+        called = {"n": 0}
+
+        class FakeMod:
+            def consolidate(self, **k):
+                called["n"] += 1
+                return ConsolidateResult(status="ok")
+
+        reports.consolidator_for_spec = lambda spec: FakeMod()
+        w = _worker()
+        w._auto_consolidate(_FakeSpec("Ramp Summary", "ramp_summary"),
+                            RunResult(output_dir="x", saved=0), Events())
+        check("empty run skips consolidation (not called)", called["n"] == 0)
+        check("empty run logs the skip", "nothing to combine" in _drain_log(w.q).lower())
+
+        # Consolidator raises -> logged, never propagated (export already succeeded).
+        class BoomMod:
+            def consolidate(self, **k):
+                raise RuntimeError("boom")
+
+        reports.consolidator_for_spec = lambda spec: BoomMod()
+        w = _worker()
+        raised = False
+        try:
+            w._auto_consolidate(_FakeSpec("Ramp Summary", "ramp_summary"),
+                                RunResult(output_dir="x", saved=1), Events())
+        except Exception:
+            raised = True
+        check("a consolidator error does NOT propagate", not raised)
+        check("the error is logged", "failed" in _drain_log(w.q).lower())
+    finally:
+        reports.consolidator_for_spec = orig
+
+
+def main():
+    test_mapping()
+    test_runs_with_day_and_overwrite()
+    test_skips_and_is_nonfatal()
+    print()
+    if _fail:
+        print(f"FAILED: {len(_fail)} check(s): {_fail}")
+        return 1
+    print("ALL B2 AUTO-CONSOLIDATE CHECKS PASSED")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
