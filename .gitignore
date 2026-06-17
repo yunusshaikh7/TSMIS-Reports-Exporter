@@ -75,6 +75,11 @@ spike/
 /batch_job.json
 /data/batch_job.json
 
+# The packaged app's data dir (profiles, caches, settings, manifests, downloaded
+# browser). All current contents are ignored individually above; this blanket
+# rule is defense-in-depth so a future data\ file can't be committed by accident.
+/data/
+
 # Local scratch area for code-review audit runs. The reusable prompt is the
 # tracked CODE-REVIEW-PROMPT.md at repo root; per-run reports quote code +
 # internal detail, so they stay local (never committed).
