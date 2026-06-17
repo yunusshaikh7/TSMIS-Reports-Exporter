@@ -167,9 +167,12 @@ def test_auto_consolidate_into_dest():
         check("dest mode uses day=None", seen.get("day") is None)
         check("input_dir = <dest>/<src-env>/<subdir>",
               norm(seen.get("input_dir")).endswith("/ssor-prod/highway_log"))
-        check("out_path = <dest>/<src-env>/consolidated/<FILENAME>",
+        # The combined workbook in the always-current store is env-labeled too
+        # (front-stamped with the <src-env> tag), so a file lifted out still
+        # says which environment it came from — see paths.env_tagged_filename.
+        check("out_path = <dest>/<src-env>/consolidated/<src-env FILENAME>",
               norm(seen.get("out_path")).endswith(
-                  "/ssor-prod/consolidated/highway_log_consolidated.xlsx"))
+                  "/ssor-prod/consolidated/ssor-prod highway_log_consolidated.xlsx"))
     finally:
         reports.consolidator_for_spec = orig
 

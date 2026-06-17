@@ -13,6 +13,7 @@ Covers:
     touched (driven against fake trees with the pid-wait stubbed)
   * a missing staged exe aborts the swap cleanly
 """
+import json
 import sys
 from pathlib import Path
 import tempfile
@@ -78,6 +79,76 @@ def test_safe_release_url():
           updater.safe_release_url("file:///C:/Windows/System32/calc.exe") == page)
     check("javascript: scheme -> releases page",
           updater.safe_release_url("javascript:alert(1)") == page)
+
+
+class _FakeReleasesResp:
+    """A context-manager stand-in for _http_get's response: json.load(resp)
+    reads the whole body in one call."""
+    def __init__(self, payload):
+        self._b = json.dumps(payload).encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self, *a):
+        return self._b
+
+
+def _rel(tag, *, draft=False, prerelease=False, variants=("win64", "win64-with-browser")):
+    """A minimal GitHub release object with one zip (+ .sha256) per variant."""
+    assets = []
+    for v in variants:
+        zip_name = f"TSMIS-Exporter-{tag}-{v}.zip"
+        assets.append({"name": zip_name, "browser_download_url": f"http://x/{zip_name}",
+                       "size": 10, "digest": ""})
+        assets.append({"name": zip_name + ".sha256",
+                       "browser_download_url": f"http://x/{zip_name}.sha256"})
+    return {"tag_name": tag, "draft": draft, "prerelease": prerelease,
+            "html_url": f"https://github.com/x/releases/tag/{tag}", "assets": assets}
+
+
+def test_resolve_previous_release():
+    print("resolve_previous_release (revert target = newest FULL release older than this build):")
+    orig = updater._http_get
+    try:
+        # Out of list order, with a draft + a prerelease ABOVE the right answer,
+        # to prove selection is by version number and ignores draft/prerelease.
+        payload = [
+            _rel("v0.11.0"), _rel("v0.13.0"),       # 0.13.0 == current -> excluded
+            _rel("v0.12.0"),                          # <- the correct answer
+            _rel("v0.12.5", draft=True),              # newer-older but a draft -> ignored
+            _rel("v0.12.9", prerelease=True),         # newer-older but prerelease -> ignored
+            _rel("v0.10.0"),
+        ]
+        updater._http_get = lambda url, timeout: _FakeReleasesResp(payload)
+        info = updater.resolve_previous_release(current_version="0.13.0", variant="win64")
+        check("picks newest full release strictly older (v0.12.0, not list order / draft / pre)",
+              info is not None and info.tag == "v0.12.0")
+        check("asset matches the requested variant",
+              info is not None and info.asset_name.endswith("-win64.zip"))
+        check("companion .sha256 url carried through",
+              info is not None and info.asset_sha256_url.endswith("-win64.zip.sha256"))
+
+        # The newest-older release lacks the with-browser zip -> skip to the
+        # next-older one that has it (NOT the forward check's "try again later").
+        payload2 = [_rel("v0.12.0", variants=("win64",)),
+                    _rel("v0.11.0", variants=("win64", "win64-with-browser"))]
+        updater._http_get = lambda url, timeout: _FakeReleasesResp(payload2)
+        info2 = updater.resolve_previous_release(current_version="0.13.0",
+                                                 variant="win64-with-browser")
+        check("variant-skip: falls to the next-older release that has the variant (v0.11.0)",
+              info2 is not None and info2.tag == "v0.11.0")
+
+        # No release older than this build -> None (a clean "nothing to revert to").
+        updater._http_get = lambda url, timeout: _FakeReleasesResp(
+            [_rel("v0.13.0"), _rel("v0.14.0")])
+        check("no older release -> None (not an error)",
+              updater.resolve_previous_release(current_version="0.13.0", variant="win64") is None)
+    finally:
+        updater._http_get = orig
 
 
 def _make_tree(base, exe_bytes, internal_bytes, extras=None):
@@ -207,6 +278,7 @@ def main():
         test_versions()
         test_expected_sha256()
         test_safe_release_url()
+        test_resolve_previous_release()
         test_sha256_verify(monkeypatch_wait)
         test_staged_allowlist(monkeypatch_wait)
         test_missing_exe_aborts(monkeypatch_wait)
