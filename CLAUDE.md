@@ -485,19 +485,28 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
     same Events sink; `reports.consolidator_for_spec` maps export→consolidate by
     subdir; Intersection reports have none and are skipped; failures are logged,
     never fatal). `build/check_b2_autoconsolidate.py`.
-  - **B3 Export Everything:** the **Everything** tab runs selected report types ×
-    selected environments SEQUENTIALLY (`gui_worker.BatchWorker`) into the normal
-    `output/<run>/<report>/` layout, reusing `ExportWorker._run_specs` per env — so
-    resume/idempotency, fast mode, pause (B1) and auto-consolidate (B2) all come
-    free. Per-env targeting uses the **process-global `common.set_site`** (NOT
-    `set_thread_site` — the batch is a single sequential orchestrator and the
-    single-task gate guarantees no concurrent export; the original selection is
-    restored at the end). Progress persists to `batch_manifest` (`DATA_ROOT/
-    batch_job.json`, atomic write, untouched by Delete-all-reports) after every
-    environment, so a batch resumes across app restarts; a startup resume banner
-    offers Resume/Discard (`GuiApi.start_batch_export`/`resume_batch`/
-    `discard_batch`). The physical report-first deliverable tree was DEFERRED (a
-    log/manifest summary instead). `build/check_b3_batch.py`.
+  - **B3 Export Everything (always-current store):** the **Everything** tab runs
+    selected report types × selected environments SEQUENTIALLY
+    (`gui_worker.BatchWorker`, per-env, reusing `ExportWorker._run_specs`) into a
+    CONFIGURABLE destination (`settings.get/set_batch_dest`, default
+    `output/All Reports (current)`), laid out `<dest>/<src-env>/<report>/`
+    (+ `consolidated/`) — UNDATED and OVERWRITTEN in place so it always holds the
+    latest of every report. Each report+env folder is cleared then re-exported (a
+    true REFRESH, not a resume-skip) via the engine's `out_dir` override +
+    ExportWorker `out_base`; the 4 consolidators gained `input_dir`/`out_path`
+    overrides so auto-consolidate (B2) lands in the dest too. Per-env targeting
+    uses the **process-global `common.set_site`** (NOT `set_thread_site` — a single
+    sequential orchestrator under the single-task gate; original restored at end);
+    fast mode + pause (B1) reused. The tab shows the destination (folder picker)
+    and a **Saved reports library** — each type's age, stale ones flagged, with
+    per-report Refresh (a 1-report batch) — via `report_library.report_ages` +
+    `GuiApi.report_library_info`/`set_batch_dest`/`pick_batch_dest`. Progress
+    persists to `batch_manifest` (`DATA_ROOT/batch_job.json`, atomic, untouched by
+    Delete-all-reports) so a batch resumes across restarts (startup Resume/Discard
+    banner; `start_batch_export`/`resume_batch`/`discard_batch`). NOTE: the GUI is
+    a stopgap — a full GUI overhaul is planned (the user designs it elsewhere), so
+    don't over-invest in the current Everything-tab layout. `build/check_b3_batch.py`
+    + `build/check_report_library.py`.
 - **Run folders (v0.10.0; replaces bare dated outputs):** every run writes into
   `output/<YYYY-MM-DD src-env>/<report>/` (`paths.output_run_dir`, src/env from
   `common.get_site()` at run start), so each day's exports live in their own
