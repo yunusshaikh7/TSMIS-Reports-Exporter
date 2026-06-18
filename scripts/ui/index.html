@@ -165,6 +165,9 @@
           <button class="tab" id="tabCompare" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-compare"/></svg>Compare
           </button>
+          <button class="tab" id="tabHighwayLog" role="tab" aria-selected="false">
+            <svg class="ic"><use href="#i-scroll"/></svg>Highway Log
+          </button>
           <button class="tab" id="tabEverything" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-zap"/></svg>Everything
           </button>
@@ -359,10 +362,12 @@
         </div>
       </div>
 
-      <!-- Compare pane. Two families on sub-tabs: cross-environment (default)
-           and TSMIS vs TSN. #compareSubtabs is generated from compare_groups. -->
+      <!-- Compare pane. SHARED by the "Compare" and "Highway Log" tabs: the
+           comparison list is filtered to the active tab's reports (app.js
+           selectCompareTab). The old per-family sub-tab strip is retired —
+           #compareSubtabs is kept hidden so the list reads as one flat group. -->
       <div class="card pane hidden" id="paneCompare">
-        <div class="subtabs" id="compareSubtabs" role="tablist"></div>
+        <div class="subtabs hidden" id="compareSubtabs" role="tablist"></div>
         <div class="card-section">
           <div class="section-head"><span class="section-label">Comparison type</span></div>
           <div class="option-list" id="compareList"></div>
@@ -370,21 +375,19 @@
 
         <div class="card-section" id="cmpFilesSection">
           <div class="section-head"><span class="section-label">Files to compare</span></div>
-          <p class="hint" style="margin-bottom:10px">
-            Pick the TSMIS file and the TSN file — either two per-route workbooks
-            (e.g. one route's export vs its TSN conversion from
-            <span class="mono">output\tsn_highway_log</span>) or two consolidated
-            workbooks (all routes).
+          <p class="hint" style="margin-bottom:10px" id="cmpFilesHint">
+            Pick the two files — either two per-route workbooks (e.g. one route's
+            export vs its conversion) or two consolidated workbooks (all routes).
           </p>
           <div class="file-pick-row">
-            <span class="file-pick-label">TSMIS file</span>
+            <span class="file-pick-label" id="cmpTsmisLabel">TSMIS file</span>
             <span class="mono path file-pick-path" id="cmpTsmisPath">— not selected —</span>
             <button class="btn btn-standard" id="btnPickTsmis">
               <svg class="ic"><use href="#i-folder-open"/></svg>Browse…
             </button>
           </div>
           <div class="file-pick-row">
-            <span class="file-pick-label">TSN file</span>
+            <span class="file-pick-label" id="cmpTsnLabel">TSN file</span>
             <span class="mono path file-pick-path" id="cmpTsnPath">— not selected —</span>
             <button class="btn btn-standard" id="btnPickTsn">
               <svg class="ic"><use href="#i-folder-open"/></svg>Browse…

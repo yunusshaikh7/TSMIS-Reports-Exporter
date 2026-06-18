@@ -818,18 +818,31 @@ class GuiApi:
             self._start_checks_locked()
             self._start_update_check()       # quiet unless an update exists
             self._batch_resume = self._pending_batch()   # offer to resume an interrupted batch
+        _export_fmt = {label: fmt for label, fmt, _spec in EXPORT_REPORTS}
         return {
             "app_name": APP_NAME,
             "version": __version__,
             "output_root": str(OUTPUT_ROOT),
             "log_dir": str(LOG_DIR),
             "reports": [{"label": label, "fmt": fmt} for label, fmt, _spec in EXPORT_REPORTS],
-            "cons_reports": [label for label, _mod in CONSOLIDATE_REPORTS],
+            # Each consolidate entry carries its INPUT file format for the tab
+            # badge: a module's own INPUT_FMT (the PDF-input consolidators) wins,
+            # else the matching export report's format, else Excel.
+            "cons_reports": [{"label": label,
+                              "fmt": (getattr(_mod, "INPUT_FMT", None)
+                                      or _export_fmt.get(label, "Excel"))}
+                             for label, _mod in CONSOLIDATE_REPORTS],
             "compare_groups": [{"id": gid, "label": glabel}
                                for gid, glabel in COMPARE_GROUPS],
             "compare_reports": [{"label": label, "kind": kind, "group": group,
-                                 "subdir": getattr(_mod, "subdir", None)}
-                                for label, _mod, kind, group in COMPARE_REPORTS],
+                                 "tab": tab,
+                                 "subdir": getattr(_mod, "subdir", None),
+                                 # The two file-picker labels for "files"
+                                 # comparisons (so e.g. PDF-vs-Excel doesn't
+                                 # mislabel both TSMIS sides "TSMIS"/"TSN").
+                                 "file_a_label": getattr(_mod, "file_a_label", "TSMIS"),
+                                 "file_b_label": getattr(_mod, "file_b_label", "TSN")}
+                                for label, _mod, kind, group, tab in COMPARE_REPORTS],
             "routes": list(ROUTES),
             "channels": [{"id": c, "label": CHANNEL_LABELS[c],
                           "short": _CHANNEL_SHORT.get(c, CHANNEL_LABELS[c])}
@@ -1645,7 +1658,7 @@ class GuiApi:
         row = self._pick_report(COMPARE_REPORTS, report_idx)
         if row is None:
             return {"error": "That comparison isn't available — please reopen the tab."}
-        label, mod, kind, _group = row
+        label, mod, kind, _group = row[:4]
         if kind != "files":
             return {"error": "This comparison type takes folders, not files."}
         if not tsmis_path or not tsn_path:
@@ -1682,7 +1695,7 @@ class GuiApi:
         row = self._pick_report(COMPARE_REPORTS, report_idx)
         if row is None:
             return {"folders": list_output_days()}
-        _label, adapter, kind, _group = row
+        _label, adapter, kind, _group = row[:4]
         subdir = getattr(adapter, "subdir", None)
         if kind != "folders" or not subdir:
             return {"folders": list_output_days()}
@@ -1696,7 +1709,7 @@ class GuiApi:
         row = self._pick_report(COMPARE_REPORTS, report_idx)
         if row is None:
             return {"error": "That comparison isn't available — please reopen the tab."}
-        label, adapter, kind, _group = row
+        label, adapter, kind, _group = row[:4]
         if kind != "folders":
             return {"error": "This comparison type takes files, not folders."}
         if not dir_a or not dir_b:

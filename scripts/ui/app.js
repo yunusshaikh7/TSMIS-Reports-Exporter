@@ -562,19 +562,20 @@ function buildStatic() {
   updateBatchCount();
   if (S.init.batch_dest) setBatchDest(S.init.batch_dest);
 
-  // consolidate radios
+  // consolidate radios. Each cons_reports entry is {label, fmt} where fmt is the
+  // INPUT file format (PDF or Excel) — shown as a badge so the PDF-input
+  // consolidators (TSN / TSMIS Highway Log PDF) are labeled like the rest.
   const cl = $("consList");
-  init.cons_reports.forEach((label, i) => {
+  init.cons_reports.forEach((rep, i) => {
     const row = document.createElement("label");
     row.className = "option-row" + (i === 0 ? " checked" : "");
     const rb = document.createElement("input");
     rb.type = "radio"; rb.name = "consReport"; rb.checked = i === 0; rb.dataset.idx = i;
     const dot = document.createElement("span"); dot.className = "radio";
     const name = document.createElement("span");
-    name.className = "option-name"; name.textContent = label;
-    const rep = init.reports.find((r) => r.label === label);
+    name.className = "option-name"; name.textContent = rep.label;
     row.append(rb, dot, name);
-    if (rep) {
+    if (rep.fmt) {
       const chip = document.createElement("span");
       chip.className = "chip " + (rep.fmt === "PDF" ? "chip-pdf" : "chip-excel");
       chip.textContent = rep.fmt;
@@ -588,28 +589,16 @@ function buildStatic() {
     cl.appendChild(row);
   });
 
-  // comparison-type sub-tabs + radios. Each registry row carries a `group`
-  // (cross-env vs TSMIS-vs-TSN today); every group is a sub-tab, and the radio
-  // list shows only the active group's reports. A new comparison family is a
-  // registry add — the sub-tabs are generated here from init.compare_groups.
-  const subStrip = $("compareSubtabs");
-  subStrip.textContent = "";
-  (init.compare_groups || []).forEach((g, gi) => {
-    const b = document.createElement("button");
-    b.className = "subtab" + (gi === 0 ? " active" : "");
-    b.dataset.group = g.id;
-    b.setAttribute("role", "tab");
-    b.setAttribute("aria-selected", String(gi === 0));
-    b.textContent = g.label;
-    b.addEventListener("click", () => selectCompareGroup(g.id));
-    subStrip.appendChild(b);
-  });
-
+  // Comparison rows: each carries its top-level TAB id (compare | highway_log).
+  // The list is built once; selectCompareTab() shows only the active tab's rows
+  // as one FLAT list (the old per-family sub-tab split is retired — the Highway
+  // Log comparisons now live on their own tab).
   const cl2 = $("compareList");
   (init.compare_reports || []).forEach((rep, i) => {
     const row = document.createElement("label");
     row.className = "option-row";
     row.dataset.group = rep.group || "";
+    row.dataset.tab = rep.tab || "compare";
     const rb = document.createElement("input");
     rb.type = "radio"; rb.name = "compareReport"; rb.dataset.idx = i;
     const dot = document.createElement("span"); dot.className = "radio";
@@ -623,10 +612,8 @@ function buildStatic() {
     });
     cl2.appendChild(row);
   });
-  // default sub-tab = the first group (cross-environment); also seats the
-  // initial radio selection on a visible row.
-  const groups0 = init.compare_groups || [];
-  if (groups0.length) selectCompareGroup(groups0[0].id);
+  // Seat the initial selection on the Compare tab's first comparison.
+  selectCompareTab("compare");
 
   // titlebar selects
   const fill = (sel, items, currentId) => {
@@ -675,6 +662,9 @@ function consChoice() {
 function compareChoice() {
   const r = $("compareList").querySelector("input:checked");
   return r ? +r.dataset.idx : 0;
+}
+function currentCompareRep() {
+  return (S.init.compare_reports || [])[compareChoice()] || {};
 }
 function selectedDay() {
   return $("selDay").value || null;   // "" = legacy "(older exports)"
@@ -973,7 +963,7 @@ function renderPreflight() {
     addRow("Report", r ? r.textContent : "—", { title: true });
     addRow("From", $("selDay").value || "Newest run");
     addRow("Saves to", $("consDest").textContent || "—", { path: true, title: true });
-  } else if (tab === "compare") {
+  } else if (tab === "compare" || tab === "highwaylog") {
     $("preflightTitle").textContent = "Ready to compare";
     const t = $("compareList").querySelector(".option-row.checked .option-name");
     addRow("Type", t ? t.textContent : "—", { title: true });
@@ -981,8 +971,9 @@ function renderPreflight() {
       addRow("Baseline", $("cmpDirA").value || "— not picked —", { title: true, warn: !$("cmpDirA").value });
       addRow("Compare", $("cmpDirB").value || "— not picked —", { title: true, warn: !$("cmpDirB").value });
     } else {
-      addRow("TSMIS", CMP.tsmis || "— not picked —", { path: !!CMP.tsmis, title: true, warn: !CMP.tsmis });
-      addRow("TSN", CMP.tsn || "— not picked —", { path: !!CMP.tsn, title: true, warn: !CMP.tsn });
+      const rep = currentCompareRep();
+      addRow(rep.file_a_label || "TSMIS", CMP.tsmis || "— not picked —", { path: !!CMP.tsmis, title: true, warn: !CMP.tsmis });
+      addRow(rep.file_b_label || "TSN", CMP.tsn || "— not picked —", { path: !!CMP.tsn, title: true, warn: !CMP.tsn });
     }
     const outs = [];
     if ($("cmpWantValues").checked) outs.push("Values");
@@ -1653,20 +1644,16 @@ function compareKind() {
   return (rep && rep.kind) || "files";
 }
 
-// Switch the Compare sub-tab: highlight the button, show only that group's
-// comparison-type rows, and keep exactly one VISIBLE row selected. Radios share
-// a name, so seating a new pick natively drops the now-hidden previous one;
+// Show only the active top-level tab's comparison rows (Compare vs Highway Log)
+// as ONE flat list, keeping exactly one VISIBLE row selected. Radios share a
+// name, so seating a new pick natively drops the now-hidden previous one;
 // renderCompareKind then swaps in the matching files/folders inputs.
-function selectCompareGroup(groupId) {
-  document.querySelectorAll("#compareSubtabs .subtab").forEach((b) => {
-    const on = b.dataset.group === groupId;
-    b.classList.toggle("active", on);
-    b.setAttribute("aria-selected", String(on));
-  });
+function selectCompareTab(tabId) {
+  S.compareTab = tabId;
   const rows = [...$("compareList").querySelectorAll(".option-row")];
   let firstVisible = null, checkedVisible = false;
   rows.forEach((r) => {
-    const on = r.dataset.group === groupId;
+    const on = (r.dataset.tab || "compare") === tabId;
     r.classList.toggle("hidden", !on);
     if (on) {
       firstVisible = firstVisible || r;
@@ -1742,7 +1729,19 @@ function renderCompareKind() {
   const folders = compareKind() === "folders";
   $("cmpFilesSection").classList.toggle("hidden", folders);
   $("cmpFoldersSection").classList.toggle("hidden", !folders);
-  if (folders) renderCompareDirs();
+  if (folders) {
+    renderCompareDirs();
+  } else {
+    // Label the two file pickers from the selected comparison so a
+    // PDF-vs-Excel comparison doesn't say "TSN" for a TSMIS Excel file.
+    const rep = currentCompareRep();
+    const a = rep.file_a_label || "TSMIS", b = rep.file_b_label || "TSN";
+    $("cmpTsmisLabel").textContent = a + " file";
+    $("cmpTsnLabel").textContent = b + " file";
+    $("cmpFilesHint").textContent =
+      `Pick the ${a} file and the ${b} file — either two per-route workbooks `
+      + `(one route each) or two consolidated workbooks (all routes).`;
+  }
   syncCompareButton();
 }
 
@@ -2037,7 +2036,11 @@ function bindEvents() {
     consolidate: { btn: "tabConsolidate", pane: "paneConsolidate", title: "Consolidate output",
                    sub: "Merge per-route files into a single workbook." },
     compare: { btn: "tabCompare", pane: "paneCompare", title: "Compare reports",
-               sub: "Build a discrepancy workbook from two report sources." },
+               sub: "Build a discrepancy workbook from two report sources.",
+               cmpTab: "compare" },
+    highwaylog: { btn: "tabHighwayLog", pane: "paneCompare", title: "Highway Log comparisons",
+                  sub: "Compare the Highway Log across sources and environments.",
+                  cmpTab: "highway_log" },
     everything: { btn: "tabEverything", pane: "paneEverything", title: "Export everything",
                   sub: "Export selected report types across selected environments." },
     settings: { btn: "tabSettings", pane: "paneSettings", title: "Settings",
@@ -2045,13 +2048,19 @@ function bindEvents() {
   };
   const setTab = (tab) => {
     S.tab = tab;
+    // Compare and Highway Log SHARE paneCompare (filtered per tab), so toggle
+    // visibility by the RESOLVED pane, not per key — otherwise the shared pane
+    // would be hidden when the other of the two is active.
+    const activePane = TABS[tab].pane;
+    new Set(Object.values(TABS).map((t) => t.pane)).forEach((p) =>
+      $(p).classList.toggle("hidden", p !== activePane));
     Object.entries(TABS).forEach(([key, t]) => {
       $(t.btn).classList.toggle("active", key === tab);
       $(t.btn).setAttribute("aria-selected", String(key === tab));
-      $(t.pane).classList.toggle("hidden", key !== tab);
     });
     $("panelTitle").textContent = TABS[tab].title;
     $("panelSub").textContent = TABS[tab].sub;
+    if (TABS[tab].cmpTab) selectCompareTab(TABS[tab].cmpTab);   // filter the shared list
     if (tab === "everything") renderBatchLibrary();
     updateActivityCards();
   };
@@ -2333,6 +2342,7 @@ function makeMockApi() {
     { label: "TSAR: Ramp Detail", fmt: "Excel" },
     { label: "Highway Sequence Listing", fmt: "Excel" },
     { label: "Highway Log", fmt: "Excel" },
+    { label: "Highway Log (PDF)", fmt: "PDF" },
     { label: "Intersection Summary", fmt: "Excel" },
     { label: "Intersection Detail", fmt: "Excel" },
   ];
@@ -2559,17 +2569,30 @@ function makeMockApi() {
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       reports: REPORTS,
-      cons_reports: REPORTS.slice(0, 4).map((r) => r.label).concat(["TSN Highway Log"]),
+      cons_reports: [
+        { label: "TSAR: Ramp Summary", fmt: "PDF" },
+        { label: "TSAR: Ramp Detail", fmt: "Excel" },
+        { label: "Highway Sequence Listing", fmt: "Excel" },
+        { label: "Highway Log", fmt: "Excel" },
+        { label: "TSMIS Highway Log (PDF)", fmt: "PDF" },
+        { label: "TSN Highway Log", fmt: "PDF" },
+      ],
       compare_groups: [
         { id: "env", label: "Cross-environment" },
         { id: "tsn", label: "TSMIS vs TSN" },
+        { id: "pdf", label: "Highway Log (PDF)" },
       ],
       compare_reports: [
-        { label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env" },
-        { label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env" },
-        { label: "Highway Sequence Listing — between environments", kind: "folders", group: "env" },
-        { label: "Highway Log — between environments", kind: "folders", group: "env" },
-        { label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn" },
+        { label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env", tab: "compare" },
+        { label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env", tab: "compare" },
+        { label: "Highway Sequence Listing — between environments", kind: "folders", group: "env", tab: "compare" },
+        { label: "Highway Log — between environments", kind: "folders", group: "env", tab: "highway_log" },
+        { label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn", tab: "highway_log",
+          file_a_label: "TSMIS", file_b_label: "TSN" },
+        { label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "pdf", tab: "highway_log",
+          file_a_label: "TSMIS (PDF)", file_b_label: "TSN (PDF)" },
+        { label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "pdf", tab: "highway_log",
+          file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
       ],
       batch_resume: null,
       batch_dest: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
