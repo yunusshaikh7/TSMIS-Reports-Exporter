@@ -1,14 +1,25 @@
 # CLAUDE.md — TSMIS Reports Exporter
 
 A portable Windows desktop tool that bulk-exports TSMIS (Caltrans Transportation
-System Management Information System) reports for every California state route.
-The user picks one, several, or all report types from a menu/checkboxes; one
-shared login serves them all.
+System Management Information System) reports for every California state route. The
+user picks one, several, or all report types; one shared SSO login serves them all.
+It ships as a **single-folder portable app** (bundled Python + an Edge WebView2 GUI;
+no installer, no Python needed on the target), with a `.bat` console flow retained
+for development and fallback that runs the same core engine.
 
-Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
-`…-Ramp-Detail` projects.
+One TSMIS page serves every combination of **data source** (SSOR / ARS) and
+**environment** (prod / test / dev); defaults are SSOR + Prod.
 
-## Supported Reports
+> **This file is the router.** It holds the project snapshot, the report table, and
+> the **non-negotiable conventions**. All the deep knowledge — architecture, auth,
+> the GUI, the comparison engine, Highway Log internals, build/release, IT/security,
+> verification, lessons, history — lives in the **[`docs/`](docs/INDEX.md) library**.
+> Start at **[docs/INDEX.md](docs/INDEX.md)** and open the topic doc for whatever
+> you're touching. Keep this file a thin index; don't re-expand `docs/` detail here.
+
+---
+
+## Supported reports
 
 | # | Report | Output | Folder |
 |---|---|---|---|
@@ -20,1242 +31,116 @@ Combines the former `TSMIS-Reports-Export-ALL-Ramp-Summary` and
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 
-**Highway Log (PDF) (v0.13.1):** the SAME "Highway Log" dropdown option as #4,
-saved as a PDF via the page's own Print layout instead of the Excel Export
-button (`export_highway_log_pdf.py` → `exporter.save_highway_log_pdf`). The
-on-screen Highway Log is **paginated** (`hl_renderPage` shows one page of rows),
-so unlike the inline Ramp Summary a bare `page.pdf()` would capture a single
-page — the site's global `hl_printAll()` builds the full multi-page layout (cover
-+ every page) into `#rampResults`, then calls `window.print()` and SYNCHRONOUSLY
-restores the on-screen view. The save **overrides `window.print` to raise first**,
-so that restore never runs and the complete layout stays in the DOM for
-`page.pdf()` (which emulates print media — the site's `@media print` hides every
-control and shows only `#rampResults`); 30 columns ⇒ landscape. Fails loudly with
-`ReportError` if the site's Print function is gone, rather than silently saving
-the one paginated page. Export-only (no consolidator — the consolidator reads the
-`.xlsx`); the registry uses a distinct menu label "Highway Log (PDF)" but the
-ReportSpec's `label` stays "Highway Log" (the dropdown text). Verified against the
-real site source + a headless `page.pdf()` fixture (`build/check_fake_site.py`).
-**Live-export verification against TSMIS is still pending** (this dev PC can't
-reach the site).
+`<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
+Reports 5–6 are **export-only** (no consolidate/compare). Two consolidate-only
+Highway Log sources exist too — **TSN** district PDFs (dropped into
+`input/tsn_highway_log/`) and the app's own **Highway Log (PDF)** export. The
+**Compare** tab diffs Highway Logs (TSMIS-vs-TSN, the two PDF-sourced flavors) and
+runs cross-environment comparisons of the other reports.
 
-Reports 5–6 (v0.10.3) are **export-only** for now (no consolidator/comparison).
-Labels + formats verified against the live page source (v0.10.4): NO "TSAR:"
-prefix (unlike the ramp pair), both Excel via the shared Export button.
-Empty-data markers were wired v0.11.0 (Detail `td.hl-empty`, Summary
-`Total Intersections = 0`) but are no longer load-bearing — a general
-no-download fast-fail (`EmptyExport`, see *Reliability*) catches an empty export
-marker-independently, so marker text drifting can't hang a run. The site greys
-options with a `cs-disabled` class; the env-access scan reads the dropdown for
-every `EXPORT_REPORTS` row, so any label drift shows up there as "missing"
-without running an export.
+→ Per-report behavior + the "add a report/consolidator/comparison" recipes:
+[docs/reports.md](docs/reports.md). Highway Log columns / PDF parsing / comparisons:
+[docs/highway_log/](docs/highway_log/columns.md) and
+[docs/comparison-engine.md](docs/comparison-engine.md).
 
-`<run>` is a **run folder**, `"<YYYY-MM-DD> <src>-<env>"` (e.g.
-`2026-06-11 ssor-prod`, v0.10.0) — see *Key Behaviors: run folders*.
+---
 
-One TSMIS page serves every combination of **data source** (SSOR / ARS) and
-**environment** (prod / test / dev) via query parameters — see
-`common.get_url()`. Defaults: **SSOR + Prod**; the GUI header has two dropdowns
-(`set_site`) plus a **Verify env button** (v0.10.0, `EnvCheckWorker`: opens the
-page headless exactly like an export, reads the page's own CONFIG env/src via
-`_CONFIG_JS`, screenshots it, and the modal says whether it matches the
-selection — the user's "am I really on SSOR DEV?" answer without exporting),
-the console flow honors `TSMIS_SRC` / `TSMIS_ENV`. **Per-env URL overrides**
-(v0.10.0): the Settings tab can rewrite any combo's address
-(`settings.get_site_url` → consulted by `common.get_url()` on every
-navigation; `common.expected_host()` follows the effective URL, and
-`is_logged_in` + the navigate breadcrumbs compare hosts against IT, not the
-built-in TSMIS_HOST) — the stopgap for "the site moved before an app update
-shipped". Console flows honor the same overrides automatically.
+## The knowledge library — read the owning doc before you touch its area
 
-**Beyond the TSMIS exports (v0.8.0, ported from TSMIS-Report-Consolidator):**
-- **TSN Highway Log** (consolidate-only): parses TSN district Highway Log PDFs
-  (report OTM52010) that the user drops into `input/tsn_highway_log/`, writes
-  TSMIS-format per-route workbooks to `output/tsn_highway_log/` and one
-  combined `output/tsn_highway_log_consolidated.xlsx`. The PDF parsing core
-  (`consolidate_tsn_highway_log.py`) is verbatim from the sibling repo —
-  x-position character-window parsing calibrated against real district PDFs;
-  don't re-derive the windows. `day` is ignored (vendor snapshots aren't dated
-  exports); the module exposes `INPUT_NOTE`/`INPUT_DIR` so the Consolidate
-  pane shows where the PDFs go. **Column parsing is verified flawless** against
-  all 12 district PDFs (D01-D12): 0 character-conservation failures / 0 row-count
-  mismatches over 60,083 rows (every PDF data row → exactly one Excel row, every
-  kept char in the right column). **Description capture (v0.11.0)** carries THREE
-  structural guards so totals-footer / page-furniture text can never corrupt a
-  segment's Description: (1) an **x0-gate** — a real feature description prints in
-  the feature-name column at x0≈73 (`DESC_X0_MIN..MAX`), so wrapped totals
-  fragments ("TOTAL" at x0≈170) and header furniture ("CALIFORNIA DEPARTMENT…"
-  x0≈37, "District NN" x0≈256) are excluded by POSITION, independent of any text
-  pattern; (2) a `*` totals line **closes the open row** (`last_row=None`) so
-  trailing footer can't attach; (3) `_is_totals_line` pattern-matches the
-  `(DVMS)/CUMULATIVE/TOTAL CONST UNCONST/`bare-mileage continuations. `UNCONST`
-  alone is a real abbreviation (UNCONSTRUCTED) and is kept unless paired with its
-  CONST footer counterpart; a lone hyphenated bridge number (`53-1075`) is kept.
-  Locked by `build/check_tsn_description_leak.py`.
-- **Highway Log COLUMN LABELS — corrected (v0.14.0), one source of truth in
-  `highway_log_columns.py`.** The vendor TSMIS Excel export MISLABELED most
-  Highway Log columns (`N/A` is really **Non-Add Mileage**; every roadbed column
-  was a cryptic code — `LB T` is the Left **Surface Type**, `LB OT`/`LB TR` are
-  the outside-shoulder **Total/Treated widths**, etc.; it even labeled two
-  different columns `RB SH`), and those wrong labels propagated to every Highway
-  Log workflow. The CORRECT meanings come from the report's own legend (verified
-  against the printed doc + the user). `highway_log_columns.HEADER` is now the
-  single canonical 31-column header — doc-abbreviation labels with the vendor's
-  old label in `[brackets]` (e.g. `NA [N/A]`, `LB OT-SH Total [LB OT]`,
-  `Med Wid/Var [Med Wid]`); the two old `RB SH` columns become
-  `RB IN-SH Treated`/`RB OT-SH Treated`. `VENDOR_HEADER` is the exact old labels;
-  `recognize()` accepts EITHER (so a pre-overhaul, vendor-labeled workbook still
-  compares — the engine aligns by **column POSITION** and relabels to the
-  canonical header for display). Every column carries a hover **tooltip** (Excel
-  cell comment) and every Highway Log workbook (per-route, consolidated, and the
-  comparisons) gets a **Legend** sheet (`write_legend_sheet`). This is wired
-  through both PDF consolidators, the Excel consolidator (`consolidate_xlsx`
-  gained `header_override`/`header_comment`/`decorate_workbook` — opt-in, so Ramp
-  Detail / Highway Sequence are untouched), and the comparison engine
-  (`CompareSchema.header_comment`/`legend_writer` — opt-in, so non-HL comparisons
-  stay byte-identical). The relabel is **purely cosmetic**: the same column
-  POSITIONS, so the comparison RESULTS are unchanged (route-1 PDF-vs-Excel held
-  at 11 diff rows / 67 cells before and after). Locked by
-  `build/check_highway_log_columns.py`. (The TSN log additionally has an ADT
-  Information group — Look Back / P / Look Ahead — that the 31-column TSMIS
-  format drops.)
-- **TSMIS Highway Log (PDF)** (consolidate-only, v0.14.0; **reads the export
-  folder, day-aware, since v0.14.2**): `consolidate_tsmis_highway_log_pdf.py`
-  parses the TSMIS **"Highway Log (PDF)"** exports (report 4b,
-  `highway_log_route_<ROUTE>.pdf`). These are **this app's OWN export** — the
-  "Highway Log (PDF)" report saves them to `output/<run>/highway_log_pdf/` — so the
-  consolidator reads that EXPORT folder **day-aware, exactly like the Excel Highway
-  Log consolidator** (`SUBDIR="highway_log_pdf"`, `input_dir_for`/`out_path_for`
-  parallel; the "Export day" picker DOES apply, picking which run to combine). It
-  is NOT a dropped-in folder (v0.14.0 wrongly modeled it on the TSN log with an
-  `input/tsmis_highway_log_pdf/` drop folder + `INPUT_NOTE` + ignored `day` — that
-  was redundant since the app produces these PDFs itself; fixed v0.14.2, the input
-  folder + its `.gitkeep`/.gitignore entry removed, `INPUT_NOTE` dropped so the GUI
-  shows the day picker). Per-route conversions are scratch in
-  `output/tsmis_highway_log_pdf/`; the combined workbook lands in that run's
-  `consolidated/` folder — the **accurate substitute for the buggy vendor Excel
-  Highway Log export**, the SAME 31-column "Highway Log" format the Excel export and
-  the TSN consolidator produce, so it drops straight into the Highway Log
-  comparisons. (Only the **TSN** log keeps a dropped `input/tsn_highway_log/` folder
-  + `INPUT_NOTE` + ignored `day` — those district PDFs come from outside the app.)
-  **Parsing is cell-rect based, NOT character windows** (unlike the TSN log): the
-  print view is a real bordered HTML table, so every data row's 30 columns are
-  present as cell RECTANGLES. The table is auto-laid-out (column x-boundaries
-  differ per page; routes render landscape OR portrait), so each page's 30 column
-  boundaries are derived from THAT page's zebra-shaded data-row cells and made
-  CONTIGUOUS (no character falls between two cells and is lost); every data char
-  is assigned to the column whose window holds its center. The 30 cells map 1:1,
-  in order, to the 31-column layout MINUS Description (index 28), which TSMIS
-  prints on follow-on lines below the row (joined with a space, matching the
-  report's own wrap). The column-header band is found by CONTENT (the
-  "LOCATION … ODOM … CITY" row) not a fixed y, so a row's description pushed onto
-  a near-empty "orphan" page (its layout shifts up) is still captured. NO value
-  normalization (the PDF is already native TSMIS format: MI "000.045", widths
-  "12"). A left-margin section marker ("C"/"R"/"L") stays in the Location cell,
-  which normalizes to the single-token form ("C043.925E"). **Verified flawless**
-  against all 252 route PDFs (0 char-conservation failures / 0 unclassified lines;
-  per-route rows == the PDF's data-row count) and, route-for-route, against the
-  official TSMIS Excel export of the SAME route — 55,768 matched rows across the
-  252 routes, with EVERY residual difference traced to an Excel-export quirk and
-  NONE to the parser: the Excel **drops rows and whole roadbed-column blocks**
-  (e.g. route 041 is missing 72 rows + ~4,500 blanked geometry cells; route 046
-  drops rows in dense postmile bands, cascading the `MI` distance-to-next on the
-  survivors), **expands `+`/`++` ditto markers** into values, **pads Descriptions
-  with trailing tabs**, and **mis-attributes/shifts descriptions** to adjacent
-  rows — exactly the export problems this exists to expose. (A multi-agent sweep
-  parsed every route and adversarially classified each diff; the only two routes
-  it flagged for review, 041 and 046, were confirmed to be the Excel's dropped
-  rows, NOT the parser — the dropped rows are present and complete in the PDF.)
-  Locked by `build/check_tsmis_pdf_parse.py`.
-- **Compare tab** — three comparison families (v0.14.0; two since v0.10.0), all built by ONE
-  engine: `compare_core.py` (extracted verbatim-then-parameterized from
-  compare_highway_log; a `CompareSchema` carries side names — emitted into
-  formulas through the quoting-aware `_sref` so `TSMIS!A:A` stays unquoted but
-  `'SSOR-PROD'!A:A` quotes — header, normalizer/date fields, label nouns,
-  widths, note fragments. The extraction is **regression-verified
-  cell-for-cell** — values, formulas, styles, CF, calc mode — against the
-  pre-extraction output on the real Route-1 + consolidated pairs; do NOT
-  change formula/label text in the core without re-running such a check).
-  - **TSMIS vs TSN Highway Log** (`compare_highway_log.py` = schema + loaders
-    + `suggest_name`; `"files"` kind in `COMPARE_REPORTS`).
-  - **Highway Log (PDF)** (`compare_highway_log_pdf.py`; `"files"` kind, group
-    `pdf`, v0.14.0): two file-vs-file comparisons that sidestep the buggy vendor
-    Excel by sourcing the TSMIS side from the **PDF** consolidation instead. Both
-    reuse `compare_highway_log`'s loader (any 31-column Highway Log workbook,
-    per-route or consolidated) and override ONLY the schema's two side labels +
-    notes (engine text untouched → regression lock intact); each carries
-    `file_a_label`/`file_b_label` so the GUI's two file pickers (and the data
-    sheets) are named for the actual sides (not the hard-coded "TSMIS"/"TSN").
-    `TSMIS_PDF_VS_TSN` (side labels **"TSMIS (PDF)" vs "TSN (PDF)"** — the
-    accurate replacement for the row above, both sides from PDFs, so the
-    PDF-vs-PDF nature is explicit) and `TSMIS_PDF_VS_EXCEL` (TSMIS (PDF) vs TSMIS
-    (Excel) — diffs the PDF-parsed data against the vendor Excel of the SAME
-    report to pinpoint the export's errors).
-  - **Cross-environment** (`compare_env.py`; `"folders"` kind, v0.10.0): the
-    SAME report from two run folders (ssor-prod vs ars-prod, or one env on
-    two dates) — per-route files are read straight from both folders (NO
-    consolidation step; merged in memory the way the consolidators would,
-    Route column prepended, header locked from the first file) and compared
-    with the environment names as the sides (`side_label`; same-env sides get
-    the date appended so sheet names differ). Ramp Detail / Highway Sequence
-    lock their layout from the files (both folders must agree); Highway Log
-    pins EXPECTED_HEADER + the Med Wid rule; **Ramp Summary parses the PDFs**
-    via consolidate_ramp_summary.parse_pdf, one row per route (per-route
-    shape — the route IS the row key; fields = the consolidator's GROUPS
-    minus Source/Audit). GUI: folder dropdowns list the run folders
-    (baseline defaults to newest ssor-prod) + Browse; saves default to
-    `output/comparisons/`. Verified with planted-difference fixtures and a
-    real-Excel COM recalc (all SELF-CHECK rows OK).
-  **Every comparison leads with a VERDICT** (v0.10.0): summary_lines[0] is
-  "✓ EVERYTHING MATCHES …" / "✗ DIFFERENCES FOUND …",
-  `ConsolidateResult.verdict` is "match"/"diff" (the GUI keys a green/amber
-  result dialog on it; consolidators leave it None), and the workbook's
-  Summary carries the same verdict as a big banner cell right under the
-  title (B3, or B4 under the manual-calc F9 banner) — a LIVE formula in the
-  formulas flavor (CF green/red keyed on the ✓/✗ first character), a
-  literal in the values flavor. Match ⟺ zero differing cells AND zero
-  one-sided rows.
-  The TSMIS-vs-TSN flavor takes a TSMIS and a TSN Highway Log — **either two
-  per-route workbooks or two consolidated ones** (`Route` + 31 columns; shapes
-  auto-detected, mixed shapes rejected with guidance) — and writes a
-  discrepancy workbook — Summary / Comparison / **Only in TSMIS / Only in
-  TSN** (every one-sided row pulled onto its own tab in union order, fields
-  pulled live from that system's data sheet; consolidated mode adds a
-  "Missing from <other>" column — "entire route" rows tinted — so
-  wholly-missing routes are impossible to overlook, v0.9.0) / TSMIS / TSN,
-  plus a **Routes sheet in consolidated mode** (route coverage:
-  Both/TSMIS-only/TSN-only with live per-route row/diff counts; the Summary
-  gains a ROUTE COVERAGE section and the run log lists the missing routes).
-  NOTE: one-sided routes' rows have ALWAYS been in the Comparison sheet
-  (yellow/blue, via `_union_keys`' single-side emit) — the tabs exist
-  because 65k-row sheets buried them. The Summary also carries a live
-  **SELF-CHECK section** (v0.9.0): each headline number recomputed a second
-  independent way (status totals vs union count, MATCH-hit counts, Only-in
-  tab row counts, per-field diff sums, Routes-sheet row sums) — every row
-  must read OK after F9; a CHECK means formulas no longer point at the right
-  rows. **Trust aids for formula skeptics (v0.9.0):** the TSMIS/TSN Row
-  numbers on Comparison + Only-in sheets are HYPERLINK jumps that target the
-  source row as a WHOLE-ROW reference ("57:57"), so Excel SELECTS the entire
-  row on arrival — a temporary highlight that clears on the next click —
-  without scrolling; a bounded range (A57:AH57) made Excel scroll to the
-  range's RIGHT edge (COM-measured on real Excel) — don't regress to one
-  (`_row_link`: the MATCH is computed three times — range start/end +
-  display — so the cell value stays NUMERIC; the COUNT self-check depends
-  on that); each data-sheet row
-  carries a "Comparison row" link back in its LEADING column — column A, so
-  Route/Location/fields and the key helper all sit one column right of the
-  input layout (literal target — the row universe is build-time-static, only
-  values are live); and a **Spot Check sheet** audits
-  one location at a time — raw stored values from both sheets next to an
-  independently recomputed per-field verdict (same TRIM/Med-Wid rules,
-  never reading the Comparison's answer) with an Agree? OK/CHECK column that
-  stays meaningful on one-sided rows (verdict column echoes the status,
-  tinted, plus a loud callout), a TSMIS-first ≠ legend, and a bold press-F9
-  reminder in consolidated mode. **Two output flavors (v0.9.0):**
-  `compare(..., mode="formulas"|"values"|"both")` — the Compare tab has two
-  checkboxes (both ticked by default; ≥1 required). "values" writes the SAME
-  sheets/CF/links but the bulk as plain computed results via the
-  `_count_diffs`/`_field_value` mirror (so the flavors can't disagree):
-  opens instantly, automatic calc, no F9 banner, ~⅓ the size; only the Spot
-  Check sheet and SELF-CHECK rows stay live (they recount the literal
-  sheets). "both" writes the picked name (formulas) + `<name> (values).xlsx`.
-  In the formulas flavor, EVERY number is a live
-  Excel formula (lookup keys, statuses, per-field diffs, summary counts):
-  edit a value on a data sheet and the report recalculates. Consolidated
-  workbooks ship in **manual calculation mode** (`calcPr calcMode="manual"`,
-  calcOnSave off): ~2M live formulas would otherwise recalc for minutes on
-  open and after every edit — instead the file opens instantly showing
-  blank/0 and the user presses F9 once (Summary note + run log explain;
-  per-route files stay automatic). The workbook is written in openpyxl's STREAMING (write_only)
-  mode — the consolidated comparison carries ~2M formula cells, which the
-  normal in-memory mode cannot save in reasonable time (50+ min vs ~3 min;
-  same reason the consolidators stream). Matched cells show the matched
-  value; differing cells show "tsmis ≠ tsn" in red (diff detection keys on
-  the " ≠ " marker — formulas, conditional formatting and COUNTIFs all rely
-  on it). Rows are keyed on (Route +) the key field + occurrence; the union is a
-  diff-style document-order merge PER ROUTE with first-position dedupe (a key
-  can sit in both files at different sequence positions — TSMIS prints some
-  postmiles out of order; per-route alignment keeps difflib fast on 50k+
-  rows). **Duplicate-key pairing is by SIMILARITY, not file order (v0.13.1):**
-  when a key legitimately repeats (two segments at the same postmile), the
-  occurrence # used to be assigned in file order, so a row that matched the other
-  side's SECOND instance was flagged as a difference against its FIRST.
-  `pair_occurrences_by_similarity` (run after `keys_for`, before `union_keys`)
-  re-numbers the occurrence component of duplicate keys WITHIN each (route, key)
-  group present on both sides so the most-alike rows (fewest differing fields,
-  via the same `_xl_trim`/`_medwid_norm` as `count_diffs`) share an occurrence #;
-  the larger side's leftovers get higher, side-unique occ (stay one-sided). The
-  optimal min-cost assignment's total ≤ any positional one, so it can ONLY remove
-  phantom diffs, never add one (`_min_cost_pairs`: exact permutation search with
-  pruning up to 7! groups, greedy above; deterministic, file-order tie-break).
-  The KEY/identity is unchanged — only the duplicate pairing — and the
-  non-duplicate path is byte-identical (so the approved Route-1 sample's 969 is
-  untouched; the change is verified on real consolidated data to clear ~3,600
-  phantom diff cells). Occurrence is a build-time LITERAL every sheet MATCHes on,
-  so the reassignment flows through both flavors with no formula change. Locked by
-  `build/check_compare_dupmatch.py`. Column geometry for both shapes lives in
-  compare_core's `_Layout`. The per-route
-  format is locked to the approved Route-1 sample and verified cell-for-cell
-  against it (same union order, same counts Excel cached: 299 both / 18 / 69 /
-  221 diff rows / 969 diff cells — was 971 before the v0.11.0 TSN totals-block
-  fix dropped Route-1's 2 leak-caused Description false positives) with
-  intended changes — matched values
-  shown instead of blank, row numbers rendered as clickable links, and the
-  additive Spot Check / Only-in tabs. Med Wid compares after zero-pad
-  normalization (TSMIS `0Z` = TSN `00Z`).
-  - **Key field (v0.11.0):** a row's key is `CompareSchema.key_field`, the column
-    that IS its identity — NOT necessarily `header[0]`. Highway Log keys on
-    Location (its first column); cross-env **Highway Sequence and Ramp Detail key
-    on the granular `PM` (postmile)**, not their coarse first column (County /
-    `district-county-route`) — the coarse key aligned rows positionally within the
-    group and inflated diffs/one-sided rows (PROD-vs-DEV HSL 15,797 → 5,070 diff
-    cells). The resolver falls back to the first column (+ log warning) if the
-    named column is absent, so layout drift degrades, never crashes.
-  - **Roadbed-aware key (v0.14.0; `CompareSchema.key_normalizer`, opt-in):** on a
-    divided highway the TWO sources encode the roadbed of a segment's two rows
-    DIFFERENTLY — TSMIS (PDF + Excel) suffix the Location (`R021.466R`/`…L`); TSN
-    omits the suffix (`R021.466`) and instead dittos the non-subject 8-col block
-    (a Left-block-dittoed row IS the right roadbed). Keying on the raw Location
-    therefore SPLIT the same physical roadbed row into a false one-sided pair
-    (~1,400 rows / TSMIS-vs-TSN comparison, hiding ~4,800 genuine diffs). The
-    suffix↔dittoed-block correspondence is 100% (audit-verified, raw-PDF traced),
-    so `highway_log_columns.roadbed_canonical_location` (set as the TSMIS-vs-TSN
-    schema's `key_normalizer`) derives the roadbed from the suffix when present
-    else the dittoed block, appending it to suffix-less Locations so the same
-    roadbed row keys identically. The trailing equation `E` marker and the leading
-    alignment prefix are PRESERVED (a route-start `R000.000` never collapses into
-    a bridge `000.000`; `E` variants stay distinct — deliberately NOT reconciled).
-    `keys_for` gained `key_normalizer` (None = byte-identical raw-Location key, so
-    every non-HL comparison and cross-env TSMIS-vs-TSMIS are untouched — the
-    normalizer is **cleared** on `compare_env._HL_BASE`; PDF-vs-Excel is invariant
-    since both sources already suffix). The DATA sheets still show each source's
-    raw Location; only the match/alignment KEY token is unified. The key STRICTLY
-    REFINES (can split, never merge): 0 roadbed crossings (vs 6.2% for a naive
-    postmile-only pairing), 0 over-merges. Locked by
-    `build/check_highway_log_roadbed.py`; study doc §7b. (Residual: ~11 Excel rows
-    whose own export bug drops the suffix AND blanks — not dittos — the block stay
-    conservatively one-sided, since the roadbed is unrecoverable there.)
-  - **Incompleteness contract (v0.11.0):** an unreadable input is never silently
-    dropped — `run_compare(warnings=…)` keeps `status="ok"` but forces
-    `verdict="diff"` (a clean match can't be certified) and leads
-    `summary_lines[0]` with the literal **`⚠ COULD NOT COMPARE EVERYTHING`** (the
-    in-workbook Summary banner uses `✗` so the existing red CF still applies); the
-    GUI result dialog keys on that `⚠` prefix to title it "Comparison incomplete".
-    Match ⟺ zero diff cells AND zero one-sided rows AND zero skipped inputs.
-  - **Write-path safety (v0.11.0):** free text beginning `= + - @` is stored as
-    TEXT (formula-injection guard) on BOTH compare_core flavors AND the
-    consolidators; values are canonicalized at load (`normalize_value`, dates →
-    ISO) so the flavors can't disagree; and the engine fails cleanly before
-    writing on an Excel row/column-limit overflow or a side-name⇄sheet-name
-    collision.
+| Area | Doc |
+|---|---|
+| Big picture: core + front-ends, registry, run folders, data location, feature buckets | [docs/architecture.md](docs/architecture.md) |
+| Export loop runtime: resume, retry, skip/cancel, fast-fails, timeouts, fast mode | [docs/engine-and-reliability.md](docs/engine-and-reliability.md) |
+| Sign-in: token-in-hash, `CONFIG` trap, device SSO, Edge recapture, LNA, login chips | [docs/auth-and-signin.md](docs/auth-and-signin.md) |
+| Desktop GUI: pywebview/WebView2, threading/queue, the **5 pywebview traps**, the `#mock` | [docs/gui.md](docs/gui.md) |
+| Report catalog, `ReportSpec`, `cs-disabled`, the extension recipes | [docs/reports.md](docs/reports.md) |
+| `compare_core`: regression lock, flavors, key/roadbed/ditto, write-path safety, families | [docs/comparison-engine.md](docs/comparison-engine.md) |
+| Corrected 31-column Highway Log labels | [docs/highway_log/columns.md](docs/highway_log/columns.md) |
+| Highway Log PDF (cell-rect) + TSN (char-window) parsers | [docs/highway_log/pdf-and-tsn-parsing.md](docs/highway_log/pdf-and-tsn-parsing.md) |
+| The `+`/`++` ditto domain convention + evidence | [docs/highway_log/comparison-study.md](docs/highway_log/comparison-study.md) |
+| Build, `app.spec`, DLP prune, browser channels, the **updater**, CI | [docs/build-and-release.md](docs/build-and-release.md) |
+| IT/DLP/security, the **work-PC capability model**, audit findings, code-signing | [docs/it-and-security.md](docs/it-and-security.md) |
+| How to verify (no test framework): golden `check_*.py`, COM-recalc, `#mock`, test-data locations | [docs/verification-and-testing.md](docs/verification-and-testing.md) |
+| The durable lessons (field failures, one-core, regression discipline, audit method) | [docs/lessons.md](docs/lessons.md) |
+| The narrative history | [docs/history.md](docs/history.md) |
+| Roadmap / deferred / dormant backlog | [docs/roadmap.md](docs/roadmap.md) |
+| The reusable read-only code-review prompt | [docs/code-review-prompt.md](docs/code-review-prompt.md) |
 
-## Two Run Modes, One Core
+Full map with "read this when…" for each: **[docs/INDEX.md](docs/INDEX.md)**.
 
-The export engine is **console-free** and backs both:
-- **`.bat` console flow** (development + fallback) — see *User Workflow*.
-- **Packaged GUI** — a pywebview (**Edge WebView2**) window rendering
-  `scripts/ui/` (plain HTML/CSS/JS, no build step / no npm): `gui_main.py`
-  (entry) → `gui_api.py` (js_api bridge + state + queue pump) →
-  `gui_worker.py` (worker threads, unchanged across the Tk→WebView rewrite).
+---
 
-Only `cli.py` and `gui_*.py` touch `print`/`input`/`msvcrt`/the window. Core code
-(`common.py`, `exporter.py`, consolidator cores) reports via the `Events` sink
-(`scripts/events.py`) and raises exceptions — never `print`/`input`/`sys.exit`.
-User-facing strings from the core must be **UI-neutral** (no ".bat" names, no
-"this window" / "menu option N" — that guidance lives in the driver).
+## Conventions (non-negotiable — apply every session)
 
-**Threading:** Playwright's sync API is thread-affine. All browser work runs on
-worker threads, which post `(kind, payload)` messages to a `queue.Queue` (the
-protocol is documented in `gui_worker.py`). `gui_api` pumps that queue into its
-state machine, and ONE sender thread delivers ordered JSON event batches to JS
-via `evaluate_js` → `window.__tsmis.dispatch()`; JS calls back through
-`window.pywebview.api.<method>()` (the public `GuiApi` methods). In fast mode
-each worker owns its own Playwright/browser/context.
+- **Core is console-free.** `common.py`, `exporter.py`, the consolidator/comparison
+  cores report via the `Events` sink (`scripts/events.py`) and raise exceptions —
+  **never** `print`/`input`/`sys.exit`. Only `cli.py` and `gui_*.py` touch
+  I/O/the window. User-facing strings from the core stay **UI-neutral** (no ".bat"
+  names, no "this window" / "menu option N" — that guidance lives in the driver).
+- **No AI attribution anywhere** — commits, PR titles/descriptions, code, comments.
+  Write as if the user authored it. (Project-specific reinforcement of the global rule.)
+- **Never commit** `scripts/tsmis_auth.json` (treat as a credential), generated
+  `output/`, or build artifacts (`build/.venv`, `dist/`, `.claude/` state).
+- **`compare_core` is regression-locked.** Any change to its formula/label TEXT must
+  be proven **cell-for-cell identical** for the TSMIS-vs-TSN flavor before shipping;
+  new behavior is added through **opt-in** `CompareSchema` fields that default to the
+  no-op original (so non-HL comparisons stay byte-identical). See
+  [docs/comparison-engine.md](docs/comparison-engine.md).
+- **Sync Playwright API** (not async); Playwright is **thread-affine** — only the
+  owning thread may touch a page.
+- **Call the timeout ACCESSORS** (`report_timeout_ms()` etc.) in engine code, not the
+  raw constants — they read Settings overrides at run time.
+- **Log every decision.** Each decision point (site/browser pick, channel fallback,
+  saved-session-vs-device-mode, per-route outcome) and every swallowed exception logs
+  at least `type(e).__name__` + the first line — the "one log upload answers it"
+  contract. Error messages name the failing step and stay UI-neutral; the WHY goes to
+  the log.
+- **The updater TLS trusts the Windows cert store** (`ssl.create_default_context()`).
+  Never switch it to `requests`/`certifi` — a bundled CA list breaks corporate
+  TLS inspection on exactly the managed PCs that need it.
+- **Real test data + the live TSMIS website source are LOCAL ONLY** (under
+  `C:\Users\Yunus\Downloads\TSMIS\…`) — never commit, copy into the repo, or push;
+  the website source is Caltrans-internal. It is the ground truth for selectors/labels.
+- **Work-PC reality:** any feature that must run on the locked-down Caltrans work PC
+  must work as a plain unsigned exe from a user-writable folder — no PowerShell, cmd,
+  admin, temp scripts, or scheduled tasks. See [docs/it-and-security.md](docs/it-and-security.md).
+- **Git:** commit/push only when asked; if on `main`, branch first. Commit messages
+  are short, imperative (`add route 395`). Release branches share the tag name, so
+  push tags explicitly: `git push origin refs/tags/<tag>`.
 
-**UI layering:** Python owns app state (auth, task, checks, days) and pushes
-full snapshots; `app.js` owns presentation + form fields and NEVER invents log
-lines — everything shown in the log pane originates in Python so the `tsmis.ui`
-file-log mirror stays complete. A built-in mock API can drive the whole UI,
-including simulated runs, without launching the app — **opt-in only**: open
-`scripts/ui/index.html#mock` in a browser (that's how the layout is
-screenshot-tested). The mock must never auto-start: a cold WebView2 can inject
-the real bridge later than any timeout, and a silent mock fallback would show
-convincing fake exports inside the real app. Without `#mock`, the page waits
-for the bridge and shows a fatal banner if it never arrives.
+---
 
-## The App
-
-The product is a **portable single-folder Windows desktop app** (bundled Python +
-deps + WebView2 GUI; no installer, no Python needed on target): non-technical
-staff unzip one folder and double-click the `.exe`. The `.bat` console flow
-(below) is retained as a development and fallback path, and runs the same core
-engine.
-
-**Design decisions (don't relitigate without reason):**
-- **Packaging:** PyInstaller **onefolder**, shipped as a portable zip (no installer).
-- **UI stack (v0.8.0): pywebview + Edge WebView2 rendering vanilla HTML/CSS/JS.**
-  Replaced the original Tkinter window: Tk could neither match the approved
-  design (the `tsmis-exporter-ui-demo` Lovable mock — Windows-11 look, dark
-  titlebar, two-column layout) nor stop cutting off on small screens; a web
-  layout solves both (responsive, stacks + scrolls below ~980px; theme =
-  System/Light/Dark header toggle persisted in localStorage and resolved to
-  an effective `html[data-theme]` before first paint). WebView2 is a safe
-  dependency here: it ships with
-  Windows 10/11 and evergreen Edge — the same Edge this tool already requires.
-  No frontend framework/build step on purpose (static files ship in the
-  bundle; end-user setup stays global-pip). `webview.start(gui="edgechromium")`
-  is forced so a missing runtime fails loudly (clear message box) instead of
-  silently degrading to MSHTML. tkinter is excluded from the bundle.
-  **FIVE pywebview traps, all hit in the field:**
-  1. pywebview detects "is `start()` already running" via the main thread's
-     NAME — `logging_setup` must never rename the main thread (it tags
-     `[main]` via a logging Filter instead); renaming it makes
-     `create_window` block forever running the GUI loop itself.
-  2. **Never do work in window-event handlers** (`shown` etc.): pywebview
-     fires them on the WinForms STA thread while WebView2 is still
-     initializing asynchronously on it — a handler that blocks (the original
-     icon-setter loaded a .NET assembly) starves the message pump and
-     INTERMITTENTLY deadlocks the window ("Not responding" + WER AppHangB1
-     before the page loads; ~6/8 launches at its worst, machine-state
-     dependent). The icon is set from a worker thread with pure Win32
-     (`FindWindowW` + `WM_SETICON`); only `closed` (fires after the loop
-     ends) is subscribed.
-  3. `faulthandler` is disabled in the GUI process
-     (`setup_logging(enable_faulthandler=False)`): its Windows handler sees
-     the CLR's routine first-chance access violations (pythonnet) and dumps
-     all threads mid-exception-dispatch — observed wedging init and spamming
-     `crash.log` with dumps from healthy-looking runs. Console entry points
-     never load the CLR and keep faulthandler's hard-crash dumps.
-  4. **Mark-of-the-Web kills the CLR** (field failure, v0.8.0's first
-     download): extracting the release zip without Unblock tags every file
-     with a `Zone.Identifier` stream and .NET Framework refuses to load
-     tagged assemblies → instant "Failed to resolve Python.Runtime.Loader.
-     Initialize". Dev runs and CI never go through a downloaded zip, so ONLY
-     releases hit it. `gui_main._unblock_dotnet_assemblies()` strips the
-     streams from the bundled .NET trees at startup, before the CLR loads;
-     the fatal box also explains the manual Unblock for read-only installs.
-     Repro for testing: `Set-Content <dll> -Stream Zone.Identifier` with
-     `ZoneId=3` on `_internal\pythonnet\**`.
-  5. **The js_api OBJECT appears before its method stubs** (field failure,
-     first launch after the v0.10.2 update): on a cold WebView2,
-     `window.pywebview.api` can exist while pywebview is still injecting the
-     method functions into it — calling one throws "is not a function" and a
-     one-shot boot died on it permanently. `app.js` gates boot on
-     `bridgeReady()` (the method itself must be a function, not just the api
-     object) AND retries `get_initial_state` ~6 times re-grabbing the bridge
-     each round; the 8 s banner is a reassuring "Still starting…" (the poll
-     keeps running and a late bridge still boots), with the real failure
-     banner only at 60 s. The first launch after an update is the coldest
-     start there is — Windows scans every fresh file.
-- **Browser channels — three release variants, one codebase:**
-  - **`*-win64.zip` (default build):** no bundled browser. Drives the machine's
-    installed Edge (then Chrome) via `channel="msedge"`/`"chrome"`. Edge is
-    Chromium, ships with Windows, supports `page.pdf()` + downloads. ~148 MB.
-  - **`*-win64-with-browser.zip` (`build.ps1 -BundleChromium`):** additionally
-    ships Playwright's own Chromium in `_internal\ms-playwright`; `paths.py`
-    points `PLAYWRIGHT_BROWSERS_PATH` at it and `common.py` lists **Built-in
-    Chromium** as the *default* channel (Edge/Chrome stay in the dropdown).
-  - **`*-batch-source.zip`:** the `.bat` console flow; `1. setup…bat` pip-installs
-    the libs **and** runs `playwright install chromium --no-shell`.
-  The `chromium` channel only appears when a Playwright Chromium is actually
-  present (`common._chromium_available()`): for **packaged** builds that means
-  the bundle's own `_internal\ms-playwright`, an explicit
-  `PLAYWRIGHT_BROWSERS_PATH`, **or the Settings-tab download** (v0.10.0:
-  `paths.DOWNLOADED_BROWSERS_DIR` = `data\ms-playwright` — user data, so it
-  survives one-click updates; `gui_worker.ChromiumWorker` drives the BUNDLED
-  Playwright Node driver like `playwright install chromium --no-shell` with
-  PLAYWRIGHT_BROWSERS_PATH aimed there — works frozen, streams progress to
-  the log, cancellable, no console window; delete rmtree's ONLY that folder,
-  never the bundle's. Channels are probed at startup, so download/delete
-  says "restart the app"). The machine's global Playwright cache is
-  deliberately ignored so the default build defaults to Edge even on a
-  dev PC; dev/`.bat` runs use the default cache (where setup downloads it),
-  and a Settings-tab download wins over the cache in dev too.
-  `channel="chromium"` runs the full browser in new-headless mode — one binary
-  for headed sign-in and headless exports (no headless shell needed).
-- **Data location (option A):** the packaged app writes `output/`, auth token,
-  logs, and config **next to the `.exe`**, falling back to
-  `%LOCALAPPDATA%\TSMIS Exporter` if read-only. See `scripts/paths.py`.
-- **WebView2 profile:** the GUI window uses a persistent app-owned user-data
-  folder (`paths.WEBVIEW_PROFILE_DIR`, `data\webview2`) via
-  `webview.start(private_mode=False, storage_path=...)`. pywebview's default
-  private mode writes a fresh Chromium profile into `%TEMP%` on EVERY launch
-  (tens of MB, leaked when the process is killed) and cold-starts the browser
-  each time; one stable folder avoids both, and the UI stores nothing
-  sensitive in it.
-
-**Pinned versions (`version.py` / `requirements*.txt`):** `playwright==1.60.0`
-(pins the bundled **Node driver** only — no Chromium ships), `pdfplumber==0.11.9`
-(→ `pdfminer.six==20251230`), `openpyxl==3.1.5`, `pywebview==6.2.1` (→
-`pythonnet`/`clr_loader` on Windows), `pyinstaller==6.20.0`,
-`pyinstaller-hooks-contrib==2026.5`. Built/tested on **Python 3.11**. The export
-engine is live-verified against TSMIS.
-
-> **✅ RESOLVED (v0.5.0) — Edge sign-in in the managed Caltrans environment.**
-> Managed Edge relaunches itself into the work profile mid-Azure-AD-login, killing
-> the Playwright window (`TargetClosedError` on `storage_state`) — Edge's
-> org-managed behavior, with zero interaction from us. Fixed two ways:
-> 1. **Persistent-profile Edge recapture** (`login.py` / `LoginWorker`): sign-in
->    opens Edge on a durable app-owned profile (`EDGE_LOGIN_PROFILE_DIR`) with a
->    CDP port; after the user finishes, the session is captured from the live
->    context, else by CDP re-attach to the relaunched Edge, else by reopening the
->    profile tree headless and reading the cookies back. Chrome remains the
->    fallback when nothing was captured.
-> 2. **Built-in Chromium** (preferred when present): unmanaged, so org policy
->    can't touch the sign-in window at all. Ships in the with-browser release
->    variant and is downloaded by the `.bat` setup. See *Browser channels* below.
-> (Historical: removing mid-login polling, `--edge-skip-compat-layer-relaunch`,
-> and InPrivate did NOT help; v0.4.2's "default sign-in to Chrome" regressed
-> Chrome too and was rolled back.)
-
-## `.bat` Console Flow (dev / fallback)
-
-The shipped GUI replaces steps 2–4 with buttons; these scripts run the same core
-and are kept for development and as a fallback.
-
-1. **`1. setup (one time).bat`** — `pip install -r requirements.txt`, then
-   `playwright install chromium --no-shell` (the Built-in Chromium; on download
-   failure it warns and the tool falls back to the machine's Edge/Chrome).
-2. **`2. login (update login).bat`** — tries the silent Edge device sign-in
-   first (no window, no typing — managed Caltrans PCs); else opens a visible
-   browser (Built-in Chromium when present, else the persistent-profile Edge
-   flow with Chrome fallback); user does SSO+MFA, then confirms to save the
-   session to `scripts/tsmis_auth.json` (shared by all exports). Login is
-   **validated before saving** (a real TSMIS login must be detected), so
-   clicking "finished" without signing in won't save a junk session.
-3. **`3. run_export (main script).bat`** — shows a menu (`1`–`4` single report,
-   `A` = several/all → `export_multi.py`, `Q` quit), then prompts for routes
-   (Enter = all; or `5, 99, 101` — any casing/padding, suffixes like `101U`
-   ok), then runs headlessly. A missing saved session is just a note — the
-   engine tries the automatic device sign-in itself.
-4. **`4. consolidate (combine reports).bat`** — pick a report type (and, when
-   several dated export folders exist, which day — Enter = newest, or set
-   `TSMIS_DAY`), combine that day's per-route exports into one workbook in
-   `output/<date>/consolidated/` (no auth check). Option 5 = TSN Highway Log
-   (reads `input/tsn_highway_log/*.pdf`; the day prompt is ignored).
-5. **`5. fast export (experimental).bat`** — asks worker count (sets
-   `TSMIS_FAST_WORKERS`), then the usual menu.
-
-## Repository Layout
+## Repo layout (orientation)
 
 ```
-1.–5. *.bat                       # setup / login / export / consolidate / fast export
-run app (GUI preview).bat         # dev launcher for the GUI
-requirements.txt / -build.txt     # pinned runtime / build deps
-version.py                        # app name/version + pinned Playwright (Node driver)
-.github/workflows/release.yml     # tag push (or manual dispatch) -> self-test gate ->
-                                  #   builds + publishes the three release zips
-scripts/
-  paths.py            # frozen-aware paths (option A): DATA_ROOT, OUTPUT_ROOT, AUTH, LOG_DIR, FAILURES_DIR, CONFIG_FILE;
-                      #   run folders: run_folder_name/output_run_dir/parse_run_folder/list_output_days/resolve_day_choice
-  logging_setup.py    # rotating file log under LOG_DIR (every entry point calls it); set_debug_logging (Settings toggle)
-  settings.py         # persisted user settings (config.json): timeout/worker overrides, debug toggles
-  common.py           # site config (get_url/set_site: SSOR|ARS × prod|test|dev), ROUTES, timeouts (+ settings-aware
-                      #   *_timeout_ms() accessors), auth+nav helpers, maybe_screenshot (live preview seam),
-                      #   AuthError/RunCancelled/PreflightError/ReportError/BrowserNotFoundError, launch_browser,
-                      #   set_preferred_channel, check_browsers, preflight, parse_routes/normalize_route
-  events.py           # Events sink (+ worker_no / on_status / screenshot seam) + RunResult + ConsolidateResult
-  exporter.py         # the one per-route loop: run_export(spec, events), ReportSpec, save_pdf_letter / save_via_export_button, _recover, _retry_failed_routes
-  exporter_parallel.py# EXPERIMENTAL fast mode: N browsers off a shared queue; reuses exporter.py internals
-  run_report.py       # per-route outcome CSV (auto-saved each run, site-tagged; + multi)
-  cli.py              # console adapters: run_cli / run_cli_multi / run_consolidate_cli
-  login.py            # writes the auth file (headed browser)
-  reports.py          # SINGLE registry: EXPORT_REPORTS + CONSOLIDATE_REPORTS + COMPARE_REPORTS (GUI + export_multi read it)
-  updater.py          # one-click self-update (GUI only): GitHub release check/download/stage + PowerShell swap helper
-  export_*.py         # thin (~30 lines): a ReportSpec + run_cli; export_multi.py = several/all
-  highway_log_columns.py      # ONE source of truth for the corrected Highway Log column labels + meanings (tooltips/Legend)
-  consolidate_xlsx_base.py    # shared XLSX consolidator core (Highway Log passes header_override/comment/legend)
-  consolidate_ramp_summary.py # standalone (parses PDFs)
-  consolidate_{ramp_detail,highway_sequence,highway_log}.py  # thin wrappers over the base
-  consolidate_tsn_highway_log.py  # TSN district PDFs -> TSMIS-format XLSX + combined (input/ folder)
-  consolidate_tsmis_highway_log_pdf.py  # TSMIS Highway Log PDFs (cell-rect parse) -> TSMIS-format XLSX + combined (reads output/<run>/highway_log_pdf/, day-aware)
-  compare_core.py     # THE discrepancy-workbook engine (schema-parameterized; regression-locked — see Compare tab notes)
-  compare_highway_log.py      # TSMIS-vs-TSN Highway Log: schema + loaders over compare_core ("files" kind)
-  compare_highway_log_pdf.py  # PDF-sourced Highway Log compares: TSMIS(PDF) vs TSN, TSMIS(PDF) vs TSMIS(Excel) ("files" kind, group pdf)
-  compare_env.py      # cross-environment comparison: two run folders, all four reports ("folders" kind)
-  batch_manifest.py   # persistent Export-Everything job manifest (B3; DATA_ROOT, atomic, resumable)
-  gui_main.py / gui_api.py / gui_worker.py   # GUI entry / js_api bridge + state / worker threads
-  ui/                 # the GUI itself: index.html + app.css + app.js (vanilla; design
-                      #   tokens ported from the approved Lovable demo; mock API for browser preview)
-build/
-  build.ps1           # one-command onefolder build (-SelfTest = headless verify gate;
-                      #   -BundleChromium = ship the Built-in Chromium inside the bundle)
-  prune_bundle.ps1    # strip to runtime-only files + DLP guard (run by build.ps1)
-  app.spec            # PyInstaller spec (Node driver + pdf/excel; excludes image libs; version-info + icon + manifest; no browser)
-  release_notes.md    # body of the GitHub release (which zip to pick + highlights)
-  app.ico / app.manifest / full_smoke.py / dist_readme.txt / .venv/ (git-ignored)
-dist/                 # build output: dist/TSMIS Exporter/ (git-ignored)
-output/               # contents git-ignored. Live layout: "<YYYY-MM-DD> <src>-<env>"/{ramp_summary,
-  ...               #   ramp_detail,highway_sequence,highway_log,consolidated}/ + run_reports/ + comparisons/
-                      #   (the tracked flat .gitkeep stubs are the legacy pre-dated layout; bare-date
-                      #   folders from v0.7–0.9 read as ssor-prod)
+1.–5. *.bat                  setup / login / export / consolidate / fast export (console flow)
+run app (GUI preview).bat    dev launcher for the GUI
+version.py                   app name/version + pinned Playwright (single source of truth)
+scripts/                     the engine (console-free) + console & GUI drivers + UI
+  common.py exporter.py exporter_parallel.py cli.py run_report.py events.py settings.py paths.py
+  reports.py                 the single report/consolidate/compare registry
+  export_*.py                one thin ReportSpec per report type
+  consolidate_*.py           per-route exports → one workbook (+ TSN / TSMIS-PDF parsers)
+  compare_core.py            the regression-locked comparison-workbook engine
+  compare_env.py compare_highway_log*.py   the comparison families over compare_core
+  highway_log_columns.py     one source of truth for the corrected 31-column labels
+  gui_main.py gui_api.py gui_worker.py  GUI entry / js_api bridge + state / worker threads
+  ui/                        index.html + app.css + app.js (vanilla; + the #mock API)
+  updater.py login.py logging_setup.py batch_manifest.py report_library.py
+build/                       build.ps1, app.spec, prune_bundle.ps1, full_smoke.py, check_*.py, release_notes.md
+docs/                        the knowledge library (start at docs/INDEX.md)
+output/ input/               generated/user data (git-ignored except .gitkeep stubs)
 ```
 
-`scripts/tsmis_auth.json` is git-ignored — treat it as a credential. Don't commit
-generated `output/` files (only the `.gitkeep` stubs), build artifacts
-(`build/.venv`, `dist/`), or `.claude/` permission state.
+Detail on any of these is in the matching `docs/` file (see the table above).
 
-## Architecture Notes
+---
 
-- **One shared loop, per-report differences in a `ReportSpec`.** Each report's
-  differences (label, output filename, post-Generate `wait_js`, `is_empty` check,
-  `save` strategy) live in its `ReportSpec`; the proven loop, recovery, and
-  skip/cancel logic live once in `exporter.py`. To fix one report's behavior, edit
-  only its `ReportSpec`.
-- **Single report registry** (`reports.py`) feeds both the GUI checkboxes and
-  `export_multi`, so the list can't drift. (The `.bat` menus are hand-edited text.)
-- **Route selection** is per-run plumbing into `run_export(..., routes=ROUTES)`.
-  `common.parse_routes` is the one parser. Console: `_resolve_routes_console`
-  (Enter/`all`/EOF = all; honors `TSMIS_ROUTES`). GUI: a Routes entry + `Choose…`
-  picker. To change the route universe permanently, edit `ROUTES` in `common.py`.
-- **Multi-report runs** run each selected `ReportSpec` in turn through the same
-  engine (so at most `workers` browsers are ever open), each with its own
-  browser/preflight/run-report CSV.
+## Pinned versions
 
-## Key Behaviors
-
-- **v0.13.0 — interface declutter, run lifecycle, accessibility & self-revert
-  (a UI/UX + trust release; the planned A3/D1 roadmap bucket was pushed down to
-  v0.14.0 — see TODO.md):**
-  - **Right-column run lifecycle:** while idle the right column shows a
-    **pre-flight summary** of exactly what the active tab will do
-    (`app.js renderPreflight`/`updateActivityCards`); during a run a **progress
-    card** with a live **ETA** (`updateEta`, an EMA over per-item times, RESET
-    when `progress.done===0` so the end-of-run retry pass can't inflate it);
-    after a run a persistent **completion summary**
-    (`gui_api._build_export_summary` → snapshot `last_summary`/`last_run_folder`,
-    cleared at each start/resume/retry) with **Open run folder**
-    (`open_run_folder`) and **Retry failed routes** (`retry_failed`; the failed
-    list is de-duped). Covered by `build/check_gui_bridge.py`.
-  - **Progress reads as a hierarchy (says exactly what's running):** the progress
-    card shows a PRIMARY line (the environment for an Export Everything batch, the
-    report for a single/multi export) + a SECONDARY line (report+route for a
-    batch, route+count for an export), and **Export Everything adds a
-    per-environment stepper** — one pill per env (done / running / pending) — so a
-    long batch's position is obvious (the 0.12.0 pain point). The backend ships
-    the ordered per-env state list in the `batch_progress` message
-    (`gui_worker.BatchWorker._step_views`, read from the manifest so it's correct
-    across a resume) → `gui_api._on_batch_progress` carries `src`/`env`/`steps`
-    into the `batch` snapshot. The env headline + stepper refresh on batch state
-    pushes (`app.js syncBatchHeadline`, which arrive BETWEEN per-route `progress`
-    events) but deliberately NEVER move the bar — only a real route outcome does,
-    so the bar stays monotonic at env boundaries; a fresh env shows
-    `Preparing <env>…` until its first route, and `renderBatchSteps` rebuilds only
-    when a step's state changes (so the running spinner doesn't restart per route).
-  - **Completion notification (default on):** a taskbar flash when a task
-    finishes (`gui_api._flash_taskbar`, `FlashWindowEx` via ctypes — modeled on
-    the late icon-setter, NOT a window-event handler; see pywebview trap 2),
-    toggled by settings `notify_on_finish`.
-  - **Compare sub-tabs:** the Compare pane splits its comparison families onto
-    sub-tabs. **Regrouped in v0.14.1** to two: **Cross-environment** (default — the
-    plain cross-env report comparisons) and **Highway Log** (EVERY Highway Log
-    comparison: cross-env HL, TSMIS-vs-TSN and the two PDF-sourced ones, gathered in
-    one place instead of the old env / TSMIS-vs-TSN / PDF split). See *New
-    comparison type* (`COMPARE_GROUPS` / `group`). (v0.14.0 briefly made Highway Log
-    a top-level tab; v0.14.1 moved it back to a sub-tab inside Compare.)
-  - **Revert to the previous version (Settings ▸ Debugging):**
-    `updater.resolve_previous_release` finds the newest FULL release strictly
-    OLDER than this build (lists `/releases`, ignores drafts/prereleases, picks
-    by VERSION NUMBER not list order, and **variant-skips** a release missing
-    this variant's zip rather than failing) and reinstalls it through the SAME
-    SHA-verified download→stage→swap pipeline as a forward update
-    (`gui_api.revert_to_previous` → `UpdateWorker("revert")`; the pill / restart
-    dialog read "Reverting…" / "Restart to revert"). Gated to a writable install
-    (`update_support()=="ok"` — hidden on dev/read-only); REFUSED while a forward
-    update is `staged` (it would clobber the staged download). Locked by
-    `build/check_updater.py` (`test_resolve_previous_release`).
-  - **Env-check setting split:** the single auto-scan toggle became
-    `env_check_after_signin` (default **ON**) + `env_check_after_start` (default
-    **OFF**); `gui_api._maybe_autoscan(reason)` keys off which event fired.
-  - **Everything tab brought to convention:** the pane now greys with the other
-    tabs while ANY task runs incl. env check (`.option-row.disabled` on both
-    batch lists, `.fast-toggle.disabled`, the dest + Saved-reports Refresh
-    buttons locked — `renderBatchLibrary` only re-runs on tab-switch/run-end, so
-    `renderState` re-syncs them). Its output files are **env-labeled**:
-    `paths.env_tagged_filename` FRONT-stamps the `<src-env>` (the dest subfolder
-    name) onto every per-route file AND the consolidated workbook in the
-    always-current store — FRONT on purpose, so the consolidators' `*.xlsx`/
-    `*.pdf` glob + end-anchored `_route_(\w+)\.xlsx$` route parser keep matching
-    (a trailing tag would break them; Ramp Summary reads its route from PDF text,
-    not the name). Wired by wrapping `spec.filename` in `ExportWorker._run_specs`
-    when `out_base` is set (covers the sequential + parallel engines + both retry
-    passes at once); the normal dated-run path is untouched (its folder already
-    self-labels). `build/check_a1_filenames.py` + `check_b2_autoconsolidate.py`.
-    Report types / environments the env-access scan flagged are **colour-coded**
-    in the Everything tab (`app.js renderBatchAccess`, same convention as the
-    Export tab's `.report-off`): each env row maps 1:1 to its verdict — amber
-    (`report-off`, "limited") or red (`option-row.env-error`, "will fail
-    outright") — and a report type goes amber when it's greyed/missing in any
-    SELECTED environment.
-  - **Accessibility:** report/env checkboxes are keyboard-focusable (sr-only
-    clipped input + visible focus ring, NOT `display:none`), status icons pair
-    colour with a glyph (`setCheckIcon`/`.check-ic`), and the icon-only controls
-    (Verify, theme, popovers) carry aria-labels.
-
-- **v0.12.0 — output labeling, run control & batch export (roadmap A+B; A3 deferred):**
-  - **A1 self-describing filenames:** consolidated workbooks stamp the run's
-    `<date> <src>-<env>` into the filename (`paths.stamped_consolidated_filename`,
-    used by every `consolidate_*.out_path_for`); both comparison families append a
-    generated-on date in `suggest_name`. TSN Highway Log is exempt (no src/env,
-    undated input); the legacy flat layout (`day=None`) keeps its fixed name.
-    compare_core/_SCHEMA text is untouched (regression-locked).
-    Locked by `build/check_a1_filenames.py`.
-  - **A2 compare-folder filter:** the cross-env compare folder dropdowns list only
-    runs that actually contain the chosen report
-    (`paths.list_output_days_for_report` + `GuiApi.get_compare_folders`, called by
-    `app.js` on report-type change; `start_compare_env` preflights it server-side;
-    Browse paths skip the filter). `build/check_a2_compare_filter.py`.
-  - **B1 Pause/Resume:** `Events.is_paused` (8th callback) + a shared
-    `exporter._wait_while_paused` hold BETWEEN routes (never inside a thread-affine
-    Playwright wait) in both the sequential and parallel engines — so it WORKS IN
-    FAST MODE too (all workers park), unlike Skip. `GuiApi.pause_or_resume` toggles
-    `pause_event` (covers export AND batch); cleared on cancel and at end-of-task.
-    `build/check_b1_pause.py`.
-  - **B2 auto-consolidate:** one Export-tab toggle; `ExportWorker` runs the matching
-    consolidator INLINE after each spec's export (reuses the held task slot + the
-    same Events sink; `reports.consolidator_for_spec` maps export→consolidate by
-    subdir; Intersection reports have none and are skipped; failures are logged,
-    never fatal). `build/check_b2_autoconsolidate.py`.
-  - **B3 Export Everything (always-current store):** the **Everything** tab runs
-    selected report types × selected environments SEQUENTIALLY
-    (`gui_worker.BatchWorker`, per-env, reusing `ExportWorker._run_specs`) into a
-    CONFIGURABLE destination (`settings.get/set_batch_dest`, default
-    `output/All Reports (current)`), laid out `<dest>/<src-env>/<report>/`
-    (+ `consolidated/`) — UNDATED and OVERWRITTEN in place so it always holds the
-    latest of every report. Each report+env folder is cleared then re-exported (a
-    true REFRESH, not a resume-skip) via the engine's `out_dir` override +
-    ExportWorker `out_base`; the 4 consolidators gained `input_dir`/`out_path`
-    overrides so auto-consolidate (B2) lands in the dest too. Per-env targeting
-    uses the **process-global `common.set_site`** (NOT `set_thread_site` — a single
-    sequential orchestrator under the single-task gate; original restored at end);
-    fast mode + pause (B1) reused. The tab shows the destination (folder picker)
-    and a **Saved reports library** — each type's age, stale ones flagged, with
-    per-report Refresh (a 1-report batch) — via `report_library.report_ages` +
-    `GuiApi.report_library_info`/`set_batch_dest`/`pick_batch_dest`. Progress
-    persists to `batch_manifest` (`DATA_ROOT/batch_job.json`, atomic, untouched by
-    Delete-all-reports) so a batch resumes across restarts (startup Resume/Discard
-    banner; `start_batch_export`/`resume_batch`/`discard_batch`). NOTE: the GUI is
-    a stopgap — a full GUI overhaul is planned (the user designs it elsewhere), so
-    don't over-invest in the current Everything-tab layout. `build/check_b3_batch.py`
-    + `build/check_report_library.py`.
-- **Run folders (v0.10.0; replaces bare dated outputs):** every run writes into
-  `output/<YYYY-MM-DD src-env>/<report>/` (`paths.output_run_dir`, src/env from
-  `common.get_site()` at run start), so each day's exports live in their own
-  folder AND different source/environment combinations never mix — the folder
-  name says exactly what's inside (this labeling is what the cross-environment
-  comparison keys on). Legacy bare-date folders read as **ssor-prod**
-  (`paths.parse_run_folder`). The consolidators take the run-folder NAME as
-  their `day` argument (opaque to them): `day=None` means the **newest** run
-  folder (`paths.latest_output_day`), the GUI picker lists run folders, the
-  console prompts (Enter = newest; `TSMIS_DAY` accepts a folder name or a bare
-  date — `paths.resolve_day_choice` picks that date's newest run folder), and
-  the combined workbook lands in `output/<run>/consolidated/`. When NO run
-  folders exist the consolidators fall back to the legacy flat
-  `output/<report>/` layout, so pre-0.7 exports stay consolidatable.
-- **Resume / idempotency:** `run_export` skips a route whose output file already
-  exists **in today's run folder for the active src/env**. Delete a file to
-  force re-download; a new day (or a different environment) always starts a
-  fresh folder (yesterday's files never block today's run). **Integrity gate
-  (v0.11.0):** a pre-existing file only counts as "done" if it passes a magic
-  check (XLSX `PK`, PDF `%PDF`) and is non-empty — a half-written/corrupt file
-  from an interrupted run is re-pulled; a file the user has locked open (e.g. in
-  Excel) is treated as present so resume tolerates the lock instead of failing.
-- **Live browser status + previews (v0.10.0, GUI):** the engines emit a
-  one-line per-browser status through `events.on_status(worker_no, text)`
-  (phase changes + a ~5 s heartbeat with elapsed time inside
-  `wait_with_skip_option`), shown as one row per browser in the progress card.
-  Each row's **Preview** button requests a screenshot: GUI →
-  `ExportWorker.request_screenshot(worker_no)` sets a flag the worker drains
-  at its next safe poll point via `common.maybe_screenshot` (Playwright is
-  thread-affine — only the owning thread may touch the page; a blocking
-  download wait answers at the next route), and the JPEG comes back as a
-  `("preview_shot", (worker, b64, note, url))` message → a closeable modal
-  showing the page's address over the screenshot (likewise the Verify-env
-  modal; `common.page_url_for_display` strips the URL fragment — the OAuth
-  token rides in the hash and must never reach the screen). The Events seam
-  (`worker_no`, `on_status`, `screenshot_wanted`, `on_screenshot`) is no-op
-  in the console flow.
-- **Settings tab (v0.10.0, GUI):** persisted via `settings.py` →
-  `data/config.json`. Timeout/worker overrides are read at RUN time through
-  `common.*_timeout_ms()` accessors / `exporter_parallel.default_worker_count()`
-  (next run picks them up; env vars still win where one exists); verbose
-  logging applies live (`logging_setup.set_debug_logging`); DevTools applies
-  next launch. **Per-env TSMIS addresses** (six editable rows; custom ones
-  chip-marked; clearing restores the default — see *Supported Reports*) and
-  the **Built-in Chromium download/remove** (see *Browser channels*) live
-  here too. **Check all environments** (v0.10.2, `EnvScanWorker`): probes
-  every src×env combo headless like an export — sign-in completes, the page
-  reports the requested env/src, AND a real preflight passes (the
-  County-enable data round-trip; the form itself is static HTML even signed
-  out, so form presence proves nothing) — catching "signs in fine but can't
-  pull reports". It also reads the dropdown's per-report availability
-  (`_REPORT_OPTIONS_JS`: the site sometimes greys single report types out;
-  every common disable convention counts, classes are logged, an unreadable
-  list = unknown — never "all missing") — the preflight probes the first
-  AVAILABLE type, ≥1 unavailable ⇒ amber `reports_off` naming them (per-type
-  states in the row tooltip), all ⇒ `no_reports`. Verdicts (ok /
-  reports_off / no_reports / denied / no_signin / wrong_site / unreachable /
-  error) stream onto each address row as they
-  land (`("env_access", dict)` per combo → snapshot `env_access`), with a
-  title-bar **Env access chip** showing the aggregate ("Envs 5/6"; click =
-  jump to the Settings rows), and the Export tab tints report types the
-  ACTIVE combo's scan found unavailable. Results are session-only on
-  purpose (access is server-side state that changes under us).
-  **Fast + automatic (v0.10.3):** combos drain from a shared queue into up
-  to 3 scanner threads, each owning its own Playwright/browser (fast-mode
-  idiom; `parallel=True`, so the scanners use the Chromium/Chrome parallel
-  channel — see *Fast Mode* — and when only managed Edge is usable the scan
-  drops to ONE browser, `_parallel_scanners` /
-  `common.resolve_parallel_channel`, instead of risking concurrent Edge
-  sessions) and pinning its target via
-  `common.set_thread_site` — a
-  threading.local consulted by `get_site()`, so every site-aware helper
-  (get_url/expected_host/_site_params_ok, custom URL overrides included)
-  follows the pin for that thread only and the user's header selection is
-  never touched (engine/login threads never pin). Device sign-in mode caps
-  the scan to 1 thread (the Edge profile opens in ONE browser — fast mode's
-  rule). The scan auto-runs once per session after startup/sign-in when a
-  login is available (`gui_api._maybe_autoscan`; Settings toggle
-  `env_check_on_start`, default on); Cancel lands between combos. Also: support-bundle zip (logs + run reports + manifest —
-  NEVER the auth file/profiles), forget-saved-login, open-folder shortcuts,
-  and **Delete all reports** (`gui_worker.reset_targets`/`ResetWorker`):
-  removes run folders, legacy flat report folders, consolidated/comparisons,
-  run_reports, failure dumps, TSN outputs (+ optionally the TSN input PDFs)
-  after a confirm dialog listing the concrete targets with file count + size
-  (`reset_preview`); logs, login, Edge profile and settings are NEVER
-  deleted; Excel-locked files are reported, not silently skipped.
-- **Skip a slow route:** console `S` key / GUI Skip button →
-  `events.should_skip()`. After `SKIP_PROMPT_AFTER_MS` a "still working" line
-  appears and the skip hatch opens; skipped routes are recorded and the form
-  re-armed. (Skip is disabled during the parallel phase — use Cancel.)
-- **Cancel:** stops the **current** export immediately (not just between routes).
-  `wait_with_skip_option` checks `is_cancelled()` ~every 5 s and raises
-  `RunCancelled` mid-wait; engines treat it as a clean stop (not a failure) and
-  return a partial `RunResult`. Re-running resumes.
-- **End-of-run retry pass** (`_retry_failed_routes`): after the main run, `failed`
-  routes get one slow, **serial** retry (`RETRY_REPORT_TIMEOUT_MS`, 15 min). In
-  fast mode a single fresh browser retries stragglers serially. Only `failed`
-  routes (not skipped/empty) are retried; bookkeeping keeps one CSV row per route;
-  the run report is written **after** the retry.
-- **In-loop auto-retry:** a transient (non-timeout) route error retries once after
-  `_recover()` (`RETRY_COUNT=1`). A hard timeout is not retried in-loop.
-- **Site-error fast-fail:** a fatal per-route TSMIS error (`#rampResults` gets an
-  `error` class) is detected via `common.ERROR_JS` and raised as `ReportError` —
-  recorded `failed` in seconds (with message + screenshot) instead of burning the
-  full timeout.
-- **No-download fast-fail (v0.11.0):** an export that starts no download within
-  `DOWNLOAD_START_TIMEOUT_MS` raises `EmptyExport` → recorded `empty` in ~60 s
-  instead of hanging the full per-route ceiling (the old empty-route hang was
-  ~21 min). Marker-independent — it keys on "Export control ready, no download"
-  (`EXPORT_READY_JS` watches the Export button, not Print) — so a report-specific
-  empty marker drifting can't reintroduce the hang. A greyed-out report type
-  raises `ReportUnavailableError` (`cs-disabled`). Tradeoff: a non-`#rampResults.
-  error` transient inside the export-click window reads as `empty` (not retried
-  in-loop); resume re-pulls it next run.
-- **Run report:** every route's outcome (`saved`/`empty`/`skipped`/`failed`/
-  `exists`) is recorded and auto-saved to `output/run_reports/<report>_run_<ts>.csv`.
-  GUI "Save run report…" copies it (combined CSV when several ran).
-- **One-click update (v0.9.0, GUI only — `updater.py`):** at launch (quiet
-  unless something is found) and on clicking the version chip, the app asks
-  the GitHub Releases API for the latest tag and compares it to `version.py`
-  (public repo, stdlib urllib; TLS trusts the **Windows cert store** so
-  corporate TLS inspection works — never switch this to requests/certifi).
-  If newer, a title-bar pill offers **Update** → downloads the
-  variant-matching zip (`-with-browser` when `_internal\ms-playwright` ships;
-  same probe as `paths.py`) into `data\update\`, **verifies its SHA-256 against
-  the release's published `.sha256` and aborts before extracting on mismatch,
-  and restricts the swap to an allowlist of expected staged items** (v0.11.0;
-  `release.yml` publishes the checksum and asserts the git tag == `version.py`),
-  extracts it, then
-  **Restart to update** launches the STAGED NEW EXE in swap mode
-  (`updater.SWAP_FLAG` / `run_swap_mode`; gui_main branches into it FIRST,
-  before logging/paths/CLR — the process runs from the staged tree, so
-  normal path resolution would aim at the wrong folder) and exits: the swap
-  process waits on the app's PID and installs in **two phases (v0.10.3,
-  field failure)** — phase 1 COPIES every staged piece to `*.new` (the big
-  failure-prone copytree happens while the installed app is untouched; a
-  failure = clean abort), phase 2 swaps by pure RENAMES (`live→.old`,
-  `.new→live`; rollback is renames too). The v0.10.2 one-phase copy could
-  die mid-`_internal` and its delete-based rollback could fail on a
-  Defender-held file, relaunching a MIXED tree ("says 0.10.2, features
-  missing"). A rolled-back update announces itself when the update is
-  re-offered (`updater.last_swap_failure` reads `update_helper.log`'s
-  tail), and `_clear_webview_caches()` (every launch, in
-  cleanup_leftovers) drops the WebView2 HTTP caches so the UI on screen is
-  always the one on disk (the persistent profile could serve a cached
-  app.js after an update; Local Storage/theme untouched); user data folders
-  are never in the staged tree. A swap process that dies instantly is
-  detected BEFORE the window closes (UpdateError; the app stays open on the
-  old version). **Why an exe, not a script (v0.10.1, field failure):**
-  v0.9.0 ran a PowerShell helper from `%TEMP%`; locked-down PCs that block
-  PowerShell entirely killed it silently — the app closed, nothing swapped,
-  and the staged download just sat in `data\update`. The swap-mode design
-  needs only "exes run from user folders", which is proven anywhere the app
-  itself runs. `updater.cleanup_leftovers()` (gui_main
-  startup, before the CLR loads) removes `*.old` + stale staging — including
-  a staged-but-never-applied download, deliberately, so stale versions are
-  re-offered fresh. In-app downloads never carry the Mark-of-the-Web
-  (zipfile writes raw bytes), so the v0.8.1 CLR failure can't happen on this
-  path. Read-only installs (`update_support()` = "link": DATA_ROOT fell back
-  to %LOCALAPPDATA%) get a pill that opens the release page instead; dev runs
-  skip the check ("off"). Restart is gated on no task running; the download
-  isn't. Update state is pushed in every snapshot (`update:{phase,…}`);
-  worker protocol message is `("update_status", dict)`. `full_smoke.py` stubs
-  `UpdateWorker` so the release gate never touches the network.
-  (A "dev update channel" + dev-release workflow existed briefly in
-  v0.10.2–0.10.3 and was removed in v0.10.4 — only full releases from
-  `/releases/latest` are ever offered. Don't resurrect it casually; if it
-  returns, releases must be picked by newest `published_at`, never list
-  order — that ordering bug is why it never worked in the field.)
-
-## Timeouts (`scripts/common.py`)
-
-| Constant | Default | Purpose |
-|---|---|---|
-| `REPORT_TIMEOUT_MS` | 360_000 (6 min) | Per-route ceiling, sequential flow |
-| `FAST_REPORT_TIMEOUT_MS` | 600_000 (10 min) | Per-route ceiling, fast mode (server under load) |
-| `RETRY_REPORT_TIMEOUT_MS` | 900_000 (15 min) | Per-route ceiling, end-of-run retry pass |
-| `SKIP_PROMPT_AFTER_MS` | 60_000 (1 min) | When the "still working" status + skip hatch open |
-| `COUNTY_ENABLE_TIMEOUT_MS` | 60_000 (60 s) | Max wait for the county dropdown to enable |
-| `DOWNLOAD_START_TIMEOUT_MS` | 60_000 (60 s) | Max wait for a download to START after Generate; elapsing ⇒ `EmptyExport` no-data fast-fail (capped at `min(60 s, ceiling)`) |
-| `RETRY_COUNT` | 1 | In-loop retries after a transient (non-timeout) failure |
-
-Increase these if the TSMIS server is slow. The constants are the DEFAULTS;
-since v0.10.0 the GUI's Settings tab overrides the four ceilings via
-`settings.py`, and engines read them at run time through the accessor
-functions (`report_timeout_ms()` etc.) — when editing engine code, call the
-accessors, don't import the constants. `DOWNLOAD_START_TIMEOUT_MS` (v0.11.0) is
-config.json-only (no Settings UI) and read the same way.
-
-## Fast Mode (experimental, `exporter_parallel.py`)
-
-N headless browsers restore the **same** session and pull routes off a shared
-queue. Additive — the sequential engine is untouched and remains the default. Same
-contract (merged `RunResult`, same errors, honors cancel, resumes, auto-saves CSV;
-one preflight before launching N browsers). A crashed worker never silently drops
-routes — others keep draining, and unrecorded routes are reconciled as `failed`.
-
-`DEFAULT_WORKERS=3`, `MAX_WORKERS=30`. The limit is the **client PC, not the
-server** (~0.5 GB RAM/worker): 3 = safe (~2.5–3× faster), 8–12 = big speedup on a
-healthy multi-core PC, 30 = hard cap. Turn on via `5. fast export…bat`
-(`TSMIS_FAST_WORKERS`) or the GUI "⚡ Fast mode" checkbox + spinner.
-`run_cli`/`run_cli_multi` route to the parallel engine when workers > 1.
-
-**Parallel browsers avoid managed Edge (v0.10.3, field failure):** N
-concurrent headless Edge instances restoring the same saved session timed
-out (org-managed Edge misbehaves under concurrency — the same management
-that breaks its headed sign-in). Every saved-session browser that runs
-ALONGSIDE OTHERS — fast mode's workers, its preflight + serial retry pass,
-and the env scan's scanners — launches with
-`new_authed_browser(p, parallel=True)` → `launch_browser(..., parallel=True)`
-→ `common._parallel_candidates()`: Built-in Chromium, then Chrome, **Edge
-only as a warned last resort**. A UI pick of Edge is deliberately not
-honored for these (it caused the failure; `TSMIS_BROWSER_CHANNEL` still
-hard-overrides for debugging), the parallel channel keeps its own
-process cache, and Edge keeps its one-click device sign-in role untouched.
-The sequential single-browser engine keeps the normal channel order.
-
-## Auth / Session
-
-- **Signed-in detection** (`common.is_logged_in`): the report page ships its
-  whole form in static HTML even when signed out, and the app **never shows a
-  signed-out page** — `initAuth()` with no token immediately self-redirects
-  into the portal OAuth flow (same tab, `response_type=token`; the token comes
-  back in the URL hash and lives **only in page memory**, ~120 min TTL — so a
-  storage_state never carries the app session, every fresh navigation re-runs
-  the silent round-trip, and `_recover()` re-mints expired tokens mid-run).
-  The only trustworthy signal is the app's post-auth UI: any of
-  `#modeSelector`/`#controlsGrid`/`#generateRow`/`#appForm`/`#versionCtrl`
-  visible (ARS: immediately; SSOR: after the TSMIS_HI group check) with
-  `#accessDenied`/`#loginPrompt` hidden (`common._SIGNED_IN_JS`; visibility via
-  `Element.checkVisibility()` — offsetParent is wrong for fixed-position
-  ancestors). Sign-in gate failures dump `auth_fail_<ts>.png/.html` to
-  `FAILURES_DIR` plus a per-signal snapshot to the log
-  (`common.require_signed_in` / `dump_auth_failure`). `navigate_with_auth`
-  (60 s budget, state-change breadcrumbs in the log) drives the portal
-  sign-in page's IdP hop **directly** — `goto` of the button's `data-url` +
-  the page's `oauth_state` — then polls for the signed-in state. THREE traps,
-  all hit in the field: (1) the portal keeps **no session cookie**, so every
-  recovery is a full silent SAML round-trip; (2) the app's `CONFIG` is a
-  top-level `const` — a lexical global, NOT `window.CONFIG` — readable only by
-  bare identifier in a try/catch (`_CONFIG_JS`); (3) reloading the page
-  destroys the memory-only token, so the wrong-env/src check
-  (`_site_params_ok`) runs INSIDE the sign-in loop (one corrective reload,
-  then a fresh sign-in pass) and NEVER after success — and host checks must
-  parse the hostname (`_page_host`), because the portal's authorize URL
-  contains the app host inside its `redirect_uri` parameter.
-- **Silent device sign-in** (`common.try_device_sso_login` →
-  `open_edge_device_context`) is tried first: it reopens the app-owned
-  **persistent Edge sign-in profile** (`EDGE_LOGIN_PROFILE_DIR`) headless and
-  clicks "Caltrans Azure AD" (via the same `navigate_with_auth` the engine
-  uses) — the **one-click Windows sign-in lives in that profile**; a fresh
-  cookie-free Edge context does NOT get it, and Chrome never does (manual
-  credentials there). Each known profile dir is tried (managed Edge may have
-  moved the session into a work profile). The profile is **primed by the headed
-  Edge login** — first-ever use still needs one headed sign-in. If the minted
-  state passes the portability check it is saved as the normal auth file; if
-  sign-in worked but the state is device-bound, **nothing is saved** and the
-  app enters **device sign-in mode** (GUI message `login_device_ok`,
-  `App._device_ok`): exports don't need a file — each run signs itself in live
-  the same way.
-- **Engines no longer hard-require the auth file.** They log a notice
-  (`has_valid_auth`) instead of raising, and `new_authed_browser` restores the
-  saved session when one is valid, else opens the persistent Edge profile via
-  `open_edge_device_context` (the context doubles as the browser handle;
-  `.close()` shuts the persistent browser down); `_recover()` re-auths the
-  same way mid-run. If sign-in still fails, `AuthError` is raised as before.
-  The profile can only be open in ONE browser at a time, so **device mode caps
-  fast mode to 1 worker** (a saved login is required for real parallelism — the
-  GUI greys the Fast-mode checkbox out without one and says why).
-  The `.bat` export menus print a note instead of exiting when the file is
-  missing; the GUI offers to start anyway.
-- **Local Network Access:** the TSMIS page pulls report data from an intranet
-  host, which Chromium's LNA checks would block behind a permission prompt no
-  one can click headless. Every automated context launches with
-  `common._LNA_ARGS` and pre-grants `local-network-access`
-  (`common._new_app_context`) — engine contexts, the device sign-in, and the
-  portability probe alike. The **headed sign-in windows need it too**
-  (`LOGIN_BROWSER_ARGS` + `new_login_context`, used by `login.py` and
-  `gui_worker.LoginWorker`): without the grant Chrome re-prompts on every
-  sign-in, and an unanswered prompt blocks the signed-in UI — so the login is
-  never detected and no session is saved (field bug, fixed v0.8.0; managed
-  Edge avoided it via enterprise policy, which is why only Chrome showed it).
-- **Headed sign-in browser order** (`login.py` console / `gui_worker.LoginWorker`)
-  honors the user's pick first (`get_preferred_channel()` — the GUI Browser
-  dropdown / `TSMIS_BROWSER_CHANNEL`; picking Chrome goes straight to Chrome and
-  skips the silent attempt). With no pick, after the silent attempt:
-  1. **Built-in Chromium** when present — a normal headed sign-in; unmanaged, so
-     org policy can't kill the window.
-  2. **Persistent-profile Edge recapture** — Edge opens on the app-owned
-     `EDGE_LOGIN_PROFILE_DIR` with a CDP port; capture from the live context,
-     else `capture_edge_login_state_over_cdp` (re-attach to the relaunched
-     managed Edge), else `capture_edge_login_state_from_profiles` (reopen the
-     profile tree headless and read the session off disk).
-  3. **Chrome fallback**, then any `launch_browser`-resolvable browser.
-- **Edge captures are portability-validated before saving**
-  (`common.storage_state_is_portable`): the state is restored into a fresh
-  headless context and must actually log in, exactly as the engine will use it.
-  Managed Edge work profiles can sign in via the Windows device broker (PRT) —
-  `amr: ["wia"]`, an `ESTSAUTH` stub with no payload — leaving cookies that look
-  captured but can't log in anywhere else; such captures are rejected with a
-  clear message and the flow falls back to another browser instead of saving a
-  dud auth file.
-- The auth file is written only **after** a real login is detected
-  (`is_logged_in` on any page — SSO can land in a popup). The GUI `LoginWorker`
-  also watches the window closing, but the reliable signal is **no open tabs
-  remain** (the SSO flow always keeps ≥1 tab) — it does NOT treat the original
-  page closing, a connection blip, or a single transient `ctx.cookies()` error
-  as "closed" (that caused false "cancelled"). On any non-save outcome no file
-  is written, so a prior valid session is preserved.
-- **The title bar shows the two sign-in paths separately (v0.10.4):** a
-  "Saved login" chip (the auth file — valid/missing, age in the tooltip;
-  what exports restore, required for fast mode) and an "Edge one-click" chip
-  (green = silent device sign-in proven this session, amber = the Edge
-  sign-in profile exists but is unproven, grey = never set up).
-  `gui_api._login_states()` → snapshot `logins`; cheap stat calls only — the
-  device path is only ever PROVEN by an actual sign-in, never probed eagerly.
-- `require_valid_auth()` still validates the file shape (exists, valid JSON,
-  `cookies`/`origins` lists) and backs `has_valid_auth()` / the GUI status dot.
-  On `AuthError` from a run, `cli.py` clears the stale file and guides re-login;
-  the GUI shows a re-login dialog.
-
-## Build & Packaging (portable onefolder)
-
-From the repo root: `powershell -ExecutionPolicy Bypass -File build\build.ps1`
-→ windowed `dist\TSMIS Exporter\` (~148 MB; double-click `TSMIS Exporter.exe`).
-Add `-BundleChromium` for the with-browser variant (downloads Playwright's
-Chromium into `_internal\ms-playwright` before the prune). Add `-SelfTest` for a
-headless console build that **builds AND runs** `full_smoke.py` over the pruned
-frozen bundle (browser pdf+download, pdfplumber, openpyxl, GUI) — a real release
-gate (`-SelfTest -BundleChromium` gates the bundled-Chromium path).
-
-`build.ps1`: (1) creates `build\.venv` from `requirements-build.txt`; (2) runs
-PyInstaller with `app.spec`, entry `scripts\gui_main.py`, windowed, copies
-`dist_readme.txt` in as "Start Here.txt"; (2b) with `-BundleChromium`, runs
-`playwright install chromium --no-shell` with `PLAYWRIGHT_BROWSERS_PATH` aimed
-inside the bundle; (3) runs `prune_bundle.ps1`; (4) with `-SelfTest`, runs the
-self-test exe and fails on nonzero exit.
-
-**Releasing:** push a `v*` tag (or run the `release` workflow manually with a
-tag input — it creates the tag) and `.github/workflows/release.yml` runs both
-self-test gates on `windows-latest`, builds the three zips (`win64`,
-`win64-with-browser`, `batch-source` via `git archive`), and publishes the
-GitHub release with `build/release_notes.md` as the body. Bump `version.py`
-first; nothing is published if any gate fails.
-
-`app.spec` highlights:
-- `collect_all('playwright')` + Playwright's hooks → the Node driver ships. **No
-  browser bundled** (no `ms-playwright` data entry).
-- `collect_all('webview'/'pythonnet'/'clr_loader')` — the GUI shell. Their package
-  DATA is load-bearing when frozen: `webview/lib` (WebView2 .NET assemblies),
-  `pythonnet/runtime` (Python.Runtime.dll + netstandard facades),
-  `clr_loader/ffi/dlls` (ClrLoader natives). `hiddenimports += ['clr']`.
-- `scripts/ui/*` ships as data files under `_internal/ui/`
-  (`gui_api._ui_index_path()` resolves them via `sys._MEIPASS`).
-- `collect_data_files('pdfminer')` + `collect_all('pdfplumber'/'openpyxl')` — the
-  pdfminer CMap data is the classic frozen trap. `cryptography` is a hard pdfminer
-  import and **must stay**.
-- `excludes=['PIL','pypdfium2','pypdfium2_raw','tkinter','_tkinter']` — image libs
-  the runtime paths (text/table extraction + plain workbooks) don't need, plus
-  Tk/Tcl (the UI is a WebView since 0.8.0); proven safe by the frozen `-SelfTest`
-  passing with them excluded.
-- **Trust metadata** (reduces IT/Defender/DLP false-positives on the unsigned exe):
-  version-info resource from `version.py`, `app.ico`, `app.manifest` (`asInvoker` +
-  Win10/11), `upx=False`. **Code-signing is the only complete fix** (not yet done).
-- **Browser selection** is in `common.launch_browser`: once per process it probes
-  each channel (chromium when present → msedge → chrome; override
-  `TSMIS_BROWSER_CHANNEL`; GUI dropdown sets `set_preferred_channel`) by
-  launching headless and driving a page, so a too-new Edge falls through to the
-  next channel. Raises `BrowserNotFoundError` (distinguishing "none installed"
-  from "too new — update the tool") only if all fail. `PLAYWRIGHT_BROWSERS_PATH`
-  is set by `paths.py` only when the bundle ships `_internal\ms-playwright`.
-
-**Bundle hygiene / DLP (`prune_bundle.ps1`):** strips the bundle to runtime-only
-files and **fails the build** if DLP-blocked content remains. Motivating case: the
-Playwright Node driver shipped docs (`tracing.md`) containing a test credit-card
-number that corporate DLP blocks. Deletes: all prose docs bundle-wide (`*.md`/
-`*.rst`/`README`/… — **licenses kept**), sanitizes `dist-info` METADATA to headers
-only, Playwright driver extras (`*.d.ts`, `types/`, `skill/`, `tools/trace/`,
-`tools/dashboard/`, `vite/`), `tests/`/`*.pyi` stubs, any image-lib dirs that
-slipped through. Guards (fail build if found): non-license docs, credit cards
-(IIN + length + Luhn), PEM private keys, AWS keys, US SSNs. Re-runnable on an
-extracted release: `prune_bundle.ps1 -Target "…\TSMIS Exporter"` (`-GuardOnly` to
-audit). The ~149 MB floor is `node.exe` (~80 MB) + Python + pythonnet/WebView2
-assemblies + pdf/excel libs.
-
-## Extending
-
-**New report type:**
-1. `scripts/export_<name>.py` — a `ReportSpec` (`label` = exact dropdown text,
-   `subdir`, `filename`, `wait_js`, `is_empty`, `save` — reuse `save_pdf_letter`/
-   `save_via_export_button`) + `run_cli(SPEC, title=…)`.
-2. Add a branch to `3. run_export…bat` and `5. fast export…bat`.
-3. Add one entry to `EXPORT_REPORTS` in `reports.py` (feeds GUI + export_multi).
-4. List the module in `APP_MODULES` in `build/app.spec` (lazy imports need it).
-5. Add `output/<name>/.gitkeep`, whitelist in `.gitignore`.
-6. Document in the table at the top.
-
-**New consolidator** — implement `consolidate(events, confirm_overwrite) ->
-ConsolidateResult` (console-free: log via `events.on_log`, ask before overwrite via
-the callback, honor `is_cancelled()`, guard third-party imports with `_DEPS_OK`,
-build openpyxl styles inside functions). For an XLSX report, wrap
-`consolidate_xlsx_base.consolidate_xlsx` (set `INPUT_DIR`, `OUT_PATH`, `SHEET_NAME`,
-`REPORT_NAME`) like `consolidate_highway_log.py`; for a different input format
-(like PDF Ramp Summary), write standalone. Then add the `__main__` →
-`run_consolidate_cli`, wire `4. consolidate…bat`, add to `APP_MODULES` and
-`CONSOLIDATE_REPORTS`, and document here.
-
-**New comparison type:** add one row to `COMPARE_REPORTS` in `reports.py`
-(the comparison type lists are generated from it; rows are
-`(label, module_or_adapter, kind, group)`) and the module to `APP_MODULES` in
-`build/app.spec`. `group` is one of `COMPARE_GROUPS`' ids — the Compare pane
-renders one **sub-tab per group** (first = default), and a row shows only under its
-group's sub-tab. As of v0.14.1 the two sub-tabs are `env` "Cross-environment"
-(the plain cross-environment report comparisons) and `highway_log` "Highway Log"
-(EVERY Highway Log comparison — cross-env HL, TSMIS-vs-TSN and the PDF-sourced
-ones — gathered in one place; `app.js selectCompareGroup`, `#compareSubtabs`). So a
-new Highway Log comparison is `group="highway_log"`; a new plain cross-env one is
-`group="env"`; a brand-new family can add its own sub-tab by appending to
-`COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input
-plumbing is untouched. Two input kinds:
-- `"files"` — a module exposing
-  `compare(path_a, path_b, out_path, events=None, confirm_overwrite=None,
-  mode="formulas") -> ConsolidateResult` (console-free, same rules as
-  consolidators; the GUI passes `mode` from its values/formulas checkboxes —
-  accept it even if only one flavor is implemented) plus `REPORT_NAME` and
-  `suggest_name(path_a)`.
-- `"folders"` — an adapter exposing
-  `compare_folders(dir_a, dir_b, out_path, events=None,
-  confirm_overwrite=None, mode="formulas") -> ConsolidateResult` plus
-  `REPORT_NAME` and `suggest_name(dir_a, dir_b)` — usually just another
-  `compare_env.EnvCompare(...)` instance (give it the report's subdir, sheet
-  name, and optionally a pinned header / base `CompareSchema`).
-Don't hand-roll workbook output: build a `CompareSchema` and call
-`compare_core.run_compare` — that's the approved workbook style for free
-(and the core's text/formulas are regression-locked; see *Compare tab*).
-
-**Add/remove a route:** edit `ROUTES` in `common.py` (zero-padded 3-digit, optional
-suffixes like `"005S"`/`"101U"` — must match the TSMIS `<select>` option values).
-
-## Reliability
-
-- **Heavy file logging (the "one log upload answers it" contract, v0.7.6):**
-  `logging_setup.setup_logging()` → rotating `LOG_DIR/tsmis.log` (5 × 2 MB),
-  file-only. Every line is thread-tagged (`[main]`, `[export-w2]`, `[login]` —
-  fast mode's interleaved browsers stay distinguishable); the startup banner
-  pins build (frozen/dev), Python/OS, resolved paths, and `TSMIS_*`/
-  `PLAYWRIGHT_BROWSERS_PATH` overrides. Everything shown in the GUI log pane
-  and every engine `on_log` line in the console flow is **mirrored** to the
-  `tsmis.ui` logger, so the file carries the user's view (what was clicked,
-  what was reported) alongside the engine's own diagnostics. Decision points
-  log themselves: site/browser picks, channel probe results + why a fallback
-  happened, saved-session-vs-device-mode (with auth-file age), each Edge
-  profile attempt, portability verdicts, preflight steps, per-route outcomes
-  **with elapsed time and file size**. Crash safety nets: `sys.excepthook` +
-  `threading.excepthook` log full tracebacks (a windowed .exe has no stderr);
-  every `GuiApi` method is wrapped (`_api_method`) so a bridge-call crash is
-  logged AND returned to JS as a structured error instead of a dead Promise;
-  uncaught JS errors come back through `api.log_js_error` into `tsmis.crash`;
-  `faulthandler` writes hard interpreter crashes to `LOG_DIR/crash.log` for
-  the **console entry points only** — it is incompatible with pythonnet and
-  disabled in the GUI process (see *Design decisions*, trap 3; the GUI's
-  native-crash trail is WER/Event Log).
-  NOTE: the `[main]` thread tag is applied by a logging **Filter** — never
-  rename the actual main thread (it breaks pywebview; see *Design decisions*).
-  **Error messages must name the
-  failing step and stay UI-neutral; the WHY (exception text, probe status,
-  profile name) always goes to the log** — when adding code, log every
-  decision and every swallowed exception (`type(e).__name__` + first line at
-  minimum).
-- **Preflight** (`common.preflight`): after login, before the loop, confirms the
-  report selects and the Route control + Generate button exist — else
-  `PreflightError` naming the failed step in the log + a `preflight_fail_*`
-  page dump, so the run fails fast with one clear error.
-  `SiteUnreachableError` (a `PreflightError`) covers "couldn't open the page
-  at all" (network/VPN) with a check-your-connection message.
-- **Failure screenshots:** on final failure, `_capture_failure()` writes
-  `<report>_route_<route>_<ts>.png` + `.html` to `FAILURES_DIR` (best-effort).
-- **Session expiry mid-run:** `_recover()` raises `AuthError`, stopping cleanly.
-
-## Conventions
-
-- Keep core code console-free; messages UI-neutral (see *Two Run Modes*).
-- Sync Playwright API (not async). Runtime deps pinned; a browser is bundled
-  **only** in the `-BundleChromium` variant.
-- End-user setup uses global `pip` (no venv); the build uses `build\.venv`.
-- **Regression checks (v0.11.0; no unit-test framework still).** True
-  verification remains a live export against TSMIS (needs login) or running a
-  consolidator/comparison over real files — but `build\check_*.py` are runnable
-  golden guards (plain `build\.venv\Scripts\python.exe`, no login): the
-  comparison set (`check_compare_*` + `check_ramp_summary_partial` +
-  `check_tsn_description_leak`) locks the regression-locked `compare_core`; the
-  og set (`check_export_engine` / `gui_bridge` / `updater` / `fake_site`, the
-  last driving a real headless Chromium over DOM fixtures) covers the engine /
-  GUI / updater. `.github/workflows/checks.yml` runs them all (blocking) on
-  every push/PR; the comparison value/formula flavors are additionally
-  COM-recalc-verified on real data (Excel required).
-- **Never commit** `scripts/tsmis_auth.json` or generated `output/`/build artifacts.
-  Commit messages: short, imperative (`add route 395`).
-
-## Common Issues
-
-| Symptom | Cause | Fix |
-|---|---|---|
-| `Playwright is not installed` | Setup not run | Run `1. setup…bat` |
-| `LOGIN PROBLEM` (`AuthError`) | Session missing/expired AND automatic device sign-in unavailable | Run `2. login…bat` |
-| Route keeps timing out | TSMIS server slow | Raise `REPORT_TIMEOUT_MS` |
-| Route fails instantly with a "TSMIS site error" | The site can't build that route | Expected — recorded `failed` (see `FAILURES_DIR`); a TSMIS issue |
-| County dropdown timeout | Slow network | Raise `COUNTY_ENABLE_TIMEOUT_MS` |
-| One report's output wrong | That report's selector changed | Edit only its `ReportSpec` |
-| "page looks different than expected" | Preflight failed — site changed | Check `LOG_DIR`/`FAILURES_DIR`; update selectors |
-| `BrowserNotFoundError` | No usable browser found | Install Edge, re-run `1. setup…bat` (downloads Chromium), or use the with-browser zip |
-| "The app window could not be created" box | WebView2 runtime missing/broken (very old or stripped Windows) | Install/update Microsoft Edge (ships the Evergreen WebView2 runtime); details in `LOG_DIR` |
-| GUI shows a blank window | UI assets missing or JS crashed | `tsmis.log` carries JS errors (`log_js_error`); run with `TSMIS_UI_DEBUG=1` for DevTools |
-| Edge sign-in "works" but exports can't log in | Edge signed in via the Windows device broker (PRT) — session never reaches cookies | Expected & detected: the capture is rejected (`storage_state_is_portable`) and login falls back to Chrome / Built-in Chromium |
-| Browser launch fails after an Edge/Chrome update | Evergreen browser outran pinned Playwright CDP | Bump `playwright` in `requirements*.txt`, rebuild |
-| DLP blocks a release file ("Credit Card Number") | Playwright driver docs bundled | `build.ps1` prunes them; clean a release with `prune_bundle.ps1 -Target …` |
-| Build: "GUARD FAILED" | A dep shipped DLP-blocked content | Extend `$killDirs` in `prune_bundle.ps1` |
-| Update pill opens a web page instead of installing | App folder is read-only (data fell back to `%LOCALAPPDATA%`) | Expected (`update_support()` = "link") — move the app somewhere writable, or extract the new zip manually |
-| Update applied but the old version came back | A swap step failed; the swap rolled back | See `data\logs\update_helper.log`; close anything holding `_internal` open and update again. Since v0.10.3 the app says so itself when it re-offers the update (`updater.last_swap_failure`) |
-| "The app couldn't load its settings" right after an update (≤ v0.10.2) | Cold-WebView2 bridge race — the api object landed before its method stubs (pywebview trap 5) | Fixed (boot gates on the method + retries); on old builds just relaunch |
-| Update downloaded, app closed, but nothing was installed (≤ v0.10.0) | The old PowerShell swap helper was silently blocked (locked-down PCs with no PowerShell) | Fixed in v0.10.1 (the staged exe swaps itself; no scripts). One manual install of ≥ 0.10.1 — the new version sits intact in `data\update\staged`, or download the zip — then auto-update works |
+`version.py` / `requirements*.txt`: `playwright==1.60.0` (Node driver only — no
+Chromium ships in the default build), `pdfplumber==0.11.9`
+(→ `pdfminer.six==20251230`), `openpyxl==3.1.5`, `pywebview==6.2.1`
+(→ `pythonnet`/`clr_loader`), `pyinstaller==6.20.0`,
+`pyinstaller-hooks-contrib==2026.5`. Built/tested on **Python 3.11**. Rationale +
+the three release variants: [docs/build-and-release.md](docs/build-and-release.md).

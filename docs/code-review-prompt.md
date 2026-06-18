@@ -24,7 +24,8 @@ patch — point it at the current `HEAD` or a specific diff range and go.
   contract assumptions are the easiest thing to get wrong from the repo alone.
 - **Output.** One report file at `code-review/AUDIT-<agent>-<short-sha>.md` (create
   the folder if needed; per-run reports are git-ignored — they quote code and
-  internal detail). Distil durable follow-ups into the project `TODO.md`; do not
+  internal detail). Distil durable follow-ups into the project roadmap
+  ([roadmap.md](roadmap.md)); do not
   leave them only in the report.
 
 ---

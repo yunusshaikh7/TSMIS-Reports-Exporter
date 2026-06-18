@@ -267,7 +267,7 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
     # a loud warning so a partial result is never mistaken for a full one. (The
     # status stays "ok" so the GUI still offers the file that WAS produced; an
     # explicit "partial" status would need matching consumer support — tracked
-    # in code-review/COMPARISON-TODO.md.)
+    # in docs/roadmap.md.)
     incomplete = bool(skipped or failed)
     summary_lines = []
     if incomplete:

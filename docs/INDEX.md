@@ -1,0 +1,58 @@
+# TSMIS Reports Exporter — knowledge library
+
+The canonical, deduplicated home for everything we know about this project, written
+for AI agents (and humans) working on the repo. Each file is the **single source of
+truth** for its domain; where topics overlap, the owner holds the detail and the
+others link to it.
+
+**Start here:** [`../CLAUDE.md`](../CLAUDE.md) is the slim **router** — it carries the
+project snapshot and the non-negotiable conventions, and points into this library.
+Read the conventions there first, then come here for the deep dive on whatever you're
+touching.
+
+## The docs
+
+| Doc | Read this when… |
+|---|---|
+| [architecture.md](architecture.md) | You need the big picture — the console-free core + two front-ends, the `Events` seam, the single report registry, run folders, the data-location model, and the v0.12/v0.13 feature buckets. |
+| [engine-and-reliability.md](engine-and-reliability.md) | You're touching the export loop's runtime behavior — resume + integrity gate, skip/cancel, retry, the fast-fails (`EmptyExport`/`ReportError`/`ReportUnavailableError`), timeouts, fast mode, preflight, run reports. |
+| [auth-and-signin.md](auth-and-signin.md) | Anything about signing into TSMIS — the token-in-hash session model, the `CONFIG` lexical-global trap, device sign-in / Edge recapture / portability, LNA pre-grant, signed-in detection, the two login chips. |
+| [gui.md](gui.md) | You're in the desktop GUI — pywebview/WebView2, the threading + queue model, Python↔JS layering, the **five pywebview traps**, the `#mock` preview and its gotchas. |
+| [reports.md](reports.md) | You need the report catalog, a single report's `ReportSpec`/save/empty behavior, the `cs-disabled` rule, or the "add a report / consolidator / comparison" recipes. |
+| [comparison-engine.md](comparison-engine.md) | You're in `compare_core` — the regression lock + harness, the two flavors, key-field / roadbed key / duplicate-pairing, ditto non-asserting, the verdict / incompleteness contract, write-path safety, the three comparison families. |
+| [highway_log/columns.md](highway_log/columns.md) | You need the corrected 31-column Highway Log labels (the vendor mislabeled most) — `highway_log_columns.py`, tooltips, the Legend sheet. |
+| [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) | You're parsing a Highway Log PDF — the TSMIS cell-rect parser and the TSN character-window parser (with the 3 description guards), the two PDF formats, the flawless-validation results. |
+| [highway_log/comparison-study.md](highway_log/comparison-study.md) | You need the `+`/`++` **ditto domain convention** and the raw evidence behind it (the "pointer to the paired roadbed, not data" finding + the roadbed-encoding split §7b). |
+| [build-and-release.md](build-and-release.md) | You're building/packaging/releasing — PyInstaller `app.spec`, `prune_bundle.ps1` + the DLP guard, the three browser-channel variants, the full **updater** (swap mode / MOTW / SHA-256 / revert), and CI (`release.yml` / `checks.yml`). |
+| [it-and-security.md](it-and-security.md) | You need the IT/DLP/security view — what the app talks to, files it touches, browser flags, the **work-PC capability model**, the read-only audit's findings + the "good designs," and code-signing. |
+| [verification-and-testing.md](verification-and-testing.md) | You need to verify a change — the golden `check_*.py` catalog, the COM-recalc compare loop, the `#mock` preview, the owed live-export, where the real test data + website source live (local only), and the diagnostics. |
+| [lessons.md](lessons.md) | You want the project's hard-won judgment — the three field failures, "refactor to one core," regression-lock discipline, "consolidate from raw," "verify agent claims," audit methodology. Distilled; links to the owners. |
+| [history.md](history.md) | You want the narrative — how a one-day console script became a self-updating desktop app, the dead ends and reverts, the field failures that rewrote the design (through v0.14.2). |
+| [roadmap.md](roadmap.md) | You're picking future work — the deferred/dormant/blocked backlog (A3, C1, D1, F1, code-signing, live-export verification, the dormant Med Wid gap). |
+| [code-review-prompt.md](code-review-prompt.md) | You're running an audit — the reusable, project-tailored read-only review prompt. |
+
+## Find it fast (topic → doc)
+
+- **Sign-in / OAuth / device SSO / managed Edge** → auth-and-signin.md (+ lessons.md for the field story)
+- **pywebview traps / WebView2 / the `#mock`** → gui.md
+- **Resume / retry / skip / cancel / timeouts / fast mode** → engine-and-reliability.md
+- **`compare_core` / flavors / regression lock / roadbed key / ditto** → comparison-engine.md
+- **Highway Log columns / PDF & TSN parsing / ditto evidence** → highway_log/
+- **Updater / swap mode / MOTW / DLP / `app.spec` / CI** → build-and-release.md
+- **Work-PC constraints / what's safe for IT / audit findings** → it-and-security.md
+- **Golden checks / how to verify / test-data locations** → verification-and-testing.md
+- **Adding a report / consolidator / comparison** → reports.md
+
+## Conventions, archive, and external resources
+
+- **Conventions** (console-free core, UI-neutral strings, no AI attribution, never commit
+  the auth file, regression-lock discipline, call the timeout accessors, branch off `main`)
+  live in [`../CLAUDE.md`](../CLAUDE.md).
+- **`build/release_notes.md`** stays in `build/` (it is the GitHub release body that
+  `release.yml` publishes) — it is the user-facing changelog; history.md is the narrative.
+- **Real test data + the live TSMIS website source are LOCAL ONLY** (under
+  `C:\Users\Yunus\Downloads\TSMIS\…` on the dev PC) and are **never** committed, copied
+  into the repo, or pushed — the website source is Caltrans-internal. See
+  verification-and-testing.md for what lives where.
+- The former `~/.claude` session-memory files were harvested into this library and archived
+  under `memory/_archive/` (see `MEMORY.md`); this `docs/` library is now the canonical home.

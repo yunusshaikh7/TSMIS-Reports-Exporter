@@ -1,9 +1,10 @@
-# TSMIS Exporter — Project TODO
+# TSMIS Exporter — Roadmap & backlog
 
 A living backlog of deferred, blocked, and future-work items, updated
 collaboratively. **Nothing here blocked the v0.11.0 release** — these are
-follow-ups. Fuller detail for most items lives in `code-review/`
-(`RECONCILED-FINDINGS.md`, `COMPARISON-TODO.md`, and the two handoff docs).
+follow-ups. (Earlier detail lived in `code-review/` working docs that were
+retired into this file; that folder is now local audit scratch only — see
+[code-review-prompt.md](code-review-prompt.md).)
 
 ---
 
@@ -64,7 +65,8 @@ adversarial refutation; all methods agreed.
 
 - [ ] **Code-sign the executable** — the one big remaining IT lever (removes most
   Defender / DLP / SmartScreen friction on the unsigned `.exe`). Needs a
-  code-signing certificate; the path is scaffolded in `build/IT-NOTES.md` §7.
+  code-signing certificate; the path is scaffolded in
+  [it-and-security.md](it-and-security.md) §7.
   The updater checksum + staged-item allowlist (v0.11.0) are the integrity half;
   the signature half waits on the cert.
 
@@ -78,7 +80,8 @@ adversarial refutation; all methods agreed.
   a clean `<digits><letter>` code or `"+++"` (parity-proven over 554k+
   COM-recalc'd cells), so the **current deliverable is accurate**. Decision
   (2026-06-16): **leave dormant**; revisit only if a Med Wid value ever contains
-  those characters. Repro + fix sketch in `code-review/COMPARISON-TODO.md`.
+  those characters. Repro + fix sketch in
+  [comparison-engine.md](comparison-engine.md) (Med Wid flavor-parity).
 
 ## Low priority
 

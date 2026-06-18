@@ -5,8 +5,12 @@ Working notes for getting the Highway Log consolidations and comparisons
 district PDFs, the vendor Excel exports, and the existing comparison workbooks
 (2026-06-17).
 
-> Status: **study / not yet implemented.** The resolver design here supersedes
-> the earlier "track-aware carry-down" idea, which the evidence below disproves.
+> Status: **IMPLEMENTED (v0.14.0).** The resolution design below (non-asserting
+> ditto + roadbed-aware key) shipped — see [../comparison-engine.md](../comparison-engine.md)
+> §6–§7 for the engine wiring. This doc remains the authoritative record of the
+> **domain convention** and the evidence behind it. (The resolver design here
+> supersedes the earlier "track-aware carry-down" idea, which the evidence below
+> disproves.)
 
 ---
 

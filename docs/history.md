@@ -3,11 +3,11 @@
 How a one-day console script became a portable, self-updating Windows desktop
 app — told from the repository.
 
-**By the numbers:** 119 commits · 37 pull requests · 25 tagged releases ·
-6 report types · **May 20 → June 12, 2026** (8 days with commits in a 24-day span).
+**By the numbers:** 191 commits · 37 pull requests · 34 tagged releases ·
+7 report types · **May 20 → June 18, 2026**.
 
-This is the narrative companion to [`CLAUDE.md`](CLAUDE.md) (the authoritative
-"how it works and why") and [`build/release_notes.md`](build/release_notes.md)
+This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
+"how it works and why") and [`build/release_notes.md`](../build/release_notes.md)
 (the user-facing changelog). Where they explain the *what*, this explains the
 *journey* — including the dead ends, the reverts, and the three field failures
 that rewrote the design.
@@ -31,6 +31,14 @@ that rewrote the design.
 | `v0.10.1` | Jun 12 | Self-update without PowerShell (locked-down PCs) |
 | `v0.10.3` | Jun 12 | Two new Intersection reports; parallel browsers dodge managed Edge |
 | `v0.10.4` | Jun 12 | Intersection labels/formats matched to the live site; dual login indicators |
+| `v0.11.0` | Jun 16 | Audit-hardening: no-download fast-fail, token redaction, updater SHA-256, postmile-keyed compares |
+| `v0.11.1` | Jun 16 | TSN Highway Log PDF→Excel proven flawless across all 12 districts |
+| `v0.12.0` | Jun 16 | Self-describing filenames, Pause/Resume, auto-consolidate, Export Everything |
+| `v0.13.0` | Jun 17 | Run lifecycle + ETA, accessibility, completion notification, revert-to-previous |
+| `v0.13.1` | Jun 17 | Duplicate-key pairing by similarity (phantom-diff fix) |
+| `v0.14.0` | Jun 18 | Highway Log (PDF) consolidator + PDF-sourced compares + corrected 31-column labels + roadbed-aware key |
+| `v0.14.1` | Jun 18 | Highway Log comparisons regrouped onto a Compare sub-tab |
+| `v0.14.2` | Jun 18 | Consolidate-label clarity + a 22-finding UI-vs-logic audit |
 
 ---
 
@@ -161,6 +169,45 @@ seventh report type:
   prefix, Summary exports as XLSX), **dual login indicators** in the title bar
   (Saved login vs. Edge one-click), and the short-lived Dev update channel
   removed again.
+
+## Chapter 10 — Trust, scale, and the Highway Log endgame (June 16 → 18) · `v0.11.0` → `v0.14.2`
+
+The last three days turned the tool from "works" into "trustworthy as a
+deliverable," then finished the Highway Log story it had been circling since
+Chapter 7.
+
+- **`v0.11.0` — the audit patch.** A ruthless read-only audit (multi-agent
+  fan-out, source-backed against the live site) drove a hardening release
+  implemented by **two agents in parallel** on a shared branch. It brought a
+  marker-independent **no-download fast-fail** (`EmptyExport` — an empty route now
+  fails in ~60 s instead of hanging ~21 min), OAuth-**token redaction** in logs, an
+  updater **SHA-256 + staged-allowlist** check, a saved-file **integrity gate**, and
+  the comparison **incompleteness contract** (`⚠ COULD NOT COMPARE EVERYTHING`).
+  The comparisons re-keyed on the granular **postmile** — cross-env Highway Sequence
+  fell from 15,797 to 5,070 diff cells once positional misalignment was removed.
+- **`v0.11.1` — the TSN converter, flawless.** Audited against all 12 district PDFs
+  (60,083 rows): 0 dropped characters, 0 row mismatches, 0 description leaks — with
+  three structural guards so totals-footer text can never corrupt a Description.
+- **`v0.12.0` — labeling, control, scale.** Self-describing output filenames,
+  **Pause/Resume** (works in fast mode, unlike Skip), **auto-consolidate on finish**,
+  and **Export Everything** — every report × every environment into one
+  always-current store, resumable across restarts via a persistent manifest.
+- **`v0.13.0`–`v0.13.1` — interface and trust.** A right-column run lifecycle
+  (pre-flight summary → live ETA → completion summary + retry-failed), accessibility,
+  a completion notification, **revert to the previous version**, and a subtle but
+  important compare fix: **duplicate-key pairing by similarity**, so two segments at
+  the same postmile no longer flag phantom differences.
+- **`v0.14.0`–`v0.14.2` — the Highway Log endgame.** The vendor's Excel Highway Log
+  export is *buggy* — it drops rows and whole roadbed-column blocks. So the tool now
+  consolidates the report's **own PDF** (a cell-rectangle parser, verified flawless
+  across all 252 routes) and ships **PDF-sourced comparisons** that expose the Excel's
+  bug directly. Two deeper fixes landed with it: every Highway Log column was
+  **relabeled to its true meaning** (the vendor had mislabeled most — `N/A` is really
+  *Non-Add Mileage*), corrected in one source of truth; and a **roadbed-aware
+  comparison key** that unifies how TSMIS and TSN encode a divided highway's two
+  roadbeds, surfacing ~4,800 genuine differences the old key hid. The `.14.1`/`.14.2`
+  hotfixes folded the Highway Log comparisons into a Compare sub-tab, clarified the
+  Consolidate labels, and cleared a 22-finding UI-vs-logic audit.
 
 ---
 
