@@ -14,6 +14,13 @@ import os
 import sys
 from dataclasses import replace
 
+# This check prints the " ≠ " diff marker in its test names; force UTF-8 stdout so
+# it runs on a Windows cp1252 console (and the CI runner) without crashing.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import compare_core as cc       # noqa: E402
 
