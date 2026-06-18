@@ -165,9 +165,6 @@
           <button class="tab" id="tabCompare" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-compare"/></svg>Compare
           </button>
-          <button class="tab" id="tabHighwayLog" role="tab" aria-selected="false">
-            <svg class="ic"><use href="#i-scroll"/></svg>Highway Log
-          </button>
           <button class="tab" id="tabEverything" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-zap"/></svg>Everything
           </button>
@@ -362,12 +359,11 @@
         </div>
       </div>
 
-      <!-- Compare pane. SHARED by the "Compare" and "Highway Log" tabs: the
-           comparison list is filtered to the active tab's reports (app.js
-           selectCompareTab). The old per-family sub-tab strip is retired —
-           #compareSubtabs is kept hidden so the list reads as one flat group. -->
+      <!-- Compare pane. Two sub-tabs: Cross-environment (default) and Highway Log
+           (every Highway Log comparison). #compareSubtabs is generated from
+           compare_groups; the radio list shows the active sub-tab's reports. -->
       <div class="card pane hidden" id="paneCompare">
-        <div class="subtabs hidden" id="compareSubtabs" role="tablist"></div>
+        <div class="subtabs" id="compareSubtabs" role="tablist"></div>
         <div class="card-section">
           <div class="section-head"><span class="section-label">Comparison type</span></div>
           <div class="option-list" id="compareList"></div>

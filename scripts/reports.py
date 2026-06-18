@@ -71,29 +71,21 @@ CONSOLIDATE_REPORTS = [
     ("TSN Highway Log", _c_tsn_highway_log),
 ]
 
-# Comparison TABS (GUI top-level): every Highway Log comparison lives on its own
-# "Highway Log" tab (v0.14.0), so the user is not hunting the same report across
-# the old cross-env / TSMIS-vs-TSN / PDF sub-tab split. The plain cross-env report
-# comparisons (Ramp Summary/Detail, Highway Sequence) stay on the "Compare" tab.
-# Each COMPARE_REPORTS row carries a `tab` id; the GUI renders a FLAT comparison
-# list per tab (no sub-tabs — that split is what this replaces).
-COMPARE_TABS = [
-    ("compare", "Compare"),
+# Compare tab SUB-TABS (GUI): the comparison types are grouped onto these sub-tabs
+# within the Compare pane, in this order (the FIRST is the default). Every Highway
+# Log comparison lives on the "Highway Log" sub-tab (v0.14.1) — cross-env HL,
+# TSMIS-vs-TSN and the two PDF-sourced ones — so they're in one place instead of
+# spread across the old env / TSMIS-vs-TSN / PDF split; the plain cross-environment
+# report comparisons (Ramp Summary/Detail, Highway Sequence) stay on
+# "Cross-environment". A row's `group` (below) names its sub-tab.
+COMPARE_GROUPS = [
+    ("env", "Cross-environment"),
     ("highway_log", "Highway Log"),
 ]
 
-# Retained for back-compat in the bridge JSON (the UI no longer renders sub-tabs;
-# the `group` on each row is informational). Highway Log families: cross-env HL,
-# TSMIS-vs-TSN (Excel), and the two PDF-sourced comparisons.
-COMPARE_GROUPS = [
-    ("env", "Cross-environment"),
-    ("tsn", "TSMIS vs TSN"),
-    ("pdf", "Highway Log (PDF)"),
-]
-
-# Compare registry: (menu label, module/adapter, input kind, group, tab). The
-# GUI's per-tab type lists are generated from this; the kind decides which inputs
-# the pane asks for:
+# Compare registry: (menu label, module/adapter, input kind, group). The GUI's
+# per-sub-tab type lists are generated from this; the kind decides which inputs the
+# pane asks for:
 #   "files"   -- two workbooks; the module exposes
 #                compare(path_a, path_b, out_path, events, confirm_overwrite,
 #                mode) -> ConsolidateResult and suggest_name(path_a).
@@ -104,21 +96,21 @@ COMPARE_GROUPS = [
 #                comparisons (compare_env.py) -- no consolidation needed
 #                first; the per-route files are read straight from both
 #                run folders.
-# `tab` is one of COMPARE_TABS' ids. Selection is by index, so this order is what
-# the UI radios and start_compare* calls key on; the Compare-tab rows lead.
+# `group` is one of COMPARE_GROUPS' ids (its sub-tab). Selection is by index, so
+# this order is what the UI radios and start_compare* calls key on.
 COMPARE_REPORTS = [
-    ("TSAR: Ramp Summary — between environments", _cmp_env.RAMP_SUMMARY, "folders", "env", "compare"),
-    ("TSAR: Ramp Detail — between environments", _cmp_env.RAMP_DETAIL, "folders", "env", "compare"),
-    ("Highway Sequence Listing — between environments", _cmp_env.HIGHWAY_SEQUENCE, "folders", "env", "compare"),
-    ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders", "env", "highway_log"),
-    ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "tsn", "highway_log"),
+    ("TSAR: Ramp Summary — between environments", _cmp_env.RAMP_SUMMARY, "folders", "env"),
+    ("TSAR: Ramp Detail — between environments", _cmp_env.RAMP_DETAIL, "folders", "env"),
+    ("Highway Sequence Listing — between environments", _cmp_env.HIGHWAY_SEQUENCE, "folders", "env"),
+    ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders", "highway_log"),
+    ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "highway_log"),
     # Both sides parsed from PDFs (accurate replacement for the Excel-based row
     # above — the "(PDF)" on BOTH sides makes the PDF-vs-PDF nature explicit),
     # and the PDF data diffed against the vendor Excel to expose its bug.
     ("Highway Log — TSMIS (PDF) vs TSN (PDF)", _cmp_highway_log_pdf.TSMIS_PDF_VS_TSN,
-     "files", "pdf", "highway_log"),
+     "files", "highway_log"),
     ("Highway Log — TSMIS (PDF) vs TSMIS (Excel)",
-     _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "pdf", "highway_log"),
+     _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "highway_log"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each

@@ -835,14 +835,13 @@ class GuiApi:
             "compare_groups": [{"id": gid, "label": glabel}
                                for gid, glabel in COMPARE_GROUPS],
             "compare_reports": [{"label": label, "kind": kind, "group": group,
-                                 "tab": tab,
                                  "subdir": getattr(_mod, "subdir", None),
                                  # The two file-picker labels for "files"
                                  # comparisons (so e.g. PDF-vs-Excel doesn't
                                  # mislabel both TSMIS sides "TSMIS"/"TSN").
                                  "file_a_label": getattr(_mod, "file_a_label", "TSMIS"),
                                  "file_b_label": getattr(_mod, "file_b_label", "TSN")}
-                                for label, _mod, kind, group, tab in COMPARE_REPORTS],
+                                for label, _mod, kind, group in COMPARE_REPORTS],
             "routes": list(ROUTES),
             "channels": [{"id": c, "label": CHANNEL_LABELS[c],
                           "short": _CHANNEL_SHORT.get(c, CHANNEL_LABELS[c])}

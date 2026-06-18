@@ -637,11 +637,13 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
     finishes (`gui_api._flash_taskbar`, `FlashWindowEx` via ctypes — modeled on
     the late icon-setter, NOT a window-event handler; see pywebview trap 2),
     toggled by settings `notify_on_finish`.
-  - **Compare sub-tabs:** the Compare pane splits its two families onto sub-tabs
-    (cross-environment default, then TSMIS-vs-TSN). **SUPERSEDED in v0.14.0** — the
-    sub-tab split is retired in favor of a dedicated top-level **Highway Log** tab
-    (every HL comparison) beside **Compare** (the plain cross-env ones); see *New
-    comparison type* (`COMPARE_TABS` / `tab`).
+  - **Compare sub-tabs:** the Compare pane splits its comparison families onto
+    sub-tabs. **Regrouped in v0.14.1** to two: **Cross-environment** (default — the
+    plain cross-env report comparisons) and **Highway Log** (EVERY Highway Log
+    comparison: cross-env HL, TSMIS-vs-TSN and the two PDF-sourced ones, gathered in
+    one place instead of the old env / TSMIS-vs-TSN / PDF split). See *New
+    comparison type* (`COMPARE_GROUPS` / `group`). (v0.14.0 briefly made Highway Log
+    a top-level tab; v0.14.1 moved it back to a sub-tab inside Compare.)
   - **Revert to the previous version (Settings ▸ Debugging):**
     `updater.resolve_previous_release` finds the newest FULL release strictly
     OLDER than this build (lists `/releases`, ignores drafts/prereleases, picks
@@ -1136,16 +1138,17 @@ build openpyxl styles inside functions). For an XLSX report, wrap
 
 **New comparison type:** add one row to `COMPARE_REPORTS` in `reports.py`
 (the comparison type lists are generated from it; rows are
-`(label, module_or_adapter, kind, group, tab)`) and the module to `APP_MODULES`
-in `build/app.spec`. `tab` (v0.14.0) is one of `COMPARE_TABS`' ids — `compare`
-(plain cross-env report comparisons) or `highway_log` (every Highway Log
-comparison). The GUI shows two top-level tabs ("Compare" / "Highway Log") that
-SHARE one pane (`paneCompare`); each renders a FLAT comparison list filtered to
-its `tab` (`app.js selectCompareTab` / `setTab`'s `cmpTab`). `group` is now
-informational only — the old per-family sub-tab strip (`COMPARE_GROUPS`,
-`#compareSubtabs`) is RETIRED (kept hidden / back-compat in the bridge JSON); a
-Highway Log comparison no longer hides under a sub-tab. So a new HL comparison is
-`tab="highway_log"`; a new plain cross-env one is `tab="compare"`. Two input kinds:
+`(label, module_or_adapter, kind, group)`) and the module to `APP_MODULES` in
+`build/app.spec`. `group` is one of `COMPARE_GROUPS`' ids — the Compare pane
+renders one **sub-tab per group** (first = default), and a row shows only under its
+group's sub-tab. As of v0.14.1 the two sub-tabs are `env` "Cross-environment"
+(the plain cross-environment report comparisons) and `highway_log` "Highway Log"
+(EVERY Highway Log comparison — cross-env HL, TSMIS-vs-TSN and the PDF-sourced
+ones — gathered in one place; `app.js selectCompareGroup`, `#compareSubtabs`). So a
+new Highway Log comparison is `group="highway_log"`; a new plain cross-env one is
+`group="env"`; a brand-new family can add its own sub-tab by appending to
+`COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input
+plumbing is untouched. Two input kinds:
 - `"files"` — a module exposing
   `compare(path_a, path_b, out_path, events=None, confirm_overwrite=None,
   mode="formulas") -> ConsolidateResult` (console-free, same rules as

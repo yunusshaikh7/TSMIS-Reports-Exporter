@@ -28,11 +28,12 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
   uses the **report's own legend** labels, with the old label kept in `[brackets]`,
   a hover tooltip on every column, and a **Legend** sheet explaining each one. This
   is a relabel only — the data and comparison results are unchanged.
-- **A dedicated Highway Log tab (0.14.0).** All the Highway Log comparisons now
-  live on their own **Highway Log** tab — TSMIS vs TSN, the two PDF-sourced
-  comparisons, and across environments — instead of being split across the Compare
-  tab's sub-tabs. The Compare tab keeps the plain cross-environment report
-  comparisons.
+- **Highway Log comparisons in one place (0.14.1).** The Compare tab now has a
+  **Highway Log** sub-tab gathering every Highway Log comparison — TSMIS vs TSN, the
+  two PDF-sourced comparisons, and across environments — beside a
+  **Cross-environment** sub-tab for the plain report comparisons, instead of the old
+  three-way split. (v0.14.0 briefly made this a separate top-level tab; v0.14.1
+  moves it to a sub-tab inside Compare.)
 - **Divided-highway rows now line up correctly (0.14.0).** On a divided highway
   each segment has two rows (one per roadbed). TSMIS marks the roadbed in the
   location (`R021.466R`/`…L`); the TSN log marks it a different way. The comparison
