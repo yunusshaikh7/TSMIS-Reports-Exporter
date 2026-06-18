@@ -191,7 +191,8 @@ strips ALL prose docs.
 working):
 - Driver extras: `package\lib\tools\cli-client\skill`, `…\tools\trace`,
   `…\tools\dashboard`, `…\vite`, `package\types`.
-- Loose `*.md` and `*.d.ts` anywhere in the driver.
+- Loose `*.d.ts` anywhere in the driver (driver-scoped); `*.md` is stripped here
+  **and** bundle-wide by the later pass (see the all-prose-docs bullet below).
 - Chromium locale packs: keep `en-US.pak`, drop the other ~220 locales (~42 MB).
 - Safety net for the PyInstaller excludes: drop `PIL`/`Pillow`/`pypdfium2`/
   `pypdfium2_raw` package dirs + their dist-info if a hook re-bundled them.

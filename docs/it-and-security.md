@@ -22,7 +22,7 @@ methodology lives in [code-review-prompt.md](code-review-prompt.md).
 |---|---|---|---|
 | `tsmis.dot.ca.gov` (or the per-env host; a Settings override is restricted to `*.ca.gov`) | Every export / sign-in / env check | Load the TSMIS report page and pull report data (the page itself fetches from a Caltrans intranet ArcGIS host) | The user's Caltrans SSO session |
 | The Caltrans ArcGIS **portal / Azure AD IdP** (the page's `CONFIG.oauthAuthorizeUrl` host) | During sign-in only | Standard OAuth/SAML sign-in; the access token comes back in the URL fragment and lives only in page memory (~120 min) | Caltrans SSO / Windows device account |
-| `api.github.com` + the release asset host (`objects.githubusercontent.com`) | The one-click **update check** (launch + when the version chip is clicked) and download | Read the latest release tag; download the update zip + its `.sha256` | None — public repo, read-only |
+| `api.github.com` + GitHub's release-asset CDN (a `*.githubusercontent.com` host, resolved at download time) | The one-click **update check** (launch + when the version chip is clicked) and download | Read the latest release tag; download the update zip + its `.sha256` | None — public repo, read-only |
 | Playwright's Chromium CDN | **Only** the `.bat` first-time setup, or the optional Settings ▸ "Download Built-in Chromium" | Fetch the bundled-browser binary | None |
 
 It makes **no other outbound connections** — no analytics, no telemetry, no
@@ -76,8 +76,8 @@ These are the only non-default low-level options, all on automated browser conte
   nothing can click in a headless run. This grants that one permission to the app's
   own automated pages — it does not scan or expose the local network.
 - **A loopback CDP debug port** (`--remote-debugging-port=<ephemeral>` on
-  `127.0.0.1`, via `_free_local_port()` in `open_edge_device_context` /
-  `launch_edge_login_context`): used **only** during the headed Microsoft Edge
+  `127.0.0.1`, via `_free_local_port()` in `launch_edge_login_context`): used
+  **only** during the headed Microsoft Edge
   sign-in flow, so the app can recapture the session if managed Edge relaunches
   itself into a work profile mid-login (returned as `http://127.0.0.1:<port>` for a
   CDP re-attach). The port is a free local port, bound to loopback, and only open

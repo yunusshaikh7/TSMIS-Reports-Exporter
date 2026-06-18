@@ -78,7 +78,8 @@ Each `export_<name>.py` module is thin (~30 lines): a `ReportSpec` + `run_cli`.
 
 One source of truth feeds both the GUI tabs and the console multi-exporter, so the
 lists can't drift. `export_multi.py` imports `EXPORT_REPORTS`; `gui_api.py` reads
-all three lists. The `.bat` menus are static text and are still hand-edited
+the registry lists (`EXPORT_REPORTS`, `CONSOLIDATE_REPORTS`, `COMPARE_REPORTS`) plus
+`COMPARE_GROUPS`. The `.bat` menus are static text and are still hand-edited
 separately. The module is import-light and console-free: importing it never
 launches a browser or does I/O.
 

@@ -414,7 +414,7 @@ descriptions. 21 routes are TSN-only (not in the 252 TSMIS PDFs). LESSON: always
 Excel side from raw yourself — a stale/partial pre-existing consolidated workbook (missing 25
 routes) inflated PDF-vs-Excel to 22,210 diffs.
 
-### 9c. Cross-environment — `compare_env.py` (`"folders"`, group `env`)
+### 9c. Cross-environment — `compare_env.py` (`"folders"`; group `env` for Ramp Summary/Detail + Highway Sequence, group `highway_log` for the Highway Log cross-env row)
 
 The SAME report from two **run folders** (ssor-prod vs ars-prod, or one env on two dates). Per-route
 files are read straight from both folders (NO consolidation step; merged in memory the way the

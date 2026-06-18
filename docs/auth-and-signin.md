@@ -52,7 +52,7 @@ Flow:
 2. Loop until the deadline:
    - **If `is_logged_in(page)`:** if `_site_params_ok(page)` OR we already reloaded for params → `note("signed in")`, break. Otherwise (signed in on the *wrong* data source / env) → set `reloaded_for_params=True`, `page.goto(url)` again, continue. The reload destroys the in-memory token, so the loop must sign in again — the app re-stores our env/src via its own `sessionStorage` handoff (`login()` stashes env/src before the redirect; config.js lets URL params win on reload).
    - Click the app's own (currently unused) signed-out button `Sign In with ArcGIS` if visible.
-   - On the **portal sign-in page**: drive the SAML authorize URL *directly* — `page.goto(f"{idp_url}?oauth_state={state}")` using the `Caltrans Azure AD` button's `data-url` (`idp_url`) and the page's `#oauth_state` input value — with a plain `.click()` as fallback. Capped at 3 IdP drives (`idp_drives < 3`).
+   - On the **portal sign-in page**: drive the SAML authorize URL *directly* — `page.goto(f"{idp_url}?oauth_state={quote(state_val, safe='')}")` (the state value is URL-encoded via `urllib.parse.quote`) using the `Caltrans Azure AD` button's `data-url` (`idp_url`) and the page's `#oauth_state` input value — with a plain `.click()` as fallback. Capped at 3 IdP drives (`idp_drives < 3`).
    - Breadcrumb when parked off-site (host != `expected_host()`).
    - `page.wait_for_timeout(1000)` per iteration.
 3. After the loop: one final `is_logged_in` + a structured log line (`signed_in`, `idp_drives`, `reloaded_for_params`, `elapsed`, redacted `url`). If not signed in, log the signal snapshot.
@@ -155,7 +155,7 @@ The TSMIS page pulls report data from an **intranet host**. Chromium's Local Net
 The OAuth access token rides in the URL **fragment**. `page_url_for_display(page)` strips the fragment (`urlsplit(page.url)._replace(fragment="").geturl()`) so the token can never reach the screen, a log line, or a failure dump.
 
 - `auth_state(page)` — the diagnostics snapshot feeding both `navigate_with_auth`'s logs and `dump_auth_failure` — takes its `url` through `page_url_for_display`. The Verify-env and Preview modals (`maybe_screenshot`) likewise display the redacted URL.
-- **Origin of the fix:** the v0.10.4 audit flagged `AUTH-TOKEN-IN-LOG-BUNDLE` as a candidate P0 — `auth_state()` logged the raw `page.url` and the support bundle zips `tsmis.log*`. Source verification (2026-06-15) downgraded it to ~P2/P3: the SPA `history.replaceState`s the hash away synchronously on load (`shared.js:544`), so success-path logs are clean and only a sub-second failure-dump race could ever leak. The fix is to route every `auth_state`/URL log through `page_url_for_display`, which the current code does. (`AUTH-WRONG-ENV-SILENT-SUCCESS` was likewise downgraded P1→P3: reload reliably lands on the right env because URL params win in config.js and `login()` stashes env/src to sessionStorage before redirect.) Full audit context → [it-and-security.md](it-and-security.md).
+- **Origin of the fix:** the v0.10.4 audit flagged `AUTH-TOKEN-IN-LOG-BUNDLE` as a candidate P0 — `auth_state()` logged the raw `page.url` and the support bundle zips `tsmis.log*`. Source verification (2026-06-15) downgraded it to ~P2/P3: the SPA `history.replaceState`s the hash away synchronously on load (in the TSMIS site's own `shared.js`, ~line 544 at audit time — **off-repo**, not in this codebase), so success-path logs are clean and only a sub-second failure-dump race could ever leak. The fix is to route every `auth_state`/URL log through `page_url_for_display`, which the current code does. (`AUTH-WRONG-ENV-SILENT-SUCCESS` was likewise downgraded P1→P3: reload reliably lands on the right env because URL params win in config.js and `login()` stashes env/src to sessionStorage before redirect.) Full audit context → [it-and-security.md](it-and-security.md).
 
 ---
 
@@ -187,7 +187,7 @@ The title bar shows the **two sign-in paths separately** so the user can tell wh
 | `page_url_for_display` / `auth_state` / `dump_auth_failure` | common.py | token redaction + failure diagnostics |
 | `require_valid_auth` / `has_valid_auth` / `clear_auth` / `save_auth_state` | common.py | auth-file shape validation + lifecycle |
 | `_run_login` / `_login_with_browser` | login.py | console headed login |
-| `LoginWorker` (`_run_login_in_browser`, `_any_logged_in`) | gui_worker.py | GUI headed login; "no open tabs" = window-closed signal |
+| `LoginWorker` (`_run_login_in_browser`, `_try_edge_persistent_login`, `_run_standard_login`, `_any_logged_in`) | gui_worker.py | GUI headed login (mirrors the layered order); "no open tabs" = window-closed signal |
 | `_login_states` / `_device_ok` | gui_api.py | the two title-bar chips |
 
 **The "no open tabs" rule (`LoginWorker`):** the reliable "user closed the window" signal is that **no tabs remain open** in the context (the SSO flow always keeps ≥1 tab), with a long all-calls-failing streak (`blips >= 20`, ~6 s) as a backstop. It does NOT treat the original page closing, a connection blip, or a single transient `ctx.cookies()` error as "closed" — that caused a false "cancelled" that slammed the window shut the instant a password went through.

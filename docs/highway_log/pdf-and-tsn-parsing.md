@@ -273,7 +273,9 @@ would swallow the description. (`Y_TOLERANCE = 3`, `WORD_GAP = 1.5`,
   31-column layout has no County column.
 - Data row: a postmile begins inside the Location column (`LOCATION_RE` AND
   `first_x0 < col0_right`). Accepts either a bare postmile OR a lone
-  left-margin letter (`C`/`R`/`L`) followed by the postmile.
+  single-letter left-margin marker followed by the postmile — the code accepts
+  **any** single alphabetic char (`texts[0].isalpha()`), not a fixed set; in
+  practice it is `C`/`R`/`L`.
 - Else, starting to the RIGHT of col0 → a Description for `last_row`. A long
   description WRAPS across baselines; wrapped lines rejoin with a **space** (not
   a comma) to match the report's own wrap (`"… END R" + "REALIGNMENT"` →
