@@ -118,6 +118,22 @@ Numbered flow:
 9. **Sanity assert** — `staged/_EXE_NAME` is a file AND `staged/_internal` is a dir, else `UpdateError("missing expected app files")`.
 10. `return staged`.
 
+> **⚠ Known field issue — the stage rename has NO Defender retry (unlike the swap step).**
+> Step 8's `root.rename(staged)` (`updater.py:416`) is a **bare** directory rename. If
+> Windows Defender / the Search indexer is still scanning the freshly-extracted
+> `data\update\extract\TSMIS Exporter` tree, the rename fails with
+> **`PermissionError: [WinError 5] Access is denied`** and `download_and_stage` aborts →
+> the GUI shows "Update problem" and `cleanup_leftovers` drops the staged download, so the
+> user just **re-downloads and it works** (the scan has finished by then). This is
+> **asymmetric with `perform_swap`** (§6), whose every file op is wrapped in `_retry`
+> (`_RETRY_ATTEMPTS=12 × _RETRY_DELAY_S=0.5 s`, commented *"Defender / slow handle
+> release"*) — the swap was hardened against held files; the stage step was not.
+> **Observed twice on the work PC** (2026-06-17 ~09:20 and 2026-06-18 ~09:39, both in the
+> morning; both self-healed on a re-download — every *swap* that actually started has
+> always succeeded). **Fix:** wrap `root.rename(staged)` + the follow-on
+> `rmtree(extract_dir)` in the same `_retry`, or `extractall` straight into `staged` and
+> skip the intermediate rename. Tracked in [../roadmap.md](../roadmap.md).
+
 ### 3.1 `_expected_sha256` — where the trust comes from
 
 `updater.py:310`. Returns lowercase-hex SHA-256 or `None`:

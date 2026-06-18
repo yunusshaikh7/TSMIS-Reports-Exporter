@@ -15,6 +15,20 @@ A read-only code review (6 risk-domain auditors + adversarial refutation) over c
 refutation. Full report with code anchors + fix sketches: `code-review/AUDIT-phase3-0a4c071.md`
 (git-ignored scratch). The durable, actionable items, by theme:
 
+### Field-reported (work-PC logs, 2026-06-18 — CONFIRMED in the field)
+- [ ] **`update-stage-rename-no-retry`** — intermittent **`PermissionError: [WinError 5]
+  Access is denied`** while *staging* an update (NOT the swap): `download_and_stage`'s
+  bare `root.rename(extract\TSMIS Exporter → staged)` (`updater.py:416`) fails when
+  Defender / the indexer is still scanning the freshly-extracted ~150 MB tree. The stage
+  aborts, the GUI shows "Update problem", the staged download is cleaned up, and the user
+  **re-downloads and it works** (scan finished by then). **Asymmetry is the bug:**
+  `perform_swap` wraps its file ops in `_retry` (12 × 0.5 s, "Defender / slow handle
+  release") but the stage rename has no retry. Observed **2× on the work PC** (2026-06-17
+  ~09:20, 2026-06-18 ~09:39, both mornings; ~2/10 stagings). **Fix:** wrap the rename +
+  `rmtree(extract_dir)` in the same `_retry`, or `extractall` straight into `staged`.
+  Evidence + full diagnosis: `code-review/field-update-stage-rename.md` (git-ignored);
+  code-level note in [internals/updater-swap.md](internals/updater-swap.md) §3.
+
 ### Product-risk — does the app ever report success on bad/missing data? (do first)
 - [ ] **P1 `navigate-accepts-wrong-env-after-one-reload`** — the export path never re-checks
   `_site_params_ok` after sign-in (only `require_signed_in`), so if the one corrective reload
