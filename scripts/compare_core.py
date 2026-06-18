@@ -43,12 +43,18 @@ from pathlib import Path
 try:
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
+    from openpyxl.comments import Comment
     from openpyxl.formatting.rule import CellIsRule, FormulaRule
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
+
+# Tint for a dittoed roadbed cell on the data sheets (a soft lavender, distinct
+# from the diff/one-sided fills); only applied when a schema supplies a
+# ditto_resolver (Highway Log), so other comparisons' data sheets are unchanged.
+_DITTO_FILL = "E4DFEC"
 
 from events import ConsolidateResult, Events
 
@@ -114,6 +120,42 @@ class CompareSchema:
     # group. The column stays in its display position everywhere — only the
     # identity used for alignment + the Comparison sheet's lead column change.
     key_field: int = 0
+    # Optional per-report decoration (default None = the byte-identical original
+    # output; only the Highway Log comparisons set these, so other comparisons
+    # and the regression-locked fixtures are unchanged):
+    #   header_comment — callable(label) -> openpyxl Comment | None, attached as a
+    #     hover tooltip to each column-label header cell (Comparison / Only-in /
+    #     data sheets).
+    #   legend_writer  — callable(wb) run after the sheets, before save (e.g. to
+    #     append a column-Legend sheet).
+    header_comment: object = None
+    legend_writer: object = None
+    # When True, a cell whose value is a "+"-run ditto marker ('+', '++', '+++')
+    # is NON-ASSERTING: it never counts as a difference against the other side
+    # (its real value is compared on the paired roadbed's own row). Only the
+    # Highway Log comparisons set this; for every other comparison it is False,
+    # so the equality formula, the Spot Check verdict, and the Python mirrors are
+    # byte-identical to the regression-locked output. See
+    # docs/highway_log/comparison-study.md and highway_log_columns.is_ditto.
+    ditto_nonasserting: bool = False
+    # Optional DISPLAY-only resolver: callable(rows, has_route) ->
+    # {row_index: {col_in_row: resolved_value}} for each dittoed cell. When set
+    # (Highway Log), the data sheets keep the raw ditto in the cell (the
+    # non-asserting diff depends on detecting the '+'-run) but tint it and attach
+    # a comment with the paired-roadbed value, so a reviewer sees what each
+    # `+`/`++` resolved to. None for every other comparison -> data sheets stay
+    # byte-identical.
+    ditto_resolver: object = None
+    # Optional KEY normalizer: callable(row, off, key_field) -> str, the canonical
+    # identity token used for matching/alignment IN PLACE OF the raw key-column
+    # value. When None (every comparison except TSMIS-vs-TSN Highway Log), the raw
+    # key-column string is used exactly as before, so the union, helper keys, and
+    # MATCH lookups are byte-identical and the regression lock holds. The Highway
+    # Log TSMIS-vs-TSN schemas set it to highway_log_columns.roadbed_canonical_
+    # location so a divided segment's roadbed row keys identically whether the
+    # source suffixes the Location (PDF/Excel) or dittos a block (TSN). The DATA
+    # sheets still show each source's raw Location; only the key token is unified.
+    key_normalizer: object = None
 
     @property
     def n_fields(self):
@@ -152,20 +194,28 @@ def _sref(name):
 # Keys + union (document-order diff merge)
 # =============================================================================
 
-def keys_for(rows, has_route, key_field=0):
+def keys_for(rows, has_route, key_field=0, key_normalizer=None):
     """[(route, key, occurrence), ...] in file order (route "" for the
     per-route shape). Occurrence repeats of the same (route, key) are
     numbered 1.., exactly like the sheets' live helper column.
 
     `key_field` picks WHICH header column is the identity key (default 0 = the
     first column, the original behavior). The raw row carries a leading Route
-    when has_route, so the key sits at r[(1 if has_route else 0) + key_field]."""
+    when has_route, so the key sits at r[(1 if has_route else 0) + key_field].
+
+    `key_normalizer` (opt-in; None = byte-identical original behavior) is a
+    callable(row, off, key_field) -> str returning the canonical identity token
+    used IN PLACE OF the raw key-column string (the Highway Log roadbed key)."""
     seen = {}
     out = []
-    koff = (1 if has_route else 0) + key_field
+    off = 1 if has_route else 0
+    koff = off + key_field
     for r in rows:
         route = "" if not has_route or r[0] is None else str(r[0])
-        loc = "" if r[koff] is None else str(r[koff])
+        if key_normalizer is not None:
+            loc = key_normalizer(r, off, key_field)
+        else:
+            loc = "" if r[koff] is None else str(r[koff])
         k = (route, loc)
         seen[k] = seen.get(k, 0) + 1
         out.append((route, loc, seen[k]))
@@ -252,6 +302,17 @@ def _xl_trim(v):
     return re.sub(" +", " ", str(v)).strip(" ")
 
 
+def _is_plus_run(v):
+    """True if `v` is a Highway Log ditto marker — a non-empty run of only '+'
+    ('+', '++', '+++'). Mirrors highway_log_columns.is_ditto, kept local so the
+    generic engine carries no Highway-Log import; gated by
+    CompareSchema.ditto_nonasserting so it is inert for every other comparison."""
+    if v is None:
+        return False
+    s = str(v).strip()
+    return bool(s) and set(s) == {"+"}
+
+
 def _medwid_norm(t):
     """Mirror the Med Wid formula: VALUE() the whole code, else VALUE() all but
     the last character and keep that suffix, else the raw text — so '0Z',
@@ -296,6 +357,8 @@ def _row_diff_count(sc, rt, rn, off):
     d = 0
     for f in sc.field_indices:
         va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
+        if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
+            continue                     # ditto = non-asserting
         if sc.is_medwid(f):
             va, vb = _medwid_norm(va), _medwid_norm(vb)
         if va != vb:
@@ -434,6 +497,8 @@ def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route):
         row_diffs = 0
         for f in sc.field_indices:                # every column but the key
             va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
+            if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
+                continue                          # ditto = non-asserting
             if sc.is_medwid(f):
                 va, vb = _medwid_norm(va), _medwid_norm(vb)
             if va != vb:
@@ -571,6 +636,21 @@ def _medwid_ref(sheet, col, row_ref):
             f'IFERROR(VALUE(LEFT({t},LEN({t})-1))&RIGHT({t},1),{t}))')
 
 
+def _isditto_xl(trim_ref):
+    """Excel expression: TRUE when an already-TRIM'd cell ref is a ditto marker
+    (non-empty and only '+' characters) — the formula twin of _is_plus_run."""
+    return f'AND({trim_ref}<>"",SUBSTITUTE({trim_ref},"+","")="")'
+
+
+def _eq_with_ditto(sc, eq, trim_t, trim_n):
+    """Wrap an equality expression so a ditto on EITHER side counts as equal
+    (non-asserting), when the schema enables it. Otherwise returns `eq`
+    unchanged, so non-Highway-Log comparisons stay byte-identical."""
+    if sc.ditto_nonasserting:
+        return f'OR({_isditto_xl(trim_t)},{_isditto_xl(trim_n)},{eq})'
+    return eq
+
+
 def _field_formula(lay, r, field_idx):
     """Comparison cell formula for data field `field_idx` (1-based into the
     header) on Comparison row `r`: the matched value when the two systems
@@ -587,6 +667,7 @@ def _field_formula(lay, r, field_idx):
         eq = f'{_medwid_ref(sc.side_a, col, ct)}={_medwid_ref(sc.side_b, col, cs)}'
     else:
         eq = f"{t}={n}"
+    eq = _eq_with_ditto(sc, eq, t, n)        # ditto = non-asserting (HL only)
     show_t = f'IF({t}="","(blank)",{t})'
     show_n = f'IF({n}="","(blank)",{n})'
     st = f"${lay.c_status}{r}"
@@ -603,6 +684,8 @@ def _field_value(sc, rt, rn, off, f):
     if rn is None:                       # A-only row
         return _xl_trim(rt[f + off])
     va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
+    if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
+        return va                        # ditto = non-asserting: show side A's value
     ca, cb = va, vb
     if sc.is_medwid(f):
         ca, cb = _medwid_norm(va), _medwid_norm(vb)
@@ -645,11 +728,17 @@ def _styled(ws, value, font, fill=None, align=None, guard=False):
     return c
 
 
-def _header_row(ws, values):
+def _header_row(ws, values, comment_fn=None):
     font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill = PatternFill("solid", start_color=_DARK)
     align = Alignment(horizontal="center", vertical="bottom", wrap_text=True)
-    return [_styled(ws, v, font, fill, align) for v in values]
+    cells = [_styled(ws, v, font, fill, align) for v in values]
+    if comment_fn is not None:                # attach hover tooltips (HL columns)
+        for c in cells:
+            cm = comment_fn(c.value)
+            if cm is not None:
+                c.comment = cm
+    return cells
 
 
 def _apply_field_widths(ws, widths, col_for, lay):
@@ -692,7 +781,14 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         ws.column_dimensions[lay.route_data_col].width = 8
     _apply_field_widths(ws, lay.sc.data_widths, lay.data_col, lay)
 
-    ws.append(_header_row(ws, ["Comparison row"] + lay.data_header + ["Key (helper)"]))
+    ws.append(_header_row(ws, ["Comparison row"] + lay.data_header + ["Key (helper)"],
+                          lay.sc.header_comment))
+    # DISPLAY-only ditto resolution (Highway Log): {row_index: {col_in_row:
+    # resolved}} — keeps the raw `++` in the cell (the non-asserting diff needs
+    # it) but tints it and shows the paired-roadbed value on hover. None elsewhere.
+    fills = (lay.sc.ditto_resolver(rows, lay.has_route)
+             if lay.sc.ditto_resolver is not None else None)
+    ditto_fill = PatternFill("solid", start_color=_DITTO_FILL) if fills else None
     for r, row in enumerate(rows, start=2):
         u = cmp_rows[r - 2]
         # Whole-row target: the jump selects the entire Comparison row
@@ -703,6 +799,16 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         # never a live formula (the field FORMULAS read these via TRIM/INDEX, so
         # guarding here protects both flavors at the source).
         cells += [_styled(ws, v, body_font, guard=True) for v in row]
+        row_fills = fills.get(r - 2) if fills else None
+        if row_fills:                        # mark each dittoed cell in this row
+            for col_in_row, resolved in row_fills.items():
+                c = cells[1 + col_in_row]    # cells[0] is the back-link
+                c.fill = ditto_fill
+                shown = resolved if resolved not in (None, "") else "(no paired value found)"
+                c.comment = Comment(
+                    f"Ditto ('{c.value}') — value is on the paired roadbed's row; "
+                    f"resolves to: {shown}. Not counted as a difference.",
+                    "TSMIS Exporter")
         # Both flavors write a LITERAL key (the comparison's row universe is
         # build-time static): a live COUNTIFS mis-numbers blank key fields, and
         # the literal always matches the Comparison sheet's stored occurrence #.
@@ -762,7 +868,8 @@ def _write_comparison(wb, union, lay, events, vals=None):
     link_font = _link_font()
     link_cols = {3, 4} if lay.has_route else {2, 3}   # trow / nrow positions
     ws.append(_header_row(ws, lay.id_headers
-                          + [sc.header[i] for i in lay.field_indices]))
+                          + [sc.header[i] for i in lay.field_indices],
+                          lay.sc.header_comment))
     for i, (route, loc, occ) in enumerate(union):
         r = i + 2
         if vals is None:
@@ -1004,6 +1111,7 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
                 None, center)
         else:
             eq = f"{trim_t}={trim_n}"
+        eq = _eq_with_ditto(sc, eq, trim_t, trim_n)   # ditto = non-asserting (HL only)
         put((r, 2), sc.header[f], bold_font)
         put((r, 3), raw(a, col, trow_cell), body_font, None, None, fmt)
         put((r, 4), raw(b, col, nrow_cell), body_font, None, None, fmt)
@@ -1108,7 +1216,8 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None):
         own_by = vals["by_t"] if side == sc.side_a else vals["by_n"]
         other_routes = vals["routes_n"] if side == sc.side_a else vals["routes_t"]
     ws.append(_header_row(ws, id_headers
-                          + [sc.header[i] for i in lay.field_indices]))
+                          + [sc.header[i] for i in lay.field_indices],
+                          lay.sc.header_comment))
     for i, (route, loc, occ) in enumerate(keys):
         r = i + 2
         if vals is None:
@@ -1609,8 +1718,8 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         return ConsolidateResult(status="cancelled", message="Cancelled by user.")
 
     lay = _Layout(sc, has_route)
-    keys_t = keys_for(rows_t, has_route, sc.key_field)
-    keys_n = keys_for(rows_n, has_route, sc.key_field)
+    keys_t = keys_for(rows_t, has_route, sc.key_field, sc.key_normalizer)
+    keys_n = keys_for(rows_n, has_route, sc.key_field, sc.key_normalizer)
     # Pair duplicate keys by data similarity, not file order, so a row that
     # actually matches the other side's SECOND instance isn't reported as a
     # difference against its FIRST (can only remove phantom diffs, never add).
@@ -1726,6 +1835,8 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         if _write_data_sheet(wb, b, _TAB_COLORS["side_b"], rows_n, lay, events,
                              cmp_rows_n, helper_keys=hk_n) is None:
             return cancelled
+        if sc.legend_writer is not None:     # append a column-Legend sheet (HL)
+            sc.legend_writer(wb)
         events.on_log("Saving…")
         path.parent.mkdir(parents=True, exist_ok=True)
         try:

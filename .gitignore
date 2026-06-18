@@ -32,12 +32,15 @@ output/consolidated/*
 !output/intersection_detail/.gitkeep
 !output/consolidated/.gitkeep
 
-# input/ holds user-supplied source files (TSN district PDFs). Keep the folder
-# structure via .gitkeep, ignore the files themselves.
+# input/ holds user-supplied source files (TSN district PDFs; TSMIS Highway Log
+# PDFs). Keep the folder structure via .gitkeep, ignore the files themselves.
 input/*
 !input/tsn_highway_log/
 input/tsn_highway_log/*
 !input/tsn_highway_log/.gitkeep
+!input/tsmis_highway_log_pdf/
+input/tsmis_highway_log_pdf/*
+!input/tsmis_highway_log_pdf/.gitkeep
 
 __pycache__/
 *.pyc

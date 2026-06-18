@@ -27,6 +27,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import highway_log_columns as hlc       # the corrected column labels (one source)
 from compare_core import CompareSchema, normalize_value, run_compare
 from events import ConsolidateResult, Events
 from paths import today_str
@@ -34,18 +35,16 @@ from paths import today_str
 REPORT_NAME = "Highway Log"          # registry label (comparison type)
 SHEET_NAME = "Highway Log"           # required sheet in both inputs
 
-# The per-route Highway Log layout (TSMIS export == converted TSN file).
+# The canonical (CORRECTED) per-route Highway Log layout. A workbook built before
+# the label overhaul carries the old vendor labels — hlc.recognize() accepts it
+# too and the engine compares by POSITION, relabeling to these for display.
 # Consolidated workbooks carry ["Route"] + this.
-EXPECTED_HEADER = [
-    "Location", "MI", "N/A", "Cnty Odom", "City", "R/U", "SPD", "TER", "H/G",
-    "A/C", "LB T", "LB Lns", "LB F", "LB OT", "LB TR", "LB T-W", "LB IN",
-    "LB SH", "Med TCB", "Med Wid", "RB T", "RB Lns", "RB F", "RB IN", "RB SH",
-    "RB T-W", "RB OT", "RB SH", "Description", "Date of Rec", "Sig Chg. Date",
-]
+EXPECTED_HEADER = hlc.HEADER
 
-# The approved workbook's wording and geometry, exactly (see compare_core's
-# CompareSchema): TSMIS/TSN side names, Med Wid zero-pad normalization, the
-# Highway-Log-specific notes, and the sample's column widths.
+# The approved workbook's wording and geometry (see compare_core's CompareSchema):
+# TSMIS/TSN side names, Med Wid zero-pad normalization (the corrected Median
+# Width/Variance column), the Highway-Log-specific notes, the sample's widths,
+# and the column tooltips + Legend sheet.
 _SCHEMA = CompareSchema(
     report_name="Highway Log",
     header=EXPECTED_HEADER,
@@ -55,13 +54,18 @@ _SCHEMA = CompareSchema(
     id_noun_plural="locations",
     pair_noun="postmile",
     sides_noun="systems",
-    medwid_fields=("Med Wid",),
+    medwid_fields=(hlc.HEADER[19],),     # "Med Wid/Var [Med Wid]"
     date_fields=("Date of Rec", "Sig Chg. Date"),
-    data_widths={"Location": 12, "MI": 11, "Description": 26, "Date of Rec": 11},
-    cmp_widths={"MI": 12, "Description": 30, "Date of Rec": 12},
+    data_widths={"Location": 12, hlc.HEADER[1]: 11, "Description": 26, "Date of Rec": 11},
+    cmp_widths={hlc.HEADER[1]: 12, "Description": 30, "Date of Rec": 12},
     one_sided_note_extra=" (mostly TSN segment splits and TSMIS realignment "
                          "markers)",
     trim_note_extra=" — the TSMIS export pads Description with trailing blanks",
+    header_comment=hlc.comment_for,      # hover any column header for its meaning
+    legend_writer=hlc.write_legend_sheet,  # a "Legend" tab explaining every column
+    ditto_nonasserting=True,             # +/++/+++ = "see paired roadbed" -> never a diff
+    ditto_resolver=hlc.display_fills,    # tint + hover the resolved value on each ditto cell
+    key_normalizer=hlc.roadbed_canonical_location,  # unify roadbed encoding (TSMIS suffix vs TSN dittoed block)
 )
 
 
@@ -78,6 +82,22 @@ def suggest_name(tsmis_path):
         tag = "Highway_Log"
     # Trailing generated-on date (A1): stamps when the comparison was built.
     return f"TSMIS_vs_TSN_{tag}_Comparison {today_str()}.xlsx"
+
+
+_HL_WS_RE = re.compile(r"[\t\n\r\f\v]")
+
+
+def _hl_normalize(v):
+    """compare_core.normalize_value, plus: collapse tab/newline whitespace to a
+    space. The TSMIS Excel export pads Description with trailing TAB characters,
+    which Excel's TRIM (and _xl_trim) do NOT strip — so an otherwise-identical
+    description ('END BR 5-95' vs 'END BR 5-95\\t\\t\\t') showed as a phantom
+    difference. Replacing tabs with spaces at load lets TRIM collapse them, and
+    keeps the values and formulas flavors in agreement (both then see only
+    spaces). Highway-Log-scoped: other comparisons load through normalize_value
+    directly and are unchanged."""
+    nv = normalize_value(v)
+    return _HL_WS_RE.sub(" ", nv) if isinstance(nv, str) else nv
 
 
 def _load_input(path):
@@ -100,11 +120,11 @@ def _load_input(path):
         header = [v for v in next(rows_iter, [])]
         while header and header[-1] in (None, ""):
             header.pop()
-        if header == EXPECTED_HEADER:
-            has_route = False
-        elif header == ["Route"] + EXPECTED_HEADER:
-            has_route = True
-        else:
+        # Accept the corrected labels OR the old vendor labels (a pre-overhaul
+        # workbook) — the engine compares by POSITION and relabels to the
+        # corrected header for display.
+        has_route = hlc.recognize(header)
+        if has_route is None:
             raise ValueError(
                 f"{name} doesn't have the Highway Log column layout this "
                 f"comparison expects — re-create it with this app, then retry.")
@@ -113,7 +133,7 @@ def _load_input(path):
         for r in rows_iter:
             r = list(r)[:n] + [None] * max(0, n - len(r))
             if any(v is not None and str(v).strip() != "" for v in r):
-                rows.append([normalize_value(v) for v in r])
+                rows.append([_hl_normalize(v) for v in r])
         return rows, has_route
     finally:
         wb.close()

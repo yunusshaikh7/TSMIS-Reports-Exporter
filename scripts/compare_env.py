@@ -267,13 +267,18 @@ class EnvCompare:
     suggest_name(dir_a, dir_b)."""
 
     def __init__(self, key, report_name, subdir, sheet_name=None,
-                 expected_header=None, base_schema=None, key_col=None):
+                 expected_header=None, base_schema=None, key_col=None,
+                 force_header=None):
         self.key = key                        # "ramp_summary" | "ramp_detail" | …
         self.REPORT_NAME = report_name
         self.subdir = subdir
         self.sheet_name = sheet_name          # None = the PDF (Ramp Summary) path
         self.expected_header = expected_header
         self.base_schema = base_schema        # report-specific schema extras
+        # When set, the DISPLAY header is forced to this (the loaded files are
+        # accepted as-is and compared by POSITION). Highway Log uses it so the
+        # vendor-mislabeled Excel exports still compare but show CORRECTED labels.
+        self.force_header = force_header
         # The column NAME to key rows on, when the report's FIRST column is too
         # coarse to identify a row (e.g. Highway Sequence / Ramp Detail lead
         # with County / a district-county-route Location that repeats for
@@ -307,6 +312,10 @@ class EnvCompare:
         return 0
 
     def _schema(self, header, la, lb):
+        # Force the corrected display header when configured (Highway Log); the
+        # data is positional, so relabeling for display can't shift columns.
+        if self.force_header is not None and len(self.force_header) == len(header):
+            header = list(self.force_header)
         base = self.base_schema or CompareSchema(
             report_name=self.REPORT_NAME, header=header,
             id_noun="row", id_noun_plural="rows")
@@ -399,9 +408,16 @@ class EnvCompare:
                            warnings=warnings)
 
 
-# Highway Log: pin the known layout + keep the Med Wid rule and the sample's
-# widths; the other XLSX reports lock their layout from the files themselves.
-_HL_BASE = replace(_hl._SCHEMA, one_sided_note_extra="", trim_note_extra="")
+# Highway Log: keep the Med Wid rule, the sample's widths, and the column
+# tooltips + Legend (inherited from _hl._SCHEMA); the other XLSX reports lock
+# their layout from the files. The vendor Excel exports carry the OLD mislabeled
+# header, so the cross-env loader accepts the files as-is (lock from files) and
+# force_header relabels the display to the CORRECTED header (positional).
+# key_normalizer is cleared: cross-env compares two TSMIS exports (SAME roadbed
+# encoding — both suffix the Location), so the roadbed-unifying key is unnecessary
+# and would only perturb the validated cross-env output. It is a TSMIS-vs-TSN tool.
+_HL_BASE = replace(_hl._SCHEMA, one_sided_note_extra="", trim_note_extra="",
+                   key_normalizer=None)
 
 RAMP_SUMMARY = EnvCompare(
     "ramp_summary", "Ramp Summary", "ramp_summary",
@@ -417,7 +433,7 @@ HIGHWAY_SEQUENCE = EnvCompare(
     sheet_name="Highway Locations", key_col="PM")
 HIGHWAY_LOG = EnvCompare(
     "highway_log", "Highway Log", "highway_log", sheet_name=_hl.SHEET_NAME,
-    expected_header=_hl.EXPECTED_HEADER, base_schema=_HL_BASE)
+    base_schema=_HL_BASE, force_header=_hl.EXPECTED_HEADER)
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).

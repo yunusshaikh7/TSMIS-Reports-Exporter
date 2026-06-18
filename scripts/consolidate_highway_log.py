@@ -15,6 +15,7 @@ ConsolidateResult and never prints/prompts/exits, so the GUI can drive it. The
 console UX lives in cli.run_consolidate_cli, used by the __main__ entry (and
 therefore by "4. consolidate (combine reports).bat").
 """
+import highway_log_columns as hlc               # the corrected column labels
 from consolidate_xlsx_base import consolidate_xlsx
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
@@ -64,6 +65,10 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         sheet_name=SHEET_NAME, report_name=REPORT_NAME,
         title="Highway Log Consolidation",
         events=events, confirm_overwrite=confirm_overwrite,
+        # Ship the CORRECTED column labels even though the vendor Excel header is
+        # wrong: relabel by position, add hover tooltips + a Legend sheet.
+        header_override=hlc.HEADER, header_comment=hlc.comment_for,
+        decorate_workbook=hlc.write_legend_sheet,
     )
 
 

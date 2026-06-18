@@ -77,14 +77,25 @@ def _stream_data_rows(path, sheet_name):
 
 
 def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
-                     events=None, confirm_overwrite=None):
+                     events=None, confirm_overwrite=None,
+                     header_override=None, header_comment=None,
+                     decorate_workbook=None):
     """Combine every per-route XLSX in `input_dir` (reading worksheet
     `sheet_name`) into one workbook at `out_path`, prepending a "Route" column so
     rows from different routes stay distinguishable.
 
     input_dir / out_path are pathlib.Path. report_name is the friendly name used
     in user-facing messages (UI-neutral). title is the banner shown in the log.
-    """
+
+    Optional (used by the Highway Log consolidator to ship CORRECTED column
+    labels even though the vendor Excel header is wrong; the data is relabeled by
+    POSITION so the rows are untouched):
+      * header_override   — list of column labels written instead of the
+        file-locked header (must be the same length, else ignored with a note).
+      * header_comment     — callable(label) -> openpyxl Comment | None, attached
+        to each written header cell (a hover tooltip).
+      * decorate_workbook  — callable(wb) run after the rows, before save (e.g.
+        to append a Legend sheet)."""
     events = events or Events()
     if not _DEPS_OK:
         return ConsolidateResult(
@@ -159,13 +170,28 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
     for i, _ in enumerate(canonical_header, start=2):
         ws.column_dimensions[get_column_letter(i)].width = 16
 
-    header_values = ["Route"] + [v if v is not None else "" for v in canonical_header]
+    # Relabel the output header by POSITION when an override is supplied (the
+    # data rows are untouched — only the header text changes). Length must match
+    # so a positional relabel can't silently shift columns.
+    out_header = canonical_header
+    if header_override is not None:
+        if len(header_override) == len(canonical_header):
+            out_header = list(header_override)
+        else:
+            events.on_log(f"  note: header override has {len(header_override)} "
+                          f"columns but the files have {len(canonical_header)}; "
+                          "keeping the files' own header.")
+    header_values = ["Route"] + [v if v is not None else "" for v in out_header]
     header_cells = []
     for v in header_values:
         cell = WriteOnlyCell(ws, value=str(v))
         cell.font = header_font
         cell.fill = header_fill
         cell.alignment = header_align
+        if header_comment is not None:
+            cm = header_comment(str(v))
+            if cm is not None:
+                cell.comment = cm
         header_cells.append(cell)
     ws.append(header_cells)
 
@@ -220,6 +246,10 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
                      f"read ({len(skipped)} skipped, {len(failed)} failed) — "
                      f"nothing was combined and the existing file (if any) was "
                      f"left unchanged.\nSee the log for the per-file reasons."))
+
+    # Optional final touch (e.g. append a Legend sheet) before saving.
+    if decorate_workbook is not None:
+        decorate_workbook(wb)
 
     events.on_log("")
     events.on_log("Writing consolidated workbook...")

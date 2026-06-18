@@ -71,10 +71,11 @@ APP_MODULES = [
     "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
     "export_highway_log", "export_highway_log_pdf", "export_intersection_summary",
     "export_intersection_detail", "export_multi",
+    "highway_log_columns",
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
-    "consolidate_tsn_highway_log",
-    "compare_core", "compare_highway_log", "compare_env",
+    "consolidate_tsn_highway_log", "consolidate_tsmis_highway_log_pdf",
+    "compare_core", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
     "gui_main", "gui_api", "gui_worker",
 ]
 

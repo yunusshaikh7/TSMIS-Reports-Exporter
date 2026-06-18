@@ -59,6 +59,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import highway_log_columns as hlc               # the corrected column labels
 from compare_core import is_formula_injection   # shared formula-injection guard
 from consolidate_xlsx_base import consolidate_xlsx
 from events import ConsolidateResult, Events
@@ -82,16 +83,12 @@ def out_path_for(day):                   # noqa: ARG001 (interface compatibility
     """Combined workbook destination (the 'Export day' picker doesn't apply)."""
     return OUT_PATH
 
-# Must match the TSMIS Highway Log export exactly (sheet name AND header), so
-# the converted files consolidate with the same core and the combined workbook
-# is column-compatible with the consolidated TSMIS Highway Log.
+# Same sheet name AND header as the TSMIS Highway Log so the converted files
+# consolidate with the same core and line up column-for-column with the TSMIS
+# Highway Log. The CORRECTED 31-column header lives in one place (the vendor
+# Excel mislabeled these; see highway_log_columns).
 SHEET_NAME = "Highway Log"
-TSMIS_HEADER = [
-    "Location", "MI", "N/A", "Cnty Odom", "City", "R/U", "SPD", "TER", "H/G",
-    "A/C", "LB T", "LB Lns", "LB F", "LB OT", "LB TR", "LB T-W", "LB IN",
-    "LB SH", "Med TCB", "Med Wid", "RB T", "RB Lns", "RB F", "RB IN", "RB SH",
-    "RB T-W", "RB OT", "RB SH", "Description", "Date of Rec", "Sig Chg. Date",
-]
+TSMIS_HEADER = hlc.HEADER
 
 # Friendly report name for user-facing messages (shown in both the GUI and the
 # console, so keep it UI-neutral -- no ".bat" / "menu option" wording).
@@ -99,6 +96,9 @@ REPORT_NAME = "TSN Highway Log"
 
 # File pattern the GUI uses to preview how many inputs a folder holds.
 INPUT_GLOB = "*.pdf"
+
+# Input file format, shown as the Consolidate-tab badge (these are district PDFs).
+INPUT_FMT = "PDF"
 
 
 # =============================================================================
@@ -390,10 +390,11 @@ def _write_route_workbook(rows, out_path):
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = header_align
+    hlc.apply_header_tooltips(ws)            # hover any header for its meaning
     ws.freeze_panes = "A2"
     for i, name in enumerate(TSMIS_HEADER, start=1):
         ws.column_dimensions[get_column_letter(i)].width = \
-            40 if name == "Description" else 10
+            40 if name == "Description" else 12
 
     for row in rows:
         ws.append([row.get(k) for k in ROW_KEYS])
@@ -402,6 +403,7 @@ def _write_route_workbook(rows, out_path):
         for cell in ws[ws.max_row]:
             if is_formula_injection(cell.value):
                 cell.data_type = "s"
+    hlc.write_legend_sheet(wb)               # a "Legend" tab explaining every column
     wb.save(out_path)
 
 
@@ -534,6 +536,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
         input_dir=CONVERTED_DIR, out_path=out, sheet_name=SHEET_NAME,
         report_name=REPORT_NAME, title="TSN Highway Log Consolidation",
         events=events, confirm_overwrite=lambda _p: True,
+        header_override=hlc.HEADER, header_comment=hlc.comment_for,
+        decorate_workbook=hlc.write_legend_sheet,
     )
     if result.status == "ok":
         result.summary_lines = [

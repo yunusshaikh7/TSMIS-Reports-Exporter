@@ -74,8 +74,10 @@ jobs:
           for c in check_compare_blankkey check_compare_keyfield check_compare_skipwarn \
                    check_compare_injection check_compare_coercion check_compare_limits \
                    check_compare_audit check_compare_ramp_detail check_compare_ramp_summary \
-                   check_compare_dupmatch check_ramp_summary_partial \
-                   check_tsn_description_leak check_a1_filenames; do
+                   check_compare_dupmatch check_compare_ditto check_ramp_summary_partial \
+                   check_tsn_description_leak check_tsmis_pdf_parse \
+                   check_highway_log_columns check_highway_log_ditto check_highway_log_roadbed \
+                   check_a1_filenames; do
             echo "::group::$c"
             python "build/$c.py"
             echo "::endgroup::"
