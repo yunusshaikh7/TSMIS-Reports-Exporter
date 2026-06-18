@@ -14,6 +14,24 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **Consolidate tab cleanup (0.14.2).** The three Highway Log consolidations now
+  have clear, parallel names — **TSMIS Highway Log (Excel)**, **TSMIS Highway Log
+  (PDF)**, **TSN Highway Log (PDF)** — so the plain "Highway Log" can't be confused
+  for the others. The **TSMIS Highway Log (PDF)** consolidation now reads the app's
+  own "Highway Log (PDF)" export straight from the output folder (with the Export-day
+  picker, like the Excel one) instead of a redundant drop folder — you no longer copy
+  the app's own exports into an input folder. The "Export day" picker is now hidden
+  for the one report it doesn't apply to (TSN, whose district PDFs come from outside
+  the app).
+- **A few UI labels now match what actually happens (0.14.2).** The environment
+  check no longer wrongly flags **Highway Log (PDF)** as unavailable on every site
+  (it shares the "Highway Log" dropdown option, so it now follows that report's
+  result); the Export Everything description says it writes to your chosen
+  destination folder (not "dated run folders"); the auto-consolidate note lists every
+  report that has no consolidator; and **Delete all reports** now also clears the
+  Highway-Log-PDF outputs and the Export Everything store, so a "fresh start" really
+  is one.
+
 - **An accurate Highway Log, sourced from the PDF (0.14.0).** The site's Highway
   Log **Excel** export is buggy — it drops rows and whole roadbed-geometry
   columns, expands the report's "same as the other roadbed" `+` markers into
