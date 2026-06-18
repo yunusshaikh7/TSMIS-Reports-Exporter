@@ -87,7 +87,8 @@ log = logging.getLogger("tsmis.gui")
 # also clears. Everything else directly under output/ that isn't a run folder
 # is left alone — only content this app generates is ever deleted.
 _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_detail", "highway_sequence",
-                       "highway_log", "consolidated", "tsn_highway_log",
+                       "highway_log", "highway_log_pdf", "consolidated",
+                       "tsn_highway_log", "tsmis_highway_log_pdf",
                        "run_reports", "comparisons")
 
 
@@ -106,9 +107,21 @@ def reset_targets(include_input=False):
         p = OUTPUT_ROOT / name
         if p.is_dir():
             targets.append((f"output folder '{name}'", p))
-    p = OUTPUT_ROOT / "tsn_highway_log_consolidated.xlsx"
-    if p.is_file():
-        targets.append(("TSN consolidated workbook", p))
+    for fname, lbl in (("tsn_highway_log_consolidated.xlsx", "TSN consolidated workbook"),
+                       ("tsmis_highway_log_pdf_consolidated.xlsx",
+                        "TSMIS Highway Log (PDF) consolidated workbook")):
+        p = OUTPUT_ROOT / fname
+        if p.is_file():
+            targets.append((lbl, p))
+    # The Export Everything "always-current" store (configurable destination,
+    # default output/All Reports (current)) holds generated reports too.
+    try:
+        from settings import get_batch_dest
+        bdest = Path(get_batch_dest())
+        if bdest.is_dir():
+            targets.append(("Export Everything store", bdest))
+    except Exception:
+        pass
     if FAILURES_DIR.is_dir():
         targets.append(("failure screenshots", FAILURES_DIR))
     if include_input:
@@ -834,13 +847,19 @@ class EnvScanWorker(threading.Thread):
 
     def run(self):
         from reports import EXPORT_REPORTS
-        labels = [label for label, _fmt, _spec in EXPORT_REPORTS]
+        # (registry label for the verdict/UI, dropdown option text to probe &
+        # select). These DIFFER for "Highway Log (PDF)": its dropdown option is the
+        # same "Highway Log" the Excel export uses (the PDF is that report saved a
+        # different way), so probing the registry label would never match the
+        # dropdown and would falsely flag it "missing" on every environment.
+        report_specs = [(label, getattr(spec, "label", None) or label)
+                        for label, _fmt, spec in EXPORT_REPORTS]
         combos = [(s, e) for s in DATA_SOURCES for e in ENVIRONMENTS]
         n = min(self.MAX_SCANNERS, len(combos)) if has_valid_auth() else 1
         if n > 1:
             n = self._parallel_scanners(n)
         log.info("env scan: starting (%d combos, %d scanner browser(s), "
-                 "report types %s)", len(combos), n, labels)
+                 "report types %s)", len(combos), n, [r for r, _d in report_specs])
         work = queue_mod.Queue()
         for combo in combos:
             work.put(combo)
@@ -865,7 +884,7 @@ class EnvScanWorker(threading.Thread):
                                 # at once -> the parallel channel (not Edge).
                                 browser, _ctx, page = new_authed_browser(
                                     p, parallel=True)
-                            out = self._check_one(page, src, env, labels)
+                            out = self._check_one(page, src, env, report_specs)
                             with lock:
                                 results[out["key"]] = out
                             self.q.put(("env_access", out))
@@ -986,25 +1005,32 @@ class EnvScanWorker(threading.Thread):
             # Which of the report types is actually offered? The site
             # sometimes greys single types out. None readable = unknown
             # (keep the old first-report probe), never "all missing".
+            # Probe the dropdown by the OPTION TEXT (de-duplicated — the Excel and
+            # PDF Highway Log share one "Highway Log" option), and key the verdict
+            # by the registry label the UI reads. None readable = unknown (keep the
+            # old first-report probe), never "all missing".
+            probe = list(dict.fromkeys(drop for _reg, drop in report_labels))
             options = None
             try:
-                options = page.evaluate(_REPORT_OPTIONS_JS, list(report_labels))
+                options = page.evaluate(_REPORT_OPTIONS_JS, probe)
             except Exception as e:
                 log.info("env scan: %s report dropdown read failed (%s)",
                          out["key"], type(e).__name__)
             if options:
-                out["reports"] = {lbl: options.get(lbl, {}).get("state", "missing")
-                                  for lbl in report_labels}
-                for lbl, state in out["reports"].items():
+                out["reports"] = {reg: options.get(drop, {}).get("state", "missing")
+                                  for reg, drop in report_labels}
+                for reg, drop in report_labels:
+                    state = out["reports"][reg]
                     if state != "ok":
                         log.info("env scan: %s report %r is %s (class=%r)",
-                                 out["key"], lbl, state,
-                                 options.get(lbl, {}).get("cls", ""))
-            avail = [lbl for lbl in report_labels
-                     if out["reports"].get(lbl) == "ok"]
-            off = [lbl for lbl, state in out["reports"].items()
-                   if state != "ok"]
-            if options and not avail:
+                                 out["key"], reg, state,
+                                 options.get(drop, {}).get("cls", ""))
+            # An AVAILABLE dropdown option text, for the preflight round-trip
+            # (preflight SELECTS the report, so it takes the option text).
+            avail_drop = [drop for reg, drop in report_labels
+                          if out["reports"].get(reg) == "ok"]
+            off = [reg for reg, state in out["reports"].items() if state != "ok"]
+            if options and not avail_drop:
                 out["status"] = "no_reports"
                 out["detail"] = ("Signs in, but every report type is greyed "
                                  "out or missing here.")
@@ -1013,7 +1039,7 @@ class EnvScanWorker(threading.Thread):
                 # The data probe, on the first AVAILABLE report type: County
                 # only enables once the site's own route/county round-trip
                 # answers (the form itself is static).
-                preflight(page, avail[0] if avail else report_labels[0])
+                preflight(page, avail_drop[0] if avail_drop else probe[0])
             except PreflightError:
                 out["status"] = "no_reports"
                 out["detail"] = ("Signs in, but the report form couldn't load "
