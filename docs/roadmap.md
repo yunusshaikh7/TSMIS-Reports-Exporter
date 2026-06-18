@@ -8,6 +8,80 @@ retired into this file; that folder is now local audit scratch only — see
 
 ---
 
+## Code-review findings (Phase 3 review, 2026-06-18)
+
+A read-only code review (6 risk-domain auditors + adversarial refutation) over commit
+`0a4c071` confirmed **45 findings (5 P1 · 17 P2 · 23 P3)**; 12 candidates were rejected on
+refutation. Full report with code anchors + fix sketches: `code-review/AUDIT-phase3-0a4c071.md`
+(git-ignored scratch). The durable, actionable items, by theme:
+
+### Product-risk — does the app ever report success on bad/missing data? (do first)
+- [ ] **P1 `navigate-accepts-wrong-env-after-one-reload`** — the export path never re-checks
+  `_site_params_ok` after sign-in (only `require_signed_in`), so if the one corrective reload
+  doesn't switch the site's `CONFIG`, **wrong-env data is saved under a folder labeled with the
+  selected env** and reported as success. Add an env backstop on the export path mirroring the
+  env-scan's `wrong_site` verdict. (Re-confirms the v0.10.4 `AUTH-WRONG-ENV-SILENT-SUCCESS`; see
+  [it-and-security.md](it-and-security.md) §8.2.)
+- [ ] **P1 `empty-routes-read-as-export-complete`** — an all-empty run shows the green "Export
+  complete" headline (`app.js renderCompletion` keys only on `failed===0`). Show an amber
+  "Finished with no data" when `saved+exists===0 && empty>0`.
+- [ ] **P1 `transient-export-click-failure-recorded-empty`** — a transient failure in the Export
+  click window is recorded `empty` and **never retried** (`_retry_failed_routes` excludes
+  `empty`). Make the first `EmptyExport` retriable; collapse to `empty` only if it reproduces.
+- [ ] **P2 PDF Highway Log silent-drop trio** (`pdf-stale-geometry-carryforward-silent-corruption`,
+  `pdf-page-skip-unlogged-when-no-prior-geometry`, `pdf-consolidator-no-row-count-verification`) —
+  the cell-rect parser carries forward stale page geometry / skips data lines with **no log**, and
+  never cross-checks extracted rows vs the PDF's data-row count at runtime (unlike the loud skip
+  accounting elsewhere). Log + guard the geometry-miss paths and add a runtime row-count check.
+- [ ] **P2 `report-error-text-blanket-swallow-hides-fatal`** / **`highway-sequence-errored-route-can-record-empty`**
+  — `report_error_text` swallows all exceptions to `None` with no log, so a fatal route can be
+  misclassified `empty`/`saved` (worst on Highway Sequence, whose empty = button-absence). Log the
+  swallow; make Highway Sequence's empty signal positive.
+
+### Data-loss / the Export-Everything store
+- [ ] **P1 `reset-deletes-unvalidated-batch-dest`** — "Delete all reports" `rmtree`s the
+  user-chosen Everything destination **wholesale** (including any foreign files) and the confirm
+  dialog **hides the real path** (shows labels only). Scope deletion to known `<src-env>/` children
+  and surface `str(path)` in the confirm list.
+- [ ] **P2 `auto-consolidate-rmtree-out-dir-before-export`** — the store clears a report+env folder
+  **before** re-export, so a failed/crashed refresh destroys the last-good copy and can read as
+  fresh. Stage-and-swap (clear on success), or flag a short-route folder as partial.
+
+### Security / IT (re-confirms existing items + new)
+- [ ] **P1 `update-trust-is-tls-plus-sibling-sha-only`** — auto-update authenticity = TLS (Windows
+  store, so a TLS-inspection root is trusted) + a same-release `.sha256`; **no signature**.
+  Code-signing (already the top IT item below) is the fix; consider a pinned-in-build public key.
+- [ ] **P2 `edge-login-cdp-port-unauthenticated-loopback`** — the headed-Edge fallback opens an
+  unauthenticated CDP port on `127.0.0.1` for the whole live SSO session; any local process can
+  drive the authenticated session. Open it only when CDP recapture is actually needed; close on
+  capture. (Document in IT-notes.)
+- [ ] **P2 `auth-file-plaintext-no-acl-dpapi`** — re-confirms the auth-at-rest item below (DPAPI/ACL).
+- [ ] **P2 updater integrity** (`size-and-checksum-guards-both-skippable`,
+  `immediate-death-check-narrow-window`, `no-rollback-when-relaunch-launches-partial-tree`) — size
+  + checksum guards can both be off (size 0 / no `.sha256`); the 1.5 s death-check misses a later
+  swap-exe crash; a partially-failed rollback still relaunches and the message box claims the old
+  version was kept. Harden each.
+
+### Robustness (P2/P3)
+- [ ] **P2 `select-report-substring-match-no-exact-guard`** — `select_report` uses `has_text` +
+  `.first` (substring) while the env-scan uses exact-first; a future superstring option could
+  silently mis-export. Match exactly.
+- [ ] **P2 `parallel-reconcile-uses-read-strict-not-lock-tolerant`** / **`parallel-crash-plus-cancel-skips-reconciliation`**
+  — fast-mode reconciliation re-marks an Excel-locked-but-complete file `failed`, and a crash+cancel
+  combo omits orphaned routes from the run report.
+- [ ] **P2 `handle-no-default-branch`** — `gui_api._handle` silently drops an unrecognized message
+  kind; add a logging `else`.
+- [ ] **P2 ramp-summary parsing** (`ramp-summary-parse-failure-misattributed-to-source`,
+  `ramp-summary-duplicate-pop-pattern-misassignment`) — a parser schema-miss is attributed to the
+  source PDF (steering the user away from the tool); the Population-group pattern disambiguates two
+  identical regexes only by document order.
+- [ ] **P3 hygiene batch** (23 items) — stale `gui_worker.py` Tkinter module docstring; the magic
+  `wait_for_timeout(1000)`; `update_helper.log` rotation; dev WebView-cache clearing; the
+  `_min_cost_pairs` greedy cliff at 8+ duplicates; ramp-summary combined-sheet hard-coded
+  coordinates; etc. See the full report.
+
+---
+
 ## Ramp comparisons — VERIFIED on real data (2026-06-16 audit)
 
 Cross-env Ramp Detail + Ramp Summary were ruthlessly audited against real 3-env
