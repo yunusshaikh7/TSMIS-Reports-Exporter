@@ -92,7 +92,73 @@ shipped". Console flows honor the same overrides automatically.
   alone is a real abbreviation (UNCONSTRUCTED) and is kept unless paired with its
   CONST footer counterpart; a lone hyphenated bridge number (`53-1075`) is kept.
   Locked by `build/check_tsn_description_leak.py`.
-- **Compare tab** — two comparison families since v0.10.0, both built by ONE
+- **Highway Log COLUMN LABELS — corrected (v0.14.0), one source of truth in
+  `highway_log_columns.py`.** The vendor TSMIS Excel export MISLABELED most
+  Highway Log columns (`N/A` is really **Non-Add Mileage**; every roadbed column
+  was a cryptic code — `LB T` is the Left **Surface Type**, `LB OT`/`LB TR` are
+  the outside-shoulder **Total/Treated widths**, etc.; it even labeled two
+  different columns `RB SH`), and those wrong labels propagated to every Highway
+  Log workflow. The CORRECT meanings come from the report's own legend (verified
+  against the printed doc + the user). `highway_log_columns.HEADER` is now the
+  single canonical 31-column header — doc-abbreviation labels with the vendor's
+  old label in `[brackets]` (e.g. `NA [N/A]`, `LB OT-SH Total [LB OT]`,
+  `Med Wid/Var [Med Wid]`); the two old `RB SH` columns become
+  `RB IN-SH Treated`/`RB OT-SH Treated`. `VENDOR_HEADER` is the exact old labels;
+  `recognize()` accepts EITHER (so a pre-overhaul, vendor-labeled workbook still
+  compares — the engine aligns by **column POSITION** and relabels to the
+  canonical header for display). Every column carries a hover **tooltip** (Excel
+  cell comment) and every Highway Log workbook (per-route, consolidated, and the
+  comparisons) gets a **Legend** sheet (`write_legend_sheet`). This is wired
+  through both PDF consolidators, the Excel consolidator (`consolidate_xlsx`
+  gained `header_override`/`header_comment`/`decorate_workbook` — opt-in, so Ramp
+  Detail / Highway Sequence are untouched), and the comparison engine
+  (`CompareSchema.header_comment`/`legend_writer` — opt-in, so non-HL comparisons
+  stay byte-identical). The relabel is **purely cosmetic**: the same column
+  POSITIONS, so the comparison RESULTS are unchanged (route-1 PDF-vs-Excel held
+  at 11 diff rows / 67 cells before and after). Locked by
+  `build/check_highway_log_columns.py`. (The TSN log additionally has an ADT
+  Information group — Look Back / P / Look Ahead — that the 31-column TSMIS
+  format drops.)
+- **TSMIS Highway Log (PDF)** (consolidate-only, v0.14.0):
+  `consolidate_tsmis_highway_log_pdf.py` parses the TSMIS **"Highway Log (PDF)"**
+  exports (report 4b, `highway_log_route_<ROUTE>.pdf`) the user drops into
+  `input/tsmis_highway_log_pdf/`, writing per-route workbooks to
+  `output/tsmis_highway_log_pdf/` and one combined
+  `output/tsmis_highway_log_pdf_consolidated.xlsx` — the **accurate substitute
+  for the buggy vendor Excel Highway Log export**. The output is the SAME 31-column
+  "Highway Log" format the Excel export and the TSN consolidator produce, so it
+  drops straight into the Highway Log comparisons. Like the TSN log these are
+  user-dropped snapshots (`day` ignored; `INPUT_NOTE`/`INPUT_DIR` exposed).
+  **Parsing is cell-rect based, NOT character windows** (unlike the TSN log): the
+  print view is a real bordered HTML table, so every data row's 30 columns are
+  present as cell RECTANGLES. The table is auto-laid-out (column x-boundaries
+  differ per page; routes render landscape OR portrait), so each page's 30 column
+  boundaries are derived from THAT page's zebra-shaded data-row cells and made
+  CONTIGUOUS (no character falls between two cells and is lost); every data char
+  is assigned to the column whose window holds its center. The 30 cells map 1:1,
+  in order, to the 31-column layout MINUS Description (index 28), which TSMIS
+  prints on follow-on lines below the row (joined with a space, matching the
+  report's own wrap). The column-header band is found by CONTENT (the
+  "LOCATION … ODOM … CITY" row) not a fixed y, so a row's description pushed onto
+  a near-empty "orphan" page (its layout shifts up) is still captured. NO value
+  normalization (the PDF is already native TSMIS format: MI "000.045", widths
+  "12"). A left-margin section marker ("C"/"R"/"L") stays in the Location cell,
+  which normalizes to the single-token form ("C043.925E"). **Verified flawless**
+  against all 252 route PDFs (0 char-conservation failures / 0 unclassified lines;
+  per-route rows == the PDF's data-row count) and, route-for-route, against the
+  official TSMIS Excel export of the SAME route — 55,768 matched rows across the
+  252 routes, with EVERY residual difference traced to an Excel-export quirk and
+  NONE to the parser: the Excel **drops rows and whole roadbed-column blocks**
+  (e.g. route 041 is missing 72 rows + ~4,500 blanked geometry cells; route 046
+  drops rows in dense postmile bands, cascading the `MI` distance-to-next on the
+  survivors), **expands `+`/`++` ditto markers** into values, **pads Descriptions
+  with trailing tabs**, and **mis-attributes/shifts descriptions** to adjacent
+  rows — exactly the export problems this exists to expose. (A multi-agent sweep
+  parsed every route and adversarially classified each diff; the only two routes
+  it flagged for review, 041 and 046, were confirmed to be the Excel's dropped
+  rows, NOT the parser — the dropped rows are present and complete in the PDF.)
+  Locked by `build/check_tsmis_pdf_parse.py`.
+- **Compare tab** — three comparison families (v0.14.0; two since v0.10.0), all built by ONE
   engine: `compare_core.py` (extracted verbatim-then-parameterized from
   compare_highway_log; a `CompareSchema` carries side names — emitted into
   formulas through the quoting-aware `_sref` so `TSMIS!A:A` stays unquoted but
@@ -103,6 +169,19 @@ shipped". Console flows honor the same overrides automatically.
   change formula/label text in the core without re-running such a check).
   - **TSMIS vs TSN Highway Log** (`compare_highway_log.py` = schema + loaders
     + `suggest_name`; `"files"` kind in `COMPARE_REPORTS`).
+  - **Highway Log (PDF)** (`compare_highway_log_pdf.py`; `"files"` kind, group
+    `pdf`, v0.14.0): two file-vs-file comparisons that sidestep the buggy vendor
+    Excel by sourcing the TSMIS side from the **PDF** consolidation instead. Both
+    reuse `compare_highway_log`'s loader (any 31-column Highway Log workbook,
+    per-route or consolidated) and override ONLY the schema's two side labels +
+    notes (engine text untouched → regression lock intact); each carries
+    `file_a_label`/`file_b_label` so the GUI's two file pickers (and the data
+    sheets) are named for the actual sides (not the hard-coded "TSMIS"/"TSN").
+    `TSMIS_PDF_VS_TSN` (side labels **"TSMIS (PDF)" vs "TSN (PDF)"** — the
+    accurate replacement for the row above, both sides from PDFs, so the
+    PDF-vs-PDF nature is explicit) and `TSMIS_PDF_VS_EXCEL` (TSMIS (PDF) vs TSMIS
+    (Excel) — diffs the PDF-parsed data against the vendor Excel of the SAME
+    report to pinpoint the export's errors).
   - **Cross-environment** (`compare_env.py`; `"folders"` kind, v0.10.0): the
     SAME report from two run folders (ssor-prod vs ars-prod, or one env on
     two dates) — per-route files are read straight from both folders (NO
@@ -223,6 +302,30 @@ shipped". Console flows honor the same overrides automatically.
     group and inflated diffs/one-sided rows (PROD-vs-DEV HSL 15,797 → 5,070 diff
     cells). The resolver falls back to the first column (+ log warning) if the
     named column is absent, so layout drift degrades, never crashes.
+  - **Roadbed-aware key (v0.14.0; `CompareSchema.key_normalizer`, opt-in):** on a
+    divided highway the TWO sources encode the roadbed of a segment's two rows
+    DIFFERENTLY — TSMIS (PDF + Excel) suffix the Location (`R021.466R`/`…L`); TSN
+    omits the suffix (`R021.466`) and instead dittos the non-subject 8-col block
+    (a Left-block-dittoed row IS the right roadbed). Keying on the raw Location
+    therefore SPLIT the same physical roadbed row into a false one-sided pair
+    (~1,400 rows / TSMIS-vs-TSN comparison, hiding ~4,800 genuine diffs). The
+    suffix↔dittoed-block correspondence is 100% (audit-verified, raw-PDF traced),
+    so `highway_log_columns.roadbed_canonical_location` (set as the TSMIS-vs-TSN
+    schema's `key_normalizer`) derives the roadbed from the suffix when present
+    else the dittoed block, appending it to suffix-less Locations so the same
+    roadbed row keys identically. The trailing equation `E` marker and the leading
+    alignment prefix are PRESERVED (a route-start `R000.000` never collapses into
+    a bridge `000.000`; `E` variants stay distinct — deliberately NOT reconciled).
+    `keys_for` gained `key_normalizer` (None = byte-identical raw-Location key, so
+    every non-HL comparison and cross-env TSMIS-vs-TSMIS are untouched — the
+    normalizer is **cleared** on `compare_env._HL_BASE`; PDF-vs-Excel is invariant
+    since both sources already suffix). The DATA sheets still show each source's
+    raw Location; only the match/alignment KEY token is unified. The key STRICTLY
+    REFINES (can split, never merge): 0 roadbed crossings (vs 6.2% for a naive
+    postmile-only pairing), 0 over-merges. Locked by
+    `build/check_highway_log_roadbed.py`; study doc §7b. (Residual: ~11 Excel rows
+    whose own export bug drops the suffix AND blanks — not dittos — the block stay
+    conservatively one-sided, since the roadbed is unrecoverable there.)
   - **Incompleteness contract (v0.11.0):** an unreadable input is never silently
     dropped — `run_compare(warnings=…)` keeps `status="ok"` but forces
     `verdict="diff"` (a clean match can't be certified) and leads
@@ -451,12 +554,15 @@ scripts/
   reports.py          # SINGLE registry: EXPORT_REPORTS + CONSOLIDATE_REPORTS + COMPARE_REPORTS (GUI + export_multi read it)
   updater.py          # one-click self-update (GUI only): GitHub release check/download/stage + PowerShell swap helper
   export_*.py         # thin (~30 lines): a ReportSpec + run_cli; export_multi.py = several/all
-  consolidate_xlsx_base.py    # shared XLSX consolidator core
+  highway_log_columns.py      # ONE source of truth for the corrected Highway Log column labels + meanings (tooltips/Legend)
+  consolidate_xlsx_base.py    # shared XLSX consolidator core (Highway Log passes header_override/comment/legend)
   consolidate_ramp_summary.py # standalone (parses PDFs)
   consolidate_{ramp_detail,highway_sequence,highway_log}.py  # thin wrappers over the base
   consolidate_tsn_highway_log.py  # TSN district PDFs -> TSMIS-format XLSX + combined (input/ folder)
+  consolidate_tsmis_highway_log_pdf.py  # TSMIS Highway Log PDFs (cell-rect parse) -> TSMIS-format XLSX + combined (input/ folder)
   compare_core.py     # THE discrepancy-workbook engine (schema-parameterized; regression-locked — see Compare tab notes)
   compare_highway_log.py      # TSMIS-vs-TSN Highway Log: schema + loaders over compare_core ("files" kind)
+  compare_highway_log_pdf.py  # PDF-sourced Highway Log compares: TSMIS(PDF) vs TSN, TSMIS(PDF) vs TSMIS(Excel) ("files" kind, group pdf)
   compare_env.py      # cross-environment comparison: two run folders, all four reports ("folders" kind)
   batch_manifest.py   # persistent Export-Everything job manifest (B3; DATA_ROOT, atomic, resumable)
   gui_main.py / gui_api.py / gui_worker.py   # GUI entry / js_api bridge + state / worker threads
@@ -532,8 +638,10 @@ generated `output/` files (only the `.gitkeep` stubs), build artifacts
     the late icon-setter, NOT a window-event handler; see pywebview trap 2),
     toggled by settings `notify_on_finish`.
   - **Compare sub-tabs:** the Compare pane splits its two families onto sub-tabs
-    (cross-environment default, then TSMIS-vs-TSN) — see *New comparison type*
-    (`COMPARE_GROUPS`).
+    (cross-environment default, then TSMIS-vs-TSN). **SUPERSEDED in v0.14.0** — the
+    sub-tab split is retired in favor of a dedicated top-level **Highway Log** tab
+    (every HL comparison) beside **Compare** (the plain cross-env ones); see *New
+    comparison type* (`COMPARE_TABS` / `tab`).
   - **Revert to the previous version (Settings ▸ Debugging):**
     `updater.resolve_previous_release` finds the newest FULL release strictly
     OLDER than this build (lists `/releases`, ignores drafts/prereleases, picks
@@ -1027,14 +1135,17 @@ build openpyxl styles inside functions). For an XLSX report, wrap
 `CONSOLIDATE_REPORTS`, and document here.
 
 **New comparison type:** add one row to `COMPARE_REPORTS` in `reports.py`
-(the Compare tab's type list is generated from it; rows are
-`(label, module_or_adapter, kind, group)`) and the module to `APP_MODULES` in
-`build/app.spec`. `group` is one of `COMPARE_GROUPS`' ids — the Compare pane
-renders one **sub-tab per group** (first = default; currently `env`
-"Cross-environment" then `tsn` "TSMIS vs TSN"), and a row only shows under its
-group's sub-tab. `group` is independent of `kind` so a new family can get its
-own sub-tab without changing the files/folders input plumbing; add a brand-new
-sub-tab by appending to `COMPARE_GROUPS`. Two input kinds:
+(the comparison type lists are generated from it; rows are
+`(label, module_or_adapter, kind, group, tab)`) and the module to `APP_MODULES`
+in `build/app.spec`. `tab` (v0.14.0) is one of `COMPARE_TABS`' ids — `compare`
+(plain cross-env report comparisons) or `highway_log` (every Highway Log
+comparison). The GUI shows two top-level tabs ("Compare" / "Highway Log") that
+SHARE one pane (`paneCompare`); each renders a FLAT comparison list filtered to
+its `tab` (`app.js selectCompareTab` / `setTab`'s `cmpTab`). `group` is now
+informational only — the old per-family sub-tab strip (`COMPARE_GROUPS`,
+`#compareSubtabs`) is RETIRED (kept hidden / back-compat in the bridge JSON); a
+Highway Log comparison no longer hides under a sub-tab. So a new HL comparison is
+`tab="highway_log"`; a new plain cross-env one is `tab="compare"`. Two input kinds:
 - `"files"` — a module exposing
   `compare(path_a, path_b, out_path, events=None, confirm_overwrite=None,
   mode="formulas") -> ConsolidateResult` (console-free, same rules as

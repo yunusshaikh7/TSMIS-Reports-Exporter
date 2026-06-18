@@ -14,6 +14,38 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **An accurate Highway Log, sourced from the PDF (0.14.0).** The site's Highway
+  Log **Excel** export is buggy — it drops rows and whole roadbed-geometry
+  columns, expands the report's "same as the other roadbed" `+` markers into
+  numbers, and mis-attaches descriptions. A new consolidation parses the Highway
+  Log **PDF** export instead (drop the per-route PDFs into
+  `input\tsmis_highway_log_pdf`), producing the same 31-column workbook **without**
+  those export errors — verified row-for-row against all 252 routes.
+- **Highway Log columns are correctly labeled (0.14.0).** The vendor Excel export
+  mislabeled most Highway Log columns (e.g. "N/A" is really **Non-Add Mileage**;
+  the cryptic roadbed codes are surface type, shoulder widths, lane counts, …; it
+  even reused "RB SH" for two different columns). Every Highway Log workbook now
+  uses the **report's own legend** labels, with the old label kept in `[brackets]`,
+  a hover tooltip on every column, and a **Legend** sheet explaining each one. This
+  is a relabel only — the data and comparison results are unchanged.
+- **A dedicated Highway Log tab (0.14.0).** All the Highway Log comparisons now
+  live on their own **Highway Log** tab — TSMIS vs TSN, the two PDF-sourced
+  comparisons, and across environments — instead of being split across the Compare
+  tab's sub-tabs. The Compare tab keeps the plain cross-environment report
+  comparisons.
+- **Divided-highway rows now line up correctly (0.14.0).** On a divided highway
+  each segment has two rows (one per roadbed). TSMIS marks the roadbed in the
+  location (`R021.466R`/`…L`); the TSN log marks it a different way. The comparison
+  used to treat these as *different* locations, so the same physical roadbed row
+  showed up as **"only in TSMIS" + "only in TSN"** instead of being compared —
+  hiding thousands of genuine differences. It now recognizes the roadbed on both
+  sides and pairs them, surfacing those differences (audited against the source
+  PDFs — every pairing is the correct roadbed, none crossed).
+- **"Same as the other roadbed" markers are handled (0.14.0).** A roadbed column
+  printed as `+`/`++` means "this roadbed's value is on the paired row" — a
+  pointer, not a value. Comparisons now treat it as such (it is **never** counted
+  as a difference, on either source), and a comparison cell that resolved a `+`
+  shows what it points to in a hover note.
 - **Highway Log can now be exported as a PDF (0.13.1).** A new **Highway Log
   (PDF)** report exports each route's Highway Log as a print-formatted PDF — the
   same layout the site's Print button produces (cover page + every page) — into

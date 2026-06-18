@@ -2,7 +2,7 @@
 
 > Bulk-export Caltrans TSMIS reports for every California state route — from a single click.
 
-[![Version](https://img.shields.io/badge/version-0.13.1-blue)](version.py)
+[![Version](https://img.shields.io/badge/version-0.14.0-blue)](version.py)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](#)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](#)
 [![Automation](https://img.shields.io/badge/automation-Playwright-2EAD33?logo=microsoftedge&logoColor=white)](#)
@@ -52,11 +52,13 @@ of `.bat` scripts for development and as a fallback.
 - **Skip & cancel.** Skip a slow route mid-run, or cancel the whole run — the
   current route stops promptly, not after a long wait.
 - **Consolidation.** Combine every per-route export into a single workbook —
-  including **TSN Highway Log** district PDFs, converted into TSMIS-format
-  Excel for side-by-side use.
-- **TSMIS vs TSN comparison.** Build a discrepancy workbook from two Highway
+  including **TSN Highway Log** district PDFs and **TSMIS Highway Log PDFs**,
+  both converted into TSMIS-format Excel for side-by-side use.
+- **Highway Log comparisons.** Build a discrepancy workbook from two Highway
   Logs (per-route or consolidated): matching values shown plainly, differences
-  in red, live Excel formulas throughout, plus per-route coverage stats.
+  in red, live Excel formulas throughout, plus per-route coverage stats. Three
+  flavors: TSMIS vs TSN, **TSMIS (PDF) vs TSN (PDF)**, and **TSMIS (PDF) vs TSMIS
+  (Excel)** — the PDF-sourced ones sidestep the vendor Excel export's bug.
 - **Run reports.** Every run records a per-route outcome CSV (saved / empty /
   skipped / failed).
 - **Optional fast mode.** Run several browsers in parallel for a 2.5–3×+ speedup.
@@ -80,9 +82,11 @@ The two Intersection reports are **export-only** for now (no consolidate or
 compare support yet).
 
 Consolidate-only: **TSN Highway Log** (drop district PDFs into
-`input/tsn_highway_log/`; converted per-route files + one combined workbook
-land under `output/`). The **Compare** tab turns a TSMIS and a TSN Highway Log
-into a formula-driven discrepancy workbook.
+`input/tsn_highway_log/`) and **TSMIS Highway Log (PDF)** (drop the "Highway Log
+(PDF)" route exports into `input/tsmis_highway_log_pdf/`) — both produce
+TSMIS-format per-route files + one combined workbook under `output/`. The
+**Compare** tab turns two Highway Logs into a formula-driven discrepancy
+workbook (TSMIS vs TSN, TSMIS-PDF vs TSN-PDF, or TSMIS-PDF vs TSMIS-Excel).
 
 <!-- Tip: drop a screenshot of the GUI here once available, e.g. ![TSMIS Exporter](docs/screenshot.png) -->
 
