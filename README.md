@@ -200,7 +200,8 @@ powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
 `release` workflow manually) and `.github/workflows/release.yml` gates both
 variants with the frozen self-test, then publishes all three zips.
 
-See [`CLAUDE.md`](CLAUDE.md) for build internals, bundle hygiene, and the DLP guard.
+See [`docs/build-and-release.md`](docs/build-and-release.md) for build internals,
+bundle hygiene, and the DLP guard.
 
 ## Project structure
 
@@ -218,13 +219,14 @@ scripts/        Core engine (console-free) + console & GUI drivers
 build/          Reproducible PyInstaller build (build.ps1, app.spec, prune, self-test)
 output/         Per-report output folders + consolidated/ + run_reports/
 *.bat           Numbered launchers for the console workflow
-CLAUDE.md       In-depth architecture & contributor reference
+CLAUDE.md       Router → conventions + an index into the docs/ library
+docs/           In-depth knowledge library (start at docs/INDEX.md)
 ```
 
 A single report registry (`scripts/reports.py`) drives both the GUI and the
 multi-report selector, so the two never drift. For the full design — the
 `Events`/`ReportSpec` seam, retry logic, fast mode, and packaging — see
-[`CLAUDE.md`](CLAUDE.md).
+[`CLAUDE.md`](CLAUDE.md) and the [`docs/`](docs/INDEX.md) knowledge library.
 
 ## Tech stack
 
