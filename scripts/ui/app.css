@@ -432,7 +432,12 @@ button, input, select { font-family: inherit; }
 /* custom checkbox / radio — the native input is visually hidden but stays
    FOCUSABLE and in the accessibility tree (Tab reaches it, Space toggles it,
    screen readers announce it). The styled box mirrors its state and shows a
-   focus ring when the input has keyboard focus. */
+   focus ring when the input has keyboard focus. The label MUST be a containing
+   block: the hidden input is position:absolute, so without a positioned parent
+   it resolves against the viewport (the initial containing block) — escaping
+   the panes' overflow:hidden clip and inflating the document's scroll height,
+   which let the whole page scroll into a blank area below the UI. */
+.option-row, .fast-toggle { position: relative; }
 .option-row input[type="checkbox"], .option-row input[type="radio"],
 .fast-toggle input[type="checkbox"] {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
