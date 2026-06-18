@@ -219,7 +219,7 @@
             <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
             <span class="fast-label">Consolidate each report when its export finishes</span>
           </label>
-          <p class="hint">Builds the combined workbook automatically after the export. Skipped for reports with no consolidator (Intersection Summary / Detail).</p>
+          <p class="hint">Builds the combined workbook automatically after the export. Skipped for reports with no consolidator (Intersection Summary / Detail and Highway Log (PDF)).</p>
         </div>
 
         <div class="card-section actions-row">
@@ -295,7 +295,7 @@
             <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
             <span class="fast-label">Consolidate each report when its export finishes</span>
           </label>
-          <p class="hint">Exports every ticked report type for every ticked environment, one after another, into its dated run folder. The job is saved to disk, so you can pause and pick up later — even after closing the app.</p>
+          <p class="hint">Exports every ticked report type for every ticked environment, one after another, into the destination folder below (one subfolder per environment, refreshed in place — not dated run folders). The job is saved to disk, so you can pause and pick up later — even after closing the app.</p>
         </div>
         <div class="card-section actions-row">
           <button class="btn btn-accent" id="btnStartBatch">
@@ -331,7 +331,12 @@
           </div>
         </div>
 
-        <div class="card-section">
+        <!-- Export day: only meaningful for reports consolidated from dated export
+             run folders. Hidden (app.js refreshConsDest) for the one dropped-input
+             report — TSN Highway Log (PDF), whose district PDFs come from outside
+             the app and ignore the day. (TSMIS Highway Log (PDF) reads the app's
+             OWN dated export, so it keeps the picker.) -->
+        <div class="card-section" id="consDaySection">
           <div class="section-head"><span class="section-label">Export day</span></div>
           <div class="day-row">
             <span class="tb-select select-light"><select id="selDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>

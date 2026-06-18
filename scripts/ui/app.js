@@ -974,7 +974,10 @@ function renderPreflight() {
     $("preflightTitle").textContent = "Ready to consolidate";
     const r = $("consList").querySelector(".option-row.checked .option-name");
     addRow("Report", r ? r.textContent : "—", { title: true });
-    addRow("From", $("selDay").value || "Newest run");
+    // Dropped-input reports (TSN / TSMIS Highway Log PDF) read from their input
+    // folder, not a dated export run, so the "From" is that folder, not a day.
+    if (S.consDropped) addRow("From", S.consInputDir || "input folder", { path: true, title: true });
+    else addRow("From", $("selDay").value || "Newest run");
     addRow("Saves to", $("consDest").textContent || "—", { path: true, title: true });
   } else if (tab === "compare") {
     $("preflightTitle").textContent = "Ready to compare";
@@ -1220,9 +1223,17 @@ async function refreshConsDest() {
   if (seq !== consDestSeq) return;          // a newer request superseded this one
   $("consDest").textContent = info.dest_dir;
   $("consDest").title = info.dest_dir;
-  // Reports with user-supplied inputs (TSN PDFs) say where the files go.
+  // The one dropped-input report (TSN Highway Log (PDF), whose district PDFs come
+  // from OUTSIDE the app) reads a fixed input folder, not a dated export run — so
+  // it advertises where the files go AND the "Export day" picker is meaningless for
+  // it (signalled by info.input_note). Every other report — including TSMIS Highway
+  // Log (PDF), which reads the app's own dated export — keeps the picker.
+  const dropped = !!info.input_note;
+  S.consDropped = dropped;
+  S.consInputDir = dropped ? info.input_dir : null;
+  $("consDaySection").classList.toggle("hidden", dropped);   // hide the day picker
   const row = $("consInputRow");
-  if (info.input_note) {
+  if (dropped) {
     $("consInputNote").textContent = info.input_note;
     $("consInputDir").textContent = info.input_dir;
     $("consInputDir").title = info.input_dir;
@@ -2353,6 +2364,17 @@ function makeMockApi() {
     { label: "Intersection Summary", fmt: "Excel" },
     { label: "Intersection Detail", fmt: "Excel" },
   ];
+  // The Consolidate radios index into THIS list (matches reports.CONSOLIDATE_REPORTS,
+  // 6 rows) — NOT the 7-row export REPORTS above. consolidate_info/start_consolidate
+  // must use this so the preview's labels/out_paths mirror the real bridge.
+  const CONS_REPORTS = [
+    { label: "TSAR: Ramp Summary" },
+    { label: "TSAR: Ramp Detail" },
+    { label: "Highway Sequence Listing" },
+    { label: "TSMIS Highway Log (Excel)" },
+    { label: "TSMIS Highway Log (PDF)" },
+    { label: "TSN Highway Log (PDF)" },
+  ];
   const st = {
     task: null, fast_run: false,
     authed: false, device_ok: false,
@@ -2399,7 +2421,7 @@ function makeMockApi() {
       values: { ...mockSettings }, defaults: { ...mockSettings },
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       meta: {
-        version: "0.10.0 (preview)", build: "portable app",
+        version: "0.14.2 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
@@ -2572,7 +2594,7 @@ function makeMockApi() {
 
   return {
     get_initial_state: async () => ({
-      app_name: "TSMIS Exporter", version: "0.11.0 (preview)",
+      app_name: "TSMIS Exporter", version: "0.14.2 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       reports: REPORTS,
@@ -2580,9 +2602,9 @@ function makeMockApi() {
         { label: "TSAR: Ramp Summary", fmt: "PDF" },
         { label: "TSAR: Ramp Detail", fmt: "Excel" },
         { label: "Highway Sequence Listing", fmt: "Excel" },
-        { label: "Highway Log", fmt: "Excel" },
+        { label: "TSMIS Highway Log (Excel)", fmt: "Excel" },
         { label: "TSMIS Highway Log (PDF)", fmt: "PDF" },
-        { label: "TSN Highway Log", fmt: "PDF" },
+        { label: "TSN Highway Log (PDF)", fmt: "PDF" },
       ],
       compare_groups: [
         { id: "env", label: "Cross-environment" },
@@ -2639,7 +2661,7 @@ function makeMockApi() {
         pct += 18;
         if (pct < 100) { push({ t: "log", text: `  Chromium 142.0.7444.52 (playwright build) — ${pct}% of 168 MiB` }); return; }
         clearInterval(t2);
-        mockChromium.downloaded = true; mockChromium.downloaded_mb = 471;
+        mockChromium.downloaded = true; mockChromium.downloaded_mb = 170;
         push({ t: "log", text: "Built-in Chromium downloaded. Restart the app to see it in the Browser dropdown (browsers are probed at startup)." },
              { t: "settings", s: mockSettingsPayload() },
              { t: "run_ended" },
@@ -2746,11 +2768,14 @@ function makeMockApi() {
     },
     reset_preview: async (includeInput) => ({
       targets: ["export run folder '2026-06-11 ssor-prod'", "export run folder '2026-06-11 ars-prod'",
-                "output folder 'consolidated'", "output folder 'run_reports'", "failure screenshots"]
+                "output folder 'consolidated'", "output folder 'tsmis_highway_log_pdf'",
+                "TSMIS Highway Log (PDF) consolidated workbook", "Export Everything store",
+                "output folder 'run_reports'", "failure screenshots"]
         .concat(includeInput ? ["TSN input PDFs"] : []),
       files: includeInput ? 1480 : 1398, mb: includeInput ? 612.4 : 540.1,
+      token: "mock-reset-token",        // real bridge issues a single-use confirm token
     }),
-    start_reset: async () => {
+    start_reset: async (_includeInput, _token) => {
       st.task = "reset"; st.auth_dot = "busy"; st.auth_text = "Deleting reports…";
       pushState();
       push({ t: "log", text: "Deleting all reports…" },
@@ -2826,13 +2851,16 @@ function makeMockApi() {
     discard_batch: async () => { st.batch_resume = null; pushState(); return { ok: true }; },
     report_library_info: async () => ({
       dest: st.batch_dest || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
+      // One row per EXPORT_REPORTS entry (7), in export order — matches the real
+      // report_library_info, which builds from ALL of EXPORT_REPORTS incl. the PDF.
       reports: [
-        { label: "TSAR: Ramp Summary", subdir: "ramp_summary", present: true, age_seconds: 2 * 3600 },
-        { label: "TSAR: Ramp Detail", subdir: "ramp_detail", present: true, age_seconds: 2 * 3600 },
-        { label: "Highway Sequence Listing", subdir: "highway_sequence", present: true, age_seconds: 3 * 3600 },
-        { label: "Highway Log", subdir: "highway_log", present: true, age_seconds: 6 * 86400 },
-        { label: "Intersection Summary", subdir: "intersection_summary", present: false, age_seconds: null },
-        { label: "Intersection Detail", subdir: "intersection_detail", present: false, age_seconds: null },
+        { label: "TSAR: Ramp Summary", subdir: "ramp_summary", present: true, mtime: 0, age_seconds: 2 * 3600 },
+        { label: "TSAR: Ramp Detail", subdir: "ramp_detail", present: true, mtime: 0, age_seconds: 2 * 3600 },
+        { label: "Highway Sequence Listing", subdir: "highway_sequence", present: true, mtime: 0, age_seconds: 3 * 3600 },
+        { label: "Highway Log", subdir: "highway_log", present: true, mtime: 0, age_seconds: 6 * 86400 },
+        { label: "Highway Log (PDF)", subdir: "highway_log_pdf", present: true, mtime: 0, age_seconds: 6 * 86400 },
+        { label: "Intersection Summary", subdir: "intersection_summary", present: false, mtime: null, age_seconds: null },
+        { label: "Intersection Detail", subdir: "intersection_detail", present: false, mtime: null, age_seconds: null },
       ],
     }),
     set_batch_dest: async (p) => {
@@ -2892,18 +2920,30 @@ function makeMockApi() {
         push({ t: "log", text: "Cancelled." });
       }, 600);
     },
-    consolidate_info: async (idx, day) => (idx === 4 ? {
-      dest_dir: "C:\\Tools\\TSMIS Exporter\\output",
-      out_path: "C:\\Tools\\TSMIS Exporter\\output\\tsn_highway_log_consolidated.xlsx",
-      exists: false,
-      input_note: "Drop the TSN district Highway Log PDFs into the input folder first.",
-      input_dir: "C:\\Tools\\TSMIS Exporter\\input\\tsn_highway_log",
-    } : {
-      dest_dir: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated`,
-      out_path: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated\\${REPORTS[idx].label.replace(/[:\s]+/g, "_")}.xlsx`,
-      exists: idx === 0 && day === "2026-06-10",
-    }),
-    open_consolidate_input: async () => push({ t: "log", text: "(mock) would open the TSN input folder" }),
+    consolidate_info: async (idx, day) => {
+      // Only index 5 (TSN Highway Log) reads from a dropped-in input folder (those
+      // district PDFs come from outside the app) — so it carries an input_note and
+      // the day picker is hidden. Index 4 (TSMIS Highway Log PDF) reads this app's
+      // own "Highway Log (PDF)" export, day-aware like the Excel one.
+      const dropped = {
+        5: { note: "Drop the TSN district Highway Log PDFs into the input folder first.",
+             dir: "C:\\Tools\\TSMIS Exporter\\input\\tsn_highway_log",
+             out: "tsn_highway_log_consolidated.xlsx" },
+      }[idx];
+      if (dropped) return {
+        dest_dir: "C:\\Tools\\TSMIS Exporter\\output",
+        out_path: "C:\\Tools\\TSMIS Exporter\\output\\" + dropped.out,
+        exists: false,
+        input_note: dropped.note,
+        input_dir: dropped.dir,
+      };
+      return {
+        dest_dir: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated`,
+        out_path: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated\\${CONS_REPORTS[idx].label.replace(/[:\s]+/g, "_")}.xlsx`,
+        exists: idx === 0 && day === "2026-06-10",
+      };
+    },
+    open_consolidate_input: async () => push({ t: "log", text: "(mock) would open the input folder" }),
     pick_compare_file: async (side) => ({
       path: side === "TSMIS"
         ? "C:\\Users\\you\\Downloads\\tsmis_highway_log_route 1.xlsx"
@@ -2970,10 +3010,10 @@ function makeMockApi() {
     decline_overwrite: async () => push({ t: "log", text: "Consolidation cancelled (kept existing file)." }),
     start_consolidate: async (idx, day) => {
       st.task = "consolidate";
-      st.auth_dot = "busy"; st.auth_text = `Consolidating ${REPORTS[idx].label}…`;
+      st.auth_dot = "busy"; st.auth_text = `Consolidating ${CONS_REPORTS[idx].label}…`;
       pushState();
-      push({ t: "log", text: `Starting consolidation: ${REPORTS[idx].label}` + (day ? `   ·   ${day}` : "") },
-           { t: "run_started", mode: "consolidate", label: `Consolidating ${REPORTS[idx].label}…` });
+      push({ t: "log", text: `Starting consolidation: ${CONS_REPORTS[idx].label}` + (day ? `   ·   ${day}` : "") },
+           { t: "run_started", mode: "consolidate", label: `Consolidating ${CONS_REPORTS[idx].label}…` });
       setTimeout(() => {
         push({ t: "log", text: `Consolidated 31 file(s) -> Output: consolidated\\workbook.xlsx` }, { t: "run_ended" });
         st.task = null;
@@ -3023,15 +3063,16 @@ function makeMockApi() {
     },
     open_release_page: async () => push({ t: "log", text: "(mock) would open the GitHub releases page" }),
     revert_to_previous: async () => {
-      st.update = { phase: "downloading", progress: 0, version: "0.12.0", url: "#", can_apply: true, revert: true };
+      // The real revert lands on a version STRICTLY LOWER than the current build.
+      st.update = { phase: "downloading", progress: 0, version: "0.14.1", url: "#", can_apply: true, revert: true };
       push({ t: "log", text: "Reverting to the previous version — finding it and downloading…" });
       pushState();
       const tr = setInterval(() => {
         st.update.progress = Math.min(100, (st.update.progress || 0) + 8);
         if (st.update.progress >= 100) {
           clearInterval(tr);
-          st.update = { phase: "staged", version: "0.12.0", url: "#", can_apply: true, revert: true };
-          push({ t: "log", text: "Previous version v0.12.0 is downloaded and ready — click ‘Restart to revert’ in the title bar." });
+          st.update = { phase: "staged", version: "0.14.1", url: "#", can_apply: true, revert: true };
+          push({ t: "log", text: "Previous version v0.14.1 is downloaded and ready — click ‘Restart to revert’ in the title bar." });
         }
         pushState();
       }, 130);

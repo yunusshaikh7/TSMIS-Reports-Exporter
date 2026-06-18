@@ -16,9 +16,9 @@ echo.
 echo     1.  TSAR: Ramp Summary       (PDFs -^> XLSX)
 echo     2.  TSAR: Ramp Detail        (XLSX -^> XLSX)
 echo     3.  Highway Sequence Listing (XLSX -^> XLSX)
-echo     4.  Highway Log              (XLSX -^> XLSX)
-echo     5.  TSN Highway Log          (district PDFs from input\tsn_highway_log -^> XLSX)
-echo     6.  TSMIS Highway Log (PDF)  (route PDFs from input\tsmis_highway_log_pdf -^> XLSX)
+echo     4.  TSMIS Highway Log (Excel) (Excel export from output\...\highway_log -^> XLSX)
+echo     5.  TSN Highway Log (PDF)     (district PDFs from input\tsn_highway_log -^> XLSX)
+echo     6.  TSMIS Highway Log (PDF)   (PDF export from output\...\highway_log_pdf -^> XLSX)
 echo.
 echo     Q.  Quit
 echo.

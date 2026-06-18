@@ -58,17 +58,19 @@ CONSOLIDATE_REPORTS = [
     ("TSAR: Ramp Summary", _c_ramp_summary),
     ("TSAR: Ramp Detail", _c_ramp_detail),
     ("Highway Sequence Listing", _c_highway_seq),
-    # The three Highway Log consolidators are grouped here, TSMIS before TSN:
-    # the Excel export, then the same report from the PDF (sidesteps the buggy
-    # vendor Excel), then the TSN reference. The two PDF ones take user-dropped
-    # snapshots (day picker ignored; INPUT_NOTE/INPUT_DIR point at the folder).
-    ("Highway Log", _c_highway_log),
-    # Input = the TSMIS "Highway Log (PDF)" exports dropped into
-    # input/tsmis_highway_log_pdf -- parsed into the SAME 31-column format as the
-    # Excel export, then combined.
+    # The three Highway Log consolidators are grouped here, TSMIS before TSN.
+    # Labels are SOURCE-explicit and parallel — "<system> Highway Log (<format>)"
+    # — so the bare "Highway Log" can't be mistaken for one of the others.
+    #   Input = the TSMIS "Highway Log" Excel export, output/<run>/highway_log/ (day-aware).
+    ("TSMIS Highway Log (Excel)", _c_highway_log),
+    #   Input = the TSMIS "Highway Log (PDF)" export, output/<run>/highway_log_pdf/
+    #   (day-aware, this app's own export -- NOT a dropped folder) -- parsed into
+    #   the SAME 31-column format as the Excel export, then combined (the accurate
+    #   substitute for the buggy vendor Excel).
     ("TSMIS Highway Log (PDF)", _c_tsmis_highway_log_pdf),
-    # Input = TSN district PDFs dropped into input/tsn_highway_log.
-    ("TSN Highway Log", _c_tsn_highway_log),
+    #   Input = TSN district PDFs the user drops into input/tsn_highway_log/ (these
+    #   come from OUTSIDE the app, so this one keeps an input folder + day ignored).
+    ("TSN Highway Log (PDF)", _c_tsn_highway_log),
 ]
 
 # Compare tab SUB-TABS (GUI): the comparison types are grouped onto these sub-tabs

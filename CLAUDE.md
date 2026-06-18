@@ -119,16 +119,25 @@ shipped". Console flows honor the same overrides automatically.
   `build/check_highway_log_columns.py`. (The TSN log additionally has an ADT
   Information group — Look Back / P / Look Ahead — that the 31-column TSMIS
   format drops.)
-- **TSMIS Highway Log (PDF)** (consolidate-only, v0.14.0):
-  `consolidate_tsmis_highway_log_pdf.py` parses the TSMIS **"Highway Log (PDF)"**
-  exports (report 4b, `highway_log_route_<ROUTE>.pdf`) the user drops into
-  `input/tsmis_highway_log_pdf/`, writing per-route workbooks to
-  `output/tsmis_highway_log_pdf/` and one combined
-  `output/tsmis_highway_log_pdf_consolidated.xlsx` — the **accurate substitute
-  for the buggy vendor Excel Highway Log export**. The output is the SAME 31-column
-  "Highway Log" format the Excel export and the TSN consolidator produce, so it
-  drops straight into the Highway Log comparisons. Like the TSN log these are
-  user-dropped snapshots (`day` ignored; `INPUT_NOTE`/`INPUT_DIR` exposed).
+- **TSMIS Highway Log (PDF)** (consolidate-only, v0.14.0; **reads the export
+  folder, day-aware, since v0.14.2**): `consolidate_tsmis_highway_log_pdf.py`
+  parses the TSMIS **"Highway Log (PDF)"** exports (report 4b,
+  `highway_log_route_<ROUTE>.pdf`). These are **this app's OWN export** — the
+  "Highway Log (PDF)" report saves them to `output/<run>/highway_log_pdf/` — so the
+  consolidator reads that EXPORT folder **day-aware, exactly like the Excel Highway
+  Log consolidator** (`SUBDIR="highway_log_pdf"`, `input_dir_for`/`out_path_for`
+  parallel; the "Export day" picker DOES apply, picking which run to combine). It
+  is NOT a dropped-in folder (v0.14.0 wrongly modeled it on the TSN log with an
+  `input/tsmis_highway_log_pdf/` drop folder + `INPUT_NOTE` + ignored `day` — that
+  was redundant since the app produces these PDFs itself; fixed v0.14.2, the input
+  folder + its `.gitkeep`/.gitignore entry removed, `INPUT_NOTE` dropped so the GUI
+  shows the day picker). Per-route conversions are scratch in
+  `output/tsmis_highway_log_pdf/`; the combined workbook lands in that run's
+  `consolidated/` folder — the **accurate substitute for the buggy vendor Excel
+  Highway Log export**, the SAME 31-column "Highway Log" format the Excel export and
+  the TSN consolidator produce, so it drops straight into the Highway Log
+  comparisons. (Only the **TSN** log keeps a dropped `input/tsn_highway_log/` folder
+  + `INPUT_NOTE` + ignored `day` — those district PDFs come from outside the app.)
   **Parsing is cell-rect based, NOT character windows** (unlike the TSN log): the
   print view is a real bordered HTML table, so every data row's 30 columns are
   present as cell RECTANGLES. The table is auto-laid-out (column x-boundaries
@@ -559,7 +568,7 @@ scripts/
   consolidate_ramp_summary.py # standalone (parses PDFs)
   consolidate_{ramp_detail,highway_sequence,highway_log}.py  # thin wrappers over the base
   consolidate_tsn_highway_log.py  # TSN district PDFs -> TSMIS-format XLSX + combined (input/ folder)
-  consolidate_tsmis_highway_log_pdf.py  # TSMIS Highway Log PDFs (cell-rect parse) -> TSMIS-format XLSX + combined (input/ folder)
+  consolidate_tsmis_highway_log_pdf.py  # TSMIS Highway Log PDFs (cell-rect parse) -> TSMIS-format XLSX + combined (reads output/<run>/highway_log_pdf/, day-aware)
   compare_core.py     # THE discrepancy-workbook engine (schema-parameterized; regression-locked — see Compare tab notes)
   compare_highway_log.py      # TSMIS-vs-TSN Highway Log: schema + loaders over compare_core ("files" kind)
   compare_highway_log_pdf.py  # PDF-sourced Highway Log compares: TSMIS(PDF) vs TSN, TSMIS(PDF) vs TSMIS(Excel) ("files" kind, group pdf)

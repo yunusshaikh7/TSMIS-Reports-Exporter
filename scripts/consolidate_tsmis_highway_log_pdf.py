@@ -10,12 +10,14 @@ Log format the Excel export and the TSN consolidator produce, so:
   * it can be diffed against the (buggy) vendor Excel export to pinpoint exactly
     which cells the Excel export is getting wrong.
 
-Mirrors the TSN Highway Log consolidator's contract: the inputs are NOT this
-app's dated exports but PDFs the user drops into  input/tsmis_highway_log_pdf/
-(highway_log_route_<ROUTE>.pdf), so the "Export day" picker doesn't apply (the
-`day` parameter is accepted for interface compatibility and ignored). Writes
-per-route workbooks to  output/tsmis_highway_log_pdf/  and one combined
-output/tsmis_highway_log_pdf_consolidated.xlsx. Each PDF is ONE route; a route
+The inputs ARE this app's own exports: the "Highway Log (PDF)" export (report 4b)
+saves the per-route PDFs (highway_log_route_<ROUTE>.pdf) to
+output/<run>/highway_log_pdf/, so this consolidator reads that export folder
+day-aware, exactly like the Excel Highway Log consolidator (the "Export day"
+picker picks which run to combine) — NOT a separate dropped-in folder. Converts
+each PDF to a per-route workbook (scratch, in output/tsmis_highway_log_pdf/) and
+writes one combined workbook to that run's consolidated/ folder. Each PDF is ONE
+route; a route
 crosses several counties, each introduced by a centered
 "<district> <county> <route>" group header (county is a section marker only —
 the 31-column layout has no County column, exactly like the TSN/Excel forms).
@@ -63,17 +65,23 @@ import highway_log_columns as hlc               # the corrected column labels
 from compare_core import is_formula_injection   # shared formula-injection guard
 from consolidate_xlsx_base import consolidate_xlsx
 from events import ConsolidateResult, Events
-from paths import INPUT_ROOT, OUTPUT_ROOT
+from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
+                   stamped_consolidated_filename)
 
-INPUT_DIR = INPUT_ROOT / "tsmis_highway_log_pdf"
-CONVERTED_DIR = OUTPUT_ROOT / "tsmis_highway_log_pdf"   # per-route workbooks
-OUT_PATH = OUTPUT_ROOT / "tsmis_highway_log_pdf_consolidated.xlsx"
+# These PDFs ARE produced by this app's "Highway Log (PDF)" export (report 4b),
+# which saves them to output/<run>/highway_log_pdf/. So this consolidator reads
+# that EXPORT folder, day-aware, exactly like the Excel Highway Log consolidator —
+# NOT a separate user-dropped input folder, which would be redundant (you'd have
+# to copy the app's own exports into it). The "Export day" picker therefore DOES
+# apply: it picks which export run to combine.
+SUBDIR = "highway_log_pdf"
+FILENAME = "tsmis_highway_log_pdf_consolidated.xlsx"
 
-# Shown in the GUI's Consolidate pane so users know where the PDFs go (this and
-# the TSN log are the report types whose input is NOT produced by this app's
-# Excel exports).
-INPUT_NOTE = ("Drop the TSMIS Highway Log PDFs (highway_log_route_*.pdf, the "
-              "'Highway Log (PDF)' export) into the input folder first.")
+# Legacy flat-layout location (pre-dated exports, or a manual drop on a machine
+# that can't run the export itself); used when no dated output/<run>/ folders exist.
+INPUT_DIR = OUTPUT_ROOT / SUBDIR
+CONVERTED_DIR = OUTPUT_ROOT / "tsmis_highway_log_pdf"   # scratch per-route workbooks
+OUT_PATH = OUTPUT_ROOT / FILENAME                       # legacy flat combined output
 
 # Friendly report name for user-facing messages (UI-neutral: no ".bat" /
 # "menu option" wording).
@@ -86,15 +94,19 @@ INPUT_GLOB = "*.pdf"
 INPUT_FMT = "PDF"
 
 
-def input_dir_for(day):                  # noqa: ARG001 (interface compatibility)
-    """TSMIS Highway Log PDFs live in one fixed folder; they're user-dropped
-    vendor-style snapshots, not dated exports."""
-    return INPUT_DIR
+def input_dir_for(day):
+    """The 'Highway Log (PDF)' export PDFs for `day` (a run-folder name); None =
+    the legacy flat layout."""
+    return (output_day_dir(day) / SUBDIR) if day else INPUT_DIR
 
 
-def out_path_for(day):                   # noqa: ARG001 (interface compatibility)
-    """Combined workbook destination (the 'Export day' picker doesn't apply)."""
-    return OUT_PATH
+def out_path_for(day):
+    """Combined workbook destination for `day` (a run-folder name); None = the
+    legacy location. The dated filename carries the run's date + source/environment
+    so a copy lifted out of its folder keeps its provenance."""
+    if not day:
+        return OUT_PATH
+    return output_day_dir(day) / "consolidated" / stamped_consolidated_filename(FILENAME, day)
 
 
 # Must match the TSMIS Highway Log export exactly (sheet name AND header), so the
@@ -409,15 +421,18 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
     """Convert every TSMIS Highway Log PDF to a TSMIS-format per-route workbook,
     then combine them into one workbook (Route column added).
 
-    `day` is accepted for interface compatibility and ignored — these PDFs are
-    user-dropped snapshots in one fixed input folder, not dated exports.
+    `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") of
+    "Highway Log (PDF)" exports to read; None means the newest run folder, falling
+    back to the legacy flat layout when no run folders exist yet — exactly like the
+    Excel Highway Log consolidator.
 
     Console-free: progress via events.on_log, overwrite confirmed through the
     confirm_overwrite(path)->bool callback, a ConsolidateResult returned. Honors
     events.is_cancelled() between pages.
     """
-    in_dir = INPUT_DIR
-    out = OUT_PATH
+    day = day or latest_output_day()
+    in_dir = input_dir_for(day)
+    out = out_path_for(day)
     events = events or Events()
     if not _DEPS_OK:
         return ConsolidateResult(
@@ -426,8 +441,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
         )
     confirm = confirm_overwrite or (lambda _p: True)
 
-    # Create the input folder on first use so the user has somewhere to drop the
-    # PDFs (the error below then names a real, openable folder).
+    # Ensure the folder exists so the error below names a real, openable path.
     try:
         in_dir.mkdir(parents=True, exist_ok=True)
     except OSError:
@@ -438,8 +452,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
         return ConsolidateResult(
             status="error",
             message=(f"No {REPORT_NAME} files were found in:\n{in_dir}\n\n"
-                     f"Put the Highway Log PDFs (e.g. highway_log_route_001.pdf, "
-                     f"the 'Highway Log (PDF)' export) there, then run again."),
+                     f"Export the 'Highway Log (PDF)' report first (it saves the "
+                     f"per-route PDFs there), then run this again."),
         )
 
     # Confirm overwrite *before* spending time parsing PDFs.

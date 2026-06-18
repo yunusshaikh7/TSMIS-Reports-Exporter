@@ -36,6 +36,10 @@ SHEET_NAME = "Highway Log"
 # console, so keep it UI-neutral -- no ".bat" / "menu option" wording).
 REPORT_NAME = "Highway Log"
 
+# Input format badge in the Consolidate list. Set explicitly (this reads the TSMIS
+# Excel export) so the chip is correct regardless of the GUI menu label.
+INPUT_FMT = "Excel"
+
 
 def input_dir_for(day):
     """Per-route exports for `day` (a run-folder name); None = the legacy flat layout."""
