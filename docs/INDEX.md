@@ -30,6 +30,7 @@ touching.
 | [history.md](history.md) | You want the narrative — how a one-day console script became a self-updating desktop app, the dead ends and reverts, the field failures that rewrote the design (through v0.14.2). |
 | [roadmap.md](roadmap.md) | You're picking future work — the deferred/dormant/blocked backlog (A3, C1, D1, F1, code-signing, live-export verification, the dormant Med Wid gap). |
 | [code-review-prompt.md](code-review-prompt.md) | You're running an audit — the reusable, project-tailored read-only review prompt. |
+| [agent-prompts.md](agent-prompts.md) | You're starting the **roadmap-curator** or the **fix-implementer** agent — copy-paste prompts for both single-agent workflows. |
 
 ## Internals (deep-dive, for future development)
 
