@@ -66,7 +66,10 @@ runs cross-environment comparisons of the other reports.
 | Roadmap / deferred / dormant backlog | [docs/roadmap.md](docs/roadmap.md) |
 | The reusable read-only code-review prompt | [docs/code-review-prompt.md](docs/code-review-prompt.md) |
 
-Full map with "read this when…" for each: **[docs/INDEX.md](docs/INDEX.md)**.
+Code-level deep-dives (algorithms, data/control flow, extension points) live under
+**`docs/internals/`** — `compare-core`, `highway-log-data-processing`, `gui-bridge`,
+`auth-state-machine`, `export-engine`, `updater-swap`. Full map with "read this when…"
+for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
 
 ---
 

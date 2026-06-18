@@ -4,7 +4,9 @@ What this doc covers: how the portable onefolder bundle is built (`build.ps1` �
 PyInstaller `app.spec` → `prune_bundle.ps1`), the three release variants and
 their browser channels, the full one-click self-updater (`updater.py`: swap
 mode, two-phase install, MOTW-free download, SHA-256 verify, revert), and the
-CI/release workflows. This doc OWNS the updater detail and the build pipeline.
+CI/release workflows. This doc OWNS the updater detail and the build pipeline. For
+the **code-level updater walkthrough** (the download→stage→two-phase-swap pipeline,
+rollback, revert), see [internals/updater-swap.md](internals/updater-swap.md).
 
 Related: work-PC constraints that force the updater's design → [it-and-security.md](it-and-security.md);
 the golden `check_*.py` set and verification loops → [verification-and-testing.md](verification-and-testing.md);

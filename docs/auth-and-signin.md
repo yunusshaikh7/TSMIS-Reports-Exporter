@@ -6,6 +6,8 @@ Code owners: `scripts/common.py` (the auth/nav helpers), `scripts/login.py` (con
 
 Related docs: [build-and-release.md](build-and-release.md) (browser channels — which browser gets used and why), [lessons.md](lessons.md) (the managed-Edge field-failure narrative in full), [it-and-security.md](it-and-security.md) (work-PC constraints, support-bundle secrecy), [gui.md](gui.md) (GUI threading/queue model that `LoginWorker` posts into).
 
+> **Code-level walkthrough:** [internals/auth-state-machine.md](internals/auth-state-machine.md) — `navigate_with_auth` as an explicit state machine, the recapture chain, device-mode browser handles, and the concurrency rules.
+
 ---
 
 ## 1. The session model (why this is hard)

@@ -5,6 +5,8 @@ TSMIS Highway Log format. There are **two distinct parsers** with two distinct
 parsing strategies; this doc covers both and the validation that proved each
 flawless.
 
+> **Code-level walkthrough:** [../internals/highway-log-data-processing.md](../internals/highway-log-data-processing.md) — the char→line→column geometry, the per-page vs fixed windows, the 30→31 mapping, the consolidator streaming core, and the ditto/roadbed algorithms.
+
 The corrected 31-column header itself is owned by [columns.md](./columns.md)
 (`highway_log_columns.py` — `HEADER`, `VENDOR_HEADER`, `recognize()`, tooltips,
 Legend sheet). The vendor Excel bug these parsers exist to expose, and the

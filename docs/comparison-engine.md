@@ -5,7 +5,10 @@ comparison type — its internals, the regression lock that guards it, the two o
 the verdict / incompleteness contract, the key-field / roadbed / duplicate-pairing logic, the
 write-path safety guards, and the three comparison families that delegate to it.
 
-This doc OWNS `compare_core` internals and the regression-lock harness. Sibling docs:
+This doc OWNS `compare_core` internals and the regression-lock harness. For the
+**code-level walkthrough** (the alignment/pairing algorithms, the exact formula
+construction, and the two-flavor mirror), see
+[internals/compare-core.md](internals/compare-core.md). Sibling docs:
 [reports.md](reports.md) (the `COMPARE_REPORTS` registry, sub-tab wiring),
 [verification-and-testing.md](verification-and-testing.md) (the golden checks + verification
 loops referenced here), [highway_log/columns.md](highway_log/columns.md) (the corrected

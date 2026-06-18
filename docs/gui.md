@@ -4,6 +4,8 @@ What this doc covers: the desktop GUI's UI stack, the Python⇄JS bridge and thr
 
 For the engine the GUI drives, see [engine-and-reliability.md](engine-and-reliability.md); for sign-in flows surfaced in the GUI, [auth-and-signin.md](auth-and-signin.md); for the updater swap-mode/MOTW/SHA-256 pipeline (full treatment), [build-and-release.md](build-and-release.md) and [it-and-security.md](it-and-security.md); for golden checks + verification loops, [verification-and-testing.md](verification-and-testing.md); cross-cutting field-failure narratives live in [lessons.md](lessons.md).
 
+> **Code-level walkthrough:** [internals/gui-bridge.md](internals/gui-bridge.md) — the full Python⇄JS message lifecycle (kind→handler→event→renderer), the single-task gate, every worker's `run()`, and the env-scan concurrency.
+
 ## UI stack
 
 The packaged product is a **pywebview window using the Edge WebView2 backend**, rendering `scripts/ui/` (`index.html` + `app.css` + `app.js`) — **plain HTML/CSS/JS, no framework and no build step**. Static files ship in the bundle; end-user setup stays global-pip. This replaced the original Tkinter window (v0.8.0): Tk could neither match the approved design (Windows-11 look, dark titlebar, two-column layout) nor stop cutting off on small screens. A web layout is responsive (stacks + scrolls below ~980px wide; theme = System/Light/Dark header toggle persisted in `localStorage`, resolved to an effective `html[data-theme]` before first paint).

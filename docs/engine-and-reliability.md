@@ -4,6 +4,8 @@ What this doc covers: the export engine's runtime behavior — the per-route loo
 
 The engine is **console-free**: it reports progress through an `Events` sink and raises exceptions (`AuthError`, `PreflightError`, `ReportError`, …), so the same core backs both the `.bat` console flow and the GUI. See [architecture.md](architecture.md) for the `ReportSpec` / single-loop design and [auth-and-signin.md](auth-and-signin.md) for sign-in and `_recover()` re-auth.
 
+> **Code-level walkthrough:** [internals/export-engine.md](internals/export-engine.md) — the per-route loop step by step, `_recover`/`_retry_failed_routes`, the save-strategy mechanics, and the parallel engine.
+
 Two engines share one per-route loop:
 
 | File | Entry | Role |

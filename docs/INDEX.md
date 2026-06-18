@@ -31,6 +31,21 @@ touching.
 | [roadmap.md](roadmap.md) | You're picking future work — the deferred/dormant/blocked backlog (A3, C1, D1, F1, code-signing, live-export verification, the dormant Med Wid gap). |
 | [code-review-prompt.md](code-review-prompt.md) | You're running an audit — the reusable, project-tailored read-only review prompt. |
 
+## Internals (deep-dive, for future development)
+
+Code-level walkthroughs under `docs/internals/` — the exhaustive "how it actually works"
+companions to the topic docs above (algorithms, data/control flow, edge cases, extension
+points), every claim anchored to `file:symbol`.
+
+| Internals doc | Deepens | Covers |
+|---|---|---|
+| [internals/compare-core.md](internals/compare-core.md) | comparison-engine | `run_compare` end to end: the duplicate-pairing + per-route alignment algorithms, the streaming sheet build, the exact formula construction, the two-flavor mirror, the write-path guards. |
+| [internals/highway-log-data-processing.md](internals/highway-log-data-processing.md) | highway_log/pdf-and-tsn-parsing + columns | The pdfplumber char→line→column geometry (fixed vs per-page windows), the 30→31 mapping, the description guards, the ramp-summary parse, the consolidator streaming core, the ditto/roadbed algorithms. |
+| [internals/gui-bridge.md](internals/gui-bridge.md) | gui | The full Python⇄JS message lifecycle (kind→handler→event→renderer table), the single-task gate, every worker's `run()`, the env-scan concurrency, the JS boot/dispatch. |
+| [internals/auth-state-machine.md](internals/auth-state-machine.md) | auth-and-signin | `navigate_with_auth` as an explicit state machine, the layered sign-in order, the three-step Edge recapture, portability probe, device-mode handles, the concurrency rules. |
+| [internals/export-engine.md](internals/export-engine.md) | engine-and-reliability | The per-route loop step by step, the save strategies' mechanics, `_recover`/`_retry_failed_routes`, `wait_with_skip_option`, the parallel engine + crash reconciliation, where each error class is raised. |
+| [internals/updater-swap.md](internals/updater-swap.md) | build-and-release | The download→stage→two-phase-swap pipeline, the PID wait + rename rollback, the staged allowlist, `update_support` tiers, revert resolution, cache clearing. |
+
 ## Find it fast (topic → doc)
 
 - **Sign-in / OAuth / device SSO / managed Edge** → auth-and-signin.md (+ lessons.md for the field story)
