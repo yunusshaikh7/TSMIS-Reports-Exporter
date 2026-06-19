@@ -1748,25 +1748,45 @@ function mxColRefreshBtn(title, locked, onClick) {
 }
 
 // The vs-TSN file picker shown under a row's name when it's in a TSN mode.
+// A status-dot chip surfaces the ACTIVE file the engine uses (mono basename,
+// truncated, full path on hover) over a compact action row. Every api.* call +
+// confirm flow is unchanged; the buttons keep the .mx-linkbtn hook so the
+// live-lock sweep still disables them.
 function mxTsnPicker(tm, locked) {
   const wrap = document.createElement("div"); wrap.className = "mx-tsnpick";
-  const state = document.createElement("div"); state.className = "mxtp-state";
-  if (tm.source_kind === "file" || tm.source_kind === "consolidated")
-    state.textContent = "TSN: " + (tm.source_path || "").split(/[\\/]/).pop();
-  else if (tm.source_kind === "pdfs") state.textContent = `${tm.pdf_count} TSN PDFs (not consolidated)`;
-  else state.textContent = "no TSN file";
+
+  const hasFile = tm.source_kind === "file" || tm.source_kind === "consolidated";
+  const needsCons = tm.source_kind === "pdfs";
+
+  // Line 1: status dot + truncated monospace filename (full path = tooltip).
+  const fileLine = document.createElement("div");
+  fileLine.className = "mxtp-file " + (hasFile ? "has-file" : needsCons ? "needs-cons" : "is-empty");
+  const dot = document.createElement("span"); dot.className = "mxtp-dot";
+  const name = document.createElement("span"); name.className = "mxtp-name";
+  if (hasFile) {
+    const full = tm.source_path || "";
+    name.textContent = full.split(/[\\/]/).pop() || "(file)";
+    name.title = "TSN file in use:\n" + (full || name.textContent);
+  } else if (needsCons) {
+    name.textContent = tm.pdf_count + " TSN PDF" + (tm.pdf_count === 1 ? "" : "s");
+    name.title = tm.pdf_count + " TSN PDF(s) in:\n" + (tm.input_dir || "")
+      + "\nNot consolidated yet — Consolidate to build one TSN workbook.";
+  } else {
+    name.textContent = "No TSN file";
+    name.title = "Choose a TSN workbook, or drop district PDFs into the TSN input folder and consolidate.";
+  }
+  fileLine.append(dot, name);
+  wrap.appendChild(fileLine);
+
+  // Line 2: compact actions — Consolidate (accent, pdfs only) / Choose / Clear.
   const row = document.createElement("div"); row.className = "mxtp-row";
-  const choose = document.createElement("button");
-  choose.className = "mx-linkbtn"; choose.textContent = "Choose…"; choose.disabled = locked;
-  choose.onclick = async () => {
-    const r = await api.pick_matrix_tsn_file(tm.tsn_subdir);
-    if (r && r.error) showMessage("error", "Can't pick", r.error);
-    if (r && (r.ok || r.path)) await renderMatrix();
-  };
-  row.appendChild(choose);
-  if (tm.source_kind === "pdfs") {
+
+  if (needsCons) {
     const cons = document.createElement("button");
-    cons.className = "mx-linkbtn"; cons.textContent = "Consolidate"; cons.disabled = locked;
+    cons.type = "button"; cons.className = "mx-linkbtn is-primary"; cons.disabled = locked;
+    cons.title = "Build one TSN workbook from the dropped PDFs";
+    cons.append(icon("i-grid"), Object.assign(document.createElement("span"),
+      { textContent: "Consolidate" }));
     cons.onclick = async () => {
       const ok = await showConfirm({ title: "Consolidate TSN PDFs?",
         message: `Build one TSN workbook from the ${tm.pdf_count} PDF(s) in:\n\n${tm.input_dir}`,
@@ -1777,13 +1797,29 @@ function mxTsnPicker(tm, locked) {
     };
     row.appendChild(cons);
   }
+
+  const choose = document.createElement("button");
+  choose.type = "button"; choose.className = "mx-linkbtn"; choose.disabled = locked;
+  choose.title = "Pick a TSN workbook (.xlsx)";
+  choose.append(icon("i-folder-open"), Object.assign(document.createElement("span"),
+    { textContent: hasFile ? "Replace…" : "Choose…" }));
+  choose.onclick = async () => {
+    const r = await api.pick_matrix_tsn_file(tm.tsn_subdir);
+    if (r && r.error) showMessage("error", "Can't pick", r.error);
+    if (r && (r.ok || r.path)) await renderMatrix();
+  };
+  row.appendChild(choose);
+
   if (tm.file) {
     const clr = document.createElement("button");
-    clr.className = "mx-linkbtn"; clr.textContent = "Clear"; clr.disabled = locked;
+    clr.type = "button"; clr.className = "mx-linkbtn mxtp-clear"; clr.disabled = locked;
+    clr.title = "Clear the picked TSN file"; clr.setAttribute("aria-label", "Clear the picked TSN file");
+    clr.appendChild(icon("i-x"));
     clr.onclick = async () => { await api.set_matrix_tsn_file(tm.tsn_subdir, ""); await renderMatrix(); };
     row.appendChild(clr);
   }
-  wrap.append(state, row);
+
+  wrap.appendChild(row);
   return wrap;
 }
 
@@ -1879,11 +1915,15 @@ async function renderMatrix() {
         else if (r && r.error) showMessage("error", "Can't refresh", r.error);
       }));
     rh.appendChild(top);
-    // per-row comparison-mode dropdown (only when the row has >1 mode)
+    // per-row comparison-mode dropdown (only when the row has >1 mode) — a
+    // compact, content-sized select inside a wrapper that draws the chevron.
     const modes = (snap.row_modes && snap.row_modes[rk]) || [];
     if (modes.length > 1) {
+      const fs = document.createElement("div"); fs.className = "mx-fluent-select";
       const ms = document.createElement("select");
       ms.className = "mx-rowmode"; ms.disabled = locked;
+      ms.title = "Comparison type for " + (snap.row_labels[rk] || rk);
+      ms.setAttribute("aria-label", ms.title);
       modes.forEach((m) => {
         const o = document.createElement("option");
         o.value = m.id; o.textContent = m.label + (m.supported ? "" : " (soon)");
@@ -1896,7 +1936,8 @@ async function renderMatrix() {
         if (r && r.error) showMessage("error", "Can't switch", r.error);
         await renderMatrix();
       };
-      rh.appendChild(ms);
+      fs.append(ms, icon("i-chevron-down", "mx-fs-chev"));
+      rh.appendChild(fs);
     }
     const tm = snap.tsn_meta && snap.tsn_meta[rk];
     if (tm && tm.supported) rh.appendChild(mxTsnPicker(tm, locked));

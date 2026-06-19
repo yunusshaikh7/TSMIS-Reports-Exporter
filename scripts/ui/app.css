@@ -42,6 +42,20 @@
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: Consolas, "Cascadia Mono", ui-monospace, monospace;
+
+  /* Motion scale — one vocabulary so every animation reads the same.
+     Theme-independent (durations/easings don't change with light/dark). */
+  --motion-instant: 80ms;   /* tactile :active depress */
+  --motion-fast: 120ms;     /* hover / colour / border feedback */
+  --motion: 180ms;          /* small state changes, entrances, list inserts */
+  --motion-slow: 240ms;     /* larger entrances, pane rise, column resize */
+  --motion-theme: 500ms;    /* deliberate light<->dark cross-fade */
+  --ease-out: cubic-bezier(.2, .7, .2, 1);   /* decelerate-into-place */
+  --ease-pop: cubic-bezier(.2, .8, .2, 1);   /* punchier pop for flyouts */
+
+  /* Shared geometry so compact controls share one rhythm. */
+  --control-h-sm: 26px;
+  --control-h-md: 30px;
 }
 
 /* Dark palette. The EFFECTIVE theme is always resolved to light/dark in
@@ -271,12 +285,17 @@ button, input, select { font-family: inherit; }
 .tb-select select:focus-visible { box-shadow: 0 0 0 2px var(--ring); }
 .tb-select select:disabled { opacity: 0.4; cursor: default; }
 
-/* select-light: same control on light card surfaces (consolidate day picker) */
+/* select-light: same control on light card surfaces (consolidate day picker +
+   the matrix baseline picker). A real light-surface field in BOTH themes —
+   never the washed-out title-bar skin — with a proper hover + focus ring. */
 .select-light select {
   background: var(--card); color: var(--foreground);
-  border-color: var(--input-border);
+  border-color: var(--input-border); font-weight: 500;
+  transition: border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
 }
 .select-light > .ic { color: var(--muted-foreground); }
+.select-light select:hover:not(:disabled) { border-color: var(--primary); }
+.select-light select:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }
 
 .checks { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .check-item {
@@ -295,25 +314,35 @@ button, input, select { font-family: inherit; }
    theme icon toggle — the declutter: verbose chips/strips collapse behind these. */
 .status-chip {
   display: inline-flex; align-items: center; gap: 7px;
-  height: 30px; padding: 0 10px; border-radius: var(--radius-md);
+  height: var(--control-h-md); padding: 0 10px; border-radius: var(--radius-md);
   border: 1px solid var(--titlebar-border); background: oklch(1 0 0 / 4%);
   color: var(--titlebar-foreground); font-size: 12.5px; font-weight: 500;
-  white-space: nowrap; cursor: pointer; transition: background-color 0.1s;
+  white-space: nowrap; cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
 }
-.status-chip:hover { background: oklch(1 0 0 / 10%); }
+.status-chip:hover { background: oklch(1 0 0 / 12%); border-color: var(--titlebar-muted); }
 .status-chip:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 .status-chip .chev { width: 13px; height: 13px; color: var(--titlebar-muted); }
 
 .btn-icon {
-  width: 30px; height: 30px; padding: 0; display: inline-grid; place-items: center;
+  width: var(--control-h-md); height: var(--control-h-md); padding: 0;
+  display: inline-grid; place-items: center;
   border-radius: var(--radius-md); cursor: pointer;
   border: 1px solid var(--titlebar-border); background: oklch(1 0 0 / 4%);
-  color: var(--titlebar-foreground); transition: background-color 0.1s;
+  color: var(--titlebar-foreground);
+  transition: background-color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out),
+              transform var(--motion-instant) var(--ease-out);
 }
-.btn-icon:hover:not(:disabled) { background: oklch(1 0 0 / 10%); }
+.btn-icon:hover:not(:disabled) { background: oklch(1 0 0 / 12%); border-color: var(--titlebar-muted); }
+.btn-icon:active:not(:disabled) { background: oklch(1 0 0 / 16%); }
 .btn-icon:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-icon .ic { width: 16px; height: 16px; }
+.btn-icon .ic { width: 16px; height: 16px; transition: transform var(--motion-slow) var(--ease-out); }
+.btn-icon:hover:not(:disabled) .ic { transform: scale(1.08); }
 
 .popover-host { position: relative; display: inline-flex; }
 .popover {
@@ -349,15 +378,25 @@ button, input, select { font-family: inherit; }
 .btn-accent:hover:not(:disabled) { background: var(--primary-hover); }
 .btn-accent:active:not(:disabled) { background: var(--primary-active); }
 
-.btn-standard { border-color: var(--border); background: var(--card); box-shadow: 0 1px 2px oklch(0 0 0 / 0.06); }
-.btn-standard:hover:not(:disabled) { background: var(--accent); }
+.btn-standard { border-color: var(--input-border); background: var(--card); box-shadow: 0 1px 2px oklch(0 0 0 / 0.06); }
+.btn-standard:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 55%, var(--card)); border-color: var(--border);
+}
 .btn-standard:active:not(:disabled) { background: var(--secondary); }
 
-.btn-subtle:hover:not(:disabled) { background: var(--accent); }
+/* Secondary buttons read as real buttons (a resting border + soft tinted hover)
+   instead of bold floating text — matching the matrix .mx-linkbtn. */
+.btn-subtle { border-color: var(--input-border); background: var(--card); color: var(--foreground); font-weight: 500; }
+.btn-subtle:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 55%, var(--card)); border-color: var(--border);
+}
 .btn-subtle:active:not(:disabled) { background: var(--secondary); }
 
-.btn-titlebar { color: var(--titlebar-foreground); height: 30px; padding: 0 12px; font-size: 12.5px; }
-.btn-titlebar:hover:not(:disabled) { background: oklch(1 0 0 / 10%); }
+.btn-titlebar {
+  color: var(--titlebar-foreground); height: var(--control-h-md); padding: 0 12px; font-size: 12.5px;
+  border: 1px solid var(--titlebar-border); background: oklch(1 0 0 / 4%);
+}
+.btn-titlebar:hover:not(:disabled) { background: oklch(1 0 0 / 12%); border-color: var(--titlebar-muted); }
 .btn-titlebar:focus-visible { box-shadow: 0 0 0 2px var(--ring); }
 
 /* one-click update pill (title bar; hidden until an update exists) */
@@ -370,7 +409,14 @@ button, input, select { font-family: inherit; }
 .btn-update:hover:not(:disabled) { background: color-mix(in oklab, var(--success) 26%, transparent); }
 .btn-update:disabled { opacity: 0.75; }
 
-.btn-small { height: 26px; padding: 0 10px; font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
+.btn-small {
+  height: var(--control-h-sm); padding: 0 10px; font-size: 12px; font-weight: 500;
+  border-color: var(--input-border); background: var(--card); color: var(--muted-foreground);
+}
+.btn-small:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 55%, var(--card));
+  border-color: var(--border); color: var(--foreground);
+}
 
 /* ------------------------------ main panes ------------------------------- */
 /* Title block stacked ABOVE the tab bar, always — so the header never reflows
@@ -502,20 +548,31 @@ button, input, select { font-family: inherit; }
   border: 1px solid var(--primary);
   display: grid; place-items: center; flex-shrink: 0;
   color: var(--primary-foreground); background: transparent;
-  transition: background-color 0.1s;
+  transition: background-color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
 }
-.checkbox .ic { width: 12px; height: 12px; stroke-width: 3; visibility: hidden; }
+.checkbox .ic {
+  width: 12px; height: 12px; stroke-width: 3; visibility: hidden;
+  transform: scale(.6); transition: transform var(--motion-fast) var(--ease-pop);
+}
+/* hover cue on the box itself while unchecked (the row already tints) */
+.option-row:hover input:not(:checked) ~ .checkbox,
+.fast-toggle:hover input:not(:checked) ~ .checkbox {
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+}
 .checked > .checkbox, input:checked ~ .checkbox { background: var(--primary); }
-.checked > .checkbox .ic, input:checked ~ .checkbox .ic { visibility: visible; }
+.checked > .checkbox .ic, input:checked ~ .checkbox .ic { visibility: visible; transform: scale(1); }
 .radio {
   width: 16px; height: 16px; border-radius: 50%;
   border: 2px solid color-mix(in oklab, var(--muted-foreground) 50%, transparent);
   display: grid; place-items: center; flex-shrink: 0;
+  transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
 .radio::after {
   content: ""; width: 8px; height: 8px; border-radius: 50%;
   background: var(--primary); transform: scale(0);
-  transition: transform 0.1s;
+  transition: transform var(--motion-fast) var(--ease-pop);
 }
 .checked > .radio, input:checked ~ .radio { border-color: var(--primary); }
 .checked > .radio::after, input:checked ~ .radio::after { transform: scale(1); }
@@ -553,15 +610,17 @@ button, input, select { font-family: inherit; }
    (.dest-row itself is defined once, below, near the consolidate pane.) */
 .dest-path {
   flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px;
-  color: var(--foreground); background: var(--muted);
-  border: 1px solid var(--input-border); border-radius: var(--radius-md);
+  color: var(--foreground); background: var(--secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: 7px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .lib-list { display: flex; flex-direction: column; }
 .lib-row {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 2px; border-top: 1px solid var(--border); font-size: 13px;
+  padding: 8px; border-top: 1px solid var(--border); font-size: 13px;
+  border-radius: var(--radius-md); transition: background-color var(--motion-fast) var(--ease-out);
 }
+.lib-row:hover { background: color-mix(in oklab, var(--accent) 40%, transparent); }
 .lib-row:first-child { border-top: none; }
 .lib-name { flex: 1; min-width: 0; }
 .lib-age { font-size: 12px; color: var(--muted-foreground); white-space: nowrap; }
@@ -653,33 +712,151 @@ button, input, select { font-family: inherit; }
 /* Row header: report label + per-row comparison-mode dropdown + (vs-TSN) file
    picker + a per-row refresh; left-aligned, stacked. */
 .mx-rowhead {
-  align-items: stretch; justify-content: flex-start; gap: 5px;
+  align-items: stretch; justify-content: flex-start; gap: 6px;
   text-align: left; padding: 8px 10px;
 }
 .mxrh-top { display: flex; align-items: center; gap: 6px; }
-.mxrh-label { flex: 1; min-width: 0; font-weight: 600; color: var(--foreground); }
+.mxrh-label {
+  flex: 1; min-width: 0; font-weight: 600; color: var(--foreground);
+  font-size: 12.5px; line-height: 1.25; overflow-wrap: anywhere;
+}
+
+/* Refresh: one polished ghost icon-button for BOTH the row + column headers.
+   (The row button used to be unstyled and the column one a bare transparent
+   square — now both read as deliberate Fluent ghost buttons that tint to the
+   accent on hover, with a focus ring + a subtle refresh-spin affordance.) */
+.mxch-refresh {
+  flex: none; width: 24px; height: 24px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  background: transparent; color: var(--muted-foreground); cursor: pointer;
+  transition: background-color .12s ease, color .12s ease,
+              border-color .12s ease, box-shadow .12s ease;
+}
+.mxch-refresh .ic { width: 14px; height: 14px; transition: transform .25s ease; }
+.mxch-refresh:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  border-color: color-mix(in oklab, var(--primary) 28%, transparent);
+  color: var(--primary);
+}
+.mxch-refresh:hover:not(:disabled) .ic { transform: rotate(180deg); }
+.mxch-refresh:active:not(:disabled) { background: color-mix(in oklab, var(--primary) 20%, transparent); }
+.mxch-refresh:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+.mxch-refresh:disabled { opacity: .4; cursor: default; }
+/* mx-cell is flex-direction:column, so the per-column refresh stacks centered
+   below its env label. */
+.mx-colhead .mxch-refresh { margin-top: 2px; }
+
+/* Row-mode dropdown: a compact, content-sized Fluent select (was a clunky
+   full-width raw <select>). The wrapper carries the custom chevron; the
+   <select> keeps the .mx-rowmode hook so the live-lock sweep still disables it. */
+.mx-fluent-select {
+  position: relative; display: inline-flex; align-items: center;
+  align-self: flex-start; max-width: 100%; min-width: 0;
+}
 .mx-rowmode {
-  width: 100%; font-size: 11px; padding: 2px 4px; border-radius: var(--radius-sm);
-  border: 1px solid var(--input-border); background: var(--card); color: var(--foreground);
+  appearance: none; -webkit-appearance: none;
+  height: 26px; max-width: 100%; width: max-content; min-width: 0;
+  padding: 0 26px 0 9px;
+  font-family: var(--font-sans); font-size: 11.5px; font-weight: 500; line-height: 1;
+  border: 1px solid var(--input-border); border-radius: var(--radius-md);
+  background: var(--card); color: var(--foreground);
+  cursor: pointer; outline: none; overflow: hidden; text-overflow: ellipsis;
+  transition: border-color .12s ease, box-shadow .12s ease;
 }
-.mx-tsnpick { display: flex; flex-direction: column; gap: 2px; font-size: 10.5px;
-  color: var(--muted-foreground); }
-.mx-tsnpick .mxtp-state { overflow-wrap: anywhere; }
-.mx-tsnpick .mxtp-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.mx-rowmode:hover:not(:disabled) { border-color: var(--primary); }
+.mx-rowmode:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 2px var(--ring); }
+.mx-rowmode:disabled { opacity: .5; cursor: default; }
+.mx-rowmode option { background: var(--card); color: var(--foreground); }
+.mx-rowmode option:disabled { color: var(--muted-foreground); }
+.mx-fluent-select > .mx-fs-chev {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 13px; height: 13px; pointer-events: none; color: var(--muted-foreground);
+}
+
+/* vs-TSN file picker: a status-dot chip that SURFACES THE ACTIVE FILE (mono
+   basename, truncated, full path on hover) over a compact action-button row. */
+.mx-tsnpick { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.mxtp-file {
+  display: flex; align-items: center; gap: 7px; min-width: 0;
+  height: 24px; padding: 0 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--secondary);
+}
+.mxtp-dot {
+  flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted-foreground);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--muted-foreground) 20%, transparent);
+}
+.mxtp-file.has-file .mxtp-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--success) 22%, transparent);
+}
+/* needs-consolidate: keep the chip surface neutral (consistent with the other
+   states) and let the amber DOT carry the "needs attention" signal — no loud
+   alert-coloured field competing with the action button. */
+.mxtp-file.needs-cons .mxtp-dot {
+  background: var(--warning);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--warning) 24%, transparent);
+}
+.mxtp-name {
+  flex: 1; min-width: 0;
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--foreground);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mxtp-file.is-empty .mxtp-name,
+.mxtp-file.needs-cons .mxtp-name { font-family: var(--font-sans); }
+.mxtp-file.is-empty .mxtp-name { font-style: italic; color: var(--muted-foreground); }
+
+/* Action row: real compact buttons (replaces the cheap underlined links).
+   Each keeps the .mx-linkbtn class so the live-lock sweep still disables it. */
+.mxtp-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .mx-linkbtn {
-  border: none; background: transparent; padding: 0; cursor: pointer;
-  color: var(--primary); font-size: 10.5px; text-decoration: underline;
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 9px;
+  border: 1px solid var(--input-border); border-radius: var(--radius-md);
+  background: var(--card); color: var(--foreground);
+  font-family: var(--font-sans); font-size: 11px; font-weight: 500; line-height: 1;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
 }
-.mx-linkbtn:disabled { color: var(--muted-foreground); cursor: default; text-decoration: none; }
-/* Column header: env label + per-column refresh icon. */
-.mx-colhead .mxch-refresh {
-  border: none; background: transparent; cursor: pointer; padding: 2px;
-  border-radius: var(--radius-sm); color: var(--muted-foreground);
-  display: inline-flex; transition: background-color .12s ease, color .12s ease;
+.mx-linkbtn .ic { width: 13px; height: 13px; }
+.mx-linkbtn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 55%, var(--card)); border-color: var(--border);
 }
-.mx-colhead .mxch-refresh .ic { width: 13px; height: 13px; }
-.mx-colhead .mxch-refresh:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
-.mxrh-refresh { /* per-row refresh icon button, in mxrh-top */ }
+.mx-linkbtn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+.mx-linkbtn:disabled { opacity: .5; cursor: default; text-decoration: none; }
+/* Consolidate = the suggested next step in the pdfs state. A soft primary TINT
+   (not a heavy filled CTA) so it reads as "do this" without shouting next to
+   the neutral Choose button. */
+.mx-linkbtn.is-primary {
+  border-color: color-mix(in oklab, var(--primary) 38%, transparent);
+  background: color-mix(in oklab, var(--primary) 12%, var(--card));
+  color: var(--primary);
+}
+.mx-linkbtn.is-primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--primary) 20%, var(--card));
+  border-color: color-mix(in oklab, var(--primary) 50%, transparent);
+}
+/* Clear = a tiny right-aligned ghost icon. */
+.mx-linkbtn.mxtp-clear {
+  margin-left: auto; width: 24px; height: 24px; padding: 0; justify-content: center;
+  border-color: transparent; background: transparent; color: var(--muted-foreground);
+}
+.mx-linkbtn.mxtp-clear:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--destructive) 14%, transparent);
+  color: var(--destructive); border-color: transparent;
+}
+
+/* Baseline picker in the matrix header: centre it against the "Baseline" label
+   (a 30px control was floating against the 12px meta text). */
+#matrixSection .section-head { align-items: center; }
+#matrixSection .section-meta { display: inline-flex; align-items: center; gap: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mxch-refresh .ic, .mx-rowmode, .mx-linkbtn { transition: none; }
+  .mxch-refresh:hover:not(:disabled) .ic { transform: none; }
+}
 
 /* Config zone (bottom-right, under the activity log) — only on the matrix tab. */
 .matrix-config { display: none; }
@@ -712,7 +889,8 @@ body.matrix-wide .matrix-config {
 }
 
 .day-row { display: flex; align-items: center; gap: 10px; }
-.day-row select { min-width: 150px; height: 34px; font-size: 13px; }
+/* width floor only — height/font come from .select-light so all card selects match */
+.day-row select { min-width: 150px; }
 
 .dest-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .dest-text { min-width: 0; }
@@ -728,7 +906,11 @@ body.matrix-wide .matrix-config {
   padding: 6px 0;
 }
 .file-pick-label { width: 78px; flex-shrink: 0; font-size: 13px; font-weight: 500; }
-.file-pick-path { flex: 1; min-width: 0; }
+.file-pick-path {
+  flex: 1; min-width: 0;
+  background: var(--secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 6px 10px;
+}
 .file-pick-path.unset { color: var(--muted-foreground); font-family: var(--font-sans); }
 .path { font-size: 12px; color: color-mix(in oklab, var(--foreground) 80%, transparent);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -878,7 +1060,10 @@ body.matrix-wide .matrix-config {
 .log-line.ok { color: var(--success); }
 .log-line.err { color: var(--destructive); }
 .log-actions { display: flex; gap: 4px; align-items: center; }
-#btnLogFailures.active { color: var(--destructive); background: color-mix(in oklab, var(--destructive) 10%, transparent); }
+#btnLogFailures.active {
+  color: var(--destructive); background: color-mix(in oklab, var(--destructive) 12%, transparent);
+  border-color: color-mix(in oklab, var(--destructive) 30%, transparent);
+}
 .log-body.filter-failures .log-line:not(.err) { display: none; }
 .log-placeholder { color: color-mix(in oklab, var(--muted-foreground) 60%, transparent); }
 
@@ -1022,10 +1207,12 @@ body.matrix-wide .matrix-config {
   font-family: var(--font-mono); font-size: 12px;
   border: 1px solid transparent; cursor: pointer; user-select: none;
   color: var(--muted-foreground);
+  transition: background-color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
 }
-.route-cell:hover { background: var(--accent); color: var(--foreground); }
+.route-cell:hover { background: color-mix(in oklab, var(--accent) 55%, var(--card)); color: var(--foreground); }
 .route-cell.on {
-  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  background: color-mix(in oklab, var(--primary) 12%, var(--card));
   border-color: color-mix(in oklab, var(--primary) 35%, transparent);
   color: var(--primary); font-weight: 600;
 }
@@ -1054,24 +1241,42 @@ body.matrix-wide .matrix-config {
 @keyframes fade-in   { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pop-in    { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes modal-in  { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes rise-in   { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes line-in   { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 
 /* Tab panes rise+fade in on switch; the Everything sub-panes just cross-fade
    (so they don't double-animate with the parent pane). */
-.pane:not(.hidden) { animation: pane-in 0.22s cubic-bezier(.2, .7, .2, 1) both; }
-#everyExport:not(.hidden), #everyMatrix:not(.hidden) { animation: fade-in 0.18s ease both; }
+.pane:not(.hidden) { animation: pane-in var(--motion-slow) var(--ease-out) both; }
+#everyExport:not(.hidden), #everyMatrix:not(.hidden) { animation: fade-in var(--motion) var(--ease-out) both; }
+/* Compare's per-group radio rows fade+rise as the chosen group is revealed. */
+#compareList .option-row:not(.hidden) { animation: rise-in var(--motion) var(--ease-out) both; }
+
+/* Activity column: whichever lifecycle card is shown rises+fades into the slot. */
+.preflight-card:not(.hidden), .progress-card:not(.hidden), .completion-card:not(.hidden) {
+  animation: pane-in var(--motion) var(--ease-out) both;
+}
+
+/* List entrances — these surfaces are rebuilt element-by-element on each render,
+   so each new row/line/pill animates in. transform/opacity only (compositor-cheap). */
+.log-line   { animation: line-in var(--motion-fast) var(--ease-out) both; }
+.pstep      { animation: rise-in var(--motion) var(--ease-out) both; }
+.worker-row { animation: rise-in var(--motion) var(--ease-out) both; }
+.lib-row    { animation: line-in var(--motion-fast) var(--ease-out) both; }
 
 /* Flyouts + dialogs. */
-.popover:not(.hidden) { animation: pop-in 0.15s cubic-bezier(.2, .8, .2, 1) both; transform-origin: top right; }
-.modal-overlay:not(.hidden) { animation: fade-in 0.16s ease both; }
-.modal-overlay:not(.hidden) .modal { animation: modal-in 0.20s cubic-bezier(.2, .8, .2, 1) both; }
+.popover:not(.hidden) { animation: pop-in var(--motion) var(--ease-pop) both; transform-origin: top right; }
+.modal-overlay:not(.hidden) { animation: fade-in var(--motion-fast) var(--ease-out) both; }
+.modal-overlay:not(.hidden) .modal { animation: modal-in var(--motion-slow) var(--ease-pop) both; }
 
-/* Tactile press across the app's interactive controls. */
+/* Tactile press + unified control transitions (one motion vocabulary). */
 .btn, .btn-icon {
-  transition: background-color .14s ease, border-color .14s ease, color .14s ease,
-              box-shadow .14s ease, transform .08s ease;
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out),
+              color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out),
+              transform var(--motion-instant) var(--ease-out);
 }
 .tab, .subtab {
-  transition: color .14s ease, background-color .14s ease, box-shadow .14s ease, transform .08s ease;
+  transition: color var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out), transform var(--motion-instant) var(--ease-out);
 }
 .btn:active:not(:disabled), .btn-icon:active:not(:disabled),
 .tab:active, .subtab:active { transform: translateY(0.5px) scale(0.99); }
@@ -1080,8 +1285,9 @@ body.matrix-wide .matrix-config {
    for the duration of a theme change so colours ease instead of snapping —
    scoped to that window so ordinary hovers stay snappy. */
 html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
-  transition: background-color .5s ease, color .5s ease, border-color .5s ease,
-              fill .5s ease, stroke .5s ease, box-shadow .5s ease !important;
+  transition: background-color var(--motion-theme) ease, color var(--motion-theme) ease,
+              border-color var(--motion-theme) ease, fill var(--motion-theme) ease,
+              stroke var(--motion-theme) ease, box-shadow var(--motion-theme) ease !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1089,4 +1295,11 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
     animation-duration: .001ms !important; animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
   }
+  /* the theme cross-fade transition is !important, so it must be re-overridden
+     here or a theme toggle would still ease under reduced motion. */
+  html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+    transition-duration: .001ms !important;
+  }
+  /* transform-on-hover end-states the duration clamp alone can't neutralize. */
+  .btn-icon:hover:not(:disabled) .ic { transform: none; }
 }
