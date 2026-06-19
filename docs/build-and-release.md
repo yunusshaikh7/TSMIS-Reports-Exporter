@@ -30,9 +30,12 @@ field-failure narratives behind these design choices → [lessons.md](lessons.md
   `%LOCALAPPDATA%\TSMIS Exporter` if the folder is read-only (`scripts/paths.py`).
   This fallback is what makes an install "read-only" for update purposes (see
   *Read-only installs* below).
-- Built/tested on **Python 3.11**. Unsigned exe — **code-signing is the only
-  complete fix** for IT/Defender/DLP false-positives and is not yet done; the
-  trust metadata below is the partial mitigation.
+- Built/tested on **Python 3.11**. Published exe is not trust-signed yet —
+  **code-signing is the only complete fix** for IT/Defender/DLP false-positives.
+  A SignPath Foundation cert is applied for; `build.ps1 -Sign` self-signs for
+  local/test use and `release.yml` has a gated SignPath step ready
+  ([it-and-security.md §7](it-and-security.md)). The trust metadata below is the
+  partial mitigation until then.
 
 ---
 
@@ -51,6 +54,7 @@ Produces the windowed `dist\TSMIS Exporter\` (~148 MB; double-click
 |---|---|
 | `-SelfTest` | Builds a **headless console** self-test exe AND runs it over the pruned bundle — the real release gate (see step 3b). |
 | `-BundleChromium` | Additionally ships Playwright's own Chromium inside `_internal\ms-playwright` (the with-browser variant). |
+| `-Sign` | **Self-signs** the built `.exe` (SHA-256 + timestamp) with a self-signed cert (auto-created in `Cert:\CurrentUser\My`; override `-CertSubject`). Interim/local only — other PCs won't trust it; real signing is SignPath in CI. See [it-and-security.md §7](it-and-security.md). |
 
 Steps:
 
@@ -402,6 +406,11 @@ git push origin refs/tags/v0.14.2
 3. **Build + zip three variants** — `build.ps1` then `Compress-Archive` for
    `win64`; `build.ps1 -BundleChromium` then `Compress-Archive` for
    `win64-with-browser`; `git archive` for `batch-source`.
+3b. **Code signing (SignPath, gated, inert by default)** — upload the app zip and
+   submit it to SignPath, overwriting it with the signed artifact *before*
+   checksums so they cover the signed file. Runs only when the repo variable
+   `SIGNPATH_ENABLED=true` and `SIGNPATH_API_TOKEN`/`SIGNPATH_ORG_ID` + policy are
+   set (post-approval); otherwise skipped. See [it-and-security.md §7](it-and-security.md).
 4. **Publish SHA-256 checksums** — one `<asset>.sha256` per zip (sha256sum
    format `"<hash>  <name>"`, ASCII = no BOM, since a BOM would corrupt the
    hash). These are what the updater verifies against.
@@ -416,6 +425,13 @@ git push origin refs/tags/v0.14.2
 
 Uses `actions/checkout@v5` + `actions/setup-python@v6` (the older v4/v5 warned on
 the June 16, 2026 GitHub-runner Node-24 switch).
+
+---
+
+## Website (`gh-pages`)
+
+The marketing/landing page is a separate concern on the `gh-pages` branch, with its
+own regeneration tooling (`tools/screenshots.py`). Full detail: [website.md](website.md).
 
 ---
 

@@ -60,6 +60,7 @@ runs cross-environment comparisons of the other reports.
 | The `+`/`++` ditto domain convention + evidence | [docs/highway_log/comparison-study.md](docs/highway_log/comparison-study.md) |
 | Build, `app.spec`, DLP prune, browser channels, the **updater**, CI | [docs/build-and-release.md](docs/build-and-release.md) |
 | IT/DLP/security, the **work-PC capability model**, audit findings, code-signing | [docs/it-and-security.md](docs/it-and-security.md) |
+| The **`gh-pages` landing page** — layout, live download button, theme toggle, screenshot/OG regen, SEO | [docs/website.md](docs/website.md) |
 | How to verify (no test framework): golden `check_*.py`, COM-recalc, `#mock`, test-data locations | [docs/verification-and-testing.md](docs/verification-and-testing.md) |
 | The durable lessons (field failures, one-core, regression discipline, audit method) | [docs/lessons.md](docs/lessons.md) |
 | The narrative history | [docs/history.md](docs/history.md) |
@@ -133,11 +134,14 @@ scripts/                     the engine (console-free) + console & GUI drivers +
 build/                       build.ps1, app.spec, prune_bundle.ps1, full_smoke.py, check_*.py
   gen_release_notes.py release_notes_header.md backfill_release_notes.ps1   per-version release notes
 CHANGELOG.md                 user-facing changelog (one section per version; source of release bodies)
+tools/                       dev utilities (not shipped) — screenshots.py regenerates the site/README shots
 docs/                        the knowledge library (start at docs/INDEX.md)
 output/ input/               generated/user data (git-ignored except .gitkeep stubs)
 ```
 
-Detail on any of these is in the matching `docs/` file (see the table above).
+The **landing page** is on a separate **`gh-pages`** branch (GitHub Pages), not in
+`main` — see [docs/website.md](docs/website.md). Detail on anything above is in the
+matching `docs/` file (see the table above).
 
 ---
 
