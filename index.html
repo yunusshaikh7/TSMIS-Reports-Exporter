@@ -19,14 +19,14 @@
     :root {
       --bg: #f6f8fc; --ink: #0f172a; --muted: #5b6577; --line: #e6eaf2;
       --brand: #0969da; --brand-2: #0a7ea4; --card: #fff;
-      --shadow: 0 10px 40px rgba(16,24,40,.12);
+      --shadow: 0 30px 70px rgba(16,24,40,.18);
       color-scheme: light dark;
     }
     @media (prefers-color-scheme: dark) {
       :root {
         --bg: #0b0f17; --ink: #e9eef7; --muted: #9aa6b8; --line: #1d2636;
         --brand: #4f9dff; --brand-2: #38bec9; --card: #111826;
-        --shadow: 0 14px 50px rgba(0,0,0,.5);
+        --shadow: 0 30px 80px rgba(0,0,0,.6);
       }
     }
     * { box-sizing: border-box; }
@@ -36,19 +36,32 @@
       font-family: "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
       color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased;
       background:
-        radial-gradient(900px 460px at 80% -10%, rgba(9,105,218,.18), transparent 60%),
-        radial-gradient(680px 360px at 5% 10%, rgba(10,126,164,.16), transparent 55%),
+        radial-gradient(1100px 520px at 78% 12%, rgba(9,105,218,.20), transparent 60%),
+        radial-gradient(760px 420px at 4% 8%, rgba(10,126,164,.16), transparent 55%),
         var(--bg);
     }
     a { color: inherit; text-decoration: none; }
+
+    /* Top nav */
+    .nav {
+      flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+      width: min(1380px, 94vw); margin: 0 auto; padding: 1.1rem .25rem;
+    }
+    .brand { display: flex; align-items: center; gap: .6rem; font-weight: 800; font-size: 1.02rem; }
+    .brand .logo {
+      width: 30px; height: 30px; border-radius: 8px; color: #fff; font-size: .8rem; font-weight: 800;
+      display: grid; place-items: center; background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    }
+    .nav-links { display: flex; gap: 1.5rem; font-size: .9rem; font-weight: 600; color: var(--muted); }
+    .nav-links a:hover { color: var(--brand); }
 
     /* Hero — two columns, centered, fills the screen */
     .hero {
       flex: 1; min-height: 0;
       display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      align-items: center; gap: clamp(1.5rem, 3.5vw, 3.5rem);
-      width: min(1380px, 96vw); margin: 0 auto;
-      padding: clamp(1rem, 3vh, 2.5rem) clamp(1.25rem, 3vw, 2rem);
+      align-items: center; gap: clamp(1.5rem, 3.5vw, 4rem);
+      width: min(1380px, 94vw); margin: 0 auto;
+      padding: clamp(.5rem, 2vh, 1.5rem) .25rem;
     }
     .copy { text-align: left; }
     .pill {
@@ -59,30 +72,41 @@
     }
     .dot { width: .5rem; height: .5rem; border-radius: 50%; background: #22c55e; }
     h1 {
-      font-size: clamp(2rem, 4vw, 3.1rem); font-weight: 800;
-      letter-spacing: -.02em; line-height: 1.08; margin: 0 0 .8rem;
+      font-size: clamp(2rem, 4.2vw, 3.4rem); font-weight: 800;
+      letter-spacing: -.02em; line-height: 1.07; margin: 0 0 .85rem;
     }
     .grad { background: linear-gradient(90deg, var(--brand), var(--brand-2));
       -webkit-background-clip: text; background-clip: text; color: transparent; }
-    p.tag { font-size: clamp(1rem, 1.5vw, 1.18rem); color: var(--muted); margin: 0 0 1.9rem; max-width: 34ch; }
+    p.tag { font-size: clamp(1rem, 1.5vw, 1.2rem); color: var(--muted); margin: 0 0 2rem; max-width: 34ch; }
     .download {
       display: inline-flex; align-items: center; gap: .6rem;
       background: var(--brand); color: #fff; font-weight: 700; font-size: 1.1rem;
-      padding: .95rem 1.9rem; border-radius: 12px; box-shadow: var(--shadow);
+      padding: .95rem 1.9rem; border-radius: 12px; box-shadow: 0 12px 30px rgba(9,105,218,.35);
       transition: transform .08s ease, background .2s ease;
     }
     .download:hover { background: #0a5cc0; }
     .download:active { transform: translateY(1px); }
-    .sub { margin-top: .85rem; font-size: .85rem; color: var(--muted); }
+    .sub { margin-top: .9rem; font-size: .85rem; color: var(--muted); }
     .sub a { font-weight: 600; color: var(--brand); border-bottom: 1px solid transparent; }
     .sub a:hover { border-color: currentColor; }
 
-    .shot {
-      width: 100%; max-height: 80vh;
-      border: 1px solid var(--line); border-radius: 14px;
+    /* Screenshot framed as an app window */
+    .window {
+      width: 100%; border: 1px solid var(--line); border-radius: 14px;
       box-shadow: var(--shadow); overflow: hidden; background: var(--card);
     }
-    .shot img { display: block; width: 100%; height: auto; }
+    .window-bar {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .65rem .85rem; border-bottom: 1px solid var(--line);
+      background: linear-gradient(var(--card), var(--card)) padding-box,
+                  rgba(127,127,127,.04);
+    }
+    .window-bar i { width: .72rem; height: .72rem; border-radius: 50%; display: inline-block; }
+    .window-bar i:nth-child(1) { background: #ff5f57; }
+    .window-bar i:nth-child(2) { background: #febc2e; }
+    .window-bar i:nth-child(3) { background: #28c840; }
+    .window-bar span { margin-left: .5rem; font-size: .78rem; color: var(--muted); font-weight: 500; }
+    .window img { display: block; width: 100%; height: auto; }
 
     footer {
       flex: 0 0 auto; text-align: center; padding: .85rem 1.25rem;
@@ -93,14 +117,24 @@
     /* Narrow screens: stack and allow normal scrolling */
     @media (max-width: 860px) {
       body { height: auto; min-height: 100vh; overflow: auto; }
-      .hero { grid-template-columns: 1fr; text-align: center; gap: 2rem; padding-top: 2.5rem; }
+      .nav-links { gap: 1rem; }
+      .hero { grid-template-columns: 1fr; text-align: center; gap: 2rem; padding-top: 1.5rem; padding-bottom: 2.5rem; }
       .copy { text-align: center; }
       p.tag { margin-inline: auto; }
-      .shot { max-height: none; }
     }
+    @media (max-width: 520px) { .nav-links { display: none; } }
   </style>
 </head>
 <body>
+  <header class="nav">
+    <div class="brand"><span class="logo">TS</span> TSMIS Exporter</div>
+    <nav class="nav-links">
+      <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases">Releases</a>
+      <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter">GitHub</a>
+    </nav>
+  </header>
+
   <main class="hero">
     <div class="copy">
       <span class="pill"><span class="dot"></span> Free &amp; open source · Windows</span>
@@ -110,10 +144,11 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download for Windows
       </a>
-      <p class="sub"><a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases">All downloads &amp; release notes</a> · <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter">GitHub</a></p>
+      <p class="sub"><a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases">All downloads &amp; release notes</a></p>
     </div>
 
-    <div class="shot">
+    <div class="window">
+      <div class="window-bar"><i></i><i></i><i></i><span>TSMIS Exporter</span></div>
       <picture>
         <source srcset="screenshot-dark.png" media="(prefers-color-scheme: dark)">
         <img src="screenshot-light.png" alt="TSMIS Reports Exporter app screenshot">
@@ -136,9 +171,7 @@
       })
         .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
         .then(function (rel) {
-          var assets = rel.assets || [];
-          // Standard portable app: ends with -win64.zip (excludes -with-browser).
-          var a = assets.find(function (x) { return /-win64\.zip$/.test(x.name); });
+          var a = (rel.assets || []).find(function (x) { return /-win64\.zip$/.test(x.name); });
           if (a) document.getElementById("dl").href = a.browser_download_url;
         })
         .catch(function () { /* keep the releases-page fallback */ });
