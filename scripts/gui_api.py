@@ -1475,15 +1475,16 @@ class GuiApi:
         return f"{verb} all comparisons"
 
     def _make_job(self, kind, scope, label, row=None, env=None, subdir=None,
-                  fast=False, which="env"):
+                  fast=False, which="env", force=False):
         # `which` ("env" = Everything matrix, "day" = Compare by-day matrix) lets
         # ONE queue serve both matrices; for day jobs `env` carries the date.
+        # `force` rebuilds the persistent consolidated even when it looks fresh.
         with self._lock:
             self._job_seq += 1
             jid = self._job_seq
         return {"id": jid, "kind": kind, "scope": scope, "label": label,
                 "row": row, "env": env, "subdir": subdir, "fast": bool(fast),
-                "which": which, "status": "queued"}
+                "which": which, "force": bool(force), "status": "queued"}
 
     def _enqueue_matrix_job(self, job):
         """Append a Job and try to start it (or leave it queued behind the
@@ -1597,7 +1598,8 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
         MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event,
-                            tsn_files=settings.get_matrix_tsn_files()).start()
+                            tsn_files=settings.get_matrix_tsn_files(),
+                            force_consolidate=job.get("force", False)).start()
         return True
 
     def _dispatch_day_compare_job(self, job):
@@ -1614,7 +1616,8 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
         DayMatrixCompareWorker(source, cells, dest, self._q, self.cancel_event,
-                               tsn_files=settings.get_matrix_tsn_files()).start()
+                               tsn_files=settings.get_matrix_tsn_files(),
+                               force_consolidate=job.get("force", False)).start()
         return True
 
     def _matrix_worker_count(self):
@@ -1748,11 +1751,13 @@ class GuiApi:
         return self._enqueue_matrix_job(job)
 
     @_api_method
-    def recompute_matrix(self, scope="stale", row=None, env=None):
+    def recompute_matrix(self, scope="stale", row=None, env=None, force=False):
         """Queue a comparison rebuild in scope ('stale'/'all') for the current
         baseline — drives refresh-stale, the baseline-switch recompute, and (with
-        `row`/`env`) the per-row and per-column rebuild buttons. Returns
-        {nothing:True} only when the queue is idle AND there's nothing to do, so
+        `row`/`env`) the per-row and per-column rebuild buttons. `force` also
+        rebuilds the persistent consolidated workbook ('refresh consolidated').
+        Returns {nothing:True} only when the queue is idle AND there's nothing to
+        do (and not forced), so
         the UI can say so without queuing a no-op (targets are re-resolved when a
         job actually runs)."""
         base = self._current_baseline()
@@ -1762,14 +1767,14 @@ class GuiApi:
         job_scope = "row" if row else "column" if env else scope
         with self._lock:
             idle = not self._task and not self._queue
-        if idle:
+        if idle and not force:
             cells = matrix.cells_to_rebuild(self._matrix_snapshot(base), scope=scope,
                                             row=row, env=env)
             if not cells:
                 return {"ok": True, "nothing": True}
         job = self._make_job("compare", job_scope,
                              self._job_label("compare", job_scope, row=row, env=env),
-                             row=row, env=env)
+                             row=row, env=env, force=force)
         return self._enqueue_matrix_job(job)
 
     @_api_method
@@ -2066,10 +2071,11 @@ class GuiApi:
         return self._enqueue_matrix_job(job)
 
     @_api_method
-    def rebuild_day_matrix(self, scope="stale", row=None, date=None):
+    def rebuild_day_matrix(self, scope="stale", row=None, date=None, force=False):
         """Queue a by-day comparison rebuild in scope ('stale'/'all'), optionally
-        scoped to one report row or one day column. {nothing:True} only when idle
-        and there's nothing to do."""
+        scoped to one report row or one day column. `force` also rebuilds the day's
+        persistent consolidated workbook ('refresh consolidated'). {nothing:True}
+        only when idle, not forced, and there's nothing to do."""
         snap = self._day_matrix_snapshot()
         scope = scope if scope in ("stale", "all") else "stale"
         row = row if (row and row in {r["key"] for r in snap["all_rows"]}) else None
@@ -2077,13 +2083,13 @@ class GuiApi:
         job_scope = "row" if row else "column" if date else scope
         with self._lock:
             idle = not self._task and not self._queue
-        if idle:
+        if idle and not force:
             cells = day_matrix.cells_to_rebuild(snap, scope=scope, row=row, date=date)
             if not cells:
                 return {"ok": True, "nothing": True}
         job = self._make_job("compare", job_scope,
                              self._day_job_label(job_scope, row, date),
-                             row=row, env=date, which="day")
+                             row=row, env=date, which="day", force=force)
         return self._enqueue_matrix_job(job)
 
     @_api_method

@@ -2308,11 +2308,13 @@ async function renderDayMatrix() {
   corner.className = "mx-cell mx-corner mx-colhead";
   corner.textContent = "Report \\ Day";
   grid.appendChild(corner);
+  const dayCons = snap.day_consolidated || {};
   days.forEach((d) => {
     const h = document.createElement("div");
     h.className = "mx-cell mx-colhead";
     const lab = document.createElement("div"); lab.textContent = d;
     h.appendChild(lab);
+    h.appendChild(dmConsolidatedBadge(d, dayCons[d] || { exists: false, fresh: false }));
     const btns = document.createElement("span"); btns.className = "mxch-btns";
     btns.append(
       mxHeadBtn("i-compare", `Rebuild every report for ${d}`, "mxch-rebuild", async () => {
@@ -2378,6 +2380,30 @@ async function renderDayMatrix() {
 
   wireDayMatrixFooter();
   updateDayMatrixProgress();
+}
+
+// A small per-day "consolidated workbook" indicator + refresh-consolidated action.
+// Reuse means a comparison doesn't re-consolidate the day's export every time; the
+// badge shows whether a fresh consolidated exists, and clicking it force-rebuilds
+// it (e.g. after the consolidation mechanism changes).
+function dmConsolidatedBadge(date, state) {
+  const cls = !state.exists ? "dm-cons-none" : state.fresh ? "dm-cons-fresh" : "dm-cons-stale";
+  const b = document.createElement("button");
+  b.className = "dm-cons " + cls;
+  b.appendChild(icon("i-layers"));
+  b.title = !state.exists
+    ? `No consolidated workbook for ${date} yet — built on first compare. Click to (re)consolidate now.`
+    : state.fresh
+      ? `Consolidated workbook ready for ${date} (reused by comparisons). Click to re-consolidate.`
+      : `Consolidated for ${date} is stale — a newer export exists. Click to re-consolidate.`;
+  b.setAttribute("aria-label", b.title);
+  b.onclick = async () => {
+    const r = await api.rebuild_day_matrix("all", null, date, true);   // force re-consolidate
+    if (r && r.nothing) showMessage("info", "Nothing to consolidate",
+      "Add a TSN file and an export for this day first.");
+    else if (r && r.error) showMessage("error", "Can't re-consolidate", r.error);
+  };
+  return b;
 }
 
 function wireDayMatrixFooter() {
@@ -3429,6 +3455,8 @@ function makeMockApi() {
              days, rows: shown.map((r) => r.key), row_labels: rowLabels,
              row_supported: rowSupported, all_rows: allRows, hidden,
              tsn_meta: tsnMeta, cells,
+             day_consolidated: Object.fromEntries(days.map((d, i) =>
+               [d, { exists: i % 3 !== 0, fresh: i % 2 === 0 }])),
              available_days: MOCK_DAY_AVAIL[source] || [] };
   }
   // v0.16.0 mock job queue — mirrors gui_api: enqueue, run one at a time, auto-

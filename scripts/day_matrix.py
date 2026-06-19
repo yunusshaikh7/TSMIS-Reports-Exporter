@@ -203,6 +203,24 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
             per[date] = {"export": export, "cmp": cmp}
         cells[row_key] = per
 
+    # Per-day "consolidated" indicator: does a reusable consolidated workbook exist
+    # for the day's Highway Log export(s), and is it still fresh? Summarised across
+    # the supported subdirs that actually have an export that day, so the day-column
+    # header can show a badge + offer a 'refresh consolidated'.
+    day_consolidated = {}
+    for date in days:
+        subs = {}
+        for _k, _label, subdir, fmt, supported in all_rows:
+            if not supported:
+                continue
+            tdir = tsmis_dir(date, source, subdir)
+            if _folder_newest_mtime(tdir) is None:
+                continue                         # no export -> nothing to consolidate
+            subs[subdir] = matrix.consolidated_state(tdir, subdir)
+        exists = any(s["exists"] for s in subs.values())
+        fresh = exists and all(s["fresh"] for s in subs.values() if s["exists"])
+        day_consolidated[date] = {"exists": exists, "fresh": fresh}
+
     return {
         "source": source,
         "sources": [{"key": k, "label": matrix.default_env_label(k)} for k in sources()],
@@ -214,6 +232,7 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
         "hidden": sorted(hidden),
         "tsn_meta": tsn_meta,
         "cells": cells,
+        "day_consolidated": day_consolidated,
     }
 
 
@@ -241,10 +260,11 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
 
 
 def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
-                   confirm_overwrite=None):
+                   confirm_overwrite=None, force_consolidate=False):
     """Build ONE (day, report) vs-TSN comparison: resolve the shared TSN dataset,
-    consolidate that day's per-route export, compare vs TSN, write the VALUES
-    workbook to the by-day store, and cache its counts. Pure delegation to
+    consolidate that day's per-route export (reusing the day folder's persistent
+    consolidated unless stale or `force_consolidate`), compare vs TSN, write the
+    VALUES workbook to the by-day store, and cache its counts. Pure delegation to
     matrix.consolidate_and_compare_tsn (the SHARED path). Returns the
     ConsolidateResult. Raises ValueError on an unknown/greyed row or no TSN."""
     rows = _row_lookup()
@@ -266,7 +286,7 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     out_path = day_out_path(date, source, row_key)
     result = matrix.consolidate_and_compare_tsn(
         tsmis_dir(date, source, subdir), src_tsn["path"], out_path, fmt, events,
-        confirm_overwrite=confirm_overwrite)
+        confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate)
     if result.status == "ok" and out_path.exists():
         diff_cells, one_sided = matrix.read_counts(out_path, has_route=True)
         try:

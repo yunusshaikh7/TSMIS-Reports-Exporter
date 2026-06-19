@@ -630,53 +630,116 @@ def consolidate_tsn_pdfs(dest, subdir, events=None, confirm_overwrite=None):
     return out_path
 
 
+# --- persistent (reusable) consolidated workbooks ------------------------- #
+# v0.16.x: instead of consolidating a per-route store folder to a throwaway temp
+# on EVERY comparison, persist the consolidated workbook into the run/store
+# folder's `consolidated/` dir — the SAME filename + location the Consolidate tab
+# uses — and REUSE it until the per-route files change. So: re-exporting a report
+# makes its consolidated stale (a source file is newer) → the next comparison
+# re-consolidates; only changing the comparison mechanism (not the data) reuses
+# the existing consolidated. A force flag rebuilds it on demand.
+def _consolidated_filename(subdir):
+    if subdir == "highway_log":
+        import consolidate_highway_log as _m          # lazy
+        return _m.FILENAME
+    if subdir == "highway_log_pdf":
+        import consolidate_tsmis_highway_log_pdf as _m
+        return _m.FILENAME
+    raise ValueError(f"no consolidated filename for {subdir}")
+
+
+def consolidated_store_path(store_dir, subdir):
+    """The PERSISTENT consolidated workbook for a per-route store folder: a sibling
+    `consolidated/` dir, date/env-stamped via the parent run-folder name (so a day
+    folder gets a stamped name and matches the Consolidate-tab output; the always-
+    current Everything store, whose parent is just `<src-env>`, gets the plain
+    name)."""
+    from paths import stamped_consolidated_filename     # lazy (avoid import cycle)
+    parent = Path(store_dir).parent
+    name = stamped_consolidated_filename(_consolidated_filename(subdir), parent.name)
+    return parent / "consolidated" / name
+
+
+def consolidated_state(store_dir, subdir):
+    """{exists, fresh, path} for a store folder's persistent consolidated — drives
+    the 'consolidated for this day' indicator. fresh = present AND newer than every
+    per-route source file."""
+    p = consolidated_store_path(store_dir, subdir)
+    return {"exists": p.exists(), "fresh": not _consolidated_stale(p, store_dir),
+            "path": str(p)}
+
+
+def _consolidated_stale(consolidated, store_dir):
+    """True when the persistent consolidated is missing, unreadable, or older than
+    any per-route source file in the store folder (so it must be rebuilt)."""
+    cm = _safe_mtime(consolidated)
+    if cm is None:
+        return True
+    newest = None
+    try:
+        for e in Path(store_dir).iterdir():
+            if e.is_file() and not e.name.startswith("~$"):
+                m = e.stat().st_mtime
+                if newest is None or m > newest:
+                    newest = m
+    except OSError:
+        return True                                    # can't read store -> rebuild
+    return newest is None or newest > cm + _MTIME_TOL_S
+
+
 def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, fmt, events,
-                                confirm_overwrite=None):
+                                confirm_overwrite=None, force_consolidate=False):
     """The SHARED TSN compare path used by BOTH matrices (the Everything matrix's
     latest-store cells AND the Compare tab's by-day cells).
 
-    Consolidate a per-route TSMIS Highway Log store folder (`tsmis_store_dir`) to a
-    temp workbook, then compare it vs a consolidated TSN workbook — Excel-vs-TSN
-    when `fmt == "excel"`, else PDF-vs-TSN — writing the VALUES workbook to
-    `out_path`. Returns the ConsolidateResult (the caller reads counts / records
-    into its own cache). Pure delegation to the untouched consolidate_* /
-    compare_highway_log[_pdf] adapters; the only thing that varies between the two
-    matrices is the source folder + the output path."""
+    Consolidate a per-route TSMIS Highway Log store folder (`tsmis_store_dir`) into
+    its PERSISTENT `consolidated/` workbook (reused when still fresh; rebuilt when a
+    source file is newer or `force_consolidate`), then compare it vs a consolidated
+    TSN workbook — Excel-vs-TSN when `fmt == "excel"`, else PDF-vs-TSN — writing the
+    VALUES workbook to `out_path`. Returns the ConsolidateResult (the caller reads
+    counts / records into its own cache). Pure delegation to the untouched
+    consolidate_* / compare_highway_log[_pdf] adapters; the matrices differ only by
+    the source folder + the output path."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     subdir = "highway_log" if fmt == "excel" else "highway_log_pdf"
-    tmp = out_path.parent / f".{out_path.stem}_tsmis.tmp.xlsx"
-    try:
-        _consolidate_store_folder(subdir, Path(tsmis_store_dir), tmp, events)
-        # The consolidator can return without raising yet write nothing (an empty
-        # store folder). Catch that here so the failure names the consolidation
-        # step, instead of the compare adapter raising a confusing error on a
-        # missing/empty input.
-        if not tmp.exists() or tmp.stat().st_size == 0:
-            raise ValueError(
-                f"nothing to compare — no Highway Log {'Excel' if fmt == 'excel' else 'PDF'} "
-                f"export found in {tsmis_store_dir}")
-        import compare_highway_log as _cmp_x          # lazy — untouched adapters
-        import compare_highway_log_pdf as _cmp_p
-        cmp_mod = _cmp_x if fmt == "excel" else _cmp_p.TSMIS_PDF_VS_TSN
-        result = cmp_mod.compare(tmp, str(tsn_path), out_path, events=events,
-                                 confirm_overwrite=confirm_overwrite or (lambda _p: True),
-                                 mode="values")
-    finally:
-        try:
-            tmp.unlink()
-        except OSError:
-            pass
+    consolidated = consolidated_store_path(tsmis_store_dir, subdir)
+    if force_consolidate or _consolidated_stale(consolidated, tsmis_store_dir):
+        _consolidate_store_folder(subdir, Path(tsmis_store_dir), consolidated, events)
+    # The consolidator can return without raising yet write nothing (an empty store
+    # folder). Catch that here so the failure names the consolidation step instead
+    # of the compare adapter raising a confusing error on a missing/empty input.
+    if not consolidated.exists() or consolidated.stat().st_size == 0:
+        raise ValueError(
+            f"nothing to compare — no Highway Log {'Excel' if fmt == 'excel' else 'PDF'} "
+            f"export found in {tsmis_store_dir}")
+    import compare_highway_log as _cmp_x              # lazy — untouched adapters
+    import compare_highway_log_pdf as _cmp_p
+    cmp_mod = _cmp_x if fmt == "excel" else _cmp_p.TSMIS_PDF_VS_TSN
+    result = cmp_mod.compare(consolidated, str(tsn_path), out_path, events=events,
+                             confirm_overwrite=confirm_overwrite or (lambda _p: True),
+                             mode="values")
     return result
 
 
+def _ensure_consolidated(store_dir, subdir, events, force):
+    """Return the persistent consolidated workbook for a store folder, rebuilding
+    it when stale or forced. Shared by the self (PDF-vs-Excel) path."""
+    p = consolidated_store_path(store_dir, subdir)
+    if force or _consolidated_stale(p, store_dir):
+        _consolidate_store_folder(subdir, Path(store_dir), p, events)
+    return p
+
+
 def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
-                     tsn_files=None, confirm_overwrite=None, row_defs=None):
+                     tsn_files=None, confirm_overwrite=None, row_defs=None,
+                     force_consolidate=False):
     """(Re)build one cell's comparison for the row's SELECTED mode, write the VALUES
     workbook, and cache its counts. Dispatches to the existing comparison adapters
     (never edits them). Returns the ConsolidateResult. Raises ValueError for an
     unknown row or an unsupported/greyed mode; an absent input side yields the
-    adapter's clean error result."""
+    adapter's clean error result. `force_consolidate` rebuilds the persistent
+    consolidated even when it looks fresh (the 'refresh consolidated' control)."""
     rows = row_defs if row_defs is not None else _row_defs()
     if row_key not in rows:
         raise ValueError(f"unknown matrix row: {row_key}")
@@ -693,38 +756,26 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
     out_path = mode_out_path(dest, baseline_key, row_key, cell_key, mode)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tsn_files = tsn_files or {}
-    tmps = []
-    try:
-        if mode["kind"] == "tsn":
-            src = tsn_source(dest, mode["tsn_subdir"], tsn_files.get(mode["tsn_subdir"]))
-            if src.get("kind") not in ("file", "consolidated"):
-                raise ValueError("no consolidated TSN workbook available")
-            # The shared TSN path (also used by the Compare by-day matrix); it
-            # manages its own temp, so nothing is added to `tmps` here.
-            result = consolidate_and_compare_tsn(
-                dest / cell_key / mode["env_subdir"], src["path"], out_path,
-                mode.get("fmt"), events, confirm_overwrite=confirm_overwrite)
-        else:                                # self: TSMIS PDF vs Excel
-            tmp_a = out_path.parent / f".{cell_key}_{row_key}_{mode['id']}_a.tmp.xlsx"
-            tmp_b = out_path.parent / f".{cell_key}_{row_key}_{mode['id']}_b.tmp.xlsx"
-            tmps += [tmp_a, tmp_b]
-            _consolidate_store_folder(mode["env_subdir"],
-                                      dest / cell_key / mode["env_subdir"], tmp_a, events)
-            _consolidate_store_folder(mode["other_subdir"],
-                                      dest / cell_key / mode["other_subdir"], tmp_b, events)
-            # the adapter fixes PDF=side A, Excel=side B regardless of the row.
-            pdf_tmp = tmp_a if mode["env_subdir"] == "highway_log_pdf" else tmp_b
-            excel_tmp = tmp_b if mode["env_subdir"] == "highway_log_pdf" else tmp_a
-            import compare_highway_log_pdf as _cmp_p
-            result = _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
-                pdf_tmp, excel_tmp, out_path, events=events,
-                confirm_overwrite=confirm_overwrite or (lambda _p: True), mode="values")
-    finally:
-        for t in tmps:
-            try:
-                t.unlink()
-            except OSError:
-                pass
+    if mode["kind"] == "tsn":
+        src = tsn_source(dest, mode["tsn_subdir"], tsn_files.get(mode["tsn_subdir"]))
+        if src.get("kind") not in ("file", "consolidated"):
+            raise ValueError("no consolidated TSN workbook available")
+        result = consolidate_and_compare_tsn(
+            dest / cell_key / mode["env_subdir"], src["path"], out_path,
+            mode.get("fmt"), events, confirm_overwrite=confirm_overwrite,
+            force_consolidate=force_consolidate)
+    else:                                # self: TSMIS PDF vs Excel (persisted both sides)
+        side_env = _ensure_consolidated(dest / cell_key / mode["env_subdir"],
+                                        mode["env_subdir"], events, force_consolidate)
+        side_other = _ensure_consolidated(dest / cell_key / mode["other_subdir"],
+                                          mode["other_subdir"], events, force_consolidate)
+        # the adapter fixes PDF=side A, Excel=side B regardless of the row.
+        pdf_c = side_env if mode["env_subdir"] == "highway_log_pdf" else side_other
+        excel_c = side_other if mode["env_subdir"] == "highway_log_pdf" else side_env
+        import compare_highway_log_pdf as _cmp_p
+        result = _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
+            pdf_c, excel_c, out_path, events=events,
+            confirm_overwrite=confirm_overwrite or (lambda _p: True), mode="values")
 
     if result.status == "ok" and out_path.exists():
         # has_route=True is correct for ALL tsn/self modes: their output is always

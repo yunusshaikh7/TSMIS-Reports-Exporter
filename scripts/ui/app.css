@@ -963,6 +963,20 @@ body.matrix-wide .matrix-config {
 /* Day-matrix report toggles row (parity with the Everything config zone). */
 .dm-options { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
 .dm-options .mc-label { margin: 0; }
+/* Per-day "consolidated workbook" indicator + refresh control in the column head. */
+.dm-cons {
+  flex: none; width: 22px; height: 20px; padding: 0; margin-top: 2px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  background: transparent; cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+.dm-cons .ic { width: 13px; height: 13px; }
+.dm-cons:hover { background: var(--accent); }
+.dm-cons:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+.dm-cons-fresh { color: var(--success); }
+.dm-cons-stale { color: var(--warning); }
+.dm-cons-none { color: var(--muted-foreground); opacity: .5; }
 /* Config-zone chips were missing the focus ring every other ghost control has. */
 .mx-toggle:focus-visible, .mc-mode:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 
