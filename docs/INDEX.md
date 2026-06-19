@@ -65,8 +65,9 @@ points), every claim anchored to `file:symbol`.
 - **Conventions** (console-free core, UI-neutral strings, no AI attribution, never commit
   the auth file, regression-lock discipline, call the timeout accessors, branch off `main`)
   live in [`../CLAUDE.md`](../CLAUDE.md).
-- **`build/release_notes.md`** stays in `build/` (it is the GitHub release body that
-  `release.yml` publishes) — it is the user-facing changelog; history.md is the narrative.
+- **`CHANGELOG.md`** (repo root) is the user-facing changelog, one section per version.
+  `release.yml` publishes each release body from the matching section + the shared
+  `build/release_notes_header.md` (via `build/gen_release_notes.py`); history.md is the narrative.
 - **Real test data + the live TSMIS website source are LOCAL ONLY** (under
   `C:\Users\Yunus\Downloads\TSMIS\…` on the dev PC) and are **never** committed, copied
   into the repo, or pushed — the website source is Caltrans-internal. See

@@ -1,7 +1,7 @@
 # TSMIS Exporter — Roadmap & backlog
 
 The single forward list — bugs to fix, features to add, and standing concerns. The **changelog**
-(what already shipped, per release) is `build/release_notes.md`; the narrative is
+(what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
 ## How to maintain this file
@@ -13,12 +13,12 @@ The single forward list — bugs to fix, features to add, and standing concerns.
   under the matching section; start a new theme only if nothing fits. Bugs go under *Next patch*
   (or the findings record), not the feature backlog.
 - **Reconcile every session / after each release** — the list rots otherwise. Compare the open
-  items + the version table against `git tag` / `version.py` / `build/release_notes.md`; check
+  items + the version table against `git tag` / `version.py` / `CHANGELOG.md`; check
   off what shipped (one line), update the version table to reality, and **flag anything deferred
   across multiple releases** for a keep / drop / bump decision. Record *what* shipped; the owner
   decides *where* deferred items go next.
 - This is the backlog, **not** the changelog — keep "done" notes to one line; detail lives in
-  `release_notes.md` and the docs.
+  `CHANGELOG.md` and the docs.
 
 ---
 
@@ -164,7 +164,7 @@ or accept as someday.**
 
 ## Shipped (reconciled record)
 
-What landed, so the open list stays honest. Full changelog: `build/release_notes.md`.
+What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
 ### Version buckets — reconciled to reality (current: v0.14.2)
 

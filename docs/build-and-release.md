@@ -405,8 +405,14 @@ git push origin refs/tags/v0.14.2
 4. **Publish SHA-256 checksums** — one `<asset>.sha256` per zip (sha256sum
    format `"<hash>  <name>"`, ASCII = no BOM, since a BOM would corrupt the
    hash). These are what the updater verifies against.
-5. **Create the GitHub release** with all six assets (3 zips + 3 `.sha256`),
-   `--target ${{ github.sha }}`, body from `build/release_notes.md`.
+5. **Assemble per-version notes** — `gen_release_notes.py "$TAG" -o notes.md`
+   joins the shared `build/release_notes_header.md` (download table) with the
+   matching `## <tag>` section from `CHANGELOG.md`. Runs *before* the build so a
+   missing CHANGELOG section fails fast; each release shows only its own version,
+   not the whole history.
+6. **Create the GitHub release** with all six assets (3 zips + 3 `.sha256`),
+   `--target ${{ github.sha }}`, body from `notes.md`. (Backfill old releases to
+   this format with `build/backfill_release_notes.ps1`.)
 
 Uses `actions/checkout@v5` + `actions/setup-python@v6` (the older v4/v5 warned on
 the June 16, 2026 GitHub-runner Node-24 switch).
