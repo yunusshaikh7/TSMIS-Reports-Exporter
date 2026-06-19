@@ -1830,6 +1830,7 @@ function mxCellContent(cmp, tsnMeta) {
 function mxActBtn(iconName, title, locked, onClick) {
   const b = document.createElement("button");
   b.className = "mx-act"; b.title = title; b.disabled = locked;
+  b.setAttribute("aria-label", title);     // icon-only — needs an accessible name
   b.appendChild(icon(iconName));
   b.onclick = onClick;
   return b;
@@ -1918,6 +1919,7 @@ function mxTsnPicker(tm, locked, rerender) {
       if (!ok) return;
       const r = await api.consolidate_matrix_tsn(tm.tsn_subdir);
       if (r && r.error) showMessage("error", "Can't consolidate", r.error);
+      else await rerender();      // reflect the queued job (Choose/Clear do the same)
     };
     row.appendChild(cons);
   }
@@ -2000,6 +2002,21 @@ async function renderMatrix() {
   try { snap = await api.matrix_info(); } catch (e) { return; }
   if (!snap || !snap.rows) return;
   const envs = snap.envs, locked = !!(S.st && S.st.task);
+  // All rows or all columns hidden (only reachable via a hand-edited config — the
+  // bridge keeps at least one of each): show guidance instead of a blank grid, but
+  // still render the config zone so the user can turn something back on.
+  if (!snap.rows.length || !envs.length) {
+    grid.style.gridTemplateColumns = ""; grid.style.gridTemplateRows = "";
+    grid.textContent = "";
+    const empty = document.createElement("div");
+    empty.className = "dm-empty";
+    empty.textContent = (!snap.rows.length ? "All reports" : "All environments")
+      + " are hidden — turn one back on under Matrix options.";
+    grid.appendChild(empty);
+    renderMatrixConfig(snap, locked);
+    updateMatrixProgress();
+    return;
+  }
   // Wider row-label column (it carries the mode dropdown + TSN picker now); the
   // fr units stretch to fill the window, the data rows share the leftover height.
   grid.style.gridTemplateColumns =
@@ -2229,6 +2246,28 @@ async function renderDayMatrix() {
     if (snap.tsn_meta) tsnHost.appendChild(mxTsnPicker(snap.tsn_meta, locked, renderDayMatrix));
   }
 
+  // Report show/hide toggles (parity with the Everything matrix's config zone) —
+  // lets the user hide the greyed "(soon)" rows.
+  const rtog = $("dayMatrixReportToggles");
+  if (rtog) {
+    rtog.textContent = "";
+    const hidden = new Set(snap.hidden || []);
+    (snap.all_rows || []).forEach((r) => {
+      const isOn = !hidden.has(r.key);
+      const b = document.createElement("button");
+      b.className = "mx-toggle" + (isOn ? " on" : "");
+      b.textContent = r.label + (r.supported ? "" : " (soon)");
+      b.disabled = locked;
+      b.title = (isOn ? "Hide " : "Show ") + r.label;
+      b.onclick = async () => {
+        const res = await api.set_day_matrix_report(r.key, !isOn);
+        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
+        await renderDayMatrix();
+      };
+      rtog.appendChild(b);
+    });
+  }
+
   grid.textContent = "";
   if (!days.length) {
     grid.style.gridTemplateColumns = ""; grid.style.gridTemplateRows = "";
@@ -2320,6 +2359,12 @@ async function renderDayMatrix() {
 }
 
 function wireDayMatrixFooter() {
+  const ba = $("btnDayBuildAll");
+  if (ba) ba.onclick = async () => {
+    const r = await api.rebuild_day_matrix("all");
+    if (r && r.nothing) showMessage("info", "Nothing to build", "Add days (and a TSN file) first.");
+    else if (r && r.error) showMessage("error", "Can't build", r.error);
+  };
   const rb = $("btnDayRebuildAll");
   if (rb) rb.onclick = async () => {
     const r = await api.rebuild_day_matrix("stale");
@@ -2344,8 +2389,15 @@ function updateDayMatrixProgress() {
   }
   const locked = !!(S.st && S.st.task);
   document.querySelectorAll(
-    "#dayMatrixSection .mx-linkbtn, #dayMatrixSource, #dayMatrixAddDay, #btnDayAddDay")
+    "#dayMatrixSection .mx-linkbtn, #dayMatrixSource, #dayMatrixReportToggles .mx-toggle")
     .forEach((c) => { c.disabled = locked; });
+  // Add-day controls: disable on lock OR when there are no days left to add (the
+  // latter is owned by renderDayMatrix). Don't blindly re-enable here — that would
+  // override the "no exported days" guard on a plain state push.
+  const addSel = $("dayMatrixAddDay"), addBtn = $("btnDayAddDay");
+  const noAvail = !addSel || !addSel.querySelector('option[value]:not([value=""])');
+  if (addSel) addSel.disabled = locked || noAvail;
+  if (addBtn) addBtn.disabled = locked || noAvail;
   const cancel = $("btnDayCancel");
   if (cancel) {
     const running = !!(S.st && S.st.task === "matrix");

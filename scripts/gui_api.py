@@ -833,9 +833,13 @@ class GuiApi:
         with self._lock:
             if kind == "auth":
                 self._authed = False
-            clear_pending = kind == "auth" or self._current_job is not None
-            cleared = len(self._queue) if clear_pending else 0
-            if clear_pending:
+            # Clear the pending queue only when the error ended a MATRIX job —
+            # those remaining jobs would hit the same failure. A non-matrix auth
+            # failure (e.g. a login) leaves queued matrix jobs alone; the first one
+            # to run then self-clears the rest if the problem persists.
+            was_matrix = self._current_job is not None
+            cleared = len(self._queue) if was_matrix else 0
+            if was_matrix:
                 self._queue.clear()
         if kind == "auth":
             clear_auth()
@@ -852,6 +856,8 @@ class GuiApi:
                              f"{message}\n\nMore details are in the log file.")
         self._flash_taskbar()        # a task ended (with an error) — nudge if away
         self._end_task()
+        if was_matrix:               # the failed cell stays as-is; refresh both grids
+            self._emit({"t": "matrix_refresh"})
 
     # ======================= JS-callable api methods ==========================
 
@@ -1508,7 +1514,17 @@ class GuiApi:
                 self._task = "matrix"            # claim atomically with the pop
                 self._current_job = job
                 job["status"] = "running"
-            if self._dispatch_matrix_job(job):
+            try:
+                started = self._dispatch_matrix_job(job)
+            except Exception as e:               # noqa: BLE001 — never leave the gate stuck
+                log.exception("matrix dispatch failed for %r", job.get("label"))
+                with self._lock:
+                    self._task = None
+                    self._current_job = None
+                self._emit_log(f"ERROR: couldn't start '{job['label']}': "
+                               f"{type(e).__name__}: {e} (details are in the log file)")
+                continue                         # drop this job, try the next
+            if started:
                 self._push_state()
                 return
             # Nothing to do (e.g. the cells were rebuilt by an earlier job) —
@@ -2101,6 +2117,10 @@ class GuiApi:
                            f"{errs} could not be built (see the log).")
         else:
             self._emit_log(f"Comparison run finished — {done} of {total} done.")
+        # Nudge only when the WHOLE queue has drained (not after every auto-
+        # advancing job), matching exports/consolidations honoring notify_on_finish.
+        if not self._queue:
+            self._flash_taskbar()
         self._end_task()
         self._emit({"t": "matrix_refresh"})
 
@@ -2116,7 +2136,8 @@ class GuiApi:
         with self._lock:
             if not self._authed:
                 self._device_ok = True   # the run signed itself in (device mode)
-        self._flash_taskbar()
+        if not self._queue:              # flash once the queue is fully drained
+            self._flash_taskbar()
         self._end_task()
         self._emit({"t": "matrix_refresh"})
 

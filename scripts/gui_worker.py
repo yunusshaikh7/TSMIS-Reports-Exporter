@@ -1645,7 +1645,8 @@ class MatrixBatchExportWorker(threading.Thread):
                     return                       # stop the batch (terminal via _on_error)
                 except Exception as e:           # noqa: BLE001
                     log.exception("matrix export %s-%s crashed", src, env)
-                    self.q.put(("log", f"  {src}-{env}: {type(e).__name__}: {e}"))
+                    self.q.put(("log", f"  {spec.label} / {src}-{env}: "
+                                       f"{type(e).__name__}: {e}"))
                 done += 1
             self.q.put(("matrix_export_done",
                         {"count": done, "total": total, "ok": ok == total,
@@ -1698,6 +1699,8 @@ class MatrixCompareWorker(threading.Thread):
                 except Exception as e:                   # noqa: BLE001
                     log.exception("matrix compare %s/%s/%s crashed", row_key, cell_key, mode_id)
                     status, errors = "error", errors + 1
+                    self.q.put(("log", f"  {cell_key} {row_key}: "
+                                       f"{type(e).__name__}: {e}"))
                 done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
                                             "status": status,
@@ -1750,6 +1753,8 @@ class DayMatrixCompareWorker(threading.Thread):
                 except Exception as e:                   # noqa: BLE001
                     log.exception("day matrix compare %s/%s crashed", date, row_key)
                     status, errors = "error", errors + 1
+                    self.q.put(("log", f"  {date} {row_key}: "
+                                       f"{type(e).__name__}: {e}"))
                 done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": status,

@@ -673,6 +673,9 @@ button, input, select { font-family: inherit; }
 .mx-act.mx-open:hover:not(:disabled) { color: var(--primary); }
 .mx-act:active:not(:disabled) { transform: scale(0.9); }
 .mx-act:disabled { opacity: 0.4; cursor: default; }
+.mx-act:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+/* Reveal a cell's actions for keyboard users (otherwise only shown on hover). */
+.mx-cell:focus-within .mx-actions { opacity: 1; }
 .mx-cell { transition: box-shadow 0.15s ease; }
 .mx-cell:not(.mx-colhead):not(.mx-rowhead):not(.mx-corner):not(.mx-baseline-col):hover {
   box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--primary) 50%, transparent);
@@ -706,6 +709,7 @@ button, input, select { font-family: inherit; }
 .mx-key.mx-diff-hi { background: color-mix(in oklab, var(--destructive) 18%, var(--card)); }
 .mx-key.mx-stale { background: color-mix(in oklab, var(--muted) 60%, var(--card)); }
 .mx-key.mx-missing { background: var(--card); font-style: italic; }
+.mx-key.mx-na { background: var(--card); color: var(--muted-foreground); font-style: italic; }
 .mx-cell.mx-na { background: var(--card); }
 .mx-cell.mx-na .mx-num { color: var(--muted-foreground); font-style: italic; font-weight: 500; }
 
@@ -956,6 +960,11 @@ body.matrix-wide .matrix-config {
   color: var(--destructive);
 }
 .mxch-rm:hover:not(:disabled) .ic { transform: none; }
+/* Day-matrix report toggles row (parity with the Everything config zone). */
+.dm-options { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+.dm-options .mc-label { margin: 0; }
+/* Config-zone chips were missing the focus ring every other ghost control has. */
+.mx-toggle:focus-visible, .mc-mode:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 
 .day-row { display: flex; align-items: center; gap: 10px; }
 /* width floor only — height/font come from .select-light so all card selects match */

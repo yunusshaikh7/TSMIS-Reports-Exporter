@@ -97,7 +97,11 @@ def load_results(dest, baseline_key):
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
+    except OSError:
+        return {}                            # not written yet (first run) — expected
+    except ValueError as e:                  # corrupt JSON: surface it, then degrade
+        log.warning("matrix: corrupt results cache %s (%s: %s); treating as empty",
+                    p, type(e).__name__, e)
         return {}
 
 
@@ -140,7 +144,9 @@ def read_counts(values_path, has_route):
     try:
         from openpyxl import load_workbook
         wb = load_workbook(values_path, read_only=True, data_only=True)
-    except Exception:                            # noqa: BLE001 (best-effort read)
+    except Exception as e:                       # noqa: BLE001 (best-effort read)
+        log.debug("read_counts: can't open %s (%s: %s)", values_path,
+                  type(e).__name__, e)
         return (None, None)
     try:
         ws = wb["Comparison"]
@@ -156,7 +162,9 @@ def read_counts(values_path, has_route):
                 if isinstance(v, str) and _NEQ in v:
                     diff_cells += 1
         return (diff_cells, one_sided)
-    except Exception:                            # noqa: BLE001
+    except Exception as e:                       # noqa: BLE001
+        log.debug("read_counts: can't read %s (%s: %s)", values_path,
+                  type(e).__name__, e)
         return (None, None)
     finally:
         wb.close()
@@ -346,11 +354,16 @@ def _tsn_results_path(dest):
 def load_tsn_results(dest):
     """{ "<row>|<mode>": {cell_key: {verdict, diff_cells, one_sided,
     built_at_mtime}} } — the non-env (TSN/self) comparison counts cache."""
+    p = _tsn_results_path(dest)
     try:
-        with open(_tsn_results_path(dest), encoding="utf-8") as f:
+        with open(p, encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
+    except OSError:
+        return {}                            # not written yet (first run) — expected
+    except ValueError as e:                  # corrupt JSON: surface it, then degrade
+        log.warning("matrix: corrupt TSN results cache %s (%s: %s); treating as empty",
+                    p, type(e).__name__, e)
         return {}
 
 
@@ -635,6 +648,14 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, fmt, events
     tmp = out_path.parent / f".{out_path.stem}_tsmis.tmp.xlsx"
     try:
         _consolidate_store_folder(subdir, Path(tsmis_store_dir), tmp, events)
+        # The consolidator can return without raising yet write nothing (an empty
+        # store folder). Catch that here so the failure names the consolidation
+        # step, instead of the compare adapter raising a confusing error on a
+        # missing/empty input.
+        if not tmp.exists() or tmp.stat().st_size == 0:
+            raise ValueError(
+                f"nothing to compare — no Highway Log {'Excel' if fmt == 'excel' else 'PDF'} "
+                f"export found in {tsmis_store_dir}")
         import compare_highway_log as _cmp_x          # lazy — untouched adapters
         import compare_highway_log_pdf as _cmp_p
         cmp_mod = _cmp_x if fmt == "excel" else _cmp_p.TSMIS_PDF_VS_TSN
@@ -706,6 +727,10 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                 pass
 
     if result.status == "ok" and out_path.exists():
+        # has_route=True is correct for ALL tsn/self modes: their output is always
+        # the consolidated Highway Log shape (Route-keyed), regardless of the row's
+        # cross-env `_hr` (the HL-PDF row has adapter=None → _hr=False, but its TSN
+        # output is still Route-keyed). Do NOT switch this to the row's _hr.
         diff_cells, one_sided = read_counts(out_path, has_route=True)
         record_tsn_result(dest, f"{row_key}|{mode['id']}", cell_key, result.verdict,
                           diff_cells, one_sided, _safe_mtime(out_path))

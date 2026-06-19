@@ -89,7 +89,11 @@ def load_results():
         with open(_results_path(), encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
+    except OSError:
+        return {}                            # not written yet (first run) — expected
+    except ValueError as e:                  # corrupt JSON: surface it, then degrade
+        log.warning("day_matrix: corrupt results cache %s (%s: %s); treating as empty",
+                    _results_path(), type(e).__name__, e)
         return {}
 
 

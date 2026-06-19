@@ -350,6 +350,7 @@
               <span class="mx-key mx-diff-hi">many diffs</span>
               <span class="mx-key mx-stale">stale</span>
               <span class="mx-key mx-missing">needs export</span>
+              <span class="mx-key mx-na">not available</span>
             </div>
           </div>
           <div class="matrix-wrap"><div class="matrix-grid" id="matrixGrid"></div></div>
@@ -556,12 +557,17 @@
               <span class="hint" id="dayMatrixProgress" hidden></span>
             </div>
             <div class="dm-tsn" id="dayMatrixTsn"></div>
+            <div class="dm-options">
+              <span class="mc-label">Reports</span>
+              <div class="mx-toggles" id="dayMatrixReportToggles"></div>
+            </div>
             <div class="matrix-legend">
               <span class="mx-key mx-match">identical</span>
               <span class="mx-key mx-diff-lo">few diffs</span>
               <span class="mx-key mx-diff-hi">many diffs</span>
               <span class="mx-key mx-stale">stale</span>
               <span class="mx-key mx-missing">needs export</span>
+              <span class="mx-key mx-na">not available</span>
             </div>
             <div class="matrix-wrap"><div class="matrix-grid" id="dayMatrixGrid"></div></div>
           </div>
@@ -581,6 +587,9 @@
           </div>
 
           <div class="card-section actions-row">
+            <button class="btn btn-subtle btn-small" id="btnDayBuildAll">
+              <svg class="ic"><use href="#i-layers"/></svg>Build all
+            </button>
             <button class="btn btn-subtle btn-small" id="btnDayRebuildAll">
               <svg class="ic"><use href="#i-refresh"/></svg>Rebuild stale
             </button>
