@@ -7,7 +7,7 @@ app — told from the repository.
 7 report types · **May 20 → June 18, 2026**.
 
 This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
-"how it works and why") and [`build/release_notes.md`](../build/release_notes.md)
+"how it works and why") and [`CHANGELOG.md`](../CHANGELOG.md)
 (the user-facing changelog). Where they explain the *what*, this explains the
 *journey* — including the dead ends, the reverts, and the three field failures
 that rewrote the design.

@@ -130,7 +130,9 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   gui_main.py gui_api.py gui_worker.py  GUI entry / js_api bridge + state / worker threads
   ui/                        index.html + app.css + app.js (vanilla; + the #mock API)
   updater.py login.py logging_setup.py batch_manifest.py report_library.py
-build/                       build.ps1, app.spec, prune_bundle.ps1, full_smoke.py, check_*.py, release_notes.md
+build/                       build.ps1, app.spec, prune_bundle.ps1, full_smoke.py, check_*.py
+  gen_release_notes.py release_notes_header.md backfill_release_notes.ps1   per-version release notes
+CHANGELOG.md                 user-facing changelog (one section per version; source of release bodies)
 docs/                        the knowledge library (start at docs/INDEX.md)
 output/ input/               generated/user data (git-ignored except .gitkeep stubs)
 ```

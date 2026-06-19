@@ -56,6 +56,12 @@ jobs:
           }
           Write-Host "OK: tag $env:TAG matches version.py ($v)."
 
+      - name: Assemble release notes for this version (fast-fail before build)
+        # Shared header + this version's CHANGELOG.md section only — so the
+        # release shows what changed in THIS version, not the whole history.
+        # Runs before the long build so a missing CHANGELOG section fails fast.
+        run: python build/gen_release_notes.py "$env:TAG" -o notes.md
+
       - name: Build + run frozen self-test, system browser (release gate)
         run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
 
@@ -78,6 +84,33 @@ jobs:
 
       - name: Zip the batch/source variant
         run: git archive --format=zip --prefix="TSMIS-Exporter-batch/" -o "TSMIS-Exporter-$env:TAG-batch-source.zip" HEAD
+
+      # --- Code signing (SignPath) ------------------------------------------
+      # Inert until the repo variable SIGNPATH_ENABLED is set to "true" (do that
+      # once the SignPath Foundation project is approved) and the secret/vars
+      # below are filled in. When enabled, the app zip is uploaded, submitted to
+      # SignPath, and the signed artifact overwrites the local file BEFORE the
+      # checksums + release steps below. Repeat the pair for the with-browser zip.
+      # Docs: https://about.signpath.io/documentation/github-integration
+      - name: Upload unsigned artifact (SignPath)
+        if: ${{ vars.SIGNPATH_ENABLED == 'true' }}
+        id: upload-unsigned-win64
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-win64
+          path: TSMIS-Exporter-${{ env.TAG }}-win64.zip
+
+      - name: Submit signing request (SignPath)
+        if: ${{ vars.SIGNPATH_ENABLED == 'true' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORG_ID }}
+          project-slug: tsmis-reports-exporter
+          signing-policy-slug: release-signing          # set to your SignPath policy slug
+          github-artifact-id: ${{ steps.upload-unsigned-win64.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: .                  # overwrites the unsigned zip in place
 
       - name: Publish SHA-256 checksums
         shell: pwsh
@@ -104,4 +137,4 @@ jobs:
           "TSMIS-Exporter-$env:TAG-batch-source.zip.sha256"
           --target "${{ github.sha }}"
           --title "TSMIS Exporter $env:TAG"
-          --notes-file build/release_notes.md
+          --notes-file notes.md

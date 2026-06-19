@@ -13,7 +13,9 @@
 
 param(
     [switch]$SelfTest,        # builds a headless self-test instead of the windowed app
-    [switch]$BundleChromium   # ships Playwright's own Chromium inside the bundle (the with-browser variant)
+    [switch]$BundleChromium,  # ships Playwright's own Chromium inside the bundle (the with-browser variant)
+    [switch]$Sign,            # sign the built .exe with a self-signed cert (interim, local trust only)
+    [string]$CertSubject = "CN=TSMIS Exporter (self-signed)"
 )
 
 $ErrorActionPreference = "Stop"
@@ -108,6 +110,30 @@ if ($SelfTest) {
 if (-not $SelfTest) {
     Copy-Item (Join-Path $BuildDir "dist_readme.txt") (Join-Path $AppDir "Start Here.txt") -Force
     Copy-Item (Join-Path $BuildDir "it_readme.txt") (Join-Path $AppDir "IT-README.txt") -Force
+}
+
+# --- 4b. Optional self-signing (interim) ----------------------------------
+# -Sign signs the built .exe with a SELF-SIGNED certificate. This is a stop-gap
+# for local/test machines and for exercising the signing toolchain -- other PCs
+# will NOT trust it unless the certificate is imported into Trusted Root. Real,
+# broadly-trusted signing is done in CI via SignPath (see release.yml); leave
+# -Sign off for the artifacts you publish from that pipeline.
+if ($Sign -and -not $SelfTest) {
+    $cert = Get-ChildItem Cert:\CurrentUser\My |
+        Where-Object { $_.Subject -eq $CertSubject -and $_.HasPrivateKey } |
+        Select-Object -First 1
+    if (-not $cert) {
+        Write-Host "==> Creating self-signed code-signing certificate: $CertSubject"
+        $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $CertSubject `
+            -CertStoreLocation Cert:\CurrentUser\My -KeyUsage DigitalSignature `
+            -KeyExportPolicy Exportable
+    }
+    $ExeToSign = Join-Path $AppDir ("{0}.exe" -f $env:TSMIS_APP_NAME)
+    Write-Host "==> Self-signing $ExeToSign"
+    $r = Set-AuthenticodeSignature -FilePath $ExeToSign -Certificate $cert `
+        -HashAlgorithm SHA256 -TimestampServer "http://timestamp.digicert.com"
+    if ($r.Status -ne "Valid") { throw "Signing failed: $($r.Status) - $($r.StatusMessage)" }
+    Write-Host "==> Signed (self-signed; trusted only where this cert is installed)."
 }
 $SizeMB = (Get-ChildItem $AppDir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
 Write-Host ("`n==> Built {0}  ({1:N0} MB onefolder)" -f $AppDir, $SizeMB)
