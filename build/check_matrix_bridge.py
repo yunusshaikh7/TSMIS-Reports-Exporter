@@ -51,9 +51,11 @@ def main():
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mxb_"))
     cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_mxbcfg_"))
     saved = (gui_api.MatrixCompareWorker, gui_api.MatrixExportWorker,
+             gui_api.MatrixTsnConsolidateWorker,
              settings.get_batch_dest, settings.CONFIG_FILE)
     gui_api.MatrixCompareWorker = _FakeWorker
     gui_api.MatrixExportWorker = _FakeWorker
+    gui_api.MatrixTsnConsolidateWorker = _FakeWorker
     settings.get_batch_dest = lambda: str(dest)
     settings.CONFIG_FILE = cfgdir / "config.json"
     settings._cache = settings._cache_mtime = None
@@ -159,8 +161,57 @@ def main():
         check("open comparisons folder ok", fr.get("ok") is True)
         check("the baseline comparisons root was opened",
               opened[-1] == matrix.comparisons_root(str(dest), "ssor-prod"))
+
+        print("env-column toggle + per-row modes + global set-all:")
+        eh = a.set_matrix_env("ars-dev", False)
+        check("hide env ok", eh.get("ok") and "ars-dev" in eh.get("hidden_envs", []))
+        check("hidden env gone from envs, kept in all_envs",
+              "ars-dev" not in a.matrix_info()["envs"]
+              and "ars-dev" in a.matrix_info()["all_envs"])
+        a.set_matrix_env("ars-dev", True)
+        check("unknown env rejected", bool(a.set_matrix_env("zz-zz", False).get("error")))
+        check("unknown row mode-set rejected",
+              bool(a.set_matrix_row_mode("nope", "tsn").get("error")))
+        check("greyed mode rejected (ramp_summary vs TSN)",
+              bool(a.set_matrix_row_mode("ramp_summary", "tsn").get("error")))
+        check("supported mode set (HL Excel vs TSN)",
+              a.set_matrix_row_mode("highway_log", "tsn").get("ok")
+              and a.matrix_info()["modes"]["highway_log"] == "tsn")
+        check("HL PDF vs_excel mode set",
+              a.set_matrix_row_mode("highway_log_pdf", "vs_excel").get("ok"))
+        a.set_matrix_row_mode("highway_log", "env")
+        a.set_matrix_row_mode("highway_log_pdf", "env")
+        check("set-all bad mode rejected", bool(a.set_all_matrix_modes("nope").get("error")))
+        a.set_all_matrix_modes("tsn")
+        m = a.matrix_info()["modes"]
+        check("set-all tsn applies to the supported HL rows",
+              m["highway_log"] == "tsn" and m["highway_log_pdf"] == "tsn")
+        a.set_all_matrix_modes("env")
+        check("set-all env clears every row to cross-env",
+              all(v == "env" for v in a.matrix_info()["modes"].values()))
+
+        print("TSN file pick + scoped refresh + TSN-PDF consolidate gate:")
+        check("tsn file bad subdir rejected",
+              bool(a.set_matrix_tsn_file("nope", "/x.xlsx").get("error")))
+        check("tsn file set ok", a.set_matrix_tsn_file("highway_log", "/x.xlsx").get("ok"))
+        a.set_matrix_tsn_file("highway_log", "")
+        _touch(dest / "ssor-prod" / "ramp_detail" / "r1.xlsx")
+        _touch(dest / "ars-prod" / "ramp_detail" / "r1.xlsx")
+        rrow = a.recompute_matrix("all", row="ramp_detail")
+        check("per-row refresh launched", rrow.get("ok") and rrow.get("count", 0) >= 1)
+        a._end_task()
+        rcol = a.recompute_matrix("all", env="ars-prod")
+        check("per-column refresh launched", rcol.get("ok") and rcol.get("count", 0) >= 1)
+        a._end_task()
+        check("consolidate TSN rejects non-Highway-Log",
+              bool(a.consolidate_matrix_tsn("ramp_detail").get("error")))
+        ct = a.consolidate_matrix_tsn("highway_log")
+        check("consolidate TSN launched + task claimed",
+              ct.get("ok") is True and a._task == "matrix")
+        a._end_task()
     finally:
         (gui_api.MatrixCompareWorker, gui_api.MatrixExportWorker,
+         gui_api.MatrixTsnConsolidateWorker,
          settings.get_batch_dest, settings.CONFIG_FILE) = saved
         settings._cache = settings._cache_mtime = None
         shutil.rmtree(dest, ignore_errors=True)

@@ -1682,3 +1682,33 @@ class MatrixCompareWorker(threading.Thread):
             self.q.put(("matrix_done", {"done": done, "total": total,
                                         "errors": errors,
                                         "cancelled": self.cancel.is_set()}))
+
+
+class MatrixTsnConsolidateWorker(threading.Thread):
+    """Consolidate the district TSN PDFs the user dropped in _tsn_input/<subdir>/
+    into one TSN workbook (the 'consolidate these PDFs?' prompt path), so the TSN
+    comparison can run. Offline (pdfplumber); posts ('matrix_done', …) so the
+    bridge clears the task and refreshes the grid."""
+
+    def __init__(self, dest, subdir, queue, cancel_event):
+        super().__init__(daemon=True, name="matrix-tsn-consolidate")
+        self.dest = dest
+        self.subdir = subdir
+        self.q = queue
+        self.cancel = cancel_event
+
+    def run(self):
+        events = Events(is_cancelled=self.cancel.is_set,
+                        on_log=lambda m: self.q.put(("log", m)))
+        errors = 0
+        try:
+            res = matrix.consolidate_tsn_pdfs(self.dest, self.subdir, events=events)
+            self.q.put(("log", f"TSN workbook ready: {res}"))
+        except Exception as e:                       # noqa: BLE001
+            errors = 1
+            log.exception("matrix TSN consolidate (%s) crashed", self.subdir)
+            self.q.put(("log", f"TSN consolidation failed ({type(e).__name__}): {e}"))
+        finally:
+            self.q.put(("matrix_done", {"done": 1 - errors, "total": 1,
+                                        "errors": errors,
+                                        "cancelled": self.cancel.is_set()}))

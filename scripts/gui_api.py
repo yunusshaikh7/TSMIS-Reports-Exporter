@@ -45,6 +45,7 @@ import updater
 from gui_worker import (BatchWorker, CheckWorker, ChromiumWorker,
                         ConsolidateWorker, EnvCheckWorker, EnvScanWorker,
                         MatrixCompareWorker, MatrixExportWorker,
+                        MatrixTsnConsolidateWorker,
                         ExportWorker, LoginWorker, ResetWorker, UpdateWorker,
                         measure_targets, reset_targets)
 from exporter_parallel import MAX_WORKERS, default_worker_count
@@ -1458,14 +1459,19 @@ class GuiApi:
         return {"ok": True}
 
     @_api_method
-    def recompute_matrix(self, scope="stale"):
-        """Rebuild every stale (scope='stale') or every (scope='all') comparison
-        against the current baseline — the 'refresh all' button and the
-        baseline-switch recompute."""
+    def recompute_matrix(self, scope="stale", row=None, env=None):
+        """Rebuild comparisons in scope ('stale' = missing/stale, 'all' = every
+        comparable cell) for the current baseline — drives refresh-all, the
+        baseline-switch recompute, and (with `row`/`env`) the per-row and
+        per-column refresh buttons. Honors cancel between cells; re-running 'stale'
+        resumes a cancelled run idempotently."""
         base = self._current_baseline()
         dest = settings.get_batch_dest()
         scope = scope if scope in ("stale", "all") else "stale"
-        cells = matrix.cells_to_rebuild(self._matrix_snapshot(base), scope=scope)
+        row = row if (row and row in {r[0] for r in matrix_rows()}) else None
+        env = env if (env and self._parse_env_keys([env])) else None
+        cells = matrix.cells_to_rebuild(self._matrix_snapshot(base), scope=scope,
+                                        row=row, env=env)
         if not cells:
             return {"ok": True, "nothing": True}
         if not self._try_claim_task("matrix"):
@@ -1486,21 +1492,104 @@ class GuiApi:
 
     @_api_method
     def open_cell_comparison(self, row_key, env_key):
-        """Open ONE cell's comparison VALUES workbook (the plain-results copy that
-        opens without F9). The path is built from validated keys under the
-        baseline's comparisons store, so it can't point outside it."""
+        """Open ONE cell's comparison VALUES workbook for the row's SELECTED mode
+        (cross-env -> comparisons/<baseline>/, TSN/self -> comparisons/tsn/). The
+        path is built from validated keys, so it can't point outside the store."""
         base = self._current_baseline()
         if row_key not in {r[0] for r in matrix_rows()}:
             return {"error": "Unknown report for the matrix."}
         if not self._parse_env_keys([env_key]):
             return {"error": "Unknown environment."}
-        if env_key == base:
+        mode = settings.get_matrix_row_modes().get(row_key, "env")
+        if mode == "env" and env_key == base:
             return {"error": "The baseline column has no comparison to open."}
         dest = settings.get_batch_dest()
-        path = matrix.comparison_path(dest, base, row_key, env_key)
-        if not path.exists():
+        path = matrix.out_path_for_cell(dest, base, row_key, env_key, mode)
+        if path is None or not path.exists():
             return {"error": "No comparison built yet — use “↻ compare” first."}
         self._open_file(path)
+        return {"ok": True}
+
+    @_api_method
+    def set_matrix_env(self, env_key, visible):
+        """Show/hide an environment COLUMN on the matrix (hidden columns aren't
+        rendered or refreshed). At least one column must stay on."""
+        if not self._parse_env_keys([env_key]):
+            return {"error": "Unknown environment."}
+        all_envs = matrix.env_keys()
+        hidden = set(settings.get_matrix_hidden_envs())
+        if visible:
+            hidden.discard(env_key)
+        else:
+            hidden.add(env_key)
+        if len(hidden & set(all_envs)) >= len(all_envs):
+            return {"error": "Keep at least one environment on the matrix."}
+        settings.set_matrix_hidden_envs(sorted(hidden))
+        self._push_state()
+        return {"ok": True, "hidden_envs": sorted(hidden)}
+
+    @_api_method
+    def set_matrix_row_mode(self, row_key, mode_id):
+        """Set one report row's comparison mode (the dropdown under its name).
+        Validated against that row's available, SUPPORTED modes."""
+        dest = settings.get_batch_dest()
+        snap = self._matrix_snapshot(self._current_baseline())
+        avail = {m["id"]: m for m in snap.get("row_modes", {}).get(row_key, [])}
+        if not avail:
+            return {"error": "Unknown report for the matrix."}
+        if mode_id not in avail:
+            return {"error": "Unknown comparison mode for this report."}
+        if not avail[mode_id]["supported"]:
+            return {"error": "That comparison isn't available yet for this report."}
+        settings.set_matrix_row_mode(row_key, mode_id)
+        self._push_state()
+        return {"ok": True, "mode": mode_id}
+
+    @_api_method
+    def set_all_matrix_modes(self, mode_id):
+        """Global 'set all comparisons to…' — apply a mode to every row that
+        supports it (others stay on cross-environment). mode_id is 'env' or 'tsn'
+        (the two universal axes; per-row PDF/Excel flavors stay row-local)."""
+        if mode_id not in ("env", "tsn"):
+            return {"error": "Pick Cross-environment or vs TSN."}
+        snap = self._matrix_snapshot(self._current_baseline())
+        for row_key, modes in snap.get("row_modes", {}).items():
+            avail = {m["id"]: m for m in modes}
+            if mode_id == "env":
+                settings.set_matrix_row_mode(row_key, "env")
+            elif mode_id in avail and avail[mode_id]["supported"]:
+                settings.set_matrix_row_mode(row_key, mode_id)
+            # rows without a supported tsn mode are left as-is (cross-env)
+        self._push_state()
+        return {"ok": True, "mode": mode_id}
+
+    @_api_method
+    def set_matrix_tsn_file(self, subdir, path):
+        """Set/clear the TSN file for a report subdir (the picker under the name).
+        An empty path clears it (back to auto-find in _tsn_input/<subdir>/)."""
+        if subdir not in {sd for _k, _l, sd, _i, _a in matrix_rows()}:
+            return {"error": "Unknown report subdir."}
+        settings.set_matrix_tsn_file(subdir, path or "")
+        self._push_state()
+        return {"ok": True}
+
+    @_api_method
+    def consolidate_matrix_tsn(self, subdir):
+        """Build the consolidated TSN workbook from the district PDFs the user
+        dropped in _tsn_input/<subdir>/ (the 'consolidate these PDFs?' prompt
+        path). Offline (pdfplumber); claims the matrix task and refreshes on done."""
+        if subdir != "highway_log":
+            return {"error": "TSN consolidation is only available for Highway Log."}
+        if not self._try_claim_task("matrix"):
+            return {"error": "A task is already running."}
+        self.cancel_event.clear()
+        dest = settings.get_batch_dest()
+        self._emit_log("Consolidating the dropped TSN Highway Log PDFs…")
+        self._set_dot("busy", "Consolidating TSN…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Consolidating TSN…", "workers": 1})
+        self._push_state()
+        MatrixTsnConsolidateWorker(dest, subdir, self._q, self.cancel_event).start()
         return {"ok": True}
 
     @_api_method

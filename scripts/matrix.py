@@ -328,6 +328,17 @@ def mode_out_path(dest, baseline_key, row_key, cell_key, mode):
     return tsn_comparisons_root(dest) / f"{cell_key}_{row_key}_{mode['id']}.xlsx"
 
 
+def out_path_for_cell(dest, baseline_key, row_key, cell_key, mode_id, row_defs=None):
+    """The comparison workbook path for one cell under the row's mode — for the
+    'open' action. None for an unknown row."""
+    rows = row_defs if row_defs is not None else _row_defs()
+    if row_key not in rows:
+        return None
+    _l, subdir, _i, adapter, _hr = rows[row_key]
+    mode = _mode_by_id(_row_modes(row_key, subdir, adapter), mode_id)
+    return mode_out_path(dest, baseline_key, row_key, cell_key, mode)
+
+
 def _tsn_results_path(dest):
     return tsn_comparisons_root(dest) / _TSN_RESULTS_FILE
 
