@@ -658,6 +658,42 @@ def require_signed_in(page, message):
     raise AuthError(message)
 
 
+def require_site_params(page):
+    """Export-path backstop: after sign-in, confirm the app is actually running
+    the SELECTED data source / environment, and raise PreflightError if not.
+
+    navigate_with_auth issues at most ONE corrective reload and then accepts the
+    next signed-in page unconditionally (the in-memory token can't survive a
+    second reload), so a site that ignores the env/src query params after the
+    OAuth handoff could leave the app on the WRONG env while still signed in.
+    Without this check, run_export derives the output folder name from get_site()
+    and would write wrong-env data into a folder LABELED with the selected env
+    and report success — which the cross-environment comparison would then trust.
+    This mirrors the env-scan's wrong_site verdict
+    (gui_worker.EnvScanWorker._check_one).
+
+    No-ops when the running env/src can't be determined (_site_params_ok returns
+    True on 'unknown'), so it never blocks a run it cannot positively refute.
+    """
+    if _site_params_ok(page):
+        return
+    want_src, want_env = get_site()
+    try:
+        got = page.evaluate(_CONFIG_JS) or []
+    except Exception:
+        got = []
+    got_env, got_src = (list(got) + [None, None])[:2]
+    dump_auth_failure(page, "preflight: wrong site env/src after sign-in",
+                      stem="preflight_wrong_env")
+    raise PreflightError(
+        f"The site loaded the {got_src}-{got_env} data source / environment, "
+        f"but {want_src}-{want_env} was selected, and re-checking the sign-in "
+        "didn't switch it. Stopping before export so reports aren't saved under "
+        "the wrong label — verify the selected data source / environment, then "
+        "try again."
+    )
+
+
 def select_report(page, report_label):
     """Pick a report from the #customReport dropdown then fan out
     District/County/Route to -- ALL --.
@@ -733,7 +769,14 @@ def report_error_text(page):
         if loc.count() > 0:
             text = (loc.first.inner_text() or "").strip()
             return text or "The TSMIS site reported an error for this route."
-    except Exception:
+    except Exception as e:
+        # Best-effort, but NEVER silent: this swallow is the sole gate that turns
+        # a site-rendered error into a `failed` route. If it returns None on an
+        # actually-errored page, the route is downgraded to benign "No data" and
+        # never retried — so log it (the "one uploaded log answers it" contract).
+        log.warning("report_error_text: error-state probe failed (%s: %s); "
+                    "treating as 'no error seen'", type(e).__name__,
+                    (str(e).splitlines()[0] if str(e) else ""))
         return None
     return None
 

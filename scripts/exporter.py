@@ -37,6 +37,7 @@ from common import (
     report_error_text,
     report_timeout_ms,
     require_signed_in,
+    require_site_params,
     retry_report_timeout_ms,
     select_report,
     wait_with_skip_option,
@@ -344,14 +345,13 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     # answer preview requests until it returns).
     maybe_screenshot(page, events, note=prefix.strip())
     events.on_status(events.worker_no, f"{prefix} saving…")
-    try:
-        spec.save(page, out_path, timeout_ms)
-    except EmptyExport:
-        # The report rendered but had nothing to export (the site's Export
-        # no-op). is_empty didn't catch it -- the empty marker may have drifted
-        # -- but the general no-download guard did, so treat the route as empty
-        # rather than burning the full timeout. (Marker-independent safety net.)
-        return "empty"
+    # A save that finds no download (and no site error) raises EmptyExport, which
+    # PROPAGATES to _process_route rather than being collapsed to "empty" here.
+    # The is_empty check above is the POSITIVE (marker-matched) empty; the
+    # no-download case is INCONCLUSIVE — a transient export-click flake looks
+    # identical to a real no-op — so _process_route retries it once and records
+    # "empty" only if it reproduces.
+    spec.save(page, out_path, timeout_ms)
     return "saved"
 
 
@@ -392,6 +392,28 @@ def _process_route(page, spec, route, prefix, out_path, events, result, timeout_
             result.failed.append(route)
             _record(result, events, route, "failed")
             return _recover_or_stop(page, spec, events)
+        except EmptyExport:
+            # No download AND no site error in the export-click window. This is
+            # the marker-independent empty net -- but a transient flake in that
+            # short window is INDISTINGUISHABLE from a real empty, so don't trust
+            # it on the FIRST attempt: retry once in-loop and record `empty` only
+            # if it reproduces. (A positive is_empty match short-circuits to
+            # "empty" in _attempt_route and never reaches here.) This stops a
+            # populated route whose Export click flaked from being reported as
+            # benign "No data" and never retried.
+            if attempt < RETRY_COUNT:
+                events.on_log(f"{prefix} no data on first try -- retrying once "
+                              "to rule out a transient export hiccup")
+                log.info("%s no-download empty on attempt %d/%d; retrying",
+                         prefix, attempt + 1, 1 + RETRY_COUNT)
+                if not _recover_or_stop(page, spec, events):
+                    return False
+                continue
+            events.on_log(f"{prefix} empty, skip")
+            result.empty.append(route)
+            _record(result, events, route, "empty")
+            log.info("%s empty after retry (%ds)", prefix, took())
+            return True
         except Exception as e:
             log.exception("%s attempt %d/%d failed after %ds",
                           prefix, attempt + 1, 1 + RETRY_COUNT, took())
@@ -560,6 +582,11 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
                 "Sign-in didn't complete - the saved session may be expired, "
                 "or automatic sign-in isn't available on this PC. Please log in.",
             )
+            # Env backstop: navigate_with_auth accepts the page after one
+            # corrective reload WITHOUT re-confirming env/src, so verify here that
+            # the app is on the SELECTED data source / environment before writing
+            # anything into a folder labeled with it (raises PreflightError if not).
+            require_site_params(page)
 
             events.on_log("Logged in. Checking the report form...")
             events.on_status(events.worker_no, "Checking the report form…")

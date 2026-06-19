@@ -39,6 +39,7 @@ from exporter import (  # noqa: E402
     _attempt_route,
     _can_resume,
     _file_looks_complete,
+    _process_route,
     _verify_saved_file,
     save_via_export_button,
 )
@@ -241,7 +242,7 @@ class FakeRoutePage:
 
 
 def test_attempt_route_empty(monkeypatch):
-    print("_attempt_route EmptyExport -> empty:")
+    print("_attempt_route empty handling (positive vs no-download):")
     monkeypatch(exporter, "wait_with_skip_option", lambda *a, **k: True)
     monkeypatch(exporter, "report_error_text", lambda page: None)
     monkeypatch(exporter, "maybe_screenshot", lambda *a, **k: None)
@@ -249,16 +250,68 @@ def test_attempt_route_empty(monkeypatch):
     def _raise_empty(page, out_path, timeout_ms):
         raise EmptyExport()
 
-    spec = ReportSpec(
-        label="X", subdir="x",
-        filename=lambda r: f"x_{r}.xlsx",
+    # A POSITIVE is_empty match is authoritative -> returns "empty" before save.
+    spec_pos = ReportSpec(
+        label="X", subdir="x", filename=lambda r: f"x_{r}.xlsx",
         wait_js=lambda r: "() => true",
-        is_empty=lambda page: False,        # marker missed it...
-        save=_raise_empty,                   # ...but the no-download guard caught it
-    )
-    outcome = _attempt_route(FakeRoutePage(), spec, "005", "[t]",
+        is_empty=lambda page: True, save=_raise_empty)
+    outcome = _attempt_route(FakeRoutePage(), spec_pos, "005", "[t]",
                              Path("x_005.xlsx"), Events(), 600_000)
-    check("EmptyExport from save becomes the 'empty' outcome", outcome == "empty")
+    check("positive is_empty match returns 'empty'", outcome == "empty")
+
+    # A no-download EmptyExport (marker missed) now PROPAGATES (inconclusive) so
+    # _process_route can retry it once rather than recording empty immediately.
+    spec_nodl = ReportSpec(
+        label="X", subdir="x", filename=lambda r: f"x_{r}.xlsx",
+        wait_js=lambda r: "() => true",
+        is_empty=lambda page: False, save=_raise_empty)
+    expect_raises("no-download EmptyExport propagates out of _attempt_route",
+                  EmptyExport,
+                  lambda: _attempt_route(FakeRoutePage(), spec_nodl, "005", "[t]",
+                                         Path("x_005.xlsx"), Events(), 600_000))
+
+
+def test_process_route_empty_retry(monkeypatch, tmp):
+    print("transient export-click empty is retried, not recorded empty on first try:")
+    from events import RunResult
+    monkeypatch(exporter, "wait_with_skip_option", lambda *a, **k: True)
+    monkeypatch(exporter, "report_error_text", lambda page: None)
+    monkeypatch(exporter, "maybe_screenshot", lambda *a, **k: None)
+    monkeypatch(exporter, "_recover_or_stop", lambda *a, **k: True)
+    monkeypatch(exporter, "_capture_failure", lambda *a, **k: None)
+
+    # Case A: EmptyExport on the FIRST attempt, a real download on the retry ->
+    # the route is SAVED (a transient export-click flake must not read as empty).
+    calls = {"n": 0}
+
+    def save_flaky(page, out_path, timeout_ms):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise EmptyExport()
+        _write_xlsx(out_path)
+
+    specA = ReportSpec(label="X", subdir="x", filename=lambda r: "x.xlsx",
+                       wait_js=lambda r: "() => true", is_empty=lambda p: False,
+                       save=save_flaky)
+    rA = RunResult(output_dir=str(tmp))
+    _process_route(FakeRoutePage(), specA, "005", "[t]", tmp / "x_a.xlsx",
+                   Events(), rA, 600_000)
+    check("transient empty retried then SAVED",
+          rA.saved == 1 and "005" not in rA.empty)
+    check("the export was attempted twice", calls["n"] == 2)
+
+    # Case B: EmptyExport on BOTH attempts -> genuinely empty, recorded once.
+    def save_always_empty(page, out_path, timeout_ms):
+        raise EmptyExport()
+
+    specB = ReportSpec(label="X", subdir="x", filename=lambda r: "x.xlsx",
+                       wait_js=lambda r: "() => true", is_empty=lambda p: False,
+                       save=save_always_empty)
+    rB = RunResult(output_dir=str(tmp))
+    _process_route(FakeRoutePage(), specB, "006", "[t]", tmp / "x_b.xlsx",
+                   Events(), rB, 600_000)
+    check("reproduced empty recorded as 'empty'", rB.empty == ["006"])
+    check("reproduced empty NOT recorded 'failed'", "006" not in rB.failed)
 
 
 # --- empty-marker predicates -------------------------------------------------
@@ -310,6 +363,17 @@ def test_markers():
     check("Highway Log empty marker",
           hl.SPEC.is_empty(FakeMarkerPage(body="No results found in this segment.")))
 
+    # Highway Sequence now keys empty on the POSITIVE "No results found" text
+    # (hsl.js), not Export-button absence — so an error page (no button, message
+    # in #rampResults.error, NOT in the body) is no longer misread as empty.
+    import export_highway_sequence as hsq
+    check("Highway Sequence empty via 'No results found'",
+          hsq.SPEC.is_empty(FakeMarkerPage(body="No results found")))
+    check("Highway Sequence NOT empty on an error page (no no-results text)",
+          not hsq.SPEC.is_empty(FakeMarkerPage(body="An unexpected error occurred.")))
+    check("Highway Sequence NOT empty when data present",
+          not hsq.SPEC.is_empty(FakeMarkerPage(body="District County Route PM ...")))
+
 
 # --- cs-disabled detection in select_report ----------------------------------
 
@@ -359,6 +423,90 @@ def test_cs_disabled():
         check("enabled report proceeds without error", True)
     except Exception as e:  # noqa: BLE001
         check(f"enabled report proceeds (raised {type(e).__name__})", False)
+
+
+def test_report_error_text():
+    print("report_error_text (best-effort but never silent):")
+    import io
+    import logging
+
+    class _Loc:
+        def __init__(self, cnt, text=None):
+            self._c, self._t = cnt, text
+
+        def count(self):
+            return self._c
+
+        @property
+        def first(self):
+            return self
+
+        def inner_text(self):
+            return self._t
+
+    class P:
+        def __init__(self, loc):
+            self._loc = loc
+
+        def locator(self, sel):
+            return self._loc
+
+    check("error page returns the site message",
+          common.report_error_text(P(_Loc(1, "Build failed"))) == "Build failed")
+    check("error page with blank text -> generic message",
+          "error" in (common.report_error_text(P(_Loc(1, "  "))) or "").lower())
+    check("no error -> None", common.report_error_text(P(_Loc(0))) is None)
+
+    # A probe flake must return None AND be logged (the swallow is the gate that
+    # turns a site error into a `failed` route; a silent None downgrades it).
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    handler.setLevel(logging.DEBUG)
+    common.log.addHandler(handler)
+    old_level = common.log.level
+    common.log.setLevel(logging.DEBUG)
+
+    class _BoomPage:
+        def locator(self, sel):
+            raise RuntimeError("navigation race")
+
+    try:
+        res = common.report_error_text(_BoomPage())
+    finally:
+        common.log.removeHandler(handler)
+        common.log.setLevel(old_level)
+    check("probe exception -> None (best effort)", res is None)
+    check("probe exception is LOGGED (not silent)",
+          "report_error_text" in buf.getvalue())
+
+
+def test_require_site_params(monkeypatch):
+    print("require_site_params env backstop:")
+    monkeypatch(common, "dump_auth_failure", lambda *a, **k: None)
+    monkeypatch(common, "_data_source", "ssor")
+    monkeypatch(common, "_environment", "prod")
+
+    class FakeCfgPage:
+        def __init__(self, cfg, raises=False):
+            self._cfg = cfg
+            self._raises = raises
+
+        def evaluate(self, js):
+            if self._raises:
+                raise RuntimeError("config unavailable")
+            return self._cfg
+
+    # _CONFIG_JS resolves to [env, src]; selected = ssor/prod.
+    common.require_site_params(FakeCfgPage(["prod", "ssor"]))   # match -> no raise
+    check("matching env/src passes the backstop", True)
+    common.require_site_params(FakeCfgPage(None, raises=True))  # unknown -> no raise
+    check("undeterminable env/src does NOT false-block", True)
+    common.require_site_params(FakeCfgPage([]))                 # empty -> no raise
+    check("empty config does NOT false-block", True)
+    expect_raises("wrong env/src raises PreflightError", common.PreflightError,
+                  lambda: common.require_site_params(FakeCfgPage(["test", "ssor"])))
+    expect_raises("wrong src raises PreflightError", common.PreflightError,
+                  lambda: common.require_site_params(FakeCfgPage(["prod", "ars"])))
 
 
 def test_auth_url_redaction():
@@ -446,8 +594,11 @@ def main():
         test_save_via_export_button(tmp, monkeypatch_error)
         exporter.report_error_text = _orig_error
         test_attempt_route_empty(monkeypatch)
+        test_process_route_empty_retry(monkeypatch, tmp)
         test_markers()
         test_cs_disabled()
+        test_report_error_text()
+        test_require_site_params(monkeypatch)
         test_auth_url_redaction()
         test_site_url_override()
         test_corrupt_config_backup()
