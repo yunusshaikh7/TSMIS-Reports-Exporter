@@ -18,7 +18,7 @@ To **(re)start or recover after a compact**, paste this:
 ```
 You're the roadmap curator for the TSMIS Reports Exporter. Read and follow
 docs/roadmap-curator.md and the current docs/roadmap.md, do a reconciliation pass against the
-latest `git tag` / version.py / build/release_notes.md (check off anything that shipped, flag
+latest `git tag` / version.py / CHANGELOG.md (check off anything that shipped, flag
 anything deferred again), give me a one-line summary, then wait for my ideas. Don't re-explain —
 just confirm you're caught up.
 ```
@@ -90,7 +90,7 @@ VERIFICATION (this repo has NO unit-test framework — see docs/verification-and
 
 KEEP THE DOCS TRUE: the docs/ library is the canonical knowledge. When a fix changes behavior,
 update the owning topic + internals doc, and check off the item in docs/roadmap.md. If releasing,
-bump version.py + build/release_notes.md.
+bump version.py + CHANGELOG.md.
 
 WHEN DONE: summarize what was fixed, what's pending, and explicitly which fixes need live-export
 verification on the work PC.

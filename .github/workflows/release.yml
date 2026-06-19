@@ -56,6 +56,12 @@ jobs:
           }
           Write-Host "OK: tag $env:TAG matches version.py ($v)."
 
+      - name: Assemble release notes for this version (fast-fail before build)
+        # Shared header + this version's CHANGELOG.md section only — so the
+        # release shows what changed in THIS version, not the whole history.
+        # Runs before the long build so a missing CHANGELOG section fails fast.
+        run: python build/gen_release_notes.py "$env:TAG" -o notes.md
+
       - name: Build + run frozen self-test, system browser (release gate)
         run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
 
@@ -104,4 +110,4 @@ jobs:
           "TSMIS-Exporter-$env:TAG-batch-source.zip.sha256"
           --target "${{ github.sha }}"
           --title "TSMIS Exporter $env:TAG"
-          --notes-file build/release_notes.md
+          --notes-file notes.md

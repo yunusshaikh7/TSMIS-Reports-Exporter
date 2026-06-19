@@ -175,7 +175,7 @@ shared branch is a `git add -A` sweeping the other agent's WIP into a commit, so
 the discipline is: **review the diff at finish-up** — confirm every commit's
 files match its scope before merging. (At merge: no cross-scope contamination,
 all golden checks green, then a fast-forward to main.) Neither agent edited the
-close-out files (CLAUDE.md / version.py / README / UI mock / release_notes) —
+close-out files (CLAUDE.md / version.py / README / UI mock / CHANGELOG) —
 those are done once, at close-out, by the integrator.
 
 ## 9. Work-PC reality shapes every shippable feature

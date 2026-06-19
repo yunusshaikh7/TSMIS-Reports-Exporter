@@ -29,9 +29,9 @@ git-ignored `code-review/` audit detail won't be visible; the roadmap itself is 
 Items stay "open" after they ship and version buckets quietly get pushed back. Counter it:
 - **Reconcile** at session start and whenever I say a patch went out. Compare the open items + the
   version table against what ACTUALLY shipped — sources of truth, in order: `git tag` / `git log`,
-  `version.py`, `build/release_notes.md`, the docs.
+  `version.py`, `CHANGELOG.md`, the docs.
 - Mark shipped items done in the roadmap's existing style (`- [x] ~~…~~ **Done (vX.Y.Z / <commit>)**`,
-  one line). The roadmap is **not** the changelog (`build/release_notes.md` is) — keep "done" notes
+  one line). The roadmap is **not** the changelog (`CHANGELOG.md` is) — keep "done" notes
   to one line.
 - Update the version table to reality; re-draft the forward buckets so deferred work moves honestly.
 - **Flag the pushed-back pattern:** an item deferred across multiple releases gets called out by name
