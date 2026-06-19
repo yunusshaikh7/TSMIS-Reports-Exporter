@@ -32,7 +32,6 @@ SOURCE_DEFAULT = "ssor-prod"
 BYDAY_DIRNAME = "tsn-by-day"          # under output/comparisons/
 TSN_SUBDIR = "highway_log"            # both HL rows share one TSN dataset
 _RESULTS_FILE = "_results.json"
-_MTIME_TOL_S = 1.0
 
 
 # --------------------------------------------------------------------------- #
@@ -247,6 +246,11 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     rows = _row_lookup()
     if row_key not in rows:
         raise ValueError(f"unknown by-day matrix row: {row_key}")
+    # Validate date+source at the boundary so neither can traverse out of output/
+    # even if a settings file was hand-edited (the bridge already validates the
+    # normal path). The combined folder name must parse as a real run folder.
+    if not parse_run_folder(day_folder_name(date, source)):
+        raise ValueError(f"invalid date/source for the by-day matrix: {date!r} / {source!r}")
     _k, _label, subdir, fmt, supported = rows[row_key]
     if not supported:
         raise ValueError(f"no TSN comparison for {row_key} yet")

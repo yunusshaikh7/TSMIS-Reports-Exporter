@@ -3,6 +3,30 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.16.0 — 2026-06-19
+
+- **Queue up matrix work instead of waiting.** On the Everything tab's
+  Comparison matrix, a second action no longer says "a task is already running" —
+  it joins a **queue** that runs one job at a time and moves on by itself. The
+  queue is shown right on the matrix, and you can reorder it, remove a job, clear
+  what's waiting, or stop everything. Line up a re-export and a rebuild, or several
+  cells in a row, and walk away.
+- **Two clear buttons on every row and column.** Each report row and each
+  environment column now has **two** buttons with distinct icons: one **re-exports**
+  that report/environment live from TSMIS, the other **rebuilds its comparisons** —
+  so the bulk "refresh" you want is never ambiguous. (Re-exporting a whole row or
+  column asks first, since it pulls many reports from TSMIS.)
+- **Fast mode for matrix re-exports.** A new **Fast mode** toggle on the matrix
+  runs re-exports with several browsers at once (the same speed-up the Export tab
+  has), for when you're refreshing a lot at once.
+- **New: compare exports day-by-day against TSN.** A new **"TSN by day"** sub-tab
+  on the Compare tab lets you pick specific exported **days** and compare each one's
+  Highway Log against TSN side by side — e.g. the 17th vs TSN next to the 18th vs
+  TSN. Pick a data source, add the days you want as columns, and build each cell;
+  it reuses the same TSN dataset and comparison engine as the Everything matrix.
+  Highway Log (Excel and PDF) works now; the other reports appear greyed until their
+  TSN comparison is added.
+
 ## v0.15.0 — 2026-06-19
 
 - **New: a comparison matrix on the Everything tab.** A new **Comparison

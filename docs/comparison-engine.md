@@ -538,8 +538,12 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 - **build_comparison** dispatches by mode: env → `build_cell_comparison`; tsn/self → consolidate the env's
   store folder(s) on the fly (`consolidate_highway_log` / `consolidate_tsmis_highway_log_pdf` — the PDF
   one gained an **additive** `input_dir`/`out_path`/`converted_dir` override, no-arg behavior unchanged)
-  then call the file-vs-file adapter. TSN/self sheets → `<dest>/comparisons/tsn/<cell>_<row>_<mode>.xlsx`
-  (cross-env stays `<dest>/comparisons/<baseline>/<cell>_<row>.xlsx`) — both **stable, dateless** names.
+  then call the file-vs-file adapter. The **tsn** branch delegates to the shared
+  `matrix.consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, fmt, …)` (v0.16.0) — the SAME
+  helper the by-day matrix uses (§12b), so the two matrices differ only by source folder + output path
+  (proven byte-identical: same consolidate-to-temp → same compare → same out_path). TSN/self sheets →
+  `<dest>/comparisons/tsn/<cell>_<row>_<mode>.xlsx` (cross-env stays
+  `<dest>/comparisons/<baseline>/<cell>_<row>.xlsx`) — both **stable, dateless** names.
 - **Cells** carry a unified `cmp` state (env mode also keeps a `comparison` alias). Each shows the
   **discrepancy count** (diff cells + one-sided), color-coded; plus greyed (mode not coded), needs-export,
   needs-TSN / "consolidate N PDFs", and stale states. **Freshness** is pure-filesystem
@@ -551,14 +555,49 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
   row=, env=)`); **cancel** between cells (`MatrixCompareWorker`) + idempotent resume (re-run stale).
   TSN actions: pick a file, or **consolidate dropped PDFs** (`MatrixTsnConsolidateWorker`).
 - **Workers** (`gui_worker`): `MatrixCompareWorker` (loops `build_comparison` over `(row, cell, mode)`),
-  `MatrixExportWorker` (single (report,env) live refresh, no manifest), `MatrixTsnConsolidateWorker`.
-  Bridge (`gui_api`): `matrix_info` / `set_matrix_baseline` / `set_matrix_report` / `set_matrix_env` /
+  `MatrixBatchExportWorker` (v0.16.0; loops `_run_matrix_export_step` over `[(spec, src, env)]` for a cell,
+  row or column — manifest-free, `workers=N` ⇒ fast; replaced the single-cell `MatrixExportWorker`),
+  `MatrixTsnConsolidateWorker`.
+- **The matrix job queue (v0.16.0):** matrix actions ENQUEUE Jobs instead of claiming the gate; the
+  queue runs one at a time + auto-advances (see [gui.md](gui.md) for the gate/race details). Bridge
+  (`gui_api`): `matrix_info` / `set_matrix_baseline` / `set_matrix_report` / `set_matrix_env` /
   `set_matrix_row_mode` / `set_all_matrix_modes` / `set_matrix_tsn_file` / `pick_matrix_tsn_file` /
-  `consolidate_matrix_tsn` / `refresh_cell_export` / `refresh_cell_comparison` / `recompute_matrix` /
-  `open_cell_comparison` / `open_comparisons_folder`.
+  `consolidate_matrix_tsn` / `refresh_cell_export` / **`refresh_row_export`** / **`refresh_column_export`** /
+  `refresh_cell_comparison` / `recompute_matrix` / `open_cell_comparison` / `open_comparisons_folder` /
+  **`set_matrix_fast`** / **`matrix_queue_remove|move|clear`** / **`matrix_stop_all`**.
 - **Locked by** `build/check_matrix.py` (enumeration, mtime staleness, stable paths, real env
   orchestration with a planted diff), `build/check_matrix_tsn.py` (mode registry, TSN source detection,
-  greyed cells, scoped rebuilds, build guards) and `build/check_matrix_bridge.py` (every bridge method +
+  greyed cells, scoped rebuilds, build guards) and `build/check_matrix_bridge.py` (every bridge method,
+  the **queue** — enqueue/auto-advance/reorder/remove/clear/stop-all/no-work-drop/auth-clear/fast — and
   the "a cell export leaves a paused batch intact" invariant). **Owed on the work PC:** a LIVE per-cell
-  export, a full baseline recompute, and the live HL TSN / PDF-vs-Excel comparisons over a real store
-  (the underlying compare adapters are already golden-locked; the consolidate→compare glue is what's owed).
+  export, queue auto-advance + fast mode under real exports, a full baseline recompute, and the live HL
+  TSN / PDF-vs-Excel comparisons over a real store (the underlying compare adapters are already
+  golden-locked; the consolidate→compare glue is what's owed).
+
+### 12b. The Compare-tab "TSN by-day" matrix (`scripts/day_matrix.py`, v0.16.0)
+
+A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
+day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
+(report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
+cross-environment, no live re-export** (it compares specific historical exports). HL Excel + PDF are
+supported; RS/RD/HSL appear greyed (groundwork). Like `matrix.py`, it NEVER edits the manual compare
+code — it only orchestrates.
+
+- **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
+  (the same path `build_comparison`'s tsn branch uses) over the day's run folder
+  `output/<date src-env>/<subdir>/`. TSN dataset + picker are **shared** with the Everything matrix
+  (`matrix.tsn_source` over `<batch_dest>/_tsn_input/highway_log/`, `settings.matrix_tsn_files`).
+- **Store:** `output/comparisons/tsn-by-day/<date src-env>/<row>_vs_tsn.xlsx` (stable, dateless per
+  cell); counts cached in that tree's `_results.json`. Snapshot (`day_matrix_snapshot`) is a pure stat,
+  reusing `matrix._cmp_state`; `cells_to_rebuild(scope, row=, date=)` skips greyed rows + missing sides.
+- **One queue, both matrices:** day compare Jobs carry `which:"day"` and route to
+  `DayMatrixCompareWorker` (mirrors `MatrixCompareWorker`); they share the Everything matrix's queue,
+  gate, Cancel and queue panel. Bridge: `day_matrix_info` / `set_day_matrix_source` /
+  `add_day_matrix_day` / `remove_day_matrix_day` / `set_day_matrix_report` / `build_day_cell` /
+  `rebuild_day_matrix` / `open_day_cell_comparison` / `open_day_comparisons_folder`. Settings:
+  `day_matrix_source` / `day_matrix_days` / `day_matrix_hidden` (TSN file reuses `matrix_tsn_files`).
+- **Boundary guard:** `build_day_cell` rejects any `date`/`source` whose combined folder name doesn't
+  parse as a real run folder, so neither can traverse out of `output/`.
+- **Locked by** `build/check_day_matrix.py` (rows/sources, available-day detection, snapshot + greyed
+  cells, scoped rebuild list, build guards, and the gui_api bridge incl. the shared queue). **Owed on
+  the work PC:** building two real days vs TSN end-to-end.

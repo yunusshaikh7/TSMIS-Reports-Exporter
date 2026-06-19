@@ -106,14 +106,14 @@ the field bug + P1s first.
 
 ---
 
-## v0.15.0 — the Everything comparison matrix
+## v0.15.0 — the Everything comparison matrix  ✅ SHIPPED (2026-06-19)
 
-Shipping in **v0.15.0** (`version.py` bumped + CHANGELOG written; tag push pending review).
-Built on `feat/everything-matrix`, reconciled with `main`. Golden-checked offline; the LIVE
-paths below are owed on the work PC. This release also carries an **app-wide UI polish + motion
-pass** — the matrix controls set the bar and the rest of the app was brought up to it (motion
-tokens, bordered secondary buttons, consistent title-bar-vs-card controls, reduced-motion-safe
-entrance animations); see [gui.md](gui.md) "Motion layer + control polish".
+**Shipped — v0.15.0** (tag pushed, GitHub release live; updater offers it to users). Built on
+`feat/everything-matrix`, merged to `main`. Carried an **app-wide UI polish + motion pass** —
+the matrix controls set the bar and the rest of the app was brought up to it (motion tokens,
+bordered secondary buttons, consistent title-bar-vs-card controls, reduced-motion-safe entrance
+animations); see [gui.md](gui.md) "Motion layer + control polish". (Items below kept for the
+work-PC live-verify list.)
 
 - [x] **Stage-1 foundation audit** — see the closed-findings record below.
 - [x] **8 groundwork code-review fixes** — the field bug + 4 P1s + 3 P2s above are checked off.
@@ -152,6 +152,54 @@ matrix's **live per-cell Refresh export** + a full **baseline-switch recompute o
 store**; and the **live TSN / PDF-vs-Excel comparisons** (consolidate-store-folder → compare glue;
 the compare adapters themselves are already golden-locked). Before releasing: bump `version.py` +
 `build/release_notes.md`.
+
+---
+
+## v0.16.0 — matrix queue + fast mode + Compare-tab "TSN by-day" matrix  ✅ SHIPPED (2026-06-19)
+
+Two undertakings, one feature release (committed in stages A → shared-engine factor → B).
+Also the release that **field-tests the updater rename-retry fix** (v0.15.0 → v0.16.0).
+`compare_core` stays untouched — orchestration only. Golden coverage:
+`check_matrix_bridge.py` (queue) + `check_day_matrix.py` (by-day matrix).
+
+**A — Everything-matrix upgrades (commit `a5d7d05`):**
+- [x] **Row/column header buttons with distinct icons** — two buttons per header matching the
+  cells: ↻ **live re-export** (one report × all envs, or all reports × one env; bulk confirms
+  first) + ⟳ **rebuild-comparison** (`recompute_matrix`).
+- [x] **Fast (parallel) mode for matrix exports** — toggle in the config zone, reuses the global
+  `fast_workers` (`settings.get/set_matrix_fast`); routes through `MatrixBatchExportWorker`
+  → `ExportWorker(workers=N)`.
+- [x] **Editable, matrix-scoped job queue** — a 2nd action **queues** instead of being rejected;
+  jobs run one at a time + auto-advance from `_end_task`; view / remove / reorder / clear /
+  stop-all. New manifest-free `MatrixBatchExportWorker`. Gate+popleft claimed atomically (no
+  queue↔gate race); an error that ends a matrix job clears the pending queue (no cascade).
+  Cuts held: no per-job fast, no drag-drop, no cross-restart persistence, no whole-matrix button.
+
+**B — Compare-tab "TSN by-day" matrix (commit `868d673`):** rows = report types, columns =
+exported **days** you add, each cell = (report, day) **vs TSN**; ONE data source (default
+SSOR/Prod); no cross-env, no live re-export. New Compare sub-tab; **Highway Log Excel + PDF**
+supported, RS/RD/HSL **greyed**. Days from `output/<date src-env>/`; outputs to
+`output/comparisons/tsn-by-day/<date src-env>/<row>_vs_tsn.xlsx`. New `day_matrix` engine +
+`DayMatrixCompareWorker` + `day_matrix_*` bridge + `day_matrix_*` settings. Everything KEEPS its
+vs-TSN (latest-refresh dashboard).
+
+**Cross-cutting:**
+- [x] **Shared TSN comparison engine** (commit `21ecdb5`) — `matrix.consolidate_and_compare_tsn`
+  ("consolidate TMSIS store folder → `compare_highway_log[_pdf]` TSMIS_*_VS_TSN → write") used by
+  BOTH matrices (differ only by source folder + output path); byte-identical to the prior
+  Everything output (same consolidate-to-temp → same compare → same out_path).
+- [x] **One queue serves both matrices** — a `which: env|day` discriminator on the Job routes to
+  `MatrixCompareWorker` vs `DayMatrixCompareWorker`; one queue panel renders in both places.
+- **Deviation from the plan's "auto-consolidate WITH prompt":** the user-facing consolidated
+  artifact (the **TSN** district-PDF → workbook) already prompts (the existing
+  `consolidate_matrix_tsn` flow, reused by both matrices). The TMSIS side is consolidated to a
+  throwaway temp per build (internal plumbing), kept **silent** — prompting on every cell build
+  would be hostile. Revisit if a per-build TMSIS-consolidation prompt is actually wanted.
+
+**Owed work-PC live verification:** matrix queue auto-advance under real exports; fast mode (N
+browsers, bounded, no `batch_job.json` clobber); a row/column live re-export; the by-day matrix
+building two real days vs TSN; auth-error clearing the queue; and **the updater field test —
+v0.15.0 → v0.16.0 stages with no manual redownload**.
 
 ---
 

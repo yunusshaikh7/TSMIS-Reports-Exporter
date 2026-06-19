@@ -159,6 +159,39 @@ new bridge method, exercising all states at `/index.html#mock`. Engine + bridge:
 reports viewport width 0 until `preview_resize`d and won't tick transitions — verify
 the wide layout end-state via DOM measurement.
 
+### The matrix job queue + fast mode + row/col buttons (v0.16.0)
+
+Matrix actions no longer claim the single-task gate directly — they **enqueue a
+Job** and the queue runs one at a time. The queue lives in `gui_api`: `self._queue`
+(deque) + `self._current_job` + `self._job_seq`; `_enqueue_matrix_job` →
+`_try_start_next_matrix_job` (claims the gate AND `popleft`s **atomically** under the
+lock, then `_dispatch_matrix_job` resolves targets with the lock released — returns
+False ⇒ drop the no-work job + try the next). `_end_task` clears `_current_job` and
+auto-advances; an error that ends a matrix job (`_on_error`, auth or browser) clears
+the pending queue so it can't cascade. **Targets resolve at START, not enqueue**
+(`_resolve_compare_cells` / `_resolve_export_steps`), so a job reflects exports done
+before it. Snapshot keys: `matrix_queue`, `matrix_current`, `matrix_fast`. New bridge:
+`refresh_row_export`/`refresh_column_export`, `set_matrix_fast`,
+`matrix_queue_remove|move|clear`, `matrix_stop_all`. Worker: `MatrixBatchExportWorker`
+(manifest-free, `workers=N` ⇒ fast). UI: each row/column header has a **two-button
+group** (`mxHeaderBtns`: ↻ `i-refresh` re-export + ⟳ `i-compare` rebuild), a Fast
+toggle + a live queue panel (`renderQueuePanel` / `mxQueueRow`) in the config zone;
+action triggers stay LIVE mid-run (a 2nd click queues) — only selection controls grey.
+
+### The Compare-tab "TSN by day" matrix (v0.16.0)
+
+A second matrix under the **Compare** tab (sub-tab `tsn_by_day`, appended after the
+registry `compare_groups`): rows = report types, columns = exported **days** you add,
+each cell = (report, day) **vs TSN**. ONE source selector (default ssor-prod); no
+cross-env, no live re-export. `selectCompareGroup("tsn_by_day")` swaps `#compareClassic`
+out for `#dayMatrixSection`; `renderDayMatrix` is fed by `gui_api.day_matrix_info`.
+HL Excel + PDF supported; RS/RD/HSL greyed. It **shares** the TSN dataset/picker
+(`mxTsnPicker`, keyed `highway_log`), the cell vocab (`mxCellContent`/`mxActBtn`), and
+the SAME job queue (the queue panel renders in both places); day compare Jobs carry
+`which:"day"` and route to `DayMatrixCompareWorker`. Engine + store:
+[comparison-engine.md](comparison-engine.md) §12. Mock + bridge exercised at
+`/index.html#mock` (Compare ▸ TSN by day).
+
 ## Motion layer + control polish
 
 A light app-wide motion system (end of `app.css`, `prefers-reduced-motion`-aware),

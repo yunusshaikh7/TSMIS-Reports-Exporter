@@ -317,6 +317,18 @@ cross-fade) lands with it. Engine internals are owned by
 [gui.md](gui.md). (This delivers a slice of the parked A3 file-browser intent;
 A3 stays parked.)
 
+**v0.16.0 extends the matrix in two ways.** (1) Matrix actions now flow through a
+**matrix-scoped job queue** in front of the single-task gate — a 2nd action queues
+(reorder/remove/clear/stop-all), jobs auto-advance, row/column headers gain distinct
+↻ re-export + ⟳ rebuild buttons, and re-exports support **fast mode**
+(`MatrixBatchExportWorker`). (2) A **second matrix** lives under the **Compare** tab —
+the manual **"TSN by day"** matrix (`scripts/day_matrix.py`): rows = reports, columns
+= exported days, each cell = (report, day) vs TSN; no cross-env, no live re-export.
+The two matrices **share** the TSN compare path (`matrix.consolidate_and_compare_tsn`,
+factored out — byte-identical to the prior output), the TSN dataset/picker, and the
+ONE job queue (a `which:env|day` Job discriminator routes to the right worker). Engine
++ store details: [comparison-engine.md](comparison-engine.md) §12/§12b.
+
 ## See also
 
 - [reports.md](reports.md) — the per-report `ReportSpec` details and how to add a
