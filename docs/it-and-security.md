@@ -247,7 +247,13 @@ The same audit explicitly cleared these as sound — re-auditing them is wasted 
   "logs, the saved login, the Edge sign-in profile and the app's settings are NEVER
   in this list." It removes only run folders, legacy output folders, the
   TSN/TSMIS-PDF consolidated workbooks, the Export-Everything store, `FAILURES_DIR`,
-  and (opt-in) the TSN input PDFs.
+  and (opt-in) the TSN input PDFs. **Phase-3 hardening (`reset-deletes-unvalidated-batch-dest`):**
+  the user-chosen Export-Everything destination is NOT rmtree'd wholesale — only its
+  known `<src-env>/` children (the exact `{ssor,ars}-{prod,test,dev}` folders the batch
+  writer creates) are deleted, so any foreign files the user keeps alongside the store
+  survive; and the confirm dialog now shows each target's **real `str(path)`** under its
+  label (`reset_preview` returns `paths`), not a label that hid the location. Locked by
+  `check_b3_batch.py` (`test_reset_scopes_batch_dest`).
 - **The support bundle excludes the auth file and browser profiles.**
   `gui_api.save_support_bundle` adds only the rotating logs (`tsmis.log*`,
   `crash.log`, `update_helper.log`), up to 50 recent run-report CSVs, and a
@@ -261,9 +267,11 @@ The same audit explicitly cleared these as sound — re-auditing them is wasted 
   targets** (verified empirically on Python 3.11 + Windows, 2026-06-16).
   `shutil.rmtree` **refuses** a top-level directory junction (leaves the junction's
   target untouched) and does **not** recurse into a nested junction (removes the
-  link only); `reset_targets` builds its delete list solely from path constants
-  (`OUTPUT_ROOT` run folders / fixed legacy names / `FAILURES_DIR` / `INPUT_ROOT`),
-  never user-supplied names. The updater's `zipfile.extractall` is likewise safe:
+  link only); `reset_targets` builds its delete list from path constants
+  (`OUTPUT_ROOT` run folders / fixed legacy names / `FAILURES_DIR` / `INPUT_ROOT`) plus,
+  for the user-chosen Export-Everything dest, ONLY its recognized `<src-env>/` children
+  (name-gated against `{ssor,ars}-{prod,test,dev}`) — never the dest root and never an
+  arbitrary user-supplied path. The updater's `zipfile.extractall` is likewise safe:
   3.11 sanitizes `..`/absolute/drive members and the staged zip is SHA-256-verified
   and self-produced. (Closed item; see [roadmap.md](roadmap.md).)
 

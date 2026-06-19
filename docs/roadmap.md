@@ -30,32 +30,33 @@ report with code anchors + fix sketches: `code-review/AUDIT-phase3-0a4c071.md` (
 the field bug + P1s first.
 
 ### Field-reported (work-PC logs — CONFIRMED in the field)
-- [ ] **`update-stage-rename-no-retry`** — intermittent **`PermissionError: [WinError 5] Access is
-  denied`** while *staging* an update (NOT the swap): `download_and_stage`'s bare
-  `root.rename(extract\TSMIS Exporter → staged)` (`updater.py:416`) fails when Defender / the
-  indexer still holds the freshly-extracted ~150 MB tree; the stage aborts, the user re-downloads
-  and it works. **Asymmetry is the bug:** `perform_swap` wraps its file ops in `_retry`
-  (12 × 0.5 s, "Defender / slow handle release") but the stage rename has none. Observed 2× on the
-  work PC (2026-06-17 ~09:20, 2026-06-18 ~09:39). **Fix:** wrap the rename + `rmtree(extract_dir)`
-  in the same `_retry`, or `extractall` straight into `staged`. Evidence:
-  `code-review/field-update-stage-rename.md`; note in [internals/updater-swap.md](internals/updater-swap.md) §3.
+- [x] **`update-stage-rename-no-retry`** ✅ **Done (this update)** — wrapped the extract→staged
+  rename (+ the follow-on cleanup rmtree) in the swap step's `_retry` (12×0.5 s) so a transient
+  Defender/indexer lock retries instead of aborting the stage. Locked by `check_updater.py`
+  (`test_stage_rename_retries` + `test_retry_recovers_transient_oserror`). ⚠ FIELD-VERIFY on the
+  work PC that staging no longer fails (the Defender timing only reproduces there). Original
+  evidence: `code-review/field-update-stage-rename.md`; note in
+  [internals/updater-swap.md](internals/updater-swap.md) §3.
 
 ### P1 — product-risk / data-loss / security (do first)
-- [ ] **P1 `navigate-accepts-wrong-env-after-one-reload`** — the export path never re-checks
-  `_site_params_ok` after sign-in (only `require_signed_in`), so if the one corrective reload
-  doesn't switch the site's `CONFIG`, **wrong-env data is saved under a folder labeled with the
-  selected env** and reported as success. Add an env backstop on the export path mirroring the
-  env-scan's `wrong_site` verdict. (Re-confirms the v0.10.4 `AUTH-WRONG-ENV-SILENT-SUCCESS`; see
-  [it-and-security.md](it-and-security.md) §8.2.)
-- [ ] **P1 `empty-routes-read-as-export-complete`** — an all-empty run shows the green "Export
-  complete" headline (`app.js renderCompletion` keys only on `failed===0`). Show an amber "Finished
-  with no data" when `saved+exists===0 && empty>0`.
-- [ ] **P1 `transient-export-click-failure-recorded-empty`** — a transient failure in the Export
-  click window is recorded `empty` and **never retried** (`_retry_failed_routes` excludes `empty`).
-  Make the first `EmptyExport` retriable; collapse to `empty` only if it reproduces.
-- [ ] **P1 `reset-deletes-unvalidated-batch-dest`** — "Delete all reports" `rmtree`s the user-chosen
-  Everything destination **wholesale** (incl. foreign files) and the confirm dialog **hides the real
-  path** (labels only). Scope deletion to known `<src-env>/` children and show `str(path)`.
+- [x] **P1 `navigate-accepts-wrong-env-after-one-reload`** ✅ **Done (this update)** — added
+  `common.require_site_params(page)` on the export path (after `require_signed_in`), raising
+  `PreflightError` when the app is on a different env/src than selected; no-ops when undeterminable.
+  Locked by `check_export_engine.py` (`test_require_site_params`). ⚠ LIVE work-PC re-test (only a
+  real site returning the wrong env after OAuth truly exercises it).
+- [x] **P1 `empty-routes-read-as-export-complete`** ✅ **Done (this update)** — `renderCompletion`
+  shows an amber "Finished with no data" when `saved+exists===0 && empty>0`; `appendLog` no longer
+  paints a `saved 0` summary green. Verified in the `#mock` preview.
+- [x] **P1 `transient-export-click-failure-recorded-empty`** ✅ **Done (this update)** — a no-download
+  `EmptyExport` now PROPAGATES from `_attempt_route`; `_process_route` retries it once in-loop and
+  records `empty` only if it reproduces (a positive `is_empty` match stays immediate empty). Locked by
+  `check_export_engine.py` (`test_attempt_route_empty` + `test_process_route_empty_retry`). ⚠ LIVE
+  work-PC re-test (the true transient click flake only occurs against the real site).
+- [x] **P1 `reset-deletes-unvalidated-batch-dest`** ✅ **Done (this update)** — `reset_targets` now
+  scopes the Export-Everything store to its known `<src-env>/` children (never rmtree's the dest
+  wholesale; foreign files untouched); `reset_preview` returns the real `str(path)`s and the confirm
+  dialog shows each under its label. Locked by `check_b3_batch.py` (`test_reset_scopes_batch_dest`);
+  dialog verified in the `#mock`.
 - [ ] **P1 `update-trust-is-tls-plus-sibling-sha-only`** — auto-update authenticity = TLS (Windows
   store → a TLS-inspection root is trusted) + a same-release `.sha256`; **no signature**.
   Code-signing (Standing § below) is the fix; consider a pinned-in-build public key.
@@ -65,12 +66,17 @@ the field bug + P1s first.
   `pdf-page-skip-unlogged-when-no-prior-geometry`, `pdf-consolidator-no-row-count-verification`) —
   the cell-rect parser carries forward stale page geometry / skips data lines with **no log**, and
   never cross-checks extracted rows vs the PDF's data-row count. Log + guard + add a runtime count.
-- [ ] **P2 `report-error-text-blanket-swallow-hides-fatal`** / **`highway-sequence-errored-route-can-record-empty`**
-  — `report_error_text` swallows all exceptions to `None` with no log → a fatal route can be
-  misclassified `empty`/`saved` (worst on Highway Sequence, whose empty = button-absence).
-- [ ] **P2 `auto-consolidate-rmtree-out-dir-before-export`** — the Everything store clears a
-  report+env folder **before** re-export → a failed refresh destroys the last-good copy and reads
-  fresh. Stage-and-swap (clear on success), or flag a short-route folder as partial.
+- [x] **P2 `report-error-text-blanket-swallow-hides-fatal`** / **`highway-sequence-errored-route-can-record-empty`**
+  ✅ **Done (this update)** — `report_error_text` now LOGS the swallowed probe exception (no longer
+  silent), and Highway Sequence's `is_empty` keys on the POSITIVE "No results found" text (hsl.js)
+  instead of Export-button absence, so an error page is no longer misread as empty. Locked by
+  `check_export_engine.py` (`test_report_error_text` + the Highway Sequence marker checks). ⚠ LIVE
+  work-PC re-test of the error-page path.
+- [x] **P2 `auto-consolidate-rmtree-out-dir-before-export`** ✅ **Done (this update)** — the Everything
+  store now STAGE-AND-SWAPS: each report exports into a `.staging` sibling, swapped into place only on
+  a clean finish (discarded on cancel/crash), so a failed refresh never destroys the last-good copy.
+  Locked by `check_b3_batch.py` (`test_swap_store_dir`). ⚠ LIVE work-PC re-test of the end-to-end
+  crash-preserves-last-good path.
 - [ ] **P2 `edge-login-cdp-port-unauthenticated-loopback`** — the headed-Edge fallback opens an
   unauthenticated CDP port on `127.0.0.1` for the whole live SSO session. Open it only when CDP
   recapture is needed; close on capture.
@@ -82,9 +88,11 @@ the field bug + P1s first.
 - [ ] **P2 `select-report-substring-match-no-exact-guard`** — `select_report` uses `has_text` +
   `.first` (substring) while the env-scan uses exact-first; a future superstring option could
   silently mis-export. Match exactly.
-- [ ] **P2 `parallel-reconcile-uses-read-strict-not-lock-tolerant`** / **`parallel-crash-plus-cancel-skips-reconciliation`**
-  — fast-mode reconciliation re-marks an Excel-locked-but-complete file `failed`, and a crash+cancel
-  combo omits orphaned routes from the run report.
+- [x] **P2 `parallel-reconcile-uses-read-strict-not-lock-tolerant`** / **`parallel-crash-plus-cancel-skips-reconciliation`**
+  ✅ **Done (this update)** — extracted `_reconcile_unaccounted`: it now uses the lock-tolerant
+  `_can_resume` (an Excel-locked-but-complete file is trusted, not re-failed) and still reconciles on
+  cancel when a worker CRASHED (so a crash's orphaned routes always reach the run report). Locked by
+  the new `check_parallel_reconcile.py`. ⚠ LIVE work-PC re-test of the real crash+cancel path.
 - [ ] **P2 `handle-no-default-branch`** — `gui_api._handle` silently drops an unrecognized message
   kind; add a logging `else`.
 - [ ] **P2 ramp-summary parsing** (`ramp-summary-parse-failure-misattributed-to-source`,
@@ -180,6 +188,20 @@ What landed, so the open list stays honest. Full changelog: `build/release_notes
 > now in the Feature backlog above, flagged 3×-deferred.
 
 ### Closed findings & decisions (record)
+- [x] **Stage-1 foundation audit — consolidate + cross-env compare VERIFIED on the full 6-env
+  batch** (2026-06-18; HSL / Ramp Detail / Ramp Summary). 18/18 consolidations + 15/15 cross-env
+  comparisons (baseline SSOR-PROD) proven cell-accurate ≥3 independent ways (independent
+  from-scratch recompute · values-flavor content · Summary literals · Excel-COM F9 of the
+  formulas flavor with SELF-CHECK all OK + flavor parity) + raw-source spot checks. **Zero tool
+  bugs.** The Ramp Summary "Source ≠ total" 9-route quirk reproduces identically on all 6 envs
+  (SOURCE quirk, correctly flagged RED — not fixed away; geometric parser cross-check = 0
+  mismatches across 756 PDFs). HSL cross-env (no prior audit) now covered: an apparent diff-cell
+  over-count was traced to duplicate-PM pairing — an independent OPTIMAL recompute matches the
+  workbook exactly (the engine's similarity pairing is correct; ~4,474 dup groups/pair). ARS-PROD
+  == SSOR-PROD for RD/RS; HSL has 2 genuine ARS-PROD diffs (real source difference, confirmed).
+  The 2026-06-16 closed finding below reproduces exactly. New lock: **`build/check_compare_highway_sequence.py`**
+  (HSL adapter end-to-end: PM key, "Highway Locations" sheet, "(col X)" unnamed-column labels)
+  wired into `checks.yml`. Full report: `code-review/AUDIT-stage1-foundation.md` (git-ignored).
 - [x] **Cross-env Ramp comparisons VERIFIED on real data** (2026-06-16, 3-env × 126 routes,
   ≥3 independent methods): v0.11.0 PM re-key correct (Ramp Detail PROD-vs-TEST true diff = 8 cells /
   4 rows + 10 TEST-only, vs the old 1,451-cell positional inflation); Ramp Summary PROD-vs-TEST = 32

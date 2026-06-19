@@ -114,25 +114,23 @@ Numbered flow:
 5. **Completeness** — if `asset_size` known and `done != asset_size` → `UpdateError` "incomplete".
 6. **SHA-256 verify** (see §3.1) — mismatch deletes the zip and raises; no checksum → warn + proceed on size only.
 7. **Extract** — `zipfile.ZipFile(zip_path).extractall(extract_dir)`; `BadZipFile`/`OSError` → `UpdateError("not a valid app package")`. **Then `zip_path.unlink()` immediately** — frees ~150 MB before the app keeps running.
-8. **Locate + rename the bundle root** — `_bundle_root(extract_dir)` (§3.2), then `root.rename(staged)` (instant — same volume). Clean up `extract_dir` if it wasn't the root itself.
+8. **Locate + rename the bundle root** — `_bundle_root(extract_dir)` (§3.2), then `_retry(lambda: root.rename(staged))` (instant — same volume). Clean up `extract_dir` if it wasn't the root itself, via `_retry(rmtree)` with a best-effort `ignore_errors` fallback so leftover-cleanup trouble can't abort an otherwise-good stage.
 9. **Sanity assert** — `staged/_EXE_NAME` is a file AND `staged/_internal` is a dir, else `UpdateError("missing expected app files")`.
 10. `return staged`.
 
-> **⚠ Known field issue — the stage rename has NO Defender retry (unlike the swap step).**
-> Step 8's `root.rename(staged)` (`updater.py:416`) is a **bare** directory rename. If
-> Windows Defender / the Search indexer is still scanning the freshly-extracted
-> `data\update\extract\TSMIS Exporter` tree, the rename fails with
-> **`PermissionError: [WinError 5] Access is denied`** and `download_and_stage` aborts →
-> the GUI shows "Update problem" and `cleanup_leftovers` drops the staged download, so the
-> user just **re-downloads and it works** (the scan has finished by then). This is
+> **✅ Fixed (this update) — `update-stage-rename-no-retry`.** Step 8's rename used to be a
+> **bare** `root.rename(staged)` (`updater.py:416`) with no retry. If Windows Defender / the
+> Search indexer was still scanning the freshly-extracted `data\update\extract\TSMIS Exporter`
+> tree, it failed with **`PermissionError: [WinError 5] Access is denied`** and aborted the
+> whole stage → the GUI showed "Update problem", `cleanup_leftovers` dropped the staged
+> download, and the user **re-downloaded and it worked** (the scan had finished). It was
 > **asymmetric with `perform_swap`** (§6), whose every file op is wrapped in `_retry`
-> (`_RETRY_ATTEMPTS=12 × _RETRY_DELAY_S=0.5 s`, commented *"Defender / slow handle
-> release"*) — the swap was hardened against held files; the stage step was not.
-> **Observed twice on the work PC** (2026-06-17 ~09:20 and 2026-06-18 ~09:39, both in the
-> morning; both self-healed on a re-download — every *swap* that actually started has
-> always succeeded). **Fix:** wrap `root.rename(staged)` + the follow-on
-> `rmtree(extract_dir)` in the same `_retry`, or `extractall` straight into `staged` and
-> skip the intermediate rename. Tracked in [../roadmap.md](../roadmap.md).
+> (`_RETRY_ATTEMPTS=12 × _RETRY_DELAY_S=0.5 s`, *"Defender / slow handle release"*).
+> **Observed twice on the work PC** (2026-06-17 ~09:20 and 2026-06-18 ~09:39, both morning;
+> every *swap* that actually started always succeeded). The rename + cleanup `rmtree` are now
+> wrapped in the same `_retry`, so a transient lock retries instead of aborting. Locked by
+> `check_updater.py` (`test_stage_rename_retries`, `test_retry_recovers_transient_oserror`).
+> ⚠ The Defender timing only reproduces on the work PC — field-verify there.
 
 ### 3.1 `_expected_sha256` — where the trust comes from
 

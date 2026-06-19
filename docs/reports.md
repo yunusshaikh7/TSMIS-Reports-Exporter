@@ -61,7 +61,7 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 
 ### Report 3 -- Highway Sequence Listing (XLSX)
 - `label="Highway Sequence Listing"`, `subdir="highway_sequence"`, `filename=highway_sequence_route_<ROUTE>.xlsx`.
-- The Export button only renders when the report has data; an empty route shows a "No ... found" message. `wait_js` matches `EXPORT_READY_JS` or the loose `/No \w+ found/i`. `is_empty` = `page.locator("button.export-btn").count() == 0` (button absence -- the only report that detects empty by button absence).
+- The Export button only renders when the report has data; an empty route shows "No results found" (hsl.js). `wait_js` matches `EXPORT_READY_JS` or the loose `/No \w+ found/i`. `is_empty` keys on that **positive** text — `bool(re.search(r"No \w+ found", body, re.I))` — NOT Export-button absence (Phase-3 fix `highway-sequence-errored-route-can-record-empty`): a fatal error page ALSO lacks the button but renders its message in `#rampResults.error` (caught first by `report_error_text`), not as this text, so button-absence alone would misclassify an errored route as "No data". Locked by `check_export_engine.py`.
 - `save=save_via_export_button`.
 
 ### Report 4 -- Highway Log (XLSX)

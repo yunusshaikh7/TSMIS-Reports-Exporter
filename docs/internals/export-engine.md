@@ -25,6 +25,7 @@ exporter.run_export(spec, events, *, routes, timeout_ms, retry_timeout_ms, out_d
   ├─ new_authed_browser(p)                  (common)  saved session OR device mode
   ├─ navigate_with_auth(page)               (common)  drives the OAuth hop
   ├─ require_signed_in(page, msg)           (common)  AuthError if not
+  ├─ require_site_params(page)              (common)  PreflightError on wrong env/src (Phase-3 backstop)
   ├─ preflight(page, spec.label)            (common)  PreflightError if form wrong
   └─ for route in routes:
         _wait_while_paused(events)                    B1 hold between routes
@@ -110,12 +111,12 @@ Returns `'saved' | 'empty' | 'skipped'`; **raises** on any failure (the caller `
 | empty check | `if spec.is_empty(page): return "empty"` (`:340-341`) | report-specific empty marker |
 | settle | `page.wait_for_timeout(1000)` (`:342`) | a 1 s settle before grabbing the page |
 | preview | `maybe_screenshot(page, events, note=prefix.strip())` (`:345`) | last poll point before a blocking download wait |
-| save | `spec.save(page, out_path, timeout_ms)` inside `try/except EmptyExport` (`:347-354`) | `EmptyExport` ⇒ `return "empty"` |
-| | `return "saved"` (`:355`) | |
+| save | `spec.save(page, out_path, timeout_ms)` — `EmptyExport` **propagates** (no longer caught here) | a no-download empty is inconclusive; `_process_route` retries it once |
+| | `return "saved"` | |
 
 **Why the `wait_js` is OR'd with `ERROR_JS`:** without it, a route the site can't build would sit in `wait_with_skip_option` until the **full** per-route ceiling, then the 15-min retry. OR-ing the error check makes the wait resolve the instant the site flags an error, and the immediate `report_error_text` lookup turns it into a `ReportError` in seconds.
 
-**The `EmptyExport` catch at `:349` is the marker-independent safety net:** `spec.is_empty` may miss a drifted empty marker, but `save_via_export_button`'s no-download guard raises `EmptyExport`, and `_attempt_route` translates that to `"empty"` rather than a failure.
+**The `EmptyExport` from `save` is the marker-independent safety net — now retry-once (Phase-3 fix `transient-export-click-failure-recorded-empty`):** `spec.is_empty` may miss a drifted empty marker, but `save_via_export_button`'s no-download guard raises `EmptyExport`. That no-download case is INCONCLUSIVE (a transient export-click flake looks identical to a real no-op), so `_attempt_route` lets it **propagate** and `_process_route` retries the route once in-loop, recording `empty` only if it reproduces (a POSITIVE `is_empty` match at the empty-check step is authoritative and still returns `"empty"` immediately). Locked by `check_export_engine.py` (`test_attempt_route_empty`, `test_process_route_empty_retry`).
 
 ---
 
@@ -246,7 +247,7 @@ A `step` string is tracked so the log names the failed step (`:757,760,762`). `R
 |---|---|---|
 | `ERROR_JS` (`common.py:705`) | `document.querySelector('#rampResults.error') !== null` | OR'd into every route's wait (`_attempt_route:331`) |
 | `EXPORT_READY_JS` (`common.py:717`) | `[...querySelectorAll('button.export-btn')].some(b => /export/i.test(b.textContent||''))` | a readiness signal a report's `wait_js` keys on (NOT the no-download detector) |
-| `report_error_text(page)` (`common.py:723`) | reads `#rampResults.error`'s inner text, or a default message; best-effort `None` on any lookup problem | error short-circuit in `_attempt_route` and `save_via_export_button` |
+| `report_error_text(page)` (`common.py:759`) | reads `#rampResults.error`'s inner text, or a default message; best-effort `None` on any lookup problem — but a swallowed probe exception is now **logged** (Phase-3 fix `report-error-text-blanket-swallow-hides-fatal`: a silent `None` on a real error page would downgrade a `failed` route to benign `empty`) | error short-circuit in `_attempt_route` and `save_via_export_button` |
 
 `clearResults()` resets the `error` class on each Generate, so `ERROR_JS` only ever reflects the **current** route (no stale-error false positives, `common.py:699-704`).
 
@@ -383,14 +384,16 @@ Shared mutable state is only: the `work` queue, three `threading.Event`s (`stop`
 
 1. **Auth** (`:311-315`): `auth_failed` set ⇒ `raise AuthError(...)` so the driver clears the stale file and prompts re-login. Files already saved stay on disk (a re-run resumes).
 2. **Merge** (`:318-327`): sum `saved`, extend the lists and `per_route` from each `worker_results` entry into one `result`.
-3. **Reconcile** (`:336-350`): a crashed/stopped worker can leave routes with **no recorded outcome** — the one it had in flight plus any it never reached. Skip reconciliation if the user cancelled (those routes are simply not-done, resume later). Otherwise:
+3. **Reconcile** — the extracted `_reconcile_unaccounted(routes, result, out_dir, spec, events, *, cancelled, worker_crashed)` helper (Phase-3 fixes, locked by `check_parallel_reconcile.py`): a crashed/stopped worker can leave routes with **no recorded outcome** — the one it had in flight plus any it never reached.
    ```python
+   if cancelled and not worker_crashed:
+       return []                            # clean cancel: not-done, resume later
    accounted = {r for r, _ in result.per_route}
    missing = [r for r in routes
               if r not in accounted
-              and not _file_looks_complete(out_dir / spec.filename(r))]
+              and not _can_resume(out_dir / spec.filename(r))]
    ```
-   Every `missing` route (no record **and** no complete file on disk) is appended to `result.failed` and recorded `failed` — so nothing is silently dropped, and the serial retry below gives them a fresh attempt. The `_file_looks_complete` guard means a route whose file landed (but whose record was lost in a crash) is **not** re-failed.
+   Two corrected behaviors: (a) it still reconciles when a worker **CRASHED even on cancel** (`parallel-crash-plus-cancel-skips-reconciliation`), so a crash's orphaned routes always reach the run report instead of vanishing — only a *clean* cancel skips; (b) it uses the lock-tolerant **`_can_resume`** instead of the read-strict `_file_looks_complete` (`parallel-reconcile-uses-read-strict-not-lock-tolerant`), so a route whose file landed but is open in Excel (sharing-deny lock) is trusted as present, not re-failed and needlessly re-downloaded. Every `missing` route is appended to `result.failed` and recorded `failed`.
 4. **Serial retry** (`:359-366`): if `result.failed` and not cancelled, `_retry_failed_sequential(...)` runs the shared `_retry_failed_routes` in a **single fresh browser** (`new_authed_browser(p, parallel=True)`) — fast-mode retries are sequential too, on the parallel channel (Chrome / Built-in Chromium, never managed Edge). Done **before** the run report so the CSV reflects final outcomes.
 5. Run report written (`:368-376`), same as the sequential engine.
 
@@ -453,7 +456,7 @@ Add the constant + a `*_timeout_ms()` accessor in `common.py` (model on `report_
 - **Thread-affinity is absolute.** Only the thread that created a Playwright `page` may touch it. This is why `maybe_screenshot` runs *on the worker thread at poll points* (the GUI can never screenshot directly), why pause holds *between* routes (never inside a Playwright wait), and why each parallel worker owns its own `sync_playwright()`. Don't move a `page` call onto another thread.
 - **`_file_looks_complete` vs `_can_resume` treat a read failure oppositely.** Fresh-save: `OSError` ⇒ `False` (re-pull). Resume: `OSError` ⇒ `True` (trust the locked file). Mixing them up either re-downloads over Excel-locked files or masks truncated downloads.
 - **Resume keys on `out_dir`, which encodes `src-env` + date.** A different environment or a new day ⇒ a fresh folder ⇒ nothing skipped. The same route from `ssor-prod` and `ars-prod` never collide because they're in different run folders. The B3 `out_dir` override breaks the dated convention deliberately (always-current store).
-- **The non-`#rampResults.error`-in-the-export-window → `empty` edge.** A transient hiccup *inside* `save_via_export_button`'s download wait that doesn't render a `#rampResults.error` reads as `EmptyExport` ⇒ recorded `empty` (not retried in-loop). Resume re-pulls it next run. This is the documented tradeoff of the no-download fast-fail.
+- **The non-`#rampResults.error`-in-the-export-window → `empty` edge is now retry-once.** A transient hiccup *inside* `save_via_export_button`'s download wait that doesn't render a `#rampResults.error` raises `EmptyExport`, which `_attempt_route` now PROPAGATES; `_process_route` retries the route once in-loop and records `empty` only if it reproduces (Phase-3 fix). A positive `is_empty` match stays immediate `empty`. This closes the old "populated route whose Export click flaked, reported as No data and never retried" gap.
 - **`ReportError` and `PlaywrightTimeoutError` are NOT retried in-loop** — only a transient non-timeout `Exception` is (`RETRY_COUNT = 1`). The end-of-run serial pass is the second chance for `ReportError`/timeout routes.
 - **The retry pass mutates `result` in place** and *drops* the first-pass `failed` records before re-running (`exporter.py:461-463`). If you add per-route bookkeeping to `RunResult`, mirror this filter or you'll get duplicate/stale rows.
 - **Skip is silently a no-op in fast mode** (`_worker_events`). Don't wire a Skip button to fast mode expecting per-route behavior — only Cancel works there.
