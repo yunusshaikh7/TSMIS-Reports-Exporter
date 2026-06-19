@@ -75,6 +75,7 @@ from common import (
 )
 import batch_manifest
 import dataclasses
+import matrix
 from pathlib import Path
 from events import Events
 from exporter import run_export, _wait_while_paused
@@ -1566,3 +1567,104 @@ class CheckWorker(threading.Thread):
             self.q.put(("check", (f"browser_{ch}", "ok" if status == "ok" else "bad",
                                    f"{CHANNEL_LABELS[ch]}: {detail[status]}")))
         self.q.put(("checks_done", results))
+
+
+class MatrixExportWorker(threading.Thread):
+    """Refresh ONE (report, env) cell into the Export-Everything store.
+
+    Runs the SAME per-environment body BatchWorker uses (set_site + a single
+    ExportWorker into <dest>/<src-env>/<subdir>, stage-and-swap, env-tagged
+    names), but for one report+env and WITHOUT a manifest — so a single-cell
+    refresh can never clobber a paused Export-Everything batch (BatchWorker is
+    the only thing that persists batch_job.json). Posts the reused export
+    log/progress, then ('matrix_export_done', {src, env, ok, cancelled}). The
+    process-global site is restored at the end."""
+
+    def __init__(self, spec, src, env, dest, queue, cancel_event, skip_event,
+                 pause_event):
+        super().__init__(daemon=True, name="matrix-export")
+        self.spec = spec
+        self.src = src
+        self.env = env
+        self.dest = dest
+        self.q = queue
+        self.cancel = cancel_event
+        self.skip = skip_event
+        self.pause = pause_event
+
+    def run(self):
+        original = get_site()
+        try:
+            set_site(self.src, self.env)
+            out_base = Path(self.dest) / f"{self.src}-{self.env}"
+            ew = ExportWorker([self.spec], self.q, self.cancel, self.skip,
+                              workers=1, routes=None, pause_event=self.pause,
+                              auto_consolidate=False, out_base=out_base)
+            try:
+                ew._run_specs(ew._build_events(), [])
+                self.q.put(("matrix_export_done",
+                            {"src": self.src, "env": self.env, "ok": True,
+                             "cancelled": self.cancel.is_set()}))
+            except (AuthError, BrowserNotFoundError) as e:
+                log.warning("matrix cell export %s-%s stopped: %s: %s",
+                            self.src, self.env, type(e).__name__, e)
+                self.q.put(("error",
+                            ("auth" if isinstance(e, AuthError) else "general",
+                             str(e))))
+            except Exception as e:                       # noqa: BLE001
+                log.exception("matrix cell export %s-%s crashed", self.src, self.env)
+                self.q.put(("matrix_export_done",
+                            {"src": self.src, "env": self.env, "ok": False,
+                             "error": f"{type(e).__name__}: {e}"}))
+        finally:
+            set_site(*original)
+
+
+class MatrixCompareWorker(threading.Thread):
+    """(Re)build matrix cell comparisons against the baseline.
+
+    `cells` is a list of (row_key, cell_key); one entry for a single-cell
+    refresh, or many for a baseline-switch / 'refresh all' recompute. No
+    browser — pure compare_env orchestration via matrix.build_cell_comparison,
+    writing into <dest>/comparisons/<baseline>/. Honors cancel BETWEEN cells.
+    Posts ('matrix_cell', {...}) around each cell and ('matrix_done', {...}) at
+    the end."""
+
+    def __init__(self, dest, baseline, cells, queue, cancel_event):
+        super().__init__(daemon=True, name="matrix-compare")
+        self.dest = dest
+        self.baseline = baseline
+        self.cells = list(cells)
+        self.q = queue
+        self.cancel = cancel_event
+
+    def run(self):
+        events = Events(is_cancelled=self.cancel.is_set,
+                        on_log=lambda m: self.q.put(("log", m)))
+        total = len(self.cells)
+        done = errors = 0
+        try:
+            for row_key, cell_key in self.cells:
+                if self.cancel.is_set():
+                    break
+                self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
+                                            "status": "running",
+                                            "done": done, "total": total}))
+                try:
+                    res = matrix.build_cell_comparison(
+                        self.dest, self.baseline, row_key, cell_key, events=events)
+                    status = res.status
+                    if status != "ok":
+                        errors += 1
+                        self.q.put(("log", f"  {cell_key} {row_key}: {res.message}"))
+                except Exception as e:                   # noqa: BLE001
+                    log.exception("matrix compare %s/%s crashed", row_key, cell_key)
+                    status, errors = "error", errors + 1
+                done += 1
+                self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
+                                            "status": status,
+                                            "done": done, "total": total}))
+        finally:
+            self.q.put(("matrix_done", {"done": done, "total": total,
+                                        "errors": errors,
+                                        "cancelled": self.cancel.is_set()}))

@@ -44,6 +44,7 @@ import report_library
 import updater
 from gui_worker import (BatchWorker, CheckWorker, ChromiumWorker,
                         ConsolidateWorker, EnvCheckWorker, EnvScanWorker,
+                        MatrixCompareWorker, MatrixExportWorker,
                         ExportWorker, LoginWorker, ResetWorker, UpdateWorker,
                         measure_targets, reset_targets)
 from exporter_parallel import MAX_WORKERS, default_worker_count
@@ -62,7 +63,9 @@ from common import (
 )
 from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
-                     EXPORT_REPORTS, enabled_export_reports, is_export_disabled)
+                     EXPORT_REPORTS, enabled_export_reports, is_export_disabled,
+                     matrix_rows)
+import matrix
 
 log = logging.getLogger("tsmis.gui")
 # Everything shown in the GUI's log pane is mirrored here, so tsmis.log
@@ -159,6 +162,7 @@ class GuiApi:
         self._last_run_folder = None # dated run-folder root of the last export
         self._batch = None           # B3: live Export-Everything progress {label,done,total}
         self._batch_resume = None    # B3: a resumable manifest summary, or None
+        self._matrix = None          # matrix recompute progress {phase,row,cell,done,total} | None
         self._export_worker = None   # live ExportWorker (screenshot requests)
         # Server-side confirmation for the one destructive op (delete all
         # reports): reset_preview issues a single-use token bound to the
@@ -220,6 +224,7 @@ class GuiApi:
                 "last_summary": self._last_summary,
                 "batch": self._batch,
                 "batch_resume": self._batch_resume,
+                "matrix": self._matrix,
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},
                 "logins": self._login_states(),
@@ -474,6 +479,12 @@ class GuiApi:
             self._on_batch_progress(payload)
         elif kind == "batch_done":
             self._on_batch_done(payload)
+        elif kind == "matrix_cell":
+            self._on_matrix_cell(payload)
+        elif kind == "matrix_done":
+            self._on_matrix_done(payload)
+        elif kind == "matrix_export_done":
+            self._on_matrix_export_done(payload)
         elif kind == "update_status":
             self._on_update_status(payload)
         elif kind == "error":
@@ -486,6 +497,7 @@ class GuiApi:
             self._login_phase = None
             self._export_worker = None
             self._batch = None
+            self._matrix = None
             self.pause_event.clear()      # never leak a paused state across runs
         self._refresh_auth()
         self._emit({"t": "run_ended"})
@@ -1327,6 +1339,153 @@ class GuiApi:
         self._flash_taskbar()
         self._end_task()
 
+    # ----- comparison matrix (Everything tab) --------------------------------
+    def _valid_baseline(self, key):
+        return key if key in matrix.env_keys() else None
+
+    def _current_baseline(self):
+        return (self._valid_baseline(settings.get_matrix_baseline())
+                or matrix.BASELINE_DEFAULT)
+
+    @_api_method
+    def matrix_info(self, baseline=None):
+        """The comparison-matrix snapshot for the Everything tab — a pure
+        filesystem read (per-cell export + comparison freshness, cached verdict +
+        discrepancy counts). `baseline` overrides the persisted one for a one-off
+        view; otherwise the saved baseline (default ssor-prod) is used."""
+        dest = settings.get_batch_dest()
+        base = self._valid_baseline(baseline) or self._current_baseline()
+        return matrix.matrix_snapshot(dest, base)
+
+    @_api_method
+    def set_matrix_baseline(self, baseline):
+        """Persist the matrix baseline. Returns the new baseline and how many
+        cells a full recompute against it would (re)build (the UI confirms before
+        calling recompute_matrix('all'))."""
+        base = self._valid_baseline(baseline)
+        if not base:
+            return {"error": "Unknown baseline environment."}
+        settings.set_matrix_baseline(base)
+        self._emit_log(f"Matrix baseline set to {matrix.default_env_label(base)}.")
+        snap = matrix.matrix_snapshot(settings.get_batch_dest(), base)
+        pending = len(matrix.cells_to_rebuild(snap, scope="all"))
+        self._push_state()
+        return {"baseline": base, "recompute_pending": pending}
+
+    @_api_method
+    def refresh_cell_export(self, row_key, env_key):
+        """Re-export ONE (report, env) into the store. LIVE (hits TSMIS); reuses
+        the export engine for one report+env with no manifest, so it can't
+        disturb a paused Export-Everything batch."""
+        row = {r[0]: r for r in matrix_rows()}.get(row_key)
+        combo = self._parse_env_keys([env_key])
+        if row is None or row[3] is None:
+            return {"error": "That report can't be exported from the matrix."}
+        if not combo:
+            return {"error": "Unknown environment."}
+        spec = EXPORT_REPORTS[row[3]][2]
+        src, env = combo[0]
+        if not self._try_claim_task("matrix"):
+            return {"error": "A task is already running."}
+        self.cancel_event.clear()
+        self.skip_event.clear()
+        self.pause_event.clear()
+        dest = settings.get_batch_dest()
+        self._emit_log(f"Refreshing {row[1]} — {matrix.default_env_label(env_key)}…")
+        self._set_dot("busy", "Refreshing a report…")
+        self._emit({"t": "run_started", "mode": "export", "label": "Refreshing…",
+                    "workers": 1})
+        self._push_state()
+        MatrixExportWorker(spec, src, env, dest, self._q, self.cancel_event,
+                           self.skip_event, self.pause_event).start()
+        return {"ok": True}
+
+    @_api_method
+    def refresh_cell_comparison(self, row_key, env_key):
+        """(Re)compare ONE (report, env) against the baseline — offline."""
+        base = self._current_baseline()
+        if row_key not in {r[0] for r in matrix_rows()}:
+            return {"error": "Unknown report for the matrix."}
+        if not self._parse_env_keys([env_key]):
+            return {"error": "Unknown environment."}
+        if env_key == base:
+            return {"error": "The baseline column has nothing to compare against."}
+        if not self._try_claim_task("matrix"):
+            return {"error": "A task is already running."}
+        self.cancel_event.clear()
+        dest = settings.get_batch_dest()
+        with self._lock:
+            self._matrix = {"phase": "comparing", "row": row_key, "cell": env_key,
+                            "done": 0, "total": 1}
+        self._emit_log(f"Comparing {matrix.default_env_label(env_key)} vs "
+                       f"{matrix.default_env_label(base)} ({row_key})…")
+        self._set_dot("busy", "Comparing…")
+        self._emit({"t": "run_started", "mode": "matrix", "label": "Comparing…",
+                    "workers": 1})
+        self._push_state()
+        MatrixCompareWorker(dest, base, [(row_key, env_key)], self._q,
+                            self.cancel_event).start()
+        return {"ok": True}
+
+    @_api_method
+    def recompute_matrix(self, scope="stale"):
+        """Rebuild every stale (scope='stale') or every (scope='all') comparison
+        against the current baseline — the 'refresh all' button and the
+        baseline-switch recompute."""
+        base = self._current_baseline()
+        dest = settings.get_batch_dest()
+        scope = scope if scope in ("stale", "all") else "stale"
+        cells = matrix.cells_to_rebuild(matrix.matrix_snapshot(dest, base), scope=scope)
+        if not cells:
+            return {"ok": True, "nothing": True}
+        if not self._try_claim_task("matrix"):
+            return {"error": "A task is already running."}
+        self.cancel_event.clear()
+        with self._lock:
+            self._matrix = {"phase": "comparing", "row": None, "cell": None,
+                            "done": 0, "total": len(cells)}
+        self._emit_log(f"Rebuilding {len(cells)} comparison(s) against "
+                       f"{matrix.default_env_label(base)}…")
+        self._set_dot("busy", "Comparing…")
+        self._emit({"t": "run_started", "mode": "matrix", "label": "Comparing…",
+                    "workers": 1})
+        self._push_state()
+        MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event).start()
+        return {"ok": True, "count": len(cells)}
+
+    def _on_matrix_cell(self, payload):
+        with self._lock:
+            if self._matrix is not None:
+                self._matrix = {**self._matrix,
+                                "row": payload.get("row"),
+                                "cell": payload.get("cell"),
+                                "done": payload.get("done", 0),
+                                "total": payload.get("total", 0)}
+        self._push_state()
+
+    def _on_matrix_done(self, payload):
+        done, total = payload.get("done", 0), payload.get("total", 0)
+        errs = payload.get("errors", 0)
+        if payload.get("cancelled"):
+            self._emit_log(f"Comparison run stopped — {done} of {total} done.")
+        elif errs:
+            self._emit_log(f"Comparison run finished — {done} of {total} done; "
+                           f"{errs} could not be built (see the log).")
+        else:
+            self._emit_log(f"Comparison run finished — {done} of {total} done.")
+        self._end_task()
+        self._emit({"t": "matrix_refresh"})
+
+    def _on_matrix_export_done(self, payload):
+        sx = f"{payload.get('src')}-{payload.get('env')}"
+        if payload.get("ok"):
+            self._emit_log(f"Refreshed {sx}.")
+        else:
+            self._emit_log(f"Refresh of {sx} ended: {payload.get('error', '(see log)')}")
+        self._flash_taskbar()
+        self._end_task()
+        self._emit({"t": "matrix_refresh"})
+
     @_api_method
     def request_preview(self, worker_no):
         """Ask browser `worker_no` (1-based) for a live screenshot; it answers
@@ -1353,7 +1512,7 @@ class GuiApi:
         # Tasks that honor cancel_event between steps. (login has its own cancel;
         # envcheck is a single short headless verify that can't stop partway.)
         if self._task in ("export", "batch", "consolidate", "compare", "chromium",
-                          "envscan", "reset"):
+                          "envscan", "reset", "matrix"):
             self.cancel_event.set()
             self.pause_event.clear()      # unblock a paused run so cancel lands
             self._emit_log("Cancel requested…")

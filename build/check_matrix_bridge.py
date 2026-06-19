@@ -1,0 +1,137 @@
+"""Golden check for the matrix GUI bridge (gui_api matrix_* methods) with the
+matrix workers stubbed — no browser, no real compare. Pure Python.
+
+Covers: matrix_info shape + the "matrix" snapshot key; set_matrix_baseline
+validation + persistence + recompute_pending; the single-task gate on
+refresh_cell_comparison / refresh_cell_export / recompute_matrix; bad-key and
+baseline-vs-baseline rejection; recompute over an empty store ('nothing') vs a
+store with stale cells; and the HIGH-RISK integration — a cell export must NOT
+clobber a paused Export-Everything batch's manifest.
+
+Run with the build venv:
+    build\\.venv\\Scripts\\python.exe build\\check_matrix_bridge.py
+"""
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
+
+import batch_manifest
+import gui_api
+import settings
+
+_fail = []
+
+
+def check(name, cond):
+    print(f"  [{'OK ' if cond else 'FAIL'}] {name}")
+    if not cond:
+        _fail.append(name)
+
+
+class _FakeWorker:
+    last = None
+
+    def __init__(self, *args, **kwargs):
+        _FakeWorker.last = (args, kwargs)
+
+    def start(self):
+        self.started = True
+
+
+def _touch(p):
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(b"PK")
+
+
+def main():
+    dest = Path(tempfile.mkdtemp(prefix="tsmis_mxb_"))
+    cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_mxbcfg_"))
+    saved = (gui_api.MatrixCompareWorker, gui_api.MatrixExportWorker,
+             settings.get_batch_dest, settings.CONFIG_FILE)
+    gui_api.MatrixCompareWorker = _FakeWorker
+    gui_api.MatrixExportWorker = _FakeWorker
+    settings.get_batch_dest = lambda: str(dest)
+    settings.CONFIG_FILE = cfgdir / "config.json"
+    settings._cache = settings._cache_mtime = None
+    mpath = cfgdir / "batch_job.json"     # explicit test manifest — never the real one
+    try:
+        a = gui_api.GuiApi()
+
+        print("matrix_info + snapshot key:")
+        info = a.matrix_info()
+        check("rows are the three comparable reports",
+              info["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence"])
+        check("baseline defaults to ssor-prod", info["baseline"] == "ssor-prod")
+        check("snapshot carries the 'matrix' key (None idle)",
+              "matrix" in a._state_snapshot() and a._state_snapshot()["matrix"] is None)
+
+        print("set_matrix_baseline:")
+        check("unknown baseline rejected",
+              bool(a.set_matrix_baseline("nope-x").get("error")))
+        res = a.set_matrix_baseline("ars-prod")
+        check("valid baseline persists",
+              res.get("baseline") == "ars-prod"
+              and settings.get_matrix_baseline() == "ars-prod")
+        check("recompute_pending present", "recompute_pending" in res)
+        a.set_matrix_baseline("ssor-prod")            # back to default for the rest
+
+        print("refresh_cell_comparison gate + validation:")
+        check("unknown row rejected",
+              bool(a.refresh_cell_comparison("nope", "ars-prod").get("error")))
+        check("baseline column rejected",
+              bool(a.refresh_cell_comparison("ramp_detail", "ssor-prod").get("error")))
+        ok = a.refresh_cell_comparison("ramp_detail", "ars-prod")
+        check("valid cell compare launched", ok.get("ok") is True)
+        check("task claimed as 'matrix'", a._task == "matrix")
+        check("second action refused while running",
+              bool(a.refresh_cell_comparison("ramp_detail", "ars-dev").get("error")))
+        a._end_task()
+
+        print("recompute_matrix scope:")
+        check("empty store -> nothing to do",
+              a.recompute_matrix("all").get("nothing") is True)
+        check("no task claimed when nothing to do", a._task is None)
+        # Two sides present for ramp_detail -> one stale cell to rebuild.
+        _touch(dest / "ssor-prod" / "ramp_detail" / "r1.xlsx")
+        _touch(dest / "ars-prod" / "ramp_detail" / "r1.xlsx")
+        rc = a.recompute_matrix("all")
+        check("stale cells -> launched", rc.get("ok") and rc.get("count") >= 1)
+        check("matrix progress state set",
+              a._matrix is not None and a._matrix.get("total") >= 1)
+        a._end_task()
+
+        print("refresh_cell_export does NOT clobber a paused real batch:")
+        real = batch_manifest.build([0, 1], [("ssor", "prod"), ("ars", "prod")],
+                                    fast=False, workers=1, auto_consolidate=False)
+        batch_manifest.save(real, mpath)
+        before = batch_manifest.load(mpath)
+        check("a real batch is pending", bool(batch_manifest.pending(before)))
+        ex = a.refresh_cell_export("ramp_detail", "ars-prod")
+        check("cell export launched", ex.get("ok") is True)
+        after = batch_manifest.load(mpath)
+        check("the paused batch manifest is intact",
+              after == before and bool(batch_manifest.pending(after)))
+        a._end_task()
+        check("bad row for export rejected",
+              bool(a.refresh_cell_export("nope", "ars-prod").get("error")))
+    finally:
+        (gui_api.MatrixCompareWorker, gui_api.MatrixExportWorker,
+         settings.get_batch_dest, settings.CONFIG_FILE) = saved
+        settings._cache = settings._cache_mtime = None
+        shutil.rmtree(dest, ignore_errors=True)
+        shutil.rmtree(cfgdir, ignore_errors=True)
+
+    print()
+    if _fail:
+        print(f"FAILED: {len(_fail)} check(s): {_fail}")
+        return 1
+    print("ALL MATRIX-BRIDGE CHECKS PASSED")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
