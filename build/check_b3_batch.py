@@ -124,6 +124,7 @@ def test_reset_scopes_batch_dest():
     dest = Path(tempfile.mkdtemp(prefix="tsmis_store_"))
     (dest / "ssor-prod" / "ramp_detail").mkdir(parents=True)   # app-owned
     (dest / "ars-test" / "consolidated").mkdir(parents=True)   # app-owned
+    (dest / "comparisons" / "ssor-prod").mkdir(parents=True)   # app-owned (matrix)
     (dest / "My Personal Files").mkdir()                       # foreign — keep
     (dest / "important.txt").write_text("keep me", encoding="utf-8")  # foreign — keep
     saved = settings.get_batch_dest
@@ -134,6 +135,7 @@ def test_reset_scopes_batch_dest():
         settings.get_batch_dest = saved
     check("known ssor-prod child targeted", (dest / "ssor-prod") in paths)
     check("known ars-test child targeted", (dest / "ars-test") in paths)
+    check("matrix comparisons child targeted", (dest / "comparisons") in paths)
     check("the store ROOT itself is never a target (no wholesale rmtree)",
           dest not in paths)
     check("foreign folder left untouched", (dest / "My Personal Files") not in paths)

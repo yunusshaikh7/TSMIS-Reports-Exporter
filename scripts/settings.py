@@ -328,6 +328,50 @@ def set_batch_dest(path):
     return get_batch_dest()
 
 
+# ---- Comparison-matrix baseline --------------------------------------------
+# The environment the matrix compares every other env against (a "src-env" key
+# like "ssor-prod"). Empty/unset -> the default. The caller (gui_api) validates
+# the key against the known combos before saving (like batch_dest, this stores a
+# plain string and isn't validated here, so settings stays common-free).
+
+_DEFAULT_MATRIX_BASELINE = "ssor-prod"
+
+
+def get_matrix_baseline():
+    """The configured matrix baseline env key, or the default."""
+    raw = _read_file().get("matrix_baseline")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return _DEFAULT_MATRIX_BASELINE
+
+
+def set_matrix_baseline(key):
+    """Save (or, with an empty key, reset to default) the matrix baseline.
+    Returns the new effective baseline."""
+    global _cache, _cache_mtime
+    key = (key or "").strip()
+    data = dict(_read_file())
+    if key:
+        data["matrix_baseline"] = key
+    else:
+        data.pop("matrix_baseline", None)
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp, CONFIG_FILE)
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    _cache, _cache_mtime = None, None
+    log.info("settings: matrix_baseline -> %s", key or "(default)")
+    return get_matrix_baseline()
+
+
 def reset():
     """Delete the settings file (back to all defaults). Returns True if a
     file was removed."""

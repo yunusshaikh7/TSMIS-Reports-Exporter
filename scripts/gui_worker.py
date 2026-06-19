@@ -126,7 +126,10 @@ def reset_targets(include_input=False):
         known = {f"{s}-{e}" for s in DATA_SOURCES for e in ENVIRONMENTS}
         if bdest.is_dir():
             for child in sorted(bdest.iterdir()):
-                if child.is_dir() and child.name in known:
+                # The known <src-env> export folders AND the matrix's own
+                # "comparisons" tree are app-owned; foreign files stay untouched.
+                if child.is_dir() and (child.name in known
+                                       or child.name == "comparisons"):
                     targets.append(
                         (f"Export Everything store: {child.name}", child))
     except Exception:

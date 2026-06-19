@@ -122,10 +122,29 @@ def test_cell_ages():
         shutil.rmtree(dest, ignore_errors=True)
 
 
+def test_matrix_baseline_setting():
+    print("settings.get/set_matrix_baseline:")
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_mxb_"))
+    orig = settings.CONFIG_FILE
+    settings.CONFIG_FILE = tmp / "config.json"
+    settings._cache, settings._cache_mtime = None, None
+    try:
+        check("unset -> ssor-prod default", settings.get_matrix_baseline() == "ssor-prod")
+        settings.set_matrix_baseline("ars-test")
+        check("set persists", settings.get_matrix_baseline() == "ars-test")
+        settings.set_matrix_baseline("")
+        check("empty -> back to default", settings.get_matrix_baseline() == "ssor-prod")
+    finally:
+        settings.CONFIG_FILE = orig
+        settings._cache, settings._cache_mtime = None, None
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     test_batch_dest_setting()
     test_report_ages()
     test_cell_ages()
+    test_matrix_baseline_setting()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")
