@@ -43,5 +43,5 @@ foreach ($tag in $versions) {
     }
 }
 
-Write-Host "Done. Releases without a CHANGELOG.md section (e.g. v0.7.4 and"
-Write-Host "earlier, dev-2) were left untouched."
+Write-Host "Done. The 'dev-2' prerelease has no CHANGELOG.md section and was"
+Write-Host "left untouched (delete it on GitHub if you don't want it listed)."

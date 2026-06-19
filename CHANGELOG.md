@@ -478,3 +478,129 @@ release shows only its own section (see `build/gen_release_notes.py`).
 - First run: if Windows warns about an unknown publisher, choose
   "More info" → "Run anyway" (in-house unsigned tool). If downloaded as a zip,
   right-click → Properties → Unblock before extracting.
+
+## v0.7.4 — 2026-06-11
+
+- **Sign-in works on the new TSMIS site.** The portal showed its "Caltrans Azure
+  AD" button before the button's click handler was wired up, so the tool's early
+  click landed dead. It now keeps clicking each second until the page actually
+  moves, and after several dead clicks drives the sign-in hop directly via the
+  portal's own SAML URL. The Edge sign-in window also pre-grants the
+  local-network permission.
+- **Fits small screens.** The window caps its height to the screen and can be
+  shrunk — the log pane absorbs the difference instead of the bottom buttons
+  being cut off.
+
+## v0.7.3 — 2026-06-11
+
+- **Sign-in detection hardened, plus diagnostics.** Stronger signed-in detection
+  (several post-sign-in signals, robust visibility checks) and deep sign-in
+  diagnostics: the log records the app version and every sign-in attempt's
+  outcome, and a failed sign-in saves a screenshot + page snapshot under
+  `data\failures\` so problems can be pinpointed from one run.
+
+## v0.7.2 — 2026-06-11
+
+- **Sign-in works on the new TSMIS site.** The new app never shows a signed-out
+  page — it redirects through the portal OAuth flow on every load and keeps its
+  token in page memory only. The tool now rides that flow: it polls for the app's
+  real post-sign-in state and clicks "Caltrans Azure AD" the moment the portal
+  renders it, so saved Chrome sessions and the hands-free Edge sign-in work again
+  (0.7.0/0.7.1 raced the redirect or watched for the wrong signals).
+
+## v0.7.1 — 2026-06-11
+
+- **Sign-in fix for the new report page.** The new page shows its own "Sign In
+  with ArcGIS" button instead of redirecting, and renders the report form even
+  when signed out — both broke automatic sign-in (Edge and Chrome) in 0.7.0. The
+  tool now clicks the full chain (app button → portal page → "Caltrans Azure AD",
+  popup-tolerant) and detects sign-in from the app's own state.
+
+## v0.7.0 — 2026-06-11
+
+- **Pick the data source and environment.** Two new header dropdowns choose
+  **SSOR or ARS** and **Prod / Test / Dev** (defaults: SSOR + Prod) — the tool
+  now drives the new TSMIS site, one page for every combination. Console flow:
+  set `TSMIS_SRC` / `TSMIS_ENV`.
+
+## v0.6.1 — 2026-06-10
+
+- **Hands-free sign-in, refined.** After one normal Edge sign-in (which primes
+  the app's own Edge profile), the tool signs in automatically — no password, no
+  window — and exports can even start with **no saved login at all**: the export
+  reopens that Edge profile, clicks "Caltrans Azure AD" itself, and Windows signs
+  it in. Edge only (Chrome stays on the manual path); automatic sign-in runs one
+  browser at a time, so save a login to use fast mode.
+
+## v0.6.0 — 2026-06-10
+
+- **Hands-free sign-in on managed Caltrans PCs.** The tool signs in
+  **automatically** with Microsoft Edge and your Windows account — no password,
+  no browser window. Each headless browser clicks "Caltrans Azure AD" itself and
+  Windows signs it in (Edge only — Chrome stays on the manual sign-in path). The
+  local-network permission the TSMIS site needs is pre-granted in every automated
+  browser.
+
+## v0.5.1 — 2026-06-10
+
+- **Managed-Edge sign-in hardened.** Recovers the session even when org-managed
+  Edge relaunches itself into the work profile mid-SSO (live capture, then CDP
+  re-attach, then on-disk profile recapture), with a Google Chrome fallback if
+  nothing was captured.
+
+## v0.5.0 — 2026-06-10
+
+- **Managed-Edge sign-in fixed.** Sign-in opens Edge with a durable app-owned
+  profile and recovers the session even when org-managed Edge relaunches into the
+  work profile mid-SSO, with a Google Chrome fallback if nothing was captured.
+
+## v0.4.1 — 2026-06-05
+
+- **Edge/Chrome login fixed.** Signing in no longer cancels itself the moment
+  your password/MFA goes through — the session saves reliably.
+- **A broken route fails fast.** If TSMIS itself errors on a route, it's recorded
+  as Failed in seconds with the site's message instead of hanging for minutes.
+- **Friendlier to IT / Defender.** Proper version details, an icon, and a
+  no-admin manifest; the download is stripped of third-party documentation that
+  could trip data-loss-prevention scanners.
+
+## v0.4.0 — 2026-06-05
+
+- **New report: Highway Log.** Bulk-export the Highway Log for every route
+  (XLSX), plus a matching consolidator to combine them.
+- **Export several report types at once.** Tick any combination (or all) and they
+  run back-to-back in one go.
+- **Cancel actually cancels now.** It stops the report it's currently working on
+  right away instead of waiting for that route to finish first.
+- **Fast mode is sturdier.** If one browser hits a snag the others keep going,
+  and any routes that get dropped are retried rather than silently skipped.
+
+## v0.3.0 — 2026-06-05
+
+- **Much smaller — ~587 MB → ~148 MB.** No longer bundles Chromium; it uses the
+  **Microsoft Edge (or Chrome) already installed** on the machine. This also
+  fixes the SharePoint/DLP "blocked file" problem from the old bundled doc files.
+- **Browser picker + startup checks in the header.** Choose Edge or Chrome, with
+  readiness dots for the browser, output folder, and report tools.
+- **Choose which routes to export.** Leave the Routes box blank for all, or type
+  a few (e.g. `5, 99, 101`).
+- **Automatic retry.** Routes that fail get one more patient, one-at-a-time
+  attempt at the end of the run.
+- **Login fixes.** Confirms you actually signed in before saving, and closing the
+  sign-in window no longer leaves the app stuck on "Waiting…".
+
+## v0.2.0 — 2026-06-04
+
+- **Experimental fast mode.** Run several headless browsers at once to export
+  routes in parallel (default 3, up to 30; each uses ~0.5 GB RAM).
+- **Live elapsed timer** beneath the progress bar during a run.
+- **Clearer run summary.** Adds an "already had" count for routes saved on a
+  previous run, so the numbers reconcile to the full route count.
+
+## v0.1.0-preview — 2026-06-04
+
+- **Initial preview build.** First portable Windows release — no install, no
+  Python required. Sign in with your Caltrans `@dot.ca.gov` account + MFA, export
+  a report for every route, consolidate the per-route files into one workbook, and
+  save a per-route outcome CSV. Bundles its own Chromium. Preview build, pending
+  live verification against TSMIS.
