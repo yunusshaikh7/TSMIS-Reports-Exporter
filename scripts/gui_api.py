@@ -1946,6 +1946,10 @@ class GuiApi:
         with self._lock:
             self._reset_token = (token, include_input)
         return {"targets": [label for label, _p in targets],
+                # The concrete paths too, so the confirm dialog shows EXACTLY
+                # what will be deleted (the labels alone hid the real location of
+                # the user-chosen Export Everything store).
+                "paths": [str(p) for _label, p in targets],
                 "files": files, "mb": round(size / 1e6, 1), "token": token}
 
     @_api_method

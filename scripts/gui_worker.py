@@ -114,12 +114,21 @@ def reset_targets(include_input=False):
         if p.is_file():
             targets.append((lbl, p))
     # The Export Everything "always-current" store (configurable destination,
-    # default output/All Reports (current)) holds generated reports too.
+    # default output/All Reports (current)) holds generated reports too. The
+    # destination is user-chosen and NOT validated as app-owned, so NEVER rmtree
+    # it wholesale — only its known "<src-env>/" children (the exact folders the
+    # batch writer creates, BatchWorker out_base = dest/"<src>-<env>"). Any
+    # foreign files the user keeps alongside the store are left untouched.
     try:
         from settings import get_batch_dest
+        from common import DATA_SOURCES, ENVIRONMENTS
         bdest = Path(get_batch_dest())
+        known = {f"{s}-{e}" for s in DATA_SOURCES for e in ENVIRONMENTS}
         if bdest.is_dir():
-            targets.append(("Export Everything store", bdest))
+            for child in sorted(bdest.iterdir()):
+                if child.is_dir() and child.name in known:
+                    targets.append(
+                        (f"Export Everything store: {child.name}", child))
     except Exception:
         pass
     if FAILURES_DIR.is_dir():
@@ -151,6 +160,48 @@ def measure_targets(targets):
         except OSError:
             pass
     return files, size
+
+
+def _swap_store_dir(live, staged):
+    """Replace `live` with the freshly-exported `staged` folder (clear-on-success).
+
+    The Export-Everything store used to rmtree the live folder BEFORE re-export,
+    so a failed/crashed refresh destroyed the last-good copy (and a partial set
+    could read as fresh). Now each report exports into a `.staging` sibling and
+    this swaps it in only on a clean finish. Best-effort against locked files (a
+    report the user has open in Excel): a clean clear+rename when possible, else
+    merge the staged files over the live folder so the refresh still lands."""
+    import shutil
+    try:
+        if not live.exists():
+            staged.rename(live)
+            return
+        shutil.rmtree(live, ignore_errors=True)
+        if not live.exists():
+            staged.rename(live)
+            return
+        # A locked leftover blocked the clean swap — merge staged over live.
+        log.warning("batch store: %s could not be fully cleared; merging refresh", live)
+        live.mkdir(parents=True, exist_ok=True)
+        for item in staged.iterdir():
+            target = live / item.name
+            if target.is_dir():
+                shutil.rmtree(target, ignore_errors=True)
+            elif target.exists():
+                try:
+                    target.unlink()
+                except OSError:
+                    pass
+            try:
+                shutil.move(str(item), str(target))
+            except OSError as e:
+                log.warning("batch store: could not place %s: %s: %s",
+                            target, type(e).__name__, e)
+        shutil.rmtree(staged, ignore_errors=True)
+    except OSError as e:
+        log.warning("batch store swap failed for %s: %s: %s",
+                    live, type(e).__name__, e)
+        shutil.rmtree(staged, ignore_errors=True)
 
 
 class ExportWorker(threading.Thread):
@@ -313,12 +364,17 @@ class ExportWorker(threading.Thread):
                 "report": spec.label, "report_i": i, "report_n": self._report_n,
             }))
             # B3: when an always-current destination is set, write each report
-            # straight into <dest>/<src-env>/<subdir>, clearing it first so the
-            # run re-pulls fresh (a refresh, not a resume-skip).
+            # into <dest>/<src-env>/<subdir>. STAGE-AND-SWAP: export into a fresh
+            # `.staging` sibling (so the run re-pulls everything — a refresh, not a
+            # resume-skip) and replace the live folder only on a clean finish, so a
+            # failed/crashed/cancelled refresh never destroys the last-good copy.
             out_dir = (self.out_base / spec.subdir) if self.out_base else None
+            stage_dir = None
             if out_dir is not None:
                 import shutil
-                shutil.rmtree(out_dir, ignore_errors=True)
+                stage_dir = out_dir.with_name(out_dir.name + ".staging")
+                shutil.rmtree(stage_dir, ignore_errors=True)
+                stage_dir.mkdir(parents=True, exist_ok=True)
             # B3: in the always-current store, prefix every output file with the
             # src-env tag (the dest's <src-env> subfolder name) so a file lifted
             # out still says which environment it came from. Wrapping spec.filename
@@ -332,12 +388,29 @@ class ExportWorker(threading.Thread):
                 run_spec = dataclasses.replace(
                     spec,
                     filename=lambda r, _f=spec.filename, _t=tag: env_tagged_filename(_f(r), _t))
-            if self.workers and self.workers > 1:
-                from exporter_parallel import run_export_parallel  # lazy
-                result = run_export_parallel(run_spec, events, workers=self.workers,
-                                             routes=self.routes, out_dir=out_dir)
-            else:
-                result = run_export(run_spec, events, routes=self.routes, out_dir=out_dir)
+            run_dir = stage_dir if stage_dir is not None else out_dir
+            try:
+                if self.workers and self.workers > 1:
+                    from exporter_parallel import run_export_parallel  # lazy
+                    result = run_export_parallel(run_spec, events, workers=self.workers,
+                                                 routes=self.routes, out_dir=run_dir)
+                else:
+                    result = run_export(run_spec, events, routes=self.routes, out_dir=run_dir)
+            except Exception:
+                # A crash must NOT cost the last-good copy: drop staging, leave the
+                # live folder as it was, and let the caller handle the error.
+                if stage_dir is not None:
+                    import shutil
+                    shutil.rmtree(stage_dir, ignore_errors=True)
+                raise
+            # Swap the fresh export into place on a clean finish; on cancel, discard
+            # staging so a partial refresh never replaces the last-good copy.
+            if stage_dir is not None:
+                if self.cancel.is_set():
+                    import shutil
+                    shutil.rmtree(stage_dir, ignore_errors=True)
+                else:
+                    _swap_store_dir(out_dir, stage_dir)
             results.append((spec, result))
             if self.auto_consolidate and not self.cancel.is_set():
                 self._auto_consolidate(spec, result, events)

@@ -117,9 +117,60 @@ def test_gui_api_batch():
         bm.save, bm.load, bm.clear, gui_api.BatchWorker = saved
 
 
+def test_reset_scopes_batch_dest():
+    print("reset_targets scopes the Export Everything store to known <src-env> children:")
+    import gui_worker
+    import settings
+    dest = Path(tempfile.mkdtemp(prefix="tsmis_store_"))
+    (dest / "ssor-prod" / "ramp_detail").mkdir(parents=True)   # app-owned
+    (dest / "ars-test" / "consolidated").mkdir(parents=True)   # app-owned
+    (dest / "My Personal Files").mkdir()                       # foreign — keep
+    (dest / "important.txt").write_text("keep me", encoding="utf-8")  # foreign — keep
+    saved = settings.get_batch_dest
+    settings.get_batch_dest = lambda: str(dest)
+    try:
+        paths = [p for _label, p in gui_worker.reset_targets()]
+    finally:
+        settings.get_batch_dest = saved
+    check("known ssor-prod child targeted", (dest / "ssor-prod") in paths)
+    check("known ars-test child targeted", (dest / "ars-test") in paths)
+    check("the store ROOT itself is never a target (no wholesale rmtree)",
+          dest not in paths)
+    check("foreign folder left untouched", (dest / "My Personal Files") not in paths)
+    check("foreign file left untouched", (dest / "important.txt") not in paths)
+
+
+def test_swap_store_dir():
+    print("Export-Everything store stage-and-swap (clear-on-success):")
+    from gui_worker import _swap_store_dir
+    base = Path(tempfile.mkdtemp(prefix="tsmis_swap_"))
+    # Refresh over an existing last-good copy: staged replaces live entirely.
+    live = base / "ramp_detail"
+    staged = base / "ramp_detail.staging"
+    live.mkdir()
+    (live / "old_route_001.xlsx").write_text("OLD", encoding="utf-8")
+    staged.mkdir()
+    (staged / "new_route_002.xlsx").write_text("NEW", encoding="utf-8")
+    _swap_store_dir(live, staged)
+    check("swap: fresh file present in live", (live / "new_route_002.xlsx").exists())
+    check("swap: stale file removed", not (live / "old_route_001.xlsx").exists())
+    check("swap: staging dir consumed", not staged.exists())
+
+    # First refresh (no live yet): staging is promoted to live.
+    live2 = base / "highway_sequence"
+    staged2 = base / "highway_sequence.staging"
+    staged2.mkdir()
+    (staged2 / "hs_route_001.xlsx").write_text("X", encoding="utf-8")
+    _swap_store_dir(live2, staged2)
+    check("first refresh: staging promoted to live", (live2 / "hs_route_001.xlsx").exists())
+    check("first refresh: staging dir gone", not staged2.exists())
+
+
 def main():
     test_manifest_module()
     test_gui_api_batch()
+    test_reset_scopes_batch_dest()
+    test_swap_store_dir()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")
