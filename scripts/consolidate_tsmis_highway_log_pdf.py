@@ -417,7 +417,8 @@ def _write_route_workbook(rows, out_path):
 # Entry point
 # =============================================================================
 
-def consolidate(events=None, confirm_overwrite=None, day=None):
+def consolidate(events=None, confirm_overwrite=None, day=None,
+                input_dir=None, out_path=None, converted_dir=None):
     """Convert every TSMIS Highway Log PDF to a TSMIS-format per-route workbook,
     then combine them into one workbook (Route column added).
 
@@ -430,9 +431,13 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
     confirm_overwrite(path)->bool callback, a ConsolidateResult returned. Honors
     events.is_cancelled() between pages.
     """
+    # input_dir/out_path/converted_dir are OPTIONAL overrides (the matrix points
+    # them at an Export-Everything store folder + a scratch dir). When omitted the
+    # behavior is byte-identical to before: the dated run folder + the shared dirs.
     day = day or latest_output_day()
-    in_dir = input_dir_for(day)
-    out = out_path_for(day)
+    in_dir = Path(input_dir) if input_dir else input_dir_for(day)
+    out = Path(out_path) if out_path else out_path_for(day)
+    conv = Path(converted_dir) if converted_dir else CONVERTED_DIR
     events = events or Events()
     if not _DEPS_OK:
         return ConsolidateResult(
@@ -468,8 +473,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
 
     # The combined workbook reflects exactly THIS run's PDFs: clear previously
     # converted files so routes removed from the input folder don't linger.
-    CONVERTED_DIR.mkdir(parents=True, exist_ok=True)
-    stale = list(CONVERTED_DIR.glob("tsmis_highway_log_pdf_*.xlsx"))
+    conv.mkdir(parents=True, exist_ok=True)
+    stale = list(conv.glob("tsmis_highway_log_pdf_*.xlsx"))
     for p in stale:
         try:
             p.unlink()
@@ -513,7 +518,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
             events.on_log(f"{prefix} no highway-log data found; skipping")
             failed.append(p.name)
             continue
-        out_file = CONVERTED_DIR / f"tsmis_highway_log_pdf_route_{route}.xlsx"
+        out_file = conv / f"tsmis_highway_log_pdf_route_{route}.xlsx"
         if out_file.name in written:
             events.on_log(f"  WARNING: route {route} already converted from an earlier "
                           f"PDF; {p.name} replaces it (is the same route in the "
@@ -545,7 +550,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
     # lock-in, Route column from the filename, streaming write). Overwrite was
     # already confirmed above.
     result = consolidate_xlsx(
-        input_dir=CONVERTED_DIR, out_path=out, sheet_name=SHEET_NAME,
+        input_dir=conv, out_path=out, sheet_name=SHEET_NAME,
         report_name=REPORT_NAME, title="TSMIS Highway Log (PDF) Consolidation",
         events=events, confirm_overwrite=lambda _p: True,
         header_override=hlc.HEADER, header_comment=hlc.comment_for,
@@ -555,7 +560,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None):
         result.summary_lines = [
             f"Route PDFs:   {len(pdfs) - len(failed)} converted"
             + (f", {len(failed)} failed {failed}" if failed else ""),
-            f"Route files:  {converted} (in {CONVERTED_DIR})",
+            f"Route files:  {converted} (in {conv})",
         ] + result.summary_lines
     return result
 

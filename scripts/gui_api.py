@@ -1350,11 +1350,15 @@ class GuiApi:
                 or matrix.BASELINE_DEFAULT)
 
     def _matrix_snapshot(self, base):
-        """The matrix snapshot for `base`, with the user's hidden rows applied —
-        used by matrix_info, the baseline-switch pending count and recompute so
-        hidden reports are neither shown nor refreshed."""
-        return matrix.matrix_snapshot(settings.get_batch_dest(), base,
-                                      hidden=settings.get_matrix_hidden_reports())
+        """The matrix snapshot for `base`, with the user's hidden rows/columns,
+        per-row modes and TSN files applied — used by matrix_info, the
+        baseline-switch pending count and recompute."""
+        return matrix.matrix_snapshot(
+            settings.get_batch_dest(), base,
+            hidden=settings.get_matrix_hidden_reports(),
+            hidden_envs=settings.get_matrix_hidden_envs(),
+            row_modes=settings.get_matrix_row_modes(),
+            tsn_files=settings.get_matrix_tsn_files())
 
     @_api_method
     def matrix_info(self, baseline=None):
@@ -1427,13 +1431,14 @@ class GuiApi:
 
     @_api_method
     def refresh_cell_comparison(self, row_key, env_key):
-        """(Re)compare ONE (report, env) against the baseline — offline."""
+        """(Re)build ONE cell's comparison for the row's SELECTED mode — offline."""
         base = self._current_baseline()
         if row_key not in {r[0] for r in matrix_rows()}:
             return {"error": "Unknown report for the matrix."}
         if not self._parse_env_keys([env_key]):
             return {"error": "Unknown environment."}
-        if env_key == base:
+        mode = settings.get_matrix_row_modes().get(row_key, "env")
+        if mode == "env" and env_key == base:
             return {"error": "The baseline column has nothing to compare against."}
         if not self._try_claim_task("matrix"):
             return {"error": "A task is already running."}
@@ -1442,14 +1447,14 @@ class GuiApi:
         with self._lock:
             self._matrix = {"phase": "comparing", "row": row_key, "cell": env_key,
                             "done": 0, "total": 1}
-        self._emit_log(f"Comparing {matrix.default_env_label(env_key)} vs "
-                       f"{matrix.default_env_label(base)} ({row_key})…")
+        self._emit_log(f"Comparing {row_key} — {matrix.default_env_label(env_key)}…")
         self._set_dot("busy", "Comparing…")
         self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
         self._push_state()
-        MatrixCompareWorker(dest, base, [(row_key, env_key)], self._q,
-                            self.cancel_event).start()
+        MatrixCompareWorker(dest, base, [(row_key, env_key, mode)], self._q,
+                            self.cancel_event,
+                            tsn_files=settings.get_matrix_tsn_files()).start()
         return {"ok": True}
 
     @_api_method
@@ -1475,7 +1480,8 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
         self._push_state()
-        MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event).start()
+        MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event,
+                            tsn_files=settings.get_matrix_tsn_files()).start()
         return {"ok": True, "count": len(cells)}
 
     @_api_method

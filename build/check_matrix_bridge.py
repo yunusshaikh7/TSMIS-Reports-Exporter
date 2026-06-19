@@ -63,8 +63,9 @@ def main():
 
         print("matrix_info + snapshot key:")
         info = a.matrix_info()
-        check("rows are the four comparable reports (incl. highway_log)",
-              info["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence", "highway_log"])
+        check("rows are the five comparable reports (incl. both Highway Log formats)",
+              info["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence",
+                               "highway_log", "highway_log_pdf"])
         check("baseline defaults to ssor-prod", info["baseline"] == "ssor-prod")
 
         print("set_matrix_report (show/hide rows):")
@@ -75,12 +76,12 @@ def main():
         check("show puts it back",
               a.set_matrix_report("highway_log", True).get("ok")
               and "highway_log" in a.matrix_info()["rows"])
-        # can't hide them all
-        for k in ("ramp_summary", "ramp_detail", "highway_sequence"):
+        # can't hide them all (5 rows: hide 4, the 5th hide is rejected)
+        for k in ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log"):
             a.set_matrix_report(k, False)
-        last = a.set_matrix_report("highway_log", False)
+        last = a.set_matrix_report("highway_log_pdf", False)
         check("can't hide the last remaining row", bool(last.get("error")))
-        for k in ("ramp_summary", "ramp_detail", "highway_sequence"):
+        for k in ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log"):
             a.set_matrix_report(k, True)
         check("snapshot carries the 'matrix' key (None idle)",
               "matrix" in a._state_snapshot() and a._state_snapshot()["matrix"] is None)

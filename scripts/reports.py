@@ -189,4 +189,13 @@ def matrix_rows():
         idx = by_subdir.get(subdir)
         disp = EXPORT_REPORTS[idx][0] if idx is not None else adapter.REPORT_NAME
         rows.append((adapter.key, disp, subdir, idx, adapter))
+    # Highway Log (PDF) is its OWN matrix row (separate toggle + its own modes:
+    # vs TSN-PDF, vs TSMIS Excel). It has no cross-environment adapter (that
+    # comparison isn't coded yet -> env mode greyed), so add it explicitly from the
+    # export spec with adapter=None. row_key = its subdir, to stay distinct from the
+    # Excel "highway_log" row.
+    pdf_subdir = _HIGHWAY_LOG_PDF_SPEC.subdir
+    pdf_idx = by_subdir.get(pdf_subdir)
+    pdf_label = EXPORT_REPORTS[pdf_idx][0] if pdf_idx is not None else "Highway Log (PDF)"
+    rows.append((pdf_subdir, pdf_label, pdf_subdir, pdf_idx, None))
     return rows

@@ -1631,22 +1631,25 @@ class MatrixExportWorker(threading.Thread):
 
 
 class MatrixCompareWorker(threading.Thread):
-    """(Re)build matrix cell comparisons against the baseline.
+    """(Re)build matrix cell comparisons for each cell's SELECTED mode.
 
-    `cells` is a list of (row_key, cell_key); one entry for a single-cell
-    refresh, or many for a baseline-switch / 'refresh all' recompute. No
-    browser — pure compare_env orchestration via matrix.build_cell_comparison,
-    writing into <dest>/comparisons/<baseline>/. Honors cancel BETWEEN cells.
-    Posts ('matrix_cell', {...}) around each cell and ('matrix_done', {...}) at
-    the end."""
+    `cells` is a list of (row_key, cell_key, mode_id) — one entry for a single
+    cell, or many for a per-row / per-column / 'refresh all' recompute. No browser
+    — pure orchestration via matrix.build_comparison over the existing comparison
+    adapters (cross-env -> comparisons/<baseline>/; TSN/self -> comparisons/tsn/).
+    Honors cancel BETWEEN cells (each finished cell is saved, so a cancelled run
+    resumes idempotently). Posts ('matrix_cell', {...}) around each cell and
+    ('matrix_done', {...}) at the end."""
 
-    def __init__(self, dest, baseline, cells, queue, cancel_event):
+    def __init__(self, dest, baseline, cells, queue, cancel_event, tsn_files=None):
         super().__init__(daemon=True, name="matrix-compare")
         self.dest = dest
         self.baseline = baseline
-        self.cells = list(cells)
+        # accept 2-tuples (legacy, env mode) or 3-tuples (row, cell, mode)
+        self.cells = [(c[0], c[1], c[2] if len(c) > 2 else "env") for c in cells]
         self.q = queue
         self.cancel = cancel_event
+        self.tsn_files = tsn_files or {}
 
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
@@ -1654,21 +1657,22 @@ class MatrixCompareWorker(threading.Thread):
         total = len(self.cells)
         done = errors = 0
         try:
-            for row_key, cell_key in self.cells:
+            for row_key, cell_key, mode_id in self.cells:
                 if self.cancel.is_set():
                     break
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
                                             "status": "running",
                                             "done": done, "total": total}))
                 try:
-                    res = matrix.build_cell_comparison(
-                        self.dest, self.baseline, row_key, cell_key, events=events)
+                    res = matrix.build_comparison(
+                        self.dest, row_key, cell_key, mode_id, self.baseline,
+                        events=events, tsn_files=self.tsn_files)
                     status = res.status
                     if status != "ok":
                         errors += 1
                         self.q.put(("log", f"  {cell_key} {row_key}: {res.message}"))
                 except Exception as e:                   # noqa: BLE001
-                    log.exception("matrix compare %s/%s crashed", row_key, cell_key)
+                    log.exception("matrix compare %s/%s/%s crashed", row_key, cell_key, mode_id)
                     status, errors = "error", errors + 1
                 done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,

@@ -39,11 +39,15 @@ def test_enumeration():
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mx_"))
     try:
         snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod")
-        check("four comparable rows incl. highway_log",
-              snap["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence", "highway_log"])
-        check("all_rows lists every row with labels",
+        check("five comparable rows incl. both Highway Log formats",
+              snap["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence",
+                               "highway_log", "highway_log_pdf"])
+        check("all_rows lists every row with labels + tsn_capable",
               [r["key"] for r in snap["all_rows"]] == snap["rows"]
               and all(r.get("label") for r in snap["all_rows"]))
+        check("only the Highway Log rows are tsn_capable",
+              {r["key"] for r in snap["all_rows"] if r["tsn_capable"]}
+              == {"highway_log", "highway_log_pdf"})
         check("six env columns", len(snap["envs"]) == 6
               and snap["envs"][0] == "ssor-prod")
         check("no intersection row",
@@ -52,10 +56,16 @@ def test_enumeration():
         hidden_snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod",
                                              hidden=["highway_log"])
         check("hidden row dropped from rows",
-              "highway_log" not in hidden_snap["rows"] and len(hidden_snap["rows"]) == 3)
+              "highway_log" not in hidden_snap["rows"] and len(hidden_snap["rows"]) == 4)
         check("hidden row still in all_rows + hidden list",
               any(r["key"] == "highway_log" for r in hidden_snap["all_rows"])
               and hidden_snap["hidden"] == ["highway_log"])
+        # hidden env filter: dropping a column removes it but keeps it in all_envs
+        henv = matrix.matrix_snapshot(dest, baseline_key="ssor-prod",
+                                      hidden_envs=["ars-dev"])
+        check("hidden env dropped from envs, kept in all_envs",
+              "ars-dev" not in henv["envs"] and "ars-dev" in henv["all_envs"]
+              and henv["hidden_envs"] == ["ars-dev"])
         cell = snap["cells"]["ramp_detail"]
         check("baseline column flagged", cell["ssor-prod"]["is_baseline"]
               and cell["ssor-prod"]["comparison"] is None)
@@ -164,10 +174,24 @@ def test_orchestration_and_cache():
         check("snapshot: surfaces diff_cells", comp["diff_cells"] == 1)
         check("snapshot: surfaces one_sided", comp["one_sided"] == 1)
 
-        # cells_to_rebuild('stale') no longer lists this fresh cell.
+        # cells_to_rebuild('stale') no longer lists this fresh cell (entries are
+        # (row, cell, mode) now).
         todo = matrix.cells_to_rebuild(snap, scope="stale")
         check("fresh cell not in stale rebuild list",
-              ("ramp_detail", "ars-prod") not in todo)
+              all(not (rk == "ramp_detail" and ev == "ars-prod")
+                  for rk, ev, _m in todo))
+        # scoped rebuild: per-row / per-column filters
+        snap_all = matrix.matrix_snapshot(dest, baseline_key="ssor-prod")
+        # force a stale all-scope by asking for everything
+        allc = matrix.cells_to_rebuild(snap_all, scope="all")
+        check("scope=all entries are (row, cell, mode) triples",
+              all(len(t) == 3 and t[2] == "env" for t in allc))
+        check("row filter limits to that report",
+              all(rk == "ramp_detail"
+                  for rk, _e, _m in matrix.cells_to_rebuild(snap_all, "all", row="ramp_detail")))
+        check("env filter limits to that column",
+              all(ev == "ars-prod"
+                  for _r, ev, _m in matrix.cells_to_rebuild(snap_all, "all", env="ars-prod")))
 
         # Baseline switch -> a different tree; old results untouched.
         snap2 = matrix.matrix_snapshot(dest, baseline_key="ars-prod")

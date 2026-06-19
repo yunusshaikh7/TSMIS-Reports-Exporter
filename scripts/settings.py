@@ -418,34 +418,65 @@ def set_matrix_hidden_reports(keys):
     return get_matrix_hidden_reports()
 
 
-# ---- Comparison-matrix TSN view --------------------------------------------
-# Which report rows are in 'vs TSN' mode (vs the default cross-environment), and
-# the TSN file the user explicitly picked per report (else the matrix auto-finds
-# one in <dest>/_tsn_input/<subdir>/). Validation lives in gui_api.
+# ---- Comparison-matrix modes / env visibility / TSN files ------------------
+# Per-row comparison MODE (env / tsn / vs-format), the hidden ENV columns, and the
+# TSN file the user explicitly picked per subdir (else the matrix auto-finds one in
+# <dest>/_tsn_input/<subdir>/). Validation lives in gui_api.
 
-def get_matrix_tsn_rows():
-    """Row keys currently switched to 'vs TSN' mode (default: none)."""
-    raw = _read_file().get("matrix_tsn_rows")
+def get_matrix_row_modes():
+    """{row_key: mode_id} — the comparison mode chosen per row (default: 'env',
+    omitted from the map)."""
+    raw = _read_file().get("matrix_row_modes")
+    if isinstance(raw, dict):
+        return {k: v for k, v in raw.items()
+                if isinstance(k, str) and isinstance(v, str) and v}
+    return {}
+
+
+def set_matrix_row_mode(row_key, mode_id):
+    """Set one row's comparison mode. 'env' (the default) clears the entry.
+    Returns the new {row_key: mode_id} map."""
+    data = dict(_read_file())
+    modes = dict(get_matrix_row_modes())
+    mode_id = (mode_id or "").strip()
+    if mode_id and mode_id != "env":
+        modes[row_key] = mode_id
+    else:
+        modes.pop(row_key, None)
+    if modes:
+        data["matrix_row_modes"] = modes
+    else:
+        data.pop("matrix_row_modes", None)
+    _atomic_write(data)
+    log.info("settings: matrix_row_mode[%s] -> %s", row_key, mode_id or "env")
+    return get_matrix_row_modes()
+
+
+def get_matrix_hidden_envs():
+    """Env (column) keys the user has hidden on the matrix (default: none)."""
+    raw = _read_file().get("matrix_hidden_envs")
     if isinstance(raw, list):
         return [k for k in raw if isinstance(k, str)]
     return []
 
 
-def set_matrix_tsn_rows(keys):
-    """Persist the 'vs TSN' row keys. Empty -> cleared. Returns the new list."""
+def set_matrix_hidden_envs(keys):
+    """Persist the hidden env-column keys. Empty -> cleared. Returns the new list."""
     data = dict(_read_file())
     keys = [k for k in (keys or []) if isinstance(k, str)]
     if keys:
-        data["matrix_tsn_rows"] = sorted(set(keys))
+        data["matrix_hidden_envs"] = sorted(set(keys))
     else:
-        data.pop("matrix_tsn_rows", None)
+        data.pop("matrix_hidden_envs", None)
     _atomic_write(data)
-    log.info("settings: matrix_tsn_rows -> %s", keys or "(none)")
-    return get_matrix_tsn_rows()
+    log.info("settings: matrix_hidden_envs -> %s", keys or "(none)")
+    return get_matrix_hidden_envs()
 
 
 def get_matrix_tsn_files():
-    """{row_key: tsn_file_path} the user explicitly selected (per report)."""
+    """{subdir: tsn_file_path} the user explicitly selected (keyed by the report's
+    store subdir, since the TSN dataset is per format — highway_log vs
+    highway_log_pdf)."""
     raw = _read_file().get("matrix_tsn_files")
     if isinstance(raw, dict):
         return {k: v for k, v in raw.items()
@@ -453,22 +484,22 @@ def get_matrix_tsn_files():
     return {}
 
 
-def set_matrix_tsn_file(row_key, path):
-    """Set (or, with an empty path, clear) the TSN file for one report row.
-    Returns the new {row_key: path} map."""
+def set_matrix_tsn_file(subdir, path):
+    """Set (or, with an empty path, clear) the TSN file for one report subdir.
+    Returns the new {subdir: path} map."""
     data = dict(_read_file())
     files = dict(get_matrix_tsn_files())
     path = (path or "").strip()
     if path:
-        files[row_key] = path
+        files[subdir] = path
     else:
-        files.pop(row_key, None)
+        files.pop(subdir, None)
     if files:
         data["matrix_tsn_files"] = files
     else:
         data.pop("matrix_tsn_files", None)
     _atomic_write(data)
-    log.info("settings: matrix_tsn_file[%s] -> %s", row_key, path or "(default)")
+    log.info("settings: matrix_tsn_file[%s] -> %s", subdir, path or "(default)")
     return get_matrix_tsn_files()
 
 
