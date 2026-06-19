@@ -132,3 +132,23 @@ def consolidator_for_spec(spec):
     is export-only (Intersection Summary / Detail). Keyed on the spec's output
     subdir."""
     return _CONSOLIDATOR_BY_SUBDIR.get(getattr(spec, "subdir", None))
+
+
+def matrix_rows():
+    """The cross-environment comparison MATRIX rows, derived once from the
+    registry so they can't drift: every "env"-group "folders" comparison (Ramp
+    Summary / Ramp Detail / Highway Sequence), mapped to its export ReportSpec so
+    a matrix cell can be re-exported. Returns
+    [(row_key, label, subdir, export_idx, adapter)] in registry order.
+    Intersection reports have no cross-env adapter, so they never appear (this is
+    the same intent as the app-wide intersection disable)."""
+    by_subdir = {spec.subdir: i for i, (_l, _f, spec) in enumerate(EXPORT_REPORTS)}
+    rows = []
+    for _label, adapter, kind, group in COMPARE_REPORTS:
+        if kind != "folders" or group != "env":
+            continue
+        subdir = adapter.subdir
+        idx = by_subdir.get(subdir)
+        disp = EXPORT_REPORTS[idx][0] if idx is not None else adapter.REPORT_NAME
+        rows.append((adapter.key, disp, subdir, idx, adapter))
+    return rows
