@@ -21,6 +21,13 @@ machine** (nothing extra to install), and a *with-browser* build ships its own
 PCs where managed browsers get in the way. The same engine also runs from a set
 of `.bat` scripts for development and as a fallback.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+    <img alt="TSMIS Reports Exporter — Export tab" src="docs/screenshot-light.png" width="820">
+  </picture>
+</p>
+
 ---
 
 ## Table of Contents
@@ -87,8 +94,6 @@ Consolidate-only: **TSN Highway Log** (drop district PDFs into
 TSMIS-format per-route files + one combined workbook under `output/`. The
 **Compare** tab turns two Highway Logs into a formula-driven discrepancy
 workbook (TSMIS vs TSN, TSMIS-PDF vs TSN-PDF, or TSMIS-PDF vs TSMIS-Excel).
-
-<!-- Tip: drop a screenshot of the GUI here once available, e.g. ![TSMIS Exporter](docs/screenshot.png) -->
 
 ---
 
