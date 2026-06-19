@@ -129,10 +129,13 @@ function appendLog(text) {
   // Comparison verdict lines lead with ✓/✗ and win outright.
   const scrubbed = text.replace(/\bfailed:?\s+0\b/gi, "");
   const upper = scrubbed.toUpperCase();
+  // An all-empty run summary ("saved 0 ... empty N") is NOT a success — don't
+  // paint it green just because it contains the word "saved".
+  const savedZero = /\bsaved:?\s+0\b/i.test(text);
   if (text.startsWith("✓")) line.classList.add("ok");
   else if (text.startsWith("✗")) line.classList.add("err");
   else if (upper.includes("FAIL") || upper.includes("ERROR")) line.classList.add("err");
-  else if (text.includes("saved") || text.includes("Output file") || text.includes("Output:")) line.classList.add("ok");
+  else if ((text.includes("saved") && !savedZero) || text.includes("Output file") || text.includes("Output:")) line.classList.add("ok");
   line.textContent = text === "" ? " " : text;
   body.appendChild(line);
   if (++S.logLines > LOG_MAX_LINES) { body.firstChild.remove(); S.logLines--; }
@@ -882,6 +885,12 @@ function renderCompletion() {
   } else if (failed > 0) {
     head.className = "completion-head warn"; use.setAttribute("href", "#i-warn");
     $("completionTitle").textContent = "Finished with failures";
+  } else if (((t.saved || 0) + (t.exists || 0)) === 0 && (t.empty || 0) > 0) {
+    // Every route came back empty (no data) — NOT a success. An environment that
+    // signs in but returns no data for all routes (outage / permissions /
+    // selector drift) must not read as a green "Export complete".
+    head.className = "completion-head warn"; use.setAttribute("href", "#i-warn");
+    $("completionTitle").textContent = "Finished with no data";
   } else {
     head.className = "completion-head ok"; use.setAttribute("href", "#i-check");
     $("completionTitle").textContent = "Export complete";
@@ -2008,7 +2017,13 @@ async function deleteAllReports() {
     summary.textContent = prev.targets.length
       ? `This permanently deletes ${prev.files.toLocaleString()} file(s) (${prev.mb} MB):`
       : "Nothing to delete — no generated reports were found.";
-    list.textContent = prev.targets.length ? prev.targets.join("\n") : "";
+    // Show each target's REAL path under its label, so the exact folders being
+    // deleted (especially the user-chosen Export Everything store) are visible —
+    // never just a friendly label that hides the location.
+    list.textContent = prev.targets.length
+      ? prev.targets.map((t, i) =>
+          (prev.paths && prev.paths[i]) ? `${t}\n    ${prev.paths[i]}` : t).join("\n")
+      : "";
     list.style.display = prev.targets.length ? "" : "none";
   };
   render();
