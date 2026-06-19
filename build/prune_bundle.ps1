@@ -144,7 +144,8 @@ if (-not $GuardOnly) {
     # stray README/CHANGELOG/HISTORY/AUTHORS/CONTRIBUTING/NEWS text -- EXCEPT
     # license/notice files, which OSS licenses legally require us to redistribute
     # (and which never carry DLP-flagged content). Our own clean "Start Here.txt"
-    # is at the app root, not under _internal, so it is untouched.
+    # and "IT-README.txt" are at the app root, not under _internal, so they are
+    # untouched.
     $licenseLike = '(?i)^(license|licence|copying|notice|copyright|third.?party)'
     Get-ChildItem $internal -Recurse -File -Include *.md, *.markdown, *.rst -ErrorAction Ignore |
         Where-Object { $_.BaseName -notmatch $licenseLike } |

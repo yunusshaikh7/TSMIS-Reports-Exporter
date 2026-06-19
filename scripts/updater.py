@@ -76,8 +76,10 @@ _API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 _API_RELEASES = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=100"
 _EXE_NAME = APP_NAME + ".exe"
 # Bundle items the swap replaces / cleanup removes. Everything else next to
-# the exe (output/, input/, data/) is user data and is never touched.
-_BUNDLE_ITEMS = (_EXE_NAME, "_internal", "Start Here.txt")
+# the exe (output/, input/, data/) is user data and is never touched. The two
+# readmes ride the allowlist so a content edit in build/ propagates on update;
+# the swap runs in the STAGED exe, so this list governs each install.
+_BUNDLE_ITEMS = (_EXE_NAME, "_internal", "Start Here.txt", "IT-README.txt")
 _CHUNK = 256 * 1024
 _API_TIMEOUT_S = 20
 _DL_TIMEOUT_S = 60          # socket timeout per read while streaming the zip

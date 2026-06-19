@@ -30,7 +30,7 @@ RELEASES_PAGE = https://github.com/<repo>/releases/latest
 _API_LATEST   = https://api.github.com/repos/<repo>/releases/latest
 _API_RELEASES = https://api.github.com/repos/<repo>/releases?per_page=100
 _EXE_NAME     = APP_NAME + ".exe"          # "TSMIS Exporter.exe"
-_BUNDLE_ITEMS = (_EXE_NAME, "_internal", "Start Here.txt")   # the swap allowlist
+_BUNDLE_ITEMS = (_EXE_NAME, "_internal", "Start Here.txt", "IT-README.txt")   # the swap allowlist
 _CHUNK        = 256 * 1024                  # stream read size
 _API_TIMEOUT_S = 20      _DL_TIMEOUT_S = 60 # socket read timeout while streaming
 SWAP_FLAG     = "--apply-update"
@@ -394,9 +394,9 @@ The updater's verification only works because of what `.github/workflows/release
 ## 12. Extension points
 
 **Add a new top-level item to the installed bundle** (a sibling file/folder next to the exe that updates should carry, e.g. a new `Read Me.pdf` or a config template):
-- Add its name to `_BUNDLE_ITEMS` (`updater.py:80`). That one tuple is the allowlist for **both** `perform_swap` (what gets copied+swapped) **and** `cleanup_leftovers` (which `.old`/`.new` it removes). An item not in the list is logged-and-ignored during a swap and never cleaned up.
+- Add its name to `_BUNDLE_ITEMS` (`updater.py:82`). That one tuple is the allowlist for **both** `perform_swap` (what gets copied+swapped) **and** `cleanup_leftovers` (which `.old`/`.new` it removes). An item not in the list is logged-and-ignored during a swap and never cleaned up. (`IT-README.txt` was added this way — it rides updates so a content edit in `build/it_readme.txt` propagates.)
 - It must actually ship inside the zip's top-level folder (i.e. be in `dist\TSMIS Exporter\`). User data dirs (`data\`, `output\`, `input\`) must **never** be added — they are not in the staged tree and must stay untouched.
-- `check_updater.py:_make_tree`/`test_staged_allowlist` assume the three current items; extend the fixture if you change the set.
+- `check_updater.py:_make_tree`/`test_staged_allowlist` assume the four current items; extend the fixture if you change the set.
 
 **Change the release asset naming / variants:** the `-{want}.zip` suffix logic lives only in `_asset_info_from_release`, and the variant probe only in `current_variant()`. Keep both in lockstep with `release.yml`'s zip names.
 

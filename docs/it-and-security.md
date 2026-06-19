@@ -14,6 +14,13 @@ Related docs: full updater swap-mode / MOTW / SHA-256 / revert mechanics live in
 flow live in [auth-and-signin.md](auth-and-signin.md); the audit prompt / review
 methodology lives in [code-review-prompt.md](code-review-prompt.md).
 
+**Shipped handout:** a plain-language, distribution-facing summary of §1–§7 ships
+in the app bundle as `IT-README.txt` (source: `build/it_readme.txt`, wired in by
+`build.ps1`) — the page to hand an external IT/security reviewer who "raises an
+eyebrow" at the app. This file stays the candid *internal* source of truth (it
+keeps the audit findings and threat model); keep the two in sync when §1–§7
+change. The handout omits the §8 audit P-codes / threat model on purpose.
+
 ---
 
 ## 1. Network connections it makes
@@ -108,8 +115,8 @@ narrative: [lessons.md](lessons.md); the strip routine itself is
   against the published `<asset>.sha256` (and the GitHub API's asset digest) before
   extracting. A mismatch refuses the install.
 - Installs by COPY-then-RENAME of **only the known bundle items** (`TSMIS
-  Exporter.exe`, `_internal`, `Start Here.txt`) — an unexpected staged file is
-  ignored. User data (`output\`, `input\`, `data\`) is never in the update and is
+  Exporter.exe`, `_internal`, `Start Here.txt`, `IT-README.txt`) — an unexpected
+  staged file is ignored. User data (`output\`, `input\`, `data\`) is never in the update and is
   never touched. A failed swap rolls back to the previous version.
 - A read-only install can't self-update; it opens the release page instead.
 

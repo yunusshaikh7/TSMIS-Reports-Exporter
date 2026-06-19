@@ -107,6 +107,7 @@ if ($SelfTest) {
 # --- 4. Report ------------------------------------------------------------
 if (-not $SelfTest) {
     Copy-Item (Join-Path $BuildDir "dist_readme.txt") (Join-Path $AppDir "Start Here.txt") -Force
+    Copy-Item (Join-Path $BuildDir "it_readme.txt") (Join-Path $AppDir "IT-README.txt") -Force
 }
 $SizeMB = (Get-ChildItem $AppDir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB
 Write-Host ("`n==> Built {0}  ({1:N0} MB onefolder)" -f $AppDir, $SizeMB)

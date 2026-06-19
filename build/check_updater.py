@@ -157,6 +157,10 @@ def _make_tree(base, exe_bytes, internal_bytes, extras=None):
     (base / "_internal").mkdir(exist_ok=True)
     (base / "_internal" / "app.dll").write_bytes(internal_bytes)
     (base / "Start Here.txt").write_text("hi", encoding="utf-8")
+    # IT-README.txt also rides the allowlist; tie its content to exe_bytes so a
+    # test can prove the staged copy actually replaced the installed one.
+    (base / "IT-README.txt").write_text(
+        "readme-" + exe_bytes.decode("latin-1"), encoding="utf-8")
     for name, data in (extras or {}).items():
         (base / name).write_bytes(data)
 
@@ -181,6 +185,8 @@ def test_staged_allowlist(monkeypatch_wait):
           (app / updater._EXE_NAME).read_bytes() == b"NEW-EXE")
     check("_internal replaced with new bytes",
           (app / "_internal" / "app.dll").read_bytes() == b"NEW-DLL")
+    check("IT-README.txt refreshed with new content",
+          (app / "IT-README.txt").read_text(encoding="utf-8") == "readme-NEW-EXE")
     check("unexpected staged item NOT installed", not (app / "evil.dll").exists())
     check("user data untouched",
           (app / "data" / "config.json").read_text(encoding="utf-8") == "{}")

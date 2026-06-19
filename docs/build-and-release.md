@@ -76,8 +76,9 @@ Steps:
    (system browser `page.pdf()` + download, pdfplumber text/table extraction,
    openpyxl round-trip, GUI construction through the real JS bridge).
    `-SelfTest -BundleChromium` gates the bundled-Chromium path.
-4. **Report** — copies `dist_readme.txt` in as `Start Here.txt` (windowed builds
-   only) and prints the onefolder size.
+4. **Report** — copies `dist_readme.txt` in as `Start Here.txt` and
+   `it_readme.txt` in as `IT-README.txt` (the IT/security handout), windowed
+   builds only, and prints the onefolder size.
 
 The ~148–149 MB floor is `node.exe` (~80 MB, the Playwright Node driver) +
 Python + pythonnet/WebView2 assemblies + pdf/excel libs.
@@ -326,7 +327,7 @@ mid-`_internal`, and its delete-based rollback could fail on a Defender-held
 file, relaunching a MIXED tree ("says 0.10.2 but features missing").
 
 **Staged allowlist:** the swap installs ONLY the known bundle items
-`_BUNDLE_ITEMS = ("TSMIS Exporter.exe", "_internal", "Start Here.txt")` — never
+`_BUNDLE_ITEMS = ("TSMIS Exporter.exe", "_internal", "Start Here.txt", "IT-README.txt")` — never
 whatever else happens to sit in the staged tree, so a tampered/mis-packaged
 extra top-level item can't ride into the install (unexpected items are logged
 and ignored). User data (`data\`, `output\`, `input\`) is never in the staged
