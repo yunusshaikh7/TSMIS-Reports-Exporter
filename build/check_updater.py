@@ -257,6 +257,103 @@ def test_sha256_verify(monkeypatch_wait):
         updater.UPDATE_DIR = orig_update_dir
 
 
+def test_retry_recovers_transient_oserror():
+    print("_retry recovers a transient OSError (the Defender/indexer lock):")
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise OSError(5, "Access is denied")
+        return "staged"
+
+    check("returns after transient failures", updater._retry(flaky) == "staged")
+    check("retried until it succeeded (3 calls)", calls["n"] == 3)
+
+
+def _build_bundle_zip():
+    """A valid update zip: one top-level 'TSMIS Exporter/' folder holding the exe
+    + _internal, exactly what _bundle_root expects."""
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(f"TSMIS Exporter/{updater._EXE_NAME}", b"NEW-EXE")
+        zf.writestr("TSMIS Exporter/_internal/app.dll", b"NEW-DLL")
+    return buf.getvalue()
+
+
+def test_stage_rename_retries():
+    """The field bug: download_and_stage's extract->staged rename had no retry, so
+    a transient WinError 5 (Defender/indexer holding the freshly-extracted tree)
+    aborted the whole stage. Prove the rename now goes through _retry and recovers
+    a one-shot denial, completing the stage."""
+    print("download_and_stage rename retries past a transient WinError 5:")
+    zip_bytes = _build_bundle_zip()
+
+    class _FakeResp:
+        def __init__(self, data):
+            self._data, self._pos = data, 0
+            self.headers = {"Content-Length": str(len(data))}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, n):
+            chunk = self._data[self._pos:self._pos + n]
+            self._pos += len(chunk)
+            return chunk
+
+    orig_http = updater._http_get
+    orig_support = updater.update_support
+    orig_update_dir = updater.UPDATE_DIR
+    orig_retry = updater._retry
+    updater._http_get = lambda url, timeout: _FakeResp(zip_bytes)
+    updater.update_support = lambda: ("ok", None)
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_stage_"))
+    updater.UPDATE_DIR = tmp / "update"
+
+    state = {"first": True, "rename_wrapped": False, "rename_recovered": False}
+
+    def spy_retry(fn):
+        # The FIRST _retry call in download_and_stage is the extract->staged
+        # rename; inject one transient denial into it, then let the real retry
+        # recover. Later _retry calls (the cleanup rmtree) pass straight through.
+        if state["first"]:
+            state["first"] = False
+            state["rename_wrapped"] = True
+            calls = {"n": 0}
+
+            def flaky():
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    raise OSError(5, "Access is denied")
+                state["rename_recovered"] = True
+                return fn()
+
+            return orig_retry(flaky)
+        return orig_retry(fn)
+
+    updater._retry = spy_retry
+    Info = updater.UpdateInfo
+    try:
+        info = Info("1", "v1", "pkg.zip", "http://x/pkg.zip", 0, "")  # size 0, no sha
+        staged = updater.download_and_stage(info)
+        check("staging rename went through _retry", state["rename_wrapped"])
+        check("transient WinError 5 was recovered (not aborted)",
+              state["rename_recovered"])
+        check("staged tree completed with the exe", (staged / updater._EXE_NAME).is_file())
+        check("staged tree has _internal", (staged / "_internal").is_dir())
+    finally:
+        updater._http_get = orig_http
+        updater.update_support = orig_support
+        updater.UPDATE_DIR = orig_update_dir
+        updater._retry = orig_retry
+
+
 def test_missing_exe_aborts(monkeypatch_wait):
     print("swap aborts on an incomplete staged tree:")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_upd2_"))
@@ -286,6 +383,8 @@ def main():
         test_safe_release_url()
         test_resolve_previous_release()
         test_sha256_verify(monkeypatch_wait)
+        test_retry_recovers_transient_oserror()
+        test_stage_rename_retries()
         test_staged_allowlist(monkeypatch_wait)
         test_missing_exe_aborts(monkeypatch_wait)
     finally:

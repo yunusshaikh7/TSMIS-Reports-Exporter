@@ -415,9 +415,22 @@ def download_and_stage(info, on_progress=None):
 
     root = _bundle_root(extract_dir)    # the zip wraps a "TSMIS Exporter\" folder
     staged = UPDATE_DIR / "staged"
-    root.rename(staged)                 # same volume: instant
+    # Defender / the Search indexer can still hold a handle in the freshly-
+    # extracted ~150 MB tree, denying the rename with WinError 5 (seen in the
+    # field, both times during the ~09:20 morning scan window). The swap step
+    # wraps every file op in _retry for exactly this; the stage rename had none,
+    # so a transient lock aborted the whole stage and forced a re-download.
+    # Retry with the same cadence rather than failing on the first denial.
+    _retry(lambda: root.rename(staged))   # same volume: instant
     if extract_dir.exists() and root != extract_dir:
-        shutil.rmtree(extract_dir, ignore_errors=True)
+        # Best-effort cleanup with the same retry cadence — but a leftover
+        # extract dir must never abort an otherwise-good stage.
+        try:
+            _retry(lambda: shutil.rmtree(extract_dir))
+        except OSError as e:
+            log.warning("update: could not remove extract dir %s: %s: %s",
+                        extract_dir, type(e).__name__, e)
+            shutil.rmtree(extract_dir, ignore_errors=True)
 
     if not (staged / _EXE_NAME).is_file() or not (staged / "_internal").is_dir():
         raise UpdateError("the downloaded package is missing expected app files")
