@@ -63,7 +63,6 @@ from events import Events, RunResult
 from exporter import (
     _can_resume,
     _capture_failure,
-    _file_looks_complete,
     _process_route,
     _record,
     _retry_failed_routes,
@@ -154,6 +153,43 @@ def _preflight_once(spec, events):
             preflight(page, spec.label)
         finally:
             browser.close()
+
+
+def _reconcile_unaccounted(routes, result, out_dir, spec, events, *,
+                           cancelled, worker_crashed):
+    """Account for routes a crashed/stopped worker left with NO recorded outcome
+    (the one it had in flight, plus any it never reached) so they can't be
+    silently dropped from an otherwise-"successful" run. Marks each such route
+    `failed` (so it appears in the run report and the serial retry pass / a later
+    resume re-pulls it). Returns the list of routes newly marked failed.
+
+    Two corrected behaviors (see the Phase-3 audit findings):
+      * Skip on a clean cancel (those routes are simply not-done -- resume later)
+        BUT still reconcile when a worker CRASHED, even on cancel, so the crash's
+        orphaned route(s) don't vanish from the run report.
+      * Use the lock-tolerant _can_resume, NOT the read-strict _file_looks_complete:
+        a file the worker saved before crashing but that the user has open in
+        Excel (sharing-deny lock) is TRUSTED as present, not re-marked failed and
+        needlessly re-downloaded -- matching the rest of the engine.
+    """
+    if cancelled and not worker_crashed:
+        return []
+    accounted = {r for r, _ in result.per_route}
+    missing = [r for r in routes
+               if r not in accounted
+               and not _can_resume(out_dir / spec.filename(r))]
+    if missing:
+        log.warning("parallel: %d route(s) had no recorded outcome "
+                    "(worker_crashed=%s, cancelled=%s); marking failed: %s",
+                    len(missing), worker_crashed, cancelled, missing)
+        if worker_crashed:
+            events.on_log(f"{len(missing)} route(s) weren't completed because a "
+                          "browser stopped unexpectedly -- marking them failed so "
+                          "they're retried / picked up on the next run.")
+        for r in missing:
+            result.failed.append(r)
+            _record(result, events, r, "failed")
+    return missing
 
 
 def _retry_failed_sequential(spec, events, result, out_dir, timeout_ms):
@@ -326,28 +362,9 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
         result.exists.extend(wr.exists)
         result.per_route.extend(wr.per_route)
 
-    # Reconcile: a crashed (or stopped) worker can leave routes with NO recorded
-    # outcome -- the one it had in flight, plus any it never reached. Without this
-    # those routes would be silently dropped from a "successful" run. Mark every
-    # such route failed (unless its file is already on disk) so nothing is lost:
-    # the serial retry pass below then gives them a fresh attempt, and the run
-    # report + counts account for every route exactly once. Skip when the user
-    # cancelled -- those routes are simply not-done (resume later), not failures.
-    if not events.is_cancelled():
-        accounted = {r for r, _ in result.per_route}
-        missing = [r for r in routes
-                   if r not in accounted
-                   and not _file_looks_complete(out_dir / spec.filename(r))]
-        if missing:
-            log.warning("parallel: %d route(s) had no recorded outcome "
-                        "(worker_crashed=%s); marking failed: %s",
-                        len(missing), worker_crashed.is_set(), missing)
-            if worker_crashed.is_set():
-                events.on_log(f"{len(missing)} route(s) weren't completed because a browser "
-                              "stopped unexpectedly -- marking them failed to retry.")
-            for r in missing:
-                result.failed.append(r)
-                _record(result, events, r, "failed")
+    _reconcile_unaccounted(routes, result, out_dir, spec, events,
+                           cancelled=events.is_cancelled(),
+                           worker_crashed=worker_crashed.is_set())
 
     log.info("parallel export done in %ds: saved=%d empty=%d skipped=%d failed=%d exists=%d%s",
              int(time.monotonic() - run_t0), result.saved, len(result.empty),
