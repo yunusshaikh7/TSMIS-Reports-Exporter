@@ -4,13 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TSMIS Reports Exporter — bulk-export Caltrans TSMIS reports</title>
-  <meta name="description" content="Free, open-source Windows tool that bulk-exports Caltrans TSMIS reports for every California state route. Sign in once, pick the report types, and export every route automatically.">
+  <meta name="description" content="Free, open-source Windows tool that bulk-exports Caltrans TSMIS reports for every California state route. Unzip and run — no install.">
   <link rel="canonical" href="https://yunusshaikh7.github.io/TSMIS-Reports-Exporter/">
-
-  <!-- Social / search preview -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="TSMIS Reports Exporter">
-  <meta property="og:description" content="Free, open-source Windows tool that bulk-exports Caltrans TSMIS reports for every California state route.">
+  <meta property="og:description" content="Bulk-export Caltrans TSMIS reports for every California state route — in one click.">
   <meta property="og:url" content="https://yunusshaikh7.github.io/TSMIS-Reports-Exporter/">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,246 +17,96 @@
 
   <style>
     :root {
-      --bg: #ffffff;
-      --bg-soft: #f6f8fc;
-      --ink: #0f172a;
-      --muted: #5b6577;
-      --line: #e6eaf2;
-      --brand: #0969da;
-      --brand-2: #0a7ea4;
-      --card: #ffffff;
-      --shadow: 0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.06);
+      --bg: #f6f8fc; --ink: #0f172a; --muted: #5b6577; --line: #e6eaf2;
+      --brand: #0969da; --brand-2: #0a7ea4; --card: #fff;
+      --shadow: 0 10px 40px rgba(16,24,40,.12);
       color-scheme: light dark;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #0b0f17;
-        --bg-soft: #0f1521;
-        --ink: #e9eef7;
-        --muted: #9aa6b8;
-        --line: #1d2636;
-        --brand: #4f9dff;
-        --brand-2: #38bec9;
-        --card: #111826;
-        --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+        --bg: #0b0f17; --ink: #e9eef7; --muted: #9aa6b8; --line: #1d2636;
+        --brand: #4f9dff; --brand-2: #38bec9; --card: #111826;
+        --shadow: 0 14px 50px rgba(0,0,0,.5);
       }
     }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
     body {
-      margin: 0;
-      font-family: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: var(--ink);
-      background: var(--bg);
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-    a { color: var(--brand); text-decoration: none; }
-    code { background: rgba(127,127,127,.14); padding: .1em .4em; border-radius: 5px; font-size: .9em; }
-    .wrap { width: min(1040px, 92vw); margin: 0 auto; }
-
-    /* Hero */
-    header.hero {
-      position: relative;
-      overflow: hidden;
-      padding: 5.5rem 0 4.5rem;
+      margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center;
+      padding: 2.5rem 1.25rem;
+      font-family: "Inter", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased;
       background:
-        radial-gradient(900px 420px at 75% -10%, rgba(9,105,218,.16), transparent 60%),
-        radial-gradient(700px 360px at 10% 0%, rgba(10,126,164,.14), transparent 55%),
-        var(--bg-soft);
-      border-bottom: 1px solid var(--line);
-      text-align: center;
+        radial-gradient(800px 380px at 70% -5%, rgba(9,105,218,.18), transparent 60%),
+        radial-gradient(640px 320px at 12% 5%, rgba(10,126,164,.16), transparent 55%),
+        var(--bg);
     }
-    .badge-pill {
+    a { color: inherit; text-decoration: none; }
+    .pill {
       display: inline-flex; align-items: center; gap: .5rem;
-      font-size: .82rem; font-weight: 600; color: var(--muted);
+      font-size: .8rem; font-weight: 600; color: var(--muted);
       background: var(--card); border: 1px solid var(--line);
-      padding: .35rem .8rem; border-radius: 999px; margin-bottom: 1.4rem;
-      box-shadow: var(--shadow);
+      padding: .35rem .8rem; border-radius: 999px; margin-bottom: 1.5rem;
     }
     .dot { width: .5rem; height: .5rem; border-radius: 50%; background: #22c55e; }
     h1 {
-      font-size: clamp(2.3rem, 5.5vw, 3.6rem);
-      font-weight: 800; letter-spacing: -.02em; line-height: 1.08;
-      margin: 0 0 1rem;
+      font-size: clamp(2rem, 6vw, 3.2rem); font-weight: 800;
+      letter-spacing: -.02em; line-height: 1.1; margin: 0 0 .8rem;
     }
-    h1 .grad {
-      background: linear-gradient(90deg, var(--brand), var(--brand-2));
-      -webkit-background-clip: text; background-clip: text; color: transparent;
+    .grad { background: linear-gradient(90deg, var(--brand), var(--brand-2));
+      -webkit-background-clip: text; background-clip: text; color: transparent; }
+    p.tag { font-size: clamp(1rem, 2.4vw, 1.2rem); color: var(--muted); margin: 0 0 2rem; max-width: 30ch; }
+    .download {
+      display: inline-flex; align-items: center; gap: .6rem;
+      background: var(--brand); color: #fff; font-weight: 700; font-size: 1.15rem;
+      padding: 1rem 2rem; border-radius: 12px; box-shadow: var(--shadow);
+      transition: transform .08s ease, background .2s ease;
     }
-    .lede { font-size: clamp(1.05rem, 2.2vw, 1.3rem); color: var(--muted); max-width: 640px; margin: 0 auto 2.2rem; }
-    .cta { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
-    .btn {
-      display: inline-flex; align-items: center; gap: .55rem;
-      padding: .85rem 1.5rem; border-radius: 10px;
-      font-weight: 600; font-size: 1rem; border: 1px solid transparent;
-      transition: transform .08s ease, box-shadow .2s ease, background .2s ease;
-    }
-    .btn:active { transform: translateY(1px); }
-    .btn-primary { background: var(--brand); color: #fff; box-shadow: var(--shadow); }
-    .btn-primary:hover { background: #0a5cc0; }
-    .btn-ghost { background: var(--card); color: var(--ink); border-color: var(--line); }
-    .btn-ghost:hover { border-color: var(--brand); color: var(--brand); }
-    .sub-note { margin-top: 1.1rem; font-size: .85rem; color: var(--muted); }
+    .download:hover { background: #0a5cc0; }
+    .download:active { transform: translateY(1px); }
+    .sub { margin-top: .9rem; font-size: .85rem; color: var(--muted); }
+    .sub a { font-weight: 600; color: var(--brand); border-bottom: 1px solid transparent; }
+    .sub a:hover { border-color: currentColor; }
 
-    /* Sections */
-    section { padding: 4rem 0; }
-    .eyebrow { text-align: center; font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); margin: 0 0 .5rem; }
-    h2 { text-align: center; font-size: clamp(1.6rem, 3.5vw, 2.2rem); font-weight: 800; letter-spacing: -.01em; margin: 0 0 2.5rem; }
-
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.1rem; }
-    .card {
-      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-      padding: 1.5rem; box-shadow: var(--shadow);
+    .shot {
+      margin-top: 3rem; width: min(900px, 100%);
+      border: 1px solid var(--line); border-radius: 14px;
+      box-shadow: var(--shadow); overflow: hidden; background: var(--card);
     }
-    .card .ico {
-      width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center;
-      background: linear-gradient(135deg, rgba(9,105,218,.14), rgba(10,126,164,.14));
-      color: var(--brand); margin-bottom: .9rem;
+    .shot img { display: block; width: 100%; height: auto; }
+    .placeholder {
+      aspect-ratio: 16 / 10; display: grid; place-items: center;
+      color: var(--muted); font-size: .9rem; gap: .5rem;
+      background:
+        repeating-linear-gradient(45deg, transparent, transparent 12px, rgba(127,127,127,.05) 12px, rgba(127,127,127,.05) 24px);
     }
-    .card h3 { margin: 0 0 .4rem; font-size: 1.08rem; font-weight: 700; }
-    .card p { margin: 0; color: var(--muted); font-size: .96rem; }
-
-    /* Steps */
-    .steps { counter-reset: step; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.1rem; }
-    .step { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1.5rem 1.5rem 1.4rem; box-shadow: var(--shadow); }
-    .step::before {
-      counter-increment: step; content: counter(step);
-      display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%;
-      font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-2));
-      margin-bottom: .8rem;
-    }
-    .step h3 { margin: 0 0 .35rem; font-size: 1.05rem; }
-    .step p { margin: 0; color: var(--muted); font-size: .95rem; }
-
-    .reports { background: var(--bg-soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .chips { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; max-width: 760px; margin: 0 auto; }
-    .chip { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: .55rem 1rem; font-size: .92rem; font-weight: 500; box-shadow: var(--shadow); }
-
-    /* Footer */
-    footer { padding: 2.5rem 0 3rem; border-top: 1px solid var(--line); text-align: center; color: var(--muted); font-size: .9rem; }
-    footer a { font-weight: 600; }
-    .foot-links { display: flex; gap: 1.2rem; justify-content: center; margin-bottom: 1rem; flex-wrap: wrap; }
-    .disc { max-width: 620px; margin: 1rem auto 0; font-size: .82rem; opacity: .85; }
-    svg { display: block; }
+    footer { margin-top: 2.5rem; font-size: .8rem; color: var(--muted); max-width: 52ch; }
+    footer a { font-weight: 600; color: var(--brand); }
   </style>
 </head>
 <body>
-  <header class="hero">
-    <div class="wrap">
-      <span class="badge-pill"><span class="dot"></span> Free &amp; open source · Windows · MIT</span>
-      <h1>Bulk-export Caltrans TSMIS reports<br><span class="grad">for every California route</span></h1>
-      <p class="lede">
-        Sign in once, tick the reports you want, and let it walk all 250+ state
-        routes for you — no copy-pasting route numbers, no babysitting the browser.
-      </p>
-      <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases/latest">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download for Windows
-        </a>
-        <a class="btn btn-ghost" href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18 4.6 19 4.9 19 4.9c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
-          View on GitHub
-        </a>
-      </div>
-      <p class="sub-note">Unzip and double-click — no installer, no Python required.</p>
-    </div>
-  </header>
+  <span class="pill"><span class="dot"></span> Free &amp; open source · Windows</span>
 
-  <section>
-    <div class="wrap">
-      <p class="eyebrow">Why it helps</p>
-      <h2>Built for the people who pull these reports</h2>
-      <div class="grid">
-        <div class="card">
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v4H4z"/><path d="M4 12h10v8H4z"/><path d="M18 12h2v8h-2z"/></svg></div>
-          <h3>Every route, one click</h3>
-          <p>Pick one report or all six, run all 250+ routes or just a subset like <code>5, 99, 101</code>.</p>
-        </div>
-        <div class="card">
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-          <h3>One sign-in for all</h3>
-          <p>A single SSO + MFA login covers every report and environment. On managed PCs it can even sign itself in.</p>
-        </div>
-        <div class="card">
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg></div>
-          <h3>Resumable &amp; resilient</h3>
-          <p>Interrupted runs pick up where they left off, with per-route timeouts, automatic retries, and full logs.</p>
-        </div>
-        <div class="card">
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></div>
-          <h3>Consolidate &amp; compare</h3>
-          <p>Merge per-route exports into one workbook, and build discrepancy reports comparing TSMIS and TSN data.</p>
-        </div>
-        <div class="card">
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-          <h3>Optional fast mode</h3>
-          <p>Run several browsers in parallel for a 2.5–3×+ speedup when you need a full set in a hurry.</p>
-        </div>
-        <div class="card">
-          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6l8-4z"/></svg></div>
-          <h3>Portable &amp; self-contained</h3>
-          <p>Runs from any writable folder and leaves nothing behind. Updates itself in place when a new version ships.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+  <h1>TSMIS Reports Exporter</h1>
+  <p class="tag">Bulk-export every Caltrans TSMIS route — in one click.</p>
 
-  <section class="reports">
-    <div class="wrap">
-      <p class="eyebrow">Supported reports</p>
-      <h2>Six report types, any combination</h2>
-      <div class="chips">
-        <span class="chip">TSAR: Ramp Summary</span>
-        <span class="chip">TSAR: Ramp Detail</span>
-        <span class="chip">Highway Sequence Listing</span>
-        <span class="chip">Highway Log</span>
-        <span class="chip">Intersection Summary</span>
-        <span class="chip">Intersection Detail</span>
-      </div>
-    </div>
-  </section>
+  <a class="download" href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases/latest">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download for Windows
+  </a>
+  <p class="sub">Unzip and run — no installer · <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter">View on GitHub</a></p>
 
-  <section>
-    <div class="wrap">
-      <p class="eyebrow">How it works</p>
-      <h2>Three steps, then walk away</h2>
-      <div class="steps">
-        <div class="step">
-          <h3>Download &amp; unzip</h3>
-          <p>Grab the latest release, unzip anywhere writable, and double-click <code>TSMIS Exporter.exe</code>.</p>
-        </div>
-        <div class="step">
-          <h3>Sign in once</h3>
-          <p>Log in with your Caltrans SSO + MFA. Your session is saved and reused until it expires.</p>
-        </div>
-        <div class="step">
-          <h3>Pick &amp; export</h3>
-          <p>Tick the reports and routes, hit Start, and the tool exports every route for you.</p>
-        </div>
-      </div>
-      <div class="cta" style="margin-top:2.5rem">
-        <a class="btn btn-primary" href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases/latest">Download the latest release</a>
-      </div>
+  <div class="shot">
+    <img src="screenshot.png" alt="TSMIS Reports Exporter app screenshot"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='grid';">
+    <div class="placeholder" style="display:none">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+      <span>Screenshot coming soon</span>
     </div>
-  </section>
+  </div>
 
   <footer>
-    <div class="wrap">
-      <div class="foot-links">
-        <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter">GitHub</a>
-        <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases">Releases</a>
-        <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/blob/main/CHANGELOG.md">Changelog</a>
-        <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/issues">Report an issue</a>
-      </div>
-      <p>Released under the MIT License · Built for Caltrans TSMIS reporting</p>
-      <p class="disc">
-        This is an unofficial utility that automates exporting reports a user is
-        already authorized to access. It is not affiliated with, endorsed by, or
-        supported by Caltrans or the State of California.
-      </p>
-    </div>
+    MIT licensed · Unofficial tool, not affiliated with or endorsed by Caltrans or the State of California.
   </footer>
 </body>
 </html>
