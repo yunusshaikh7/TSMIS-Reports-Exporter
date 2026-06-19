@@ -106,11 +106,11 @@
       <span class="pill"><span class="dot"></span> Free &amp; open source · Windows</span>
       <h1>Bulk-export every<br><span class="grad">Caltrans TSMIS route</span></h1>
       <p class="tag">All 250+ California state routes, in one click. Unzip and run — no installer.</p>
-      <a class="download" href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases/latest">
+      <a class="download" id="dl" href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases/latest">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download for Windows
       </a>
-      <p class="sub"><a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter">View source on GitHub</a></p>
+      <p class="sub"><a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases">All downloads &amp; release notes</a> · <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter">GitHub</a></p>
     </div>
 
     <div class="shot">
@@ -124,5 +124,25 @@
   <footer>
     MIT licensed · Unofficial tool, not affiliated with or endorsed by Caltrans or the State of California.
   </footer>
+
+  <script>
+    // Point the button straight at the latest *standard* build (…-win64.zip).
+    // Asset names carry the version, so resolve it live; the href stays on the
+    // releases page as a fallback if the API call fails or JS is off.
+    (function () {
+      var REPO = "yunusshaikh7/TSMIS-Reports-Exporter";
+      fetch("https://api.github.com/repos/" + REPO + "/releases/latest", {
+        headers: { "Accept": "application/vnd.github+json" }
+      })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (rel) {
+          var assets = rel.assets || [];
+          // Standard portable app: ends with -win64.zip (excludes -with-browser).
+          var a = assets.find(function (x) { return /-win64\.zip$/.test(x.name); });
+          if (a) document.getElementById("dl").href = a.browser_download_url;
+        })
+        .catch(function () { /* keep the releases-page fallback */ });
+    })();
+  </script>
 </body>
 </html>
