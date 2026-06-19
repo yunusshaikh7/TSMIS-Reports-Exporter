@@ -299,15 +299,19 @@ structural level:
 
 A report × environment **comparison matrix** lives on its own **sub-tab** of the
 Everything tab (sibling to *Refresh & export*) and goes full-width (the activity
-column animates down to a slim log). It sits ON TOP of the always-current store and
-the cross-environment comparison family (additive — `compare_core` untouched): each
-non-baseline cell compares that (report, env) against a baseline (default `ssor-prod`)
-and shows the **discrepancy count, colour-coded**, with per-cell export + comparison
-freshness, granular refresh, and an open-the-workbook link. New module
-`scripts/matrix.py` (console-free engine); freshness via `report_library.cell_ages`;
-the intersection reports are **shown greyed/unpickable** (not removed) app-wide via
-one `reports` gate (`DISABLED_EXPORT_SUBDIRS` / `export_reports_status`). A light
-app-wide motion layer (pane/popover/modal enters, button press, a slow theme
+column animates down to a slim log + a config zone). It sits ON TOP of the
+always-current store and **orchestrates the existing comparison adapters
+(`compare_env` / `compare_highway_log` / `compare_highway_log_pdf`) without editing
+them**. **5 rows** (Highway Log is two — Excel + PDF), each with a per-row
+**comparison-mode** dropdown: cross-environment, **vs TSN** (Excel/PDF flavors), and
+**TSMIS PDF-vs-Excel** (greyed where no code exists). Cells show the **discrepancy
+count, colour-coded**, with per-cell/row/column/all refresh (cancellable + resumable),
+report + **environment-column** toggles (config zone), TSN drops in
+`<dest>/_tsn_input/`, and TSN/cross-format sheets in `<dest>/comparisons/tsn/`. New
+module `scripts/matrix.py` (console-free engine); freshness via
+`report_library.cell_ages`; intersection reports **shown greyed/unpickable** (not
+removed) via one `reports` gate (`DISABLED_EXPORT_SUBDIRS` / `export_reports_status`).
+A light app-wide motion layer (pane/popover/modal enters, button press, a slow theme
 cross-fade) lands with it. Engine internals are owned by
 [comparison-engine.md](comparison-engine.md) §12; the UI + bridge + motion by
 [gui.md](gui.md). (This delivers a slice of the parked A3 file-browser intent;

@@ -86,8 +86,9 @@ is owned by [comparison-engine.md](comparison-engine.md).
 | `check_compare_ramp_detail.py` | cross-env Ramp Detail PM re-key (planted mid-list insert isolates one new row) |
 | `check_compare_ramp_summary.py` | cross-env Ramp Summary route-keyed compare + route-key normalizer (unpadded `5` == zero-padded `005`) |
 | `check_compare_highway_sequence.py` | cross-env Highway Sequence adapter end to end: PM key, "Highway Locations" sheet, `(col X)` unnamed-column labels (the stage-1 audit gap) |
-| `check_matrix.py` | the comparison-matrix engine (`scripts/matrix.py`): cell enumeration, mtime staleness, stable dateless comparison paths, real `compare_env` orchestration with a planted diff → counts read back + cached |
-| `check_matrix_bridge.py` | the matrix `gui_api` bridge (stubbed workers): validation + single-task gate + the "a cell export leaves a paused batch's manifest intact" invariant |
+| `check_matrix.py` | the comparison-matrix engine (`scripts/matrix.py`): 5-row enumeration (both Highway Log formats), mtime staleness, stable dateless paths, hidden row/env filters, the unified scoped rebuild list, real `compare_env` orchestration with a planted diff → counts read back + cached |
+| `check_matrix_tsn.py` | the multi-mode / TSN engine: per-row mode registry (env / vs-TSN / PDF-vs-Excel; HL is two rows), TSN source detection (file > consolidated > PDFs > none), snapshot mode + greyed unsupported cells, `build_comparison` guards |
+| `check_matrix_bridge.py` | the matrix `gui_api` bridge (stubbed workers): every method (baseline / report+env toggle / per-row + global mode / TSN file / scoped refresh / consolidate-TSN), single-task gate, and the "a cell export leaves a paused batch's manifest intact" invariant |
 | `check_compare_dupmatch.py` | duplicate-key SIMILARITY pairing (`pair_occurrences_by_similarity` — opposite file order still pairs the truly-equal rows) |
 | `check_compare_ditto.py` | ditto (`+`-run) cells are NON-ASSERTING in a Highway Log compare (the `+`/`++` domain convention is owned by [highway_log/comparison-study.md](highway_log/comparison-study.md)) |
 | `check_ramp_summary_partial.py` | ramp-summary failures-OK + short-PDF-blank |

@@ -127,15 +127,27 @@ offline; the LIVE paths below are owed on the work PC.
   (`report_library.cell_ages`), surfaced in the matrix cells (no filename changes — the store
   overwrites in place). Lock: `check_report_library.py`.
 - [x] **Intersection app-wide disable [S]** — one gate (`reports.DISABLED_EXPORT_SUBDIRS` +
-  `enabled_export_reports`) hides Intersection from the Export tab, Everything and Saved-reports,
-  rejects it server-side, and the matrix excludes it structurally; `EXPORT_REPORTS` indices stay
-  stable. Flip back by emptying the set. Lock: `check_intersection_gate.py`.
+  `export_reports_status`) shows Intersection **greyed/unpickable** (not hidden) in the Export tab +
+  Everything report lists, excludes it from the Saved-reports library + matrix, and rejects it
+  server-side; `EXPORT_REPORTS` indices stay stable. Flip back by emptying the set. Lock:
+  `check_intersection_gate.py`.
+- [x] **Matrix → Everything sub-tab + multi-mode + TSN [L]** (the new phase) — the matrix moved to a
+  full-width **sub-tab** of Everything; Highway Log is now **two rows** (Excel + PDF); each row has a
+  **comparison-mode dropdown** (cross-env / vs TSN (Excel|PDF) / TSMIS PDF-vs-Excel; greyed where no
+  code) + a **TSN file picker**. A **config zone** under the slim activity log holds report +
+  **environment-column** show/hide toggles and a global "set all". Refresh is per-cell / **per-row** /
+  **per-column** / all, **cancellable + resumable**. TSN drops → `<dest>/_tsn_input/<subdir>/`, sheets →
+  `<dest>/comparisons/tsn/`. Additive only — the manual compare code is untouched (the PDF *consolidator*
+  gained an additive input_dir/out_path override). App-wide **motion layer** + slow theme cross-fade
+  landed alongside. Locks: `check_matrix.py`, `check_matrix_tsn.py`, `check_matrix_bridge.py`.
 
 **Owed on the work PC (live; can't verify on the dev PC):** the field bug's Defender-timing fix; the
 wrong-env backstop; the transient-empty retry; `report_error_text`/Highway-Sequence empty;
-batch stage-and-swap crash-preserves-last-good; parallel crash+cancel reconciliation; and the
+batch stage-and-swap crash-preserves-last-good; parallel crash+cancel reconciliation; the
 matrix's **live per-cell Refresh export** + a full **baseline-switch recompute over a real 6-env
-store**. Before releasing: bump `version.py` + `build/release_notes.md`.
+store**; and the **live TSN / PDF-vs-Excel comparisons** (consolidate-store-folder → compare glue;
+the compare adapters themselves are already golden-locked). Before releasing: bump `version.py` +
+`build/release_notes.md`.
 
 ---
 

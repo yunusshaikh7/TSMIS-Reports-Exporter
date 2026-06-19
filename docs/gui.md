@@ -134,18 +134,26 @@ data rows sharing the leftover height). NB grid-template-columns can't transitio
 between `minmax(…fr)` track-lists in Chromium, which is why the layout is flex.
 
 The grid (`renderMatrix`) is fed by `gui_api.matrix_info` (a pure-filesystem
-snapshot). Each non-baseline cell renders the **discrepancy count, colour-coded** via
-CSS classes keyed off the status vars (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing`),
-plus a stale/needs-export state and compact **icon** actions (`↻ export` / `↻ compare`,
-and `↗ open` on built cells → opens the values workbook); a baseline `<select>`
-(switch → confirm → `set_matrix_baseline` + `recompute_matrix("all")`), a refresh-all
-button and an Open-comparisons-folder button. While any task runs,
-`updateMatrixProgress()` (called on each state push) greys the matrix controls live
-and shows a "Comparing N/M" line — the grid itself re-renders on `run_ended` / the
-`matrix_refresh` event (not on every state push). The mock provides `matrix_info` +
-`set_matrix_baseline`/`refresh_cell_*`/`recompute_matrix`/`open_*` returning a 3×6
-snapshot that exercises every cell state, so it verifies at `/index.html#mock`. The
-engine + bridge are owned by [comparison-engine.md](comparison-engine.md) §12.
+snapshot). **5 rows** (incl. both Highway Log formats); each **row header** carries the
+report name, a per-row **comparison-mode `<select>`** (greys not-yet-coded modes
+"(soon)"), a vs-TSN **file picker** (Choose… / Consolidate dropped PDFs / Clear) when
+in a TSN mode, and a **per-row refresh**; each **column header** has a **per-column
+refresh**. Each cell renders the unified `cmp` state — **discrepancy count,
+colour-coded** (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing`/`.mx-na`)
+plus greyed / needs-export / needs-TSN / "consolidate N PDFs" / stale states — with
+compact **icon** actions (`↻ export` / `↻ compare` / `↗ open`, gated on support+built).
+The **config zone** (`#matrixConfig`, a card under the slim activity log, shown via
+`body.matrix-wide`) holds the report + **environment-column** show/hide toggles and the
+global "set all comparisons to…" (env|tsn). A baseline `<select>` (switch → confirm →
+`set_matrix_baseline` + `recompute_matrix("all")`), Refresh-stale (also the **resume**
+after a **Cancel**), Open-comparisons-folder, and a Cancel button live in the actions
+row. `updateMatrixProgress()` greys all matrix controls live + toggles the Cancel
+button; the grid re-renders on `run_ended` / `matrix_refresh`. The mock returns the
+full multi-mode snapshot (modes, row_modes, all_envs, hidden_envs, tsn_meta) + every
+new bridge method, exercising all states at `/index.html#mock`. Engine + bridge:
+[comparison-engine.md](comparison-engine.md) §12. **Headless caveat:** the `#mock`
+reports viewport width 0 until `preview_resize`d and won't tick transitions — verify
+the wide layout end-state via DOM measurement.
 
 ## Motion layer
 

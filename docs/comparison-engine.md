@@ -517,37 +517,48 @@ other is *Refresh & export*) holds the **report × environment comparison matrix
 orchestration layer over the cross-environment family
 ([§9c](#9c-cross-environment--compare_envpy-folders-group-env-for-ramp-summarydetail--highway-sequence-highway_log-for-the-highway-log-cross-env-row)).
 Selecting it goes **full-width** (`body.matrix-wide`: the right activity column shrinks via animated
-`flex-grow` to a slim-but-present log, so the grid fills the screen with no scrolling). It is **ADDITIVE**:
-`matrix.py` never edits `compare_core`'s formula/label text and adds no `CompareSchema` field — it
-simply calls the existing audited `EnvCompare.compare_folders(...)`. The foundation it sits on (HSL /
-Ramp Detail / Ramp Summary consolidate + cross-env compare) was audited cell-accurate over the full
-6-env batch (2026-06-18; see [roadmap.md](roadmap.md) closed findings).
+`flex-grow` to a slim-but-present log + the matrix **config zone**, so the grid fills the screen). It is
+strictly **ADDITIVE / orchestration-only**: `matrix.py` NEVER edits the manual comparison code
+(`compare_core`, `compare_env`, `compare_highway_log`, `compare_highway_log_pdf`) — it just CALLS those
+adapters. The foundation it sits on was audited cell-accurate over the full 6-env batch (2026-06-18; see
+[roadmap.md](roadmap.md) closed findings).
 
-- **Rows** come from `reports.matrix_rows()` (the `env`-group `folders` adapters, mapped to their
-  export `ReportSpec` by subdir). Intersection has no adapter → never a row.
-- **Cells** are computed against a **baseline** env (default `ssor-prod`, `settings.get/set_matrix_baseline`).
-  Each non-baseline cell shows the **discrepancy count** (differing cells + one-sided rows),
-  color-coded, with the comparison cached at `<batch_dest>/comparisons/<baseline>/<cell>_<row>.xlsx`
-  (a **stable, dateless** name — NOT `suggest_name`, whose date would defeat the mtime-staleness model).
-- **Freshness** is pure-filesystem: per-cell export freshness from `report_library.cell_ages`
-  (newest file mtime per `<dest>/<src-env>/<subdir>/`); a comparison is **stale** when either side's
-  export mtime is newer than the comparison workbook. A baseline switch is an explicit FULL recompute
-  against the new baseline tree (the old tree is left intact).
-- **Verdict + counts** are read off the produced VALUES workbook (literal Summary/Comparison content,
-  no Excel/COM) and cached in `<dest>/comparisons/<baseline>/_results.json`, so `matrix_snapshot()`
-  stays a pure offline read. A cached result is trusted only while its recorded build-mtime matches
-  the file (else the cell reads "re-run").
-- **Per-cell actions** are compact ICON buttons (text labels don't fit a ~128px cell): `↻ export`
-  (re-export that report+env, live), `↻ compare` (rebuild this comparison), and — on a **built** cell —
-  `↗ open` which opens that cell's VALUES comparison workbook in Excel (`gui_api.open_cell_comparison`).
-  The sub-tab also has an **Open comparisons folder** button (`open_comparisons_folder` →
-  `<dest>/comparisons/<baseline>/`).
-- **Workers** (`gui_worker`): `MatrixCompareWorker` (offline, loops `build_cell_comparison`) and
-  `MatrixExportWorker` (a single (report,env) refresh that reuses `ExportWorker` with **no manifest**,
-  so it can't clobber a paused Export-Everything batch). Bridge: `gui_api.matrix_info` /
-  `set_matrix_baseline` / `refresh_cell_export` / `refresh_cell_comparison` / `recompute_matrix` /
+- **Rows** = `reports.matrix_rows()` — the **5 enabled export reports**: Ramp Summary, Ramp Detail,
+  Highway Sequence, **Highway Log (Excel)** and **Highway Log (PDF)** (HL is two rows, keyed by subdir
+  `highway_log` / `highway_log_pdf`; the PDF row has no cross-env adapter → its env mode is greyed).
+  Intersection has no adapter → never a row.
+- **Per-row comparison MODE** (`matrix._row_modes`, picked via a dropdown under each row's name,
+  persisted in `settings.matrix_row_modes`):
+  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). All rows but HL-PDF.
+  - `tsn` — vs TSN. HL-Excel: `compare_highway_log` (TSMIS Excel vs TSN); HL-PDF: `compare_highway_log_pdf.TSMIS_PDF_VS_TSN`.
+    TSN is ONE dataset for both, dropped in `<dest>/_tsn_input/highway_log/`. RS/RD/HSL show a greyed `tsn` placeholder.
+  - `vs_pdf` / `vs_excel` — TSMIS PDF vs Excel (`compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL`, the one
+    comparison framed from each HL row's side).
+  A global "set all comparisons to…" (env|tsn) lives in the config zone.
+- **build_comparison** dispatches by mode: env → `build_cell_comparison`; tsn/self → consolidate the env's
+  store folder(s) on the fly (`consolidate_highway_log` / `consolidate_tsmis_highway_log_pdf` — the PDF
+  one gained an **additive** `input_dir`/`out_path`/`converted_dir` override, no-arg behavior unchanged)
+  then call the file-vs-file adapter. TSN/self sheets → `<dest>/comparisons/tsn/<cell>_<row>_<mode>.xlsx`
+  (cross-env stays `<dest>/comparisons/<baseline>/<cell>_<row>.xlsx`) — both **stable, dateless** names.
+- **Cells** carry a unified `cmp` state (env mode also keeps a `comparison` alias). Each shows the
+  **discrepancy count** (diff cells + one-sided), color-coded; plus greyed (mode not coded), needs-export,
+  needs-TSN / "consolidate N PDFs", and stale states. **Freshness** is pure-filesystem
+  (`report_library.cell_ages` mtimes vs the comparison mtime); counts come from the produced VALUES
+  workbook and are cached (`comparisons/<baseline>/_results.json` for env, `comparisons/tsn/_tsn_results.json`
+  for tsn/self), so `matrix_snapshot()` is a pure offline read.
+- **Toggles + refresh:** report and **environment-column** show/hide (`matrix_hidden_reports` /
+  `matrix_hidden_envs`); refresh per-cell, **per-row**, **per-column**, or all (`cells_to_rebuild(scope,
+  row=, env=)`); **cancel** between cells (`MatrixCompareWorker`) + idempotent resume (re-run stale).
+  TSN actions: pick a file, or **consolidate dropped PDFs** (`MatrixTsnConsolidateWorker`).
+- **Workers** (`gui_worker`): `MatrixCompareWorker` (loops `build_comparison` over `(row, cell, mode)`),
+  `MatrixExportWorker` (single (report,env) live refresh, no manifest), `MatrixTsnConsolidateWorker`.
+  Bridge (`gui_api`): `matrix_info` / `set_matrix_baseline` / `set_matrix_report` / `set_matrix_env` /
+  `set_matrix_row_mode` / `set_all_matrix_modes` / `set_matrix_tsn_file` / `pick_matrix_tsn_file` /
+  `consolidate_matrix_tsn` / `refresh_cell_export` / `refresh_cell_comparison` / `recompute_matrix` /
   `open_cell_comparison` / `open_comparisons_folder`.
-- **Locked by** `build/check_matrix.py` (enumeration, mtime staleness, stable paths, real
-  orchestration with a planted diff → counts read back) + `build/check_matrix_bridge.py` (gate +
-  the "a cell export leaves a paused batch intact" invariant). LIVE per-cell export / a full
-  baseline recompute over a real store are owed on the work PC.
+- **Locked by** `build/check_matrix.py` (enumeration, mtime staleness, stable paths, real env
+  orchestration with a planted diff), `build/check_matrix_tsn.py` (mode registry, TSN source detection,
+  greyed cells, scoped rebuilds, build guards) and `build/check_matrix_bridge.py` (every bridge method +
+  the "a cell export leaves a paused batch intact" invariant). **Owed on the work PC:** a LIVE per-cell
+  export, a full baseline recompute, and the live HL TSN / PDF-vs-Excel comparisons over a real store
+  (the underlying compare adapters are already golden-locked; the consolidate→compare glue is what's owed).
