@@ -1349,15 +1349,39 @@ class GuiApi:
         return (self._valid_baseline(settings.get_matrix_baseline())
                 or matrix.BASELINE_DEFAULT)
 
+    def _matrix_snapshot(self, base):
+        """The matrix snapshot for `base`, with the user's hidden rows applied —
+        used by matrix_info, the baseline-switch pending count and recompute so
+        hidden reports are neither shown nor refreshed."""
+        return matrix.matrix_snapshot(settings.get_batch_dest(), base,
+                                      hidden=settings.get_matrix_hidden_reports())
+
     @_api_method
     def matrix_info(self, baseline=None):
         """The comparison-matrix snapshot for the Everything tab — a pure
         filesystem read (per-cell export + comparison freshness, cached verdict +
         discrepancy counts). `baseline` overrides the persisted one for a one-off
         view; otherwise the saved baseline (default ssor-prod) is used."""
-        dest = settings.get_batch_dest()
         base = self._valid_baseline(baseline) or self._current_baseline()
-        return matrix.matrix_snapshot(dest, base)
+        return self._matrix_snapshot(base)
+
+    @_api_method
+    def set_matrix_report(self, row_key, visible):
+        """Show/hide a report ROW on the matrix (hidden rows aren't rendered or
+        refreshed). Persisted as the hidden-set; at least one row must stay on."""
+        keys = {r[0] for r in matrix_rows()}
+        if row_key not in keys:
+            return {"error": "Unknown report for the matrix."}
+        hidden = set(settings.get_matrix_hidden_reports())
+        if visible:
+            hidden.discard(row_key)
+        else:
+            hidden.add(row_key)
+        if len(hidden & keys) >= len(keys):
+            return {"error": "Keep at least one report on the matrix."}
+        settings.set_matrix_hidden_reports(sorted(hidden))
+        self._push_state()
+        return {"ok": True, "hidden": sorted(hidden)}
 
     @_api_method
     def set_matrix_baseline(self, baseline):
@@ -1369,8 +1393,7 @@ class GuiApi:
             return {"error": "Unknown baseline environment."}
         settings.set_matrix_baseline(base)
         self._emit_log(f"Matrix baseline set to {matrix.default_env_label(base)}.")
-        snap = matrix.matrix_snapshot(settings.get_batch_dest(), base)
-        pending = len(matrix.cells_to_rebuild(snap, scope="all"))
+        pending = len(matrix.cells_to_rebuild(self._matrix_snapshot(base), scope="all"))
         self._push_state()
         return {"baseline": base, "recompute_pending": pending}
 
@@ -1437,7 +1460,7 @@ class GuiApi:
         base = self._current_baseline()
         dest = settings.get_batch_dest()
         scope = scope if scope in ("stale", "all") else "stale"
-        cells = matrix.cells_to_rebuild(matrix.matrix_snapshot(dest, base), scope=scope)
+        cells = matrix.cells_to_rebuild(self._matrix_snapshot(base), scope=scope)
         if not cells:
             return {"ok": True, "nothing": True}
         if not self._try_claim_task("matrix"):

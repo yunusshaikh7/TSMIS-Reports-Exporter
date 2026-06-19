@@ -1688,7 +1688,7 @@ function updateMatrixProgress() {
   // at run end, so toggle the existing buttons/select here on each state push).
   const locked = !!(S.st && S.st.task);
   document.querySelectorAll(
-    "#matrixSection .mx-act, #matrixBaseline, #btnMatrixRefreshAll, #btnOpenComparisons")
+    "#matrixSection .mx-act, #matrixSection .mx-toggle, #matrixBaseline, #btnMatrixRefreshAll, #btnOpenComparisons")
     .forEach((c) => { c.disabled = locked; });
 }
 
@@ -1736,7 +1736,9 @@ async function renderMatrix() {
   // the grid fills the screen vertically too (see body.matrix-wide CSS).
   grid.style.gridTemplateColumns =
     `minmax(160px,1.1fr) repeat(${envs.length}, minmax(124px,1fr))`;
-  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(56px,1fr))`;
+  // Data rows share the leftover height down to a readable minimum that fits a
+  // cell's content (count + sub + icon actions); below that the wrap scrolls.
+  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(68px,1fr))`;
   grid.textContent = "";
 
   const corner = document.createElement("div");
@@ -1807,6 +1809,28 @@ async function renderMatrix() {
       grid.appendChild(cell);
     });
   });
+
+  // Report toggle chips — which reports are rows (and get refreshed). Toggling
+  // re-renders from the new snapshot; at least one report must stay on.
+  const tog = $("matrixToggles");
+  if (tog) {
+    tog.textContent = "";
+    const hidden = new Set(snap.hidden || []);
+    (snap.all_rows || []).forEach((r) => {
+      const isOn = !hidden.has(r.key);
+      const b = document.createElement("button");
+      b.className = "mx-toggle" + (isOn ? " on" : "");
+      b.textContent = r.label;
+      b.disabled = locked;
+      b.title = (isOn ? "Hide " : "Show ") + r.label + " on the matrix";
+      b.onclick = async () => {
+        const res = await api.set_matrix_report(r.key, !isOn);   // visible = make it on
+        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
+        await renderMatrix();
+      };
+      tog.appendChild(b);
+    });
+  }
 
   const sel = $("matrixBaseline");
   if (sel) {
@@ -2638,6 +2662,7 @@ function makeMockApi() {
     env_access: {},
     matrix: null,
     matrix_baseline: "ssor-prod",
+    matrix_hidden: [],
   };
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
@@ -2684,9 +2709,15 @@ function makeMockApi() {
   // diff-low, diff-high, stale, needs-export) so the grid + colors are verifiable.
   function mockMatrixSnapshot(baseline) {
     const envs = ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"];
-    const rows = ["ramp_summary", "ramp_detail", "highway_sequence"];
-    const rowLabels = { ramp_summary: "TSAR: Ramp Summary", ramp_detail: "TSAR: Ramp Detail",
-                        highway_sequence: "Highway Sequence Listing" };
+    const allRows = [
+      { key: "ramp_summary", label: "TSAR: Ramp Summary" },
+      { key: "ramp_detail", label: "TSAR: Ramp Detail" },
+      { key: "highway_sequence", label: "Highway Sequence Listing" },
+      { key: "highway_log", label: "Highway Log" },
+    ];
+    const rowLabels = {}; allRows.forEach((r) => { rowLabels[r.key] = r.label; });
+    const hidden = st.matrix_hidden || [];
+    const rows = allRows.map((r) => r.key).filter((k) => hidden.indexOf(k) < 0);
     const envLabels = {};
     envs.forEach((e) => { const [s, v] = e.split("-");
       envLabels[e] = `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}`; });
@@ -2695,6 +2726,7 @@ function makeMockApi() {
       ramp_summary: { "ssor-test": [42, 0], "ssor-dev": [42, 0], "ars-prod": [0, 0], "ars-test": [48, 0], "ars-dev": "stale" },
       ramp_detail: { "ssor-test": [25, 10], "ssor-dev": [25, 10], "ars-prod": [0, 0], "ars-test": [31, 10], "ars-dev": "missing" },
       highway_sequence: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
+      highway_log: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
     };
     const cells = {};
     rows.forEach((rk) => {
@@ -2717,7 +2749,8 @@ function makeMockApi() {
       });
     });
     return { dest: st.batch_dest || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
-             baseline, rows, row_labels: rowLabels, envs, env_labels: envLabels, cells };
+             baseline, rows, row_labels: rowLabels, all_rows: allRows, hidden,
+             envs, env_labels: envLabels, cells };
   }
   function mockMatrixRun(mode, label, total) {
     st.task = "matrix";
@@ -3160,6 +3193,13 @@ function makeMockApi() {
       ],
     }),
     matrix_info: async () => mockMatrixSnapshot(st.matrix_baseline || "ssor-prod"),
+    set_matrix_report: async (rk, visible) => {
+      const hidden = new Set(st.matrix_hidden || []);
+      if (visible) hidden.delete(rk); else hidden.add(rk);
+      if (hidden.size >= 4) return { error: "Keep at least one report on the matrix." };
+      st.matrix_hidden = [...hidden];
+      return { ok: true, hidden: st.matrix_hidden };
+    },
     set_matrix_baseline: async (b) => {
       st.matrix_baseline = b;
       push({ t: "log", text: `Matrix baseline set to ${b}.` });

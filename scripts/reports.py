@@ -168,16 +168,22 @@ def export_reports_status():
 
 def matrix_rows():
     """The cross-environment comparison MATRIX rows, derived once from the
-    registry so they can't drift: every "env"-group "folders" comparison (Ramp
-    Summary / Ramp Detail / Highway Sequence), mapped to its export ReportSpec so
-    a matrix cell can be re-exported. Returns
-    [(row_key, label, subdir, export_idx, adapter)] in registry order.
-    Intersection reports have no cross-env adapter, so they never appear (this is
-    the same intent as the app-wide intersection disable)."""
+    registry so they can't drift: every cross-environment `folders` comparison —
+    Ramp Summary / Ramp Detail / Highway Sequence (group "env") AND Highway Log
+    (group "highway_log", but it IS a `compare_env` folder adapter) — mapped to
+    its export ReportSpec so a matrix cell can be re-exported. Returns
+    [(row_key, label, subdir, export_idx, adapter)] in registry order. Only
+    `compare_env` `folders` adapters qualify; the file-based Highway Log
+    comparisons (TSMIS-vs-TSN, the PDF pair) are NOT matrix rows — they drive the
+    separate vs-TSN view. Intersection reports have no cross-env adapter, so they
+    never appear (the same intent as the app-wide intersection disable)."""
     by_subdir = {spec.subdir: i for i, (_l, _f, spec) in enumerate(EXPORT_REPORTS)}
     rows = []
     for _label, adapter, kind, group in COMPARE_REPORTS:
-        if kind != "folders" or group != "env":
+        # Only the cross-env folder adapters (compare_env.*). Highway Log's adapter
+        # lives in the "highway_log" group (with its TSN/PDF siblings) but is still
+        # a folders/EnvCompare adapter, so include it; skip the file-based ones.
+        if kind != "folders" or group not in ("env", "highway_log"):
             continue
         subdir = adapter.subdir
         idx = by_subdir.get(subdir)

@@ -171,13 +171,16 @@ button, input, select { font-family: inherit; }
   body.matrix-wide #everyMatrix #matrixSection {
     flex: 1; min-height: 0; display: flex; flex-direction: column;
   }
-  body.matrix-wide #everyMatrix .matrix-wrap { flex: 1; min-height: 0; margin: 2px 0 4px; }
-  /* Fit the column instead of forcing max-content width (which would re-introduce
-     the horizontal scroll/cut-off): drop the min-width floor so the fr columns
-     distribute the available width and the grid fills it exactly. */
-  body.matrix-wide #everyMatrix .matrix-grid { height: 100%; width: 100%; min-width: 0; }
-  /* Trim the surrounding fixed vertical margins so the flex-filled grid leaves a
-     little slack — the whole view fits with no scrollbar. */
+  /* The grid takes all the leftover height. Rows share it (tall when few reports,
+     shorter as more are toggled on) down to a readable minimum; only if even the
+     minimums overflow does the wrap SCROLL (last resort, never eating the button
+     row below). overflow:auto on the wrap handles both that and the rare h-scroll. */
+  body.matrix-wide #everyMatrix .matrix-wrap { flex: 1; min-height: 0; overflow: auto; margin: 2px 0 4px; }
+  /* Fit the column width instead of forcing max-content (which would re-introduce
+     the horizontal cut-off): drop the min-width floor so the fr columns distribute
+     the width. min-height:100% fills the column when rows are few and lets the grid
+     grow past it (→ wrap scrolls) when many rows hit their min height. */
+  body.matrix-wide #everyMatrix .matrix-grid { min-height: 100%; width: 100%; min-width: 0; }
   body.matrix-wide #everyMatrix .matrix-legend { margin: 2px 0; }
   body.matrix-wide .subtabs { margin-bottom: 10px; }
   body.matrix-wide #everyMatrix .mx-cell { justify-content: flex-start; padding: 10px 12px; }
@@ -615,6 +618,28 @@ button, input, select { font-family: inherit; }
 .mx-cell:not(.mx-colhead):not(.mx-rowhead):not(.mx-corner):not(.mx-baseline-col):hover {
   box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--primary) 50%, transparent);
 }
+/* Controls row above the grid: report toggle chips (left) + colour legend (right),
+   one compact line so the grid keeps the height. */
+.mx-controls {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 6px;
+}
+.mx-controls .matrix-legend { margin: 0; }
+.mx-toggles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mx-toggle {
+  font-size: 11.5px; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--muted-foreground); cursor: pointer;
+  transition: background-color .12s ease, color .12s ease, border-color .12s ease, opacity .12s ease;
+}
+.mx-toggle.on {
+  background: color-mix(in oklab, var(--primary) 12%, var(--card));
+  border-color: color-mix(in oklab, var(--primary) 35%, transparent);
+  color: var(--primary); font-weight: 600;
+}
+.mx-toggle:hover:not(:disabled) { border-color: var(--primary); color: var(--foreground); }
+.mx-toggle.on:hover:not(:disabled) { color: var(--primary); }
+.mx-toggle:disabled { opacity: 0.5; cursor: default; }
 .matrix-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
 .mx-key { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
 .mx-key.mx-match { background: color-mix(in oklab, var(--success) 16%, var(--card)); }

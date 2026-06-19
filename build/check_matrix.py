@@ -39,12 +39,23 @@ def test_enumeration():
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mx_"))
     try:
         snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod")
-        check("three comparable rows",
-              snap["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence"])
+        check("four comparable rows incl. highway_log",
+              snap["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence", "highway_log"])
+        check("all_rows lists every row with labels",
+              [r["key"] for r in snap["all_rows"]] == snap["rows"]
+              and all(r.get("label") for r in snap["all_rows"]))
         check("six env columns", len(snap["envs"]) == 6
               and snap["envs"][0] == "ssor-prod")
         check("no intersection row",
               not any("intersection" in r for r in snap["rows"]))
+        # hidden filter: dropping a row removes it from rows but keeps it in all_rows
+        hidden_snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod",
+                                             hidden=["highway_log"])
+        check("hidden row dropped from rows",
+              "highway_log" not in hidden_snap["rows"] and len(hidden_snap["rows"]) == 3)
+        check("hidden row still in all_rows + hidden list",
+              any(r["key"] == "highway_log" for r in hidden_snap["all_rows"])
+              and hidden_snap["hidden"] == ["highway_log"])
         cell = snap["cells"]["ramp_detail"]
         check("baseline column flagged", cell["ssor-prod"]["is_baseline"]
               and cell["ssor-prod"]["comparison"] is None)

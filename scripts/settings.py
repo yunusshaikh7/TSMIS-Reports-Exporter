@@ -372,6 +372,52 @@ def set_matrix_baseline(key):
     return get_matrix_baseline()
 
 
+# ---- Comparison-matrix report visibility -----------------------------------
+# Which report ROWS the matrix shows (and refreshes). Stored as the set of HIDDEN
+# row keys so any report type added later defaults to VISIBLE. Validation (key is
+# a known matrix row) lives in gui_api; settings just stores the list.
+
+def _atomic_write(data):
+    """Write the settings dict atomically (temp file + os.replace) and bust the
+    cache. Shared by the newer setters."""
+    global _cache, _cache_mtime
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp, CONFIG_FILE)
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    _cache, _cache_mtime = None, None
+
+
+def get_matrix_hidden_reports():
+    """The list of matrix row keys the user has hidden (default: none hidden)."""
+    raw = _read_file().get("matrix_hidden_reports")
+    if isinstance(raw, list):
+        return [k for k in raw if isinstance(k, str)]
+    return []
+
+
+def set_matrix_hidden_reports(keys):
+    """Persist the hidden matrix row keys (a list of strings). Empty -> cleared.
+    Returns the new effective list."""
+    data = dict(_read_file())
+    keys = [k for k in (keys or []) if isinstance(k, str)]
+    if keys:
+        data["matrix_hidden_reports"] = sorted(set(keys))
+    else:
+        data.pop("matrix_hidden_reports", None)
+    _atomic_write(data)
+    log.info("settings: matrix_hidden_reports -> %s", keys or "(none)")
+    return get_matrix_hidden_reports()
+
+
 def reset():
     """Delete the settings file (back to all defaults). Returns True if a
     file was removed."""

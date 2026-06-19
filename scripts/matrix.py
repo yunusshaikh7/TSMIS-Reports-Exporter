@@ -217,12 +217,16 @@ def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
 # the snapshot the GUI renders (pure filesystem read)
 # --------------------------------------------------------------------------- #
 def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
-                    env_labels=None, row_defs=None, now=None):
+                    env_labels=None, row_defs=None, hidden=None, now=None):
     """The full render model for the matrix. PURE stat — no workbook is opened
     (counts come from the cache). `row_defs` is injectable for tests; otherwise
-    derived from the registry."""
+    derived from the registry. `hidden` is the set of row keys the user has
+    toggled OFF — they're dropped from the rendered/refreshed rows but still
+    listed in `all_rows` so the UI can offer them as toggle chips."""
     now = now if now is not None else time.time()
-    rows = row_defs if row_defs is not None else _row_defs()
+    all_defs = row_defs if row_defs is not None else _row_defs()
+    hidden = set(hidden or [])
+    rows = {k: v for k, v in all_defs.items() if k not in hidden}
     envs = envs if envs is not None else env_keys()
     env_labels = env_labels or {k: default_env_label(k) for k in envs}
     report_pairs = [(label, subdir) for label, subdir, *_ in rows.values()]
@@ -250,6 +254,9 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
         "baseline": baseline_key,
         "rows": list(rows.keys()),
         "row_labels": {k: rows[k][0] for k in rows},
+        # Every matrix row (visible or not) so the UI can render toggle chips.
+        "all_rows": [{"key": k, "label": all_defs[k][0]} for k in all_defs],
+        "hidden": sorted(hidden),
         "envs": list(envs),
         "env_labels": env_labels,
         "cells": cells,
