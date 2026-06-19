@@ -14,6 +14,13 @@ Both app zips: unzip anywhere writable and double-click `TSMIS Exporter.exe`.
 
 ## Highlights
 
+- **A "for IT" page now ships in the app folder (0.14.3).** Every download now
+  includes an **`IT-README.txt`** next to `Start Here.txt` — a plain-language page
+  for whoever in IT or security reviews the tool: what it connects to, what it
+  reads and writes, how the saved login is handled, and why a portable,
+  self-updating, unsigned in-house app is safe to run. It rides app updates, so
+  the page stays current from this version on.
+
 - **Consolidate tab cleanup (0.14.2).** The three Highway Log consolidations now
   have clear, parallel names — **TSMIS Highway Log (Excel)**, **TSMIS Highway Log
   (PDF)**, **TSN Highway Log (PDF)** — so the plain "Highway Log" can't be confused
