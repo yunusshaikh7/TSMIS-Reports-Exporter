@@ -62,7 +62,7 @@ from common import (
 )
 from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
-                     EXPORT_REPORTS)
+                     EXPORT_REPORTS, enabled_export_reports, is_export_disabled)
 
 log = logging.getLogger("tsmis.gui")
 # Everything shown in the GUI's log pane is mirrored here, so tsmis.log
@@ -824,7 +824,11 @@ class GuiApi:
             "version": __version__,
             "output_root": str(OUTPUT_ROOT),
             "log_dir": str(LOG_DIR),
-            "reports": [{"label": label, "fmt": fmt} for label, fmt, _spec in EXPORT_REPORTS],
+            # Enabled export reports only (Intersection is app-wide disabled);
+            # `idx` is the STABLE index into EXPORT_REPORTS the UI passes back to
+            # start_export / start_batch_export.
+            "reports": [{"idx": i, "label": label, "fmt": fmt}
+                        for i, label, fmt, _spec in enabled_export_reports()],
             # Each consolidate entry carries its INPUT file format for the tab
             # badge: a module's own INPUT_FMT (the PDF-input consolidators) wins,
             # else the matching export report's format, else Excel.
@@ -1044,8 +1048,8 @@ class GuiApi:
         specs = []
         for i in (report_idxs if isinstance(report_idxs, (list, tuple)) else []):
             row = self._pick_report(EXPORT_REPORTS, i)
-            if row is not None:
-                specs.append(row[2])
+            if row is not None and not is_export_disabled(row[2]):
+                specs.append(row[2])      # drop app-wide-disabled (Intersection)
         if not specs:
             return {"error": "Tick at least one report to export."}
         raw = (routes_text or "").strip()
@@ -1182,7 +1186,9 @@ class GuiApi:
         selected environments, sequentially, with a persistent manifest so it can
         resume across restarts."""
         specs_idx = [i for i in (report_idxs if isinstance(report_idxs, (list, tuple))
-                                 else []) if self._pick_report(EXPORT_REPORTS, i)]
+                                 else [])
+                     if self._pick_report(EXPORT_REPORTS, i)
+                     and not is_export_disabled(EXPORT_REPORTS[i][2])]
         if not specs_idx:
             return {"error": "Tick at least one report type to export."}
         combos = self._parse_env_keys(env_keys)
@@ -1229,7 +1235,8 @@ class GuiApi:
         """The always-current destination + per-report freshness, for the
         Export Everything tab's library view (B3). Pure filesystem stat."""
         dest = settings.get_batch_dest()
-        reports = [(label, spec.subdir) for label, _fmt, spec in EXPORT_REPORTS]
+        reports = [(label, spec.subdir)
+                   for _i, label, _fmt, spec in enabled_export_reports()]
         return {"dest": dest, "reports": report_library.report_ages(dest, reports)}
 
     @_api_method

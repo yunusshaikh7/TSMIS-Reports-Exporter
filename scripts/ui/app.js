@@ -508,7 +508,9 @@ function buildStatic() {
     const row = document.createElement("label");
     row.className = "option-row" + (i === 0 ? " checked" : "");
     const cb = document.createElement("input");
-    cb.type = "checkbox"; cb.checked = i === 0; cb.dataset.idx = i;
+    // dataset.idx is the STABLE index into EXPORT_REPORTS (rep.idx), not the
+    // list position — the reports list is filtered (Intersection is disabled).
+    cb.type = "checkbox"; cb.checked = i === 0; cb.dataset.idx = rep.idx;
     const box = document.createElement("span");
     box.className = "checkbox"; box.appendChild(icon("i-check"));
     const name = document.createElement("span");
@@ -530,7 +532,7 @@ function buildStatic() {
     const row = document.createElement("label");
     row.className = "option-row checked";
     const cb = document.createElement("input");
-    cb.type = "checkbox"; cb.checked = true; cb.dataset.idx = i;
+    cb.type = "checkbox"; cb.checked = true; cb.dataset.idx = rep.idx;
     const box = document.createElement("span");
     box.className = "checkbox"; box.appendChild(icon("i-check"));
     const name = document.createElement("span");
@@ -2612,7 +2614,10 @@ function makeMockApi() {
       app_name: "TSMIS Exporter", version: "0.14.2 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
-      reports: REPORTS,
+      // Mirror the real gate: enabled reports only, each carrying its STABLE
+      // index into the full registry (Intersection is app-wide disabled).
+      reports: REPORTS.map((r, i) => ({ idx: i, ...r }))
+                      .filter((r) => !/^Intersection/.test(r.label)),
       cons_reports: [
         { label: "TSAR: Ramp Summary", fmt: "PDF" },
         { label: "TSAR: Ramp Detail", fmt: "Excel" },
@@ -2866,16 +2871,14 @@ function makeMockApi() {
     discard_batch: async () => { st.batch_resume = null; pushState(); return { ok: true }; },
     report_library_info: async () => ({
       dest: st.batch_dest || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
-      // One row per EXPORT_REPORTS entry (7), in export order — matches the real
-      // report_library_info, which builds from ALL of EXPORT_REPORTS incl. the PDF.
+      // One row per ENABLED export report — matches the real report_library_info
+      // (Intersection is app-wide disabled, so it's absent here too).
       reports: [
         { label: "TSAR: Ramp Summary", subdir: "ramp_summary", present: true, mtime: 0, age_seconds: 2 * 3600 },
         { label: "TSAR: Ramp Detail", subdir: "ramp_detail", present: true, mtime: 0, age_seconds: 2 * 3600 },
         { label: "Highway Sequence Listing", subdir: "highway_sequence", present: true, mtime: 0, age_seconds: 3 * 3600 },
         { label: "Highway Log", subdir: "highway_log", present: true, mtime: 0, age_seconds: 6 * 86400 },
         { label: "Highway Log (PDF)", subdir: "highway_log_pdf", present: true, mtime: 0, age_seconds: 6 * 86400 },
-        { label: "Intersection Summary", subdir: "intersection_summary", present: false, mtime: null, age_seconds: null },
-        { label: "Intersection Detail", subdir: "intersection_detail", present: false, mtime: null, age_seconds: null },
       ],
     }),
     set_batch_dest: async (p) => {

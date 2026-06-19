@@ -134,6 +134,28 @@ def consolidator_for_spec(spec):
     return _CONSOLIDATOR_BY_SUBDIR.get(getattr(spec, "subdir", None))
 
 
+# App-wide disable for export-only reports that aren't ready for users. ONE gate:
+# the GUI report lists, the matrix, and the start guards all route through it.
+# Intersection Summary/Detail are export-only (no consolidate/compare) and still
+# under active site development. Flip them back on by emptying this set.
+DISABLED_EXPORT_SUBDIRS = {"intersection_summary", "intersection_detail"}
+
+
+def is_export_disabled(spec):
+    """True if `spec` is an app-wide-disabled export report."""
+    return getattr(spec, "subdir", None) in DISABLED_EXPORT_SUBDIRS
+
+
+def enabled_export_reports():
+    """`(idx, label, fmt, spec)` for each ENABLED export report, where `idx` is
+    the position in EXPORT_REPORTS (preserved so callers keep stable indices —
+    manifests / env-scan / start_export index into the full list). Drops the
+    app-wide-disabled reports (Intersection)."""
+    return [(i, label, fmt, spec)
+            for i, (label, fmt, spec) in enumerate(EXPORT_REPORTS)
+            if not is_export_disabled(spec)]
+
+
 def matrix_rows():
     """The cross-environment comparison MATRIX rows, derived once from the
     registry so they can't drift: every "env"-group "folders" comparison (Ramp
