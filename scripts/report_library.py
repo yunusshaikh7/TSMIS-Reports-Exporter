@@ -59,3 +59,45 @@ def report_ages(dest, reports, now=None):
             "age_seconds": (now - m) if m is not None else None,
         })
     return out
+
+
+def _newest_in(d):
+    """Newest file mtime directly inside one folder, or None. Never raises."""
+    newest = None
+    try:
+        for f in Path(d).iterdir():
+            try:
+                if f.is_file():
+                    m = f.stat().st_mtime
+                    if newest is None or m > newest:
+                        newest = m
+            except OSError:
+                continue
+    except OSError:
+        return None
+    return newest
+
+
+def cell_ages(dest, reports, env_keys, now=None):
+    """Per (environment, report) freshness for the comparison matrix.
+
+    Unlike report_ages (which takes the global newest across ALL envs), this
+    looks at each <dest>/<env_key>/<subdir>/ individually. `reports` is a list
+    of (label, subdir); `env_keys` is ["ssor-prod", "ars-test", ...]. Returns
+    {env_key: {subdir: {present, mtime, age_seconds}}}. `now` (epoch) is
+    injectable for testing. Never raises — a missing/unreadable folder is just
+    'not present'."""
+    now = now if now is not None else time.time()
+    dest = Path(dest)
+    out = {}
+    for env_key in env_keys:
+        per = {}
+        for _label, subdir in reports:
+            m = _newest_in(dest / env_key / subdir)
+            per[subdir] = {
+                "present": m is not None,
+                "mtime": m,
+                "age_seconds": (now - m) if m is not None else None,
+            }
+        out[env_key] = per
+    return out

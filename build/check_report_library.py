@@ -81,9 +81,51 @@ def test_report_ages():
         shutil.rmtree(dest, ignore_errors=True)
 
 
+def test_cell_ages():
+    print("report_library.cell_ages (per (env, report) freshness for the matrix):")
+    dest = Path(tempfile.mkdtemp(prefix="tsmis_cell_"))
+    try:
+        # ssor-prod has a fresh ramp_detail; ars-prod has an OLD ramp_detail and
+        # a fresh ramp_summary; ars-test is empty.
+        (dest / "ssor-prod" / "ramp_detail").mkdir(parents=True)
+        (dest / "ssor-prod" / "ramp_detail" / "r1.xlsx").write_bytes(b"PK")
+        (dest / "ars-prod" / "ramp_detail").mkdir(parents=True)
+        oldf = dest / "ars-prod" / "ramp_detail" / "r1.xlsx"
+        oldf.write_bytes(b"PK")
+        old_t = time.time() - 4 * 86400
+        os.utime(oldf, (old_t, old_t))
+        (dest / "ars-prod" / "ramp_summary").mkdir(parents=True)
+        (dest / "ars-prod" / "ramp_summary" / "r1.pdf").write_bytes(b"%PDF")
+
+        reports = [("Ramp Detail", "ramp_detail"), ("Ramp Summary", "ramp_summary")]
+        envs = ["ssor-prod", "ars-prod", "ars-test"]
+        cells = report_library.cell_ages(dest, reports, envs)
+
+        check("ssor-prod ramp_detail present + fresh",
+              cells["ssor-prod"]["ramp_detail"]["present"]
+              and cells["ssor-prod"]["ramp_detail"]["age_seconds"] < 3600)
+        check("ssor-prod ramp_summary absent",
+              not cells["ssor-prod"]["ramp_summary"]["present"])
+        check("ars-prod ramp_detail present + ~4 days old",
+              cells["ars-prod"]["ramp_detail"]["present"]
+              and 3 * 86400 < cells["ars-prod"]["ramp_detail"]["age_seconds"] < 5 * 86400)
+        check("ars-prod ramp_summary present + fresh",
+              cells["ars-prod"]["ramp_summary"]["present"])
+        check("ars-test all absent (empty env folder)",
+              not cells["ars-test"]["ramp_detail"]["present"]
+              and not cells["ars-test"]["ramp_summary"]["present"])
+        check("missing dest -> all absent, no raise",
+              all(not v["present"]
+                  for env in report_library.cell_ages(dest / "nope", reports, envs).values()
+                  for v in env.values()))
+    finally:
+        shutil.rmtree(dest, ignore_errors=True)
+
+
 def main():
     test_batch_dest_setting()
     test_report_ages()
+    test_cell_ages()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")
