@@ -122,10 +122,13 @@ narrative: [lessons.md](lessons.md); the strip routine itself is
 
 ## 6. Known gaps (honest disclosure)
 
-- **The `.exe` is not code-signed yet.** This is the single biggest remaining item —
-  see §7. Until then SmartScreen may warn on first run, and EDR/AV may treat the
-  self-updating exe with suspicion (the audit's `IT-UNSIGNED-SELF-MODIFY-EDR`
-  finding; signing calms it).
+- **The published `.exe` is not trust-signed yet.** This is the single biggest
+  remaining item — see §7. A **SignPath Foundation** certificate (free for open
+  source) has been **applied for**; `build.ps1 -Sign` can self-sign for local/test
+  use in the meantime, and `release.yml` already has a gated SignPath step ready to
+  switch on. Until a trusted signature ships, SmartScreen may warn on first run and
+  EDR/AV may treat the self-updating exe with suspicion (the audit's
+  `IT-UNSIGNED-SELF-MODIFY-EDR` finding; signing calms it).
 - **The saved session file is plaintext** (`storage_state` cookies, written by
   `common.save_auth_state`), protected only by NTFS file permissions in the user's
   own app folder. Windows DPAPI (`CryptProtectData`) at-rest encryption is the
@@ -140,16 +143,25 @@ narrative: [lessons.md](lessons.md); the strip routine itself is
 Signing the executable (and the bundled native DLLs) with an Authenticode
 certificate is the highest-leverage fix: it establishes updater trust, calms EDR
 heuristics about a self-replacing exe, and earns SmartScreen reputation — all at
-once. Recommended approach:
+once. Current state and remaining steps:
 
-1. Obtain an **OV or EV** Authenticode code-signing certificate for the publishing
-   org (EV gives immediate SmartScreen reputation).
-2. Add a signing step to `build.ps1` / `release.yml` that runs `signtool sign` on
-   `TSMIS Exporter.exe` after the build, **gated on a CI secret** holding the cert
-   (so the build still works for contributors without it).
-3. Once releases are signed, enable **signature verification in the updater** (verify
-   the staged exe's Authenticode signature + expected publisher before the swap, in
-   addition to the SHA-256 check) and switch the requirement on.
+1. **Certificate.** Obtain a broadly-trusted Authenticode certificate. An OV/EV
+   cert needs a registered org (EV gives immediate SmartScreen reputation); for
+   this open-source project a free **SignPath Foundation** certificate has been
+   **applied for** — that is the intended source. *Interim:* `build.ps1 -Sign`
+   self-signs the built exe (SHA-256 + timestamp) for local/test machines and to
+   exercise the toolchain — other PCs do **not** trust it unless the cert is
+   imported into Trusted Root, so it is not for published releases.
+2. **CI signing.** `release.yml` already carries a **gated SignPath step** (the
+   `actions/upload-artifact` + `signpath/github-action-submit-signing-request`
+   pair). It is inert until the repo variable `SIGNPATH_ENABLED=true` and the
+   `SIGNPATH_API_TOKEN` secret / `SIGNPATH_ORG_ID` + policy slug are set — so
+   builds still work for contributors without the cert. Flip it on once SignPath
+   approves (and add an analogous pair for the with-browser zip).
+3. **Updater enforcement.** Once releases are signed, enable **signature
+   verification in the updater** (verify the staged exe's Authenticode signature +
+   expected publisher before the swap, in addition to the SHA-256 check) and switch
+   the requirement on.
 
 The SHA-256 verification and staged-item allowlist already shipped (§5) are the
 checksum/integrity half of this; the signature half needs the certificate.
