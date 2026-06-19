@@ -23,6 +23,7 @@ const S = {
   init: null,          // immutable initial payload from Python
   st: null,            // latest state snapshot from Python
   tab: "export",
+  everySub: "export",  // Everything sub-tab: "export" | "matrix"
   progress: null,      // latest export progress payload
   runMode: null,       // "export" | "consolidate" while the bar is live
   workers: 0,          // browser-status rows currently shown (export runs)
@@ -73,7 +74,21 @@ function applyTheme() {
   document.documentElement.dataset.theme = dark ? "dark" : "light";
 }
 
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+// Run a theme change behind a brief .theme-anim window so light<->dark eases
+// (a slower, deliberate colour cross-fade) instead of snapping. Scoped in time
+// so ordinary hovers stay snappy — the CSS only transitions while the class is on.
+const THEME_FADE_MS = 500;
+function withThemeTransition(fn) {
+  const el = document.documentElement;
+  el.classList.add("theme-anim");
+  fn();
+  window.clearTimeout(withThemeTransition._t);
+  withThemeTransition._t = window.setTimeout(
+    () => el.classList.remove("theme-anim"), THEME_FADE_MS + 60);
+}
+
+window.matchMedia("(prefers-color-scheme: dark)")
+  .addEventListener("change", () => withThemeTransition(applyTheme));
 
 // Theme toggle button (replaces the labeled dropdown): shows the current
 // preference as an icon and cycles System -> Light -> Dark on click.
@@ -493,6 +508,37 @@ document.addEventListener("keydown", (e) => {
 // work for copying log lines and paths.
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
+// A report-type checkbox row (Export tab + Everything tab share this). `off`
+// marks an app-wide-disabled report: shown but greyed (.option-static) and
+// unpickable (disabled input + dataset.off so the lock-sweep leaves it alone).
+function makeReportRow(rep, checked, off, onChange) {
+  const row = document.createElement("label");
+  row.className = "option-row" + (checked ? " checked" : "") + (off ? " option-static" : "");
+  const cb = document.createElement("input");
+  // dataset.idx is the STABLE index into EXPORT_REPORTS (rep.idx), not the row
+  // position — kept stable even though disabled rows are shown, not filtered.
+  cb.type = "checkbox"; cb.checked = !!checked; cb.dataset.idx = rep.idx;
+  if (off) { cb.disabled = true; cb.dataset.off = "1"; }
+  const box = document.createElement("span");
+  box.className = "checkbox"; box.appendChild(icon("i-check"));
+  const name = document.createElement("span");
+  name.className = "option-name"; name.textContent = rep.label;
+  if (off) {
+    const note = document.createElement("span");
+    note.className = "option-static-note"; note.textContent = " — export-only (unavailable)";
+    name.appendChild(note);
+  }
+  const chip = document.createElement("span");
+  chip.className = "chip " + (rep.fmt === "PDF" ? "chip-pdf" : "chip-excel");
+  chip.textContent = rep.fmt;
+  row.append(cb, box, name, chip);
+  cb.addEventListener("change", () => {
+    row.classList.toggle("checked", cb.checked);
+    onChange();
+  });
+  return row;
+}
+
 // ------------------------------------------------------ one-time build -----
 function buildStatic() {
   const init = S.init;
@@ -502,49 +548,23 @@ function buildStatic() {
   $("outputRoot").textContent = init.output_root;
   document.title = init.app_name;
 
-  // report checkboxes (first ticked by default, same as the old GUI)
+  // report checkboxes (first ticked by default, same as the old GUI).
+  // App-wide-disabled reports (Intersection) are SHOWN but greyed/unpickable —
+  // .option-static keeps them dim even when no task is running, and dataset.off
+  // keeps the lock-sweep from re-enabling them.
   const list = $("reportList");
   init.reports.forEach((rep, i) => {
-    const row = document.createElement("label");
-    row.className = "option-row" + (i === 0 ? " checked" : "");
-    const cb = document.createElement("input");
-    // dataset.idx is the STABLE index into EXPORT_REPORTS (rep.idx), not the
-    // list position — the reports list is filtered (Intersection is disabled).
-    cb.type = "checkbox"; cb.checked = i === 0; cb.dataset.idx = rep.idx;
-    const box = document.createElement("span");
-    box.className = "checkbox"; box.appendChild(icon("i-check"));
-    const name = document.createElement("span");
-    name.className = "option-name"; name.textContent = rep.label;
-    const chip = document.createElement("span");
-    chip.className = "chip " + (rep.fmt === "PDF" ? "chip-pdf" : "chip-excel");
-    chip.textContent = rep.fmt;
-    row.append(cb, box, name, chip);
-    cb.addEventListener("change", () => {
-      row.classList.toggle("checked", cb.checked);
-      updateReportCount();
-    });
+    const off = !!rep.disabled;
+    const row = makeReportRow(rep, !off && i === 0, off, updateReportCount);
     list.appendChild(row);
   });
   updateReportCount();
 
-  // B3: Export Everything — report-type + environment checklists (all ticked).
-  init.reports.forEach((rep, i) => {
-    const row = document.createElement("label");
-    row.className = "option-row checked";
-    const cb = document.createElement("input");
-    cb.type = "checkbox"; cb.checked = true; cb.dataset.idx = rep.idx;
-    const box = document.createElement("span");
-    box.className = "checkbox"; box.appendChild(icon("i-check"));
-    const name = document.createElement("span");
-    name.className = "option-name"; name.textContent = rep.label;
-    const chip = document.createElement("span");
-    chip.className = "chip " + (rep.fmt === "PDF" ? "chip-pdf" : "chip-excel");
-    chip.textContent = rep.fmt;
-    row.append(cb, box, name, chip);
-    cb.addEventListener("change", () => {
-      row.classList.toggle("checked", cb.checked);
-      updateBatchCount();
-    });
+  // B3: Export Everything — report-type + environment checklists (all enabled
+  // ones ticked; disabled ones shown greyed, never ticked).
+  init.reports.forEach((rep) => {
+    const off = !!rep.disabled;
+    const row = makeReportRow(rep, !off, off, updateBatchCount);
     $("batchReportList").appendChild(row);
   });
   (init.sources || []).forEach((s) => (init.envs || []).forEach((e) => {
@@ -769,7 +789,8 @@ function renderState() {
   $("btnChromiumDownload").disabled = locked;
   $("btnChromiumDelete").disabled = locked;
   $("btnChromiumCancel").classList.toggle("hidden", st.task !== "chromium");
-  $("reportList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+  // dataset.off rows (app-wide-disabled reports) stay disabled regardless of lock.
+  $("reportList").querySelectorAll("input").forEach((c) => { c.disabled = locked || c.dataset.off === "1"; });
   $("reportList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
   $("consList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
   $("consList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
@@ -814,7 +835,7 @@ function renderState() {
   // re-runs on tab-switch/run-end, so without this they'd stay clickable.
   $("btnPickBatchDest").disabled = locked;
   ["batchReportList", "batchEnvList"].forEach((id) => {
-    $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+    $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked || c.dataset.off === "1"; });
     $(id).querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
   });
   $("batchLibrary").querySelectorAll("button").forEach((b) => { b.disabled = locked; });
@@ -1453,8 +1474,8 @@ function dispatch(events) {
         case "wstatus": updateWorkerStatus(ev.w, ev.text); break;
         case "preview": showPreviewEvent(ev); break;
         case "run_started": startRunUi(ev.mode, ev.label, ev.workers); break;
-        case "run_ended": endRunUi(); if (S.tab === "everything") { renderBatchLibrary(); renderMatrix(); } break;
-        case "matrix_refresh": if (S.tab === "everything") renderMatrix(); break;
+        case "run_ended": endRunUi(); if (S.tab === "everything") { renderBatchLibrary(); if (S.everySub === "matrix") renderMatrix(); } break;
+        case "matrix_refresh": if (S.tab === "everything" && S.everySub === "matrix") renderMatrix(); break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default: break;
       }
@@ -1667,7 +1688,7 @@ function updateMatrixProgress() {
   // at run end, so toggle the existing buttons/select here on each state push).
   const locked = !!(S.st && S.st.task);
   document.querySelectorAll(
-    "#matrixSection .mx-act, #matrixBaseline, #btnMatrixRefreshAll")
+    "#matrixSection .mx-act, #matrixBaseline, #btnMatrixRefreshAll, #btnOpenComparisons")
     .forEach((c) => { c.disabled = locked; });
 }
 
@@ -1692,6 +1713,16 @@ function mxCellContent(c) {
            sub: os ? `+${os} one-sided` : "" };
 }
 
+// A compact icon action button for a matrix cell (export / compare / open). Icons
+// (not text) so three actions fit a narrow cell; the title carries the meaning.
+function mxActBtn(iconName, title, locked, onClick) {
+  const b = document.createElement("button");
+  b.className = "mx-act"; b.title = title; b.disabled = locked;
+  b.appendChild(icon(iconName));
+  b.onclick = onClick;
+  return b;
+}
+
 async function renderMatrix() {
   const grid = $("matrixGrid");
   if (!grid) return;
@@ -1699,8 +1730,13 @@ async function renderMatrix() {
   try { snap = await api.matrix_info(); } catch (e) { return; }
   if (!snap || !snap.rows) return;
   const envs = snap.envs, locked = !!(S.st && S.st.task);
+  // Full-width sub-tab: cells breathe (wider label column, comfortable per-env
+  // minimum; the fr units stretch to fill the window). The rows template lets
+  // the header stay compact while the data rows share the leftover height, so
+  // the grid fills the screen vertically too (see body.matrix-wide CSS).
   grid.style.gridTemplateColumns =
-    `minmax(132px,1.3fr) repeat(${envs.length}, minmax(92px,1fr))`;
+    `minmax(160px,1.1fr) repeat(${envs.length}, minmax(124px,1fr))`;
+  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(56px,1fr))`;
   grid.textContent = "";
 
   const corner = document.createElement("div");
@@ -1744,25 +1780,28 @@ async function renderMatrix() {
 
       const acts = document.createElement("div");
       acts.className = "mx-actions";
-      const expBtn = document.createElement("button");
-      expBtn.className = "mx-act"; expBtn.textContent = "↻ export";
-      expBtn.title = "Re-export this report for this environment (live)";
-      expBtn.disabled = locked;
-      expBtn.onclick = async () => {
-        const r = await api.refresh_cell_export(rk, env);
-        if (r && r.error) showMessage("error", "Can't refresh", r.error);
-      };
-      acts.appendChild(expBtn);
+      acts.appendChild(mxActBtn("i-refresh", "Re-export this report for this environment (live)",
+        locked, async () => {
+          const r = await api.refresh_cell_export(rk, env);
+          if (r && r.error) showMessage("error", "Can't refresh", r.error);
+        }));
       if (!c.is_baseline) {
-        const cmpBtn = document.createElement("button");
-        cmpBtn.className = "mx-act"; cmpBtn.textContent = "↻ compare";
-        cmpBtn.title = "Rebuild this comparison against the baseline";
-        cmpBtn.disabled = locked;
-        cmpBtn.onclick = async () => {
-          const r = await api.refresh_cell_comparison(rk, env);
-          if (r && r.error) showMessage("error", "Can't compare", r.error);
-        };
-        acts.appendChild(cmpBtn);
+        acts.appendChild(mxActBtn("i-compare", "Rebuild this comparison against the baseline",
+          locked, async () => {
+            const r = await api.refresh_cell_comparison(rk, env);
+            if (r && r.error) showMessage("error", "Can't compare", r.error);
+          }));
+        // Open the cell's comparison workbook (values copy) — only when built.
+        if (c.comparison && c.comparison.built) {
+          const openBtn = mxActBtn("i-external",
+            "Open this comparison workbook (values copy — opens without recalculating)",
+            locked, async () => {
+              const r = await api.open_cell_comparison(rk, env);
+              if (r && r.error) showMessage("error", "Can't open", r.error);
+            });
+          openBtn.classList.add("mx-open");
+          acts.appendChild(openBtn);
+        }
       }
       cell.appendChild(acts);
       grid.appendChild(cell);
@@ -1801,6 +1840,14 @@ async function renderMatrix() {
       const r = await api.recompute_matrix("stale");
       if (r && r.nothing) showMessage("info", "Up to date", "Every comparison is current.");
       else if (r && r.error) showMessage("error", "Can't refresh", r.error);
+    };
+  }
+  const openFolderBtn = $("btnOpenComparisons");
+  if (openFolderBtn) {
+    openFolderBtn.disabled = locked;
+    openFolderBtn.onclick = async () => {
+      const r = await api.open_comparisons_folder();
+      if (r && r.error) showMessage("error", "Can't open", r.error);
     };
   }
   updateMatrixProgress();
@@ -2244,6 +2291,22 @@ function bindEvents() {
     settings: { btn: "tabSettings", pane: "paneSettings", title: "Settings",
                 sub: "Reliability, debugging and storage options." },
   };
+  // Everything has two sub-tabs: the batch refresh/export controls and the
+  // comparison matrix. The matrix one goes full-width — body.matrix-wide makes
+  // the stylesheet shrink the activity column to a slim log so the grid fills
+  // the screen, transitioning cleanly. Only active while ON the Everything tab.
+  const setEverySub = (sub) => {
+    S.everySub = sub;
+    $("subEveryExport").classList.toggle("active", sub === "export");
+    $("subEveryExport").setAttribute("aria-selected", String(sub === "export"));
+    $("subEveryMatrix").classList.toggle("active", sub === "matrix");
+    $("subEveryMatrix").setAttribute("aria-selected", String(sub === "matrix"));
+    $("everyExport").classList.toggle("hidden", sub !== "export");
+    $("everyMatrix").classList.toggle("hidden", sub !== "matrix");
+    document.body.classList.toggle("matrix-wide", sub === "matrix");
+    if (sub === "matrix") renderMatrix();
+    updateActivityCards();
+  };
   const setTab = (tab) => {
     S.tab = tab;
     Object.entries(TABS).forEach(([key, t]) => {
@@ -2253,18 +2316,24 @@ function bindEvents() {
     });
     $("panelTitle").textContent = TABS[tab].title;
     $("panelSub").textContent = TABS[tab].sub;
-    if (tab === "everything") { renderBatchLibrary(); renderMatrix(); }
+    if (tab === "everything") {
+      renderBatchLibrary();
+      setEverySub(S.everySub || "export");   // re-applies matrix-wide if on the matrix sub-tab
+    } else {
+      document.body.classList.remove("matrix-wide");   // leaving Everything restores the layout
+    }
     updateActivityCards();
   };
   Object.entries(TABS).forEach(([key, t]) => { $(t.btn).onclick = () => setTab(key); });
+  $("subEveryExport").onclick = () => setEverySub("export");
+  $("subEveryMatrix").onclick = () => setEverySub("matrix");
 
   renderThemeButton();
   $("btnTheme").onclick = () => {
     const order = ["auto", "light", "dark"];
     const next = order[(order.indexOf(themePref()) + 1) % order.length];
     try { localStorage.setItem(THEME_KEY, next); } catch (_) { /* keep for session */ }
-    applyTheme();
-    renderThemeButton();
+    withThemeTransition(() => { applyTheme(); renderThemeButton(); });
     api.ui_event("theme:" + next);
   };
   document.querySelectorAll(".popover-host").forEach(attachPopover);
@@ -2823,10 +2892,10 @@ function makeMockApi() {
       app_name: "TSMIS Exporter", version: "0.14.2 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
-      // Mirror the real gate: enabled reports only, each carrying its STABLE
-      // index into the full registry (Intersection is app-wide disabled).
-      reports: REPORTS.map((r, i) => ({ idx: i, ...r }))
-                      .filter((r) => !/^Intersection/.test(r.label)),
+      // Mirror the real gate: ALL reports, each carrying its STABLE index into
+      // the full registry, with Intersection flagged disabled (shown greyed).
+      reports: REPORTS.map((r, i) => ({ idx: i, ...r,
+                                        disabled: /^Intersection/.test(r.label) })),
       cons_reports: [
         { label: "TSAR: Ramp Summary", fmt: "PDF" },
         { label: "TSAR: Ramp Detail", fmt: "Excel" },
@@ -3114,6 +3183,14 @@ function makeMockApi() {
       const n = scope === "all" ? 10 : 3;
       mockMatrixRun("consolidate", `Rebuilding ${n} comparison(s)…`, n);
       return { ok: true, count: n };
+    },
+    open_cell_comparison: async (rk, env) => {
+      push({ t: "log", text: `(mock) open comparison workbook: ${env}_${rk}.xlsx` });
+      return { ok: true };
+    },
+    open_comparisons_folder: async () => {
+      push({ t: "log", text: "(mock) open comparisons folder" });
+      return { ok: true };
     },
     set_batch_dest: async (p) => {
       st.batch_dest = p || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)";

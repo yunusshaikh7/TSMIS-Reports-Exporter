@@ -2,10 +2,11 @@
 (reports.DISABLED_EXPORT_SUBDIRS / enabled_export_reports + the GUI wiring).
 
 Intersection Summary/Detail are export-only and not ready for users, so they're
-disabled across the Export tab, the Everything tab, the Saved-reports library
-and the matrix — through ONE gate — while keeping EXPORT_REPORTS indices stable
-(manifests / env-scan / start_* index into the full list). Flip back by emptying
-DISABLED_EXPORT_SUBDIRS.
+disabled through ONE gate: SHOWN GREYED (not hidden) in the Export- and
+Everything-tab report lists, excluded from the Saved-reports freshness library
+and the matrix, and rejected by the start_* guards server-side — while keeping
+EXPORT_REPORTS indices stable (manifests / env-scan / start_* index into the
+full list). Flip back by emptying DISABLED_EXPORT_SUBDIRS.
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_intersection_gate.py
@@ -46,15 +47,35 @@ def test_enabled_export_reports():
           all(i not in (5, 6) for i, *_ in enabled))
 
 
+def test_export_reports_status():
+    print("reports.export_reports_status (full list + disabled flag):")
+    status = reports.export_reports_status()
+    check("all seven reports present (none hidden)", len(status) == 7)
+    check("idx is the true EXPORT_REPORTS position",
+          all(reports.EXPORT_REPORTS[i] == (label, fmt, spec)
+              for i, label, fmt, spec, _d in status))
+    disabled = {label for _i, label, _f, _s, d in status if d}
+    check("exactly the two Intersection reports are disabled",
+          disabled == {"Intersection Summary", "Intersection Detail"})
+    check("the five real reports are not disabled",
+          all(not d for _i, label, _f, _s, d in status if "Intersection" not in label))
+
+
 def test_gui_initial_state():
-    print("gui_api.get_initial_state reports list:")
+    print("gui_api.get_initial_state reports list (shown greyed, not dropped):")
     a = gui_api.GuiApi()
     a._started = True            # skip the one-time check/update worker launch
     init = a.get_initial_state()
     labels = [r["label"] for r in init["reports"]]
-    check("no Intersection in the Export/Everything report list",
-          not any("Intersection" in l for l in labels))
-    check("five reports offered", len(init["reports"]) == 5)
+    check("Intersection is SHOWN in the report list (greyed, not removed)",
+          any("Intersection" in l for l in labels))
+    check("all seven reports offered", len(init["reports"]) == 7)
+    check("every report item carries a disabled flag",
+          all("disabled" in r for r in init["reports"]))
+    check("Intersection rows are flagged disabled",
+          all(r["disabled"] for r in init["reports"] if "Intersection" in r["label"]))
+    check("the five real reports are not disabled",
+          all(not r["disabled"] for r in init["reports"] if "Intersection" not in r["label"]))
     check("every report item carries a stable idx",
           all(isinstance(r.get("idx"), int) for r in init["reports"]))
     check("idx values match EXPORT_REPORTS labels",
@@ -95,6 +116,7 @@ def test_toggle_back_on():
 
 def main():
     test_enabled_export_reports()
+    test_export_reports_status()
     test_gui_initial_state()
     test_report_library_info()
     test_start_rejects_disabled()

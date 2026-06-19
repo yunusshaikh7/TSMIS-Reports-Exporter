@@ -156,6 +156,16 @@ def enabled_export_reports():
             if not is_export_disabled(spec)]
 
 
+def export_reports_status():
+    """`(idx, label, fmt, spec, disabled)` for EVERY export report (the full
+    EXPORT_REPORTS, with its stable index). `disabled` flags the app-wide-disabled
+    reports (Intersection): the GUI shows these GREYED rather than hiding them, so
+    users can see they exist but can't pick them, while the start guards still
+    reject a disabled index server-side."""
+    return [(i, label, fmt, spec, is_export_disabled(spec))
+            for i, (label, fmt, spec) in enumerate(EXPORT_REPORTS)]
+
+
 def matrix_rows():
     """The cross-environment comparison MATRIX rows, derived once from the
     registry so they can't drift: every "env"-group "folders" comparison (Ramp

@@ -48,6 +48,8 @@
   <symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
   <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol>
   <symbol id="i-compare" viewBox="0 0 24 24"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
   <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></symbol>
@@ -242,8 +244,20 @@
         </div>
       </div>
 
-      <!-- Export Everything pane (B3) -->
+      <!-- Export Everything pane (B3): two sub-tabs — the batch refresh/export
+           controls, and the cross-environment comparison matrix. -->
       <div class="card pane hidden" id="paneEverything">
+        <div class="subtabs" role="tablist">
+          <button class="subtab active" id="subEveryExport" role="tab" aria-selected="true">
+            <svg class="ic"><use href="#i-refresh"/></svg>Refresh &amp; export
+          </button>
+          <button class="subtab" id="subEveryMatrix" role="tab" aria-selected="false">
+            <svg class="ic"><use href="#i-grid"/></svg>Comparison matrix
+          </button>
+        </div>
+
+        <!-- Sub-tab 1: batch refresh / export -->
+        <div id="everyExport">
         <div class="card-section" id="batchResume" hidden></div>
         <div class="card-section">
           <div class="section-head"><span class="section-label">Destination</span></div>
@@ -310,6 +324,13 @@
           <span class="spacer"></span>
           <span class="hint" id="batchProgress" hidden></span>
         </div>
+        </div><!-- /everyExport -->
+
+        <!-- Sub-tab 2: comparison matrix. Full-width — app.js sets body.matrix-wide
+             so the activity column shrinks to a slim log and the grid fills the
+             screen with no scrolling. #matrixSection wraps the live controls so
+             the per-state greying selector still matches. -->
+        <div id="everyMatrix" class="hidden">
         <div class="card-section" id="matrixSection">
           <div class="section-head">
             <span class="section-label">Environment comparison matrix</span>
@@ -318,9 +339,8 @@
               <span class="tb-select"><select id="matrixBaseline"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
             </span>
           </div>
-          <p class="hint">Each cell compares that report + environment against the
-            baseline column and shows the number of differing cells (green = identical).
-            Intersection reports are export-only and aren't shown.</p>
+          <p class="hint">Each cell compares that report + environment against the baseline
+            (green = identical); <b>open</b> a built cell for its comparison workbook.</p>
           <div class="matrix-wrap"><div class="matrix-grid" id="matrixGrid"></div></div>
           <div class="matrix-legend">
             <span class="mx-key mx-match">identical</span>
@@ -329,15 +349,19 @@
             <span class="mx-key mx-stale">stale</span>
             <span class="mx-key mx-missing">needs export</span>
           </div>
-          <div class="actions-row">
-            <button class="btn btn-subtle btn-small" id="btnMatrixRefreshAll">
-              <svg class="ic"><use href="#i-refresh"/></svg>Refresh stale comparisons
-            </button>
-            <span class="spacer"></span>
-            <span class="hint" id="matrixProgress" hidden></span>
-          </div>
         </div>
-      </div>
+        <div class="card-section actions-row">
+          <button class="btn btn-subtle btn-small" id="btnMatrixRefreshAll">
+            <svg class="ic"><use href="#i-refresh"/></svg>Refresh stale comparisons
+          </button>
+          <button class="btn btn-subtle btn-small" id="btnOpenComparisons">
+            <svg class="ic"><use href="#i-folder-open"/></svg>Open comparisons folder
+          </button>
+          <span class="spacer"></span>
+          <span class="hint" id="matrixProgress" hidden></span>
+        </div>
+        </div><!-- /everyMatrix -->
+      </div><!-- /paneEverything -->
 
       <!-- Consolidate pane -->
       <div class="card pane hidden" id="paneConsolidate">

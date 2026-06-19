@@ -119,14 +119,24 @@ button, input, select { font-family: inherit; }
 
 @media (min-width: 980px) {
   .app { height: 100vh; overflow: hidden; }
+  /* Two side-by-side columns via flex (not grid) so their widths can TRANSITION:
+     flex-grow is reliably animatable, whereas grid-template-columns between fr
+     track-lists is not (it sticks at the start value). Default split ~1 : 1.1
+     (config : activity), matching the previous grid proportions. */
   .main {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    display: flex; flex-direction: row;
     gap: 20px; padding: 20px;
     min-height: 0; overflow: hidden;
   }
   .col { min-height: 0; }
-  .col-config { overflow-y: auto; padding-right: 2px; }
+  .col-config {
+    flex: 1 1 0; min-width: 0; overflow-y: auto; padding-right: 2px;
+    transition: flex-grow 240ms cubic-bezier(.4, 0, .2, 1);
+  }
+  .col-activity {
+    flex: 1.1 1 0; min-width: 0;
+    transition: flex-grow 240ms cubic-bezier(.4, 0, .2, 1);
+  }
   .col-activity .log-card { flex: 1; min-height: 160px; }
 
   /* The config column scrolls internally on wide windows. Pin the tabs to the
@@ -143,6 +153,37 @@ button, input, select { font-family: inherit; }
     border-bottom-right-radius: var(--radius-xl);
     box-shadow: 0 -4px 10px -8px oklch(0 0 0 / 0.18);
   }
+
+  /* Comparison-matrix sub-tab: give the grid the screen. The config column grows
+     and the activity column shrinks to a slim — but still present — log; the
+     flex-grow change animates (see the .col transitions above). The export-centric
+     idle cards step aside so the log keeps the space. */
+  body.matrix-wide .col-config { flex-grow: 3.4; }
+  body.matrix-wide .col-activity { flex-grow: 1; }
+  body.matrix-wide .preflight-card,
+  body.matrix-wide .completion-card { display: none; }
+
+  /* Fill the height too — no wasted space, no scrolling at full screen: the
+     matrix pane and grid stretch to the column and the data rows share the
+     leftover height. Scoped to #everyMatrix so the export sub-tab is untouched. */
+  body.matrix-wide #paneEverything,
+  body.matrix-wide #everyMatrix,
+  body.matrix-wide #everyMatrix #matrixSection {
+    flex: 1; min-height: 0; display: flex; flex-direction: column;
+  }
+  body.matrix-wide #everyMatrix .matrix-wrap { flex: 1; min-height: 0; margin: 2px 0 4px; }
+  /* Fit the column instead of forcing max-content width (which would re-introduce
+     the horizontal scroll/cut-off): drop the min-width floor so the fr columns
+     distribute the available width and the grid fills it exactly. */
+  body.matrix-wide #everyMatrix .matrix-grid { height: 100%; width: 100%; min-width: 0; }
+  /* Trim the surrounding fixed vertical margins so the flex-filled grid leaves a
+     little slack — the whole view fits with no scrollbar. */
+  body.matrix-wide #everyMatrix .matrix-legend { margin: 2px 0; }
+  body.matrix-wide .subtabs { margin-bottom: 10px; }
+  body.matrix-wide #everyMatrix .mx-cell { justify-content: flex-start; padding: 10px 12px; }
+  body.matrix-wide #everyMatrix .mx-num { font-size: 14px; }
+  body.matrix-wide #everyMatrix .mx-colhead,
+  body.matrix-wide #everyMatrix .mx-rowhead { justify-content: center; }
 }
 
 /* ------------------------------ title bar -------------------------------- */
@@ -419,6 +460,11 @@ button, input, select { font-family: inherit; }
 }
 .option-row.disabled { opacity: 0.55; cursor: default; }
 .option-row.disabled:hover { background: transparent; }
+/* Permanently-greyed report rows (app-wide disabled, e.g. Intersection): shown
+   but unpickable. Distinct from .disabled, which toggles only while a task runs. */
+.option-row.option-static { opacity: 0.5; cursor: default; }
+.option-row.option-static:hover { background: transparent; }
+.option-static-note { font-size: 11px; font-weight: 400; color: var(--muted-foreground); }
 .option-name { flex: 1; font-size: 13px; font-weight: 500; }
 
 /* format chips */
@@ -546,13 +592,29 @@ button, input, select { font-family: inherit; }
 .mx-cell.mx-stale .mx-num { color: var(--muted-foreground); text-decoration: line-through; }
 .mx-cell.mx-missing  { background: var(--card); }
 .mx-cell.mx-missing .mx-num { color: var(--muted-foreground); font-style: italic; font-weight: 500; }
-.mx-actions { display: flex; gap: 4px; margin-top: 2px; }
-.mx-act {
-  border: none; background: transparent; cursor: pointer; padding: 1px 4px;
-  border-radius: 4px; color: var(--muted-foreground); font-size: 11px;
+/* Compact ICON action buttons — three text labels never fit a ~128px cell, so
+   the per-cell actions are icons (export / compare / open) with tooltips. They
+   recede a little until the cell is hovered, keeping the grid clean. */
+.mx-actions {
+  display: flex; gap: 2px; margin-top: 4px;
+  opacity: 0.55; transition: opacity 0.15s ease;
 }
+.mx-cell:hover .mx-actions { opacity: 1; }
+.mx-act {
+  border: none; background: transparent; cursor: pointer; padding: 3px;
+  border-radius: var(--radius-sm); color: var(--muted-foreground);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
+}
+.mx-act .ic { width: 14px; height: 14px; }
 .mx-act:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
+.mx-act.mx-open:hover:not(:disabled) { color: var(--primary); }
+.mx-act:active:not(:disabled) { transform: scale(0.9); }
 .mx-act:disabled { opacity: 0.4; cursor: default; }
+.mx-cell { transition: box-shadow 0.15s ease; }
+.mx-cell:not(.mx-colhead):not(.mx-rowhead):not(.mx-corner):not(.mx-baseline-col):hover {
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--primary) 50%, transparent);
+}
 .matrix-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
 .mx-key { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
 .mx-key.mx-match { background: color-mix(in oklab, var(--success) 16%, var(--card)); }
@@ -709,6 +771,7 @@ button, input, select { font-family: inherit; }
 .log-card { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 .log-head {
   display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 6px 8px;
   padding: 8px 12px 8px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .log-title {
@@ -893,3 +956,49 @@ button, input, select { font-family: inherit; }
 }
 .fatal-title .ic { width: 22px; height: 22px; color: var(--destructive); }
 .fatal-detail { max-width: 560px; font-size: 12px; color: var(--muted-foreground); line-height: 1.6; }
+
+/* ------------------------------- motion ---------------------------------- */
+/* A light, consistent motion layer: quick, non-intrusive enter animations for
+   panes, popovers and modals; a tactile press on buttons; and a slower,
+   deliberate colour fade when the theme is toggled. The whole layer yields to
+   prefers-reduced-motion. */
+@keyframes pane-in   { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in    { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes modal-in  { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+/* Tab panes rise+fade in on switch; the Everything sub-panes just cross-fade
+   (so they don't double-animate with the parent pane). */
+.pane:not(.hidden) { animation: pane-in 0.22s cubic-bezier(.2, .7, .2, 1) both; }
+#everyExport:not(.hidden), #everyMatrix:not(.hidden) { animation: fade-in 0.18s ease both; }
+
+/* Flyouts + dialogs. */
+.popover:not(.hidden) { animation: pop-in 0.15s cubic-bezier(.2, .8, .2, 1) both; transform-origin: top right; }
+.modal-overlay:not(.hidden) { animation: fade-in 0.16s ease both; }
+.modal-overlay:not(.hidden) .modal { animation: modal-in 0.20s cubic-bezier(.2, .8, .2, 1) both; }
+
+/* Tactile press across the app's interactive controls. */
+.btn, .btn-icon {
+  transition: background-color .14s ease, border-color .14s ease, color .14s ease,
+              box-shadow .14s ease, transform .08s ease;
+}
+.tab, .subtab {
+  transition: color .14s ease, background-color .14s ease, box-shadow .14s ease, transform .08s ease;
+}
+.btn:active:not(:disabled), .btn-icon:active:not(:disabled),
+.tab:active, .subtab:active { transform: translateY(0.5px) scale(0.99); }
+
+/* Slower, deliberate light<->dark cross-fade. app.js adds .theme-anim to <html>
+   for the duration of a theme change so colours ease instead of snapping —
+   scoped to that window so ordinary hovers stay snappy. */
+html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+  transition: background-color .5s ease, color .5s ease, border-color .5s ease,
+              fill .5s ease, stroke .5s ease, box-shadow .5s ease !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

@@ -63,8 +63,8 @@ from common import (
 )
 from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
-                     EXPORT_REPORTS, enabled_export_reports, is_export_disabled,
-                     matrix_rows)
+                     EXPORT_REPORTS, enabled_export_reports, export_reports_status,
+                     is_export_disabled, matrix_rows)
 import matrix
 
 log = logging.getLogger("tsmis.gui")
@@ -836,11 +836,13 @@ class GuiApi:
             "version": __version__,
             "output_root": str(OUTPUT_ROOT),
             "log_dir": str(LOG_DIR),
-            # Enabled export reports only (Intersection is app-wide disabled);
+            # Every export report, with `disabled` marking the app-wide-disabled
+            # ones (Intersection) — the UI shows those GREYED (not hidden) so they
+            # stay visible but unpickable; the start guards reject them anyway.
             # `idx` is the STABLE index into EXPORT_REPORTS the UI passes back to
             # start_export / start_batch_export.
-            "reports": [{"idx": i, "label": label, "fmt": fmt}
-                        for i, label, fmt, _spec in enabled_export_reports()],
+            "reports": [{"idx": i, "label": label, "fmt": fmt, "disabled": disabled}
+                        for i, label, fmt, _spec, disabled in export_reports_status()],
             # Each consolidate entry carries its INPUT file format for the tab
             # badge: a module's own INPUT_FMT (the PDF-input consolidators) wins,
             # else the matching export report's format, else Excel.
@@ -1452,6 +1454,33 @@ class GuiApi:
         self._push_state()
         MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event).start()
         return {"ok": True, "count": len(cells)}
+
+    @_api_method
+    def open_cell_comparison(self, row_key, env_key):
+        """Open ONE cell's comparison VALUES workbook (the plain-results copy that
+        opens without F9). The path is built from validated keys under the
+        baseline's comparisons store, so it can't point outside it."""
+        base = self._current_baseline()
+        if row_key not in {r[0] for r in matrix_rows()}:
+            return {"error": "Unknown report for the matrix."}
+        if not self._parse_env_keys([env_key]):
+            return {"error": "Unknown environment."}
+        if env_key == base:
+            return {"error": "The baseline column has no comparison to open."}
+        dest = settings.get_batch_dest()
+        path = matrix.comparison_path(dest, base, row_key, env_key)
+        if not path.exists():
+            return {"error": "No comparison built yet — use “↻ compare” first."}
+        self._open_file(path)
+        return {"ok": True}
+
+    @_api_method
+    def open_comparisons_folder(self):
+        """Open the folder holding every comparison workbook for the current
+        baseline (<dest>/comparisons/<baseline>/)."""
+        dest = settings.get_batch_dest()
+        self._open_folder(matrix.comparisons_root(dest, self._current_baseline()))
+        return {"ok": True}
 
     def _on_matrix_cell(self, payload):
         with self._lock:
@@ -2294,6 +2323,17 @@ class GuiApi:
         except Exception as e:
             log.warning("could not open folder %s (%s: %s)", folder, type(e).__name__, e)
             self._emit_modal("error", "Could not open folder", str(e))
+
+    def _open_file(self, path):
+        """Open a FILE with its default app (Excel for .xlsx). Unlike
+        _open_folder it never creates anything — the caller has already checked
+        the file exists."""
+        try:
+            os.startfile(str(path))          # Windows; launches the associated app
+            ui_log.info("opened file: %s", path)
+        except Exception as e:
+            log.warning("could not open file %s (%s: %s)", path, type(e).__name__, e)
+            self._emit_modal("error", "Could not open file", str(e))
 
     @_api_method
     def open_output_folder(self):

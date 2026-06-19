@@ -118,6 +118,30 @@ def main():
         a._end_task()
         check("bad row for export rejected",
               bool(a.refresh_cell_export("nope", "ars-prod").get("error")))
+
+        print("open_cell_comparison / open_comparisons_folder:")
+        opened = []
+        a._open_file = lambda p: opened.append(Path(p))
+        a._open_folder = lambda p: opened.append(Path(p))
+        check("open rejects unknown row",
+              bool(a.open_cell_comparison("nope", "ars-prod").get("error")))
+        check("open rejects the baseline column",
+              bool(a.open_cell_comparison("ramp_detail", "ssor-prod").get("error")))
+        check("open errors when no comparison file exists yet",
+              bool(a.open_cell_comparison("ramp_detail", "ars-prod").get("error")))
+        check("nothing was opened for the missing file", not opened)
+        # Plant a comparison workbook where the matrix expects it, then open it.
+        import matrix
+        cpath = matrix.comparison_path(str(dest), "ssor-prod", "ramp_detail", "ars-prod")
+        _touch(cpath)
+        r = a.open_cell_comparison("ramp_detail", "ars-prod")
+        check("open succeeds once the workbook exists", r.get("ok") is True)
+        check("the correct workbook path was opened",
+              opened and opened[-1] == cpath)
+        fr = a.open_comparisons_folder()
+        check("open comparisons folder ok", fr.get("ok") is True)
+        check("the baseline comparisons root was opened",
+              opened[-1] == matrix.comparisons_root(str(dest), "ssor-prod"))
     finally:
         (gui_api.MatrixCompareWorker, gui_api.MatrixExportWorker,
          settings.get_batch_dest, settings.CONFIG_FILE) = saved
