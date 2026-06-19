@@ -526,6 +526,25 @@ def set_matrix_fast(on):
     return get_matrix_fast()
 
 
+def get_matrix_formulas():
+    """Whether matrix comparisons ALSO write a live-formulas workbook beside the
+    values copy (default off; the values copy always wins for the offline counts)."""
+    return bool(_read_file().get("matrix_formulas", False))
+
+
+def set_matrix_formulas(on):
+    """Persist the matrix formulas-workbook toggle (cleared when off). Returns the
+    new effective value."""
+    data = dict(_read_file())
+    if on:
+        data["matrix_formulas"] = True
+    else:
+        data.pop("matrix_formulas", None)
+    _atomic_write(data)
+    log.info("settings: matrix_formulas -> %s", bool(on))
+    return get_matrix_formulas()
+
+
 # ---- Compare-tab "TSN by day" matrix ---------------------------------------
 # The data source (a "src-env" key), the picked day-columns (date strings), and
 # the hidden report rows. The TSN file reuses matrix_tsn_files (one TSN dataset).

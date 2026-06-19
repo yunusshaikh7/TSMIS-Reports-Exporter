@@ -566,6 +566,11 @@
             <div class="dm-options">
               <span class="mc-label">Reports</span>
               <div class="mx-toggles" id="dayMatrixReportToggles"></div>
+              <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
+                <input type="checkbox" id="dayMatrixFormulas">
+                <svg class="ic"><use href="#i-file-text"/></svg>
+                <span>Live-formulas copy</span>
+              </label>
             </div>
             <div class="matrix-legend">
               <span class="mx-key mx-match">identical</span>
@@ -881,6 +886,15 @@
             <input type="checkbox" id="matrixFast">
             <svg class="ic"><use href="#i-zap"/></svg>
             <span>Fast mode <span class="mc-fast-note" id="matrixFastNote"></span></span>
+          </label>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Comparison output</div>
+          <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
+            <input type="checkbox" id="matrixFormulas">
+            <svg class="ic"><use href="#i-file-text"/></svg>
+            <span>Also write a live-formulas copy</span>
           </label>
         </div>
 

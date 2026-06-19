@@ -1736,6 +1736,7 @@ function updateMatrixProgress() {
   }
   renderMatrixQueue();
   syncMatrixFast();
+  syncMatrixFormulas();
 }
 
 // The live job-queue panel (driven from each state push, so reorder/remove/
@@ -1813,6 +1814,15 @@ function syncMatrixFast() {
   cb.checked = !!mf.on;
   const note = $("matrixFastNote");
   if (note) note.textContent = mf.on && mf.workers ? `(${mf.workers} browsers)` : "";
+}
+
+// Reflect the persisted live-formulas toggle (one global setting; mirrored on both
+// matrices' checkboxes).
+function syncMatrixFormulas() {
+  const on = !!(S.st && S.st.matrix_formulas);
+  ["matrixFormulas", "dayMatrixFormulas"].forEach((id) => {
+    const cb = $(id); if (cb) cb.checked = on;
+  });
 }
 
 function mxCellContent(cmp, tsnMeta) {
@@ -2453,6 +2463,7 @@ function updateDayMatrixProgress() {
     cancel.disabled = !running;
   }
   renderQueuePanel("dayQueueGroup", "dayQueue", "dayQueueCount");
+  syncMatrixFormulas();
 }
 
 async function startConsolidate() {
@@ -2943,6 +2954,14 @@ function bindEvents() {
     const r = await api.set_matrix_fast(e.target.checked);
     if (r && r.error) { showMessage("error", "Can't set fast mode", r.error); syncMatrixFast(); }
   });
+  // Live-formulas toggle — one global setting, mirrored on both matrices.
+  const onFormulasToggle = async (e) => {
+    const r = await api.set_matrix_formulas(e.target.checked);
+    if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
+    syncMatrixFormulas();
+  };
+  $("matrixFormulas")?.addEventListener("change", onFormulasToggle);
+  $("dayMatrixFormulas")?.addEventListener("change", onFormulasToggle);
   $("btnQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
   $("btnQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
   // The by-day matrix shares the same queue (Clear / Stop-all act on it too).
@@ -3273,6 +3292,7 @@ function makeMockApi() {
     matrix_queue: [],            // v0.16.0 pending jobs
     matrix_current: null,        // v0.16.0 running job
     matrix_fast: { on: false, workers: 3 },
+    matrix_formulas: false,
     matrix_baseline: "ssor-prod",
     matrix_hidden: [],
     matrix_hidden_envs: [],
@@ -4004,6 +4024,12 @@ function makeMockApi() {
     set_matrix_fast: async (on) => {
       st.matrix_fast = { on: !!on, workers: st.matrix_fast.workers || 3 };
       push({ t: "log", text: `Matrix fast mode ${on ? "on" : "off"}.` });
+      pushState();
+      return { ok: true, on: !!on };
+    },
+    set_matrix_formulas: async (on) => {
+      st.matrix_formulas = !!on;
+      push({ t: "log", text: `Matrix live-formulas workbook ${on ? "on" : "off"}.` });
       pushState();
       return { ok: true, on: !!on };
     },

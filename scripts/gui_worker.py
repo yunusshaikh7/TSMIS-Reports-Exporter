@@ -1676,7 +1676,7 @@ class MatrixCompareWorker(threading.Thread):
     ('matrix_done', {...}) at the end."""
 
     def __init__(self, dest, baseline, cells, queue, cancel_event, tsn_files=None,
-                 force_consolidate=False):
+                 force_consolidate=False, also_formulas=False):
         super().__init__(daemon=True, name="matrix-compare")
         self.dest = dest
         self.baseline = baseline
@@ -1686,6 +1686,7 @@ class MatrixCompareWorker(threading.Thread):
         self.cancel = cancel_event
         self.tsn_files = tsn_files or {}
         self.force_consolidate = force_consolidate
+        self.also_formulas = also_formulas
 
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
@@ -1703,7 +1704,8 @@ class MatrixCompareWorker(threading.Thread):
                     res = matrix.build_comparison(
                         self.dest, row_key, cell_key, mode_id, self.baseline,
                         events=events, tsn_files=self.tsn_files,
-                        force_consolidate=self.force_consolidate)
+                        force_consolidate=self.force_consolidate,
+                        also_formulas=self.also_formulas)
                     status = res.status
                     if status != "ok":
                         errors += 1
@@ -1734,7 +1736,7 @@ class DayMatrixCompareWorker(threading.Thread):
     reusing the Everything matrix's progress events so the bridge handles both."""
 
     def __init__(self, source, cells, dest, queue, cancel_event, tsn_files=None,
-                 force_consolidate=False):
+                 force_consolidate=False, also_formulas=False):
         super().__init__(daemon=True, name="day-matrix-compare")
         self.source = source
         self.cells = [(c[0], c[1]) for c in cells]   # (date, row_key)
@@ -1743,6 +1745,7 @@ class DayMatrixCompareWorker(threading.Thread):
         self.cancel = cancel_event
         self.tsn_files = tsn_files or {}
         self.force_consolidate = force_consolidate
+        self.also_formulas = also_formulas
 
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
@@ -1760,7 +1763,8 @@ class DayMatrixCompareWorker(threading.Thread):
                     res = day_matrix.build_day_cell(
                         self.source, date, row_key, self.dest, events,
                         tsn_files=self.tsn_files,
-                        force_consolidate=self.force_consolidate)
+                        force_consolidate=self.force_consolidate,
+                        also_formulas=self.also_formulas)
                     status = res.status
                     if status != "ok":
                         errors += 1

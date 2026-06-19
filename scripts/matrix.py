@@ -523,14 +523,37 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
 
 
 # --------------------------------------------------------------------------- #
+# optional live-formulas twin (opt-in). The matrix's offline counts + freshness
+# all key off the VALUES workbook at the canonical out_path (compare_core is
+# regression-locked, so we can't make mode="both" put values there). So when the
+# user opts in, we ALSO write a recalculating formulas copy to a "(formulas)"
+# sibling via a second compare pass — best-effort, never failing the values cell.
+# --------------------------------------------------------------------------- #
+def _formulas_sibling(out_path):
+    out_path = Path(out_path)
+    return out_path.with_name(f"{out_path.stem} (formulas){out_path.suffix}")
+
+
+def _try_formulas(compare_call, out_path):
+    """Run `compare_call(formulas_path)` (mode='formulas') beside the values copy.
+    Best-effort: a failure here must NOT fail the already-written values cell."""
+    try:
+        compare_call(_formulas_sibling(out_path))
+    except Exception as e:                       # noqa: BLE001
+        log.warning("matrix: live-formulas workbook for %s not written (%s: %s)",
+                    Path(out_path).name, type(e).__name__, e)
+
+
+# --------------------------------------------------------------------------- #
 # orchestration: build one cell's comparison (pure delegation to compare_env)
 # --------------------------------------------------------------------------- #
 def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
-                          confirm_overwrite=None, row_defs=None):
+                          confirm_overwrite=None, row_defs=None, also_formulas=False):
     """Compare (row's report, cell env) against the baseline env, writing the
     VALUES workbook to comparison_path(...), and record its verdict + discrepancy
     counts in the cache. Pure delegation to the adapter's compare_folders — the
-    comparison engine is untouched. Returns the ConsolidateResult.
+    comparison engine is untouched. Returns the ConsolidateResult. With
+    `also_formulas`, also writes a live-formulas twin beside the values copy.
 
     Raises ValueError on an unknown row_key or a baseline cell (nothing to
     compare); compare_folders itself returns a clean error result when a side
@@ -551,6 +574,10 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
         dest / cell_key, dest / baseline_key, out_path,
         events=events, confirm_overwrite=confirm_overwrite or (lambda _p: True),
         mode="values")
+    if also_formulas and result.status == "ok":
+        _try_formulas(lambda fp: adapter.compare_folders(
+            dest / cell_key, dest / baseline_key, fp, events=events,
+            confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
 
     if result.status == "ok" and out_path.exists():
         diff_cells, one_sided = read_counts(out_path, has_route)
@@ -688,7 +715,8 @@ def _consolidated_stale(consolidated, store_dir):
 
 
 def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, fmt, events,
-                                confirm_overwrite=None, force_consolidate=False):
+                                confirm_overwrite=None, force_consolidate=False,
+                                also_formulas=False):
     """The SHARED TSN compare path used by BOTH matrices (the Everything matrix's
     latest-store cells AND the Compare tab's by-day cells).
 
@@ -719,6 +747,10 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, fmt, events
     result = cmp_mod.compare(consolidated, str(tsn_path), out_path, events=events,
                              confirm_overwrite=confirm_overwrite or (lambda _p: True),
                              mode="values")
+    if also_formulas and result.status == "ok":
+        _try_formulas(lambda fp: cmp_mod.compare(
+            consolidated, str(tsn_path), fp, events=events,
+            confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
     return result
 
 
@@ -733,13 +765,14 @@ def _ensure_consolidated(store_dir, subdir, events, force):
 
 def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                      tsn_files=None, confirm_overwrite=None, row_defs=None,
-                     force_consolidate=False):
+                     force_consolidate=False, also_formulas=False):
     """(Re)build one cell's comparison for the row's SELECTED mode, write the VALUES
     workbook, and cache its counts. Dispatches to the existing comparison adapters
     (never edits them). Returns the ConsolidateResult. Raises ValueError for an
     unknown row or an unsupported/greyed mode; an absent input side yields the
     adapter's clean error result. `force_consolidate` rebuilds the persistent
-    consolidated even when it looks fresh (the 'refresh consolidated' control)."""
+    consolidated even when it looks fresh; `also_formulas` writes a live-formulas
+    twin beside the values copy."""
     rows = row_defs if row_defs is not None else _row_defs()
     if row_key not in rows:
         raise ValueError(f"unknown matrix row: {row_key}")
@@ -750,7 +783,8 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
 
     if mode["kind"] == "env":
         return build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
-                                     confirm_overwrite=confirm_overwrite, row_defs=rows)
+                                     confirm_overwrite=confirm_overwrite, row_defs=rows,
+                                     also_formulas=also_formulas)
 
     dest = Path(dest)
     out_path = mode_out_path(dest, baseline_key, row_key, cell_key, mode)
@@ -763,7 +797,7 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         result = consolidate_and_compare_tsn(
             dest / cell_key / mode["env_subdir"], src["path"], out_path,
             mode.get("fmt"), events, confirm_overwrite=confirm_overwrite,
-            force_consolidate=force_consolidate)
+            force_consolidate=force_consolidate, also_formulas=also_formulas)
     else:                                # self: TSMIS PDF vs Excel (persisted both sides)
         side_env = _ensure_consolidated(dest / cell_key / mode["env_subdir"],
                                         mode["env_subdir"], events, force_consolidate)
@@ -776,6 +810,10 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         result = _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
             pdf_c, excel_c, out_path, events=events,
             confirm_overwrite=confirm_overwrite or (lambda _p: True), mode="values")
+        if also_formulas and result.status == "ok":
+            _try_formulas(lambda fp: _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
+                pdf_c, excel_c, fp, events=events,
+                confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
 
     if result.status == "ok" and out_path.exists():
         # has_route=True is correct for ALL tsn/self modes: their output is always

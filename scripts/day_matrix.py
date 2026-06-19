@@ -260,7 +260,8 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
 
 
 def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
-                   confirm_overwrite=None, force_consolidate=False):
+                   confirm_overwrite=None, force_consolidate=False,
+                   also_formulas=False):
     """Build ONE (day, report) vs-TSN comparison: resolve the shared TSN dataset,
     consolidate that day's per-route export (reusing the day folder's persistent
     consolidated unless stale or `force_consolidate`), compare vs TSN, write the
@@ -286,7 +287,8 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     out_path = day_out_path(date, source, row_key)
     result = matrix.consolidate_and_compare_tsn(
         tsmis_dir(date, source, subdir), src_tsn["path"], out_path, fmt, events,
-        confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate)
+        confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
+        also_formulas=also_formulas)
     if result.status == "ok" and out_path.exists():
         diff_cells, one_sided = matrix.read_counts(out_path, has_route=True)
         try:

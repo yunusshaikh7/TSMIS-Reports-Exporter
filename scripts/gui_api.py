@@ -240,6 +240,7 @@ class GuiApi:
                                    if self._current_job else None),
                 "matrix_fast": {"on": settings.get_matrix_fast(),
                                 "workers": settings.get("fast_workers")},
+                "matrix_formulas": settings.get_matrix_formulas(),
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},
                 "logins": self._login_states(),
@@ -1599,7 +1600,8 @@ class GuiApi:
                     "workers": 1})
         MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event,
                             tsn_files=settings.get_matrix_tsn_files(),
-                            force_consolidate=job.get("force", False)).start()
+                            force_consolidate=job.get("force", False),
+                            also_formulas=settings.get_matrix_formulas()).start()
         return True
 
     def _dispatch_day_compare_job(self, job):
@@ -1617,7 +1619,8 @@ class GuiApi:
                     "workers": 1})
         DayMatrixCompareWorker(source, cells, dest, self._q, self.cancel_event,
                                tsn_files=settings.get_matrix_tsn_files(),
-                               force_consolidate=job.get("force", False)).start()
+                               force_consolidate=job.get("force", False),
+                               also_formulas=settings.get_matrix_formulas()).start()
         return True
 
     def _matrix_worker_count(self):
@@ -1901,6 +1904,18 @@ class GuiApi:
         val = settings.set_matrix_fast(bool(on))
         self._emit_log("Matrix fast mode " + ("on" if val else "off")
                        + (f" — up to {settings.get('fast_workers')} browsers." if val else "."))
+        self._push_state()
+        return {"ok": True, "on": val}
+
+    @_api_method
+    def set_matrix_formulas(self, on):
+        """Toggle whether matrix comparisons ALSO write a live-formulas workbook
+        beside the values copy (persisted). The values copy always remains the
+        offline-count source; the formulas twin is an opt-in auditable extra."""
+        val = settings.set_matrix_formulas(bool(on))
+        self._emit_log("Matrix live-formulas workbook " + ("on" if val else "off")
+                       + (" — each comparison also writes a '… (formulas).xlsx'."
+                          if val else "."))
         self._push_state()
         return {"ok": True, "on": val}
 

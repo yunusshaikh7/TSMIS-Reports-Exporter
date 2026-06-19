@@ -239,6 +239,12 @@ def main():
               settings.get_matrix_fast() is True
               and a._state_snapshot()["matrix_fast"]["on"] is True)
         a.set_matrix_fast(False)
+        check("formulas toggle off by default", settings.get_matrix_formulas() is False)
+        a.set_matrix_formulas(True)
+        check("formulas toggle persists + snapshot reflects it",
+              settings.get_matrix_formulas() is True
+              and a._state_snapshot().get("matrix_formulas") is True)
+        a.set_matrix_formulas(False)
         # Two real exportable sides so row/column export resolves >=1 step.
         _touch(dest / "ssor-prod" / "ramp_detail" / "r1.xlsx")
         rr = a.refresh_row_export("ramp_detail")
