@@ -503,6 +503,29 @@ def set_matrix_tsn_file(subdir, path):
     return get_matrix_tsn_files()
 
 
+# ---- Comparison-matrix fast (parallel) mode --------------------------------
+# Whether the matrix's live re-exports run in fast mode (N browsers per env). A
+# matrix-local toggle, NOT a Settings-tab knob — it reuses the global
+# "fast_workers" count for N, so it lives here (not in DEFAULTS/all_settings).
+
+def get_matrix_fast():
+    """Whether matrix re-exports run in fast (parallel) mode (default off)."""
+    return bool(_read_file().get("matrix_fast", False))
+
+
+def set_matrix_fast(on):
+    """Persist the matrix fast-mode toggle (cleared when off). Returns the new
+    effective value."""
+    data = dict(_read_file())
+    if on:
+        data["matrix_fast"] = True
+    else:
+        data.pop("matrix_fast", None)
+    _atomic_write(data)
+    log.info("settings: matrix_fast -> %s", bool(on))
+    return get_matrix_fast()
+
+
 def reset():
     """Delete the settings file (back to all defaults). Returns True if a
     file was removed."""

@@ -743,9 +743,14 @@ button, input, select { font-family: inherit; }
 .mxch-refresh:active:not(:disabled) { background: color-mix(in oklab, var(--primary) 20%, transparent); }
 .mxch-refresh:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 .mxch-refresh:disabled { opacity: .4; cursor: default; }
-/* mx-cell is flex-direction:column, so the per-column refresh stacks centered
+/* Header buttons come in a PAIR now (↻ re-export + ⇄ rebuild). The spin
+   affordance suits the refresh glyph but not the compare glyph, so scope the
+   rotate to the re-export button only. */
+.mxch-btns { display: inline-flex; align-items: center; gap: 2px; }
+.mxch-rebuild:hover:not(:disabled) .ic { transform: none; }
+/* mx-cell is flex-direction:column, so the per-column buttons stack centered
    below its env label. */
-.mx-colhead .mxch-refresh { margin-top: 2px; }
+.mx-colhead .mxch-btns { margin-top: 2px; }
 
 /* Row-mode dropdown: a compact, content-sized Fluent select (was a clunky
    full-width raw <select>). The wrapper carries the custom chevron; the
@@ -887,6 +892,55 @@ body.matrix-wide .matrix-config {
   border-color: color-mix(in oklab, var(--primary) 35%, transparent);
   color: var(--primary); font-weight: 600;
 }
+
+/* Fast-mode toggle (matrix re-exports). A compact checkbox row with the bolt. */
+.mc-fast {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--foreground); cursor: pointer;
+  user-select: none;
+}
+.mc-fast input { width: 14px; height: 14px; accent-color: var(--primary); cursor: pointer; }
+.mc-fast .ic { width: 14px; height: 14px; color: var(--warning); }
+.mc-fast-note { color: var(--muted-foreground); font-size: 11px; }
+
+/* The job-queue panel: a running row + the pending jobs (reorder / remove). */
+.mx-queue-count { font-weight: 500; color: var(--muted-foreground); text-transform: none; letter-spacing: 0; }
+.mx-queue { display: flex; flex-direction: column; gap: 4px; }
+.mx-qrow {
+  display: flex; align-items: center; gap: 7px; min-width: 0;
+  padding: 4px 7px; border-radius: var(--radius-md);
+  border: 1px solid var(--border); background: var(--card);
+  animation: rise-in var(--motion-fast) var(--ease-out) both;
+}
+.mx-qrow.is-running {
+  background: color-mix(in oklab, var(--primary) 8%, var(--card));
+  border-color: color-mix(in oklab, var(--primary) 28%, transparent);
+}
+.mx-qicon { flex: none; width: 14px; height: 14px; color: var(--muted-foreground); }
+.mx-qrow.is-running .mx-qicon { color: var(--primary); }
+.mx-qicon.spin { animation: spin 1s linear infinite; }
+.mx-qlabel {
+  flex: 1; min-width: 0; font-size: 11.5px; color: var(--foreground);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mx-qfast { flex: none; width: 12px; height: 12px; color: var(--warning); }
+.mx-qbadge {
+  flex: none; font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; padding: 1px 6px; border-radius: 999px;
+  color: var(--primary); background: color-mix(in oklab, var(--primary) 14%, transparent);
+}
+.mx-qctrls { flex: none; display: inline-flex; gap: 1px; }
+.mx-qbtn {
+  border: none; background: transparent; cursor: pointer; padding: 2px;
+  border-radius: var(--radius-sm); color: var(--muted-foreground);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background-color .12s ease, color .12s ease;
+}
+.mx-qbtn .ic { width: 13px; height: 13px; }
+.mx-qbtn:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
+.mx-qbtn.mx-qrm:hover:not(:disabled) { color: var(--destructive); }
+.mx-qbtn:disabled { opacity: .3; cursor: default; }
+.mx-queue-actions { display: flex; gap: 6px; margin-top: 2px; }
 
 .day-row { display: flex; align-items: center; gap: 10px; }
 /* width floor only — height/font come from .select-light so all card selects match */

@@ -23,6 +23,7 @@ The tsmis.ui logging contract from the Tk GUI carries over: every line shown
 in the log pane is mirrored to the `tsmis.ui` logger, every user decision and
 every swallowed exception is logged with its reason.
 """
+import collections
 import ctypes
 import json
 import logging
@@ -44,7 +45,7 @@ import report_library
 import updater
 from gui_worker import (BatchWorker, CheckWorker, ChromiumWorker,
                         ConsolidateWorker, EnvCheckWorker, EnvScanWorker,
-                        MatrixCompareWorker, MatrixExportWorker,
+                        MatrixBatchExportWorker, MatrixCompareWorker,
                         MatrixTsnConsolidateWorker,
                         ExportWorker, LoginWorker, ResetWorker, UpdateWorker,
                         measure_targets, reset_targets)
@@ -164,6 +165,13 @@ class GuiApi:
         self._batch = None           # B3: live Export-Everything progress {label,done,total}
         self._batch_resume = None    # B3: a resumable manifest summary, or None
         self._matrix = None          # matrix recompute progress {phase,row,cell,done,total} | None
+        # Matrix-scoped job queue (v0.16.0): matrix actions ENQUEUE instead of
+        # racing the single-task gate. A second click queues; jobs run one at a
+        # time and auto-advance. The global gate (self._task) still serializes
+        # everything — the queue just feeds matrix work into it in order.
+        self._queue = collections.deque()   # pending Jobs (dicts)
+        self._current_job = None             # the running matrix Job, or None
+        self._job_seq = 0                    # monotonic Job id source
         self._export_worker = None   # live ExportWorker (screenshot requests)
         # Server-side confirmation for the one destructive op (delete all
         # reports): reset_preview issues a single-use token bound to the
@@ -226,6 +234,11 @@ class GuiApi:
                 "batch": self._batch,
                 "batch_resume": self._batch_resume,
                 "matrix": self._matrix,
+                "matrix_queue": [self._job_view(j) for j in self._queue],
+                "matrix_current": (self._job_view(self._current_job)
+                                   if self._current_job else None),
+                "matrix_fast": {"on": settings.get_matrix_fast(),
+                                "workers": settings.get("fast_workers")},
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},
                 "logins": self._login_states(),
@@ -499,10 +512,15 @@ class GuiApi:
             self._export_worker = None
             self._batch = None
             self._matrix = None
+            self._current_job = None
             self.pause_event.clear()      # never leak a paused state across runs
         self._refresh_auth()
         self._emit({"t": "run_ended"})
         self._push_state()
+        # Whatever just ended (matrix or not) frees the gate — pull the next
+        # queued matrix job in. No-op when the queue is empty or another task
+        # grabs the gate first (re-checked under the lock inside).
+        self._try_start_next_matrix_job()
 
     # ---- single-flight task gate + input validation (bridge hardening) --------
 
@@ -807,10 +825,23 @@ class GuiApi:
     def _on_error(self, payload):
         kind, message = payload
         self._emit_log(f"ERROR: {message}")
+        # An error that ENDS A MATRIX JOB (only auth / browser-not-found reach
+        # here from the matrix workers — both unrecoverable this session) would
+        # hit every queued matrix job the same way. Drop the pending queue so it
+        # can't cascade into a modal storm; the user fixes the cause + re-queues.
+        with self._lock:
+            if kind == "auth":
+                self._authed = False
+            clear_pending = kind == "auth" or self._current_job is not None
+            cleared = len(self._queue) if clear_pending else 0
+            if clear_pending:
+                self._queue.clear()
         if kind == "auth":
             clear_auth()
-            with self._lock:
-                self._authed = False
+        if cleared:
+            self._emit_log(f"Cleared {cleared} queued matrix job(s) — fix the "
+                           "problem above, then re-queue them.")
+        if kind == "auth":
             self._set_dot("bad", "No saved login — click Log in")
             self._emit_modal("warning", "Login needed",
                              f"{message}\n\nClick 'Log in' to sign in again.")
@@ -1402,37 +1433,248 @@ class GuiApi:
         self._push_state()
         return {"baseline": base, "recompute_pending": pending}
 
-    @_api_method
-    def refresh_cell_export(self, row_key, env_key):
-        """Re-export ONE (report, env) into the store. LIVE (hits TSMIS); reuses
-        the export engine for one report+env with no manifest, so it can't
-        disturb a paused Export-Everything batch."""
-        row = {r[0]: r for r in matrix_rows()}.get(row_key)
-        combo = self._parse_env_keys([env_key])
-        if row is None or row[3] is None:
-            return {"error": "That report can't be exported from the matrix."}
-        if not combo:
-            return {"error": "Unknown environment."}
-        spec = EXPORT_REPORTS[row[3]][2]
-        src, env = combo[0]
-        if not self._try_claim_task("matrix"):
-            return {"error": "A task is already running."}
+    # ----- the matrix job queue (v0.16.0) ------------------------------------
+    # Matrix actions enqueue a Job instead of claiming the gate directly; a 2nd
+    # action queues rather than being rejected. The queue runs one job at a time
+    # and auto-advances from _end_task. A Job's TARGETS (export steps / compare
+    # cells) are resolved when it STARTS, not when it's queued — so a job reflects
+    # exports finished before it. The global gate still serializes everything.
+    _QUEUE_LIMIT = 50         # backstop against a stuck UI flooding the queue
+
+    def _job_view(self, job):
+        """JSON-safe summary of a Job for the snapshot (queue panel + current)."""
+        return {"id": job["id"], "kind": job["kind"], "scope": job["scope"],
+                "label": job["label"], "status": job.get("status", "queued"),
+                "fast": bool(job.get("fast"))}
+
+    def _matrix_row_label(self, row_key):
+        return {r[0]: r[1] for r in matrix_rows()}.get(row_key, row_key)
+
+    def _job_label(self, kind, scope, row=None, env=None):
+        """Human label for the queue panel / log from a job's shape."""
+        if kind == "tsn_consolidate":
+            return "Consolidate TSN Highway Log PDFs"
+        verb = "Re-export" if kind == "export" else "Rebuild"
+        rl = self._matrix_row_label(row) if row else None
+        el = matrix.default_env_label(env) if env else None
+        if scope == "cell":
+            return f"{verb} {rl} — {el}"
+        if scope == "row":
+            return f"{verb} {rl} — all environments"
+        if scope == "column":
+            return f"{verb} all reports — {el}"
+        if scope == "stale":
+            return "Refresh stale comparisons"
+        return f"{verb} all comparisons"
+
+    def _make_job(self, kind, scope, label, row=None, env=None, subdir=None,
+                  fast=False):
+        with self._lock:
+            self._job_seq += 1
+            jid = self._job_seq
+        return {"id": jid, "kind": kind, "scope": scope, "label": label,
+                "row": row, "env": env, "subdir": subdir, "fast": bool(fast),
+                "status": "queued"}
+
+    def _enqueue_matrix_job(self, job):
+        """Append a Job and try to start it (or leave it queued behind the
+        running one). The UI's '2nd action queues' contract lives here."""
+        with self._lock:
+            if len(self._queue) >= self._QUEUE_LIMIT:
+                return {"error": "The matrix queue is full — let some jobs finish "
+                                 "first."}
+            self._queue.append(job)
+            busy = self._task is not None or self._current_job is not None
+            depth = len(self._queue)
+        if busy:
+            self._emit_log(f"Queued (#{depth}): {job['label']}.")
+        self._push_state()
+        self._try_start_next_matrix_job()
+        return {"ok": True, "job_id": job["id"], "queued": depth}
+
+    def _try_start_next_matrix_job(self):
+        """Start the next queued matrix job if the gate is free. Claims the gate
+        and pops the job ATOMICALLY (so a non-matrix task can't slip in between),
+        then resolves targets with the gate held. A job that resolves to no work
+        is dropped and the next one is tried."""
+        while True:
+            with self._lock:
+                if self._task or self._current_job is not None or not self._queue:
+                    return
+                job = self._queue.popleft()
+                self._task = "matrix"            # claim atomically with the pop
+                self._current_job = job
+                job["status"] = "running"
+            if self._dispatch_matrix_job(job):
+                self._push_state()
+                return
+            # Nothing to do (e.g. the cells were rebuilt by an earlier job) —
+            # release the gate, drop the job, and try the next one.
+            with self._lock:
+                self._task = None
+                self._current_job = None
+            self._emit_log(f"Skipped (nothing to do): {job['label']}.")
+
+    def _dispatch_matrix_job(self, job):
+        """Resolve a claimed job's targets and start its worker. Returns True if a
+        worker was launched, False if there was no work. The gate is already held
+        by _try_start_next_matrix_job."""
         self.cancel_event.clear()
         self.skip_event.clear()
         self.pause_event.clear()
+        kind = job["kind"]
+        if kind == "compare":
+            return self._dispatch_compare_job(job)
+        if kind == "export":
+            return self._dispatch_export_job(job)
+        if kind == "tsn_consolidate":
+            return self._dispatch_tsn_consolidate_job(job)
+        return False
+
+    def _resolve_compare_cells(self, job, base):
+        """[(row, cell, mode)] for a compare job. A 'cell' job is the one explicit
+        cell (always run); row/column/all/stale defer to the staleness-aware
+        rebuild list."""
+        scope = job["scope"]
+        if scope == "cell":
+            row, env = job["row"], job["env"]
+            mode = settings.get_matrix_row_modes().get(row, "env")
+            if mode == "env" and env == base:
+                return []
+            return [(row, env, mode)]
+        rebuild_scope = "stale" if scope == "stale" else "all"
+        return matrix.cells_to_rebuild(self._matrix_snapshot(base),
+                                       scope=rebuild_scope,
+                                       row=job.get("row"), env=job.get("env"))
+
+    def _dispatch_compare_job(self, job):
+        base = self._current_baseline()
         dest = settings.get_batch_dest()
-        self._emit_log(f"Refreshing {row[1]} — {matrix.default_env_label(env_key)}…")
-        self._set_dot("busy", "Refreshing a report…")
-        self._emit({"t": "run_started", "mode": "export", "label": "Refreshing…",
+        cells = self._resolve_compare_cells(job, base)
+        if not cells:
+            return False
+        with self._lock:
+            self._matrix = {"phase": "comparing", "row": job.get("row"),
+                            "cell": job.get("env"), "done": 0, "total": len(cells)}
+        self._emit_log(f"{job['label']} — {len(cells)} comparison(s) against "
+                       f"{matrix.default_env_label(base)}…")
+        self._set_dot("busy", "Comparing…")
+        self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
-        self._push_state()
-        MatrixExportWorker(spec, src, env, dest, self._q, self.cancel_event,
-                           self.skip_event, self.pause_event).start()
-        return {"ok": True}
+        MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event,
+                            tsn_files=settings.get_matrix_tsn_files()).start()
+        return True
+
+    def _matrix_worker_count(self):
+        """Fast-mode browser count for matrix re-exports (the shared fast_workers
+        knob, clamped to the engine's 2..MAX range)."""
+        try:
+            return max(2, min(int(settings.get("fast_workers")), MAX_WORKERS))
+        except (TypeError, ValueError):
+            return max(2, default_worker_count())
+
+    def _resolve_export_steps(self, job):
+        """[(spec, src, env)] for an export job. 'cell' = one (report, env); 'row'
+        = one report across the visible envs; 'column' = every exportable report
+        for one env. Reports with no export adapter are skipped."""
+        rows_by_key = {r[0]: r for r in matrix_rows()}
+
+        def spec_for(row_key):
+            row = rows_by_key.get(row_key)
+            return EXPORT_REPORTS[row[3]][2] if row is not None and row[3] is not None else None
+
+        scope = job["scope"]
+        if scope == "cell":
+            spec, combo = spec_for(job["row"]), self._parse_env_keys([job["env"]])
+            return [(spec, combo[0][0], combo[0][1])] if spec is not None and combo else []
+        snap = self._matrix_snapshot(self._current_baseline())
+        steps = []
+        if scope == "row":
+            spec = spec_for(job["row"])
+            if spec is None:
+                return []
+            for env in snap["envs"]:
+                combo = self._parse_env_keys([env])
+                if combo:
+                    steps.append((spec, combo[0][0], combo[0][1]))
+        elif scope == "column":
+            combo = self._parse_env_keys([job["env"]])
+            if not combo:
+                return []
+            src, env = combo[0]
+            for row_key in snap["rows"]:
+                spec = spec_for(row_key)
+                if spec is not None:
+                    steps.append((spec, src, env))
+        return steps
+
+    def _dispatch_export_job(self, job):
+        dest = settings.get_batch_dest()
+        steps = self._resolve_export_steps(job)
+        if not steps:
+            return False
+        n_workers = self._matrix_worker_count() if job.get("fast") else 1
+        with self._lock:
+            self._fast_run = n_workers > 1
+        note = f"   ·   FAST MODE ({n_workers} browsers)" if n_workers > 1 else ""
+        self._emit_log(f"{job['label']} — {len(steps)} export(s){note}…")
+        self._set_dot("busy", "Refreshing…")
+        self._emit({"t": "run_started", "mode": "export", "label": "Refreshing…",
+                    "workers": n_workers})
+        MatrixBatchExportWorker(steps, dest, self._q, self.cancel_event,
+                                self.skip_event, self.pause_event,
+                                workers=n_workers).start()
+        return True
+
+    def _dispatch_tsn_consolidate_job(self, job):
+        dest = settings.get_batch_dest()
+        self._emit_log("Consolidating the dropped TSN Highway Log PDFs…")
+        self._set_dot("busy", "Consolidating TSN…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Consolidating TSN…", "workers": 1})
+        MatrixTsnConsolidateWorker(dest, job["subdir"], self._q,
+                                   self.cancel_event).start()
+        return True
+
+    # ----- matrix entry methods (enqueue onto the job queue) ------------------
+    @_api_method
+    def refresh_cell_export(self, row_key, env_key):
+        """Queue a LIVE re-export of ONE (report, env) into the store. Reuses the
+        export engine with no manifest, so it can't disturb a paused batch."""
+        row = {r[0]: r for r in matrix_rows()}.get(row_key)
+        if row is None or row[3] is None:
+            return {"error": "That report can't be exported from the matrix."}
+        if not self._parse_env_keys([env_key]):
+            return {"error": "Unknown environment."}
+        job = self._make_job("export", "cell",
+                             self._job_label("export", "cell", row_key, env_key),
+                             row=row_key, env=env_key, fast=settings.get_matrix_fast())
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def refresh_row_export(self, row_key):
+        """Queue a LIVE re-export of ONE report across every visible environment."""
+        row = {r[0]: r for r in matrix_rows()}.get(row_key)
+        if row is None or row[3] is None:
+            return {"error": "That report can't be exported from the matrix."}
+        job = self._make_job("export", "row",
+                             self._job_label("export", "row", row=row_key),
+                             row=row_key, fast=settings.get_matrix_fast())
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def refresh_column_export(self, env_key):
+        """Queue a LIVE re-export of every exportable report for ONE environment."""
+        if not self._parse_env_keys([env_key]):
+            return {"error": "Unknown environment."}
+        job = self._make_job("export", "column",
+                             self._job_label("export", "column", env=env_key),
+                             env=env_key, fast=settings.get_matrix_fast())
+        return self._enqueue_matrix_job(job)
 
     @_api_method
     def refresh_cell_comparison(self, row_key, env_key):
-        """(Re)build ONE cell's comparison for the row's SELECTED mode — offline."""
+        """Queue a (re)build of ONE cell's comparison for the row's SELECTED mode."""
         base = self._current_baseline()
         if row_key not in {r[0] for r in matrix_rows()}:
             return {"error": "Unknown report for the matrix."}
@@ -1441,54 +1683,35 @@ class GuiApi:
         mode = settings.get_matrix_row_modes().get(row_key, "env")
         if mode == "env" and env_key == base:
             return {"error": "The baseline column has nothing to compare against."}
-        if not self._try_claim_task("matrix"):
-            return {"error": "A task is already running."}
-        self.cancel_event.clear()
-        dest = settings.get_batch_dest()
-        with self._lock:
-            self._matrix = {"phase": "comparing", "row": row_key, "cell": env_key,
-                            "done": 0, "total": 1}
-        self._emit_log(f"Comparing {row_key} — {matrix.default_env_label(env_key)}…")
-        self._set_dot("busy", "Comparing…")
-        self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
-                    "workers": 1})
-        self._push_state()
-        MatrixCompareWorker(dest, base, [(row_key, env_key, mode)], self._q,
-                            self.cancel_event,
-                            tsn_files=settings.get_matrix_tsn_files()).start()
-        return {"ok": True}
+        job = self._make_job("compare", "cell",
+                             self._job_label("compare", "cell", row_key, env_key),
+                             row=row_key, env=env_key)
+        return self._enqueue_matrix_job(job)
 
     @_api_method
     def recompute_matrix(self, scope="stale", row=None, env=None):
-        """Rebuild comparisons in scope ('stale' = missing/stale, 'all' = every
-        comparable cell) for the current baseline — drives refresh-all, the
-        baseline-switch recompute, and (with `row`/`env`) the per-row and
-        per-column refresh buttons. Honors cancel between cells; re-running 'stale'
-        resumes a cancelled run idempotently."""
+        """Queue a comparison rebuild in scope ('stale'/'all') for the current
+        baseline — drives refresh-stale, the baseline-switch recompute, and (with
+        `row`/`env`) the per-row and per-column rebuild buttons. Returns
+        {nothing:True} only when the queue is idle AND there's nothing to do, so
+        the UI can say so without queuing a no-op (targets are re-resolved when a
+        job actually runs)."""
         base = self._current_baseline()
-        dest = settings.get_batch_dest()
         scope = scope if scope in ("stale", "all") else "stale"
         row = row if (row and row in {r[0] for r in matrix_rows()}) else None
         env = env if (env and self._parse_env_keys([env])) else None
-        cells = matrix.cells_to_rebuild(self._matrix_snapshot(base), scope=scope,
-                                        row=row, env=env)
-        if not cells:
-            return {"ok": True, "nothing": True}
-        if not self._try_claim_task("matrix"):
-            return {"error": "A task is already running."}
-        self.cancel_event.clear()
+        job_scope = "row" if row else "column" if env else scope
         with self._lock:
-            self._matrix = {"phase": "comparing", "row": None, "cell": None,
-                            "done": 0, "total": len(cells)}
-        self._emit_log(f"Rebuilding {len(cells)} comparison(s) against "
-                       f"{matrix.default_env_label(base)}…")
-        self._set_dot("busy", "Comparing…")
-        self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
-                    "workers": 1})
-        self._push_state()
-        MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event,
-                            tsn_files=settings.get_matrix_tsn_files()).start()
-        return {"ok": True, "count": len(cells)}
+            idle = not self._task and not self._queue
+        if idle:
+            cells = matrix.cells_to_rebuild(self._matrix_snapshot(base), scope=scope,
+                                            row=row, env=env)
+            if not cells:
+                return {"ok": True, "nothing": True}
+        job = self._make_job("compare", job_scope,
+                             self._job_label("compare", job_scope, row=row, env=env),
+                             row=row, env=env)
+        return self._enqueue_matrix_job(job)
 
     @_api_method
     def open_cell_comparison(self, row_key, env_key):
@@ -1597,22 +1820,91 @@ class GuiApi:
 
     @_api_method
     def consolidate_matrix_tsn(self, subdir):
-        """Build the consolidated TSN workbook from the district PDFs the user
-        dropped in _tsn_input/<subdir>/ (the 'consolidate these PDFs?' prompt
-        path). Offline (pdfplumber); claims the matrix task and refreshes on done."""
+        """Queue building the consolidated TSN workbook from the district PDFs the
+        user dropped in _tsn_input/<subdir>/ (the 'consolidate these PDFs?' prompt
+        path). Offline (pdfplumber)."""
         if subdir != "highway_log":
             return {"error": "TSN consolidation is only available for Highway Log."}
-        if not self._try_claim_task("matrix"):
-            return {"error": "A task is already running."}
-        self.cancel_event.clear()
-        dest = settings.get_batch_dest()
-        self._emit_log("Consolidating the dropped TSN Highway Log PDFs…")
-        self._set_dot("busy", "Consolidating TSN…")
-        self._emit({"t": "run_started", "mode": "consolidate",
-                    "label": "Consolidating TSN…", "workers": 1})
+        job = self._make_job("tsn_consolidate", "consolidate",
+                             "Consolidate TSN Highway Log PDFs", subdir=subdir)
+        return self._enqueue_matrix_job(job)
+
+    # ----- matrix queue management (v0.16.0) ---------------------------------
+    @_api_method
+    def set_matrix_fast(self, on):
+        """Toggle fast (parallel) mode for matrix re-exports (persisted; reuses
+        the global fast_workers count)."""
+        val = settings.set_matrix_fast(bool(on))
+        self._emit_log("Matrix fast mode " + ("on" if val else "off")
+                       + (f" — up to {settings.get('fast_workers')} browsers." if val else "."))
         self._push_state()
-        MatrixTsnConsolidateWorker(dest, subdir, self._q, self.cancel_event).start()
-        return {"ok": True}
+        return {"ok": True, "on": val}
+
+    @_api_method
+    def matrix_queue_remove(self, job_id):
+        """Remove ONE pending (not-yet-running) job from the queue."""
+        try:
+            jid = int(job_id)
+        except (TypeError, ValueError):
+            return {"error": "Bad job id."}
+        with self._lock:
+            before = len(self._queue)
+            self._queue = collections.deque(j for j in self._queue if j["id"] != jid)
+            removed = len(self._queue) != before
+        if removed:
+            self._push_state()
+        return {"ok": True, "removed": removed}
+
+    @_api_method
+    def matrix_queue_move(self, job_id, direction):
+        """Reorder a pending job up (earlier) or down (later) in the queue."""
+        if direction not in ("up", "down"):
+            return {"error": "Direction must be up or down."}
+        try:
+            jid = int(job_id)
+        except (TypeError, ValueError):
+            return {"error": "Bad job id."}
+        with self._lock:
+            q = list(self._queue)
+            idx = next((i for i, j in enumerate(q) if j["id"] == jid), None)
+            moved = False
+            if idx is not None:
+                swap = idx - 1 if direction == "up" else idx + 1
+                if 0 <= swap < len(q):
+                    q[idx], q[swap] = q[swap], q[idx]
+                    self._queue = collections.deque(q)
+                    moved = True
+        if moved:
+            self._push_state()
+        return {"ok": True, "moved": moved}
+
+    @_api_method
+    def matrix_queue_clear(self):
+        """Drop every PENDING job (the running one keeps going)."""
+        with self._lock:
+            n = len(self._queue)
+            self._queue.clear()
+        if n:
+            self._emit_log(f"Cleared {n} queued matrix job(s).")
+            self._push_state()
+        return {"ok": True, "cleared": n}
+
+    @_api_method
+    def matrix_stop_all(self):
+        """Clear the pending queue AND cancel the running matrix job."""
+        with self._lock:
+            n = len(self._queue)
+            self._queue.clear()
+            running = self._task == "matrix"
+        if running:
+            self.cancel_event.set()
+            self.pause_event.clear()
+        if n or running:
+            self._emit_log("Stopping matrix work — cleared "
+                           f"{n} queued"
+                           + ("; cancelling the running job." if running else "."))
+            self._push_state()
+        return {"ok": True, "cleared": n, "cancelling": running}
 
     @_api_method
     def open_comparisons_folder(self):
@@ -1646,11 +1938,17 @@ class GuiApi:
         self._emit({"t": "matrix_refresh"})
 
     def _on_matrix_export_done(self, payload):
-        sx = f"{payload.get('src')}-{payload.get('env')}"
-        if payload.get("ok"):
-            self._emit_log(f"Refreshed {sx}.")
+        done, total = payload.get("count", 0), payload.get("total", 0)
+        if payload.get("cancelled"):
+            self._emit_log(f"Re-export stopped — {done} of {total} done.")
+        elif payload.get("ok"):
+            self._emit_log(f"Re-export finished — {done} of {total} done.")
         else:
-            self._emit_log(f"Refresh of {sx} ended: {payload.get('error', '(see log)')}")
+            self._emit_log(f"Re-export finished — {done} of {total} done "
+                           "(some did not complete; see the log).")
+        with self._lock:
+            if not self._authed:
+                self._device_ok = True   # the run signed itself in (device mode)
         self._flash_taskbar()
         self._end_task()
         self._emit({"t": "matrix_refresh"})

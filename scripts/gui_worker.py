@@ -1579,53 +1579,76 @@ class CheckWorker(threading.Thread):
         self.q.put(("checks_done", results))
 
 
-class MatrixExportWorker(threading.Thread):
-    """Refresh ONE (report, env) cell into the Export-Everything store.
+def _run_matrix_export_step(spec, src, env, dest, queue, cancel, skip, pause,
+                            workers):
+    """Export ONE report for ONE environment into the Export-Everything store,
+    WITHOUT a manifest (so a matrix refresh can never clobber a paused
+    Export-Everything batch — BatchWorker alone persists batch_job.json). Runs
+    the SAME per-environment body BatchWorker uses (set_site + an ExportWorker
+    into <dest>/<src-env>/<subdir>, env-tagged names); fast mode runs N browsers.
+    The caller sets/restores the process-global site. Auth / browser failures
+    raise up to the batch loop, which stops the run."""
+    set_site(src, env)
+    out_base = Path(dest) / f"{src}-{env}"
+    ew = ExportWorker([spec], queue, cancel, skip, workers=workers, routes=None,
+                      pause_event=pause, auto_consolidate=False, out_base=out_base)
+    ew._run_specs(ew._build_events(), [])
 
-    Runs the SAME per-environment body BatchWorker uses (set_site + a single
-    ExportWorker into <dest>/<src-env>/<subdir>, stage-and-swap, env-tagged
-    names), but for one report+env and WITHOUT a manifest — so a single-cell
-    refresh can never clobber a paused Export-Everything batch (BatchWorker is
-    the only thing that persists batch_job.json). Posts the reused export
-    log/progress, then ('matrix_export_done', {src, env, ok, cancelled}). The
-    process-global site is restored at the end."""
 
-    def __init__(self, spec, src, env, dest, queue, cancel_event, skip_event,
-                 pause_event):
-        super().__init__(daemon=True, name="matrix-export")
-        self.spec = spec
-        self.src = src
-        self.env = env
+class MatrixBatchExportWorker(threading.Thread):
+    """Refresh a SET of (report, env) cells into the Export-Everything store — the
+    matrix's live re-export of a single cell (1 step), a whole ROW (one report ×
+    every visible env) or a whole COLUMN (every report × one env).
+
+    Each step runs manifest-free via _run_matrix_export_step (so it can't disturb
+    a paused Export-Everything batch); steps run sequentially, and fast mode runs
+    N browsers PER step. Honors cancel between steps. Posts the reused export
+    log/progress, then ('matrix_export_done', {count, total, ok, cancelled}). An
+    auth / browser failure stops the batch and posts ('error', …) — the bridge
+    then clears the queue (auth) or advances (general). The process-global site is
+    restored at the end."""
+
+    def __init__(self, steps, dest, queue, cancel_event, skip_event, pause_event,
+                 workers=1):
+        super().__init__(daemon=True, name="matrix-batch-export")
+        self.steps = list(steps)               # [(spec, src, env), ...]
         self.dest = dest
         self.q = queue
         self.cancel = cancel_event
         self.skip = skip_event
         self.pause = pause_event
+        self.workers = workers
 
     def run(self):
         original = get_site()
+        total = len(self.steps)
+        done = ok = 0
         try:
-            set_site(self.src, self.env)
-            out_base = Path(self.dest) / f"{self.src}-{self.env}"
-            ew = ExportWorker([self.spec], self.q, self.cancel, self.skip,
-                              workers=1, routes=None, pause_event=self.pause,
-                              auto_consolidate=False, out_base=out_base)
-            try:
-                ew._run_specs(ew._build_events(), [])
-                self.q.put(("matrix_export_done",
-                            {"src": self.src, "env": self.env, "ok": True,
-                             "cancelled": self.cancel.is_set()}))
-            except (AuthError, BrowserNotFoundError) as e:
-                log.warning("matrix cell export %s-%s stopped: %s: %s",
-                            self.src, self.env, type(e).__name__, e)
-                self.q.put(("error",
-                            ("auth" if isinstance(e, AuthError) else "general",
-                             str(e))))
-            except Exception as e:                       # noqa: BLE001
-                log.exception("matrix cell export %s-%s crashed", self.src, self.env)
-                self.q.put(("matrix_export_done",
-                            {"src": self.src, "env": self.env, "ok": False,
-                             "error": f"{type(e).__name__}: {e}"}))
+            for spec, src, env in self.steps:
+                if self.cancel.is_set():
+                    break
+                if total > 1:
+                    self.q.put(("log", f"Re-exporting {spec.label} — {src}-{env} "
+                                       f"({done + 1} of {total})…"))
+                try:
+                    _run_matrix_export_step(spec, src, env, self.dest, self.q,
+                                            self.cancel, self.skip, self.pause,
+                                            self.workers)
+                    ok += 1
+                except (AuthError, BrowserNotFoundError) as e:
+                    log.warning("matrix export %s-%s stopped: %s: %s",
+                                src, env, type(e).__name__, e)
+                    self.q.put(("error",
+                                ("auth" if isinstance(e, AuthError) else "general",
+                                 str(e))))
+                    return                       # stop the batch (terminal via _on_error)
+                except Exception as e:           # noqa: BLE001
+                    log.exception("matrix export %s-%s crashed", src, env)
+                    self.q.put(("log", f"  {src}-{env}: {type(e).__name__}: {e}"))
+                done += 1
+            self.q.put(("matrix_export_done",
+                        {"count": done, "total": total, "ok": ok == total,
+                         "cancelled": self.cancel.is_set()}))
         finally:
             set_site(*original)
 

@@ -1684,12 +1684,12 @@ function updateMatrixProgress() {
   } else {
     el.hidden = true;
   }
-  // Grey the matrix controls live while ANY task runs (the grid only re-renders
-  // at run end, so toggle the existing buttons/selects here on each state push).
+  // Grey only the SELECTION controls while a task runs (the grid re-renders at
+  // run end). The cell/header ACTION triggers stay live — a 2nd click queues —
+  // and the queue/fast controls are always editable (excluded here on purpose).
   const locked = !!(S.st && S.st.task);
   document.querySelectorAll(
-    "#matrixSection .mx-act, #matrixSection .mxch-refresh, #matrixSection .mx-rowmode, "
-    + "#matrixSection .mx-linkbtn, #matrixBaseline, #btnMatrixRefreshAll, #btnOpenComparisons, "
+    "#matrixSection .mx-rowmode, #matrixSection .mx-linkbtn, #matrixBaseline, "
     + "#matrixConfig .mx-toggle, #matrixConfig .mc-mode")
     .forEach((c) => { c.disabled = locked; });
   // Cancel is visible + active only while a matrix run is in progress; the
@@ -1700,6 +1700,79 @@ function updateMatrixProgress() {
     cancel.classList.toggle("hidden", !running);
     cancel.disabled = !running;
   }
+  renderMatrixQueue();
+  syncMatrixFast();
+}
+
+// The live job-queue panel in the matrix config zone (driven from each state
+// push, so reorder/remove/clear/stop-all update without a full grid re-render).
+function renderMatrixQueue() {
+  const group = $("matrixQueueGroup");
+  if (!group) return;
+  const st = S.st || {};
+  const cur = st.matrix_current || null;
+  const pending = st.matrix_queue || [];
+  if (!cur && !pending.length) { group.hidden = true; return; }
+  group.hidden = false;
+  const count = $("matrixQueueCount");
+  if (count) count.textContent = pending.length ? `(${pending.length} waiting)` : "";
+  const list = $("matrixQueue");
+  list.textContent = "";
+  if (cur) list.appendChild(mxQueueRow(cur, true, 0, 1));
+  pending.forEach((job, i) => list.appendChild(mxQueueRow(job, false, i, pending.length)));
+}
+
+function mxQueueRow(job, running, idx, total) {
+  const row = document.createElement("div");
+  row.className = "mx-qrow" + (running ? " is-running" : "");
+  const kindIcon = job.kind === "export" ? "i-refresh"
+    : job.kind === "compare" ? "i-compare" : "i-layers";
+  const ic = icon(running ? "i-loader" : kindIcon, "mx-qicon");
+  if (running) ic.classList.add("spin");
+  row.appendChild(ic);
+  const label = document.createElement("span");
+  label.className = "mx-qlabel"; label.textContent = job.label;
+  label.title = job.label + (job.fast ? "  ·  fast mode" : "");
+  row.appendChild(label);
+  if (job.fast) {
+    const f = icon("i-zap", "mx-qfast"); f.setAttribute("aria-label", "fast mode");
+    row.appendChild(f);
+  }
+  if (running) {
+    const badge = document.createElement("span");
+    badge.className = "mx-qbadge"; badge.textContent = "running";
+    row.appendChild(badge);
+  } else {
+    const ctr = document.createElement("span"); ctr.className = "mx-qctrls";
+    ctr.append(
+      mxQctrl("i-chevron-up", "Move up", idx === 0,
+        () => api.matrix_queue_move(job.id, "up")),
+      mxQctrl("i-chevron-down", "Move down", idx >= total - 1,
+        () => api.matrix_queue_move(job.id, "down")),
+      mxQctrl("i-trash", "Remove from queue", false,
+        () => api.matrix_queue_remove(job.id), "mx-qrm"));
+    row.appendChild(ctr);
+  }
+  return row;
+}
+
+function mxQctrl(iconName, title, disabled, onClick, extra) {
+  const b = document.createElement("button");
+  b.className = "mx-qbtn" + (extra ? " " + extra : "");
+  b.title = title; b.setAttribute("aria-label", title);
+  b.disabled = disabled; b.appendChild(icon(iconName));
+  b.onclick = onClick;          // a state push re-renders the panel
+  return b;
+}
+
+// Reflect the persisted matrix fast-mode toggle (kept editable mid-run).
+function syncMatrixFast() {
+  const cb = $("matrixFast");
+  if (!cb) return;
+  const mf = (S.st && S.st.matrix_fast) || { on: false, workers: 0 };
+  cb.checked = !!mf.on;
+  const note = $("matrixFastNote");
+  if (note) note.textContent = mf.on && mf.workers ? `(${mf.workers} browsers)` : "";
 }
 
 function mxCellContent(cmp, tsnMeta) {
@@ -1740,11 +1813,37 @@ function mxActBtn(iconName, title, locked, onClick) {
   return b;
 }
 
-function mxColRefreshBtn(title, locked, onClick) {
+// A matrix HEADER button group (row + column): ↻ live re-export (i-refresh) and
+// ⟳ rebuild comparisons (i-compare), mirroring the per-cell action icons. Both
+// keep the .mxch-refresh hook for CSS; they enqueue, so they stay live mid-run.
+function mxHeadBtn(iconName, title, extra, onClick) {
   const b = document.createElement("button");
-  b.className = "mxch-refresh"; b.title = title; b.disabled = locked;
-  b.appendChild(icon("i-refresh")); b.onclick = onClick;
+  b.className = "mxch-refresh" + (extra ? " " + extra : "");
+  b.title = title; b.setAttribute("aria-label", title);
+  b.appendChild(icon(iconName)); b.onclick = onClick;
   return b;
+}
+
+function mxHeaderBtns(label, onReexport, onRebuild) {
+  const grp = document.createElement("span");
+  grp.className = "mxch-btns";
+  grp.append(
+    mxHeadBtn("i-refresh", `Re-export ${label} live from TSMIS`, "mxch-reexport", onReexport),
+    mxHeadBtn("i-compare", `Rebuild every comparison in ${label}`, "mxch-rebuild", onRebuild),
+  );
+  return grp;
+}
+
+// Bulk live re-export (a whole row or column) hits TSMIS many times, so confirm
+// first. The job is queued and cancellable; single-cell re-export needs no
+// confirm.
+function confirmBulkReexport(what) {
+  return showConfirm({
+    title: "Re-export from TSMIS?",
+    message: `This re-exports ${what} live from TSMIS. It can take a while and `
+      + `runs as a queued job you can reorder or cancel.\n\nStart it?`,
+    confirmLabel: "Re-export",
+  });
 }
 
 // The vs-TSN file picker shown under a row's name when it's in a TSN mode.
@@ -1890,14 +1989,20 @@ async function renderMatrix() {
   envs.forEach((env) => {
     const h = document.createElement("div");
     h.className = "mx-cell mx-colhead" + (env === snap.baseline ? " mx-baseline-col" : "");
+    const elabel = snap.env_labels[env] || env;
     const lab = document.createElement("div");
-    lab.textContent = (snap.env_labels[env] || env) + (env === snap.baseline ? " ★" : "");
+    lab.textContent = elabel + (env === snap.baseline ? " ★" : "");
     h.appendChild(lab);
-    h.appendChild(mxColRefreshBtn(`Refresh every comparison in ${snap.env_labels[env] || env}`,
-      locked, async () => {
+    h.appendChild(mxHeaderBtns(elabel,
+      async () => {
+        if (!await confirmBulkReexport(`every report for ${elabel}`)) return;
+        const r = await api.refresh_column_export(env);
+        if (r && r.error) showMessage("error", "Can't re-export", r.error);
+      },
+      async () => {
         const r = await api.recompute_matrix("all", null, env);
-        if (r && r.nothing) showMessage("info", "Nothing to refresh", "No comparable cells here.");
-        else if (r && r.error) showMessage("error", "Can't refresh", r.error);
+        if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells here.");
+        else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
       }));
     grid.appendChild(h);
   });
@@ -1907,12 +2012,18 @@ async function renderMatrix() {
     rh.className = "mx-cell mx-rowhead";
     const top = document.createElement("div"); top.className = "mxrh-top";
     const lbl = document.createElement("span"); lbl.className = "mxrh-label";
-    lbl.textContent = snap.row_labels[rk] || rk;
-    top.append(lbl, mxColRefreshBtn(`Refresh every comparison in ${snap.row_labels[rk]}`,
-      locked, async () => {
+    const rlabel = snap.row_labels[rk] || rk;
+    lbl.textContent = rlabel;
+    top.append(lbl, mxHeaderBtns(rlabel,
+      async () => {
+        if (!await confirmBulkReexport(`${rlabel} across every environment`)) return;
+        const r = await api.refresh_row_export(rk);
+        if (r && r.error) showMessage("error", "Can't re-export", r.error);
+      },
+      async () => {
         const r = await api.recompute_matrix("all", rk, null);
-        if (r && r.nothing) showMessage("info", "Nothing to refresh", "No comparable cells here.");
-        else if (r && r.error) showMessage("error", "Can't refresh", r.error);
+        if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells here.");
+        else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
       }));
     rh.appendChild(top);
     // per-row comparison-mode dropdown (only when the row has >1 mode) — a
@@ -1959,21 +2070,23 @@ async function renderMatrix() {
       cell.title = `${snap.row_labels[rk]} — ${snap.env_labels[env] || env}\nExported: ${expWhen}`;
       cell.append(main, sub);
 
+      // Action triggers stay LIVE during a run — a 2nd click now QUEUES rather
+      // than being rejected, so they are never disabled by the lock sweep.
       const acts = document.createElement("div"); acts.className = "mx-actions";
       acts.appendChild(mxActBtn("i-refresh", "Re-export this report for this environment (live)",
-        locked, async () => {
+        false, async () => {
           const r = await api.refresh_cell_export(rk, env);
           if (r && r.error) showMessage("error", "Can't refresh", r.error);
         }));
       const supported = cmp && cmp.supported !== false;
       if (cmp !== null && supported) {
-        acts.appendChild(mxActBtn("i-compare", "Rebuild this comparison", locked, async () => {
+        acts.appendChild(mxActBtn("i-compare", "Rebuild this comparison", false, async () => {
           const r = await api.refresh_cell_comparison(rk, env);
           if (r && r.error) showMessage("error", "Can't compare", r.error);
         }));
         if (cmp.built) {
           const ob = mxActBtn("i-external", "Open this comparison workbook (values copy)",
-            locked, async () => {
+            false, async () => {
               const r = await api.open_cell_comparison(rk, env);
               if (r && r.error) showMessage("error", "Can't open", r.error);
             });
@@ -2503,6 +2616,14 @@ function bindEvents() {
   $("subEveryExport").onclick = () => setEverySub("export");
   $("subEveryMatrix").onclick = () => setEverySub("matrix");
 
+  // Matrix fast-mode toggle + queue Clear / Stop-all (stay live mid-run).
+  $("matrixFast")?.addEventListener("change", async (e) => {
+    const r = await api.set_matrix_fast(e.target.checked);
+    if (r && r.error) { showMessage("error", "Can't set fast mode", r.error); syncMatrixFast(); }
+  });
+  $("btnQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
+  $("btnQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
+
   renderThemeButton();
   $("btnTheme").onclick = () => {
     const order = ["auto", "light", "dark"];
@@ -2812,6 +2933,9 @@ function makeMockApi() {
     update: { phase: "idle" },
     env_access: {},
     matrix: null,
+    matrix_queue: [],            // v0.16.0 pending jobs
+    matrix_current: null,        // v0.16.0 running job
+    matrix_fast: { on: false, workers: 3 },
     matrix_baseline: "ssor-prod",
     matrix_hidden: [],
     matrix_hidden_envs: [],
@@ -2955,14 +3079,40 @@ function makeMockApi() {
              modes, row_modes: rowModes, tsn_meta: tsnMeta,
              envs, all_envs: allEnvs, hidden_envs: henv, env_labels: envLabels, cells };
   }
-  function mockMatrixRun(mode, label, total) {
-    st.task = "matrix";
-    if (total) st.matrix = { phase: "comparing", row: null, cell: null, done: 0, total };
+  // v0.16.0 mock job queue — mirrors gui_api: enqueue, run one at a time, auto-
+  // advance. `kind` drives the run-mode/icon; `total` feeds the compare progress.
+  let mockJobSeq = 0;
+  function mockEnqueue(kind, scope, label, opts) {
+    opts = opts || {};
+    mockJobSeq++;
+    const job = { id: mockJobSeq, kind, scope, label, status: "queued",
+                  fast: !!opts.fast, total: opts.total || 1,
+                  mode: kind === "export" ? "export" : "consolidate" };
+    st.matrix_queue = [...(st.matrix_queue || []), job];
+    if (st.task || st.matrix_current) {
+      push({ t: "log", text: `Queued (#${st.matrix_queue.length}): ${label}.` });
+    }
     pushState();
-    push({ t: "run_started", mode, label, workers: 1 }, { t: "log", text: label });
+    mockTryStartNext();
+    return { ok: true, job_id: job.id, queued: st.matrix_queue.length };
+  }
+  function mockTryStartNext() {
+    if (st.task || st.matrix_current || !(st.matrix_queue || []).length) return;
+    const job = st.matrix_queue.shift();
+    st.task = "matrix";
+    st.matrix_current = { ...job, status: "running" };
+    if (job.kind !== "export") {
+      st.matrix = { phase: "comparing", row: null, cell: null, done: 0, total: job.total };
+    }
+    pushState();
+    const workers = job.fast ? (st.matrix_fast.workers || 3) : 1;
+    push({ t: "run_started", mode: job.mode, label: job.label, workers },
+         { t: "log", text: job.label });
     setTimeout(() => {
-      st.task = null; st.matrix = null; pushState();
+      st.task = null; st.matrix = null; st.matrix_current = null;
+      pushState();
       push({ t: "run_ended" }, { t: "matrix_refresh" });
+      mockTryStartNext();      // auto-advance
     }, 700);
   }
 
@@ -3436,10 +3586,9 @@ function makeMockApi() {
       return { ok: true, path: st.matrix_tsn_files[subdir] };
     },
     consolidate_matrix_tsn: async (subdir) => {
-      if (st.task) return { error: "A task is already running." };
       st.mock_tsn_pdfs = false;               // pretend the PDFs are now consolidated
-      mockMatrixRun("consolidate", `Consolidating TSN ${subdir} PDFs…`, 1);
-      return { ok: true };
+      return mockEnqueue("tsn_consolidate", "consolidate",
+                         "Consolidate TSN Highway Log PDFs", { total: 1 });
     },
     set_matrix_baseline: async (b) => {
       st.matrix_baseline = b;
@@ -3447,21 +3596,50 @@ function makeMockApi() {
       pushState();
       return { baseline: b, recompute_pending: 5 };
     },
-    refresh_cell_export: async (rk, env) => {
-      if (st.task) return { error: "A task is already running." };
-      mockMatrixRun("export", `Refreshing ${rk} — ${env}…`);
-      return { ok: true };
+    set_matrix_fast: async (on) => {
+      st.matrix_fast = { on: !!on, workers: st.matrix_fast.workers || 3 };
+      push({ t: "log", text: `Matrix fast mode ${on ? "on" : "off"}.` });
+      pushState();
+      return { ok: true, on: !!on };
     },
-    refresh_cell_comparison: async (rk, env) => {
-      if (st.task) return { error: "A task is already running." };
-      mockMatrixRun("consolidate", `Comparing ${rk} — ${env}…`, 1);
-      return { ok: true };
-    },
+    refresh_cell_export: async (rk, env) =>
+      mockEnqueue("export", "cell", `Re-export ${rk} — ${env}`, { fast: st.matrix_fast.on }),
+    refresh_row_export: async (rk) =>
+      mockEnqueue("export", "row", `Re-export ${rk} — all environments`, { fast: st.matrix_fast.on }),
+    refresh_column_export: async (env) =>
+      mockEnqueue("export", "column", `Re-export all reports — ${env}`, { fast: st.matrix_fast.on }),
+    refresh_cell_comparison: async (rk, env) =>
+      mockEnqueue("compare", "cell", `Rebuild ${rk} — ${env}`, { total: 1 }),
     recompute_matrix: async (scope, row, env) => {
-      if (st.task) return { error: "A task is already running." };
       const n = row ? 5 : env ? 4 : scope === "all" ? 18 : 6;
-      mockMatrixRun("consolidate", `Rebuilding ${n} comparison(s)…`, n);
-      return { ok: true, count: n };
+      const label = row ? `Rebuild ${row} — all environments`
+        : env ? `Rebuild all reports — ${env}`
+        : scope === "all" ? "Rebuild all comparisons" : "Refresh stale comparisons";
+      return mockEnqueue("compare", row ? "row" : env ? "column" : scope, label, { total: n });
+    },
+    matrix_queue_remove: async (id) => {
+      st.matrix_queue = (st.matrix_queue || []).filter((j) => j.id !== id);
+      pushState(); return { ok: true, removed: true };
+    },
+    matrix_queue_move: async (id, dir) => {
+      const q = [...(st.matrix_queue || [])];
+      const i = q.findIndex((j) => j.id === id);
+      const s = dir === "up" ? i - 1 : i + 1;
+      if (i >= 0 && s >= 0 && s < q.length) { [q[i], q[s]] = [q[s], q[i]]; st.matrix_queue = q; pushState(); }
+      return { ok: true, moved: i >= 0 };
+    },
+    matrix_queue_clear: async () => {
+      const n = (st.matrix_queue || []).length;
+      st.matrix_queue = [];
+      if (n) push({ t: "log", text: `Cleared ${n} queued matrix job(s).` });
+      pushState(); return { ok: true, cleared: n };
+    },
+    matrix_stop_all: async () => {
+      const n = (st.matrix_queue || []).length;
+      st.matrix_queue = [];
+      const running = st.task === "matrix";
+      if (n || running) push({ t: "log", text: `Stopping matrix work — cleared ${n} queued.` });
+      pushState(); return { ok: true, cleared: n, cancelling: running };
     },
     open_cell_comparison: async (rk, env) => {
       push({ t: "log", text: `(mock) open comparison workbook: ${env}_${rk}.xlsx` });
