@@ -106,10 +106,14 @@ the field bug + P1s first.
 
 ---
 
-## This update — the Everything comparison matrix (implemented, unreleased)
+## v0.15.0 — the Everything comparison matrix
 
-On branch `feat/everything-matrix`; not yet released (no version bump/tag). Golden-checked
-offline; the LIVE paths below are owed on the work PC.
+Shipping in **v0.15.0** (`version.py` bumped + CHANGELOG written; tag push pending review).
+Built on `feat/everything-matrix`, reconciled with `main`. Golden-checked offline; the LIVE
+paths below are owed on the work PC. This release also carries an **app-wide UI polish + motion
+pass** — the matrix controls set the bar and the rest of the app was brought up to it (motion
+tokens, bordered secondary buttons, consistent title-bar-vs-card controls, reduced-motion-safe
+entrance animations); see [gui.md](gui.md) "Motion layer + control polish".
 
 - [x] **Stage-1 foundation audit** — see the closed-findings record below.
 - [x] **8 groundwork code-review fixes** — the field bug + 4 P1s + 3 P2s above are checked off.

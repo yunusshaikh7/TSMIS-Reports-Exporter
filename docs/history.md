@@ -4,7 +4,7 @@ How a one-day console script became a portable, self-updating Windows desktop
 app — told from the repository.
 
 **By the numbers:** 191 commits · 37 pull requests · 34 tagged releases ·
-7 report types · **May 20 → June 18, 2026**.
+7 report types · **May 20 → June 19, 2026**.
 
 This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
 "how it works and why") and [`CHANGELOG.md`](../CHANGELOG.md)
@@ -39,6 +39,8 @@ that rewrote the design.
 | `v0.14.0` | Jun 18 | Highway Log (PDF) consolidator + PDF-sourced compares + corrected 31-column labels + roadbed-aware key |
 | `v0.14.1` | Jun 18 | Highway Log comparisons regrouped onto a Compare sub-tab |
 | `v0.14.2` | Jun 18 | Consolidate-label clarity + a 22-finding UI-vs-logic audit |
+| `v0.14.3` | Jun 19 | An "IT-README" security handout that ships in the app folder and rides updates |
+| `v0.15.0` | Jun 19 | **The Everything comparison matrix** (cross-env + vs-TSN, two Highway Log rows) + an app-wide UI polish & motion pass |
 
 ---
 

@@ -3,6 +3,36 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.15.0 — 2026-06-19
+
+- **New: a comparison matrix on the Everything tab.** A new **Comparison
+  matrix** sub-tab shows every report against every data source / environment at
+  a glance — each cell is colour-coded by how many differences it found (green
+  for identical, shading from amber to red as differences grow), alongside the
+  export date and a
+  one-click link to open that comparison workbook. Choose the baseline to compare
+  everything against; refresh a single cell, a whole row, a whole column, or every
+  stale comparison at once; and cancel a long refresh and resume it later. Your
+  matrix setup — the baseline, which reports and environments are shown, and the
+  comparison mode per row — is remembered between sessions.
+- **Compare the Highway Log against TSN, right in the matrix.** The Highway Log
+  now appears as two rows — **Excel** and **PDF** — and each can compare
+  cross-environment, against **TSN**, or Excel-vs-PDF. Drop the district TSN PDFs
+  into the Everything folder and the matrix offers to consolidate them for you, or
+  point a row at a consolidated TSN workbook; the file in use is shown right under
+  the report name. (TSN comparisons for Ramp Summary, Ramp Detail and the Highway
+  Sequence Listing appear greyed for now — groundwork for a later version.)
+- **Choose what's on the matrix.** Toggle which report types and which
+  environments appear, so the grid stays as compact or as complete as you need.
+- **Intersection reports are clearly marked as not-yet-supported.** The two
+  Intersection reports now show greyed-out everywhere (they're export-only, with no
+  comparison), instead of quietly behaving differently from the rest.
+- **A top-to-bottom visual polish.** Cleaner, more consistent buttons, dropdowns
+  and file pickers across every tab — all readable in both light and dark mode —
+  plus quick, non-intrusive animations throughout: panes, lists, the activity log
+  and the light/dark switch now ease in smoothly (and fully respect the system's
+  "reduce motion" setting).
+
 ## v0.14.3 — 2026-06-19
 
 - **A "for IT" page now ships in the app folder.** Every download now

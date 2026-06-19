@@ -135,10 +135,14 @@ between `minmax(…fr)` track-lists in Chromium, which is why the layout is flex
 
 The grid (`renderMatrix`) is fed by `gui_api.matrix_info` (a pure-filesystem
 snapshot). **5 rows** (incl. both Highway Log formats); each **row header** carries the
-report name, a per-row **comparison-mode `<select>`** (greys not-yet-coded modes
-"(soon)"), a vs-TSN **file picker** (Choose… / Consolidate dropped PDFs / Clear) when
-in a TSN mode, and a **per-row refresh**; each **column header** has a **per-column
-refresh**. Each cell renders the unified `cmp` state — **discrepancy count,
+report name, a per-row **comparison-mode select** (compact + content-sized in a
+`.mx-fluent-select` chevron wrapper; greys not-yet-coded modes "(soon)"), a vs-TSN
+**file picker** when in a TSN mode — a **status-dot chip** (`.mxtp-file`) that surfaces
+the active TSN file (green dot = file ready / amber = dropped PDFs need consolidating /
+grey = none) over compact Choose / Consolidate / Clear buttons — and a **per-row
+refresh**; each **column header** has a **per-column refresh**. Refreshes are polished
+**ghost icon-buttons** (`.mxch-refresh`) and the header **baseline picker** is a
+light-surface `select-light` (not the dark title-bar skin). Each cell renders the unified `cmp` state — **discrepancy count,
 colour-coded** (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing`/`.mx-na`)
 plus greyed / needs-export / needs-TSN / "consolidate N PDFs" / stale states — with
 compact **icon** actions (`↻ export` / `↻ compare` / `↗ open`, gated on support+built).
@@ -155,17 +159,36 @@ new bridge method, exercising all states at `/index.html#mock`. Engine + bridge:
 reports viewport width 0 until `preview_resize`d and won't tick transitions — verify
 the wide layout end-state via DOM measurement.
 
-## Motion layer
+## Motion layer + control polish
 
-A light app-wide motion system (end of `app.css`, `prefers-reduced-motion`-aware):
-tab panes rise+fade (`pane-in`), sub-panes cross-fade, popovers/modals get
-`pop-in`/`modal-in`, buttons/tabs have a tactile `:active` press, and the theme
-toggle runs a **slower 0.5s light↔dark cross-fade** — `app.js withThemeTransition()`
-adds `html.theme-anim` for the change window so colours ease instead of snapping
-without making ordinary hovers sluggish. NOTE: the `#mock` is rendered headless,
-which does not advance CSS transitions — verify motion *end-states* + that the rules
-apply (animation-name / computed values), and watch the actual motion in the real
-WebView2 window.
+A light app-wide motion system (end of `app.css`, `prefers-reduced-motion`-aware),
+driven by a **motion-token scale** in `:root`: `--motion-instant` (80ms `:active`
+press), `--motion-fast` (120ms hover/colour), `--motion` (180ms entrances + list
+inserts), `--motion-slow` (240ms panes), `--motion-theme` (500ms theme fade), plus
+`--ease-out` / `--ease-pop`. Entrances: tab panes rise+fade (`pane-in`), sub-panes
+cross-fade, popovers/modals `pop-in`/`modal-in`, and per-element inserts for
+**activity-log lines** (`line-in`), the **env stepper** + **worker rows** (`rise-in`),
+**saved-report rows**, and the preflight↔progress↔completion **lifecycle cards**.
+Buttons/tabs have a tactile `:active` press; the theme toggle runs a **slower
+light↔dark cross-fade** — `app.js withThemeTransition()` adds `html.theme-anim` for the
+change window, and the `@media (prefers-reduced-motion)` block **re-overrides that
+`!important` transition** so reduced-motion still snaps (and zeroes transform-on-hover
+end-states the duration clamp alone can't).
+
+**Control-polish conventions** (the matrix controls set the bar; the rest of the app
+matches it — keep it that way): tints are always
+`color-mix(in oklab, var(--token) N%, <surface>)`, never hardcoded literals; focus is a
+2px `var(--ring)` ring on inset/ghost controls, while the filled `.btn` keeps its
+offset **double-ring** so focus stays visible on a primary fill; compact-control
+heights come from `--control-h-sm`/`--control-h-md`. **Title-bar vs card trap:**
+title-bar controls (`.tb-select`, `.btn-icon`, `.btn-titlebar`, `.status-chip`) MUST
+keep `--titlebar-*` tokens + faint white fills; card controls (`select-light`, the
+matrix controls, `.btn-*` on cards) use `--card`/`--foreground`/`--input-border` — a
+card skin on the dark bar (or the bar skin on a light card) goes invisible.
+
+NOTE: the `#mock` is rendered headless, which does not advance CSS transitions — verify
+motion *end-states* + that the rules apply (animation-name / computed values), and watch
+the actual motion in the real WebView2 window.
 
 ## Related GUI behaviors (owned elsewhere)
 
