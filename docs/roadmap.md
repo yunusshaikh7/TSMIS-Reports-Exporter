@@ -190,9 +190,12 @@ or accept as someday.**
 ### Security / IT
 - [ ] **Code-sign the executable** — the one big remaining IT lever (removes most Defender / DLP /
   SmartScreen friction on the unsigned `.exe`, and is the real fix for the P1 auto-update-trust
-  finding above). Needs a cert; path scaffolded in [it-and-security.md](it-and-security.md) §7. The
-  updater checksum + staged-item allowlist (v0.11.0) are the integrity half; the signature half
-  waits on the cert.
+  finding above). **In progress:** SignPath Foundation cert applied for; `build.ps1 -Sign`
+  self-signs for local/test; `release.yml` has a gated SignPath step (inert until
+  `SIGNPATH_ENABLED=true` + secrets). *Remaining:* approval → flip the gate on (add the
+  with-browser pair) → enable updater signature verification. See
+  [it-and-security.md](it-and-security.md) §7. The updater checksum + staged-item allowlist
+  (v0.11.0) are the integrity half; the signature half waits on the trusted cert.
 - [ ] **Auth file at rest** — `storage_state` is plaintext JSON (documented, not encrypted).
   Defense-in-depth; consider Windows DPAPI (`CryptProtectData`) if IT ever requires it. (Same as the
   P2 `auth-file-plaintext-no-acl-dpapi` finding.)
