@@ -67,6 +67,7 @@ jobs:
           python build/check_report_library.py
           python build/check_matrix.py
           python build/check_matrix_bridge.py
+          python build/check_matrix_tsn.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py

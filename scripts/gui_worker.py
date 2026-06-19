@@ -141,6 +141,16 @@ def reset_targets(include_input=False):
         p = INPUT_ROOT / "tsn_highway_log"
         if p.is_dir():
             targets.append(("TSN input PDFs", p))
+        # The Export-Everything store's TSN drops (user-placed TSN datasets) are
+        # inputs too, so they only clear with include_input (the generated TSN
+        # comparison sheets under comparisons/tsn are covered by "comparisons").
+        try:
+            from settings import get_batch_dest
+            tsn_in = Path(get_batch_dest()) / "_tsn_input"
+            if tsn_in.is_dir():
+                targets.append(("Export Everything store: _tsn_input", tsn_in))
+        except Exception:
+            pass
     return targets
 
 

@@ -214,10 +214,159 @@ def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
 
 
 # --------------------------------------------------------------------------- #
+# TSN-vs-TSMIS view (decision: <dest>/_tsn_input/<subdir>/ drops,
+# <dest>/comparisons/tsn/ sheets — kept apart from the cross-env tree)
+# --------------------------------------------------------------------------- #
+TSN_INPUT_DIRNAME = "_tsn_input"
+TSN_COMPARE_DIRNAME = "tsn"            # under comparisons/
+TSN_SUPPORTED = {"highway_log"}        # rows with a working TSN comparison adapter
+_TSN_RESULTS_FILE = "_tsn_results.json"
+
+
+def tsn_supported(row_key):
+    """True if (row_key) has a working TSN-vs-TSMIS comparison (today: Highway
+    Log). The others are shown but greyed until their comparison is built."""
+    return row_key in TSN_SUPPORTED
+
+
+def tsn_input_root(dest, subdir):
+    """Where the user drops the TSN dataset for a report (a consolidated workbook
+    or the district PDFs)."""
+    return Path(dest) / TSN_INPUT_DIRNAME / subdir
+
+
+def tsn_comparisons_root(dest):
+    return Path(dest) / COMPARISONS_DIRNAME / TSN_COMPARE_DIRNAME
+
+
+def tsn_comparison_path(dest, row_key, cell_key):
+    """The TSN comparison workbook for (row, env-cell) — dateless/stable like the
+    cross-env names, in the separate tsn/ tree."""
+    return tsn_comparisons_root(dest) / f"{cell_key}_{row_key}.xlsx"
+
+
+def _safe_mtime(p):
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return None
+
+
+def tsn_source(dest, subdir, selected_file=None):
+    """Resolve the TSN dataset for one report. A user-picked `selected_file` wins
+    (must be a real .xlsx). Otherwise scan <dest>/_tsn_input/<subdir>/: a
+    consolidated .xlsx (newest) is used; only district PDFs -> the 'prompt to
+    consolidate' state; nothing -> none. Returns
+    {kind: file|consolidated|pdfs|none, path?, mtime?, pdf_count?}."""
+    if selected_file:
+        p = Path(selected_file)
+        if p.is_file() and p.suffix.lower() == ".xlsx":
+            return {"kind": "file", "path": str(p), "mtime": _safe_mtime(p)}
+    root = tsn_input_root(dest, subdir)
+    xlsx, pdfs = [], 0
+    try:
+        for e in root.iterdir():
+            if not e.is_file():
+                continue
+            sfx = e.suffix.lower()
+            if sfx == ".xlsx" and not e.name.startswith("~$"):
+                xlsx.append(e)
+            elif sfx == ".pdf":
+                pdfs += 1
+    except OSError:
+        pass
+    if xlsx:
+        newest = max(xlsx, key=lambda q: _safe_mtime(q) or 0)
+        return {"kind": "consolidated", "path": str(newest), "mtime": _safe_mtime(newest)}
+    if pdfs:
+        return {"kind": "pdfs", "pdf_count": pdfs}
+    return {"kind": "none"}
+
+
+def load_tsn_results(dest):
+    """{row_key: {cell_key: {verdict, diff_cells, one_sided, built_at_mtime}}}."""
+    p = tsn_comparisons_root(dest) / _TSN_RESULTS_FILE
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record_tsn_result(dest, row_key, cell_key, verdict, diff_cells, one_sided,
+                      built_at_mtime):
+    data = load_tsn_results(dest)
+    data.setdefault(row_key, {})[cell_key] = {
+        "verdict": verdict, "diff_cells": diff_cells,
+        "one_sided": one_sided, "built_at_mtime": built_at_mtime,
+    }
+    p = tsn_comparisons_root(dest) / _TSN_RESULTS_FILE
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name(p.name + ".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.replace(tmp, p)
+    except OSError as e:
+        log.warning("matrix: could not write TSN results cache %s: %s: %s",
+                    p, type(e).__name__, e)
+
+
+def tsn_comparison_state(dest, row_key, cell_key, subdir, cell_ages_map, src,
+                         results):
+    """{supported, source_kind, built, mtime, stale, reason, missing_side,
+    verdict, diff_cells, one_sided} for one env cell in vs-TSN mode. STALE when
+    the comparison file is missing, or either side (this env's TSMIS export, or
+    the TSN source) is newer than it."""
+    cell_m = cell_ages_map.get(cell_key, {}).get(subdir, {}).get("mtime")
+    src_kind = src.get("kind")
+    src_m = src.get("mtime")
+    has_tsn = src_kind in ("file", "consolidated")
+    if cell_m is None and not has_tsn:
+        missing_side = "both"
+    elif cell_m is None:
+        missing_side = "cell"
+    elif not has_tsn:
+        missing_side = "tsn"
+    else:
+        missing_side = None
+
+    cmp_m = _safe_mtime(tsn_comparison_path(dest, row_key, cell_key))
+    built = cmp_m is not None
+
+    verdict = diff_cells = one_sided = None
+    rec = (results.get(row_key, {}) or {}).get(cell_key)
+    if built and rec and abs(float(rec.get("built_at_mtime", -1)) - cmp_m) < _MTIME_TOL_S:
+        verdict = rec.get("verdict")
+        diff_cells = rec.get("diff_cells")
+        one_sided = rec.get("one_sided")
+
+    if not built:
+        stale, reason = True, "missing"
+    else:
+        newer_cell = cell_m is not None and cell_m > cmp_m + _MTIME_TOL_S
+        newer_tsn = src_m is not None and src_m > cmp_m + _MTIME_TOL_S
+        if newer_cell and newer_tsn:
+            stale, reason = True, "both_newer"
+        elif newer_cell:
+            stale, reason = True, "cell_newer"
+        elif newer_tsn:
+            stale, reason = True, "tsn_newer"
+        else:
+            stale, reason = False, "fresh"
+    return {"supported": True, "source_kind": src_kind, "built": built,
+            "mtime": cmp_m, "stale": stale, "reason": reason,
+            "missing_side": missing_side, "verdict": verdict,
+            "diff_cells": diff_cells, "one_sided": one_sided}
+
+
+# --------------------------------------------------------------------------- #
 # the snapshot the GUI renders (pure filesystem read)
 # --------------------------------------------------------------------------- #
 def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
-                    env_labels=None, row_defs=None, hidden=None, now=None):
+                    env_labels=None, row_defs=None, hidden=None,
+                    tsn_rows=None, tsn_files=None, now=None):
     """The full render model for the matrix. PURE stat — no workbook is opened
     (counts come from the cache). `row_defs` is injectable for tests; otherwise
     derived from the registry. `hidden` is the set of row keys the user has
@@ -226,27 +375,50 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
     now = now if now is not None else time.time()
     all_defs = row_defs if row_defs is not None else _row_defs()
     hidden = set(hidden or [])
+    tsn_rows = set(tsn_rows or [])
+    tsn_files = tsn_files or {}
     rows = {k: v for k, v in all_defs.items() if k not in hidden}
     envs = envs if envs is not None else env_keys()
     env_labels = env_labels or {k: default_env_label(k) for k in envs}
     report_pairs = [(label, subdir) for label, subdir, *_ in rows.values()]
     ages = report_library.cell_ages(dest, report_pairs, envs, now=now)
     results = load_results(dest, baseline_key)
+    tsn_results = load_tsn_results(dest)
 
-    cells = {}
+    cells, modes, tsn_meta = {}, {}, {}
     for row_key, (label, subdir, _idx, _adapter, _hr) in rows.items():
+        mode = "tsn" if row_key in tsn_rows else "env"
+        modes[row_key] = mode
         per = {}
-        for env in envs:
-            export = ages.get(env, {}).get(subdir, {"present": False,
-                                                    "mtime": None,
-                                                    "age_seconds": None})
-            is_baseline = (env == baseline_key)
-            comp = None
-            if not is_baseline:
-                comp = comparison_state(dest, baseline_key, row_key, env, subdir,
-                                        ages, results)
-            per[env] = {"export": export, "is_baseline": is_baseline,
-                        "comparison": comp}
+        if mode == "tsn":
+            supported = tsn_supported(row_key)
+            src = tsn_source(dest, subdir, tsn_files.get(row_key)) if supported else {"kind": "none"}
+            for env in envs:
+                export = ages.get(env, {}).get(subdir, {"present": False,
+                                                        "mtime": None,
+                                                        "age_seconds": None})
+                tsn = ({"supported": False} if not supported
+                       else tsn_comparison_state(dest, row_key, env, subdir,
+                                                 ages, src, tsn_results))
+                per[env] = {"export": export, "is_baseline": False, "tsn": tsn}
+            tsn_meta[row_key] = {"supported": supported,
+                                 "source_kind": src.get("kind"),
+                                 "source_path": src.get("path"),
+                                 "pdf_count": src.get("pdf_count"),
+                                 "file": tsn_files.get(row_key),
+                                 "input_dir": str(tsn_input_root(dest, subdir))}
+        else:
+            for env in envs:
+                export = ages.get(env, {}).get(subdir, {"present": False,
+                                                        "mtime": None,
+                                                        "age_seconds": None})
+                is_baseline = (env == baseline_key)
+                comp = None
+                if not is_baseline:
+                    comp = comparison_state(dest, baseline_key, row_key, env, subdir,
+                                            ages, results)
+                per[env] = {"export": export, "is_baseline": is_baseline,
+                            "comparison": comp}
         cells[row_key] = per
 
     return {
@@ -254,9 +426,13 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
         "baseline": baseline_key,
         "rows": list(rows.keys()),
         "row_labels": {k: rows[k][0] for k in rows},
-        # Every matrix row (visible or not) so the UI can render toggle chips.
-        "all_rows": [{"key": k, "label": all_defs[k][0]} for k in all_defs],
+        # Every matrix row (visible or not) so the UI can render toggle chips;
+        # `tsn_capable` marks which rows have a working TSN comparison.
+        "all_rows": [{"key": k, "label": all_defs[k][0],
+                      "tsn_capable": tsn_supported(k)} for k in all_defs],
         "hidden": sorted(hidden),
+        "modes": modes,            # row_key -> "env" | "tsn"
+        "tsn_meta": tsn_meta,      # row_key -> TSN source summary (tsn rows only)
         "envs": list(envs),
         "env_labels": env_labels,
         "cells": cells,
@@ -305,13 +481,17 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
 
 
 def cells_to_rebuild(snapshot, scope="stale"):
-    """[(row_key, cell_key)] for non-baseline cells to (re)compute. scope='all'
-    = every cell where BOTH sides are exported; scope='stale' = only those whose
-    comparison is missing or stale (and both sides present). A side that was
-    never exported is skipped (can't compare)."""
+    """[(row_key, cell_key)] for CROSS-ENV (env-mode) non-baseline cells to
+    (re)compute. scope='all' = every cell where BOTH sides are exported;
+    scope='stale' = only those whose comparison is missing or stale (and both
+    sides present). A side that was never exported is skipped. TSN-mode rows are
+    handled separately by tsn_cells_to_rebuild."""
     baseline = snapshot["baseline"]
+    modes = snapshot.get("modes", {})
     todo = []
     for row_key in snapshot["rows"]:
+        if modes.get(row_key) == "tsn":
+            continue
         for env in snapshot["envs"]:
             if env == baseline:
                 continue
@@ -321,3 +501,92 @@ def cells_to_rebuild(snapshot, scope="stale"):
             if scope == "all" or comp.get("stale"):
                 todo.append((row_key, env))
     return todo
+
+
+def tsn_cells_to_rebuild(snapshot, scope="stale"):
+    """[(row_key, cell_key)] for TSN-mode cells to (re)compute — supported rows
+    only, both sides present (this env's TSMIS export AND a usable TSN source).
+    scope='all' rebuilds every such cell; 'stale' only the missing/stale ones."""
+    modes = snapshot.get("modes", {})
+    todo = []
+    for row_key in snapshot["rows"]:
+        if modes.get(row_key) != "tsn":
+            continue
+        for env in snapshot["envs"]:
+            tsn = snapshot["cells"][row_key][env].get("tsn") or {}
+            if not tsn.get("supported") or tsn.get("missing_side"):
+                continue
+            if scope == "all" or tsn.get("stale"):
+                todo.append((row_key, env))
+    return todo
+
+
+# --------------------------------------------------------------------------- #
+# TSN orchestration: consolidate the env's store folder, diff it against the TSN
+# dataset (today: Highway Log only — compare_highway_log is file-vs-file, so the
+# per-route env folder is consolidated first).
+# --------------------------------------------------------------------------- #
+def consolidate_tsn_pdfs(dest, subdir, events=None, confirm_overwrite=None):
+    """Build a consolidated TSN workbook FROM the district PDFs the user dropped
+    in <dest>/_tsn_input/<subdir>/, writing it back into that same folder so the
+    next tsn_source() finds it. Today: Highway Log only. Returns the output path.
+    Raises ValueError if the report has no TSN PDF consolidator."""
+    if subdir != "highway_log":
+        raise ValueError(f"no TSN PDF consolidator for {subdir}")
+    import consolidate_tsn_highway_log as _ctsn   # pdfplumber — lazy
+    in_dir = tsn_input_root(dest, subdir)
+    out_path = in_dir / "tsn_highway_log_consolidated.xlsx"
+    _ctsn.consolidate(events=events, confirm_overwrite=confirm_overwrite or (lambda _p: True),
+                      input_dir=in_dir, out_path=out_path)
+    return out_path
+
+
+def build_tsn_comparison(dest, row_key, cell_key, events, tsn_file=None,
+                         confirm_overwrite=None, row_defs=None):
+    """Compare one env's TSMIS data against the report's TSN dataset, writing the
+    VALUES workbook to tsn_comparison_path(...) and caching its counts. Today:
+    Highway Log only — the env's per-route store folder is consolidated on the fly
+    (consolidate_highway_log) and diffed against the consolidated TSN workbook
+    (compare_highway_log). Returns the ConsolidateResult.
+
+    Raises ValueError for an unsupported row or when no consolidated TSN source is
+    available (the caller resolves PDFs via consolidate_tsn_pdfs first)."""
+    rows = row_defs if row_defs is not None else _row_defs()
+    if row_key not in rows:
+        raise ValueError(f"unknown matrix row: {row_key}")
+    if not tsn_supported(row_key):
+        raise ValueError(f"no TSN comparison for {row_key}")
+    _label, subdir, _idx, _adapter, _hr = rows[row_key]
+    dest = Path(dest)
+
+    src = tsn_source(dest, subdir, tsn_file)
+    if src.get("kind") not in ("file", "consolidated"):
+        raise ValueError("no consolidated TSN workbook available")
+    tsn_path = src["path"]
+
+    out_path = tsn_comparison_path(dest, row_key, cell_key)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    import consolidate_highway_log as _chl       # Excel consolidator — lazy
+    import compare_highway_log as _cmp_hl
+    env_dir = dest / cell_key / subdir
+    tmp_tsmis = out_path.parent / f".{cell_key}_{row_key}_tsmis.tmp.xlsx"
+    _chl.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                     input_dir=env_dir, out_path=tmp_tsmis)
+    try:
+        # side A = this env's TSMIS (consolidated), side B = TSN.
+        result = _cmp_hl.compare(tmp_tsmis, tsn_path, out_path, events=events,
+                                 confirm_overwrite=confirm_overwrite or (lambda _p: True),
+                                 mode="values")
+    finally:
+        try:
+            tmp_tsmis.unlink()
+        except OSError:
+            pass
+
+    if result.status == "ok" and out_path.exists():
+        # consolidated HL comparison has the Route-keyed layout.
+        diff_cells, one_sided = read_counts(out_path, has_route=True)
+        record_tsn_result(dest, row_key, cell_key, result.verdict,
+                          diff_cells, one_sided, _safe_mtime(out_path))
+    return result

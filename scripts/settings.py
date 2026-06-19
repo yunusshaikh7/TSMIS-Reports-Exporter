@@ -418,6 +418,60 @@ def set_matrix_hidden_reports(keys):
     return get_matrix_hidden_reports()
 
 
+# ---- Comparison-matrix TSN view --------------------------------------------
+# Which report rows are in 'vs TSN' mode (vs the default cross-environment), and
+# the TSN file the user explicitly picked per report (else the matrix auto-finds
+# one in <dest>/_tsn_input/<subdir>/). Validation lives in gui_api.
+
+def get_matrix_tsn_rows():
+    """Row keys currently switched to 'vs TSN' mode (default: none)."""
+    raw = _read_file().get("matrix_tsn_rows")
+    if isinstance(raw, list):
+        return [k for k in raw if isinstance(k, str)]
+    return []
+
+
+def set_matrix_tsn_rows(keys):
+    """Persist the 'vs TSN' row keys. Empty -> cleared. Returns the new list."""
+    data = dict(_read_file())
+    keys = [k for k in (keys or []) if isinstance(k, str)]
+    if keys:
+        data["matrix_tsn_rows"] = sorted(set(keys))
+    else:
+        data.pop("matrix_tsn_rows", None)
+    _atomic_write(data)
+    log.info("settings: matrix_tsn_rows -> %s", keys or "(none)")
+    return get_matrix_tsn_rows()
+
+
+def get_matrix_tsn_files():
+    """{row_key: tsn_file_path} the user explicitly selected (per report)."""
+    raw = _read_file().get("matrix_tsn_files")
+    if isinstance(raw, dict):
+        return {k: v for k, v in raw.items()
+                if isinstance(k, str) and isinstance(v, str) and v.strip()}
+    return {}
+
+
+def set_matrix_tsn_file(row_key, path):
+    """Set (or, with an empty path, clear) the TSN file for one report row.
+    Returns the new {row_key: path} map."""
+    data = dict(_read_file())
+    files = dict(get_matrix_tsn_files())
+    path = (path or "").strip()
+    if path:
+        files[row_key] = path
+    else:
+        files.pop(row_key, None)
+    if files:
+        data["matrix_tsn_files"] = files
+    else:
+        data.pop("matrix_tsn_files", None)
+    _atomic_write(data)
+    log.info("settings: matrix_tsn_file[%s] -> %s", row_key, path or "(default)")
+    return get_matrix_tsn_files()
+
+
 def reset():
     """Delete the settings file (back to all defaults). Returns True if a
     file was removed."""
