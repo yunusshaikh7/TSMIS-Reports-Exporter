@@ -62,7 +62,7 @@ stdout (the runner default) would crash on. Three lint/audit steps (ruff
 |---|---|
 | `check_export_engine.py` | WS1/WS3 audit-fix hardening: integrity helpers (XLSX `PK` / PDF `%PDF` magic), empty-marker predicates incl. Highway Sequence's positive "No results found" marker, `cs-disabled` detection in `select_report`; the Phase-3 fixes — `require_site_params` env backstop, the retry-once-then-empty path (`_process_route`), `report_error_text` logging. Pure Python, no browser. |
 | `check_parallel_reconcile.py` | Phase-3 parallel-engine reconciliation (`_reconcile_unaccounted`): lock-tolerant `_can_resume` (not read-strict), and reconcile-on-crash-even-if-cancelled. |
-| `check_intersection_gate.py` | the app-wide intersection disable (`reports.enabled_export_reports` drops Intersection from the GUI lists + server-side, EXPORT_REPORTS indices stay stable, toggle-back-on). |
+| `check_intersection_gate.py` | the app-wide intersection disable: `export_reports_status` SHOWS Intersection greyed (per-report `disabled` flag) rather than hiding it, `enabled_export_reports`/`report_library_info`/matrix still exclude it, `start_*` reject a disabled index server-side, EXPORT_REPORTS indices stay stable, toggle-back-on. |
 | `check_fake_site.py` | Selector contract via a **real headless browser** over authored synthetic HTML fixtures (`build/fake_site/*`) that reconstruct only the contract-bearing DOM (the shared action bar, per-report empty states, `#rampResults` error box, `#customReport` dropdown). Catches selector drift pure Python can't — e.g. `EXPORT_READY_JS` keying on a button's *text*, not the bare `.export-btn` class shared by Print. Fixtures are AUTHORED reconstructions, **not** copies of the Caltrans-internal source. Prints SKIPPED and exits 0 if no Chromium-based browser is drivable. |
 | `check_gui_bridge.py` | `gui_api` bridge methods. Its "dialog blew up" traceback is an **intentional** test fixture — the run still reports `[OK]`. |
 | `check_updater.py` | WS4 updater hardening (incl. `test_resolve_previous_release` for the v0.13.0 revert). Updater swap/SHA detail is owned by [build-and-release.md](build-and-release.md). |
@@ -228,10 +228,21 @@ server. The pywebview traps + the GUI threading model are owned by [gui.md](gui.
   (30 s timeout) while `preview_eval` / `inspect` / `snapshot` keep working.
   Verify via **DOM-state evals** (classes, computed styles, geometry) — they're
   conclusive. Restarting the server sometimes recovers screenshots; don't fight it.
-- **Cache / stale page:** the browser caches `app.js`; if the server dies and
-  restarts, the loaded page can stay on the OLD `app.js` (reloads silently fail
-  while the server is down). After editing, confirm fresh code loaded with
-  `typeof <a-newly-added-fn> !== 'undefined'`; if stale, navigate cache-busted:
+- **Headless freezes CSS transitions + the media query:** the preview renderer
+  reports `innerWidth: 0` until you `preview_resize` to an explicit width (then the
+  `≥980px` two-column layout engages), and it does **not** advance CSS transitions
+  (a property with a `transition` reads its START value forever). To verify
+  transitioned layout/colour (e.g. the matrix `flex-grow` widen, the theme fade),
+  set the element's `transition='none'` inline and re-toggle to read the END state,
+  and confirm the rule applies (`getComputedStyle(...).animationName`, computed
+  values). Watch the actual motion only in the real WebView2 window.
+- **Cache / stale page:** the browser caches `app.js` **and `app.css`**; a
+  `?cb=`/`#mock` cache-bust on the URL only reloads `index.html`, not the linked
+  stylesheet — after a CSS edit, force-refresh it too:
+  `var l=document.querySelector('link[rel=stylesheet]'); l.href=l.href.split('?')[0]+'?cb='+Date.now()`.
+  If the server died/restarted the page can stay on OLD `app.js` (reloads silently
+  fail while down); confirm fresh code with `typeof <a-newly-added-fn> !== 'undefined'`,
+  else navigate cache-busted:
   `location.replace('/index.html?v='+Math.floor(performance.now())+'#mock')`.
   `Date.now()` / `Math.random()` are fine in `preview_eval` (it's the page, not a
   Workflow script).

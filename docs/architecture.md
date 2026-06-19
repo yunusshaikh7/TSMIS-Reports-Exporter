@@ -297,16 +297,19 @@ structural level:
 
 ### This update — the cross-environment comparison matrix
 
-A report × environment **comparison matrix** lives as a section on the Everything
-tab. It sits ON TOP of the always-current store and the cross-environment
-comparison family (additive — `compare_core` untouched): each non-baseline cell
-compares that (report, env) against a baseline (default `ssor-prod`) and shows the
-**discrepancy count, colour-coded**, with per-cell export + comparison freshness
-and granular refresh. New module `scripts/matrix.py` (console-free engine);
-freshness via `report_library.cell_ages`; the intersection reports are removed
-app-wide via one `reports` gate (`DISABLED_EXPORT_SUBDIRS` /
-`enabled_export_reports`). Engine internals are owned by
-[comparison-engine.md](comparison-engine.md) §12; the UI + bridge by
+A report × environment **comparison matrix** lives on its own **sub-tab** of the
+Everything tab (sibling to *Refresh & export*) and goes full-width (the activity
+column animates down to a slim log). It sits ON TOP of the always-current store and
+the cross-environment comparison family (additive — `compare_core` untouched): each
+non-baseline cell compares that (report, env) against a baseline (default `ssor-prod`)
+and shows the **discrepancy count, colour-coded**, with per-cell export + comparison
+freshness, granular refresh, and an open-the-workbook link. New module
+`scripts/matrix.py` (console-free engine); freshness via `report_library.cell_ages`;
+the intersection reports are **shown greyed/unpickable** (not removed) app-wide via
+one `reports` gate (`DISABLED_EXPORT_SUBDIRS` / `export_reports_status`). A light
+app-wide motion layer (pane/popover/modal enters, button press, a slow theme
+cross-fade) lands with it. Engine internals are owned by
+[comparison-engine.md](comparison-engine.md) §12; the UI + bridge + motion by
 [gui.md](gui.md). (This delivers a slice of the parked A3 file-browser intent;
 A3 stays parked.)
 

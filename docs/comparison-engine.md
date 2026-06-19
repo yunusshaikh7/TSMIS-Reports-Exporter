@@ -512,8 +512,12 @@ type") for the full recipe.
 
 ## 12. The comparison matrix (`scripts/matrix.py`) — orchestration ON TOP of cross-env
 
-The Everything-tab **report × environment comparison matrix** is a thin orchestration layer over
-the cross-environment family ([§9c](#9c-cross-environment--compare_envpy-folders-group-env-for-ramp-summarydetail--highway-sequence-highway_log-for-the-highway-log-cross-env-row)). It is **ADDITIVE**:
+The **Everything ▸ Comparison matrix** sub-tab (one of two sub-tabs on the Everything pane — the
+other is *Refresh & export*) holds the **report × environment comparison matrix**, a thin
+orchestration layer over the cross-environment family
+([§9c](#9c-cross-environment--compare_envpy-folders-group-env-for-ramp-summarydetail--highway-sequence-highway_log-for-the-highway-log-cross-env-row)).
+Selecting it goes **full-width** (`body.matrix-wide`: the right activity column shrinks via animated
+`flex-grow` to a slim-but-present log, so the grid fills the screen with no scrolling). It is **ADDITIVE**:
 `matrix.py` never edits `compare_core`'s formula/label text and adds no `CompareSchema` field — it
 simply calls the existing audited `EnvCompare.compare_folders(...)`. The foundation it sits on (HSL /
 Ramp Detail / Ramp Summary consolidate + cross-env compare) was audited cell-accurate over the full
@@ -533,10 +537,16 @@ Ramp Detail / Ramp Summary consolidate + cross-env compare) was audited cell-acc
   no Excel/COM) and cached in `<dest>/comparisons/<baseline>/_results.json`, so `matrix_snapshot()`
   stays a pure offline read. A cached result is trusted only while its recorded build-mtime matches
   the file (else the cell reads "re-run").
+- **Per-cell actions** are compact ICON buttons (text labels don't fit a ~128px cell): `↻ export`
+  (re-export that report+env, live), `↻ compare` (rebuild this comparison), and — on a **built** cell —
+  `↗ open` which opens that cell's VALUES comparison workbook in Excel (`gui_api.open_cell_comparison`).
+  The sub-tab also has an **Open comparisons folder** button (`open_comparisons_folder` →
+  `<dest>/comparisons/<baseline>/`).
 - **Workers** (`gui_worker`): `MatrixCompareWorker` (offline, loops `build_cell_comparison`) and
   `MatrixExportWorker` (a single (report,env) refresh that reuses `ExportWorker` with **no manifest**,
   so it can't clobber a paused Export-Everything batch). Bridge: `gui_api.matrix_info` /
-  `set_matrix_baseline` / `refresh_cell_export` / `refresh_cell_comparison` / `recompute_matrix`.
+  `set_matrix_baseline` / `refresh_cell_export` / `refresh_cell_comparison` / `recompute_matrix` /
+  `open_cell_comparison` / `open_comparisons_folder`.
 - **Locked by** `build/check_matrix.py` (enumeration, mtime staleness, stable paths, real
   orchestration with a planted diff → counts read back) + `build/check_matrix_bridge.py` (gate +
   the "a cell export leaves a paused batch intact" invariant). LIVE per-cell export / a full

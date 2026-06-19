@@ -120,21 +120,44 @@ How to live-verify `scripts/ui/` changes without launching the packaged app, and
 
 Golden checks (no login, fast) live under `build\.venv\Scripts\python.exe build\check_*.py` — `check_gui_bridge.py` exercises `gui_api` (its "dialog blew up" traceback is an intentional test, still `[OK]`). Run them after Python edits. Full list + the COM-recalc compare loop: [verification-and-testing.md](verification-and-testing.md).
 
-## The comparison matrix (Everything tab)
+## The comparison matrix (Everything ▸ Comparison-matrix sub-tab)
 
-A report × environment grid section in `#paneEverything` (`app.js renderMatrix`),
-fed by `gui_api.matrix_info` (a pure-filesystem snapshot). Each non-baseline cell
-renders the **discrepancy count, colour-coded** via CSS classes keyed off the
-existing status vars (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing`),
-plus a stale/needs-export state and per-cell `↻ export` / `↻ compare` actions; a
-baseline `<select>` (switch → confirm → `set_matrix_baseline` + `recompute_matrix("all")`)
-and a refresh-all button. While any task runs, `updateMatrixProgress()` (called on
-each state push) greys the matrix controls live and shows a "Comparing N/M" line —
-the grid itself re-renders on `run_ended` / the `matrix_refresh` event (not on every
-state push, to avoid re-fetching). The mock provides `matrix_info` +
-`set_matrix_baseline`/`refresh_cell_*`/`recompute_matrix` returning a 3×6 snapshot
-that exercises every cell state, so it verifies at `/index.html#mock`. The engine +
-bridge are owned by [comparison-engine.md](comparison-engine.md) §12.
+The Everything pane has **two sub-tabs** (`.subtabs` like Compare's): *Refresh & export*
+(`#everyExport`, the batch controls) and *Comparison matrix* (`#everyMatrix`). `app.js
+setEverySub(sub)` toggles them and sets `body.matrix-wide` on the matrix one;
+`setTab` re-applies the active sub-tab when entering Everything and clears
+`matrix-wide` when leaving. **Full-width layout:** `.main` is a flex row (not grid)
+so the two columns' `flex-grow` can animate — `body.matrix-wide` grows the config
+column and shrinks the activity column to a slim, still-present log (the
+preflight/completion cards step aside; the grid fills width *and* height with the
+data rows sharing the leftover height). NB grid-template-columns can't transition
+between `minmax(…fr)` track-lists in Chromium, which is why the layout is flex.
+
+The grid (`renderMatrix`) is fed by `gui_api.matrix_info` (a pure-filesystem
+snapshot). Each non-baseline cell renders the **discrepancy count, colour-coded** via
+CSS classes keyed off the status vars (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing`),
+plus a stale/needs-export state and compact **icon** actions (`↻ export` / `↻ compare`,
+and `↗ open` on built cells → opens the values workbook); a baseline `<select>`
+(switch → confirm → `set_matrix_baseline` + `recompute_matrix("all")`), a refresh-all
+button and an Open-comparisons-folder button. While any task runs,
+`updateMatrixProgress()` (called on each state push) greys the matrix controls live
+and shows a "Comparing N/M" line — the grid itself re-renders on `run_ended` / the
+`matrix_refresh` event (not on every state push). The mock provides `matrix_info` +
+`set_matrix_baseline`/`refresh_cell_*`/`recompute_matrix`/`open_*` returning a 3×6
+snapshot that exercises every cell state, so it verifies at `/index.html#mock`. The
+engine + bridge are owned by [comparison-engine.md](comparison-engine.md) §12.
+
+## Motion layer
+
+A light app-wide motion system (end of `app.css`, `prefers-reduced-motion`-aware):
+tab panes rise+fade (`pane-in`), sub-panes cross-fade, popovers/modals get
+`pop-in`/`modal-in`, buttons/tabs have a tactile `:active` press, and the theme
+toggle runs a **slower 0.5s light↔dark cross-fade** — `app.js withThemeTransition()`
+adds `html.theme-anim` for the change window so colours ease instead of snapping
+without making ordinary hovers sluggish. NOTE: the `#mock` is rendered headless,
+which does not advance CSS transitions — verify motion *end-states* + that the rules
+apply (animation-name / computed values), and watch the actual motion in the real
+WebView2 window.
 
 ## Related GUI behaviors (owned elsewhere)
 
