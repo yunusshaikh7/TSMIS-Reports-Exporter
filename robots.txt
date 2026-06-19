@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://yunusshaikh7.github.io/TSMIS-Reports-Exporter/sitemap.xml
