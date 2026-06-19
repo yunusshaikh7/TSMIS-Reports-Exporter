@@ -205,6 +205,17 @@ v0.15.0 → v0.16.0 stages with no manual redownload**.
 
 ## Feature backlog
 
+- [ ] **Intersection consolidate + compare-vs-TSN** [M] — **groundwork laid (vNEXT).** Intersection
+  Summary/Detail EXPORT is now ENABLED (`reports.DISABLED_EXPORT_SUBDIRS` emptied; the exporters
+  already existed) — they live on the **development** TSMIS site, reachable via the new Settings ▸
+  **"Use development site"** preset (`gui_api.apply_site_preset` → `common.dev_site_url`,
+  tsmis-dev.dot.ca.gov). STILL TO DO once the user supplies fully-exported Intersection
+  Summary/Detail **+ the TSN versions**: build the two consolidators (`consolidate_intersection_*`)
+  and the TSN comparators, following the recipes in [reports.md](reports.md) /
+  [comparison-engine.md](comparison-engine.md). They have no cross-env adapter, so they stay off the
+  Everything matrix; the natural home for the TSN compare is the Compare-tab **by-day** matrix
+  (`day_matrix`) once their `tsn` mode is coded (today they render greyed there).
+
 From a notebook brainstorm (2026-06-16); size `[S/M/L]`. Their original version buckets are now in
 the Shipped record below. **⚠ A3 and D1 were the planned v0.13 *and* v0.14 themes but got displaced
 both times by interface + Highway Log work — deferred 3× and now unscheduled. Decide: bump, drop,

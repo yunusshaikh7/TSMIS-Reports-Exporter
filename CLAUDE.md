@@ -32,7 +32,10 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
-Reports 5–6 are **export-only** (no consolidate/compare). Two consolidate-only
+Reports 5–6 (Intersection) are **export-only for now** (consolidate + compare-vs-TSN are
+**groundwork** — see [docs/roadmap.md](docs/roadmap.md)). Their export is **enabled** but the
+report lives on the **development** TSMIS site — switch via Settings ▸ "Use development site"
+(`tsmis-dev.dot.ca.gov`). Two consolidate-only
 Highway Log sources exist too — **TSN** district PDFs (dropped into
 `input/tsn_highway_log/`) and the app's own **Highway Log (PDF)** export. The
 **Compare** tab diffs Highway Logs (TSMIS-vs-TSN, the two PDF-sourced flavors) and

@@ -59,7 +59,7 @@ from version import APP_NAME, __version__
 from common import (
     BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES, DATA_SOURCE_LABELS,
     ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError,
-    _auth_file_age_hours, clear_auth, default_site_url, get_site,
+    _auth_file_age_hours, clear_auth, default_site_url, dev_site_url, get_site,
     has_valid_auth, parse_routes, require_valid_auth, set_preferred_channel,
     set_site,
 )
@@ -2698,6 +2698,33 @@ class GuiApi:
                            "(used from the next sign-in or export on).")
         else:
             self._emit_log(f"Site address for {label} reset to the default.")
+        return {"ok": True, "site_urls": self._site_url_rows()}
+
+    @_api_method
+    def apply_site_preset(self, preset):
+        """Point ALL six site addresses at a preset in one click: 'dev' (the
+        development host tsmis-dev.dot.ca.gov — where Intersection reports are
+        available) or 'prod' (clear every override → the built-in production
+        addresses). Returns the refreshed site-URL rows for the Settings list."""
+        if preset not in ("dev", "prod"):
+            return {"error": "Unknown site preset."}
+        failed = []
+        for src in DATA_SOURCES:
+            for env in ENVIRONMENTS:
+                url = dev_site_url(src, env) if preset == "dev" else ""
+                try:
+                    settings.set_site_url(src, env, url)
+                except ValueError as e:
+                    failed.append(f"{src}-{env}: {e}")
+        if failed:
+            self._emit_log("Some site addresses couldn't be set: " + "; ".join(failed))
+            return {"error": "Some addresses couldn't be set — see the log.",
+                    "site_urls": self._site_url_rows()}
+        self._emit_log("All site addresses set to the "
+                       + ("development site (tsmis-dev.dot.ca.gov) — Intersection "
+                          "reports are available there." if preset == "dev"
+                          else "built-in production addresses."))
+        self._push_state()
         return {"ok": True, "site_urls": self._site_url_rows()}
 
     # ---- Built-in Chromium download / delete -----------------------------------

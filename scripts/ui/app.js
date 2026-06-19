@@ -3042,6 +3042,18 @@ function bindEvents() {
     if (res && res.error) showMessage("info", "Can't check right now", res.error);
   };
   $("btnCheckEnvsCancel").onclick = () => api.cancel_run();
+  const applySitePreset = async (preset, confirmMsg) => {
+    if (confirmMsg && !await showConfirm({ title: "Switch all site addresses?",
+        message: confirmMsg, confirmLabel: "Switch all" })) return;
+    const res = await api.apply_site_preset(preset);
+    if (res && res.error) showMessage("error", "Couldn't switch", res.error);
+    if (res && res.site_urls) { S.init.settings.site_urls = res.site_urls; renderSiteUrls(res.site_urls); }
+  };
+  $("btnSiteDev").onclick = () => applySitePreset("dev",
+    "Point all six TSMIS addresses at the development site (tsmis-dev.dot.ca.gov)? "
+    + "Intersection reports are available there. Used by the next sign-in / export.");
+  $("btnSiteProd").onclick = () => applySitePreset("prod",
+    "Clear every site-address override and go back to the built-in production addresses?");
   $("btnEnvAccess").onclick = () => {
     $("tabSettings").click();
     $("setSiteUrls").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -3658,10 +3670,10 @@ function makeMockApi() {
       app_name: "TSMIS Exporter", version: "0.14.2 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
-      // Mirror the real gate: ALL reports, each carrying its STABLE index into
-      // the full registry, with Intersection flagged disabled (shown greyed).
-      reports: REPORTS.map((r, i) => ({ idx: i, ...r,
-                                        disabled: /^Intersection/.test(r.label) })),
+      // Mirror the real gate (now EMPTY — all reports enabled, incl. Intersection,
+      // which lives on the dev site). Each carries its STABLE index into the full
+      // registry; `disabled` stays for when a report is gated off again.
+      reports: REPORTS.map((r, i) => ({ idx: i, ...r, disabled: false })),
       cons_reports: [
         { label: "TSAR: Ramp Summary", fmt: "PDF" },
         { label: "TSAR: Ramp Detail", fmt: "Excel" },
@@ -3713,6 +3725,17 @@ function makeMockApi() {
       push({ t: "log", text: url && url !== dflt
         ? `Site address for ${key} changed to ${url} (used from the next sign-in or export on).`
         : `Site address for ${key} reset to the default.` });
+      return { ok: true, site_urls: mockSiteUrlRows() };
+    },
+    apply_site_preset: async (preset) => {
+      if (preset !== "dev" && preset !== "prod") return { error: "Unknown site preset." };
+      for (const src of ["ssor", "ars"]) for (const env of ["prod", "test", "dev"]) {
+        const key = `${src}-${env}`;
+        if (preset === "dev") mockUrlOverrides[key] = `https://tsmis-dev.dot.ca.gov/index.html?env=${env}&src=${src}`;
+        else delete mockUrlOverrides[key];
+      }
+      push({ t: "log", text: "All site addresses set to the "
+        + (preset === "dev" ? "development site (tsmis-dev.dot.ca.gov)." : "built-in production addresses.") });
       return { ok: true, site_urls: mockSiteUrlRows() };
     },
     download_chromium: async () => {
@@ -3916,13 +3939,15 @@ function makeMockApi() {
     report_library_info: async () => ({
       dest: st.batch_dest || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
       // One row per ENABLED export report — matches the real report_library_info
-      // (Intersection is app-wide disabled, so it's absent here too).
+      // (Intersection is now enabled too, so it appears here).
       reports: [
         { label: "TSAR: Ramp Summary", subdir: "ramp_summary", present: true, mtime: 0, age_seconds: 2 * 3600 },
         { label: "TSAR: Ramp Detail", subdir: "ramp_detail", present: true, mtime: 0, age_seconds: 2 * 3600 },
         { label: "Highway Sequence Listing", subdir: "highway_sequence", present: true, mtime: 0, age_seconds: 3 * 3600 },
         { label: "Highway Log", subdir: "highway_log", present: true, mtime: 0, age_seconds: 6 * 86400 },
         { label: "Highway Log (PDF)", subdir: "highway_log_pdf", present: true, mtime: 0, age_seconds: 6 * 86400 },
+        { label: "Intersection Summary", subdir: "intersection_summary", present: false, mtime: 0, age_seconds: null },
+        { label: "Intersection Detail", subdir: "intersection_detail", present: false, mtime: 0, age_seconds: null },
       ],
     }),
     matrix_info: async () => mockMatrixSnapshot(st.matrix_baseline || "ssor-prod"),

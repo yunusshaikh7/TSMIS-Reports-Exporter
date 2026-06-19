@@ -136,9 +136,12 @@ def consolidator_for_spec(spec):
 
 # App-wide disable for export-only reports that aren't ready for users. ONE gate:
 # the GUI report lists, the matrix, and the start guards all route through it.
-# Intersection Summary/Detail are export-only (no consolidate/compare) and still
-# under active site development. Flip them back on by emptying this set.
-DISABLED_EXPORT_SUBDIRS = {"intersection_summary", "intersection_detail"}
+# (v0.16.x) Intersection Summary/Detail export is now ENABLED — the reports are
+# available on the DEVELOPMENT site (greyed in production), so users switch to the
+# dev addresses via Settings ▸ "Use development site" to export them. They remain
+# export-only for now; consolidate + compare-vs-TSN are groundwork (docs/roadmap).
+# To disable a report app-wide again, add its subdir back to this set.
+DISABLED_EXPORT_SUBDIRS = set()
 
 
 def is_export_disabled(spec):

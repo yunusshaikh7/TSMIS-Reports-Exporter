@@ -85,6 +85,10 @@ class ReportError(Exception):
 # user picks both in the GUI header (set_site) or via TSMIS_SRC / TSMIS_ENV in
 # the console flow. Defaults: SSOR + prod.
 TSMIS_HOST = "tsmis.dot.ca.gov"
+# The development host (same path + ?env=/?src= scheme). The dev site offers
+# report types still greyed in production (Intersection Summary/Detail), so the
+# Settings "use development site" preset points all six combos here.
+TSMIS_DEV_HOST = "tsmis-dev.dot.ca.gov"
 DATA_SOURCES = ("ssor", "ars")
 ENVIRONMENTS = ("prod", "test", "dev")
 DATA_SOURCE_LABELS = {"ssor": "SSOR", "ars": "ARS"}
@@ -141,6 +145,12 @@ def get_site():
 def default_site_url(source, environment):
     """The built-in report-page URL for one data source / environment."""
     return f"https://{TSMIS_HOST}/index.html?env={environment}&src={source}"
+
+
+def dev_site_url(source, environment):
+    """The DEVELOPMENT-host report-page URL for one data source / environment —
+    the Settings 'use development site' preset (where Intersection reports live)."""
+    return f"https://{TSMIS_DEV_HOST}/index.html?env={environment}&src={source}"
 
 
 def get_url():
