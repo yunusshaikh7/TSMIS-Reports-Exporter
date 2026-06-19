@@ -60,7 +60,9 @@ stdout (the runner default) would crash on. Three lint/audit steps (ruff
 
 | Check | Locks |
 |---|---|
-| `check_export_engine.py` | WS1/WS3 audit-fix hardening: integrity helpers (XLSX `PK` / PDF `%PDF` magic), `_attempt_route` translating `EmptyExport` → `"empty"`, empty-marker predicates, `cs-disabled` detection in `select_report`. Pure Python, no browser. |
+| `check_export_engine.py` | WS1/WS3 audit-fix hardening: integrity helpers (XLSX `PK` / PDF `%PDF` magic), empty-marker predicates incl. Highway Sequence's positive "No results found" marker, `cs-disabled` detection in `select_report`; the Phase-3 fixes — `require_site_params` env backstop, the retry-once-then-empty path (`_process_route`), `report_error_text` logging. Pure Python, no browser. |
+| `check_parallel_reconcile.py` | Phase-3 parallel-engine reconciliation (`_reconcile_unaccounted`): lock-tolerant `_can_resume` (not read-strict), and reconcile-on-crash-even-if-cancelled. |
+| `check_intersection_gate.py` | the app-wide intersection disable (`reports.enabled_export_reports` drops Intersection from the GUI lists + server-side, EXPORT_REPORTS indices stay stable, toggle-back-on). |
 | `check_fake_site.py` | Selector contract via a **real headless browser** over authored synthetic HTML fixtures (`build/fake_site/*`) that reconstruct only the contract-bearing DOM (the shared action bar, per-report empty states, `#rampResults` error box, `#customReport` dropdown). Catches selector drift pure Python can't — e.g. `EXPORT_READY_JS` keying on a button's *text*, not the bare `.export-btn` class shared by Print. Fixtures are AUTHORED reconstructions, **not** copies of the Caltrans-internal source. Prints SKIPPED and exits 0 if no Chromium-based browser is drivable. |
 | `check_gui_bridge.py` | `gui_api` bridge methods. Its "dialog blew up" traceback is an **intentional** test fixture — the run still reports `[OK]`. |
 | `check_updater.py` | WS4 updater hardening (incl. `test_resolve_previous_release` for the v0.13.0 revert). Updater swap/SHA detail is owned by [build-and-release.md](build-and-release.md). |
@@ -83,6 +85,9 @@ is owned by [comparison-engine.md](comparison-engine.md).
 | `check_compare_audit.py` | audit-round hardening across compare_core + compare_env |
 | `check_compare_ramp_detail.py` | cross-env Ramp Detail PM re-key (planted mid-list insert isolates one new row) |
 | `check_compare_ramp_summary.py` | cross-env Ramp Summary route-keyed compare + route-key normalizer (unpadded `5` == zero-padded `005`) |
+| `check_compare_highway_sequence.py` | cross-env Highway Sequence adapter end to end: PM key, "Highway Locations" sheet, `(col X)` unnamed-column labels (the stage-1 audit gap) |
+| `check_matrix.py` | the comparison-matrix engine (`scripts/matrix.py`): cell enumeration, mtime staleness, stable dateless comparison paths, real `compare_env` orchestration with a planted diff → counts read back + cached |
+| `check_matrix_bridge.py` | the matrix `gui_api` bridge (stubbed workers): validation + single-task gate + the "a cell export leaves a paused batch's manifest intact" invariant |
 | `check_compare_dupmatch.py` | duplicate-key SIMILARITY pairing (`pair_occurrences_by_similarity` — opposite file order still pairs the truly-equal rows) |
 | `check_compare_ditto.py` | ditto (`+`-run) cells are NON-ASSERTING in a Highway Log compare (the `+`/`++` domain convention is owned by [highway_log/comparison-study.md](highway_log/comparison-study.md)) |
 | `check_ramp_summary_partial.py` | ramp-summary failures-OK + short-PDF-blank |

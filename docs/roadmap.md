@@ -106,6 +106,39 @@ the field bug + P1s first.
 
 ---
 
+## This update — the Everything comparison matrix (implemented, unreleased)
+
+On branch `feat/everything-matrix`; not yet released (no version bump/tag). Golden-checked
+offline; the LIVE paths below are owed on the work PC.
+
+- [x] **Stage-1 foundation audit** — see the closed-findings record below.
+- [x] **8 groundwork code-review fixes** — the field bug + 4 P1s + 3 P2s above are checked off.
+- [x] **Comparison matrix [L]** — report × environment grid on the Everything tab. Engine
+  `scripts/matrix.py` orchestrates `compare_env` (compare_core untouched): per-cell export +
+  comparison freshness (mtime staleness), comparisons cached per baseline under
+  `<dest>/comparisons/<baseline>/` (stable dateless names) + a `_results.json` verdict/count cache,
+  baseline switch = explicit full recompute. Cells show the **discrepancy count, color-coded**
+  (green identical → amber/red by magnitude, stale, needs-export). Per-cell refresh-export
+  (live) / refresh-comparison (offline) + refresh-all. Bridge in `gui_api` (`matrix_info`,
+  `set_matrix_baseline`, `refresh_cell_export`, `refresh_cell_comparison`, `recompute_matrix`);
+  workers `MatrixCompareWorker` / `MatrixExportWorker` (the latter reuses ExportWorker with NO
+  manifest, so it can't clobber a paused batch). Locks: `check_matrix.py`, `check_matrix_bridge.py`.
+- [x] **export-date-in-UI [S]** — per-(report,env) freshness from file mtime
+  (`report_library.cell_ages`), surfaced in the matrix cells (no filename changes — the store
+  overwrites in place). Lock: `check_report_library.py`.
+- [x] **Intersection app-wide disable [S]** — one gate (`reports.DISABLED_EXPORT_SUBDIRS` +
+  `enabled_export_reports`) hides Intersection from the Export tab, Everything and Saved-reports,
+  rejects it server-side, and the matrix excludes it structurally; `EXPORT_REPORTS` indices stay
+  stable. Flip back by emptying the set. Lock: `check_intersection_gate.py`.
+
+**Owed on the work PC (live; can't verify on the dev PC):** the field bug's Defender-timing fix; the
+wrong-env backstop; the transient-empty retry; `report_error_text`/Highway-Sequence empty;
+batch stage-and-swap crash-preserves-last-good; parallel crash+cancel reconciliation; and the
+matrix's **live per-cell Refresh export** + a full **baseline-switch recompute over a real 6-env
+store**. Before releasing: bump `version.py` + `build/release_notes.md`.
+
+---
+
 ## Feature backlog
 
 From a notebook brainstorm (2026-06-16); size `[S/M/L]`. Their original version buckets are now in
@@ -116,8 +149,9 @@ or accept as someday.**
 - [ ] **A3 — Results tab / in-app file browser** [M] (#9) — a tab to open the latest per-route
   files, consolidated workbooks, comparison outputs, failure screenshots, and run reports without
   digging through folders. The v0.13.0 Everything-tab **Saved reports** library + env-labeled
-  filenames are a partial down-payment on the "what's been produced, where" index this needs.
-  *(deferred 3×.)* NOTE: weigh against the planned GUI overhaul (designed elsewhere).
+  filenames, and now the **comparison matrix** (this-update: a per-cell view of what's been exported
+  + compared, with freshness, in the Everything tab), are a partial down-payment on the
+  "what's been produced, where" index this needs. **A3 stays parked** (do not revive). *(deferred 3×.)*
 - [ ] **C1 — Deeper self-audit so outputs are trustworthy as deliverables** [?] (#1) — **NEEDS
   SCOPING — much may already exist.** Comparisons already have a live SELF-CHECK, a VERDICT banner,
   the v0.11.0 incompleteness contract, write-path safety, and CI COM-recalc. Identify the real gap

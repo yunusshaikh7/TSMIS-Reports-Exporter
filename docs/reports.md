@@ -79,6 +79,16 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 - Verified against the real site source + a headless `page.pdf()` fixture (`build/check_fake_site.py`). **Live-export verification against TSMIS is still pending** (the dev PC can't reach the site).
 
 ### Reports 5-6 -- Intersection Summary / Intersection Detail (XLSX, EXPORT-ONLY)
+- **APP-WIDE DISABLED (this update).** While the site's Intersection feature is still under
+  development, both are hidden across the GUI via ONE gate in `reports.py`:
+  `DISABLED_EXPORT_SUBDIRS = {"intersection_summary", "intersection_detail"}` +
+  `enabled_export_reports()`. `gui_api.get_initial_state` / `report_library_info` build their report
+  lists from `enabled_export_reports()` (so Intersection drops from the Export tab, Everything and
+  Saved-reports), `start_export` / `start_batch_export` reject a disabled index server-side, and the
+  matrix excludes them structurally (no cross-env adapter). **`EXPORT_REPORTS` indices stay stable**
+  (the GUI passes each report's real `idx`), so manifests / env-scan are unaffected. Flip back on by
+  emptying the set. Locked by `build/check_intersection_gate.py`. The spec/empty-marker detail below
+  still applies if/when they're re-enabled.
 - **Export-only** -- NO consolidator and NO comparison support. They are absent from `_CONSOLIDATOR_BY_SUBDIR`, so `consolidator_for_spec()` returns `None` and B2 auto-consolidate skips them.
 - Labels + formats verified against the live page source (v0.10.4): **NO `"TSAR:"` prefix** (unlike the ramp pair), both Excel via the shared Export button.
 - **Intersection Summary**: `label="Intersection Summary"`, `subdir="intersection_summary"`, `filename=intersection_summary_route_<ROUTE>.xlsx`. The page never renders an empty notice -- it ALWAYS shows `Total Intersections = N` (including `= 0`) and always offers a working Export. `wait_js` = `EXPORT_READY_JS` or `.ints-total` present. `is_empty` matches the regex `total intersections\s*=\s*0\b` (a zero total; not `= 10`/`= 20`). No hang risk: a drifted marker just reverts to the old benign all-zeros-file behavior, never a stall.

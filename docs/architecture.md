@@ -295,6 +295,21 @@ structural level:
 - **Accessibility** — keyboard-focusable checkboxes (sr-only clipped input + visible
   focus ring), colour-plus-glyph status icons, aria-labels on icon-only controls.
 
+### This update — the cross-environment comparison matrix
+
+A report × environment **comparison matrix** lives as a section on the Everything
+tab. It sits ON TOP of the always-current store and the cross-environment
+comparison family (additive — `compare_core` untouched): each non-baseline cell
+compares that (report, env) against a baseline (default `ssor-prod`) and shows the
+**discrepancy count, colour-coded**, with per-cell export + comparison freshness
+and granular refresh. New module `scripts/matrix.py` (console-free engine);
+freshness via `report_library.cell_ages`; the intersection reports are removed
+app-wide via one `reports` gate (`DISABLED_EXPORT_SUBDIRS` /
+`enabled_export_reports`). Engine internals are owned by
+[comparison-engine.md](comparison-engine.md) §12; the UI + bridge by
+[gui.md](gui.md). (This delivers a slice of the parked A3 file-browser intent;
+A3 stays parked.)
+
 ## See also
 
 - [reports.md](reports.md) — the per-report `ReportSpec` details and how to add a

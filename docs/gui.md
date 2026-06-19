@@ -120,6 +120,22 @@ How to live-verify `scripts/ui/` changes without launching the packaged app, and
 
 Golden checks (no login, fast) live under `build\.venv\Scripts\python.exe build\check_*.py` — `check_gui_bridge.py` exercises `gui_api` (its "dialog blew up" traceback is an intentional test, still `[OK]`). Run them after Python edits. Full list + the COM-recalc compare loop: [verification-and-testing.md](verification-and-testing.md).
 
+## The comparison matrix (Everything tab)
+
+A report × environment grid section in `#paneEverything` (`app.js renderMatrix`),
+fed by `gui_api.matrix_info` (a pure-filesystem snapshot). Each non-baseline cell
+renders the **discrepancy count, colour-coded** via CSS classes keyed off the
+existing status vars (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing`),
+plus a stale/needs-export state and per-cell `↻ export` / `↻ compare` actions; a
+baseline `<select>` (switch → confirm → `set_matrix_baseline` + `recompute_matrix("all")`)
+and a refresh-all button. While any task runs, `updateMatrixProgress()` (called on
+each state push) greys the matrix controls live and shows a "Comparing N/M" line —
+the grid itself re-renders on `run_ended` / the `matrix_refresh` event (not on every
+state push, to avoid re-fetching). The mock provides `matrix_info` +
+`set_matrix_baseline`/`refresh_cell_*`/`recompute_matrix` returning a 3×6 snapshot
+that exercises every cell state, so it verifies at `/index.html#mock`. The engine +
+bridge are owned by [comparison-engine.md](comparison-engine.md) §12.
+
 ## Related GUI behaviors (owned elsewhere)
 
 - **Run lifecycle / completion summary / ETA / progress hierarchy / Export Everything stepper** (v0.13.0): `gui_api._build_export_summary`, `_on_batch_progress`, `app.js renderPreflight`/`updateActivityCards`/`updateEta`/`syncBatchHeadline`/`renderBatchSteps`. See [engine-and-reliability.md](engine-and-reliability.md).

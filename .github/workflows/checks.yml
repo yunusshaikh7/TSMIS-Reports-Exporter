@@ -53,6 +53,7 @@ jobs:
           set -e
           python build/check_export_engine.py
           python build/check_parallel_reconcile.py
+          python build/check_intersection_gate.py
 
       - name: GUI-bridge regression checks (blocking)
         shell: bash
@@ -64,6 +65,8 @@ jobs:
           python build/check_b2_autoconsolidate.py
           python build/check_b3_batch.py
           python build/check_report_library.py
+          python build/check_matrix.py
+          python build/check_matrix_bridge.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py

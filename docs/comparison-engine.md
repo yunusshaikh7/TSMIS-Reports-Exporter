@@ -507,3 +507,37 @@ contain the chosen report — see [gui.md](gui.md).
 Extending: a new comparison is one `COMPARE_REPORTS` row + module; build a `CompareSchema` and call
 `run_compare` — never hand-roll workbook output. See [reports.md](reports.md) ("New comparison
 type") for the full recipe.
+
+---
+
+## 12. The comparison matrix (`scripts/matrix.py`) — orchestration ON TOP of cross-env
+
+The Everything-tab **report × environment comparison matrix** is a thin orchestration layer over
+the cross-environment family ([§9c](#9c-cross-environment--compare_envpy-folders-group-env-for-ramp-summarydetail--highway-sequence-highway_log-for-the-highway-log-cross-env-row)). It is **ADDITIVE**:
+`matrix.py` never edits `compare_core`'s formula/label text and adds no `CompareSchema` field — it
+simply calls the existing audited `EnvCompare.compare_folders(...)`. The foundation it sits on (HSL /
+Ramp Detail / Ramp Summary consolidate + cross-env compare) was audited cell-accurate over the full
+6-env batch (2026-06-18; see [roadmap.md](roadmap.md) closed findings).
+
+- **Rows** come from `reports.matrix_rows()` (the `env`-group `folders` adapters, mapped to their
+  export `ReportSpec` by subdir). Intersection has no adapter → never a row.
+- **Cells** are computed against a **baseline** env (default `ssor-prod`, `settings.get/set_matrix_baseline`).
+  Each non-baseline cell shows the **discrepancy count** (differing cells + one-sided rows),
+  color-coded, with the comparison cached at `<batch_dest>/comparisons/<baseline>/<cell>_<row>.xlsx`
+  (a **stable, dateless** name — NOT `suggest_name`, whose date would defeat the mtime-staleness model).
+- **Freshness** is pure-filesystem: per-cell export freshness from `report_library.cell_ages`
+  (newest file mtime per `<dest>/<src-env>/<subdir>/`); a comparison is **stale** when either side's
+  export mtime is newer than the comparison workbook. A baseline switch is an explicit FULL recompute
+  against the new baseline tree (the old tree is left intact).
+- **Verdict + counts** are read off the produced VALUES workbook (literal Summary/Comparison content,
+  no Excel/COM) and cached in `<dest>/comparisons/<baseline>/_results.json`, so `matrix_snapshot()`
+  stays a pure offline read. A cached result is trusted only while its recorded build-mtime matches
+  the file (else the cell reads "re-run").
+- **Workers** (`gui_worker`): `MatrixCompareWorker` (offline, loops `build_cell_comparison`) and
+  `MatrixExportWorker` (a single (report,env) refresh that reuses `ExportWorker` with **no manifest**,
+  so it can't clobber a paused Export-Everything batch). Bridge: `gui_api.matrix_info` /
+  `set_matrix_baseline` / `refresh_cell_export` / `refresh_cell_comparison` / `recompute_matrix`.
+- **Locked by** `build/check_matrix.py` (enumeration, mtime staleness, stable paths, real
+  orchestration with a planted diff → counts read back) + `build/check_matrix_bridge.py` (gate +
+  the "a cell export leaves a paused batch intact" invariant). LIVE per-cell export / a full
+  baseline recompute over a real store are owed on the work PC.
