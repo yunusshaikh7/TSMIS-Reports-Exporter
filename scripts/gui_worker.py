@@ -1581,19 +1581,27 @@ class CheckWorker(threading.Thread):
 
 
 def _run_matrix_export_step(spec, src, env, dest, queue, cancel, skip, pause,
-                            workers):
+                            workers, on_worker=None):
     """Export ONE report for ONE environment into the Export-Everything store,
     WITHOUT a manifest (so a matrix refresh can never clobber a paused
     Export-Everything batch — BatchWorker alone persists batch_job.json). Runs
     the SAME per-environment body BatchWorker uses (set_site + an ExportWorker
     into <dest>/<src-env>/<subdir>, env-tagged names); fast mode runs N browsers.
     The caller sets/restores the process-global site. Auth / browser failures
-    raise up to the batch loop, which stops the run."""
+    raise up to the batch loop, which stops the run. `on_worker(ew|None)` exposes
+    the live ExportWorker to the bridge for the duration of the step (so live
+    screenshot previews work, just like a normal export)."""
     set_site(src, env)
     out_base = Path(dest) / f"{src}-{env}"
     ew = ExportWorker([spec], queue, cancel, skip, workers=workers, routes=None,
                       pause_event=pause, auto_consolidate=False, out_base=out_base)
-    ew._run_specs(ew._build_events(), [])
+    if on_worker:
+        on_worker(ew)
+    try:
+        ew._run_specs(ew._build_events(), [])
+    finally:
+        if on_worker:
+            on_worker(None)
 
 
 class MatrixBatchExportWorker(threading.Thread):
@@ -1610,7 +1618,7 @@ class MatrixBatchExportWorker(threading.Thread):
     restored at the end."""
 
     def __init__(self, steps, dest, queue, cancel_event, skip_event, pause_event,
-                 workers=1):
+                 workers=1, on_worker=None):
         super().__init__(daemon=True, name="matrix-batch-export")
         self.steps = list(steps)               # [(spec, src, env), ...]
         self.dest = dest
@@ -1619,6 +1627,7 @@ class MatrixBatchExportWorker(threading.Thread):
         self.skip = skip_event
         self.pause = pause_event
         self.workers = workers
+        self.on_worker = on_worker             # exposes the live ExportWorker for preview
 
     def run(self):
         original = get_site()
@@ -1634,7 +1643,7 @@ class MatrixBatchExportWorker(threading.Thread):
                 try:
                     _run_matrix_export_step(spec, src, env, self.dest, self.q,
                                             self.cancel, self.skip, self.pause,
-                                            self.workers)
+                                            self.workers, on_worker=self.on_worker)
                     ok += 1
                 except (AuthError, BrowserNotFoundError) as e:
                     log.warning("matrix export %s-%s stopped: %s: %s",

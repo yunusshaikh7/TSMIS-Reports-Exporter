@@ -1675,8 +1675,15 @@ class GuiApi:
                     "workers": n_workers})
         MatrixBatchExportWorker(steps, dest, self._q, self.cancel_event,
                                 self.skip_event, self.pause_event,
-                                workers=n_workers).start()
+                                workers=n_workers,
+                                on_worker=self._set_matrix_export_worker).start()
         return True
+
+    def _set_matrix_export_worker(self, worker):
+        """Track the matrix re-export's live ExportWorker (or None when a step
+        ends) so request_preview can reach it, like a normal export."""
+        with self._lock:
+            self._export_worker = worker
 
     def _dispatch_tsn_consolidate_job(self, job):
         dest = settings.get_batch_dest()
@@ -2148,16 +2155,26 @@ class GuiApi:
         report wait; a long download can delay it until the next route)."""
         with self._lock:
             worker = self._export_worker
-            running = self._task == "export"
+            running = self._task == "export" or (
+                self._task == "matrix" and self._current_job is not None
+                and self._current_job.get("kind") == "export")
         if not running or worker is None:
             return {"error": "No export is running."}
         worker.request_screenshot(worker_no)
         ui_log.info("preview requested for browser %s", worker_no)
         return {"ok": True}
 
+    def _matrix_export_running(self):
+        """True while a matrix re-EXPORT job is the running task. Pause/Skip + live
+        preview apply to it exactly like a normal export — MatrixBatchExportWorker
+        forwards pause_event/skip_event to the underlying ExportWorker."""
+        with self._lock:
+            return (self._task == "matrix" and self._current_job is not None
+                    and self._current_job.get("kind") == "export")
+
     @_api_method
     def skip_route(self):
-        if self._task == "export":
+        if self._task == "export" or self._matrix_export_running():
             self.skip_event.set()
             self._emit_log("Skip requested — will move on once the current wait ends.")
         return {"ok": True}
@@ -2182,8 +2199,9 @@ class GuiApi:
         route(s) finish, then the run holds until Resume. Unlike Skip, pause is
         well-defined in fast mode (every browser parks before its next route), so
         it works there too. Also pauses an Export Everything batch (between
-        routes, and between environments). No-op unless one is running."""
-        if self._task not in ("export", "batch"):
+        routes, and between environments) and a matrix re-export. No-op unless one
+        is running."""
+        if self._task not in ("export", "batch") and not self._matrix_export_running():
             return {"error": "No export is running."}
         if self.pause_event.is_set():
             self.pause_event.clear()

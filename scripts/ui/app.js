@@ -1716,6 +1716,24 @@ function updateMatrixProgress() {
     cancel.classList.toggle("hidden", !running);
     cancel.disabled = !running;
   }
+  // Pause/Skip apply only to a matrix re-EXPORT run (the worker forwards the
+  // pause/skip events to the engine). Skip is meaningless in fast mode.
+  const cur = S.st && S.st.matrix_current;
+  const exporting = !!(S.st && S.st.task === "matrix" && cur && cur.kind === "export");
+  const pause = $("btnMatrixPause");
+  if (pause) {
+    pause.classList.toggle("hidden", !exporting);
+    pause.disabled = !exporting;
+    const u = pause.querySelector("use");
+    if (u) u.setAttribute("href", S.st && S.st.paused ? "#i-play" : "#i-pause");
+    const lbl = $("btnMatrixPauseLabel");
+    if (lbl) lbl.textContent = S.st && S.st.paused ? "Resume" : "Pause";
+  }
+  const skip = $("btnMatrixSkip");
+  if (skip) {
+    skip.classList.toggle("hidden", !exporting);
+    skip.disabled = !exporting || !!(S.st && S.st.fast_run);
+  }
   renderMatrixQueue();
   syncMatrixFast();
 }
@@ -2178,6 +2196,10 @@ async function renderMatrix() {
   };
   const cancelBtn = $("btnMatrixCancel");
   if (cancelBtn) cancelBtn.onclick = () => api.cancel_run();
+  const pauseBtn = $("btnMatrixPause");
+  if (pauseBtn) pauseBtn.onclick = () => api.pause_or_resume();
+  const skipBtn = $("btnMatrixSkip");
+  if (skipBtn) skipBtn.onclick = () => api.skip_route();
 
   renderMatrixConfig(snap, locked);
   updateMatrixProgress();
