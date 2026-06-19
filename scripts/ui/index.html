@@ -422,11 +422,14 @@
         </div>
       </div>
 
-      <!-- Compare pane. Two sub-tabs: Cross-environment (default) and Highway Log
-           (every Highway Log comparison). #compareSubtabs is generated from
-           compare_groups; the radio list shows the active sub-tab's reports. -->
+      <!-- Compare pane. Sub-tabs: Cross-environment (default), Highway Log
+           (every Highway Log comparison), and "TSN by day" (the manual
+           day-picking matrix). #compareSubtabs is generated from compare_groups
+           plus the appended TSN-by-day tab; the classic picker lives in
+           #compareClassic, the matrix in #dayMatrixSection. -->
       <div class="card pane hidden" id="paneCompare">
         <div class="subtabs" id="compareSubtabs" role="tablist"></div>
+        <div id="compareClassic">
         <div class="card-section">
           <div class="section-head"><span class="section-label">Comparison type</span></div>
           <div class="option-list" id="compareList"></div>
@@ -524,6 +527,70 @@
           <button class="btn btn-subtle" id="btnCancelCompare" disabled>
             <svg class="ic"><use href="#i-x"/></svg>Cancel
           </button>
+        </div>
+        </div><!-- /compareClassic -->
+
+        <!-- TSN by day: a manual day-picking matrix (rows = reports, columns =
+             exported days; each cell = that day's export vs TSN). Shown only on
+             the "TSN by day" sub-tab. Shares the TSN dataset + compare engine with
+             the Everything matrix; no cross-environment, no live re-export. -->
+        <div id="dayMatrixSection" class="hidden">
+          <div class="card-section">
+            <div class="section-head">
+              <span class="section-label">Highway Log vs TSN — by export day</span>
+              <span class="section-meta">
+                Source
+                <span class="tb-select select-light"><select id="dayMatrixSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+              </span>
+            </div>
+            <p class="hint" style="margin-bottom:8px">
+              Add exported days, then build each cell to compare that day's export against TSN.
+              Highway Log now; the other reports follow once their TSN comparison exists.
+            </p>
+            <div class="dm-toolbar">
+              <span class="tb-select select-light"><select id="dayMatrixAddDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+              <button class="btn btn-standard btn-small" id="btnDayAddDay">
+                <svg class="ic"><use href="#i-check"/></svg>Add day
+              </button>
+              <span class="spacer"></span>
+              <span class="hint" id="dayMatrixProgress" hidden></span>
+            </div>
+            <div class="dm-tsn" id="dayMatrixTsn"></div>
+            <div class="matrix-legend">
+              <span class="mx-key mx-match">identical</span>
+              <span class="mx-key mx-diff-lo">few diffs</span>
+              <span class="mx-key mx-diff-hi">many diffs</span>
+              <span class="mx-key mx-stale">stale</span>
+              <span class="mx-key mx-missing">needs export</span>
+            </div>
+            <div class="matrix-wrap"><div class="matrix-grid" id="dayMatrixGrid"></div></div>
+          </div>
+
+          <!-- Shared job-queue panel (the same queue as the Everything matrix). -->
+          <div class="card-section mx-queue-group" id="dayQueueGroup" hidden>
+            <div class="mc-label">Queue <span class="mx-queue-count" id="dayQueueCount"></span></div>
+            <div class="mx-queue" id="dayQueue"></div>
+            <div class="mx-queue-actions">
+              <button class="btn btn-subtle btn-small" id="btnDayQueueClear">
+                <svg class="ic"><use href="#i-trash"/></svg>Clear queued
+              </button>
+              <button class="btn btn-subtle btn-small" id="btnDayQueueStopAll">
+                <svg class="ic"><use href="#i-x"/></svg>Stop all
+              </button>
+            </div>
+          </div>
+
+          <div class="card-section actions-row">
+            <button class="btn btn-subtle btn-small" id="btnDayRebuildAll">
+              <svg class="ic"><use href="#i-refresh"/></svg>Rebuild stale
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnOpenDayComparisons">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open comparisons folder
+            </button>
+            <button class="btn btn-subtle btn-small hidden" id="btnDayCancel">
+              <svg class="ic"><use href="#i-x"/></svg>Cancel
+            </button>
+          </div>
         </div>
       </div>
 

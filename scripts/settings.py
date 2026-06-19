@@ -526,6 +526,76 @@ def set_matrix_fast(on):
     return get_matrix_fast()
 
 
+# ---- Compare-tab "TSN by day" matrix ---------------------------------------
+# The data source (a "src-env" key), the picked day-columns (date strings), and
+# the hidden report rows. The TSN file reuses matrix_tsn_files (one TSN dataset).
+# Validation (known source / real run-folder dates) lives in gui_api.
+
+_DEFAULT_DAY_MATRIX_SOURCE = "ssor-prod"
+
+
+def get_day_matrix_source():
+    raw = _read_file().get("day_matrix_source")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return _DEFAULT_DAY_MATRIX_SOURCE
+
+
+def set_day_matrix_source(key):
+    """Save (or, empty, reset) the by-day matrix source. Returns the new value."""
+    data = dict(_read_file())
+    key = (key or "").strip()
+    if key:
+        data["day_matrix_source"] = key
+    else:
+        data.pop("day_matrix_source", None)
+    _atomic_write(data)
+    log.info("settings: day_matrix_source -> %s", key or "(default)")
+    return get_day_matrix_source()
+
+
+def get_day_matrix_days():
+    """The ordered day-column date strings the user added (default: none)."""
+    raw = _read_file().get("day_matrix_days")
+    if isinstance(raw, list):
+        return [d for d in raw if isinstance(d, str) and d]
+    return []
+
+
+def set_day_matrix_days(days):
+    """Persist the ordered day-column list. Empty -> cleared. Returns the new list."""
+    data = dict(_read_file())
+    days = [d for d in (days or []) if isinstance(d, str) and d]
+    if days:
+        data["day_matrix_days"] = days
+    else:
+        data.pop("day_matrix_days", None)
+    _atomic_write(data)
+    log.info("settings: day_matrix_days -> %s", days or "(none)")
+    return get_day_matrix_days()
+
+
+def get_day_matrix_hidden():
+    """Hidden report-row keys on the by-day matrix (default: none)."""
+    raw = _read_file().get("day_matrix_hidden")
+    if isinstance(raw, list):
+        return [k for k in raw if isinstance(k, str)]
+    return []
+
+
+def set_day_matrix_hidden(keys):
+    """Persist the hidden by-day report rows. Empty -> cleared. Returns the list."""
+    data = dict(_read_file())
+    keys = [k for k in (keys or []) if isinstance(k, str)]
+    if keys:
+        data["day_matrix_hidden"] = sorted(set(keys))
+    else:
+        data.pop("day_matrix_hidden", None)
+    _atomic_write(data)
+    log.info("settings: day_matrix_hidden -> %s", keys or "(none)")
+    return get_day_matrix_hidden()
+
+
 def reset():
     """Delete the settings file (back to all defaults). Returns True if a
     file was removed."""

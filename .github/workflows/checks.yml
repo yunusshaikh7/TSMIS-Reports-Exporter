@@ -68,6 +68,7 @@ jobs:
           python build/check_matrix.py
           python build/check_matrix_bridge.py
           python build/check_matrix_tsn.py
+          python build/check_day_matrix.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py

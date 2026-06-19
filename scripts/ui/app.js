@@ -24,6 +24,7 @@ const S = {
   st: null,            // latest state snapshot from Python
   tab: "export",
   everySub: "export",  // Everything sub-tab: "export" | "matrix"
+  compareGroup: null,  // active Compare sub-tab id (incl. "tsn_by_day")
   progress: null,      // latest export progress payload
   runMode: null,       // "export" | "consolidate" while the bar is live
   workers: 0,          // browser-status rows currently shown (export runs)
@@ -630,6 +631,14 @@ function buildStatic() {
     b.addEventListener("click", () => selectCompareGroup(g.id));
     subStrip.appendChild(b);
   });
+  // The "TSN by day" matrix is a manual day-picking sub-tab (not a registry
+  // comparison group), appended after the generated ones.
+  const dayTab = document.createElement("button");
+  dayTab.className = "subtab"; dayTab.dataset.group = DAY_MATRIX_GROUP;
+  dayTab.setAttribute("role", "tab"); dayTab.setAttribute("aria-selected", "false");
+  dayTab.textContent = "TSN by day";
+  dayTab.addEventListener("click", () => selectCompareGroup(DAY_MATRIX_GROUP));
+  subStrip.appendChild(dayTab);
 
   const cl2 = $("compareList");
   (init.compare_reports || []).forEach((rep, i) => {
@@ -1462,7 +1471,7 @@ function dispatch(events) {
   for (const ev of events) {
     try {
       switch (ev.t) {
-        case "state": S.st = ev.s; renderState(); updateMatrixProgress(); break;
+        case "state": S.st = ev.s; renderState(); updateMatrixProgress(); updateDayMatrixProgress(); break;
         case "settings":
           S.init.settings = ev.s;
           fillSettings();
@@ -1474,8 +1483,15 @@ function dispatch(events) {
         case "wstatus": updateWorkerStatus(ev.w, ev.text); break;
         case "preview": showPreviewEvent(ev); break;
         case "run_started": startRunUi(ev.mode, ev.label, ev.workers); break;
-        case "run_ended": endRunUi(); if (S.tab === "everything") { renderBatchLibrary(); if (S.everySub === "matrix") renderMatrix(); } break;
-        case "matrix_refresh": if (S.tab === "everything" && S.everySub === "matrix") renderMatrix(); break;
+        case "run_ended":
+          endRunUi();
+          if (S.tab === "everything") { renderBatchLibrary(); if (S.everySub === "matrix") renderMatrix(); }
+          if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
+          break;
+        case "matrix_refresh":
+          if (S.tab === "everything" && S.everySub === "matrix") renderMatrix();
+          if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
+          break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default: break;
       }
@@ -1704,19 +1720,25 @@ function updateMatrixProgress() {
   syncMatrixFast();
 }
 
-// The live job-queue panel in the matrix config zone (driven from each state
-// push, so reorder/remove/clear/stop-all update without a full grid re-render).
+// The live job-queue panel (driven from each state push, so reorder/remove/
+// clear/stop-all update without a full grid re-render). The SAME queue serves
+// both matrices, so it renders into both panels (Everything config zone + the
+// Compare by-day section).
 function renderMatrixQueue() {
-  const group = $("matrixQueueGroup");
+  renderQueuePanel("matrixQueueGroup", "matrixQueue", "matrixQueueCount");
+}
+
+function renderQueuePanel(groupId, listId, countId) {
+  const group = $(groupId);
   if (!group) return;
   const st = S.st || {};
   const cur = st.matrix_current || null;
   const pending = st.matrix_queue || [];
   if (!cur && !pending.length) { group.hidden = true; return; }
   group.hidden = false;
-  const count = $("matrixQueueCount");
+  const count = $(countId);
   if (count) count.textContent = pending.length ? `(${pending.length} waiting)` : "";
-  const list = $("matrixQueue");
+  const list = $(listId);
   list.textContent = "";
   if (cur) list.appendChild(mxQueueRow(cur, true, 0, 1));
   pending.forEach((job, i) => list.appendChild(mxQueueRow(job, false, i, pending.length)));
@@ -1851,7 +1873,10 @@ function confirmBulkReexport(what) {
 // truncated, full path on hover) over a compact action row. Every api.* call +
 // confirm flow is unchanged; the buttons keep the .mx-linkbtn hook so the
 // live-lock sweep still disables them.
-function mxTsnPicker(tm, locked) {
+function mxTsnPicker(tm, locked, rerender) {
+  // The TSN dataset is shared by both matrices, so the picker re-renders whichever
+  // grid it sits in (default: the Everything matrix).
+  rerender = rerender || renderMatrix;
   const wrap = document.createElement("div"); wrap.className = "mx-tsnpick";
 
   const hasFile = tm.source_kind === "file" || tm.source_kind === "consolidated";
@@ -1905,7 +1930,7 @@ function mxTsnPicker(tm, locked) {
   choose.onclick = async () => {
     const r = await api.pick_matrix_tsn_file(tm.tsn_subdir);
     if (r && r.error) showMessage("error", "Can't pick", r.error);
-    if (r && (r.ok || r.path)) await renderMatrix();
+    if (r && (r.ok || r.path)) await rerender();
   };
   row.appendChild(choose);
 
@@ -1914,7 +1939,7 @@ function mxTsnPicker(tm, locked) {
     clr.type = "button"; clr.className = "mx-linkbtn mxtp-clear"; clr.disabled = locked;
     clr.title = "Clear the picked TSN file"; clr.setAttribute("aria-label", "Clear the picked TSN file");
     clr.appendChild(icon("i-x"));
-    clr.onclick = async () => { await api.set_matrix_tsn_file(tm.tsn_subdir, ""); await renderMatrix(); };
+    clr.onclick = async () => { await api.set_matrix_tsn_file(tm.tsn_subdir, ""); await rerender(); };
     row.appendChild(clr);
   }
 
@@ -2141,6 +2166,195 @@ async function renderMatrix() {
   updateMatrixProgress();
 }
 
+// ---- Compare-tab "TSN by day" matrix --------------------------------------
+// A manual day-picking matrix: rows = report types, columns = exported days the
+// user adds, each cell = that day's export vs TSN. Reuses the matrix cell vocab
+// (mxCellContent / mxActBtn / mxHeadBtn) + the shared queue panel; no live
+// re-export and no cross-environment (only ⟳ rebuild + open).
+async function renderDayMatrix() {
+  const grid = $("dayMatrixGrid");
+  if (!grid) return;
+  let snap;
+  try { snap = await api.day_matrix_info(); } catch (e) { return; }
+  if (!snap) return;
+  const days = snap.days || [], locked = !!(S.st && S.st.task);
+
+  const srcSel = $("dayMatrixSource");
+  if (srcSel) {
+    srcSel.textContent = "";
+    (snap.sources || []).forEach((s) => {
+      const o = document.createElement("option");
+      o.value = s.key; o.textContent = s.label;
+      if (s.key === snap.source) o.selected = true;
+      srcSel.appendChild(o);
+    });
+    srcSel.disabled = locked;
+    srcSel.onchange = async () => {
+      const r = await api.set_day_matrix_source(srcSel.value);
+      if (r && r.error) showMessage("error", "Can't set source", r.error);
+      await renderDayMatrix();
+    };
+  }
+
+  const addSel = $("dayMatrixAddDay"), addBtn = $("btnDayAddDay");
+  const avail = (snap.available_days || []).filter((d) => !days.includes(d));
+  if (addSel) {
+    addSel.textContent = "";
+    if (!avail.length) {
+      const o = document.createElement("option");
+      o.value = ""; o.textContent = days.length ? "— no more exported days —" : "— no exported days —";
+      addSel.appendChild(o);
+    } else {
+      avail.forEach((d) => {
+        const o = document.createElement("option"); o.value = d; o.textContent = d;
+        addSel.appendChild(o);
+      });
+    }
+    addSel.disabled = locked || !avail.length;
+  }
+  if (addBtn) {
+    addBtn.disabled = locked || !avail.length;
+    addBtn.onclick = async () => {
+      const d = $("dayMatrixAddDay").value;
+      if (!d) return;
+      const r = await api.add_day_matrix_day(d);
+      if (r && r.error) showMessage("error", "Can't add day", r.error);
+      await renderDayMatrix();
+    };
+  }
+
+  const tsnHost = $("dayMatrixTsn");
+  if (tsnHost) {
+    tsnHost.textContent = "";
+    if (snap.tsn_meta) tsnHost.appendChild(mxTsnPicker(snap.tsn_meta, locked, renderDayMatrix));
+  }
+
+  grid.textContent = "";
+  if (!days.length) {
+    grid.style.gridTemplateColumns = ""; grid.style.gridTemplateRows = "";
+    const empty = document.createElement("div");
+    empty.className = "dm-empty";
+    empty.textContent = "Add an export day above to compare it against TSN.";
+    grid.appendChild(empty);
+    wireDayMatrixFooter();
+    updateDayMatrixProgress();
+    return;
+  }
+  grid.style.gridTemplateColumns = `minmax(170px,1.1fr) repeat(${days.length}, minmax(120px,1fr))`;
+  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(82px,1fr))`;
+
+  const corner = document.createElement("div");
+  corner.className = "mx-cell mx-corner mx-colhead";
+  corner.textContent = "Report \\ Day";
+  grid.appendChild(corner);
+  days.forEach((d) => {
+    const h = document.createElement("div");
+    h.className = "mx-cell mx-colhead";
+    const lab = document.createElement("div"); lab.textContent = d;
+    h.appendChild(lab);
+    const btns = document.createElement("span"); btns.className = "mxch-btns";
+    btns.append(
+      mxHeadBtn("i-compare", `Rebuild every report for ${d}`, "mxch-rebuild", async () => {
+        const r = await api.rebuild_day_matrix("all", null, d);
+        if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this day.");
+        else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+      }),
+      mxHeadBtn("i-trash", `Remove the ${d} column`, "mxch-rm", async () => {
+        await api.remove_day_matrix_day(d); await renderDayMatrix();
+      }));
+    h.appendChild(btns);
+    grid.appendChild(h);
+  });
+
+  snap.rows.forEach((rk) => {
+    const supported = !!snap.row_supported[rk];
+    const rlabel = snap.row_labels[rk] || rk;
+    const rh = document.createElement("div"); rh.className = "mx-cell mx-rowhead";
+    const top = document.createElement("div"); top.className = "mxrh-top";
+    const lbl = document.createElement("span"); lbl.className = "mxrh-label";
+    lbl.textContent = rlabel + (supported ? "" : " (soon)");
+    top.appendChild(lbl);
+    if (supported) {
+      top.appendChild(mxHeadBtn("i-compare", `Rebuild ${rlabel} for every day`, "mxch-rebuild",
+        async () => {
+          const r = await api.rebuild_day_matrix("all", rk, null);
+          if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this row.");
+          else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+        }));
+    }
+    rh.appendChild(top);
+    grid.appendChild(rh);
+    days.forEach((d) => {
+      const c = snap.cells[rk][d], cmp = c.cmp;
+      const cell = document.createElement("div"); cell.className = "mx-cell";
+      const main = document.createElement("div"); main.className = "mx-num";
+      const sub = document.createElement("div"); sub.className = "mx-sub";
+      const v = mxCellContent(cmp, snap.tsn_meta);
+      cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
+      const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "not exported";
+      cell.title = `${rlabel} — ${d}\nExported: ${expWhen}`;
+      cell.append(main, sub);
+      if (supported) {
+        const acts = document.createElement("div"); acts.className = "mx-actions";
+        acts.appendChild(mxActBtn("i-compare", "Build / rebuild this comparison vs TSN",
+          false, async () => {
+            const r = await api.build_day_cell(rk, d);
+            if (r && r.error) showMessage("error", "Can't build", r.error);
+          }));
+        if (cmp && cmp.built) {
+          const ob = mxActBtn("i-external", "Open this comparison workbook (values copy)",
+            false, async () => {
+              const r = await api.open_day_cell_comparison(rk, d);
+              if (r && r.error) showMessage("error", "Can't open", r.error);
+            });
+          ob.classList.add("mx-open"); acts.appendChild(ob);
+        }
+        cell.appendChild(acts);
+      }
+      grid.appendChild(cell);
+    });
+  });
+
+  wireDayMatrixFooter();
+  updateDayMatrixProgress();
+}
+
+function wireDayMatrixFooter() {
+  const rb = $("btnDayRebuildAll");
+  if (rb) rb.onclick = async () => {
+    const r = await api.rebuild_day_matrix("stale");
+    if (r && r.nothing) showMessage("info", "Up to date", "Every by-day comparison is current.");
+    else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+  };
+  const of = $("btnOpenDayComparisons");
+  if (of) of.onclick = async () => {
+    const r = await api.open_day_comparisons_folder();
+    if (r && r.error) showMessage("error", "Can't open", r.error);
+  };
+  const cb = $("btnDayCancel");
+  if (cb) cb.onclick = () => api.cancel_run();
+}
+
+function updateDayMatrixProgress() {
+  const el = $("dayMatrixProgress");
+  if (el) {
+    const m = S.st && S.st.matrix;
+    if (m && m.total) { el.hidden = false; el.textContent = `Comparing ${m.done}/${m.total}…`; }
+    else el.hidden = true;
+  }
+  const locked = !!(S.st && S.st.task);
+  document.querySelectorAll(
+    "#dayMatrixSection .mx-linkbtn, #dayMatrixSource, #dayMatrixAddDay, #btnDayAddDay")
+    .forEach((c) => { c.disabled = locked; });
+  const cancel = $("btnDayCancel");
+  if (cancel) {
+    const running = !!(S.st && S.st.task === "matrix");
+    cancel.classList.toggle("hidden", !running);
+    cancel.disabled = !running;
+  }
+  renderQueuePanel("dayQueueGroup", "dayQueue", "dayQueueCount");
+}
+
 async function startConsolidate() {
   const idx = consChoice();
   const day = selectedDay();
@@ -2175,12 +2389,20 @@ function compareKind() {
 // comparison-type rows, and keep exactly one VISIBLE row selected. Radios share a
 // name, so seating a new pick natively drops the now-hidden previous one;
 // renderCompareKind then swaps in the matching files/folders inputs.
+const DAY_MATRIX_GROUP = "tsn_by_day";
+
 function selectCompareGroup(groupId) {
+  S.compareGroup = groupId;
   document.querySelectorAll("#compareSubtabs .subtab").forEach((b) => {
     const on = b.dataset.group === groupId;
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", String(on));
   });
+  // The TSN-by-day matrix swaps the whole classic picker out for the grid.
+  const dayMode = groupId === DAY_MATRIX_GROUP;
+  $("compareClassic")?.classList.toggle("hidden", dayMode);
+  $("dayMatrixSection")?.classList.toggle("hidden", !dayMode);
+  if (dayMode) { renderDayMatrix(); return; }
   const rows = [...$("compareList").querySelectorAll(".option-row")];
   let firstVisible = null, checkedVisible = false;
   rows.forEach((r) => {
@@ -2623,6 +2845,9 @@ function bindEvents() {
   });
   $("btnQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
   $("btnQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
+  // The by-day matrix shares the same queue (Clear / Stop-all act on it too).
+  $("btnDayQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
+  $("btnDayQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
 
   renderThemeButton();
   $("btnTheme").onclick = () => {
@@ -2942,6 +3167,9 @@ function makeMockApi() {
     matrix_modes: {},            // row_key -> mode id
     matrix_tsn_files: {},        // subdir -> picked file path
     mock_tsn_pdfs: true,         // TSN folder starts with PDFs (not consolidated)
+    day_matrix_source: "ssor-prod",
+    day_matrix_days: [],
+    day_matrix_hidden: [],
   };
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
@@ -3078,6 +3306,56 @@ function makeMockApi() {
              baseline, rows, row_labels: rowLabels, all_rows: allRows, hidden,
              modes, row_modes: rowModes, tsn_meta: tsnMeta,
              envs, all_envs: allEnvs, hidden_envs: henv, env_labels: envLabels, cells };
+  }
+  const MOCK_DAY_AVAIL = {
+    "ssor-prod": ["2026-06-18", "2026-06-17", "2026-06-11"],
+    "ars-prod": ["2026-06-17", "2026-06-11"],
+    "ssor-test": ["2026-06-16"], "ssor-dev": [], "ars-test": [], "ars-dev": [],
+  };
+  function mockDayMatrixSnapshot() {
+    const source = st.day_matrix_source || "ssor-prod";
+    const days = st.day_matrix_days || [];
+    const allRows = [
+      { key: "highway_log", label: "Highway Log (Excel)", supported: true },
+      { key: "highway_log_pdf", label: "Highway Log (PDF)", supported: true },
+      { key: "ramp_summary", label: "TSAR: Ramp Summary", supported: false },
+      { key: "ramp_detail", label: "TSAR: Ramp Detail", supported: false },
+      { key: "highway_sequence", label: "Highway Sequence Listing", supported: false },
+    ];
+    const hidden = st.day_matrix_hidden || [];
+    const shown = allRows.filter((r) => hidden.indexOf(r.key) < 0);
+    const rowLabels = {}, rowSupported = {};
+    allRows.forEach((r) => { rowLabels[r.key] = r.label; rowSupported[r.key] = r.supported; });
+    const tsnSub = "highway_log";
+    const tsnFile = (st.matrix_tsn_files || {})[tsnSub];
+    const srcKind = tsnFile ? "file" : (st.mock_tsn_pdfs ? "pdfs" : "consolidated");
+    const tsnMeta = { supported: true, source_kind: srcKind,
+      pdf_count: srcKind === "pdfs" ? 12 : undefined,
+      source_path: tsnFile || "…\\_tsn_input\\highway_log\\tsn_highway_log_consolidated.xlsx",
+      tsn_subdir: tsnSub, file: tsnFile || null,
+      input_dir: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)\\_tsn_input\\highway_log" };
+    const tsnReady = srcKind !== "pdfs";
+    const cells = {};
+    shown.forEach((r) => {
+      cells[r.key] = {};
+      days.forEach((d, i) => {
+        const present = !(r.key === "highway_log_pdf" && d === "2026-06-11");
+        let cmp;
+        if (!r.supported) cmp = { supported: false };
+        else if (!present) cmp = mockCmp("missing");
+        else if (!tsnReady) cmp = mockCmp("needtsn");
+        else cmp = mockCmp(i === 0 ? [4, 1] : i === 1 ? [0, 0] : "notbuilt");
+        cells[r.key][d] = { export: { present, mtime: 0,
+          age_seconds: present ? (i + 1) * 86400 : null }, cmp };
+      });
+    });
+    return { source, sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
+               .map((k) => { const [s, v] = k.split("-");
+                 return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
+             days, rows: shown.map((r) => r.key), row_labels: rowLabels,
+             row_supported: rowSupported, all_rows: allRows, hidden,
+             tsn_meta: tsnMeta, cells,
+             available_days: MOCK_DAY_AVAIL[source] || [] };
   }
   // v0.16.0 mock job queue — mirrors gui_api: enqueue, run one at a time, auto-
   // advance. `kind` drives the run-mode/icon; `total` feeds the compare progress.
@@ -3647,6 +3925,46 @@ function makeMockApi() {
     },
     open_comparisons_folder: async () => {
       push({ t: "log", text: "(mock) open comparisons folder" });
+      return { ok: true };
+    },
+    // ---- Compare-tab "TSN by day" matrix (shares the queue) ----
+    day_matrix_info: async () => mockDayMatrixSnapshot(),
+    set_day_matrix_source: async (s) => {
+      st.day_matrix_source = s; st.day_matrix_days = [];
+      pushState(); return { ok: true, source: s };
+    },
+    add_day_matrix_day: async (d) => {
+      const avail = MOCK_DAY_AVAIL[st.day_matrix_source] || [];
+      if (avail.indexOf(d) < 0) return { error: "That day has no Highway Log export for this source." };
+      if ((st.day_matrix_days || []).indexOf(d) < 0) st.day_matrix_days = [...(st.day_matrix_days || []), d];
+      pushState(); return { ok: true, days: st.day_matrix_days };
+    },
+    remove_day_matrix_day: async (d) => {
+      st.day_matrix_days = (st.day_matrix_days || []).filter((x) => x !== d);
+      pushState(); return { ok: true, days: st.day_matrix_days };
+    },
+    set_day_matrix_report: async (rk, visible) => {
+      const hidden = new Set(st.day_matrix_hidden || []);
+      if (visible) hidden.delete(rk); else hidden.add(rk);
+      st.day_matrix_hidden = [...hidden];
+      return { ok: true, hidden: st.day_matrix_hidden };
+    },
+    build_day_cell: async (rk, d) =>
+      mockEnqueue("compare", "cell", `Rebuild ${rk} — ${d} vs TSN`, { total: 1 }),
+    rebuild_day_matrix: async (scope, row, date) => {
+      if (!(st.day_matrix_days || []).length) return { ok: true, nothing: true };
+      const n = row ? (st.day_matrix_days || []).length : date ? 2 : 4;
+      const label = row ? `Rebuild ${row} — all days vs TSN`
+        : date ? `Rebuild all reports — ${date} vs TSN`
+        : scope === "all" ? "Rebuild all by-day comparisons" : "Refresh stale by-day comparisons";
+      return mockEnqueue("compare", row ? "row" : date ? "column" : scope, label, { total: n });
+    },
+    open_day_cell_comparison: async (rk, d) => {
+      push({ t: "log", text: `(mock) open by-day comparison: ${d} ${rk}_vs_tsn.xlsx` });
+      return { ok: true };
+    },
+    open_day_comparisons_folder: async () => {
+      push({ t: "log", text: "(mock) open by-day comparisons folder" });
       return { ok: true };
     },
     set_batch_dest: async (p) => {

@@ -44,8 +44,8 @@ import batch_manifest
 import report_library
 import updater
 from gui_worker import (BatchWorker, CheckWorker, ChromiumWorker,
-                        ConsolidateWorker, EnvCheckWorker, EnvScanWorker,
-                        MatrixBatchExportWorker, MatrixCompareWorker,
+                        ConsolidateWorker, DayMatrixCompareWorker, EnvCheckWorker,
+                        EnvScanWorker, MatrixBatchExportWorker, MatrixCompareWorker,
                         MatrixTsnConsolidateWorker,
                         ExportWorker, LoginWorker, ResetWorker, UpdateWorker,
                         measure_targets, reset_targets)
@@ -68,6 +68,7 @@ from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
                      EXPORT_REPORTS, enabled_export_reports, export_reports_status,
                      is_export_disabled, matrix_rows)
 import matrix
+import day_matrix
 
 log = logging.getLogger("tsmis.gui")
 # Everything shown in the GUI's log pane is mirrored here, so tsmis.log
@@ -1468,13 +1469,15 @@ class GuiApi:
         return f"{verb} all comparisons"
 
     def _make_job(self, kind, scope, label, row=None, env=None, subdir=None,
-                  fast=False):
+                  fast=False, which="env"):
+        # `which` ("env" = Everything matrix, "day" = Compare by-day matrix) lets
+        # ONE queue serve both matrices; for day jobs `env` carries the date.
         with self._lock:
             self._job_seq += 1
             jid = self._job_seq
         return {"id": jid, "kind": kind, "scope": scope, "label": label,
                 "row": row, "env": env, "subdir": subdir, "fast": bool(fast),
-                "status": "queued"}
+                "which": which, "status": "queued"}
 
     def _enqueue_matrix_job(self, job):
         """Append a Job and try to start it (or leave it queued behind the
@@ -1547,7 +1550,23 @@ class GuiApi:
                                        scope=rebuild_scope,
                                        row=job.get("row"), env=job.get("env"))
 
+    def _resolve_day_cells(self, job):
+        """[(date, row)] for a by-day compare job. 'cell' = the one explicit cell;
+        row/column/all/stale defer to day_matrix's staleness-aware list."""
+        snap = self._day_matrix_snapshot()
+        scope = job["scope"]
+        if scope == "cell":
+            row, date = job["row"], job["env"]
+            if not snap.get("row_supported", {}).get(row) or date not in snap["days"]:
+                return []
+            return [(date, row)]
+        rebuild_scope = "stale" if scope == "stale" else "all"
+        return day_matrix.cells_to_rebuild(snap, scope=rebuild_scope,
+                                           row=job.get("row"), date=job.get("env"))
+
     def _dispatch_compare_job(self, job):
+        if job.get("which") == "day":
+            return self._dispatch_day_compare_job(job)
         base = self._current_baseline()
         dest = settings.get_batch_dest()
         cells = self._resolve_compare_cells(job, base)
@@ -1563,6 +1582,23 @@ class GuiApi:
                     "workers": 1})
         MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event,
                             tsn_files=settings.get_matrix_tsn_files()).start()
+        return True
+
+    def _dispatch_day_compare_job(self, job):
+        source = settings.get_day_matrix_source()
+        dest = settings.get_batch_dest()
+        cells = self._resolve_day_cells(job)
+        if not cells:
+            return False
+        with self._lock:
+            self._matrix = {"phase": "comparing", "row": job.get("row"),
+                            "cell": job.get("env"), "done": 0, "total": len(cells)}
+        self._emit_log(f"{job['label']} — {len(cells)} comparison(s) vs TSN…")
+        self._set_dot("busy", "Comparing…")
+        self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
+                    "workers": 1})
+        DayMatrixCompareWorker(source, cells, dest, self._q, self.cancel_event,
+                               tsn_files=settings.get_matrix_tsn_files()).start()
         return True
 
     def _matrix_worker_count(self):
@@ -1912,6 +1948,137 @@ class GuiApi:
         baseline (<dest>/comparisons/<baseline>/)."""
         dest = settings.get_batch_dest()
         self._open_folder(matrix.comparisons_root(dest, self._current_baseline()))
+        return {"ok": True}
+
+    # ----- Compare-tab "TSN by day" matrix -----------------------------------
+    def _day_matrix_snapshot(self):
+        """The by-day snapshot with the user's source / day columns / hidden rows
+        and the shared TSN dataset applied (dest = the Everything matrix's
+        batch_dest, so both matrices reuse one _tsn_input folder)."""
+        return day_matrix.day_matrix_snapshot(
+            settings.get_day_matrix_source(), settings.get_day_matrix_days(),
+            hidden=settings.get_day_matrix_hidden(),
+            tsn_files=settings.get_matrix_tsn_files(),
+            dest=settings.get_batch_dest())
+
+    def _day_job_label(self, scope, row=None, date=None):
+        rl = self._matrix_row_label(row) if row else None
+        if scope == "cell":
+            return f"Rebuild {rl} — {date} vs TSN"
+        if scope == "row":
+            return f"Rebuild {rl} — all days vs TSN"
+        if scope == "column":
+            return f"Rebuild all reports — {date} vs TSN"
+        if scope == "stale":
+            return "Refresh stale by-day comparisons"
+        return "Rebuild all by-day comparisons"
+
+    @_api_method
+    def day_matrix_info(self):
+        """The by-day matrix snapshot for the Compare tab — a pure filesystem read
+        plus the add-day picker's available days for the current source."""
+        snap = self._day_matrix_snapshot()
+        snap["available_days"] = day_matrix.available_days(snap["source"])
+        return snap
+
+    @_api_method
+    def set_day_matrix_source(self, source):
+        """Set the by-day matrix data source (the day columns are dates within it)."""
+        if source not in day_matrix.sources():
+            return {"error": "Unknown data source."}
+        settings.set_day_matrix_source(source)
+        self._emit_log(f"By-day matrix source set to {matrix.default_env_label(source)}.")
+        self._push_state()
+        return {"ok": True, "source": source}
+
+    @_api_method
+    def add_day_matrix_day(self, date):
+        """Add a day COLUMN (a date that has a Highway Log export for the source)."""
+        if date not in day_matrix.available_days(settings.get_day_matrix_source()):
+            return {"error": "That day has no Highway Log export for this source."}
+        days = settings.get_day_matrix_days()
+        if date not in days:
+            settings.set_day_matrix_days(days + [date])
+        self._push_state()
+        return {"ok": True, "days": settings.get_day_matrix_days()}
+
+    @_api_method
+    def remove_day_matrix_day(self, date):
+        """Remove a day column."""
+        settings.set_day_matrix_days(
+            [d for d in settings.get_day_matrix_days() if d != date])
+        self._push_state()
+        return {"ok": True, "days": settings.get_day_matrix_days()}
+
+    @_api_method
+    def set_day_matrix_report(self, row_key, visible):
+        """Show/hide a report ROW on the by-day matrix. At least one stays on."""
+        keys = {r["key"] for r in self._day_matrix_snapshot()["all_rows"]}
+        if row_key not in keys:
+            return {"error": "Unknown report for the matrix."}
+        hidden = set(settings.get_day_matrix_hidden())
+        if visible:
+            hidden.discard(row_key)
+        else:
+            hidden.add(row_key)
+        if len(hidden & keys) >= len(keys):
+            return {"error": "Keep at least one report on the matrix."}
+        settings.set_day_matrix_hidden(sorted(hidden))
+        self._push_state()
+        return {"ok": True, "hidden": sorted(hidden)}
+
+    @_api_method
+    def build_day_cell(self, row_key, date):
+        """Queue a (re)build of ONE (report, day) vs-TSN comparison."""
+        snap = self._day_matrix_snapshot()
+        if row_key not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report for the matrix."}
+        if not snap.get("row_supported", {}).get(row_key):
+            return {"error": "That comparison isn't available yet for this report."}
+        if date not in snap["days"]:
+            return {"error": "Add that day first."}
+        job = self._make_job("compare", "cell",
+                             self._day_job_label("cell", row_key, date),
+                             row=row_key, env=date, which="day")
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def rebuild_day_matrix(self, scope="stale", row=None, date=None):
+        """Queue a by-day comparison rebuild in scope ('stale'/'all'), optionally
+        scoped to one report row or one day column. {nothing:True} only when idle
+        and there's nothing to do."""
+        snap = self._day_matrix_snapshot()
+        scope = scope if scope in ("stale", "all") else "stale"
+        row = row if (row and row in {r["key"] for r in snap["all_rows"]}) else None
+        date = date if (date and date in snap["days"]) else None
+        job_scope = "row" if row else "column" if date else scope
+        with self._lock:
+            idle = not self._task and not self._queue
+        if idle:
+            cells = day_matrix.cells_to_rebuild(snap, scope=scope, row=row, date=date)
+            if not cells:
+                return {"ok": True, "nothing": True}
+        job = self._make_job("compare", job_scope,
+                             self._day_job_label(job_scope, row, date),
+                             row=row, env=date, which="day")
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def open_day_cell_comparison(self, row_key, date):
+        """Open ONE by-day comparison VALUES workbook."""
+        snap = self._day_matrix_snapshot()
+        if date not in snap["days"] or row_key not in snap["rows"]:
+            return {"error": "Unknown cell."}
+        path = day_matrix.day_out_path(date, snap["source"], row_key)
+        if not path.exists():
+            return {"error": "No comparison built yet — use “⟳ rebuild” first."}
+        self._open_file(path)
+        return {"ok": True}
+
+    @_api_method
+    def open_day_comparisons_folder(self):
+        """Open the by-day comparison store (output/comparisons/tsn-by-day/)."""
+        self._open_folder(day_matrix.byday_root())
         return {"ok": True}
 
     def _on_matrix_cell(self, payload):

@@ -75,6 +75,7 @@ from common import (
 )
 import batch_manifest
 import dataclasses
+import day_matrix
 import matrix
 from pathlib import Path
 from events import Events
@@ -1699,6 +1700,58 @@ class MatrixCompareWorker(threading.Thread):
                     status, errors = "error", errors + 1
                 done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
+                                            "status": status,
+                                            "done": done, "total": total}))
+        finally:
+            self.q.put(("matrix_done", {"done": done, "total": total,
+                                        "errors": errors,
+                                        "cancelled": self.cancel.is_set()}))
+
+
+class DayMatrixCompareWorker(threading.Thread):
+    """(Re)build Compare-tab "TSN by day" cells — each a (day, report) vs TSN.
+
+    `cells` is a list of (date, row_key). No browser — pure orchestration via
+    day_matrix.build_day_cell over the SHARED TSN compare path (the same untouched
+    consolidate_*/compare_highway_log[_pdf] adapters the Everything matrix uses).
+    Honors cancel BETWEEN cells (each finished cell is saved). Posts
+    ('matrix_cell', {...}) around each cell and ('matrix_done', {...}) at the end —
+    reusing the Everything matrix's progress events so the bridge handles both."""
+
+    def __init__(self, source, cells, dest, queue, cancel_event, tsn_files=None):
+        super().__init__(daemon=True, name="day-matrix-compare")
+        self.source = source
+        self.cells = [(c[0], c[1]) for c in cells]   # (date, row_key)
+        self.dest = dest
+        self.q = queue
+        self.cancel = cancel_event
+        self.tsn_files = tsn_files or {}
+
+    def run(self):
+        events = Events(is_cancelled=self.cancel.is_set,
+                        on_log=lambda m: self.q.put(("log", m)))
+        total = len(self.cells)
+        done = errors = 0
+        try:
+            for date, row_key in self.cells:
+                if self.cancel.is_set():
+                    break
+                self.q.put(("matrix_cell", {"row": row_key, "cell": date,
+                                            "status": "running",
+                                            "done": done, "total": total}))
+                try:
+                    res = day_matrix.build_day_cell(
+                        self.source, date, row_key, self.dest, events,
+                        tsn_files=self.tsn_files)
+                    status = res.status
+                    if status != "ok":
+                        errors += 1
+                        self.q.put(("log", f"  {date} {row_key}: {res.message}"))
+                except Exception as e:                   # noqa: BLE001
+                    log.exception("day matrix compare %s/%s crashed", date, row_key)
+                    status, errors = "error", errors + 1
+                done += 1
+                self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": status,
                                             "done": done, "total": total}))
         finally:
