@@ -1441,7 +1441,7 @@ function dispatch(events) {
   for (const ev of events) {
     try {
       switch (ev.t) {
-        case "state": S.st = ev.s; renderState(); break;
+        case "state": S.st = ev.s; renderState(); updateMatrixProgress(); break;
         case "settings":
           S.init.settings = ev.s;
           fillSettings();
@@ -1453,7 +1453,8 @@ function dispatch(events) {
         case "wstatus": updateWorkerStatus(ev.w, ev.text); break;
         case "preview": showPreviewEvent(ev); break;
         case "run_started": startRunUi(ev.mode, ev.label, ev.workers); break;
-        case "run_ended": endRunUi(); if (S.tab === "everything") renderBatchLibrary(); break;
+        case "run_ended": endRunUi(); if (S.tab === "everything") { renderBatchLibrary(); renderMatrix(); } break;
+        case "matrix_refresh": if (S.tab === "everything") renderMatrix(); break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default: break;
       }
@@ -1647,6 +1648,162 @@ async function renderBatchLibrary() {
   });
   const meta = $("batchLibMeta");
   if (meta) meta.textContent = `${present.length} of ${rows.length} present`;
+}
+
+// ---- environment comparison matrix --------------------------------------
+const MX_HI = 50;   // >= this many discrepancies reads as "many" (red); tunable
+
+function updateMatrixProgress() {
+  const el = $("matrixProgress");
+  if (!el) return;
+  const m = S.st && S.st.matrix;
+  if (m && m.total) {
+    el.hidden = false;
+    el.textContent = `Comparing ${m.done}/${m.total}…`;
+  } else {
+    el.hidden = true;
+  }
+  // Grey the matrix controls live while ANY task runs (the grid only re-renders
+  // at run end, so toggle the existing buttons/select here on each state push).
+  const locked = !!(S.st && S.st.task);
+  document.querySelectorAll(
+    "#matrixSection .mx-act, #matrixBaseline, #btnMatrixRefreshAll")
+    .forEach((c) => { c.disabled = locked; });
+}
+
+function mxCellContent(c) {
+  // Returns {cls, main, sub} for a non-baseline cell's comparison state.
+  const comp = c.comparison || {};
+  if (comp.missing_side) {
+    const why = comp.missing_side === "baseline" ? "baseline not exported"
+      : comp.missing_side === "both" ? "neither exported" : "not exported";
+    return { cls: "mx-missing", main: "needs export", sub: why };
+  }
+  if (!comp.built) return { cls: "mx-stale", main: "compare", sub: "not built yet" };
+  if (comp.stale || comp.diff_cells == null) {
+    return { cls: "mx-stale",
+             main: comp.diff_cells == null ? "re-run" : String(comp.diff_cells),
+             sub: "stale — refresh" };
+  }
+  const d = comp.diff_cells || 0, os = comp.one_sided || 0;
+  if (d === 0 && os === 0) return { cls: "mx-match", main: "✓ match", sub: "identical" };
+  const cls = (d >= MX_HI || d + os >= MX_HI) ? "mx-diff-hi" : "mx-diff-lo";
+  return { cls, main: `${d} diff${d === 1 ? "" : "s"}`,
+           sub: os ? `+${os} one-sided` : "" };
+}
+
+async function renderMatrix() {
+  const grid = $("matrixGrid");
+  if (!grid) return;
+  let snap;
+  try { snap = await api.matrix_info(); } catch (e) { return; }
+  if (!snap || !snap.rows) return;
+  const envs = snap.envs, locked = !!(S.st && S.st.task);
+  grid.style.gridTemplateColumns =
+    `minmax(132px,1.3fr) repeat(${envs.length}, minmax(92px,1fr))`;
+  grid.textContent = "";
+
+  const corner = document.createElement("div");
+  corner.className = "mx-cell mx-corner mx-colhead";
+  corner.textContent = "Report \\ Env";
+  grid.appendChild(corner);
+  envs.forEach((env) => {
+    const h = document.createElement("div");
+    h.className = "mx-cell mx-colhead" + (env === snap.baseline ? " mx-baseline-col" : "");
+    h.textContent = (snap.env_labels[env] || env) + (env === snap.baseline ? " ★" : "");
+    grid.appendChild(h);
+  });
+
+  snap.rows.forEach((rk) => {
+    const rh = document.createElement("div");
+    rh.className = "mx-cell mx-rowhead";
+    rh.textContent = snap.row_labels[rk] || rk;
+    grid.appendChild(rh);
+    envs.forEach((env) => {
+      const c = snap.cells[rk][env];
+      const cell = document.createElement("div");
+      cell.className = "mx-cell" + (env === snap.baseline ? " mx-baseline-col" : "");
+      const main = document.createElement("div");
+      main.className = "mx-num";
+      const sub = document.createElement("div");
+      sub.className = "mx-sub";
+      const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "never exported";
+      if (c.is_baseline) {
+        main.textContent = "baseline";
+        sub.textContent = expWhen;
+      } else {
+        const v = mxCellContent(c);
+        cell.classList.add(v.cls);
+        main.textContent = v.main;
+        sub.textContent = v.sub;
+      }
+      cell.title = `${snap.row_labels[rk]} — ${snap.env_labels[env] || env}\n`
+        + `Exported: ${expWhen}`
+        + (c.is_baseline ? "  (baseline)" : "");
+      cell.append(main, sub);
+
+      const acts = document.createElement("div");
+      acts.className = "mx-actions";
+      const expBtn = document.createElement("button");
+      expBtn.className = "mx-act"; expBtn.textContent = "↻ export";
+      expBtn.title = "Re-export this report for this environment (live)";
+      expBtn.disabled = locked;
+      expBtn.onclick = async () => {
+        const r = await api.refresh_cell_export(rk, env);
+        if (r && r.error) showMessage("error", "Can't refresh", r.error);
+      };
+      acts.appendChild(expBtn);
+      if (!c.is_baseline) {
+        const cmpBtn = document.createElement("button");
+        cmpBtn.className = "mx-act"; cmpBtn.textContent = "↻ compare";
+        cmpBtn.title = "Rebuild this comparison against the baseline";
+        cmpBtn.disabled = locked;
+        cmpBtn.onclick = async () => {
+          const r = await api.refresh_cell_comparison(rk, env);
+          if (r && r.error) showMessage("error", "Can't compare", r.error);
+        };
+        acts.appendChild(cmpBtn);
+      }
+      cell.appendChild(acts);
+      grid.appendChild(cell);
+    });
+  });
+
+  const sel = $("matrixBaseline");
+  if (sel) {
+    sel.textContent = "";
+    envs.forEach((env) => {
+      const o = document.createElement("option");
+      o.value = env; o.textContent = snap.env_labels[env] || env;
+      if (env === snap.baseline) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.disabled = locked;
+    sel.onchange = async () => {
+      const nb = sel.value;
+      const ok = await showConfirm({
+        title: "Switch baseline?",
+        message: `Compare every environment against ${snap.env_labels[nb] || nb}?\n\n`
+          + "This recomputes the whole matrix against the new baseline.",
+        confirmLabel: "Switch & recompute",
+      });
+      if (!ok) { sel.value = snap.baseline; return; }
+      const r = await api.set_matrix_baseline(nb);
+      if (r && r.error) { showMessage("error", "Can't switch", r.error); sel.value = snap.baseline; return; }
+      await renderMatrix();
+      await api.recompute_matrix("all");
+    };
+  }
+  const btn = $("btnMatrixRefreshAll");
+  if (btn) {
+    btn.disabled = locked;
+    btn.onclick = async () => {
+      const r = await api.recompute_matrix("stale");
+      if (r && r.nothing) showMessage("info", "Up to date", "Every comparison is current.");
+      else if (r && r.error) showMessage("error", "Can't refresh", r.error);
+    };
+  }
+  updateMatrixProgress();
 }
 
 async function startConsolidate() {
@@ -2096,7 +2253,7 @@ function bindEvents() {
     });
     $("panelTitle").textContent = TABS[tab].title;
     $("panelSub").textContent = TABS[tab].sub;
-    if (tab === "everything") renderBatchLibrary();
+    if (tab === "everything") { renderBatchLibrary(); renderMatrix(); }
     updateActivityCards();
   };
   Object.entries(TABS).forEach(([key, t]) => { $(t.btn).onclick = () => setTab(key); });
@@ -2410,6 +2567,8 @@ function makeMockApi() {
     can_save_report: false,
     update: { phase: "idle" },
     env_access: {},
+    matrix: null,
+    matrix_baseline: "ssor-prod",
   };
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
@@ -2451,6 +2610,56 @@ function makeMockApi() {
   let timer = null;
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
+
+  // A canned 3x6 matrix snapshot exercising every cell state (baseline, match,
+  // diff-low, diff-high, stale, needs-export) so the grid + colors are verifiable.
+  function mockMatrixSnapshot(baseline) {
+    const envs = ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"];
+    const rows = ["ramp_summary", "ramp_detail", "highway_sequence"];
+    const rowLabels = { ramp_summary: "TSAR: Ramp Summary", ramp_detail: "TSAR: Ramp Detail",
+                        highway_sequence: "Highway Sequence Listing" };
+    const envLabels = {};
+    envs.forEach((e) => { const [s, v] = e.split("-");
+      envLabels[e] = `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}`; });
+    // [diff_cells, one_sided] | "stale" | "missing", keyed to a ssor-prod baseline.
+    const sample = {
+      ramp_summary: { "ssor-test": [42, 0], "ssor-dev": [42, 0], "ars-prod": [0, 0], "ars-test": [48, 0], "ars-dev": "stale" },
+      ramp_detail: { "ssor-test": [25, 10], "ssor-dev": [25, 10], "ars-prod": [0, 0], "ars-test": [31, 10], "ars-dev": "missing" },
+      highway_sequence: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
+    };
+    const cells = {};
+    rows.forEach((rk) => {
+      cells[rk] = {};
+      envs.forEach((env) => {
+        const isB = env === baseline;
+        let comp = null;
+        if (!isB) {
+          const s = (sample[rk] || {})[env];
+          if (!s || s === "missing")
+            comp = { built: false, stale: true, reason: "missing", missing_side: "cell", verdict: null, diff_cells: null, one_sided: null };
+          else if (s === "stale")
+            comp = { built: true, stale: true, reason: "cell_newer", missing_side: null, verdict: "diff", diff_cells: 18, one_sided: 2 };
+          else
+            comp = { built: true, stale: false, reason: "fresh", missing_side: null,
+                     verdict: (s[0] === 0 && s[1] === 0) ? "match" : "diff", diff_cells: s[0], one_sided: s[1] };
+        }
+        cells[rk][env] = { export: { present: true, mtime: 0, age_seconds: env.endsWith("dev") ? 5 * 86400 : 2 * 3600 },
+                           is_baseline: isB, comparison: comp };
+      });
+    });
+    return { dest: st.batch_dest || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
+             baseline, rows, row_labels: rowLabels, envs, env_labels: envLabels, cells };
+  }
+  function mockMatrixRun(mode, label, total) {
+    st.task = "matrix";
+    if (total) st.matrix = { phase: "comparing", row: null, cell: null, done: 0, total };
+    pushState();
+    push({ t: "run_started", mode, label, workers: 1 }, { t: "log", text: label });
+    setTimeout(() => {
+      st.task = null; st.matrix = null; pushState();
+      push({ t: "run_ended" }, { t: "matrix_refresh" });
+    }, 700);
+  }
 
   // A fake TSMIS page screenshot (canvas → JPEG base64) so the preview modal
   // can be styled without the real app.
@@ -2881,6 +3090,31 @@ function makeMockApi() {
         { label: "Highway Log (PDF)", subdir: "highway_log_pdf", present: true, mtime: 0, age_seconds: 6 * 86400 },
       ],
     }),
+    matrix_info: async () => mockMatrixSnapshot(st.matrix_baseline || "ssor-prod"),
+    set_matrix_baseline: async (b) => {
+      st.matrix_baseline = b;
+      push({ t: "log", text: `Matrix baseline set to ${b}.` });
+      pushState();
+      return { baseline: b, recompute_pending: 5 };
+    },
+    refresh_cell_export: async (rk, env) => {
+      if (st.task) return { error: "A task is already running." };
+      mockMatrixRun("export", `Refreshing ${rk} — ${env}…`);
+      return { ok: true };
+    },
+    refresh_cell_comparison: async (rk, env) => {
+      if (st.task) return { error: "A task is already running." };
+      if (env === (st.matrix_baseline || "ssor-prod"))
+        return { error: "The baseline column has nothing to compare against." };
+      mockMatrixRun("consolidate", `Comparing ${env} vs ${st.matrix_baseline}…`, 1);
+      return { ok: true };
+    },
+    recompute_matrix: async (scope) => {
+      if (st.task) return { error: "A task is already running." };
+      const n = scope === "all" ? 10 : 3;
+      mockMatrixRun("consolidate", `Rebuilding ${n} comparison(s)…`, n);
+      return { ok: true, count: n };
+    },
     set_batch_dest: async (p) => {
       st.batch_dest = p || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)";
       pushState(); return { dest: st.batch_dest };

@@ -310,6 +310,33 @@
           <span class="spacer"></span>
           <span class="hint" id="batchProgress" hidden></span>
         </div>
+        <div class="card-section" id="matrixSection">
+          <div class="section-head">
+            <span class="section-label">Environment comparison matrix</span>
+            <span class="section-meta">
+              Baseline
+              <span class="tb-select"><select id="matrixBaseline"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+            </span>
+          </div>
+          <p class="hint">Each cell compares that report + environment against the
+            baseline column and shows the number of differing cells (green = identical).
+            Intersection reports are export-only and aren't shown.</p>
+          <div class="matrix-wrap"><div class="matrix-grid" id="matrixGrid"></div></div>
+          <div class="matrix-legend">
+            <span class="mx-key mx-match">identical</span>
+            <span class="mx-key mx-diff-lo">few diffs</span>
+            <span class="mx-key mx-diff-hi">many diffs</span>
+            <span class="mx-key mx-stale">stale</span>
+            <span class="mx-key mx-missing">needs export</span>
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-subtle btn-small" id="btnMatrixRefreshAll">
+              <svg class="ic"><use href="#i-refresh"/></svg>Refresh stale comparisons
+            </button>
+            <span class="spacer"></span>
+            <span class="hint" id="matrixProgress" hidden></span>
+          </div>
+        </div>
       </div>
 
       <!-- Consolidate pane -->

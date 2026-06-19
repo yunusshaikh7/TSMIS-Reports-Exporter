@@ -519,6 +519,48 @@ button, input, select { font-family: inherit; }
 .lib-row.stale .lib-age { color: var(--warning); font-weight: 600; }
 .lib-row.missing .lib-age { font-style: italic; }
 
+/* Environment comparison matrix (Everything tab) */
+.matrix-wrap { overflow-x: auto; margin: 4px 0 8px; }
+.matrix-grid {
+  display: grid; gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  overflow: hidden; min-width: max-content; font-size: 12px;
+}
+.mx-cell {
+  background: var(--card); padding: 7px 9px; min-height: 30px;
+  display: flex; flex-direction: column; gap: 2px; justify-content: center;
+}
+.mx-cell.mx-corner { background: var(--muted); }
+.mx-colhead, .mx-rowhead {
+  background: var(--muted); font-weight: 600; color: var(--muted-foreground);
+}
+.mx-colhead { text-align: center; align-items: center; }
+.mx-colhead.mx-baseline-col, .mx-cell.mx-baseline-col { box-shadow: inset 0 0 0 2px var(--primary); }
+.mx-rowhead { justify-content: center; }
+.mx-num { font-weight: 600; font-size: 13px; }
+.mx-sub { color: var(--muted-foreground); font-size: 11px; }
+.mx-cell.mx-match    { background: color-mix(in oklab, var(--success) 16%, var(--card)); }
+.mx-cell.mx-diff-lo  { background: color-mix(in oklab, var(--warning) 18%, var(--card)); }
+.mx-cell.mx-diff-hi  { background: color-mix(in oklab, var(--destructive) 18%, var(--card)); }
+.mx-cell.mx-stale    { background: color-mix(in oklab, var(--muted) 60%, var(--card)); }
+.mx-cell.mx-stale .mx-num { color: var(--muted-foreground); text-decoration: line-through; }
+.mx-cell.mx-missing  { background: var(--card); }
+.mx-cell.mx-missing .mx-num { color: var(--muted-foreground); font-style: italic; font-weight: 500; }
+.mx-actions { display: flex; gap: 4px; margin-top: 2px; }
+.mx-act {
+  border: none; background: transparent; cursor: pointer; padding: 1px 4px;
+  border-radius: 4px; color: var(--muted-foreground); font-size: 11px;
+}
+.mx-act:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
+.mx-act:disabled { opacity: 0.4; cursor: default; }
+.matrix-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
+.mx-key { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
+.mx-key.mx-match { background: color-mix(in oklab, var(--success) 16%, var(--card)); }
+.mx-key.mx-diff-lo { background: color-mix(in oklab, var(--warning) 18%, var(--card)); }
+.mx-key.mx-diff-hi { background: color-mix(in oklab, var(--destructive) 18%, var(--card)); }
+.mx-key.mx-stale { background: color-mix(in oklab, var(--muted) 60%, var(--card)); }
+.mx-key.mx-missing { background: var(--card); font-style: italic; }
+
 .day-row { display: flex; align-items: center; gap: 10px; }
 .day-row select { min-width: 150px; height: 34px; font-size: 13px; }
 

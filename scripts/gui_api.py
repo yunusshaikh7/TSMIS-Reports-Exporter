@@ -1420,7 +1420,7 @@ class GuiApi:
         self._emit_log(f"Comparing {matrix.default_env_label(env_key)} vs "
                        f"{matrix.default_env_label(base)} ({row_key})…")
         self._set_dot("busy", "Comparing…")
-        self._emit({"t": "run_started", "mode": "matrix", "label": "Comparing…",
+        self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
         self._push_state()
         MatrixCompareWorker(dest, base, [(row_key, env_key)], self._q,
@@ -1447,7 +1447,7 @@ class GuiApi:
         self._emit_log(f"Rebuilding {len(cells)} comparison(s) against "
                        f"{matrix.default_env_label(base)}…")
         self._set_dot("busy", "Comparing…")
-        self._emit({"t": "run_started", "mode": "matrix", "label": "Comparing…",
+        self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
         self._push_state()
         MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event).start()
