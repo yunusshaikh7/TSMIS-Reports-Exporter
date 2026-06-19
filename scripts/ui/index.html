@@ -339,11 +339,10 @@
               <span class="tb-select"><select id="matrixBaseline"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
             </span>
           </div>
-          <!-- Report toggle chips (which rows show + get refreshed) on the left;
-               the colour legend on the right. One compact line to keep the grid
+          <!-- The colour legend rides the header; report/env toggles + the global
+               mode control live in the config zone (bottom-right) to keep the grid
                as tall as possible. -->
           <div class="mx-controls">
-            <div class="mx-toggles" id="matrixToggles" title="Toggle which reports appear on the matrix"></div>
             <div class="matrix-legend">
               <span class="mx-key mx-match">identical</span>
               <span class="mx-key mx-diff-lo">few diffs</span>
@@ -360,6 +359,9 @@
           </button>
           <button class="btn btn-subtle btn-small" id="btnOpenComparisons">
             <svg class="ic"><use href="#i-folder-open"/></svg>Open comparisons folder
+          </button>
+          <button class="btn btn-subtle btn-small hidden" id="btnMatrixCancel">
+            <svg class="ic"><use href="#i-x"/></svg>Cancel
           </button>
           <span class="spacer"></span>
           <span class="hint" id="matrixProgress" hidden></span>
@@ -755,6 +757,28 @@
         </div>
         <div class="log-body mono" id="logBody">
           <div class="log-placeholder" id="logPlaceholder">Waiting for an action… export and consolidation activity will appear here.</div>
+        </div>
+      </div>
+
+      <!-- Matrix config zone: only shown on the Comparison-matrix sub-tab (under
+           the slim activity log). Report + environment show/hide toggles and the
+           global "set all comparisons to…" control; populated by app.js. -->
+      <div class="card matrix-config" id="matrixConfig">
+        <div class="mc-head"><svg class="ic"><use href="#i-grid"/></svg>Matrix options</div>
+        <div class="mc-group">
+          <div class="mc-label">Show comparison for all</div>
+          <div class="mc-allmodes">
+            <button class="mc-mode" data-mode="env">Cross-environment</button>
+            <button class="mc-mode" data-mode="tsn">vs TSN</button>
+          </div>
+        </div>
+        <div class="mc-group">
+          <div class="mc-label">Reports</div>
+          <div class="mx-toggles" id="matrixReportToggles"></div>
+        </div>
+        <div class="mc-group">
+          <div class="mc-label">Environments</div>
+          <div class="mx-toggles" id="matrixEnvToggles"></div>
         </div>
       </div>
     </section>

@@ -647,6 +647,69 @@ button, input, select { font-family: inherit; }
 .mx-key.mx-diff-hi { background: color-mix(in oklab, var(--destructive) 18%, var(--card)); }
 .mx-key.mx-stale { background: color-mix(in oklab, var(--muted) 60%, var(--card)); }
 .mx-key.mx-missing { background: var(--card); font-style: italic; }
+.mx-cell.mx-na { background: var(--card); }
+.mx-cell.mx-na .mx-num { color: var(--muted-foreground); font-style: italic; font-weight: 500; }
+
+/* Row header: report label + per-row comparison-mode dropdown + (vs-TSN) file
+   picker + a per-row refresh; left-aligned, stacked. */
+.mx-rowhead {
+  align-items: stretch; justify-content: flex-start; gap: 5px;
+  text-align: left; padding: 8px 10px;
+}
+.mxrh-top { display: flex; align-items: center; gap: 6px; }
+.mxrh-label { flex: 1; min-width: 0; font-weight: 600; color: var(--foreground); }
+.mx-rowmode {
+  width: 100%; font-size: 11px; padding: 2px 4px; border-radius: var(--radius-sm);
+  border: 1px solid var(--input-border); background: var(--card); color: var(--foreground);
+}
+.mx-tsnpick { display: flex; flex-direction: column; gap: 2px; font-size: 10.5px;
+  color: var(--muted-foreground); }
+.mx-tsnpick .mxtp-state { overflow-wrap: anywhere; }
+.mx-tsnpick .mxtp-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.mx-linkbtn {
+  border: none; background: transparent; padding: 0; cursor: pointer;
+  color: var(--primary); font-size: 10.5px; text-decoration: underline;
+}
+.mx-linkbtn:disabled { color: var(--muted-foreground); cursor: default; text-decoration: none; }
+/* Column header: env label + per-column refresh icon. */
+.mx-colhead .mxch-refresh {
+  border: none; background: transparent; cursor: pointer; padding: 2px;
+  border-radius: var(--radius-sm); color: var(--muted-foreground);
+  display: inline-flex; transition: background-color .12s ease, color .12s ease;
+}
+.mx-colhead .mxch-refresh .ic { width: 13px; height: 13px; }
+.mx-colhead .mxch-refresh:hover:not(:disabled) { background: var(--accent); color: var(--foreground); }
+.mxrh-refresh { /* per-row refresh icon button, in mxrh-top */ }
+
+/* Config zone (bottom-right, under the activity log) — only on the matrix tab. */
+.matrix-config { display: none; }
+body.matrix-wide .matrix-config {
+  display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;
+  padding: 12px 14px; max-height: 46%; overflow-y: auto;
+}
+.matrix-config .mc-head {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 600; color: var(--muted-foreground);
+}
+.matrix-config .mc-head .ic { width: 14px; height: 14px; }
+.mc-group { display: flex; flex-direction: column; gap: 5px; }
+.mc-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted-foreground);
+}
+.mc-allmodes { display: flex; gap: 6px; flex-wrap: wrap; }
+.mc-mode {
+  font-size: 11.5px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--muted-foreground); cursor: pointer;
+  transition: background-color .12s ease, color .12s ease, border-color .12s ease;
+}
+.mc-mode:hover:not(:disabled) { border-color: var(--primary); color: var(--foreground); }
+.mc-mode.on {
+  background: color-mix(in oklab, var(--primary) 12%, var(--card));
+  border-color: color-mix(in oklab, var(--primary) 35%, transparent);
+  color: var(--primary); font-weight: 600;
+}
 
 .day-row { display: flex; align-items: center; gap: 10px; }
 .day-row select { min-width: 150px; height: 34px; font-size: 13px; }

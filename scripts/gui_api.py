@@ -1574,6 +1574,28 @@ class GuiApi:
         return {"ok": True}
 
     @_api_method
+    def pick_matrix_tsn_file(self, subdir):
+        """Native open dialog (xlsx) for a report's TSN workbook, defaulting into
+        its <dest>/_tsn_input/<subdir>/ folder; persists the choice. Returns
+        {ok, path} or {cancelled}."""
+        if subdir not in {sd for _k, _l, sd, _i, _a in matrix_rows()}:
+            return {"error": "Unknown report subdir."}
+        start = matrix.tsn_input_root(settings.get_batch_dest(), subdir)
+        try:
+            start.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        picked = self._window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False, directory=str(start),
+            file_types=("Excel workbook (*.xlsx)",))
+        if not picked:
+            return {"cancelled": True}
+        path = picked[0] if isinstance(picked, (list, tuple)) else picked
+        settings.set_matrix_tsn_file(subdir, str(path))
+        self._push_state()
+        return {"ok": True, "path": str(path)}
+
+    @_api_method
     def consolidate_matrix_tsn(self, subdir):
         """Build the consolidated TSN workbook from the district PDFs the user
         dropped in _tsn_input/<subdir>/ (the 'consolidate these PDFs?' prompt

@@ -1685,28 +1685,45 @@ function updateMatrixProgress() {
     el.hidden = true;
   }
   // Grey the matrix controls live while ANY task runs (the grid only re-renders
-  // at run end, so toggle the existing buttons/select here on each state push).
+  // at run end, so toggle the existing buttons/selects here on each state push).
   const locked = !!(S.st && S.st.task);
   document.querySelectorAll(
-    "#matrixSection .mx-act, #matrixSection .mx-toggle, #matrixBaseline, #btnMatrixRefreshAll, #btnOpenComparisons")
+    "#matrixSection .mx-act, #matrixSection .mxch-refresh, #matrixSection .mx-rowmode, "
+    + "#matrixSection .mx-linkbtn, #matrixBaseline, #btnMatrixRefreshAll, #btnOpenComparisons, "
+    + "#matrixConfig .mx-toggle, #matrixConfig .mc-mode")
     .forEach((c) => { c.disabled = locked; });
+  // Cancel is visible + active only while a matrix run is in progress; the
+  // "Refresh stale" button then resumes whatever was left when re-clicked.
+  const cancel = $("btnMatrixCancel");
+  if (cancel) {
+    const running = !!(S.st && S.st.task === "matrix");
+    cancel.classList.toggle("hidden", !running);
+    cancel.disabled = !running;
+  }
 }
 
-function mxCellContent(c) {
-  // Returns {cls, main, sub} for a non-baseline cell's comparison state.
-  const comp = c.comparison || {};
-  if (comp.missing_side) {
-    const why = comp.missing_side === "baseline" ? "baseline not exported"
-      : comp.missing_side === "both" ? "neither exported" : "not exported";
+function mxCellContent(cmp, tsnMeta) {
+  // Returns {cls, main, sub} for a non-baseline cell from its unified `cmp` state.
+  cmp = cmp || {};
+  if (cmp.supported === false) return { cls: "mx-na", main: "—", sub: "not available yet" };
+  if (cmp.missing_side) {
+    if (cmp.missing_side === "tsn") {
+      if (tsnMeta && tsnMeta.source_kind === "pdfs")
+        return { cls: "mx-missing", main: "consolidate", sub: `${tsnMeta.pdf_count} TSN PDFs` };
+      return { cls: "mx-missing", main: "needs TSN", sub: "pick a TSN file" };
+    }
+    const why = cmp.missing_side === "baseline" ? "baseline not exported"
+      : cmp.missing_side === "both" ? "neither exported"
+      : cmp.missing_side === "other" ? "other format missing" : "not exported";
     return { cls: "mx-missing", main: "needs export", sub: why };
   }
-  if (!comp.built) return { cls: "mx-stale", main: "compare", sub: "not built yet" };
-  if (comp.stale || comp.diff_cells == null) {
+  if (!cmp.built) return { cls: "mx-stale", main: "compare", sub: "not built yet" };
+  if (cmp.stale || cmp.diff_cells == null) {
     return { cls: "mx-stale",
-             main: comp.diff_cells == null ? "re-run" : String(comp.diff_cells),
+             main: cmp.diff_cells == null ? "re-run" : String(cmp.diff_cells),
              sub: "stale — refresh" };
   }
-  const d = comp.diff_cells || 0, os = comp.one_sided || 0;
+  const d = cmp.diff_cells || 0, os = cmp.one_sided || 0;
   if (d === 0 && os === 0) return { cls: "mx-match", main: "✓ match", sub: "identical" };
   const cls = (d >= MX_HI || d + os >= MX_HI) ? "mx-diff-hi" : "mx-diff-lo";
   return { cls, main: `${d} diff${d === 1 ? "" : "s"}`,
@@ -1723,6 +1740,99 @@ function mxActBtn(iconName, title, locked, onClick) {
   return b;
 }
 
+function mxColRefreshBtn(title, locked, onClick) {
+  const b = document.createElement("button");
+  b.className = "mxch-refresh"; b.title = title; b.disabled = locked;
+  b.appendChild(icon("i-refresh")); b.onclick = onClick;
+  return b;
+}
+
+// The vs-TSN file picker shown under a row's name when it's in a TSN mode.
+function mxTsnPicker(tm, locked) {
+  const wrap = document.createElement("div"); wrap.className = "mx-tsnpick";
+  const state = document.createElement("div"); state.className = "mxtp-state";
+  if (tm.source_kind === "file" || tm.source_kind === "consolidated")
+    state.textContent = "TSN: " + (tm.source_path || "").split(/[\\/]/).pop();
+  else if (tm.source_kind === "pdfs") state.textContent = `${tm.pdf_count} TSN PDFs (not consolidated)`;
+  else state.textContent = "no TSN file";
+  const row = document.createElement("div"); row.className = "mxtp-row";
+  const choose = document.createElement("button");
+  choose.className = "mx-linkbtn"; choose.textContent = "Choose…"; choose.disabled = locked;
+  choose.onclick = async () => {
+    const r = await api.pick_matrix_tsn_file(tm.tsn_subdir);
+    if (r && r.error) showMessage("error", "Can't pick", r.error);
+    if (r && (r.ok || r.path)) await renderMatrix();
+  };
+  row.appendChild(choose);
+  if (tm.source_kind === "pdfs") {
+    const cons = document.createElement("button");
+    cons.className = "mx-linkbtn"; cons.textContent = "Consolidate"; cons.disabled = locked;
+    cons.onclick = async () => {
+      const ok = await showConfirm({ title: "Consolidate TSN PDFs?",
+        message: `Build one TSN workbook from the ${tm.pdf_count} PDF(s) in:\n\n${tm.input_dir}`,
+        confirmLabel: "Consolidate" });
+      if (!ok) return;
+      const r = await api.consolidate_matrix_tsn(tm.tsn_subdir);
+      if (r && r.error) showMessage("error", "Can't consolidate", r.error);
+    };
+    row.appendChild(cons);
+  }
+  if (tm.file) {
+    const clr = document.createElement("button");
+    clr.className = "mx-linkbtn"; clr.textContent = "Clear"; clr.disabled = locked;
+    clr.onclick = async () => { await api.set_matrix_tsn_file(tm.tsn_subdir, ""); await renderMatrix(); };
+    row.appendChild(clr);
+  }
+  wrap.append(state, row);
+  return wrap;
+}
+
+// Config zone (bottom-right): report + environment show/hide toggles + the global
+// "set all comparisons to…" control.
+function renderMatrixConfig(snap, locked) {
+  const mkToggle = (label, isOn, title, onClick) => {
+    const b = document.createElement("button");
+    b.className = "mx-toggle" + (isOn ? " on" : "");
+    b.textContent = label; b.disabled = locked; b.title = title;
+    b.onclick = onClick;
+    return b;
+  };
+  const rtog = $("matrixReportToggles");
+  if (rtog) {
+    rtog.textContent = "";
+    const hidden = new Set(snap.hidden || []);
+    (snap.all_rows || []).forEach((r) => {
+      const isOn = !hidden.has(r.key);
+      rtog.appendChild(mkToggle(r.label, isOn, (isOn ? "Hide " : "Show ") + r.label, async () => {
+        const res = await api.set_matrix_report(r.key, !isOn);
+        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
+        await renderMatrix();
+      }));
+    });
+  }
+  const etog = $("matrixEnvToggles");
+  if (etog) {
+    etog.textContent = "";
+    const henv = new Set(snap.hidden_envs || []);
+    (snap.all_envs || []).forEach((e) => {
+      const isOn = !henv.has(e), lbl = snap.env_labels[e] || e;
+      etog.appendChild(mkToggle(lbl, isOn, (isOn ? "Hide " : "Show ") + lbl, async () => {
+        const res = await api.set_matrix_env(e, !isOn);
+        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
+        await renderMatrix();
+      }));
+    });
+  }
+  document.querySelectorAll("#matrixConfig .mc-mode").forEach((b) => {
+    b.disabled = locked;
+    b.onclick = async () => {
+      const r = await api.set_all_matrix_modes(b.dataset.mode);
+      if (r && r.error) { showMessage("error", "Can't apply", r.error); return; }
+      await renderMatrix();
+    };
+  });
+}
+
 async function renderMatrix() {
   const grid = $("matrixGrid");
   if (!grid) return;
@@ -1730,15 +1840,11 @@ async function renderMatrix() {
   try { snap = await api.matrix_info(); } catch (e) { return; }
   if (!snap || !snap.rows) return;
   const envs = snap.envs, locked = !!(S.st && S.st.task);
-  // Full-width sub-tab: cells breathe (wider label column, comfortable per-env
-  // minimum; the fr units stretch to fill the window). The rows template lets
-  // the header stay compact while the data rows share the leftover height, so
-  // the grid fills the screen vertically too (see body.matrix-wide CSS).
+  // Wider row-label column (it carries the mode dropdown + TSN picker now); the
+  // fr units stretch to fill the window, the data rows share the leftover height.
   grid.style.gridTemplateColumns =
-    `minmax(160px,1.1fr) repeat(${envs.length}, minmax(124px,1fr))`;
-  // Data rows share the leftover height down to a readable minimum that fits a
-  // cell's content (count + sub + icon actions); below that the wrap scrolls.
-  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(68px,1fr))`;
+    `minmax(190px,1.2fr) repeat(${envs.length}, minmax(116px,1fr))`;
+  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(82px,1fr))`;
   grid.textContent = "";
 
   const corner = document.createElement("div");
@@ -1748,61 +1854,89 @@ async function renderMatrix() {
   envs.forEach((env) => {
     const h = document.createElement("div");
     h.className = "mx-cell mx-colhead" + (env === snap.baseline ? " mx-baseline-col" : "");
-    h.textContent = (snap.env_labels[env] || env) + (env === snap.baseline ? " ★" : "");
+    const lab = document.createElement("div");
+    lab.textContent = (snap.env_labels[env] || env) + (env === snap.baseline ? " ★" : "");
+    h.appendChild(lab);
+    h.appendChild(mxColRefreshBtn(`Refresh every comparison in ${snap.env_labels[env] || env}`,
+      locked, async () => {
+        const r = await api.recompute_matrix("all", null, env);
+        if (r && r.nothing) showMessage("info", "Nothing to refresh", "No comparable cells here.");
+        else if (r && r.error) showMessage("error", "Can't refresh", r.error);
+      }));
     grid.appendChild(h);
   });
 
   snap.rows.forEach((rk) => {
     const rh = document.createElement("div");
     rh.className = "mx-cell mx-rowhead";
-    rh.textContent = snap.row_labels[rk] || rk;
+    const top = document.createElement("div"); top.className = "mxrh-top";
+    const lbl = document.createElement("span"); lbl.className = "mxrh-label";
+    lbl.textContent = snap.row_labels[rk] || rk;
+    top.append(lbl, mxColRefreshBtn(`Refresh every comparison in ${snap.row_labels[rk]}`,
+      locked, async () => {
+        const r = await api.recompute_matrix("all", rk, null);
+        if (r && r.nothing) showMessage("info", "Nothing to refresh", "No comparable cells here.");
+        else if (r && r.error) showMessage("error", "Can't refresh", r.error);
+      }));
+    rh.appendChild(top);
+    // per-row comparison-mode dropdown (only when the row has >1 mode)
+    const modes = (snap.row_modes && snap.row_modes[rk]) || [];
+    if (modes.length > 1) {
+      const ms = document.createElement("select");
+      ms.className = "mx-rowmode"; ms.disabled = locked;
+      modes.forEach((m) => {
+        const o = document.createElement("option");
+        o.value = m.id; o.textContent = m.label + (m.supported ? "" : " (soon)");
+        o.disabled = !m.supported;
+        if (m.id === snap.modes[rk]) o.selected = true;
+        ms.appendChild(o);
+      });
+      ms.onchange = async () => {
+        const r = await api.set_matrix_row_mode(rk, ms.value);
+        if (r && r.error) showMessage("error", "Can't switch", r.error);
+        await renderMatrix();
+      };
+      rh.appendChild(ms);
+    }
+    const tm = snap.tsn_meta && snap.tsn_meta[rk];
+    if (tm && tm.supported) rh.appendChild(mxTsnPicker(tm, locked));
     grid.appendChild(rh);
+
     envs.forEach((env) => {
-      const c = snap.cells[rk][env];
+      const c = snap.cells[rk][env], cmp = c.cmp;
       const cell = document.createElement("div");
       cell.className = "mx-cell" + (env === snap.baseline ? " mx-baseline-col" : "");
-      const main = document.createElement("div");
-      main.className = "mx-num";
-      const sub = document.createElement("div");
-      sub.className = "mx-sub";
+      const main = document.createElement("div"); main.className = "mx-num";
+      const sub = document.createElement("div"); sub.className = "mx-sub";
       const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "never exported";
-      if (c.is_baseline) {
-        main.textContent = "baseline";
-        sub.textContent = expWhen;
+      if (cmp === null) {                 // env-mode baseline column
+        main.textContent = "baseline"; sub.textContent = expWhen;
       } else {
-        const v = mxCellContent(c);
-        cell.classList.add(v.cls);
-        main.textContent = v.main;
-        sub.textContent = v.sub;
+        const v = mxCellContent(cmp, tm);
+        cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
       }
-      cell.title = `${snap.row_labels[rk]} — ${snap.env_labels[env] || env}\n`
-        + `Exported: ${expWhen}`
-        + (c.is_baseline ? "  (baseline)" : "");
+      cell.title = `${snap.row_labels[rk]} — ${snap.env_labels[env] || env}\nExported: ${expWhen}`;
       cell.append(main, sub);
 
-      const acts = document.createElement("div");
-      acts.className = "mx-actions";
+      const acts = document.createElement("div"); acts.className = "mx-actions";
       acts.appendChild(mxActBtn("i-refresh", "Re-export this report for this environment (live)",
         locked, async () => {
           const r = await api.refresh_cell_export(rk, env);
           if (r && r.error) showMessage("error", "Can't refresh", r.error);
         }));
-      if (!c.is_baseline) {
-        acts.appendChild(mxActBtn("i-compare", "Rebuild this comparison against the baseline",
-          locked, async () => {
-            const r = await api.refresh_cell_comparison(rk, env);
-            if (r && r.error) showMessage("error", "Can't compare", r.error);
-          }));
-        // Open the cell's comparison workbook (values copy) — only when built.
-        if (c.comparison && c.comparison.built) {
-          const openBtn = mxActBtn("i-external",
-            "Open this comparison workbook (values copy — opens without recalculating)",
+      const supported = cmp && cmp.supported !== false;
+      if (cmp !== null && supported) {
+        acts.appendChild(mxActBtn("i-compare", "Rebuild this comparison", locked, async () => {
+          const r = await api.refresh_cell_comparison(rk, env);
+          if (r && r.error) showMessage("error", "Can't compare", r.error);
+        }));
+        if (cmp.built) {
+          const ob = mxActBtn("i-external", "Open this comparison workbook (values copy)",
             locked, async () => {
               const r = await api.open_cell_comparison(rk, env);
               if (r && r.error) showMessage("error", "Can't open", r.error);
             });
-          openBtn.classList.add("mx-open");
-          acts.appendChild(openBtn);
+          ob.classList.add("mx-open"); acts.appendChild(ob);
         }
       }
       cell.appendChild(acts);
@@ -1810,32 +1944,10 @@ async function renderMatrix() {
     });
   });
 
-  // Report toggle chips — which reports are rows (and get refreshed). Toggling
-  // re-renders from the new snapshot; at least one report must stay on.
-  const tog = $("matrixToggles");
-  if (tog) {
-    tog.textContent = "";
-    const hidden = new Set(snap.hidden || []);
-    (snap.all_rows || []).forEach((r) => {
-      const isOn = !hidden.has(r.key);
-      const b = document.createElement("button");
-      b.className = "mx-toggle" + (isOn ? " on" : "");
-      b.textContent = r.label;
-      b.disabled = locked;
-      b.title = (isOn ? "Hide " : "Show ") + r.label + " on the matrix";
-      b.onclick = async () => {
-        const res = await api.set_matrix_report(r.key, !isOn);   // visible = make it on
-        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
-        await renderMatrix();
-      };
-      tog.appendChild(b);
-    });
-  }
-
   const sel = $("matrixBaseline");
   if (sel) {
     sel.textContent = "";
-    envs.forEach((env) => {
+    snap.all_envs.forEach((env) => {
       const o = document.createElement("option");
       o.value = env; o.textContent = snap.env_labels[env] || env;
       if (env === snap.baseline) o.selected = true;
@@ -1847,7 +1959,7 @@ async function renderMatrix() {
       const ok = await showConfirm({
         title: "Switch baseline?",
         message: `Compare every environment against ${snap.env_labels[nb] || nb}?\n\n`
-          + "This recomputes the whole matrix against the new baseline.",
+          + "This recomputes the cross-environment comparisons against the new baseline.",
         confirmLabel: "Switch & recompute",
       });
       if (!ok) { sel.value = snap.baseline; return; }
@@ -1858,22 +1970,20 @@ async function renderMatrix() {
     };
   }
   const btn = $("btnMatrixRefreshAll");
-  if (btn) {
-    btn.disabled = locked;
-    btn.onclick = async () => {
-      const r = await api.recompute_matrix("stale");
-      if (r && r.nothing) showMessage("info", "Up to date", "Every comparison is current.");
-      else if (r && r.error) showMessage("error", "Can't refresh", r.error);
-    };
-  }
+  if (btn) btn.onclick = async () => {
+    const r = await api.recompute_matrix("stale");
+    if (r && r.nothing) showMessage("info", "Up to date", "Every comparison is current.");
+    else if (r && r.error) showMessage("error", "Can't refresh", r.error);
+  };
   const openFolderBtn = $("btnOpenComparisons");
-  if (openFolderBtn) {
-    openFolderBtn.disabled = locked;
-    openFolderBtn.onclick = async () => {
-      const r = await api.open_comparisons_folder();
-      if (r && r.error) showMessage("error", "Can't open", r.error);
-    };
-  }
+  if (openFolderBtn) openFolderBtn.onclick = async () => {
+    const r = await api.open_comparisons_folder();
+    if (r && r.error) showMessage("error", "Can't open", r.error);
+  };
+  const cancelBtn = $("btnMatrixCancel");
+  if (cancelBtn) cancelBtn.onclick = () => api.cancel_run();
+
+  renderMatrixConfig(snap, locked);
   updateMatrixProgress();
 }
 
@@ -2663,6 +2773,10 @@ function makeMockApi() {
     matrix: null,
     matrix_baseline: "ssor-prod",
     matrix_hidden: [],
+    matrix_hidden_envs: [],
+    matrix_modes: {},            // row_key -> mode id
+    matrix_tsn_files: {},        // subdir -> picked file path
+    mock_tsn_pdfs: true,         // TSN folder starts with PDFs (not consolidated)
   };
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
@@ -2705,52 +2819,100 @@ function makeMockApi() {
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
 
-  // A canned 3x6 matrix snapshot exercising every cell state (baseline, match,
-  // diff-low, diff-high, stale, needs-export) so the grid + colors are verifiable.
+  // A canned 5-row x 6-env snapshot exercising every cell + mode state so the grid,
+  // colours, mode dropdowns and TSN pickers are all verifiable in #mock.
+  function mockMatrixModes(rk) {
+    if (rk === "highway_log") return [
+      { id: "env", label: "Cross-environment", kind: "env", supported: true },
+      { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
+      { id: "vs_pdf", label: "vs TSMIS PDF", kind: "self", supported: true }];
+    if (rk === "highway_log_pdf") return [
+      { id: "env", label: "Cross-environment", kind: "env", supported: false },
+      { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
+      { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
+    return [
+      { id: "env", label: "Cross-environment", kind: "env", supported: true },
+      { id: "tsn", label: "vs TSN", kind: "tsn", supported: false }];
+  }
+  function mockCmp(s) {
+    if (s === "needtsn") return { supported: true, built: false, stale: true,
+      reason: "missing", missing_side: "tsn", verdict: null, diff_cells: null, one_sided: null };
+    if (s === "missing") return { supported: true, built: false, stale: true,
+      reason: "missing", missing_side: "cell", verdict: null, diff_cells: null, one_sided: null };
+    if (s === "notbuilt") return { supported: true, built: false, stale: true,
+      reason: "missing", missing_side: null, verdict: null, diff_cells: null, one_sided: null };
+    if (s === "stale") return { supported: true, built: true, stale: true,
+      reason: "cell_newer", missing_side: null, verdict: "diff", diff_cells: 18, one_sided: 2 };
+    return { supported: true, built: true, stale: false, reason: "fresh", missing_side: null,
+             verdict: (s[0] === 0 && s[1] === 0) ? "match" : "diff", diff_cells: s[0], one_sided: s[1] };
+  }
   function mockMatrixSnapshot(baseline) {
-    const envs = ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"];
+    const allEnvs = ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"];
+    const henv = st.matrix_hidden_envs || [];
+    const envs = allEnvs.filter((e) => henv.indexOf(e) < 0);
     const allRows = [
-      { key: "ramp_summary", label: "TSAR: Ramp Summary" },
-      { key: "ramp_detail", label: "TSAR: Ramp Detail" },
-      { key: "highway_sequence", label: "Highway Sequence Listing" },
-      { key: "highway_log", label: "Highway Log" },
+      { key: "ramp_summary", label: "TSAR: Ramp Summary", tsn_capable: false },
+      { key: "ramp_detail", label: "TSAR: Ramp Detail", tsn_capable: false },
+      { key: "highway_sequence", label: "Highway Sequence Listing", tsn_capable: false },
+      { key: "highway_log", label: "Highway Log (Excel)", tsn_capable: true },
+      { key: "highway_log_pdf", label: "Highway Log (PDF)", tsn_capable: true },
     ];
     const rowLabels = {}; allRows.forEach((r) => { rowLabels[r.key] = r.label; });
     const hidden = st.matrix_hidden || [];
     const rows = allRows.map((r) => r.key).filter((k) => hidden.indexOf(k) < 0);
     const envLabels = {};
-    envs.forEach((e) => { const [s, v] = e.split("-");
+    allEnvs.forEach((e) => { const [s, v] = e.split("-");
       envLabels[e] = `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}`; });
-    // [diff_cells, one_sided] | "stale" | "missing", keyed to a ssor-prod baseline.
-    const sample = {
+    // env-mode samples (vs the baseline column).
+    const envSample = {
       ramp_summary: { "ssor-test": [42, 0], "ssor-dev": [42, 0], "ars-prod": [0, 0], "ars-test": [48, 0], "ars-dev": "stale" },
       ramp_detail: { "ssor-test": [25, 10], "ssor-dev": [25, 10], "ars-prod": [0, 0], "ars-test": [31, 10], "ars-dev": "missing" },
       highway_sequence: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
       highway_log: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
     };
-    const cells = {};
+    const cells = {}, modes = {}, rowModes = {}, tsnMeta = {};
     rows.forEach((rk) => {
+      const avail = mockMatrixModes(rk);
+      let selId = (st.matrix_modes || {})[rk] || "env";
+      if (!avail.some((m) => m.id === selId)) selId = "env";
+      const mode = avail.find((m) => m.id === selId) || avail[0];
+      modes[rk] = mode.id; rowModes[rk] = avail;
+      const tsnSub = "highway_log";                 // both HL rows share the TSN folder
+      const tsnFile = (st.matrix_tsn_files || {})[tsnSub];
+      const srcKind = tsnFile ? "file" : (st.mock_tsn_pdfs ? "pdfs" : "consolidated");
+      if (mode.kind === "tsn") {
+        tsnMeta[rk] = { supported: mode.supported, fmt: rk === "highway_log_pdf" ? "pdf" : "excel",
+          source_kind: srcKind, pdf_count: srcKind === "pdfs" ? 12 : undefined,
+          source_path: tsnFile || "…\\_tsn_input\\highway_log\\tsn_highway_log_consolidated.xlsx",
+          tsn_subdir: tsnSub, file: tsnFile || null,
+          input_dir: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)\\_tsn_input\\highway_log" };
+      }
       cells[rk] = {};
-      envs.forEach((env) => {
-        const isB = env === baseline;
-        let comp = null;
-        if (!isB) {
-          const s = (sample[rk] || {})[env];
-          if (!s || s === "missing")
-            comp = { built: false, stale: true, reason: "missing", missing_side: "cell", verdict: null, diff_cells: null, one_sided: null };
-          else if (s === "stale")
-            comp = { built: true, stale: true, reason: "cell_newer", missing_side: null, verdict: "diff", diff_cells: 18, one_sided: 2 };
-          else
-            comp = { built: true, stale: false, reason: "fresh", missing_side: null,
-                     verdict: (s[0] === 0 && s[1] === 0) ? "match" : "diff", diff_cells: s[0], one_sided: s[1] };
+      envs.forEach((env, i) => {
+        const isB = mode.kind === "env" && env === baseline;
+        let cmp;
+        if (!mode.supported) cmp = { supported: false };
+        else if (isB) cmp = null;
+        else if (mode.kind === "env") {
+          const s = (envSample[rk] || {})[env];
+          cmp = mockCmp(s || "missing");
+        } else if (mode.kind === "tsn") {
+          cmp = (srcKind === "pdfs" || srcKind === "none") ? mockCmp("needtsn")
+            : mockCmp(["ssor-prod", "ssor-test"].indexOf(env) >= 0 ? [4, 1]
+                : env === "ars-prod" ? [0, 0] : env === "ars-dev" ? "stale" : [73, 9]);
+        } else {                               // self (PDF vs Excel) — per env
+          cmp = mockCmp(env === baseline ? [11, 0] : i % 4 === 0 ? "notbuilt" : [11, 0]);
         }
-        cells[rk][env] = { export: { present: true, mtime: 0, age_seconds: env.endsWith("dev") ? 5 * 86400 : 2 * 3600 },
-                           is_baseline: isB, comparison: comp };
+        cells[rk][env] = { export: { present: true, mtime: 0,
+                                     age_seconds: env.endsWith("dev") ? 5 * 86400 : 2 * 3600 },
+                           is_baseline: isB, cmp,
+                           comparison: mode.kind === "env" ? cmp : undefined };
       });
     });
     return { dest: st.batch_dest || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
              baseline, rows, row_labels: rowLabels, all_rows: allRows, hidden,
-             envs, env_labels: envLabels, cells };
+             modes, row_modes: rowModes, tsn_meta: tsnMeta,
+             envs, all_envs: allEnvs, hidden_envs: henv, env_labels: envLabels, cells };
   }
   function mockMatrixRun(mode, label, total) {
     st.task = "matrix";
@@ -3196,9 +3358,47 @@ function makeMockApi() {
     set_matrix_report: async (rk, visible) => {
       const hidden = new Set(st.matrix_hidden || []);
       if (visible) hidden.delete(rk); else hidden.add(rk);
-      if (hidden.size >= 4) return { error: "Keep at least one report on the matrix." };
+      if (hidden.size >= 5) return { error: "Keep at least one report on the matrix." };
       st.matrix_hidden = [...hidden];
       return { ok: true, hidden: st.matrix_hidden };
+    },
+    set_matrix_env: async (env, visible) => {
+      const hidden = new Set(st.matrix_hidden_envs || []);
+      if (visible) hidden.delete(env); else hidden.add(env);
+      if (hidden.size >= 6) return { error: "Keep at least one environment on the matrix." };
+      st.matrix_hidden_envs = [...hidden];
+      return { ok: true, hidden_envs: st.matrix_hidden_envs };
+    },
+    set_matrix_row_mode: async (rk, mode) => {
+      const avail = mockMatrixModes(rk);
+      const m = avail.find((x) => x.id === mode);
+      if (!m) return { error: "Unknown comparison mode for this report." };
+      if (!m.supported) return { error: "That comparison isn't available yet for this report." };
+      st.matrix_modes = { ...(st.matrix_modes || {}), [rk]: mode };
+      return { ok: true, mode };
+    },
+    set_all_matrix_modes: async (mode) => {
+      if (mode !== "env" && mode !== "tsn") return { error: "Pick Cross-environment or vs TSN." };
+      const next = {};
+      ["highway_log", "highway_log_pdf"].forEach((rk) => { if (mode === "tsn") next[rk] = "tsn"; });
+      st.matrix_modes = next;
+      return { ok: true, mode };
+    },
+    set_matrix_tsn_file: async (subdir, path) => {
+      st.matrix_tsn_files = { ...(st.matrix_tsn_files || {}) };
+      if (path) st.matrix_tsn_files[subdir] = path; else delete st.matrix_tsn_files[subdir];
+      return { ok: true };
+    },
+    pick_matrix_tsn_file: async (subdir) => {
+      st.matrix_tsn_files = { ...(st.matrix_tsn_files || {}), [subdir]: "C:\\Users\\you\\Desktop\\tsn_highway_log.xlsx" };
+      push({ t: "log", text: `(mock) picked TSN file for ${subdir}` });
+      return { ok: true, path: st.matrix_tsn_files[subdir] };
+    },
+    consolidate_matrix_tsn: async (subdir) => {
+      if (st.task) return { error: "A task is already running." };
+      st.mock_tsn_pdfs = false;               // pretend the PDFs are now consolidated
+      mockMatrixRun("consolidate", `Consolidating TSN ${subdir} PDFs…`, 1);
+      return { ok: true };
     },
     set_matrix_baseline: async (b) => {
       st.matrix_baseline = b;
@@ -3213,14 +3413,12 @@ function makeMockApi() {
     },
     refresh_cell_comparison: async (rk, env) => {
       if (st.task) return { error: "A task is already running." };
-      if (env === (st.matrix_baseline || "ssor-prod"))
-        return { error: "The baseline column has nothing to compare against." };
-      mockMatrixRun("consolidate", `Comparing ${env} vs ${st.matrix_baseline}…`, 1);
+      mockMatrixRun("consolidate", `Comparing ${rk} — ${env}…`, 1);
       return { ok: true };
     },
-    recompute_matrix: async (scope) => {
+    recompute_matrix: async (scope, row, env) => {
       if (st.task) return { error: "A task is already running." };
-      const n = scope === "all" ? 10 : 3;
+      const n = row ? 5 : env ? 4 : scope === "all" ? 18 : 6;
       mockMatrixRun("consolidate", `Rebuilding ${n} comparison(s)…`, n);
       return { ok: true, count: n };
     },
