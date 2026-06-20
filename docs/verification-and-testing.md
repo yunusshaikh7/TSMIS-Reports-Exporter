@@ -211,6 +211,41 @@ e.g., that whole-row `57:57` link targets don't scroll right while bounded range
 do, and to F9-recalc the formulas flavor so every SELF-CHECK reads OK. This is
 the **only** way to verify formula/HYPERLINK behavior (see gotchas below).
 
+## Per-report flawless-audit recipe (v0.17.0 standard)
+
+The bar for the v0.17.0 effort (a full audit + rethink + perfection of **every**
+consolidator/comparator, existing and new) is **flawless, cell-for-cell, proven ≥3
+independent ways**. Run this recipe for each report's consolidator + vs-TSN comparator
+before it is marked done; record the result + the report's approved counts in
+[tsn-parsers.md](tsn-parsers.md).
+
+1. **Reconcile both raw files by hand FIRST.** Open the TSN and the TMSIS file and agree
+   the key column(s), row identity, and normalization rules **before** writing the loader —
+   the `CompareSchema` comes from the data, not a guess.
+2. **Assert the wiring** in a `check_compare_<report>_tsn.py` / `check_consolidate_<report>.py`:
+   the `CompareSchema` key field + side names, the `COMPARE_REPORTS` row (`group="tsn"`),
+   `_CONSOLIDATOR_BY_SUBDIR`, and the `day_matrix._day_rows()` `supported` flip + `build_day_cell`
+   dispatch.
+3. **Synthetic key-collapse test** — plant a mid-list insert; prove the key field collapses
+   the spurious diffs to the real rows (the `check_compare_ramp_detail.py` pattern).
+4. **End-to-end** — drive `compare()` / `compare_folders` to a VALUES workbook in `%TEMP%`,
+   read it back with openpyxl, assert the diff/one-sided counts and a known diff cell.
+5. **Throwaway `%TEMP%` verifier vs RAW ground truth** — regenerate the consolidated +
+   comparison from the raw files and check **every cell** against an **independent
+   from-scratch recompute that does NOT import the engine** (the v0.9.0 loop).
+6. **COM recalc** the live-formulas flavor (F9): every SELF-CHECK row reads OK and the
+   formulas flavor equals the values flavor.
+7. **Adversarial refutation** — a separate agent/method tries to **refute** the counts
+   against the raw source; **verify against the actual PDF/XLSX, don't relay an agent's
+   claim** (the ramp-audit gotcha below). A real source inconsistency stays flagged RED.
+8. **Lock it** — record the approved counts as that report's canary in tsn-parsers.md, add
+   the new `check_*.py` to the blocking loop in `.github/workflows/checks.yml`, and for any
+   `compare_core` change confirm the **Route-1 = 969** HL canary is unchanged.
+
+`compare_core` stays **regression-locked** — touching its formula/label text needs the
+`%TEMP%\tsmis_regress` before/after harness above; **new behavior is an opt-in
+`CompareSchema` field defaulting to the no-op original**, never a fork.
+
 ## `#mock` GUI preview (verify `scripts/ui/` without the app)
 
 Verify `scripts/ui/` changes without launching the real app, via a preview HTTP

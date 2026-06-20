@@ -146,18 +146,19 @@ See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for
 
 Add one row to `COMPARE_REPORTS` in `reports.py` and the module to `APP_MODULES` in `build/app.spec`. Rows are `(label, module_or_adapter, kind, group)`. The GUI's per-sub-tab type lists are generated from it; **selection is by index**, so the row order is what the UI radios and `start_compare*` calls key on.
 
-**`group`** is one of `COMPARE_GROUPS`' ids. The Compare pane renders one **sub-tab per group** (first = default), and a row shows only under its group's sub-tab. As of v0.14.1 the two sub-tabs are:
+**`group`** is one of `COMPARE_GROUPS`' ids. The Compare pane renders one **sub-tab per group** (first = default), and a row shows only under its group's sub-tab. As of v0.16.1 the two registry sub-tabs are:
 
 ```python
 COMPARE_GROUPS = [
     ("env", "Cross-environment"),
-    ("highway_log", "Highway Log"),
+    ("tsn", "vs TSN"),
 ]
 ```
-- `group="env"` -- plain cross-environment report comparisons (Ramp Summary/Detail, Highway Sequence).
-- `group="highway_log"` -- EVERY Highway Log comparison gathered in one place: cross-env HL, TSMIS-vs-TSN, and the two PDF-sourced ones.
+- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, **and Highway Log**), plus the HL TMSIS-PDF-vs-Excel consistency check.
+- `group="tsn"` -- the file-based **TMSIS-vs-TSN** comparisons (Highway Log Excel/PDF today; 0.17.0 adds the other reports' `"<report> — TSMIS vs TSN"` rows here).
+- The GUI also appends a **third** sub-tab on its own, the day-keyed **"vs TSN Matrix"** (group id `tsn_by_day`) — not a registry comparison type.
 
-A new Highway Log comparison is `group="highway_log"`; a new plain cross-env one is `group="env"`; a brand-new family can add its own sub-tab by appending to `COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input plumbing is untouched.
+A new cross-environment comparison is `group="env"`; a new TMSIS-vs-TSN one is `group="tsn"`; a brand-new family can add its own sub-tab by appending to `COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input plumbing is untouched. (v0.16.1 staging moved HL's cross-env row from the old `highway_log` group to `env` and renamed that sub-tab to `tsn`.)
 
 **`kind`** decides which inputs the pane asks for:
 - **`"files"`** -- two workbooks; the module exposes `compare(path_a, path_b, out_path, events=None, confirm_overwrite=None, mode="formulas") -> ConsolidateResult` (console-free, same rules as consolidators; the GUI passes `mode` from its values/formulas checkboxes -- accept it even if only one flavor is implemented) plus `REPORT_NAME` and `suggest_name(path_a)`.

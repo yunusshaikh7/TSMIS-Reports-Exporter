@@ -23,6 +23,7 @@ touching.
 | [highway_log/columns.md](highway_log/columns.md) | You need the corrected 31-column Highway Log labels (the vendor mislabeled most) — `highway_log_columns.py`, tooltips, the Legend sheet. |
 | [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) | You're parsing a Highway Log PDF — the TSMIS cell-rect parser and the TSN character-window parser (with the 3 description guards), the two PDF formats, the flawless-validation results. |
 | [highway_log/comparison-study.md](highway_log/comparison-study.md) | You need the `+`/`++` **ditto domain convention** and the raw evidence behind it (the "pointer to the paired roadbed, not data" finding + the roadbed-encoding split §7b). |
+| [tsn-parsers.md](tsn-parsers.md) | You need a **non-HL report's TSN format + comparison schema** — the per-report TSN file format, column→TMSIS mapping, key field, normalization, and approved sample counts (filled during v0.17.0). HL's own TSN specifics stay under highway_log/. |
 | [build-and-release.md](build-and-release.md) | You're building/packaging/releasing — PyInstaller `app.spec`, `prune_bundle.ps1` + the DLP guard, the three browser-channel variants, the full **updater** (swap mode / MOTW / SHA-256 / revert), and CI (`release.yml` / `checks.yml`). |
 | [it-and-security.md](it-and-security.md) | You need the IT/DLP/security view — what the app talks to, files it touches, browser flags, the **work-PC capability model**, the read-only audit's findings + the "good designs," and code-signing. |
 | [website.md](website.md) | You're touching the **`gh-pages` landing page** — the single-screen layout, the live-resolving Download button, the System/Light/Dark toggle, screenshot/OG regeneration (`tools/screenshots.py`), favicon, and SEO (sitemap/Search Console). |
@@ -56,6 +57,7 @@ points), every claim anchored to `file:symbol`.
 - **Resume / retry / skip / cancel / timeouts / fast mode** → engine-and-reliability.md
 - **`compare_core` / flavors / regression lock / roadbed key / ditto** → comparison-engine.md
 - **Highway Log columns / PDF & TSN parsing / ditto evidence** → highway_log/
+- **A non-HL report's TSN format / key / comparison schema** → tsn-parsers.md
 - **Updater / swap mode / MOTW / DLP / `app.spec` / CI** → build-and-release.md
 - **Work-PC constraints / what's safe for IT / audit findings** → it-and-security.md
 - **Golden checks / how to verify / test-data locations** → verification-and-testing.md

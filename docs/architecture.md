@@ -132,10 +132,10 @@ the file-based TSMIS-vs-TSN compares sit in `tsn` (HL today; other reports in 0.
 | `TSAR: Ramp Summary — between environments` | `compare_env.RAMP_SUMMARY` | folders | env |
 | `TSAR: Ramp Detail — between environments` | `compare_env.RAMP_DETAIL` | folders | env |
 | `Highway Sequence Listing — between environments` | `compare_env.HIGHWAY_SEQUENCE` | folders | env |
-| `Highway Log — between environments` | `compare_env.HIGHWAY_LOG` | folders | highway_log |
-| `Highway Log — TSMIS vs TSN` | `compare_highway_log` | files | highway_log |
-| `Highway Log — TSMIS (PDF) vs TSN (PDF)` | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | highway_log |
-| `Highway Log — TSMIS (PDF) vs TSMIS (Excel)` | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | highway_log |
+| `Highway Log — between environments` | `compare_env.HIGHWAY_LOG` | folders | env |
+| `Highway Log — TSMIS vs TSN` | `compare_highway_log` | files | tsn |
+| `Highway Log — TSMIS (PDF) vs TSN (PDF)` | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| `Highway Log — TSMIS (PDF) vs TSMIS (Excel)` | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
 
 The comparison engine itself is owned by
 [comparison-engine.md](comparison-engine.md).

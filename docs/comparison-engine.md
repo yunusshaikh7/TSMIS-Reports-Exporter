@@ -420,7 +420,11 @@ descriptions. 21 routes are TSN-only (not in the 252 TSMIS PDFs). LESSON: always
 Excel side from raw yourself — a stale/partial pre-existing consolidated workbook (missing 25
 routes) inflated PDF-vs-Excel to 22,210 diffs.
 
-### 9c. Cross-environment — `compare_env.py` (`"folders"`; group `env` for Ramp Summary/Detail + Highway Sequence, group `highway_log` for the Highway Log cross-env row)
+### 9c. Cross-environment — `compare_env.py` (the `"folders"` family)
+
+> Group: **`env`** for ALL cross-environment comparisons — Ramp Summary/Detail, Highway
+> Sequence, AND Highway Log (v0.16.1 moved HL's cross-env row out of the old `highway_log`
+> group). The file-based TMSIS-vs-TSN comparisons live in group `tsn` (§9b).
 
 The SAME report from two **run folders** (ssor-prod vs ars-prod, or one env on two dates). Per-route
 files are read straight from both folders (NO consolidation step; merged in memory the way the
@@ -518,7 +522,7 @@ type") for the full recipe.
 The **Everything ▸ Comparison matrix** sub-tab (one of two sub-tabs on the Everything pane — the
 other is *Refresh & export*) holds the **report × environment comparison matrix**, a thin
 orchestration layer over the cross-environment family
-([§9c](#9c-cross-environment--compare_envpy-folders-group-env-for-ramp-summarydetail--highway-sequence-highway_log-for-the-highway-log-cross-env-row)).
+([§9c](#9c-cross-environment--compare_envpy-the-folders-family)).
 Selecting it goes **full-width** (`body.matrix-wide`: the right activity column shrinks via animated
 `flex-grow` to a slim-but-present log + the matrix **config zone**, so the grid fills the screen). The
 full-width CSS is written once against shared classes (`.mx-host`/`.mx-pane`/`.mx-gridsection`) and the

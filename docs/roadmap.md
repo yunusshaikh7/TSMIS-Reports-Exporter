@@ -328,7 +328,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.14.2)
+### Version buckets — reconciled to reality (current: v0.16.1)
 
 | Version | Date | What actually shipped |
 |---|---|---|
