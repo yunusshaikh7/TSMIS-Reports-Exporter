@@ -173,6 +173,7 @@ Current `COMPARE_REPORTS` rows:
 | TSAR: Ramp Detail -- between environments | `compare_env.RAMP_DETAIL` | folders | env |
 | Highway Sequence Listing -- between environments | `compare_env.HIGHWAY_SEQUENCE` | folders | env |
 | Highway Log -- between environments | `compare_env.HIGHWAY_LOG` | folders | env |
+| TSAR: Intersection Summary -- between environments (v0.17.0, AGGREGATE per route) | `compare_env.INTERSECTION_SUMMARY` | folders | env |
 | Highway Log -- TSMIS vs TSN | `compare_highway_log` | files | tsn |
 | Highway Log -- TSMIS (PDF) vs TSN (PDF) | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
 | Highway Log -- TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |

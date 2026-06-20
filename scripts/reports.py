@@ -119,6 +119,12 @@ COMPARE_REPORTS = [
     # reports under "env" (v0.16.1 staging — the old "highway_log" sub-tab became
     # the general "vs TSN" group below).
     ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders", "env"),
+    # Intersection Summary cross-env (v0.17.0): the per-route category-summary sheet
+    # is compared the AGGREGATE way (one category-count row per route) — see
+    # compare_env.INTERSECTION_SUMMARY. Having a folders/env adapter promotes it from
+    # a TSN-only extra row to a full Everything-matrix + by-day matrix row.
+    ("TSAR: Intersection Summary — between environments",
+     _cmp_env.INTERSECTION_SUMMARY, "folders", "env"),
     # vs TSN (file-based). Highway Log Excel/PDF today; 0.17.0 adds the other
     # reports' "<report> — TSMIS vs TSN" rows here once their comparators exist.
     ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "tsn"),
@@ -256,8 +262,10 @@ def matrix_rows():
 # today but their consolidate + TSN comparator (and a per-report TSN dataset) are
 # 0.17.0 work, so the matrix shows them as greyed groundwork rows for now.
 # Returns [(row_key, label, subdir)] (row_key == export subdir, like the HL rows).
+# Reports that have NO cross-env (folders) adapter, so they aren't in matrix_rows()
+# but still need a by-day vs-TSN row. Intersection Summary GAINED a cross-env adapter
+# in v0.17.0 (now a full matrix_rows row), so only Intersection Detail remains here.
 _TSN_MATRIX_EXTRA = [
-    ("Intersection Summary", _INT_SUMMARY_SPEC),
     ("Intersection Detail", _INT_DETAIL_SPEC),
 ]
 

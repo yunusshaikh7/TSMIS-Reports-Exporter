@@ -3588,7 +3588,7 @@ function makeMockApi() {
       { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
     return [
       { id: "env", label: "Cross-environment", kind: "env", supported: true },
-      { id: "tsn", label: "vs TSN", kind: "tsn", supported: false }];
+      { id: "tsn", label: "vs TSN", kind: "tsn", supported: true }];   // all reports vs-TSN as of v0.17.0
   }
   function mockCmp(s) {
     if (s === "needtsn") return { supported: true, built: false, stale: true,
@@ -3618,6 +3618,7 @@ function makeMockApi() {
       { key: "ramp_detail", label: "TSAR: Ramp Detail", tsn_capable: true },
       { key: "highway_sequence", label: "Highway Sequence Listing", tsn_capable: true },
       { key: "highway_log", label: "Highway Log (Excel)", tsn_capable: true },
+      { key: "intersection_summary", label: "TSAR: Intersection Summary", tsn_capable: true },
       { key: "highway_log_pdf", label: "Highway Log (PDF)", tsn_capable: true },
     ];
     const rowLabels = {}; allRows.forEach((r) => { rowLabels[r.key] = r.label; });
@@ -3633,6 +3634,7 @@ function makeMockApi() {
       ramp_detail: { "ssor-test": [25, 10], "ssor-dev": [25, 10], "ars-prod": [0, 0], "ars-test": [31, 10], "ars-dev": "missing" },
       highway_sequence: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
       highway_log: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
+      intersection_summary: { "ssor-test": [3, 0], "ssor-dev": [3, 0], "ars-prod": [0, 0], "ars-test": [40, 2], "ars-dev": "stale" },
     };
     const cells = {}, modes = {}, rowModes = {}, tsnMeta = {};
     rows.forEach((rk) => {

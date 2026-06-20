@@ -48,6 +48,7 @@ def _norm_route_key(token):
     return m.group(1).zfill(3) + m.group(2).upper() if m else str(token).strip().upper()
 
 import compare_highway_log as _hl
+import consolidate_intersection_summary as _is
 import consolidate_ramp_summary as _rs
 from compare_core import CompareSchema, normalize_value, run_compare
 from events import ConsolidateResult, Events
@@ -257,6 +258,52 @@ def _load_ramp_summary_side(folder, label, events):
     return rows, skipped
 
 
+# Intersection Summary's comparison columns: Total + one column per canonical
+# category (the consolidator's category key as the header), in spec order.
+_IS_FIELDS = [(c.slug, c.key) for c in _is._CATS]
+IS_HEADER = ["Route", "Total Intersections"] + [key for _slug, key in _IS_FIELDS]
+
+
+def _load_intersection_summary_side(folder, label, events):
+    """Parse every per-route Intersection Summary XLSX on one side into per-route-
+    shape rows ([route, total, *category counts] — the route IS the row key), reusing
+    the consolidator's own block-walk parser (consolidate_intersection_summary
+    .parse_route) so the two sides can't drift from each other or the consolidation.
+    Returns (rows, skipped); raises ValueError when nothing is readable."""
+    in_dir, files = _find_input_dir(folder, "intersection_summary", "*.xlsx")
+    files = [p for p in files if not p.name.startswith("~$")]
+    if not files:
+        raise ValueError(
+            f"No Intersection Summary files were found for the {label} side:\n{in_dir}"
+            "\n\nExport the Intersection Summary report on that environment first.")
+    rows, skipped = [], []
+    for i, p in enumerate(files, 1):
+        if events.is_cancelled():
+            raise ValueError("Cancelled by user.")
+        try:
+            route, counts, total = _is.parse_route(str(p))
+        except Exception as e:
+            events.on_log(f"  [{label}] {p.name}: could not parse "
+                          f"({type(e).__name__}); skipping")
+            log.warning("env compare: %s parse failed", p, exc_info=True)
+            skipped.append(f"{label} {p.name}: could not parse ({type(e).__name__})")
+            continue
+        if not _is.record_has_data({"counts": counts}):
+            events.on_log(f"  [{label}] {p.name}: no intersection data; skipping")
+            skipped.append(f"{label} {p.name}: no intersection data")
+            continue
+        rkey = _norm_route_key(route)
+        rows.append([rkey, total] + [counts.get(slug, 0) for slug, _k in _IS_FIELDS])
+        events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} (route {rkey})")
+    if not rows:
+        raise ValueError(
+            f"No readable Intersection Summary files were found for the {label} "
+            f"side in:\n{in_dir}")
+    if skipped:
+        events.on_log(f"  [{label}] note: {len(skipped)} file(s) skipped (details above).")
+    return rows, skipped
+
+
 # ---------------------------------------------------------------------------
 # Per-report adapters
 # ---------------------------------------------------------------------------
@@ -268,12 +315,19 @@ class EnvCompare:
 
     def __init__(self, key, report_name, subdir, sheet_name=None,
                  expected_header=None, base_schema=None, key_col=None,
-                 force_header=None):
+                 force_header=None, side_loader=None, agg_header=None):
         self.key = key                        # "ramp_summary" | "ramp_detail" | …
         self.REPORT_NAME = report_name
         self.subdir = subdir
-        self.sheet_name = sheet_name          # None = the PDF (Ramp Summary) path
+        self.sheet_name = sheet_name          # None = an aggregate (PDF/category) path
         self.expected_header = expected_header
+        # Aggregate-per-route path: a custom (folder,label,events)->(rows,skipped)
+        # loader that yields ONE [route, *fields] row per route (route is the key,
+        # has_route=False), with `agg_header` as the schema header. Used by the
+        # category-summary reports (Intersection Summary) whose per-route sheet
+        # isn't a flat header+rows table. (Ramp Summary keeps its own PDF path.)
+        self.side_loader = side_loader
+        self.agg_header = agg_header
         self.base_schema = base_schema        # report-specific schema extras
         # When set, the DISPLAY header is forced to this (the loaded files are
         # accepted as-is and compared by POSITION). Highway Log uses it so the
@@ -341,7 +395,8 @@ class EnvCompare:
             return ConsolidateResult(
                 status="error",
                 message="Required components are missing (openpyxl).")
-        if self.sheet_name is None and not getattr(_rs, "_DEPS_OK", False):
+        if (self.sheet_name is None and self.side_loader is None
+                and not getattr(_rs, "_DEPS_OK", False)):
             return ConsolidateResult(
                 status="error",
                 message="Required components are missing (pdfplumber).")
@@ -366,7 +421,11 @@ class EnvCompare:
         events.on_log("")
 
         try:
-            if self.sheet_name is None:       # Ramp Summary: PDFs, route-keyed
+            if self.side_loader is not None:  # aggregate per-route XLSX (Intersection Summary)
+                rows_a, skip_a = self.side_loader(dir_a, la, events)
+                rows_b, skip_b = self.side_loader(dir_b, lb, events)
+                header, has_route = self.agg_header, False
+            elif self.sheet_name is None:     # Ramp Summary: PDFs, route-keyed
                 rows_a, skip_a = _load_ramp_summary_side(dir_a, la, events)
                 rows_b, skip_b = _load_ramp_summary_side(dir_b, lb, events)
                 header, has_route = RS_HEADER, False
@@ -434,6 +493,17 @@ HIGHWAY_SEQUENCE = EnvCompare(
 HIGHWAY_LOG = EnvCompare(
     "highway_log", "Highway Log", "highway_log", sheet_name=_hl.SHEET_NAME,
     base_schema=_HL_BASE, force_header=_hl.EXPECTED_HEADER)
+# Intersection Summary: the per-route export is a CATEGORY-summary sheet (not a flat
+# table), so it's compared the AGGREGATE way (one row of category counts per route,
+# route-keyed) via the consolidator's own block-walk parser — the analog of Ramp
+# Summary's PDF path, but XLSX.
+INTERSECTION_SUMMARY = EnvCompare(
+    "intersection_summary", "Intersection Summary", "intersection_summary",
+    side_loader=_load_intersection_summary_side, agg_header=IS_HEADER,
+    base_schema=CompareSchema(
+        report_name="Intersection Summary", header=IS_HEADER,
+        id_noun="route", id_noun_plural="routes",
+        scope_flat="All routes (one row per route)"))
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).

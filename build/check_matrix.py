@@ -39,25 +39,26 @@ def test_enumeration():
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mx_"))
     try:
         snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod")
-        check("five comparable rows incl. both Highway Log formats",
+        check("six comparable rows incl. both HL formats + Intersection Summary (cross-env)",
               snap["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence",
-                               "highway_log", "highway_log_pdf"])
+                               "highway_log", "intersection_summary", "highway_log_pdf"])
         check("all_rows lists every row with labels + tsn_capable",
               [r["key"] for r in snap["all_rows"]] == snap["rows"]
               and all(r.get("label") for r in snap["all_rows"]))
         check("every matrix row is now tsn_capable (v0.17.0 — all reports vs TSN)",
               {r["key"] for r in snap["all_rows"] if r["tsn_capable"]}
               == {"highway_log", "highway_log_pdf", "ramp_detail", "ramp_summary",
-                  "highway_sequence"})
+                  "highway_sequence", "intersection_summary"})
         check("six env columns", len(snap["envs"]) == 6
               and snap["envs"][0] == "ssor-prod")
-        check("no intersection row",
-              not any("intersection" in r for r in snap["rows"]))
+        check("Intersection Summary is a matrix row (cross-env), Detail is NOT (no cross-env adapter)",
+              "intersection_summary" in snap["rows"]
+              and "intersection_detail" not in snap["rows"])
         # hidden filter: dropping a row removes it from rows but keeps it in all_rows
         hidden_snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod",
                                              hidden=["highway_log"])
         check("hidden row dropped from rows",
-              "highway_log" not in hidden_snap["rows"] and len(hidden_snap["rows"]) == 4)
+              "highway_log" not in hidden_snap["rows"] and len(hidden_snap["rows"]) == 5)
         check("hidden row still in all_rows + hidden list",
               any(r["key"] == "highway_log" for r in hidden_snap["all_rows"])
               and hidden_snap["hidden"] == ["highway_log"])

@@ -295,8 +295,15 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   re-export + recompute + refresh-consolidated; by-day per-day refresh) → not rebuilt (user decision).
   A 6-lens adversarial-review workflow over the session's change set confirmed + fixed 3 minor issues
   (incl. Intersection wrongly greyed in the by-day matrix). Verified in `#mock`; suite 42/42.
-- **v0.17.0 is COMPLETE** (all consolidators + comparators + UX). **Before release:** `version.py` +
-  `CHANGELOG.md` bump and **work-PC verification** of live export/compare with real TSN data.
+- [x] **Intersection Summary cross-environment** [S] — **DONE (v0.17.0).** `compare_env.INTERSECTION_SUMMARY`
+  — the AGGREGATE-per-route env recipe (the per-route export is a category sheet, so a `side_loader` parses
+  each file into one `[route, total, *counts]` row via the consolidator's block-walk, route-keyed). Promotes
+  Intersection Summary to a full Everything-matrix + by-day row (removed from the TSN-only extra rows so it
+  isn't duplicated). Golden `check_compare_env_intersection_summary.py`; verified on real exports + in `#mock`.
+  (Intersection **Detail** cross-env + HL-PDF cross-env remain the only un-built Phase-5 items.)
+- **v0.17.0 is COMPLETE** (all consolidators + comparators + UX + Intersection Summary cross-env).
+  **Before release:** `version.py` + `CHANGELOG.md` bump and **work-PC verification** of live
+  export/compare with real TSN data.
 
 From a notebook brainstorm (2026-06-16); size `[S/M/L]`. Their original version buckets are now in
 the Shipped record below. **⚠ A3 and D1 were the planned v0.13 *and* v0.14 themes but got displaced
