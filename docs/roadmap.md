@@ -211,12 +211,17 @@ v0.15.0 → v0.16.0 stages with no manual redownload**.
 
 ---
 
-## UNRELEASED — `polish/matrix-tabs` branch (held for review, 2026-06-19)
+## Shipped in v0.16.1 (`polish/matrix-tabs` → `main`, tag `v0.16.1`)
 
-6 commits atop `main` (v0.16.0); **not pushed, not tagged.** Awaiting a release decision:
-bump `version.py` + `CHANGELOG.md`, fast-forward `main`, push the tag — **v0.16.1** (polish/UX)
-or **v0.17.0** (it grew into a feature release). All verified offline (34 golden checks, two
-APPROVE code-reviews); live behavior is work-PC-only.
+Released 2026-06-19. Fast-forwarded onto `main` and tagged; `release.yml` built + published.
+All verified offline (34 golden checks, adversarial reviews); **live behavior is still
+work-PC-only to verify** (matrix re-export pause/skip/preview, consolidated reuse over real
+exports, the updater field-test v0.15.0→v0.16.1). Beyond the bullets below, v0.16.1 also: gave
+the **"vs TSN Matrix"** full-width parity + its own config corner + a fast-mode **worker
+picker** + independent per-matrix formulas; **restructured the Compare sub-tabs** to
+Cross-environment / vs TSN / vs TSN Matrix (HL cross-env back in "env"); **generalized the
+vs-TSN matrix to every report** (HL wired, the rest greyed groundwork) as staging for v0.17.0;
+and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.0-prompt.md`.
 
 - **Matrix review polish** — queue robustness (`_on_error` clears the queue only when a matrix job
   was running; dispatch wrapped so it can't stick the gate; taskbar flash on queue-drain), worker
