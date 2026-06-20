@@ -178,6 +178,7 @@ Current `COMPARE_REPORTS` rows:
 | Highway Log -- TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
 | TSAR: Ramp Detail -- TSMIS vs TSN (v0.17.0) | `compare_ramp_detail_tsn` | files | tsn |
 | TSAR: Ramp Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE) | `compare_ramp_summary_tsn` | files | tsn |
+| TSAR: Intersection Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE, one-sided divergence) | `compare_intersection_summary_tsn` | files | tsn |
 
 **Don't hand-roll workbook output**: build a `CompareSchema` and call `compare_core.run_compare` -- that's the approved workbook style for free, and the core's text/formulas are regression-locked. See [comparison-engine.md](comparison-engine.md) (engine + regression-lock harness) and [highway_log/comparison-study.md](highway_log/comparison-study.md) (the PDF-vs-Excel/TSN findings).
 

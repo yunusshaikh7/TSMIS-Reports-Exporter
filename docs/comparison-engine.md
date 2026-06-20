@@ -462,6 +462,20 @@ P/V are TSN-only → TSMIS contributes 0 → they read as `0 ≠ 122` / `0 ≠ 8
 *Only in TSMIS* + the footer). Approved canary in [tsn-parsers.md](tsn-parsers.md): **31 categories
 both, 1 only-TSMIS, 27 diff cells, 4 identical; TSMIS 15215 vs TSN 15410**. Live in both matrices.
 
+### 9e. TSMIS vs TSN Intersection Summary — `compare_intersection_summary_tsn.py` (AGGREGATE, ONE-SIDED divergence)
+
+The AGGREGATE recipe applied to the intersection taxonomy. The category schema (`summary_layout.
+INTERSECTION_SUMMARY_SPEC`, 11 blocks, 72 categories) is the **union of both systems' taxonomies**;
+the spec-driven block-walk `summary_layout.counts_from_rows` maps a (count, code-text) stream to
+`{slug: count}` and is shared by BOTH sides (the TSMIS consolidator AND the TSN parser) so they can't
+drift. The TSN side is a **3-column statewide PDF** — split into left/middle/right x-bands, each
+block-walked independently (so each column's count+label rows pair correctly). **Two blocks DIVERGED**
+between the systems and show **one-sided** (user decision; no crosswalk), driven by `Cat.sides`
+("both" | "tsmis" | "tsn") + `SummarySpec.categories_for(side)`: CONTROL TYPES (TSN-only legacy signals
+J–P; TSMIS-only S/O/Q/R) and INTERSECTION TYPE (TSMIS-only Roundabout/Circular/Midblock). Keyed on
+`(block, code-letter)` because TSMIS reworded labels. Canary in [tsn-parsers.md](tsn-parsers.md):
+**72 union — 56 both / 10 only-TSMIS / 6 only-TSN; 52 diff; TSMIS 16473 vs TSN 16626**. Live in both matrices.
+
 ### 9c. Cross-environment — `compare_env.py` (the `"folders"` family)
 
 > Group: **`env`** for ALL cross-environment comparisons — Ramp Summary/Detail, Highway
@@ -634,17 +648,16 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 > automatically (`_row_modes` + `day_matrix._day_rows` + `available_days` all gate on it).
 > `day_matrix.TSN_SUBDIR` is GONE → per-row `tsn_subdir`; `consolidate_and_compare_tsn` is
 > keyed on `(row_key, subdir)` and consolidates via `reports.consolidator_for_subdir`. **Live
-> today: HL Excel/PDF + Ramp Detail (FLAT) + Ramp Summary (AGGREGATE)** (Ramp Summary verified
-> end-to-end = 27 diff / 31 both / 1 only-TSMIS via the matrix's normalized-workbook path). Greyed:
-> Highway Sequence, Intersection Summary/Detail (until their comparators land).
+> today: HL Excel/PDF + Ramp Detail (FLAT) + Ramp Summary & Intersection Summary (AGGREGATE)**.
+> Greyed: Highway Sequence, Intersection Detail (until their comparators land).
 
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
 cross-environment, no live re-export** (it compares specific historical exports). HL Excel/PDF +
-**Ramp Detail + Ramp Summary** are live (v0.17.0); Highway Sequence / Intersection appear greyed
-(until their comparators land). Like `matrix.py`, it NEVER edits the manual compare code — it only
-orchestrates.
+**Ramp Detail + Ramp Summary + Intersection Summary** are live (v0.17.0); Highway Sequence /
+Intersection Detail appear greyed (until their comparators land). Like `matrix.py`, it NEVER edits
+the manual compare code — it only orchestrates.
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
   (the same path `build_comparison`'s tsn branch uses, now keyed on `(row_key, subdir)`) over the

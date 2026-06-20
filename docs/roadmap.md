@@ -263,12 +263,14 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   Canary: 31 both / 1 only-TSMIS / 27 diff / TSMIS 15215 vs TSN 15410. See [tsn-parsers.md](tsn-parsers.md).
 - [ ] **Intersection consolidate + compare-vs-TSN** [M] — **IN PROGRESS (v0.17.0).** Export enabled
   (dev site, via Settings ▸ "Use development site"). **Done:** `consolidate_intersection_detail`
-  (thin `consolidate_xlsx` wrapper, in `_CONSOLIDATOR_BY_SUBDIR` + `check_consolidate_intersection.py`);
-  the shared `summary_layout.py` renderer (built for Ramp Summary, reused by Intersection Summary).
-  **STILL TO DO:** `consolidate_intersection_summary` (category-count summer, reusing `summary_layout`);
-  `compare_intersection_detail_tsn` (FLAT recipe; ⚠ TSN `(eff_date,type)` vs TSMIS `(type,eff_date)`
-  pair reordering; exclude `Date of Record`); `compare_intersection_summary_tsn` (AGGREGATE recipe,
-  the Ramp Summary recipe with the intersection category maps).
+  (thin `consolidate_xlsx` wrapper); **`consolidate_intersection_summary`** (block-walk category summer,
+  218 routes → 16,473) + **`compare_intersection_summary_tsn`** (AGGREGATE; 11-block union taxonomy;
+  the diverged CONTROL/INTERSECTION-TYPE codes show one-sided via `Cat.sides`; 3-column TSN PDF parser;
+  canary 72 union / 56 both / 10 only-TSMIS / 6 only-TSN; 16473 vs 16626) — live in both matrices, golden
+  `check_compare_intersection_summary_tsn.py` + `check_consolidate_intersection.py`. The shared
+  `summary_layout.py` (spec + block-walk + familiar sheet) backs both Summary reports.
+  **STILL TO DO:** `compare_intersection_detail_tsn` (FLAT recipe; ⚠ TSN `(eff_date,type)` vs TSMIS
+  `(type,eff_date)` pair reordering; exclude `Date of Record`).
   The vs-TSN comparators flip on in BOTH matrices by adding them to `matrix.tsn_comparator_for`.
   Recipes: [reports.md](reports.md) / [comparison-engine.md](comparison-engine.md); schema + counts:
   [tsn-parsers.md](tsn-parsers.md); resume state: [v0.17.0-prompt.md](v0.17.0-prompt.md).

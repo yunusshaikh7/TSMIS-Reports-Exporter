@@ -74,6 +74,14 @@ _REPORTS = {
         consolidated_name="tsn_ramp_summary_normalized.xlsx",
         builder="tsn_load_ramp_summary:build_into",
     ),
+    "intersection_summary": TsnReport(
+        subdir="intersection_summary",
+        label="TSN Intersection Summary",
+        raw_glob="*.pdf",
+        raw_kind="statewide_pdf",
+        consolidated_name="tsn_intersection_summary_normalized.xlsx",
+        builder="tsn_load_intersection_summary:build_into",
+    ),
 }
 
 

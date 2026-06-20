@@ -37,10 +37,19 @@ _TAB_COLOR = "00B0F0"
 class Cat:
     """One comparison category: `slug` maps to the consolidator column, `label`
     is the short familiar-block text, `key` is the unique compare key (the value
-    shown in the generic Comparison sheet's key column)."""
+    shown in the generic Comparison sheet's key column). `code` is the within-block
+    code token (letter / number / '+') used to map a parsed row to this category
+    when the source is block-walked (Intersection Summary); '' for slug-mapped
+    reports (Ramp Summary)."""
     slug: str
     label: str
     key: str
+    code: str = ""
+    # Which system classifies this category: "both" (compared), "tsmis" (TSMIS-only
+    # -> lands in 'Only in TSMIS'), or "tsn" (TSN-only -> 'Only in TSN'). Used for
+    # the diverged Intersection Summary CONTROL/INTERSECTION-TYPE codes (user chose
+    # one-sided, no crosswalk). Default "both" -> every other report unchanged.
+    sides: str = "both"
 
 
 @dataclass(frozen=True)
@@ -67,6 +76,18 @@ class SummarySpec:
         out = []
         for sec in self.sections:
             out += [(c.key, c.slug) for c in sec.cats]
+        if self.total is not None:
+            out.append((self.total.key, self.total.slug))
+        return out
+
+    def categories_for(self, side):
+        """The categories EMITTED on `side` ('tsmis' | 'tsn'): shared categories
+        plus that side's own one-sided ones, then the grand total. A category the
+        other system doesn't classify is omitted here for `side`, so it lands in
+        the comparison's 'Only in …' tab (the user's one-sided choice). For an
+        all-'both' spec (Ramp Summary) this equals categories()."""
+        out = [(c.key, c.slug) for sec in self.sections for c in sec.cats
+               if c.sides in ("both", side)]
         if self.total is not None:
             out.append((self.total.key, self.total.slug))
         return out
@@ -133,6 +154,177 @@ RAMP_SUMMARY_SPEC = SummarySpec(
            "Ramp Points w/out linework"),
     ),
 )
+
+
+# =============================================================================
+# Intersection Summary canonical spec (UNION of the TSN + TSMIS taxonomies)
+# =============================================================================
+# 11 category blocks; the comparison keys on (block, code-letter) because TSMIS
+# reworded many labels ("STOP SIGN"->"STOP SIGNS", "FOUR-WAY"->"4-WAY"). Two
+# blocks DIVERGED between the systems (CONTROL TYPES: TSN J-P signals vs TSMIS
+# S/O/Q/R; INTERSECTION TYPE: TSMIS adds R/C/P) — those non-shared codes show
+# one-sided (user decision; no crosswalk). See docs/tsn-parsers.md.
+import re as _re
+
+
+def _bslug(name):
+    return _re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def _codeslug(code):
+    return "plus" if code == "+" else code.lower().replace("-", "_")
+
+
+# Diverged codes the two systems don't share (confirmed on the 6.19 raw): these
+# show ONE-SIDED (user decision — no crosswalk). Everything else is shared.
+_IS_TSN_ONLY = {("CONTROL TYPES", c) for c in "JKLMNP"}      # legacy signal codes
+_IS_TSMIS_ONLY = {
+    ("CONTROL TYPES", "R"), ("CONTROL TYPES", "S"), ("CONTROL TYPES", "O"),
+    ("CONTROL TYPES", "Q"),                                   # new control taxonomy
+    ("INTERSECTION TYPE", "R"), ("INTERSECTION TYPE", "C"),
+    ("INTERSECTION TYPE", "P"), ("INTERSECTION TYPE", "+"),   # new intersection types
+    ("MAINLINE NUM OF LANES", "+"),                           # TSN omits the no-data lane row
+    ("MAINLINE LEFT CHANNELIZATION", "Y"),                    # "channelization not specified"
+}
+
+
+def _icat(block, code, label):
+    """One Intersection-Summary category in `block` with within-block `code`."""
+    if code.isdigit():
+        disp, key = f"{code} lane(s)", f"{block}: {code} lanes"
+    else:
+        disp, key = f"{code} - {label}", f"{block}: {code} - {label}"
+    sides = ("tsn" if (block, code) in _IS_TSN_ONLY
+             else "tsmis" if (block, code) in _IS_TSMIS_ONLY else "both")
+    return Cat(slug=f"is_{_bslug(block)}_{_codeslug(code)}", label=disp, key=key,
+               code=code, sides=sides)
+
+
+def _isec(block, *cat_specs):
+    return Section(block, tuple(_icat(block, c, l) for c, l in cat_specs))
+
+
+_IS_RURAL_URBAN = "RURAL/URBAN/SUBURBAN"
+
+INTERSECTION_SUMMARY_SPEC = SummarySpec(
+    report="Intersection Summary",
+    sheet_name="Summary by Category",
+    title="Intersection Summary — TSMIS vs TSN by category",
+    sections=(
+        _isec("HIGHWAY GROUP",
+              ("R", "RIGHT IND ALIGN"), ("L", "LEFT IND ALIGN"),
+              ("X", "UNCONSTRUCTED"), ("U", "UNDIVIDED"), ("D", "DIVIDED")),
+        # Rural/Urban: the two '-O OUTSIDE CITY' rows are disambiguated by their
+        # R-RURAL / U-URBAN parent (codes R-O / U-O); handled in counts_from_rows.
+        Section(_IS_RURAL_URBAN, (
+            _icat(_IS_RURAL_URBAN, "R", "RURAL -I INSIDE CITY"),
+            _icat(_IS_RURAL_URBAN, "R-O", "RURAL -O OUTSIDE CITY"),
+            _icat(_IS_RURAL_URBAN, "U", "URBAN -I INSIDE CITY"),
+            _icat(_IS_RURAL_URBAN, "U-O", "URBAN -O OUTSIDE CITY"),
+            _icat(_IS_RURAL_URBAN, "+", "INVALID DATA"),
+        )),
+        _isec("INTERSECTION TYPE",
+              ("F", "FOUR-LEGGED"), ("M", "MULTI-LEGGED"), ("S", "OFFSET"),
+              ("T", "TEE"), ("Y", "WYE"), ("R", "ROUNDABOUT"),
+              ("C", "OTHER CIRCULAR INTERSECTION"), ("P", "MIDBLOCK PED CROSSING (AT GRADE)"),
+              ("Z", "OTHER"), ("+", "NO DATA GIVEN")),
+        _isec("LIGHTING TYPE",
+              ("N", "NO LIGHTING"), ("Y", "LIGHTING"), ("+", "NO DATA GIVEN")),
+        _isec("CONTROL TYPES",
+              ("A", "NO CONTROL"), ("B", "STOP SIGNS ON CROSS ST ONLY"),
+              ("C", "STOP SIGNS ON MAINLINE ONLY"), ("D", "FOUR-WAY STOP SIGNS"),
+              ("E", "4-WAY FLASHER (RED/CROSS ST)"), ("F", "4-WAY FLASHER (RED/MAINLINE)"),
+              ("G", "4-WAY FLASHER (RED ON ALL)"), ("H", "YIELD SIGNS (CROSS ST ONLY)"),
+              ("I", "YIELD SIGNS (MAIN LINE ONLY)"),
+              ("J", "SIGNAL PRETIMED (2-PHASE)"), ("K", "SIGNAL PRETIMED (MULTI-PHASE)"),
+              ("L", "SIGNALS SEMI-ACTUATED (2-PHASE)"), ("M", "SIGNALS SEMI-ACTUATED (MULTI-PHASE)"),
+              ("N", "SIGNALS FULL-ACTUATED (2-PHASE)"), ("P", "SIGNALS FULL-ACTUATED (MULTI-PHASE)"),
+              ("R", "YIELD ALL WAYS (ROUNDABOUT)"), ("S", "SIGNALIZED"),
+              ("O", "PEDESTRIAN HYBRID BEACON"), ("Q", "FLASH BEACON"),
+              ("Z", "OTHER"), ("+", "NO DATA GIVEN")),
+        _isec("MAINLINE NUM OF LANES",
+              ("1", ""), ("2", ""), ("3", ""), ("4", ""), ("5", ""),
+              ("6", ""), ("7", ""), ("8", ""), ("+", "NO DATA GIVEN")),
+        _isec("MAINLINE MASTARM",
+              ("Y", "YES"), ("N", "NO"), ("+", "NO DATA GIVEN")),
+        _isec("MAINLINE LEFT CHANNELIZATION",
+              ("C", "CURBED MEDIAN LEFT TURN CHAN"), ("N", "NO LEFT TURN CHANNELIZATION"),
+              ("P", "PAINTED LEFT TURN CHAN"), ("R", "RAISED BARS LEFT TURN CHAN"),
+              ("Y", "CHANNELIZATION NOT SPECIFIED"), ("+", "NO DATA GIVEN")),
+        _isec("MAINLINE RIGHT CHANNELIZATION",
+              ("Y", "FREE RIGHT TURNS"), ("N", "NO FREE RIGHT TURNS"), ("+", "NO DATA GIVEN")),
+        _isec("MAINLINE TRAFFIC FLOW",
+              ("N", "2 WAY - NO LEFT TURNS"), ("P", "2 WAY WITH LEFT TURN"),
+              ("R", "2 WAY - LEFT TURN RESTRICT"), ("W", "ONE WAY TRAFFIC"),
+              ("Z", "OTHERS"), ("+", "NO DATA GIVEN")),
+    ),
+    total=Cat("total_intersections", "Total Intersections", "Total Intersections"),
+)
+
+
+# =============================================================================
+# Spec-driven block-walk: a (count, text) row sequence -> {slug: count}
+# Shared by the TSN PDF parser and the TSMIS per-route consolidator (both feed a
+# (count_or_None, code-text) stream; block headers switch the active block).
+# =============================================================================
+_HEADER_NOISE = _re.compile(r"[<>]|-{2,}")
+
+
+def _norm_header(text):
+    return _re.sub(r"\s+", " ", _HEADER_NOISE.sub(" ", str(text or ""))).strip().upper()
+
+
+def _plain_code(text):
+    """The within-block code token from a row's code text: a leading 'X-' letter,
+    a leading number (lanes), or '+'. None for a non-data row."""
+    t = str(text or "").strip()
+    if not t:
+        return None
+    if t[0] == "+":
+        return "+"
+    m = _re.match(r"^([A-Za-z])\s*-", t)
+    if m:
+        return m.group(1).upper()
+    m = _re.match(r"^(\d+)\b", t)
+    if m:
+        return m.group(1)
+    return None
+
+
+def counts_from_rows(spec, rows):
+    """Map a (count_or_None, text) row stream to {slug: count} using `spec`'s
+    block structure. A row whose text matches a block header switches the active
+    block; data rows (numeric count) map by within-block code. The Rural/Urban
+    block's two '-O OUTSIDE CITY' rows are bound to their R-RURAL / U-URBAN parent."""
+    headers = {_norm_header(s.name): s for s in spec.sections}
+    by_block = {s.name: {c.code: c for c in s.cats} for s in spec.sections}
+    out, cur, ru_parent = {}, None, None
+    for count, text in rows:
+        t = str(text or "").strip()
+        h = _norm_header(t)
+        if h in headers:
+            cur, ru_parent = headers[h], None
+            continue
+        if count is None or cur is None:
+            continue
+        if cur.name == _IS_RURAL_URBAN:
+            up = t.upper()
+            if up.startswith("R-RURAL"):
+                ru_parent, code = "R", "R"
+            elif up.startswith("U-URBAN"):
+                ru_parent, code = "U", "U"
+            elif up.startswith("-O"):
+                code = f"{ru_parent or 'R'}-O"
+            elif up.startswith("+"):
+                code = "+"
+            else:
+                code = None
+        else:
+            code = _plain_code(t)
+        cat = by_block[cur.name].get(code) if code is not None else None
+        if cat is not None:
+            out[cat.slug] = out.get(cat.slug, 0) + int(count)
+    return out
 
 
 # =============================================================================

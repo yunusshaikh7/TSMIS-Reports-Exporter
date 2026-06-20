@@ -315,6 +315,9 @@ def tsn_comparator_for(row_key):
     if row_key == "ramp_summary":
         import compare_ramp_summary_tsn as _m       # AGGREGATE recipe
         return _m
+    if row_key == "intersection_summary":
+        import compare_intersection_summary_tsn as _m   # AGGREGATE
+        return _m
     return None
 
 

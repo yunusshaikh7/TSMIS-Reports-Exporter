@@ -26,12 +26,14 @@ import consolidate_highway_log as _c_highway_log
 import consolidate_tsn_highway_log as _c_tsn_highway_log
 import consolidate_tsmis_highway_log_pdf as _c_tsmis_highway_log_pdf
 import consolidate_intersection_detail as _c_int_detail
+import consolidate_intersection_summary as _c_int_summary
 
 import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
 import compare_highway_log_pdf as _cmp_highway_log_pdf
 import compare_ramp_detail_tsn as _cmp_ramp_detail_tsn
 import compare_ramp_summary_tsn as _cmp_ramp_summary_tsn
+import compare_intersection_summary_tsn as _cmp_int_summary_tsn
 
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
 # Order here is the display order in the GUI and the numbering in the console menu.
@@ -61,6 +63,7 @@ CONSOLIDATE_REPORTS = [
     ("TSAR: Ramp Summary", _c_ramp_summary),
     ("TSAR: Ramp Detail", _c_ramp_detail),
     ("Highway Sequence Listing", _c_highway_seq),
+    ("Intersection Summary", _c_int_summary),
     ("Intersection Detail", _c_int_detail),
     # The three Highway Log consolidators are grouped here, TSMIS before TSN.
     # Labels are SOURCE-explicit and parallel — "<system> Highway Log (<format>)"
@@ -133,6 +136,9 @@ COMPARE_REPORTS = [
     # Ramp Summary is the AGGREGATE recipe (statewide category counts, not per-row):
     # TSMIS consolidated workbook summed vs the TSN statewide PDF, keyed on category.
     ("TSAR: Ramp Summary — TSMIS vs TSN", _cmp_ramp_summary_tsn, "files", "tsn"),
+    # Intersection Summary is AGGREGATE too (the Ramp Summary recipe with the
+    # intersection category taxonomy; CONTROL/INTERSECTION-TYPE codes diverge → one-sided).
+    ("TSAR: Intersection Summary — TSMIS vs TSN", _cmp_int_summary_tsn, "files", "tsn"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each
@@ -144,7 +150,8 @@ _CONSOLIDATOR_BY_SUBDIR = {
     _RAMP_DETAIL_SPEC.subdir: _c_ramp_detail,
     _HIGHWAY_SEQ_SPEC.subdir: _c_highway_seq,
     _HIGHWAY_LOG_SPEC.subdir: _c_highway_log,
-    _INT_DETAIL_SPEC.subdir: _c_int_detail,        # v0.17.0 (Intersection Summary still export-only)
+    _INT_SUMMARY_SPEC.subdir: _c_int_summary,      # v0.17.0 (AGGREGATE category summer)
+    _INT_DETAIL_SPEC.subdir: _c_int_detail,        # v0.17.0
 }
 
 

@@ -101,7 +101,7 @@ side is per-route throughout. This yields **two comparison shapes**:
 - **Normalization:** PM padding + prefix/suffix markers; whitespace; County repeats down rows (key on PM, not County). **Ditto/roadbed:** PM-marker equate handling (mirror HL).
 - **Drop folder / consolidator / comparator / golden check / approved counts:** `tsn_library/highway_sequence/` (raw district PDFs → consolidated) · `consolidate_tsn_highway_sequence` (Phase 3d) · `compare_highway_sequence_tsn` · `check_tsn_highway_sequence_parse.py` + `check_compare_highway_sequence_tsn.py` · **canary TBD.**
 
-### Intersection Summary — TSN  *(reconciled by hand; build pending — Phase 3b/3c)*
+### Intersection Summary — TSN  *(BUILT + verified — v0.17.0 Phase 3b/3c)*
 - **TSMIS side:** per-route XLSX ×218, **sheet `Intersection Summary`** (CONFIRMED), 3-col sheet
   (`A`=NUMBER, `B`=CODE). Rows: `TSAR - Intersection Summary` / `Route: NNN` / `Total Intersections = N`,
   then **11 category blocks**, each a `<BLOCK NAME>` header + `NUMBER | CODE` subheader + `count | code-label`
@@ -130,10 +130,18 @@ side is per-route throughout. This yields **two comparison shapes**:
   `(block, code)` categories) + grand Total, reusing the Ramp Summary AGGREGATE machinery + `extra_sheet_writer`.
 - **Normalization:** key on block+code-letter (label text ignored); rural/urban + lanes special-cased.
   **No ditto/roadbed.**
-- **Drop folder / consolidator / comparator / golden check / approved counts:** `tsn_library/intersection_summary/`
-  (raw statewide PDF → normalized `Category|Count`) · `consolidate_intersection_summary` (+ shared `summary_layout`)
-  · `compare_intersection_summary_tsn` (AGGREGATE) · `check_compare_intersection_summary_tsn.py` · **canary TBD**
-  (anchor: Total Intersections **16626**; equals the Intersection-Detail-derived rollup).
+- **Drop folder / consolidator / comparator / golden check:** `tsn_library/intersection_summary/`
+  (raw statewide PDF → normalized `Category|Count` via `tsn_load_intersection_summary.build_into`) ·
+  `consolidate_intersection_summary` (block-walk category summer; per-route sheet + familiar Combined) ·
+  `compare_intersection_summary_tsn` (AGGREGATE; `summary_layout.counts_from_rows` shared with the consolidator;
+  one-sided diverged codes via `Cat.sides`) · `check_compare_intersection_summary_tsn.py` +
+  `check_consolidate_intersection.py`. Live in both matrices (`matrix.tsn_comparator_for("intersection_summary")`).
+- **Approved counts (CANARY — 6.19 statewide set; never regress):** consolidator **218 routes → 16,473**
+  (== the Intersection Detail row count ✓). Comparison: **72 union categories — 56 both, 10 only-TSMIS, 6 only-TSN**;
+  **52 diff cells**, **4 identical** (CONTROL +/Z, HIGHWAY GROUP X, LIGHTING +); TSMIS **16,473** vs TSN **16,626**.
+  Only-in-TSN = the 6 legacy signal codes CONTROL J–P; Only-in-TSMIS = the 10 new codes (CONTROL R/S/O/Q,
+  INTERSECTION-TYPE R/C/P/+, NUM-OF-LANES +, LEFT-CHAN Y). Verified 3 ways (independent loader recompute +
+  compare_core workbook + familiar sheet, all agree).
 
 ### Intersection Detail — TSN
 - **TSMIS side:** per-route XLSX ×218, **sheet `Intersection Detail`** (CONFIRMED), **36 columns** `[P, Post Mile, S, Location, Date of Record, H/G, City Code, R/U, INT Type, INT Eff-Date, Ctrl T, Ctrl Type, Light Eff-Date, Light T/Y, ML Eff-Date, ML S/M, …]`. Free-text **Description** column → formula-injection guard (handled by the shared `consolidate_xlsx` core). **Consolidator DONE (v0.17.0):** `consolidate_intersection_detail` (thin `consolidate_xlsx` wrapper) — verified 218 routes → 16,473 rows.
