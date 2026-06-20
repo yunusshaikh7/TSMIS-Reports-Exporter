@@ -608,24 +608,30 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 
 ### 12b. The Compare-tab "vs TSN Matrix" (`scripts/day_matrix.py`, v0.16.0; generalized v0.16.1)
 
-> **0.17.0 plug-in:** the matrix now lists EVERY report (HL Excel/PDF wired; Ramp
-> Summary/Detail, Highway Sequence, Intersection Summary/Detail greyed). To light a
-> report up: add its TSN comparator + a per-report TSN dataset, flip `supported` in
-> `day_matrix._day_rows()`, and dispatch it in `build_day_cell`. The shell, store,
-> snapshot, queue and actions are already report-agnostic; the only Highway-Log-specific
-> bit left is the shared `TSN_SUBDIR` constant (generalize to a per-row `tsn_subdir`).
+> **0.17.0 plug-in (GENERALIZED):** the matrix lists EVERY report and the dispatch is now
+> report-agnostic. To light a report up, the ONLY required step is adding it to
+> **`matrix.tsn_comparator_for(row_key)`** (and, for a FLAT report, its consolidator to
+> `reports._CONSOLIDATOR_BY_SUBDIR`) — `tsn_supported()` then flips it on in BOTH matrices
+> automatically (`_row_modes` + `day_matrix._day_rows` + `available_days` all gate on it).
+> `day_matrix.TSN_SUBDIR` is GONE → per-row `tsn_subdir`; `consolidate_and_compare_tsn` is
+> keyed on `(row_key, subdir)` and consolidates via `reports.consolidator_for_subdir`. **Live
+> today: HL Excel/PDF + Ramp Detail** (verified end-to-end = 902 diff / 0 context). Greyed:
+> Ramp Summary, Highway Sequence, Intersection Summary/Detail (until their comparators land).
 
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
-cross-environment, no live re-export** (it compares specific historical exports). HL Excel + PDF are
-supported; RS/RD/HSL appear greyed (groundwork). Like `matrix.py`, it NEVER edits the manual compare
-code — it only orchestrates.
+cross-environment, no live re-export** (it compares specific historical exports). HL Excel/PDF +
+**Ramp Detail** are live (v0.17.0); Ramp Summary / Highway Sequence / Intersection appear greyed
+(until their comparators land). Like `matrix.py`, it NEVER edits the manual compare code — it only
+orchestrates.
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
-  (the same path `build_comparison`'s tsn branch uses) over the day's run folder
-  `output/<date src-env>/<subdir>/`. TSN dataset + picker are **shared** with the Everything matrix
-  (`matrix.tsn_source` over `<batch_dest>/_tsn_input/highway_log/`, `settings.matrix_tsn_files`).
+  (the same path `build_comparison`'s tsn branch uses, now keyed on `(row_key, subdir)`) over the
+  day's run folder `output/<date src-env>/<subdir>/`. The TSN dataset resolves per row's `tsn_subdir`
+  via `matrix.tsn_source` → the **canonical TSN library** (`tsn_library.resolve`), with the legacy
+  `<batch_dest>/_tsn_input/<subdir>/` + `settings.matrix_tsn_files` pick as fallback/override. The
+  by-day matrix's single shared picker stays HL-primary; each cell resolves its own report's TSN.
 - **Store:** `output/comparisons/tsn-by-day/<date src-env>/<row>_vs_tsn.xlsx` (stable, dateless per
   cell); counts cached in that tree's `_results.json`. Snapshot (`day_matrix_snapshot`) is a pure stat,
   reusing `matrix._cmp_state`; `cells_to_rebuild(scope, row=, date=)` skips greyed rows + missing sides.

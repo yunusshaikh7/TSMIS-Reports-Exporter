@@ -254,16 +254,15 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
 
 ## Feature backlog
 
-- [ ] **Intersection consolidate + compare-vs-TSN** [M] — **groundwork laid (vNEXT).** Intersection
-  Summary/Detail EXPORT is now ENABLED (`reports.DISABLED_EXPORT_SUBDIRS` emptied; the exporters
-  already existed) — they live on the **development** TSMIS site, reachable via the new Settings ▸
-  **"Use development site"** preset (`gui_api.apply_site_preset` → `common.dev_site_url`,
-  tsmis-dev.dot.ca.gov). STILL TO DO once the user supplies fully-exported Intersection
-  Summary/Detail **+ the TSN versions**: build the two consolidators (`consolidate_intersection_*`)
-  and the TSN comparators, following the recipes in [reports.md](reports.md) /
-  [comparison-engine.md](comparison-engine.md). They have no cross-env adapter, so they stay off the
-  Everything matrix; the natural home for the TSN compare is the Compare-tab **by-day** matrix
-  (`day_matrix`) once their `tsn` mode is coded (today they render greyed there).
+- [ ] **Intersection consolidate + compare-vs-TSN** [M] — **IN PROGRESS (v0.17.0).** Export enabled
+  (dev site, via Settings ▸ "Use development site"). **Done:** `consolidate_intersection_detail`
+  (thin `consolidate_xlsx` wrapper, in `_CONSOLIDATOR_BY_SUBDIR` + `check_consolidate_intersection.py`).
+  **STILL TO DO:** `consolidate_intersection_summary` (category-count summer + `summary_layout.py`);
+  `compare_intersection_detail_tsn` (FLAT recipe; ⚠ TSN `(eff_date,type)` vs TSMIS `(type,eff_date)`
+  pair reordering; exclude `Date of Record`); `compare_intersection_summary_tsn` (AGGREGATE recipe).
+  The vs-TSN comparators flip on in BOTH matrices by adding them to `matrix.tsn_comparator_for`.
+  Recipes: [reports.md](reports.md) / [comparison-engine.md](comparison-engine.md); schema + counts:
+  [tsn-parsers.md](tsn-parsers.md); resume state: [v0.17.0-prompt.md](v0.17.0-prompt.md).
 
 From a notebook brainstorm (2026-06-16); size `[S/M/L]`. Their original version buckets are now in
 the Shipped record below. **⚠ A3 and D1 were the planned v0.13 *and* v0.14 themes but got displaced
