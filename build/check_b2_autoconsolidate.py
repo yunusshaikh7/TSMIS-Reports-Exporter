@@ -1,7 +1,8 @@
 """Golden check for B2 — auto-consolidate on export finish (v0.12.0).
 
 Covers reports.consolidator_for_spec (the export-subdir -> consolidate-module map,
-None for the export-only Intersection reports) and ExportWorker._auto_consolidate
+None only for the export-only Highway Log (PDF) — every other report, incl. both
+Intersection reports, has a consolidator as of v0.17.0) and ExportWorker._auto_consolidate
 (runs inline with the right run-folder day + silent overwrite, skips export-only
 reports and empty runs, and is non-fatal on a consolidator error).
 
@@ -104,11 +105,11 @@ def test_skips_and_is_nonfatal():
     print("_auto_consolidate skips export-only / empty runs and survives errors:")
     orig = reports.consolidator_for_spec
 
-    # Export-only report (no consolidator): skipped, nothing run.
+    # Export-only report (no consolidator, e.g. Highway Log (PDF)): skipped, nothing run.
     reports.consolidator_for_spec = lambda spec: None
     try:
         w = _worker()
-        w._auto_consolidate(_FakeSpec("Intersection Detail", "intersection_detail"),
+        w._auto_consolidate(_FakeSpec("Highway Log (PDF)", "highway_log_pdf"),
                             RunResult(output_dir="x", saved=4), Events())
         check("export-only report is skipped (logged)",
               "no consolidator" in _drain_log(w.q).lower())

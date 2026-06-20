@@ -329,7 +329,8 @@ def tsn_comparator_for(row_key):
 
 def tsn_supported(row_key):
     """True when the report row has a coded vs-TSN comparator (the matrices show it
-    live; others stay greyed groundwork)."""
+    live). Every report qualifies as of v0.17.0; an uncoded row would grey out —
+    defensive, kept for any future report added before its comparator lands."""
     return tsn_comparator_for(row_key) is not None
 
 

@@ -260,7 +260,7 @@ mechanics are owned by [engine-and-reliability.md](engine-and-reliability.md) an
 | **A1 self-describing filenames** | Consolidated workbooks stamp the run's `<date> <src>-<env>` into the filename; both comparison families append a generated-on date in `suggest_name`. TSN Highway Log exempt (no src/env, undated input); legacy flat layout keeps its fixed name. `compare_core/_SCHEMA` text untouched (regression-locked). | `paths.stamped_consolidated_filename` via every `consolidate_*.out_path_for`. Lock: `build/check_a1_filenames.py`. |
 | **A2 compare-folder filter** | Cross-env compare folder dropdowns list only runs that actually contain the chosen report (server-side; Browse paths skip the filter). | `paths.list_output_days_for_report` + `GuiApi.get_compare_folders`; `start_compare_env` preflights it. Lock: `build/check_a2_compare_filter.py`. |
 | **B1 Pause/Resume** | Holds BETWEEN routes (never inside a thread-affine Playwright wait), in both sequential and parallel engines — so it WORKS in fast mode (all workers park), unlike Skip. | `Events.is_paused` (8th callback) + shared `exporter._wait_while_paused`; `GuiApi.pause_or_resume` toggles `pause_event`, cleared on cancel and at end-of-task. Lock: `build/check_b1_pause.py`. |
-| **B2 auto-consolidate** | One Export-tab toggle; `ExportWorker` runs the matching consolidator INLINE after each spec's export (reuses the held task slot + same Events sink). Intersection reports have no consolidator → skipped; failures logged, never fatal. | `reports.consolidator_for_spec` maps export→consolidate by subdir. Lock: `build/check_b2_autoconsolidate.py`. |
+| **B2 auto-consolidate** | One Export-tab toggle; `ExportWorker` runs the matching consolidator INLINE after each spec's export (reuses the held task slot + same Events sink). Highway Log (PDF) has no auto-consolidator → skipped (every other report, incl. both Intersection reports, consolidates as of v0.17.0); failures logged, never fatal. | `reports.consolidator_for_spec` maps export→consolidate by subdir. Lock: `build/check_b2_autoconsolidate.py`. |
 | **B3 Export Everything (always-current store)** | The **Everything** tab runs selected report types × selected environments SEQUENTIALLY into a configurable, UNDATED, overwritten-in-place destination (always holds the latest of every report), laid out `<dest>/<src-env>/<report>/` (+ `consolidated/`). Each report+env folder is refreshed via **STAGE-AND-SWAP** (`_swap_store_dir`): the export writes into a `.staging` sibling and replaces the live folder only on a clean finish (discarded on cancel/crash), so a failed refresh never destroys the last-good copy — the Phase-3 fix for `auto-consolidate-rmtree-out-dir-before-export`. Reuses B1 pause + B2 auto-consolidate. | `gui_worker.BatchWorker` (per-env, reusing `ExportWorker._run_specs`); per-env targeting via process-global `common.set_site` (NOT `set_thread_site` — a single sequential orchestrator under the single-task gate; original restored at end). Dest = `settings.get/set_batch_dest`. Saved-reports freshness library via `report_library.report_ages` + `GuiApi.report_library_info`. Progress persists to `batch_manifest` (`DATA_ROOT/batch_job.json`, atomic, untouched by Delete-all-reports) → resumes across restarts (startup Resume/Discard banner). Locks: `build/check_b3_batch.py` + `check_report_library.py`. |
 
 A3 (results tab) was deferred. **The current GUI is a stopgap** — a full GUI
@@ -304,15 +304,18 @@ Everything tab (sibling to *Refresh & export*) and goes full-width (the activity
 column animates down to a slim log + a config zone). It sits ON TOP of the
 always-current store and **orchestrates the existing comparison adapters
 (`compare_env` / `compare_highway_log` / `compare_highway_log_pdf`) without editing
-them**. **5 rows** (Highway Log is two — Excel + PDF), each with a per-row
+them**. **5 rows** at the time (**7 as of v0.17.0** — every report; nothing greyed),
+each with a per-row
 **comparison-mode** dropdown: cross-environment, **vs TSN** (Excel/PDF flavors), and
-**TSMIS PDF-vs-Excel** (greyed where no code exists). Cells show the **discrepancy
+**TSMIS PDF-vs-Excel** (the "greyed where no code exists" is now defensive — all coded). Cells show the **discrepancy
 count, colour-coded**, with per-cell/row/column/all refresh (cancellable + resumable),
 report + **environment-column** toggles (config zone), TSN drops in
 `<dest>/_tsn_input/`, and TSN/cross-format sheets in `<dest>/comparisons/tsn/`. New
 module `scripts/matrix.py` (console-free engine); freshness via
-`report_library.cell_ages`; intersection reports **shown greyed/unpickable** (not
-removed) via one `reports` gate (`DISABLED_EXPORT_SUBDIRS` / `export_reports_status`).
+`report_library.cell_ages`; intersection reports were **shown greyed/unpickable** at
+this version via one `reports` gate (`DISABLED_EXPORT_SUBDIRS` / `export_reports_status`)
+— **v0.17.0 enabled them** (on the dev site), so `DISABLED_EXPORT_SUBDIRS` is now empty
+and the gate stays as defensive groundwork.
 A light app-wide motion layer (pane/popover/modal enters, button press, a slow theme
 cross-fade) lands with it. Engine internals are owned by
 [comparison-engine.md](comparison-engine.md) §12; the UI + bridge + motion by
@@ -325,7 +328,7 @@ A3 stays parked.)
 ↻ re-export + ⟳ rebuild buttons, and re-exports support **fast mode**
 (`MatrixBatchExportWorker`). (2) A **second matrix** lives under the **Compare** tab —
 the manual **"vs TSN Matrix"** (`scripts/day_matrix.py`; the sub-tab was "TSN by day"):
-rows = EVERY report (HL wired; the rest greyed groundwork for 0.17.0), columns =
+rows = EVERY report (HL wired then; all reports wired as of v0.17.0), columns =
 exported days, each cell = (report, day) vs TSN; no cross-env, no live re-export.
 The two matrices **share** the TSN compare path (`matrix.consolidate_and_compare_tsn`,
 factored out — byte-identical to the prior output), the TSN dataset/picker, and the

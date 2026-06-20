@@ -139,9 +139,12 @@ so the rules are written once (`body.matrix-wide .mx-pane …`) and the Everythi
 and the by-day matrix get identical layout.
 
 The grid (`renderMatrix`) is fed by `gui_api.matrix_info` (a pure-filesystem
-snapshot). **5 rows** (incl. both Highway Log formats); each **row header** carries the
+snapshot). **7 rows** (every report — Ramp Summary/Detail, Highway Sequence, both
+Highway Log formats, Intersection Summary/Detail — all with cross-env AND vs-TSN as of
+v0.17.0); each **row header** carries the
 report name, a per-row **comparison-mode select** (compact + content-sized in a
-`.mx-fluent-select` chevron wrapper; greys not-yet-coded modes "(soon)"), a vs-TSN
+`.mx-fluent-select` chevron wrapper; the "(soon)" greying is now defensive — every
+mode is coded), a vs-TSN
 **file picker** when in a TSN mode — a **status-dot chip** (`.mxtp-file`) that surfaces
 the active TSN file (green dot = file ready / amber = dropped PDFs need consolidating /
 grey = none) over compact Choose / Consolidate / Clear buttons — and a **per-row
@@ -191,8 +194,8 @@ action triggers stay LIVE mid-run (a 2nd click queues) — only selection contro
 
 A second matrix under the **Compare** tab — sub-tab label **"vs TSN Matrix"** (internal
 group id stays `tsn_by_day`), appended after the registry `compare_groups`: rows = **every
-report type** (HL Excel + PDF wired; RS/RD/HSL + Intersection Summary/Detail greyed
-groundwork for 0.17.0), columns = exported **days** you add, each cell = (report, day)
+report type** (HL Excel + PDF, Ramp Summary/Detail, Highway Sequence, Intersection
+Summary/Detail — all wired as of v0.17.0), columns = exported **days** you add, each cell = (report, day)
 **vs TSN**. ONE source selector (default ssor-prod); no cross-env, no live re-export.
 `selectCompareGroup("tsn_by_day")` swaps `#compareClassic` out for `#dayMatrixSection` and
 calls `applyMatrixWide()` so it goes **full-width too** (same treatment as the Everything
@@ -209,6 +212,29 @@ live-formulas toggle is its **own** setting (`day_matrix_formulas`, snapshot key
 `set_day_matrix_formulas`, synced by `syncDayMatrixFormulas`) — independent of the Everything
 matrix's `matrix_formulas`. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
 Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs TSN Matrix).
+
+### One-stop EXPORT on the by-day matrix (v0.17.0)
+
+The by-day matrix is the **export + consolidate + compare-vs-TSN** home for
+individually-pulled days (the Everything matrix stays the always-current health view).
+**"Export today →"** (footer, accent) — or the today **column-header ↻**, a **row ↻**, or
+a **today cell's ↻** — pulls a fresh **dated run folder** `output/<today> <src-env>/` for
+the matrix source, then auto-chains the consolidate + compare so the new column **fills
+itself**. **Only today is exportable**: `day_matrix_snapshot.today` gates every export
+control (past columns show no export action — their pull stays the immutable record handed
+to the vendor; you can still rebuild/compare them). Plumbing: `export_day_column/row/cell`
+→ a `which:"day"` **export** Job → `MatrixBatchExportWorker(dated=True)` (the
+`_run_matrix_export_step(dated=True)` writes the dated folder via `out_base=None`, site set
+to the matrix source like `BatchWorker`); on `matrix_export_done` for a day job,
+`_on_matrix_export_done` enqueues the matching **compare** Job (skipped on cancel). Fast
+mode + worker count reuse the **shared** `matrix_fast`/`fast_workers` knob (the by-day
+corner's `#dayMatrixFast`/`#dayMatrixWorkers` stay in sync with the Everything matrix /
+Export pane / Settings via `syncDayMatrixFast`); **pause/resume + skip** (`#btnDayPause`/
+`#btnDaySkip`, shown while a `which:"day"` export runs) forward to the engine like a normal
+export. Foundation note: a future **district-wide** pull (TSN HL/HSL are per-district) would
+widen `_resolve_day_export_steps` to per-district steps — the dated/site/queue machinery
+already fits. Golden `check_day_matrix` (today-gating, dated worker, export→compare chain);
+mock + bridge at `/index.html#mock`.
 
 ### Drag-to-reorder matrix rows + columns (v0.17.0 Phase 4b)
 

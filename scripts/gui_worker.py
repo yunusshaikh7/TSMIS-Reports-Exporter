@@ -1581,18 +1581,24 @@ class CheckWorker(threading.Thread):
 
 
 def _run_matrix_export_step(spec, src, env, dest, queue, cancel, skip, pause,
-                            workers, on_worker=None):
-    """Export ONE report for ONE environment into the Export-Everything store,
-    WITHOUT a manifest (so a matrix refresh can never clobber a paused
-    Export-Everything batch — BatchWorker alone persists batch_job.json). Runs
-    the SAME per-environment body BatchWorker uses (set_site + an ExportWorker
-    into <dest>/<src-env>/<subdir>, env-tagged names); fast mode runs N browsers.
-    The caller sets/restores the process-global site. Auth / browser failures
-    raise up to the batch loop, which stops the run. `on_worker(ew|None)` exposes
-    the live ExportWorker to the bridge for the duration of the step (so live
-    screenshot previews work, just like a normal export)."""
+                            workers, on_worker=None, dated=False):
+    """Export ONE report for ONE environment, WITHOUT a manifest (so a matrix
+    refresh can never clobber a paused Export-Everything batch — BatchWorker alone
+    persists batch_job.json). Runs the SAME per-environment body BatchWorker uses
+    (set_site + an ExportWorker); fast mode runs N browsers. The caller
+    sets/restores the process-global site. Auth / browser failures raise up to the
+    batch loop, which stops the run. `on_worker(ew|None)` exposes the live
+    ExportWorker to the bridge for the duration of the step (so live screenshot
+    previews work, just like a normal export).
+
+    `dated=False` -> the Everything store (`<dest>/<src-env>/<subdir>`, env-tagged
+    names). `dated=True` (the Compare by-day matrix) -> out_base=None, so the
+    ExportWorker writes a normal DATED run folder `output/<today> <src-env>/
+    <subdir>/` with plain route names — the immutable per-day pull the by-day
+    matrix consolidates + compares vs TSN. Only today can be exported (run_export
+    always names the folder for today)."""
     set_site(src, env)
-    out_base = Path(dest) / f"{src}-{env}"
+    out_base = None if dated else Path(dest) / f"{src}-{env}"
     ew = ExportWorker([spec], queue, cancel, skip, workers=workers, routes=None,
                       pause_event=pause, auto_consolidate=False, out_base=out_base)
     if on_worker:
@@ -1618,7 +1624,7 @@ class MatrixBatchExportWorker(threading.Thread):
     restored at the end."""
 
     def __init__(self, steps, dest, queue, cancel_event, skip_event, pause_event,
-                 workers=1, on_worker=None):
+                 workers=1, on_worker=None, dated=False):
         super().__init__(daemon=True, name="matrix-batch-export")
         self.steps = list(steps)               # [(spec, src, env), ...]
         self.dest = dest
@@ -1628,6 +1634,9 @@ class MatrixBatchExportWorker(threading.Thread):
         self.pause = pause_event
         self.workers = workers
         self.on_worker = on_worker             # exposes the live ExportWorker for preview
+        # dated=True -> the Compare by-day matrix: write DATED run folders
+        # (output/<today> <src-env>/) instead of the always-current Everything store.
+        self.dated = bool(dated)
 
     def run(self):
         original = get_site()
@@ -1643,7 +1652,8 @@ class MatrixBatchExportWorker(threading.Thread):
                 try:
                     _run_matrix_export_step(spec, src, env, self.dest, self.q,
                                             self.cancel, self.skip, self.pause,
-                                            self.workers, on_worker=self.on_worker)
+                                            self.workers, on_worker=self.on_worker,
+                                            dated=self.dated)
                     ok += 1
                 except (AuthError, BrowserNotFoundError) as e:
                     log.warning("matrix export %s-%s stopped: %s: %s",

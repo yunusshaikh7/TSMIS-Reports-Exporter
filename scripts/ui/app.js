@@ -550,9 +550,10 @@ function buildStatic() {
   document.title = init.app_name;
 
   // report checkboxes (first ticked by default, same as the old GUI).
-  // App-wide-disabled reports (Intersection) are SHOWN but greyed/unpickable —
+  // App-wide-disabled reports (rep.disabled — none today; the gate is empty since
+  // Intersection moved to the dev site) are SHOWN but greyed/unpickable:
   // .option-static keeps them dim even when no task is running, and dataset.off
-  // keeps the lock-sweep from re-enabling them.
+  // keeps the lock-sweep from re-enabling them. Kept for any future gated report.
   const list = $("reportList");
   init.reports.forEach((rep, i) => {
     const off = !!rep.disabled;
@@ -1837,6 +1838,19 @@ function syncDayMatrixFormulas() {
   const cb = $("dayMatrixFormulas");
   if (cb) cb.checked = !!(S.st && S.st.day_matrix_formulas);
 }
+// The by-day matrix's Export-speed controls reflect the SHARED fast knob (matrix_fast
+// + the one fast_workers count), so toggling fast here / in the Everything matrix /
+// in Settings all stay on one value.
+function syncDayMatrixFast() {
+  const cb = $("dayMatrixFast");
+  if (!cb) return;
+  const mf = (S.st && S.st.matrix_fast) || { on: false, workers: 0 };
+  cb.checked = !!mf.on;
+  const row = $("dayMatrixWorkersRow");
+  if (row) row.classList.toggle("is-off", !mf.on);
+  const wk = $("dayMatrixWorkers");
+  if (wk && document.activeElement !== wk && mf.workers) wk.value = mf.workers;
+}
 
 function mxCellContent(cmp, tsnMeta) {
   // Returns {cls, main, sub} for a non-baseline cell from its unified `cmp` state.
@@ -2305,6 +2319,7 @@ async function renderDayMatrix() {
   try { snap = await api.day_matrix_info(); } catch (e) { return; }
   if (!snap) return;
   const days = snap.days || [], locked = !!(S.st && S.st.task);
+  const today = snap.today;          // the one EXPORTABLE column (past = locked)
 
   const srcSel = $("dayMatrixSource");
   if (srcSel) {
@@ -2356,8 +2371,9 @@ async function renderDayMatrix() {
     if (snap.tsn_meta) tsnHost.appendChild(mxTsnPicker(snap.tsn_meta, locked, renderDayMatrix));
   }
 
-  // Report show/hide toggles (parity with the Everything matrix's config zone) —
-  // lets the user hide the greyed "(soon)" rows.
+  // Report show/hide toggles (parity with the Everything matrix's config zone).
+  // The " (soon)" suffix below is defensive — every report is wired as of v0.17.0,
+  // so it only renders if a future report ships before its by-day comparator does.
   const rtog = $("dayMatrixReportToggles");
   if (rtog) {
     rtog.textContent = "";
@@ -2404,6 +2420,16 @@ async function renderDayMatrix() {
     h.appendChild(lab);
     h.appendChild(dmConsolidatedBadge(d, dayCons[d] || { exists: false, fresh: false }));
     const btns = document.createElement("span"); btns.className = "mxch-btns";
+    // Export is offered ONLY for today's column — past days are the immutable
+    // record you pulled (re-exporting them would overwrite with today's data).
+    if (d === today) {
+      btns.appendChild(mxHeadBtn("i-refresh",
+        `Export every report for ${d} (today) from TSMIS, then compare vs TSN`,
+        "mxch-reexport", async () => {
+          const r = await api.export_day_column();
+          if (r && r.error) showMessage("error", "Can't export", r.error);
+        }));
+    }
     btns.append(
       mxHeadBtn("i-compare", `Rebuild every report for ${d}`, "mxch-rebuild", async () => {
         const r = await api.rebuild_day_matrix("all", null, d);
@@ -2426,6 +2452,11 @@ async function renderDayMatrix() {
     lbl.textContent = rlabel + (supported ? "" : " (soon)");
     top.appendChild(lbl);
     if (supported) {
+      top.appendChild(mxHeadBtn("i-refresh", `Export ${rlabel} for today + compare vs TSN`,
+        "mxch-reexport", async () => {
+          const r = await api.export_day_row(rk);
+          if (r && r.error) showMessage("error", "Can't export", r.error);
+        }));
       top.appendChild(mxHeadBtn("i-compare", `Rebuild ${rlabel} for every day`, "mxch-rebuild",
         async () => {
           const r = await api.rebuild_day_matrix("all", rk, null);
@@ -2452,6 +2483,15 @@ async function renderDayMatrix() {
       cell.append(main, sub);
       if (supported) {
         const acts = document.createElement("div"); acts.className = "mx-actions";
+        // Export action only on TODAY's cell (the primary action when it's not yet
+        // pulled); past cells stay export-locked and offer compare/open only.
+        if (d === today) {
+          acts.appendChild(mxActBtn("i-refresh", "Export this report for today + compare vs TSN",
+            false, async () => {
+              const r = await api.export_day_cell(rk, d);
+              if (r && r.error) showMessage("error", "Can't export", r.error);
+            }));
+        }
         acts.appendChild(mxActBtn("i-compare", "Build / rebuild this comparison vs TSN",
           false, async () => {
             const r = await api.build_day_cell(rk, d);
@@ -2517,8 +2557,17 @@ function wireDayMatrixFooter() {
     const r = await api.open_day_comparisons_folder();
     if (r && r.error) showMessage("error", "Can't open", r.error);
   };
+  const ex = $("btnDayExportToday");
+  if (ex) ex.onclick = async () => {
+    const r = await api.export_day_column();
+    if (r && r.error) showMessage("error", "Can't export", r.error);
+  };
   const cb = $("btnDayCancel");
   if (cb) cb.onclick = () => api.cancel_run();
+  const pb = $("btnDayPause");
+  if (pb) pb.onclick = () => api.pause_or_resume();
+  const sb = $("btnDaySkip");
+  if (sb) sb.onclick = () => api.skip_route();
 }
 
 function updateDayMatrixProgress() {
@@ -2540,14 +2589,36 @@ function updateDayMatrixProgress() {
   const noAvail = !addSel || !addSel.querySelector('option[value]:not([value=""])');
   if (addSel) addSel.disabled = locked || noAvail;
   if (addBtn) addBtn.disabled = locked || noAvail;
+  const exportBtn = $("btnDayExportToday");
+  if (exportBtn) exportBtn.disabled = locked;   // action stays queue-able? no — export claims a run
   const cancel = $("btnDayCancel");
   if (cancel) {
     const running = !!(S.st && S.st.task === "matrix");
     cancel.classList.toggle("hidden", !running);
     cancel.disabled = !running;
   }
+  // Pause/Skip apply only to a by-day re-EXPORT run (today's column). The worker
+  // forwards pause/skip to the engine; Skip is meaningless in fast mode.
+  const cur = S.st && S.st.matrix_current;
+  const exporting = !!(S.st && S.st.task === "matrix" && cur
+                       && cur.kind === "export" && cur.which === "day");
+  const pause = $("btnDayPause");
+  if (pause) {
+    pause.classList.toggle("hidden", !exporting);
+    pause.disabled = !exporting;
+    const u = pause.querySelector("use");
+    if (u) u.setAttribute("href", S.st && S.st.paused ? "#i-play" : "#i-pause");
+    const lbl = $("btnDayPauseLabel");
+    if (lbl) lbl.textContent = S.st && S.st.paused ? "Resume" : "Pause";
+  }
+  const skip = $("btnDaySkip");
+  if (skip) {
+    skip.classList.toggle("hidden", !exporting);
+    skip.disabled = !exporting || !!(S.st && S.st.fast_run);
+  }
   renderQueuePanel("dayQueueGroup", "dayQueue", "dayQueueCount");
   syncDayMatrixFormulas();
+  syncDayMatrixFast();
 }
 
 async function startConsolidate() {
@@ -3166,6 +3237,24 @@ function bindEvents() {
     if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
     syncDayMatrixFormulas();
   });
+  // By-day Export-speed controls — the SAME shared fast knob the Everything matrix /
+  // Export pane / Settings use (set_matrix_fast + the one fast_workers count).
+  $("dayMatrixFast")?.addEventListener("change", async (e) => {
+    const r = await api.set_matrix_fast(e.target.checked);
+    if (r && r.error) { showMessage("error", "Can't set fast mode", r.error); syncDayMatrixFast(); }
+  });
+  $("dayMatrixWorkers")?.addEventListener("change", async (e) => {
+    const res = await api.set_setting("fast_workers", e.target.value);
+    if (res && res.error) { showMessage("error", "Can't set browser count", res.error); syncDayMatrixFast(); return; }
+    if (res && res.values) {
+      S.init.settings.values = res.values;
+      const n = res.values.fast_workers;
+      e.target.value = n;                                    // reflect clamping
+      if (!(S.st && S.st.task)) {
+        ["fastWorkers", "setFastWorkers", "matrixWorkers"].forEach((id) => { const el = $(id); if (el) el.value = n; });
+      }
+    }
+  });
   $("btnQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
   $("btnQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
   // The by-day matrix shares the same queue (Clear / Stop-all act on it too).
@@ -3447,6 +3536,7 @@ if (WANT_MOCK) {
 // Lets the UI run in a plain browser: simulated checks, login, exports and
 // consolidation. Never loaded by the real app (pywebview wins the race above).
 function makeMockApi() {
+  const MOCK_TODAY = "2026-06-20";   // the by-day matrix's EXPORTABLE column in #mock
   const ROUTES = [];
   for (let i = 1; i <= 280; i++) {
     ROUTES.push(String(i).padStart(3, "0"));
@@ -3464,12 +3554,15 @@ function makeMockApi() {
     { label: "Intersection Detail", fmt: "Excel" },
   ];
   // The Consolidate radios index into THIS list (matches reports.CONSOLIDATE_REPORTS,
-  // 6 rows) — NOT the 7-row export REPORTS above. consolidate_info/start_consolidate
-  // must use this so the preview's labels/out_paths mirror the real bridge.
+  // 8 rows incl. both Intersection consolidators as of v0.17.0) — NOT the 7-row
+  // export REPORTS above. consolidate_info/start_consolidate must use this so the
+  // preview's labels/out_paths mirror the real bridge.
   const CONS_REPORTS = [
     { label: "TSAR: Ramp Summary" },
     { label: "TSAR: Ramp Detail" },
     { label: "Highway Sequence Listing" },
+    { label: "Intersection Summary" },
+    { label: "Intersection Detail" },
     { label: "TSMIS Highway Log (Excel)" },
     { label: "TSMIS Highway Log (PDF)" },
     { label: "TSN Highway Log (PDF)" },
@@ -3733,7 +3826,7 @@ function makeMockApi() {
     return { source, sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
                .map((k) => { const [s, v] = k.split("-");
                  return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
-             days, rows: shown.map((r) => r.key), row_labels: rowLabels,
+             days, today: MOCK_TODAY, rows: shown.map((r) => r.key), row_labels: rowLabels,
              row_supported: rowSupported, all_rows: allRows, hidden,
              tsn_meta: tsnMeta, cells,
              day_consolidated: Object.fromEntries(days.map((d, i) =>
@@ -3748,6 +3841,7 @@ function makeMockApi() {
     mockJobSeq++;
     const job = { id: mockJobSeq, kind, scope, label, status: "queued",
                   fast: !!opts.fast, total: opts.total || 1,
+                  which: opts.which || "env",
                   mode: kind === "export" ? "export" : "consolidate" };
     st.matrix_queue = [...(st.matrix_queue || []), job];
     if (st.task || st.matrix_current) {
@@ -3770,10 +3864,19 @@ function makeMockApi() {
     push({ t: "run_started", mode: job.mode, label: job.label, workers },
          { t: "log", text: job.label });
     setTimeout(() => {
+      const finished = st.matrix_current;
       st.task = null; st.matrix = null; st.matrix_current = null;
       pushState();
       push({ t: "run_ended" }, { t: "matrix_refresh" });
-      mockTryStartNext();      // auto-advance
+      // A by-day EXPORT chains a compare for the same scope (mirrors the real
+      // bridge's export -> consolidate -> compare so the column fills itself).
+      if (finished && finished.kind === "export" && finished.which === "day") {
+        const cs = finished.scope === "cell" ? "cell" : finished.scope === "row" ? "row" : "column";
+        mockEnqueue("compare", cs, finished.label.replace(/^Export /, "Compare "),
+                    { which: "day", total: finished.total });
+      } else {
+        mockTryStartNext();      // auto-advance
+      }
     }, 700);
   }
 
@@ -3947,6 +4050,8 @@ function makeMockApi() {
         { label: "TSAR: Ramp Summary", fmt: "PDF" },
         { label: "TSAR: Ramp Detail", fmt: "Excel" },
         { label: "Highway Sequence Listing", fmt: "Excel" },
+        { label: "Intersection Summary", fmt: "Excel" },
+        { label: "Intersection Detail", fmt: "Excel" },
         { label: "TSMIS Highway Log (Excel)", fmt: "Excel" },
         { label: "TSMIS Highway Log (PDF)", fmt: "PDF" },
         { label: "TSN Highway Log (PDF)", fmt: "PDF" },
@@ -3955,17 +4060,34 @@ function makeMockApi() {
         { id: "env", label: "Cross-environment" },
         { id: "tsn", label: "vs TSN" },
       ],
+      // Mirrors the real reports.COMPARE_REPORTS (15 rows as of v0.17.0): every
+      // report has a cross-env ("— between environments") AND a vs-TSN comparator,
+      // plus the Highway Log PDF↔Excel self-check. Order matches the registry so
+      // the radios index correctly.
       compare_reports: [
         { label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env" },
         { label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env" },
         { label: "Highway Sequence Listing — between environments", kind: "folders", group: "env" },
         { label: "Highway Log — between environments", kind: "folders", group: "env" },
+        { label: "TSAR: Intersection Summary — between environments", kind: "folders", group: "env" },
+        { label: "TSAR: Intersection Detail — between environments", kind: "folders", group: "env" },
+        { label: "Highway Log (PDF) — between environments", kind: "folders", group: "env" },
         { label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
         { label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "tsn",
           file_a_label: "TSMIS (PDF)", file_b_label: "TSN (PDF)" },
         { label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env",
           file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
+        { label: "TSAR: Ramp Detail — TSMIS vs TSN", kind: "files", group: "tsn",
+          file_a_label: "TSMIS", file_b_label: "TSN" },
+        { label: "TSAR: Ramp Summary — TSMIS vs TSN", kind: "files", group: "tsn",
+          file_a_label: "TSMIS", file_b_label: "TSN" },
+        { label: "TSAR: Intersection Summary — TSMIS vs TSN", kind: "files", group: "tsn",
+          file_a_label: "TSMIS", file_b_label: "TSN" },
+        { label: "TSAR: Intersection Detail — TSMIS vs TSN", kind: "files", group: "tsn",
+          file_a_label: "TSMIS", file_b_label: "TSN" },
+        { label: "Highway Sequence Listing — TSMIS vs TSN", kind: "files", group: "tsn",
+          file_a_label: "TSMIS", file_b_label: "TSN" },
       ],
       batch_resume: null,
       batch_dest: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
@@ -4416,6 +4538,25 @@ function makeMockApi() {
       push({ t: "log", text: `(mock) open by-day comparison: ${d} ${rk}_vs_tsn.xlsx` });
       return { ok: true };
     },
+    export_day_column: async () => {
+      if ((st.day_matrix_days || []).indexOf(MOCK_TODAY) < 0)
+        st.day_matrix_days = [...(st.day_matrix_days || []), MOCK_TODAY];
+      return mockEnqueue("export", "column", `Export all reports — ${MOCK_TODAY}`,
+                         { which: "day", total: 7, fast: !!(st.matrix_fast || {}).on });
+    },
+    export_day_row: async (rk) => {
+      if ((st.day_matrix_days || []).indexOf(MOCK_TODAY) < 0)
+        st.day_matrix_days = [...(st.day_matrix_days || []), MOCK_TODAY];
+      return mockEnqueue("export", "row", `Export ${rk} — ${MOCK_TODAY}`,
+                         { which: "day", total: 1, fast: !!(st.matrix_fast || {}).on });
+    },
+    export_day_cell: async (rk, d) => {
+      if (d !== MOCK_TODAY) return { error: "Only today's column can be exported." };
+      if ((st.day_matrix_days || []).indexOf(MOCK_TODAY) < 0)
+        st.day_matrix_days = [...(st.day_matrix_days || []), MOCK_TODAY];
+      return mockEnqueue("export", "cell", `Export ${rk} — ${d}`,
+                         { which: "day", total: 1, fast: !!(st.matrix_fast || {}).on });
+    },
     open_day_comparisons_folder: async () => {
       push({ t: "log", text: "(mock) open by-day comparisons folder" });
       return { ok: true };
@@ -4478,12 +4619,13 @@ function makeMockApi() {
       }, 600);
     },
     consolidate_info: async (idx, day) => {
-      // Only index 5 (TSN Highway Log) reads from a dropped-in input folder (those
+      // Only index 7 (TSN Highway Log) reads from a dropped-in input folder (those
       // district PDFs come from outside the app) — so it carries an input_note and
-      // the day picker is hidden. Index 4 (TSMIS Highway Log PDF) reads this app's
-      // own "Highway Log (PDF)" export, day-aware like the Excel one.
+      // the day picker is hidden. Index 6 (TSMIS Highway Log PDF) reads this app's
+      // own "Highway Log (PDF)" export, day-aware like the Excel one. (Indices
+      // shifted +2 in v0.17.0 when Intersection Summary/Detail joined the list.)
       const dropped = {
-        5: { note: "Drop the TSN district Highway Log PDFs into the input folder first.",
+        7: { note: "Drop the TSN district Highway Log PDFs into the input folder first.",
              dir: "C:\\Tools\\TSMIS Exporter\\input\\tsn_highway_log",
              out: "tsn_highway_log_consolidated.xlsx" },
       }[idx];

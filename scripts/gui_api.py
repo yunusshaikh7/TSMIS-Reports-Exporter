@@ -1475,7 +1475,7 @@ class GuiApi:
         """JSON-safe summary of a Job for the snapshot (queue panel + current)."""
         return {"id": job["id"], "kind": job["kind"], "scope": job["scope"],
                 "label": job["label"], "status": job.get("status", "queued"),
-                "fast": bool(job.get("fast"))}
+                "fast": bool(job.get("fast")), "which": job.get("which", "env")}
 
     def _matrix_row_label(self, row_key):
         return {r[0]: r[1] for r in matrix_rows()}.get(row_key, row_key)
@@ -1688,7 +1688,66 @@ class GuiApi:
                     steps.append((spec, src, env))
         return steps
 
+    def _resolve_day_export_steps(self, job):
+        """[(spec, src, env)] for a by-day EXPORT job — TODAY only, into a dated run
+        folder. 'cell'/'row' = the one report; 'column' = every visible supported
+        report. src/env come from the matrix's single source. Reports with no
+        export adapter are skipped. (Foundation note: a future district-wide pull
+        would widen this to per-district steps; the dated/site machinery already
+        fits, only the route/district scope would change.)"""
+        snap = self._day_matrix_snapshot()
+        combo = self._parse_env_keys([snap["source"]])
+        if not combo:
+            return []
+        src, env = combo[0]
+        rows_by_key = {r[0]: r for r in matrix_rows()}
+
+        def spec_for(row_key):
+            row = rows_by_key.get(row_key)
+            if row is not None and row[3] is not None:
+                return EXPORT_REPORTS[row[3]][2]
+            for _label, _fmt, spec in EXPORT_REPORTS:   # extra rows keyed by subdir
+                if spec.subdir == row_key:
+                    return spec
+            return None
+
+        scope = job["scope"]
+        if scope in ("cell", "row"):
+            spec = spec_for(job["row"])
+            return [(spec, src, env)] if spec is not None else []
+        steps = []                                       # column / all: every visible report
+        for rk in snap["rows"]:
+            if not snap.get("row_supported", {}).get(rk):
+                continue
+            spec = spec_for(rk)
+            if spec is not None:
+                steps.append((spec, src, env))
+        return steps
+
+    def _dispatch_day_export_job(self, job):
+        """Export the by-day matrix's TODAY column (or one report) into a dated run
+        folder for the matrix source, then auto-chain the consolidate+compare in
+        _on_matrix_export_done so the column 'fills itself'."""
+        steps = self._resolve_day_export_steps(job)
+        if not steps:
+            return False
+        n_workers = self._matrix_worker_count() if job.get("fast") else 1
+        with self._lock:
+            self._fast_run = n_workers > 1
+        note = f"   ·   FAST MODE ({n_workers} browsers)" if n_workers > 1 else ""
+        self._emit_log(f"{job['label']} — {len(steps)} export(s){note}…")
+        self._set_dot("busy", "Exporting…")
+        self._emit({"t": "run_started", "mode": "export", "label": "Exporting…",
+                    "workers": n_workers})
+        MatrixBatchExportWorker(steps, settings.get_batch_dest(), self._q,
+                                self.cancel_event, self.skip_event, self.pause_event,
+                                workers=n_workers, dated=True,
+                                on_worker=self._set_matrix_export_worker).start()
+        return True
+
     def _dispatch_export_job(self, job):
+        if job.get("which") == "day":
+            return self._dispatch_day_export_job(job)
         dest = settings.get_batch_dest()
         steps = self._resolve_export_steps(job)
         if not steps:
@@ -2194,6 +2253,66 @@ class GuiApi:
         self._push_state()
         return {"ok": True, "order": clean}
 
+    def _ensure_day_column(self, date):
+        """Make sure `date` is a day column, so an export's results show AND the
+        chained compare can target it. Idempotent."""
+        days = settings.get_day_matrix_days()
+        if date not in days:
+            settings.set_day_matrix_days(days + [date])
+
+    @_api_method
+    def export_day_column(self):
+        """One-stop: export EVERY visible report for TODAY (the matrix source) into
+        a dated run folder, then auto-consolidate + compare each vs TSN — the new
+        column 'fills itself'. Only today is exportable (past columns are the
+        immutable record you pulled). Needs a saved login; the export signs in."""
+        snap = self._day_matrix_snapshot()
+        today = snap["today"]
+        self._ensure_day_column(today)
+        job = self._make_job("export", "column", f"Export all reports — {today}",
+                             env=today, which="day", fast=settings.get_matrix_fast())
+        self._push_state()
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def export_day_row(self, row_key):
+        """Export ONE report for TODAY into the dated run folder, then compare it
+        vs TSN (e.g. re-pull a single report for today)."""
+        snap = self._day_matrix_snapshot()
+        if row_key not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report for the matrix."}
+        if not snap.get("row_supported", {}).get(row_key):
+            return {"error": "That report has no TSN comparison yet."}
+        today = snap["today"]
+        self._ensure_day_column(today)
+        job = self._make_job("export", "row",
+                             f"Export {self._matrix_row_label(row_key)} — {today}",
+                             row=row_key, env=today, which="day",
+                             fast=settings.get_matrix_fast())
+        self._push_state()
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def export_day_cell(self, row_key, date):
+        """Export ONE report for TODAY's cell, then compare vs TSN. Only today is
+        exportable — a past date is rejected so its pull is preserved."""
+        snap = self._day_matrix_snapshot()
+        if row_key not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report for the matrix."}
+        if not snap.get("row_supported", {}).get(row_key):
+            return {"error": "That report has no TSN comparison yet."}
+        if date != snap["today"]:
+            return {"error": "Only today's column can be exported — earlier days "
+                             "are kept as the record you pulled. Use the rebuild "
+                             "action to re-compare a past day."}
+        self._ensure_day_column(date)
+        job = self._make_job("export", "cell",
+                             f"Export {self._matrix_row_label(row_key)} — {date}",
+                             row=row_key, env=date, which="day",
+                             fast=settings.get_matrix_fast())
+        self._push_state()
+        return self._enqueue_matrix_job(job)
+
     @_api_method
     def build_day_cell(self, row_key, date):
         """Queue a (re)build of ONE (report, day) vs-TSN comparison."""
@@ -2288,9 +2407,25 @@ class GuiApi:
         with self._lock:
             if not self._authed:
                 self._device_ok = True   # the run signed itself in (device mode)
-        if not self._queue:              # flash once the queue is fully drained
+            cur = self._current_job      # capture before _end_task clears it
+        # By-day export -> auto-chain the consolidate+compare for the SAME scope, so
+        # a new column "fills itself" (export -> consolidate -> compare vs TSN) in
+        # one action. Skipped on cancel (a stopped export shouldn't trigger a build).
+        chain = None
+        if (cur and cur.get("which") == "day" and cur.get("kind") == "export"
+                and not payload.get("cancelled")):
+            cscope = "cell" if cur["scope"] == "cell" else (
+                "row" if cur["scope"] == "row" else "all")
+            chain = self._make_job(
+                "compare", cscope,
+                self._day_job_label("column" if cscope == "all" else cscope,
+                                    cur.get("row"), cur.get("env")),
+                row=cur.get("row"), env=cur.get("env"), which="day")
+        if not self._queue and chain is None:   # flash once the queue is fully drained
             self._flash_taskbar()
         self._end_task()
+        if chain is not None:
+            self._enqueue_matrix_job(chain)
         self._emit({"t": "matrix_refresh"})
 
     @_api_method

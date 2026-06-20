@@ -374,8 +374,8 @@ leave dormant; revisit only if a Med Wid value ever contains those characters. T
 All built by `compare_core`. The GUI Compare pane renders one **sub-tab per `COMPARE_GROUPS` id**
 (v0.16.1: `env` "Cross-environment" default, `tsn` "vs TSN"; the GUI appends a third sub-tab, the
 day-keyed "vs TSN Matrix", on its own). Every report's "between environments" compare lives in
-`env` (Highway Log included now); the file-based TSMIS-vs-TSN compares live in `tsn` (Highway Log
-Excel/PDF today; the other reports plug in in 0.17.0). Each `COMPARE_REPORTS`
+`env` (Highway Log included now); the file-based TSMIS-vs-TSN compares live in `tsn` (every report
+as of v0.17.0). Each `COMPARE_REPORTS`
 row `(label, module_or_adapter, kind, group)` shows only under its group. `kind` is `"files"`
 (file-vs-file) or `"folders"` (folder-vs-folder) — independent of `group`. See
 [reports.md](reports.md) for the registry + sub-tab wiring.
@@ -487,8 +487,11 @@ right-channelization / lighting are `Y/N` on TSN but `1/0` on TSMIS — **normal
 **(2)** Control Type diverges taxonomically (TSN legacy vs TSMIS `S`) — no crosswalk → genuine diffs;
 **(3)** `context_fields` = PR + Date of Record (a TSMIS refresh date) + the **5 cross-street attrs**
 (TSMIS leaves them blank for ~37% of intersections, so counting them would bury the mainline diffs —
-shown, never counted). Canary in [tsn-parsers.md](tsn-parsers.md): **16,180 both / 293 only-TSMIS /
-446 only-TSN; 5,520 counted diffs (0 in context); 16473 vs 16626**. Live in both matrices.
+shown, never counted). **(4)** Divided-highway routes carry a roadbed suffix (S/U) on TSN but not
+TSMIS — keyed on the BASE route so the same intersection still pairs, with the suffix surfaced as a
+compared `Roadbed` column so a suffix-only difference is flagged (match-and-indicate, 2026-06-20).
+Canary in [tsn-parsers.md](tsn-parsers.md): **16,211 both / 262 only-TSMIS / 415 only-TSN (routes
+one-sided NONE/NONE); 5,632 counted diffs incl. Roadbed 31 (0 in context); 16473 vs 16626**. Live in both matrices.
 
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 

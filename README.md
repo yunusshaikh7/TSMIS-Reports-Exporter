@@ -85,8 +85,9 @@ of `.bat` scripts for development and as a fallback.
 | Intersection Summary | XLSX | `output/<date>/intersection_summary/` |
 | Intersection Detail | XLSX | `output/<date>/intersection_detail/` |
 
-The two Intersection reports are **export-only** for now (no consolidate or
-compare support yet).
+The two Intersection reports live on the **development** TSMIS site (switch via
+Settings ▸ "Use development site"); as of v0.17.0 they consolidate, compare
+cross-environment, and compare vs TSN like every other report.
 
 Consolidate-only: **TSN Highway Log** (drop district PDFs into
 `input/tsn_highway_log/`) and **TSMIS Highway Log (PDF)** (drop the "Highway Log

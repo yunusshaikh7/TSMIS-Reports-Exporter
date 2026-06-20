@@ -222,7 +222,7 @@
             <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
             <span class="fast-label">Consolidate each report when its export finishes</span>
           </label>
-          <p class="hint">Builds the combined workbook automatically after the export. Skipped for reports with no consolidator (Intersection Summary / Detail and Highway Log (PDF)).</p>
+          <p class="hint">Builds the combined workbook automatically after the export. Highway Log (PDF) is the one exception — build it from the Consolidate tab.</p>
         </div>
 
         <div class="card-section actions-row">
@@ -429,12 +429,11 @@
         </div>
       </div>
 
-      <!-- Compare pane. Sub-tabs: Cross-environment (default, every report's
-           between-environments compare), "vs TSN" (the file-based TSMIS-vs-TSN
-           compares), and "vs TSN Matrix" (the manual day-picking matrix).
-           #compareSubtabs is generated from compare_groups plus the appended
-           matrix tab; the classic picker lives in #compareClassic, the matrix in
-           #dayMatrixSection. -->
+      <!-- Compare pane. Sub-tabs generated from compare_groups — "Cross-environment"
+           (every report's between-environments compare) and "vs TSN" (the file-based
+           TSMIS-vs-TSN compares, all reports as of v0.17.0) — plus the appended
+           "vs TSN Matrix" (the manual day-picking matrix). The classic picker lives
+           in #compareClassic, the matrix in #dayMatrixSection. -->
       <div class="card pane hidden mx-host" id="paneCompare">
         <div class="subtabs" id="compareSubtabs" role="tablist"></div>
         <div id="compareClassic">
@@ -542,7 +541,7 @@
              exported days; each cell = that day's export vs TSN). Shown only on
              the "vs TSN Matrix" sub-tab. Shares the TSN dataset + compare engine
              with the Everything matrix; no cross-environment, no live re-export.
-             Highway Log is wired today; the other reports plug in in 0.17.0. -->
+             Every report type is wired (v0.17.0). -->
         <div id="dayMatrixSection" class="hidden mx-pane">
           <div class="card-section mx-gridsection">
             <div class="section-head">
@@ -565,6 +564,10 @@
           </div>
 
           <div class="card-section actions-row">
+            <button class="btn btn-accent btn-small" id="btnDayExportToday"
+                    title="Export today's column for every report, then consolidate + compare each vs TSN — fills a fresh, dated column in one go">
+              <svg class="ic"><use href="#i-zap"/></svg>Export today →
+            </button>
             <button class="btn btn-subtle btn-small" id="btnDayBuildAll">
               <svg class="ic"><use href="#i-layers"/></svg>Build all
             </button>
@@ -573,6 +576,13 @@
             </button>
             <button class="btn btn-subtle btn-small" id="btnOpenDayComparisons">
               <svg class="ic"><use href="#i-folder-open"/></svg>Open comparisons folder
+            </button>
+            <span class="spacer"></span>
+            <button class="btn btn-subtle btn-small hidden" id="btnDayPause">
+              <svg class="ic"><use href="#i-pause"/></svg><span id="btnDayPauseLabel">Pause</span>
+            </button>
+            <button class="btn btn-subtle btn-small hidden" id="btnDaySkip">
+              <svg class="ic"><use href="#i-skip"/></svg>Skip route
             </button>
             <button class="btn btn-subtle btn-small hidden" id="btnDayCancel">
               <svg class="ic"><use href="#i-x"/></svg>Cancel
@@ -930,6 +940,25 @@
             <button class="btn btn-standard btn-small" id="btnDayAddDay">
               <svg class="ic"><use href="#i-check"/></svg>Add day
             </button>
+          </div>
+          <p class="hint" style="margin:6px 0 0">Add a day already exported, or use
+            <b>Export today →</b> to pull a fresh dated column now. Only today can be
+            exported — earlier days are kept exactly as pulled.</p>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Export speed</div>
+          <label class="mc-fast" title="Run today's export with several browsers at once (faster; needs a saved login). Shares the one fast-mode browser count with the rest of the app.">
+            <input type="checkbox" id="dayMatrixFast">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-zap"/></svg>
+            <span>Fast mode</span>
+          </label>
+          <div class="mc-workers" id="dayMatrixWorkersRow">
+            <span>run</span>
+            <input type="number" class="input input-num" id="dayMatrixWorkers" min="2" max="30"
+                   aria-label="Browsers to run at once in fast mode">
+            <span>browsers at once</span>
           </div>
         </div>
 

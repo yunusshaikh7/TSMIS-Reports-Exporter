@@ -31,7 +31,7 @@ from pathlib import Path
 
 import matrix
 import reports
-from paths import OUTPUT_ROOT, list_output_days, parse_run_folder
+from paths import OUTPUT_ROOT, list_output_days, parse_run_folder, today_str
 
 log = logging.getLogger("tsmis.day_matrix")
 
@@ -190,13 +190,20 @@ def available_days(source):
 # the snapshot the GUI renders (pure filesystem read)
 # --------------------------------------------------------------------------- #
 def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
-                        now=None, row_order=None):
+                        now=None, row_order=None, today=None):
     """Full render model for the by-day matrix. PURE stat — no workbook opened
     (counts come from the cache). `days` is the ordered list of date columns;
     `hidden` hides report rows; `row_order` is the user's drag-to-reorder row
     preference; `tsn_files`/`dest` resolve the shared TSN dataset (same as the
-    Everything matrix). Greyed rows render cmp {supported:false}."""
+    Everything matrix). Greyed rows render cmp {supported:false}.
+
+    `today` (default `today_str()`) is the one date that is EXPORTABLE from the
+    matrix — the UI gates the export action on `day == today`. Past columns are
+    export-locked so each day's pull stays the immutable record you hand the
+    vendor; you can still consolidate + compare them. (`today` is a param so the
+    golden check can pin it.)"""
     now = now if now is not None else time.time()
+    today = today if today is not None else today_str()
     source = source if source in sources() else SOURCE_DEFAULT
     days = [d for d in (days or []) if isinstance(d, str)]
     hidden = set(hidden or [])
@@ -275,6 +282,7 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
         "source": source,
         "sources": [{"key": k, "label": matrix.default_env_label(k)} for k in sources()],
         "days": days,
+        "today": today,                  # the only EXPORTABLE column (past = locked)
         "rows": [r[0] for r in rows],
         "row_labels": {r[0]: r[1] for r in rows},
         "row_supported": {r[0]: r[4] for r in rows},

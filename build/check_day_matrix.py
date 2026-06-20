@@ -192,6 +192,42 @@ def main():
         check("rebuild-all over real days -> launched", rb.get("ok") and a._task == "matrix")
         a._end_task()
 
+        print("gui_api bridge — by-day EXPORT (today only) + export->compare chain:")
+        today = paths.today_str()
+        _touch(out / f"{today} ssor-prod" / "highway_log" / "r1.xlsx")   # today's HL pull
+        saved_mbe = gui_api.MatrixBatchExportWorker
+        gui_api.MatrixBatchExportWorker = _FakeWorker
+        try:
+            settings.set_day_matrix_days([])
+            check("snapshot exposes today (the one exportable column)",
+                  a._day_matrix_snapshot().get("today") == today)
+            check("exporting a PAST day cell is rejected (its pull is preserved)",
+                  bool(a.export_day_cell("highway_log", "2026-06-17").get("error")))
+            r = a.export_day_column()
+            check("export_day_column -> which=day export task on the DATED worker",
+                  r.get("ok") is True and a._task == "matrix"
+                  and a._current_job["kind"] == "export" and a._current_job["which"] == "day"
+                  and isinstance(_FakeWorker.last, tuple)
+                  and _FakeWorker.last[1].get("dated") is True)
+            check("today auto-added as a column", today in settings.get_day_matrix_days())
+            # one (spec, src, env) step per visible supported report
+            steps = a._resolve_day_export_steps(a._current_job)
+            check("column export = one step per visible supported report",
+                  len(steps) >= 5 and all(len(s) == 3 for s in steps))
+            a._on_matrix_export_done({"count": 7, "total": 7, "ok": True, "cancelled": False})
+            check("a finished export auto-chains a by-day COMPARE (fills the column)",
+                  a._current_job is not None and a._current_job["kind"] == "compare"
+                  and a._current_job.get("which") == "day")
+            a._end_task()
+            a.export_day_column()
+            a._on_matrix_export_done({"count": 0, "total": 7, "ok": False, "cancelled": True})
+            check("a CANCELLED export does NOT chain a compare",
+                  a._current_job is None or a._current_job["kind"] != "compare")
+            a._end_task()
+        finally:
+            gui_api.MatrixBatchExportWorker = saved_mbe
+        settings.set_day_matrix_days(["2026-06-17", "2026-06-18"])   # restore for open guards
+
         print("gui_api bridge — open guards:")
         opened = []
         a._open_file = lambda p: opened.append(Path(p))

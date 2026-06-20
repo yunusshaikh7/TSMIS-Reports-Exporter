@@ -86,7 +86,7 @@ CONSOLIDATE_REPORTS = [
 # within the Compare pane, in this order (the FIRST is the default). Two registry
 # groups: "env" (Cross-environment — every report's between-environments compare,
 # Highway Log included) and "tsn" (vs TSN — the file-based TSMIS-vs-TSN compares;
-# Highway Log Excel/PDF today, the other reports plug in in 0.17.0). A THIRD
+# every report as of v0.17.0). A THIRD
 # sub-tab, the "vs TSN Matrix" (the day-keyed matrix, group "tsn_by_day"), is
 # appended by the GUI itself — it is not a registry comparison type. A row's
 # `group` (below) names its sub-tab. (v0.16.1 staging: HL's cross-env compare
@@ -171,8 +171,9 @@ COMPARE_REPORTS = [
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each
 # EXPORTABLE report, keyed by the export ReportSpec's output subdir so this can't
-# drift from the lists above. Intersection Summary / Detail are export-only and
-# have no consolidator (absent from the map -> None).
+# drift from the lists above. Every exportable report is here EXCEPT Highway Log
+# (PDF) (highway_log_pdf) — it needs a scratch converted_dir, so the matrix and
+# auto-consolidate handle it specially (absent from the map -> None).
 _CONSOLIDATOR_BY_SUBDIR = {
     _RAMP_SUMMARY_SPEC.subdir: _c_ramp_summary,
     _RAMP_DETAIL_SPEC.subdir: _c_ramp_detail,
@@ -185,8 +186,8 @@ _CONSOLIDATOR_BY_SUBDIR = {
 
 def consolidator_for_spec(spec):
     """The consolidate module for an export ReportSpec, or None when the report
-    is export-only (Intersection Summary / Detail). Keyed on the spec's output
-    subdir."""
+    has no auto-consolidator (Highway Log (PDF), which needs a scratch
+    converted_dir). Keyed on the spec's output subdir."""
     return _CONSOLIDATOR_BY_SUBDIR.get(getattr(spec, "subdir", None))
 
 
@@ -264,15 +265,11 @@ def matrix_rows():
     return rows
 
 
-# Reports that belong on the vs-TSN MATRIX but have NO cross-environment adapter,
-# so they're absent from matrix_rows(): Intersection Summary / Detail. They export
-# today but their consolidate + TSN comparator (and a per-report TSN dataset) are
-# 0.17.0 work, so the matrix shows them as greyed groundwork rows for now.
-# Returns [(row_key, label, subdir)] (row_key == export subdir, like the HL rows).
 # Reports that have NO cross-env (folders) adapter, so they aren't in matrix_rows()
 # but still need a by-day vs-TSN row. As of v0.17.0 EVERY report has a cross-env
 # adapter (Intersection Summary + Detail gained theirs), so this is now empty — kept
 # as the documented extension point for any future export-only report.
+# Returns [(row_key, label, subdir)] (row_key == export subdir, like the HL rows).
 _TSN_MATRIX_EXTRA = []
 
 
