@@ -35,6 +35,7 @@ import compare_ramp_detail_tsn as _cmp_ramp_detail_tsn
 import compare_ramp_summary_tsn as _cmp_ramp_summary_tsn
 import compare_intersection_summary_tsn as _cmp_int_summary_tsn
 import compare_intersection_detail_tsn as _cmp_int_detail_tsn
+import compare_highway_sequence_tsn as _cmp_highway_seq_tsn
 
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
 # Order here is the display order in the GUI and the numbering in the console menu.
@@ -143,6 +144,12 @@ COMPARE_REPORTS = [
     # Intersection Detail is FLAT (the Ramp Detail recipe): route+PM key; TSMIS read
     # by position; Y/N<->1/0 booleans normalized; cross-street attrs + Date of Record context.
     ("TSAR: Intersection Detail — TSMIS vs TSN", _cmp_int_detail_tsn, "files", "tsn"),
+    # Highway Sequence is FLAT with a COUNTY+PM key (CA postmiles are county-relative):
+    # TSMIS consolidated read by position (prefix+PM+suffix re-glued) vs the TSN PDFs'
+    # normalized workbook. FT + Description compared; HG/City/Distance are context
+    # (completeness gaps + listing-granularity artifact). TSN's finer segment breaks
+    # surface as one-sided rows (as for Highway Log).
+    ("Highway Sequence Listing — TSMIS vs TSN", _cmp_highway_seq_tsn, "files", "tsn"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each

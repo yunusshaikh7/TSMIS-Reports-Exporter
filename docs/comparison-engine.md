@@ -490,6 +490,27 @@ right-channelization / lighting are `Y/N` on TSN but `1/0` on TSMIS — **normal
 shown, never counted). Canary in [tsn-parsers.md](tsn-parsers.md): **16,180 both / 293 only-TSMIS /
 446 only-TSN; 5,520 counted diffs (0 in context); 16473 vs 16626**. Live in both matrices.
 
+### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
+
+The FLAT recipe with a **county-relative key** — the direct analog of the Highway Log comparison (a
+postmile-sequence listing with the same "TSN lists more segment breaks, TSMIS more realignment markers"
+one-sided behavior). TSMIS side = the consolidated `Highway Locations` workbook read **by position**
+(two unnamed header columns hold a postmile prefix and an equate suffix); the canonical postmile
+**re-glues** prefix+PM+suffix. TSN side = a normalized workbook from `consolidate_tsn_highway_sequence`
+(word-level PDF parse of the 12 district `Highway Locations` PDFs; the 2-char `G/RF` flag splits into
+HG+FT; `EQUATES TO` annotation lines are emitted so they pair with TSMIS `END R REALIGNMENT` rows).
+**California postmiles are county-relative** (a route restarts at `000.000` per county), so the key is
+composited via `key_normalizer` → `"COUNTY POSTMILE"` (County stays its own visible column;
+`pair_occurrences_by_similarity` handles landmarks still sharing a county+PM). Reconciliations, all
+locked: **(1)** County trailing-period strip (`LA.`→`LA` etc. — else whole counties go one-sided);
+**(2)** Description strips the TSMIS `^\d{1,3}[A-Z]?/` route prefix + collapses whitespace; **(3)**
+`context_fields` = **HG** (TSMIS blanks it for whole counties), **City** (TSN tags it far more
+aggressively), **Distance To Next Point** (measured to each system's OWN next listed point — a listing-
+granularity artifact, not a disagreement) — shown, never counted; **FT + Description are compared**, with a
+**Notes sheet** (`legend_writer`) indicating all of this. Canary in [tsn-parsers.md](tsn-parsers.md):
+**57,070 both / 3,369 only-TSMIS / 12,688 only-TSN; 5,538 counted diffs (FT 699 + Description 4,839; 0 in
+context); 60,439 vs 69,758 rows; 242 routes both**. Live in both matrices — completing all 6 reports + HL-PDF.
+
 ### 9c. Cross-environment — `compare_env.py` (the `"folders"` family)
 
 > Group: **`env`** for ALL cross-environment comparisons — Ramp Summary/Detail, Highway
@@ -662,16 +683,16 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 > automatically (`_row_modes` + `day_matrix._day_rows` + `available_days` all gate on it).
 > `day_matrix.TSN_SUBDIR` is GONE → per-row `tsn_subdir`; `consolidate_and_compare_tsn` is
 > keyed on `(row_key, subdir)` and consolidates via `reports.consolidator_for_subdir`. **Live
-> today: HL Excel/PDF + Ramp Detail & Intersection Detail (FLAT) + Ramp Summary & Intersection
-> Summary (AGGREGATE)**. Greyed: Highway Sequence only (until its TSN PDF parser lands).
+> today: ALL reports — HL Excel/PDF + Ramp Detail & Intersection Detail & Highway Sequence (FLAT)
+> + Ramp Summary & Intersection Summary (AGGREGATE)**. Nothing greyed (v0.17.0 complete).
 
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
-cross-environment, no live re-export** (it compares specific historical exports). HL Excel/PDF +
-**Ramp Detail + Ramp Summary + Intersection Summary + Intersection Detail** are live (v0.17.0);
-only Highway Sequence appears greyed (until its TSN PDF parser lands). Like `matrix.py`, it NEVER
-edits the manual compare code — it only orchestrates.
+cross-environment, no live re-export** (it compares specific historical exports). **ALL reports are
+live (v0.17.0 complete)** — HL Excel/PDF + Ramp Detail + Ramp Summary + Intersection Summary +
+Intersection Detail + Highway Sequence; nothing greyed. Like `matrix.py`, it NEVER edits the manual
+compare code — it only orchestrates.
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
   (the same path `build_comparison`'s tsn branch uses, now keyed on `(row_key, subdir)`) over the

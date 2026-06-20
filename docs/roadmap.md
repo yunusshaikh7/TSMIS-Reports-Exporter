@@ -277,6 +277,17 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   `matrix.tsn_comparator_for`.
   Recipes: [reports.md](reports.md) / [comparison-engine.md](comparison-engine.md); schema + counts:
   [tsn-parsers.md](tsn-parsers.md); resume state: [v0.17.0-prompt.md](v0.17.0-prompt.md).
+- [x] **Highway Sequence vs TSN (FLAT, route+county+PM)** [M] — **DONE (v0.17.0; the LAST report).**
+  New `consolidate_tsn_highway_sequence` (word-level parse of the 12 district `Highway Locations` PDFs
+  → one normalized workbook; 2-char G/RF flag split into HG+FT; equate annotation lines emitted) +
+  `compare_highway_sequence_tsn` (FLAT with a **county-relative key** — CA postmiles restart per county,
+  so `key_normalizer` composites `"COUNTY POSTMILE"`; TSMIS read by position with prefix+PM+suffix
+  re-glued; FT + Description compared, HG/City/Distance context with a Notes indicator). Registered in
+  `tsn_library` + `matrix.tsn_comparator_for`, live in both matrices, golden
+  `check_compare_highway_sequence_tsn.py`. Canary: 57,070 both / 3,369 only-TSMIS / 12,688 only-TSN /
+  5,538 diff (FT 699 + Description 4,839); 60,439 vs 69,758 rows; 242 routes both. **This completes
+  v0.17.0's comparator goal — ALL 6 reports + HL-PDF now compare vs TSN in both matrices.** See
+  [tsn-parsers.md](tsn-parsers.md).
 
 From a notebook brainstorm (2026-06-16); size `[S/M/L]`. Their original version buckets are now in
 the Shipped record below. **⚠ A3 and D1 were the planned v0.13 *and* v0.14 themes but got displaced

@@ -40,7 +40,7 @@ side is per-route throughout. This yields **two comparison shapes**:
 | Intersection Summary | PDF | **statewide aggregate** | per-route XLSX ×218 | **AGGREGATE** |
 | Ramp Detail | XLSX `Sheet 1` | statewide flat (15410 rows × 18 col; 126 rtes) | per-route XLSX ×126 | **FLAT** (route+PM) |
 | Intersection Detail | XLSX `Sheet 1` | statewide flat (16626 rows × 36 col; 216 rtes) | per-route XLSX ×218 | **FLAT** (route+PM) |
-| Highway Sequence | PDF | **per-district** D01–D12 (~81 pp ea.) | per-route XLSX ×252 | **FLAT** (route+PM) |
+| Highway Sequence | PDF | **per-district** D01–D12 (~81 pp ea.) | per-route XLSX ×252 | **FLAT** (route+**county**+PM) |
 | Highway Log | PDF | per-district D01–D12 | per-route XLSX + PDF | FLAT — already built |
 
 - **AGGREGATE**: TSN is one statewide category-count table; SUM the TSMIS per-route counts
@@ -94,12 +94,61 @@ side is per-route throughout. This yields **two comparison shapes**:
 - **Drop folder / consolidator / comparator / golden check:** `tsn_library/ramp_detail/` (raw XLSX → normalized via `tsn_load_ramp_detail.build_into`) · TSMIS via `consolidate_ramp_detail` (no rollup sheet — a normal worksheet) · `compare_ramp_detail_tsn` (`"files"` adapter, `key_field=PM`, `context_fields=(Ramp Name, On/Off, Ramp Type, ADT)`) · `check_compare_ramp_detail_tsn.py`.
 - **Approved counts (CANARY — 6.19 statewide set; never regress):** TSN normalized **15,410 rows / 126 routes** (== Ramp Summary statewide total 15410 ✓). Comparison: **both 15,211**, only-TSMIS **4**, only-TSN **199**, matched-with-diffs **767**, **diff cells 902**, identical **14,444**, routes both **126**. Per-field diffs: HG **364**, Description **218**, City Code **156**, Area 4 **81**, R/U **68**, Date of Record **15**, PR **0**; **context columns 0** (verified on real data — the `context_fields` never count). Verified 3 ways: golden check + full compare-suite + live recompute; route-001 = 272/272 PM-matched.
 
-### Highway Sequence Listing — TSN  *(⏳ THE LAST remaining report — schema rows below are from PLANNING-phase inspection; RECONCILE the real D01–D12 PDFs + a TSMIS per-route XLSX BY HAND first, then build. NB: Intersection Detail's planning guess ("pair-order reversal") turned out WRONG on the real data — treat every fact here as a hypothesis to re-verify.)*
-- **TSMIS side:** per-route XLSX ×252, sheet `Highway Locations`, 9 columns `[County, City, (unnamed=R/U prefix), PM, (unnamed), HG, FT, Distance To Next Point, Description]`, consolidated via `consolidate_xlsx_base`. Comparison key = **PM**. Some columns are **unnamed** → `compare_env` labels them `(col X)`; the TSN side must align/label the same way.
-- **TSN format:** **PDF, per-district** (`D01..D12 HSL TSN.pdf`; D01 ≈ 81 pages). Report header `OTM22025 Highway Locations`, `Ref Dt`, `DIST 01 RTE 001 DIR S-N`. Char-window data layout per row: `CO. | CITY | POSTMILE | G/RF (HG+FT) | DISTANCE TO NXT POINT | DESCRIPTION`. PM carries **prefix/suffix markers** (`R010.179`, `010.637E`, `EQUATES TO`) — roadbed/equate analog, handle like the HL parser. Routes appear sequentially within each district file.
-- **Compare shape:** **FLAT**, **key = route + PM**. Needs a **new char-window parser** `consolidate_tsn_highway_sequence.py` modeled on `consolidate_tsn_highway_log` (calibrate `COLUMN_WINDOWS` against the real D01–D12). ⚠ Riskiest fan-out item.
-- **Normalization:** PM padding + prefix/suffix markers; whitespace; County repeats down rows (key on PM, not County). **Ditto/roadbed:** PM-marker equate handling (mirror HL).
-- **Drop folder / consolidator / comparator / golden check / approved counts:** `tsn_library/highway_sequence/` (raw district PDFs → consolidated) · `consolidate_tsn_highway_sequence` (Phase 3d) · `compare_highway_sequence_tsn` · `check_tsn_highway_sequence_parse.py` + `check_compare_highway_sequence_tsn.py` · **canary TBD.**
+### Highway Sequence Listing — TSN  *(BUILT + verified — v0.17.0 Phase 3e; the LAST report)*
+**Reconciled by hand on the real 6.19 set** (several planning-phase guesses were wrong — corrected below):
+the layout is **NOT char-window** (columns are widely spaced, so word-level extraction is safe; only the
+2-char flag is split), and the key is **route + COUNTY + PM**, not route + PM.
+
+- **TSMIS side:** per-route XLSX ×252, sheet `Highway Locations`, consolidated via `consolidate_xlsx_base`.
+  The per-route header has **two unnamed columns** (a postmile prefix and an equate suffix), so the
+  consolidated workbook is read **BY POSITION** (NOT by `(col X)` label): `0 Route · 1 County · 2 City ·
+  3 prefix · 4 PM · 5 suffix · 6 HG · 7 FT · 8 Distance To Next Point · 9 Description`. The canonical
+  postmile **re-glues** prefix+PM+suffix (`"R" + "000.129" → "R000.129"`; `"050.025" + "E" → "050.025E"`).
+- **TSN format:** **PDF, per-district** (`D01..D12 HSL TSN.pdf`; D01 ≈ 81 pp). `OTM22025 Highway Locations`;
+  group header `DIST 01 RTE 001 DIR S-N`; per row `CO. | CITY | POSTMILE | G/RF | DIST-TO-NXT | DESCRIPTION`.
+  The **G/RF** field is one fused 2-char token = **HG (1st char) + FT (2nd char)** (`"DH"` → HG `D`, FT `H`).
+  POSTMILE carries a glued realignment prefix (`R010.179`) and/or equate suffix (`050.025E`). Equate points
+  print as a `Rxxx.xxx EQUATES TO` annotation line; TSMIS records the same equate as an `END R REALIGNMENT`
+  row at that postmile — the parser **emits the equate line** (county carried from context) so the two pair.
+- **Parser** `consolidate_tsn_highway_sequence.py` (writes ONE normalized workbook, sheet
+  `Highway Locations (TSN)`, header `[Route, County, PM, City, HG, FT, Distance To Next Point, Description]`):
+  word-level extraction with x0-windows `county[0,44) city[44,98) pm[98,168) flag[168,205) dist[205,270)
+  desc[270,…)`; lines clustered with `Y_TOLERANCE=3` (a plain `round(top)` splits jittered rows and drops
+  them). A route appears across MULTIPLE district PDFs (different counties) — rows accumulate per route.
+- **Compare shape:** **FLAT, key = route + COUNTY + PM.** California postmiles are **county-relative** (a route
+  restarts at `000.000` in each county it crosses), so the postmile alone is not unique across a route. The
+  key is composited via `key_normalizer` → `"COUNTY POSTMILE"` (shown in the key column); **County also stays
+  its own visible column**. Landmarks still sharing a (route, county, PM) — e.g. a `COUNTY BEGIN` marker at the
+  same postmile — are paired by `compare_core`'s similarity matcher.
+
+  **Column map (shared header; key = route+county+PM):**
+
+  | Shared label | TSMIS (consolidated pos) | TSN (parsed) | Note |
+  |---|---|---|---|
+  | County *(in key)* | 1 | CO. | **strip trailing period** (TSMIS `LA.`/`SB.`/`SM.`/`SF.`/`CC.`/`DN.`/`ED.`/`SD.`/`SJ.` → `LA`…); else whole counties go one-sided |
+  | PM *(key)* | 3+4+5 (prefix+PM+suffix) | POSTMILE | glued canonical form on both sides |
+  | FT | 7 | flag[1] | **compared** — genuine feature-type diffs (H↔I, R↔H) |
+  | Description | 9 | DESCRIPTION | **compared** — strip TSMIS leading `^\d{1,3}[A-Z]?/` route prefix, collapse whitespace runs |
+  | HG | 6 | flag[0] | **context** — TSMIS blanks it for whole counties; TSN always fills U/D |
+  | City | 2 | CITY | **context** — TSN assigns a city code far more aggressively than TSMIS |
+  | Distance To Next Point | 8 | DIST | **context** — measured to each system's OWN next listed point; TSN lists finer breaks → smaller gap (listing artifact, not a disagreement) |
+
+- **One-sided rows are expected & honest** (same as Highway Log: *"mostly TSN segment breaks and TSMIS
+  realignment markers"*) — TSN lists every segment break incl. unnamed ones; TSMIS omits most. The
+  S/U **suffixed routes** (`005S`, `008U`, `010S`, …) are separate TSMIS route files but TSN folds them
+  into the base route → they read as routes-only-in-TSMIS.
+- **Drop folder / consolidator / comparator / golden check:** `tsn_library/highway_sequence/` (raw district
+  PDFs → `consolidate_tsn_highway_sequence.build_into`) · TSMIS via `consolidate_highway_sequence` (no rollup —
+  a normal worksheet) · `compare_highway_sequence_tsn` (`"files"` adapter, `key_field=PM`,
+  `key_normalizer=county|PM`, `context_fields=(HG, City, Distance To Next Point)`, Notes legend indicator) ·
+  `check_compare_highway_sequence_tsn.py`.
+- **Approved counts (CANARY — 6.19 statewide set; never regress):** TSN normalized **69,758 rows / 263 routes**
+  (12 district PDFs); TSMIS consolidated **60,439 rows**. Comparison: union **73,127**, **both 57,070**,
+  only-TSMIS **3,369**, only-TSN **12,688**, matched-with-diffs **4,843**, **diff cells 5,538**, identical
+  **52,227**; routes both **242**, only-TSMIS **10** (the S/U suffixed), only-TSN **21**. Per-field diffs:
+  **FT 699**, **Description 4,839**; **County/City/HG/Distance = 0** (key/context — never count). Verified 3
+  ways: golden check + full compare-suite + live independent recompute (which confirmed the engine's
+  similarity pairing reduces FT 1,504→699 false order-pairs).
 
 ### Intersection Summary — TSN  *(BUILT + verified — v0.17.0 Phase 3b/3c)*
 - **TSMIS side:** per-route XLSX ×218, **sheet `Intersection Summary`** (CONFIRMED), 3-col sheet

@@ -84,9 +84,9 @@ def main():
         check("HL Excel supported (excel) + HL PDF supported (pdf)",
               rows["highway_log"][3] == "excel" and rows["highway_log"][4]
               and rows["highway_log_pdf"][3] == "pdf" and rows["highway_log_pdf"][4])
-        check("ramp_detail + ramp_summary supported (v0.17.0); highway_sequence greyed",
+        check("every report row supported (v0.17.0 — ramp_detail/ramp_summary/highway_sequence)",
               rows["ramp_detail"][4] and rows["ramp_summary"][4]
-              and not rows["highway_sequence"][4])
+              and rows["highway_sequence"][4])
         check("available days for ssor-prod (newest first, both HL days)",
               day_matrix.available_days("ssor-prod") == ["2026-06-18", "2026-06-17"])
         check("available days for ars-prod scoped to that source",
@@ -108,8 +108,10 @@ def main():
         pdfcell = snap["cells"]["highway_log_pdf"]["2026-06-17"]
         check("HL PDF cell for a day with no PDF export -> missing cell side",
               pdfcell["cmp"]["missing_side"] == "cell")
-        greyed = snap["cells"]["highway_sequence"]["2026-06-17"]
-        check("greyed row cell -> supported False", greyed["cmp"].get("supported") is False)
+        hs_cell = snap["cells"]["highway_sequence"]["2026-06-17"]
+        check("highway_sequence cell now supported (v0.17.0), missing its data side here",
+              hs_cell["cmp"].get("supported") is True
+              and hs_cell["cmp"]["missing_side"] is not None)
 
         # Without a TSN dataset the supported cells read 'needs TSN'.
         snap_notsn = day_matrix.day_matrix_snapshot(
@@ -122,7 +124,7 @@ def main():
         check("all-scope includes the ready HL Excel cells",
               ("2026-06-17", "highway_log") in todo
               and ("2026-06-18", "highway_log") in todo)
-        check("excludes greyed rows + missing sides",
+        check("excludes not-ready rows (no export/TSN here) + missing sides",
               all(rk not in ("ramp_summary", "ramp_detail", "highway_sequence")
                   for _d, rk in todo)
               and ("2026-06-17", "highway_log_pdf") not in todo)
@@ -137,7 +139,7 @@ def main():
         check("unknown row raises",
               _raises(lambda: day_matrix.build_day_cell("ssor-prod", "2026-06-17", "nope",
                                                         str(dest), None)))
-        check("greyed row raises",
+        check("supported row with no export/TSN raises",
               _raises(lambda: day_matrix.build_day_cell("ssor-prod", "2026-06-17",
                                                         "highway_sequence", str(dest), None)))
         notsn = tempfile.mkdtemp(prefix="tsmis_day_notsn2_")
@@ -164,8 +166,8 @@ def main():
         a.set_day_matrix_report("ramp_summary", True)
 
         print("gui_api bridge — build/rebuild onto the shared queue:")
-        check("build greyed report rejected",
-              bool(a.build_day_cell("highway_sequence", "2026-06-17").get("error")))
+        check("build unknown report rejected",
+              bool(a.build_day_cell("nope", "2026-06-17").get("error")))
         check("build a not-added day rejected",
               bool(a.build_day_cell("highway_log", "2026-06-30").get("error")))
         bc = a.build_day_cell("highway_log", "2026-06-17")

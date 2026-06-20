@@ -90,6 +90,14 @@ _REPORTS = {
         consolidated_name="tsn_intersection_detail_normalized.xlsx",
         builder="tsn_load_intersection_detail:build_into",
     ),
+    "highway_sequence": TsnReport(
+        subdir="highway_sequence",
+        label="TSN Highway Sequence",
+        raw_glob="*.pdf",
+        raw_kind="district_pdfs",
+        consolidated_name="tsn_highway_sequence_normalized.xlsx",
+        builder="consolidate_tsn_highway_sequence:build_into",
+    ),
 }
 
 

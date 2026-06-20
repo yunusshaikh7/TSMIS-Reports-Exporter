@@ -34,15 +34,15 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
 Reports 5–6 (Intersection): export is **enabled** but the report lives on the
 **development** TSMIS site — switch via Settings ▸ "Use development site"
-(`tsmis-dev.dot.ca.gov`). v0.17.0 is bringing them up to parity: **Intersection
-Detail now consolidates** (`consolidate_intersection_detail`); Intersection Summary
-consolidate + both vs-TSN comparators are in progress (see
-[docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md)).
-Two consolidate-only
+(`tsmis-dev.dot.ca.gov`). v0.17.0 brought all reports to parity: **every report now
+consolidates AND compares vs TSN** — all 6 reports + the PDF Highway Log have a
+vs-TSN comparator, live in both the Everything and by-day matrices (see
+[docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md) for
+the per-report schema + locked canaries). Two consolidate-only
 Highway Log sources exist too — **TSN** district PDFs (dropped into
 `input/tsn_highway_log/`) and the app's own **Highway Log (PDF)** export. The
-**Compare** tab diffs Highway Logs (TSMIS-vs-TSN, the two PDF-sourced flavors) and
-runs cross-environment comparisons of the other reports.
+**Compare** tab diffs every report **TSMIS-vs-TSN** (the two PDF-sourced Highway Log
+flavors among them) and runs cross-environment comparisons.
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
 [docs/reports.md](docs/reports.md). Highway Log columns / PDF parsing / comparisons:

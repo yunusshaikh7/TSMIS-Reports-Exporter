@@ -47,8 +47,8 @@ def test_paths_and_modes():
     check("highway_log_pdf is tsn_capable", matrix.tsn_capable("highway_log_pdf"))
     check("ramp_summary is tsn_capable (v0.17.0 AGGREGATE)",
           matrix.tsn_capable("ramp_summary"))
-    check("highway_sequence is NOT tsn_capable yet (env only)",
-          not matrix.tsn_capable("highway_sequence"))
+    check("highway_sequence is tsn_capable (v0.17.0 FLAT, county+PM key)",
+          matrix.tsn_capable("highway_sequence"))
 
     defs = matrix._row_defs()
     check("five matrix rows incl. both Highway Log formats",
@@ -76,8 +76,8 @@ def test_paths_and_modes():
     check("ramp_summary: env + tsn supported (v0.17.0 AGGREGATE)",
           rs["env"]["supported"] and rs["tsn"]["supported"])
     hs = modes("highway_sequence")
-    check("highway_sequence: env supported, tsn still greyed",
-          hs["env"]["supported"] and hs["tsn"]["supported"] is False)
+    check("highway_sequence: env + tsn supported (v0.17.0 FLAT)",
+          hs["env"]["supported"] and hs["tsn"]["supported"])
 
     # mode_out_path: env stays under comparisons/<baseline>/, others under tsn/
     env_p = matrix.mode_out_path(d, "ssor-prod", "highway_log", "ars-prod", hl["env"])
@@ -184,7 +184,7 @@ def test_build_guards():
         check("unknown row raises",
               raises(lambda: matrix.build_comparison(dest, "nope", "ars-prod", "env",
                                                      "ssor-prod", events=None)))
-        check("greyed mode raises (highway_sequence vs TSN — not built yet)",
+        check("highway_sequence vs TSN now WIRED — reaches the no-TSN-source error (not greyed)",
               raises(lambda: matrix.build_comparison(dest, "highway_sequence", "ars-prod", "tsn",
                                                      "ssor-prod", events=None)))
         check("greyed mode raises (HL-PDF cross-env)",
