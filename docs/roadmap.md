@@ -269,9 +269,12 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   canary 72 union / 56 both / 10 only-TSMIS / 6 only-TSN; 16473 vs 16626) — live in both matrices, golden
   `check_compare_intersection_summary_tsn.py` + `check_consolidate_intersection.py`. The shared
   `summary_layout.py` (spec + block-walk + familiar sheet) backs both Summary reports.
-  **STILL TO DO:** `compare_intersection_detail_tsn` (FLAT recipe; ⚠ TSN `(eff_date,type)` vs TSMIS
-  `(type,eff_date)` pair reordering; exclude `Date of Record`).
-  The vs-TSN comparators flip on in BOTH matrices by adding them to `matrix.tsn_comparator_for`.
+  **`compare_intersection_detail_tsn`** (FLAT; read TSMIS by position — the planning "pair-order
+  reversal" was a shifted-header misread; `Y↔1 / N↔0` boolean normalize + Notes indicator;
+  cross-street attrs + Date of Record context; canary 16180 both / 5520 diff; 16473 vs 16626) +
+  `tsn_load_intersection_detail` + golden check — live in both matrices. **Intersection is now COMPLETE
+  (both reports consolidate + compare vs TSN).** The vs-TSN comparators flip on in BOTH matrices via
+  `matrix.tsn_comparator_for`.
   Recipes: [reports.md](reports.md) / [comparison-engine.md](comparison-engine.md); schema + counts:
   [tsn-parsers.md](tsn-parsers.md); resume state: [v0.17.0-prompt.md](v0.17.0-prompt.md).
 

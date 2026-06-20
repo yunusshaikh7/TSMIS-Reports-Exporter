@@ -82,6 +82,14 @@ _REPORTS = {
         consolidated_name="tsn_intersection_summary_normalized.xlsx",
         builder="tsn_load_intersection_summary:build_into",
     ),
+    "intersection_detail": TsnReport(
+        subdir="intersection_detail",
+        label="TSN Intersection Detail",
+        raw_glob="*.xlsx",
+        raw_kind="statewide_xlsx",
+        consolidated_name="tsn_intersection_detail_normalized.xlsx",
+        builder="tsn_load_intersection_detail:build_into",
+    ),
 }
 
 

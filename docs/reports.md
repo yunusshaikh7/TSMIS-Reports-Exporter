@@ -179,6 +179,7 @@ Current `COMPARE_REPORTS` rows:
 | TSAR: Ramp Detail -- TSMIS vs TSN (v0.17.0) | `compare_ramp_detail_tsn` | files | tsn |
 | TSAR: Ramp Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE) | `compare_ramp_summary_tsn` | files | tsn |
 | TSAR: Intersection Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE, one-sided divergence) | `compare_intersection_summary_tsn` | files | tsn |
+| TSAR: Intersection Detail -- TSMIS vs TSN (v0.17.0, FLAT, Y/N<->1/0 normalized) | `compare_intersection_detail_tsn` | files | tsn |
 
 **Don't hand-roll workbook output**: build a `CompareSchema` and call `compare_core.run_compare` -- that's the approved workbook style for free, and the core's text/formulas are regression-locked. See [comparison-engine.md](comparison-engine.md) (engine + regression-lock harness) and [highway_log/comparison-study.md](highway_log/comparison-study.md) (the PDF-vs-Excel/TSN findings).
 

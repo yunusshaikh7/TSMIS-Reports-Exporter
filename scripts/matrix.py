@@ -318,6 +318,9 @@ def tsn_comparator_for(row_key):
     if row_key == "intersection_summary":
         import compare_intersection_summary_tsn as _m   # AGGREGATE
         return _m
+    if row_key == "intersection_detail":
+        import compare_intersection_detail_tsn as _m    # FLAT
+        return _m
     return None
 
 
