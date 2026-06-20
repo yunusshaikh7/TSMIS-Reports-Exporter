@@ -102,27 +102,29 @@ def test_schema():
 def test_end_to_end():
     print("end-to-end VALUES workbook (counts + context non-asserting):")
     root = Path(tempfile.mkdtemp(prefix="tsmis_rd_tsn_"))
-    a = root / "tmsis.xlsx"
-    b = root / "tsn.xlsx"
-    out = root / "cmp.xlsx"
+    # Side A = the TSMIS consolidated Ramp Detail export; side B = the raw TSN
+    # workbook; out_path = the comparison workbook compare() writes.
+    tsmis_path = root / "tsmis.xlsx"
+    tsn_path = root / "tsn.xlsx"
+    out_path = root / "cmp.xlsx"
     # Two routes. Matched PMs with: an identical row, a COMPARED diff (HG), a
     # CONTEXT-only value (Ramp Type, TSMIS blank), and one-sided ramps on each side.
-    _write_tsmis(a, [
+    _write_tsmis(tsmis_path, [
         _tsmis_row("001", "12-ORA-001", "R", "000.606", "02/25/1976", "D", "Y", "DAPT", "U", "001/NB OFF TO X"),
         _tsmis_row("001", "12-ORA-001", "R", "001.000", "02/25/1976", "",  "Y", "DAPT", "U", "001/SB ON FR Y"),   # HG blank vs TSN 'D' -> COMPARED diff
         _tsmis_row("001", "12-ORA-001", "R", "002.000", "01/01/2000", "D", "N", "LGNB", "U", "001/RAMP Z"),       # Ramp Type context only
         _tsmis_row("002", "12-ORA-002", "M", "010.000", "03/03/1990", "U", "Y", "SANA", "R", "002/ON A"),
     ])
-    _write_tsn(b, [
+    _write_tsn(tsn_path, [
         ["001", "R", "0.606", "1976-02-25", "D", "Y", "DAPT", "U", "NB OFF TO X", "101_1", "F", "D", "70"],
         ["001", "R", "1.000", "1976-02-25", "D", "Y", "DAPT", "U", "SB ON FR Y", "101_2", "O", "F", "80"],   # HG 'D' vs TSMIS blank
         ["001", "R", "1.500", "1965-01-01", "D", "Y", "LGNB", "U", "MID INSERT", "101_x", "O", "H", "90"],   # only in TSN (mid-list)
         ["001", "R", "2.000", "2000-01-01", "D", "N", "LGNB", "U", "RAMP Z", "101_3", "F", "M", "55"],       # Ramp Type 'M' (TSMIS blank) -> context, no diff
         ["002", "M", "10.000", "1990-03-03", "U", "Y", "SANA", "R", "ON A", "201_1", "O", "D", "30"],
     ])
-    res = rd.compare(a, b, out, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
+    res = rd.compare(tsmis_path, tsn_path, out_path, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
     check("compare ok", res.status == "ok")
-    header, rows = _comparison(out)
+    header, rows = _comparison(out_path)
 
     # Key collapse: the mid-list TSN insert is ONE one-sided ramp, no cascade.
     pm_col = header.index("PM")
