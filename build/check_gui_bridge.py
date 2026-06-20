@@ -134,6 +134,43 @@ def test_compare_dialog_error_releases():
     a._release_task()
 
 
+def test_tsn_library_panel():
+    print("Settings TSN-library panel (v0.17.0):")
+    import shutil
+    import tempfile
+
+    import tsn_library
+    saved = paths.TSN_LIBRARY_ROOT
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_tsnlib_"))
+    paths.TSN_LIBRARY_ROOT = tmp                  # empty -> every report has no raw
+    try:
+        a = gui_api.GuiApi()
+        rows = a._tsn_library_status()
+        reg = {r.subdir for r in tsn_library.reports()}
+        check("status lists every registered TSN report",
+              {r["report"] for r in rows} == reg)
+        fields = {"report", "label", "raw_kind", "raw_present", "raw_count",
+                  "consolidated_present", "current"}
+        check("status rows carry exactly the panel fields",
+              all(set(r) == fields for r in rows))
+        check("tsn_library_status() wraps the rows",
+              {x["report"] for x in a.tsn_library_status()["reports"]} == reg)
+        check("import_tsn_raw rejects an unknown report",
+              a.import_tsn_raw("nope").get("error") is not None)
+        check("rebuild_tsn_library rejects an unknown report",
+              a.rebuild_tsn_library("nope").get("error") is not None)
+        # A registered report with no raw imported: rebuild must error BEFORE
+        # claiming the task slot (a no-raw rebuild can't wedge the gate).
+        res = a.rebuild_tsn_library(next(iter(reg)))
+        check("rebuild with no raw returns an error", res.get("error") is not None)
+        check("task slot left free after a no-raw rebuild",
+              a._try_claim_task("x") is True)
+        a._release_task()
+    finally:
+        paths.TSN_LIBRARY_ROOT = saved
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_env_verdict():
     print("env-scan fail-closed verdict (WS3):")
     from gui_worker import env_verdict
@@ -159,6 +196,7 @@ def main():
     test_reset_token()
     test_consolidate_index_before_claim()
     test_compare_dialog_error_releases()
+    test_tsn_library_panel()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

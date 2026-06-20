@@ -210,6 +210,22 @@ live-formulas toggle is its **own** setting (`day_matrix_formulas`, snapshot key
 matrix's `matrix_formulas`. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
 Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs TSN Matrix).
 
+### Settings ▸ TSN reports panel (v0.17.0)
+
+The canonical TSN library ([comparison-engine.md](comparison-engine.md) / `tsn_library.py`) gets a
+status panel in Settings (`#setTsnLibrary`, rendered by `renderTsnLibrary` from
+`get_settings().tsn_library`). One row per registered report: a **dot** (green = consolidated
+current · amber = missing/stale-or-raw-not-yet-built · grey = no raw imported), a status line
+(`N raw <kind> · consolidated current|STALE|not yet built`), and two actions —
+**Import raw…** (`import_tsn_raw`: a native multi-file dialog, PDFs or the statewide workbook
+per the report's `raw_kind`, copied into the library via `tsn_library.import_raw`) and
+**Rebuild** (`rebuild_tsn_library`: builds the consolidated/normalized workbook via
+`tsn_library.build_consolidated(force=True)` on the shared single-task slot, reusing
+`ConsolidateWorker`). The bridge methods refresh the panel: Import returns the fresh rows;
+Rebuild sets `S._tsnRebuildPending` and the `"state"` handler re-fetches `tsn_library_status()`
+once the task slot frees. Mock + bridge exercised at `/index.html#mock` (Settings ▸ TSN reports)
+and golden `check_gui_bridge.test_tsn_library_panel`.
+
 ## Motion layer + control polish
 
 A light app-wide motion system (end of `app.css`, `prefers-reduced-motion`-aware),

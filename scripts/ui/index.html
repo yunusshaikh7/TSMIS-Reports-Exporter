@@ -714,6 +714,19 @@
         </div>
 
         <div class="card-section">
+          <div class="section-head"><span class="section-label">TSN reports</span></div>
+          <p class="hint" style="margin-bottom:8px">
+            The canonical home for each report's <b>TSN</b> source data (the comparison
+            ground truth). Import the raw TSN file(s) once — district PDFs or a statewide
+            workbook, depending on the report — then <b>Rebuild</b> turns them into the
+            consolidated workbook every TSMIS-vs-TSN comparison reads. A green dot means
+            the consolidated workbook is current; amber means it's missing or older than
+            the raw you imported.
+          </p>
+          <div class="tsn-lib" id="setTsnLibrary"></div>
+        </div>
+
+        <div class="card-section">
           <div class="section-head"><span class="section-label">Data &amp; storage</span></div>
           <div class="set-paths mono" id="setPaths"></div>
           <div class="actions-row" style="margin-top:10px">

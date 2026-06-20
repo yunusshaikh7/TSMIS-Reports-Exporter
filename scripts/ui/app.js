@@ -1471,7 +1471,13 @@ function dispatch(events) {
   for (const ev of events) {
     try {
       switch (ev.t) {
-        case "state": S.st = ev.s; renderState(); updateMatrixProgress(); updateDayMatrixProgress(); break;
+        case "state":
+          S.st = ev.s; renderState(); updateMatrixProgress(); updateDayMatrixProgress();
+          // A TSN-library rebuild finished (task slot freed) → refresh its panel.
+          if (S._tsnRebuildPending && (!S.st || S.st.task !== "consolidate")) {
+            S._tsnRebuildPending = false; refreshTsnLibrary();
+          }
+          break;
         case "settings":
           S.init.settings = ev.s;
           fillSettings();
@@ -2723,6 +2729,7 @@ function fillSettings() {
 
   renderSiteUrls(s.site_urls || []);
   renderChromium(s.chromium || {});
+  renderTsnLibrary(s.tsn_library || []);
 
   const about = $("setAbout");
   about.textContent = "";
@@ -2799,6 +2806,92 @@ function renderChromium(c) {
   $("btnChromiumDelete").classList.toggle("hidden", !c.downloaded);
   const downloading = S.st && S.st.task === "chromium";
   $("btnChromiumCancel").classList.toggle("hidden", !downloading);
+}
+
+// ---- Settings: canonical TSN library (v0.17.0) ----
+const TSN_RAW_KIND_LABEL = {
+  district_pdfs: "district PDFs", statewide_pdf: "statewide PDF",
+  statewide_xlsx: "statewide workbook",
+};
+
+function renderTsnLibrary(reports) {
+  const box = $("setTsnLibrary");
+  if (!box) return;
+  box.textContent = "";
+  const rebuilding = S.st && S.st.task === "consolidate";
+  reports.forEach((r) => {
+    const row = document.createElement("div");
+    row.className = "tsn-row";
+
+    const dot = document.createElement("span");
+    // Green = consolidated current; amber = missing/stale OR raw not imported.
+    dot.className = "tsn-dot " + (r.current ? "ok" : (r.raw_present ? "warn" : "none"));
+    dot.title = r.current ? "Consolidated workbook is current"
+      : r.raw_present ? "Consolidated workbook is missing or older than the raw — rebuild it"
+      : "No raw TSN file imported yet";
+
+    const name = document.createElement("span");
+    name.className = "tsn-name";
+    name.textContent = r.label;
+
+    const status = document.createElement("span");
+    status.className = "tsn-status muted";
+    const kind = TSN_RAW_KIND_LABEL[r.raw_kind] || r.raw_kind;
+    if (!r.raw_present) {
+      status.textContent = `no raw imported (${kind})`;
+    } else {
+      const raw = `${r.raw_count} raw ${kind}`;
+      const cons = r.consolidated_present
+        ? (r.current ? "consolidated current" : "consolidated STALE")
+        : "not yet built";
+      status.textContent = `${raw} · ${cons}`;
+    }
+
+    const actions = document.createElement("span");
+    actions.className = "tsn-actions";
+    const imp = document.createElement("button");
+    imp.className = "btn btn-subtle btn-small";
+    imp.textContent = "Import raw…";
+    imp.disabled = !!rebuilding;
+    imp.addEventListener("click", () => importTsnRaw(r.report));
+    const reb = document.createElement("button");
+    reb.className = "btn btn-standard btn-small";
+    reb.textContent = "Rebuild";
+    reb.disabled = !!rebuilding || !r.raw_present;
+    reb.addEventListener("click", () => rebuildTsnLibrary(r.report));
+    actions.append(imp, reb);
+
+    row.append(dot, name, status, actions);
+    box.appendChild(row);
+  });
+}
+
+async function importTsnRaw(report) {
+  const res = await api.import_tsn_raw(report);
+  if (res && res.error) { showMessage("error", "Import failed", res.error); return; }
+  if (res && res.cancelled) return;
+  if (res && res.reports) {
+    S.init.settings.tsn_library = res.reports;
+    renderTsnLibrary(res.reports);
+  }
+}
+
+async function rebuildTsnLibrary(report) {
+  const res = await api.rebuild_tsn_library(report);
+  if (res && res.error) { showMessage("error", "Can't rebuild", res.error); return; }
+  // The rebuild runs on the shared task slot; refresh the panel once it finishes
+  // (see the "state" handler, which clears _tsnRebuildPending when task goes idle).
+  S._tsnRebuildPending = true;
+  renderTsnLibrary(S.init.settings.tsn_library || []);   // reflect the busy/disabled state
+}
+
+async function refreshTsnLibrary() {
+  const res = await api.tsn_library_status();
+  if (res && res.reports) {
+    S.init.settings = S.init.settings || {};
+    S.init.settings.tsn_library = res.reports;
+    renderTsnLibrary(res.reports);
+  }
 }
 
 async function downloadChromium() {
@@ -3354,6 +3447,24 @@ function makeMockApi() {
   const mockUrlOverrides = {};
   const mockChromium = { bundled: false, downloaded: false, downloaded_mb: 0,
                          active: false, dir: "C:\\Tools\\TSMIS Exporter\\data\\ms-playwright" };
+  // Settings ▸ TSN reports panel — one row per registered report (mixed states so
+  // the green/amber dots, the "Rebuild" disabled-until-raw, and the Import/Rebuild
+  // buttons are all verifiable in #mock).
+  const mockTsnLib = {
+    ramp_summary:        { label: "TSN Ramp Summary", raw_kind: "statewide_pdf", raw_count: 1, present: true, current: true },
+    ramp_detail:         { label: "TSN Ramp Detail", raw_kind: "statewide_xlsx", raw_count: 1, present: true, current: true },
+    intersection_summary:{ label: "TSN Intersection Summary", raw_kind: "statewide_pdf", raw_count: 1, present: true, current: false },
+    intersection_detail: { label: "TSN Intersection Detail", raw_kind: "statewide_xlsx", raw_count: 1, present: true, current: false },
+    highway_sequence:    { label: "TSN Highway Sequence", raw_kind: "district_pdfs", raw_count: 12, present: true, current: false },
+    highway_log:         { label: "TSN Highway Log", raw_kind: "district_pdfs", raw_count: 0, present: false, current: false },
+  };
+  function mockTsnLibraryRows() {
+    return Object.entries(mockTsnLib).map(([report, m]) => ({
+      report, label: m.label, raw_kind: m.raw_kind,
+      raw_present: m.present, raw_count: m.raw_count,
+      consolidated_present: m.current, current: m.current,
+    }));
+  }
   function mockSiteUrlRows() {
     const rows = [];
     for (const src of ["ssor", "ars"]) {
@@ -3372,6 +3483,7 @@ function makeMockApi() {
     return {
       values: { ...mockSettings }, defaults: { ...mockSettings },
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
+      tsn_library: mockTsnLibraryRows(),
       meta: {
         version: "0.14.2 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
@@ -3909,7 +4021,32 @@ function makeMockApi() {
       }, 650 * (i + 1)));
       return { ok: true };
     },
-    get_settings: async () => ({ values: { ...mockSettings }, defaults: { ...mockSettings }, meta: { update_support: "ok" } }),
+    get_settings: async () => ({ values: { ...mockSettings }, defaults: { ...mockSettings },
+                                 tsn_library: mockTsnLibraryRows(), meta: { update_support: "ok" } }),
+    tsn_library_status: async () => ({ reports: mockTsnLibraryRows() }),
+    import_tsn_raw: async (report) => {
+      const m = mockTsnLib[report];
+      if (!m) return { error: "Unknown TSN report." };
+      m.present = true;
+      m.raw_count = m.raw_count || (m.raw_kind === "district_pdfs" ? 12 : 1);
+      m.current = false;                       // freshly imported raw → consolidated stale
+      push({ t: "log", text: `Imported raw file(s) for ${m.label}. Rebuild to use them.` });
+      return { ok: true, imported: m.raw_count, reports: mockTsnLibraryRows() };
+    },
+    rebuild_tsn_library: async (report) => {
+      const m = mockTsnLib[report];
+      if (!m) return { error: "Unknown TSN report." };
+      if (!m.present) return { error: "No raw files imported yet — import first." };
+      st.task = "consolidate"; pushState();
+      push({ t: "log", text: `Rebuilding TSN library: ${m.label}…` },
+           { t: "run_started", mode: "consolidate", label: `Rebuilding ${m.label}…` });
+      setTimeout(() => {
+        m.current = true;
+        push({ t: "log", text: `${m.label} consolidated workbook ready.` }, { t: "run_ended" });
+        st.task = null; pushState();           // → the "state" handler refreshes the panel
+      }, 700);
+      return { ok: true };
+    },
     set_setting: async (key, value) => {
       const numeric = typeof mockSettings[key] === "number";
       const boolish = typeof mockSettings[key] === "boolean";

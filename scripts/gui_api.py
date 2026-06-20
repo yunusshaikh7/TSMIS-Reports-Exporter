@@ -1897,6 +1897,87 @@ class GuiApi:
                              "Consolidate TSN Highway Log PDFs", subdir=subdir)
         return self._enqueue_matrix_job(job)
 
+    # ----- canonical TSN library (Settings ▸ TSN reports panel, v0.17.0) ------
+    def _tsn_library_status(self):
+        """Per-report status rows for the Settings TSN-reports panel. Floats
+        (mtimes) are dropped — the panel only needs the booleans/counts/label."""
+        import tsn_library                              # lazy (no pdfplumber pull)
+        rows = []
+        for s in tsn_library.all_status():
+            rows.append({
+                "report": s["report"], "label": s["label"],
+                "raw_kind": s["raw_kind"], "raw_present": s["raw_present"],
+                "raw_count": s["raw_count"],
+                "consolidated_present": s["consolidated_present"],
+                "current": s["current"],
+            })
+        return rows
+
+    @_api_method
+    def tsn_library_status(self):
+        """Refresh the Settings TSN-reports panel (after an import / rebuild)."""
+        return {"reports": self._tsn_library_status()}
+
+    @_api_method
+    def import_tsn_raw(self, report):
+        """Native open dialog to copy raw TSN file(s) into the canonical library's
+        raw/ folder for `report` (PDFs or the statewide XLSX, per the report). The
+        consolidated workbook is then out of date until rebuilt. Returns
+        {ok, imported, reports} / {cancelled} / {error}."""
+        import tsn_library                              # lazy
+        if not tsn_library.is_registered(report):
+            return {"error": "Unknown TSN report."}
+        spec = tsn_library.get(report)
+        is_pdf = spec.raw_glob.lower().endswith("pdf")
+        ftype = ("PDF document (*.pdf)" if is_pdf else "Excel workbook (*.xlsx)")
+        picked = self._window.create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=True, file_types=(ftype,))
+        if not picked:
+            return {"cancelled": True}
+        srcs = list(picked) if isinstance(picked, (list, tuple)) else [picked]
+        try:
+            landed = tsn_library.import_raw(report, srcs)
+        except (OSError, ValueError) as e:
+            self._emit_log(f"TSN import failed for {spec.label} ({type(e).__name__}): {e}")
+            return {"error": f"Could not import the file(s): {e}"}
+        self._emit_log(f"Imported {len(landed)} raw file(s) for {spec.label}. "
+                       "Rebuild its consolidated workbook to use them.")
+        return {"ok": True, "imported": len(landed),
+                "reports": self._tsn_library_status()}
+
+    @_api_method
+    def rebuild_tsn_library(self, report):
+        """Rebuild the consolidated/normalized TSN workbook for `report` from its
+        library raw/ files (offline; pdfplumber/openpyxl). Runs on the shared
+        single-task slot via ConsolidateWorker, so progress shows in the activity
+        log like any consolidation. Returns {ok} / {error}."""
+        import tsn_library                              # lazy
+        if not tsn_library.is_registered(report):
+            return {"error": "Unknown TSN report."}
+        spec = tsn_library.get(report)
+        if not self._tsn_library_status_for(report)["raw_present"]:
+            return {"error": f"No raw {spec.label} files are imported yet — "
+                             "import the raw TSN file(s) first."}
+        if not self._try_claim_task("consolidate"):
+            return {"error": "A task is already running."}
+        self.cancel_event.clear()
+        self._emit_log(f"Rebuilding TSN library: {spec.label}…")
+        self._set_dot("busy", f"Rebuilding {spec.label}…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": f"Rebuilding {spec.label}…"})
+        self._push_state()
+
+        def _run(events=None, confirm_overwrite=None, day=None):   # noqa: ARG001
+            return tsn_library.build_consolidated(
+                report, events=events, confirm_overwrite=lambda _p: True, force=True)
+
+        ConsolidateWorker(_run, self._q, self.cancel_event, lambda _p: True).start()
+        return {"ok": True}
+
+    def _tsn_library_status_for(self, report):
+        import tsn_library                              # lazy
+        return tsn_library.status(report)
+
     # ----- matrix queue management (v0.16.0) ---------------------------------
     @_api_method
     def set_matrix_fast(self, on):
@@ -2689,6 +2770,7 @@ class GuiApi:
             "defaults": dict(settings.DEFAULTS),
             "site_urls": self._site_url_rows(),
             "chromium": self._chromium_state(),
+            "tsn_library": self._tsn_library_status(),
             "meta": {
                 "version": __version__,
                 "build": "portable app" if is_frozen() else "development run",
