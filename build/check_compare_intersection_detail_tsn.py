@@ -100,6 +100,10 @@ def test_schema():
           idt._norm_bool("Y") == "Y" and idt._norm_bool("1") == "Y"
           and idt._norm_bool("N") == "N" and idt._norm_bool("0") == "N")
     check("route from LOCATION '12 ORA 001' -> '001'", idt._norm_route("12 ORA 001") == "001")
+    check("roadbed split '12 ORA 210U' -> ('210','U')", idt._split_route("12 ORA 210U") == ("210", "U"))
+    check("roadbed split '12 ORA. 210' -> ('210','')", idt._split_route("12 ORA. 210") == ("210", ""))
+    check("Roadbed is a COMPARED column (not context)",
+          "Roadbed" in sc.header and "Roadbed" not in sc.context_fields)
     check("PM ' 000.204' -> '0.204'", idt._norm_pm(" 000.204") == "0.204")
     check("date ISO from YY-MM-DD ('73-10-19' -> '1973-10-19')",
           idt._iso_date("73-10-19") == "1973-10-19")
@@ -157,9 +161,40 @@ def test_end_to_end():
     print(f"      (rows={len(rows)}, total diff cells={total}, context diff cells={ctx_diffs})")
 
 
+def test_roadbed_match():
+    """A TSN route carrying a roadbed suffix (210U) must MATCH the suffix-less
+    TSMIS route (210) on base route + PM — not drop to one-sided — and the suffix
+    difference must be FLAGGED in the 'Roadbed' column (the indicator)."""
+    print("roadbed-suffix matching + indicator:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_id_rb_"))
+    tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
+    # TSMIS lists the route WITHOUT a suffix ("210"); everything else identical.
+    _write_tsmis(tsmis, [
+        _tsmis_row("210", "R", "5.000", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
+                   "1", "N", "0", "P", "3", "JCT 99"),
+    ])
+    # TSN lists the SAME intersection under "210U" (divided-highway roadbed).
+    _write_tsn(tsn, [
+        {"PP": "R", "POST_MILE": " 005.000", "LOCATION": "12 ORA 210U", "DATE_REC": "73-10-19",
+         "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "S", "LT_TY": "Y",
+         "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
+         "DESCRIPTION": "JCT 99"},
+    ])
+    res = idt.compare(tsmis, tsn, out, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
+    check("compare ok", res.status == "ok")
+    header, rows, sheets = _comparison(out)
+    check("matched (1 row on the Comparison sheet, not one-sided)", len(rows) == 1)
+    rb = header.index("Roadbed")
+    check("Roadbed flags the suffix-only difference (U vs blank)", DIFF in rows[0][rb])
+    # the substantive attributes are identical, so NOTHING else differs.
+    other = sum(1 for i, c in enumerate(rows[0]) if i != rb and DIFF in c)
+    check("no other column differs (suffix is the only difference)", other == 0)
+
+
 def main():
     test_schema()
     test_end_to_end()
+    test_roadbed_match()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

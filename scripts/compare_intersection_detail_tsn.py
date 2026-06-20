@@ -45,12 +45,12 @@ NORMALIZED_SHEET = "Intersection Detail (TSN)"
 
 KEY = "PM"
 SHARED_HEADER = [
-    "PR", "PM", "HG", "City Code", "R/U", "INT Type", "Control Type", "Lighting",
-    "ML Mastarm", "ML Left Chan", "ML Right Chan", "ML Traffic Flow", "ML Num Lanes",
-    "Description", "CS Mastarm", "CS Left Chan", "CS Right Chan", "CS Traffic Flow",
-    "CS Num Lanes", "Date of Record",
+    "PR", "Roadbed", "PM", "HG", "City Code", "R/U", "INT Type", "Control Type",
+    "Lighting", "ML Mastarm", "ML Left Chan", "ML Right Chan", "ML Traffic Flow",
+    "ML Num Lanes", "Description", "CS Mastarm", "CS Left Chan", "CS Right Chan",
+    "CS Traffic Flow", "CS Num Lanes", "Date of Record",
 ]
-KEY_FIELD = SHARED_HEADER.index(KEY)      # 1
+KEY_FIELD = SHARED_HEADER.index(KEY)      # 2 (after PR + the derived Roadbed column)
 # Shown but never counted: the roadbed indicator, the TSMIS refresh date, and the
 # CROSS-STREET attributes — TSMIS leaves cross-street detail blank for ~37% of
 # intersections while TSN defaults them (so a raw compare floods 30k blank-vs-N
@@ -87,12 +87,26 @@ _TSMIS_ROUTE_POS = 4                       # consolidated "Location" column ("12
 # --------------------------------------------------------------------------- #
 # normalization
 # --------------------------------------------------------------------------- #
-def _norm_route(tok):
+def _split_route(tok):
+    """Split a LOCATION token into (base_route, roadbed_suffix):
+    '12 ORA 210U' -> ('210', 'U'); '12 ORA. 210' -> ('210', '').
+
+    California divided highways carry a roadbed letter (S/U) on the route name that
+    TSN keeps but TSMIS often omits. Keying on the BASE route lets the same
+    intersection still pair across that label difference, while the suffix is
+    surfaced as the compared 'Roadbed' column — so a suffix-only difference is
+    flagged there (TSN 'U' vs TSMIS blank) rather than the rows being dropped to
+    one-sided OR silently merged."""
     t = str(tok or "").strip().upper().replace("-", " ")
     parts = t.split()
     last = parts[-1] if parts else ""
     m = re.fullmatch(r"(\d+)([A-Z]?)", last)
-    return f"{int(m.group(1)):03d}{m.group(2)}" if m else last
+    return (f"{int(m.group(1)):03d}", m.group(2)) if m else (last, "")
+
+
+def _norm_route(tok):
+    """The base route number (roadbed suffix stripped) — the row key. See _split_route."""
+    return _split_route(tok)[0]
 
 
 def _norm_pm(pm):
@@ -153,8 +167,9 @@ def _tsn_row(r, h):
     def g(name):
         i = h.get(name)
         return r[i] if i is not None and i < len(r) else None
-    route = _norm_route(g("LOCATION"))
-    return [route] + [_project(f, g(_TSN_COL[f])) for f in SHARED_HEADER]
+    base, roadbed = _split_route(g("LOCATION"))
+    return [base] + [roadbed if f == "Roadbed" else _project(f, g(_TSN_COL[f]))
+                     for f in SHARED_HEADER]
 
 
 def tsn_rows_from_raw(path):
@@ -194,8 +209,9 @@ def _load_tsn(path):
 def _tsmis_row(r):
     def at(i):
         return r[i] if i < len(r) else None
-    route = _norm_route(at(_TSMIS_ROUTE_POS))
-    return [route] + [_project(f, at(_TSMIS_POS[f])) for f in SHARED_HEADER]
+    base, roadbed = _split_route(at(_TSMIS_ROUTE_POS))
+    return [base] + [roadbed if f == "Roadbed" else _project(f, at(_TSMIS_POS[f]))
+                     for f in SHARED_HEADER]
 
 
 def _load_tsmis(path):
@@ -258,6 +274,12 @@ def _write_notes_sheet(wb):
         "TSN defaults it, so counting them would bury the substantive mainline differences. The "
         "cross-street values are still shown so the completeness gap is visible.",
         "Rows are keyed on Route + Postmile (PM); attribute effective-dates are not compared.",
+        "California divided highways carry a roadbed suffix (S/U) on the route name that "
+        "TSN keeps but TSMIS often omits (TSN \"210U\" vs TSMIS \"210\"). Rows are matched on "
+        "the BASE route number so the same intersection still pairs across that label "
+        "difference; the suffix is shown in the 'Roadbed' column and — when it is the only "
+        "difference — is flagged there (TSN \"U\" vs TSMIS blank) rather than dropped to a "
+        "one-sided row or silently merged.",
     ):
         ws.append([cell(line, body, align=wrap)])
     return ws
