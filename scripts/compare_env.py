@@ -504,6 +504,17 @@ INTERSECTION_SUMMARY = EnvCompare(
         report_name="Intersection Summary", header=IS_HEADER,
         id_noun="route", id_noun_plural="routes",
         scope_flat="All routes (one row per route)"))
+# Intersection Detail: a flat per-route XLSX (sheet "Intersection Detail"), keyed on
+# the postmile, so it uses the standard flat path like Ramp Detail / Highway Sequence.
+# (The export header is offset within each type/eff-date pair, but BOTH env sides share
+# the identical layout, so the position-wise comparison is valid; intersections sharing
+# a postmile pair by data similarity in compare_core. id_noun = intersection.)
+INTERSECTION_DETAIL = EnvCompare(
+    "intersection_detail", "Intersection Detail", "intersection_detail",
+    sheet_name="Intersection Detail", key_col="Post Mile",
+    base_schema=CompareSchema(
+        report_name="Intersection Detail", header=["Post Mile"],
+        id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"))
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).

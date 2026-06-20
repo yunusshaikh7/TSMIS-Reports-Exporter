@@ -534,6 +534,7 @@ limit and falls back to "Side A"/"Side B" on collision).
 | `HIGHWAY_SEQUENCE` | Highway Sequence | `highway_sequence` / "Highway Locations" | `PM` | per-route XLSX; unnamed internal columns get a stable `(col X)` label |
 | `HIGHWAY_LOG` | Highway Log | `highway_log` / `_hl.SHEET_NAME` | Location | `base_schema=_HL_BASE`, `force_header=_hl.EXPECTED_HEADER` (relabels the vendor-mislabeled Excel to corrected labels by POSITION); inherits Med Wid + tooltips + Legend but `key_normalizer` is CLEARED |
 | `INTERSECTION_SUMMARY` | Intersection Summary | `intersection_summary` / category sheet | route (first col) | **AGGREGATE per route** (v0.17.0): the per-route export is a CATEGORY-summary sheet, not a flat table, so a `side_loader` (`_load_intersection_summary_side`) parses each file into ONE `[route, total, *category counts]` row via the consolidator's own `parse_route` block-walk (`has_route=False`, `agg_header=IS_HEADER`) — the XLSX analog of `RAMP_SUMMARY`'s PDF path |
+| `INTERSECTION_DETAIL` | Intersection Detail | `intersection_detail` / "Intersection Detail" | `Post Mile` | **flat** (v0.17.0): a normal per-route XLSX, consolidated shape, route+PM key (the export header is offset within each type/eff-date pair, but both env sides share the layout so the position-wise compare is valid) |
 
 `EnvCompare` has two shapes: the **flat** path (Ramp Detail / Highway Sequence / Highway Log — read
 the per-route sheet rows in consolidated shape) and the **aggregate-per-route** path (a `side_loader`
@@ -627,14 +628,13 @@ strictly **ADDITIVE / orchestration-only**: `matrix.py` NEVER edits the manual c
 adapters. The foundation it sits on was audited cell-accurate over the full 6-env batch (2026-06-18; see
 [roadmap.md](roadmap.md) closed findings).
 
-- **Rows** = `reports.matrix_rows()` — the **6 cross-env-capable reports**: Ramp Summary, Ramp Detail,
-  Highway Sequence, **Highway Log (Excel)**, **Intersection Summary**, and **Highway Log (PDF)** (HL is
-  two rows, keyed by subdir `highway_log` / `highway_log_pdf`; the PDF row has no cross-env adapter → its
-  env mode is greyed). **Intersection Summary** gained a cross-env adapter in v0.17.0
-  (`compare_env.INTERSECTION_SUMMARY` — the AGGREGATE-per-route recipe, route-keyed via the
-  consolidator's block-walk parser), so it's a full matrix row. **Intersection Detail** still has no
-  cross-env adapter → it's a by-day vs-TSN row only (`reports.tsn_matrix_extra_rows`), not an
-  Everything-matrix row.
+- **Rows** = `reports.matrix_rows()` — **all 7 reports**: Ramp Summary, Ramp Detail, Highway Sequence,
+  **Highway Log (Excel)**, **Intersection Summary**, **Intersection Detail**, and **Highway Log (PDF)**
+  (HL is two rows, keyed by subdir `highway_log` / `highway_log_pdf`; the PDF row has no cross-env adapter
+  yet → its env mode is greyed). v0.17.0 gave **both Intersection reports** a cross-env adapter —
+  `compare_env.INTERSECTION_SUMMARY` (AGGREGATE-per-route, route-keyed via the consolidator's block-walk)
+  and `compare_env.INTERSECTION_DETAIL` (flat, route+PM) — so `reports.tsn_matrix_extra_rows()` is now
+  empty (every report is a full matrix row).
 - **Per-row comparison MODE** (`matrix._row_modes`, picked via a dropdown under each row's name,
   persisted in `settings.matrix_row_modes`):
   - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). All rows but HL-PDF.

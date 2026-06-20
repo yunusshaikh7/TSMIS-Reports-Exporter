@@ -3619,6 +3619,7 @@ function makeMockApi() {
       { key: "highway_sequence", label: "Highway Sequence Listing", tsn_capable: true },
       { key: "highway_log", label: "Highway Log (Excel)", tsn_capable: true },
       { key: "intersection_summary", label: "TSAR: Intersection Summary", tsn_capable: true },
+      { key: "intersection_detail", label: "TSAR: Intersection Detail", tsn_capable: true },
       { key: "highway_log_pdf", label: "Highway Log (PDF)", tsn_capable: true },
     ];
     const rowLabels = {}; allRows.forEach((r) => { rowLabels[r.key] = r.label; });
@@ -3635,6 +3636,7 @@ function makeMockApi() {
       highway_sequence: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
       highway_log: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
       intersection_summary: { "ssor-test": [3, 0], "ssor-dev": [3, 0], "ars-prod": [0, 0], "ars-test": [40, 2], "ars-dev": "stale" },
+      intersection_detail: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "stale" },
     };
     const cells = {}, modes = {}, rowModes = {}, tsnMeta = {};
     rows.forEach((rk) => {

@@ -69,9 +69,10 @@ def main():
 
         print("matrix_info + snapshot key:")
         info = a.matrix_info()
-        check("rows are the six comparable reports (HL Excel/PDF + Intersection Summary cross-env)",
+        check("rows are all seven comparable reports (both HL formats + both Intersection, cross-env)",
               info["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence",
-                               "highway_log", "intersection_summary", "highway_log_pdf"])
+                               "highway_log", "intersection_summary",
+                               "intersection_detail", "highway_log_pdf"])
         check("baseline defaults to ssor-prod", info["baseline"] == "ssor-prod")
 
         print("set_matrix_report (show/hide rows):")
@@ -82,14 +83,14 @@ def main():
         check("show puts it back",
               a.set_matrix_report("highway_log", True).get("ok")
               and "highway_log" in a.matrix_info()["rows"])
-        # can't hide them all (6 rows: hide 5, the 6th hide is rejected)
+        # can't hide them all (7 rows: hide 6, the 7th hide is rejected)
         for k in ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
-                  "intersection_summary"):
+                  "intersection_summary", "intersection_detail"):
             a.set_matrix_report(k, False)
         last = a.set_matrix_report("highway_log_pdf", False)
         check("can't hide the last remaining row", bool(last.get("error")))
         for k in ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
-                  "intersection_summary"):
+                  "intersection_summary", "intersection_detail"):
             a.set_matrix_report(k, True)
         snap0 = a._state_snapshot()
         check("snapshot carries the 'matrix' key (None idle)",

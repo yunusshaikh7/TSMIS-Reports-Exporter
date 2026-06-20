@@ -125,6 +125,11 @@ COMPARE_REPORTS = [
     # a TSN-only extra row to a full Everything-matrix + by-day matrix row.
     ("TSAR: Intersection Summary — between environments",
      _cmp_env.INTERSECTION_SUMMARY, "folders", "env"),
+    # Intersection Detail cross-env (v0.17.0): a flat per-route XLSX, route+PM key —
+    # the standard EnvCompare flat path (like Ramp Detail). Promotes it to a full
+    # Everything-matrix + by-day matrix row.
+    ("TSAR: Intersection Detail — between environments",
+     _cmp_env.INTERSECTION_DETAIL, "folders", "env"),
     # vs TSN (file-based). Highway Log Excel/PDF today; 0.17.0 adds the other
     # reports' "<report> — TSMIS vs TSN" rows here once their comparators exist.
     ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "tsn"),
@@ -263,11 +268,10 @@ def matrix_rows():
 # 0.17.0 work, so the matrix shows them as greyed groundwork rows for now.
 # Returns [(row_key, label, subdir)] (row_key == export subdir, like the HL rows).
 # Reports that have NO cross-env (folders) adapter, so they aren't in matrix_rows()
-# but still need a by-day vs-TSN row. Intersection Summary GAINED a cross-env adapter
-# in v0.17.0 (now a full matrix_rows row), so only Intersection Detail remains here.
-_TSN_MATRIX_EXTRA = [
-    ("Intersection Detail", _INT_DETAIL_SPEC),
-]
+# but still need a by-day vs-TSN row. As of v0.17.0 EVERY report has a cross-env
+# adapter (Intersection Summary + Detail gained theirs), so this is now empty — kept
+# as the documented extension point for any future export-only report.
+_TSN_MATRIX_EXTRA = []
 
 
 def tsn_matrix_extra_rows():
