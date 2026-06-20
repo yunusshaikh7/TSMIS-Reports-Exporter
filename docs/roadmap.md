@@ -9,8 +9,11 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > The app was **staged for it in v0.16.1** (compare sub-tabs → Cross-environment / vs TSN / vs TSN
 > Matrix; the vs-TSN matrix generalized to every report with greyed groundwork rows + marked
 > plug-in points). 0.17.0 builds the per-report TSN parsers/comparators + Intersection consolidate
-> and flips them on. Carried-over feature asks (per-cell/row consolidate buttons; the one-stop
-> add-day→export→consolidate→compare pipeline) are listed there too.
+> and flips them on, as a **full audit + perfection** of all consolidators/comparators against
+> the complete raw TSN+TMSIS ground truth. It also adds: a **canonical TSN library** (one fixed
+> home the whole app references, raw + generated-Excel, with a **Settings status panel**),
+> **row/column reordering** on both matrices, per-cell/row consolidate buttons, and the one-stop
+> add-day→export→consolidate→compare pipeline. Full task list + audit recipe in the prompt.
 
 ## How to maintain this file
 
