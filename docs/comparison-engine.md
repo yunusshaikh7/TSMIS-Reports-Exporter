@@ -443,6 +443,25 @@ descriptions. 21 routes are TSN-only (not in the 252 TSMIS PDFs). LESSON: always
 Excel side from raw yourself — a stale/partial pre-existing consolidated workbook (missing 25
 routes) inflated PDF-vs-Excel to 22,210 diffs.
 
+### 9d. TSMIS vs TSN Ramp Summary — `compare_ramp_summary_tsn.py` (`"files"`, group `tsn`, **AGGREGATE**)
+
+The first **AGGREGATE** vs-TSN comparator — the recipe for the two Summary reports. Unlike the
+FLAT comparators (per-PM rows), each side reduces to ONE statewide `{category: count}` table, so
+the comparison runs with **`has_route=False`**, `header=[Category, Count]`, `key_field=0` (the
+category is the key, the count is the single field). The TSMIS loader **sums** the consolidated
+Ramp Summary workbook's per-route sheet column-by-column (the same totals its live "Combined"
+sheet shows); the TSN loader parses the **statewide PDF** directly (reusing
+`consolidate_ramp_summary`'s geometry helpers — see [tsn-parsers.md](tsn-parsers.md)) or reads the
+library's normalized `Category|Count` workbook (`tsn_load_ramp_summary.build_into`). The canonical
+category list (the **16-ramp-type superset** incl. the TSN-only **P/V** "Dummy" classes + the
+grand Total) lives in `summary_layout.RAMP_SUMMARY_SPEC`, shared with the familiar sheet. A
+**"Summary by Category"** familiar-layout sheet (TSN sections/labels/order; *Category | TSMIS |
+TSN | Δ*) is appended via `extra_sheet_writer=summary_layout.make_extra_sheet_writer(SPEC)`.
+P/V are TSN-only → TSMIS contributes 0 → they read as `0 ≠ 122` / `0 ≠ 81` (both-sided);
+`Ramp Points w/out linework` is a TSMIS-only diagnostic emitted on the TSMIS side only (lands in
+*Only in TSMIS* + the footer). Approved canary in [tsn-parsers.md](tsn-parsers.md): **31 categories
+both, 1 only-TSMIS, 27 diff cells, 4 identical; TSMIS 15215 vs TSN 15410**. Live in both matrices.
+
 ### 9c. Cross-environment — `compare_env.py` (the `"folders"` family)
 
 > Group: **`env`** for ALL cross-environment comparisons — Ramp Summary/Detail, Highway
@@ -615,14 +634,15 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 > automatically (`_row_modes` + `day_matrix._day_rows` + `available_days` all gate on it).
 > `day_matrix.TSN_SUBDIR` is GONE → per-row `tsn_subdir`; `consolidate_and_compare_tsn` is
 > keyed on `(row_key, subdir)` and consolidates via `reports.consolidator_for_subdir`. **Live
-> today: HL Excel/PDF + Ramp Detail** (verified end-to-end = 902 diff / 0 context). Greyed:
-> Ramp Summary, Highway Sequence, Intersection Summary/Detail (until their comparators land).
+> today: HL Excel/PDF + Ramp Detail (FLAT) + Ramp Summary (AGGREGATE)** (Ramp Summary verified
+> end-to-end = 27 diff / 31 both / 1 only-TSMIS via the matrix's normalized-workbook path). Greyed:
+> Highway Sequence, Intersection Summary/Detail (until their comparators land).
 
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
 cross-environment, no live re-export** (it compares specific historical exports). HL Excel/PDF +
-**Ramp Detail** are live (v0.17.0); Ramp Summary / Highway Sequence / Intersection appear greyed
+**Ramp Detail + Ramp Summary** are live (v0.17.0); Highway Sequence / Intersection appear greyed
 (until their comparators land). Like `matrix.py`, it NEVER edits the manual compare code — it only
 orchestrates.
 

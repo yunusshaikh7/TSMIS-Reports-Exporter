@@ -76,9 +76,10 @@ APP_MODULES = [
     "consolidate_highway_sequence", "consolidate_highway_log",
     "consolidate_tsn_highway_log", "consolidate_tsmis_highway_log_pdf",
     "consolidate_intersection_detail",
-    "tsn_library", "tsn_load_ramp_detail",
+    "tsn_library", "tsn_load_ramp_detail", "tsn_load_ramp_summary",
+    "summary_layout",
     "compare_core", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
-    "compare_ramp_detail_tsn",
+    "compare_ramp_detail_tsn", "compare_ramp_summary_tsn",
     "gui_main", "gui_api", "gui_worker",
 ]
 

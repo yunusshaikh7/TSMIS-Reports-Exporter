@@ -254,12 +254,21 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
 
 ## Feature backlog
 
+- [x] **Ramp Summary vs TSN (AGGREGATE)** [M] — **DONE (v0.17.0).** The first AGGREGATE comparator
+  + the shared `summary_layout.py` familiar-layout renderer. `consolidate_ramp_summary` completed to
+  the full 16 ramp types (added TSN-only **P/V** "Dummy" classes); `compare_ramp_summary_tsn` sums
+  the consolidated TSMIS workbook vs the statewide TSN PDF (key = category), with a "Summary by
+  Category" familiar sheet via `extra_sheet_writer`. Registered in `tsn_library` (+
+  `tsn_load_ramp_summary.build_into`), live in both matrices, golden `check_compare_ramp_summary_tsn.py`.
+  Canary: 31 both / 1 only-TSMIS / 27 diff / TSMIS 15215 vs TSN 15410. See [tsn-parsers.md](tsn-parsers.md).
 - [ ] **Intersection consolidate + compare-vs-TSN** [M] — **IN PROGRESS (v0.17.0).** Export enabled
   (dev site, via Settings ▸ "Use development site"). **Done:** `consolidate_intersection_detail`
-  (thin `consolidate_xlsx` wrapper, in `_CONSOLIDATOR_BY_SUBDIR` + `check_consolidate_intersection.py`).
-  **STILL TO DO:** `consolidate_intersection_summary` (category-count summer + `summary_layout.py`);
+  (thin `consolidate_xlsx` wrapper, in `_CONSOLIDATOR_BY_SUBDIR` + `check_consolidate_intersection.py`);
+  the shared `summary_layout.py` renderer (built for Ramp Summary, reused by Intersection Summary).
+  **STILL TO DO:** `consolidate_intersection_summary` (category-count summer, reusing `summary_layout`);
   `compare_intersection_detail_tsn` (FLAT recipe; ⚠ TSN `(eff_date,type)` vs TSMIS `(type,eff_date)`
-  pair reordering; exclude `Date of Record`); `compare_intersection_summary_tsn` (AGGREGATE recipe).
+  pair reordering; exclude `Date of Record`); `compare_intersection_summary_tsn` (AGGREGATE recipe,
+  the Ramp Summary recipe with the intersection category maps).
   The vs-TSN comparators flip on in BOTH matrices by adding them to `matrix.tsn_comparator_for`.
   Recipes: [reports.md](reports.md) / [comparison-engine.md](comparison-engine.md); schema + counts:
   [tsn-parsers.md](tsn-parsers.md); resume state: [v0.17.0-prompt.md](v0.17.0-prompt.md).

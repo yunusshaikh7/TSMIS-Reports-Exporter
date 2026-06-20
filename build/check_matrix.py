@@ -45,9 +45,9 @@ def test_enumeration():
         check("all_rows lists every row with labels + tsn_capable",
               [r["key"] for r in snap["all_rows"]] == snap["rows"]
               and all(r.get("label") for r in snap["all_rows"]))
-        check("Highway Log + Ramp Detail rows are tsn_capable (v0.17.0)",
+        check("Highway Log + Ramp Detail + Ramp Summary rows are tsn_capable (v0.17.0)",
               {r["key"] for r in snap["all_rows"] if r["tsn_capable"]}
-              == {"highway_log", "highway_log_pdf", "ramp_detail"})
+              == {"highway_log", "highway_log_pdf", "ramp_detail", "ramp_summary"})
         check("six env columns", len(snap["envs"]) == 6
               and snap["envs"][0] == "ssor-prod")
         check("no intersection row",

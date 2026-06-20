@@ -47,6 +47,10 @@ jobs:
       - name: Byte-compile all sources (blocking)
         run: python -m compileall -q scripts build version.py
 
+      - name: Product-name guard (blocking)
+        # Fails the build if the product name is ever mis-typed — it is always TSMIS.
+        run: python build/check_no_misspelling.py
+
       - name: Export-engine regression checks (blocking)
         shell: bash
         run: |
@@ -88,6 +92,7 @@ jobs:
                    check_compare_injection check_compare_coercion check_compare_limits \
                    check_compare_audit check_compare_ramp_detail check_compare_ramp_summary \
                    check_compare_highway_sequence check_compare_ramp_detail_tsn \
+                   check_compare_ramp_summary_tsn \
                    check_compare_dupmatch check_compare_ditto check_ramp_summary_partial \
                    check_consolidate_intersection \
                    check_tsn_description_leak check_tsmis_pdf_parse check_tsmis_pdf_reconcile \

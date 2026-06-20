@@ -197,8 +197,8 @@ def main():
         check("unknown env rejected", bool(a.set_matrix_env("zz-zz", False).get("error")))
         check("unknown row mode-set rejected",
               bool(a.set_matrix_row_mode("nope", "tsn").get("error")))
-        check("greyed mode rejected (ramp_summary vs TSN)",
-              bool(a.set_matrix_row_mode("ramp_summary", "tsn").get("error")))
+        check("greyed mode rejected (highway_sequence vs TSN — not built yet)",
+              bool(a.set_matrix_row_mode("highway_sequence", "tsn").get("error")))
         check("supported mode set (HL Excel vs TSN)",
               a.set_matrix_row_mode("highway_log", "tsn").get("ok")
               and a.matrix_info()["modes"]["highway_log"] == "tsn")

@@ -45,8 +45,10 @@ def test_paths_and_modes():
           matrix.tsn_comparisons_root(d).as_posix().endswith("comparisons/tsn"))
     check("highway_log is tsn_capable", matrix.tsn_capable("highway_log"))
     check("highway_log_pdf is tsn_capable", matrix.tsn_capable("highway_log_pdf"))
-    check("ramp_summary is NOT tsn_capable (env only)",
-          not matrix.tsn_capable("ramp_summary"))
+    check("ramp_summary is tsn_capable (v0.17.0 AGGREGATE)",
+          matrix.tsn_capable("ramp_summary"))
+    check("highway_sequence is NOT tsn_capable yet (env only)",
+          not matrix.tsn_capable("highway_sequence"))
 
     defs = matrix._row_defs()
     check("five matrix rows incl. both Highway Log formats",
@@ -71,8 +73,11 @@ def test_paths_and_modes():
     check("HL PDF tsn shares the highway_log TSN folder (one TSN dataset)",
           hp["tsn"]["fmt"] == "pdf" and hp["tsn"]["tsn_subdir"] == "highway_log")
     rs = modes("ramp_summary")
-    check("ramp_summary: env supported, tsn greyed",
-          rs["env"]["supported"] and rs["tsn"]["supported"] is False)
+    check("ramp_summary: env + tsn supported (v0.17.0 AGGREGATE)",
+          rs["env"]["supported"] and rs["tsn"]["supported"])
+    hs = modes("highway_sequence")
+    check("highway_sequence: env supported, tsn still greyed",
+          hs["env"]["supported"] and hs["tsn"]["supported"] is False)
 
     # mode_out_path: env stays under comparisons/<baseline>/, others under tsn/
     env_p = matrix.mode_out_path(d, "ssor-prod", "highway_log", "ars-prod", hl["env"])
@@ -179,8 +184,8 @@ def test_build_guards():
         check("unknown row raises",
               raises(lambda: matrix.build_comparison(dest, "nope", "ars-prod", "env",
                                                      "ssor-prod", events=None)))
-        check("greyed mode raises (ramp_summary vs TSN)",
-              raises(lambda: matrix.build_comparison(dest, "ramp_summary", "ars-prod", "tsn",
+        check("greyed mode raises (highway_sequence vs TSN — not built yet)",
+              raises(lambda: matrix.build_comparison(dest, "highway_sequence", "ars-prod", "tsn",
                                                      "ssor-prod", events=None)))
         check("greyed mode raises (HL-PDF cross-env)",
               raises(lambda: matrix.build_comparison(dest, "highway_log_pdf", "ars-prod", "env",

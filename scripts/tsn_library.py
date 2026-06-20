@@ -66,6 +66,14 @@ _REPORTS = {
         consolidated_name="tsn_ramp_detail_normalized.xlsx",
         builder="tsn_load_ramp_detail:build_into",
     ),
+    "ramp_summary": TsnReport(
+        subdir="ramp_summary",
+        label="TSN Ramp Summary",
+        raw_glob="*.pdf",
+        raw_kind="statewide_pdf",
+        consolidated_name="tsn_ramp_summary_normalized.xlsx",
+        builder="tsn_load_ramp_summary:build_into",
+    ),
 }
 
 

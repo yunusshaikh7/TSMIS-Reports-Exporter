@@ -312,6 +312,9 @@ def tsn_comparator_for(row_key):
     if row_key == "ramp_detail":
         import compare_ramp_detail_tsn as _m
         return _m
+    if row_key == "ramp_summary":
+        import compare_ramp_summary_tsn as _m       # AGGREGATE recipe
+        return _m
     return None
 
 

@@ -100,7 +100,14 @@ RAMP_TYPES = [
     ("ramp_K_split",        r"^K\s*-\s*Split Ramp$"),
     ("ramp_L_loop_noleft",  r"^L\s*-\s*Loop without Left Turn$"),
     ("ramp_M_two_way",      r"^M\s*-\s*Two way Ramp Segment$"),
+    # P/V are statewide TSN ramp classifications. No per-route TSMIS PDF in the
+    # 6.19 ground-truth set emits them, but TSN's statewide Ramp Summary does
+    # (P=122, V=81), so the schema carries them in TSN document order (P after M,
+    # V after R) to (a) match TSN exactly for the vs-TSN comparison and (b) capture
+    # them should a TSMIS route ever report one, instead of silently dropping it.
+    ("ramp_P_dummy_paired", r"^P\s*-\s*Dummy Paired$"),
     ("ramp_R_rest_area",    r"^R\s*-\s*Rest Area, Vista Point, Truck Scale$"),
+    ("ramp_V_dummy_volume", r"^V\s*-\s*Dummy, Volume only$"),
     ("ramp_Z_other",        r"^Z\s*-\s*Other$"),
 ]
 
@@ -149,6 +156,12 @@ def get_rows_for_column(words, left=True):
 
 
 # Noise tokens that get merged into data rows by pdfplumber's row clustering.
+# The arrow-decoration + case-insensitive total patterns let the SAME cleaner
+# handle the TSN statewide page (whose section headers are bracketed like
+# "<------Highway Groups------>" and whose footer is lowercase "Total number of
+# Ramps:") as well as the TSMIS per-route page (no brackets, capital "Number").
+# Real data labels use a single spaced " - " and never contain "<", ">", or a run
+# of 3+ dashes, so stripping those is a no-op on the TSMIS layout (verified).
 NOISE_PATTERNS = [
     r"\bHighway Groups\b",
     r"\bOn/Off Indicator\b",
@@ -158,8 +171,10 @@ NOISE_PATTERNS = [
     r"\bNUMB\b",
     r"\bCODE\b",
     r"\bER\b",
-    r"\bTotal Number of Ramps:\s*[\d,]+\b",
-    r"\bRamp Points w/out linework:\s*[\d,]+\b",
+    r"(?i)\bTotal Number of Ramps:\s*[\d,]+",
+    r"(?i)\bRamp Points w/out linework:\s*[\d,]+",
+    r"[<>]",          # TSN section-header bracket glyphs
+    r"-{3,}",         # TSN section-header dash runs ("------")
 ]
 
 
@@ -349,7 +364,9 @@ GROUPS = [
         ("ramp_K_split",       "K-Split"),
         ("ramp_L_loop_noleft", "L-LoopNoL"),
         ("ramp_M_two_way",     "M-TwoWay"),
+        ("ramp_P_dummy_paired","P-DummyPair"),
         ("ramp_R_rest_area",   "R-Rest"),
+        ("ramp_V_dummy_volume","V-DummyVol"),
         ("ramp_Z_other",       "Z-Other"),
     ]),
     ("Totals", [
@@ -407,7 +424,9 @@ LONG_LABELS = {
     "ramp_K_split":        "K - Split Ramp",
     "ramp_L_loop_noleft":  "L - Loop without Left Turn",
     "ramp_M_two_way":      "M - Two way Ramp Segment",
+    "ramp_P_dummy_paired": "P - Dummy Paired",
     "ramp_R_rest_area":    "R - Rest Area, Vista Point, Truck Scale",
+    "ramp_V_dummy_volume": "V - Dummy, Volume only",
     "ramp_Z_other":        "Z - Other",
 }
 
@@ -423,10 +442,13 @@ def build_combined_sheet(wb, records, col_letters):
       row 2: gray subtitle ("Aggregated across N routes...")
       row 4: section headers — "Highway Groups" (left) and "Ramp Types" (right)
       rows 5-11: NUMBER/CODE header + 6 Highway Groups rows
-                 and rows 5-19 on the right: 14 Ramp Types rows
+                 and rows 5-21 on the right: 16 Ramp Types rows (incl. P, V)
       rows 13-17: On/Off Indicator section
       rows 19-25: Population Groups section
       rows 28-29: Total Number of Ramps + Ramp Points w/out linework
+    The right (Ramp Types) and left (HG/On-Off/Pop) blocks live in disjoint
+    columns (E-G vs A-C), so the extended 16-row Ramp Types list cannot collide
+    with the Population block even though their row ranges now overlap.
     """
     ws = wb.create_sheet("Combined", 0)
 

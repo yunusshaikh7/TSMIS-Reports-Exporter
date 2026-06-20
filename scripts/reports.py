@@ -31,6 +31,7 @@ import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
 import compare_highway_log_pdf as _cmp_highway_log_pdf
 import compare_ramp_detail_tsn as _cmp_ramp_detail_tsn
+import compare_ramp_summary_tsn as _cmp_ramp_summary_tsn
 
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
 # Order here is the display order in the GUI and the numbering in the console menu.
@@ -129,6 +130,9 @@ COMPARE_REPORTS = [
     # registry indices above are unchanged (selection is by index). Each takes the
     # consolidated TSMIS workbook + the TSN library file ("files" kind, group "tsn").
     ("TSAR: Ramp Detail — TSMIS vs TSN", _cmp_ramp_detail_tsn, "files", "tsn"),
+    # Ramp Summary is the AGGREGATE recipe (statewide category counts, not per-row):
+    # TSMIS consolidated workbook summed vs the TSN statewide PDF, keyed on category.
+    ("TSAR: Ramp Summary — TSMIS vs TSN", _cmp_ramp_summary_tsn, "files", "tsn"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each
