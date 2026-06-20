@@ -166,6 +166,16 @@ def test_tsn_library_panel():
         check("task slot left free after a no-raw rebuild",
               a._try_claim_task("x") is True)
         a._release_task()
+        # import_raw rejects a wrong-extension file (else it lands in raw/ but is
+        # invisible to the glob reader — a silent import-vs-ignore mismatch).
+        bad = tmp / "wrong.txt"
+        bad.write_text("x")
+        raised = False
+        try:
+            tsn_library.import_raw("ramp_detail", [str(bad)])     # expects *.xlsx
+        except ValueError:
+            raised = True
+        check("import_raw rejects a wrong-extension file", raised)
     finally:
         paths.TSN_LIBRARY_ROOT = saved
         shutil.rmtree(tmp, ignore_errors=True)

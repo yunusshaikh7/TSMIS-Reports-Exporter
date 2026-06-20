@@ -252,8 +252,12 @@ def all_status():
 def import_raw(report, src_paths, move=False):
     """Copy (or move) user-picked raw file(s) into the report's raw/ folder — the
     only way raw enters the library. Returns the landed paths. Raises
-    FileNotFoundError for a missing source; ValueError for an unknown report."""
-    get(report)  # validate
+    FileNotFoundError for a missing source; ValueError for an unknown report OR a
+    file whose extension doesn't match the report's raw_glob (else it would land
+    in raw/ but be invisible to the glob-based reader — a silent import-vs-ignore
+    mismatch)."""
+    spec = get(report)  # validate + read the expected extension
+    want = spec.raw_glob.lower().lstrip("*")          # "*.pdf" -> ".pdf"
     dest = raw_dir(report)
     dest.mkdir(parents=True, exist_ok=True)
     landed = []
@@ -261,6 +265,9 @@ def import_raw(report, src_paths, move=False):
         src = Path(src)
         if not src.is_file():
             raise FileNotFoundError(f"TSN raw file not found: {src}")
+        if want and src.suffix.lower() != want:
+            raise ValueError(f"{src.name} is not a {want} file — {spec.label} "
+                             f"expects {spec.raw_glob}.")
         target = dest / src.name
         if move:
             shutil.move(str(src), str(target))

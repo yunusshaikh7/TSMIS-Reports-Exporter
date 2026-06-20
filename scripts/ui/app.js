@@ -3522,19 +3522,23 @@ function makeMockApi() {
   // Settings ▸ TSN reports panel — one row per registered report (mixed states so
   // the green/amber dots, the "Rebuild" disabled-until-raw, and the Import/Rebuild
   // buttons are all verifiable in #mock).
+  // `cons` (consolidated workbook EXISTS) is independent of `current` (exists AND
+  // not older than the raw) — exactly as the real bridge reports them — so every
+  // panel state is reachable in #mock: current (cons+current), STALE (cons, not
+  // current), raw-only/not-built (no cons), and no-raw.
   const mockTsnLib = {
-    ramp_summary:        { label: "TSN Ramp Summary", raw_kind: "statewide_pdf", raw_count: 1, present: true, current: true },
-    ramp_detail:         { label: "TSN Ramp Detail", raw_kind: "statewide_xlsx", raw_count: 1, present: true, current: true },
-    intersection_summary:{ label: "TSN Intersection Summary", raw_kind: "statewide_pdf", raw_count: 1, present: true, current: false },
-    intersection_detail: { label: "TSN Intersection Detail", raw_kind: "statewide_xlsx", raw_count: 1, present: true, current: false },
-    highway_sequence:    { label: "TSN Highway Sequence", raw_kind: "district_pdfs", raw_count: 12, present: true, current: false },
-    highway_log:         { label: "TSN Highway Log", raw_kind: "district_pdfs", raw_count: 0, present: false, current: false },
+    ramp_summary:        { label: "TSN Ramp Summary", raw_kind: "statewide_pdf", raw_count: 1, present: true, cons: true, current: true },
+    ramp_detail:         { label: "TSN Ramp Detail", raw_kind: "statewide_xlsx", raw_count: 1, present: true, cons: true, current: true },
+    intersection_summary:{ label: "TSN Intersection Summary", raw_kind: "statewide_pdf", raw_count: 1, present: true, cons: true, current: false },   // STALE
+    intersection_detail: { label: "TSN Intersection Detail", raw_kind: "statewide_xlsx", raw_count: 1, present: true, cons: false, current: false }, // raw imported, not built
+    highway_sequence:    { label: "TSN Highway Sequence", raw_kind: "district_pdfs", raw_count: 12, present: true, cons: true, current: false },      // STALE
+    highway_log:         { label: "TSN Highway Log", raw_kind: "district_pdfs", raw_count: 0, present: false, cons: false, current: false },          // no raw
   };
   function mockTsnLibraryRows() {
     return Object.entries(mockTsnLib).map(([report, m]) => ({
       report, label: m.label, raw_kind: m.raw_kind,
       raw_present: m.present, raw_count: m.raw_count,
-      consolidated_present: m.current, current: m.current,
+      consolidated_present: m.cons, current: m.current,
     }));
   }
   function mockSiteUrlRows() {
@@ -4124,7 +4128,7 @@ function makeMockApi() {
       push({ t: "log", text: `Rebuilding TSN library: ${m.label}…` },
            { t: "run_started", mode: "consolidate", label: `Rebuilding ${m.label}…` });
       setTimeout(() => {
-        m.current = true;
+        m.cons = true; m.current = true;       // a rebuild produces a current consolidated
         push({ t: "log", text: `${m.label} consolidated workbook ready.` }, { t: "run_ended" });
         st.task = null; pushState();           // → the "state" handler refreshes the panel
       }, 700);
