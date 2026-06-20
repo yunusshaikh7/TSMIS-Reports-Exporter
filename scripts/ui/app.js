@@ -1806,23 +1806,30 @@ function mxQctrl(iconName, title, disabled, onClick, extra) {
   return b;
 }
 
-// Reflect the persisted matrix fast-mode toggle (kept editable mid-run).
+// Reflect the persisted matrix fast-mode toggle + browser-count picker (kept
+// editable mid-run). The count is the shared `fast_workers` knob, so the spinner,
+// the Export pane and the Settings tab all stay on one value.
 function syncMatrixFast() {
   const cb = $("matrixFast");
   if (!cb) return;
   const mf = (S.st && S.st.matrix_fast) || { on: false, workers: 0 };
   cb.checked = !!mf.on;
-  const note = $("matrixFastNote");
-  if (note) note.textContent = mf.on && mf.workers ? `(${mf.workers} browsers)` : "";
+  const row = $("matrixWorkersRow");
+  if (row) row.classList.toggle("is-off", !mf.on);
+  const wk = $("matrixWorkers");
+  // Don't stomp the field while the user is mid-edit (focused).
+  if (wk && document.activeElement !== wk && mf.workers) wk.value = mf.workers;
 }
 
-// Reflect the persisted live-formulas toggle (one global setting; mirrored on both
-// matrices' checkboxes).
+// Reflect the persisted live-formulas toggles. Each matrix has its OWN setting, so
+// they're synced separately (Everything ← matrix_formulas, by-day ← day_matrix_formulas).
 function syncMatrixFormulas() {
-  const on = !!(S.st && S.st.matrix_formulas);
-  ["matrixFormulas", "dayMatrixFormulas"].forEach((id) => {
-    const cb = $(id); if (cb) cb.checked = on;
-  });
+  const cb = $("matrixFormulas");
+  if (cb) cb.checked = !!(S.st && S.st.matrix_formulas);
+}
+function syncDayMatrixFormulas() {
+  const cb = $("dayMatrixFormulas");
+  if (cb) cb.checked = !!(S.st && S.st.day_matrix_formulas);
 }
 
 function mxCellContent(cmp, tsnMeta) {
@@ -2306,7 +2313,7 @@ async function renderDayMatrix() {
     grid.style.gridTemplateColumns = ""; grid.style.gridTemplateRows = "";
     const empty = document.createElement("div");
     empty.className = "dm-empty";
-    empty.textContent = "Add an export day above to compare it against TSN.";
+    empty.textContent = "Add an export day from Matrix options to compare it against TSN.";
     grid.appendChild(empty);
     wireDayMatrixFooter();
     updateDayMatrixProgress();
@@ -2448,7 +2455,8 @@ function updateDayMatrixProgress() {
   }
   const locked = !!(S.st && S.st.task);
   document.querySelectorAll(
-    "#dayMatrixSection .mx-linkbtn, #dayMatrixSource, #dayMatrixReportToggles .mx-toggle")
+    "#dayMatrixSection .mx-linkbtn, #dayMatrixConfig .mx-linkbtn, "
+    + "#dayMatrixSource, #dayMatrixReportToggles .mx-toggle")
     .forEach((c) => { c.disabled = locked; });
   // Add-day controls: disable on lock OR when there are no days left to add (the
   // latter is owned by renderDayMatrix). Don't blindly re-enable here — that would
@@ -2464,7 +2472,7 @@ function updateDayMatrixProgress() {
     cancel.disabled = !running;
   }
   renderQueuePanel("dayQueueGroup", "dayQueue", "dayQueueCount");
-  syncMatrixFormulas();
+  syncDayMatrixFormulas();
 }
 
 async function startConsolidate() {
@@ -2503,6 +2511,18 @@ function compareKind() {
 // renderCompareKind then swaps in the matching files/folders inputs.
 const DAY_MATRIX_GROUP = "tsn_by_day";
 
+// Full-width "matrix" layout is shared by the Everything comparison matrix and the
+// Compare-tab by-day matrix. Compute it from the active tab/sub-tab in ONE place so
+// every entry point (tab switch, Everything sub-tab, compare-group switch) stays in
+// sync. body.matrix-wide drives the shared layout (grid fills the screen, activity
+// log shrinks); body.mw-day additionally picks the by-day config corner.
+function applyMatrixWide() {
+  const every = S.tab === "everything" && S.everySub === "matrix";
+  const day = S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP;
+  document.body.classList.toggle("matrix-wide", every || day);
+  document.body.classList.toggle("mw-day", day);
+}
+
 function selectCompareGroup(groupId) {
   S.compareGroup = groupId;
   document.querySelectorAll("#compareSubtabs .subtab").forEach((b) => {
@@ -2510,10 +2530,12 @@ function selectCompareGroup(groupId) {
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", String(on));
   });
-  // The TSN-by-day matrix swaps the whole classic picker out for the grid.
+  // The TSN-by-day matrix swaps the whole classic picker out for the grid and goes
+  // full-width (same treatment as the Everything matrix).
   const dayMode = groupId === DAY_MATRIX_GROUP;
   $("compareClassic")?.classList.toggle("hidden", dayMode);
   $("dayMatrixSection")?.classList.toggle("hidden", !dayMode);
+  applyMatrixWide();
   if (dayMode) { renderDayMatrix(); return; }
   const rows = [...$("compareList").querySelectorAll(".option-row")];
   let firstVisible = null, checkedVisible = false;
@@ -2925,7 +2947,7 @@ function bindEvents() {
     $("subEveryMatrix").setAttribute("aria-selected", String(sub === "matrix"));
     $("everyExport").classList.toggle("hidden", sub !== "export");
     $("everyMatrix").classList.toggle("hidden", sub !== "matrix");
-    document.body.classList.toggle("matrix-wide", sub === "matrix");
+    applyMatrixWide();
     if (sub === "matrix") renderMatrix();
     updateActivityCards();
   };
@@ -2942,7 +2964,9 @@ function bindEvents() {
       renderBatchLibrary();
       setEverySub(S.everySub || "export");   // re-applies matrix-wide if on the matrix sub-tab
     } else {
-      document.body.classList.remove("matrix-wide");   // leaving Everything restores the layout
+      // Compare re-enters its last sub-tab; the by-day one re-applies full-width.
+      if (tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
+      applyMatrixWide();   // clears matrix-wide unless the by-day matrix is active
     }
     updateActivityCards();
   };
@@ -2955,14 +2979,31 @@ function bindEvents() {
     const r = await api.set_matrix_fast(e.target.checked);
     if (r && r.error) { showMessage("error", "Can't set fast mode", r.error); syncMatrixFast(); }
   });
-  // Live-formulas toggle — one global setting, mirrored on both matrices.
-  const onFormulasToggle = async (e) => {
+  // Fast-mode browser count — the shared `fast_workers` knob, editable from the
+  // matrix corner (same value the Export pane + Settings tab use).
+  $("matrixWorkers")?.addEventListener("change", async (e) => {
+    const res = await api.set_setting("fast_workers", e.target.value);
+    if (res && res.error) { showMessage("error", "Can't set browser count", res.error); syncMatrixFast(); return; }
+    if (res && res.values) {
+      S.init.settings.values = res.values;
+      const n = res.values.fast_workers;
+      e.target.value = n;                                    // reflect clamping
+      if (!(S.st && S.st.task)) {                            // keep the other mirrors in sync
+        ["fastWorkers", "setFastWorkers"].forEach((id) => { const el = $(id); if (el) el.value = n; });
+      }
+    }
+  });
+  // Live-formulas toggles — each matrix has its OWN persisted setting.
+  $("matrixFormulas")?.addEventListener("change", async (e) => {
     const r = await api.set_matrix_formulas(e.target.checked);
     if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
     syncMatrixFormulas();
-  };
-  $("matrixFormulas")?.addEventListener("change", onFormulasToggle);
-  $("dayMatrixFormulas")?.addEventListener("change", onFormulasToggle);
+  });
+  $("dayMatrixFormulas")?.addEventListener("change", async (e) => {
+    const r = await api.set_day_matrix_formulas(e.target.checked);
+    if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
+    syncDayMatrixFormulas();
+  });
   $("btnQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
   $("btnQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
   // The by-day matrix shares the same queue (Clear / Stop-all act on it too).
@@ -3303,6 +3344,7 @@ function makeMockApi() {
     day_matrix_source: "ssor-prod",
     day_matrix_days: [],
     day_matrix_hidden: [],
+    day_matrix_formulas: false,
   };
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
@@ -3869,9 +3911,17 @@ function makeMockApi() {
     set_setting: async (key, value) => {
       const numeric = typeof mockSettings[key] === "number";
       const boolish = typeof mockSettings[key] === "boolean";
-      mockSettings[key] = numeric ? Math.max(1, parseInt(value, 10) || mockSettings[key])
+      // fast_workers floors at 2 (the matrix's effective minimum), like the engine.
+      const floor = key === "fast_workers" ? 2 : 1;
+      mockSettings[key] = numeric ? Math.max(floor, parseInt(value, 10) || mockSettings[key])
                         : boolish ? !!value : value;
       push({ t: "log", text: `(mock) setting ${key} = ${mockSettings[key]}` });
+      // The snapshot derives the matrix worker count from fast_workers — mirror it
+      // so the matrix-corner spinner round-trips like the real bridge.
+      if (key === "fast_workers") {
+        st.matrix_fast = { ...st.matrix_fast, workers: mockSettings.fast_workers };
+        pushState();
+      }
       return { ok: true, values: { ...mockSettings } };
     },
     reset_preview: async (includeInput) => ({
@@ -4031,6 +4081,12 @@ function makeMockApi() {
     set_matrix_formulas: async (on) => {
       st.matrix_formulas = !!on;
       push({ t: "log", text: `Matrix live-formulas workbook ${on ? "on" : "off"}.` });
+      pushState();
+      return { ok: true, on: !!on };
+    },
+    set_day_matrix_formulas: async (on) => {
+      st.day_matrix_formulas = !!on;
+      push({ t: "log", text: `By-day live-formulas workbook ${on ? "on" : "off"}.` });
       pushState();
       return { ok: true, on: !!on };
     },

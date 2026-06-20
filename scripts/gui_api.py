@@ -241,6 +241,7 @@ class GuiApi:
                 "matrix_fast": {"on": settings.get_matrix_fast(),
                                 "workers": settings.get("fast_workers")},
                 "matrix_formulas": settings.get_matrix_formulas(),
+                "day_matrix_formulas": settings.get_day_matrix_formulas(),
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},
                 "logins": self._login_states(),
@@ -1620,7 +1621,7 @@ class GuiApi:
         DayMatrixCompareWorker(source, cells, dest, self._q, self.cancel_event,
                                tsn_files=settings.get_matrix_tsn_files(),
                                force_consolidate=job.get("force", False),
-                               also_formulas=settings.get_matrix_formulas()).start()
+                               also_formulas=settings.get_day_matrix_formulas()).start()
         return True
 
     def _matrix_worker_count(self):
@@ -1914,6 +1915,17 @@ class GuiApi:
         offline-count source; the formulas twin is an opt-in auditable extra."""
         val = settings.set_matrix_formulas(bool(on))
         self._emit_log("Matrix live-formulas workbook " + ("on" if val else "off")
+                       + (" — each comparison also writes a '… (formulas).xlsx'."
+                          if val else "."))
+        self._push_state()
+        return {"ok": True, "on": val}
+
+    @_api_method
+    def set_day_matrix_formulas(self, on):
+        """Toggle the by-day matrix's OWN live-formulas option (persisted,
+        independent of the Everything matrix's)."""
+        val = settings.set_day_matrix_formulas(bool(on))
+        self._emit_log("By-day live-formulas workbook " + ("on" if val else "off")
                        + (" — each comparison also writes a '… (formulas).xlsx'."
                           if val else "."))
         self._push_state()
@@ -2816,6 +2828,10 @@ class GuiApi:
         new = settings.update({key: value})
         if key == "debug_logging":
             set_debug_logging(new["debug_logging"])
+        if key == "fast_workers":
+            # The matrix corner spinner reads this back from the snapshot
+            # (matrix_fast.workers); push so an unrelated state event can't revert it.
+            self._push_state()
         ui_log.info("settings: %s = %r", key, new.get(key))
         return {"ok": True, "values": new}
 

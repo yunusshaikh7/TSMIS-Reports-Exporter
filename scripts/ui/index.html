@@ -247,7 +247,7 @@
 
       <!-- Export Everything pane (B3): two sub-tabs — the batch refresh/export
            controls, and the cross-environment comparison matrix. -->
-      <div class="card pane hidden" id="paneEverything">
+      <div class="card pane hidden mx-host" id="paneEverything">
         <div class="subtabs" role="tablist">
           <button class="subtab active" id="subEveryExport" role="tab" aria-selected="true">
             <svg class="ic"><use href="#i-refresh"/></svg>Refresh &amp; export
@@ -331,8 +331,8 @@
              so the activity column shrinks to a slim log and the grid fills the
              screen with no scrolling. #matrixSection wraps the live controls so
              the per-state greying selector still matches. -->
-        <div id="everyMatrix" class="hidden">
-        <div class="card-section" id="matrixSection">
+        <div id="everyMatrix" class="hidden mx-pane">
+        <div class="card-section mx-gridsection" id="matrixSection">
           <div class="section-head">
             <span class="section-label">Comparison matrix</span>
             <span class="section-meta">
@@ -434,7 +434,7 @@
            day-picking matrix). #compareSubtabs is generated from compare_groups
            plus the appended TSN-by-day tab; the classic picker lives in
            #compareClassic, the matrix in #dayMatrixSection. -->
-      <div class="card pane hidden" id="paneCompare">
+      <div class="card pane hidden mx-host" id="paneCompare">
         <div class="subtabs" id="compareSubtabs" role="tablist"></div>
         <div id="compareClassic">
         <div class="card-section">
@@ -541,36 +541,15 @@
              exported days; each cell = that day's export vs TSN). Shown only on
              the "TSN by day" sub-tab. Shares the TSN dataset + compare engine with
              the Everything matrix; no cross-environment, no live re-export. -->
-        <div id="dayMatrixSection" class="hidden">
-          <div class="card-section">
+        <div id="dayMatrixSection" class="hidden mx-pane">
+          <div class="card-section mx-gridsection">
             <div class="section-head">
               <span class="section-label">Highway Log vs TSN — by export day</span>
               <span class="section-meta">
                 Source
                 <span class="tb-select select-light"><select id="dayMatrixSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+                <span class="hint" id="dayMatrixProgress" hidden></span>
               </span>
-            </div>
-            <p class="hint" style="margin-bottom:8px">
-              Add exported days, then build each cell to compare that day's export against TSN.
-              Highway Log now; the other reports follow once their TSN comparison exists.
-            </p>
-            <div class="dm-toolbar">
-              <span class="tb-select select-light"><select id="dayMatrixAddDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
-              <button class="btn btn-standard btn-small" id="btnDayAddDay">
-                <svg class="ic"><use href="#i-check"/></svg>Add day
-              </button>
-              <span class="spacer"></span>
-              <span class="hint" id="dayMatrixProgress" hidden></span>
-            </div>
-            <div class="dm-tsn" id="dayMatrixTsn"></div>
-            <div class="dm-options">
-              <span class="mc-label">Reports</span>
-              <div class="mx-toggles" id="dayMatrixReportToggles"></div>
-              <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
-                <input type="checkbox" id="dayMatrixFormulas">
-                <svg class="ic"><use href="#i-file-text"/></svg>
-                <span>Live-formulas copy</span>
-              </label>
             </div>
             <div class="matrix-legend">
               <span class="mx-key mx-match">identical</span>
@@ -581,20 +560,6 @@
               <span class="mx-key mx-na">not available</span>
             </div>
             <div class="matrix-wrap"><div class="matrix-grid" id="dayMatrixGrid"></div></div>
-          </div>
-
-          <!-- Shared job-queue panel (the same queue as the Everything matrix). -->
-          <div class="card-section mx-queue-group" id="dayQueueGroup" hidden>
-            <div class="mc-label">Queue <span class="mx-queue-count" id="dayQueueCount"></span></div>
-            <div class="mx-queue" id="dayQueue"></div>
-            <div class="mx-queue-actions">
-              <button class="btn btn-subtle btn-small" id="btnDayQueueClear">
-                <svg class="ic"><use href="#i-trash"/></svg>Clear queued
-              </button>
-              <button class="btn btn-subtle btn-small" id="btnDayQueueStopAll">
-                <svg class="ic"><use href="#i-x"/></svg>Stop all
-              </button>
-            </div>
           </div>
 
           <div class="card-section actions-row">
@@ -885,8 +850,14 @@
           <label class="mc-fast" title="Run matrix re-exports with several browsers at once (faster; needs a saved login)">
             <input type="checkbox" id="matrixFast">
             <svg class="ic"><use href="#i-zap"/></svg>
-            <span>Fast mode <span class="mc-fast-note" id="matrixFastNote"></span></span>
+            <span>Fast mode</span>
           </label>
+          <div class="mc-workers" id="matrixWorkersRow">
+            <span>run</span>
+            <input type="number" class="input input-num" id="matrixWorkers" min="2" max="30"
+                   aria-label="Browsers to run at once in fast mode">
+            <span>browsers at once</span>
+          </div>
         </div>
 
         <div class="mc-group">
@@ -912,6 +883,56 @@
         <div class="mc-group">
           <div class="mc-label">Environments</div>
           <div class="mx-toggles" id="matrixEnvToggles"></div>
+        </div>
+      </div>
+
+      <!-- By-day matrix config zone: same corner pattern as #matrixConfig, shown
+           on the "TSN by day" sub-tab (body.matrix-wide.mw-day). Holds the granular
+           controls the by-day matrix has: the shared job queue, the live-formulas
+           option (its OWN setting), and the report show/hide toggles. -->
+      <div class="card matrix-config" id="dayMatrixConfig">
+        <div class="mc-head"><svg class="ic"><use href="#i-grid"/></svg>Matrix options</div>
+
+        <div class="mc-group mx-queue-group" id="dayQueueGroup" hidden>
+          <div class="mc-label">Queue <span class="mx-queue-count" id="dayQueueCount"></span></div>
+          <div class="mx-queue" id="dayQueue"></div>
+          <div class="mx-queue-actions">
+            <button class="btn btn-subtle btn-small" id="btnDayQueueClear">
+              <svg class="ic"><use href="#i-trash"/></svg>Clear queued
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnDayQueueStopAll">
+              <svg class="ic"><use href="#i-x"/></svg>Stop all
+            </button>
+          </div>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Day columns</div>
+          <div class="dm-toolbar">
+            <span class="tb-select select-light"><select id="dayMatrixAddDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+            <button class="btn btn-standard btn-small" id="btnDayAddDay">
+              <svg class="ic"><use href="#i-check"/></svg>Add day
+            </button>
+          </div>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">TSN dataset</div>
+          <div class="dm-tsn" id="dayMatrixTsn"></div>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Comparison output</div>
+          <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
+            <input type="checkbox" id="dayMatrixFormulas">
+            <svg class="ic"><use href="#i-file-text"/></svg>
+            <span>Also write a live-formulas copy</span>
+          </label>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Reports</div>
+          <div class="mx-toggles" id="dayMatrixReportToggles"></div>
         </div>
       </div>
     </section>

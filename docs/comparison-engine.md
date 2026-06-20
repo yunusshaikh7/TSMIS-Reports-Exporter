@@ -517,7 +517,9 @@ other is *Refresh & export*) holds the **report × environment comparison matrix
 orchestration layer over the cross-environment family
 ([§9c](#9c-cross-environment--compare_envpy-folders-group-env-for-ramp-summarydetail--highway-sequence-highway_log-for-the-highway-log-cross-env-row)).
 Selecting it goes **full-width** (`body.matrix-wide`: the right activity column shrinks via animated
-`flex-grow` to a slim-but-present log + the matrix **config zone**, so the grid fills the screen). It is
+`flex-grow` to a slim-but-present log + the matrix **config zone**, so the grid fills the screen). The
+full-width CSS is written once against shared classes (`.mx-host`/`.mx-pane`/`.mx-gridsection`) and the
+by-day matrix (§12b) carries the same classes, so both matrices get identical layout. It is
 strictly **ADDITIVE / orchestration-only**: `matrix.py` NEVER edits the manual comparison code
 (`compare_core`, `compare_env`, `compare_highway_log`, `compare_highway_log_pdf`) — it just CALLS those
 adapters. The foundation it sits on was audited cell-accurate over the full 6-env batch (2026-06-18; see
@@ -593,9 +595,15 @@ code — it only orchestrates.
 - **One queue, both matrices:** day compare Jobs carry `which:"day"` and route to
   `DayMatrixCompareWorker` (mirrors `MatrixCompareWorker`); they share the Everything matrix's queue,
   gate, Cancel and queue panel. Bridge: `day_matrix_info` / `set_day_matrix_source` /
-  `add_day_matrix_day` / `remove_day_matrix_day` / `set_day_matrix_report` / `build_day_cell` /
-  `rebuild_day_matrix` / `open_day_cell_comparison` / `open_day_comparisons_folder`. Settings:
-  `day_matrix_source` / `day_matrix_days` / `day_matrix_hidden` (TSN file reuses `matrix_tsn_files`).
+  `add_day_matrix_day` / `remove_day_matrix_day` / `set_day_matrix_report` / **`set_day_matrix_formulas`** /
+  `build_day_cell` / `rebuild_day_matrix` / `open_day_cell_comparison` / `open_day_comparisons_folder`.
+  Settings (all persist across sessions): `day_matrix_source` / `day_matrix_days` / `day_matrix_hidden` /
+  **`day_matrix_formulas`** (its OWN live-formulas toggle, independent of the Everything matrix's
+  `matrix_formulas`; the TSN file reuses `matrix_tsn_files`).
+- **Full-width + own config corner (v0.16.x):** selecting the sub-tab calls `applyMatrixWide()` so the
+  by-day matrix fills the screen like the Everything matrix; its controls (queue, add-day, TSN picker,
+  live-formulas, report toggles) live in a mirrored corner `#dayMatrixConfig` (shown via
+  `body.matrix-wide.mw-day`), keeping the grid area lean. See [gui.md](gui.md).
 - **Boundary guard:** `build_day_cell` rejects any `date`/`source` whose combined folder name doesn't
   parse as a real run folder, so neither can traverse out of `output/`.
 - **Locked by** `build/check_day_matrix.py` (rows/sources, available-day detection, snapshot + greyed

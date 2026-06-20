@@ -98,6 +98,9 @@ def main():
               isinstance(snap0.get("matrix_fast"), dict)
               and snap0["matrix_fast"].get("on") is False
               and isinstance(snap0["matrix_fast"].get("workers"), int))
+        check("snapshot carries both formulas flags (off by default)",
+              snap0.get("matrix_formulas") is False
+              and snap0.get("day_matrix_formulas") is False)
 
         print("set_matrix_baseline:")
         check("unknown baseline rejected",
@@ -244,6 +247,16 @@ def main():
         check("formulas toggle persists + snapshot reflects it",
               settings.get_matrix_formulas() is True
               and a._state_snapshot().get("matrix_formulas") is True)
+        # The by-day matrix has its OWN formulas toggle — independent of the above.
+        check("day formulas off by default", settings.get_day_matrix_formulas() is False)
+        a.set_day_matrix_formulas(True)
+        check("day formulas persists + snapshot reflects it",
+              settings.get_day_matrix_formulas() is True
+              and a._state_snapshot().get("day_matrix_formulas") is True)
+        check("toggling day formulas OFF leaves the Everything one ON (independent)",
+              a.set_day_matrix_formulas(False).get("on") is False
+              and settings.get_matrix_formulas() is True
+              and settings.get_day_matrix_formulas() is False)
         a.set_matrix_formulas(False)
         # Two real exportable sides so row/column export resolves >=1 step.
         _touch(dest / "ssor-prod" / "ramp_detail" / "r1.xlsx")

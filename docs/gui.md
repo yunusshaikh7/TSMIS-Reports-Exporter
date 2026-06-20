@@ -123,15 +123,20 @@ Golden checks (no login, fast) live under `build\.venv\Scripts\python.exe build\
 ## The comparison matrix (Everything ▸ Comparison-matrix sub-tab)
 
 The Everything pane has **two sub-tabs** (`.subtabs` like Compare's): *Refresh & export*
-(`#everyExport`, the batch controls) and *Comparison matrix* (`#everyMatrix`). `app.js
-setEverySub(sub)` toggles them and sets `body.matrix-wide` on the matrix one;
-`setTab` re-applies the active sub-tab when entering Everything and clears
-`matrix-wide` when leaving. **Full-width layout:** `.main` is a flex row (not grid)
-so the two columns' `flex-grow` can animate — `body.matrix-wide` grows the config
+(`#everyExport`, the batch controls) and *Comparison matrix* (`#everyMatrix`). A single
+**`app.js applyMatrixWide()`** computes the full-width context from `S.tab`/`S.everySub`/
+`S.compareGroup` and toggles `body.matrix-wide` (+ `body.mw-day` for the by-day matrix);
+`setEverySub`, `setTab`, and `selectCompareGroup` all call it, so every entry point stays
+in sync and leaving always clears it. **Full-width layout:** `.main` is a flex row (not
+grid) so the two columns' `flex-grow` can animate — `body.matrix-wide` grows the config
 column and shrinks the activity column to a slim, still-present log (the
 preflight/completion cards step aside; the grid fills width *and* height with the
 data rows sharing the leftover height). NB grid-template-columns can't transition
 between `minmax(…fr)` track-lists in Chromium, which is why the layout is flex.
+**Both matrices share the same full-width CSS** via three classes — `.mx-host` (the
+pane), `.mx-pane` (the matrix container), `.mx-gridsection` (the grid's card-section) —
+so the rules are written once (`body.matrix-wide .mx-pane …`) and the Everything matrix
+and the by-day matrix get identical layout.
 
 The grid (`renderMatrix`) is fed by `gui_api.matrix_info` (a pure-filesystem
 snapshot). **5 rows** (incl. both Highway Log formats); each **row header** carries the
@@ -147,8 +152,12 @@ colour-coded** (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing
 plus greyed / needs-export / needs-TSN / "consolidate N PDFs" / stale states — with
 compact **icon** actions (`↻ export` / `↻ compare` / `↗ open`, gated on support+built).
 The **config zone** (`#matrixConfig`, a card under the slim activity log, shown via
-`body.matrix-wide`) holds the report + **environment-column** show/hide toggles and the
-global "set all comparisons to…" (env|tsn). A baseline `<select>` (switch → confirm →
+`body.matrix-wide:not(.mw-day)`) holds the report + **environment-column** show/hide toggles,
+the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the live queue, and
+the **fast-mode browser-count spinner** (`#matrixWorkers`, the `.mc-workers` row): it writes the
+shared `fast_workers` setting via `set_setting`, so the matrix corner, the Export pane
+(`#fastWorkers`) and the Settings tab (`#setFastWorkers`) stay on one value; `syncMatrixFast`
+reflects it (and greys the row when fast mode is off). A baseline `<select>` (switch → confirm →
 `set_matrix_baseline` + `recompute_matrix("all")`), Refresh-stale (also the **resume**
 after a **Cancel**), Open-comparisons-folder, and a Cancel button live in the actions
 row. `updateMatrixProgress()` greys all matrix controls live + toggles the Cancel
@@ -184,13 +193,21 @@ A second matrix under the **Compare** tab (sub-tab `tsn_by_day`, appended after 
 registry `compare_groups`): rows = report types, columns = exported **days** you add,
 each cell = (report, day) **vs TSN**. ONE source selector (default ssor-prod); no
 cross-env, no live re-export. `selectCompareGroup("tsn_by_day")` swaps `#compareClassic`
-out for `#dayMatrixSection`; `renderDayMatrix` is fed by `gui_api.day_matrix_info`.
-HL Excel + PDF supported; RS/RD/HSL greyed. It **shares** the TSN dataset/picker
-(`mxTsnPicker`, keyed `highway_log`), the cell vocab (`mxCellContent`/`mxActBtn`), and
-the SAME job queue (the queue panel renders in both places); day compare Jobs carry
-`which:"day"` and route to `DayMatrixCompareWorker`. Engine + store:
-[comparison-engine.md](comparison-engine.md) §12. Mock + bridge exercised at
-`/index.html#mock` (Compare ▸ TSN by day).
+out for `#dayMatrixSection` and calls `applyMatrixWide()` so it goes **full-width too**
+(same treatment as the Everything matrix); `renderDayMatrix` is fed by
+`gui_api.day_matrix_info`. HL Excel + PDF supported; RS/RD/HSL greyed. It **shares** the
+TSN dataset/picker (`mxTsnPicker`, keyed `highway_log`), the cell vocab
+(`mxCellContent`/`mxActBtn`), and the SAME job queue (the queue panel renders in both
+places); day compare Jobs carry `which:"day"` and route to `DayMatrixCompareWorker`.
+**Its own config corner** (`#dayMatrixConfig`, shown via `body.matrix-wide.mw-day`) mirrors
+`#matrixConfig` and holds the by-day matrix's granular controls — the queue, the **Day
+columns** add-day toolbar, the **TSN dataset** picker, a **live-formulas** toggle, and the
+**Reports** show/hide toggles — all relocated out of the grid section so the grid area is as
+lean as the Everything matrix's (fits ~5 rows at 1440×720 without scrolling). The by-day
+live-formulas toggle is its **own** setting (`day_matrix_formulas`, snapshot key + bridge
+`set_day_matrix_formulas`, synced by `syncDayMatrixFormulas`) — independent of the Everything
+matrix's `matrix_formulas`. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
+Mock + bridge exercised at `/index.html#mock` (Compare ▸ TSN by day).
 
 ## Motion layer + control polish
 

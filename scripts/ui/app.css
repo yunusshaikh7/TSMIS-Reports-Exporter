@@ -179,57 +179,59 @@ button, input, select { font-family: inherit; }
 
   /* Fill the height too — no wasted space, no scrolling at full screen: the
      matrix pane and grid stretch to the column and the data rows share the
-     leftover height. Scoped to #everyMatrix so the export sub-tab is untouched. */
-  body.matrix-wide #paneEverything,
-  body.matrix-wide #everyMatrix,
-  body.matrix-wide #everyMatrix #matrixSection {
+     leftover height. Shared by BOTH matrices via .mx-host (the pane) / .mx-pane
+     (the matrix container) / .mx-gridsection (the grid's card-section), so the
+     export sub-tab and the classic Compare picker are untouched. */
+  body.matrix-wide .mx-host,
+  body.matrix-wide .mx-pane,
+  body.matrix-wide .mx-pane .mx-gridsection {
     flex: 1; min-height: 0; display: flex; flex-direction: column;
   }
   /* The grid takes all the leftover height. Rows share it (tall when few reports,
      shorter as more are toggled on) down to a readable minimum; only if even the
      minimums overflow does the wrap SCROLL (last resort, never eating the button
      row below). overflow:auto on the wrap handles both that and the rare h-scroll. */
-  body.matrix-wide #everyMatrix .matrix-wrap { flex: 1; min-height: 0; overflow: auto; margin: 2px 0 4px; }
+  body.matrix-wide .mx-pane .matrix-wrap { flex: 1; min-height: 0; overflow: auto; margin: 2px 0 4px; }
   /* Fit the column width instead of forcing max-content (which would re-introduce
      the horizontal cut-off): drop the min-width floor so the fr columns distribute
      the width. min-height:100% fills the column when rows are few and lets the grid
      grow past it (→ wrap scrolls) when many rows hit their min height. */
-  body.matrix-wide #everyMatrix .matrix-grid { min-height: 100%; width: 100%; min-width: 0; }
+  body.matrix-wide .mx-pane .matrix-grid { min-height: 100%; width: 100%; min-width: 0; }
   /* Reclaim vertical chrome on short/wide laptops so the grid isn't squeezed to
      2 scrolling rows: the page heading is redundant here (the sub-tab + section
      header already say "Comparison matrix"), and the surrounding margins shrink. */
   body.matrix-wide .panel-title { display: none; }
   body.matrix-wide .subtabs { margin-bottom: 6px; }
-  body.matrix-wide #everyMatrix .mx-controls { margin: 0 0 4px; }
-  body.matrix-wide #everyMatrix .matrix-legend { margin: 0; }
-  body.matrix-wide #everyMatrix #matrixSection { padding: 8px 12px; }
-  body.matrix-wide #everyMatrix #matrixSection .section-head { margin-bottom: 4px; }
-  body.matrix-wide #everyMatrix .actions-row { padding-top: 6px; padding-bottom: 6px; }
+  body.matrix-wide .mx-pane .mx-controls { margin: 0 0 4px; }
+  body.matrix-wide .mx-pane .matrix-legend { margin: 0; }
+  body.matrix-wide .mx-pane .mx-gridsection { padding: 8px 12px; }
+  body.matrix-wide .mx-pane .mx-gridsection .section-head { margin-bottom: 4px; }
+  body.matrix-wide .mx-pane .actions-row { padding-top: 6px; padding-bottom: 6px; }
   /* Tighter cells (padding + number size; actions overlay so they don't reserve a
      row) and a compact row header (label + smaller mode dropdown) so a ~56px row
      floor isn't clipped — more reports show before the grid has to scroll. */
-  body.matrix-wide #everyMatrix .mx-cell { justify-content: flex-start; padding: 5px 12px; }
-  body.matrix-wide #everyMatrix .mx-num { font-size: 13.5px; }
-  body.matrix-wide #everyMatrix .mx-sub { line-height: 1.2; }
+  body.matrix-wide .mx-pane .mx-cell { justify-content: flex-start; padding: 5px 12px; }
+  body.matrix-wide .mx-pane .mx-num { font-size: 13.5px; }
+  body.matrix-wide .mx-pane .mx-sub { line-height: 1.2; }
   /* Compact row header: tighter padding/gap, smaller label + mode dropdown +
      header buttons, so the header isn't what drives row height (the floor is). */
-  body.matrix-wide #everyMatrix .mx-rowhead { padding: 3px 10px; gap: 1px; }
+  body.matrix-wide .mx-pane .mx-rowhead { padding: 3px 10px; gap: 1px; }
   /* Label keeps the whole top line (buttons aside) and ellipses rather than
      wrapping, so the row header stays one short line + the stacked dropdown. */
-  body.matrix-wide #everyMatrix .mxrh-label {
+  body.matrix-wide .mx-pane .mxrh-label {
     font-size: 12px; line-height: 1.15;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal;
   }
-  body.matrix-wide #everyMatrix .mx-fluent-select { align-self: flex-start; }
-  body.matrix-wide #everyMatrix .mx-rowmode { height: 18px; font-size: 10.5px; padding: 0 22px 0 7px; }
-  body.matrix-wide #everyMatrix .mxch-refresh { width: 20px; height: 20px; }
+  body.matrix-wide .mx-pane .mx-fluent-select { align-self: flex-start; }
+  body.matrix-wide .mx-pane .mx-rowmode { height: 18px; font-size: 10.5px; padding: 0 22px 0 7px; }
+  body.matrix-wide .mx-pane .mxch-refresh { width: 20px; height: 20px; }
   /* Column header lays its label + the two buttons on one row (wide columns), so
      it costs ~one line instead of two. */
-  body.matrix-wide #everyMatrix .mx-colhead {
+  body.matrix-wide .mx-pane .mx-colhead {
     flex-direction: row; flex-wrap: wrap; align-items: center;
     justify-content: center; gap: 4px 6px; padding: 4px 8px;
   }
-  body.matrix-wide #everyMatrix .mx-rowhead { justify-content: center; }
+  body.matrix-wide .mx-pane .mx-rowhead { justify-content: center; }
 }
 
 /* ------------------------------ title bar -------------------------------- */
@@ -902,12 +904,15 @@ button, input, select { font-family: inherit; }
   .mxch-refresh:hover:not(:disabled) .ic { transform: none; }
 }
 
-/* Config zone (bottom-right, under the activity log) — only on the matrix tab. */
-.matrix-config { display: none; }
-body.matrix-wide .matrix-config {
-  display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;
+/* Config zone (bottom-right, under the activity log) — only on a matrix tab.
+   Two cards share the look (.matrix-config); the body context class picks which
+   one shows: the Everything corner by default, the by-day corner under .mw-day. */
+.matrix-config {
+  display: none; flex-direction: column; gap: 12px; flex-shrink: 0;
   padding: 12px 14px; max-height: 46%; overflow-y: auto;
 }
+body.matrix-wide:not(.mw-day) #matrixConfig { display: flex; }
+body.matrix-wide.mw-day #dayMatrixConfig { display: flex; }
 .matrix-config .mc-head {
   display: flex; align-items: center; gap: 7px;
   font-size: 12px; font-weight: 600; color: var(--muted-foreground);
@@ -940,7 +945,15 @@ body.matrix-wide .matrix-config {
 }
 .mc-fast input { width: 14px; height: 14px; accent-color: var(--primary); cursor: pointer; }
 .mc-fast .ic { width: 14px; height: 14px; color: var(--warning); }
-.mc-fast-note { color: var(--muted-foreground); font-size: 11px; }
+/* Browser-count picker beside the fast toggle (matrix re-exports). Indents to
+   line up under the toggle label; greys out when fast mode is off. */
+.mc-workers {
+  display: flex; align-items: center; gap: 6px; margin-left: 21px;
+  font-size: 11.5px; color: var(--muted-foreground);
+  transition: opacity .12s ease;
+}
+.mc-workers .input-num { width: 50px; }
+.mc-workers.is-off { opacity: .45; }
 
 /* The job-queue panel: a running row + the pending jobs (reorder / remove). */
 .mx-queue-count { font-weight: 500; color: var(--muted-foreground); text-transform: none; letter-spacing: 0; }
@@ -981,9 +994,11 @@ body.matrix-wide .matrix-config {
 .mx-qbtn:disabled { opacity: .3; cursor: default; }
 .mx-queue-actions { display: flex; gap: 6px; margin-top: 2px; }
 
-/* Compare-tab "TSN by day" matrix */
-.dm-toolbar { display: flex; align-items: center; gap: 8px; margin: 6px 0 8px; }
-.dm-tsn { max-width: 440px; margin: 0 0 10px; }
+/* Compare-tab "TSN by day" matrix. The add-day toolbar + TSN picker live in the
+   config corner now, so they wrap within the narrow column and carry no margin
+   (the .mc-group gap handles spacing). */
+.dm-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dm-tsn { margin: 0; }
 .dm-empty {
   padding: 20px; text-align: center; color: var(--muted-foreground);
   font-size: 12.5px; border: 1px dashed var(--border); border-radius: var(--radius-lg);
@@ -995,9 +1010,6 @@ body.matrix-wide .matrix-config {
   color: var(--destructive);
 }
 .mxch-rm:hover:not(:disabled) .ic { transform: none; }
-/* Day-matrix report toggles row (parity with the Everything config zone). */
-.dm-options { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
-.dm-options .mc-label { margin: 0; }
 /* Per-day "consolidated workbook" indicator + refresh control in the column head. */
 .dm-cons {
   flex: none; width: 22px; height: 20px; padding: 0; margin-top: 2px;

@@ -545,6 +545,25 @@ def set_matrix_formulas(on):
     return get_matrix_formulas()
 
 
+def get_day_matrix_formulas():
+    """Whether the by-day matrix ALSO writes a live-formulas workbook (its own
+    toggle, independent of the Everything matrix's; default off)."""
+    return bool(_read_file().get("day_matrix_formulas", False))
+
+
+def set_day_matrix_formulas(on):
+    """Persist the by-day matrix formulas-workbook toggle (cleared when off).
+    Returns the new effective value."""
+    data = dict(_read_file())
+    if on:
+        data["day_matrix_formulas"] = True
+    else:
+        data.pop("day_matrix_formulas", None)
+    _atomic_write(data)
+    log.info("settings: day_matrix_formulas -> %s", bool(on))
+    return get_day_matrix_formulas()
+
+
 # ---- Compare-tab "TSN by day" matrix ---------------------------------------
 # The data source (a "src-env" key), the picked day-columns (date strings), and
 # the hidden report rows. The TSN file reuses matrix_tsn_files (one TSN dataset).
