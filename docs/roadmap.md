@@ -203,6 +203,35 @@ v0.15.0 → v0.16.0 stages with no manual redownload**.
 
 ---
 
+## UNRELEASED — `polish/matrix-tabs` branch (held for review, 2026-06-19)
+
+6 commits atop `main` (v0.16.0); **not pushed, not tagged.** Awaiting a release decision:
+bump `version.py` + `CHANGELOG.md`, fast-forward `main`, push the tag — **v0.16.1** (polish/UX)
+or **v0.17.0** (it grew into a feature release). All verified offline (34 golden checks, two
+APPROVE code-reviews); live behavior is work-PC-only.
+
+- **Matrix review polish** — queue robustness (`_on_error` clears the queue only when a matrix job
+  was running; dispatch wrapped so it can't stick the gate; taskbar flash on queue-drain), worker
+  error lines name the cell, corrupt-cache logging, a11y (aria-labels + focus rings), by-day report
+  toggles + Build-all, all-hidden empty state, `mx-na` legend swatch.
+- **Pause/Resume + Skip + live preview on matrix re-export** — the events were already forwarded to
+  `ExportWorker`; widened `pause_or_resume`/`skip_route`/`request_preview` to matrix EXPORT jobs +
+  `MatrixBatchExportWorker.on_worker` + buttons.
+- **Persist + reuse date/env-stamped consolidated** — both matrices persist the consolidated to the
+  run/store `consolidated/` (the Consolidate-tab file) and reuse until a source is newer; `force`
+  re-consolidate; per-day consolidated badge.
+- **Opt-in live-formulas workbook** — `(formulas)` twin beside values (best-effort 2nd pass;
+  values stays canonical). `settings.matrix_formulas` + toggle in both config zones.
+- **Intersection export ENABLED + dev-site URL switch** — `DISABLED_EXPORT_SUBDIRS` emptied;
+  Settings ▸ "Use development site" (`tsmis-dev.dot.ca.gov`, `gui_api.apply_site_preset`). See the
+  Intersection consolidate/compare entry in the backlog below (groundwork; build when the user
+  supplies exported Intersection + TSN data).
+- **Short/wide-laptop layout fix** — the matrix no longer scrolls after ~2 rows: hidden page
+  heading on the matrix sub-tab, cell actions as a hover overlay, inline column header, 82→50px row
+  floor + tighter chrome. All 5 rows fit at 1440×720; labels readable (longest ellipses + tooltip).
+
+---
+
 ## Feature backlog
 
 - [ ] **Intersection consolidate + compare-vs-TSN** [M] — **groundwork laid (vNEXT).** Intersection
