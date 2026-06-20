@@ -154,11 +154,11 @@ COMPARE_GROUPS = [
     ("tsn", "vs TSN"),
 ]
 ```
-- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, **and Highway Log**), plus the HL TMSIS-PDF-vs-Excel consistency check.
-- `group="tsn"` -- the file-based **TMSIS-vs-TSN** comparisons (Highway Log Excel/PDF today; 0.17.0 adds the other reports' `"<report> — TSMIS vs TSN"` rows here).
+- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, **and Highway Log**), plus the HL TSMIS-PDF-vs-Excel consistency check.
+- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons (Highway Log Excel/PDF today; 0.17.0 adds the other reports' `"<report> — TSMIS vs TSN"` rows here).
 - The GUI also appends a **third** sub-tab on its own, the day-keyed **"vs TSN Matrix"** (group id `tsn_by_day`) — not a registry comparison type.
 
-A new cross-environment comparison is `group="env"`; a new TMSIS-vs-TSN one is `group="tsn"`; a brand-new family can add its own sub-tab by appending to `COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input plumbing is untouched. (v0.16.1 staging moved HL's cross-env row from the old `highway_log` group to `env` and renamed that sub-tab to `tsn`.)
+A new cross-environment comparison is `group="env"`; a new TSMIS-vs-TSN one is `group="tsn"`; a brand-new family can add its own sub-tab by appending to `COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input plumbing is untouched. (v0.16.1 staging moved HL's cross-env row from the old `highway_log` group to `env` and renamed that sub-tab to `tsn`.)
 
 **`kind`** decides which inputs the pane asks for:
 - **`"files"`** -- two workbooks; the module exposes `compare(path_a, path_b, out_path, events=None, confirm_overwrite=None, mode="formulas") -> ConsolidateResult` (console-free, same rules as consolidators; the GUI passes `mode` from its values/formulas checkboxes -- accept it even if only one flavor is implemented) plus `REPORT_NAME` and `suggest_name(path_a)`.
@@ -171,12 +171,15 @@ Current `COMPARE_REPORTS` rows:
 | TSAR: Ramp Summary -- between environments | `compare_env.RAMP_SUMMARY` | folders | env |
 | TSAR: Ramp Detail -- between environments | `compare_env.RAMP_DETAIL` | folders | env |
 | Highway Sequence Listing -- between environments | `compare_env.HIGHWAY_SEQUENCE` | folders | env |
-| Highway Log -- between environments | `compare_env.HIGHWAY_LOG` | folders | highway_log |
-| Highway Log -- TSMIS vs TSN | `compare_highway_log` | files | highway_log |
-| Highway Log -- TSMIS (PDF) vs TSN (PDF) | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | highway_log |
-| Highway Log -- TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | highway_log |
+| Highway Log -- between environments | `compare_env.HIGHWAY_LOG` | folders | env |
+| Highway Log -- TSMIS vs TSN | `compare_highway_log` | files | tsn |
+| Highway Log -- TSMIS (PDF) vs TSN (PDF) | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| Highway Log -- TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
+| TSAR: Ramp Detail -- TSMIS vs TSN (v0.17.0) | `compare_ramp_detail_tsn` | files | tsn |
 
 **Don't hand-roll workbook output**: build a `CompareSchema` and call `compare_core.run_compare` -- that's the approved workbook style for free, and the core's text/formulas are regression-locked. See [comparison-engine.md](comparison-engine.md) (engine + regression-lock harness) and [highway_log/comparison-study.md](highway_log/comparison-study.md) (the PDF-vs-Excel/TSN findings).
+
+**Extra steps for a `group="tsn"` (vs-TSN) report (v0.17.0):** beyond the `COMPARE_REPORTS` row + `APP_MODULES`, (1) register the report's TSN source in `tsn_library._REPORTS` (a `TsnReport` with its raw format + a `build_into` builder) so the matrices resolve it from the canonical library; (2) add the golden check (`check_compare_<report>_tsn.py`) to the blocking loop in `.github/workflows/checks.yml`; (3) reconcile both raw files by hand FIRST and lock the approved counts in [tsn-parsers.md](tsn-parsers.md). `compare_ramp_detail_tsn` is the reference: a `"files"` adapter whose two loaders project each side's own shape onto one shared, PM-keyed header, with the TSN-only columns marked `context_fields` (shown, never counted).
 
 ## Verification
 

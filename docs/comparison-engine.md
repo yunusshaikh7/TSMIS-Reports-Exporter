@@ -114,6 +114,13 @@ types override the data-shape fields and side names.
 | `ditto_nonasserting` | `False` | `+`-run ditto markers never count as a difference (HL only) — [§7](#7-ditto-non-asserting-highway-log-only) |
 | `ditto_resolver` | `None` | DISPLAY-only resolver: tint + comment each ditto cell with its paired value (HL only) |
 | `key_normalizer` | `None` | `callable(row, off, key_field)->str` canonical identity token IN PLACE OF the raw key (HL roadbed key) — [§6](#6-roadbed-aware-key-normalizer-tsmis-vs-tsn-only) |
+| `context_fields` | `()` | field NAMES shown but NON-ASSERTING — never count as a diff, never get the ≠ mark; the cell coalesces to whichever side has a value (v0.17.0; Ramp Detail's TSN-only DB columns) |
+| `extra_sheet_writer` | `None` | `callable(wb, ctx)` run after the sheets, before save — appends a familiar-layout rollup sheet (v0.17.0; the Summary reports). `ctx = {rows_a, rows_b, has_route, sc, side_a, side_b}` |
+
+Both v0.17.0 fields keep the lock: default `()`/`None` → `is_context` is always False / no extra
+sheet, so every existing comparison (and the Route-1=969 HL canary) is byte-identical.
+`field_indices` still includes context columns (they show), but the per-field equality + the
+Comparison-cell formula + the Spot Check skip them, so they contribute zero diff cells.
 
 Derived: `n_fields = len(header)-1`; `field_indices` = every header index except `key_field`, in
 display order (`key_field==0` gives `[1..n]` — the original byte-identical path).
@@ -408,6 +415,22 @@ actual sides (not hard-coded TSMIS/TSN).
 | `TSMIS_PDF_VS_TSN` | "TSMIS (PDF)" vs "TSN (PDF)" | accurate replacement for 9a — BOTH sides from PDFs, so the PDF-vs-PDF nature is explicit and the vendor Excel bug never enters |
 | `TSMIS_PDF_VS_EXCEL` | "TSMIS (PDF)" vs "TSMIS (Excel)" | diffs PDF-parsed data against the vendor Excel of the SAME report to pinpoint the export's errors |
 
+### 9c. TSMIS vs TSN Ramp Detail — `compare_ramp_detail_tsn.py` (`"files"`, group `tsn`)
+
+The **reference v0.17.0 vs-TSN comparator** (the recipe the other reports follow). Both sides are
+XLSX but in DIFFERENT shapes, so each side has its own loader projecting to ONE shared header keyed
+on **PM**: the TSMIS side reads the **consolidated** Ramp Detail workbook **by POSITION** (its
+header row is column-shifted — the City Code / R/U / Description labels sit right of their values);
+the TSN side reads the statewide raw `Sheet 1` (18 DB columns) or the library's normalized workbook,
+taking the route from `LOCATION` ("01-DN-101"→"101"). Normalization: PM zero-pad → one canon,
+`Date of Record` → ISO, Description drops the TSMIS leading `"<route>/"` prefix; TSN `POP` maps to
+TSMIS `R/U`. `_SCHEMA` sets `key_field=PM`, `date_fields=("Date of Record",)`, and
+**`context_fields=("Ramp Name","On/Off","Ramp Type","ADT")`** — the TSN-only DB columns, shown for
+reference but never counted (see [§3](#3-compareschema-the-parameterization)). Reconciled + locked
+on the 6.19 statewide set (approved canary in [tsn-parsers.md](tsn-parsers.md): 15,211 both / 902
+diff cells / 0 context-column diffs; TSN normalized 15,410 rows == the Ramp Summary total). The TSN
+side is normalized once into the canonical TSN library via `tsn_load_ramp_detail.build_into`.
+
 Project premise CONFIRMED on real data: Excel-vs-TSN has ~4,280 MORE diffs than PDF-vs-TSN — those
 extra diffs are the Excel's dropped-geometry artifacts leaking in (98.9% dropped-value blanks), so
 sourcing TSMIS from the PDF gives a CLEANER TSMIS-vs-TSN comparison. PDF-vs-Excel at full scale
@@ -424,7 +447,7 @@ routes) inflated PDF-vs-Excel to 22,210 diffs.
 
 > Group: **`env`** for ALL cross-environment comparisons — Ramp Summary/Detail, Highway
 > Sequence, AND Highway Log (v0.16.1 moved HL's cross-env row out of the old `highway_log`
-> group). The file-based TMSIS-vs-TSN comparisons live in group `tsn` (§9b).
+> group). The file-based TSMIS-vs-TSN comparisons live in group `tsn` (§9b).
 
 The SAME report from two **run folders** (ssor-prod vs ars-prod, or one env on two dates). Per-route
 files are read straight from both folders (NO consolidation step; merged in memory the way the

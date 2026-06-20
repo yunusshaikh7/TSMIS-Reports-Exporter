@@ -156,6 +156,21 @@ class CompareSchema:
     # source suffixes the Location (PDF/Excel) or dittos a block (TSN). The DATA
     # sheets still show each source's raw Location; only the key token is unified.
     key_normalizer: object = None
+    # Optional CONTEXT fields: field NAMES that are SHOWN but never asserted on —
+    # they never count as a difference and never get the ≠ mark / diff highlight.
+    # Used for columns that exist on only one side (e.g. the TSN Ramp Detail DB
+    # columns ADT / Ramp Type that the TSMIS report has no counterpart for): the
+    # comparison still displays the value (coalescing the non-blank side) so a
+    # reviewer sees it, but it contributes zero diff cells. Default () -> is_context
+    # is always False, so every existing comparison (and the regression-locked
+    # Route-1=969 Highway Log canary) is byte-identical.
+    context_fields: tuple = ()
+    # Optional EXTRA sheet writer: callable(wb, ctx) run after the standard sheets,
+    # before save — like legend_writer but with a context dict ({rows_a, rows_b,
+    # has_route, sc, side_a, side_b}) so a report can append a FAMILIAR-LAYOUT sheet
+    # (e.g. the Ramp Summary category-count rollup) rendered from the compared rows.
+    # Default None -> no extra sheet, byte-identical to before.
+    extra_sheet_writer: object = None
 
     @property
     def n_fields(self):
@@ -170,6 +185,10 @@ class CompareSchema:
 
     def is_medwid(self, field_idx):
         return self.header[field_idx] in self.medwid_fields
+
+    def is_context(self, field_idx):
+        """True for a non-asserting CONTEXT field (shown, never counted as a diff)."""
+        return self.header[field_idx] in self.context_fields
 
     def sheet_names(self, has_route):
         names = ["Summary", "Spot Check", "Comparison"]
@@ -356,6 +375,8 @@ def _row_diff_count(sc, rt, rn, off):
     counts. This is the similarity cost: lower = more alike."""
     d = 0
     for f in sc.field_indices:
+        if sc.is_context(f):
+            continue                     # context = non-asserting (never a diff)
         va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
         if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
             continue                     # ditto = non-asserting
@@ -496,6 +517,8 @@ def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route):
             rs["matched"] += 1
         row_diffs = 0
         for f in sc.field_indices:                # every column but the key
+            if sc.is_context(f):
+                continue                          # context = non-asserting (never a diff)
             va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
             if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
                 continue                          # ditto = non-asserting
@@ -663,6 +686,12 @@ def _field_formula(lay, r, field_idx):
     col = lay.data_col(field_idx)
     ct, cs = f"${lay.c_trow}{r}", f"${lay.c_nrow}{r}"
     t, n = _trim_ref(sc.side_a, col, ct), _trim_ref(sc.side_b, col, cs)
+    if sc.is_context(field_idx):
+        # Context field: non-asserting — never a ≠. Show whichever side has a value
+        # (coalesce A→B), and on a one-sided row that side's own value.
+        st = f"${lay.c_status}{r}"
+        coalesce = f'IF({t}="",{n},{t})'
+        return (f'=IF({st}="{lay.only_a}",{t},IF({st}="{lay.only_b}",{n},{coalesce}))')
     if sc.is_medwid(field_idx):
         eq = f'{_medwid_ref(sc.side_a, col, ct)}={_medwid_ref(sc.side_b, col, cs)}'
     else:
@@ -684,6 +713,8 @@ def _field_value(sc, rt, rn, off, f):
     if rn is None:                       # A-only row
         return _xl_trim(rt[f + off])
     va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
+    if sc.is_context(f):
+        return va if va else vb          # context = non-asserting: coalesce, never ≠
     if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
         return va                        # ditto = non-asserting: show side A's value
     ca, cb = va, vb
@@ -1112,6 +1143,8 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
         else:
             eq = f"{trim_t}={trim_n}"
         eq = _eq_with_ditto(sc, eq, trim_t, trim_n)   # ditto = non-asserting (HL only)
+        if sc.is_context(f):
+            eq = "TRUE"                                # context = non-asserting: always 'match'
         put((r, 2), sc.header[f], bold_font)
         put((r, 3), raw(a, col, trow_cell), body_font, None, None, fmt)
         put((r, 4), raw(b, col, nrow_cell), body_font, None, None, fmt)
@@ -1837,6 +1870,10 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
             return cancelled
         if sc.legend_writer is not None:     # append a column-Legend sheet (HL)
             sc.legend_writer(wb)
+        if sc.extra_sheet_writer is not None:  # append a familiar-layout rollup sheet
+            sc.extra_sheet_writer(wb, {"rows_a": rows_t, "rows_b": rows_n,
+                                       "has_route": has_route, "sc": sc,
+                                       "side_a": name_a, "side_b": name_b})
         events.on_log("Saving…")
         path.parent.mkdir(parents=True, exist_ok=True)
         try:

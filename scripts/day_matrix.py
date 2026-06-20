@@ -282,7 +282,7 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
 # --------------------------------------------------------------------------- #
 def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
     """[(date, row_key)] to (re)build, honoring scope. 'all' = every supported
-    cell with the TMSIS side present; 'stale' = only missing/stale ones. Optional
+    cell with the TSMIS side present; 'stale' = only missing/stale ones. Optional
     `row` / `date` filters drive the per-row and per-column rebuilds. Skips greyed
     rows and cells whose export or TSN side is missing."""
     todo = []

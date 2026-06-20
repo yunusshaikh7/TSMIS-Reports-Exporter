@@ -29,6 +29,7 @@ import consolidate_tsmis_highway_log_pdf as _c_tsmis_highway_log_pdf
 import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
 import compare_highway_log_pdf as _cmp_highway_log_pdf
+import compare_ramp_detail_tsn as _cmp_ramp_detail_tsn
 
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
 # Order here is the display order in the GUI and the numbering in the console menu.
@@ -119,10 +120,13 @@ COMPARE_REPORTS = [
      "files", "tsn"),
     # TSMIS (PDF) vs TSMIS (Excel) is an internal consistency check (one system,
     # one environment — the PDF export diffed against the vendor Excel to expose its
-    # bug), NOT a TSN comparison, so it lives under "env", not "tsn". Kept LAST so
-    # the registry indices above are unchanged (selection is by index).
+    # bug), NOT a TSN comparison, so it lives under "env", not "tsn".
     ("Highway Log — TSMIS (PDF) vs TSMIS (Excel)",
      _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
+    # v0.17.0 vs-TSN comparators (the reference recipe). Appended at the END so the
+    # registry indices above are unchanged (selection is by index). Each takes the
+    # consolidated TSMIS workbook + the TSN library file ("files" kind, group "tsn").
+    ("TSAR: Ramp Detail — TSMIS vs TSN", _cmp_ramp_detail_tsn, "files", "tsn"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each

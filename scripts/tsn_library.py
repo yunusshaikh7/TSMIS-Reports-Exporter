@@ -58,6 +58,14 @@ _REPORTS = {
         consolidated_name="tsn_highway_log_consolidated.xlsx",
         builder="consolidate_tsn_highway_log:build_into",
     ),
+    "ramp_detail": TsnReport(
+        subdir="ramp_detail",
+        label="TSN Ramp Detail",
+        raw_glob="*.xlsx",
+        raw_kind="statewide_xlsx",
+        consolidated_name="tsn_ramp_detail_normalized.xlsx",
+        builder="tsn_load_ramp_detail:build_into",
+    ),
 }
 
 

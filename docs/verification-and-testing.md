@@ -220,7 +220,7 @@ independent ways**. Run this recipe for each report's consolidator + vs-TSN comp
 before it is marked done; record the result + the report's approved counts in
 [tsn-parsers.md](tsn-parsers.md).
 
-1. **Reconcile both raw files by hand FIRST.** Open the TSN and the TMSIS file and agree
+1. **Reconcile both raw files by hand FIRST.** Open the TSN and the TSMIS file and agree
    the key column(s), row identity, and normalization rules **before** writing the loader —
    the `CompareSchema` comes from the data, not a guess.
 2. **Assert the wiring** in a `check_compare_<report>_tsn.py` / `check_consolidate_<report>.py`:

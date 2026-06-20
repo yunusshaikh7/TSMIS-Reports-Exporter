@@ -10,7 +10,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > Matrix; the vs-TSN matrix generalized to every report with greyed groundwork rows + marked
 > plug-in points). 0.17.0 builds the per-report TSN parsers/comparators + Intersection consolidate
 > and flips them on, as a **full audit + perfection** of all consolidators/comparators against
-> the complete raw TSN+TMSIS ground truth. It also adds: a **canonical TSN library** (one fixed
+> the complete raw TSN+TSMIS ground truth. It also adds: a **canonical TSN library** (one fixed
 > home the whole app references, raw + generated-Excel, with a **Settings status panel**),
 > **row/column reordering** on both matrices, per-cell/row consolidate buttons, and the one-stop
 > add-day→export→consolidate→compare pipeline. Full task list + audit recipe in the prompt.
@@ -200,16 +200,16 @@ vs-TSN (latest-refresh dashboard).
 
 **Cross-cutting:**
 - [x] **Shared TSN comparison engine** (commit `21ecdb5`) — `matrix.consolidate_and_compare_tsn`
-  ("consolidate TMSIS store folder → `compare_highway_log[_pdf]` TSMIS_*_VS_TSN → write") used by
+  ("consolidate TSMIS store folder → `compare_highway_log[_pdf]` TSMIS_*_VS_TSN → write") used by
   BOTH matrices (differ only by source folder + output path); byte-identical to the prior
   Everything output (same consolidate-to-temp → same compare → same out_path).
 - [x] **One queue serves both matrices** — a `which: env|day` discriminator on the Job routes to
   `MatrixCompareWorker` vs `DayMatrixCompareWorker`; one queue panel renders in both places.
 - **Deviation from the plan's "auto-consolidate WITH prompt":** the user-facing consolidated
   artifact (the **TSN** district-PDF → workbook) already prompts (the existing
-  `consolidate_matrix_tsn` flow, reused by both matrices). The TMSIS side is consolidated to a
+  `consolidate_matrix_tsn` flow, reused by both matrices). The TSMIS side is consolidated to a
   throwaway temp per build (internal plumbing), kept **silent** — prompting on every cell build
-  would be hostile. Revisit if a per-build TMSIS-consolidation prompt is actually wanted.
+  would be hostile. Revisit if a per-build TSMIS-consolidation prompt is actually wanted.
 
 **Owed work-PC live verification:** matrix queue auto-advance under real exports; fast mode (N
 browsers, bounded, no `batch_job.json` clobber); a row/column live re-export; the by-day matrix
