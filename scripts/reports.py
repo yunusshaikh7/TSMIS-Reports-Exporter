@@ -113,13 +113,16 @@ COMPARE_REPORTS = [
     # vs TSN (file-based). Highway Log Excel/PDF today; 0.17.0 adds the other
     # reports' "<report> — TSMIS vs TSN" rows here once their comparators exist.
     ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "tsn"),
-    # Both sides parsed from PDFs (accurate replacement for the Excel-based row
-    # above — the "(PDF)" on BOTH sides makes the PDF-vs-PDF nature explicit),
-    # and the PDF data diffed against the vendor Excel to expose its bug.
+    # Both sides parsed from PDFs (accurate replacement for the Excel-based row —
+    # the "(PDF)" on BOTH sides makes the PDF-vs-PDF nature explicit).
     ("Highway Log — TSMIS (PDF) vs TSN (PDF)", _cmp_highway_log_pdf.TSMIS_PDF_VS_TSN,
      "files", "tsn"),
+    # TSMIS (PDF) vs TSMIS (Excel) is an internal consistency check (one system,
+    # one environment — the PDF export diffed against the vendor Excel to expose its
+    # bug), NOT a TSN comparison, so it lives under "env", not "tsn". Kept LAST so
+    # the registry indices above are unchanged (selection is by index).
     ("Highway Log — TSMIS (PDF) vs TSMIS (Excel)",
-     _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "tsn"),
+     _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each

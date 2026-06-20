@@ -3,6 +3,36 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.16.1 — 2026-06-19
+
+- **The TSN comparison view is now a full matrix that covers every report.** The
+  Compare tab's sub-tabs are now **Cross-environment**, **vs TSN**, and **vs TSN
+  Matrix**. The matrix (formerly "TSN by day") fills the screen like the Everything
+  matrix and lists every report — Highway Log works today; Ramp Summary/Detail,
+  Highway Sequence, and Intersection Summary/Detail appear greyed until their TSN
+  comparison is added in the next update. (Highway Log's between-environments
+  comparison moved back onto "Cross-environment" with the other reports.)
+- **Pause, resume, and skip a matrix re-export — and watch it live.** A matrix
+  re-export now shows the same per-route progress and live preview as the Export tab,
+  and you can pause/resume or skip a stuck route without cancelling the whole run.
+- **Pick the number of browsers for matrix Fast mode.** A browser-count picker sits
+  next to the Fast mode toggle (shared with the Export tab and Settings, so it's one
+  value).
+- **Consolidated workbooks are saved and reused.** A comparison reuses the day's
+  existing consolidated workbook instead of rebuilding it every time; a small
+  indicator shows whether one exists and is current, with one click to refresh it.
+- **Optional live-formulas copy of any comparison.** A toggle writes an auditable,
+  recalculating workbook beside the plain values copy; each matrix remembers its own
+  setting.
+- **Export Intersection Summary & Detail.** These are greyed on the production TSMIS
+  site but available on the development site — a new **Settings ▸ "Use development
+  site"** switch points the app there (and back).
+- **Fits short, wide laptop screens.** The comparison matrices no longer scroll after
+  a couple of rows — the grid reclaims the surrounding space and shows all rows.
+- **Polish.** The matrix-options checkboxes now match the rest of the app (no stray
+  white boxes in dark mode), plus accessibility and reliability fixes across both
+  matrices.
+
 ## v0.16.0 — 2026-06-19
 
 - **Queue up matrix work instead of waiting.** On the Everything tab's

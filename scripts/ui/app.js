@@ -3760,7 +3760,7 @@ function makeMockApi() {
           file_a_label: "TSMIS", file_b_label: "TSN" },
         { label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "tsn",
           file_a_label: "TSMIS (PDF)", file_b_label: "TSN (PDF)" },
-        { label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "tsn",
+        { label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env",
           file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
       ],
       batch_resume: null,
