@@ -22,6 +22,7 @@ import consolidate_ramp_summary
 import consolidate_ramp_detail
 import consolidate_highway_sequence
 import consolidate_highway_log
+import consolidate_intersection_detail
 from events import Events, RunResult, ConsolidateResult
 
 _fail = []
@@ -54,6 +55,7 @@ def test_mapping():
         "ramp_detail": consolidate_ramp_detail,
         "highway_sequence": consolidate_highway_sequence,
         "highway_log": consolidate_highway_log,
+        "intersection_detail": consolidate_intersection_detail,   # v0.17.0
     }
     for _label, _fmt, spec in reports.EXPORT_REPORTS:
         got = reports.consolidator_for_spec(spec)

@@ -25,6 +25,7 @@ import consolidate_highway_sequence as _c_highway_seq
 import consolidate_highway_log as _c_highway_log
 import consolidate_tsn_highway_log as _c_tsn_highway_log
 import consolidate_tsmis_highway_log_pdf as _c_tsmis_highway_log_pdf
+import consolidate_intersection_detail as _c_int_detail
 
 import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
@@ -59,6 +60,7 @@ CONSOLIDATE_REPORTS = [
     ("TSAR: Ramp Summary", _c_ramp_summary),
     ("TSAR: Ramp Detail", _c_ramp_detail),
     ("Highway Sequence Listing", _c_highway_seq),
+    ("Intersection Detail", _c_int_detail),
     # The three Highway Log consolidators are grouped here, TSMIS before TSN.
     # Labels are SOURCE-explicit and parallel — "<system> Highway Log (<format>)"
     # — so the bare "Highway Log" can't be mistaken for one of the others.
@@ -138,6 +140,7 @@ _CONSOLIDATOR_BY_SUBDIR = {
     _RAMP_DETAIL_SPEC.subdir: _c_ramp_detail,
     _HIGHWAY_SEQ_SPEC.subdir: _c_highway_seq,
     _HIGHWAY_LOG_SPEC.subdir: _c_highway_log,
+    _INT_DETAIL_SPEC.subdir: _c_int_detail,        # v0.17.0 (Intersection Summary still export-only)
 }
 
 

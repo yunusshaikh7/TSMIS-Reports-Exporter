@@ -139,6 +139,7 @@ Then add the `__main__` -> `run_consolidate_cli`, wire `4. consolidate...bat`, a
 - `"TSMIS Highway Log (Excel)"` (`consolidate_highway_log`) -- reads the TSMIS "Highway Log" Excel export, day-aware.
 - `"TSMIS Highway Log (PDF)"` (`consolidate_tsmis_highway_log_pdf`) -- reads the app's own "Highway Log (PDF)" export, day-aware (NOT a dropped folder); parsed into the SAME 31-column format as the Excel export, the accurate substitute for the buggy vendor Excel.
 - `"TSN Highway Log (PDF)"` (`consolidate_tsn_highway_log`) -- TSN district PDFs the user drops into `input/tsn_highway_log/` (from OUTSIDE the app, so this one keeps an input folder + `day` ignored).
+- `"Intersection Detail"` (`consolidate_intersection_detail`, v0.17.0) -- a thin `consolidate_xlsx` wrapper (sheet "Intersection Detail", 36 cols), day-aware; also in `_CONSOLIDATOR_BY_SUBDIR` so it auto-consolidates on export finish and the matrix can build its vs-TSN cell. (Intersection Summary's consolidator — a category-count summer — is still to come.)
 
 See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for the Highway Log consolidator internals.
 
