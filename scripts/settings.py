@@ -473,6 +473,71 @@ def set_matrix_hidden_envs(keys):
     return get_matrix_hidden_envs()
 
 
+# ---- Matrix ROW / COLUMN ORDER (drag-to-reorder) ---------------------------
+# A user-chosen display order for the matrix rows (reports) and columns (envs on
+# the Everything matrix, days on the by-day matrix). Unlike the hidden lists these
+# PRESERVE order (no sort). The list is a PREFERENCE, not the source of truth:
+# apply_order() (matrix.py) treats it as a sort key over the ACTUAL rows/columns,
+# so a report/env/day added or removed later degrades gracefully (unknown keys fall
+# to the end in their natural order; stale keys are ignored).
+
+def _get_order(name):
+    """A de-duplicated, order-preserving list of string keys for `name` (or [])."""
+    raw = _read_file().get(name)
+    if not isinstance(raw, list):
+        return []
+    seen, out = set(), []
+    for k in raw:
+        if isinstance(k, str) and k not in seen:
+            seen.add(k)
+            out.append(k)
+    return out
+
+
+def _set_order(name, keys):
+    """Persist an order list (de-duplicated, order preserved). Empty -> cleared."""
+    data = dict(_read_file())
+    seen, clean = set(), []
+    for k in (keys or []):
+        if isinstance(k, str) and k not in seen:
+            seen.add(k)
+            clean.append(k)
+    if clean:
+        data[name] = clean
+    else:
+        data.pop(name, None)
+    _atomic_write(data)
+    log.info("settings: %s -> %s", name, clean or "(none)")
+    return _get_order(name)
+
+
+def get_matrix_row_order():
+    """Preferred row (report) order for the Everything matrix."""
+    return _get_order("matrix_row_order")
+
+
+def set_matrix_row_order(keys):
+    return _set_order("matrix_row_order", keys)
+
+
+def get_matrix_env_order():
+    """Preferred env-column order for the Everything matrix."""
+    return _get_order("matrix_env_order")
+
+
+def set_matrix_env_order(keys):
+    return _set_order("matrix_env_order", keys)
+
+
+def get_day_matrix_row_order():
+    """Preferred row (report) order for the by-day matrix."""
+    return _get_order("day_matrix_row_order")
+
+
+def set_day_matrix_row_order(keys):
+    return _set_order("day_matrix_row_order", keys)
+
+
 def get_matrix_tsn_files():
     """{subdir: tsn_file_path} the user explicitly selected (keyed by the report's
     store subdir, since the TSN dataset is per format — highway_log vs

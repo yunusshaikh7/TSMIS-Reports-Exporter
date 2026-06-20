@@ -1399,7 +1399,9 @@ class GuiApi:
             hidden=settings.get_matrix_hidden_reports(),
             hidden_envs=settings.get_matrix_hidden_envs(),
             row_modes=settings.get_matrix_row_modes(),
-            tsn_files=settings.get_matrix_tsn_files())
+            tsn_files=settings.get_matrix_tsn_files(),
+            row_order=settings.get_matrix_row_order(),
+            env_order=settings.get_matrix_env_order())
 
     @_api_method
     def matrix_info(self, baseline=None):
@@ -1427,6 +1429,25 @@ class GuiApi:
         settings.set_matrix_hidden_reports(sorted(hidden))
         self._push_state()
         return {"ok": True, "hidden": sorted(hidden)}
+
+    @_api_method
+    def set_matrix_row_order(self, keys):
+        """Persist the drag-to-reorder ROW order for the Everything matrix. Unknown
+        keys are dropped; rows missing from the list keep their natural order."""
+        valid = {r[0] for r in matrix_rows()}
+        clean = [k for k in (keys or []) if isinstance(k, str) and k in valid]
+        settings.set_matrix_row_order(clean)
+        self._push_state()
+        return {"ok": True, "order": clean}
+
+    @_api_method
+    def set_matrix_env_order(self, keys):
+        """Persist the drag-to-reorder ENV-column order for the Everything matrix."""
+        valid = set(matrix.env_keys())
+        clean = [k for k in (keys or []) if isinstance(k, str) and k in valid]
+        settings.set_matrix_env_order(clean)
+        self._push_state()
+        return {"ok": True, "order": clean}
 
     @_api_method
     def set_matrix_baseline(self, baseline):
@@ -2095,7 +2116,8 @@ class GuiApi:
             settings.get_day_matrix_source(), settings.get_day_matrix_days(),
             hidden=settings.get_day_matrix_hidden(),
             tsn_files=settings.get_matrix_tsn_files(),
-            dest=settings.get_batch_dest())
+            dest=settings.get_batch_dest(),
+            row_order=settings.get_day_matrix_row_order())
 
     def _day_job_label(self, scope, row=None, date=None):
         rl = self._matrix_row_label(row) if row else None
@@ -2162,6 +2184,15 @@ class GuiApi:
         settings.set_day_matrix_hidden(sorted(hidden))
         self._push_state()
         return {"ok": True, "hidden": sorted(hidden)}
+
+    @_api_method
+    def set_day_matrix_row_order(self, keys):
+        """Persist the drag-to-reorder ROW order for the by-day matrix."""
+        valid = {r["key"] for r in self._day_matrix_snapshot()["all_rows"]}
+        clean = [k for k in (keys or []) if isinstance(k, str) and k in valid]
+        settings.set_day_matrix_row_order(clean)
+        self._push_state()
+        return {"ok": True, "order": clean}
 
     @_api_method
     def build_day_cell(self, row_key, date):

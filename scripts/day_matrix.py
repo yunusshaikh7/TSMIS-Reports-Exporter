@@ -188,11 +188,12 @@ def available_days(source):
 # the snapshot the GUI renders (pure filesystem read)
 # --------------------------------------------------------------------------- #
 def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
-                        now=None):
+                        now=None, row_order=None):
     """Full render model for the by-day matrix. PURE stat — no workbook opened
     (counts come from the cache). `days` is the ordered list of date columns;
-    `hidden` hides report rows; `tsn_files`/`dest` resolve the shared TSN dataset
-    (same as the Everything matrix). Greyed rows render cmp {supported:false}."""
+    `hidden` hides report rows; `row_order` is the user's drag-to-reorder row
+    preference; `tsn_files`/`dest` resolve the shared TSN dataset (same as the
+    Everything matrix). Greyed rows render cmp {supported:false}."""
     now = now if now is not None else time.time()
     source = source if source in sources() else SOURCE_DEFAULT
     days = [d for d in (days or []) if isinstance(d, str)]
@@ -200,6 +201,8 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
     tsn_files = tsn_files or {}
     all_rows = _day_rows()
     rows = [r for r in all_rows if r[0] not in hidden]
+    by_key = {r[0]: r for r in rows}
+    rows = [by_key[k] for k in matrix.apply_order(list(by_key.keys()), row_order)]
     results = load_results()
 
     # The TSN dataset is resolved PER ROW by its tsn_subdir (both HL rows share

@@ -1335,6 +1335,20 @@ body.matrix-wide.mw-day #dayMatrixConfig { display: flex; }
 .tsn-status { font-size: 12px; }
 .tsn-actions { margin-left: auto; display: flex; gap: 6px; }
 
+/* Drag-to-reorder grips + drop indicators (matrix rows/columns, v0.17.0 Phase 4b) */
+.dnd-grip {
+  cursor: grab; user-select: none; flex: none;
+  opacity: .45; color: var(--muted-foreground);
+  font-size: 11px; line-height: 1; padding: 0 3px; margin-right: 1px;
+}
+.dnd-grip:hover { opacity: 1; }
+.dnd-grip:active { cursor: grabbing; }
+.dnd-dragging { opacity: .45; }
+.dnd-before-y { box-shadow: inset 0 3px 0 0 var(--primary); }
+.dnd-after-y  { box-shadow: inset 0 -3px 0 0 var(--primary); }
+.dnd-before-x { box-shadow: inset 3px 0 0 0 var(--primary); }
+.dnd-after-x  { box-shadow: inset -3px 0 0 0 var(--primary); }
+
 .btn-danger {
   border-color: color-mix(in oklab, var(--destructive) 45%, transparent);
   background: color-mix(in oklab, var(--destructive) 8%, transparent);

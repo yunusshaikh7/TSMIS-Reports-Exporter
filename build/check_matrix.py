@@ -82,6 +82,44 @@ def test_enumeration():
         shutil.rmtree(dest, ignore_errors=True)
 
 
+def test_reorder():
+    print("drag-to-reorder (apply_order + snapshot row/env order, v0.17.0 Phase 4b):")
+    # apply_order: named keys first (only those present), the rest in natural order;
+    # unknown/stale keys ignored; keys missing from `order` appended.
+    check("apply_order moves named keys to the front",
+          matrix.apply_order(["a", "b", "c", "d"], ["c", "a"]) == ["c", "a", "b", "d"])
+    check("apply_order ignores unknown/stale keys",
+          matrix.apply_order(["a", "b"], ["zz", "b"]) == ["b", "a"])
+    check("apply_order with no preference keeps natural order",
+          matrix.apply_order(["a", "b", "c"], []) == ["a", "b", "c"])
+
+    dest = Path(tempfile.mkdtemp(prefix="tsmis_mx_ord_"))
+    try:
+        base = matrix.matrix_snapshot(dest, baseline_key="ssor-prod")
+        natural_rows, natural_envs = base["rows"], base["envs"]
+        # Move the last row + last env to the front via the order preference.
+        ro = [natural_rows[-1]]
+        eo = [natural_envs[-1]]
+        snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod",
+                                      row_order=ro, env_order=eo)
+        check("row_order puts the chosen row first (rest natural)",
+              snap["rows"][0] == natural_rows[-1]
+              and set(snap["rows"]) == set(natural_rows))
+        check("env_order puts the chosen env first (rest natural)",
+              snap["envs"][0] == natural_envs[-1]
+              and set(snap["envs"]) == set(natural_envs))
+        # Order is a preference, not a filter: a hidden row stays dropped even if
+        # named in the order list.
+        snap2 = matrix.matrix_snapshot(dest, baseline_key="ssor-prod",
+                                       hidden=[natural_rows[0]],
+                                       row_order=[natural_rows[0], natural_rows[-1]])
+        check("hidden row not resurrected by the order list",
+              natural_rows[0] not in snap2["rows"]
+              and snap2["rows"][0] == natural_rows[-1])
+    finally:
+        shutil.rmtree(dest, ignore_errors=True)
+
+
 def test_comparison_path_stable():
     print("comparison_path is stable + dateless (mtime is the freshness signal):")
     p = matrix.comparison_path("/d", "ssor-prod", "ramp_detail", "ars-test")
@@ -210,6 +248,7 @@ def test_orchestration_and_cache():
 
 def main():
     test_enumeration()
+    test_reorder()
     test_comparison_path_stable()
     test_staleness()
     test_orchestration_and_cache()

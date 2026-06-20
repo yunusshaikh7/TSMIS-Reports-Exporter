@@ -2036,6 +2036,60 @@ function renderMatrixConfig(snap, locked) {
   });
 }
 
+// ---- Drag-to-reorder (matrix rows + columns), v0.17.0 Phase 4b ----
+// A small drag grip on each row/column header reorders it; the new key order is
+// persisted via the bridge and re-rendered (the backend applies the order). The
+// order is a display preference only — it never touches exports or comparisons.
+let _dnd = null;   // { group, key } while a drag is in flight
+
+function _clearDndOver() {
+  document.querySelectorAll(".dnd-before-x,.dnd-after-x,.dnd-before-y,.dnd-after-y")
+    .forEach((x) => x.classList.remove("dnd-before-x", "dnd-after-x", "dnd-before-y", "dnd-after-y"));
+}
+
+// targetEl = the drop target (the whole header); gripHost = where the grip is
+// inserted; axis 'x' (columns) or 'y' (rows); getOrder() = current visible key
+// list; commit(newOrder) persists + re-renders.
+function dndAttach(targetEl, gripHost, key, group, axis, getOrder, commit) {
+  const grip = document.createElement("span");
+  grip.className = "dnd-grip"; grip.textContent = "⠿";
+  grip.title = "Drag to reorder"; grip.setAttribute("aria-hidden", "true");
+  grip.draggable = true;
+  grip.addEventListener("dragstart", (e) => {
+    _dnd = { group, key }; targetEl.classList.add("dnd-dragging");
+    try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", key); } catch (_) { /* ignore */ }
+  });
+  grip.addEventListener("dragend", () => {
+    targetEl.classList.remove("dnd-dragging"); _clearDndOver(); _dnd = null;
+  });
+  const isAfter = (e) => {
+    const r = targetEl.getBoundingClientRect();
+    return axis === "x" ? (e.clientX > r.left + r.width / 2) : (e.clientY > r.top + r.height / 2);
+  };
+  targetEl.addEventListener("dragover", (e) => {
+    if (!_dnd || _dnd.group !== group || _dnd.key === key) return;
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = "move"; } catch (_) { /* ignore */ }
+    _clearDndOver();
+    targetEl.classList.add((isAfter(e) ? "dnd-after-" : "dnd-before-") + axis);
+  });
+  targetEl.addEventListener("dragleave", () => {
+    targetEl.classList.remove("dnd-before-" + axis, "dnd-after-" + axis);
+  });
+  targetEl.addEventListener("drop", async (e) => {
+    if (!_dnd || _dnd.group !== group || _dnd.key === key) return;
+    e.preventDefault();
+    const after = isAfter(e), from = _dnd.key;
+    _clearDndOver();
+    const order = getOrder().filter((k) => k !== from);
+    let idx = order.indexOf(key); if (idx < 0) idx = order.length;
+    order.splice(after ? idx + 1 : idx, 0, from);
+    await commit(order);
+  });
+  gripHost.prepend(grip);
+  targetEl.classList.add("dnd-target");
+}
+
 async function renderMatrix() {
   const grid = $("matrixGrid");
   if (!grid) return;
@@ -2087,6 +2141,11 @@ async function renderMatrix() {
         if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells here.");
         else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
       }));
+    dndAttach(h, h, env, "mx-col", "x", () => snap.envs.slice(), async (order) => {
+      const r = await api.set_matrix_env_order(order);
+      if (r && r.error) showMessage("error", "Can't reorder", r.error);
+      else await renderMatrix();
+    });
     grid.appendChild(h);
   });
 
@@ -2136,6 +2195,11 @@ async function renderMatrix() {
     }
     const tm = snap.tsn_meta && snap.tsn_meta[rk];
     if (tm && tm.supported) rh.appendChild(mxTsnPicker(tm, locked));
+    dndAttach(rh, top, rk, "mx-row", "y", () => snap.rows.slice(), async (order) => {
+      const r = await api.set_matrix_row_order(order);
+      if (r && r.error) showMessage("error", "Can't reorder", r.error);
+      else await renderMatrix();
+    });
     grid.appendChild(rh);
 
     envs.forEach((env) => {
@@ -2370,6 +2434,11 @@ async function renderDayMatrix() {
         }));
     }
     rh.appendChild(top);
+    dndAttach(rh, top, rk, "dm-row", "y", () => snap.rows.slice(), async (order) => {
+      const r = await api.set_day_matrix_row_order(order);
+      if (r && r.error) showMessage("error", "Can't reorder", r.error);
+      else await renderDayMatrix();
+    });
     grid.appendChild(rh);
     days.forEach((d) => {
       const c = snap.cells[rk][d], cmp = c.cmp;
@@ -3433,10 +3502,13 @@ function makeMockApi() {
     matrix_hidden_envs: [],
     matrix_modes: {},            // row_key -> mode id
     matrix_tsn_files: {},        // subdir -> picked file path
+    matrix_row_order: [],        // drag-to-reorder row preference (Everything)
+    matrix_env_order: [],        // drag-to-reorder env-column preference
     mock_tsn_pdfs: true,         // TSN folder starts with PDFs (not consolidated)
     day_matrix_source: "ssor-prod",
     day_matrix_days: [],
     day_matrix_hidden: [],
+    day_matrix_row_order: [],    // drag-to-reorder row preference (by-day)
     day_matrix_formulas: false,
   };
   const mockSettings = {
@@ -3526,20 +3598,28 @@ function makeMockApi() {
     return { supported: true, built: true, stale: false, reason: "fresh", missing_side: null,
              verdict: (s[0] === 0 && s[1] === 0) ? "match" : "diff", diff_cells: s[0], one_sided: s[1] };
   }
+  function mockApplyOrder(keys, order) {
+    if (!order || !order.length) return keys.slice();
+    const ks = new Set(keys);
+    const front = order.filter((k) => ks.has(k));
+    const fs = new Set(front);
+    return front.concat(keys.filter((k) => !fs.has(k)));
+  }
   function mockMatrixSnapshot(baseline) {
     const allEnvs = ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"];
     const henv = st.matrix_hidden_envs || [];
-    const envs = allEnvs.filter((e) => henv.indexOf(e) < 0);
+    const envs = mockApplyOrder(allEnvs.filter((e) => henv.indexOf(e) < 0), st.matrix_env_order);
     const allRows = [
-      { key: "ramp_summary", label: "TSAR: Ramp Summary", tsn_capable: false },
-      { key: "ramp_detail", label: "TSAR: Ramp Detail", tsn_capable: false },
-      { key: "highway_sequence", label: "Highway Sequence Listing", tsn_capable: false },
+      { key: "ramp_summary", label: "TSAR: Ramp Summary", tsn_capable: true },
+      { key: "ramp_detail", label: "TSAR: Ramp Detail", tsn_capable: true },
+      { key: "highway_sequence", label: "Highway Sequence Listing", tsn_capable: true },
       { key: "highway_log", label: "Highway Log (Excel)", tsn_capable: true },
       { key: "highway_log_pdf", label: "Highway Log (PDF)", tsn_capable: true },
     ];
     const rowLabels = {}; allRows.forEach((r) => { rowLabels[r.key] = r.label; });
     const hidden = st.matrix_hidden || [];
-    const rows = allRows.map((r) => r.key).filter((k) => hidden.indexOf(k) < 0);
+    const rows = mockApplyOrder(
+      allRows.map((r) => r.key).filter((k) => hidden.indexOf(k) < 0), st.matrix_row_order);
     const envLabels = {};
     allEnvs.forEach((e) => { const [s, v] = e.split("-");
       envLabels[e] = `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}`; });
@@ -3605,14 +3685,17 @@ function makeMockApi() {
     const allRows = [
       { key: "highway_log", label: "Highway Log (Excel)", supported: true },
       { key: "highway_log_pdf", label: "Highway Log (PDF)", supported: true },
-      { key: "ramp_summary", label: "TSAR: Ramp Summary", supported: false },
-      { key: "ramp_detail", label: "TSAR: Ramp Detail", supported: false },
-      { key: "highway_sequence", label: "Highway Sequence Listing", supported: false },
-      { key: "intersection_summary", label: "Intersection Summary", supported: false },
-      { key: "intersection_detail", label: "Intersection Detail", supported: false },
+      { key: "ramp_summary", label: "TSAR: Ramp Summary", supported: true },
+      { key: "ramp_detail", label: "TSAR: Ramp Detail", supported: true },
+      { key: "highway_sequence", label: "Highway Sequence Listing", supported: true },
+      { key: "intersection_summary", label: "Intersection Summary", supported: true },
+      { key: "intersection_detail", label: "Intersection Detail", supported: true },
     ];
     const hidden = st.day_matrix_hidden || [];
-    const shown = allRows.filter((r) => hidden.indexOf(r.key) < 0);
+    const _visible = allRows.filter((r) => hidden.indexOf(r.key) < 0);
+    const _byKey = {}; _visible.forEach((r) => { _byKey[r.key] = r; });
+    const shown = mockApplyOrder(_visible.map((r) => r.key), st.day_matrix_row_order)
+      .map((k) => _byKey[k]);
     const rowLabels = {}, rowSupported = {};
     allRows.forEach((r) => { rowLabels[r.key] = r.label; rowSupported[r.key] = r.supported; });
     const tsnSub = "highway_log";
@@ -4167,6 +4250,18 @@ function makeMockApi() {
       if (hidden.size >= 5) return { error: "Keep at least one report on the matrix." };
       st.matrix_hidden = [...hidden];
       return { ok: true, hidden: st.matrix_hidden };
+    },
+    set_matrix_row_order: async (keys) => {
+      st.matrix_row_order = (keys || []).filter((k) => typeof k === "string");
+      return { ok: true, order: st.matrix_row_order };
+    },
+    set_matrix_env_order: async (keys) => {
+      st.matrix_env_order = (keys || []).filter((k) => typeof k === "string");
+      return { ok: true, order: st.matrix_env_order };
+    },
+    set_day_matrix_row_order: async (keys) => {
+      st.day_matrix_row_order = (keys || []).filter((k) => typeof k === "string");
+      return { ok: true, order: st.day_matrix_row_order };
     },
     set_matrix_env: async (env, visible) => {
       const hidden = new Set(st.matrix_hidden_envs || []);

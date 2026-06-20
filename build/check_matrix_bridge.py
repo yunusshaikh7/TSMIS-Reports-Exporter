@@ -218,6 +218,27 @@ def main():
         check("set-all env clears every row to cross-env",
               all(v == "env" for v in a.matrix_info()["modes"].values()))
 
+        print("drag-to-reorder bridge (rows + env columns; v0.17.0 Phase 4b):")
+        natural = a.matrix_info()["rows"]
+        r = a.set_matrix_row_order([natural[-1], "zz-bogus"])   # unknown dropped
+        check("set_matrix_row_order persists + drops unknown keys",
+              r.get("ok") and r["order"] == [natural[-1]]
+              and settings.get_matrix_row_order() == [natural[-1]])
+        check("matrix_info applies the row order (chosen row first)",
+              a.matrix_info()["rows"][0] == natural[-1])
+        envs0 = a.matrix_info()["envs"]
+        e = a.set_matrix_env_order([envs0[-1]])
+        check("set_matrix_env_order persists + applies",
+              e.get("ok") and a.matrix_info()["envs"][0] == envs0[-1])
+        a.set_matrix_row_order([]); a.set_matrix_env_order([])   # reset
+        check("clearing the order restores natural order",
+              a.matrix_info()["rows"] == natural)
+        dr = a.set_day_matrix_row_order(["highway_log", "zz"])
+        check("set_day_matrix_row_order persists + drops unknown",
+              dr.get("ok") and dr["order"] == ["highway_log"]
+              and settings.get_day_matrix_row_order() == ["highway_log"])
+        a.set_day_matrix_row_order([])
+
         print("TSN file pick + scoped refresh + TSN-PDF consolidate gate:")
         check("tsn file bad subdir rejected",
               bool(a.set_matrix_tsn_file("nope", "/x.xlsx").get("error")))

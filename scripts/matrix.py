@@ -446,14 +446,30 @@ def _cmp_state(out_path, sources, rec):
 # --------------------------------------------------------------------------- #
 # the snapshot the GUI renders (pure filesystem read)
 # --------------------------------------------------------------------------- #
+def apply_order(keys, order):
+    """Reorder `keys` by the user's preference list `order`: keys named in `order`
+    come first (in that order, only those actually present), then any remaining keys
+    in their original order. `order` is a PREFERENCE, not a filter — unknown/stale
+    keys in `order` are ignored, and keys missing from `order` are kept (appended in
+    their natural order), so a report/env added or removed later degrades gracefully."""
+    if not order:
+        return list(keys)
+    keyset = set(keys)
+    front = [k for k in order if k in keyset]
+    frontset = set(front)
+    return front + [k for k in keys if k not in frontset]
+
+
 def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                     env_labels=None, row_defs=None, hidden=None, hidden_envs=None,
-                    row_modes=None, tsn_files=None, now=None):
+                    row_modes=None, tsn_files=None, now=None,
+                    row_order=None, env_order=None):
     """The full render model for the matrix. PURE stat — no workbook opened (counts
     come from the caches). Per row, the SELECTED mode (`row_modes`, default 'env')
     decides each cell's comparison; `hidden`/`hidden_envs` drop rows/columns from
     the rendered+refreshed grid (still listed in all_rows/all_envs for the
-    toggles). `row_defs` is injectable for tests."""
+    toggles); `row_order`/`env_order` are the user's drag-to-reorder preferences
+    applied to the VISIBLE rows/columns. `row_defs` is injectable for tests."""
     now = now if now is not None else time.time()
     all_defs = row_defs if row_defs is not None else _row_defs()
     hidden = set(hidden or [])
@@ -461,8 +477,9 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
     row_modes = row_modes or {}
     tsn_files = tsn_files or {}
     rows = {k: v for k, v in all_defs.items() if k not in hidden}
+    rows = {k: rows[k] for k in apply_order(list(rows.keys()), row_order)}
     all_envs = list(envs) if envs is not None else env_keys()
-    envs = [e for e in all_envs if e not in hidden_envs]
+    envs = apply_order([e for e in all_envs if e not in hidden_envs], env_order)
     env_labels = env_labels or {k: default_env_label(k) for k in all_envs}
 
     # Resolve each visible row's selected mode + gather the store subdirs whose

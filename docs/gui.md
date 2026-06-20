@@ -210,6 +210,21 @@ live-formulas toggle is its **own** setting (`day_matrix_formulas`, snapshot key
 matrix's `matrix_formulas`. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
 Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs TSN Matrix).
 
+### Drag-to-reorder matrix rows + columns (v0.17.0 Phase 4b)
+
+Each row/column header carries a small drag grip (`dndAttach` in app.js — one HTML5-DnD
+helper shared by both matrices). Dropping reorders: the new key order is persisted via the
+bridge (`set_matrix_row_order` / `set_matrix_env_order` / `set_day_matrix_row_order` →
+`settings.{matrix_row_order,matrix_env_order,day_matrix_row_order}`) and re-rendered. The
+**backend applies the order** — `matrix.apply_order(keys, order)` treats the saved list as a
+sort key over the ACTUAL visible rows/columns (named keys first, then the rest in natural
+order), so it's a pure display preference: unknown/stale keys are ignored, a report/env/day
+added or removed later degrades gracefully, and a hidden row is never resurrected by the order
+list. The drop indicator (`--primary` edge via `.dnd-before-/.dnd-after-{x,y}`) shows the
+insert point. Verified at `/index.html#mock` (synthetic drag on both matrices, rows + env
+columns, persistence across re-render) + golden `check_matrix.test_reorder` /
+`check_matrix_bridge` (bridge round-trip).
+
 ### Settings ▸ TSN reports panel (v0.17.0)
 
 The canonical TSN library ([comparison-engine.md](comparison-engine.md) / `tsn_library.py`) gets a
