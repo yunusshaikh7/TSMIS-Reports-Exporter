@@ -429,11 +429,12 @@
         </div>
       </div>
 
-      <!-- Compare pane. Sub-tabs: Cross-environment (default), Highway Log
-           (every Highway Log comparison), and "TSN by day" (the manual
-           day-picking matrix). #compareSubtabs is generated from compare_groups
-           plus the appended TSN-by-day tab; the classic picker lives in
-           #compareClassic, the matrix in #dayMatrixSection. -->
+      <!-- Compare pane. Sub-tabs: Cross-environment (default, every report's
+           between-environments compare), "vs TSN" (the file-based TSMIS-vs-TSN
+           compares), and "vs TSN Matrix" (the manual day-picking matrix).
+           #compareSubtabs is generated from compare_groups plus the appended
+           matrix tab; the classic picker lives in #compareClassic, the matrix in
+           #dayMatrixSection. -->
       <div class="card pane hidden mx-host" id="paneCompare">
         <div class="subtabs" id="compareSubtabs" role="tablist"></div>
         <div id="compareClassic">
@@ -537,14 +538,15 @@
         </div>
         </div><!-- /compareClassic -->
 
-        <!-- TSN by day: a manual day-picking matrix (rows = reports, columns =
+        <!-- vs TSN Matrix: a manual day-picking matrix (rows = reports, columns =
              exported days; each cell = that day's export vs TSN). Shown only on
-             the "TSN by day" sub-tab. Shares the TSN dataset + compare engine with
-             the Everything matrix; no cross-environment, no live re-export. -->
+             the "vs TSN Matrix" sub-tab. Shares the TSN dataset + compare engine
+             with the Everything matrix; no cross-environment, no live re-export.
+             Highway Log is wired today; the other reports plug in in 0.17.0. -->
         <div id="dayMatrixSection" class="hidden mx-pane">
           <div class="card-section mx-gridsection">
             <div class="section-head">
-              <span class="section-label">Highway Log vs TSN — by export day</span>
+              <span class="section-label">Reports vs TSN — by export day</span>
               <span class="section-meta">
                 Source
                 <span class="tb-select select-light"><select id="dayMatrixSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
@@ -849,6 +851,7 @@
           <div class="mc-label">Re-export speed</div>
           <label class="mc-fast" title="Run matrix re-exports with several browsers at once (faster; needs a saved login)">
             <input type="checkbox" id="matrixFast">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
             <svg class="ic"><use href="#i-zap"/></svg>
             <span>Fast mode</span>
           </label>
@@ -864,6 +867,7 @@
           <div class="mc-label">Comparison output</div>
           <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
             <input type="checkbox" id="matrixFormulas">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
             <svg class="ic"><use href="#i-file-text"/></svg>
             <span>Also write a live-formulas copy</span>
           </label>
@@ -887,7 +891,7 @@
       </div>
 
       <!-- By-day matrix config zone: same corner pattern as #matrixConfig, shown
-           on the "TSN by day" sub-tab (body.matrix-wide.mw-day). Holds the granular
+           on the "vs TSN Matrix" sub-tab (body.matrix-wide.mw-day). Holds the granular
            controls the by-day matrix has: the shared job queue, the live-formulas
            option (its OWN setting), and the report show/hide toggles. -->
       <div class="card matrix-config" id="dayMatrixConfig">
@@ -925,6 +929,7 @@
           <div class="mc-label">Comparison output</div>
           <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
             <input type="checkbox" id="dayMatrixFormulas">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
             <svg class="ic"><use href="#i-file-text"/></svg>
             <span>Also write a live-formulas copy</span>
           </label>

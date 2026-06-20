@@ -118,7 +118,9 @@ See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for
 PDF parsers.
 
 **`COMPARE_GROUPS`** — the Compare-pane sub-tabs, in order (first = default). As of
-v0.14.1: `("env", "Cross-environment")` and `("highway_log", "Highway Log")`.
+v0.16.1: `("env", "Cross-environment")` and `("tsn", "vs TSN")` (the GUI appends a
+third, the "vs TSN Matrix"). HL's cross-env compare sits in `env` with the others;
+the file-based TSMIS-vs-TSN compares sit in `tsn` (HL today; other reports in 0.17.0).
 
 **`COMPARE_REPORTS`** — `(menu label, module/adapter, input kind, group)`. `kind` is
 `"files"` (two workbooks) or `"folders"` (two export run folders); `group` is one of
@@ -322,8 +324,9 @@ A3 stays parked.)
 (reorder/remove/clear/stop-all), jobs auto-advance, row/column headers gain distinct
 ↻ re-export + ⟳ rebuild buttons, and re-exports support **fast mode**
 (`MatrixBatchExportWorker`). (2) A **second matrix** lives under the **Compare** tab —
-the manual **"TSN by day"** matrix (`scripts/day_matrix.py`): rows = reports, columns
-= exported days, each cell = (report, day) vs TSN; no cross-env, no live re-export.
+the manual **"vs TSN Matrix"** (`scripts/day_matrix.py`; the sub-tab was "TSN by day"):
+rows = EVERY report (HL wired; the rest greyed groundwork for 0.17.0), columns =
+exported days, each cell = (report, day) vs TSN; no cross-env, no live re-export.
 The two matrices **share** the TSN compare path (`matrix.consolidate_and_compare_tsn`,
 factored out — byte-identical to the prior output), the TSN dataset/picker, and the
 ONE job queue (a `which:env|day` Job discriminator routes to the right worker). Engine

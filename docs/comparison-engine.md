@@ -365,7 +365,10 @@ leave dormant; revisit only if a Med Wid value ever contains those characters. T
 ## 9. The three comparison families
 
 All built by `compare_core`. The GUI Compare pane renders one **sub-tab per `COMPARE_GROUPS` id**
-(v0.14.1: `env` "Cross-environment" default, `highway_log` "Highway Log"); each `COMPARE_REPORTS`
+(v0.16.1: `env` "Cross-environment" default, `tsn` "vs TSN"; the GUI appends a third sub-tab, the
+day-keyed "vs TSN Matrix", on its own). Every report's "between environments" compare lives in
+`env` (Highway Log included now); the file-based TSMIS-vs-TSN compares live in `tsn` (Highway Log
+Excel/PDF today; the other reports plug in in 0.17.0). Each `COMPARE_REPORTS`
 row `(label, module_or_adapter, kind, group)` shows only under its group. `kind` is `"files"`
 (file-vs-file) or `"folders"` (folder-vs-folder) — independent of `group`. See
 [reports.md](reports.md) for the registry + sub-tab wiring.
@@ -576,7 +579,14 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
   TSN / PDF-vs-Excel comparisons over a real store (the underlying compare adapters are already
   golden-locked; the consolidate→compare glue is what's owed).
 
-### 12b. The Compare-tab "TSN by-day" matrix (`scripts/day_matrix.py`, v0.16.0)
+### 12b. The Compare-tab "vs TSN Matrix" (`scripts/day_matrix.py`, v0.16.0; generalized v0.16.1)
+
+> **0.17.0 plug-in:** the matrix now lists EVERY report (HL Excel/PDF wired; Ramp
+> Summary/Detail, Highway Sequence, Intersection Summary/Detail greyed). To light a
+> report up: add its TSN comparator + a per-report TSN dataset, flip `supported` in
+> `day_matrix._day_rows()`, and dispatch it in `build_day_cell`. The shell, store,
+> snapshot, queue and actions are already report-agnostic; the only Highway-Log-specific
+> bit left is the shared `TSN_SUBDIR` constant (generalize to a per-row `tsn_subdir`).
 
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =

@@ -74,15 +74,17 @@ CONSOLIDATE_REPORTS = [
 ]
 
 # Compare tab SUB-TABS (GUI): the comparison types are grouped onto these sub-tabs
-# within the Compare pane, in this order (the FIRST is the default). Every Highway
-# Log comparison lives on the "Highway Log" sub-tab (v0.14.1) — cross-env HL,
-# TSMIS-vs-TSN and the two PDF-sourced ones — so they're in one place instead of
-# spread across the old env / TSMIS-vs-TSN / PDF split; the plain cross-environment
-# report comparisons (Ramp Summary/Detail, Highway Sequence) stay on
-# "Cross-environment". A row's `group` (below) names its sub-tab.
+# within the Compare pane, in this order (the FIRST is the default). Two registry
+# groups: "env" (Cross-environment — every report's between-environments compare,
+# Highway Log included) and "tsn" (vs TSN — the file-based TSMIS-vs-TSN compares;
+# Highway Log Excel/PDF today, the other reports plug in in 0.17.0). A THIRD
+# sub-tab, the "vs TSN Matrix" (the day-keyed matrix, group "tsn_by_day"), is
+# appended by the GUI itself — it is not a registry comparison type. A row's
+# `group` (below) names its sub-tab. (v0.16.1 staging: HL's cross-env compare
+# moved back to "env" and the "Highway Log" sub-tab became the general "vs TSN".)
 COMPARE_GROUPS = [
     ("env", "Cross-environment"),
-    ("highway_log", "Highway Log"),
+    ("tsn", "vs TSN"),
 ]
 
 # Compare registry: (menu label, module/adapter, input kind, group). The GUI's
@@ -104,15 +106,20 @@ COMPARE_REPORTS = [
     ("TSAR: Ramp Summary — between environments", _cmp_env.RAMP_SUMMARY, "folders", "env"),
     ("TSAR: Ramp Detail — between environments", _cmp_env.RAMP_DETAIL, "folders", "env"),
     ("Highway Sequence Listing — between environments", _cmp_env.HIGHWAY_SEQUENCE, "folders", "env"),
-    ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders", "highway_log"),
-    ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "highway_log"),
+    # Highway Log's cross-environment compare now sits with the other cross-env
+    # reports under "env" (v0.16.1 staging — the old "highway_log" sub-tab became
+    # the general "vs TSN" group below).
+    ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders", "env"),
+    # vs TSN (file-based). Highway Log Excel/PDF today; 0.17.0 adds the other
+    # reports' "<report> — TSMIS vs TSN" rows here once their comparators exist.
+    ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "tsn"),
     # Both sides parsed from PDFs (accurate replacement for the Excel-based row
     # above — the "(PDF)" on BOTH sides makes the PDF-vs-PDF nature explicit),
     # and the PDF data diffed against the vendor Excel to expose its bug.
     ("Highway Log — TSMIS (PDF) vs TSN (PDF)", _cmp_highway_log_pdf.TSMIS_PDF_VS_TSN,
-     "files", "highway_log"),
+     "files", "tsn"),
     ("Highway Log — TSMIS (PDF) vs TSMIS (Excel)",
-     _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "highway_log"),
+     _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "tsn"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each
@@ -172,21 +179,20 @@ def export_reports_status():
 def matrix_rows():
     """The cross-environment comparison MATRIX rows, derived once from the
     registry so they can't drift: every cross-environment `folders` comparison —
-    Ramp Summary / Ramp Detail / Highway Sequence (group "env") AND Highway Log
-    (group "highway_log", but it IS a `compare_env` folder adapter) — mapped to
-    its export ReportSpec so a matrix cell can be re-exported. Returns
-    [(row_key, label, subdir, export_idx, adapter)] in registry order. Only
-    `compare_env` `folders` adapters qualify; the file-based Highway Log
-    comparisons (TSMIS-vs-TSN, the PDF pair) are NOT matrix rows — they drive the
-    separate vs-TSN view. Intersection reports have no cross-env adapter, so they
-    never appear (the same intent as the app-wide intersection disable)."""
+    Ramp Summary / Ramp Detail / Highway Sequence AND Highway Log (all group
+    "env") — mapped to its export ReportSpec so a matrix cell can be re-exported.
+    Returns [(row_key, label, subdir, export_idx, adapter)] in registry order.
+    Only `compare_env` `folders` adapters qualify; the file-based vs-TSN
+    comparisons (group "tsn") are NOT matrix rows — they drive the separate vs-TSN
+    view. Intersection reports have no cross-env adapter, so they never appear
+    (the same intent as the app-wide intersection disable)."""
     by_subdir = {spec.subdir: i for i, (_l, _f, spec) in enumerate(EXPORT_REPORTS)}
     rows = []
     for _label, adapter, kind, group in COMPARE_REPORTS:
-        # Only the cross-env folder adapters (compare_env.*). Highway Log's adapter
-        # lives in the "highway_log" group (with its TSN/PDF siblings) but is still
-        # a folders/EnvCompare adapter, so include it; skip the file-based ones.
-        if kind != "folders" or group not in ("env", "highway_log"):
+        # Only the cross-env folder adapters (compare_env.*) — every report's
+        # "between environments" row now lives in the "env" group, Highway Log
+        # included; the file-based "tsn" rows are skipped.
+        if kind != "folders" or group != "env":
             continue
         subdir = adapter.subdir
         idx = by_subdir.get(subdir)
@@ -202,3 +208,18 @@ def matrix_rows():
     pdf_label = EXPORT_REPORTS[pdf_idx][0] if pdf_idx is not None else "Highway Log (PDF)"
     rows.append((pdf_subdir, pdf_label, pdf_subdir, pdf_idx, None))
     return rows
+
+
+# Reports that belong on the vs-TSN MATRIX but have NO cross-environment adapter,
+# so they're absent from matrix_rows(): Intersection Summary / Detail. They export
+# today but their consolidate + TSN comparator (and a per-report TSN dataset) are
+# 0.17.0 work, so the matrix shows them as greyed groundwork rows for now.
+# Returns [(row_key, label, subdir)] (row_key == export subdir, like the HL rows).
+_TSN_MATRIX_EXTRA = [
+    ("Intersection Summary", _INT_SUMMARY_SPEC),
+    ("Intersection Detail", _INT_DETAIL_SPEC),
+]
+
+
+def tsn_matrix_extra_rows():
+    return [(spec.subdir, label, spec.subdir) for label, spec in _TSN_MATRIX_EXTRA]

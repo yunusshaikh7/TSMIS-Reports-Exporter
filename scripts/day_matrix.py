@@ -1,4 +1,4 @@
-"""Compare-tab "TSN by day" matrix engine.
+"""Compare-tab "vs TSN Matrix" engine (the day-keyed TSN comparison matrix).
 
 A MANUAL, day-picking comparison matrix (a sibling of the Everything matrix, but
 under the Compare tab): rows = report types, columns = exported DAYS the user
@@ -9,9 +9,15 @@ live re-export — it compares specific HISTORICAL exports the user already pull
 It SHARES the TSN compare path (`matrix.consolidate_and_compare_tsn`) and the TSN
 dataset (`matrix.tsn_source` over `<batch_dest>/_tsn_input/highway_log/`, with the
 user's `matrix_tsn_files` pick) with the Everything matrix — only the TSMIS source
-folder (a specific run folder under output/) and the output store differ. Highway
-Log (Excel) and Highway Log (PDF) are supported today; the other reports appear
-greyed (groundwork, wired in when their TSN comparators exist).
+folder (a specific run folder under output/) and the output store differ.
+
+The matrix lists EVERY report so it's the single place TSN comparisons surface.
+Highway Log (Excel) and Highway Log (PDF) are wired today; the rest (Ramp
+Summary/Detail, Highway Sequence, Intersection Summary/Detail) appear greyed —
+groundwork for 0.17.0, which plugs each report in by adding its TSN comparator +
+per-report TSN dataset and flipping `supported` in `_day_rows()` / dispatching it
+in `build_day_cell`. The store, snapshot, actions, and queue are report-agnostic;
+the shared `TSN_SUBDIR` constant is the last Highway-Log-specific bit to generalize.
 
 Console-free like the rest of the core: progress via the Events sink, exceptions
 raised — never print/input/sys.exit. Only gui_api / gui_worker drive it.
@@ -43,9 +49,17 @@ def sources():
 
 
 def _day_rows():
-    """[(row_key, label, subdir, fmt, supported)] for the by-day matrix. Only the
-    two Highway Log rows have a coded TSN comparison today (Excel-vs-TSN and
-    PDF-vs-TSN); the rest are greyed groundwork."""
+    """[(row_key, label, subdir, fmt, supported)] for the vs-TSN matrix — EVERY
+    report, so the matrix is the single place all TSN comparisons surface. Only the
+    two Highway Log rows have a coded TSN comparator today (Excel-vs-TSN and
+    PDF-vs-TSN); the rest (Ramp Summary/Detail, Highway Sequence, Intersection
+    Summary/Detail) are greyed groundwork.
+
+    0.17.0 plug-in: give a report a TSN comparator + a per-report TSN dataset, then
+    flip its `supported` here and dispatch it in build_day_cell — the matrix shell,
+    store, actions, and snapshot are already report-agnostic. (The shared TSN
+    dataset constant TSN_SUBDIR is the last Highway-Log-specific bit; generalize it
+    to a per-row tsn_subdir when the other reports' TSN drops are defined.)"""
     out = []
     for row_key, label, subdir, _idx, _adapter in reports.matrix_rows():
         if row_key == "highway_log":
@@ -54,6 +68,10 @@ def _day_rows():
             out.append((row_key, label, subdir, "pdf", True))
         else:
             out.append((row_key, label, subdir, None, False))
+    # Intersection Summary/Detail have no cross-env adapter (absent from
+    # matrix_rows), so add them here as greyed groundwork rows.
+    for row_key, label, subdir in reports.tsn_matrix_extra_rows():
+        out.append((row_key, label, subdir, None, False))
     return out
 
 

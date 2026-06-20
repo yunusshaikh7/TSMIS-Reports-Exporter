@@ -187,15 +187,16 @@ group** (`mxHeaderBtns`: ↻ `i-refresh` re-export + ⟳ `i-compare` rebuild), a
 toggle + a live queue panel (`renderQueuePanel` / `mxQueueRow`) in the config zone;
 action triggers stay LIVE mid-run (a 2nd click queues) — only selection controls grey.
 
-### The Compare-tab "TSN by day" matrix (v0.16.0)
+### The Compare-tab "vs TSN Matrix" (v0.16.0; renamed + generalized v0.16.1)
 
-A second matrix under the **Compare** tab (sub-tab `tsn_by_day`, appended after the
-registry `compare_groups`): rows = report types, columns = exported **days** you add,
-each cell = (report, day) **vs TSN**. ONE source selector (default ssor-prod); no
-cross-env, no live re-export. `selectCompareGroup("tsn_by_day")` swaps `#compareClassic`
-out for `#dayMatrixSection` and calls `applyMatrixWide()` so it goes **full-width too**
-(same treatment as the Everything matrix); `renderDayMatrix` is fed by
-`gui_api.day_matrix_info`. HL Excel + PDF supported; RS/RD/HSL greyed. It **shares** the
+A second matrix under the **Compare** tab — sub-tab label **"vs TSN Matrix"** (internal
+group id stays `tsn_by_day`), appended after the registry `compare_groups`: rows = **every
+report type** (HL Excel + PDF wired; RS/RD/HSL + Intersection Summary/Detail greyed
+groundwork for 0.17.0), columns = exported **days** you add, each cell = (report, day)
+**vs TSN**. ONE source selector (default ssor-prod); no cross-env, no live re-export.
+`selectCompareGroup("tsn_by_day")` swaps `#compareClassic` out for `#dayMatrixSection` and
+calls `applyMatrixWide()` so it goes **full-width too** (same treatment as the Everything
+matrix); `renderDayMatrix` is fed by `gui_api.day_matrix_info`. It **shares** the
 TSN dataset/picker (`mxTsnPicker`, keyed `highway_log`), the cell vocab
 (`mxCellContent`/`mxActBtn`), and the SAME job queue (the queue panel renders in both
 places); day compare Jobs carry `which:"day"` and route to `DayMatrixCompareWorker`.
@@ -207,7 +208,7 @@ lean as the Everything matrix's (fits ~5 rows at 1440×720 without scrolling). T
 live-formulas toggle is its **own** setting (`day_matrix_formulas`, snapshot key + bridge
 `set_day_matrix_formulas`, synced by `syncDayMatrixFormulas`) — independent of the Everything
 matrix's `matrix_formulas`. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
-Mock + bridge exercised at `/index.html#mock` (Compare ▸ TSN by day).
+Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs TSN Matrix).
 
 ## Motion layer + control polish
 

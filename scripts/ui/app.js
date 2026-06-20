@@ -636,7 +636,7 @@ function buildStatic() {
   const dayTab = document.createElement("button");
   dayTab.className = "subtab"; dayTab.dataset.group = DAY_MATRIX_GROUP;
   dayTab.setAttribute("role", "tab"); dayTab.setAttribute("aria-selected", "false");
-  dayTab.textContent = "TSN by day";
+  dayTab.textContent = "vs TSN Matrix";
   dayTab.addEventListener("click", () => selectCompareGroup(DAY_MATRIX_GROUP));
   subStrip.appendChild(dayTab);
 
@@ -3496,6 +3496,8 @@ function makeMockApi() {
       { key: "ramp_summary", label: "TSAR: Ramp Summary", supported: false },
       { key: "ramp_detail", label: "TSAR: Ramp Detail", supported: false },
       { key: "highway_sequence", label: "Highway Sequence Listing", supported: false },
+      { key: "intersection_summary", label: "Intersection Summary", supported: false },
+      { key: "intersection_detail", label: "Intersection Detail", supported: false },
     ];
     const hidden = st.day_matrix_hidden || [];
     const shown = allRows.filter((r) => hidden.indexOf(r.key) < 0);
@@ -3747,18 +3749,18 @@ function makeMockApi() {
       ],
       compare_groups: [
         { id: "env", label: "Cross-environment" },
-        { id: "highway_log", label: "Highway Log" },
+        { id: "tsn", label: "vs TSN" },
       ],
       compare_reports: [
         { label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env" },
         { label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env" },
         { label: "Highway Sequence Listing — between environments", kind: "folders", group: "env" },
-        { label: "Highway Log — between environments", kind: "folders", group: "highway_log" },
-        { label: "Highway Log — TSMIS vs TSN", kind: "files", group: "highway_log",
+        { label: "Highway Log — between environments", kind: "folders", group: "env" },
+        { label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
-        { label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "highway_log",
+        { label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "tsn",
           file_a_label: "TSMIS (PDF)", file_b_label: "TSN (PDF)" },
-        { label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "highway_log",
+        { label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "tsn",
           file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
       ],
       batch_resume: null,
