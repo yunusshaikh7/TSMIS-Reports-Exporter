@@ -4,6 +4,14 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
+> **Next big effort — v0.17.0: all-report TSN comparison + consolidation.** Kickoff prompt
+> with the what-we-have / what-we-need / resources breakdown: **[v0.17.0-prompt.md](v0.17.0-prompt.md)**.
+> The app was **staged for it in v0.16.1** (compare sub-tabs → Cross-environment / vs TSN / vs TSN
+> Matrix; the vs-TSN matrix generalized to every report with greyed groundwork rows + marked
+> plug-in points). 0.17.0 builds the per-report TSN parsers/comparators + Intersection consolidate
+> and flips them on. Carried-over feature asks (per-cell/row consolidate buttons; the one-stop
+> add-day→export→consolidate→compare pipeline) are listed there too.
+
 ## How to maintain this file
 
 - **Format.** Open item `- [ ]`; done `- [x] ~~…~~ **Done (vX.Y.Z / <commit>)**`. Tag features
