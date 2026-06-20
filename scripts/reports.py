@@ -148,6 +148,15 @@ def consolidator_for_spec(spec):
     return _CONSOLIDATOR_BY_SUBDIR.get(getattr(spec, "subdir", None))
 
 
+def consolidator_for_subdir(subdir):
+    """The consolidate module for an export output `subdir` (e.g. 'ramp_detail',
+    'highway_log'), or None. Lets the matrix consolidate ANY report's per-route
+    store generically instead of hard-coding Highway Log. NOTE: 'highway_log_pdf'
+    is NOT here (it's export-only on the TSMIS side and needs a scratch
+    converted_dir — the matrix handles it as a special case)."""
+    return _CONSOLIDATOR_BY_SUBDIR.get(subdir)
+
+
 # App-wide disable for export-only reports that aren't ready for users. ONE gate:
 # the GUI report lists, the matrix, and the start guards all route through it.
 # (v0.16.x) Intersection Summary/Detail export is now ENABLED — the reports are

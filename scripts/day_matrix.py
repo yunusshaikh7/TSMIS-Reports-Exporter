@@ -71,7 +71,10 @@ def _day_rows():
         elif row_key == "highway_log_pdf":
             out.append((row_key, label, subdir, "pdf", True, tsn_subdir))
         else:
-            out.append((row_key, label, subdir, None, False, tsn_subdir))
+            # Any report with a coded vs-TSN comparator flips on automatically
+            # (Ramp Detail in v0.17.0); the rest stay greyed groundwork.
+            out.append((row_key, label, subdir, None,
+                        matrix.tsn_supported(row_key), tsn_subdir))
     # Intersection Summary/Detail have no cross-env adapter (absent from
     # matrix_rows), so add them here as greyed groundwork rows.
     for row_key, label, subdir in reports.tsn_matrix_extra_rows():
@@ -162,8 +165,10 @@ def tsmis_dir(date, source, subdir):
 
 
 def available_days(source):
-    """Dates (newest first) under output/ that have a Highway Log export (Excel
-    or PDF) for `source` — the add-day picker's options."""
+    """Dates (newest first) under output/ that have an export for ANY supported
+    vs-TSN report for `source` — the add-day picker's options. Supported subdirs
+    come from _day_rows (Highway Log Excel/PDF + Ramp Detail today)."""
+    supported_subs = [r[2] for r in _day_rows() if r[4]]
     out, seen = [], set()
     for name in list_output_days():
         parsed = parse_run_folder(name)
@@ -173,8 +178,7 @@ def available_days(source):
         if f"{src}-{env}" != source or date in seen:
             continue
         base = OUTPUT_ROOT / name
-        if any(_folder_newest_mtime(base / sub) is not None
-               for sub in ("highway_log", "highway_log_pdf")):
+        if any(_folder_newest_mtime(base / sub) is not None for sub in supported_subs):
             seen.add(date)
             out.append(date)
     return out
@@ -210,13 +214,13 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                                if dest else {"kind": "none"})
         return _tsn_cache[sub]
 
-    # The single shared TSN picker shows the primary supported dataset (Highway Log
-    # today). Per-row readiness still drives each cell below.
-    supported_subdirs = []
-    for r in all_rows:
-        if r[4] and r[5] not in supported_subdirs:
-            supported_subdirs.append(r[5])
-    primary = supported_subdirs[0] if supported_subdirs else "highway_log"
+    # The single shared TSN picker shows ONE representative dataset (Highway Log by
+    # default — the established shared picker). Each cell still resolves its OWN
+    # report's TSN per-row below (via _tsn_for(tsn_subdir)), defaulting to the
+    # canonical TSN library; a per-report by-day picker is a later UX item.
+    supported_subdirs = [r[5] for r in all_rows if r[4]]
+    primary = ("highway_log" if "highway_log" in supported_subdirs
+               else supported_subdirs[0] if supported_subdirs else "highway_log")
     src_primary = _tsn_for(primary)
     tsn_meta = {"supported": True, "source_kind": src_primary.get("kind"),
                 "source_path": src_primary.get("path"),
@@ -327,8 +331,8 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
 
     out_path = day_out_path(date, source, row_key)
     result = matrix.consolidate_and_compare_tsn(
-        tsmis_dir(date, source, subdir), src_tsn["path"], out_path, fmt, events,
-        confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
+        tsmis_dir(date, source, subdir), src_tsn["path"], out_path, row_key, subdir,
+        events, confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
         also_formulas=also_formulas)
     if result.status == "ok" and out_path.exists():
         diff_cells, one_sided = matrix.read_counts(out_path, has_route=True)

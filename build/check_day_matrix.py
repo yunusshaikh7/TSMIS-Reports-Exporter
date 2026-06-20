@@ -84,9 +84,9 @@ def main():
         check("HL Excel supported (excel) + HL PDF supported (pdf)",
               rows["highway_log"][3] == "excel" and rows["highway_log"][4]
               and rows["highway_log_pdf"][3] == "pdf" and rows["highway_log_pdf"][4])
-        check("ramp_summary / ramp_detail / highway_sequence greyed (unsupported)",
-              not rows["ramp_summary"][4] and not rows["ramp_detail"][4]
-              and not rows["highway_sequence"][4])
+        check("ramp_detail supported (v0.17.0); ramp_summary / highway_sequence greyed",
+              rows["ramp_detail"][4]
+              and not rows["ramp_summary"][4] and not rows["highway_sequence"][4])
         check("available days for ssor-prod (newest first, both HL days)",
               day_matrix.available_days("ssor-prod") == ["2026-06-18", "2026-06-17"])
         check("available days for ars-prod scoped to that source",
