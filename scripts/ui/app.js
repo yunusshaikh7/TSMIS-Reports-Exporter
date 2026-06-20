@@ -2049,7 +2049,7 @@ async function renderMatrix() {
   // fr units stretch to fill the window, the data rows share the leftover height.
   grid.style.gridTemplateColumns =
     `minmax(190px,1.2fr) repeat(${envs.length}, minmax(116px,1fr))`;
-  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(82px,1fr))`;
+  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(50px,1fr))`;
   grid.textContent = "";
 
   const corner = document.createElement("div");
@@ -2083,7 +2083,7 @@ async function renderMatrix() {
     const top = document.createElement("div"); top.className = "mxrh-top";
     const lbl = document.createElement("span"); lbl.className = "mxrh-label";
     const rlabel = snap.row_labels[rk] || rk;
-    lbl.textContent = rlabel;
+    lbl.textContent = rlabel; lbl.title = rlabel;
     top.append(lbl, mxHeaderBtns(rlabel,
       async () => {
         if (!await confirmBulkReexport(`${rlabel} across every environment`)) return;
@@ -2096,14 +2096,15 @@ async function renderMatrix() {
         else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
       }));
     rh.appendChild(top);
-    // per-row comparison-mode dropdown (only when the row has >1 mode) — a
-    // compact, content-sized select inside a wrapper that draws the chevron.
+    // per-row comparison-mode dropdown (only when the row has >1 mode), stacked
+    // UNDER the label so the label keeps the full header line (no truncation),
+    // with a compact chevron-wrapper select.
     const modes = (snap.row_modes && snap.row_modes[rk]) || [];
     if (modes.length > 1) {
       const fs = document.createElement("div"); fs.className = "mx-fluent-select";
       const ms = document.createElement("select");
       ms.className = "mx-rowmode"; ms.disabled = locked;
-      ms.title = "Comparison type for " + (snap.row_labels[rk] || rk);
+      ms.title = "Comparison type for " + rlabel;
       ms.setAttribute("aria-label", ms.title);
       modes.forEach((m) => {
         const o = document.createElement("option");
@@ -2312,7 +2313,7 @@ async function renderDayMatrix() {
     return;
   }
   grid.style.gridTemplateColumns = `minmax(170px,1.1fr) repeat(${days.length}, minmax(120px,1fr))`;
-  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(82px,1fr))`;
+  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(50px,1fr))`;
 
   const corner = document.createElement("div");
   corner.className = "mx-cell mx-corner mx-colhead";

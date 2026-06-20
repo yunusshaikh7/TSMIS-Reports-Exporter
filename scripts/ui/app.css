@@ -195,11 +195,40 @@ button, input, select { font-family: inherit; }
      the width. min-height:100% fills the column when rows are few and lets the grid
      grow past it (→ wrap scrolls) when many rows hit their min height. */
   body.matrix-wide #everyMatrix .matrix-grid { min-height: 100%; width: 100%; min-width: 0; }
-  body.matrix-wide #everyMatrix .matrix-legend { margin: 2px 0; }
-  body.matrix-wide .subtabs { margin-bottom: 10px; }
-  body.matrix-wide #everyMatrix .mx-cell { justify-content: flex-start; padding: 10px 12px; }
-  body.matrix-wide #everyMatrix .mx-num { font-size: 14px; }
-  body.matrix-wide #everyMatrix .mx-colhead,
+  /* Reclaim vertical chrome on short/wide laptops so the grid isn't squeezed to
+     2 scrolling rows: the page heading is redundant here (the sub-tab + section
+     header already say "Comparison matrix"), and the surrounding margins shrink. */
+  body.matrix-wide .panel-title { display: none; }
+  body.matrix-wide .subtabs { margin-bottom: 6px; }
+  body.matrix-wide #everyMatrix .mx-controls { margin: 0 0 4px; }
+  body.matrix-wide #everyMatrix .matrix-legend { margin: 0; }
+  body.matrix-wide #everyMatrix #matrixSection { padding: 8px 12px; }
+  body.matrix-wide #everyMatrix #matrixSection .section-head { margin-bottom: 4px; }
+  body.matrix-wide #everyMatrix .actions-row { padding-top: 6px; padding-bottom: 6px; }
+  /* Tighter cells (padding + number size; actions overlay so they don't reserve a
+     row) and a compact row header (label + smaller mode dropdown) so a ~56px row
+     floor isn't clipped — more reports show before the grid has to scroll. */
+  body.matrix-wide #everyMatrix .mx-cell { justify-content: flex-start; padding: 5px 12px; }
+  body.matrix-wide #everyMatrix .mx-num { font-size: 13.5px; }
+  body.matrix-wide #everyMatrix .mx-sub { line-height: 1.2; }
+  /* Compact row header: tighter padding/gap, smaller label + mode dropdown +
+     header buttons, so the header isn't what drives row height (the floor is). */
+  body.matrix-wide #everyMatrix .mx-rowhead { padding: 3px 10px; gap: 1px; }
+  /* Label keeps the whole top line (buttons aside) and ellipses rather than
+     wrapping, so the row header stays one short line + the stacked dropdown. */
+  body.matrix-wide #everyMatrix .mxrh-label {
+    font-size: 12px; line-height: 1.15;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal;
+  }
+  body.matrix-wide #everyMatrix .mx-fluent-select { align-self: flex-start; }
+  body.matrix-wide #everyMatrix .mx-rowmode { height: 18px; font-size: 10.5px; padding: 0 22px 0 7px; }
+  body.matrix-wide #everyMatrix .mxch-refresh { width: 20px; height: 20px; }
+  /* Column header lays its label + the two buttons on one row (wide columns), so
+     it costs ~one line instead of two. */
+  body.matrix-wide #everyMatrix .mx-colhead {
+    flex-direction: row; flex-wrap: wrap; align-items: center;
+    justify-content: center; gap: 4px 6px; padding: 4px 8px;
+  }
   body.matrix-wide #everyMatrix .mx-rowhead { justify-content: center; }
 }
 
@@ -656,12 +685,19 @@ button, input, select { font-family: inherit; }
 .mx-cell.mx-missing .mx-num { color: var(--muted-foreground); font-style: italic; font-weight: 500; }
 /* Compact ICON action buttons — three text labels never fit a ~128px cell, so
    the per-cell actions are icons (export / compare / open) with tooltips. They
-   recede a little until the cell is hovered, keeping the grid clean. */
+   OVERLAY the cell's bottom-right corner (revealed on hover / keyboard focus)
+   instead of reserving a row of height — this keeps rows compact so more reports
+   fit before the grid has to scroll. A faint card backdrop keeps them legible
+   over the cell's value. */
 .mx-actions {
-  display: flex; gap: 2px; margin-top: 4px;
-  opacity: 0.55; transition: opacity 0.15s ease;
+  position: absolute; right: 5px; bottom: 3px;
+  display: flex; gap: 1px; padding: 1px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--card) 78%, transparent);
+  opacity: 0; pointer-events: none; transition: opacity 0.12s ease;
 }
-.mx-cell:hover .mx-actions { opacity: 1; }
+.mx-cell:hover .mx-actions,
+.mx-cell:focus-within .mx-actions { opacity: 1; pointer-events: auto; }
 .mx-act {
   border: none; background: transparent; cursor: pointer; padding: 3px;
   border-radius: var(--radius-sm); color: var(--muted-foreground);
@@ -674,9 +710,8 @@ button, input, select { font-family: inherit; }
 .mx-act:active:not(:disabled) { transform: scale(0.9); }
 .mx-act:disabled { opacity: 0.4; cursor: default; }
 .mx-act:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
-/* Reveal a cell's actions for keyboard users (otherwise only shown on hover). */
-.mx-cell:focus-within .mx-actions { opacity: 1; }
-.mx-cell { transition: box-shadow 0.15s ease; }
+/* position:relative anchors the absolute .mx-actions overlay to the cell. */
+.mx-cell { position: relative; transition: box-shadow 0.15s ease; }
 .mx-cell:not(.mx-colhead):not(.mx-rowhead):not(.mx-corner):not(.mx-baseline-col):hover {
   box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--primary) 50%, transparent);
 }
