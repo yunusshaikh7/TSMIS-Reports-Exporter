@@ -67,9 +67,9 @@ def test_paths_and_modes():
     check("HL Excel tsn mode is the excel flavor on the highway_log TSN folder",
           hl["tsn"]["fmt"] == "excel" and hl["tsn"]["tsn_subdir"] == "highway_log")
     hp = modes("highway_log_pdf")
-    check("HL PDF row modes: env(greyed) + tsn + vs_excel",
+    check("HL PDF row modes: env + tsn + vs_excel, ALL supported (v0.17.0 — env coded)",
           set(hp) == {"env", "tsn", "vs_excel"}
-          and hp["env"]["supported"] is False
+          and hp["env"]["supported"]
           and hp["tsn"]["supported"] and hp["vs_excel"]["supported"])
     check("HL PDF tsn shares the highway_log TSN folder (one TSN dataset)",
           hp["tsn"]["fmt"] == "pdf" and hp["tsn"]["tsn_subdir"] == "highway_log")
@@ -151,10 +151,11 @@ def test_snapshot_modes():
         check("tsn_meta carries the source summary",
               snap["tsn_meta"]["highway_log"]["source_kind"] == "consolidated"
               and snap["tsn_meta"]["highway_log"]["fmt"] == "excel")
-        # HL-PDF env mode is greyed (no cross-env adapter)
+        # HL-PDF env mode is now CODED (v0.17.0) — a real cross-env cell, not greyed
         hp = snap["cells"]["highway_log_pdf"]["ars-prod"]
-        check("HL-PDF cross-env cell greyed (supported False)",
-              hp["cmp"].get("supported") is False)
+        check("HL-PDF cross-env cell now supported (not greyed)",
+              hp["cmp"].get("supported") is not False
+              and hp.get("comparison") is not None)
         # env-mode rows keep the back-compat 'comparison' alias
         rd = snap["cells"]["ramp_detail"]["ars-prod"]
         check("env-mode cell keeps comparison alias", rd.get("comparison") is not None
@@ -163,7 +164,7 @@ def test_snapshot_modes():
         todo = matrix.cells_to_rebuild(snap, scope="all")
         check("rebuild list includes the ready HL tsn cell as a triple",
               ("highway_log", "ars-prod", "tsn") in todo)
-        check("rebuild list excludes greyed HL-PDF env cells",
+        check("rebuild list excludes not-ready HL-PDF env cells (no PDF export here)",
               all(rk != "highway_log_pdf" for rk, _e, _m in todo))
         check("row filter scopes to one report",
               all(rk == "highway_log"
@@ -188,9 +189,12 @@ def test_build_guards():
         check("highway_sequence vs TSN now WIRED — reaches the no-TSN-source error (not greyed)",
               raises(lambda: matrix.build_comparison(dest, "highway_sequence", "ars-prod", "tsn",
                                                      "ssor-prod", events=None)))
-        check("greyed mode raises (HL-PDF cross-env)",
-              raises(lambda: matrix.build_comparison(dest, "highway_log_pdf", "ars-prod", "env",
-                                                     "ssor-prod", events=None)))
+        # HL-PDF cross-env is now WIRED (v0.17.0): not greyed/raised — it reaches the
+        # PDF loader and returns a clean "no Highway Log (PDF) export" error result.
+        _hlpdf_env = matrix.build_comparison(dest, "highway_log_pdf", "ars-prod", "env",
+                                             "ssor-prod", events=None)
+        check("HL-PDF cross-env wired (returns a no-export error result, not greyed)",
+              _hlpdf_env is not None and getattr(_hlpdf_env, "status", "") != "ok")
         check("HL tsn with no TSN source raises",
               raises(lambda: matrix.build_comparison(dest, "highway_log", "ars-prod", "tsn",
                                                      "ssor-prod", events=None)))

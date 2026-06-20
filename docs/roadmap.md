@@ -295,13 +295,16 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   re-export + recompute + refresh-consolidated; by-day per-day refresh) → not rebuilt (user decision).
   A 6-lens adversarial-review workflow over the session's change set confirmed + fixed 3 minor issues
   (incl. Intersection wrongly greyed in the by-day matrix). Verified in `#mock`; suite 42/42.
-- [x] **Intersection Summary cross-environment** [S] — **DONE (v0.17.0).** `compare_env.INTERSECTION_SUMMARY`
-  — the AGGREGATE-per-route env recipe (the per-route export is a category sheet, so a `side_loader` parses
-  each file into one `[route, total, *counts]` row via the consolidator's block-walk, route-keyed). Promotes
-  Intersection Summary to a full Everything-matrix + by-day row (removed from the TSN-only extra rows so it
-  isn't duplicated). Golden `check_compare_env_intersection_summary.py`; verified on real exports + in `#mock`.
-  (Intersection **Detail** cross-env + HL-PDF cross-env remain the only un-built Phase-5 items.)
-- **v0.17.0 is COMPLETE** (all consolidators + comparators + UX + Intersection Summary cross-env).
+- [x] **All cross-environment comparisons complete** [S] — **DONE (v0.17.0; Phase 5 closed).** Every
+  report now compares env-vs-env: `compare_env.INTERSECTION_SUMMARY` (AGGREGATE-per-route, route-keyed
+  via the consolidator block-walk), `compare_env.INTERSECTION_DETAIL` (flat route+PM), and
+  `compare_env.HIGHWAY_LOG_PDF` (flat, both sides parsed from the PDF export — the accurate HL source,
+  via `flat_pdf_loader`). The HL-PDF matrix env cell is no longer greyed; `tsn_matrix_extra_rows()` is
+  empty (all 7 reports are full matrix rows, every cell coded). Golden
+  `check_compare_env_intersection.py` + `check_compare_env_highway_log_pdf.py`; all verified on real
+  exports + in `#mock`. **The full comparison grid is now complete: every report × {cross-env, vs TSN},
+  plus Highway Log's PDF↔Excel self-check.**
+- **v0.17.0 is COMPLETE** (all consolidators + comparators + UX + every cross-env comparison).
   **Before release:** `version.py` + `CHANGELOG.md` bump and **work-PC verification** of live
   export/compare with real TSN data.
 

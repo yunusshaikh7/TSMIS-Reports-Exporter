@@ -3583,7 +3583,7 @@ function makeMockApi() {
       { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
       { id: "vs_pdf", label: "vs TSMIS PDF", kind: "self", supported: true }];
     if (rk === "highway_log_pdf") return [
-      { id: "env", label: "Cross-environment", kind: "env", supported: false },
+      { id: "env", label: "Cross-environment", kind: "env", supported: true },   // v0.17.0: PDF cross-env coded
       { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
       { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
     return [
@@ -3637,6 +3637,7 @@ function makeMockApi() {
       highway_log: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
       intersection_summary: { "ssor-test": [3, 0], "ssor-dev": [3, 0], "ars-prod": [0, 0], "ars-test": [40, 2], "ars-dev": "stale" },
       intersection_detail: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "stale" },
+      highway_log_pdf: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
     };
     const cells = {}, modes = {}, rowModes = {}, tsnMeta = {};
     rows.forEach((rk) => {

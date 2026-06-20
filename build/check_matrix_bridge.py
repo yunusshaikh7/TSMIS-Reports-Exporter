@@ -203,8 +203,9 @@ def main():
         check("highway_sequence vs TSN mode now accepted (v0.17.0 FLAT)",
               a.set_matrix_row_mode("highway_sequence", "tsn").get("ok")
               and a.matrix_info()["modes"]["highway_sequence"] == "tsn")
-        check("greyed mode rejected (HL-PDF cross-env — no adapter)",
-              bool(a.set_matrix_row_mode("highway_log_pdf", "env").get("error")))
+        check("HL-PDF cross-env mode now accepted (v0.17.0 — env coded)",
+              a.set_matrix_row_mode("highway_log_pdf", "env").get("ok")
+              and a.matrix_info()["modes"].get("highway_log_pdf", "env") == "env")
         check("supported mode set (HL Excel vs TSN)",
               a.set_matrix_row_mode("highway_log", "tsn").get("ok")
               and a.matrix_info()["modes"]["highway_log"] == "tsn")

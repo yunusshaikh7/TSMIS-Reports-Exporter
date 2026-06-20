@@ -535,12 +535,15 @@ limit and falls back to "Side A"/"Side B" on collision).
 | `HIGHWAY_LOG` | Highway Log | `highway_log` / `_hl.SHEET_NAME` | Location | `base_schema=_HL_BASE`, `force_header=_hl.EXPECTED_HEADER` (relabels the vendor-mislabeled Excel to corrected labels by POSITION); inherits Med Wid + tooltips + Legend but `key_normalizer` is CLEARED |
 | `INTERSECTION_SUMMARY` | Intersection Summary | `intersection_summary` / category sheet | route (first col) | **AGGREGATE per route** (v0.17.0): the per-route export is a CATEGORY-summary sheet, not a flat table, so a `side_loader` (`_load_intersection_summary_side`) parses each file into ONE `[route, total, *category counts]` row via the consolidator's own `parse_route` block-walk (`has_route=False`, `agg_header=IS_HEADER`) — the XLSX analog of `RAMP_SUMMARY`'s PDF path |
 | `INTERSECTION_DETAIL` | Intersection Detail | `intersection_detail` / "Intersection Detail" | `Post Mile` | **flat** (v0.17.0): a normal per-route XLSX, consolidated shape, route+PM key (the export header is offset within each type/eff-date pair, but both env sides share the layout so the position-wise compare is valid) |
+| `HIGHWAY_LOG_PDF` | Highway Log (PDF) | `highway_log_pdf` / "Highway Log" | Location | **flat, PDF-sourced** (v0.17.0): a `flat_pdf_loader` (`_load_highway_log_pdf_side`) converts each side's PDFs to per-route XLSX (the HL-PDF consolidator's parser) then reads them flat; reuses the Highway Log schema (`_HL_BASE`, `force_header`, Med Wid, ditto/roadbed). The PDF is the accurate HL source, so this is the preferred cross-env Highway Log |
 
-`EnvCompare` has two shapes: the **flat** path (Ramp Detail / Highway Sequence / Highway Log — read
-the per-route sheet rows in consolidated shape) and the **aggregate-per-route** path (a `side_loader`
-yielding one row per route — Ramp Summary's PDFs, Intersection Summary's category sheets). Ramp Detail
-/ Highway Sequence lock their layout from the files (both folders must agree, else a clear error);
-Highway Log pins `EXPECTED_HEADER` + the Med Wid rule. Verified with
+`EnvCompare` has three shapes: the **flat** path (Ramp Detail / Highway Sequence / Highway Log /
+Intersection Detail — read the per-route sheet rows in consolidated shape); a **flat, PDF-sourced**
+variant (`flat_pdf_loader` — Highway Log (PDF), which parses each side's PDFs to per-route XLSX first);
+and the **aggregate-per-route** path (a `side_loader` yielding one row per route — Ramp Summary's PDFs,
+Intersection Summary's category sheets). Ramp Detail / Highway Sequence / Intersection Detail lock their
+layout from the files (both folders must agree, else a clear error); Highway Log (both formats) pins
+`EXPECTED_HEADER` + the Med Wid rule. Verified with
 planted-difference fixtures and a real-Excel COM recalc (all SELF-CHECK rows OK). GUI: folder
 dropdowns list run folders (baseline defaults to newest ssor-prod) + Browse; saves default to
 `output/comparisons/` (`DEFAULT_OUT_DIR`). The v0.12.0 A2 filter lists only folders that actually
@@ -630,11 +633,11 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 
 - **Rows** = `reports.matrix_rows()` — **all 7 reports**: Ramp Summary, Ramp Detail, Highway Sequence,
   **Highway Log (Excel)**, **Intersection Summary**, **Intersection Detail**, and **Highway Log (PDF)**
-  (HL is two rows, keyed by subdir `highway_log` / `highway_log_pdf`; the PDF row has no cross-env adapter
-  yet → its env mode is greyed). v0.17.0 gave **both Intersection reports** a cross-env adapter —
-  `compare_env.INTERSECTION_SUMMARY` (AGGREGATE-per-route, route-keyed via the consolidator's block-walk)
-  and `compare_env.INTERSECTION_DETAIL` (flat, route+PM) — so `reports.tsn_matrix_extra_rows()` is now
-  empty (every report is a full matrix row).
+  (HL is two rows, keyed by subdir `highway_log` / `highway_log_pdf`). As of v0.17.0 **every cell of the
+  matrix is coded — nothing is greyed**: both Intersection reports gained a cross-env adapter
+  (`compare_env.INTERSECTION_SUMMARY` AGGREGATE-per-route + `INTERSECTION_DETAIL` flat), and the **HL-PDF
+  row's cross-env mode** is now `compare_env.HIGHWAY_LOG_PDF` (both sides parsed from the PDF export — the
+  accurate Highway Log source). `reports.tsn_matrix_extra_rows()` is empty (every report is a full row).
 - **Per-row comparison MODE** (`matrix._row_modes`, picked via a dropdown under each row's name,
   persisted in `settings.matrix_row_modes`):
   - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). All rows but HL-PDF.

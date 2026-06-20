@@ -130,6 +130,12 @@ COMPARE_REPORTS = [
     # Everything-matrix + by-day matrix row.
     ("TSAR: Intersection Detail — between environments",
      _cmp_env.INTERSECTION_DETAIL, "folders", "env"),
+    # Highway Log (PDF) cross-env (v0.17.0): both sides parsed from the app's PDF
+    # export (the accurate Highway Log source). Kept LAST among the env-folders rows
+    # so the matrix row order is unchanged (…, highway_log_pdf last). Its `subdir`
+    # ("highway_log_pdf") keeps it a distinct row from the Excel "highway_log".
+    ("Highway Log (PDF) — between environments",
+     _cmp_env.HIGHWAY_LOG_PDF, "folders", "env"),
     # vs TSN (file-based). Highway Log Excel/PDF today; 0.17.0 adds the other
     # reports' "<report> — TSMIS vs TSN" rows here once their comparators exist.
     ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "tsn"),
@@ -250,15 +256,11 @@ def matrix_rows():
         idx = by_subdir.get(subdir)
         disp = EXPORT_REPORTS[idx][0] if idx is not None else adapter.REPORT_NAME
         rows.append((adapter.key, disp, subdir, idx, adapter))
-    # Highway Log (PDF) is its OWN matrix row (separate toggle + its own modes:
-    # vs TSN-PDF, vs TSMIS Excel). It has no cross-environment adapter (that
-    # comparison isn't coded yet -> env mode greyed), so add it explicitly from the
-    # export spec with adapter=None. row_key = its subdir, to stay distinct from the
-    # Excel "highway_log" row.
-    pdf_subdir = _HIGHWAY_LOG_PDF_SPEC.subdir
-    pdf_idx = by_subdir.get(pdf_subdir)
-    pdf_label = EXPORT_REPORTS[pdf_idx][0] if pdf_idx is not None else "Highway Log (PDF)"
-    rows.append((pdf_subdir, pdf_label, pdf_subdir, pdf_idx, None))
+    # Highway Log (PDF) is its OWN matrix row (distinct subdir "highway_log_pdf",
+    # with its own modes: cross-env, vs TSN-PDF, vs TSMIS Excel). As of v0.17.0 it
+    # HAS a cross-env adapter (compare_env.HIGHWAY_LOG_PDF, parsing both sides' PDFs),
+    # so it flows through the loop above like every other env-folders row — no special
+    # adapter=None append. Its prior "env greyed" state is gone.
     return rows
 
 

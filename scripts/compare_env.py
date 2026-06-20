@@ -27,6 +27,8 @@ this through the COMPARE_REPORTS registry ("folders" input kind).
 """
 import logging
 import re
+import shutil
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -304,6 +306,38 @@ def _load_intersection_summary_side(folder, label, events):
     return rows, skipped
 
 
+def _load_highway_log_pdf_side(folder, label, events):
+    """Parse one side's Highway Log PDFs (folder/highway_log_pdf/*.pdf) into
+    consolidated-shape 31-column rows: convert them to per-route XLSX with the HL-PDF
+    consolidator's own parser in a temp dir, then read those flat like any XLSX side.
+    Returns (rows, header, skipped). The PDF is the ACCURATE Highway Log source (the
+    vendor Excel drops rows), so this is the preferred cross-env Highway Log."""
+    import consolidate_tsmis_highway_log_pdf as _hlpdf
+    import highway_log_columns as hlc
+    in_dir, pdfs = _find_input_dir(folder, _hlpdf.SUBDIR, "*.pdf")
+    if not pdfs:
+        raise ValueError(
+            f"No Highway Log (PDF) files were found for the {label} side:\n{in_dir}"
+            "\n\nExport the Highway Log (PDF) report on that environment first.")
+    conv = Path(tempfile.mkdtemp(prefix="hlpdf_env_conv_"))
+    combined_dir = Path(tempfile.mkdtemp(prefix="hlpdf_env_out_"))
+    try:
+        res = _hlpdf.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                 input_dir=in_dir, out_path=combined_dir / "_combined.xlsx",
+                                 converted_dir=conv)
+        if res.status == "cancelled":
+            raise ValueError("Cancelled by user.")
+        if res.status != "ok":
+            raise ValueError(res.message or "Could not parse the Highway Log PDFs.")
+        # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
+        # excluded). Read them flat with the corrected 31-column header pinned.
+        return _load_xlsx_side(conv, label, "_perroute_", _hlpdf.SHEET_NAME,
+                               "Highway Log (PDF)", events, expected_header=hlc.HEADER)
+    finally:
+        shutil.rmtree(conv, ignore_errors=True)
+        shutil.rmtree(combined_dir, ignore_errors=True)
+
+
 # ---------------------------------------------------------------------------
 # Per-report adapters
 # ---------------------------------------------------------------------------
@@ -315,7 +349,8 @@ class EnvCompare:
 
     def __init__(self, key, report_name, subdir, sheet_name=None,
                  expected_header=None, base_schema=None, key_col=None,
-                 force_header=None, side_loader=None, agg_header=None):
+                 force_header=None, side_loader=None, agg_header=None,
+                 flat_pdf_loader=None):
         self.key = key                        # "ramp_summary" | "ramp_detail" | …
         self.REPORT_NAME = report_name
         self.subdir = subdir
@@ -328,6 +363,10 @@ class EnvCompare:
         # isn't a flat header+rows table. (Ramp Summary keeps its own PDF path.)
         self.side_loader = side_loader
         self.agg_header = agg_header
+        # Flat path (has_route=True) whose source is PDFs, not XLSX: a
+        # (folder,label,events)->(rows,header,skipped) loader used instead of
+        # _load_xlsx_side. Highway Log (PDF) uses it to parse each side's PDFs.
+        self.flat_pdf_loader = flat_pdf_loader
         self.base_schema = base_schema        # report-specific schema extras
         # When set, the DISPLAY header is forced to this (the loaded files are
         # accepted as-is and compared by POSITION). Highway Log uses it so the
@@ -429,13 +468,15 @@ class EnvCompare:
                 rows_a, skip_a = _load_ramp_summary_side(dir_a, la, events)
                 rows_b, skip_b = _load_ramp_summary_side(dir_b, lb, events)
                 header, has_route = RS_HEADER, False
-            else:
-                rows_a, header, skip_a = _load_xlsx_side(
-                    dir_a, la, self.subdir, self.sheet_name, self.REPORT_NAME,
-                    events, expected_header=self.expected_header)
-                rows_b, header_b, skip_b = _load_xlsx_side(
-                    dir_b, lb, self.subdir, self.sheet_name, self.REPORT_NAME,
-                    events, expected_header=self.expected_header)
+            else:                             # flat (has_route=True): XLSX, or PDF-sourced
+                def _flat_load(d, lab):
+                    if self.flat_pdf_loader is not None:
+                        return self.flat_pdf_loader(d, lab, events)
+                    return _load_xlsx_side(d, lab, self.subdir, self.sheet_name,
+                                           self.REPORT_NAME, events,
+                                           expected_header=self.expected_header)
+                rows_a, header, skip_a = _flat_load(dir_a, la)
+                rows_b, header_b, skip_b = _flat_load(dir_b, lb)
                 if header != header_b:
                     return ConsolidateResult(
                         status="error",
@@ -515,6 +556,14 @@ INTERSECTION_DETAIL = EnvCompare(
     base_schema=CompareSchema(
         report_name="Intersection Detail", header=["Post Mile"],
         id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"))
+# Highway Log (PDF) cross-env: same Highway Log schema as the Excel row (Med Wid rule,
+# corrected labels, ditto/roadbed), but BOTH sides are parsed from the app's own PDF
+# export — the accurate Highway Log source (the vendor Excel drops rows), so this is
+# the preferred cross-env Highway Log. flat_pdf_loader parses each side's PDFs first.
+HIGHWAY_LOG_PDF = EnvCompare(
+    "highway_log_pdf", "Highway Log (PDF)", "highway_log_pdf",
+    sheet_name=_hl.SHEET_NAME, base_schema=_HL_BASE,
+    force_header=_hl.EXPECTED_HEADER, flat_pdf_loader=_load_highway_log_pdf_side)
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).
