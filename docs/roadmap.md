@@ -288,6 +288,15 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   5,538 diff (FT 699 + Description 4,839); 60,439 vs 69,758 rows; 242 routes both. **This completes
   v0.17.0's comparator goal — ALL 6 reports + HL-PDF now compare vs TSN in both matrices.** See
   [tsn-parsers.md](tsn-parsers.md).
+- [x] **Phase 4 UX (ride-along)** [M] — **DONE (v0.17.0).** **4a** Settings ▸ TSN reports status panel
+  (per-report raw/consolidated/current dot + Import raw… / Rebuild over `tsn_library`); **4b**
+  drag-to-reorder rows + columns on both matrices (`matrix.apply_order` + persisted order lists). 4c
+  (per-cell/row consolidate) + 4d (add-day pipeline) were found to already exist (Everything matrix
+  re-export + recompute + refresh-consolidated; by-day per-day refresh) → not rebuilt (user decision).
+  A 6-lens adversarial-review workflow over the session's change set confirmed + fixed 3 minor issues
+  (incl. Intersection wrongly greyed in the by-day matrix). Verified in `#mock`; suite 42/42.
+- **v0.17.0 is COMPLETE** (all consolidators + comparators + UX). **Before release:** `version.py` +
+  `CHANGELOG.md` bump and **work-PC verification** of live export/compare with real TSN data.
 
 From a notebook brainstorm (2026-06-16); size `[S/M/L]`. Their original version buckets are now in
 the Shipped record below. **⚠ A3 and D1 were the planned v0.13 *and* v0.14 themes but got displaced
