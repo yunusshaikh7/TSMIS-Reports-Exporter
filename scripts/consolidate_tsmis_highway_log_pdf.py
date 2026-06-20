@@ -284,26 +284,38 @@ def _make_row(vals, description):
 def parse_pdf(path, events, pdf_name=""):
     """Parse one TSMIS Highway Log PDF into TSMIS-format rows.
 
-    Returns (route, rows): `route` from the in-PDF cover (cross-checked against
-    the filename by the caller), `rows` a list of 31-column row lists in
-    document order (all counties concatenated — county is a section marker, not
-    a column). Returns (route, None) if cancelled mid-PDF.
+    Returns (route, rows, stats): `route` from the in-PDF cover (cross-checked
+    against the filename by the caller), `rows` a list of 31-column row lists in
+    document order (all counties concatenated — county is a section marker, not a
+    column), and `stats` a row-drop reconciliation dict (emitted, pages,
+    skipped_no_geometry, stale_geometry_pages). Returns (route, None, None) if
+    cancelled mid-PDF.
+
+    The reconciliation is REPORTING ONLY — the row-emit logic is unchanged, so
+    the per-route output (and every PDF comparison) is byte-identical. It just
+    makes two previously-silent conditions visible: data-looking lines dropped
+    on a page with no column geometry, and pages whose data is parsed with the
+    previous page's carried-forward geometry.
     """
     route = None
     rows = []
     last_row = None                   # description lines attach to this row
+    skipped_no_geometry = 0           # data-looking lines dropped: no column band yet
+    stale_geometry_pages = 0          # pages whose data used carried-forward geometry
 
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
         page_windows = None           # carried forward if a page lacks a data band
         for page_no, page in enumerate(pdf.pages, 1):
             if events.is_cancelled():
-                return route, None
+                return route, None, None
             if page_no % 25 == 0:
                 events.on_log(f"    …page {page_no}/{n_pages}")
             derived = _page_column_windows(page)
             if derived is not None:
                 page_windows, col0_right = derived
+            page_has_own_geometry = derived is not None
+            page_stale_logged = False    # log the carried-forward warning once per page
 
             lines = _cluster_lines(page)
             hdr_bottom = _header_bottom(lines)
@@ -345,6 +357,17 @@ def parse_pdf(path, events, pdf_name=""):
                     continue
 
                 if page_windows is None:
+                    # No column geometry has been derived yet. A postmile-leading
+                    # line here is a DATA row we cannot place — COUNT it so a
+                    # silently-dropped row surfaces in the reconciliation instead of
+                    # vanishing into a "clean" parse.
+                    if (LOCATION_RE.match(texts[0])
+                            or (len(texts) >= 2 and len(texts[0]) == 1
+                                and texts[0].isalpha() and LOCATION_RE.match(texts[1]))):
+                        skipped_no_geometry += 1
+                        events.on_log(f"    WARNING: page {page_no} has a data-looking line "
+                                      f"but no column geometry; dropped: "
+                                      f"{' '.join(texts)[:60]}")
                     continue                          # no table on this page yet
 
                 # Data row: a postmile begins inside the Location column. The
@@ -355,6 +378,16 @@ def parse_pdf(path, events, pdf_name=""):
                     or (len(texts) >= 2 and len(texts[0]) == 1 and texts[0].isalpha()
                         and LOCATION_RE.match(texts[1]) and first_x0 < col0_right))
                 if is_data:
+                    if not page_has_own_geometry and not page_stale_logged:
+                        # Data on a page with no column band of its own: parsed with
+                        # the previous page's geometry. Benign for the normal export
+                        # (the band repeats), but flag it once so a drifted layout
+                        # can't corrupt values silently.
+                        stale_geometry_pages += 1
+                        page_stale_logged = True
+                        events.on_log(f"    NOTE: page {page_no} has data rows but no column "
+                                      "band of its own; parsing with the previous page's "
+                                      "geometry (verify alignment).")
                     vals = _assign_columns(line_chars, page_windows)
                     row = _make_row(vals, None)
                     rows.append(row)
@@ -374,7 +407,10 @@ def parse_pdf(path, events, pdf_name=""):
                     else:
                         last_row[_DESC_IDX] = text
 
-    return route, rows
+    stats = {"emitted": len(rows), "pages": n_pages,
+             "skipped_no_geometry": skipped_no_geometry,
+             "stale_geometry_pages": stale_geometry_pages}
+    return route, rows, stats
 
 
 # =============================================================================
@@ -489,6 +525,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     converted = 0
     total_rows = 0
+    total_skipped = 0                # data-looking lines dropped for lack of geometry
+    total_stale_pages = 0           # pages parsed with carried-forward geometry
     failed = []
     written = set()                  # guard against duplicate route across PDFs
     for i, p in enumerate(pdfs, 1):
@@ -499,13 +537,16 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         name_m = ROUTE_FROM_NAME.search(p.stem)
         name_route = _norm_route(name_m.group(1)) if name_m else None
         try:
-            pdf_route, rows = parse_pdf(str(p), events, pdf_name=p.name)
+            pdf_route, rows, pstats = parse_pdf(str(p), events, pdf_name=p.name)
         except Exception as e:
             events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
             failed.append(p.name)
             continue
         if rows is None:                             # cancelled mid-PDF
             return ConsolidateResult(status="cancelled", message="Cancelled by user.")
+        if pstats:
+            total_skipped += pstats["skipped_no_geometry"]
+            total_stale_pages += pstats["stale_geometry_pages"]
         route = name_route or pdf_route
         if not route:
             events.on_log(f"{prefix} no route could be determined; skipping")
@@ -557,7 +598,14 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         decorate_workbook=hlc.write_legend_sheet,
     )
     if result.status == "ok":
-        result.summary_lines = [
+        notes = []
+        if total_skipped:
+            notes.append(f"⚠ INCOMPLETE: {total_skipped} data line(s) dropped (no column "
+                         "geometry) — see the log.")
+        if total_stale_pages:
+            notes.append(f"⚠ {total_stale_pages} page(s) parsed with carried-forward geometry "
+                         "— verify alignment (see the log).")
+        result.summary_lines = notes + [
             f"Route PDFs:   {len(pdfs) - len(failed)} converted"
             + (f", {len(failed)} failed {failed}" if failed else ""),
             f"Route files:  {converted} (in {conv})",

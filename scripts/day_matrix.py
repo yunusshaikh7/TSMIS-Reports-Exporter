@@ -7,9 +7,10 @@ data source for the whole matrix (default ssor-prod); no cross-environment and n
 live re-export — it compares specific HISTORICAL exports the user already pulled.
 
 It SHARES the TSN compare path (`matrix.consolidate_and_compare_tsn`) and the TSN
-dataset (`matrix.tsn_source` over `<batch_dest>/_tsn_input/highway_log/`, with the
-user's `matrix_tsn_files` pick) with the Everything matrix — only the TSMIS source
-folder (a specific run folder under output/) and the output store differ.
+dataset (`matrix.tsn_source`, now backed by the canonical TSN library and resolved
+by each row's own `tsn_subdir`, with the user's `matrix_tsn_files` pick as an
+override) with the Everything matrix — only the TSMIS source folder (a specific run
+folder under output/) and the output store differ.
 
 The matrix lists EVERY report so it's the single place TSN comparisons surface.
 Highway Log (Excel) and Highway Log (PDF) are wired today; the rest (Ramp
@@ -17,7 +18,8 @@ Summary/Detail, Highway Sequence, Intersection Summary/Detail) appear greyed —
 groundwork for 0.17.0, which plugs each report in by adding its TSN comparator +
 per-report TSN dataset and flipping `supported` in `_day_rows()` / dispatching it
 in `build_day_cell`. The store, snapshot, actions, and queue are report-agnostic;
-the shared `TSN_SUBDIR` constant is the last Highway-Log-specific bit to generalize.
+the per-row `tsn_subdir` (from `matrix.tsn_subdir_for`) carries each report's TSN
+dataset key — the old Highway-Log-only `TSN_SUBDIR` constant is gone.
 
 Console-free like the rest of the core: progress via the Events sink, exceptions
 raised — never print/input/sys.exit. Only gui_api / gui_worker drive it.
@@ -36,7 +38,6 @@ log = logging.getLogger("tsmis.day_matrix")
 
 SOURCE_DEFAULT = "ssor-prod"
 BYDAY_DIRNAME = "tsn-by-day"          # under output/comparisons/
-TSN_SUBDIR = "highway_log"            # both HL rows share one TSN dataset
 _RESULTS_FILE = "_results.json"
 
 
@@ -49,29 +50,33 @@ def sources():
 
 
 def _day_rows():
-    """[(row_key, label, subdir, fmt, supported)] for the vs-TSN matrix — EVERY
-    report, so the matrix is the single place all TSN comparisons surface. Only the
-    two Highway Log rows have a coded TSN comparator today (Excel-vs-TSN and
+    """[(row_key, label, subdir, fmt, supported, tsn_subdir)] for the vs-TSN matrix
+    — EVERY report, so the matrix is the single place all TSN comparisons surface.
+    Only the two Highway Log rows have a coded TSN comparator today (Excel-vs-TSN and
     PDF-vs-TSN); the rest (Ramp Summary/Detail, Highway Sequence, Intersection
     Summary/Detail) are greyed groundwork.
 
+    `tsn_subdir` is the report's TSN dataset key (from matrix.tsn_subdir_for): both
+    Highway Log rows share 'highway_log'; every other report uses its own subdir.
+
     0.17.0 plug-in: give a report a TSN comparator + a per-report TSN dataset, then
     flip its `supported` here and dispatch it in build_day_cell — the matrix shell,
-    store, actions, and snapshot are already report-agnostic. (The shared TSN
-    dataset constant TSN_SUBDIR is the last Highway-Log-specific bit; generalize it
-    to a per-row tsn_subdir when the other reports' TSN drops are defined.)"""
+    store, actions, and snapshot are already report-agnostic and resolve TSN per
+    `tsn_subdir`."""
     out = []
-    for row_key, label, subdir, _idx, _adapter in reports.matrix_rows():
+    for row_key, label, subdir, _idx, adapter in reports.matrix_rows():
+        tsn_subdir = matrix.tsn_subdir_for(row_key, subdir, adapter)
         if row_key == "highway_log":
-            out.append((row_key, label, subdir, "excel", True))
+            out.append((row_key, label, subdir, "excel", True, tsn_subdir))
         elif row_key == "highway_log_pdf":
-            out.append((row_key, label, subdir, "pdf", True))
+            out.append((row_key, label, subdir, "pdf", True, tsn_subdir))
         else:
-            out.append((row_key, label, subdir, None, False))
+            out.append((row_key, label, subdir, None, False, tsn_subdir))
     # Intersection Summary/Detail have no cross-env adapter (absent from
     # matrix_rows), so add them here as greyed groundwork rows.
     for row_key, label, subdir in reports.tsn_matrix_extra_rows():
-        out.append((row_key, label, subdir, None, False))
+        out.append((row_key, label, subdir, None, False,
+                    matrix.tsn_subdir_for(row_key, subdir, None)))
     return out
 
 
@@ -193,18 +198,34 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
     rows = [r for r in all_rows if r[0] not in hidden]
     results = load_results()
 
-    # The shared TSN dataset (one for both HL rows). `dest` is the Everything
-    # matrix's batch_dest so the by-day matrix reuses the same _tsn_input folder.
-    src_tsn = (matrix.tsn_source(dest, TSN_SUBDIR, tsn_files.get(TSN_SUBDIR))
-               if dest else {"kind": "none"})
-    tsn_ready = src_tsn.get("kind") in ("file", "consolidated")
-    tsn_meta = {"supported": True, "source_kind": src_tsn.get("kind"),
-                "source_path": src_tsn.get("path"), "pdf_count": src_tsn.get("pdf_count"),
-                "tsn_subdir": TSN_SUBDIR, "file": tsn_files.get(TSN_SUBDIR),
-                "input_dir": str(matrix.tsn_input_root(dest, TSN_SUBDIR)) if dest else None}
+    # The TSN dataset is resolved PER ROW by its tsn_subdir (both HL rows share
+    # 'highway_log'), cached so each distinct dataset is resolved once. `dest` is
+    # the Everything matrix's batch_dest so the by-day matrix reuses the same TSN
+    # library / _tsn_input fallback + the user's matrix_tsn_files pick.
+    _tsn_cache = {}
+
+    def _tsn_for(sub):
+        if sub not in _tsn_cache:
+            _tsn_cache[sub] = (matrix.tsn_source(dest, sub, tsn_files.get(sub))
+                               if dest else {"kind": "none"})
+        return _tsn_cache[sub]
+
+    # The single shared TSN picker shows the primary supported dataset (Highway Log
+    # today). Per-row readiness still drives each cell below.
+    supported_subdirs = []
+    for r in all_rows:
+        if r[4] and r[5] not in supported_subdirs:
+            supported_subdirs.append(r[5])
+    primary = supported_subdirs[0] if supported_subdirs else "highway_log"
+    src_primary = _tsn_for(primary)
+    tsn_meta = {"supported": True, "source_kind": src_primary.get("kind"),
+                "source_path": src_primary.get("path"),
+                "pdf_count": src_primary.get("pdf_count"),
+                "tsn_subdir": primary, "file": tsn_files.get(primary),
+                "input_dir": str(matrix.tsn_input_root(dest, primary)) if dest else None}
 
     cells = {}
-    for row_key, _label, subdir, fmt, supported in rows:
+    for row_key, _label, subdir, fmt, supported, tsn_subdir in rows:
         per = {}
         for date in days:
             tdir = tsmis_dir(date, source, subdir)
@@ -214,6 +235,8 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
             if not supported:
                 cmp = {"supported": False}
             else:
+                src_tsn = _tsn_for(tsn_subdir)
+                tsn_ready = src_tsn.get("kind") in ("file", "consolidated")
                 rec = results.get(f"{day_folder_name(date, source)}|{row_key}")
                 srcs = [{"name": "cell", "present": exp_m is not None, "mtime": exp_m},
                         {"name": "tsn", "present": tsn_ready, "mtime": src_tsn.get("mtime")}]
@@ -228,7 +251,7 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
     day_consolidated = {}
     for date in days:
         subs = {}
-        for _k, _label, subdir, fmt, supported in all_rows:
+        for _k, _label, subdir, fmt, supported, _tsn_subdir in all_rows:
             if not supported:
                 continue
             tdir = tsmis_dir(date, source, subdir)
@@ -294,11 +317,11 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     # normal path). The combined folder name must parse as a real run folder.
     if not parse_run_folder(day_folder_name(date, source)):
         raise ValueError(f"invalid date/source for the by-day matrix: {date!r} / {source!r}")
-    _k, _label, subdir, fmt, supported = rows[row_key]
+    _k, _label, subdir, fmt, supported, tsn_subdir = rows[row_key]
     if not supported:
         raise ValueError(f"no TSN comparison for {row_key} yet")
     tsn_files = tsn_files or {}
-    src_tsn = matrix.tsn_source(dest, TSN_SUBDIR, tsn_files.get(TSN_SUBDIR))
+    src_tsn = matrix.tsn_source(dest, tsn_subdir, tsn_files.get(tsn_subdir))
     if src_tsn.get("kind") not in ("file", "consolidated"):
         raise ValueError("no consolidated TSN workbook available")
 

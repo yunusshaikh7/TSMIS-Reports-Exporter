@@ -332,6 +332,29 @@ factored out — byte-identical to the prior output), the TSN dataset/picker, an
 ONE job queue (a `which:env|day` Job discriminator routes to the right worker). Engine
 + store details: [comparison-engine.md](comparison-engine.md) §12/§12b.
 
+### v0.17.0 — the canonical TSN library + per-row `tsn_subdir`
+
+The six TSN reports essentially never change, so v0.17.0 gives them **one fixed home**
+instead of scattering them across drop folders: `scripts/tsn_library.py` over
+`<DATA_ROOT>/tsn_library/<report>/` (`raw/` = the raw TSN file(s) as exported — district
+PDFs / a statewide PDF / a statewide XLSX, the format is the report's own; `consolidated/`
+= the generated consolidated/normalized Excel, built once and reused since a couple of TSN
+reports are PDFs). Paths come from `paths.tsn_library_{dir,raw_dir,consolidated_path}`.
+The module is console-free with **lazy** consolidator imports (so importing it never pulls
+pdfplumber), and exposes `status`/`all_status` (raw present? consolidated present? current
+vs the raw?), `import_raw`, `build_consolidated` (reuses when current), and **`resolve`** —
+the matrices' single TSN entry point, returning the same `{kind: file|consolidated|pdfs|
+raw|none, …}` contract as before.
+
+`matrix.tsn_source` now **delegates to `tsn_library.resolve`**: an explicit user pick
+(`settings.matrix_tsn_files`, keyed by report) wins; else the library; else the legacy
+fallbacks (`<dest>/_tsn_input/<report>/`, then the global console-flow
+`input/tsn_highway_log/` + `output/tsn_highway_log_consolidated.xlsx`) so existing installs
+keep working until imported. The report key IS the per-row **`tsn_subdir`**
+(`matrix.tsn_subdir_for`): both Highway Log rows share `highway_log`, every other report
+uses its own. This replaced `day_matrix.TSN_SUBDIR` (deleted) — the by-day matrix now
+resolves TSN per row, so plugging in a report is just registering it + flipping `supported`.
+
 ## See also
 
 - [reports.md](reports.md) — the per-report `ReportSpec` details and how to add a

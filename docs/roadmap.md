@@ -73,10 +73,14 @@ the field bug + P1s first.
   Code-signing (Standing § below) is the fix; consider a pinned-in-build public key.
 
 ### P2 — bounded correctness / robustness / IT
-- [ ] **P2 PDF Highway Log silent-drop trio** (`pdf-stale-geometry-carryforward-silent-corruption`,
-  `pdf-page-skip-unlogged-when-no-prior-geometry`, `pdf-consolidator-no-row-count-verification`) —
-  the cell-rect parser carries forward stale page geometry / skips data lines with **no log**, and
-  never cross-checks extracted rows vs the PDF's data-row count. Log + guard + add a runtime count.
+- [x] **P2 PDF Highway Log silent-drop trio** (`pdf-stale-geometry-carryforward-silent-corruption`,
+  `pdf-page-skip-unlogged-when-no-prior-geometry`, `pdf-consolidator-no-row-count-verification`)
+  ✅ **Done (v0.17.0 Phase 1)** — `consolidate_tsmis_highway_log_pdf.parse_pdf` now returns a `stats`
+  dict (emitted / skipped_no_geometry / stale_geometry_pages); data-looking lines on a page with no
+  column band are COUNTED + logged (WARNING), pages parsed with carried-forward geometry are flagged
+  once each (NOTE), and `consolidate()` leads with a ⚠ INCOMPLETE / carried-forward banner. Reporting
+  only — the row-emit logic is byte-identical (PDF comparisons unchanged). Locked by
+  `check_tsmis_pdf_reconcile.py`. (The TSN sibling already logs per-route row counts.)
 - [x] **P2 `report-error-text-blanket-swallow-hides-fatal`** / **`highway-sequence-errored-route-can-record-empty`**
   ✅ **Done (this update)** — `report_error_text` now LOGS the swallowed probe exception (no longer
   silent), and Highway Sequence's `is_empty` keys on the POSITIVE "No results found" text (hsl.js)

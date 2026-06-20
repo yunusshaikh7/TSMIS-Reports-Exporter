@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import matrix
+import paths
 
 _fail = []
 
@@ -88,6 +89,14 @@ def test_paths_and_modes():
 def test_source_detection():
     print("tsn_source detection (file / consolidated / pdfs / none):")
     dest = Path(tempfile.mkdtemp(prefix="tsmis_tsn_"))
+    # tsn_source now resolves through the canonical TSN library (tsn_library.resolve):
+    # the dest-scoped _tsn_input drop is one fallback among the library home + the
+    # global legacy locations. Isolate ALL of those roots to temp dirs so the unit
+    # test exercises only the dest drop it plants (no real dev-repo TSN leaks in).
+    saved_roots = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT)
+    paths.TSN_LIBRARY_ROOT = dest / "_lib"
+    paths.OUTPUT_ROOT = dest / "_out"
+    paths.INPUT_ROOT = dest / "_in"
     try:
         sub = "highway_log"
         check("empty folder -> none", matrix.tsn_source(dest, sub)["kind"] == "none")
@@ -105,7 +114,14 @@ def test_source_detection():
         check("a non-xlsx selection is ignored (falls back to scan)",
               matrix.tsn_source(dest, sub, selected_file=str(dest / "nope.pdf"))["kind"]
               == "consolidated")
+        # The canonical TSN library takes precedence over the legacy dest drop.
+        lib_cons = paths.tsn_library_consolidated_path(sub, "tsn_highway_log_consolidated.xlsx")
+        _touch(lib_cons)
+        r = matrix.tsn_source(dest, sub)
+        check("library consolidated preferred over the legacy dest drop",
+              r["kind"] == "consolidated" and Path(r["path"]) == lib_cons)
     finally:
+        paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT = saved_roots
         shutil.rmtree(dest, ignore_errors=True)
 
 

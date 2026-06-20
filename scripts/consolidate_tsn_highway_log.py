@@ -411,20 +411,31 @@ def _write_route_workbook(rows, out_path):
 # Entry point
 # =============================================================================
 
-def consolidate(events=None, confirm_overwrite=None, day=None):
+def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
+    """Canonical-TSN-library entry point: parse the district PDFs in `raw_dir` and
+    write the combined workbook to `out_path`. A thin wrapper over consolidate()
+    so tsn_library can build any report through one uniform builder signature."""
+    return consolidate(events=events, confirm_overwrite=confirm_overwrite,
+                       input_dir=raw_dir, out_path=out_path)
+
+
+def consolidate(events=None, confirm_overwrite=None, day=None,
+                input_dir=None, out_path=None):
     """Convert every TSN district Highway Log PDF to TSMIS-format per-route
     workbooks, then combine them all into one workbook (Route column added).
 
     `day` is accepted for interface compatibility with the other consolidators
     and ignored — TSN PDFs are vendor snapshots in one fixed input folder, not
-    dated exports.
+    dated exports. `input_dir`/`out_path` override the fixed legacy locations
+    (the canonical TSN library passes its own raw/consolidated paths here);
+    when omitted they default to the legacy INPUT_DIR / OUT_PATH.
 
     Console-free: reports progress via events.on_log, asks before overwriting
     through the confirm_overwrite(path)->bool callback, and returns a
     ConsolidateResult. Honors events.is_cancelled() between pages.
     """
-    in_dir = INPUT_DIR
-    out = OUT_PATH
+    in_dir = Path(input_dir) if input_dir else INPUT_DIR
+    out = Path(out_path) if out_path else OUT_PATH
     events = events or Events()
     if not _DEPS_OK:
         return ConsolidateResult(

@@ -69,6 +69,17 @@ OUTPUT_ROOT = DATA_ROOT / "output"
 # source data is NOT produced by this app's exports.
 INPUT_ROOT = DATA_ROOT / "input"
 
+# Canonical TSN library: the ONE fixed home for each report's TSN source data.
+# The six TSN reports essentially never change, so rather than scatter them
+# across per-run drop folders they live here, keyed by report (the same token as
+# the matrix's per-row `tsn_subdir`, e.g. "highway_log", "ramp_detail"). Each
+# report keeps its RAW TSN file(s) (district PDFs / a statewide PDF / a statewide
+# XLSX — the format is the report's own) plus the GENERATED consolidated /
+# normalized Excel built once from them and reused for every comparison. The
+# matrices default to this library; an explicit user file-pick still overrides.
+# See scripts/tsn_library.py.
+TSN_LIBRARY_ROOT = DATA_ROOT / "tsn_library"
+
 # Exports are grouped into RUN FOLDERS: output/<YYYY-MM-DD src-env>/<report>/
 # (e.g. "2026-06-11 ssor-prod"), so a new day's run never resumes over (or
 # mixes with) yesterday's files AND different data source / environment
@@ -135,6 +146,25 @@ def env_tagged_filename(filename, tag):
     if not tag:
         return filename
     return f"{tag} {filename}"
+
+
+def tsn_library_dir(report):
+    """<DATA_ROOT>/tsn_library/<report>/ — the report's TSN home. `report` is the
+    tsn_subdir token (e.g. 'highway_log', 'ramp_detail')."""
+    return TSN_LIBRARY_ROOT / report
+
+
+def tsn_library_raw_dir(report):
+    """Where the report's RAW TSN file(s) live (district PDFs, a statewide PDF, or
+    a statewide XLSX — the format is the report's own)."""
+    return tsn_library_dir(report) / "raw"
+
+
+def tsn_library_consolidated_path(report, filename):
+    """The report's GENERATED consolidated/normalized workbook, built once from the
+    raw and reused for every comparison (a couple of TSN reports are PDFs, so this
+    Excel is what the engine actually reads)."""
+    return tsn_library_dir(report) / "consolidated" / filename
 
 
 def output_day_dir(day=None):

@@ -252,34 +252,16 @@ def tsn_comparisons_root(dest):
 
 
 def tsn_source(dest, subdir, selected_file=None):
-    """Resolve the TSN dataset. A user-picked `selected_file` wins (must be a real
-    .xlsx). Otherwise scan <dest>/_tsn_input/<subdir>/: a consolidated .xlsx
-    (newest) is used; only district PDFs -> the 'prompt to consolidate' state;
-    nothing -> none. Returns {kind: file|consolidated|pdfs|none, path?, mtime?,
-    pdf_count?}."""
-    if selected_file:
-        p = Path(selected_file)
-        if p.is_file() and p.suffix.lower() == ".xlsx":
-            return {"kind": "file", "path": str(p), "mtime": _safe_mtime(p)}
-    root = tsn_input_root(dest, subdir)
-    xlsx, pdfs = [], 0
-    try:
-        for e in root.iterdir():
-            if not e.is_file():
-                continue
-            sfx = e.suffix.lower()
-            if sfx == ".xlsx" and not e.name.startswith("~$"):
-                xlsx.append(e)
-            elif sfx == ".pdf":
-                pdfs += 1
-    except OSError:
-        pass
-    if xlsx:
-        newest = max(xlsx, key=lambda q: _safe_mtime(q) or 0)
-        return {"kind": "consolidated", "path": str(newest), "mtime": _safe_mtime(newest)}
-    if pdfs:
-        return {"kind": "pdfs", "pdf_count": pdfs}
-    return {"kind": "none"}
+    """Resolve the TSN dataset for a report `subdir`, returning {kind:
+    file|consolidated|pdfs|raw|none, path?, mtime?, pdf_count?, raw_count?}.
+
+    Delegates to the canonical TSN library (tsn_library.resolve): an explicit
+    user-picked `selected_file` wins; else the library's consolidated workbook;
+    else its raw file(s) -> the 'consolidate first' state; else the legacy
+    dest-scoped drop <dest>/_tsn_input/<subdir>/ and the global legacy locations
+    (back-compat) — so an existing install keeps resolving until imported."""
+    import tsn_library                              # lazy: no import cycle
+    return tsn_library.resolve(subdir, selected_file, legacy_dest=dest)
 
 
 # --- per-row comparison MODE registry -------------------------------------- #
@@ -313,6 +295,17 @@ def _mode_by_id(modes, mode_id):
         if m["id"] == mode_id:
             return m
     return modes[0]                          # default to env
+
+
+def tsn_subdir_for(row_key, subdir, adapter=None):
+    """The TSN dataset key (per-row `tsn_subdir`) for a row's vs-TSN comparison.
+    Both Highway Log rows share ONE TSN dataset ('highway_log'); every other report
+    uses its own subdir. The single source of truth is the row's 'tsn' mode in
+    _row_modes — this is what replaces day_matrix's hardcoded TSN_SUBDIR."""
+    for m in _row_modes(row_key, subdir, adapter):
+        if m.get("kind") == "tsn":
+            return m.get("tsn_subdir") or subdir
+    return subdir
 
 
 def tsn_capable(row_key):

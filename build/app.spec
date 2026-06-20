@@ -75,6 +75,7 @@ APP_MODULES = [
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
     "consolidate_tsn_highway_log", "consolidate_tsmis_highway_log_pdf",
+    "tsn_library",
     "compare_core", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
     "gui_main", "gui_api", "gui_worker",
 ]
