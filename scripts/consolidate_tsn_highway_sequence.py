@@ -56,6 +56,11 @@ from compare_core import is_formula_injection
 from events import ConsolidateResult, Events
 from paths import INPUT_ROOT, OUTPUT_ROOT
 
+# Standalone / console (.bat) default locations — see the matching note in
+# consolidate_tsn_highway_log.py. The GUI/matrices build through the canonical
+# git-ignored tsn_library/ tree (tsn_library.build_into); this OUT_PATH holds
+# Caltrans-internal TSN data and is git-ignored (output/* + the explicit
+# output/tsn_* rule in .gitignore) — never add an "!output/tsn_*" allowlist entry.
 INPUT_DIR = INPUT_ROOT / "tsn_highway_sequence"
 OUT_PATH = OUTPUT_ROOT / "tsn_highway_sequence_consolidated.xlsx"
 

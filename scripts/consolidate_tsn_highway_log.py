@@ -65,6 +65,13 @@ from consolidate_xlsx_base import consolidate_xlsx
 from events import ConsolidateResult, Events
 from paths import INPUT_ROOT, OUTPUT_ROOT
 
+# Standalone / console (.bat) default locations. The GUI + matrices build through
+# the canonical TSN library instead — tsn_library.build_into() passes its own
+# raw/consolidated paths under the git-ignored tsn_library/<report>/ tree, and
+# tsn_library._legacy_{raw_dir,consolidated}() keep these legacy paths readable as
+# a back-compat fallback. These output paths hold Caltrans-internal TSN data; they
+# are git-ignored (output/* + an explicit output/tsn_* belt-and-suspenders rule in
+# .gitignore) — never add an "!output/tsn_*" allowlist entry.
 INPUT_DIR = INPUT_ROOT / "tsn_highway_log"
 CONVERTED_DIR = OUTPUT_ROOT / "tsn_highway_log"   # per-route TSMIS-format workbooks
 OUT_PATH = OUTPUT_ROOT / "tsn_highway_log_consolidated.xlsx"

@@ -32,6 +32,21 @@ output/consolidated/*
 !output/intersection_detail/.gitkeep
 !output/consolidated/.gitkeep
 
+# Belt-and-suspenders for the two legacy TSN consolidators: their standalone /
+# console (.bat) runs write Caltrans-internal TSN data into output/ rather than
+# the dedicated tsn_library/ tree (consolidate_tsn_highway_log -> output/
+# tsn_highway_log/ + output/tsn_highway_log_consolidated.xlsx;
+# consolidate_tsn_highway_sequence -> output/tsn_highway_sequence_consolidated
+# .xlsx). The output/* rule above already ignores them, but these EXPLICIT rules
+# come AFTER the output allowlist so a future "!output/<subdir>/" entry mirroring
+# the report folders can never silently make real Caltrans data trackable.
+# NEVER add an "!output/tsn_*" allowlist entry. (The GUI/matrices build through
+# the git-ignored tsn_library/ tree instead; see scripts/tsn_library.py.)
+output/tsn_highway_log/
+output/tsn_highway_sequence/
+output/tsn_*_consolidated.xlsx
+output/tsn_*_normalized.xlsx
+
 # input/ holds user-supplied source files (TSN district PDFs — these come from
 # outside the app). Keep the folder structure via .gitkeep, ignore the files
 # themselves. (The TSMIS Highway Log PDFs are this app's OWN export now, read from
