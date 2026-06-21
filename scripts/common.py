@@ -456,12 +456,17 @@ def _site_params_ok(page):
     return True
 
 
-def navigate_with_auth(page, *, budget_s=60):
+def navigate_with_auth(page, *, budget_s=60, should_cancel=None):
     """Open the TSMIS page and see the sign-in through.
 
     `budget_s` caps the sign-in loop (default 60s). The quiet background
     active-env check passes a shorter budget so a managed PC's silent SSO still
     completes but an unreachable machine fails fast instead of hanging.
+
+    `should_cancel` (optional) is polled once per ~1s pass; when it returns True
+    the sign-in loop stops early so a user Stop/Cancel doesn't have to wait out
+    the whole budget (the caller sees not-signed-in and handles the cancel). It
+    defaults to None — existing callers are unchanged.
 
     The app NEVER shows a signed-out page: with no token it immediately
     redirects itself into the portal OAuth flow (same tab). The portal keeps
@@ -499,6 +504,9 @@ def navigate_with_auth(page, *, budget_s=60):
             last_note = msg
 
     while time.monotonic() < deadline:
+        if should_cancel is not None and should_cancel():
+            note("cancel requested — stopping sign-in")
+            break
         try:
             if is_logged_in(page):
                 if _site_params_ok(page) or reloaded_for_params:

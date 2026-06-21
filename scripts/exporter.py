@@ -576,7 +576,14 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
         browser, _ctx, page = new_authed_browser(p)
         try:
             events.on_status(events.worker_no, "Opening TSMIS + signing in…")
-            navigate_with_auth(page)
+            # Poll the cancel signal during the sign-in wait so a Stop / "Stop all"
+            # aborts within ~1s instead of waiting out the full budget — and bail
+            # cleanly (no AuthError modal) when the user cancelled mid-sign-in.
+            navigate_with_auth(page, should_cancel=events.is_cancelled)
+            if events.is_cancelled():
+                events.on_log("Cancelled by user.")
+                log.info("cancelled by user during sign-in")
+                return result
             require_signed_in(
                 page,
                 "Sign-in didn't complete - the saved session may be expired, "

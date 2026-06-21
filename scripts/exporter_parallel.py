@@ -143,7 +143,13 @@ def _preflight_once(spec, events):
     with sync_playwright() as p:
         browser, _ctx, page = new_authed_browser(p, parallel=True)
         try:
-            navigate_with_auth(page)
+            # Poll the cancel signal during sign-in so a Stop aborts within ~1s
+            # instead of waiting out the full budget; bail clean (no AuthError) on
+            # a cancel mid-sign-in — the caller checks is_cancelled() right after.
+            navigate_with_auth(page, should_cancel=events.is_cancelled)
+            if events.is_cancelled():
+                log.info("parallel preflight cancelled during sign-in")
+                return
             require_signed_in(
                 page,
                 "Sign-in didn't complete - the saved session may be expired, "
@@ -263,6 +269,10 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                       "available; it keeps the one-click sign-in).")
 
     _preflight_once(spec, events)
+    if events.is_cancelled():
+        # Stop hit during sign-in — don't launch N browsers just to no-op.
+        events.on_log("Cancelled by user.")
+        return RunResult(output_dir=str(out_dir))
     events.on_log("Ready. Starting export.")
 
     work = queue.Queue()
@@ -286,7 +296,9 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                 browser, _ctx, page = new_authed_browser(p, parallel=True)
                 try:
                     wevents.on_status(wevents.worker_no, "Opening TSMIS + signing in…")
-                    navigate_with_auth(page)
+                    navigate_with_auth(page, should_cancel=wevents.is_cancelled)
+                    if wevents.is_cancelled():
+                        raise RunCancelled()      # Stop mid-sign-in: clean wind-down
                     require_signed_in(
                         page,
                         "Sign-in didn't complete - the session may have "

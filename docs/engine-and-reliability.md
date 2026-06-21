@@ -79,6 +79,8 @@ Console `S` key / GUI Skip button → `events.should_skip()`, polled inside `wai
 
 Stops the **current** export immediately, not just between routes. `wait_with_skip_option` checks `events.is_cancelled()` first thing every poll (~5 s) and raises `RunCancelled` mid-wait. `_attempt_route` also re-checks after the wait returns ("cancel landed between the wait and the save"). The engines catch `RunCancelled`, log "Cancelled by user", and stop cleanly — it is **not** a route failure or a worker crash. A partial `RunResult` is returned; re-running resumes. `RunCancelled` and `AuthError` are never retried and never recorded as failed.
 
+**Cancel during the sign-in wait (v0.17.1).** Cancel also interrupts the up-front `navigate_with_auth` sign-in loop, which previously polled nothing and could hold a stuck/failing sign-in for the whole budget (~60 s) — so a matrix-queue **Stop all** / **Clear queued** felt unresponsive while a job was "signing in". `navigate_with_auth(page, *, should_cancel=None)` now polls `should_cancel` once per ~1 s pass and stops early; `run_export` (and the parallel `_preflight_once` + each worker) pass `events.is_cancelled` and, when it fires mid-sign-in, bail **cleanly** — no spurious `AuthError`/login modal (sequential: early `return result`; parallel worker: `raise RunCancelled`; preflight: caller checks `is_cancelled()` and skips launching browsers). Default `should_cancel=None` keeps every other caller unchanged. A genuine login failure still surfaces in ≤ budget with the login modal — but it's now interruptible.
+
 ---
 
 ## End-of-run serial retry pass
