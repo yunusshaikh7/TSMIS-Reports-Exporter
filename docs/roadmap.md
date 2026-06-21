@@ -4,15 +4,27 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
-> **v0.17.0 SHIPPED — all-report TSN comparison + consolidation.** Every report now compares
-> **vs TSN** AND **cross-environment** in both matrices; Intersection reports **consolidate**; a
-> **canonical TSN library** + **Settings ▸ TSN reports** panel; the one-stop **Export today**
-> by-day column; **drag-to-reorder** rows/columns — plus a **login/browser overhaul** (quiet
-> background Edge one-click check; the Browser dropdown → a read-only "Export via…" indicator with
-> the choice moved to **Settings ▸ Export browser**) and **env-check warning flags on both
-> matrices**. Per-version detail: `CHANGELOG.md`; the build journal + audit recipe:
-> **[v0.17.0-prompt.md](v0.17.0-prompt.md)**. **Owed:** push the `v0.17.0` tag to cut the release,
-> + work-PC live verification. No next big effort scheduled — see the backlog below.
+> **v0.17.1 SHIPPED — hotfix on v0.17.0.** v0.17.0 brought **all-report TSN comparison +
+> consolidation** (every report compares **vs TSN** AND **cross-environment** in both matrices;
+> Intersection reports **consolidate**; a **canonical TSN library** + **Settings ▸ TSN reports**
+> panel; the one-stop **Export today** by-day column; **drag-to-reorder**; a **login/browser
+> overhaul**; **env-check flags on both matrices**). **v0.17.1** then fixed field issues found
+> using it: matrix tabs scrolling into blank space (the recurring sr-only containing-block bug →
+> **Lesson 10**), the cramped Matrix-options panel, Stop/Clear not interrupting a stuck sign-in,
+> the TSN "Choose…" dialog default, a self-documenting TSN library — plus two **security** gitignore
+> fixes (`tsn_library/` was never ignored; belt-and-suspenders `output/tsn_*`). Per-version detail:
+> `CHANGELOG.md`; v0.17.0 build journal: **[v0.17.0-prompt.md](v0.17.0-prompt.md)**.
+>
+> **Owed:** **work-PC live verification** (dev PC can't reach TSMIS — live export/compare, the
+> background one-click check, updater field-test) · the **gh-pages** landing-page regen · two
+> **deferred v0.17.1 follow-ups:** (1) **cancel-latency** — Stop now interrupts the `navigate_with_auth`
+> sign-in wait, but `preflight`/`select_report` (the ~60s county-enable `wait_for_function`) and
+> `_recover` (mid-batch re-login) still aren't cancel-polled, so a Stop in those after-sign-in /
+> recovery windows can wait up to the budget (chunking those field-hardened waits is risky to ship
+> unverified — same opt-in `should_cancel` pattern when tackled); (2) **narrow-mode** (<980 CSS px,
+> e.g. 1366×768 @150% DPI) **matrix-tab polish** — the wide layout's card-hide / height-fill /
+> config-uncap rules live inside `@media (min-width:980px)`, so a small/high-DPI laptop shows stray
+> idle cards + a cramped (but present) Matrix-options panel on the matrix sub-tabs.
 
 ## How to maintain this file
 
