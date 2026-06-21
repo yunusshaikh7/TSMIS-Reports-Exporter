@@ -80,6 +80,13 @@ spike/
 /batch_job.json
 /data/batch_job.json
 
+# Canonical TSN library (paths.TSN_LIBRARY_ROOT; dev: repo root, packaged app:
+# data\tsn_library). Holds the user's REAL TSN source + consolidated files,
+# which are LOCAL ONLY (Caltrans-internal) and must NEVER be committed. The
+# packaged data\ location is covered by the blanket /data/ rule below; this is
+# the dev-root one. (ensure_layout() seeds folders/hints here on app start.)
+/tsn_library/
+
 # The packaged app's data dir (profiles, caches, settings, manifests, downloaded
 # browser). All current contents are ignored individually above; this blanket
 # rule is defense-in-depth so a future data\ file can't be committed by accident.
