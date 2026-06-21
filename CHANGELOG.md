@@ -3,6 +3,31 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.17.1 — 2026-06-21
+
+A quick fix-up of issues found using v0.17.0 on the matrices.
+
+- **No more blank space below the matrices.** A hidden control in the Matrix-options
+  panel was stretching the page so it could scroll down into a large empty area below
+  the window. The panel's fast-mode / comparison-output toggles are now contained, so
+  the matrix tabs stay put.
+- **The Matrix-options panel is usable again.** On shorter screens it was being squeezed
+  into a tiny scrolling sliver while the activity log hogged the space — now the options
+  (queue, day columns, set-all modes, report toggles, fast mode) get the room and the log
+  shrinks to a compact status strip.
+- **Stop / Clear now work quickly when sign-in is failing or slow.** A matrix export that
+  couldn't sign in used to ignore **Stop all** / **Clear queued** until its sign-in
+  attempt timed out; both now interrupt the sign-in within about a second (normal and
+  fast mode), so a stuck queue clears right away instead of feeling frozen.
+- **The TSN "Choose…" picker opens to the TSN library.** Picking a TSN workbook on either
+  matrix now starts in that report's own folder inside the TSN library, instead of the old
+  per-run input location.
+- **The TSN library is now self-documenting.** It starts as a ready-made folder tree —
+  each report has its own `…/<report>/raw/` folder with a short note saying which file(s)
+  to drop there, plus a README — so it's clear where to put your TSN reports before you
+  import the first one. **Open folder** (Settings ▸ TSN reports) creates this tree on
+  demand too.
+
 ## v0.17.0 — 2026-06-20
 
 - **Every report now compares against TSN — not just Highway Log.** Ramp Summary,
