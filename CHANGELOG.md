@@ -3,6 +3,48 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.17.0 — 2026-06-20
+
+- **Every report now compares against TSN — not just Highway Log.** Ramp Summary,
+  Ramp Detail, Highway Sequence, Highway Log (Excel and PDF), and Intersection
+  Summary & Detail each have a TSMIS-vs-TSN comparison, live in **both** the Everything
+  matrix and the by-day "vs TSN" matrix. The rows that used to be greyed "coming next
+  update" are now active, and **"Set all to vs TSN"** switches every report at once.
+- **And every report compares between environments.** Intersection Summary/Detail and
+  Highway Log (PDF) gained their cross-environment comparison too, so the grid is now
+  complete: every report × {between environments, vs TSN}, plus Highway Log's
+  PDF-vs-Excel self-check.
+- **Intersection Summary & Detail now consolidate** into a single workbook like every
+  other report — so they can be compared and reused, not just exported.
+- **A home for your TSN data.** Each report's TSN source (district PDFs or a statewide
+  workbook) lives in one fixed folder, managed from a new **Settings ▸ TSN reports**
+  panel: import the raw file(s) once, click **Rebuild**, and a status dot shows whether
+  the comparison data is current. The panel shows the folder location with an
+  **Open folder** button, and on the matrix each report has its own TSN picker.
+- **One-stop "Export today" on the vs-TSN-by-day matrix.** A new **Export today →**
+  button (and per-row / per-cell ↻) pulls a fresh, dated column for every report and
+  automatically consolidates and compares each one against TSN — filling the column in
+  one go. Only today is exportable; past days stay as the immutable record you pulled.
+  Fast mode, worker count, and pause/skip all apply.
+- **Sign-in and browser, made obvious.** Edge one-click sign-in is now checked quietly
+  in the background (on launch and when you switch site), so the indicator lights up by
+  itself. The **Log in** button now simply opens Google Chrome to save a reusable login.
+  The old Browser dropdown is gone — the title bar shows a read-only **"Export via …"**
+  indicator of what's actually exporting, and the one real choice (Built-in Chromium vs
+  installed Chrome, Chrome by default) moved to **Settings ▸ Export browser**. Microsoft
+  Edge is still used for one-click sign-in and as a fallback.
+- **The matrices warn you before an export fails.** When the environment check has found
+  a report greyed-out or missing on a site, both matrices now flag that report/cell amber
+  — the same warning the Export tab shows — so a doomed comparison is obvious up front.
+- **Drag to reorder.** Rows and columns on both matrices can be dragged into the order
+  you prefer; the order is remembered.
+- **Divided-roadbed routes match correctly.** Intersection rows whose TSN route carries a
+  roadbed suffix (e.g. 210U vs 210) are now matched to their TSMIS counterpart, with a
+  note when the suffix is the only difference.
+- **Reliability + polish.** The Highway Log PDF reader now flags an incomplete parse
+  instead of silently dropping rows; a thorough UI-consistency pass; and a large new set
+  of automated checks across every new comparison.
+
 ## v0.16.1 — 2026-06-19
 
 - **The TSN comparison view is now a full matrix that covers every report.** The

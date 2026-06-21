@@ -3,8 +3,8 @@
 How a one-day console script became a portable, self-updating Windows desktop
 app — told from the repository.
 
-**By the numbers:** 191 commits · 37 pull requests · 34 tagged releases ·
-7 report types · **May 20 → June 19, 2026**.
+**By the numbers:** 277 commits · 39 pull requests · 38 tagged releases ·
+7 report types · **May 20 → June 20, 2026**.
 
 This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
 "how it works and why") and [`CHANGELOG.md`](../CHANGELOG.md)
@@ -41,6 +41,9 @@ that rewrote the design.
 | `v0.14.2` | Jun 18 | Consolidate-label clarity + a 22-finding UI-vs-logic audit |
 | `v0.14.3` | Jun 19 | An "IT-README" security handout that ships in the app folder and rides updates |
 | `v0.15.0` | Jun 19 | **The Everything comparison matrix** (cross-env + vs-TSN, two Highway Log rows) + an app-wide UI polish & motion pass |
+| `v0.16.0` | Jun 19 | Matrix job **queue** + **fast mode**; a Compare-tab **vs-TSN-by-day** matrix |
+| `v0.16.1` | Jun 19 | Matrix polish: pause/skip/preview, reused consolidated, opt-in formulas, Intersection export + dev-site switch |
+| `v0.17.0` | Jun 20 | **Every report compares vs TSN + cross-env**; Intersection consolidators; canonical TSN library; one-stop Export-today; login/browser overhaul |
 
 ---
 
@@ -210,6 +213,37 @@ Chapter 7.
   roadbeds, surfacing ~4,800 genuine differences the old key hid. The `.14.1`/`.14.2`
   hotfixes folded the Highway Log comparisons into a Compare sub-tab, clarified the
   Consolidate labels, and cleared a 22-finding UI-vs-logic audit.
+
+## Chapter 11 — The comparison matrix, then every report (June 19 → 20) · `v0.15.0` → `v0.17.0`
+
+The Compare tab had always been one-report-at-a-time. `v0.15.0` turned it into a
+**grid** — the **Everything comparison matrix** (report × environment), each cell a
+colour-coded discrepancy count with per-cell / per-row / per-column refresh, all over the
+one schema-driven `compare_core`, left untouched. `v0.16.0` made the grid *workable* at
+scale: a **job queue** so a second click lines up instead of being rejected, **fast mode**
+(several browsers at once), and a second, **by-day** matrix that pits a chosen export day
+against TSN. `v0.16.1` polished both and **staged** the finale — every report appeared in
+the vs-TSN matrix, greyed, with the plumbing waiting.
+
+`v0.17.0` flipped them all on. With the complete raw TSN **and** TSMIS for all six reports
+in hand, every report gained a vs-TSN comparator — Ramp Summary and Intersection Summary
+as statewide **category-count** roll-ups, Ramp Detail / Intersection Detail / Highway
+Sequence as **postmile-keyed** flat diffs (Highway Sequence needed a brand-new district-PDF
+parser and a county-relative key, since California postmiles restart per county) — and the
+last cross-environment gaps (Intersection ×2, Highway Log PDF) closed, completing the grid:
+**every report × {between environments, vs TSN}**, plus Highway Log's PDF-vs-Excel
+self-check. A **canonical TSN library** gave each report's source data one fixed home with a
+Settings panel, and the by-day matrix got a one-stop **Export today** column that exports,
+consolidates and compares in a single click. The whole surface was then audited
+report-by-report against the raw ground truth — each comparator proven cell-for-cell several
+independent ways, with `compare_core`'s Route-1 Highway Log canary byte-identical throughout
+(every new behaviour added through opt-in schema fields).
+
+It closed with a UX cleanup the field had earned: **sign-in and the browser picker** — long
+the most confusing corner — were rebuilt. Edge one-click is now proven quietly in the
+background; the Browser dropdown became a read-only "what's exporting" indicator with the
+real choice moved into Settings; and both matrices learned to **flag** a report the
+environment check found missing, before you waste an export on it.
 
 ---
 

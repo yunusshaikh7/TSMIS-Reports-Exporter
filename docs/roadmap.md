@@ -4,16 +4,15 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
-> **Next big effort — v0.17.0: all-report TSN comparison + consolidation.** Kickoff prompt
-> with the what-we-have / what-we-need / resources breakdown: **[v0.17.0-prompt.md](v0.17.0-prompt.md)**.
-> The app was **staged for it in v0.16.1** (compare sub-tabs → Cross-environment / vs TSN / vs TSN
-> Matrix; the vs-TSN matrix generalized to every report with greyed groundwork rows + marked
-> plug-in points). 0.17.0 builds the per-report TSN parsers/comparators + Intersection consolidate
-> and flips them on, as a **full audit + perfection** of all consolidators/comparators against
-> the complete raw TSN+TSMIS ground truth. It also adds: a **canonical TSN library** (one fixed
-> home the whole app references, raw + generated-Excel, with a **Settings status panel**),
-> **row/column reordering** on both matrices, per-cell/row consolidate buttons, and the one-stop
-> add-day→export→consolidate→compare pipeline. Full task list + audit recipe in the prompt.
+> **v0.17.0 SHIPPED — all-report TSN comparison + consolidation.** Every report now compares
+> **vs TSN** AND **cross-environment** in both matrices; Intersection reports **consolidate**; a
+> **canonical TSN library** + **Settings ▸ TSN reports** panel; the one-stop **Export today**
+> by-day column; **drag-to-reorder** rows/columns — plus a **login/browser overhaul** (quiet
+> background Edge one-click check; the Browser dropdown → a read-only "Export via…" indicator with
+> the choice moved to **Settings ▸ Export browser**) and **env-check warning flags on both
+> matrices**. Per-version detail: `CHANGELOG.md`; the build journal + audit recipe:
+> **[v0.17.0-prompt.md](v0.17.0-prompt.md)**. **Owed:** push the `v0.17.0` tag to cut the release,
+> + work-PC live verification. No next big effort scheduled — see the backlog below.
 
 ## How to maintain this file
 
@@ -304,9 +303,12 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   `check_compare_env_intersection.py` + `check_compare_env_highway_log_pdf.py`; all verified on real
   exports + in `#mock`. **The full comparison grid is now complete: every report × {cross-env, vs TSN},
   plus Highway Log's PDF↔Excel self-check.**
-- **v0.17.0 is COMPLETE** (all consolidators + comparators + UX + every cross-env comparison).
-  **Before release:** `version.py` + `CHANGELOG.md` bump and **work-PC verification** of live
-  export/compare with real TSN data.
+- **v0.17.0 is COMPLETE + release-prepped** (all consolidators + comparators + UX + every
+  cross-env comparison; `version.py` → 0.17.0 and the `CHANGELOG.md` section are in). It also
+  shipped the **login/browser overhaul** (background Edge one-click check + the export-browser
+  indicator/setting) and **env-check matrix flags**. **Still owed:** push the `v0.17.0` tag to cut
+  the release, and **work-PC verification** of live export/compare with real TSN data (the dev PC
+  can't reach TSMIS).
 
 From a notebook brainstorm (2026-06-16); size `[S/M/L]`. Their original version buckets are now in
 the Shipped record below. **⚠ A3 and D1 were the planned v0.13 *and* v0.14 themes but got displaced
@@ -378,14 +380,17 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.16.1)
+### Version buckets — reconciled to reality (current: v0.17.0)
 
 | Version | Date | What actually shipped |
 |---|---|---|
 | **v0.11.0–0.11.1** ✅ | Jun 16 | Audit-hardening patch (no-download fast-fail, token redaction, updater SHA-256, PM-keyed compares, incompleteness contract); TSN converter proven flawless. |
 | **v0.12.0** ✅ | Jun 16 | **A1, A2, B1, B2, B3** — self-describing filenames, compare-folder filter, Pause/Resume, auto-consolidate, Export Everything. |
 | **v0.13.0–0.13.1** ✅ | Jun 17 | UI/UX declutter, run lifecycle + ETA + completion summary, completion notification, accessibility, Compare sub-tabs, revert-to-previous, env-check split, Everything-store labeling/colour-coding; duplicate-key similarity pairing. |
-| **v0.14.0–0.14.2** ✅ | Jun 18 | **Highway Log PDF** consolidator + PDF-sourced comparisons + corrected 31-column labels + roadbed-aware key + HL Compare sub-tab + consolidate-label clarity + UI-vs-logic audit. |
+| **v0.14.0–0.14.3** ✅ | Jun 18–19 | **Highway Log PDF** consolidator + PDF-sourced comparisons + corrected 31-column labels + roadbed-aware key + HL Compare sub-tab + consolidate-label clarity + UI-vs-logic audit + the IT-README handout. |
+| **v0.15.0** ✅ | Jun 19 | The **Everything comparison matrix** (report × env, cross-env + vs-TSN, two Highway Log rows) + an app-wide UI/motion polish pass. |
+| **v0.16.0–0.16.1** ✅ | Jun 19 | Matrix **queue + fast mode**; the Compare-tab **vs-TSN-by-day** matrix; pause/skip/preview, reused consolidated, opt-in formulas; Intersection **export** + dev-site switch. |
+| **v0.17.0** ✅ | Jun 20 | **All-report TSN + cross-env comparison** (every report × {env, TSN} + HL PDF↔Excel); Intersection **consolidators**; **canonical TSN library** + Settings panel; one-stop **Export-today** by-day column; **login/browser overhaul** + **env-check matrix flags**; drag-reorder. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're
