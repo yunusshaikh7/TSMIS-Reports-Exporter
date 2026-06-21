@@ -1,9 +1,10 @@
 """Worker threads for the GUI.
 
 Playwright's sync API is thread-affine, so all browser work happens on a
-dedicated worker thread -- never on the Tk main thread. Workers communicate by
-putting messages on a queue.Queue (thread-safe); the GUI drains it via
-root.after(). Workers never touch Tk widgets.
+dedicated worker thread -- never on the GUI's main/UI thread. Workers
+communicate by putting messages on a queue.Queue (thread-safe); the GuiApi
+pump drains it and forwards each to the WebView2 renderer via evaluate_js.
+Workers never touch the window or the DOM directly.
 
 Message protocol (all are (kind, payload) tuples):
     ("log", str)                       one status line
@@ -1576,7 +1577,7 @@ def _check_tools():
 
 
 class CheckWorker(threading.Thread):
-    """Runs the launch-time readiness checks off the Tk thread, posting each
+    """Runs the launch-time readiness checks off the GUI pump thread, posting each
     result as ('check', (key, status, text)) and a final ('checks_done', dict).
 
     The instant checks (login, output folder, PDF/Excel tools) are posted first;

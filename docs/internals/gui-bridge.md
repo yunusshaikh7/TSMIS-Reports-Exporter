@@ -71,7 +71,7 @@ The `window.__tsmis &&` guard in the JS string means a dispatch that arrives bef
 
 ## 3. The kind → handler → event → renderer table
 
-This is the master map. Every worker-posted `kind` is dispatched by `_handle` (`gui_api.py:392-480`), most translate to a `{"t": …}` JS event, and `app.js dispatch` (`app.js:1428`) routes `ev.t` to a renderer. **Note: `_handle` has NO default/else branch — an unknown `kind` is silently dropped** (see Gotchas).
+This is the master map. Every worker-posted `kind` is dispatched by `_handle` (`gui_api.py:462-564`), most translate to a `{"t": …}` JS event, and `app.js dispatch` (`app.js:1482`) routes `ev.t` to a renderer. **Note: an unknown `kind` hits `_handle`'s `else`, which logs `log.warning("unhandled worker event kind …")` (P0) — it is no longer silently dropped, but a real worker message still needs its own branch to act** (see Gotchas).
 
 | Worker `kind` (`gui_worker.py`) | `_handle` branch (`gui_api.py`) | JS event `t` | `app.js dispatch` renderer |
 |---|---|---|---|
@@ -96,10 +96,14 @@ This is the master map. Every worker-posted `kind` is dispatched by `_handle` (`
 | `cancelled` | inline :469-472 | `log` + `run_ended` | `appendLog`, `endRunUi` |
 | `batch_progress` (dict) | `_on_batch_progress` :473 / :1294 | `state` | `renderState`→`syncBatchHeadline` |
 | `batch_done` (dict) | `_on_batch_done` :475 / :1304 | `log` + `run_ended` + `state` | `appendLog`, `endRunUi` |
+| `active_env_done` (dict) | `_on_active_env_done` :481 / :844 | `state` (snapshot) | `renderState`→`applyMatrixEnvFlags` (quiet background check — clears `_active_check`, NOT the task gate) |
+| `matrix_cell` (dict) | `_on_matrix_cell` :550 / :2501 | `state` (snapshot) | `renderState`→matrix progress (per-cell, non-terminal) |
+| `matrix_done` (dict) | `_on_matrix_done` :552 / :2511 | `log` + `matrix_refresh` + `run_ended` | `appendLog`, `renderMatrix`/`renderDayMatrix`, `endRunUi` |
+| `matrix_export_done` (dict) | `_on_matrix_export_done` :554 / :2528 | `log` + `run_ended` (+ auto-chain by-day) | `appendLog`, `endRunUi`, matrix refresh |
 | `update_status` (dict) | `_on_update_status` :477 / :724 | `state` + maybe `log` | `renderState`→`renderUpdate` |
 | `error` (kind,msg) | `_on_error` :479 / :794 | `log` + `modal` + `run_ended` | `appendLog`, `showMessage`, `endRunUi` |
 
-**Discrepancy note vs the topic doc / `gui_worker.py` docstring:** the worker protocol docstring (`gui_worker.py:8-55`) lists most kinds but omits `check`, `checks_done`, `batch_progress`, and `batch_done` (a pre-existing known gap, also called out in `gui.md`). The four are real and handled — see the table.
+**Discrepancy note vs the topic doc / `gui_worker.py` docstring:** the worker protocol docstring (`gui_worker.py:9-56`) lists most kinds but omits `check`, `checks_done`, `batch_progress`, `batch_done`, `active_env_done`, `matrix_cell`, `matrix_done`, and `matrix_export_done` (a pre-existing known gap, also called out in `gui.md`). All eight are real and handled — see the table.
 
 ### JS event types that have NO worker `kind`
 
@@ -238,17 +242,17 @@ Events(on_log=…, on_route=self._on_route, should_skip=self._should_skip,
 
 All workers are `threading.Thread(daemon=True)` subclasses in `gui_worker.py`. They never touch the window; they only `self.q.put(...)`.
 
-### ExportWorker (`gui_worker.py:156-369`)
+### ExportWorker (`gui_worker.py:223-460`)
 
 The workhorse: runs **one or more** `ReportSpec`s sequentially. `specs` is normalized to a list (`gui_worker.py:168`), so callers can pass one or many.
 
-- `run()` (`:346`): builds the Events sink, calls `_run_specs(events, results)`, then posts `("export_done", results)`. On `AuthError` → `("error", ("auth", …))`; on `PreflightError`/`BrowserNotFoundError` → `("error", ("general", …))`; on any other exception → `log.exception` + `("error", ("general", "Type: msg"))`. If any reports finished before the error, it first posts `("export_partial", results)` so "Save run report" still covers them.
+- `run()` (`:435`): builds the Events sink, calls `_run_specs(events, results)`, then posts `("export_done", results)`. On `AuthError` → `("error", ("auth", …))`; on `PreflightError`/`BrowserNotFoundError` → `("error", ("general", …))`; on any other exception → `log.exception` + `("error", ("general", "Type: msg"))`. If any reports finished before the error, it first posts `("export_partial", results)` so "Save run report" still covers them.
 - `_run_specs` (`:292-344`): for each spec — reset per-report progress, optionally clear `out_dir` (B3 refresh), pick `run_export` vs `run_export_parallel` (fast mode, `workers>1`), append `(spec, result)`, then B2 auto-consolidate inline (`:342`). This method **does NOT post `export_done`/`error`** — the caller owns the run lifecycle (so `BatchWorker` can reuse it per-environment).
 - `_on_route` (`:257-270`): the tally. Under `_tally_lock` (fast mode fires this from many threads), it keeps `route → latest status` so the end-of-run retry pass (which re-reports a route, e.g. failed→saved) **updates in place rather than double-counting**, derives counts, and posts `("progress", {done,total,route,report,report_i,report_n,...counts})`.
 - **Live screenshots:** `request_screenshot(worker_no)` (`:195`, called from the bridge thread by `GuiApi.request_preview`) adds to `_shot_requests` under `_shot_lock`; the engine thread polls `_shot_wanted` (`:202`, one request = one shot) and answers via `_on_screenshot` (`:210`) → `("preview_shot", (w, b64, note, url))`. Playwright thread-affinity is why the GUI thread can't snap directly — it sets a flag the owning thread drains at its next safe poll point.
 - **B3 env tagging:** when `out_base` is set, `_run_specs` wraps `spec.filename` with `dataclasses.replace(spec, filename=lambda r: env_tagged_filename(spec.filename(r), tag))` (`:329-334`) — front-stamps the `<src-env>` onto every output file in one place (covers sequential + parallel + both retry passes), keeping `subdir`/`label`/consolidator-mapping on the original spec.
 
-### BatchWorker (`gui_worker.py:372-495`)
+### BatchWorker (`gui_worker.py:461-586`)
 
 B3 "Export Everything": runs selected report types × selected environments sequentially, **reusing `ExportWorker._run_specs` once per environment** (so resume/idempotency, fast mode, pause, auto-consolidate all come free).
 
@@ -257,35 +261,35 @@ B3 "Export Everything": runs selected report types × selected environments sequ
 - `AuthError`/`BrowserNotFoundError` → post `("error", …)` and **return keeping the manifest** (every env would hit the same wall — fix the cause and resume). Other exceptions → log, leave the env pending, `continue` (don't mark done). Done envs persist via `batch_manifest.mark_done` (`:488`).
 - `_step_views` (`:407-428`) builds the ordered per-env stepper view (each step `done`/`running`/`pending`) **from the manifest** so it's correct across a resume. Posts `("batch_done", {done,total,cancelled,complete})` at the end.
 
-### ConsolidateWorker (`gui_worker.py:498-528`)
+### ConsolidateWorker (`gui_worker.py:587-619`)
 
 Runs one consolidator (or comparison `compare`/`compare_folders` — `_launch_compare` passes the run fn here too). Builds a minimal `Events(on_log, is_cancelled)`, calls `consolidate_fn(events=, confirm_overwrite=self.confirm, day=self.day)`, posts `("consolidate_done", ConsolidateResult)`. The `confirm` callback is **pre-decided** by the UI (overwrite resolved by `consolidate_info` + the JS confirm dialog before start), so it just returns `True`. Crash → `("error", ("general", …))`.
 
-### LoginWorker (`gui_worker.py:1071-1352`)
+### LoginWorker (`gui_worker.py:1232-1474`)
 
 Opens a headed browser for SSO+MFA and saves a portable storage_state. Full browser-order logic lives in `common.py`; the worker orchestrates: honor the user's pick → silent device sign-in first (`try_device_sso_login`) → Built-in Chromium headed → persistent-profile Edge recapture → Chrome fallback. Posts `login_open` (browser is up), then one of `login_saved` / `login_device_ok` / `login_failed` / `cancelled` / `("error", …)`. The hard-won detail: it captures the instant a real TSMIS login appears and treats "no tabs remain" (not the original tab closing) as the close signal (`_run_login_in_browser`, `:1244-1321`).
 
-### CheckWorker (`gui_worker.py:1458-1492`)
+### CheckWorker (`gui_worker.py:1579-1645`)
 
 Launch-time readiness probes. Posts the instant checks first — `("check", ("output", status, text))` and `("check", ("tools", …))` — then the slower per-browser probes `("check", ("browser_<ch>", …))`, then `("checks_done", results)`. `_handle("check")` updates `self._checks[key]` and pushes state; `_on_checks_done` (`gui_api.py:683-699`) flips `checks_running` off, warns if the *selected* browser is unusable, and triggers `_maybe_autoscan("startup")`.
 
-### ResetWorker (`gui_worker.py:531-588`)
+### ResetWorker (`gui_worker.py:620-679`)
 
 "Delete all reports". `reset_targets(include_input)` (`:95`) enumerates the `(label, Path)` pairs (run folders, legacy flat dirs, consolidated/comparison output, the Export-Everything store, failure shots, optionally TSN input PDFs — never logs/login/settings/profile). Deletes between targets (cancellable; `shutil.rmtree(onerror=...)`), reports what was **actually freed** (before − remaining, so Excel-locked files aren't counted as deleted), posts `("reset_done", {files, mb, errors, cancelled})`. The bridge side has a **single-use confirm token** (see §10).
 
-### ChromiumWorker (`gui_worker.py:591-705`)
+### ChromiumWorker (`gui_worker.py:680-796`)
 
 Download/delete the app-owned Built-in Chromium. Download drives the **bundled Playwright Node driver** (`compute_driver_executable()` + `install chromium --no-shell`) with `PLAYWRIGHT_BROWSERS_PATH` aimed at `DOWNLOADED_BROWSERS_DIR` — works frozen (no `python -m playwright`), streams throttled progress (ANSI-stripped) to the log, `CREATE_NO_WINDOW`, cancellable (kills the subprocess). Delete `rmtree`s only that folder. Posts `("chromium_done", {ok, action, cancelled, error})`.
 
-### EnvCheckWorker (`gui_worker.py:708-764`)
+### EnvCheckWorker (`gui_worker.py:797-903`)
 
 The idle "Verify environment". Opens TSMIS headless exactly like an export (`new_authed_browser`), reads the page's own `CONFIG` via `_CONFIG_JS` (the same source `_site_params_ok` trusts), compares to `get_site()`, screenshots (JPEG q70 → base64). **Always posts exactly one `("env_shot", dict)`** — even on failure (with `error` set) — so the task gate can never wedge. `_on_env_shot` (`gui_api.py:1434`) turns it into a `preview` event with an `env_info` payload the modal renders as a verdict banner.
 
-### UpdateWorker (`gui_worker.py:1354-1432`)
+### UpdateWorker (`gui_worker.py:1475-1578`)
 
 Off-thread one-click update/revert. Action `"check"` → `updater.check_for_update()` → `("update_status", {phase:"available"|"none", ..., "_info": UpdateInfo})`. The `_info` key carries the Python-side `UpdateInfo`; `_on_update_status` pops it into `self._update_info` and **strips it before the dict reaches JS** (`gui_api.py:728-733`). Action `"download"`/`"revert"` → `download_and_stage` with an `on_progress` callback posting `phase:"downloading"` at each new percent, then `phase:"staged"`. `revert` first resolves `resolve_previous_release()`. Network/disk only — no Playwright.
 
-### EnvScanWorker (`gui_worker.py:815-1068`)
+### EnvScanWorker (`gui_worker.py:904-1162`)
 
 The big concurrency story — see §9.
 
@@ -408,7 +412,7 @@ End-to-end, to add (say) a new long-running task "frobnicate":
 
 1. **Worker** (`gui_worker.py`): subclass `threading.Thread`, take `(queue, cancel_event, …)`, do the work posting `self.q.put(("frob_progress", …))` and a terminal `self.q.put(("frob_done", {...}))` (and `("error", (kind,msg))` on failure). Document the new kinds in the protocol docstring (`:8-55`).
 2. **Bridge method** (`gui_api.py`): `@_api_method def start_frob(self, …): validate pure inputs; if not self._try_claim_task("frob"): return {"error": …}; self.cancel_event.clear(); self._set_dot("busy", …); self._emit({"t":"run_started","mode":"consolidate","label":…}); self._push_state(); FrobWorker(self._q, self.cancel_event).start(); return {"ok": True}`. Import the worker at the top (`gui_worker` import block, `gui_api.py:45-48`). Add `"frob"` to the `cancel_run` whitelist (`gui_api.py:1348`) if it honors cancel.
-3. **Pump handler** (`gui_api.py:_handle`): add `elif kind == "frob_progress": self._emit({"t":"progress","p":payload})` and `elif kind == "frob_done": self._on_frob_done(payload)` where `_on_frob_done` ends with `self._end_task()`. (Remember: **no default branch — an unhandled kind is silently dropped.**)
+3. **Pump handler** (`gui_api.py:_handle`): add `elif kind == "frob_progress": self._emit({"t":"progress","p":payload})` and `elif kind == "frob_done": self._on_frob_done(payload)` where `_on_frob_done` ends with `self._end_task()`. (An unhandled kind now falls through to `_handle`'s `else` and is **logged** (P0), not silently dropped — but it still needs its own branch to do anything.)
 4. **Snapshot** (if the task needs persistent UI state): add a field to `_state_snapshot` (`gui_api.py:204`) and clear it in `_end_task`.
 5. **Renderer** (`app.js`): add the JS caller (e.g. a button `onclick` in `bindEvents`), surface `{"error"}` via `showMessage`, and handle any new `ev.t` in `dispatch` (`:1432`). If you reuse `progress`/`run_started`/`run_ended` you get the progress card for free.
 6. **Mock** (`app.js:makeMockApi`): add a matching `start_frob: async () => {...}` that `push(...)`es the same event sequence, so `#mock` previews it.
@@ -423,7 +427,7 @@ End-to-end, to add (say) a new long-running task "frobnicate":
 ## 14. Gotchas a maintainer will trip on
 
 - **Thread-affinity is absolute.** The bridge/UI thread must never touch a Playwright page. Screenshots are request-flag-then-drain (`_shot_wanted`); the `gui-pump` and `gui-icon`/`_flash_taskbar` threads use pure Win32 (no CLR) off the WinForms STA thread.
-- **`_handle` has no default branch (`gui_api.py:392-480`).** A worker that posts a `kind` not in the if/elif chain is **silently dropped** — no error, no log. If a new worker message "does nothing", check you added the `_handle` branch.
+- **`_handle` logs unknown kinds (`gui_api.py:462-564`).** A worker that posts a `kind` not in the if/elif chain falls through to the `else`, which logs `log.warning("unhandled worker event kind …")` (P0) — it no longer vanishes with no trace, but it still does nothing useful. If a new worker message "does nothing", check you added the `_handle` branch.
 - **The snapshot is full-state.** Don't push a partial state from JS expecting Python to merge it — Python is the sole owner. To change what the UI shows, mutate `GuiApi` state under `_lock` and `_push_state()`. JS `renderState` re-derives *everything* from the snapshot each time.
 - **Claim the task slot AFTER pure validation, BEFORE any blocking dialog.** A bad index/day that `raise`s after `self._task` is set wedges the gate until restart. Compare flows claim before the save dialog and must `_release_task()` on cancel/error (the `try/except: _release_task(); raise` pattern).
 - **`pause_event` does not self-clear; `skip_event` does.** Forgetting that pause persists (and that `_end_task`/`cancel_run` must clear it) leaks a paused state into the next run.

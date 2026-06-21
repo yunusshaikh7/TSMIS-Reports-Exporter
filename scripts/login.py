@@ -5,8 +5,8 @@ The resulting scripts/tsmis_auth.json is shared by every export script
 session expiry.
 
 The interactive flow lives in main() (guarded by __main__) so importing this
-module has no side effects -- the GUI (Phase 4) will replace the input()
-prompts with its own headed-login flow without launching a browser on import.
+module has no side effects -- the GUI replaces the input() prompts with its
+own headed-login flow without launching a browser on import.
 """
 import logging
 import sys

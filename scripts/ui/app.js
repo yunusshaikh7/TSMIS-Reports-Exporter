@@ -1516,7 +1516,12 @@ function dispatch(events) {
           if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
           break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
-        default: break;
+        default:
+          // No silent drop: the backend posted an event type app.js has no
+          // case for (bridge protocol drift). Surface it in devtools instead
+          // of letting it vanish; the known kinds above are unaffected.
+          console.warn("dispatch: unhandled event type", ev.t, ev);
+          break;
       }
     } catch (e) {
       console.error("dispatch failed for", ev, e);

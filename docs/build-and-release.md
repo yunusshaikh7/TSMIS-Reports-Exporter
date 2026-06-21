@@ -449,18 +449,30 @@ own regeneration tooling (`tools/screenshots.py`). Full detail: [website.md](web
 gate). Blocking steps: byte-compile all sources (`compileall scripts build
 version.py`), then the pure-Python golden guards:
 
-- Export-engine: `check_export_engine.py`
-- GUI bridge: `check_gui_bridge.py`, `check_a2_compare_filter.py`,
+- Product-name guard: `check_no_misspelling.py` (fails the build if the product
+  name is ever mis-typed — it is always TSMIS)
+- Export-engine: `check_export_engine.py`, `check_parallel_reconcile.py`,
+  `check_intersection_gate.py`
+- GUI bridge + diagnostics: `check_gui_bridge.py`, `check_a2_compare_filter.py`,
   `check_b1_pause.py`, `check_b2_autoconsolidate.py`, `check_b3_batch.py`,
-  `check_report_library.py`
+  `check_report_library.py`, `check_matrix.py`, `check_matrix_bridge.py`,
+  `check_matrix_tsn.py`, `check_day_matrix.py`, `check_worker_lifecycle.py`
+  (per-worker gate-release + queue-advance lifecycle), `check_import_direction.py`
+  (no module-level import cycles in `scripts/`)
 - Updater: `check_updater.py`
 - Fake-site selectors: `check_fake_site.py` (drives a real headless Chromium over
   DOM fixtures; Chromium install is `continue-on-error`, falls back to system
   Edge)
 - Comparison engine + consolidators: `check_compare_blankkey`, `_keyfield`,
   `_skipwarn`, `_injection`, `_coercion`, `_limits`, `_audit`, `_ramp_detail`,
-  `_ramp_summary`, `_dupmatch`, `_ditto`, `check_ramp_summary_partial`,
-  `check_tsn_description_leak`, `check_tsmis_pdf_parse`,
+  `_ramp_summary`, `_highway_sequence`, `_ramp_detail_tsn`, `_ramp_summary_tsn`,
+  `_intersection_summary_tsn`, `_intersection_detail_tsn`, `_highway_sequence_tsn`,
+  `check_compare_env_intersection`, `check_compare_env_highway_log_pdf`,
+  `check_compare_env_sidelabel` (side-label distinguisher kept under the cap),
+  `check_compare_dupmatch`, `_ditto`, `check_ramp_summary_partial`,
+  `check_ramp_summary_schema` (Combined-sheet schema-drift guard),
+  `check_consolidate_intersection`, `check_tsn_description_leak`,
+  `check_tsmis_pdf_parse`, `check_tsmis_pdf_reconcile`,
   `check_highway_log_columns`, `check_highway_log_ditto`,
   `check_highway_log_roadbed`, `check_a1_filenames`
 

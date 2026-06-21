@@ -556,6 +556,12 @@ class GuiApi:
             self._on_update_status(payload)
         elif kind == "error":
             self._on_error(payload)
+        else:
+            # No silent drop: a worker posted an event kind this sink has no
+            # branch for. That means the worker/bridge protocol drifted (a new
+            # kind added on one side only) -- log it so "one log upload answers
+            # it" instead of the event vanishing without a trace.
+            log.warning("unhandled worker event kind %r (payload dropped)", kind)
 
     def _end_task(self):
         with self._lock:

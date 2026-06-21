@@ -59,7 +59,7 @@ jobs:
           python build/check_parallel_reconcile.py
           python build/check_intersection_gate.py
 
-      - name: GUI-bridge regression checks (blocking)
+      - name: GUI-bridge + diagnostics regression checks (blocking)
         shell: bash
         run: |
           set -e
@@ -73,6 +73,8 @@ jobs:
           python build/check_matrix_bridge.py
           python build/check_matrix_tsn.py
           python build/check_day_matrix.py
+          python build/check_worker_lifecycle.py
+          python build/check_import_direction.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py
@@ -95,8 +97,9 @@ jobs:
                    check_compare_ramp_summary_tsn check_compare_intersection_summary_tsn \
                    check_compare_intersection_detail_tsn check_compare_highway_sequence_tsn \
                    check_compare_env_intersection check_compare_env_highway_log_pdf \
+                   check_compare_env_sidelabel \
                    check_compare_dupmatch check_compare_ditto check_ramp_summary_partial \
-                   check_consolidate_intersection \
+                   check_ramp_summary_schema check_consolidate_intersection \
                    check_tsn_description_leak check_tsmis_pdf_parse check_tsmis_pdf_reconcile \
                    check_highway_log_columns check_highway_log_ditto check_highway_log_roadbed \
                    check_a1_filenames; do
