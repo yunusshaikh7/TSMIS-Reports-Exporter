@@ -433,6 +433,52 @@ LONG_LABELS = {
 SUMMARY_SHEET_NAME = "TSAR Ramps Summary"
 
 
+# --- Combined-sheet layout guard (schema-drift tripwire) -------------------
+# build_combined_sheet() hand-places each section at FIXED row anchors: the
+# "On/Off Indicator" header at row 13, "Population Groups" at row 19, and the
+# Totals at row 28, with data rows auto-filling from each section's first row
+# (Highway Groups at 6, On/Off at 15, Population at 21, Ramp Types at 6 in the
+# disjoint E-G columns). Those anchors were sized for today's schema lengths.
+# If a schema list (HIGHWAY_GROUPS / ONOFF / POP_GROUPS / RAMP_TYPES) GROWS
+# beyond its row budget -- enough that its auto-filled rows reach or cross the
+# next section's header/Totals anchor -- the Combined sheet is silently
+# corrupted, no error raised. This guard turns that overlap into a loud failure:
+# grow a section past its budget and you MUST move the next anchor (and the bound
+# here) together. (Shrinkage, or growth that still fits the budget, can't
+# overrun, so it is intentionally left alone.)
+_HG_FIRST_ROW, _ONOFF_HEADER_ROW = 6, 13
+_ONOFF_FIRST_ROW, _POP_HEADER_ROW = 15, 19
+_POP_FIRST_ROW, _TOTALS_ROW = 21, 28
+_RAMP_FIRST_ROW = 6
+
+
+def _assert_combined_layout():
+    """Raise if a section has GROWN past its row budget -- its rows would reach
+    or cross the next section's header / Totals anchor and corrupt the Combined
+    sheet. A no-op for the current schema (and for shrinkage or in-budget
+    growth); a tripwire only for overlap-causing growth."""
+    sections = [
+        ("Highway Groups", HIGHWAY_GROUPS, _HG_FIRST_ROW, _ONOFF_HEADER_ROW),
+        ("On/Off Indicator", ONOFF, _ONOFF_FIRST_ROW, _POP_HEADER_ROW),
+        ("Population Groups", POP_GROUPS, _POP_FIRST_ROW, _TOTALS_ROW),
+        ("Ramp Types", RAMP_TYPES, _RAMP_FIRST_ROW, _TOTALS_ROW),
+    ]
+    overruns = []
+    for name, schema, first_row, next_anchor in sections:
+        last_row = first_row + len(schema) - 1
+        if last_row >= next_anchor:
+            overruns.append(
+                f"{name}: {len(schema)} rows fill {first_row}-{last_row}, "
+                f"hitting the anchor at row {next_anchor}")
+    if overruns:
+        raise ValueError(
+            "Ramp Summary Combined-sheet layout drift -- a schema list changed "
+            "length but build_combined_sheet's hardcoded row anchors did not: "
+            + "; ".join(overruns)
+            + ". Move the affected anchor(s) in build_combined_sheet and update "
+            "the bounds in _assert_combined_layout together.")
+
+
 def build_combined_sheet(wb, records, col_letters):
     """Insert a 'Combined' summary sheet at index 0 with formulas that
     aggregate the per-route data on the TSAR Ramps Summary sheet.
@@ -450,6 +496,7 @@ def build_combined_sheet(wb, records, col_letters):
     columns (E-G vs A-C), so the extended 16-row Ramp Types list cannot collide
     with the Population block even though their row ranges now overlap.
     """
+    _assert_combined_layout()      # fail loudly on schema/layout drift (P0 guard)
     ws = wb.create_sheet("Combined", 0)
 
     n_routes = len(records)
