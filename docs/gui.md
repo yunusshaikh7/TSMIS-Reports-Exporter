@@ -291,7 +291,12 @@ status panel in Settings (`#setTsnLibrary`, rendered by `renderTsnLibrary` from
 `get_settings().tsn_library`). A header line shows the **on-disk folder** (`tsn_library_root`
 = `paths.TSN_LIBRARY_ROOT`; each report keeps its raw + consolidated files in a `<report>`
 subfolder) with an **Open folder** button (`open_tsn_library_folder` → `_open_folder`); each
-row's name tooltips that report's `raw_dir`. Then one row per registered report: a **dot** (green = consolidated
+row's name tooltips that report's `raw_dir`. The library is **self-documenting**:
+`tsn_library.ensure_layout()` seeds every report's `<report>/raw/` folder with a hint file
+naming the expected format, plus a root README — run at GUI start AND before Open folder, so a
+fresh install never shows an empty folder (v0.17.1). The matrix **Choose…** picker
+(`pick_matrix_tsn_file`) also defaults its dialog into that report's library folder, not the
+legacy per-run `_tsn_input/` location. Then one row per registered report: a **dot** (green = consolidated
 current · amber = missing/stale-or-raw-not-yet-built · grey = no raw imported), a status line
 (`N raw <kind> · consolidated current|STALE|not yet built`), and two actions —
 **Import raw…** (`import_tsn_raw`: a native multi-file dialog, PDFs or the statewide workbook

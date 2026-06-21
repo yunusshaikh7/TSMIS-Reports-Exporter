@@ -149,6 +149,16 @@ class GuiApi:
         # honors it. Edge is the implicit one-click path, never an export pick.
         self._channel = settings.get_export_browser() or BROWSER_CHANNELS[0]
         init_preferred_channel_from_settings()
+        # Seed the canonical TSN library's on-disk skeleton (per-report folders
+        # + hint files) so a fresh install is self-documenting: the user can find
+        # where each report's TSN files go without first importing one. Cheap,
+        # offline, idempotent; never block startup on it.
+        try:
+            import tsn_library
+            tsn_library.ensure_layout()
+        except Exception as e:                                  # noqa: BLE001
+            log.info("tsn_library.ensure_layout skipped: %s: %s",
+                     type(e).__name__, (str(e).splitlines() or [""])[0])
         self._checks_running = False
         self._checks = {}
         for ch in BROWSER_CHANNELS:
@@ -2048,15 +2058,16 @@ class GuiApi:
     @_api_method
     def pick_matrix_tsn_file(self, subdir):
         """Native open dialog (xlsx) for a report's TSN workbook, defaulting into
-        its <dest>/_tsn_input/<subdir>/ folder; persists the choice. Returns
-        {ok, path} or {cancelled}."""
+        the report's canonical TSN library folder (<library>/<subdir>/, where its
+        raw/ + consolidated/ live); persists the choice. Returns {ok, path} or
+        {cancelled}."""
         if subdir not in {sd for _k, _l, sd, _i, _a in matrix_rows()}:
             return {"error": "Unknown report subdir."}
-        start = matrix.tsn_input_root(settings.get_batch_dest(), subdir)
+        start = TSN_LIBRARY_ROOT / subdir
         try:
             start.mkdir(parents=True, exist_ok=True)
         except OSError:
-            pass
+            start = TSN_LIBRARY_ROOT
         picked = self._window.create_file_dialog(
             webview.OPEN_DIALOG, allow_multiple=False, directory=str(start),
             file_types=("Excel workbook (*.xlsx)",))
@@ -2473,8 +2484,12 @@ class GuiApi:
     @_api_method
     def open_tsn_library_folder(self):
         """Open the canonical TSN library root (each report's raw + consolidated
-        TSN data lives in <root>/<report>/). Created on first open if absent."""
-        self._open_folder(TSN_LIBRARY_ROOT)
+        TSN data lives in <root>/<report>/). Seeds the per-report folders + hint
+        files first so the user always lands on a populated, self-documenting
+        tree (not an empty folder)."""
+        import tsn_library                              # lazy (no pdfplumber pull)
+        root = tsn_library.ensure_layout()
+        self._open_folder(root)
         return {"ok": True}
 
     def _on_matrix_cell(self, payload):

@@ -176,6 +176,28 @@ def test_tsn_library_panel():
         except ValueError:
             raised = True
         check("import_raw rejects a wrong-extension file", raised)
+        # ensure_layout() seeds a self-documenting skeleton so a fresh library
+        # isn't just an empty folder (v0.17.1 hotfix): every report gets a raw/
+        # folder + a hint file, plus a root README. GuiApi() already ran it; it's
+        # idempotent, so call again and assert the shape.
+        tsn_library.ensure_layout()
+        check("ensure_layout creates every report's raw/ folder",
+              all(tsn_library.raw_dir(r).is_dir() for r in reg))
+        check("ensure_layout drops a hint into each empty raw/ folder",
+              all((tsn_library.raw_dir(r) / tsn_library._RAW_HINT_NAME).is_file()
+                  for r in reg))
+        check("ensure_layout writes a root README",
+              (tmp / tsn_library._README_NAME).is_file())
+        check("the .txt hints stay invisible to the raw-file reader",
+              all(tsn_library.status(r)["raw_count"] == 0 for r in reg))
+        # Once real raw data is present, the hint is NOT re-seeded into that
+        # folder (don't fight a user who deleted it after dropping files in).
+        rd = tsn_library.raw_dir("ramp_detail")
+        (rd / "statewide.xlsx").write_text("x")
+        (rd / tsn_library._RAW_HINT_NAME).unlink()
+        tsn_library.ensure_layout()
+        check("hint not re-seeded once real raw data is present",
+              not (rd / tsn_library._RAW_HINT_NAME).exists())
     finally:
         paths.TSN_LIBRARY_ROOT = saved
         shutil.rmtree(tmp, ignore_errors=True)
