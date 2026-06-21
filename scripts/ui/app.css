@@ -176,6 +176,14 @@ button, input, select { font-family: inherit; }
   body.matrix-wide .col-activity { flex-grow: 1; }
   body.matrix-wide .preflight-card,
   body.matrix-wide .completion-card { display: none; }
+  /* In matrix mode the Matrix-options corner IS the primary control surface
+     (queue, baseline/source, day columns, set-all modes, report toggles, fast
+     mode, formulas) — so give it the column's height and demote the activity log
+     to a compact status strip. Previously the log kept flex:1 (hogging the space
+     while mostly empty) and the options were crammed into max-height:46% with
+     most controls hidden behind a tiny internal scroll — i.e. "not usable". */
+  body.matrix-wide .col-activity .log-card { flex: 0 1 auto; min-height: 92px; max-height: 32%; }
+  body.matrix-wide .matrix-config { flex: 1 1 auto; min-height: 0; max-height: none; }
 
   /* Fill the height too — no wasted space, no scrolling at full screen: the
      matrix pane and grid stretch to the column and the data rows share the
@@ -568,8 +576,11 @@ button, input, select { font-family: inherit; }
    block: the hidden input is position:absolute, so without a positioned parent
    it resolves against the viewport (the initial containing block) — escaping
    the panes' overflow:hidden clip and inflating the document's scroll height,
-   which let the whole page scroll into a blank area below the UI. */
-.option-row, .fast-toggle { position: relative; }
+   which let the whole page scroll into a blank area below the UI. EVERY label
+   class that wraps a hidden input below MUST appear in this containing-block
+   list (the matrix config corner's .mc-fast toggles re-introduced the scroll-
+   into-blank-space bug when they were left off it). */
+.option-row, .fast-toggle, .mc-fast { position: relative; }
 .option-row input[type="checkbox"], .option-row input[type="radio"],
 .fast-toggle input[type="checkbox"], .mc-fast input[type="checkbox"] {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;

@@ -192,6 +192,23 @@ features ship "implemented + golden-checked, live-export verification pending."
 When a problem report comes in, first confirm *which* machine it's on; "works on
 my machine" usually means the work PC ate it. → [it-and-security.md](it-and-security.md).
 
+## 10. A hidden input with no positioned parent escapes its clip
+
+The styled checkbox/radio pattern hides the real `<input>` with `position:absolute`
+(kept focusable for a11y). An absolute element resolves against its nearest
+*positioned* ancestor — and if it has none, against the viewport, **escaping the
+`overflow:hidden` clip on `.app`/`.main`/`.col-*` and inflating
+`documentElement.scrollHeight`**. The whole page then scrolls down into a blank
+area below the UI. This bit twice: first the v0.13.0 toggles (`.option-row` /
+`.fast-toggle`, fixed in v0.13.x), then the v0.16/0.17 matrix-options toggles
+(`.mc-fast`, fixed in v0.17.1) — each time because a *new* label class wrapped a
+hidden input but was left off the containing-block list. **Rule: every label
+class that wraps a hidden input MUST be in the `position:relative` list** beside
+the sr-only rule in `app.css`. No pure-Python check can catch this (it needs a
+laid-out DOM), so the inline CSS comment carries the warning; verify in the
+`#mock` by checking `scrollHeight === innerHeight` on a matrix tab.
+→ [gui.md](gui.md).
+
 ---
 
 ### Quick index of the lessons
@@ -207,3 +224,4 @@ my machine" usually means the work PC ate it. → [it-and-security.md](it-and-se
 | 7 | Audit methodology | code-review-prompt |
 | 8 | Two-agent parallel work on a shared branch | — (this doc) |
 | 9 | Work-PC reality shapes every feature | it-and-security |
+| 10 | A hidden input with no positioned parent escapes its clip | gui |
