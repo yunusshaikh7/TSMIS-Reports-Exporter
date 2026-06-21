@@ -65,13 +65,13 @@ from common import (
     PreflightError, SiteUnreachableError, BROWSER_CHANNELS, CHANNEL_LABELS,
     DATA_SOURCES, DATA_SOURCE_LABELS, ENVIRONMENTS, ENVIRONMENT_LABELS,
     auth_state, check_browsers, get_site, get_url, has_valid_auth,
-    is_logged_in, launch_browser,
+    is_logged_in,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, navigate_with_auth, new_authed_browser,
     new_login_context, page_url_for_display, preflight,
     resolve_parallel_channel, save_auth_state, set_site, set_thread_site,
-    storage_state_is_portable, try_device_sso_login,
+    storage_state_is_portable,
 )
 import batch_manifest
 import dataclasses
@@ -972,7 +972,7 @@ class EnvScanWorker(threading.Thread):
                                 # at once -> the parallel channel (not Edge).
                                 browser, _ctx, page = new_authed_browser(
                                     p, parallel=True)
-                            out = self._check_one(page, src, env, report_specs)
+                            out = self.check_one(page, src, env, report_specs)
                             with lock:
                                 results[out["key"]] = out
                             self.q.put(("env_access", out))
@@ -1046,10 +1046,13 @@ class EnvScanWorker(threading.Thread):
             return 1
         return n
 
-    def _check_one(self, page, src, env, report_labels):
-        """One combo's verdict. Never raises — the answer (crashes included)
-        rides in the returned dict's status/detail; the WHY is in the log and
-        the auth/preflight dumps the shared gates already write."""
+    @staticmethod
+    def check_one(page, src, env, report_labels, *, budget_s=60):
+        """One combo's verdict — shared by this scan (all six combos) and the
+        quiet ActiveEnvCheckWorker (the selected combo). Never raises: the answer
+        (crashes included) rides in the returned dict's status/detail; the WHY is
+        in the log and the auth/preflight dumps the shared gates already write.
+        `budget_s` bounds the sign-in loop (short for the background check)."""
         label = f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}"
         out = {"key": f"{src}-{env}", "source": src, "environment": env,
                "label": label, "status": "error", "detail": "", "url": "",
@@ -1057,7 +1060,7 @@ class EnvScanWorker(threading.Thread):
         t0 = time.monotonic()
         try:
             try:
-                navigate_with_auth(page)
+                navigate_with_auth(page, budget_s=budget_s)
             except SiteUnreachableError as e:
                 # Don't read page.url here: the failed goto leaves the page
                 # parked on the PREVIOUS combo's address.
@@ -1156,6 +1159,75 @@ class EnvScanWorker(threading.Thread):
                      out["status"], time.monotonic() - t0, out["detail"] or "-")
 
 
+class ActiveEnvCheckWorker(threading.Thread):
+    """The QUIET, single-combo env check for the CURRENTLY selected site, run
+    unprompted on app start and after an env switch. Where EnvScanWorker probes
+    all six combos on the user's command, this checks just ONE — the selected
+    src/env — in the background to:
+      • prove Edge one-click / device sign-in works (so the title-bar chip lights
+        without anyone pressing "Log in"), and
+      • refresh that env's report availability, feeding the Export-tab AND the
+        matrix warning flags.
+    Single browser, short sign-in budget so a managed PC's silent SSO completes
+    but an unreachable machine fails fast. Pins its own thread site so the user's
+    live header selection is never touched. QUIET on every failure (no modal) — a
+    failed check simply doesn't light the chip. `seq` lets a newer env switch
+    supersede a result still in flight.
+
+    Posts ("env_access", verdict) [verdict["quiet"]=True] then
+    ("active_env_done", {seq, key, signed_in, via_device})."""
+
+    BUDGET_S = 20        # sign-in budget: enough for silent SSO, short on failure
+
+    def __init__(self, queue, src, env, seq):
+        super().__init__(daemon=True, name="activeenv")
+        self.q = queue
+        self.src = src
+        self.env = env
+        self.seq = seq
+
+    def run(self):
+        from reports import EXPORT_REPORTS
+        from playwright.sync_api import sync_playwright
+        report_specs = [(label, getattr(spec, "label", None) or label)
+                        for label, _fmt, spec in EXPORT_REPORTS]
+        key = f"{self.src}-{self.env}"
+        had_file = has_valid_auth()        # classify device vs saved-file sign-in
+        signed_in = False
+        set_thread_site(self.src, self.env)
+        try:
+            with sync_playwright() as p:
+                browser = None
+                try:
+                    # Non-parallel: a saved file → the chosen Chromium browser;
+                    # no file → the device Edge context (the path that PROVES the
+                    # one-click). Either way a 3-tuple whose first item .close()s.
+                    browser, _ctx, page = new_authed_browser(p)
+                    verdict = EnvScanWorker.check_one(page, self.src, self.env,
+                                                      report_specs,
+                                                      budget_s=self.BUDGET_S)
+                    verdict["quiet"] = True    # suppress the per-combo scan log line
+                    self.q.put(("env_access", verdict))
+                    signed_in = verdict["status"] not in (
+                        "no_signin", "denied", "unreachable", "error")
+                finally:
+                    if browser is not None:
+                        try:
+                            browser.close()
+                        except Exception:
+                            pass
+        except Exception as e:
+            log.info("active env check: %s quiet failure (%s: %s)", key,
+                     type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        finally:
+            set_thread_site(None, None)
+        # via_device only when we signed in WITHOUT a saved file — that's the
+        # path that actually exercised (and so proves) Edge one-click.
+        self.q.put(("active_env_done",
+                    {"seq": self.seq, "key": key, "signed_in": signed_in,
+                     "via_device": signed_in and not had_file}))
+
+
 class LoginWorker(threading.Thread):
     """Opens a headed browser for SSO+MFA, waits for the user to signal done
     (done_event, set by a GUI button), then saves the storage_state.
@@ -1177,63 +1249,35 @@ class LoginWorker(threading.Thread):
         log = logging.getLogger("tsmis.login")
         try:
             with sync_playwright() as p:
-                # Honor the user's Browser pick for SIGN-IN too, not just for
-                # exports. With no explicit pick, the default order is: the
-                # Built-in Chromium when present (unmanaged, so org policy
-                # can't relaunch it into a work profile mid-SSO -- the
-                # managed-Edge failure), else the experimental persistent-
-                # profile Edge flow with its Chrome fallback.
-                pref = get_preferred_channel()
-                log.info("login: starting (preferred browser: %s)", pref or "none")
-                if pref == "chrome":
-                    # Explicit Chrome pick: the silent device sign-in never
-                    # works in Chrome (it's an Edge/Windows integration), so go
-                    # straight to the headed Chrome window.
-                    self._run_standard_login(p, log)
-                    return
-
-                # Silent first: on managed Caltrans PCs the persistent Edge
-                # sign-in profile signs itself in via the one-click Windows
-                # sign-in -- no window, no typing. Skipped when the user
-                # explicitly picked a non-Edge browser.
-                if pref in (None, "msedge"):
-                    self.q.put(("log", "Trying automatic sign-in (Microsoft Edge "
-                                       "+ this PC's Windows account)..."))
-                    state = try_device_sso_login(p)
-                    if self.cancel.is_set():
-                        self.q.put(("cancelled", None))
-                        return
-                    if state:
-                        if storage_state_is_portable(p, state):
-                            self._save_state(state)
-                            self.q.put(("login_saved", None))
-                            log.info("login: SAVED via silent device sign-in")
-                            return
-                        # Signed in, but the cookies are device-bound. Do NOT
-                        # save them (stale Azure stubs make later sign-ins
-                        # prompt interactively) -- exports don't need a file:
-                        # each export context signs in live the same silent way.
-                        self.q.put(("login_device_ok", None))
-                        log.info("login: device sign-in works; exports will sign "
-                                 "in live (capture not portable, not saved)")
-                        return
-                    self.q.put(("log", "Automatic sign-in isn't available here; "
-                                       "opening a browser window..."))
-
-                if "chromium" in BROWSER_CHANNELS and pref in (None, "chromium"):
-                    browser = None
+                # The quiet background active-env check now OWNS silent Edge
+                # one-click sign-in. The button's job is to CAPTURE a portable
+                # saved login (what fast mode needs, and what normal exports
+                # restore) via a headed window in the chosen Chromium-class
+                # browser — Chrome by default (preferred when installed), or the
+                # Built-in Chromium when that's the pick or Chrome is absent.
+                pref = get_preferred_channel()          # 'chrome'|'chromium'|None
+                log.info("login: starting (export browser: %s)",
+                         pref or "auto (Chrome-first)")
+                order = (["chromium", "chrome"] if pref == "chromium"
+                         else ["chrome", "chromium"])
+                for ch in order:
+                    if ch == "chromium" and "chromium" not in BROWSER_CHANNELS:
+                        continue
                     try:
-                        browser = p.chromium.launch(headless=False, channel="chromium",
+                        browser = p.chromium.launch(headless=False, channel=ch,
                                                     args=LOGIN_BROWSER_ARGS)
                     except Exception as e:
-                        log.info("login: Built-in Chromium launch failed (%s)",
-                                 type(e).__name__)
-                        self.q.put(("log", "The built-in browser could not open; "
-                                           "trying another browser."))
-                    if browser is not None:
-                        self._run_login_in_browser(browser, CHANNEL_LABELS["chromium"], log)
-                        return
+                        log.info("login: %s launch failed (%s)", ch, type(e).__name__)
+                        continue
+                    self._run_login_in_browser(browser, CHANNEL_LABELS[ch], log)
+                    return
 
+                # No Chrome/Chromium could open (an Edge-only managed PC): fall
+                # back to the persistent-profile Edge recapture, validating the
+                # capture is portable before saving (a Windows device-broker/PRT
+                # session can't be reused elsewhere -> device mode instead).
+                self.q.put(("log", "No Chrome/Chromium browser is available; "
+                                   "signing in with Microsoft Edge..."))
                 edge_state = self._try_edge_persistent_login(p, log)
                 if edge_state is self._CANCELLED:
                     self.q.put(("cancelled", None))
@@ -1249,18 +1293,17 @@ class LoginWorker(threading.Thread):
                     if storage_state_is_portable(p, edge_state):
                         self._save_state(edge_state)
                         self.q.put(("login_saved", None))
-                        log.info("login: SAVED via experimental Edge recapture")
+                        log.info("login: SAVED via Edge recapture")
                         return
-                    log.info("login: Edge capture rejected (device-bound session, "
-                             "not portable)")
-                    self.q.put(("log", "Microsoft Edge signed you in through the "
-                                       "Windows work profile, so that session can't "
-                                       "be reused for exports. Opening another "
-                                       "browser -- please sign in once more."))
-                else:
-                    self.q.put(("log", "Experimental Edge sign-in was not captured; "
-                                       "opening Google Chrome fallback."))
-                self._run_standard_login(p, log)
+                    # Device-bound capture: don't save it, but exports can still
+                    # sign themselves in live (device mode).
+                    log.info("login: Edge capture device-bound (not portable); "
+                             "device mode")
+                    self.q.put(("login_device_ok", None))
+                    return
+                self.q.put(("error", ("general",
+                            "No usable web browser was found to sign in. Install "
+                            "Google Chrome or Microsoft Edge, then try again.")))
         except BrowserNotFoundError as e:
             self.q.put(("error", ("general", str(e))))
         except Exception as e:
@@ -1317,17 +1360,6 @@ class LoginWorker(threading.Thread):
 
         log.info("login: experimental Edge capture failed")
         return None
-
-    def _run_standard_login(self, p, log):
-        try:
-            browser = p.chromium.launch(headless=False, channel="chrome",
-                                        args=LOGIN_BROWSER_ARGS)
-            label = "Google Chrome"
-        except Exception as e:
-            log.info("login: Chrome launch failed (%s); trying selected browser", type(e).__name__)
-            browser = launch_browser(p, headless=False, args=LOGIN_BROWSER_ARGS)
-            label = "selected browser"
-        self._run_login_in_browser(browser, label, log)
 
     def _run_login_in_browser(self, browser, label, log):
         """Drive a normal (non-persistent) headed sign-in in `browser` and save

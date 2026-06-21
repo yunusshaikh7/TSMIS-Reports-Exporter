@@ -674,7 +674,8 @@ function buildStatic() {
   };
   fill($("selSource"), init.sources, init.site.source);
   fill($("selEnv"), init.envs, init.site.environment);
-  fill($("selBrowser"), init.channels, init.channel);
+  // (The browser picker moved to Settings ▸ Export browser; the title bar now
+  //  shows a read-only indicator instead — see renderState / st.export_browser.)
 
   // readiness dots: one per browser channel + output + tools
   const strip = $("checkStrip");
@@ -742,6 +743,17 @@ function renderState() {
     : dev.primed
       ? "Edge one-click sign-in: set up (the Edge sign-in profile exists) — it's verified the first time something signs in this session."
       : "Edge one-click sign-in: not set up. Sign in once with Microsoft Edge to enable hands-free sign-in on this PC.";
+
+  // Export-browser indicator: what will actually do the exporting right now.
+  const eb = st.export_browser || {};
+  setDot($("exportBrowserDot"), eb.dot || "unknown");
+  $("exportBrowserText").textContent = eb.cls_label || "—";
+  $("exportBrowserInd").title = eb.normal
+    ? `Normal export: ${eb.normal}\nFast mode: ${eb.fast}`
+      + "\nMicrosoft Edge is used for one-click sign-in and as a fallback."
+      + "\nChange it under Settings ▸ Export browser."
+    : "";
+
   const bl = $("btnLogin"), blc = $("btnLoginCancel");
   const phase = st.login_phase;
   const labels = { starting: "Signing in…", saving: "Saving…", cancelling: "Cancelling…" };
@@ -786,7 +798,7 @@ function renderState() {
 
   // config inputs lock while any task runs
   const locked = st.task != null;
-  ["selSource", "selEnv", "selBrowser", "routesInput", "btnChooseRoutes", "selDay",
+  ["selSource", "selEnv", "routesInput", "btnChooseRoutes", "selDay",
    "btnVerifyEnv", "btnDeleteReports", "btnClearLogin", "btnSupportBundle",
    "btnCheckEnvs"]
     .forEach((id) => { $(id).disabled = locked; });
@@ -1474,6 +1486,10 @@ function dispatch(events) {
       switch (ev.t) {
         case "state":
           S.st = ev.s; renderState(); updateMatrixProgress(); updateDayMatrixProgress();
+          // env_access can change on a push (background active-env check / scan) —
+          // re-overlay the matrix warnings without a full rebuild when one is visible.
+          if ((S.tab === "everything" && S.everySub === "matrix")
+              || (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP)) applyMatrixEnvFlags();
           // A TSN-library rebuild finished (task slot freed) → refresh its panel.
           if (S._tsnRebuildPending && (!S.st || S.st.task !== "consolidate")) {
             S._tsnRebuildPending = false; refreshTsnLibrary();
@@ -2104,6 +2120,58 @@ function dndAttach(targetEl, gripHost, key, group, axis, getOrder, commit) {
   targetEl.classList.add("dnd-target");
 }
 
+// Overlay the env-access scan verdicts onto BOTH matrices, same amber convention
+// as the Export tab (renderEnvAccess): a report greyed/missing on an environment
+// "may cause an issue". Cheap class+tooltip toggles over already-rendered DOM
+// (cells/headers carry data-rk/data-env/data-label), so it can re-run on every
+// state push without rebuilding the grid. Source of truth: S.st.env_access.
+function applyMatrixEnvFlags() {
+  const acc = (S.st && S.st.env_access) || {};
+  const note = (state, envLabel) =>
+    `\n⚠ ${state === "greyed" ? "Greyed out" : "Missing"} on ${envLabel}`
+    + " at the last environment check — the export may fail.";
+  // Everything matrix: report × environment (flag the precise cell + its headers).
+  const mg = $("matrixGrid");
+  if (mg) {
+    const shownEnvs = [...mg.querySelectorAll(".mx-colhead[data-env]")].map((h) => h.dataset.env);
+    mg.querySelectorAll(".mx-colhead[data-env]").forEach((h) => {
+      const e = acc[h.dataset.env];
+      const badge = e && e.status !== "checking" && (ENV_ACCESS_BADGE[e.status] || ENV_ACCESS_BADGE.error);
+      const bad = !!badge && badge.dot === "bad", warn = !!badge && badge.dot === "warn";
+      h.classList.toggle("mx-env-bad", bad);
+      h.classList.toggle("mx-env-warn", warn && !bad);
+      h.title = badge && (bad || warn) ? `Last environment check: ${badge.text} on ${e.label}.` : "";
+    });
+    mg.querySelectorAll(".mx-cell[data-rk][data-env]").forEach((cell) => {
+      const e = acc[cell.dataset.env];
+      const state = e && e.reports && e.reports[cell.dataset.label];
+      const off = !!state && state !== "ok";
+      cell.classList.toggle("mx-env-flag", off);
+      const base = cell.dataset.baseTitle || "";
+      cell.title = off ? base + note(state, e.label) : base;
+    });
+    mg.querySelectorAll(".mx-rowhead[data-rk]").forEach((rh) => {
+      const label = rh.dataset.label;
+      const hit = shownEnvs.some((env) => {
+        const e = acc[env], st = e && e.reports && e.reports[label];
+        return st && st !== "ok";
+      });
+      rh.classList.toggle("mx-env-flag", hit);
+    });
+  }
+  // By-day matrix: report × day under ONE source environment — flag the row header.
+  const dg = $("dayMatrixGrid");
+  if (dg) {
+    const e = acc[dg.dataset.srcEnv];
+    dg.querySelectorAll(".mx-rowhead[data-rk]").forEach((rh) => {
+      const st = e && e.reports && e.reports[rh.dataset.label];
+      const off = !!st && st !== "ok";
+      rh.classList.toggle("mx-env-flag", off);
+      rh.title = off ? note(st, e.label).trimStart() : "";
+    });
+  }
+}
+
 async function renderMatrix() {
   const grid = $("matrixGrid");
   if (!grid) return;
@@ -2140,6 +2208,7 @@ async function renderMatrix() {
   envs.forEach((env) => {
     const h = document.createElement("div");
     h.className = "mx-cell mx-colhead" + (env === snap.baseline ? " mx-baseline-col" : "");
+    h.dataset.env = env;                 // env-access flag target (applyMatrixEnvFlags)
     const elabel = snap.env_labels[env] || env;
     const lab = document.createElement("div");
     lab.textContent = elabel + (env === snap.baseline ? " ★" : "");
@@ -2169,6 +2238,7 @@ async function renderMatrix() {
     const top = document.createElement("div"); top.className = "mxrh-top";
     const lbl = document.createElement("span"); lbl.className = "mxrh-label";
     const rlabel = snap.row_labels[rk] || rk;
+    rh.dataset.rk = rk; rh.dataset.label = rlabel;   // env-access flag target
     lbl.textContent = rlabel; lbl.title = rlabel;
     top.append(lbl, mxHeaderBtns(rlabel,
       async () => {
@@ -2230,6 +2300,9 @@ async function renderMatrix() {
         cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
       }
       cell.title = `${snap.row_labels[rk]} — ${snap.env_labels[env] || env}\nExported: ${expWhen}`;
+      cell.dataset.rk = rk; cell.dataset.env = env;
+      cell.dataset.label = snap.row_labels[rk] || rk;
+      cell.dataset.baseTitle = cell.title;             // env flag appends to this base
       cell.append(main, sub);
 
       // Action triggers stay LIVE during a run — a 2nd click now QUEUES rather
@@ -2259,6 +2332,7 @@ async function renderMatrix() {
       grid.appendChild(cell);
     });
   });
+  applyMatrixEnvFlags();              // overlay env-access warnings on the grid
 
   const sel = $("matrixBaseline");
   if (sel) {
@@ -2320,6 +2394,7 @@ async function renderDayMatrix() {
   if (!snap) return;
   const days = snap.days || [], locked = !!(S.st && S.st.task);
   const today = snap.today;          // the one EXPORTABLE column (past = locked)
+  grid.dataset.srcEnv = snap.source || "";   // env-access flags key on the source env
 
   const srcSel = $("dayMatrixSource");
   if (srcSel) {
@@ -2447,6 +2522,7 @@ async function renderDayMatrix() {
     const supported = !!snap.row_supported[rk];
     const rlabel = snap.row_labels[rk] || rk;
     const rh = document.createElement("div"); rh.className = "mx-cell mx-rowhead";
+    rh.dataset.rk = rk; rh.dataset.label = rlabel;   // env-access flag target
     const top = document.createElement("div"); top.className = "mxrh-top";
     const lbl = document.createElement("span"); lbl.className = "mxrh-label";
     lbl.textContent = rlabel + (supported ? "" : " (soon)");
@@ -2513,6 +2589,7 @@ async function renderDayMatrix() {
 
   wireDayMatrixFooter();
   updateDayMatrixProgress();
+  applyMatrixEnvFlags();              // overlay env-access warnings on the row headers
 }
 
 // A small per-day "consolidated workbook" indicator + refresh-consolidated action.
@@ -2869,6 +2946,7 @@ function fillSettings() {
 
   renderSiteUrls(s.site_urls || []);
   renderChromium(s.chromium || {});
+  renderExportBrowser(s.export_browser || {});
   renderTsnLibrary(s.tsn_library || []);
 
   const about = $("setAbout");
@@ -2935,7 +3013,7 @@ function renderChromium(c) {
     text = "Ships with this app (the “with-browser” download) — nothing to manage.";
   } else if (c.downloaded) {
     text = `Downloaded (${c.downloaded_mb} MB)` + (c.active
-      ? " and available in the Browser dropdown."
+      ? " and available as an export browser (pick it under Export browser below)."
       : " — restart the app to use it.");
   } else {
     text = "Not installed — exports use the PC's Microsoft Edge / Google Chrome.";
@@ -2946,6 +3024,44 @@ function renderChromium(c) {
   $("btnChromiumDelete").classList.toggle("hidden", !c.downloaded);
   const downloading = S.st && S.st.task === "chromium";
   $("btnChromiumCancel").classList.toggle("hidden", !downloading);
+}
+
+// ---- Settings: Export browser (Built-in Chromium vs Google Chrome) ----
+// The real CHOICE only exists when BOTH are available; otherwise just say what's
+// in use. Microsoft Edge is the implicit one-click path, never an option here.
+function renderExportBrowser(eb) {
+  const box = $("setExportBrowser"), info = $("exportBrowserInfo");
+  if (!box) return;
+  box.textContent = "";
+  const labels = eb.labels || { chromium: "Built-in Chromium", chrome: "Google Chrome" };
+  const hasChoice = !!(eb.chromium_present && eb.chrome_ok);
+  if (hasChoice) {                       // both installed → a real pick
+    box.classList.remove("hidden");
+    [["auto", "Automatic — Google Chrome when installed"],
+     ["chrome", labels.chrome], ["chromium", labels.chromium]].forEach(([val, text]) => {
+      const lab = document.createElement("label"); lab.className = "set-radio";
+      const r = document.createElement("input");
+      r.type = "radio"; r.name = "exportBrowser"; r.value = val;
+      r.checked = (eb.value || "auto") === val;
+      r.onchange = async () => {
+        const res = await api.set_export_browser(val);
+        if (res && res.error) showMessage("error", "Can't set export browser", res.error);
+      };
+      lab.append(r, document.createTextNode(" " + text));
+      box.appendChild(lab);
+    });
+    info.textContent = "";
+  } else {                               // no real choice → just say what's used
+    box.classList.add("hidden");
+    info.textContent = eb.chromium_present
+      ? `Exports use the ${labels.chromium} (no Google Chrome installed). `
+        + "Install Chrome for a choice."
+      : eb.chrome_ok
+        ? `Exports use ${labels.chrome} (no Built-in Chromium present). `
+          + "Download the Built-in Chromium above for a choice."
+        : "No Chrome/Chromium is available — exports use Microsoft Edge. Install "
+          + "Google Chrome, or download the Built-in Chromium above, for faster exports.";
+  }
 }
 
 // ---- Settings: canonical TSN library (v0.17.0) ----
@@ -3274,7 +3390,6 @@ function bindEvents() {
   document.body.addEventListener("change", renderPreflight);
   document.body.addEventListener("input", renderPreflight);
 
-  $("selBrowser").onchange = () => api.set_browser($("selBrowser").value);
   $("selSource").onchange = () => {
     api.set_site($("selSource").value, $("selEnv").value);
     renderEnvAccess();          // re-aim the Export tab's availability flags
@@ -3572,6 +3687,8 @@ function makeMockApi() {
     authed: false, device_ok: false,
     logins: { file: { valid: false, age_h: null },
               device: { ok: false, primed: true } },
+    export_browser: { normal: "sign in to export", fast: "Google Chrome ×3",
+                      dot: "warn", cls_label: "Google Chrome" },
     auth_dot: "bad", auth_text: "No saved login — click Log in",
     login_phase: null, login_label: "Log in",
     checks: {
@@ -3584,7 +3701,22 @@ function makeMockApi() {
     days: ["2026-06-11 ssor-prod", "2026-06-11 ars-prod", "2026-06-08 ssor-dev", "2026-06-02"],
     can_save_report: false,
     update: { phase: "idle" },
-    env_access: {},
+    // Seeded as if a "Check all environments" scan had run, so the Export-tab and
+    // matrix env-flag overlays are visible in #mock. Keys = registry labels (must
+    // match EXPORT_REPORTS / the matrices' row_labels).
+    env_access: {
+      "ssor-prod": { key: "ssor-prod", source: "ssor", environment: "prod",
+        label: "SSOR / Prod", status: "reports_off", checked_at: "09:14",
+        detail: "Signed in, but some report types are greyed out on this site.",
+        url: "https://tsmis.dot.ca.gov/",
+        reports: { "TSAR: Ramp Summary": "ok", "TSAR: Ramp Detail": "ok",
+          "Highway Sequence Listing": "ok", "Highway Log": "greyed",
+          "Highway Log (PDF)": "greyed", "Intersection Summary": "ok",
+          "Intersection Detail": "missing" } },
+      "ars-test": { key: "ars-test", source: "ars", environment: "test",
+        label: "ARS / Test", status: "denied", checked_at: "09:14",
+        detail: "Authenticated but not in the TSMIS group.", url: "", reports: {} },
+    },
     matrix: null,
     matrix_queue: [],            // v0.16.0 pending jobs
     matrix_current: null,        // v0.16.0 running job
@@ -3710,9 +3842,9 @@ function makeMockApi() {
       { key: "ramp_summary", label: "TSAR: Ramp Summary", tsn_capable: true },
       { key: "ramp_detail", label: "TSAR: Ramp Detail", tsn_capable: true },
       { key: "highway_sequence", label: "Highway Sequence Listing", tsn_capable: true },
-      { key: "highway_log", label: "Highway Log (Excel)", tsn_capable: true },
-      { key: "intersection_summary", label: "TSAR: Intersection Summary", tsn_capable: true },
-      { key: "intersection_detail", label: "TSAR: Intersection Detail", tsn_capable: true },
+      { key: "highway_log", label: "Highway Log", tsn_capable: true },
+      { key: "intersection_summary", label: "Intersection Summary", tsn_capable: true },
+      { key: "intersection_detail", label: "Intersection Detail", tsn_capable: true },
       { key: "highway_log_pdf", label: "Highway Log (PDF)", tsn_capable: true },
     ];
     const rowLabels = {}; allRows.forEach((r) => { rowLabels[r.key] = r.label; });
@@ -3785,7 +3917,7 @@ function makeMockApi() {
     const source = st.day_matrix_source || "ssor-prod";
     const days = st.day_matrix_days || [];
     const allRows = [
-      { key: "highway_log", label: "Highway Log (Excel)", supported: true },
+      { key: "highway_log", label: "Highway Log", supported: true },
       { key: "highway_log_pdf", label: "Highway Log (PDF)", supported: true },
       { key: "ramp_summary", label: "TSAR: Ramp Summary", supported: true },
       { key: "ramp_detail", label: "TSAR: Ramp Detail", supported: true },
@@ -4236,6 +4368,9 @@ function makeMockApi() {
       return { ok: true };
     },
     get_settings: async () => ({ values: { ...mockSettings }, defaults: { ...mockSettings },
+                                 export_browser: { value: mockSettings.export_browser || "auto",
+                                   chrome_ok: true, chromium_present: true,
+                                   labels: { chromium: "Built-in Chromium", chrome: "Google Chrome" } },
                                  tsn_library: mockTsnLibraryRows(), meta: { update_support: "ok" } }),
     tsn_library_status: async () => ({ reports: mockTsnLibraryRows() }),
     import_tsn_raw: async (report) => {
@@ -4316,8 +4451,32 @@ function makeMockApi() {
     ui_ready: async () => { setTimeout(finishChecks, 900); },
     ui_event: async () => {},
     log_js_error: async (m) => console.error("js error:", m),
-    set_browser: async (ch) => push({ t: "log", text: `Browser set to ${ch} (the other is still used as a fallback if needed).` }),
-    set_site: async (src, env) => push({ t: "log", text: `Site set to ${src.toUpperCase()} / ${env} (used by the next sign-in or export).` }),
+    set_export_browser: async (ch) => {
+      mockSettings.export_browser = (ch === "auto" ? "" : ch);
+      const label = ch === "chromium" ? "Built-in Chromium"
+        : ch === "chrome" ? "Google Chrome" : "automatic (Chrome-first)";
+      st.export_browser = { ...st.export_browser,
+        cls_label: ch === "chromium" ? "Built-in Chromium" : "Google Chrome" };
+      push({ t: "log", text: `Export browser set to ${label} (Microsoft Edge is still `
+            + `used for one-click sign-in and as a fallback).` }, { t: "state", s: st });
+      return { ok: true };
+    },
+    set_site: async (src, env) => {
+      push({ t: "log", text: `Site set to ${src.toUpperCase()} / ${env} (used by the next sign-in or export).` });
+      // Simulate the quiet background active-env check: prove Edge one-click +
+      // refresh this env's report flags (no modal, no per-combo log line).
+      st.device_ok = true;
+      st.logins = { ...st.logins, device: { ...st.logins.device, ok: true } };
+      st.export_browser = { ...st.export_browser, normal: "Microsoft Edge · one-click", dot: "ok" };
+      st.env_access = { ...st.env_access,
+        [`${src}-${env}`]: { key: `${src}-${env}`, source: src, environment: env,
+          label: `${src.toUpperCase()} / ${env[0].toUpperCase()}${env.slice(1)}`,
+          status: "reports_off", checked_at: "now", url: "",
+          detail: "Signed in; some report types are greyed out here.",
+          reports: { "Highway Log": "greyed", "Intersection Detail": "missing" } } };
+      push({ t: "state", s: st }, { t: "matrix_refresh" });
+      return { ok: true };
+    },
     start_checks: async () => {
       Object.keys(st.checks).forEach((k) => { st.checks[k] = { status: "busy", text: "checking…" }; });
       st.checks_running = true; pushState();

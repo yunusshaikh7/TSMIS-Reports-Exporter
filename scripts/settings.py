@@ -372,6 +372,34 @@ def set_matrix_baseline(key):
     return get_matrix_baseline()
 
 
+# ---- Export browser (which Chromium-class browser does the work) ------------
+# Edge stays the implicit one-click / device sign-in path and the ultimate
+# fallback; this pins which CHROMIUM-CLASS browser normal exports, fast-mode
+# workers and the login capture prefer. "" / absent = auto (Chrome when
+# installed, else Built-in Chromium). NOT in DEFAULTS: the right auto depends on
+# what's installed, so a hardcoded default would mislead all_settings()/resolver.
+
+def get_export_browser():
+    """The pinned export browser ('chrome' or 'chromium'), or '' for auto
+    (Chrome-first). Any other stored value is treated as unset."""
+    raw = _read_file().get("export_browser")
+    return raw if raw in ("chrome", "chromium") else ""
+
+
+def set_export_browser(channel):
+    """Pin the export browser to 'chrome'/'chromium', or clear it (any other
+    value, including 'msedge' or '', means auto). Returns the new effective
+    value."""
+    data = dict(_read_file())
+    if channel in ("chrome", "chromium"):
+        data["export_browser"] = channel
+    else:
+        data.pop("export_browser", None)
+    _atomic_write(data)
+    log.info("settings: export_browser -> %s", get_export_browser() or "(auto)")
+    return get_export_browser()
+
+
 # ---- Comparison-matrix report visibility -----------------------------------
 # Which report ROWS the matrix shows (and refreshes). Stored as the set of HIDDEN
 # row keys so any report type added later defaults to VISIBLE. Validation (key is

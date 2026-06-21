@@ -119,9 +119,13 @@
       </div>
       <!-- Tools: browser choice, verify, readiness, theme -->
       <div class="readiness-group">
-        <label class="tb-field">Browser
-          <span class="tb-select"><select id="selBrowser"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
-        </label>
+        <!-- Read-only indicator of what actually does the exporting; the picker
+             moved to Settings ▸ Export browser (Edge = implicit one-click). -->
+        <div class="tb-ind" id="exportBrowserInd" title="">
+          <span class="tb-ind-cap">Export via</span>
+          <span class="dot dot-unknown" id="exportBrowserDot"></span>
+          <span id="exportBrowserText">…</span>
+        </div>
         <!-- Aggregate app-readiness; the per-item checks + Re-check live in the popover. -->
         <div class="popover-host">
           <button class="status-chip" id="readyChip" aria-haspopup="dialog" aria-expanded="false" aria-controls="readyPop"
@@ -721,6 +725,18 @@
               <svg class="ic"><use href="#i-x"/></svg>Cancel download
             </button>
           </div>
+        </div>
+
+        <div class="card-section" id="exportBrowserSection">
+          <div class="section-head"><span class="section-label">Export browser</span></div>
+          <p class="hint" style="margin-bottom:8px">
+            Which browser does the actual exporting (plus fast-mode workers and the
+            sign-in capture). <b>Microsoft Edge</b> is always used for one-click
+            sign-in and as a fallback — this only chooses between Google Chrome and
+            the app's Built-in Chromium, and only when both are installed.
+          </p>
+          <div class="set-radios" id="setExportBrowser"></div>
+          <p class="hint" id="exportBrowserInfo" style="margin-top:8px"></p>
         </div>
 
         <div class="card-section">

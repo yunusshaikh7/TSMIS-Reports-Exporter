@@ -236,6 +236,37 @@ widen `_resolve_day_export_steps` to per-district steps — the dated/site/queue
 already fits. Golden `check_day_matrix` (today-gating, dated worker, export→compare chain);
 mock + bridge at `/index.html#mock`.
 
+### Env-check flags on the matrices (v0.17.0)
+
+Both matrices reuse the Export tab's amber convention to surface what the **env-access**
+scan flagged. `applyMatrixEnvFlags()` (app.js) overlays `S.st.env_access` (keyed
+`"<src>-<env>"` → `reports[<registry label>]` = `ok|greyed|missing`) onto the
+already-rendered grid — cheap class/tooltip toggles over cells/headers stamped with
+`data-rk`/`data-env`/`data-label`, so it re-runs on any state push without a rebuild.
+The **Everything** matrix is report×env, so it flags precisely: the **cell** (amber inset
+border + "export may fail" tooltip), its **row header** (amber when flagged in any shown
+env), and the **env column header** (`mx-env-warn` amber / `mx-env-bad` red for a
+whole-env verdict). The **by-day** matrix is report×day under one `snap.source` env, so it
+flags the **row header**. It re-overlays live from `dispatch`'s `state` case (when a matrix
+tab is visible) and on `matrix_refresh`, so the quiet background active-env check (auth
+§4a) keeps the flags current. The lookup works because the matrix `row_labels` ARE the
+EXPORT_REPORTS labels (`reports.matrix_rows()` → `EXPORT_REPORTS[idx][0]`) — exactly the
+`env_access.reports` key. Verified at `/index.html#mock` (seeded `env_access`).
+
+### Export-browser indicator + quiet active-env check (v0.17.0)
+
+The title-bar **Browser dropdown is gone**, replaced by a read-only **indicator**
+(`#exportBrowserInd`, fed by `state.export_browser` = `{normal, fast, dot, cls_label}` from
+`_export_browser_view`) of what will actually export — e.g. "Google Chrome · saved login"
+or "Microsoft Edge · one-click". The only real choice — **Built-in Chromium vs installed
+Chrome** — moved to **Settings ▸ Export browser** (`renderExportBrowser`: radios when both
+exist, else an info line), persisted via `set_export_browser`; Edge is the implicit
+one-click path, not pickable. On app start + env switch the GUI quietly proves one-click
+and refreshes the active env's report flags via the background **active-env check** — full
+detail in [auth-and-signin.md](auth-and-signin.md) §4 / §4a. **Title-bar vs card trap
+applies:** the indicator uses `--titlebar-*` tokens (`.tb-ind`), the Settings radios are
+card controls.
+
 ### Drag-to-reorder matrix rows + columns (v0.17.0 Phase 4b)
 
 Each row/column header carries a small drag grip (`dndAttach` in app.js — one HTML5-DnD

@@ -18,8 +18,8 @@ except ImportError:
     sys.exit(1)
 
 from common import (
-    AUTH, BROWSER_CHANNELS, LOGIN_BROWSER_ARGS, BrowserNotFoundError, get_url,
-    is_logged_in, launch_browser,
+    AUTH, BROWSER_CHANNELS, CHANNEL_LABELS, LOGIN_BROWSER_ARGS,
+    BrowserNotFoundError, get_url, is_logged_in,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
     launch_edge_login_context, new_login_context, save_auth_state,
@@ -70,24 +70,19 @@ def main():
 
 def _run_login():
     with sync_playwright() as p:
-        # Honor an explicit browser choice (TSMIS_BROWSER_CHANNEL) for sign-in
-        # too. With no explicit pick, the default order is: the Built-in
-        # Chromium when present (unmanaged, so org policy can't relaunch it
-        # into a work profile mid-SSO -- the managed-Edge failure), else the
-        # experimental persistent-profile Edge flow with its Chrome fallback.
-        pref = get_preferred_channel()
-        log.info("login: starting (preferred browser: %s)", pref or "none")
-        if pref == "chrome":
-            # Explicit Chrome pick: the silent device sign-in never works in
-            # Chrome (it's an Edge/Windows integration), so go straight to the
-            # headed Chrome window.
-            _run_standard_login(p)
-            return
+        # Console/fallback flow. The GUI moved silent Edge one-click sign-in to
+        # a quiet BACKGROUND check; the console has no background worker, so with
+        # no explicit pick it still tries the silent sign-in first, then opens a
+        # headed window in the chosen Chromium-class browser (Chrome by default,
+        # Built-in Chromium when picked), and finally the Edge recapture for
+        # Edge-only PCs. Edge is never a user-pickable EXPORT browser now.
+        pref = get_preferred_channel()          # 'chrome'|'chromium'|None
+        log.info("login: starting (export browser: %s)", pref or "auto (Chrome-first)")
 
-        # Silent first: on managed Caltrans PCs the persistent Edge sign-in
-        # profile signs itself in via the one-click Windows sign-in -- no
-        # window, no typing.
-        if pref in (None, "msedge"):
+        # Silent first (only with no explicit pick): on managed Caltrans PCs the
+        # persistent Edge sign-in profile signs itself in via the one-click
+        # Windows sign-in -- no window, no typing.
+        if pref is None:
             print()
             print("Trying automatic sign-in (Microsoft Edge + this PC's Windows account)...")
             state = try_device_sso_login(p)
@@ -112,46 +107,50 @@ def _run_login():
                 return
             print("Automatic sign-in isn't available here; opening a browser window...")
 
-        if "chromium" in BROWSER_CHANNELS and pref in (None, "chromium"):
-            browser = None
+        # Headed capture in the chosen Chromium-class browser (Chrome first by
+        # default; Built-in Chromium when picked or Chrome is absent).
+        order = (["chromium", "chrome"] if pref == "chromium"
+                 else ["chrome", "chromium"])
+        for ch in order:
+            if ch == "chromium" and "chromium" not in BROWSER_CHANNELS:
+                continue
             try:
-                browser = p.chromium.launch(headless=False, channel="chromium",
+                browser = p.chromium.launch(headless=False, channel=ch,
                                             args=LOGIN_BROWSER_ARGS)
             except Exception as e:
-                log.info("login: Built-in Chromium launch failed (%s)", type(e).__name__)
-                print()
-                print(f"The built-in browser could not open ({type(e).__name__});")
-                print("trying another browser.")
-            if browser is not None:
-                _login_with_browser(browser, "the built-in Chromium browser")
-                return
+                log.info("login: %s launch failed (%s)", ch, type(e).__name__)
+                continue
+            _login_with_browser(browser, CHANNEL_LABELS[ch])
+            return
 
+        # No Chrome/Chromium available (Edge-only PC): persistent-profile Edge
+        # recapture, validating portability before saving (a Windows
+        # device-broker/PRT capture can't be reused elsewhere -> device mode).
+        print()
+        print("No Chrome/Chromium browser is available; signing in with Microsoft Edge...")
         edge_state = _try_edge_persistent_login(p)
         if edge_state:
-            # A capture from the live Edge profile can still be useless: when
-            # Edge signed in through the Windows device broker (PRT) the session
-            # never reaches the cookie jar, so the saved file would not log in
-            # anywhere else. Prove the capture works before saving it.
             print("Checking that the captured sign-in can be reused for exports...")
             if storage_state_is_portable(p, edge_state):
                 _save_state(edge_state)
-                log.info("login: SAVED via experimental Edge recapture")
+                log.info("login: SAVED via Edge recapture")
                 print()
-                print(f"Session saved to {AUTH.name}  (experimental Edge recapture)")
+                print(f"Session saved to {AUTH.name}  (Microsoft Edge)")
                 print('  You can close this window and run "3. run_export (main script).bat"')
                 input("Press Enter to exit...")
                 return
-            log.info("login: Edge capture rejected (device-bound session, not portable)")
+            log.info("login: Edge capture device-bound (not portable); device mode")
             print()
-            print("Microsoft Edge signed you in through the Windows work profile,")
-            print("so that session can't be reused for exports.")
-            print("Opening another browser -- please sign in once more.")
-        else:
-            log.info("login: experimental Edge capture failed")
-            print()
-            print("Experimental Edge sign-in was not captured.")
-            print("Opening Google Chrome fallback -- please sign in again.")
-        _run_standard_login(p)
+            print("Microsoft Edge signed you in through the Windows work profile, so that")
+            print("session can't be saved -- but exports sign themselves in the same way,")
+            print('so you can run "3. run_export (main script).bat" directly.')
+            input("Press Enter to exit...")
+            return
+        log.info("login: Edge capture failed")
+        print()
+        print("Sign-in could not be completed. Install Google Chrome or Microsoft Edge,")
+        print("then run this again.")
+        input("Press Enter to exit...")
 
 
 def _try_edge_persistent_login(p):
@@ -189,19 +188,6 @@ def _try_edge_persistent_login(p):
     _safe_close_context(ctx)
     state, _profile_name = capture_edge_login_state_from_profiles(p)
     return state
-
-
-def _run_standard_login(p):
-    try:
-        browser = p.chromium.launch(headless=False, channel="chrome",
-                                    args=LOGIN_BROWSER_ARGS)
-        label = "Google Chrome"
-    except Exception as e:
-        log.info("login: Chrome launch failed (%s); trying selected browser",
-                 type(e).__name__)
-        browser = launch_browser(p, headless=False, args=LOGIN_BROWSER_ARGS)
-        label = "the selected browser"
-    _login_with_browser(browser, label)
 
 
 def _login_with_browser(browser, label):

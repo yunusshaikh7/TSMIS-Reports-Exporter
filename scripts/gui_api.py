@@ -43,7 +43,8 @@ import settings
 import batch_manifest
 import report_library
 import updater
-from gui_worker import (BatchWorker, CheckWorker, ChromiumWorker,
+from gui_worker import (ActiveEnvCheckWorker, BatchWorker, CheckWorker,
+                        ChromiumWorker,
                         ConsolidateWorker, DayMatrixCompareWorker, EnvCheckWorker,
                         EnvScanWorker, MatrixBatchExportWorker, MatrixCompareWorker,
                         MatrixTsnConsolidateWorker,
@@ -60,8 +61,8 @@ from common import (
     BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES, DATA_SOURCE_LABELS,
     ENVIRONMENTS, ENVIRONMENT_LABELS, ROUTES, AuthError,
     _auth_file_age_hours, clear_auth, default_site_url, dev_site_url, get_site,
-    has_valid_auth, parse_routes, require_valid_auth, set_preferred_channel,
-    set_site,
+    has_valid_auth, init_preferred_channel_from_settings, parse_routes,
+    require_valid_auth, set_preferred_channel, set_site,
 )
 from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
@@ -131,13 +132,22 @@ class GuiApi:
         self._started = False        # first get_initial_state happened
 
         self._task = None            # None | "export" | "consolidate" | "login"
+        # The quiet background active-env check runs OUTSIDE the single-task gate
+        # (it must never block the Log in / Export buttons), so it has its own
+        # lightweight flag + a supersede token for a newer env switch.
+        self._active_check = False
+        self._active_check_seq = 0
         self._fast_run = False       # running export is fast mode (Skip is off)
         self._authed = False
         self._device_ok = False      # silent device sign-in proven to work
         self._login_phase = None     # None|starting|open|saving|cancelling
         self._auth_dot = "unknown"
         self._auth_text = "Checking session…"
-        self._channel = BROWSER_CHANNELS[0]  # the dropdown's current pick
+        # The persisted EXPORT-browser pick ('' → the Chrome-first default);
+        # seed common's preferred channel from it so the first sign-in/export
+        # honors it. Edge is the implicit one-click path, never an export pick.
+        self._channel = settings.get_export_browser() or BROWSER_CHANNELS[0]
+        init_preferred_channel_from_settings()
         self._checks_running = False
         self._checks = {}
         for ch in BROWSER_CHANNELS:
@@ -223,6 +233,7 @@ class GuiApi:
                 "paused": self.pause_event.is_set(),
                 "authed": self._authed,
                 "device_ok": self._device_ok,
+                "export_browser": self._export_browser_view(),
                 "auth_dot": self._auth_dot,
                 "auth_text": self._auth_text,
                 "login_phase": self._login_phase,
@@ -267,6 +278,32 @@ class GuiApi:
         return {"file": {"valid": valid,
                          "age_h": round(age, 1) if age is not None else None},
                 "device": {"ok": self._device_ok, "primed": primed}}
+
+    def _export_browser_view(self):
+        """What will actually do the exporting right now, for the title-bar
+        indicator (cheap stat only — never launches a browser or opens the Edge
+        profile). Normal: a saved login → the chosen Chromium-class browser;
+        else device/primed Edge → one-click; else a prompt to sign in. Fast: the
+        chosen Chromium-class browser × workers. (The Settings picker between
+        Built-in Chromium and Chrome rides in get_settings, not here.) Called
+        under self._lock (from _state_snapshot)."""
+        pick = settings.get_export_browser()        # '' | 'chrome' | 'chromium'
+        chromium_present = "chromium" in BROWSER_CHANNELS
+        cls = pick if pick in ("chrome", "chromium") else (
+            "chromium" if chromium_present else "chrome")
+        cls_label = CHANNEL_LABELS.get(cls, cls)
+        if self._authed:
+            normal, dot = f"{cls_label} · saved login", "ok"
+        elif self._device_ok:
+            normal, dot = "Microsoft Edge · one-click", "ok"
+        else:
+            normal, dot = "sign in to export", "warn"
+        try:
+            workers = settings.get("fast_workers")
+        except Exception:
+            workers = default_worker_count()
+        return {"normal": normal, "fast": f"{cls_label} ×{workers}",
+                "dot": dot, "cls_label": cls_label}
 
     def _sender(self):
         """Single ordered path to JS: batch whatever is queued and dispatch."""
@@ -429,6 +466,8 @@ class GuiApi:
             self._on_env_access(payload)
         elif kind == "env_access_done":
             self._on_env_scan_done(payload)
+        elif kind == "active_env_done":
+            self._on_active_env_done(payload)
         elif kind == "reset_done":
             self._on_reset_done(payload)
         elif kind == "chromium_done":
@@ -731,6 +770,10 @@ class GuiApi:
         # Browsers are probed and the saved login (if any) is known: the right
         # moment for the automatic environment check.
         self._maybe_autoscan("startup")
+        # Also kick the quiet single-combo check for the SELECTED env — lights
+        # the Edge one-click chip and fills this env's report flags. Credential-
+        # gated, so it's a no-op for a brand-new user with nothing set up.
+        self._maybe_active_env_check("startup")
 
     def _maybe_autoscan(self, reason):
         """Start the env-access scan unprompted — once per session, only when
@@ -754,6 +797,50 @@ class GuiApi:
         self._emit_log("Checking access to all environments in the background "
                        "(automatic — turn off in Settings)…")
         self.check_environments()
+
+    def _maybe_active_env_check(self, reason):
+        """Quietly check the CURRENTLY selected env in the background (app start
+        + env switch): prove Edge one-click / device sign-in (lights the chip)
+        and refresh that env's report availability (the Export-tab + matrix
+        flags). Runs only when a credential path likely exists — a saved login
+        OR the Edge profile is primed — so brand-new users trigger no pointless
+        network hits, and NEVER while another task or check is running (it must
+        not touch the single-task gate, and the Edge profile opens one at a time).
+        Quiet on every failure."""
+        try:
+            primed = (EDGE_LOGIN_PROFILE_DIR.is_dir()
+                      and any(EDGE_LOGIN_PROFILE_DIR.iterdir()))
+        except OSError:
+            primed = False
+        if not (has_valid_auth() or primed):
+            return
+        src, env = get_site()
+        with self._lock:
+            if self._task or self._active_check:
+                return
+            self._active_check = True
+            self._active_check_seq += 1
+            seq = self._active_check_seq
+        log.info("active env check: %s (%s-%s)", reason, src, env)
+        ActiveEnvCheckWorker(self._q, src, env, seq).start()
+
+    def _on_active_env_done(self, payload):
+        """The quiet active-env check finished. Drop a stale result (a newer env
+        switch bumped the seq and owns the flag); otherwise clear the flag, light
+        the Edge one-click chip when sign-in worked via device mode, and refresh
+        the matrix env flags."""
+        via_device = False
+        with self._lock:
+            if payload.get("seq") != self._active_check_seq:
+                return                  # superseded; the newer check owns the flag
+            self._active_check = False
+            if payload.get("via_device"):
+                self._device_ok = True
+                via_device = True
+        if via_device:
+            self._refresh_auth()
+        self._push_state()
+        self._emit({"t": "matrix_refresh"})   # re-overlay the matrix env flags
 
     def _on_update_status(self, payload):
         """UpdateWorker's whole-state posts. `manual` (user clicked) decides
@@ -935,14 +1022,24 @@ class GuiApi:
     # ---- header controls -----------------------------------------------------
 
     @_api_method
-    def set_browser(self, channel):
-        if channel not in BROWSER_CHANNELS:
-            return {"error": f"unknown browser channel: {channel}"}
+    def set_export_browser(self, channel):
+        """Pick which Chromium-class browser does normal exports / fast mode /
+        the login capture. Only 'chrome' or 'chromium' (Edge stays the implicit
+        one-click sign-in path + ultimate fallback, not a user-pickable export
+        browser). Persisted across sessions."""
+        if channel in ("", "auto"):
+            channel = ""                     # clear → auto (Chrome-first default)
+        elif channel not in ("chromium", "chrome"):
+            return {"error": f"not a selectable export browser: {channel}"}
+        settings.set_export_browser(channel)
         with self._lock:
-            self._channel = channel
-        set_preferred_channel(channel)       # tried first; the others stay fallbacks
-        self._emit_log(f"Browser set to {CHANNEL_LABELS[channel]} "
-                       "(the other is still used as a fallback if needed).")
+            self._channel = channel or BROWSER_CHANNELS[0]
+        set_preferred_channel(channel or None)   # None → default; Edge stays a fallback
+        self._emit_log("Export browser set to "
+                       + (CHANNEL_LABELS[channel] if channel else "automatic (Chrome-first)")
+                       + " (Microsoft Edge is still used for one-click sign-in "
+                       "and as a fallback).")
+        self._push_state()
         return {"ok": True}
 
     @_api_method
@@ -953,6 +1050,9 @@ class GuiApi:
         src, env = get_site()
         self._emit_log(f"Site set to {DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]} "
                        "(used by the next sign-in or export).")
+        # Quietly re-check the newly selected env in the background (proves
+        # one-click here + refreshes this env's report flags). Credential-gated.
+        self._maybe_active_env_check("site_switch")
         return {"ok": True}
 
     def _start_checks_locked(self):
@@ -2612,13 +2712,17 @@ class GuiApi:
         return {"ok": True}
 
     def _on_env_access(self, payload):
-        """One site's verdict from the scan → state snapshot + a log line."""
+        """One site's verdict → state snapshot + a log line. The quiet
+        background active-env check sets `quiet` to update the flags silently
+        (no per-combo log line)."""
         entry = dict(payload)
+        quiet = entry.pop("quiet", False)
         entry["checked_at"] = time.strftime("%H:%M")
         with self._lock:
             self._env_access[entry["key"]] = entry
-        mark = "OK" if entry["status"] == "ok" else "PROBLEM"
-        self._emit_log(f"  {entry['label']}: {mark} — {entry['detail']}")
+        if not quiet:
+            mark = "OK" if entry["status"] == "ok" else "PROBLEM"
+            self._emit_log(f"  {entry['label']}: {mark} — {entry['detail']}")
         self._push_state()
 
     def _on_env_scan_done(self, payload):
@@ -2936,6 +3040,15 @@ class GuiApi:
             "defaults": dict(settings.DEFAULTS),
             "site_urls": self._site_url_rows(),
             "chromium": self._chromium_state(),
+            # Which Chromium-class browser does exports/fast/login-capture. The
+            # Settings control only matters when BOTH exist (else it's just info);
+            # Edge is the implicit one-click path, never listed here.
+            "export_browser": {
+                "value": settings.get_export_browser() or "auto",
+                "chrome_ok": self._checks.get("browser_chrome", {}).get("status") == "ok",
+                "chromium_present": "chromium" in BROWSER_CHANNELS,
+                "labels": {c: CHANNEL_LABELS[c] for c in ("chromium", "chrome")},
+            },
             "tsn_library": self._tsn_library_status(),
             "meta": {
                 "version": __version__,

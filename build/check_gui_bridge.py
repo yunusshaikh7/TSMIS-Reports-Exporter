@@ -198,6 +198,110 @@ def test_env_verdict():
     check("both unreadable -> unverified (never silent ok)", uv3 == "unverified")
 
 
+def test_export_browser():
+    print("export-browser setting + indicator (v0.17.0):")
+    import common
+    import settings
+    a = gui_api.GuiApi()
+    orig = settings.get_export_browser()
+    orig_pref = common._preferred_channel
+    try:
+        check("rejects msedge as an export browser",
+              a.set_export_browser("msedge").get("error") is not None)
+        check("rejects an unknown channel",
+              a.set_export_browser("safari").get("error") is not None)
+        check("accepts chrome", a.set_export_browser("chrome").get("ok") is True)
+        check("chrome persisted", settings.get_export_browser() == "chrome")
+        check("accepts chromium", a.set_export_browser("chromium").get("ok") is True)
+        check("chromium persisted", settings.get_export_browser() == "chromium")
+        check("auto accepted", a.set_export_browser("auto").get("ok") is True)
+        check("auto clears the pick (back to default)", settings.get_export_browser() == "")
+        eb = a._export_browser_view()
+        check("indicator carries exactly the title-bar fields",
+              set(eb) == {"normal", "fast", "dot", "cls_label"})
+        check("indicator dot is a known status",
+              eb["dot"] in ("ok", "warn", "bad", "unknown"))
+        gs = a.get_settings().get("export_browser", {})
+        check("get_settings exposes the picker info",
+              {"value", "chrome_ok", "chromium_present", "labels"} <= set(gs))
+    finally:
+        settings.set_export_browser(orig)
+        common.set_preferred_channel(orig_pref)
+
+
+def test_channel_order():
+    print("browser channel order (Chrome-first; Edge implicit):")
+    import common
+    orig_pref = common._preferred_channel
+    try:
+        ch = list(common.BROWSER_CHANNELS)
+        check("msedge is LAST in the default order", ch[-1] == "msedge")
+        check("chrome comes before edge", ch.index("chrome") < ch.index("msedge"))
+        common.set_preferred_channel(None)
+        check("_candidate_channels() == default order with no pick",
+              list(common._candidate_channels()) == ch)
+        common.set_preferred_channel("msedge")
+        check("set_preferred_channel('msedge') is rejected -> None",
+              common._preferred_channel is None)
+        common.set_preferred_channel("chrome")
+        check("a chrome pick is tried first", common._candidate_channels()[0] == "chrome")
+        common.set_preferred_channel("msedge")        # -> None again
+        par = list(common._parallel_candidates())
+        check("parallel order never STARTS with edge", par[0] != "msedge")
+        if "msedge" in ch:
+            check("parallel order keeps edge LAST", par[-1] == "msedge")
+    finally:
+        common.set_preferred_channel(orig_pref)
+
+
+def test_active_env_check_gates():
+    print("quiet active-env check gating:")
+    import tempfile
+    a = gui_api.GuiApi()
+    started = []
+
+    class _FakeWorker:
+        def __init__(self, q, src, env, seq):
+            started.append((src, env, seq))
+
+        def start(self):
+            pass
+
+    orig_worker = gui_api.ActiveEnvCheckWorker
+    orig_has_auth = gui_api.has_valid_auth
+    orig_edge = gui_api.EDGE_LOGIN_PROFILE_DIR
+    gui_api.ActiveEnvCheckWorker = _FakeWorker          # never launch a real browser
+    try:
+        # Credential gate: no saved login + an unprimed (empty) Edge profile dir.
+        gui_api.has_valid_auth = lambda: False
+        gui_api.EDGE_LOGIN_PROFILE_DIR = Path(tempfile.mkdtemp(prefix="tsmis_noedge_"))
+        a._active_check = False
+        a._maybe_active_env_check("startup")
+        check("no credentials -> no check started",
+              not started and a._active_check is False)
+        # Credentials present, but a task is running -> must not touch the gate.
+        gui_api.has_valid_auth = lambda: True
+        a._task = "export"
+        a._maybe_active_env_check("startup")
+        check("a task is running -> no check started",
+              not started and a._active_check is False)
+        a._task = None
+        # Credentials present + idle -> exactly one check, flag + seq claimed.
+        a._maybe_active_env_check("startup")
+        check("credentials + idle -> one check started", len(started) == 1)
+        check("active-check flag set + seq bumped",
+              a._active_check is True and a._active_check_seq >= 1)
+        # A stale done (old seq) is ignored; the matching one clears the flag.
+        a._on_active_env_done({"seq": -1, "via_device": True})
+        check("stale active_env_done is ignored", a._active_check is True)
+        a._on_active_env_done({"seq": a._active_check_seq, "via_device": False})
+        check("matching active_env_done clears the flag", a._active_check is False)
+    finally:
+        gui_api.ActiveEnvCheckWorker = orig_worker
+        gui_api.has_valid_auth = orig_has_auth
+        gui_api.EDGE_LOGIN_PROFILE_DIR = orig_edge
+
+
 def main():
     test_pick_report()
     test_env_verdict()
@@ -207,6 +311,9 @@ def main():
     test_consolidate_index_before_claim()
     test_compare_dialog_error_releases()
     test_tsn_library_panel()
+    test_export_browser()
+    test_channel_order()
+    test_active_env_check_gates()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

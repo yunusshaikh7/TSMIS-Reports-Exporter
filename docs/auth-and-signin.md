@@ -46,7 +46,7 @@ Diagnostics: `_AUTH_DIAG_JS` snapshots every signal ("visible/<display>" | "hidd
 
 ## 3. `navigate_with_auth` — the sign-in loop
 
-`navigate_with_auth(page)` opens the page and sees the sign-in through. 60-second budget; every state change is breadcrumbed to the log (`auth: +Ns <msg>`, change-only via the `note()` helper).
+`navigate_with_auth(page, *, budget_s=60)` opens the page and sees the sign-in through. Default 60-second budget — the quiet background active-env check (§4a) passes a shorter `budget_s` (~20s) so a managed PC's silent SSO still completes but an unreachable machine fails fast instead of hanging. Every state change is breadcrumbed to the log (`auth: +Ns <msg>`, change-only via the `note()` helper).
 
 Flow:
 
@@ -77,15 +77,46 @@ The wrong-env/src reload is allowed **at most once** (`reloaded_for_params`), an
 
 ## 4. The layered sign-in strategy
 
-Both the console flow (`login.py` `_run_login`) and the GUI (`gui_worker.LoginWorker.run`) follow the same order, honoring the user's Browser pick first via `get_preferred_channel()` (the GUI Browser dropdown / `TSMIS_BROWSER_CHANNEL`). See [build-and-release.md](build-and-release.md) for how channels are chosen.
+**v0.17.0 split the two jobs apart.** Silent **Edge one-click** is no longer part of
+the **Log in** button — it's proven quietly by the **background active-env check**
+(§4a). The button (`gui_worker.LoginWorker.run`) now does one thing: open a HEADED
+window so the user completes SSO+MFA and a **portable** session is saved (what fast
+mode needs, what normal exports restore). It opens the **chosen Chromium-class**
+browser — the **Settings ▸ Export browser** pick (`get_preferred_channel()` /
+`TSMIS_BROWSER_CHANNEL`), **Chrome-first by default**; Edge is the implicit one-click
+path + ultimate fallback, never a user-pickable export browser. See
+[build-and-release.md](build-and-release.md) for channel resolution.
 
-| Order | Path | Code | Notes |
+| Order | Path (the button) | Code | Notes |
 |---|---|---|---|
-| 0 | **Explicit Chrome pick** → straight to headed Chrome | `_run_standard_login` | Silent device sign-in is an Edge/Windows integration; Chrome never gets it, so skip it. |
-| 1 | **Silent device sign-in** (no window, no typing) | `try_device_sso_login` → `open_edge_device_context` | Tried first when pref is `None`/`msedge`. |
-| 2 | **Built-in Chromium** headed sign-in (when present) | `p.chromium.launch(channel="chromium", …)` | Unmanaged → org policy can't relaunch it mid-SSO. |
-| 3 | **Persistent-profile Edge recapture** | `_try_edge_persistent_login` → `launch_edge_login_context` + CDP/profile recapture | The original managed-Edge fix (see §5). |
-| 4 | **Chrome fallback**, then any `launch_browser`-resolvable browser | `_run_standard_login` | Manual credentials. |
+| 1 | **Chosen Chromium-class, headed** (Chrome first by default, else Built-in Chromium) | the `for ch in order` loop in `LoginWorker.run` | Captures the portable saved login via `_run_login_in_browser`. |
+| 2 | **Persistent-profile Edge recapture** (Edge-only PCs) | `_try_edge_persistent_login` → `launch_edge_login_context` + CDP/profile recapture | The managed-Edge fix (§5); the capture is portability-validated, else **device mode** (`login_device_ok`, no file saved). |
+
+The **console flow** (`login.py` `_run_login`) mirrors that headed order but — having
+**no background worker** — still tries **silent device sign-in first**
+(`try_device_sso_login`) when no explicit pick is set, before the headed window.
+
+### 4a. The background active-env check (`ActiveEnvCheckWorker`, v0.17.0)
+
+On **app start** and on every **env switch**, `gui_api._maybe_active_env_check` quietly
+runs `ActiveEnvCheckWorker` for the **selected** env — but only when a credential path
+likely exists (`has_valid_auth()` OR the Edge profile is primed), so a brand-new user
+triggers no pointless network hits. It calls `new_authed_browser(p)` (a saved file →
+the chosen Chromium browser; **no file → the device Edge context, which PROVES the
+one-click**) and `EnvScanWorker.check_one(…, budget_s=20)` — a **short** sign-in budget
+so a managed PC lights up but an unreachable machine fails fast. It then posts:
+
+- `("env_access", verdict)` (marked `quiet` — refreshes the Export-tab + matrix flags
+  with no per-combo log line), and
+- `("active_env_done", {seq, signed_in, via_device})` → when sign-in went **via device
+  mode** it sets `_device_ok` (lights the Edge one-click chip, §9) and re-overlays the
+  matrices (`matrix_refresh`).
+
+It runs **outside the single-task gate** (its own `_active_check` flag + an
+`_active_check_seq` supersede token), so it never blocks the Log in / Export buttons and
+never opens the Edge profile while another task holds it; a newer env switch supersedes a
+result still in flight. Quiet on every failure — a failed check just doesn't light the
+chip.
 
 ### Silent device sign-in (`try_device_sso_login` / `open_edge_device_context`)
 
@@ -168,9 +199,9 @@ The title bar shows the **two sign-in paths separately** so the user can tell wh
 | Chip | Source | States |
 |---|---|---|
 | **Saved login** | the auth file (`tsmis_auth.json`) | valid / missing; age (hours) in the tooltip. This is what exports *restore* and is **required for fast mode**. |
-| **Edge one-click** | the persistent Edge sign-in profile | green = silent device sign-in **proven this session** (`_device_ok`); amber = the Edge sign-in profile **exists but is unproven** (`primed` — the profile dir is non-empty); grey = never set up. |
+| **Edge one-click** | the persistent Edge sign-in profile | green = silent device sign-in **proven this session** (`_device_ok`) — now lit hands-free by the **background active-env check** (§4a) on start / env switch, as well as by an actual sign-in; amber = the Edge sign-in profile **exists but is unproven** (`primed` — the profile dir is non-empty); grey = never set up. |
 
-`gui_api._login_states()` → snapshot key `logins` = `{"file": {"valid", "age_h"}, "device": {"ok", "primed"}}`. **Cheap stat calls only** — the device path is only ever *proven* by an actual sign-in, never probed eagerly (probing it would open the profile and risk the "already in use" failure).
+`gui_api._login_states()` → snapshot key `logins` = `{"file": {"valid", "age_h"}, "device": {"ok", "primed"}}`. **Cheap stat calls only** — the device path is only ever *proven* by an actual sign-in (the gated background active-env check is one such prover), never probed eagerly here (probing it would open the profile and risk the "already in use" failure).
 
 ---
 
@@ -188,8 +219,9 @@ The title bar shows the **two sign-in paths separately** so the user can tell wh
 | `_LNA_ARGS` / `_new_app_context` / `LOGIN_BROWSER_ARGS` / `new_login_context` | common.py | Local Network Access pre-grant (automated + headed) |
 | `page_url_for_display` / `auth_state` / `dump_auth_failure` | common.py | token redaction + failure diagnostics |
 | `require_valid_auth` / `has_valid_auth` / `clear_auth` / `save_auth_state` | common.py | auth-file shape validation + lifecycle |
-| `_run_login` / `_login_with_browser` | login.py | console headed login |
-| `LoginWorker` (`_run_login_in_browser`, `_try_edge_persistent_login`, `_run_standard_login`, `_any_logged_in`) | gui_worker.py | GUI headed login (mirrors the layered order); "no open tabs" = window-closed signal |
-| `_login_states` / `_device_ok` | gui_api.py | the two title-bar chips |
+| `_run_login` / `_login_with_browser` | login.py | console headed login (keeps silent-first; no background worker) |
+| `LoginWorker` (`_run_login_in_browser`, `_try_edge_persistent_login`, `_any_logged_in`) | gui_worker.py | GUI headed portable-capture (chosen Chromium first, Edge recapture fallback); "no open tabs" = window-closed signal |
+| `ActiveEnvCheckWorker` / `EnvScanWorker.check_one` | gui_worker.py | the quiet single-combo background check (§4a) — proves one-click + refreshes report flags |
+| `_login_states` / `_device_ok` / `_maybe_active_env_check` / `_export_browser_view` | gui_api.py | the two title-bar chips, the background-check trigger/gating, the export-browser indicator |
 
 **The "no open tabs" rule (`LoginWorker`):** the reliable "user closed the window" signal is that **no tabs remain open** in the context (the SSO flow always keeps ≥1 tab), with a long all-calls-failing streak (`blips >= 20`, ~6 s) as a backstop. It does NOT treat the original page closing, a connection blip, or a single transient `ctx.cookies()` error as "closed" — that caused a false "cancelled" that slammed the window shut the instant a password went through.

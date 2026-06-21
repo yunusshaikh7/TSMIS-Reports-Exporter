@@ -94,7 +94,7 @@ Python + pythonnet/WebView2 assemblies + pdf/excel libs.
 | Variant zip | Browser | Approx size | Notes |
 |---|---|---|---|
 | `*-win64.zip` (default build) | none bundled | ~148 MB | Drives the machine's installed **Edge** (then Chrome). |
-| `*-win64-with-browser.zip` (`-BundleChromium`) | Playwright Chromium in `_internal\ms-playwright` | ~246 MB | `paths.py` points `PLAYWRIGHT_BROWSERS_PATH` there; **Built-in Chromium** is the *default* channel (Edge/Chrome stay in the dropdown). |
+| `*-win64-with-browser.zip` (`-BundleChromium`) | Playwright Chromium in `_internal\ms-playwright` | ~246 MB | `paths.py` points `PLAYWRIGHT_BROWSERS_PATH` there; **Built-in Chromium** is then a selectable export browser (chosen under Settings ▸ Export browser; Edge stays the implicit one-click path). |
 | `*-batch-source.zip` (`git archive`) | none | small | The `.bat` console flow; `1. setup…bat` pip-installs the libs **and** runs `playwright install chromium --no-shell`. |
 
 (v0.10.0 published sizes: win64 64 MB / with-browser 246 MB / batch-source — the
@@ -107,7 +107,7 @@ and driving a page, so a too-new Edge falls through to the next channel. Order
 (`common.BROWSER_CHANNELS`):
 
 ```
-chromium (only when present) → msedge → chrome
+chromium (only when present) → chrome → msedge   (Edge LAST, v0.17.0)
 ```
 
 - `chromium` appears only when a Playwright Chromium is actually present
@@ -116,9 +116,17 @@ chromium (only when present) → msedge → chrome
   (`paths.DOWNLOADED_BROWSERS_DIR` = `data\ms-playwright`). The machine's global
   Playwright cache is deliberately ignored so the default build defaults to Edge
   even on a dev PC.
-- **Override:** `TSMIS_BROWSER_CHANNEL` env var hard-pins a channel (for
-  debugging); the GUI Browser dropdown calls `set_preferred_channel` (tried
-  first, the others stay fallbacks).
+- **Export browser (v0.17.0):** Edge is the **implicit** one-click / device
+  sign-in path and the ultimate fallback — no longer a user-pickable export
+  browser. The only choice (and only when both exist) is **Built-in Chromium vs
+  installed Chrome**, persisted via `settings.get/set_export_browser` and seeded
+  into `common.set_preferred_channel` at GUI start (`init_preferred_channel_from_settings`).
+  The default is **Chrome when installed** (hence Chrome-before-Edge above). The
+  title bar shows a read-only **indicator** of what's exporting; the picker moved
+  to **Settings ▸ Export browser**. `set_preferred_channel` accepts only
+  `chromium`/`chrome` (anything else, incl. `msedge`, resets to the default order).
+- **Override:** `TSMIS_BROWSER_CHANNEL` env var still hard-pins any channel (for
+  debugging) and wins over the Settings pick.
 - `common.launch_browser` raises `BrowserNotFoundError` only if all channels
   fail (it distinguishes "none installed" from "too new — update the tool").
 - **Parallel/fast-mode workers avoid managed Edge:** `_parallel_candidates()`

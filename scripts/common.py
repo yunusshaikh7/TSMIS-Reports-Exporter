@@ -456,8 +456,12 @@ def _site_params_ok(page):
     return True
 
 
-def navigate_with_auth(page):
+def navigate_with_auth(page, *, budget_s=60):
     """Open the TSMIS page and see the sign-in through.
+
+    `budget_s` caps the sign-in loop (default 60s). The quiet background
+    active-env check passes a shorter budget so a managed PC's silent SSO still
+    completes but an unreachable machine fails fast instead of hanging.
 
     The app NEVER shows a signed-out page: with no token it immediately
     redirects itself into the portal OAuth flow (same tab). The portal keeps
@@ -483,7 +487,7 @@ def navigate_with_auth(page):
             "network / VPN connection, then try again."
         ) from e
     start = time.monotonic()
-    deadline = start + 60
+    deadline = start + budget_s
     idp_drives = 0
     reloaded_for_params = False
     last_note = None
@@ -1008,8 +1012,13 @@ def _chromium_available():
         return False
 
 
+# Default sequential order: Built-in Chromium (when present), then Google Chrome,
+# then Microsoft Edge LAST. Chrome-before-Edge is deliberate (v0.17.0): every work
+# PC has Edge but not all have Chrome, so Chrome — when installed — is the preferred
+# EXPORT browser, while Edge stays the implicit one-click/device sign-in path and the
+# ultimate fallback. `_parallel_candidates()` keeps its own (Edge-avoiding) order.
 BROWSER_CHANNELS = ((("chromium",) if _chromium_available() else ())
-                    + ("msedge", "chrome"))
+                    + ("chrome", "msedge"))
 CHANNEL_LABELS = {"chromium": "Built-in Chromium", "msedge": "Microsoft Edge",
                   "chrome": "Google Chrome"}
 
@@ -1019,16 +1028,31 @@ _preferred_channel = None       # user's pick (tried first; the other stays a fa
 
 
 def set_preferred_channel(channel):
-    """Record the user's preferred browser (tried first; the other channels stay
-    fallbacks). None resets to the default order (Built-in Chromium when present,
-    then Edge, then Chrome). Clears the resolved caches so the next launch honors
-    the new preference. A hard TSMIS_BROWSER_CHANNEL env override still wins
-    over this."""
+    """Record the user's preferred EXPORT browser (tried first; the others stay
+    fallbacks). Only a CHROMIUM-CLASS channel is accepted -- 'chrome' or
+    'chromium'; Edge is the implicit one-click/device sign-in path and is never
+    pinned here as the export browser (anything else, including 'msedge' or None,
+    resets to the default Chrome-first order). Clears the resolved caches so the
+    next launch honors the new preference. A hard TSMIS_BROWSER_CHANNEL env
+    override still wins over this."""
     global _preferred_channel, _resolved_channel, _resolved_parallel
-    _preferred_channel = channel if channel in BROWSER_CHANNELS else None
+    _preferred_channel = channel if channel in ("chromium", "chrome") else None
     _resolved_channel = None
     _resolved_parallel = None
     log.info("browser: preferred channel set to %s", _preferred_channel or "(default order)")
+
+
+def init_preferred_channel_from_settings():
+    """Seed the in-memory preferred EXPORT browser from the persisted Settings
+    pick once at GUI start (the hot resolution path stays settings-free). Lazy
+    import like get_url(); silently leaves the default order if settings can't be
+    read or the pick isn't a valid Chromium-class channel."""
+    try:
+        import settings
+        set_preferred_channel(settings.get_export_browser() or None)
+    except Exception as e:
+        log.info("browser: could not seed preferred channel from settings (%s)",
+                 type(e).__name__)
 
 
 def get_preferred_channel():
