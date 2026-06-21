@@ -83,6 +83,28 @@ def side_label(folder):
     return (clean or "FOLDER")[:20]
 
 
+# Excel caps sheet names at 31 chars; the longest sheet we derive from a side
+# label is "Only in <label>" (8 + label), so a side label must fit in 23.
+_SIDE_LABEL_CAP = 31 - len("Only in ")          # = 23
+
+
+def _cap_label(s, limit=_SIDE_LABEL_CAP):
+    """Cap a derived side label to `limit` chars WITHOUT dropping its trailing
+    distinguisher. The labels built below end in the part that keeps two
+    same-source sides apart -- a run date (" 2026-06-11") or an " (A)"/" (B)"
+    suffix. A plain end-truncation (s[:limit]) would cut exactly that, collapsing
+    two distinct sides into the same prefix (then the A/B fallback fires and the
+    real provenance is lost). Trim the BASE and keep the suffix instead."""
+    if len(s) <= limit:
+        return s
+    m = re.search(r"(?: \d{4}-\d{2}-\d{2}| \([AB]\))$", s)
+    if not m:
+        return s[:limit]
+    suffix = m.group(0)
+    keep = max(0, limit - len(suffix))
+    return (s[:m.start()][:keep] + suffix)[:limit]
+
+
 def _side_labels(dir_a, dir_b):
     """Distinct side names for the two folders. Same src-env on both sides
     (e.g. prod today vs prod last month) gets the run date appended; still
@@ -101,12 +123,10 @@ def _side_labels(dir_a, dir_b):
     if la == lb:
         la, lb = f"{la} (A)", f"{lb} (B)"
     # Cap so the longest derived sheet name ("Only in <label>", 8 + label) fits
-    # Excel's 31-char limit — these labels are auto-derived from folder names
-    # with no user override, so an overflow would otherwise be an unsatisfiable
-    # error. Truncate the END (the date/(A)/(B) distinguisher stays at the edge,
-    # so the two labels remain distinct); fall back to Side A/B if they collide.
-    cap = lambda s: s if len(s) <= 23 else s[:23]
-    la, lb = cap(la), cap(lb)
+    # Excel's 31-char limit. _cap_label trims the BASE, not the trailing
+    # distinguisher (run date / (A)/(B)), so two same-source sides stay distinct
+    # under the cap; fall back to Side A/B only if they still collide.
+    la, lb = _cap_label(la), _cap_label(lb)
     if la == lb:
         la, lb = "Side A", "Side B"
     return la, lb
