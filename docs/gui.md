@@ -288,7 +288,10 @@ columns, persistence across re-render) + golden `check_matrix.test_reorder` /
 
 The canonical TSN library ([comparison-engine.md](comparison-engine.md) / `tsn_library.py`) gets a
 status panel in Settings (`#setTsnLibrary`, rendered by `renderTsnLibrary` from
-`get_settings().tsn_library`). One row per registered report: a **dot** (green = consolidated
+`get_settings().tsn_library`). A header line shows the **on-disk folder** (`tsn_library_root`
+= `paths.TSN_LIBRARY_ROOT`; each report keeps its raw + consolidated files in a `<report>`
+subfolder) with an **Open folder** button (`open_tsn_library_folder` → `_open_folder`); each
+row's name tooltips that report's `raw_dir`. Then one row per registered report: a **dot** (green = consolidated
 current · amber = missing/stale-or-raw-not-yet-built · grey = no raw imported), a status line
 (`N raw <kind> · consolidated current|STALE|not yet built`), and two actions —
 **Import raw…** (`import_tsn_raw`: a native multi-file dialog, PDFs or the statewide workbook

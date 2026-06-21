@@ -3077,6 +3077,24 @@ function renderTsnLibrary(reports) {
   if (!box) return;
   box.textContent = "";
   const rebuilding = S.st && S.st.task === "consolidate";
+  // Folder location: WHERE the TSN files live on disk (each report has a
+  // <root>\<report>\raw + \consolidated subfolder), with an Open-folder button.
+  const root = (S.init.settings || {}).tsn_library_root;
+  if (root) {
+    const loc = document.createElement("div");
+    loc.className = "tsn-loc";
+    const lbl = document.createElement("span");
+    lbl.className = "tsn-loc-label"; lbl.textContent = "Folder";
+    const path = document.createElement("span");
+    path.className = "tsn-loc-path mono"; path.textContent = root; path.title = root;
+    const open = document.createElement("button");
+    open.className = "btn btn-subtle btn-small"; open.textContent = "Open folder";
+    open.title = "Open the TSN library folder (each report keeps its raw + "
+      + "consolidated files in a <report> subfolder)";
+    open.addEventListener("click", () => api.open_tsn_library_folder());
+    loc.append(lbl, path, open);
+    box.appendChild(loc);
+  }
   reports.forEach((r) => {
     const row = document.createElement("div");
     row.className = "tsn-row";
@@ -3091,6 +3109,7 @@ function renderTsnLibrary(reports) {
     const name = document.createElement("span");
     name.className = "tsn-name";
     name.textContent = r.label;
+    if (r.raw_dir) name.title = "Raw files for this report go in:\n" + r.raw_dir;
 
     const status = document.createElement("span");
     status.className = "tsn-status muted";
@@ -3731,7 +3750,9 @@ function makeMockApi() {
     matrix_tsn_files: {},        // subdir -> picked file path
     matrix_row_order: [],        // drag-to-reorder row preference (Everything)
     matrix_env_order: [],        // drag-to-reorder env-column preference
-    mock_tsn_pdfs: true,         // TSN folder starts with PDFs (not consolidated)
+    mock_tsn_pdfs: false,        // TSN already consolidated → vs-TSN shows real
+                                 // diffs (set true to demo the consolidate-first
+                                 // state: every vs-TSN cell shows "consolidate")
     day_matrix_source: "ssor-prod",
     day_matrix_days: [],
     day_matrix_hidden: [],
@@ -3761,11 +3782,13 @@ function makeMockApi() {
     highway_sequence:    { label: "TSN Highway Sequence", raw_kind: "district_pdfs", raw_count: 12, present: true, cons: true, current: false },      // STALE
     highway_log:         { label: "TSN Highway Log", raw_kind: "district_pdfs", raw_count: 0, present: false, cons: false, current: false },          // no raw
   };
+  const MOCK_TSN_ROOT = "C:\\Tools\\TSMIS Exporter\\data\\tsn_library";
   function mockTsnLibraryRows() {
     return Object.entries(mockTsnLib).map(([report, m]) => ({
       report, label: m.label, raw_kind: m.raw_kind,
       raw_present: m.present, raw_count: m.raw_count,
       consolidated_present: m.cons, current: m.current,
+      raw_dir: `${MOCK_TSN_ROOT}\\${report}\\raw`,
     }));
   }
   function mockSiteUrlRows() {
@@ -3786,7 +3809,7 @@ function makeMockApi() {
     return {
       values: { ...mockSettings }, defaults: { ...mockSettings },
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
-      tsn_library: mockTsnLibraryRows(),
+      tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
       meta: {
         version: "0.14.2 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
@@ -3944,7 +3967,7 @@ function makeMockApi() {
       const isPdfs = (sub === "highway_log" || sub === "highway_log_pdf"
                       || sub === "highway_sequence");
       const file = (st.matrix_tsn_files || {})[sub];
-      const kind = file ? "file" : isPdfs ? "pdfs" : "consolidated";
+      const kind = file ? "file" : (isPdfs && st.mock_tsn_pdfs) ? "pdfs" : "consolidated";
       tsnMeta[sub] = {
         supported: !!r.supported, fmt: sub === "highway_log_pdf" ? "pdf" : "excel",
         source_kind: kind, pdf_count: kind === "pdfs" ? 12 : undefined,
@@ -4384,8 +4407,10 @@ function makeMockApi() {
                                  export_browser: { value: mockSettings.export_browser || "auto",
                                    chrome_ok: true, chromium_present: true,
                                    labels: { chromium: "Built-in Chromium", chrome: "Google Chrome" } },
-                                 tsn_library: mockTsnLibraryRows(), meta: { update_support: "ok" } }),
+                                 tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
+                                 meta: { update_support: "ok" } }),
     tsn_library_status: async () => ({ reports: mockTsnLibraryRows() }),
+    open_tsn_library_folder: async () => { push({ t: "log", text: `(mock) open TSN library folder: ${MOCK_TSN_ROOT}` }); return { ok: true }; },
     import_tsn_raw: async (report) => {
       const m = mockTsnLib[report];
       if (!m) return { error: "Unknown TSN report." };

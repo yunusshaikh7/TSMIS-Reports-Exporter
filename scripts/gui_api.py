@@ -54,7 +54,8 @@ from exporter_parallel import MAX_WORKERS, default_worker_count
 from logging_setup import LOG_FILE, set_debug_logging
 
 from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
-                   FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, WEBVIEW_PROFILE_DIR,
+                   FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, TSN_LIBRARY_ROOT,
+                   WEBVIEW_PROFILE_DIR,
                    is_frozen, list_output_days, list_output_days_for_report)
 from version import APP_NAME, __version__
 from common import (
@@ -2090,6 +2091,7 @@ class GuiApi:
                 "raw_count": s["raw_count"],
                 "consolidated_present": s["consolidated_present"],
                 "current": s["current"],
+                "raw_dir": str(tsn_library.raw_dir(s["report"])),  # where its files live
             })
         return rows
 
@@ -2466,6 +2468,13 @@ class GuiApi:
     def open_day_comparisons_folder(self):
         """Open the by-day comparison store (output/comparisons/tsn-by-day/)."""
         self._open_folder(day_matrix.byday_root())
+        return {"ok": True}
+
+    @_api_method
+    def open_tsn_library_folder(self):
+        """Open the canonical TSN library root (each report's raw + consolidated
+        TSN data lives in <root>/<report>/). Created on first open if absent."""
+        self._open_folder(TSN_LIBRARY_ROOT)
         return {"ok": True}
 
     def _on_matrix_cell(self, payload):
@@ -3050,6 +3059,8 @@ class GuiApi:
                 "labels": {c: CHANNEL_LABELS[c] for c in ("chromium", "chrome")},
             },
             "tsn_library": self._tsn_library_status(),
+            "tsn_library_root": str(TSN_LIBRARY_ROOT),   # the on-disk TSN home
+
             "meta": {
                 "version": __version__,
                 "build": "portable app" if is_frozen() else "development run",

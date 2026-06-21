@@ -150,7 +150,7 @@ def test_tsn_library_panel():
         check("status lists every registered TSN report",
               {r["report"] for r in rows} == reg)
         fields = {"report", "label", "raw_kind", "raw_present", "raw_count",
-                  "consolidated_present", "current"}
+                  "consolidated_present", "current", "raw_dir"}
         check("status rows carry exactly the panel fields",
               all(set(r) == fields for r in rows))
         check("tsn_library_status() wraps the rows",

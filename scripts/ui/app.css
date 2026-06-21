@@ -1339,6 +1339,16 @@ body.matrix-wide.mw-day #dayMatrixConfig { display: flex; }
 
 /* Settings ▸ TSN reports panel (v0.17.0) */
 .tsn-lib { display: flex; flex-direction: column; gap: 6px; }
+.tsn-loc {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 10px; font-size: 12px;
+}
+.tsn-loc-label { color: var(--muted-foreground); font-weight: 600; }
+.tsn-loc-path {
+  flex: 1; min-width: 0; font-size: 11.5px; color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.tsn-loc .btn { margin-left: auto; flex: none; }
 .tsn-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tsn-dot {
   flex: none; width: 9px; height: 9px; border-radius: 50%;
