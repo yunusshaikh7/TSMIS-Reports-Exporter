@@ -64,6 +64,52 @@ def _unblock_dotnet_assemblies():
             removed, f"; {errors} could not be unblocked" if errors else "")
 
 
+def _run_self_test():
+    """``--self-test``: prove the EXACT shipped exe boots/imports before any webview.
+
+    Runs the shared comprehensive self-test (``self_test.run``): imports every app
+    module incl. the dynamically-loaded matrix modules, asserts the bundled ``ui/``
+    assets, builds the GUI bridge + initial state, exercises the real
+    browser/pdf/openpyxl code paths, and best-effort cycles a hidden WebView.
+    Returns a process exit code (0 = ok). The import/asset/registry/runtime
+    sub-checks FAIL the gate; only the hidden-window probe may skip.
+
+    A windowed release exe has no console (``sys.stdout``/``stderr`` are ``None``),
+    so output is mirrored to the log and -- if ``TSMIS_SELFTEST_OUT`` names a path
+    -- written there too, which the build.ps1 ``-SelfTest`` gate reads back for CI
+    diagnosability. The exit CODE is the actual gate."""
+    log = logging.getLogger("tsmis.selftest")
+    lines = []
+
+    def emit(line=""):
+        text = str(line)
+        lines.append(text)
+        if text.strip():
+            log.info("%s", text)
+        if sys.stderr:                         # console (dev) runs still see it
+            try:
+                print(text, file=sys.stderr)
+            except Exception:
+                pass
+
+    code = 0
+    try:
+        import self_test
+        code = self_test.run(emit=emit)
+    except Exception as e:                      # any mandatory failure fails the gate
+        emit(f"SELF-TEST FAILED: {type(e).__name__}: {e}")
+        log.exception("self-test failed")
+        code = 1
+
+    out = os.environ.get("TSMIS_SELFTEST_OUT")
+    if out:
+        try:
+            Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        except Exception:
+            log.warning("could not write TSMIS_SELFTEST_OUT=%s", out, exc_info=True)
+    return code
+
+
 def main():
     # Self-update swap mode (v0.10.1): the one-click update launches the
     # STAGED new exe with this flag; it swaps itself into the install folder
@@ -82,6 +128,12 @@ def main():
     # excepthooks and the GuiApi method wrapper.
     setup_logging(enable_faulthandler=False)
     _unblock_dotnet_assemblies()           # must run BEFORE the CLR loads
+    if "--self-test" in sys.argv:
+        # Packaging gate (build.ps1 -SelfTest): prove THIS exact exe imports every
+        # module + ui/ asset and runs every real code path, then exit before any
+        # real window. Update housekeeping below is skipped -- it mutates the
+        # install and is not a boot/import concern.
+        raise SystemExit(_run_self_test())
     try:
         # Finish any one-click update: drop the *.old bundle pieces the swap
         # helper couldn't delete while this (new) app was already starting,

@@ -83,6 +83,16 @@ APP_MODULES = [
     "compare_ramp_detail_tsn", "compare_ramp_summary_tsn", "compare_intersection_summary_tsn",
     "compare_intersection_detail_tsn", "compare_highway_sequence_tsn",
     "gui_main", "gui_api", "gui_worker",
+    # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
+    # report library they read -- previously MISSING from this list (F6). They are
+    # collected today via a transitive static import, but the "list every flat
+    # module" packaging contract was broken; build/check_app_modules.py (offline)
+    # and the frozen `--self-test` gate now enforce that every flat scripts/ module
+    # is declared here.
+    "matrix", "day_matrix", "report_library",
+    # Shared comprehensive self-test body, run by gui_main --self-test (the frozen
+    # exact-artifact release gate) and build/full_smoke.py.
+    "self_test",
 ]
 
 datas, binaries, hiddenimports = [], [], list(APP_MODULES)
@@ -94,9 +104,17 @@ if os.path.exists(ICON):
     datas += [(ICON, ".")]
 
 # The GUI's web assets (scripts/ui) ship as plain data files; gui_api resolves
-# them at runtime via sys._MEIPASS/ui/.
+# them at runtime via sys._MEIPASS/ui/. Ship ONLY real web assets -- the extension
+# allowlist guards against a stray file (an editor backup, a .py, a __pycache__
+# dir) silently riding into the bundle. Today the folder is exactly index.html +
+# app.css + app.js (P9 adds mock.js); the allowlist also covers fonts/images for
+# any future asset.
 UI_DIR = os.path.join(SCRIPTS, "ui")
-datas += [(os.path.join(UI_DIR, f), "ui") for f in os.listdir(UI_DIR)]
+_UI_ASSET_EXTS = {".html", ".htm", ".css", ".js", ".mjs", ".svg",
+                  ".png", ".ico", ".gif", ".woff", ".woff2", ".json"}
+datas += [(os.path.join(UI_DIR, f), "ui") for f in os.listdir(UI_DIR)
+          if os.path.isfile(os.path.join(UI_DIR, f))
+          and os.path.splitext(f)[1].lower() in _UI_ASSET_EXTS]
 
 # pywebview (Edge WebView2 GUI shell) + its Windows backend: pythonnet/clr need
 # their package data (Python.Runtime.dll, the netstandard facade DLLs, the

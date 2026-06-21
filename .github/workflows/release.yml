@@ -1,11 +1,13 @@
 name: release
 
 # Builds the three Windows release variants and publishes them as a GitHub
-# release whenever a version tag (v*) is pushed. The -SelfTest builds run first
-# as the release gate: each builds AND runs the frozen smoke test (browser
-# launch + page.pdf + download, pdfplumber, openpyxl, GUI construction) over
-# the pruned bundle — once against the runner's system Edge/Chrome and once
-# against the bundled Chromium — so a broken bundle can never ship.
+# release whenever a version tag (v*) is pushed. Each windowed variant is built
+# with -SelfTest, which runs the EXACT shipped exe's `--self-test` over the
+# pruned bundle (browser launch + page.pdf + download, pdfplumber, openpyxl,
+# every app module + the GUI bridge) — once against the runner's system
+# Edge/Chrome and once against the bundled Chromium. The artifact that ships is
+# the artifact that passed the gate (R1-B04), so a broken bundle can never ship.
+# The batch/source variant is gated by the offline console-flow smoke.
 #
 # Variants published:
 #   *-win64.zip               portable app; drives the machine's installed Edge/Chrome
@@ -62,28 +64,32 @@ jobs:
         # Runs before the long build so a missing CHANGELOG section fails fast.
         run: python build/gen_release_notes.py "$env:TAG" -o notes.md
 
-      - name: Build + run frozen self-test, system browser (release gate)
+      - name: Build + gate the system-browser variant (exact-artifact release gate)
+        # build.ps1 -SelfTest builds the windowed app, copies docs, prunes, then
+        # runs THIS exe's --self-test. The resulting dist is the gated, shippable
+        # artifact — zipped as-is below (no separate un-gated rebuild).
         run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
 
-      - name: Build + run frozen self-test, bundled Chromium (release gate)
-        run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest -BundleChromium
-
-      - name: Build the windowed app (system browser)
-        run: powershell -ExecutionPolicy Bypass -File build\build.ps1
-
-      - name: Zip the system-browser variant
+      - name: Zip the system-browser variant (the gated artifact)
         run: Compress-Archive -Path "dist\TSMIS Exporter" -DestinationPath "TSMIS-Exporter-$env:TAG-win64.zip"
 
-      - name: Build the windowed app (bundled Chromium)
+      - name: Build + gate the bundled-Chromium variant (exact-artifact release gate)
         run: |
           Remove-Item -Recurse -Force "dist\TSMIS Exporter"
-          powershell -ExecutionPolicy Bypass -File build\build.ps1 -BundleChromium
+          powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest -BundleChromium
 
-      - name: Zip the bundled-Chromium variant
+      - name: Zip the bundled-Chromium variant (the gated artifact)
         run: Compress-Archive -Path "dist\TSMIS Exporter" -DestinationPath "TSMIS-Exporter-$env:TAG-win64-with-browser.zip"
 
       - name: Zip the batch/source variant
         run: git archive --format=zip --prefix="TSMIS-Exporter-batch/" -o "TSMIS-Exporter-$env:TAG-batch-source.zip" HEAD
+
+      - name: Gate the batch/source ZIP — the EXACT uploaded archive (fails, never skips)
+        # Gate the SAME zip that is published (--zip): clean-extract the archive into
+        # a disposable dir and run the console menu→module dispatch smoke in a fresh
+        # interpreter rooted there. Uses the build venv (it has the runtime deps the
+        # source zip's setup.bat would install on a target).
+        run: build\.venv\Scripts\python.exe build\check_source_zip_smoke.py --zip "TSMIS-Exporter-$env:TAG-batch-source.zip"
 
       # --- Code signing (SignPath) ------------------------------------------
       # Inert until the repo variable SIGNPATH_ENABLED is set to "true" (do that

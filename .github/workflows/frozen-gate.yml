@@ -1,0 +1,61 @@
+name: frozen-gate
+
+# The exact-artifact packaging gate (R1-B04 / phase PA), run OUTSIDE the release
+# flow so the FROZEN exe is exercised before a version tag is ever cut. For each
+# windowed variant it builds the real shipped exe and runs THAT exe's
+# `--self-test` over the pruned bundle (browser launch + page.pdf + download,
+# pdfplumber, openpyxl, every app module incl. the dynamically-imported matrix
+# modules, and the GUI bridge), then runs the offline source-ZIP console smoke.
+#
+# A full PyInstaller build is heavy, so this runs nightly, on demand, or when a
+# PR is labelled `frozen-gate` — NOT on every push. The fast static + regression
+# suite stays in checks.yml; this is the slow frozen tripwire that catches a
+# packaging break (a missing module, a broken exclude/prune) the static checks
+# can't see.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * *"          # nightly ~07:00 UTC (runs on the default branch)
+  pull_request:
+    types: [opened, reopened, labeled, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-gate:
+    # schedule / manual always run. A PR run fires whenever the `frozen-gate`
+    # label is PRESENT on the PR -- on the labeling event AND on every later
+    # commit (synchronize/reopen), so subsequent broad restructuring is re-gated,
+    # not just the push that first applied the label (PA-B02). Conditioning on the
+    # PR's current label collection (not github.event.label) is what makes the
+    # synchronize re-run work; labeling a PR with anything else still no-ops.
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'frozen-gate') }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      # The self-test prints Unicode; force UTF-8 so the Windows runner's cp1252
+      # stdout can't crash on it (matches checks.yml).
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Build + gate the system-browser variant (exact shipped exe --self-test)
+        run: powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest
+
+      - name: Build + gate the bundled-Chromium variant (exact shipped exe --self-test)
+        run: |
+          Remove-Item -Recurse -Force "dist\TSMIS Exporter"
+          powershell -ExecutionPolicy Bypass -File build\build.ps1 -SelfTest -BundleChromium
+
+      - name: Source-ZIP console-flow smoke (candidate revision; fails, never skips)
+        # Default (candidate) mode: archive the checked-out PR revision's worktree
+        # via a throwaway index and clean-extract it — so the PR's actual source is
+        # gated, not a silent HEAD fallback. The build venv (created by build.ps1
+        # above) carries the runtime deps the source zip's setup.bat would install.
+        run: build\.venv\Scripts\python.exe build\check_source_zip_smoke.py

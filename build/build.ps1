@@ -12,7 +12,7 @@
 # the packaging recipe.
 
 param(
-    [switch]$SelfTest,        # builds a headless self-test instead of the windowed app
+    [switch]$SelfTest,        # after building+pruning, gate the EXACT windowed exe via `--self-test` (R1-B04)
     [switch]$BundleChromium,  # ships Playwright's own Chromium inside the bundle (the with-browser variant)
     [switch]$Sign,            # sign the built .exe with a self-signed cert (interim, local trust only)
     [string]$CertSubject = "CN=TSMIS Exporter (self-signed)"
@@ -47,22 +47,13 @@ Write-Host "==> Installing pinned build dependencies"
 # flagged browser. -BundleChromium builds the with-browser variant instead
 # (step 2b). See app.spec and scripts/common.launch_browser.
 
-# --- 2. Package as a portable onefolder -----------------------------------
-if ($SelfTest) {
-    # Comprehensive headless self-test (console): launches the SYSTEM browser +
-    # page.pdf() + a download, runs pdfplumber text/table extraction and an
-    # openpyxl round-trip, then cycles a hidden WebView window through the real
-    # JS bridge. Verifies the pruned bundle still runs every real code path
-    # without anything visible.
-    $env:TSMIS_ENTRY    = Join-Path $BuildDir "full_smoke.py"
-    $env:TSMIS_APP_NAME = "TSMIS SelfTest"
-    $env:TSMIS_CONSOLE  = "1"
-} else {
-    # The real windowed deliverable.
-    $env:TSMIS_ENTRY    = Join-Path $RepoRoot "scripts\gui_main.py"
-    $env:TSMIS_APP_NAME = "TSMIS Exporter"
-    $env:TSMIS_CONSOLE  = "0"
-}
+# --- 2. Package the real windowed app as a portable onefolder -------------
+# ALWAYS the exact shipped artifact (gui_main.py, windowed). -SelfTest no longer
+# builds a separate console exe -- it runs THIS exe's --self-test gate after
+# copy + prune (R1-B04), so the artifact that ships is the artifact that passed.
+$env:TSMIS_ENTRY    = Join-Path $RepoRoot "scripts\gui_main.py"
+$env:TSMIS_APP_NAME = "TSMIS Exporter"
+$env:TSMIS_CONSOLE  = "0"
 
 Write-Host "==> Running PyInstaller"
 & $VenvPy -m PyInstaller (Join-Path $BuildDir "app.spec") `
@@ -86,7 +77,16 @@ if ($BundleChromium) {
     Remove-Item Env:PLAYWRIGHT_BROWSERS_PATH
 }
 
-# --- 3. Trim to runtime-only files + DLP guard ----------------------------
+# --- 3. Add the user-facing docs BEFORE the prune+scan --------------------
+# Copy our own readmes in first so the DLP content guard (step 4) scans them too
+# -- a release can't ship a doc the scanner would block. (Previously copied AFTER
+# the scan, escaping it -- F10.) They land at the app root, not under _internal,
+# so the prune's doc-removal never touches them.
+Write-Host "==> Adding user-facing docs (Start Here.txt, IT-README.txt)"
+Copy-Item (Join-Path $BuildDir "dist_readme.txt") (Join-Path $AppDir "Start Here.txt") -Force
+Copy-Item (Join-Path $BuildDir "it_readme.txt") (Join-Path $AppDir "IT-README.txt") -Force
+
+# --- 4. Trim to runtime-only files + DLP guard ----------------------------
 # The bundled Playwright driver ships docs / "agent skill" files whose examples
 # contain test credit-card numbers; corporate DLP blocks those. Strip the
 # non-runtime files and FAIL the build if any markdown doc or credit-card-like
@@ -94,31 +94,37 @@ if ($BundleChromium) {
 Write-Host "==> Pruning bundle to runtime-only files and scanning for DLP-blocked content"
 & (Join-Path $BuildDir "prune_bundle.ps1") -Target $AppDir
 
-# --- 3b. Run the frozen self-test (the real release gate) -----------------
-# Building the self-test exe only proves it links; RUN it so -SelfTest actually
-# verifies the PRUNED frozen bundle exercises every real code path (system
-# browser pdf+download, pdfplumber, openpyxl, GUI). A nonzero exit fails the build.
+# --- 5. Frozen exact-artifact self-test (the real release gate) ------------
+# Run the EXACT shipped windowed exe's --self-test over the PRUNED bundle, so the
+# artifact that ships is the artifact that passed (R1-B04). The windowed exe has
+# no console, so capture the exit code via Start-Process -Wait and read the
+# human-readable result from TSMIS_SELFTEST_OUT. Runs for whichever windowed
+# variant was just built (the caller passes -BundleChromium for with-browser).
 if ($SelfTest) {
-    $SelfTestExe = Join-Path $AppDir ("{0}.exe" -f $env:TSMIS_APP_NAME)
-    Write-Host "==> Running frozen self-test: $SelfTestExe"
-    & $SelfTestExe
-    Assert-LastExit "frozen self-test"
-    Write-Host "==> Frozen self-test PASSED (pruned bundle runs every code path)."
+    $ExactExe = Join-Path $AppDir ("{0}.exe" -f $env:TSMIS_APP_NAME)
+    $SelfTestOut = Join-Path $WorkDir "selftest-output.txt"
+    if (Test-Path $SelfTestOut) { Remove-Item $SelfTestOut -Force }
+    $env:TSMIS_SELFTEST_OUT = $SelfTestOut
+    Write-Host "==> Running frozen exact-artifact self-test: `"$ExactExe`" --self-test"
+    $proc = Start-Process -FilePath $ExactExe -ArgumentList "--self-test" -Wait -PassThru
+    Remove-Item Env:TSMIS_SELFTEST_OUT
+    if (Test-Path $SelfTestOut) {
+        Get-Content $SelfTestOut | ForEach-Object { Write-Host "    $_" }
+    }
+    if ($proc.ExitCode -ne 0) {
+        throw "frozen self-test failed (exit $($proc.ExitCode)) -- see output above"
+    }
+    Write-Host "==> Frozen self-test PASSED (the EXACT shipped exe runs every code path)."
 }
 
-# --- 4. Report ------------------------------------------------------------
-if (-not $SelfTest) {
-    Copy-Item (Join-Path $BuildDir "dist_readme.txt") (Join-Path $AppDir "Start Here.txt") -Force
-    Copy-Item (Join-Path $BuildDir "it_readme.txt") (Join-Path $AppDir "IT-README.txt") -Force
-}
-
-# --- 4b. Optional self-signing (interim) ----------------------------------
+# --- 6. Optional self-signing (interim) -----------------------------------
 # -Sign signs the built .exe with a SELF-SIGNED certificate. This is a stop-gap
 # for local/test machines and for exercising the signing toolchain -- other PCs
 # will NOT trust it unless the certificate is imported into Trusted Root. Real,
 # broadly-trusted signing is done in CI via SignPath (see release.yml); leave
-# -Sign off for the artifacts you publish from that pipeline.
-if ($Sign -and -not $SelfTest) {
+# -Sign off for the artifacts you publish from that pipeline. (-SelfTest now
+# builds the real shippable exe, so signing applies even with -SelfTest.)
+if ($Sign) {
     $cert = Get-ChildItem Cert:\CurrentUser\My |
         Where-Object { $_.Subject -eq $CertSubject -and $_.HasPrivateKey } |
         Select-Object -First 1
