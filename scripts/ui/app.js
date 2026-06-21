@@ -3896,15 +3896,19 @@ function makeMockApi() {
       if (!avail.some((m) => m.id === selId)) selId = "env";
       const mode = avail.find((m) => m.id === selId) || avail[0];
       modes[rk] = mode.id; rowModes[rk] = avail;
-      const tsnSub = "highway_log";                 // both HL rows share the TSN folder
+      // Per-row TSN dataset: the two Highway Log rows SHARE "highway_log"; every
+      // other report has its OWN (mirrors the real matrix + the by-day mock).
+      const tsnSub = (rk === "highway_log_pdf") ? "highway_log" : rk;
+      const isPdfs = (tsnSub === "highway_log" || tsnSub === "highway_sequence");
       const tsnFile = (st.matrix_tsn_files || {})[tsnSub];
-      const srcKind = tsnFile ? "file" : (st.mock_tsn_pdfs ? "pdfs" : "consolidated");
+      const srcKind = tsnFile ? "file" : (isPdfs && st.mock_tsn_pdfs) ? "pdfs" : "consolidated";
       if (mode.kind === "tsn") {
         tsnMeta[rk] = { supported: mode.supported, fmt: rk === "highway_log_pdf" ? "pdf" : "excel",
           source_kind: srcKind, pdf_count: srcKind === "pdfs" ? 12 : undefined,
-          source_path: tsnFile || "…\\_tsn_input\\highway_log\\tsn_highway_log_consolidated.xlsx",
+          source_path: tsnFile || (srcKind === "consolidated"
+            ? `…\\_tsn_input\\${tsnSub}\\tsn_${tsnSub}_consolidated.xlsx` : undefined),
           tsn_subdir: tsnSub, file: tsnFile || null,
-          input_dir: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)\\_tsn_input\\highway_log" };
+          input_dir: `C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)\\_tsn_input\\${tsnSub}` };
       }
       cells[rk] = {};
       envs.forEach((env, i) => {
@@ -4608,8 +4612,17 @@ function makeMockApi() {
     },
     set_all_matrix_modes: async (mode) => {
       if (mode !== "env" && mode !== "tsn") return { error: "Pick Cross-environment or vs TSN." };
+      // Mirror gui_api.set_all_matrix_modes: apply to EVERY row that supports the
+      // mode (all reports are vs-TSN capable as of v0.17.0) — derived from the
+      // snapshot so it can't go stale. "env" clears all rows to cross-environment.
       const next = {};
-      ["highway_log", "highway_log_pdf"].forEach((rk) => { if (mode === "tsn") next[rk] = "tsn"; });
+      if (mode === "tsn") {
+        const snap = mockMatrixSnapshot(st.matrix_baseline || "ssor-prod");
+        snap.rows.forEach((rk) => {
+          const modes = (snap.row_modes || {})[rk] || [];
+          if (modes.some((m) => m.id === "tsn" && m.supported)) next[rk] = "tsn";
+        });
+      }
       st.matrix_modes = next;
       return { ok: true, mode };
     },

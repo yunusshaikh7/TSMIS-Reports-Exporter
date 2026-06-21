@@ -346,8 +346,9 @@ def tsn_subdir_for(row_key, subdir, adapter=None):
 
 
 def tsn_capable(row_key):
-    """True if the row offers a coded comparison beyond cross-environment (the two
-    Highway Log rows). Drives the 'tsn_capable' chip hint."""
+    """True if the row offers a coded comparison beyond cross-environment (every
+    report as of v0.17.0; originally only the two Highway Log rows). Drives the
+    'tsn_capable' chip hint + the 'set all to vs TSN' bulk action."""
     defs = _row_defs()
     if row_key not in defs:
         return False

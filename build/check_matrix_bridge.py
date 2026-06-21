@@ -215,9 +215,14 @@ def main():
         a.set_matrix_row_mode("highway_log_pdf", "env")
         check("set-all bad mode rejected", bool(a.set_all_matrix_modes("nope").get("error")))
         a.set_all_matrix_modes("tsn")
-        m = a.matrix_info()["modes"]
-        check("set-all tsn applies to the supported HL rows",
-              m["highway_log"] == "tsn" and m["highway_log_pdf"] == "tsn")
+        info = a.matrix_info()
+        m = info["modes"]
+        # Must apply to EVERY tsn-capable row — not just the two Highway Log rows
+        # (the original assumption). v0.17.0 makes every report vs-TSN capable.
+        tsn_rows = [r["key"] for r in info["all_rows"]
+                    if r.get("tsn_capable") and r["key"] in m]
+        check("set-all tsn applies to EVERY tsn-capable row (not just Highway Log)",
+              len(tsn_rows) > 2 and all(m[rk] == "tsn" for rk in tsn_rows))
         a.set_all_matrix_modes("env")
         check("set-all env clears every row to cross-env",
               all(v == "env" for v in a.matrix_info()["modes"].values()))
