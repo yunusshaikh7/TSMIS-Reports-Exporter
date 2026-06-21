@@ -713,7 +713,8 @@ compare code — it only orchestrates.
   day's run folder `output/<date src-env>/<subdir>/`. The TSN dataset resolves per row's `tsn_subdir`
   via `matrix.tsn_source` → the **canonical TSN library** (`tsn_library.resolve`), with the legacy
   `<batch_dest>/_tsn_input/<subdir>/` + `settings.matrix_tsn_files` pick as fallback/override. The
-  by-day matrix's single shared picker stays HL-primary; each cell resolves its own report's TSN.
+  by-day matrix shows a PER-ROW TSN picker (named by its report, like the Everything matrix);
+  each cell resolves its own report's TSN.
 - **Store:** `output/comparisons/tsn-by-day/<date src-env>/<row>_vs_tsn.xlsx` (stable, dateless per
   cell); counts cached in that tree's `_results.json`. Snapshot (`day_matrix_snapshot`) is a pure stat,
   reusing `matrix._cmp_state`; `cells_to_rebuild(scope, row=, date=)` skips greyed rows + missing sides.
@@ -726,9 +727,10 @@ compare code — it only orchestrates.
   **`day_matrix_formulas`** (its OWN live-formulas toggle, independent of the Everything matrix's
   `matrix_formulas`; the TSN file reuses `matrix_tsn_files`).
 - **Full-width + own config corner (v0.16.x):** selecting the sub-tab calls `applyMatrixWide()` so the
-  by-day matrix fills the screen like the Everything matrix; its controls (queue, add-day, TSN picker,
+  by-day matrix fills the screen like the Everything matrix; its corner controls (queue, add-day,
   live-formulas, report toggles) live in a mirrored corner `#dayMatrixConfig` (shown via
-  `body.matrix-wide.mw-day`), keeping the grid area lean. See [gui.md](gui.md).
+  `body.matrix-wide.mw-day`), keeping the grid area lean — the per-report TSN pickers sit in the
+  row headers (v0.17.0), not the corner. See [gui.md](gui.md).
 - **Boundary guard:** `build_day_cell` rejects any `date`/`source` whose combined folder name doesn't
   parse as a real run folder, so neither can traverse out of `output/`.
 - **Locked by** `build/check_day_matrix.py` (rows/sources, available-day detection, snapshot + greyed

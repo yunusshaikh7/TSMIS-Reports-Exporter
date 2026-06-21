@@ -200,13 +200,15 @@ Summary/Detail — all wired as of v0.17.0), columns = exported **days** you add
 `selectCompareGroup("tsn_by_day")` swaps `#compareClassic` out for `#dayMatrixSection` and
 calls `applyMatrixWide()` so it goes **full-width too** (same treatment as the Everything
 matrix); `renderDayMatrix` is fed by `gui_api.day_matrix_info`. It **shares** the
-TSN dataset/picker (`mxTsnPicker`, keyed `highway_log`), the cell vocab
+TSN-picker component (`mxTsnPicker`, rendered PER ROW — named by its report, like
+the Everything matrix), the cell vocab
 (`mxCellContent`/`mxActBtn`), and the SAME job queue (the queue panel renders in both
 places); day compare Jobs carry `which:"day"` and route to `DayMatrixCompareWorker`.
 **Its own config corner** (`#dayMatrixConfig`, shown via `body.matrix-wide.mw-day`) mirrors
 `#matrixConfig` and holds the by-day matrix's granular controls — the queue, the **Day
-columns** add-day toolbar, the **TSN dataset** picker, a **live-formulas** toggle, and the
-**Reports** show/hide toggles — all relocated out of the grid section so the grid area is as
+columns** add-day toolbar, a **live-formulas** toggle, and the **Reports** show/hide
+toggles (the per-report **TSN dataset** pickers moved to the row headers) — all relocated
+out of the grid section so the grid area is as
 lean as the Everything matrix's (fits ~5 rows at 1440×720 without scrolling). The by-day
 live-formulas toggle is its **own** setting (`day_matrix_formulas`, snapshot key + bridge
 `set_day_matrix_formulas`, synced by `syncDayMatrixFormulas`) — independent of the Everything

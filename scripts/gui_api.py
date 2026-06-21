@@ -3163,13 +3163,12 @@ class GuiApi:
             self._emit_log(f"ERROR: {msg}")
             self._emit_modal("error", "Built-in Chromium", msg)
         elif payload.get("action") == "download":
-            self._emit_log("Built-in Chromium downloaded. Restart the app to "
-                           "see it in the Browser dropdown (browsers are "
-                           "probed at startup).")
+            self._emit_log("Built-in Chromium downloaded. Restart the app, then "
+                           "pick it under Settings ▸ Export browser (browsers "
+                           "are probed at startup).")
             self._emit_modal("info", "Built-in Chromium downloaded",
-                             "The browser is in place. Restart the app and it "
-                             "will appear in the Browser dropdown as "
-                             "'Built-in Chromium'.")
+                             "The browser is in place. Restart the app, then "
+                             "choose it under Settings ▸ Export browser.")
         else:
             self._emit_log("Downloaded Built-in Chromium removed."
                            + (" Restart the app to finish switching back to "

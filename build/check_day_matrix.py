@@ -99,8 +99,11 @@ def main():
             "ssor-prod", ["2026-06-17", "2026-06-18"], dest=str(dest))
         check("source + day columns recorded",
               snap["source"] == "ssor-prod" and snap["days"] == ["2026-06-17", "2026-06-18"])
-        check("TSN source resolves to the shared consolidated workbook",
-              snap["tsn_meta"]["source_kind"] == "consolidated")
+        check("TSN source is PER-ROW (not a single shared dataset)",
+              isinstance(snap["tsn_meta"].get("highway_log"), dict)
+              and "source_kind" in snap["tsn_meta"]["highway_log"])
+        check("Highway Log's TSN row resolves to its consolidated workbook",
+              snap["tsn_meta"]["highway_log"]["source_kind"] == "consolidated")
         hl = snap["cells"]["highway_log"]["2026-06-17"]
         check("HL Excel cell: export present, comparable, not built",
               hl["export"]["present"] and hl["cmp"]["supported"]

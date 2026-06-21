@@ -2440,11 +2440,9 @@ async function renderDayMatrix() {
     };
   }
 
-  const tsnHost = $("dayMatrixTsn");
-  if (tsnHost) {
-    tsnHost.textContent = "";
-    if (snap.tsn_meta) tsnHost.appendChild(mxTsnPicker(snap.tsn_meta, locked, renderDayMatrix));
-  }
+  // (TSN dataset pickers are PER-ROW now — in each row header, named by its
+  //  report — exactly like the Everything matrix; the old single shared picker
+  //  in this config corner is gone.)
 
   // Report show/hide toggles (parity with the Everything matrix's config zone).
   // The " (soon)" suffix below is defensive — every report is wired as of v0.17.0,
@@ -2480,7 +2478,7 @@ async function renderDayMatrix() {
     updateDayMatrixProgress();
     return;
   }
-  grid.style.gridTemplateColumns = `minmax(170px,1.1fr) repeat(${days.length}, minmax(120px,1fr))`;
+  grid.style.gridTemplateColumns = `minmax(190px,1.1fr) repeat(${days.length}, minmax(120px,1fr))`;
   grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(50px,1fr))`;
 
   const corner = document.createElement("div");
@@ -2541,6 +2539,10 @@ async function renderDayMatrix() {
         }));
     }
     rh.appendChild(top);
+    // Per-row TSN dataset picker (named by its row) — replaces the old single
+    // shared picker; each report shows + chooses its OWN TSN source.
+    const tm = snap.tsn_meta && snap.tsn_meta[rk];
+    if (tm && tm.supported) rh.appendChild(mxTsnPicker(tm, locked, renderDayMatrix));
     dndAttach(rh, top, rk, "dm-row", "y", () => snap.rows.slice(), async (order) => {
       const r = await api.set_day_matrix_row_order(order);
       if (r && r.error) showMessage("error", "Can't reorder", r.error);
@@ -2552,7 +2554,7 @@ async function renderDayMatrix() {
       const cell = document.createElement("div"); cell.className = "mx-cell";
       const main = document.createElement("div"); main.className = "mx-num";
       const sub = document.createElement("div"); sub.className = "mx-sub";
-      const v = mxCellContent(cmp, snap.tsn_meta);
+      const v = mxCellContent(cmp, tm);
       cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
       const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "not exported";
       cell.title = `${rlabel} — ${d}\nExported: ${expWhen}`;
@@ -3154,8 +3156,8 @@ async function downloadChromium() {
   const ok = await showConfirm({
     title: "Download the Built-in Chromium?",
     message: "About 170 MB will be downloaded into the app's data folder "
-      + "(data\\ms-playwright).\n\nAfter it finishes, restart the app and "
-      + "“Built-in Chromium” appears in the Browser dropdown.",
+      + "(data\\ms-playwright).\n\nAfter it finishes, restart the app, then pick "
+      + "“Built-in Chromium” under Settings ▸ Export browser.",
     confirmLabel: "Download",
   });
   if (!ok) return;
@@ -3932,18 +3934,29 @@ function makeMockApi() {
       .map((k) => _byKey[k]);
     const rowLabels = {}, rowSupported = {};
     allRows.forEach((r) => { rowLabels[r.key] = r.label; rowSupported[r.key] = r.supported; });
-    const tsnSub = "highway_log";
-    const tsnFile = (st.matrix_tsn_files || {})[tsnSub];
-    const srcKind = tsnFile ? "file" : (st.mock_tsn_pdfs ? "pdfs" : "consolidated");
-    const tsnMeta = { supported: true, source_kind: srcKind,
-      pdf_count: srcKind === "pdfs" ? 12 : undefined,
-      source_path: tsnFile || "…\\_tsn_input\\highway_log\\tsn_highway_log_consolidated.xlsx",
-      tsn_subdir: tsnSub, file: tsnFile || null,
-      input_dir: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)\\_tsn_input\\highway_log" };
-    const tsnReady = srcKind !== "pdfs";
+    // Per-row TSN datasets (parity with the real engine + the Everything mock):
+    // Highway Log (×2) and Highway Sequence are district PDFs (the "12 TSN PDFs →
+    // Consolidate" state); the rest resolve to a statewide workbook. A picked file
+    // (matrix_tsn_files) overrides per report.
+    const tsnMeta = {};
+    shown.forEach((r) => {
+      const sub = r.key;
+      const isPdfs = (sub === "highway_log" || sub === "highway_log_pdf"
+                      || sub === "highway_sequence");
+      const file = (st.matrix_tsn_files || {})[sub];
+      const kind = file ? "file" : isPdfs ? "pdfs" : "consolidated";
+      tsnMeta[sub] = {
+        supported: !!r.supported, fmt: sub === "highway_log_pdf" ? "pdf" : "excel",
+        source_kind: kind, pdf_count: kind === "pdfs" ? 12 : undefined,
+        source_path: file || (kind === "consolidated"
+          ? `…\\_tsn_input\\${sub}\\tsn_${sub}_consolidated.xlsx` : undefined),
+        tsn_subdir: sub, file: file || null,
+        input_dir: `C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)\\_tsn_input\\${sub}` };
+    });
     const cells = {};
     shown.forEach((r) => {
       cells[r.key] = {};
+      const tsnReady = (tsnMeta[r.key] || {}).source_kind !== "pdfs";
       days.forEach((d, i) => {
         const present = !(r.key === "highway_log_pdf" && d === "2026-06-11");
         let cmp;
@@ -4272,11 +4285,11 @@ function makeMockApi() {
         if (pct < 100) { push({ t: "log", text: `  Chromium 142.0.7444.52 (playwright build) — ${pct}% of 168 MiB` }); return; }
         clearInterval(t2);
         mockChromium.downloaded = true; mockChromium.downloaded_mb = 170;
-        push({ t: "log", text: "Built-in Chromium downloaded. Restart the app to see it in the Browser dropdown (browsers are probed at startup)." },
+        push({ t: "log", text: "Built-in Chromium downloaded. Restart the app, then pick it under Settings ▸ Export browser (browsers are probed at startup)." },
              { t: "settings", s: mockSettingsPayload() },
              { t: "run_ended" },
              { t: "modal", kind: "info", title: "Built-in Chromium downloaded",
-               message: "The browser is in place. Restart the app and it will appear in the Browser dropdown as 'Built-in Chromium'." });
+               message: "The browser is in place. Restart the app, then choose it under Settings ▸ Export browser." });
         st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
         pushState();
       }, 500);

@@ -48,10 +48,11 @@ EXPORT_REPORTS = [
     # layout (hl_printAll) instead of the Excel Export button. Export-only (the
     # consolidator reads the .xlsx export; no consolidation for the PDF).
     ("Highway Log (PDF)", "PDF", _HIGHWAY_LOG_PDF_SPEC),
-    # Export-only for now (no consolidation/comparison support yet). Labels
-    # verified against the live page source: NO "TSAR:" prefix, and Summary
-    # is an Excel export like Detail. The env check reads the dropdown for
-    # every row here, so a label drift shows up there as "missing".
+    # Intersection Summary/Detail now consolidate AND compare (cross-env + vs-TSN)
+    # as of v0.17.0 — live in both matrices. Labels verified against the live page
+    # source: NO "TSAR:" prefix, and Summary is an Excel export like Detail. The
+    # env check reads the dropdown for every row here, so a label drift shows up
+    # there as "missing".
     ("Intersection Summary", "Excel", _INT_SUMMARY_SPEC),
     ("Intersection Detail", "Excel", _INT_DETAIL_SPEC),
 ]
@@ -204,9 +205,9 @@ def consolidator_for_subdir(subdir):
 # the GUI report lists, the matrix, and the start guards all route through it.
 # (v0.16.x) Intersection Summary/Detail export is now ENABLED — the reports are
 # available on the DEVELOPMENT site (greyed in production), so users switch to the
-# dev addresses via Settings ▸ "Use development site" to export them. They remain
-# export-only for now; consolidate + compare-vs-TSN are groundwork (docs/roadmap).
-# To disable a report app-wide again, add its subdir back to this set.
+# dev addresses via Settings ▸ "Use development site" to export them. As of
+# v0.17.0 they ALSO consolidate and compare (cross-env + vs-TSN), live in both
+# matrices. To disable a report app-wide again, add its subdir back to this set.
 DISABLED_EXPORT_SUBDIRS = set()
 
 

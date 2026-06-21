@@ -226,19 +226,23 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                                if dest else {"kind": "none"})
         return _tsn_cache[sub]
 
-    # The single shared TSN picker shows ONE representative dataset (Highway Log by
-    # default — the established shared picker). Each cell still resolves its OWN
-    # report's TSN per-row below (via _tsn_for(tsn_subdir)), defaulting to the
-    # canonical TSN library; a per-report by-day picker is a later UX item.
-    supported_subdirs = [r[5] for r in all_rows if r[4]]
-    primary = ("highway_log" if "highway_log" in supported_subdirs
-               else supported_subdirs[0] if supported_subdirs else "highway_log")
-    src_primary = _tsn_for(primary)
-    tsn_meta = {"supported": True, "source_kind": src_primary.get("kind"),
-                "source_path": src_primary.get("path"),
-                "pdf_count": src_primary.get("pdf_count"),
-                "tsn_subdir": primary, "file": tsn_files.get(primary),
-                "input_dir": str(matrix.tsn_input_root(dest, primary)) if dest else None}
+    # PER-ROW TSN dataset summaries — one picker per report row, exactly like the
+    # Everything matrix. Each report has its OWN TSN source (Highway Log district
+    # PDFs, Ramp Detail statewide workbook, Intersection XLSX, …), so a single
+    # shared picker was both unnamed and incomplete. Keyed by row_key over the
+    # visible rows; cells resolve the same per-report source via _tsn_for below.
+    tsn_meta = {}
+    for row_key, _label, _subdir, fmt, supported, tsn_subdir in rows:
+        if not supported:
+            continue
+        src = _tsn_for(tsn_subdir)
+        tsn_meta[row_key] = {
+            "supported": True, "fmt": fmt,
+            "source_kind": src.get("kind"), "source_path": src.get("path"),
+            "pdf_count": src.get("pdf_count"),
+            "tsn_subdir": tsn_subdir, "file": tsn_files.get(tsn_subdir),
+            "input_dir": (str(matrix.tsn_input_root(dest, tsn_subdir))
+                          if dest else None)}
 
     cells = {}
     for row_key, _label, subdir, fmt, supported, tsn_subdir in rows:
