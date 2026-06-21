@@ -3968,17 +3968,20 @@ function makeMockApi() {
     const tsnMeta = {};
     shown.forEach((r) => {
       const sub = r.key;
-      const isPdfs = (sub === "highway_log" || sub === "highway_log_pdf"
-                      || sub === "highway_sequence");
-      const file = (st.matrix_tsn_files || {})[sub];
+      // The HL-PDF row shares Highway Log's TSN dataset, so its tsn_subdir is
+      // "highway_log" — mirror the real engine (and the Everything mock) so the
+      // picker reads/writes matrix_tsn_files under the right key.
+      const tsnSub = (sub === "highway_log_pdf") ? "highway_log" : sub;
+      const isPdfs = (tsnSub === "highway_log" || tsnSub === "highway_sequence");
+      const file = (st.matrix_tsn_files || {})[tsnSub];
       const kind = file ? "file" : (isPdfs && st.mock_tsn_pdfs) ? "pdfs" : "consolidated";
       tsnMeta[sub] = {
         supported: !!r.supported, fmt: sub === "highway_log_pdf" ? "pdf" : "excel",
         source_kind: kind, pdf_count: kind === "pdfs" ? 12 : undefined,
         source_path: file || (kind === "consolidated"
-          ? `…\\_tsn_input\\${sub}\\tsn_${sub}_consolidated.xlsx` : undefined),
-        tsn_subdir: sub, file: file || null,
-        input_dir: `C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)\\_tsn_input\\${sub}` };
+          ? `…\\_tsn_input\\${tsnSub}\\tsn_${tsnSub}_consolidated.xlsx` : undefined),
+        tsn_subdir: tsnSub, file: file || null,
+        input_dir: `C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)\\_tsn_input\\${tsnSub}` };
     });
     const cells = {};
     shown.forEach((r) => {

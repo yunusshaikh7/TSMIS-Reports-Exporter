@@ -1674,6 +1674,7 @@ class MatrixBatchExportWorker(threading.Thread):
         original = get_site()
         total = len(self.steps)
         done = ok = 0
+        posted = False           # an AuthError already drove the terminal transition
         try:
             for spec, src, env in self.steps:
                 if self.cancel.is_set():
@@ -1693,17 +1694,22 @@ class MatrixBatchExportWorker(threading.Thread):
                     self.q.put(("error",
                                 ("auth" if isinstance(e, AuthError) else "general",
                                  str(e))))
+                    posted = True
                     return                       # stop the batch (terminal via _on_error)
                 except Exception as e:           # noqa: BLE001
                     log.exception("matrix export %s-%s crashed", src, env)
                     self.q.put(("log", f"  {spec.label} / {src}-{env}: "
                                        f"{type(e).__name__}: {e}"))
                 done += 1
-            self.q.put(("matrix_export_done",
-                        {"count": done, "total": total, "ok": ok == total,
-                         "cancelled": self.cancel.is_set()}))
         finally:
             set_site(*original)
+            # Post the terminal event from finally so an UNEXPECTED escape (e.g. a
+            # crash outside the per-step handlers) can never leave the single-task
+            # gate wedged with the queue stuck — matching the sibling matrix workers.
+            if not posted:
+                self.q.put(("matrix_export_done",
+                            {"count": done, "total": total, "ok": ok == total,
+                             "cancelled": self.cancel.is_set()}))
 
 
 class MatrixCompareWorker(threading.Thread):
