@@ -3691,15 +3691,16 @@ function makeMockApi() {
     { label: "Intersection Detail (PDF)", fmt: "PDF" },
   ];
   // The Consolidate radios index into THIS list (matches reports.CONSOLIDATE_REPORTS,
-  // 8 rows incl. both Intersection consolidators as of v0.17.0) — NOT the 8-row
-  // export REPORTS above (Intersection Detail (PDF) is export-only). consolidate_info/
-  // start_consolidate must use this so the preview's labels/out_paths mirror the real bridge.
+  // 9 rows as of v0.17.3 — incl. the Intersection Detail (PDF) consolidator) — NOT
+  // the 8-row export REPORTS above. consolidate_info/start_consolidate must use this
+  // so the preview's labels/out_paths mirror the real bridge.
   const CONS_REPORTS = [
     { label: "TSAR: Ramp Summary" },
     { label: "TSAR: Ramp Detail" },
     { label: "Highway Sequence Listing" },
     { label: "Intersection Summary" },
     { label: "Intersection Detail" },
+    { label: "TSMIS Intersection Detail (PDF)" },
     { label: "TSMIS Highway Log (Excel)" },
     { label: "TSMIS Highway Log (PDF)" },
     { label: "TSN Highway Log (PDF)" },
@@ -3833,8 +3834,8 @@ function makeMockApi() {
       { id: "env", label: "Cross-environment", kind: "env", supported: true },
       { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
       { id: "vs_pdf", label: "vs TSMIS PDF", kind: "self", supported: true }];
-    if (rk === "highway_log_pdf") return [
-      { id: "env", label: "Cross-environment", kind: "env", supported: true },   // v0.17.0: PDF cross-env coded
+    if (rk === "highway_log_pdf" || rk === "intersection_detail_pdf") return [
+      { id: "env", label: "Cross-environment", kind: "env", supported: true },   // v0.17.0/0.17.3: PDF cross-env coded
       { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
       { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
     return [
@@ -3872,6 +3873,7 @@ function makeMockApi() {
       { key: "intersection_summary", label: "Intersection Summary", tsn_capable: true },
       { key: "intersection_detail", label: "Intersection Detail", tsn_capable: true },
       { key: "highway_log_pdf", label: "Highway Log (PDF)", tsn_capable: true },
+      { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", tsn_capable: true },
     ];
     const rowLabels = {}; allRows.forEach((r) => { rowLabels[r.key] = r.label; });
     const hidden = st.matrix_hidden || [];
@@ -3889,6 +3891,7 @@ function makeMockApi() {
       intersection_summary: { "ssor-test": [3, 0], "ssor-dev": [3, 0], "ars-prod": [0, 0], "ars-test": [40, 2], "ars-dev": "stale" },
       intersection_detail: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "stale" },
       highway_log_pdf: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
+      intersection_detail_pdf: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "stale" },
     };
     const cells = {}, modes = {}, rowModes = {}, tsnMeta = {};
     rows.forEach((rk) => {
@@ -3897,14 +3900,17 @@ function makeMockApi() {
       if (!avail.some((m) => m.id === selId)) selId = "env";
       const mode = avail.find((m) => m.id === selId) || avail[0];
       modes[rk] = mode.id; rowModes[rk] = avail;
-      // Per-row TSN dataset: the two Highway Log rows SHARE "highway_log"; every
-      // other report has its OWN (mirrors the real matrix + the by-day mock).
-      const tsnSub = (rk === "highway_log_pdf") ? "highway_log" : rk;
+      // Per-row TSN dataset: each PDF row SHARES its Excel row's dataset
+      // (highway_log_pdf->highway_log, intersection_detail_pdf->intersection_detail);
+      // every other report has its OWN (mirrors the real matrix + the by-day mock).
+      const tsnSub = (rk === "highway_log_pdf") ? "highway_log"
+        : (rk === "intersection_detail_pdf") ? "intersection_detail" : rk;
       const isPdfs = (tsnSub === "highway_log" || tsnSub === "highway_sequence");
       const tsnFile = (st.matrix_tsn_files || {})[tsnSub];
       const srcKind = tsnFile ? "file" : (isPdfs && st.mock_tsn_pdfs) ? "pdfs" : "consolidated";
       if (mode.kind === "tsn") {
-        tsnMeta[rk] = { supported: mode.supported, fmt: rk === "highway_log_pdf" ? "pdf" : "excel",
+        tsnMeta[rk] = { supported: mode.supported,
+          fmt: (rk === "highway_log_pdf" || rk === "intersection_detail_pdf") ? "pdf" : "excel",
           source_kind: srcKind, pdf_count: srcKind === "pdfs" ? 12 : undefined,
           source_path: tsnFile || (srcKind === "consolidated"
             ? `…\\_tsn_input\\${tsnSub}\\tsn_${tsnSub}_consolidated.xlsx` : undefined),
@@ -3954,6 +3960,7 @@ function makeMockApi() {
       { key: "highway_sequence", label: "Highway Sequence Listing", supported: true },
       { key: "intersection_summary", label: "Intersection Summary", supported: true },
       { key: "intersection_detail", label: "Intersection Detail", supported: true },
+      { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", supported: true },
     ];
     const hidden = st.day_matrix_hidden || [];
     const _visible = allRows.filter((r) => hidden.indexOf(r.key) < 0);
@@ -3969,15 +3976,17 @@ function makeMockApi() {
     const tsnMeta = {};
     shown.forEach((r) => {
       const sub = r.key;
-      // The HL-PDF row shares Highway Log's TSN dataset, so its tsn_subdir is
-      // "highway_log" — mirror the real engine (and the Everything mock) so the
+      // Each PDF row shares its Excel row's TSN dataset, so its tsn_subdir is the
+      // Excel subdir — mirror the real engine (and the Everything mock) so the
       // picker reads/writes matrix_tsn_files under the right key.
-      const tsnSub = (sub === "highway_log_pdf") ? "highway_log" : sub;
+      const tsnSub = (sub === "highway_log_pdf") ? "highway_log"
+        : (sub === "intersection_detail_pdf") ? "intersection_detail" : sub;
       const isPdfs = (tsnSub === "highway_log" || tsnSub === "highway_sequence");
       const file = (st.matrix_tsn_files || {})[tsnSub];
       const kind = file ? "file" : (isPdfs && st.mock_tsn_pdfs) ? "pdfs" : "consolidated";
       tsnMeta[sub] = {
-        supported: !!r.supported, fmt: sub === "highway_log_pdf" ? "pdf" : "excel",
+        supported: !!r.supported,
+        fmt: (sub === "highway_log_pdf" || sub === "intersection_detail_pdf") ? "pdf" : "excel",
         source_kind: kind, pdf_count: kind === "pdfs" ? 12 : undefined,
         source_path: file || (kind === "consolidated"
           ? `…\\_tsn_input\\${tsnSub}\\tsn_${tsnSub}_consolidated.xlsx` : undefined),
@@ -4228,6 +4237,7 @@ function makeMockApi() {
         { label: "Highway Sequence Listing", fmt: "Excel" },
         { label: "Intersection Summary", fmt: "Excel" },
         { label: "Intersection Detail", fmt: "Excel" },
+        { label: "TSMIS Intersection Detail (PDF)", fmt: "PDF" },
         { label: "TSMIS Highway Log (Excel)", fmt: "Excel" },
         { label: "TSMIS Highway Log (PDF)", fmt: "PDF" },
         { label: "TSN Highway Log (PDF)", fmt: "PDF" },
@@ -4236,10 +4246,10 @@ function makeMockApi() {
         { id: "env", label: "Cross-environment" },
         { id: "tsn", label: "vs TSN" },
       ],
-      // Mirrors the real reports.COMPARE_REPORTS (15 rows as of v0.17.0): every
+      // Mirrors the real reports.COMPARE_REPORTS (18 rows as of v0.17.3): every
       // report has a cross-env ("— between environments") AND a vs-TSN comparator,
-      // plus the Highway Log PDF↔Excel self-check. Order matches the registry so
-      // the radios index correctly.
+      // plus the PDF↔Excel self-checks (Highway Log + Intersection Detail). Order
+      // matches the registry so the radios index correctly.
       compare_reports: [
         { label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env" },
         { label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env" },
@@ -4264,6 +4274,11 @@ function makeMockApi() {
           file_a_label: "TSMIS", file_b_label: "TSN" },
         { label: "Highway Sequence Listing — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
+        { label: "TSAR: Intersection Detail (PDF) — between environments", kind: "folders", group: "env" },
+        { label: "Intersection Detail — TSMIS (PDF) vs TSN", kind: "files", group: "tsn",
+          file_a_label: "TSMIS (PDF)", file_b_label: "TSN" },
+        { label: "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env",
+          file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
       ],
       batch_resume: null,
       batch_dest: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",

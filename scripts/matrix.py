@@ -285,6 +285,13 @@ def _row_modes(row_key, subdir, adapter):
                  "env_subdir": "highway_log_pdf", "tsn_subdir": "highway_log", "fmt": "pdf"},
                 {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
                  "env_subdir": "highway_log_pdf", "other_subdir": "highway_log"}]
+    if row_key == "intersection_detail_pdf":  # TSMIS PDF (shares the Excel's TSN dataset)
+        return [env,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                 "env_subdir": "intersection_detail_pdf",
+                 "tsn_subdir": "intersection_detail", "fmt": "pdf"},
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                 "env_subdir": "intersection_detail_pdf", "other_subdir": "intersection_detail"}]
     return [env,
             {"id": "tsn", "label": "vs TSN", "kind": "tsn",
              "supported": tsn_supported(row_key),
@@ -308,6 +315,9 @@ def tsn_comparator_for(row_key):
         return _m
     if row_key == "highway_log_pdf":
         import compare_highway_log_pdf as _m
+        return _m.TSMIS_PDF_VS_TSN
+    if row_key == "intersection_detail_pdf":
+        import compare_intersection_detail_pdf as _m
         return _m.TSMIS_PDF_VS_TSN
     if row_key == "ramp_detail":
         import compare_ramp_detail_tsn as _m

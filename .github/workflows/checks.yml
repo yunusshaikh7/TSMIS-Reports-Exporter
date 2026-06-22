@@ -95,6 +95,7 @@ jobs:
                    check_compare_ramp_summary_tsn check_compare_intersection_summary_tsn \
                    check_compare_intersection_detail_tsn check_compare_highway_sequence_tsn \
                    check_compare_env_intersection check_compare_env_highway_log_pdf \
+                   check_intersection_detail_pdf \
                    check_compare_dupmatch check_compare_ditto check_ramp_summary_partial \
                    check_consolidate_intersection \
                    check_tsn_description_leak check_tsmis_pdf_parse check_tsmis_pdf_reconcile \

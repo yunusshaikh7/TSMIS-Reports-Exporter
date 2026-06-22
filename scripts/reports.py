@@ -26,12 +26,14 @@ import consolidate_highway_sequence as _c_highway_seq
 import consolidate_highway_log as _c_highway_log
 import consolidate_tsn_highway_log as _c_tsn_highway_log
 import consolidate_tsmis_highway_log_pdf as _c_tsmis_highway_log_pdf
+import consolidate_tsmis_intersection_detail_pdf as _c_tsmis_int_detail_pdf
 import consolidate_intersection_detail as _c_int_detail
 import consolidate_intersection_summary as _c_int_summary
 
 import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
 import compare_highway_log_pdf as _cmp_highway_log_pdf
+import compare_intersection_detail_pdf as _cmp_int_detail_pdf
 import compare_ramp_detail_tsn as _cmp_ramp_detail_tsn
 import compare_ramp_summary_tsn as _cmp_ramp_summary_tsn
 import compare_intersection_summary_tsn as _cmp_int_summary_tsn
@@ -75,6 +77,10 @@ CONSOLIDATE_REPORTS = [
     ("Highway Sequence Listing", _c_highway_seq),
     ("Intersection Summary", _c_int_summary),
     ("Intersection Detail", _c_int_detail),
+    #   Input = the TSMIS "Intersection Detail (PDF)" export, day-aware (this app's
+    #   own export -- NOT a dropped folder) -- parsed into the SAME 36-column format
+    #   as the Excel export, the accurate substitute when the two sources disagree.
+    ("TSMIS Intersection Detail (PDF)", _c_tsmis_int_detail_pdf),
     # The three Highway Log consolidators are grouped here, TSMIS before TSN.
     # Labels are SOURCE-explicit and parallel — "<system> Highway Log (<format>)"
     # — so the bare "Highway Log" can't be mistaken for one of the others.
@@ -175,6 +181,18 @@ COMPARE_REPORTS = [
     # (completeness gaps + listing-granularity artifact). TSN's finer segment breaks
     # surface as one-sided rows (as for Highway Log).
     ("Highway Sequence Listing — TSMIS vs TSN", _cmp_highway_seq_tsn, "files", "tsn"),
+    # Intersection Detail (PDF) — the Highway Log (PDF) treatment, appended LAST so
+    # existing registry indices (selection is by index) are unchanged. The cross-env
+    # row (folders/env) auto-joins matrix_rows(); its subdir "intersection_detail_pdf"
+    # maps to the PDF export, and matrix.tsn_comparator_for routes its vs-TSN cell to
+    # TSMIS_PDF_VS_TSN. Both sides parse the app's own PDF export; vs-TSN swaps the
+    # PDF in for the Excel TSMIS side; vs-Excel is the PDF-vs-Excel consistency check.
+    ("TSAR: Intersection Detail (PDF) — between environments",
+     _cmp_env.INTERSECTION_DETAIL_PDF, "folders", "env"),
+    ("Intersection Detail — TSMIS (PDF) vs TSN",
+     _cmp_int_detail_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
+    ("Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)",
+     _cmp_int_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
 ]
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each

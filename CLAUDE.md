@@ -39,14 +39,16 @@ Reports 5–6 (Intersection): export is **enabled** but the report lives on the
 consolidates AND compares vs TSN** — all 6 reports + the PDF Highway Log have a
 vs-TSN comparator, live in both the Everything and by-day matrices (see
 [docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md) for
-the per-report schema + locked canaries). **Intersection Detail (PDF)** (#6b,
-v0.17.2) is **export-only** — a landscape PDF rendering of the same report via the
-site's Print layout (`intd_printAll`, the Highway Log (PDF) pattern), with no
-consolidator/comparator. Two consolidate-only
-Highway Log sources exist too — **TSN** district PDFs (dropped into
-`input/tsn_highway_log/`) and the app's own **Highway Log (PDF)** export. The
-**Compare** tab diffs every report **TSMIS-vs-TSN** (the two PDF-sourced Highway Log
-flavors among them) and runs cross-environment comparisons.
+the per-report schema + locked canaries). **Intersection Detail (PDF)** (#6b)
+gained the full Highway Log (PDF) treatment in **v0.17.3**: it **consolidates** (its
+own two-row cell-grid parser → the 36-column TSMIS format) AND **compares** —
+cross-environment, vs-TSN, and PDF-vs-Excel — live in both matrices, the PDF being
+the accurate source where it disagrees with the vendor Excel (reconciled 218/218
+routes, 0 content diffs). So **both** PDF reports (Highway Log, Intersection Detail)
+now consolidate and compare. The remaining consolidate-only sources are the **TSN**
+district PDFs dropped into `input/tsn_highway_log/`. The
+**Compare** tab diffs every report **TSMIS-vs-TSN** (the PDF-sourced flavors among
+them) and runs cross-environment comparisons.
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
 [docs/reports.md](docs/reports.md). Highway Log columns / PDF parsing / comparisons:

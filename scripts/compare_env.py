@@ -338,6 +338,37 @@ def _load_highway_log_pdf_side(folder, label, events):
         shutil.rmtree(combined_dir, ignore_errors=True)
 
 
+def _load_intersection_detail_pdf_side(folder, label, events):
+    """Parse one side's Intersection Detail PDFs (folder/intersection_detail_pdf/
+    *.pdf) into consolidated-shape 36-column rows: convert them to per-route XLSX
+    with the Intersection-Detail-PDF consolidator's own parser in a temp dir, then
+    read those flat like any XLSX side. Returns (rows, header, skipped). Both sides
+    are parsed from the app's own PDF export — the accurate Intersection Detail
+    source when it disagrees with the vendor Excel (the Highway Log (PDF) pattern)."""
+    import consolidate_tsmis_intersection_detail_pdf as _idpdf
+    import intersection_detail_columns as idc
+    in_dir, pdfs = _find_input_dir(folder, _idpdf.SUBDIR, "*.pdf")
+    if not pdfs:
+        raise ValueError(
+            f"No Intersection Detail (PDF) files were found for the {label} side:\n{in_dir}"
+            "\n\nExport the Intersection Detail (PDF) report on that environment first.")
+    conv = Path(tempfile.mkdtemp(prefix="intdpdf_env_conv_"))
+    combined_dir = Path(tempfile.mkdtemp(prefix="intdpdf_env_out_"))
+    try:
+        res = _idpdf.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                 input_dir=in_dir, out_path=combined_dir / "_combined.xlsx",
+                                 converted_dir=conv)
+        if res.status == "cancelled":
+            raise ValueError("Cancelled by user.")
+        if res.status != "ok":
+            raise ValueError(res.message or "Could not parse the Intersection Detail PDFs.")
+        return _load_xlsx_side(conv, label, "_perroute_", _idpdf.SHEET_NAME,
+                               "Intersection Detail (PDF)", events, expected_header=idc.HEADER)
+    finally:
+        shutil.rmtree(conv, ignore_errors=True)
+        shutil.rmtree(combined_dir, ignore_errors=True)
+
+
 # ---------------------------------------------------------------------------
 # Per-report adapters
 # ---------------------------------------------------------------------------
@@ -556,6 +587,17 @@ INTERSECTION_DETAIL = EnvCompare(
     base_schema=CompareSchema(
         report_name="Intersection Detail", header=["Post Mile"],
         id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"))
+# Intersection Detail (PDF) cross-env: same flat route+PM schema as the Excel row,
+# but BOTH sides are parsed from the app's own PDF export (the accurate source when
+# it disagrees with the vendor Excel). flat_pdf_loader parses each side's PDFs first
+# — the Highway Log (PDF) pattern.
+INTERSECTION_DETAIL_PDF = EnvCompare(
+    "intersection_detail_pdf", "Intersection Detail (PDF)", "intersection_detail_pdf",
+    sheet_name="Intersection Detail", key_col="Post Mile",
+    base_schema=CompareSchema(
+        report_name="Intersection Detail (PDF)", header=["Post Mile"],
+        id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"),
+    flat_pdf_loader=_load_intersection_detail_pdf_side)
 # Highway Log (PDF) cross-env: same Highway Log schema as the Excel row (Med Wid rule,
 # corrected labels, ditto/roadbed), but BOTH sides are parsed from the app's own PDF
 # export — the accurate Highway Log source (the vendor Excel drops rows), so this is

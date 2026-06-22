@@ -51,10 +51,10 @@ def test_paths_and_modes():
           matrix.tsn_capable("highway_sequence"))
 
     defs = matrix._row_defs()
-    check("seven matrix rows — every report (both HL formats + both Intersection)",
+    check("eight matrix rows — every report (both HL + both Intersection PDF formats)",
           set(defs) == {"ramp_summary", "ramp_detail", "highway_sequence",
                         "highway_log", "highway_log_pdf", "intersection_summary",
-                        "intersection_detail"})
+                        "intersection_detail", "intersection_detail_pdf"})
 
     def modes(rk):
         _l, sub, _i, adapter, _hr = defs[rk]

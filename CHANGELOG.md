@@ -3,7 +3,24 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
-## v0.17.2 — 2026-06-22
+## v0.17.3 — 2026-06-22
+
+- **Intersection Detail (PDF) now plugs into the rest of the app — consolidate, compare,
+  and the matrices.** Just like Highway Log, the PDF and the Excel export of Intersection
+  Detail can disagree on the data, and the PDF is the accurate source. So the
+  "Intersection Detail (PDF)" export now also:
+  - **Consolidates** — *Consolidate ▸ TSMIS Intersection Detail (PDF)* combines the route
+    PDFs into one workbook in the same 36-column format as the Excel export.
+  - **Compares** — three new comparisons: between environments, **TSMIS (PDF) vs TSN**, and
+    **TSMIS (PDF) vs TSMIS (Excel)** (the last pinpoints exactly where the two TSMIS exports
+    differ).
+  - **Shows up in both matrices** — Intersection Detail (PDF) is now a full row in the
+    Everything matrix and the by-day "vs TSN" matrix, with its own vs-TSN / vs-Excel modes.
+
+  The PDF parser was reconciled against every route statewide (218 of 218) and reproduces the
+  Excel data exactly, apart from harmless whitespace in the free-text Description.
+
+
 
 - **Export Intersection Detail as a PDF.** A new **Intersection Detail (PDF)** report
   saves the same Intersection Detail data as a print-ready PDF (Letter, landscape) —

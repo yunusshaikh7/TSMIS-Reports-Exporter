@@ -69,6 +69,8 @@ def _day_rows():
             out.append((row_key, label, subdir, "excel", True, tsn_subdir))
         elif row_key == "highway_log_pdf":
             out.append((row_key, label, subdir, "pdf", True, tsn_subdir))
+        elif row_key == "intersection_detail_pdf":
+            out.append((row_key, label, subdir, "pdf", True, tsn_subdir))
         else:
             # Any report with a coded vs-TSN comparator is live (all of them as of
             # v0.17.0); `supported` derives from the single tsn_supported registry.
