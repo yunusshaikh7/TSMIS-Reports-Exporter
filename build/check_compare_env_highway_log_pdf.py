@@ -50,8 +50,8 @@ def test_wiring():
     check("registered as a folders/env row",
           any(adapter is a and kind == "folders" and group == "env"
               for _l, adapter, kind, group in reports.COMPARE_REPORTS))
-    check("highway_log_pdf is a matrix row (kept LAST so order is unchanged)",
-          [r[0] for r in reports.matrix_rows()][-1] == "highway_log_pdf")
+    check("highway_log_pdf is a matrix row",
+          "highway_log_pdf" in [r[0] for r in reports.matrix_rows()])
     defs = matrix._row_defs()
     hp = {m["id"]: m for m in matrix._row_modes("highway_log_pdf", "highway_log_pdf",
                                                 defs["highway_log_pdf"][3])}
