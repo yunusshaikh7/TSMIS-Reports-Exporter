@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Synthetic reconstruction of the Intersection Detail PRINT contract (not a copy
+     of the Caltrans source). Carries only what save_intersection_detail_pdf
+     depends on:
+       * a GLOBAL intd_printAll() that rebuilds #rampResults with the FULL table
+         (every record) and a BUTTON-LESS action bar (no .export-btn -- the live
+         site calls renderActionBar(..., null, null) for the print layout), calls
+         window.print(), then SYNCHRONOUSLY restores the paginated on-screen view,
+         and
+       * an @media print rule that hides the controls and shows #rampResults,
+     exactly like the live page (intersection_detail.js intd_printAll +
+     styles.css). -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  #controls { color: #333; }
+  .hl-table-wrap { color: #666; }
+  @media print {
+    #controls { display: none !important; }
+    #rampResults { display: block !important; }
+  }
+</style>
+</head>
+<body>
+  <!-- On screen this holds the action bar (Export+Print) + ONE paginated page of
+       rows (what page.pdf would grab without invoking the print layout). -->
+  <div id="rampResults" class="ramp-results">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="intd_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line2">TSAR - Intersection Detail</div>
+      </div>
+      <button class="export-btn" onclick="intd_printAll()">Print</button>
+    </div>
+    <div class="hl-table-wrap">
+      <table class="hl-table intd-table"><tbody>
+        <tr><td>Page 1 of N (paginated on-screen view)</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <script>
+    function intd_exportToExcel() { /* no-op for the fixture */ }
+
+    function intd_printAll() {
+      const box = document.getElementById('rampResults');
+      const saved = box.innerHTML;
+      // The full report: a BUTTON-LESS action bar + one big table with EVERY row.
+      let rows = '';
+      for (let i = 0; i < 60; i++) rows += '<tr><td>full report row ' + i + '</td></tr>';
+      box.innerHTML =
+          '<div class="report-action-bar"><div></div>'
+        + '<div class="report-title"><div class="report-title-line2">TSAR - Intersection Detail</div></div>'
+        + '<div></div></div>'
+        + '<div class="hl-table-wrap"><table class="hl-table intd-table"><tbody>' + rows + '</tbody></table></div>'
+        + '<div class="generated-on">Generated on now</div>';
+      window.print();          // real intd_printAll restores AFTER this line...
+      box.innerHTML = saved;   // ...so an overridden window.print() that throws skips this
+    }
+  </script>
+</body>
+</html>

@@ -14,6 +14,7 @@ output/*
 !output/highway_log_pdf/
 !output/intersection_summary/
 !output/intersection_detail/
+!output/intersection_detail_pdf/
 !output/consolidated/
 output/ramp_summary/*
 output/ramp_detail/*
@@ -22,6 +23,7 @@ output/highway_log/*
 output/highway_log_pdf/*
 output/intersection_summary/*
 output/intersection_detail/*
+output/intersection_detail_pdf/*
 output/consolidated/*
 !output/ramp_summary/.gitkeep
 !output/ramp_detail/.gitkeep
@@ -30,6 +32,7 @@ output/consolidated/*
 !output/highway_log_pdf/.gitkeep
 !output/intersection_summary/.gitkeep
 !output/intersection_detail/.gitkeep
+!output/intersection_detail_pdf/.gitkeep
 !output/consolidated/.gitkeep
 
 # Belt-and-suspenders for the two legacy TSN consolidators: their standalone /

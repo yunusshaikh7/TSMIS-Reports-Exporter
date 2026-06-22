@@ -38,6 +38,7 @@ import export_highway_sequence as highway_sequence  # noqa: E402
 import export_highway_log as highway_log  # noqa: E402
 import export_highway_log_pdf as highway_log_pdf  # noqa: E402
 import export_intersection_detail as intersection_detail  # noqa: E402
+import export_intersection_detail_pdf as intersection_detail_pdf  # noqa: E402
 import export_intersection_summary as intersection_summary  # noqa: E402
 
 from playwright.sync_api import sync_playwright  # noqa: E402
@@ -124,6 +125,10 @@ _REPORTS = [
     (highway_log_pdf.SPEC, "Highway Log (PDF)",
      "highway_log_data.html", "highway_log_empty.html"),
     (intersection_detail.SPEC, "Intersection Detail",
+     "intersection_detail_data.html", "intersection_detail_empty.html"),
+    # The PDF variant renders the SAME way (same dropdown option), so its
+    # wait_js/is_empty must resolve on the very same fixtures as the Excel one.
+    (intersection_detail_pdf.SPEC, "Intersection Detail (PDF)",
      "intersection_detail_data.html", "intersection_detail_empty.html"),
     (intersection_summary.SPEC, "Intersection Summary",
      "intersection_summary_data.html", "intersection_summary_empty.html"),
@@ -256,6 +261,39 @@ def test_highway_log_pdf_save(page):
           isinstance(raised, ReportError))
 
 
+def test_intersection_detail_pdf_save(page):
+    print("Intersection Detail PDF save: invokes the Print layout and writes a real PDF:")
+    from exporter import save_intersection_detail_pdf
+    from common import ReportError
+    page.goto(_fixture_url("intersection_detail_print.html"))
+    out = Path(tempfile.gettempdir()) / "_intd_pdf_check.pdf"
+    if out.exists():
+        out.unlink()
+    save_intersection_detail_pdf(page, out)
+    data = out.read_bytes() if out.exists() else b""
+    check("a non-empty PDF was written", data[:4] == b"%PDF" and len(data) > 800)
+    # The FULL print layout (whole table, action buttons stripped) is in the DOM
+    # after save -- proof window.print() was neutralized so intd_printAll's
+    # synchronous restore didn't run.
+    stripped = page.evaluate(
+        "() => { const b = document.getElementById('rampResults');"
+        " return !!b.querySelector('.intd-table') && !b.querySelector('.export-btn'); }")
+    check("the full print layout was built (restore skipped)", stripped)
+    if out.exists():
+        out.unlink()
+
+    # Fails LOUDLY (ReportError) when the site's Print function is gone, rather
+    # than silently saving the one paginated on-screen page.
+    page.goto(_fixture_url("blank.html"))      # no intd_printAll
+    raised = None
+    try:
+        save_intersection_detail_pdf(page, Path(tempfile.gettempdir()) / "_intd_pdf_none.pdf")
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("missing intd_printAll -> ReportError (no silent truncated PDF)",
+          isinstance(raised, ReportError))
+
+
 def main():
     print("Fake-site selector-contract checks")
     print(f"fixtures: {FIXTURES}")
@@ -274,6 +312,7 @@ def main():
             test_error_js(page)
             test_cs_disabled(page)
             test_highway_log_pdf_save(page)
+            test_intersection_detail_pdf_save(page)
         finally:
             try:
                 browser.close()

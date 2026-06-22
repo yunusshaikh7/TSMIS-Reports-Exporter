@@ -57,6 +57,7 @@ echo     4.  Highway Log               (XLSX -^> output\highway_log\)
 echo     5.  Highway Log (PDF)         (PDF  -^> output\highway_log_pdf\)
 echo     6.  Intersection Summary      (XLSX -^> output\intersection_summary\)
 echo     7.  Intersection Detail       (XLSX -^> output\intersection_detail\)
+echo     8.  Intersection Detail (PDF) (PDF  -^> output\intersection_detail_pdf\)
 echo.
 echo     A.  Several / all report types at once
 echo     C.  Change number of browsers (currently %TSMIS_FAST_WORKERS%)
@@ -65,7 +66,7 @@ echo.
 echo ================================================================
 echo.
 set "choice="
-set /p choice="Enter your choice [1-7, A, C, Q]: "
+set /p choice="Enter your choice [1-8, A, C, Q]: "
 
 if /i "%choice%"=="1" goto summary
 if /i "%choice%"=="2" goto detail
@@ -74,12 +75,13 @@ if /i "%choice%"=="4" goto highway_log
 if /i "%choice%"=="5" goto highway_log_pdf
 if /i "%choice%"=="6" goto intersection_summary
 if /i "%choice%"=="7" goto intersection_detail
+if /i "%choice%"=="8" goto intersection_detail_pdf
 if /i "%choice%"=="A" goto multi
 if /i "%choice%"=="C" goto workers
 if /i "%choice%"=="Q" exit /b 0
 if /i "%choice%"=="quit" exit /b 0
 echo.
-echo Invalid choice "%choice%". Please pick 1-7, A, C, or Q.
+echo Invalid choice "%choice%". Please pick 1-8, A, C, or Q.
 echo.
 pause
 goto menu
@@ -116,6 +118,11 @@ exit /b 0
 
 :intersection_detail
 python scripts\export_intersection_detail.py
+pause
+exit /b 0
+
+:intersection_detail_pdf
+python scripts\export_intersection_detail_pdf.py
 pause
 exit /b 0
 

@@ -18,6 +18,7 @@ from export_highway_log import SPEC as _HIGHWAY_LOG_SPEC
 from export_highway_log_pdf import SPEC as _HIGHWAY_LOG_PDF_SPEC
 from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
 from export_intersection_detail import SPEC as _INT_DETAIL_SPEC
+from export_intersection_detail_pdf import SPEC as _INT_DETAIL_PDF_SPEC
 
 import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
@@ -55,6 +56,12 @@ EXPORT_REPORTS = [
     # there as "missing".
     ("Intersection Summary", "Excel", _INT_SUMMARY_SPEC),
     ("Intersection Detail", "Excel", _INT_DETAIL_SPEC),
+    # Same "Intersection Detail" dropdown option, saved as a PDF via the page's
+    # Print layout (intd_printAll) instead of the Excel Export button -- the
+    # Highway Log (PDF) pattern. EXPORT-ONLY (no consolidator, no comparison).
+    # Appended LAST so every existing EXPORT_REPORTS index is unchanged
+    # (manifests / env-scan / start_export index into this list).
+    ("Intersection Detail (PDF)", "PDF", _INT_DETAIL_PDF_SPEC),
 ]
 
 # Consolidate tab: (menu label, module). Same order as above. Each module
@@ -172,9 +179,10 @@ COMPARE_REPORTS = [
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each
 # EXPORTABLE report, keyed by the export ReportSpec's output subdir so this can't
-# drift from the lists above. Every exportable report is here EXCEPT Highway Log
-# (PDF) (highway_log_pdf) — it needs a scratch converted_dir, so the matrix and
-# auto-consolidate handle it specially (absent from the map -> None).
+# drift from the lists above. The two export-only PDF variants are absent (-> None):
+# Highway Log (PDF) (highway_log_pdf) needs a scratch converted_dir, so the matrix
+# and auto-consolidate handle it specially; Intersection Detail (PDF)
+# (intersection_detail_pdf) is export-only with no consolidator at all.
 _CONSOLIDATOR_BY_SUBDIR = {
     _RAMP_SUMMARY_SPEC.subdir: _c_ramp_summary,
     _RAMP_DETAIL_SPEC.subdir: _c_ramp_detail,

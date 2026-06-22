@@ -3,6 +3,15 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.17.2 — 2026-06-22
+
+- **Export Intersection Detail as a PDF.** A new **Intersection Detail (PDF)** report
+  saves the same Intersection Detail data as a print-ready PDF (Letter, landscape) —
+  the full report across every page, not just the page shown on screen — alongside the
+  existing Excel export. Pick it on the Export tab, in **Several / all report types at
+  once**, or as option 8 in the console menus. Like Highway Log (PDF), it's
+  export-only: a faithful rendering of the report, with no separate consolidate/compare.
+
 ## v0.17.1 — 2026-06-21
 
 A quick fix-up of issues found using v0.17.0 on the matrices.

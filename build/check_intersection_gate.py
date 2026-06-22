@@ -2,9 +2,11 @@
 (reports.DISABLED_EXPORT_SUBDIRS / is_export_disabled / enabled_export_reports /
 export_reports_status + the GUI wiring).
 
-As of v0.16.x the gate is EMPTY — all seven export reports, INCLUDING Intersection
+As of v0.16.x the gate is EMPTY — all export reports, INCLUDING Intersection
 Summary/Detail, are enabled (they live on the development site; users switch via
-Settings ▸ "Use development site"). This check locks (a) the default all-enabled
+Settings ▸ "Use development site"). The expected count is read from the registry
+(N = len(EXPORT_REPORTS)), so adding a report doesn't re-break this check. It locks
+(a) the default all-enabled
 state and (b) that the gate MECHANISM still works: a subdir added back to the set
 is SHOWN GREYED (not hidden), excluded from the saved-reports library, and
 rejected by the start_* guards server-side — with EXPORT_REPORTS indices kept
@@ -22,6 +24,11 @@ sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 import reports
 import gui_api
 
+# Number of export report types, read from the registry so this check locks the
+# GATE BEHAVIOR (default all-enabled, re-disable greys one) without re-breaking
+# every time a report is added/removed.
+N = len(reports.EXPORT_REPORTS)
+
 _fail = []
 
 
@@ -32,28 +39,29 @@ def check(name, cond):
 
 
 def test_default_all_enabled():
-    print("default gate is empty — all seven reports enabled (incl. Intersection):")
+    print(f"default gate is empty — all {N} reports enabled (incl. Intersection):")
     check("DISABLED_EXPORT_SUBDIRS is empty by default",
           reports.DISABLED_EXPORT_SUBDIRS == set())
     enabled = reports.enabled_export_reports()
-    check("all seven export reports enabled", len(enabled) == 7)
+    check("all export reports enabled", len(enabled) == N)
     subdirs = {spec.subdir for _i, _l, _f, spec in enabled}
-    check("Intersection Summary + Detail are now included",
-          {"intersection_summary", "intersection_detail"} <= subdirs)
+    check("Intersection Summary + Detail (Excel + PDF) are now included",
+          {"intersection_summary", "intersection_detail",
+           "intersection_detail_pdf"} <= subdirs)
     status = reports.export_reports_status()
-    check("all seven present, none flagged disabled",
-          len(status) == 7 and not any(d for *_rest, d in status))
+    check("all present, none flagged disabled",
+          len(status) == N and not any(d for *_rest, d in status))
     check("each idx maps back to its own EXPORT_REPORTS row",
           all(reports.EXPORT_REPORTS[i] == (label, fmt, spec)
               for i, label, fmt, spec, _d in status))
 
 
 def test_gui_initial_state_all_enabled():
-    print("gui_api.get_initial_state (all seven offered, none greyed):")
+    print("gui_api.get_initial_state (all offered, none greyed):")
     a = gui_api.GuiApi()
     a._started = True            # skip the one-time check/update worker launch
     init = a.get_initial_state()
-    check("seven reports offered", len(init["reports"]) == 7)
+    check("all reports offered", len(init["reports"]) == N)
     check("none greyed by default", not any(r["disabled"] for r in init["reports"]))
     check("Intersection shown AND pickable",
           any("Intersection" in r["label"] and not r["disabled"]
@@ -67,7 +75,7 @@ def test_report_library_includes_all():
     print("gui_api.report_library_info now includes Intersection:")
     a = gui_api.GuiApi()
     info = a.report_library_info()
-    check("saved-reports library lists all seven", len(info["reports"]) == 7)
+    check("saved-reports library lists all", len(info["reports"]) == N)
 
 
 def test_gate_mechanism_still_works():
@@ -78,7 +86,7 @@ def test_gate_mechanism_still_works():
         enabled = reports.enabled_export_reports()
         ensub = {spec.subdir for _i, _l, _f, spec in enabled}
         check("re-disabled subdir dropped from enabled",
-              "intersection_summary" not in ensub and len(enabled) == 6)
+              "intersection_summary" not in ensub and len(enabled) == N - 1)
         status = reports.export_reports_status()
         disabled = {label for _i, label, _f, _s, d in status if d}
         check("exactly the re-disabled report flagged disabled",
@@ -96,11 +104,11 @@ def test_gate_mechanism_still_works():
         check("re-disabled report is SHOWN greyed (not hidden)",
               any(r["label"] == "Intersection Summary" and r["disabled"]
                   for r in init["reports"])
-              and len(init["reports"]) == 7)
+              and len(init["reports"]) == N)
     finally:
         reports.DISABLED_EXPORT_SUBDIRS = saved
-    check("restored to all seven enabled",
-          len(reports.enabled_export_reports()) == 7)
+    check("restored to all enabled",
+          len(reports.enabled_export_reports()) == N)
 
 
 def main():

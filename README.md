@@ -82,10 +82,16 @@ of `.bat` scripts for development and as a fallback.
 | TSAR: Ramp Detail | XLSX | `output/<date>/ramp_detail/` |
 | Highway Sequence Listing | XLSX | `output/<date>/highway_sequence/` |
 | Highway Log | XLSX | `output/<date>/highway_log/` |
+| Highway Log (PDF) | PDF (Letter, landscape) | `output/<date>/highway_log_pdf/` |
 | Intersection Summary | XLSX | `output/<date>/intersection_summary/` |
 | Intersection Detail | XLSX | `output/<date>/intersection_detail/` |
+| Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<date>/intersection_detail_pdf/` |
 
-The two Intersection reports live on the **development** TSMIS site (switch via
+**Highway Log** and **Intersection Detail** also export as a print-ready **PDF** —
+the full report rendered the way the site's Print button lays it out. These PDF
+variants are export-only (no separate consolidate/compare).
+
+The two Intersection Excel reports live on the **development** TSMIS site (switch via
 Settings ▸ "Use development site"); as of v0.17.0 they consolidate, compare
 cross-environment, and compare vs TSN like every other report.
 

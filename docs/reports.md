@@ -1,6 +1,6 @@
 ﻿# Reports
 
-What this doc covers: the full TSMIS report catalog (the seven exportable types incl. Highway Log (PDF)), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
+What this doc covers: the full TSMIS report catalog (the eight exportable types, incl. the two PDF variants Highway Log (PDF) and Intersection Detail (PDF)), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
 
 Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- the corrected 31-column labels in [highway_log/columns.md](highway_log/columns.md), PDF/TSN parsing in [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md), and the PDF-vs-Excel/TSN study in [highway_log/comparison-study.md](highway_log/comparison-study.md). The comparison workbook engine is owned by [comparison-engine.md](comparison-engine.md).
 
@@ -15,6 +15,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
+| 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
 
@@ -96,6 +97,14 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 - **Intersection Summary**: `label="Intersection Summary"`, `subdir="intersection_summary"`, `filename=intersection_summary_route_<ROUTE>.xlsx`. The page never renders an empty notice -- it ALWAYS shows `Total Intersections = N` (including `= 0`) and always offers a working Export. `wait_js` = `EXPORT_READY_JS` or `.ints-total` present. `is_empty` matches the regex `total intersections\s*=\s*0\b` (a zero total; not `= 10`/`= 20`). No hang risk: a drifted marker just reverts to the old benign all-zeros-file behavior, never a stall.
 - **Intersection Detail**: `label="Intersection Detail"`, `subdir="intersection_detail"`, `filename=intersection_detail_route_<ROUTE>.xlsx`. The action bar (Export button) renders even for an empty route, plus an empty table row `<td class="hl-empty">No results found.</td>`. `wait_js` = `EXPORT_READY_JS` or `td.hl-empty` present. `is_empty` = `page.locator("td.hl-empty").count() > 0` (structural, robust to wording drift) OR `"no results found"` in body (text fallback). The engine's general no-download fast-fail (`save_via_export_button` -> `EmptyExport`) is the marker-independent backstop.
 - **Caveat:** the site's Intersection feature is still under active development -- its empty strings / DOM are a MOVING TARGET. The fixes key on the robust structural signals (`td.hl-empty`, `Total Intersections = 0`) plus the general empty/no-download fast-fail, and must be re-verified once the feature is finalized. Do not hard-lock to `"No results found."`.
+
+### Report 6b -- Intersection Detail (PDF)
+- **Same dropdown option as #6** -- `label="Intersection Detail"` -- saved as a PDF via the page's own Print layout instead of the Excel Export button, exactly the Highway Log (PDF) pattern. Module `export_intersection_detail_pdf.py`; `subdir="intersection_detail_pdf"`, `filename=intersection_detail_route_<ROUTE>.pdf`. Letter, **landscape** (21+ columns).
+- The registry uses a distinct **menu label** `"Intersection Detail (PDF)"`, but the `ReportSpec`'s `label` stays `"Intersection Detail"` (the actual dropdown text) -- same conflation caveat as #4b: `label` is what `select_report` clicks; the menu label is GUI/console display only.
+- `wait_js` / `is_empty` are **identical** to the Excel Intersection Detail (`EXPORT_READY_JS` or `td.hl-empty` present; empty = `td.hl-empty` count > 0 OR `"no results found"` in body). `is_empty` runs BEFORE save, so the PDF render only runs for routes that actually have rows.
+- `save=save_intersection_detail_pdf`. The on-screen Intersection Detail is **paginated** (`intd_renderPage`, 30 rows/page), so a bare `page.pdf()` would capture a single page. The site's global `intd_printAll()` rebuilds `#rampResults` with EVERY record (one wide table) under a **button-less** action bar (`renderActionBar(..., null, null)`), then calls `window.print()` and SYNCHRONOUSLY restores the on-screen view. The save **overrides `window.print` to raise first**, so that restore never runs and the complete print layout stays in the DOM for `page.pdf()` (which emulates print media; the site's `@media print` shows only `#rampResults`). It recognises the built layout by its distinctive shape -- the full `.intd-table` is present while the action bar's Export/Print buttons (`.export-btn`) are gone -- and fails loudly with `ReportError` if `intd_printAll` is missing (`no-print-fn`) or the layout didn't build (`no-layout`), rather than silently saving the one paginated page.
+- **Export-only** -- NO consolidator and NO comparison (absent from `_CONSOLIDATOR_BY_SUBDIR` and `COMPARE_REPORTS`; not a matrix row), like the export side of Highway Log (PDF).
+- Verified against a synthetic Print fixture + a headless `page.pdf()` (`build/check_fake_site.py` -> `test_intersection_detail_pdf_save`). **Live-export verification against TSMIS is still pending** (the dev PC can't reach the site).
 
 ## `cs-disabled` -- the site can temporarily disable a report (EXPECTED)
 

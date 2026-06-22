@@ -245,6 +245,53 @@ def save_highway_log_pdf(page, out_path, timeout_ms=None):
     _verify_saved_file(out_path)
 
 
+def save_intersection_detail_pdf(page, out_path, timeout_ms=None):
+    """Render the FULL Intersection Detail to a Landscape PDF, the way the site's
+    Print button lays it out.
+
+    Mirrors save_highway_log_pdf. The on-screen Intersection Detail is PAGINATED
+    (one page of rows at a time -- `intd_renderPage`, 30 rows/page), so unlike the
+    inline Ramp Summary we can't just `page.pdf()` what's shown -- it would capture
+    a single page. The site's global `intd_printAll()` rebuilds #rampResults with
+    EVERY record (one wide table) under a BUTTON-LESS action bar, then calls
+    `window.print()` and SYNCHRONOUSLY restores the on-screen view. We override
+    `window.print` to raise FIRST, so that restore line never runs and the complete
+    print layout stays in the DOM for `page.pdf()` -- which emulates print media,
+    and the site's `@media print` hides every control and shows only #rampResults.
+    21+ columns -> Landscape.
+
+    The report has already rendered (is_empty ran first, so this is never an empty
+    route), and the layout is built client-side, so timeout_ms is unused (kept for
+    the uniform save signature). The print layout is recognised by its distinctive
+    shape -- the full `.intd-table` is present while the action bar's Export/Print
+    buttons (`.export-btn`) are GONE (intd_printAll rebuilds the bar with no
+    handlers); the paginated on-screen page always keeps those buttons. Fails
+    loudly with ReportError if the site's Print function is gone/renamed or the
+    layout didn't build, rather than silently saving the one paginated page."""
+    built = page.evaluate(
+        """() => {
+            if (typeof intd_printAll !== 'function') return 'no-print-fn';
+            window.print = () => { throw new Error('skip-print'); };
+            try { intd_printAll(); } catch (e) { /* the throw skips intd_printAll's restore */ }
+            const box = document.getElementById('rampResults');
+            if (!box) return 'no-layout';
+            return (box.querySelector('.intd-table') && !box.querySelector('.export-btn'))
+                ? 'ok' : 'no-layout';
+        }""")
+    if built != "ok":
+        raise ReportError(
+            "Couldn't build the Intersection Detail print layout for the PDF "
+            f"(the site's Print control changed: {built}).")
+    page.pdf(
+        path=str(out_path),
+        format="Letter",
+        landscape=True,
+        print_background=True,
+        margin={"top": "0.4in", "bottom": "0.4in", "left": "0.4in", "right": "0.4in"},
+    )
+    _verify_saved_file(out_path)
+
+
 # --- the engine ---------------------------------------------------------------
 
 def _record(result, events, route, status):

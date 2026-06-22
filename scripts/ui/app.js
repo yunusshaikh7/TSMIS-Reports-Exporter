@@ -3688,11 +3688,12 @@ function makeMockApi() {
     { label: "Highway Log (PDF)", fmt: "PDF" },
     { label: "Intersection Summary", fmt: "Excel" },
     { label: "Intersection Detail", fmt: "Excel" },
+    { label: "Intersection Detail (PDF)", fmt: "PDF" },
   ];
   // The Consolidate radios index into THIS list (matches reports.CONSOLIDATE_REPORTS,
-  // 8 rows incl. both Intersection consolidators as of v0.17.0) — NOT the 7-row
-  // export REPORTS above. consolidate_info/start_consolidate must use this so the
-  // preview's labels/out_paths mirror the real bridge.
+  // 8 rows incl. both Intersection consolidators as of v0.17.0) — NOT the 8-row
+  // export REPORTS above (Intersection Detail (PDF) is export-only). consolidate_info/
+  // start_consolidate must use this so the preview's labels/out_paths mirror the real bridge.
   const CONS_REPORTS = [
     { label: "TSAR: Ramp Summary" },
     { label: "TSAR: Ramp Detail" },

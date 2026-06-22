@@ -30,6 +30,7 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
+| 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
 Reports 5–6 (Intersection): export is **enabled** but the report lives on the
@@ -38,7 +39,10 @@ Reports 5–6 (Intersection): export is **enabled** but the report lives on the
 consolidates AND compares vs TSN** — all 6 reports + the PDF Highway Log have a
 vs-TSN comparator, live in both the Everything and by-day matrices (see
 [docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md) for
-the per-report schema + locked canaries). Two consolidate-only
+the per-report schema + locked canaries). **Intersection Detail (PDF)** (#6b,
+v0.17.2) is **export-only** — a landscape PDF rendering of the same report via the
+site's Print layout (`intd_printAll`, the Highway Log (PDF) pattern), with no
+consolidator/comparator. Two consolidate-only
 Highway Log sources exist too — **TSN** district PDFs (dropped into
 `input/tsn_highway_log/`) and the app's own **Highway Log (PDF)** export. The
 **Compare** tab diffs every report **TSMIS-vs-TSN** (the two PDF-sourced Highway Log
