@@ -66,7 +66,7 @@ ICON     = os.path.join(SPECPATH, "app.ico")        # built once with Pillow (se
 MANIFEST = os.path.join(SPECPATH, "app.manifest")
 APP_MODULES = [
     "version", "paths", "common", "events", "outcome", "cache_envelope",
-    "consolidation_meta",
+    "consolidation_meta", "artifact_store",
     "exporter", "exporter_parallel",
     "run_report", "logging_setup", "settings", "cli", "login", "reports",
     "updater", "batch_manifest",

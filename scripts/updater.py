@@ -792,13 +792,90 @@ def _clear_webview_caches():
         log.info("webview cache clear skipped (%s)", type(e).__name__)
 
 
+def _recover_store_promotions():
+    """P2/F2: repair any interrupted Export-Everything store promotion before the GUI reads
+    a store — restore `live` from its retained backup if a crash hit between the two
+    renames; otherwise clean the residue. The store lives under the user-configured batch
+    destination (`settings.get_batch_dest`), which may be ANY local path, so recover BOTH
+    that destination AND `OUTPUT_ROOT` — deduplicated by resolved path, each isolated so
+    one failure never blocks the other (P2-B03). Recovery is constrained to APP-OWNED
+    promotion locations via an ownership predicate (P2-B04): a store root must be a known
+    `<src>-<env>` folder and a journal's target a known export report subdir, so a planted
+    or unrelated `.promote` tree under a user destination is never acted on. Best-effort +
+    idempotent; never wedges startup."""
+    try:
+        import artifact_store
+        from paths import OUTPUT_ROOT
+    except Exception as e:                        # noqa: BLE001 — startup must not fail here
+        log.warning("store-promotion recovery unavailable (%s: %s)", type(e).__name__, e)
+        return
+    # Ownership context: the app's Export-Everything stores live at <dest>/<src>-<env>/<subdir>,
+    # so a trusted `.promote` parent is a DIRECT child of THIS recovery root, a known src-env
+    # folder, and (when a journal is read) names a known export subdir (P2-B04).
+    try:
+        import common
+        import reports
+        owned_roots = {f"{s}-{e}" for s in common.DATA_SOURCES for e in common.ENVIRONMENTS}
+        owned_targets = {getattr(spec, "subdir", None) for _l, _f, spec in reports.EXPORT_REPORTS}
+    except Exception as e:                        # noqa: BLE001 — without ownership, recover nothing
+        log.warning("store-promotion recovery: could not build the ownership allowlist (%s: %s); "
+                    "skipping recovery", type(e).__name__, e)
+        return
+
+    def _owned_for(recovery_root):
+        # The store root must be a DIRECT child of THIS exact recovery root (P2-B04 round 4: a
+        # valid `<src>-<env>` NAME nested deeper, e.g. <root>/Project/ssor-prod, is NOT owned).
+        try:
+            rr = Path(recovery_root).resolve()
+        except OSError:
+            rr = Path(recovery_root)
+
+        def _is_owned(store_root, target):
+            try:
+                if store_root.parent.resolve() != rr:
+                    return False
+            except OSError:
+                return False
+            if store_root.name not in owned_roots:
+                return False
+            return target is None or target in owned_targets   # None = the location-only gate
+        return _is_owned
+
+    roots = [OUTPUT_ROOT]
+    try:
+        import settings
+        batch_dest = settings.get_batch_dest()
+        if batch_dest:
+            roots.append(Path(batch_dest))
+    except Exception as e:                        # noqa: BLE001
+        log.warning("could not resolve the batch destination for recovery (%s: %s)",
+                    type(e).__name__, e)
+    seen = set()
+    for root in roots:
+        try:
+            key = Path(root).resolve()
+        except OSError:
+            key = Path(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            artifact_store.recover_promotions(root, _owned_for(root))
+        except Exception as e:                    # noqa: BLE001 — isolate per-root failures
+            log.warning("store-promotion recovery sweep failed for %s (%s: %s)",
+                        root, type(e).__name__, e)
+
+
 def cleanup_leftovers():
     """Remove what a finished (or abandoned) update leaves behind: the
     data\\update staging area and any *.old / *.new bundle pieces the helper
     couldn't delete while the new app was already starting — and the WebView2
-    HTTP caches, so the interface on screen is always the one on disk.
+    HTTP caches, so the interface on screen is always the one on disk. Also runs the P2
+    store-promotion recovery sweep (artifact_store) so an interrupted Export-Everything
+    swap is repaired from its backup before any store is read.
     Best-effort and cheap; called on every GUI launch, before the CLR loads."""
     _clear_webview_caches()
+    _recover_store_promotions()                  # P2/F2 — independent of the update mechanism
     if not is_frozen():
         return
     targets = [UPDATE_DIR] + [install_dir() / (name + suffix)

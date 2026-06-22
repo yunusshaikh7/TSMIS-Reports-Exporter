@@ -172,7 +172,7 @@ def test_library_and_matrix_end_to_end():
         captured = {}
 
         def _rec(date, source, row_key, verdict, diff_cells, one_sided, built_at,
-                 completion=oc.COMPLETE):
+                 completion=oc.COMPLETE, input_fingerprint=None):
             captured["completion"] = completion
 
         out_file = tmp / "byday_out.xlsx"

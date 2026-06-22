@@ -29,6 +29,7 @@ except ImportError:
     _DEPS_OK = False
 
 import outcome
+import artifact_store
 from compare_core import is_formula_injection   # shared formula-injection guard
 from events import ConsolidateResult, Events
 
@@ -255,7 +256,10 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
     events.on_log("")
     events.on_log("Writing consolidated workbook...")
     try:
-        wb.save(out_path)
+        # F9: write to a temp sibling + os.replace, so an interrupted/failed write
+        # never truncates a prior good consolidated workbook (the destination open in
+        # Excel still surfaces as PermissionError, handled below).
+        artifact_store.atomic_save(wb, out_path)
     except PermissionError:
         return ConsolidateResult(
             status="error",

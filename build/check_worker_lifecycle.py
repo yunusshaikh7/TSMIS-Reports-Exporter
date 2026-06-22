@@ -235,7 +235,7 @@ def _batch(outcome):
         def rs(_self, _e, results):
             results.append((_spec, types.SimpleNamespace(
                 saved=5, exists=[], empty=[], user_skipped=[], failed=[],
-                completion=gw.outcome.COMPLETE)))
+                completion=gw.outcome.COMPLETE, artifact=gw.outcome.PROMOTED)))
     else:
         def rs(_self, _e, _r): raise gw.AuthError("no session")
     with _patched((gw.ExportWorker, "_run_specs", rs),

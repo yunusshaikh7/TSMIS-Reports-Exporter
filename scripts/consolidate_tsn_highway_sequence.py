@@ -55,6 +55,7 @@ except ImportError:
 from compare_core import is_formula_injection
 from events import ConsolidateResult, Events
 import outcome
+import artifact_store
 from paths import INPUT_ROOT, OUTPUT_ROOT
 
 # Standalone / console (.bat) default locations — see the matching note in
@@ -265,7 +266,7 @@ def _write_workbook(all_rows, out_path):
             else:
                 cells.append(v)
         ws.append(cells)
-    wb.save(out_path)
+    artifact_store.atomic_save(wb, out_path)        # F9: temp + os.replace (never truncate prior)
 
 
 # =============================================================================

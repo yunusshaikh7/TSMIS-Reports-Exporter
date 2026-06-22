@@ -55,10 +55,10 @@ class _LQ:
         self.items.append(item)
 
 
-def _xlsx(path, header, n_rows=2):
+def _xlsx(path, header, n_rows=2, sheet=None):
     wb = Workbook()
     ws = wb.active
-    ws.title = _SHEET
+    ws.title = sheet or _SHEET
     ws.append(header)
     for i in range(n_rows):
         ws.append([f"v{i}"] * len(header))
@@ -122,7 +122,7 @@ def main():
                         confirm_overwrite=None, mode="values"):
                 called["n"] += 1
                 Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-                Path(out_path).write_text("x")
+                _xlsx(out_path, ["A", "B"], n_rows=1, sheet="Comparison")  # valid comparison wb
                 return ConsolidateResult(status="ok", verdict="diff", output_path=str(out_path))
 
         def _stub_consolidate(result, write=True):
@@ -228,7 +228,7 @@ def main():
             def compare(self, pdf_c, excel_c, out_path, events=None,
                         confirm_overwrite=None, mode="values"):
                 Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-                Path(out_path).write_text("x")
+                _xlsx(out_path, ["A", "B"], n_rows=1, sheet="Comparison")  # valid comparison wb
                 return ConsolidateResult(status="ok", verdict="diff", output_path=str(out_path))
 
         def _sides(store_dir, subdir, events, force):

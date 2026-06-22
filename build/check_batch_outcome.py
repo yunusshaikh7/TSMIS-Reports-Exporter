@@ -73,9 +73,10 @@ def _rr(saved=0, empty=0, skipped=0, failed=0, exists=0):
                      failed=["f"] * failed, exists=["x"] * exists)
 
 
-def _run_batch(report_results):
-    """Run BatchWorker over ONE env whose reports yield `report_results`. Returns
-    (marked_done_envs, batch_done_payload)."""
+def _run_batch(report_results, promote=True):
+    """Run BatchWorker over ONE env whose reports yield `report_results`. `promote`
+    simulates the store-swap outcome (P2-B01: True = promoted, False = a complete report
+    whose swap failed -> previous_preserved). Returns (marked_done_envs, batch_done)."""
     q = _Q()
     manifest = {"steps": [{"src": "ssor", "env": "prod", "status": "pending"}],
                 "dest": None, "fast": False, "workers": 1, "auto_consolidate": False}
@@ -86,7 +87,14 @@ def _run_batch(report_results):
     marked = []
 
     def rs(_self, _e, results):
+        # Simulate what the real _run_specs stamps after a SUCCESSFUL in-store swap: the
+        # producer completion + the derived artifact. The env-done gate keys off artifact
+        # (P2-B01), so a complete report -> promoted, a partial/no_data -> previous_preserved.
         for s, r in zip(specs, report_results):
+            if r.completion is None:
+                r.completion = gw.outcome.run_completion(r)
+            r.artifact = (gw.outcome.artifact_after_store(r.completion, in_store=True)
+                          if promote else gw.outcome.PREVIOUS_PRESERVED)
             results.append((s, r))
 
     with _patch(gw.ExportWorker, "_run_specs", rs), \
@@ -99,20 +107,35 @@ def _run_batch(report_results):
     return marked, bd
 
 
-def _run_instore(run_result, auto=False):
+def _run_instore(run_result, auto=False, promote=True, had_prior=True, prior_empty=False):
     """Run ExportWorker._run_specs for ONE report into a STORE (out_base set), with
-    run_export stubbed to `run_result` and the swap stubbed. With auto=True the B2
-    auto-consolidate is enabled and captured (P1-B03). Returns (result, swaps, cons)
-    where `cons` is the list of (completion, artifact) the auto-consolidate saw."""
+    run_export stubbed to `run_result` and the swap stubbed to RETURN `promote` (P2-B01:
+    True = a successful promotion, False = a failed/locked swap). `had_prior` seeds a
+    last-good live store first (the refresh case); had_prior=False is a FIRST export (no
+    prior), so a failed promotion reads artifact=none, not previous_preserved (P2-B06).
+    `prior_empty` seeds an EMPTY (no-report) live dir — a failed promotion must still read
+    `none`, since an empty dir is not a usable prior store (P2-A04). With auto=True the B2
+    auto-consolidate is enabled and captured (P1-B03). Returns (result, swaps, cons)."""
     q = _Q()
     spec = _RealSpec("Ramp Summary", "ramp_summary")
     dest = Path(tempfile.mkdtemp())
+    out_base = dest / "ssor-prod"
+    if prior_empty:                                  # a pre-existing but NON-usable (empty) dir
+        (out_base / spec.subdir).mkdir(parents=True)
+    elif had_prior:                                  # a last-good live store before the refresh
+        live = out_base / spec.subdir
+        live.mkdir(parents=True)
+        (live / "old.xlsx").write_bytes(b"prior-good")
     ew = gw.ExportWorker([spec], q, threading.Event(), threading.Event(),
-                         out_base=dest / "ssor-prod", auto_consolidate=auto)
+                         out_base=out_base, auto_consolidate=auto)
     swaps, cons = [], []
     ew._auto_consolidate = lambda s, r, e: cons.append((r.completion, r.artifact))
+
+    def _swap(live, staged):
+        swaps.append((live, staged))
+        return promote                               # the boolean _run_specs must honor (P2-B01)
     with _patch(gw, "run_export", lambda *_a, **_k: run_result), \
-         _patch(gw, "_swap_store_dir", lambda live, staged: swaps.append((live, staged))):
+         _patch(gw, "_swap_store_dir", _swap):
         results = []
         ew._run_specs(ew._build_events(), results)
     import shutil
@@ -202,7 +225,9 @@ def _b02_two_env_partial():
     def rs(_self, _e, results):
         calls["n"] += 1
         if calls["n"] == 1:
-            results.append((spec, _rr(saved=5)))             # env1 complete
+            r = _rr(saved=5)                                  # env1 complete + promoted
+            r.completion, r.artifact = gw.outcome.COMPLETE, gw.outcome.PROMOTED
+            results.append((spec, r))
         else:
             raise gw.AuthError("session expired")            # env2 fatal terminal
 
@@ -266,6 +291,26 @@ def main():
     check("control: a complete in_store run DOES promote (swap called)",
           result.completion == oc.COMPLETE and len(swaps) == 1)
     check("...artifact = promoted", result.artifact == oc.PROMOTED)
+
+    print("P2-B01 -- a COMPLETE export whose store swap FAILS is NOT reported as promoted:")
+    result, swaps, _ = _run_instore(_rr(saved=5), promote=False)    # complete, swap returns False
+    check("the swap WAS attempted (complete + promotable)", len(swaps) == 1)
+    check("...completion stays complete (orthogonal)", result.completion == oc.COMPLETE)
+    check("...but artifact = previous_preserved, NOT promoted",
+          result.artifact == oc.PREVIOUS_PRESERVED)
+    _r, _s, cons = _run_instore(_rr(saved=5), auto=True, promote=False)
+    check("a failed promotion does NOT auto-consolidate (no stale-last-good rebuild)", cons == [])
+    marked, _ = _run_batch([_rr(saved=5)], promote=False)
+    check("BatchWorker: a complete report whose promotion FAILED -> env NOT marked done",
+          marked == [])
+    # P2-B06: a failed FIRST promotion (no prior store) must NOT claim previous_preserved.
+    result, swaps, _ = _run_instore(_rr(saved=5), promote=False, had_prior=False)
+    check("a failed FIRST promotion (no prior) -> artifact = none, not previous_preserved",
+          result.artifact == oc.NONE)
+    # P2-A04: a pre-existing but EMPTY dir is not a usable prior store -> still none, not preserved.
+    result, _s, _ = _run_instore(_rr(saved=5), promote=False, prior_empty=True)
+    check("a failed promotion over an EMPTY prior dir -> artifact = none (P2-A04)",
+          result.artifact == oc.NONE)
 
     print("P1-B03 (round 2) -- a partial store refresh does NOT auto-consolidate stale live data:")
     _r, _s, cons = _run_instore(_rr(saved=3, failed=1), auto=True)   # partial -> kept last-good

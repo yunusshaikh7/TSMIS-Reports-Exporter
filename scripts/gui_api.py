@@ -69,6 +69,7 @@ from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
                      EXPORT_REPORTS, enabled_export_reports, export_reports_status,
                      is_export_disabled, matrix_rows)
+import artifact_store
 import matrix
 import day_matrix
 import outcome
@@ -2971,7 +2972,19 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": f"Comparing — {label}…"})
         self._push_state()
-        ConsolidateWorker(run_fn, self._q, self.cancel_event,
+        # F9: the comparator writes to a temp path; commit_workbook validates + os.replaces
+        # it onto the picked name (compare_core untouched). For mode="both" the VALUES
+        # workbook is the single transactional artifact (committed first) and the formulas
+        # sibling is best-effort, so an interrupted run never leaves a values copy without
+        # its twin (or a truncated picked file). The OS save dialog already confirmed the
+        # destination, so the inner confirm is a pass-through.
+        def committed(events=None, confirm_overwrite=None, day=None):
+            return artifact_store.commit_workbook(
+                out,
+                lambda tmp: run_fn(tmp, events=events,
+                                   confirm_overwrite=lambda _p: True, day=day),
+                twin=(mode == "both"), expect_sheet="Comparison")
+        ConsolidateWorker(committed, self._q, self.cancel_event,
                           lambda _p: True).start()
         return {"ok": True}
 
@@ -3001,8 +3014,8 @@ class GuiApi:
                 return {"cancelled": True}
             return self._launch_compare(
                 label, mode, out,
-                lambda events=None, confirm_overwrite=None, day=None:
-                    mod.compare(tsmis_path, tsn_path, out, events=events,
+                lambda out_path, events=None, confirm_overwrite=None, day=None:
+                    mod.compare(tsmis_path, tsn_path, out_path, events=events,
                                 confirm_overwrite=confirm_overwrite, mode=mode))
         except Exception:
             self._release_task()        # a dialog/suggest_name error must not wedge the gate
@@ -3076,8 +3089,8 @@ class GuiApi:
                 return {"cancelled": True}
             return self._launch_compare(
                 label, mode, out,
-                lambda events=None, confirm_overwrite=None, day=None:
-                    adapter.compare_folders(pa, pb, out, events=events,
+                lambda out_path, events=None, confirm_overwrite=None, day=None:
+                    adapter.compare_folders(pa, pb, out_path, events=events,
                                             confirm_overwrite=confirm_overwrite,
                                             mode=mode))
         except Exception:

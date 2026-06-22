@@ -127,12 +127,15 @@ def load_results():
 
 
 def record_result(date, source, row_key, verdict, diff_cells, one_sided,
-                  built_at_mtime, completion=outcome.COMPLETE):
+                  built_at_mtime, completion=outcome.COMPLETE, input_fingerprint=None):
     data = load_results()
     data[f"{day_folder_name(date, source)}|{row_key}"] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
         "completion": completion,        # P1-R01: partial inputs flagged durably
+        # P2/F5: the day's TSMIS store-folder identity at build time; a later snapshot
+        # reads the cell stale when it differs. Absent on legacy records (mtime only).
+        "input_fingerprint": input_fingerprint,
     }
     p = _results_path()
     try:
@@ -263,7 +266,10 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                 rec = results.get(f"{day_folder_name(date, source)}|{row_key}")
                 srcs = [{"name": "cell", "present": exp_m is not None, "mtime": exp_m},
                         {"name": "tsn", "present": tsn_ready, "mtime": src_tsn.get("mtime")}]
-                cmp = matrix._cmp_state(day_out_path(date, source, row_key), srcs, rec)
+                # F5/P2: fingerprint the day's TSMIS store folder so a deleted route reads
+                # the cell stale (the TSN side is a file, captured by mtime).
+                cmp = matrix._cmp_state(day_out_path(date, source, row_key), srcs, rec,
+                                        fp_folders=(tdir,))
             per[date] = {"export": export, "cmp": cmp}
         cells[row_key] = per
 
@@ -281,8 +287,12 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
             if _folder_newest_mtime(tdir) is None:
                 continue                         # no export -> nothing to consolidate
             subs[subdir] = matrix.consolidated_state(tdir, subdir)
+        # F5/CT-7: `subs` holds every supported subdir that HAS an export that day, so a
+        # missing consolidation for any of them means the day is NOT fully consolidated.
+        # The old `all(... if s["exists"])` skipped the missing ones, so a day with one
+        # consolidated report read 'fresh' while another's consolidation was absent.
         exists = any(s["exists"] for s in subs.values())
-        fresh = exists and all(s["fresh"] for s in subs.values() if s["exists"])
+        fresh = bool(subs) and all(s["exists"] and s["fresh"] for s in subs.values())
         day_consolidated[date] = {"exists": exists, "fresh": fresh}
 
     return {
@@ -367,6 +377,10 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
             built_at = out_path.stat().st_mtime
         except OSError:
             built_at = None
+        # F5/P2: record the day's TSMIS store-folder identity so a deleted route reads
+        # the reused cell stale (same folder _cmp_state fingerprints in the snapshot).
         record_result(date, source, row_key, result.verdict, diff_cells, one_sided,
-                      built_at, completion=result.completion or outcome.COMPLETE)
+                      built_at, completion=result.completion or outcome.COMPLETE,
+                      input_fingerprint=matrix._cell_input_fingerprint(
+                          tsmis_dir(date, source, subdir)))
     return result

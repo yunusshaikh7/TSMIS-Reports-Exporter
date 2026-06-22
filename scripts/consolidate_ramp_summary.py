@@ -33,6 +33,7 @@ except ImportError:
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
 import outcome
+import artifact_store
 from events import Events, ConsolidateResult
 from compare_core import is_formula_injection   # shared formula-injection guard
 
@@ -764,7 +765,7 @@ def build_workbook(records, out_path):
     build_combined_sheet(wb, records, col_letters)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(out_path)
+    artifact_store.atomic_save(wb, out_path)        # F9: temp + os.replace (never truncate prior)
 
 
 # =============================================================================

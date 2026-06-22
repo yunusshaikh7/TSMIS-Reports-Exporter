@@ -74,6 +74,7 @@ from common import (
     resolve_parallel_channel, save_auth_state, set_site, set_thread_site,
     storage_state_is_portable,
 )
+import artifact_store
 import batch_manifest
 import dataclasses
 import consolidation_meta
@@ -181,45 +182,16 @@ def measure_targets(targets):
 
 
 def _swap_store_dir(live, staged):
-    """Replace `live` with the freshly-exported `staged` folder (clear-on-success).
+    """Replace `live` with the freshly-exported `staged` store folder, JOURNALED (P2/F2).
 
-    The Export-Everything store used to rmtree the live folder BEFORE re-export,
-    so a failed/crashed refresh destroyed the last-good copy (and a partial set
-    could read as fresh). Now each report exports into a `.staging` sibling and
-    this swaps it in only on a clean finish. Best-effort against locked files (a
-    report the user has open in Excel): a clean clear+rename when possible, else
-    merge the staged files over the live folder so the refresh still lands."""
-    import shutil
-    try:
-        if not live.exists():
-            staged.rename(live)
-            return
-        shutil.rmtree(live, ignore_errors=True)
-        if not live.exists():
-            staged.rename(live)
-            return
-        # A locked leftover blocked the clean swap — merge staged over live.
-        log.warning("batch store: %s could not be fully cleared; merging refresh", live)
-        live.mkdir(parents=True, exist_ok=True)
-        for item in staged.iterdir():
-            target = live / item.name
-            if target.is_dir():
-                shutil.rmtree(target, ignore_errors=True)
-            elif target.exists():
-                try:
-                    target.unlink()
-                except OSError:
-                    pass
-            try:
-                shutil.move(str(item), str(target))
-            except OSError as e:
-                log.warning("batch store: could not place %s: %s: %s",
-                            target, type(e).__name__, e)
-        shutil.rmtree(staged, ignore_errors=True)
-    except OSError as e:
-        log.warning("batch store swap failed for %s: %s: %s",
-                    live, type(e).__name__, e)
-        shutil.rmtree(staged, ignore_errors=True)
+    The Export-Everything store used to rmtree the live folder BEFORE re-export, so a
+    failed/crashed refresh destroyed the last-good copy. v0.18.0 delegates to
+    `artifact_store.promote_store`: a journaled rename (live -> backup -> staging -> live)
+    so a crash BETWEEN the renames is recovered on the next launch from the retained
+    backup — there is never a window with zero copies, and a locked `live` keeps the
+    last-good (the refresh is discarded), never a half-merged folder. Caller already
+    gated on a COMPLETE producer outcome (F1) before promoting."""
+    return artifact_store.promote_store(live, staged)
 
 
 class ExportWorker(threading.Thread):
@@ -449,15 +421,34 @@ class ExportWorker(threading.Thread):
                 result.completion = outcome.FAILED
             else:
                 result.completion = outcome.run_completion(result, cancelled=cancelled)
+            promoted = False
+            # P2-A04: a prior store counts only if it's a USABLE store (holds a report artifact) —
+            # the same contract recovery uses — so an empty/foreign leftover dir doesn't make a
+            # failed first promotion falsely report previous_preserved.
+            had_prior = bool(in_store and artifact_store.is_usable_store(out_dir))
             if in_store:
                 if outcome.promotable(result.completion):
-                    _swap_store_dir(out_dir, stage_dir)
+                    promoted = _swap_store_dir(out_dir, stage_dir)
+                    if not promoted:
+                        # P2-B01: a COMPLETE export whose journaled swap failed (locked /
+                        # crash) did NOT promote — the previous live copy is intact. It must
+                        # NOT read as promoted, so the frontend, auto-consolidate, and the
+                        # batch env-done gate all see previous_preserved (or none on a first run).
+                        log.warning("store refresh for %s: promotion FAILED — kept last-good, "
+                                    "NOT promoted", spec.subdir)
                 else:
                     import shutil
                     shutil.rmtree(stage_dir, ignore_errors=True)
                     log.info("store refresh for %s was %s — kept last-good, discarded staging",
                              spec.subdir, result.completion)
-            result.artifact = outcome.artifact_after_store(result.completion, in_store)
+            # Artifact reflects the ACTUAL store outcome: a successful in-store swap promotes;
+            # a failed swap with a prior keeps last-good (previous_preserved); a failed FIRST
+            # promotion (no prior) leaves NO canonical artifact (none) — never falsely claim a
+            # prior was preserved (P2-B06); a non-store dated run is new_unpromoted.
+            if in_store and not promoted:
+                result.artifact = outcome.PREVIOUS_PRESERVED if had_prior else outcome.NONE
+            else:
+                result.artifact = outcome.artifact_after_store(result.completion, in_store)
             results.append((spec, result))
             # B2 auto-consolidate after the export. For a STORE refresh only a run that
             # actually PROMOTED (completion=complete, artifact=promoted) may consolidate:
@@ -613,13 +604,13 @@ class BatchWorker(threading.Thread):
                     break
                 if crashed:
                     continue                            # leave pending for a resume
-                # §C.1: mark an environment DONE only when every selected report is
-                # COMPLETE. A partial / no_data / failed report (or a short result
-                # set) leaves the env PENDING with an explicit diagnostic, so a
-                # resume re-pulls it — the F1 swap already kept last-good for those.
+                # §C.1 + P2-B01: mark an environment DONE only when every selected report
+                # was actually PROMOTED (completion=complete AND the store swap succeeded).
+                # A partial / no_data / failed report, a short result set, OR a complete
+                # report whose promotion FAILED (locked/crash, artifact=previous_preserved)
+                # leaves the env PENDING so a resume re-pulls it — last-good is intact.
                 bad = [s.label for s, r in results
-                       if not outcome.promotable(
-                           r.completion or outcome.run_completion(r, cancelled=self.cancel.is_set()))]
+                       if getattr(r, "artifact", None) != outcome.PROMOTED]
                 if len(results) == len(specs) and not bad:
                     step["status"] = "done"
                     batch_manifest.mark_done(self.manifest, src, env)

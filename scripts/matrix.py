@@ -25,6 +25,7 @@ import shutil
 import time
 from pathlib import Path
 
+import artifact_store
 import cache_envelope
 import consolidation_meta
 import outcome
@@ -124,12 +125,17 @@ def _save_results(dest, baseline_key, data):
 
 
 def record_result(dest, baseline_key, row_key, cell_key, verdict,
-                  diff_cells, one_sided, built_at_mtime, completion=outcome.COMPLETE):
+                  diff_cells, one_sided, built_at_mtime, completion=outcome.COMPLETE,
+                  input_fingerprint=None):
     data = load_results(dest, baseline_key)
     data.setdefault(row_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
         "completion": completion,        # P1-R01: partial inputs flagged durably
+        # P2/F5: the cell's input-folder identity at build time; a later snapshot reads
+        # the cell STALE when it differs (a route added/removed/resized — invisible to
+        # the mtime check). Absent on legacy records -> the mtime check alone applies.
+        "input_fingerprint": input_fingerprint,
     }
     _save_results(dest, baseline_key, data)
 
@@ -207,15 +213,40 @@ def read_counts(values_path, has_route=None):
 
 
 # --------------------------------------------------------------------------- #
-# per-cell comparison freshness (decision c: mtime staleness)
+# per-cell comparison freshness (decision c: mtime staleness + P2 input identity)
 # --------------------------------------------------------------------------- #
+def _cell_input_fingerprint(*folders):
+    """A combined identity over a comparison cell's TSMIS source FOLDER(s) — the
+    multi-file side(s) where a DELETED route hides from a newest-mtime signal — joined
+    in the given order. Build-time (record_*) and read-time (the freshness readers) MUST
+    pass the same folders in the same order so the strings agree. (FILE sides — a TSN /
+    baseline workbook — are captured by their mtime in the existing freshness check.)"""
+    return "|".join(artifact_store.fingerprint(Path(f)) for f in folders)
+
+
+def _inputs_changed(rec_trusted, rec, *folders):
+    """True iff a TRUSTED cache record carries a recorded input fingerprint that differs
+    from the cell's CURRENT source-folder identity (R1-R03: a route added / removed /
+    resized since the comparison was built). False when the record is untrusted or has
+    no recorded fingerprint (a legacy record) — the mtime check then stands alone, so a
+    pre-P2 cache never reads falsely stale."""
+    if not rec_trusted or not rec:
+        return False
+    rec_fp = rec.get("input_fingerprint")
+    if not rec_fp:
+        return False
+    return _cell_input_fingerprint(*folders) != rec_fp
+
+
 def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
                      cell_ages_map, results):
     """{built, mtime, stale, reason, missing_side, verdict, diff_cells,
     one_sided} for one non-baseline cell. STALE when the comparison file is
-    missing, or either side's export mtime is newer than it. The cached
+    missing, either side's export mtime is newer than it, OR the inputs' IDENTITY
+    changed since it was built (a route added/removed/resized — F5/P2). The cached
     verdict/counts are surfaced only when the cache's recorded mtime still
     matches the file (else they read as unknown and the cell shows 're-run')."""
+    dest = Path(dest)                            # accept str/Path (we join folders below)
     base_m = cell_ages_map.get(baseline_key, {}).get(subdir, {}).get("mtime")
     cell_m = cell_ages_map.get(cell_key, {}).get(subdir, {}).get("mtime")
     if base_m is None and cell_m is None:
@@ -235,7 +266,9 @@ def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
 
     verdict = diff_cells = one_sided = None
     rec = (results.get(row_key, {}) or {}).get(cell_key)
-    if built and rec and abs(float(rec.get("built_at_mtime", -1)) - cmp_m) < _MTIME_TOL_S:
+    rec_trusted = bool(built and rec
+                       and abs(float(rec.get("built_at_mtime", -1)) - cmp_m) < _MTIME_TOL_S)
+    if rec_trusted:
         verdict = rec.get("verdict")
         diff_cells = rec.get("diff_cells")
         one_sided = rec.get("one_sided")
@@ -251,6 +284,9 @@ def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
             stale, reason = True, "baseline_newer"
         elif newer_cell:
             stale, reason = True, "cell_newer"
+        elif _inputs_changed(rec_trusted, rec, dest / cell_key / subdir,
+                             dest / baseline_key / subdir):
+            stale, reason = True, "inputs_changed"
         else:
             stale, reason = False, "fresh"
     return {"supported": True, "built": built, "mtime": cmp_m, "stale": stale,
@@ -435,12 +471,15 @@ def load_tsn_results(dest):
 
 
 def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided,
-                      built_at_mtime, completion=outcome.COMPLETE):
+                      built_at_mtime, completion=outcome.COMPLETE, input_fingerprint=None):
     data = load_tsn_results(dest)
     data.setdefault(result_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
         "completion": completion,        # P1-R01: partial inputs flagged durably
+        # P2/F5: the cell's TSMIS source-folder identity at build time; a later snapshot
+        # reads the cell stale when it differs. Absent on legacy records (mtime only).
+        "input_fingerprint": input_fingerprint,
     }
     p = _tsn_results_path(dest)
     try:
@@ -455,17 +494,20 @@ def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided
 
 
 # --- unified per-cell comparison state ------------------------------------- #
-def _cmp_state(out_path, sources, rec):
+def _cmp_state(out_path, sources, rec, fp_folders=()):
     """{supported, built, mtime, stale, reason, missing_side, verdict, diff_cells,
     one_sided} for one comparison cell. `sources` is the input sides
-    [{name, present, mtime}]; STALE when the workbook is missing or any present
-    source is newer than it."""
+    [{name, present, mtime}]; STALE when the workbook is missing, any present source is
+    newer than it, OR the inputs' IDENTITY changed (`fp_folders` — the TSMIS store
+    folder(s); a route added/removed/resized that the mtime check misses — F5/P2)."""
     missing = [s["name"] for s in sources if not s.get("present")]
     missing_side = missing[0] if missing else None
     cmp_m = _safe_mtime(out_path)
     built = cmp_m is not None
     verdict = diff_cells = one_sided = completion = None
-    if built and rec and abs(float(rec.get("built_at_mtime", -1)) - cmp_m) < _MTIME_TOL_S:
+    rec_trusted = bool(built and rec
+                       and abs(float(rec.get("built_at_mtime", -1)) - cmp_m) < _MTIME_TOL_S)
+    if rec_trusted:
         verdict = rec.get("verdict")
         diff_cells = rec.get("diff_cells")
         one_sided = rec.get("one_sided")
@@ -478,9 +520,13 @@ def _cmp_state(out_path, sources, rec):
     else:
         newer = [s["name"] for s in sources
                  if s.get("mtime") is not None and s["mtime"] > cmp_m + _MTIME_TOL_S]
-        stale = bool(newer)
-        reason = ("both_newer" if len(newer) > 1
-                  else (f"{newer[0]}_newer" if newer else "fresh"))
+        if newer:
+            stale = True
+            reason = "both_newer" if len(newer) > 1 else f"{newer[0]}_newer"
+        elif _inputs_changed(rec_trusted, rec, *fp_folders):
+            stale, reason = True, "inputs_changed"
+        else:
+            stale, reason = False, "fresh"
     return {"supported": True, "built": built, "mtime": cmp_m, "stale": stale,
             "reason": reason, "missing_side": missing_side, "verdict": verdict,
             "diff_cells": diff_cells, "one_sided": one_sided, "completion": completion}
@@ -513,6 +559,7 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
     the rendered+refreshed grid (still listed in all_rows/all_envs for the
     toggles); `row_order`/`env_order` are the user's drag-to-reorder preferences
     applied to the VISIBLE rows/columns. `row_defs` is injectable for tests."""
+    dest = Path(dest)                            # accept str/Path (we join store folders below)
     now = now if now is not None else time.time()
     all_defs = row_defs if row_defs is not None else _row_defs()
     hidden = set(hidden or [])
@@ -575,15 +622,21 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                            {"name": "tsn",
                             "present": src.get("kind") in ("file", "consolidated"),
                             "mtime": src.get("mtime")}]
+                # F5/P2: the TSMIS store folder is the multi-file side where a deleted
+                # route hides from mtime — fingerprint it (the TSN side is a file, mtime).
                 cmp = _cmp_state(mode_out_path(dest, baseline_key, row_key, env, mode),
-                                 sources, rec)
+                                 sources, rec, fp_folders=(dest / env / env_subdir,))
             else:                            # self: TSMIS PDF vs Excel
                 other = ages.get(env, {}).get(mode["other_subdir"], _absent)
                 rec = (tsn_results.get(f"{row_key}|{mode['id']}", {}) or {}).get(env)
                 sources = [{"name": "cell", "present": export["present"], "mtime": export["mtime"]},
                            {"name": "other", "present": other["present"], "mtime": other["mtime"]}]
+                # F5/P2: both sides are TSMIS store folders — fingerprint both (env first,
+                # other second; build_comparison records them in this same order).
                 cmp = _cmp_state(mode_out_path(dest, baseline_key, row_key, env, mode),
-                                 sources, rec)
+                                 sources, rec,
+                                 fp_folders=(dest / env / env_subdir,
+                                             dest / env / mode["other_subdir"]))
             cell = {"export": export, "is_baseline": is_baseline, "cmp": cmp}
             if mode["kind"] == "env":
                 cell["comparison"] = cmp     # back-compat alias for the Stage-A UI
@@ -624,10 +677,19 @@ def _formulas_sibling(out_path):
 
 
 def _try_formulas(compare_call, out_path):
-    """Run `compare_call(formulas_path)` (mode='formulas') beside the values copy.
-    Best-effort: a failure here must NOT fail the already-written values cell."""
+    """Run `compare_call(formulas_path)` (mode='formulas') beside the values copy,
+    committed ATOMICALLY (the adapter writes a temp; commit_workbook validates +
+    os.replace) so an interrupted formulas write never truncates a prior good sibling
+    (F9). Best-effort: a failure here must NOT fail the already-written values cell — but it
+    is LOGGED (P2-A03: a validation/finalization failure RETURNS status='error' rather than
+    raising, so the returned result is inspected, not just exceptions)."""
     try:
-        compare_call(_formulas_sibling(out_path))
+        res = artifact_store.commit_workbook(_formulas_sibling(out_path),
+                                             lambda tmp: compare_call(tmp),
+                                             expect_sheet="Comparison")
+        if getattr(res, "status", None) != "ok":
+            log.warning("matrix: live-formulas workbook for %s not refreshed (%s)",
+                        Path(out_path).name, getattr(res, "message", "") or "commit failed")
     except Exception as e:                       # noqa: BLE001
         log.warning("matrix: live-formulas workbook for %s not written (%s: %s)",
                     Path(out_path).name, type(e).__name__, e)
@@ -659,10 +721,15 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     # side A = the cell env, side B = the baseline (labels read "ARS-TEST vs SSOR-PROD").
-    result = adapter.compare_folders(
-        dest / cell_key, dest / baseline_key, out_path,
-        events=events, confirm_overwrite=confirm_overwrite or (lambda _p: True),
-        mode="values")
+    # F9: the adapter writes a temp; commit_workbook validates + os.replaces it onto
+    # out_path so an interrupted compare never truncates the prior cross-env cell.
+    result = artifact_store.commit_workbook(
+        out_path,
+        lambda tmp: adapter.compare_folders(
+            dest / cell_key, dest / baseline_key, tmp, events=events,
+            confirm_overwrite=lambda _p: True, mode="values"),
+        expect_sheet="Comparison",
+        confirm_overwrite=confirm_overwrite or (lambda _p: True))
     if also_formulas and result.status == "ok":
         _try_formulas(lambda fp: adapter.compare_folders(
             dest / cell_key, dest / baseline_key, fp, events=events,
@@ -677,9 +744,13 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
             built_at = out_path.stat().st_mtime
         except OSError:
             built_at = None
+        # F5/P2: record the inputs' identity (cell + baseline export folders, in that
+        # order) so a later snapshot reads the cell stale when a route changed.
         record_result(dest, baseline_key, row_key, cell_key, result.verdict,
                       diff_cells, one_sided, built_at,
-                      completion=result.completion or outcome.COMPLETE)
+                      completion=result.completion or outcome.COMPLETE,
+                      input_fingerprint=_cell_input_fingerprint(
+                          dest / cell_key / subdir, dest / baseline_key / subdir))
     return result
 
 
@@ -724,6 +795,10 @@ def _consolidate_store_folder(subdir, env_dir, out_path, events):
     completion — its `status`/`completion` decides whether the output is safe to
     compare and cache as a fresh result."""
     out_path = Path(out_path)
+    # P2-A02: capture the inputs' identity BEFORE the build, so write_consolidated_fingerprint
+    # can refuse to certify the workbook "fresh" if an external writer changed the source folder
+    # mid-build (the GUI task lock already serializes our own writers).
+    fp_before = artifact_store.fingerprint(env_dir)
     if subdir == "highway_log_pdf":
         import consolidate_tsmis_highway_log_pdf as _m   # pdfplumber — lazy
         conv = out_path.parent / f".{out_path.stem}_conv"
@@ -752,6 +827,13 @@ def _consolidate_store_folder(subdir, env_dir, out_path, events):
     if not consolidation_meta.write_outcome(out_path, res):
         raise ValueError(f"the {subdir} consolidation finished but its outcome could not "
                          "be recorded; the incomplete workbook was invalidated — re-run")
+    # P2/F5: record the source folder's input fingerprint beside the workbook so a later
+    # reuse rebuilds when the inputs' IDENTITY changed (a route added / removed / resized),
+    # not just when the newest mtime advanced (_consolidated_stale via consolidated_fresh).
+    # P2-A02: pass the pre-build fingerprint — if the inputs changed during the build, the
+    # workbook is NOT certified fresh (it rebuilds next reuse) rather than stamped wrong.
+    if getattr(res, "status", None) == "ok":
+        artifact_store.write_consolidated_fingerprint(out_path, env_dir, built_from=fp_before)
     return res
 
 
@@ -817,29 +899,23 @@ def consolidated_store_path(store_dir, subdir):
 
 def consolidated_state(store_dir, subdir):
     """{exists, fresh, path} for a store folder's persistent consolidated — drives
-    the 'consolidated for this day' indicator. fresh = present AND newer than every
-    per-route source file."""
+    the 'consolidated for this day' indicator. fresh = present AND its inputs' IDENTITY
+    is unchanged since it was built (the artifact_store input fingerprint, not a
+    newest-mtime check — see _consolidated_stale; P2/F5)."""
     p = consolidated_store_path(store_dir, subdir)
     return {"exists": p.exists(), "fresh": not _consolidated_stale(p, store_dir),
             "path": str(p)}
 
 
 def _consolidated_stale(consolidated, store_dir):
-    """True when the persistent consolidated is missing, unreadable, or older than
-    any per-route source file in the store folder (so it must be rebuilt)."""
-    cm = _safe_mtime(consolidated)
-    if cm is None:
-        return True
-    newest = None
-    try:
-        for e in Path(store_dir).iterdir():
-            if e.is_file() and not e.name.startswith("~$"):
-                m = e.stat().st_mtime
-                if newest is None or m > newest:
-                    newest = m
-    except OSError:
-        return True                                    # can't read store -> rebuild
-    return newest is None or newest > cm + _MTIME_TOL_S
+    """True when the persistent consolidated must be REBUILT: missing/unreadable, OR its
+    inputs' IDENTITY changed since it was built — a route file added / removed / resized /
+    re-timed (F5/R1-R03, via artifact_store's input fingerprint). The old signal was the
+    store's NEWEST mtime, which missed a DELETED non-newest route: the consolidated then
+    read as fresh though it still carried the gone route's rows. A legacy consolidated
+    with no fingerprint sidecar reads stale ONCE, rebuilds, and records the sidecar (the
+    one-time migration). Never raises."""
+    return not artifact_store.consolidated_fresh(consolidated, store_dir)
 
 
 # Producer-completion persistence for the persistent consolidated workbook lives in
@@ -854,13 +930,15 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
 
     Consolidate a per-route TSMIS store folder (`tsmis_store_dir`, the `subdir`
     report) into its PERSISTENT `consolidated/` workbook (reused when still fresh;
-    rebuilt when a source file is newer or `force_consolidate`), then compare it vs
+    rebuilt when the inputs' IDENTITY changed — a route added/removed/resized, the
+    artifact_store fingerprint — or `force_consolidate`), then compare it vs
     the consolidated TSN workbook with the row's comparator (`tsn_comparator_for(
     row_key)` — Highway Log Excel/PDF, Ramp Detail, …), writing the VALUES workbook
     to `out_path`. Returns the ConsolidateResult. Pure delegation to the untouched
     consolidate_* / compare_* adapters; the matrices differ only by the source
-    folder + the output path. (For HL the output is byte-identical to the prior
-    fmt-keyed path — same consolidator + same comparator.)"""
+    folder + the output path. (For HL the output is semantically identical to the prior
+    fmt-keyed path — same consolidator + same comparator; the P2 atomic-write wrapper only
+    changes the write mechanism, not the workbook content.)"""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     cmp_mod = tsn_comparator_for(row_key)
@@ -885,9 +963,15 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
     if not consolidated.exists() or consolidated.stat().st_size == 0:
         raise ValueError(f"nothing to compare — no {subdir} export found in "
                          f"{tsmis_store_dir}")
-    result = cmp_mod.compare(consolidated, str(tsn_path), out_path, events=events,
-                             confirm_overwrite=confirm_overwrite or (lambda _p: True),
-                             mode="values")
+    # F9: the comparator writes to a temp path; commit_workbook validates + os.replaces
+    # it onto out_path, so an interrupted/failed compare never truncates the prior cell.
+    # compare_core is untouched — it just writes to the temp it is handed.
+    result = artifact_store.commit_workbook(
+        out_path,
+        lambda tmp: cmp_mod.compare(consolidated, str(tsn_path), tmp, events=events,
+                                    confirm_overwrite=lambda _p: True, mode="values"),
+        expect_sheet="Comparison",
+        confirm_overwrite=confirm_overwrite or (lambda _p: True))
     if also_formulas and result.status == "ok":
         _try_formulas(lambda fp: cmp_mod.compare(
             consolidated, str(tsn_path), fp, events=events,
@@ -976,9 +1060,13 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         pdf_c = side_env if mode["env_subdir"] == "highway_log_pdf" else side_other
         excel_c = side_other if mode["env_subdir"] == "highway_log_pdf" else side_env
         import compare_highway_log_pdf as _cmp_p
-        result = _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
-            pdf_c, excel_c, out_path, events=events,
-            confirm_overwrite=confirm_overwrite or (lambda _p: True), mode="values")
+        result = artifact_store.commit_workbook(
+            out_path,
+            lambda tmp: _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
+                pdf_c, excel_c, tmp, events=events,
+                confirm_overwrite=lambda _p: True, mode="values"),
+            expect_sheet="Comparison",
+            confirm_overwrite=confirm_overwrite or (lambda _p: True))
         if also_formulas and result.status == "ok":
             _try_formulas(lambda fp: _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
                 pdf_c, excel_c, fp, events=events,
@@ -996,7 +1084,16 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         # a hardcoded has_route=True read their Status/Diffs one column off and
         # reported 0 diffs. The header tells us the real layout regardless of mode.
         diff_cells, one_sided = read_counts(out_path)
+        # F5/P2: fingerprint the cell's TSMIS source folder(s) in the SAME order the
+        # snapshot's _cmp_state does (env first; + 'other' for the self PDF-vs-Excel mode),
+        # so a route added/removed/resized reads the reused cell stale.
+        if mode["kind"] == "tsn":
+            fp_folders = (dest / cell_key / mode["env_subdir"],)
+        else:                                # self: TSMIS PDF vs Excel (both folders)
+            fp_folders = (dest / cell_key / mode["env_subdir"],
+                          dest / cell_key / mode["other_subdir"])
         record_tsn_result(dest, f"{row_key}|{mode['id']}", cell_key, result.verdict,
                           diff_cells, one_sided, _safe_mtime(out_path),
-                          completion=result.completion or outcome.COMPLETE)
+                          completion=result.completion or outcome.COMPLETE,
+                          input_fingerprint=_cell_input_fingerprint(*fp_folders))
     return result

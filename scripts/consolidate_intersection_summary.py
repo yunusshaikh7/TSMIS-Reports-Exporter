@@ -30,6 +30,7 @@ except ImportError:
 import summary_layout
 from compare_core import is_formula_injection
 import outcome
+import artifact_store
 from events import ConsolidateResult, Events
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
@@ -181,7 +182,7 @@ def build_workbook(records, out_path):
     total_all = sum(r.get("total") or 0 for r in records)
     _build_combined(wb, statewide, total_all)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(out_path)
+    artifact_store.atomic_save(wb, out_path)        # F9: temp + os.replace (never truncate prior)
 
 
 # --------------------------------------------------------------------------- #

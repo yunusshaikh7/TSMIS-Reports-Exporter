@@ -21,6 +21,7 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_ramp_detail_tsn as rd
+import artifact_store
 from events import ConsolidateResult, Events
 
 RAW_GLOB = "*.xlsx"
@@ -78,7 +79,7 @@ def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
         ws.append(r)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        wb.save(out_path)
+        artifact_store.atomic_save(wb, out_path)    # F9: temp + os.replace (never truncate prior)
     except PermissionError:
         return ConsolidateResult(
             status="error",

@@ -90,6 +90,17 @@ jobs:
           python build/check_batch_outcome.py
           python build/check_tsn_outcome.py
 
+      - name: Transactional artifact lifecycle checks (blocking)
+        # P2: atomic single-file write (F9), journaled store promotion + startup
+        # recovery (F2), the multi-file commit policy (CT-8b), and identity-based
+        # freshness (F5) across the matrix + by-day engines. Stdlib + openpyxl;
+        # no browser/network.
+        shell: bash
+        run: |
+          set -e
+          python build/check_artifact_store.py
+          python build/check_p2_freshness.py
+
       - name: Frontend matrix renderer check (blocking)
         # P1-R01: a matrix cell built from PARTIAL consolidation inputs must render
         # distinctly from a fully-valid match (mxCellContent -> mx-partial, not the
