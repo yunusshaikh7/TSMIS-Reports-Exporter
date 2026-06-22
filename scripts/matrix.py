@@ -25,6 +25,9 @@ import shutil
 import time
 from pathlib import Path
 
+import cache_envelope
+import consolidation_meta
+import outcome
 import report_library
 import reports
 from common import DATA_SOURCES, ENVIRONMENTS
@@ -91,12 +94,14 @@ def _results_path(dest, baseline_key):
 # --------------------------------------------------------------------------- #
 def load_results(dest, baseline_key):
     """{row_key: {cell_key: {verdict, diff_cells, one_sided, built_at_mtime}}}.
-    Tolerant: missing/corrupt -> {} (never raises)."""
+    Tolerant: missing/corrupt/old-version -> {} (never raises). The cache is a
+    versioned envelope (cache_envelope); a pre-P1 raw dict reads as empty (a
+    one-time rebuild)."""
     p = _results_path(dest, baseline_key)
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        return cache_envelope.unwrap(data)
     except OSError:
         return {}                            # not written yet (first run) — expected
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
@@ -111,7 +116,7 @@ def _save_results(dest, baseline_key, data):
         p.parent.mkdir(parents=True, exist_ok=True)
         tmp = p.with_name(p.name + ".tmp")
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+            json.dump(cache_envelope.wrap(data, output_identity=baseline_key), f)
         os.replace(tmp, p)
     except OSError as e:
         log.warning("matrix: could not write results cache %s: %s: %s",
@@ -119,11 +124,12 @@ def _save_results(dest, baseline_key, data):
 
 
 def record_result(dest, baseline_key, row_key, cell_key, verdict,
-                  diff_cells, one_sided, built_at_mtime):
+                  diff_cells, one_sided, built_at_mtime, completion=outcome.COMPLETE):
     data = load_results(dest, baseline_key)
     data.setdefault(row_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
+        "completion": completion,        # P1-R01: partial inputs flagged durably
     }
     _save_results(dest, baseline_key, data)
 
@@ -131,16 +137,25 @@ def record_result(dest, baseline_key, row_key, cell_key, verdict,
 # --------------------------------------------------------------------------- #
 # read discrepancy counts back from a produced VALUES workbook (no COM/F9)
 # --------------------------------------------------------------------------- #
-def read_counts(values_path, has_route):
+def read_counts(values_path, has_route=None):
     """(diff_cells, one_sided) read straight off a VALUES-flavor comparison
     workbook's Comparison sheet content: cells carrying the ' ≠ ' marker, and
     non-'Both' statuses. The values flavor stores literal results, so no Excel
-    recalc is needed. Returns (None, None) if unreadable. Layout:
+    recalc is needed. Returns (None, None) if unreadable.
+
+    The count columns are located by the INVARIANT header LABELS 'Status' and
+    'Diffs', which compare_core writes in EVERY flavor (the id_headers always end
+    `… "Status", "Diffs"` before the data fields — compare_core `Layout.id_headers`).
+    So the reader is correct whether column A is 'Route' (the Route-keyed layout)
+    OR an aggregate whose KEY field happens to be named 'Route' (the flat Ramp /
+    Intersection Summary cross-env adapters use has_route=False yet their schema
+    header begins with 'Route'). This is the F4/O4 fix: A1 alone is NOT a layout
+    signal — only the Status/Diffs positions are. `has_route` is accepted ONLY as an
+    explicit fallback when those labels are somehow absent (a foreign/malformed
+    sheet), so we never silently miscount. Layout:
       has_route:  A Route | B key | C # | D A-Row | E B-Row | F Status | G Diffs | H.. fields
-      flat:       A Route | B # | C A-Row | D B-Row | E Status | F Diffs | G.. fields
+      flat:       A key | B # | C A-Row | D B-Row | E Status | F Diffs | G.. fields
     """
-    status_col = 6 if has_route else 5          # 1-based
-    first_field = 8 if has_route else 7
     try:
         from openpyxl import load_workbook
         wb = load_workbook(values_path, read_only=True, data_only=True)
@@ -150,8 +165,29 @@ def read_counts(values_path, has_route):
         return (None, None)
     try:
         ws = wb["Comparison"]
+        rows_iter = ws.iter_rows(values_only=True)
+        header = next(rows_iter, None) or ()     # row 1 (header); data follows
+
+        def _col_of(label):                      # 1-based index of an exact header label
+            for i, v in enumerate(header):
+                if isinstance(v, str) and v.strip() == label:
+                    return i + 1
+            return None
+
+        status_col = _col_of("Status")
+        diffs_col = _col_of("Diffs")
+        if status_col is not None and diffs_col is not None:
+            first_field = diffs_col + 1          # data fields start right after 'Diffs'
+        else:
+            # Foreign/malformed sheet without the labelled columns — fall back to the
+            # explicit/derived has_route layout rather than silently miscounting.
+            if has_route is None:
+                a1 = header[0] if header else None
+                has_route = isinstance(a1, str) and a1.strip() == "Route"
+            status_col = 6 if has_route else 5
+            first_field = 8 if has_route else 7
         one_sided = diff_cells = 0
-        for row in ws.iter_rows(min_row=2, values_only=True):
+        for row in rows_iter:                     # data rows (header consumed above)
             if row is None or all(v is None for v in row):
                 continue
             status = row[status_col - 1] if len(row) >= status_col else None
@@ -389,7 +425,7 @@ def load_tsn_results(dest):
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        return cache_envelope.unwrap(data)
     except OSError:
         return {}                            # not written yet (first run) — expected
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
@@ -399,18 +435,19 @@ def load_tsn_results(dest):
 
 
 def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided,
-                      built_at_mtime):
+                      built_at_mtime, completion=outcome.COMPLETE):
     data = load_tsn_results(dest)
     data.setdefault(result_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
+        "completion": completion,        # P1-R01: partial inputs flagged durably
     }
     p = _tsn_results_path(dest)
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
         tmp = p.with_name(p.name + ".tmp")
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+            json.dump(cache_envelope.wrap(data, output_identity="tsn"), f)
         os.replace(tmp, p)
     except OSError as e:
         log.warning("matrix: could not write TSN results cache %s: %s: %s",
@@ -427,11 +464,15 @@ def _cmp_state(out_path, sources, rec):
     missing_side = missing[0] if missing else None
     cmp_m = _safe_mtime(out_path)
     built = cmp_m is not None
-    verdict = diff_cells = one_sided = None
+    verdict = diff_cells = one_sided = completion = None
     if built and rec and abs(float(rec.get("built_at_mtime", -1)) - cmp_m) < _MTIME_TOL_S:
         verdict = rec.get("verdict")
         diff_cells = rec.get("diff_cells")
         one_sided = rec.get("one_sided")
+        # P1-R01: a cell built from a PARTIAL consolidation carries it durably so the
+        # matrix can flag "compared, but inputs were incomplete". Old records (no
+        # field) read as complete.
+        completion = rec.get("completion", outcome.COMPLETE)
     if not built:
         stale, reason = True, "missing"
     else:
@@ -442,7 +483,7 @@ def _cmp_state(out_path, sources, rec):
                   else (f"{newer[0]}_newer" if newer else "fresh"))
     return {"supported": True, "built": built, "mtime": cmp_m, "stale": stale,
             "reason": reason, "missing_side": missing_side, "verdict": verdict,
-            "diff_cells": diff_cells, "one_sided": one_sided}
+            "diff_cells": diff_cells, "one_sided": one_sided, "completion": completion}
 
 
 # --------------------------------------------------------------------------- #
@@ -611,7 +652,7 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
         raise ValueError(f"unknown matrix row: {row_key}")
     if cell_key == baseline_key:
         raise ValueError("the baseline column has nothing to compare against")
-    _label, subdir, _idx, adapter, has_route = rows[row_key]
+    _label, subdir, _idx, adapter, _hr = rows[row_key]   # _hr: layout is detected from the workbook (O4)
 
     dest = Path(dest)
     out_path = comparison_path(dest, baseline_key, row_key, cell_key)
@@ -628,13 +669,17 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
             confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
 
     if result.status == "ok" and out_path.exists():
-        diff_cells, one_sided = read_counts(out_path, has_route)
+        # O4: detect the layout from the produced workbook, not the row's declared
+        # has_route — an aggregate cross-env adapter (Ramp/Intersection Summary) can
+        # have a sheet_name yet emit a flat sheet, which would otherwise read as 0 diffs.
+        diff_cells, one_sided = read_counts(out_path)
         try:
             built_at = out_path.stat().st_mtime
         except OSError:
             built_at = None
         record_result(dest, baseline_key, row_key, cell_key, result.verdict,
-                      diff_cells, one_sided, built_at)
+                      diff_cells, one_sided, built_at,
+                      completion=result.completion or outcome.COMPLETE)
     return result
 
 
@@ -673,24 +718,41 @@ def _consolidate_store_folder(subdir, env_dir, out_path, events):
     files) into a single workbook via the report's existing consolidator (with its
     additive input_dir/out_path override). Registry-driven via
     reports.consolidator_for_subdir, so any consolidatable report works; the PDF
-    Highway Log is the one special case (needs a scratch converted_dir)."""
+    Highway Log is the one special case (needs a scratch converted_dir).
+
+    Returns the consolidator's ConsolidateResult (F3) so callers can honor its
+    completion — its `status`/`completion` decides whether the output is safe to
+    compare and cache as a fresh result."""
     out_path = Path(out_path)
     if subdir == "highway_log_pdf":
         import consolidate_tsmis_highway_log_pdf as _m   # pdfplumber — lazy
         conv = out_path.parent / f".{out_path.stem}_conv"
         try:
-            _m.consolidate(events=events, confirm_overwrite=lambda _p: True,
-                           input_dir=Path(env_dir), out_path=out_path,
-                           converted_dir=conv)
+            res = _m.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                 input_dir=Path(env_dir), out_path=out_path,
+                                 converted_dir=conv)
         finally:
             shutil.rmtree(conv, ignore_errors=True)
-        return
-    import reports                                   # lazy (avoid import cycle)
-    mod = reports.consolidator_for_subdir(subdir)
-    if mod is None:
-        raise ValueError(f"no store consolidator for {subdir}")
-    mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
-                    input_dir=Path(env_dir), out_path=out_path)
+    else:
+        import reports                               # lazy (avoid import cycle)
+        mod = reports.consolidator_for_subdir(subdir)
+        if mod is None:
+            raise ValueError(f"no store consolidator for {subdir}")
+        # F3: RETURN the ConsolidateResult so callers can honor its completion — a
+        # failed / no-data consolidation must not be compared or cached as fresh.
+        res = mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                              input_dir=Path(env_dir), out_path=out_path)
+    # P1-R01: persist the producer completion beside the consolidated workbook through
+    # the shared boundary so a later REUSE (no fresh ConsolidateResult) still knows it
+    # was built from partial inputs. No-op unless an output was produced (status ok). A
+    # False return = a non-complete artifact's flag could NOT be recorded (publication
+    # failed): the operation cannot claim a safely persisted artifact, so raise — the
+    # comparison surfaces not-refreshed and keeps the prior cell rather than diffing a
+    # workbook that might read complete.
+    if not consolidation_meta.write_outcome(out_path, res):
+        raise ValueError(f"the {subdir} consolidation finished but its outcome could not "
+                         "be recorded; the incomplete workbook was invalidated — re-run")
+    return res
 
 
 def consolidate_tsn_pdfs(dest, subdir, events=None, confirm_overwrite=None):
@@ -703,8 +765,22 @@ def consolidate_tsn_pdfs(dest, subdir, events=None, confirm_overwrite=None):
     import consolidate_tsn_highway_log as _ctsn   # pdfplumber — lazy
     in_dir = tsn_input_root(dest, subdir)
     out_path = in_dir / "tsn_highway_log_consolidated.xlsx"
-    _ctsn.consolidate(events=events, confirm_overwrite=confirm_overwrite or (lambda _p: True),
-                      input_dir=in_dir, out_path=out_path)
+    res = _ctsn.consolidate(events=events, confirm_overwrite=confirm_overwrite or (lambda _p: True),
+                            input_dir=in_dir, out_path=out_path)
+    # P1-B05: honor the producer result. A failed / no-data / cancelled TSN consolidation
+    # must NOT return a success-shaped path — its worker would log "TSN workbook ready"
+    # with errors=0. Raise the consolidator's own message so the worker reports a
+    # not-refreshed failure (errors>0) and the prior workbook is kept untouched.
+    if not outcome.comparable(outcome.consolidate_completion_of(res)):
+        raise ValueError(res.message or f"the {subdir} TSN consolidation did not complete")
+    # A partial set (some district PDFs left out) stays usable but flagged — persist the
+    # producer completion beside the workbook so the matrix flags it on reuse. If the
+    # flag could not be recorded (publication failed), the partial workbook was
+    # invalidated — raise so the worker reports a not-refreshed failure (never a
+    # success-shaped path to a workbook that would read complete).
+    if not consolidation_meta.write_outcome(out_path, res):
+        raise ValueError(f"the {subdir} TSN consolidation finished but its outcome could "
+                         "not be recorded; the incomplete workbook was discarded — re-run")
     return out_path
 
 
@@ -766,6 +842,10 @@ def _consolidated_stale(consolidated, store_dir):
     return newest is None or newest > cm + _MTIME_TOL_S
 
 
+# Producer-completion persistence for the persistent consolidated workbook lives in
+# the shared `consolidation_meta` boundary (P1-R01) — every persistent writer (matrix
+# store consolidation, auto-consolidate, the GUI/console Consolidate tab, TSN-library
+# builds) records the outcome there, and reuse recovers it, so no writer can bypass it.
 def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, subdir,
                                 events, confirm_overwrite=None, force_consolidate=False,
                                 also_formulas=False):
@@ -787,11 +867,21 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
     if cmp_mod is None:
         raise ValueError(f"no TSN comparator for {row_key}")
     consolidated = consolidated_store_path(tsmis_store_dir, subdir)
+    cres = None
     if force_consolidate or _consolidated_stale(consolidated, tsmis_store_dir):
-        _consolidate_store_folder(subdir, Path(tsmis_store_dir), consolidated, events)
-    # The consolidator can return without raising yet write nothing (an empty store
-    # folder). Catch that here so the failure names the consolidation step instead
-    # of the compare adapter raising a confusing error on a missing/empty input.
+        cres = _consolidate_store_folder(subdir, Path(tsmis_store_dir), consolidated, events)
+    # F3: honor the consolidation outcome instead of silently discarding it. A
+    # failed / no-data / cancelled consolidation must NOT feed a comparison or be
+    # cached as fresh — raise the consolidator's OWN message (clearer than the
+    # generic backstop below), so the cell surfaces exactly why it didn't refresh
+    # and the prior cached comparison is left untouched (not overwritten with a
+    # result built from incomplete inputs). A partial consolidation still compares.
+    # cres is None when the existing consolidated was fresh and reused.
+    if cres is not None and not outcome.comparable(outcome.consolidate_completion_of(cres)):
+        raise ValueError(cres.message or f"the {subdir} consolidation did not complete")
+    # Backstop: a consolidator can return without raising yet write nothing (an
+    # empty store folder). Catch that here so the failure names the consolidation
+    # step instead of the compare adapter erroring on a missing/empty input.
     if not consolidated.exists() or consolidated.stat().st_size == 0:
         raise ValueError(f"nothing to compare — no {subdir} export found in "
                          f"{tsmis_store_dir}")
@@ -802,16 +892,38 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
         _try_formulas(lambda fp: cmp_mod.compare(
             consolidated, str(tsn_path), fp, events=events,
             confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
+    # P1-R01: a PARTIAL TSMIS consolidation (inputs left out) still compares, but the
+    # diff is over INCOMPLETE inputs — flag the comparison so the caller records the
+    # cell as partial. `cres` is set only when we (re)consolidated THIS call; when the
+    # existing consolidated was REUSED (`cres` is None) recover the producer completion
+    # from the sidecar so a reused partial stays flagged instead of silently reading
+    # as a fresh, complete cell.
+    if result.status == "ok":
+        comp = (outcome.consolidate_completion_of(cres) if cres is not None
+                else consolidation_meta.read_completion(consolidated))
+        if comp == outcome.PARTIAL:
+            result.completion = outcome.PARTIAL
     return result
 
 
 def _ensure_consolidated(store_dir, subdir, events, force):
-    """Return the persistent consolidated workbook for a store folder, rebuilding
-    it when stale or forced. Shared by the self (PDF-vs-Excel) path."""
+    """Return (persistent consolidated workbook path, its producer completion) for a
+    store folder, rebuilding when stale or forced. Shared by the self (PDF-vs-Excel)
+    path. F3: raises a clear ValueError when a rebuild did not complete (failed/
+    no-data/cancelled), so the self comparison names the consolidation failure instead
+    of erroring later on a missing/stale input. P1-R01: the completion is the fresh
+    build's (when rebuilt) or the persisted sidecar's (when reused), so a partial side
+    stays flagged through the self comparison."""
     p = consolidated_store_path(store_dir, subdir)
+    comp = None
     if force or _consolidated_stale(p, store_dir):
-        _consolidate_store_folder(subdir, Path(store_dir), p, events)
-    return p
+        cres = _consolidate_store_folder(subdir, Path(store_dir), p, events)
+        if cres is not None and not outcome.comparable(outcome.consolidate_completion_of(cres)):
+            raise ValueError(cres.message or f"the {subdir} consolidation did not complete")
+        comp = outcome.consolidate_completion_of(cres) if cres is not None else None
+    if comp is None:                       # reused (or rebuild gave no result) -> sidecar
+        comp = consolidation_meta.read_completion(p)
+    return p, comp
 
 
 def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
@@ -849,11 +961,17 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
             dest / cell_key / mode["env_subdir"], src["path"], out_path,
             row_key, mode["env_subdir"], events, confirm_overwrite=confirm_overwrite,
             force_consolidate=force_consolidate, also_formulas=also_formulas)
+        # P1-B05: the TSN side can ALSO be partial (a TSN builder left categories /
+        # district PDFs out). consolidate_and_compare_tsn reduced the TSMIS side; reduce
+        # the TSN side here (its completion rides on the resolved source) so the cell
+        # flags partial when EITHER input was incomplete.
+        if result.status == "ok" and src.get("completion") == outcome.PARTIAL:
+            result.completion = outcome.PARTIAL
     else:                                # self: TSMIS PDF vs Excel (persisted both sides)
-        side_env = _ensure_consolidated(dest / cell_key / mode["env_subdir"],
-                                        mode["env_subdir"], events, force_consolidate)
-        side_other = _ensure_consolidated(dest / cell_key / mode["other_subdir"],
-                                          mode["other_subdir"], events, force_consolidate)
+        side_env, comp_env = _ensure_consolidated(dest / cell_key / mode["env_subdir"],
+                                                  mode["env_subdir"], events, force_consolidate)
+        side_other, comp_other = _ensure_consolidated(dest / cell_key / mode["other_subdir"],
+                                                      mode["other_subdir"], events, force_consolidate)
         # the adapter fixes PDF=side A, Excel=side B regardless of the row.
         pdf_c = side_env if mode["env_subdir"] == "highway_log_pdf" else side_other
         excel_c = side_other if mode["env_subdir"] == "highway_log_pdf" else side_env
@@ -865,13 +983,20 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
             _try_formulas(lambda fp: _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
                 pdf_c, excel_c, fp, events=events,
                 confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
+        # P1-R01: a PARTIAL side means the self comparison diffed INCOMPLETE inputs —
+        # propagate it (either side partial -> the cell records partial) so a self
+        # comparison can't hide that one side was built from incomplete inputs.
+        if result.status == "ok" and outcome.PARTIAL in (comp_env, comp_other):
+            result.completion = outcome.PARTIAL
 
     if result.status == "ok" and out_path.exists():
-        # has_route=True is correct for ALL tsn/self modes: their output is always
-        # the consolidated Highway Log shape (Route-keyed), regardless of the row's
-        # cross-env `_hr` (the HL-PDF row has adapter=None → _hr=False, but its TSN
-        # output is still Route-keyed). Do NOT switch this to the row's _hr.
-        diff_cells, one_sided = read_counts(out_path, has_route=True)
+        # F4: detect the layout from the produced workbook. This path serves EVERY
+        # report's vs-TSN/self comparison — Highway Log modes are Route-keyed, but
+        # the aggregate reports (Ramp / Intersection Summary) emit a FLAT sheet, so
+        # a hardcoded has_route=True read their Status/Diffs one column off and
+        # reported 0 diffs. The header tells us the real layout regardless of mode.
+        diff_cells, one_sided = read_counts(out_path)
         record_tsn_result(dest, f"{row_key}|{mode['id']}", cell_key, result.verdict,
-                          diff_cells, one_sided, _safe_mtime(out_path))
+                          diff_cells, one_sided, _safe_mtime(out_path),
+                          completion=result.completion or outcome.COMPLETE)
     return result

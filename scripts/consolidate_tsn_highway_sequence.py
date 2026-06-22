@@ -54,6 +54,7 @@ except ImportError:
 
 from compare_core import is_formula_injection
 from events import ConsolidateResult, Events
+import outcome
 from paths import INPUT_ROOT, OUTPUT_ROOT
 
 # Standalone / console (.bat) default locations — see the matching note in
@@ -374,8 +375,13 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         f"Rows:           {len(all_rows)}",
         f"Output file:    {out}",
     ]
+    # P1-B05: producer-owned completion — district PDFs that failed to parse are
+    # left-out inputs whose routes are NOT in the workbook, so it is PARTIAL (compared,
+    # but flagged), carried structurally (failed_inputs) rather than only in the warning.
     return ConsolidateResult(status="ok", output_path=str(out),
-                             summary_lines=summary_lines)
+                             summary_lines=summary_lines,
+                             completion=outcome.PARTIAL if failed else outcome.COMPLETE,
+                             failed_inputs=len(failed))
 
 
 if __name__ == "__main__":

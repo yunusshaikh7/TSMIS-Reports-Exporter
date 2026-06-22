@@ -923,22 +923,29 @@ function renderCompletion() {
   if (!s) return;
   const t = s.totals || {};
   const failed = s.failed_total || 0;
+  // P1: branch on the PRODUCER-owned completion (default-derived from the counts
+  // when a payload predates it, for intra-version safety). A skipped-only run is
+  // now partial too — incomplete coverage never reads as a green "complete". An
+  // env that signs in but returns no data for every route is "no data", not a
+  // success.
+  const completion = s.completion || (
+    s.cancelled ? "cancelled"
+      : failed > 0 ? "partial"
+        : ((t.saved || 0) + (t.exists || 0)) === 0 && (t.empty || 0) > 0 ? "no_data"
+          : "complete");
+  // A partial/failed/cancelled store refresh keeps last-good (artifact); note it.
+  const keptLastGood = s.artifact === "previous_preserved" ? " — kept last-good" : "";
   const head = $("completionHead"), use = head.querySelector("use");
-  if (s.cancelled) {
-    head.className = "completion-head warn"; use.setAttribute("href", "#i-warn");
-    $("completionTitle").textContent = "Run stopped";
-  } else if (failed > 0) {
-    head.className = "completion-head warn"; use.setAttribute("href", "#i-warn");
-    $("completionTitle").textContent = "Finished with failures";
-  } else if (((t.saved || 0) + (t.exists || 0)) === 0 && (t.empty || 0) > 0) {
-    // Every route came back empty (no data) — NOT a success. An environment that
-    // signs in but returns no data for all routes (outage / permissions /
-    // selector drift) must not read as a green "Export complete".
-    head.className = "completion-head warn"; use.setAttribute("href", "#i-warn");
-    $("completionTitle").textContent = "Finished with no data";
-  } else {
+  if (completion === "complete") {
     head.className = "completion-head ok"; use.setAttribute("href", "#i-check");
     $("completionTitle").textContent = "Export complete";
+  } else {
+    head.className = "completion-head warn"; use.setAttribute("href", "#i-warn");
+    $("completionTitle").textContent = (
+      completion === "cancelled" ? "Run stopped"
+        : completion === "no_data" ? "Finished with no data"
+          : failed > 0 ? "Finished with failures"
+            : "Finished — incomplete") + keptLastGood;   // partial (skipped-only)
   }
   const chips = $("completionChips");
   chips.textContent = "";
@@ -1895,10 +1902,22 @@ function mxCellContent(cmp, tsnMeta) {
              sub: "stale — refresh" };
   }
   const d = cmp.diff_cells || 0, os = cmp.one_sided || 0;
-  if (d === 0 && os === 0) return { cls: "mx-match", main: "✓ match", sub: "identical" };
-  const cls = (d >= MX_HI || d + os >= MX_HI) ? "mx-diff-hi" : "mx-diff-lo";
+  // P1-R01: a comparison built from a PARTIAL consolidation diffed INCOMPLETE inputs
+  // (a TSN/self cell whose consolidation left routes out). Surface it distinctly from
+  // a fully-valid result — an amber "partial" cell + an "inputs incomplete" note — so
+  // a green "✓ match" can never hide that inputs were missing. Cross-env cells carry
+  // no completion, so they're unaffected (undefined !== "partial").
+  const partial = !!cmp.completion && cmp.completion !== "complete";
+  if (d === 0 && os === 0) {
+    return partial
+      ? { cls: "mx-partial", main: "✓ match", sub: "inputs incomplete" }
+      : { cls: "mx-match", main: "✓ match", sub: "identical" };
+  }
+  const base = os ? `+${os} one-sided` : "";
+  const cls = partial ? "mx-partial"
+    : (d >= MX_HI || d + os >= MX_HI) ? "mx-diff-hi" : "mx-diff-lo";
   return { cls, main: `${d} diff${d === 1 ? "" : "s"}`,
-           sub: os ? `+${os} one-sided` : "" };
+           sub: partial ? (base ? `${base} · inputs incomplete` : "inputs incomplete") : base };
 }
 
 // A compact icon action button for a matrix cell (export / compare / open). Icons
@@ -4124,13 +4143,22 @@ function makeMockApi() {
           reports.filter((i) => i < 4).forEach((i) =>
             push({ t: "log", text: `Auto-consolidating ${REPORTS[i].label}… done.` }));
         }
-        push({ t: "run_ended" });
+        // P1: the producer-owned outcome, mirroring the backend's outcome.py +
+        // _build_export_summary (a skipped/failed run is partial, all-empty is
+        // no_data). A plain mock export writes to a dated folder, so artifact is
+        // new_unpromoted (no store swap).
+        const completion = counts.failed || counts.skipped ? "partial"
+          : (counts.saved + counts.exists) > 0 ? "complete"
+            : counts.empty > 0 ? "no_data" : "no_data";
+        const artifact = "new_unpromoted";
+        push({ t: "run_ended", completion, artifact });
         st.task = null; st.fast_run = false; st.can_save_report = true;
         const failedRoutes = routes.slice(0, counts.failed);
         st.last_summary = {
           reports: reports.map((i, n) => ({ label: REPORTS[i].label, ...counts,
-            failed_routes: n === 0 ? failedRoutes : [] })),
+            completion, artifact, failed_routes: n === 0 ? failedRoutes : [] })),
           totals: { ...counts }, failed_total: counts.failed, cancelled: false,
+          completion, artifact,
           run_folder: "C:\\Tools\\TSMIS Exporter\\output\\2026-06-17 ssor-prod",
         };
         st.auth_dot = st.authed ? "ok" : "bad";

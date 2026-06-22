@@ -29,6 +29,7 @@ except ImportError:
 
 import summary_layout
 from compare_core import is_formula_injection
+import outcome
 from events import ConsolidateResult, Events
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
@@ -266,7 +267,9 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         f"Output file: {out_path}",
     ]
     return ConsolidateResult(status="ok", output_path=str(out_path),
-                             summary_lines=summary_lines)
+                             summary_lines=summary_lines,
+                             completion=outcome.PARTIAL if incomplete else outcome.COMPLETE,
+                             skipped_inputs=len(blank), failed_inputs=len(failed))
 
 
 if __name__ == "__main__":

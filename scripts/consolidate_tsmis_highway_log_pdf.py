@@ -64,6 +64,7 @@ except ImportError:
 import highway_log_columns as hlc               # the corrected column labels
 from compare_core import is_formula_injection   # shared formula-injection guard
 from consolidate_xlsx_base import consolidate_xlsx
+import outcome
 from events import ConsolidateResult, Events
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
@@ -610,6 +611,17 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             + (f", {len(failed)} failed {failed}" if failed else ""),
             f"Route files:  {converted} (in {conv})",
         ] + result.summary_lines
+        # RR2-B1 / D18: every converted per-route file may have combined cleanly
+        # (consolidate_xlsx -> complete), yet the PDF->row parse dropped data lines
+        # (no column geometry), carried stale geometry, or a whole PDF failed. Those
+        # losses are NOT visible to the XLSX consolidator, so ESCALATE to a
+        # producer-owned partial here — the dropped-line output must not be
+        # promoted / cached / compared as complete. (Down-payment; eliminating the
+        # stale-geometry EMIT stays deferred — docs/roadmap.md.)
+        if total_skipped or total_stale_pages or failed:
+            result.completion = outcome.PARTIAL
+            result.skipped_inputs = max(result.skipped_inputs, total_skipped)
+            result.failed_inputs = max(result.failed_inputs, len(failed))
     return result
 
 

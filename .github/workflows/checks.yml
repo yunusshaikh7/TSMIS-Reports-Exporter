@@ -76,6 +76,26 @@ jobs:
           python build/check_worker_lifecycle.py
           python build/check_import_direction.py
 
+      - name: Outcome contract + cache-envelope checks (blocking)
+        # P1: the orthogonal completion/artifact contract (outcome.py), the
+        # producer-owned consolidation completion + F3 honoring, read_counts layout
+        # detection (F4/O4), and the versioned matrix cache migration.
+        shell: bash
+        run: |
+          set -e
+          python build/check_outcome_contract.py
+          python build/check_read_counts_layout.py
+          python build/check_consolidate_outcome.py
+          python build/check_export_summary_outcome.py
+          python build/check_batch_outcome.py
+          python build/check_tsn_outcome.py
+
+      - name: Frontend matrix renderer check (blocking)
+        # P1-R01: a matrix cell built from PARTIAL consolidation inputs must render
+        # distinctly from a fully-valid match (mxCellContent -> mx-partial, not the
+        # green mx-match). Pure Node (the runner ships Node) — no browser/server.
+        run: node build/check_mx_partial_render.js
+
       - name: Packaging + console-flow checks (blocking)
         # Offline half of the exact-artifact gate (PA): APP_MODULES is the complete,
         # reachable flat-module inventory (F6 tripwire), and the source-ZIP console

@@ -227,10 +227,15 @@ def _batch(outcome):
     manifest = {"steps": [{"src": "ssor", "env": "prod", "status": "pending"}],
                 "dest": None, "fast": False, "workers": 1, "auto_consolidate": False}
     w = gw.BatchWorker(manifest, q, threading.Event(), threading.Event(), threading.Event())
-    w._specs = lambda: ["spec"]
+    _spec = types.SimpleNamespace(label="Ramp Summary", subdir="ramp_summary")
+    w._specs = lambda: [_spec]
     w._step_views = lambda _s, _e: []
     if outcome == "success":
-        def rs(_self, _e, _r): return None
+        # the env's one report exports COMPLETE -> env marked done -> batch_done.
+        def rs(_self, _e, results):
+            results.append((_spec, types.SimpleNamespace(
+                saved=5, exists=[], empty=[], user_skipped=[], failed=[],
+                completion=gw.outcome.COMPLETE)))
     else:
         def rs(_self, _e, _r): raise gw.AuthError("no session")
     with _patched((gw.ExportWorker, "_run_specs", rs),

@@ -71,6 +71,7 @@ from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
                      is_export_disabled, matrix_rows)
 import matrix
 import day_matrix
+import outcome
 
 log = logging.getLogger("tsmis.gui")
 # Everything shown in the GUI's log pane is mirrored here, so tsmis.log
@@ -183,6 +184,7 @@ class GuiApi:
 
         self._last_results = []      # [(spec, RunResult), ...] of the last export
         self._last_summary = None    # JSON-safe completion summary (persistent card)
+        self._last_batch_outcome = None   # {completion, artifact} of the last batch (run_ended)
         self._last_run_folder = None # dated run-folder root of the last export
         self._batch = None           # B3: live Export-Everything progress {label,done,total}
         self._batch_resume = None    # B3: a resumable manifest summary, or None
@@ -488,8 +490,11 @@ class GuiApi:
         elif kind == "export_partial":
             # A multi-report run errored partway; keep the completed reports so
             # "Save run report…" still covers them. The "error" message that
-            # follows resets the run state.
-            summary = (self._build_export_summary(payload, self.cancel_event.is_set())
+            # follows resets the run state. aborted=True: the run did NOT finish
+            # every selected report, so it can't read as complete even if the
+            # reports that DID finish were each complete (P1-B04).
+            summary = (self._build_export_summary(payload, self.cancel_event.is_set(),
+                                                  aborted=True)
                        if payload else None)
             with self._lock:
                 self._last_results = payload
@@ -565,6 +570,7 @@ class GuiApi:
 
     def _end_task(self):
         with self._lock:
+            ended = self._task            # capture the kind before clearing it
             self._task = None
             self._fast_run = False
             self._login_phase = None
@@ -574,7 +580,26 @@ class GuiApi:
             self._current_job = None
             self.pause_event.clear()      # never leak a paused state across runs
         self._refresh_auth()
-        self._emit({"t": "run_ended"})
+        # R1-B07: run_ended carries the just-finished run's outcome additively
+        # (completion + artifact), so a frontend handler has the result immediately.
+        # Export -> the per-run card summary; batch -> the aggregate batch outcome
+        # (P1-B02). Other tasks carry nothing (absent fields default to 'complete'
+        # on the JS side).
+        payload = {"t": "run_ended"}
+        if ended == "export" and self._last_summary:
+            payload["completion"] = self._last_summary.get("completion")
+            payload["artifact"] = self._last_summary.get("artifact")
+        elif ended == "batch":
+            # P1-B02: start/resume CLEAR _last_batch_outcome, and _on_batch_done sets
+            # the current run's outcome. So a None here means this batch ended via the
+            # ERROR path (an auth/browser failure emits 'error', not 'batch_done', and
+            # _on_error reaches here) before any environment outcome was recorded —
+            # report it as FAILED, never the previous (successful) run's outcome.
+            bo = self._last_batch_outcome or {"completion": outcome.FAILED,
+                                              "artifact": outcome.PREVIOUS_PRESERVED}
+            payload["completion"] = bo.get("completion")
+            payload["artifact"] = bo.get("artifact")
+        self._emit(payload)
         self._push_state()
         # Whatever just ended (matrix or not) frees the gate — pull the next
         # queued matrix job in. No-op when the queue is empty or another task
@@ -676,13 +701,21 @@ class GuiApi:
         self._flash_taskbar()
         self._end_task()
 
-    def _build_export_summary(self, results, cancelled):
+    def _build_export_summary(self, results, cancelled, aborted=False):
         """JSON-safe per-report outcome of an export, kept in state so the GUI
         can show a persistent completion card (counts, Open folder, Retry
-        failed) after the run instead of relaxing straight to idle."""
+        failed) after the run instead of relaxing straight to idle.
+
+        Carries the producer/store-owned outcome (P1): each report's `completion`
+        + `artifact` (set by the store-swap layer; falls back to the count-derived
+        completion for a non-store run), and a RUN-level `completion`/`artifact` the
+        card and the run_ended event key on. `aborted` = a multi-report run that did
+        NOT finish every selected report (an exception after an earlier one), so its
+        completion can't be derived solely from the reports that DID finish."""
         reports = []
         totals = {"saved": 0, "exists": 0, "empty": 0, "skipped": 0, "failed": 0}
         run_folder = None
+        completions = []
         for spec, result in results:
             counts = {"saved": result.saved, "exists": len(result.exists),
                       "empty": len(result.empty), "skipped": len(result.user_skipped),
@@ -691,12 +724,27 @@ class GuiApi:
                 totals[k] += v
             if result.output_dir and run_folder is None:
                 run_folder = str(Path(result.output_dir).parent)
+            rcompletion = result.completion or outcome.run_completion(result, cancelled=cancelled)
+            completions.append(rcompletion)
             reports.append({"label": spec.label, **counts,
+                            "completion": rcompletion,
+                            "artifact": result.artifact or outcome.NONE,
                             "failed_routes": list(result.failed),
                             "output_dir": result.output_dir,
                             "report_path": result.report_path})
+        # Run-level completion = a REDUCER over the per-report completions, NEVER
+        # re-derived from summed counts (where one complete report would mask
+        # another's no_data — P1-B04). Run-level artifact = the most telling
+        # per-report outcome (a preserved last-good wins over a promotion).
+        completion = outcome.reduce_completion(completions, cancelled=bool(cancelled),
+                                               aborted=bool(aborted))
+        arts = [r["artifact"] for r in reports]
+        run_artifact = next((a for a in (outcome.PREVIOUS_PRESERVED, outcome.PROMOTED,
+                                         outcome.NEW_UNPROMOTED) if a in arts), outcome.NONE)
         return {"reports": reports, "totals": totals,
                 "failed_total": totals["failed"], "cancelled": bool(cancelled),
+                "aborted": bool(aborted),
+                "completion": completion, "artifact": run_artifact,
                 "run_folder": run_folder}
 
     def _flash_taskbar(self):
@@ -960,6 +1008,17 @@ class GuiApi:
             self._set_dot("bad", "Error")
             self._emit_modal("error", "Error",
                              f"{message}\n\nMore details are in the log file.")
+        # P1-B02 (narrowed): a batch that FAILS mid-run (auth/browser) still finished
+        # some environments before the fatal error (BatchWorker marked them done + kept
+        # their stores). Preserve that progress so the terminal reads PARTIAL when ≥1 env
+        # completed, reserving FAILED for a batch that completed zero. _last_batch_outcome
+        # is None here (start/resume cleared it; the fatal path emits 'error', not
+        # 'batch_done'); _batch carries the live done-count from the last batch_progress.
+        if self._task == "batch" and self._last_batch_outcome is None:
+            done = (self._batch or {}).get("done", 0)
+            self._last_batch_outcome = {
+                "completion": outcome.PARTIAL if done else outcome.FAILED,
+                "artifact": outcome.PREVIOUS_PRESERVED}
         self._flash_taskbar()        # a task ended (with an error) — nudge if away
         self._end_task()
         if was_matrix:               # the failed cell stays as-is; refresh both grids
@@ -1386,6 +1445,7 @@ class GuiApi:
             self._batch_resume = None
             self._last_summary = None     # a batch supersedes the last export card
             self._last_run_folder = None
+            self._last_batch_outcome = None   # P1-B02: never reuse a prior run's outcome
         msg = (f"Starting Export Everything: {len(specs_idx)} report type(s) "
                f"across {len(combos)} environment(s)")
         if n_workers > 1:
@@ -1449,6 +1509,7 @@ class GuiApi:
             self._batch_resume = None
             self._last_summary = None
             self._last_run_folder = None
+            self._last_batch_outcome = None   # P1-B02: never reuse a prior run's outcome
         pend, total = len(batch_manifest.pending(m)), len(m.get("steps", []))
         self._emit_log(f"Resuming Export Everything — {pend} of {total} "
                        "environment(s) left.")
@@ -1492,10 +1553,18 @@ class GuiApi:
         else:
             self._emit_log(f"Export Everything ended — {done} of {total} "
                            "environment(s) done; some were left pending (see the log).")
+        # Aggregate batch outcome for run_ended (P1-B02): complete only when every
+        # environment finished; else partial (some kept last-good) / cancelled.
+        bcompletion = payload.get("completion") or (
+            outcome.COMPLETE if payload.get("complete")
+            else outcome.CANCELLED if payload.get("cancelled") else outcome.PARTIAL)
+        bartifact = (outcome.PROMOTED if bcompletion == outcome.COMPLETE
+                     else outcome.PREVIOUS_PRESERVED)
         resume = self._pending_batch()        # recompute outside the lock
         with self._lock:
             self._batch = None
             self._batch_resume = resume
+            self._last_batch_outcome = {"completion": bcompletion, "artifact": bartifact}
         self._flash_taskbar()
         self._end_task()
 
@@ -2540,10 +2609,12 @@ class GuiApi:
             cur = self._current_job      # capture before _end_task clears it
         # By-day export -> auto-chain the consolidate+compare for the SAME scope, so
         # a new column "fills itself" (export -> consolidate -> compare vs TSN) in
-        # one action. Skipped on cancel (a stopped export shouldn't trigger a build).
+        # one action. Skipped on cancel, and (§C.1) only when the export was
+        # COMPLETE: a partial/failed refresh kept last-good (F1), so auto-comparing
+        # it would diff stale data and read as freshly built.
         chain = None
         if (cur and cur.get("which") == "day" and cur.get("kind") == "export"
-                and not payload.get("cancelled")):
+                and not payload.get("cancelled") and payload.get("ok")):
             cscope = "cell" if cur["scope"] == "cell" else (
                 "row" if cur["scope"] == "row" else "all")
             chain = self._make_job(

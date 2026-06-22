@@ -98,6 +98,13 @@ class RunResult:
     # saved | empty | skipped | failed | exists.
     per_route: List = field(default_factory=list)
     report_path: str = ""           # where the run report CSV was auto-saved
+    # Orthogonal outcome contract (P1 / outcome.py), producer/store-owned. Default
+    # None for intra-version safety: a path that hasn't set them reads as "absent"
+    # (consumers fall back to inferring/`complete`). `completion` is one of
+    # outcome.COMPLETIONS; `artifact` one of outcome.ARTIFACTS (set by the store
+    # swap layer that knows promoted vs previous_preserved).
+    completion: str = None
+    artifact: str = None
 
 
 @dataclass
@@ -124,3 +131,11 @@ class ConsolidateResult:
     output_path: str = ""
     summary_lines: List[str] = field(default_factory=list)
     verdict: str = None            # None | "match" | "diff" (comparisons only)
+    # Orthogonal outcome contract (P1 / outcome.py), PRODUCER-owned. `status` stays
+    # the coarse ok/cancelled/error; `completion` adds the finer `partial` axis a
+    # status="ok"-with-skipped run hid (one of outcome.COMPLETIONS; None on a path
+    # that predates this, inferred from `status` by outcome.consolidate_completion_of).
+    # The structured counts behind a `partial`: inputs left out of the output.
+    completion: str = None
+    skipped_inputs: int = 0        # inputs with no data / left out
+    failed_inputs: int = 0         # inputs that failed to parse/read

@@ -76,8 +76,10 @@ from common import (
 )
 import batch_manifest
 import dataclasses
+import consolidation_meta
 import day_matrix
 import matrix
+import outcome
 from pathlib import Path
 from events import Events
 from exporter import run_export, _wait_while_paused
@@ -313,6 +315,15 @@ class ExportWorker(threading.Thread):
         try:
             res = mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
                                   day=day, input_dir=input_dir, out_path=out_path)
+            # P1-R01: persist the producer completion beside the workbook this writer
+            # produced (the same reusable consolidated the matrix later reuses), through
+            # the shared boundary — so an auto-consolidate partial can't be reused green.
+            # A False return = the partial flag couldn't be recorded (the incomplete
+            # combined file was discarded); surface it in the log (non-fatal — the export
+            # itself already succeeded).
+            if not consolidation_meta.write_outcome(res.output_path or out_path, res):
+                self.q.put(("log", "  Auto-consolidate: the outcome could not be recorded; "
+                                   "the incomplete combined file was discarded (it will rebuild)."))
             lines = res.summary_lines or ([res.message] if res.message else [])
             for line in lines:
                 self.q.put(("log", f"  {line}"))
@@ -419,16 +430,44 @@ class ExportWorker(threading.Thread):
                     import shutil
                     shutil.rmtree(stage_dir, ignore_errors=True)
                 raise
-            # Swap the fresh export into place on a clean finish; on cancel, discard
-            # staging so a partial refresh never replaces the last-good copy.
-            if stage_dir is not None:
-                if self.cancel.is_set():
+            # F1: ONLY a complete refresh may replace the last-good store copy. The
+            # producer-owned completion (saved/empty/failed/skipped + cancel) decides:
+            # complete -> promote (swap staging in); partial / no_data / cancelled /
+            # failed -> discard staging and keep the previous live copy, so a run
+            # where routes failed or returned nothing never clobbers last-good.
+            cancelled = self.cancel.is_set()
+            in_store = stage_dir is not None
+            if in_store and result.exists:
+                # §C.1: a FRESH staging dir (rmtree'd + remade above) must never
+                # report "already had" files. If it does, the staging is untrustworthy
+                # — REJECT the promotion (force a failed outcome) so it can't replace
+                # last-good, and log the anomaly. (`exists` stays valid for ordinary
+                # resume / non-store runs — this guard is in_store only.)
+                log.warning("store refresh for %s saw %d 'exists' route(s) in a FRESH "
+                            "staging dir (anomaly) — rejecting promotion, keeping last-good",
+                            spec.subdir, len(result.exists))
+                result.completion = outcome.FAILED
+            else:
+                result.completion = outcome.run_completion(result, cancelled=cancelled)
+            if in_store:
+                if outcome.promotable(result.completion):
+                    _swap_store_dir(out_dir, stage_dir)
+                else:
                     import shutil
                     shutil.rmtree(stage_dir, ignore_errors=True)
-                else:
-                    _swap_store_dir(out_dir, stage_dir)
+                    log.info("store refresh for %s was %s — kept last-good, discarded staging",
+                             spec.subdir, result.completion)
+            result.artifact = outcome.artifact_after_store(result.completion, in_store)
             results.append((spec, result))
-            if self.auto_consolidate and not self.cancel.is_set():
+            # B2 auto-consolidate after the export. For a STORE refresh only a run that
+            # actually PROMOTED (completion=complete, artifact=promoted) may consolidate:
+            # a partial/failed/cancelled store refresh discarded its staging and KEPT
+            # last-good, so consolidating now would rebuild a derived artifact from the
+            # OLD live store and present stale data as freshly produced (P1-B03). A
+            # non-store (dated-run) export is unchanged — it consolidates whatever routes
+            # it got (partial included), the long-standing supported behavior.
+            store_ok = (not in_store) or result.artifact == outcome.PROMOTED
+            if self.auto_consolidate and not self.cancel.is_set() and store_ok:
                 self._auto_consolidate(spec, result, events)
         return results
 
@@ -552,8 +591,9 @@ class BatchWorker(threading.Thread):
                                   pause_event=self.pause, auto_consolidate=auto,
                                   out_base=out_base)
                 crashed = False
+                results = []
                 try:
-                    ew._run_specs(ew._build_events(), [])
+                    ew._run_specs(ew._build_events(), results)
                 except (AuthError, BrowserNotFoundError) as e:
                     # Every environment would hit this — stop and keep the
                     # manifest so the user can fix the cause and resume.
@@ -573,13 +613,30 @@ class BatchWorker(threading.Thread):
                     break
                 if crashed:
                     continue                            # leave pending for a resume
-                step["status"] = "done"
-                batch_manifest.mark_done(self.manifest, src, env)
-                done += 1
+                # §C.1: mark an environment DONE only when every selected report is
+                # COMPLETE. A partial / no_data / failed report (or a short result
+                # set) leaves the env PENDING with an explicit diagnostic, so a
+                # resume re-pulls it — the F1 swap already kept last-good for those.
+                bad = [s.label for s, r in results
+                       if not outcome.promotable(
+                           r.completion or outcome.run_completion(r, cancelled=self.cancel.is_set()))]
+                if len(results) == len(specs) and not bad:
+                    step["status"] = "done"
+                    batch_manifest.mark_done(self.manifest, src, env)
+                    done += 1
+                else:
+                    miss = bad or [s.label for s in specs[len(results):]]
+                    self.q.put(("log", f"  {src}-{env}: left PENDING — "
+                                       f"{len(miss)} report(s) not complete "
+                                       f"({', '.join(miss) or 'none ran'}); kept last-good. "
+                                       "Resume to retry."))
+            complete = batch_manifest.is_complete(self.manifest)
+            batch_completion = (outcome.CANCELLED if self.cancel.is_set()
+                                else outcome.COMPLETE if complete else outcome.PARTIAL)
             self.q.put(("batch_done", {
                 "done": done, "total": total,
                 "cancelled": self.cancel.is_set(),
-                "complete": batch_manifest.is_complete(self.manifest)}))
+                "complete": complete, "completion": batch_completion}))
         finally:
             set_site(*original)
 
@@ -611,6 +668,17 @@ class ConsolidateWorker(threading.Thread):
                                          day=self.day)
             log.info("consolidate done: status=%s output=%s message=%s",
                      result.status, result.output_path or "-", result.message or "-")
+            # P1-R01: the GUI/console Consolidate tab writes the SAME reusable workbook
+            # the matrix reuses — persist its producer completion through the shared
+            # boundary so a partial consolidation here can't later read as green. A False
+            # return means the partial flag could NOT be recorded (publication failed) and
+            # the workbook was invalidated — report a degraded terminal, not success.
+            if not consolidation_meta.write_outcome(result.output_path, result):
+                self.q.put(("error", ("general",
+                            "Consolidation finished but its outcome could not be recorded; "
+                            "the incomplete output was discarded. Close any open copy and "
+                            "run it again.")))
+                return
             self.q.put(("consolidate_done", result))
         except Exception as e:
             log.exception("consolidate worker crashed")
@@ -1636,11 +1704,19 @@ def _run_matrix_export_step(spec, src, env, dest, queue, cancel, skip, pause,
                       pause_event=pause, auto_consolidate=False, out_base=out_base)
     if on_worker:
         on_worker(ew)
+    results = []
     try:
-        ew._run_specs(ew._build_events(), [])
+        ew._run_specs(ew._build_events(), results)
     finally:
         if on_worker:
             on_worker(None)
+    # A step counts as "complete" for the matrix only if its export covered
+    # everything (no failed/skipped/no-data routes). The F1 swap in _run_specs
+    # already kept last-good for a partial/failed refresh; this just lets the
+    # matrix report ok / auto-chain a compare on COMPLETE only (§C.1).
+    return bool(results) and all(
+        outcome.promotable(r.completion or outcome.run_completion(r, cancelled=cancel.is_set()))
+        for _s, r in results)
 
 
 class MatrixBatchExportWorker(threading.Thread):
@@ -1684,11 +1760,11 @@ class MatrixBatchExportWorker(threading.Thread):
                     self.q.put(("log", f"Re-exporting {spec.label} — {src}-{env} "
                                        f"({done + 1} of {total})…"))
                 try:
-                    _run_matrix_export_step(spec, src, env, self.dest, self.q,
-                                            self.cancel, self.skip, self.pause,
-                                            self.workers, on_worker=self.on_worker,
-                                            dated=self.dated)
-                    ok += 1
+                    if _run_matrix_export_step(spec, src, env, self.dest, self.q,
+                                               self.cancel, self.skip, self.pause,
+                                               self.workers, on_worker=self.on_worker,
+                                               dated=self.dated):
+                        ok += 1                  # complete only (§C.1), not "didn't raise"
                 except (AuthError, BrowserNotFoundError) as e:
                     log.warning("matrix export %s-%s stopped: %s: %s",
                                 src, env, type(e).__name__, e)

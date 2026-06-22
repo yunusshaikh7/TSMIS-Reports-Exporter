@@ -28,6 +28,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import outcome
 from compare_core import is_formula_injection   # shared formula-injection guard
 from events import ConsolidateResult, Events
 
@@ -263,11 +264,12 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
                      "(Your exported files were not changed.)"),
         )
 
-    # Skipped/failed inputs mean the combined workbook is INCOMPLETE — lead with
-    # a loud warning so a partial result is never mistaken for a full one. (The
-    # status stays "ok" so the GUI still offers the file that WAS produced; an
-    # explicit "partial" status would need matching consumer support — tracked
-    # in docs/roadmap.md.)
+    # Skipped/failed inputs mean the combined workbook is INCOMPLETE — lead with a
+    # loud warning so a partial result is never mistaken for a full one. P1 makes
+    # this a PRODUCER-OWNED outcome: completion=partial with the structured counts
+    # (below), so consumers (the matrix, auto-consolidate, the completion card) can
+    # flag it WITHOUT parsing this warning text. status stays "ok" so the file that
+    # WAS produced is still offered.
     incomplete = bool(skipped or failed)
     summary_lines = []
     if incomplete:
@@ -285,4 +287,6 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
         f"Output file:    {out_path}",
     ]
     return ConsolidateResult(status="ok", output_path=str(out_path),
-                             summary_lines=summary_lines)
+                             summary_lines=summary_lines,
+                             completion=outcome.PARTIAL if incomplete else outcome.COMPLETE,
+                             skipped_inputs=len(skipped), failed_inputs=len(failed))

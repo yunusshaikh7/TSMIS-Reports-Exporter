@@ -29,7 +29,9 @@ import os
 import time
 from pathlib import Path
 
+import cache_envelope
 import matrix
+import outcome
 import reports
 from paths import OUTPUT_ROOT, list_output_days, parse_run_folder, today_str
 
@@ -115,7 +117,7 @@ def load_results():
     try:
         with open(_results_path(), encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        return cache_envelope.unwrap(data)
     except OSError:
         return {}                            # not written yet (first run) — expected
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
@@ -125,18 +127,19 @@ def load_results():
 
 
 def record_result(date, source, row_key, verdict, diff_cells, one_sided,
-                  built_at_mtime):
+                  built_at_mtime, completion=outcome.COMPLETE):
     data = load_results()
     data[f"{day_folder_name(date, source)}|{row_key}"] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
+        "completion": completion,        # P1-R01: partial inputs flagged durably
     }
     p = _results_path()
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
         tmp = p.with_name(p.name + ".tmp")
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+            json.dump(cache_envelope.wrap(data, output_identity="tsn-by-day"), f)
         os.replace(tmp, p)
     except OSError as e:
         log.warning("day_matrix: could not write results cache %s: %s: %s",
@@ -351,12 +354,19 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
         tsmis_dir(date, source, subdir), src_tsn["path"], out_path, row_key, subdir,
         events, confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
         also_formulas=also_formulas)
+    # P1-B05: reduce the TSN side too — a partial TSN consolidation (categories /
+    # district PDFs left out) flags the by-day cell partial just like a partial TSMIS side.
+    if result.status == "ok" and src_tsn.get("completion") == outcome.PARTIAL:
+        result.completion = outcome.PARTIAL
     if result.status == "ok" and out_path.exists():
-        diff_cells, one_sided = matrix.read_counts(out_path, has_route=True)
+        # F4: detect the layout from the produced workbook — the aggregate reports
+        # (Ramp / Intersection Summary) emit a flat sheet that a hardcoded
+        # has_route=True would read one column off (0 diffs). The header decides.
+        diff_cells, one_sided = matrix.read_counts(out_path)
         try:
             built_at = out_path.stat().st_mtime
         except OSError:
             built_at = None
         record_result(date, source, row_key, result.verdict, diff_cells, one_sided,
-                      built_at)
+                      built_at, completion=result.completion or outcome.COMPLETE)
     return result

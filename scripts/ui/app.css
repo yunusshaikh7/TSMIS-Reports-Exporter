@@ -700,6 +700,12 @@ button, input, select { font-family: inherit; }
 .mx-cell.mx-match    { background: color-mix(in oklab, var(--success) 16%, var(--card)); }
 .mx-cell.mx-diff-lo  { background: color-mix(in oklab, var(--warning) 18%, var(--card)); }
 .mx-cell.mx-diff-hi  { background: color-mix(in oklab, var(--destructive) 18%, var(--card)); }
+/* P1-R01: a comparison over INCOMPLETE consolidation inputs — an amber tint plus a
+   dashed-look inset border + italic number, so a partial "✓ match" can't be mistaken
+   for a fully-valid one (and a partial diff reads as provisional, not authoritative). */
+.mx-cell.mx-partial  { background: color-mix(in oklab, var(--warning) 18%, var(--card));
+                       box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--warning) 55%, transparent); }
+.mx-cell.mx-partial .mx-num { font-style: italic; }
 .mx-cell.mx-stale    { background: color-mix(in oklab, var(--muted) 60%, var(--card)); }
 .mx-cell.mx-stale .mx-num { color: var(--muted-foreground); text-decoration: line-through; }
 .mx-cell.mx-missing  { background: var(--card); }
@@ -763,6 +769,8 @@ button, input, select { font-family: inherit; }
 .mx-key.mx-match { background: color-mix(in oklab, var(--success) 16%, var(--card)); }
 .mx-key.mx-diff-lo { background: color-mix(in oklab, var(--warning) 18%, var(--card)); }
 .mx-key.mx-diff-hi { background: color-mix(in oklab, var(--destructive) 18%, var(--card)); }
+.mx-key.mx-partial { background: color-mix(in oklab, var(--warning) 18%, var(--card));
+                     box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--warning) 55%, transparent); }
 .mx-key.mx-stale { background: color-mix(in oklab, var(--muted) 60%, var(--card)); }
 .mx-key.mx-missing { background: var(--card); font-style: italic; }
 .mx-key.mx-na { background: var(--card); color: var(--muted-foreground); font-style: italic; }

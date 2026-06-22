@@ -29,6 +29,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+import consolidation_meta
 import paths
 from events import ConsolidateResult
 
@@ -392,14 +393,38 @@ def build_consolidated(report, events=None, confirm_overwrite=None, force=False)
     builder = getattr(importlib.import_module(mod_name), func_name)
     out = consolidated_path(report)
     out.parent.mkdir(parents=True, exist_ok=True)
-    return builder(raw_dir(report), out, events=events,
-                   confirm_overwrite=confirm_overwrite)
+    result = builder(raw_dir(report), out, events=events,
+                     confirm_overwrite=confirm_overwrite)
+    # P1-B05: persist the builder's producer completion beside the generated workbook
+    # through the shared boundary, so a PARTIAL TSN normalization (categories / district
+    # PDFs left out) stays flagged when resolve() reuses the consolidated workbook. A
+    # False return = a non-complete normalization's flag could NOT be recorded
+    # (publication failed): the build cannot claim a safely persisted artifact, so report
+    # an error result rather than the success-shaped one (the worker/UI surfaces it).
+    if not consolidation_meta.write_outcome(out, result):
+        return ConsolidateResult(
+            status="error",
+            message=(f"{spec.label}: the consolidation finished but its outcome could not "
+                     "be recorded; the incomplete workbook was discarded — re-run."))
+    return result
 
 
 # --------------------------------------------------------------------------- #
 # Resolve (the matrices' single TSN entry point)
 # --------------------------------------------------------------------------- #
 def resolve(report, selected_file=None, legacy_dest=None):
+    """Resolve the TSN dataset for `report` (the matrices' single entry point) and
+    attach the persisted producer `completion` (P1-B05) to any path-bearing source —
+    so a PARTIAL generated TSN workbook (categories / district PDFs left out) flags the
+    comparison even when reused. `completion` is None for a user-picked file or a
+    workbook with no sidecar (deliberate: a user pick / legacy workbook reads complete)."""
+    r = _resolve_source(report, selected_file, legacy_dest)
+    if r.get("path"):
+        r = {**r, "completion": consolidation_meta.read_completion(r["path"])}
+    return r
+
+
+def _resolve_source(report, selected_file=None, legacy_dest=None):
     """Resolve the TSN dataset for `report`, returning the same contract as
     matrix.tsn_source: {kind: file|consolidated|pdfs|raw|none, path?, mtime?,
     pdf_count?, raw_count?}. Resolution order:

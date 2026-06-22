@@ -62,6 +62,7 @@ except ImportError:
 import highway_log_columns as hlc               # the corrected column labels
 from compare_core import is_formula_injection   # shared formula-injection guard
 from consolidate_xlsx_base import consolidate_xlsx
+import outcome
 from events import ConsolidateResult, Events
 from paths import INPUT_ROOT, OUTPUT_ROOT
 
@@ -563,6 +564,12 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             + (f", {len(failed)} failed {failed}" if failed else ""),
             f"Route files:    {converted} (in {CONVERTED_DIR})",
         ] + result.summary_lines
+        # A district PDF that failed to parse means the combined output is missing
+        # those routes — escalate to a producer-owned partial (the converted files
+        # may have combined cleanly, but the source set was incomplete).
+        if failed:
+            result.completion = outcome.PARTIAL
+            result.failed_inputs = max(result.failed_inputs, len(failed))
     return result
 
 

@@ -18,6 +18,7 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_intersection_summary_tsn as istsn
+import outcome
 from events import ConsolidateResult, Events
 
 RAW_GLOB = "*.pdf"
@@ -85,6 +86,10 @@ def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
         summary.insert(0, f"⚠ INCOMPLETE — {len(missing)} categor"
                        f"{'y' if len(missing) == 1 else 'ies'} not found in the PDF: "
                        + ", ".join(missing[:6]) + ("…" if len(missing) > 6 else ""))
+    # P1-B05: producer-owned completion — missing categories make the normalized workbook
+    # PARTIAL (compared, but flagged), carried structurally (skipped_inputs).
     return ConsolidateResult(status="ok",
                              message=f"Normalized TSN Intersection Summary ({n} categories).",
-                             summary_lines=summary)
+                             summary_lines=summary,
+                             completion=outcome.PARTIAL if missing else outcome.COMPLETE,
+                             skipped_inputs=len(missing))

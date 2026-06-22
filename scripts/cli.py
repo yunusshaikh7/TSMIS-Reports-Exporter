@@ -11,6 +11,7 @@ import re
 import sys
 
 from common import AUTH, ROUTES, AuthError, BrowserNotFoundError, PreflightError, clear_auth, parse_routes
+import consolidation_meta
 from events import Events
 from logging_setup import setup_logging
 
@@ -369,6 +370,12 @@ def run_consolidate_cli(consolidate_fn):
     )
     log.info("consolidate done: status=%s output=%s message=%s",
              result.status, result.output_path or "-", result.message or "-")
+    # P1-R01: the console / .bat consolidate writes the SAME reusable workbook the
+    # matrix reuses — persist its producer completion through the shared boundary
+    # (no-op unless status ok) so a partial dated consolidation here can't later read
+    # as a green complete cell. A False return means the partial flag could NOT be
+    # recorded (publication failed) -> we must not announce a plain success below.
+    published = consolidation_meta.write_outcome(result.output_path, result)
 
     if result.status == "cancelled":
         print(result.message or "Cancelled.")
@@ -377,6 +384,18 @@ def run_consolidate_cli(consolidate_fn):
         print()
         print("=" * 60)
         print(f"ERROR: {result.message}")
+        print("=" * 60)
+        sys.exit(1)
+
+    if not published:
+        # P1-R01: the (incomplete) outcome could not be recorded, so the partial
+        # workbook was invalidated to avoid stale data reading as complete later. Do
+        # NOT print a success summary — surface a clear failure + non-zero exit.
+        print()
+        print("=" * 60)
+        print("ERROR: the consolidation finished but its outcome could not be recorded; "
+              "the incomplete output was discarded. Close any open copy of the file and "
+              "run it again.")
         print("=" * 60)
         sys.exit(1)
 
