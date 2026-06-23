@@ -75,6 +75,8 @@ import artifact_store
 import matrix
 import day_matrix
 import outcome
+import contract
+from task_coordinator import TaskCoordinator
 
 log = logging.getLogger("tsmis.gui")
 # Everything shown in the GUI's log pane is mirrored here, so tsmis.log
@@ -83,6 +85,32 @@ ui_log = logging.getLogger("tsmis.ui")
 
 _CHANNEL_SHORT = {"chromium": "Chromium", "msedge": "Edge", "chrome": "Chrome"}
 _SHUTDOWN = object()
+
+class _StampedQueue:
+    """Wraps the worker->GUI message queue to tag each TERMINAL message with the claim
+    EPOCH it was produced under (P7a exactly-once / P7a-B01). A terminal becomes a
+    3-tuple `(kind, payload, epoch)`; every non-terminal message passes through
+    unchanged as its `(kind, payload)` 2-tuple. The pump reads the epoch back and the
+    dispatch drops a terminal whose epoch is no longer the live claim's, so a straggler
+    can't clobber a successor that already took the gate — even a same-kind one, or a
+    wildcard `error`/`cancelled`, which a kind-only guard could not distinguish.
+
+    A worker is handed one of these (via `GuiApi._gated_queue`) when it is started under
+    a held gate, so all of its messages carry that claim's identity. Workers only ever
+    `.put()`; `__getattr__` forwards anything else to the real queue for safety."""
+
+    def __init__(self, q, epoch):
+        self._q = q
+        self._epoch = epoch
+
+    def put(self, item):
+        if item[0] in contract.TERMINAL:
+            self._q.put((item[0], item[1], self._epoch))
+        else:
+            self._q.put(item)
+
+    def __getattr__(self, name):
+        return getattr(self._q, name)
 
 
 def _app_icon_path():
@@ -171,7 +199,44 @@ class GuiApi:
         self._ready = threading.Event()      # JS finished its first render
         self._started = False        # first get_initial_state happened
 
-        self._task = None            # None | "export" | "consolidate" | "login"
+        # Task state — the single-flight gate (`_task`), the running matrix job, the
+        # matrix queue, and the job-id counter — is OWNED by the TaskCoordinator
+        # (P7a). `_task` / `_current_job` / `_queue` / `_job_seq` below are thin
+        # property proxies to it, so the rest of gui_api reads them unchanged.
+        self._coord = TaskCoordinator(self._lock, self._QUEUE_LIMIT)
+        # Worker message kind -> handler (P7a: the _handle dispatch table, replacing
+        # the old if/elif chain). Built once; _handle drops a terminal whose claim
+        # epoch is no longer the live one (exactly-once) before dispatching, and
+        # log.warnings an unknown kind (no silent drop).
+        self._dispatch = {
+            contract.Msg.LOG: self._emit_log,
+            contract.Msg.PROGRESS: self._on_progress,
+            contract.Msg.WORKER_STATUS: self._on_worker_status,
+            contract.Msg.PREVIEW_SHOT: self._on_preview_shot,
+            contract.Msg.ENV_SHOT: self._on_env_shot,
+            contract.Msg.ENV_ACCESS: self._on_env_access,
+            contract.Msg.ENV_ACCESS_DONE: self._on_env_scan_done,
+            contract.Msg.ACTIVE_ENV_DONE: self._on_active_env_done,
+            contract.Msg.RESET_DONE: self._on_reset_done,
+            contract.Msg.CHROMIUM_DONE: self._on_chromium_done,
+            contract.Msg.EXPORT_DONE: self._finish_export,
+            contract.Msg.EXPORT_PARTIAL: self._on_export_partial,
+            contract.Msg.CONSOLIDATE_DONE: self._finish_consolidate,
+            contract.Msg.LOGIN_OPEN: self._on_login_open,
+            contract.Msg.LOGIN_SAVED: self._on_login_saved,
+            contract.Msg.LOGIN_DEVICE_OK: self._on_login_device_ok,
+            contract.Msg.LOGIN_FAILED: self._on_login_failed,
+            contract.Msg.CHECK: self._on_check,
+            contract.Msg.CHECKS_DONE: self._on_checks_done,
+            contract.Msg.CANCELLED: self._on_cancelled,
+            contract.Msg.BATCH_PROGRESS: self._on_batch_progress,
+            contract.Msg.BATCH_DONE: self._on_batch_done,
+            contract.Msg.MATRIX_CELL: self._on_matrix_cell,
+            contract.Msg.MATRIX_DONE: self._on_matrix_done,
+            contract.Msg.MATRIX_EXPORT_DONE: self._on_matrix_export_done,
+            contract.Msg.UPDATE_STATUS: self._on_update_status,
+            contract.Msg.ERROR: self._on_error,
+        }
         # The quiet background active-env check runs OUTSIDE the single-task gate
         # (it must never block the Log in / Export buttons), so it has its own
         # lightweight flag + a supersede token for a newer env switch.
@@ -231,9 +296,7 @@ class GuiApi:
         # racing the single-task gate. A second click queues; jobs run one at a
         # time and auto-advance. The global gate (self._task) still serializes
         # everything — the queue just feeds matrix work into it in order.
-        self._queue = collections.deque()   # pending Jobs (dicts)
-        self._current_job = None             # the running matrix Job, or None
-        self._job_seq = 0                    # monotonic Job id source
+        # (_queue / _current_job / _job_seq now live on self._coord — see proxies.)
         self._export_worker = None   # live ExportWorker (screenshot requests)
         # Server-side confirmation for the one destructive op (delete all
         # reports): reset_preview issues a single-use token bound to the
@@ -488,135 +551,169 @@ class GuiApi:
         with self._lock:
             self._auth_dot, self._auth_text = state, text
 
+    # ---- task-state proxies to the TaskCoordinator (P7a) ----------------------
+    # Plain forwards (no lock here — the coordinator guards every COMPOUND mutation
+    # under the shared RLock; these single-attr reads/writes are protected by the
+    # caller's own `with self._lock` where they already mutate state). Keeping the
+    # `_task` / `_current_job` / `_queue` / `_job_seq` names lets the rest of gui_api
+    # stay untouched while the coordinator is the single owner.
+    @property
+    def _task(self):
+        return self._coord.task
+
+    @_task.setter
+    def _task(self, value):
+        self._coord.task = value
+
+    @property
+    def _current_job(self):
+        return self._coord.current_job
+
+    @_current_job.setter
+    def _current_job(self, value):
+        self._coord.current_job = value
+
+    @property
+    def _queue(self):
+        return self._coord.queue
+
+    @_queue.setter
+    def _queue(self, value):
+        # the reorder/remove endpoints rebuild the deque wholesale; forward it to the
+        # coordinator (these run under self._lock, which the coordinator shares).
+        self._coord.queue = value
+
+    @property
+    def _job_seq(self):
+        return self._coord._job_seq
+
+    @_job_seq.setter
+    def _job_seq(self, value):
+        self._coord._job_seq = value
+
     # ---- worker-queue pump (the old gui_app._handle state machine) ------------
 
     def _worker_pump(self):
         while True:
-            kind, payload = self._q.get()
+            msg = self._q.get()
+            # Gated workers post a 3-tuple (kind, payload, epoch); everything else is a
+            # 2-tuple (kind, payload). An untagged terminal (a non-gated worker can only
+            # post non-terminals) carries epoch None — treated as the live claim's.
+            kind, payload = msg[0], msg[1]
+            epoch = msg[2] if len(msg) > 2 else None
             try:
-                self._handle(kind, payload)
+                self._handle(kind, payload, epoch)
             except Exception:
                 logging.getLogger("tsmis.crash").critical(
                     "uncaught exception handling worker message %r", kind, exc_info=True)
 
-    def _handle(self, kind, payload):
-        if kind == "log":
-            self._emit_log(payload)
-        elif kind == "progress":
-            self._emit({"t": "progress", "p": payload})
-        elif kind == "worker_status":
-            worker, text = payload
-            self._emit({"t": "wstatus", "w": worker, "text": text})
-        elif kind == "preview_shot":
-            worker, b64, note, url = payload
-            self._emit({"t": "preview", "w": worker, "img": b64, "note": note,
-                        "url": url})
-        elif kind == "env_shot":
-            self._on_env_shot(payload)
-        elif kind == "env_access":
-            self._on_env_access(payload)
-        elif kind == "env_access_done":
-            self._on_env_scan_done(payload)
-        elif kind == "active_env_done":
-            self._on_active_env_done(payload)
-        elif kind == "reset_done":
-            self._on_reset_done(payload)
-        elif kind == "chromium_done":
-            self._on_chromium_done(payload)
-        elif kind == "export_done":
-            self._finish_export(payload)
-        elif kind == "export_partial":
-            # A multi-report run errored partway; keep the completed reports so
-            # "Save run report…" still covers them. The "error" message that
-            # follows resets the run state. aborted=True: the run did NOT finish
-            # every selected report, so it can't read as complete even if the
-            # reports that DID finish were each complete (P1-B04).
-            summary = (self._build_export_summary(payload, self.cancel_event.is_set(),
-                                                  aborted=True)
-                       if payload else None)
-            with self._lock:
-                self._last_results = payload
-                self._last_summary = summary
-                self._last_run_folder = (summary or {}).get("run_folder")
-        elif kind == "consolidate_done":
-            self._finish_consolidate(payload)
-        elif kind == "login_open":
-            with self._lock:
-                self._login_phase = "open"
-            self._set_dot("busy", "Waiting — finish sign-in in the browser")
-            self._emit_log("Browser opened. Complete sign-in (SSO + MFA), then click "
-                           "‘I've finished logging in’.")
-            self._push_state()
-        elif kind == "login_saved":
-            self._emit_log("Session saved.")
-            self._refresh_auth()
-            self._end_task()
-            self._maybe_autoscan("login")
-        elif kind == "login_device_ok":
-            # Silent device sign-in works, but the session is device-bound so no
-            # file was saved (and none is needed): each export signs itself in.
-            with self._lock:
-                self._device_ok = True
-            self._emit_log("This PC signs in automatically (Microsoft Edge + your "
-                           "Windows account). Nothing to save — exports will sign "
-                           "themselves in.")
-            self._refresh_auth()
-            self._end_task()
-            self._maybe_autoscan("login")
-        elif kind == "login_failed":
-            self._emit_log("Login wasn't completed — no new session was saved.")
-            self._emit_modal(
-                "info", "Login not completed",
-                "It doesn't look like you finished signing in, so no session was saved.\n\n"
-                "Click 'Log in' and complete sign-in until the TSMIS report page loads — "
-                "then either click “I've finished logging in” or just close the "
-                "browser window, and your session will be saved.")
-            self._refresh_auth()
-            self._end_task()
-        elif kind == "check":
-            key, status, text = payload
-            with self._lock:
-                if key in self._checks:
-                    self._checks[key] = {"status": "ok" if status == "ok" else status, "text": text}
-            self._push_state()
-        elif kind == "checks_done":
-            self._on_checks_done(payload)
-        elif kind == "cancelled":
-            self._emit_log("Cancelled.")
-            self._set_dot("ok" if self._authed else "bad", "Idle")
-            self._end_task()
-        elif kind == "batch_progress":
-            self._on_batch_progress(payload)
-        elif kind == "batch_done":
-            self._on_batch_done(payload)
-        elif kind == "matrix_cell":
-            self._on_matrix_cell(payload)
-        elif kind == "matrix_done":
-            self._on_matrix_done(payload)
-        elif kind == "matrix_export_done":
-            self._on_matrix_export_done(payload)
-        elif kind == "update_status":
-            self._on_update_status(payload)
-        elif kind == "error":
-            self._on_error(payload)
-        else:
-            # No silent drop: a worker posted an event kind this sink has no
-            # branch for. That means the worker/bridge protocol drifted (a new
-            # kind added on one side only) -- log it so "one log upload answers
-            # it" instead of the event vanishing without a trace.
+    def _handle(self, kind, payload, epoch=None):
+        # Exactly-once gate (R1-R06/R1-R14/P7a-B01): a TERMINAL is acted on only if its
+        # claim EPOCH is still the live one. A terminal tagged with a prior claim's epoch
+        # is a straggler — its task ended and a successor may now hold the gate (even one
+        # of the SAME kind, or a wildcard error/cancelled, which a kind-only guard could
+        # not tell apart) — so it is dropped instead of clobbering the successor's
+        # gate/job. Workers post exactly one terminal (check_worker_lifecycle), so this
+        # is the defensive net that turns a duplicate/late terminal into a safe no-op.
+        if kind in contract.TERMINAL and not self._coord.is_live(epoch):
+            log.info("lifecycle: dropped a late %r terminal (epoch %r; live gate %r/%r)",
+                     kind, epoch, self._coord.task, self._coord.current_epoch())
+            return
+        handler = self._dispatch.get(kind)
+        if handler is None:
+            # No silent drop: a worker posted an event kind this sink has no handler
+            # for — the worker/bridge protocol drifted (a kind added on one side
+            # only). Log it so "one log upload answers it" rather than the event
+            # vanishing without a trace.
             log.warning("unhandled worker event kind %r (payload dropped)", kind)
+            return
+        handler(payload)
+
+    # ---- per-kind handlers (the dispatch table targets) -----------------------
+    def _on_progress(self, payload):
+        self._emit({"t": "progress", "p": payload})
+
+    def _on_worker_status(self, payload):
+        worker, text = payload
+        self._emit({"t": "wstatus", "w": worker, "text": text})
+
+    def _on_preview_shot(self, payload):
+        worker, b64, note, url = payload
+        self._emit({"t": "preview", "w": worker, "img": b64, "note": note, "url": url})
+
+    def _on_export_partial(self, payload):
+        # A multi-report run errored partway; keep the completed reports so
+        # "Save run report…" still covers them. The "error" message that follows
+        # resets the run state. aborted=True: the run did NOT finish every selected
+        # report, so it can't read as complete even if the reports that DID finish
+        # were each complete (P1-B04).
+        summary = (self._build_export_summary(payload, self.cancel_event.is_set(),
+                                              aborted=True)
+                   if payload else None)
+        with self._lock:
+            self._last_results = payload
+            self._last_summary = summary
+            self._last_run_folder = (summary or {}).get("run_folder")
+
+    def _on_login_open(self, payload):
+        with self._lock:
+            self._login_phase = "open"
+        self._set_dot("busy", "Waiting — finish sign-in in the browser")
+        self._emit_log("Browser opened. Complete sign-in (SSO + MFA), then click "
+                       "‘I've finished logging in’.")
+        self._push_state()
+
+    def _on_login_saved(self, payload):
+        self._emit_log("Session saved.")
+        self._refresh_auth()
+        self._end_task()
+        self._maybe_autoscan("login")
+
+    def _on_login_device_ok(self, payload):
+        # Silent device sign-in works, but the session is device-bound so no file
+        # was saved (and none is needed): each export signs itself in.
+        with self._lock:
+            self._device_ok = True
+        self._emit_log("This PC signs in automatically (Microsoft Edge + your "
+                       "Windows account). Nothing to save — exports will sign "
+                       "themselves in.")
+        self._refresh_auth()
+        self._end_task()
+        self._maybe_autoscan("login")
+
+    def _on_login_failed(self, payload):
+        self._emit_log("Login wasn't completed — no new session was saved.")
+        self._emit_modal(
+            "info", "Login not completed",
+            "It doesn't look like you finished signing in, so no session was saved.\n\n"
+            "Click 'Log in' and complete sign-in until the TSMIS report page loads — "
+            "then either click “I've finished logging in” or just close the "
+            "browser window, and your session will be saved.")
+        self._refresh_auth()
+        self._end_task()
+
+    def _on_check(self, payload):
+        key, status, text = payload
+        with self._lock:
+            if key in self._checks:
+                self._checks[key] = {"status": "ok" if status == "ok" else status, "text": text}
+        self._push_state()
+
+    def _on_cancelled(self, payload):
+        self._emit_log("Cancelled.")
+        self._set_dot("ok" if self._authed else "bad", "Idle")
+        self._end_task()
 
     def _end_task(self):
         with self._lock:
             ended = self._task            # capture the kind before clearing it
-            self._task = None
             self._fast_run = False
             self._login_phase = None
             self._export_worker = None
             self._batch = None
             self._matrix = None
-            self._current_job = None
             self.pause_event.clear()      # never leak a paused state across runs
+            self._coord.release()         # free the gate + drop the running job (RLock: nested-safe)
         self._refresh_auth()
         # R1-B07: run_ended carries the just-finished run's outcome additively
         # (completion + artifact), so a frontend handler has the result immediately.
@@ -652,18 +749,22 @@ class GuiApi:
         'check' then later 'set' -- those two race, so two quick clicks (or a
         save dialog between them) could both pass the gate and start two
         workers."""
-        with self._lock:
-            if self._task:
-                return False
-            self._task = name
-            return True
+        return self._coord.try_claim(name)
 
     def _release_task(self):
         """Drop a slot claimed by _try_claim_task before a worker actually
         started (e.g. the user cancelled the save dialog), so the next action
         isn't blocked by a phantom task."""
-        with self._lock:
-            self._task = None
+        self._coord.release()
+
+    def _gated_queue(self):
+        """The worker->GUI queue a JUST-CLAIMED worker must post to: a thin proxy that
+        tags each terminal with the current claim's epoch (P7a-B01). The gate is held by
+        the caller, so `current_epoch()` is this claim's identity; a later/duplicate
+        terminal tagged with it is then dropped once a successor has taken the gate. Every
+        gate-owning worker is started with this (never the raw `self._q`) so no terminal
+        is left untagged."""
+        return _StampedQueue(self._q, self._coord.current_epoch())
 
     @staticmethod
     def _pick_report(registry, idx):
@@ -1077,6 +1178,10 @@ class GuiApi:
             "version": __version__,
             "output_root": str(OUTPUT_ROOT),
             "log_dir": str(LOG_DIR),
+            # Bridge enum SSOT (P7a): the canonical task / terminal-kind / env-access
+            # vocabulary, so ui/contract.js (P9) is checked against the backend, not
+            # re-hardcoded. See scripts/contract.py.
+            "contract": contract.initial_state_enums(),
             # The report-list metadata (Export / Consolidate / Compare tab lists) is
             # built by the PURE module-level `_report_list_payload()` so it is also a
             # safe read-only oracle for the catalog parity check (P4-R05).
@@ -1344,7 +1449,7 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "export", "label": "Working…",
                     "workers": n_workers})
         self._push_state()
-        worker = ExportWorker(specs, self._q, self.cancel_event, self.skip_event,
+        worker = ExportWorker(specs, self._gated_queue(), self.cancel_event, self.skip_event,
                               workers=n_workers, routes=run_routes,
                               pause_event=self.pause_event,
                               auto_consolidate=bool(auto_consolidate))
@@ -1386,7 +1491,7 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "export",
                     "label": "Retrying failed routes…", "workers": 1})
         self._push_state()
-        worker = ExportWorker(specs, self._q, self.cancel_event, self.skip_event,
+        worker = ExportWorker(specs, self._gated_queue(), self.cancel_event, self.skip_event,
                               workers=1, routes=routes, pause_event=self.pause_event)
         with self._lock:
             self._export_worker = worker
@@ -1483,7 +1588,7 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "batch", "label": "Working…",
                     "workers": n_workers})
         self._push_state()
-        BatchWorker(manifest, self._q, self.cancel_event, self.skip_event,
+        BatchWorker(manifest, self._gated_queue(), self.cancel_event, self.skip_event,
                     self.pause_event).start()
         return {"ok": True}
 
@@ -1542,7 +1647,7 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "batch", "label": "Working…",
                     "workers": m.get("workers", 1) if m.get("fast") else 1})
         self._push_state()
-        BatchWorker(m, self._q, self.cancel_event, self.skip_event,
+        BatchWorker(m, self._gated_queue(), self.cancel_event, self.skip_event,
                     self.pause_event).start()
         return {"ok": True}
 
@@ -1713,9 +1818,7 @@ class GuiApi:
         # `which` ("env" = Everything matrix, "day" = Compare by-day matrix) lets
         # ONE queue serve both matrices; for day jobs `env` carries the date.
         # `force` rebuilds the persistent consolidated even when it looks fresh.
-        with self._lock:
-            self._job_seq += 1
-            jid = self._job_seq
+        jid = self._coord.next_seq()
         return {"id": jid, "kind": kind, "scope": scope, "label": label,
                 "row": row, "env": env, "subdir": subdir, "fast": bool(fast),
                 "which": which, "force": bool(force), "status": "queued"}
@@ -1723,13 +1826,11 @@ class GuiApi:
     def _enqueue_matrix_job(self, job):
         """Append a Job and try to start it (or leave it queued behind the
         running one). The UI's '2nd action queues' contract lives here."""
-        with self._lock:
-            if len(self._queue) >= self._QUEUE_LIMIT:
-                return {"error": "The matrix queue is full — let some jobs finish "
-                                 "first."}
-            self._queue.append(job)
-            busy = self._task is not None or self._current_job is not None
-            depth = len(self._queue)
+        result = self._coord.enqueue(job)
+        if result is None:
+            return {"error": "The matrix queue is full — let some jobs finish "
+                             "first."}
+        depth, busy = result
         if busy:
             self._emit_log(f"Queued (#{depth}): {job['label']}.")
         self._push_state()
@@ -1742,20 +1843,14 @@ class GuiApi:
         then resolves targets with the gate held. A job that resolves to no work
         is dropped and the next one is tried."""
         while True:
-            with self._lock:
-                if self._task or self._current_job is not None or not self._queue:
-                    return
-                job = self._queue.popleft()
-                self._task = "matrix"            # claim atomically with the pop
-                self._current_job = job
-                job["status"] = "running"
+            job = self._coord.take_next()        # atomic pop + claim "matrix"
+            if job is None:                      # gate busy or queue empty
+                return
             try:
                 started = self._dispatch_matrix_job(job)
             except Exception as e:               # noqa: BLE001 — never leave the gate stuck
                 log.exception("matrix dispatch failed for %r", job.get("label"))
-                with self._lock:
-                    self._task = None
-                    self._current_job = None
+                self._coord.release()
                 self._emit_log(f"ERROR: couldn't start '{job['label']}': "
                                f"{type(e).__name__}: {e} (details are in the log file)")
                 continue                         # drop this job, try the next
@@ -1764,9 +1859,7 @@ class GuiApi:
                 return
             # Nothing to do (e.g. the cells were rebuilt by an earlier job) —
             # release the gate, drop the job, and try the next one.
-            with self._lock:
-                self._task = None
-                self._current_job = None
+            self._coord.release()
             self._emit_log(f"Skipped (nothing to do): {job['label']}.")
 
     def _dispatch_matrix_job(self, job):
@@ -1831,7 +1924,7 @@ class GuiApi:
         self._set_dot("busy", "Comparing…")
         self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
-        MatrixCompareWorker(dest, base, cells, self._q, self.cancel_event,
+        MatrixCompareWorker(dest, base, cells, self._gated_queue(), self.cancel_event,
                             tsn_files=settings.get_matrix_tsn_files(),
                             force_consolidate=job.get("force", False),
                             also_formulas=settings.get_matrix_formulas()).start()
@@ -1850,7 +1943,7 @@ class GuiApi:
         self._set_dot("busy", "Comparing…")
         self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
-        DayMatrixCompareWorker(source, cells, dest, self._q, self.cancel_event,
+        DayMatrixCompareWorker(source, cells, dest, self._gated_queue(), self.cancel_event,
                                tsn_files=settings.get_matrix_tsn_files(),
                                force_consolidate=job.get("force", False),
                                also_formulas=settings.get_day_matrix_formulas()).start()
@@ -1950,7 +2043,7 @@ class GuiApi:
         self._set_dot("busy", "Exporting…")
         self._emit({"t": "run_started", "mode": "export", "label": "Exporting…",
                     "workers": n_workers})
-        MatrixBatchExportWorker(steps, settings.get_batch_dest(), self._q,
+        MatrixBatchExportWorker(steps, settings.get_batch_dest(), self._gated_queue(),
                                 self.cancel_event, self.skip_event, self.pause_event,
                                 workers=n_workers, dated=True,
                                 on_worker=self._set_matrix_export_worker).start()
@@ -1971,7 +2064,7 @@ class GuiApi:
         self._set_dot("busy", "Refreshing…")
         self._emit({"t": "run_started", "mode": "export", "label": "Refreshing…",
                     "workers": n_workers})
-        MatrixBatchExportWorker(steps, dest, self._q, self.cancel_event,
+        MatrixBatchExportWorker(steps, dest, self._gated_queue(), self.cancel_event,
                                 self.skip_event, self.pause_event,
                                 workers=n_workers,
                                 on_worker=self._set_matrix_export_worker).start()
@@ -1989,7 +2082,7 @@ class GuiApi:
         self._set_dot("busy", "Consolidating TSN…")
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": "Consolidating TSN…", "workers": 1})
-        MatrixTsnConsolidateWorker(dest, job["subdir"], self._q,
+        MatrixTsnConsolidateWorker(dest, job["subdir"], self._gated_queue(),
                                    self.cancel_event).start()
         return True
 
@@ -2264,7 +2357,7 @@ class GuiApi:
             return tsn_library.build_consolidated(
                 report, events=events, confirm_overwrite=lambda _p: True, force=True)
 
-        ConsolidateWorker(_run, self._q, self.cancel_event, lambda _p: True).start()
+        ConsolidateWorker(_run, self._gated_queue(), self.cancel_event, lambda _p: True).start()
         return {"ok": True}
 
     def _tsn_library_status_for(self, report):
@@ -2726,14 +2819,14 @@ class GuiApi:
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
-            self._task = "login"
+            self._coord.claim_direct("login")   # claim + bump epoch (gate already checked)
             self._login_phase = "starting"
         self.login_done.clear()
         self.login_cancel.clear()
         self._set_dot("busy", "Signing in…")
         self._emit_log("Starting sign-in…")
         self._push_state()
-        LoginWorker(self._q, self.login_done, self.login_cancel).start()
+        LoginWorker(self._gated_queue(), self.login_done, self.login_cancel).start()
         return {"ok": True}
 
     @_api_method
@@ -2765,7 +2858,7 @@ class GuiApi:
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
-            self._task = "envcheck"
+            self._coord.claim_direct("envcheck")   # claim + bump epoch (gate already checked)
         src, env = get_site()
         label = f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}"
         self._emit_log(f"Verifying environment: opening TSMIS on {label}…")
@@ -2773,7 +2866,7 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": f"Checking {label}…"})
         self._push_state()
-        EnvCheckWorker(self._q).start()
+        EnvCheckWorker(self._gated_queue()).start()
         return {"ok": True}
 
     def _on_env_shot(self, payload):
@@ -2817,7 +2910,7 @@ class GuiApi:
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
-            self._task = "envscan"
+            self._coord.claim_direct("envscan")   # claim + bump epoch (gate already checked)
             for src in DATA_SOURCES:
                 for env in ENVIRONMENTS:
                     key = f"{src}-{env}"
@@ -2834,7 +2927,7 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": "Checking all environments…"})
         self._push_state()
-        EnvScanWorker(self._q, self.cancel_event).start()
+        EnvScanWorker(self._gated_queue(), self.cancel_event).start()
         return {"ok": True}
 
     def _on_env_access(self, payload):
@@ -2934,7 +3027,7 @@ class GuiApi:
         self._push_state()
         # Overwrite was resolved by the UI before start (consolidate_info +
         # confirm dialog), so the injected callback just says yes.
-        ConsolidateWorker(mod.consolidate, self._q, self.cancel_event,
+        ConsolidateWorker(mod.consolidate, self._gated_queue(), self.cancel_event,
                           lambda _p: True, day=day).start()
         return {"ok": True}
 
@@ -3008,7 +3101,7 @@ class GuiApi:
                 lambda tmp: run_fn(tmp, events=events,
                                    confirm_overwrite=lambda _p: True, day=day),
                 twin=(mode == "both"), expect_sheet="Comparison")
-        ConsolidateWorker(committed, self._q, self.cancel_event,
+        ConsolidateWorker(committed, self._gated_queue(), self.cancel_event,
                           lambda _p: True).start()
         return {"ok": True}
 
@@ -3155,8 +3248,11 @@ class GuiApi:
                         f.stat().st_size
                         for f in DOWNLOADED_BROWSERS_DIR.rglob("*") if f.is_file()
                     ) / 1e6)
-        except OSError:
-            pass
+        except OSError as e:
+            # best-effort sizing — the Settings panel still renders (downloaded may
+            # read False / 0 MB); log so a recurring read failure is diagnosable (P7a).
+            log.info("settings: couldn't inspect the downloaded Chromium (%s: %s)",
+                     type(e).__name__, e)
         return {
             "bundled": bundled,
             "downloaded": downloaded,
@@ -3261,7 +3357,7 @@ class GuiApi:
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
-            self._task = "chromium"
+            self._coord.claim_direct("chromium")   # claim + bump epoch (gate already checked)
         self.cancel_event.clear()
         self._emit_log(start_log)
         self._set_dot("busy", "Working on the Built-in Chromium…")
@@ -3270,7 +3366,7 @@ class GuiApi:
                               if action == "download" else
                               "Removing the Built-in Chromium…")})
         self._push_state()
-        ChromiumWorker(self._q, action, self.cancel_event).start()
+        ChromiumWorker(self._gated_queue(), action, self.cancel_event).start()
         return {"ok": True}
 
     @_api_method
@@ -3380,7 +3476,7 @@ class GuiApi:
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": "Deleting reports…"})
         self._push_state()
-        ResetWorker(self._q, include_input=include_input,
+        ResetWorker(self._gated_queue(), include_input=include_input,
                     cancel_event=self.cancel_event).start()
         return {"ok": True}
 
@@ -3459,16 +3555,20 @@ class GuiApi:
                     try:
                         zf.write(f, f"{arc}/{f.name}")
                         added += 1
-                    except OSError:
-                        pass
+                    except OSError as e:
+                        # one locked/unreadable log shouldn't sink the whole bundle —
+                        # skip it, but log which so a maintainer knows it's absent (P7a).
+                        ui_log.info("support bundle: skipped %s (%s: %s)",
+                                    f.name, type(e).__name__, e)
             reports = sorted((OUTPUT_ROOT / "run_reports").glob("*.csv"),
                              key=lambda p: p.stat().st_mtime, reverse=True)[:50]
             for f in reports:
                 try:
                     zf.write(f, f"run_reports/{f.name}")
                     added += 1
-                except OSError:
-                    pass
+                except OSError as e:
+                    ui_log.info("support bundle: skipped run report %s (%s: %s)",
+                                f.name, type(e).__name__, e)
         ui_log.info("support bundle saved: %s (%d files)", out, added)
         self._emit_log(f"Support bundle saved ({added} files): {out}")
         self._emit_log("  It has logs, run reports and selected diagnostic settings "

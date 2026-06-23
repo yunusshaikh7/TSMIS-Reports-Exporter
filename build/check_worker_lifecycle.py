@@ -12,11 +12,18 @@ unexpected-error. It then feeds that terminal through `GuiApi._handle` and asser
 the gate is released. Payload-encoded cancel/error variants and queue-advance are
 covered separately.
 
-KNOWN GAP (characterized, NOT asserted-safe): `GuiApi._end_task` clears state
-unconditionally, so a duplicate-late terminal arriving after a queued successor
-has started CLOBBERS the successor. The exactly-once fix is owned by P7a
-(R1-R06 / R1-R14; see 00-coordination.md D21). `test_duplicate_late_active_successor`
-LOCKS that current behavior so P7a's fix visibly flips it.
+EXACTLY-ONCE (P7a / R1-R06 / R1-R14 / P7a-B01): the `TaskCoordinator` owns the gate and
+stamps every claim with a monotonic EPOCH -- the task instance's identity. A gated worker
+tags its terminal with the epoch it was started under (`GuiApi._gated_queue` ->
+`_StampedQueue`); `GuiApi._handle` drops any terminal whose epoch is no longer the live
+claim's (`TaskCoordinator.is_live`), so a straggler can NOT clobber a successor that
+already started -- INCLUDING a same-kind matrix successor or a wildcard `error`/`cancelled`,
+which the earlier kind-only guard could not tell apart. `test_duplicate_late_active_successor`
+and `test_duplicate_late_same_kind_matrix` assert that; `test_stamped_queue_tags_terminals`
+and `test_coordinator_epoch_is_live` pin the mechanism; `test_dispatch_covers_contract`
+keeps the dispatch table complete against the `contract` SSOT. Workers post exactly one
+terminal (see test_producer_paths), so this is the defensive net that makes a duplicate/late
+terminal safe rather than a clobber (it flipped the prior known gap).
 
 LoginWorker is producer-tested like the others: its `run()` / `_run_login_in_browser`
 are driven offline with a fake Playwright (no real browser launch), an immediate
@@ -513,20 +520,111 @@ def test_duplicate_late_idle():
     check("gate still free after an idle duplicate-late", _gate_free(a))
 
 
+def test_stamped_queue_tags_terminals():
+    print("the gated queue tags terminals with the claim epoch, passes others through:")
+    q = _Q()
+    sq = gui_api._StampedQueue(q, 42)
+    sq.put(("log", "hello"))
+    sq.put(("progress", {"done": 1}))
+    sq.put(("export_done", ["r"]))
+    sq.put(("error", ("auth", "x")))
+    check("non-terminal 'log' passes through as a 2-tuple", q.items[0] == ("log", "hello"))
+    check("non-terminal 'progress' passes through as a 2-tuple",
+          q.items[1] == ("progress", {"done": 1}))
+    check("terminal 'export_done' is stamped (kind, payload, epoch)",
+          q.items[2] == ("export_done", ["r"], 42))
+    check("terminal 'error' is stamped (kind, payload, epoch)",
+          q.items[3] == ("error", ("auth", "x"), 42))
+
+
+def test_coordinator_epoch_is_live():
+    print("the coordinator bumps the epoch on each claim and is_live tracks it:")
+    import task_coordinator
+    c = task_coordinator.TaskCoordinator(threading.RLock(), 8)
+    check("fresh coordinator: epoch 0", c.current_epoch() == 0)
+    check("is_live(0) False while idle (no task owns the gate)", c.is_live(0) is False)
+    assert c.try_claim("export")
+    e1 = c.current_epoch()
+    check("try_claim bumped the epoch", e1 == 1)
+    check("is_live(e1) True for the live claim", c.is_live(e1) is True)
+    check("is_live(None) True while a task runs (untagged == current; legacy)",
+          c.is_live(None) is True)
+    check("is_live(stale) False for a prior epoch", c.is_live(e1 - 1) is False)
+    c.release()
+    check("after release the gate is idle: is_live(e1) False", c.is_live(e1) is False)
+    check("is_live(None) False while idle", c.is_live(None) is False)
+    c.enqueue(_job("m"))
+    c.take_next()
+    e2 = c.current_epoch()
+    check("take_next bumped the epoch again (monotonic)", e2 == 2)
+    check("is_live(e1) False (stale) once a newer claim holds the gate", c.is_live(e1) is False)
+    check("is_live(e2) True for the current matrix claim", c.is_live(e2) is True)
+    c.release()
+    c.claim_direct("login")        # the login/envcheck/envscan/chromium claim path
+    check("claim_direct bumped the epoch too (monotonic)", c.current_epoch() == 3)
+    check("is_live(e2) False once claim_direct supersedes it", c.is_live(e2) is False)
+
+
+def _msg_values():
+    """Every declared message string on contract.Msg (the bridge vocabulary SSOT)."""
+    return {v for k, v in vars(gui_api.contract.Msg).items()
+            if not k.startswith("_") and isinstance(v, str)}
+
+
+def test_dispatch_covers_contract():
+    print("the _handle dispatch table + terminal set match the contract SSOT (P7a-A01):")
+    a = _api()
+    declared = _msg_values()
+    handled = set(a._dispatch.keys())
+    check("every contract.Msg has a dispatch handler", declared <= handled)
+    check("no dispatch handler outside contract.Msg", handled <= declared)
+    term = set(gui_api.contract.TERMINAL)
+    check("every terminal kind is a declared contract.Msg", term <= declared)
+    check("every terminal kind has a dispatch handler", term <= handled)
+
+
 def test_duplicate_late_active_successor():
-    print("duplicate-late terminal with an ACTIVE successor (KNOWN GAP -> P7a):")
+    print("duplicate-late terminal with an ACTIVE successor is a no-op (P7a exactly-once):")
     a = _api()
     a._dispatch_matrix_job = lambda job: True
     _claim(a, "export")
+    e1 = a._coord.current_epoch()                      # the export claim's identity (its worker stamps this)
     succ = _job("successor")
     a._queue.append(succ)
-    a._handle("export_done", [])
+    a._handle("export_done", [], e1)                   # the export's REAL terminal: frees gate, starts successor
     check("precondition: the successor is the running task",
           a._task == "matrix" and a._current_job is succ)
-    a._handle("export_done", [])                       # straggler from the finished export
-    check("[known gap: P7a] duplicate-late clobbers the successor's gate", a._task is None)
-    check("[known gap: P7a] duplicate-late clears the successor's current job",
-          a._current_job is None)
+    e2 = a._coord.current_epoch()
+    check("precondition: the successor claimed a fresh epoch", e2 != e1)
+    # Stragglers from the FINISHED export (all tagged e1) -- EVERY terminal class, incl.
+    # the generic error/cancelled wildcards a kind-only guard accepted against a successor:
+    a._handle("export_done", [], e1)
+    a._handle("error", ("general", "late straggler"), e1)
+    a._handle("cancelled", None, e1)
+    check("no straggler clobbers the successor's gate (still 'matrix')", a._task == "matrix")
+    check("no straggler clears the successor's running job", a._current_job is succ)
+
+
+def test_duplicate_late_same_kind_matrix():
+    print("a stale SAME-KIND matrix_done can't clobber the next matrix job (P7a-B01):")
+    a = _api()
+    started = []
+    a._dispatch_matrix_job = lambda job: (started.append(job["label"]) or True)
+    j1, j2 = _job("m1"), _job("m2")
+    a._queue.append(j1)
+    a._queue.append(j2)
+    a._try_start_next_matrix_job()                     # j1 claims the matrix gate
+    e1 = a._coord.current_epoch()
+    check("precondition: the first matrix job is running",
+          a._task == "matrix" and a._current_job is j1)
+    a._handle("matrix_done", {"done": 1, "total": 1}, e1)   # j1's REAL terminal -> j2 auto-starts
+    e2 = a._coord.current_epoch()
+    check("precondition: the second matrix job is running (fresh epoch)",
+          a._current_job is j2 and e2 != e1)
+    a._handle("matrix_done", {"done": 1, "total": 1}, e1)   # STALE duplicate from j1
+    check("the stale same-kind matrix_done did NOT clobber the second job",
+          a._task == "matrix" and a._current_job is j2)
+    check("each matrix job was dispatched exactly once", started == ["m1", "m2"])
 
 
 def test_invalid_manifest_batch_advances_successor():
@@ -555,14 +653,18 @@ def main():
     test_terminal_payload_variants()
     test_queue_advances_on_terminal()
     test_invalid_manifest_batch_advances_successor()
+    test_stamped_queue_tags_terminals()
+    test_coordinator_epoch_is_live()
+    test_dispatch_covers_contract()
     test_duplicate_late_idle()
     test_duplicate_late_active_successor()
+    test_duplicate_late_same_kind_matrix()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")
         return 1
     print("ALL WORKER-LIFECYCLE CHECKS PASSED")
-    print("(note: test_duplicate_late_active_successor LOCKS a known gap closed by P7a)")
+    print("(note: the TaskCoordinator's exactly-once guard drops a straggler terminal — P7a)")
     return 0
 
 

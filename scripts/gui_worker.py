@@ -1543,15 +1543,17 @@ class LoginWorker(threading.Thread):
     def _safe_close(browser):
         try:
             browser.close()
-        except Exception:
-            pass
+        except Exception as e:
+            # best-effort cleanup — never fail login on a close hiccup, but log the
+            # type+first line so a recurring leak shows up in one log upload (P7a).
+            log.info("login: browser close failed (%s: %s)", type(e).__name__, e)
 
     @staticmethod
     def _safe_close_context(ctx):
         try:
             ctx.close()
-        except Exception:
-            pass
+        except Exception as e:
+            log.info("login: context close failed (%s: %s)", type(e).__name__, e)
 
     @staticmethod
     def _save_state(state):
