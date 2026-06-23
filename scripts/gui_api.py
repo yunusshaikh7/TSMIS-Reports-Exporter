@@ -66,9 +66,11 @@ from common import (
     require_valid_auth, set_preferred_channel, set_site,
 )
 from paths import EDGE_LOGIN_PROFILE_DIR
-from reports import (COMPARE_GROUPS, COMPARE_REPORTS, CONSOLIDATE_REPORTS,
-                     EXPORT_REPORTS, enabled_export_reports, export_reports_status,
-                     is_export_disabled, matrix_rows)
+from reports import (COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPORTS, CONSOLIDATE_KEYS,
+                     CONSOLIDATE_REPORTS, EXPORT_REPORTS, compare_index_for_key,
+                     consolidate_index_for_key, enabled_export_reports,
+                     export_reports_status, is_export_disabled, matrix_rows,
+                     resolve_export_keys)
 import artifact_store
 import matrix
 import day_matrix
@@ -1044,27 +1046,30 @@ class GuiApi:
             # Every export report, with `disabled` marking the app-wide-disabled
             # ones (Intersection) — the UI shows those GREYED (not hidden) so they
             # stay visible but unpickable; the start guards reject them anyway.
-            # `idx` is the STABLE index into EXPORT_REPORTS the UI passes back to
-            # start_export / start_batch_export.
-            "reports": [{"idx": i, "label": label, "fmt": fmt, "disabled": disabled}
-                        for i, label, fmt, _spec, disabled in export_reports_status()],
+            # `key` is the STABLE export-op key the UI passes back to start_export /
+            # start_batch_export (P3 / §C.5); `idx` is retained display-order
+            # metadata only (kept for P4's catalog), never the selection contract.
+            "reports": [{"key": spec.subdir, "idx": i, "label": label, "fmt": fmt,
+                         "disabled": disabled}
+                        for i, label, fmt, spec, disabled in export_reports_status()],
             # Each consolidate entry carries its INPUT file format for the tab
             # badge: a module's own INPUT_FMT (the PDF-input consolidators) wins,
             # else the matching export report's format, else Excel.
-            "cons_reports": [{"label": label,
+            "cons_reports": [{"key": CONSOLIDATE_KEYS[i], "label": label,
                               "fmt": (getattr(_mod, "INPUT_FMT", None)
                                       or _export_fmt.get(label, "Excel"))}
-                             for label, _mod in CONSOLIDATE_REPORTS],
+                             for i, (label, _mod) in enumerate(CONSOLIDATE_REPORTS)],
             "compare_groups": [{"id": gid, "label": glabel}
                                for gid, glabel in COMPARE_GROUPS],
-            "compare_reports": [{"label": label, "kind": kind, "group": group,
+            "compare_reports": [{"key": COMPARE_KEYS[i], "label": label, "kind": kind,
+                                 "group": group,
                                  "subdir": getattr(_mod, "subdir", None),
                                  # The two file-picker labels for "files"
                                  # comparisons (so e.g. PDF-vs-Excel doesn't
                                  # mislabel both TSMIS sides "TSMIS"/"TSN").
                                  "file_a_label": getattr(_mod, "file_a_label", "TSMIS"),
                                  "file_b_label": getattr(_mod, "file_b_label", "TSN")}
-                                for label, _mod, kind, group in COMPARE_REPORTS],
+                                for i, (label, _mod, kind, group) in enumerate(COMPARE_REPORTS)],
             "routes": list(ROUTES),
             "channels": [{"id": c, "label": CHANNEL_LABELS[c],
                           "short": _CHANNEL_SHORT.get(c, CHANNEL_LABELS[c])}
@@ -1272,16 +1277,19 @@ class GuiApi:
     # ---- export ----------------------------------------------------------------
 
     @_api_method
-    def start_export(self, report_idxs, routes_text, fast, workers,
+    def start_export(self, report_keys, routes_text, fast, workers,
                      auto_consolidate=False):
         # Validate inputs BEFORE claiming the task slot (pure, no shared state),
         # then claim atomically -- so two quick clicks can't both pass the gate
-        # and launch two export runs (the old check-then-set raced).
-        specs = []
-        for i in (report_idxs if isinstance(report_idxs, (list, tuple)) else []):
-            row = self._pick_report(EXPORT_REPORTS, i)
-            if row is not None and not is_export_disabled(row[2]):
-                specs.append(row[2])      # drop app-wide-disabled (Intersection)
+        # and launch two export runs (the old check-then-set raced). Selection is
+        # by stable export-op KEY now (P3 / §C.5), resolved ALL-OR-NOTHING: any
+        # unknown/disabled/duplicate key rejects the whole selection (never a
+        # narrower run), never mis-resolved by list position.
+        specs, invalid = resolve_export_keys(
+            report_keys if isinstance(report_keys, (list, tuple)) else [])
+        if invalid:
+            return {"error": "One or more selected reports aren't available — "
+                             "reopen the tab and pick again."}
         if not specs:
             return {"error": "Tick at least one report to export."}
         raw = (routes_text or "").strip()
@@ -1412,17 +1420,22 @@ class GuiApi:
         return None
 
     @_api_method
-    def start_batch_export(self, report_idxs, env_keys, fast, workers,
+    def start_batch_export(self, report_keys, env_keys, fast, workers,
                            auto_consolidate=False):
         """B3 Export Everything: export the selected report types across the
         selected environments, sequentially, with a persistent manifest so it can
-        resume across restarts."""
-        specs_idx = [i for i in (report_idxs if isinstance(report_idxs, (list, tuple))
-                                 else [])
-                     if self._pick_report(EXPORT_REPORTS, i)
-                     and not is_export_disabled(EXPORT_REPORTS[i][2])]
-        if not specs_idx:
+        resume across restarts. Reports travel by stable export-op KEY (P3 / §C.5):
+        the manifest persists keys, so a registry re-order can't resume the wrong
+        report (F7). Resolved ALL-OR-NOTHING: any unknown/disabled/duplicate key
+        rejects the whole selection (never a narrower batch)."""
+        specs, invalid = resolve_export_keys(
+            report_keys if isinstance(report_keys, (list, tuple)) else [])
+        if invalid:
+            return {"error": "One or more selected report types aren't available — "
+                             "reopen the tab and pick again."}
+        if not specs:
             return {"error": "Tick at least one report type to export."}
+        keys = [s.subdir for s in specs]   # canonical export-op keys (validated, enabled)
         combos = self._parse_env_keys(env_keys)
         if not combos:
             return {"error": "Pick at least one environment."}
@@ -1438,7 +1451,7 @@ class GuiApi:
         self.skip_event.clear()
         self.pause_event.clear()
         dest = settings.get_batch_dest()
-        manifest = batch_manifest.build(specs_idx, combos, bool(fast), n_workers,
+        manifest = batch_manifest.build(keys, combos, bool(fast), n_workers,
                                         bool(auto_consolidate), dest=dest)
         batch_manifest.save(manifest)
         with self._lock:
@@ -1447,7 +1460,7 @@ class GuiApi:
             self._last_summary = None     # a batch supersedes the last export card
             self._last_run_folder = None
             self._last_batch_outcome = None   # P1-B02: never reuse a prior run's outcome
-        msg = (f"Starting Export Everything: {len(specs_idx)} report type(s) "
+        msg = (f"Starting Export Everything: {len(keys)} report type(s) "
                f"across {len(combos)} environment(s)")
         if n_workers > 1:
             msg += f"   ·   FAST MODE ({n_workers} browsers)"
@@ -2850,8 +2863,8 @@ class GuiApi:
     # ---- consolidate -------------------------------------------------------------
 
     @_api_method
-    def consolidate_info(self, report_idx, day):
-        row = self._pick_report(CONSOLIDATE_REPORTS, report_idx)
+    def consolidate_info(self, report_key, day):
+        row = self._pick_report(CONSOLIDATE_REPORTS, consolidate_index_for_key(report_key))
         if row is None:
             return {"error": "That report isn't available — please reopen the tab."}
         try:
@@ -2871,8 +2884,8 @@ class GuiApi:
         return info
 
     @_api_method
-    def open_consolidate_input(self, report_idx):
-        row = self._pick_report(CONSOLIDATE_REPORTS, report_idx)
+    def open_consolidate_input(self, report_key):
+        row = self._pick_report(CONSOLIDATE_REPORTS, consolidate_index_for_key(report_key))
         if row is None:
             return {"error": "That report isn't available — please reopen the tab."}
         _label, mod = row
@@ -2888,11 +2901,11 @@ class GuiApi:
         return {"ok": True}
 
     @_api_method
-    def start_consolidate(self, report_idx, day):
-        # Validate the report index + day BEFORE claiming the slot -- otherwise a
-        # bad index would IndexError after self._task was set, wedging the task
-        # gate "consolidate" forever (every later action blocked until restart).
-        row = self._pick_report(CONSOLIDATE_REPORTS, report_idx)
+    def start_consolidate(self, report_key, day):
+        # Validate the report KEY + day BEFORE claiming the slot -- otherwise a bad
+        # key would leave self._task set, wedging the task gate "consolidate"
+        # forever (every later action blocked until restart).
+        row = self._pick_report(CONSOLIDATE_REPORTS, consolidate_index_for_key(report_key))
         if row is None:
             return {"error": "That report isn't available — please reopen the tab."}
         try:
@@ -2989,9 +3002,9 @@ class GuiApi:
         return {"ok": True}
 
     @_api_method
-    def start_compare(self, report_idx, tsmis_path, tsn_path,
+    def start_compare(self, report_key, tsmis_path, tsn_path,
                       want_formulas=True, want_values=False):
-        row = self._pick_report(COMPARE_REPORTS, report_idx)
+        row = self._pick_report(COMPARE_REPORTS, compare_index_for_key(report_key))
         if row is None:
             return {"error": "That comparison isn't available — please reopen the tab."}
         label, mod, kind, _group = row[:4]
@@ -3022,13 +3035,13 @@ class GuiApi:
             raise
 
     @_api_method
-    def get_compare_folders(self, report_idx):
+    def get_compare_folders(self, report_key):
         """Run folders that contain the chosen cross-env report (the compare
         folder dropdowns call this on report-type change so only usable runs are
         offered — A2). 'files'-kind comparisons and adapters without a subdir
         return all folders (their dropdowns aren't shown). Pure filesystem stat;
         no task lock, no browser."""
-        row = self._pick_report(COMPARE_REPORTS, report_idx)
+        row = self._pick_report(COMPARE_REPORTS, compare_index_for_key(report_key))
         if row is None:
             return {"folders": list_output_days()}
         _label, adapter, kind, _group = row[:4]
@@ -3038,11 +3051,11 @@ class GuiApi:
         return {"folders": list_output_days_for_report(subdir)}
 
     @_api_method
-    def start_compare_env(self, report_idx, dir_a, dir_b,
+    def start_compare_env(self, report_key, dir_a, dir_b,
                           want_formulas=True, want_values=False):
         """Cross-environment comparison: two run folders (names from the
         dropdowns resolve under output/; Browse… hands in absolute paths)."""
-        row = self._pick_report(COMPARE_REPORTS, report_idx)
+        row = self._pick_report(COMPARE_REPORTS, compare_index_for_key(report_key))
         if row is None:
             return {"error": "That comparison isn't available — please reopen the tab."}
         label, adapter, kind, _group = row[:4]
@@ -3530,11 +3543,11 @@ class GuiApi:
         return {"ok": True}
 
     @_api_method
-    def open_consolidated_folder(self, report_idx, day):
-        # Same WS5 guards as its siblings: bounds-check the index and validate
+    def open_consolidated_folder(self, report_key, day):
+        # Same WS5 guards as its siblings: resolve the report KEY and validate
         # the day (no traversal into a folder outside OUTPUT_ROOT -- this method
         # mkdir+opens the resolved path via _open_folder).
-        row = self._pick_report(CONSOLIDATE_REPORTS, report_idx)
+        row = self._pick_report(CONSOLIDATE_REPORTS, consolidate_index_for_key(report_key))
         if row is None:
             return {"error": "That report isn't available — please reopen the tab."}
         try:

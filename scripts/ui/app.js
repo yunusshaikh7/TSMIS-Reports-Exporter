@@ -516,9 +516,10 @@ function makeReportRow(rep, checked, off, onChange) {
   const row = document.createElement("label");
   row.className = "option-row" + (checked ? " checked" : "") + (off ? " option-static" : "");
   const cb = document.createElement("input");
-  // dataset.idx is the STABLE index into EXPORT_REPORTS (rep.idx), not the row
-  // position — kept stable even though disabled rows are shown, not filtered.
-  cb.type = "checkbox"; cb.checked = !!checked; cb.dataset.idx = rep.idx;
+  // dataset.key is the STABLE export-op key (rep.key), not the row position — so
+  // selection no longer depends on registry order (P3), even though disabled rows
+  // are shown rather than filtered.
+  cb.type = "checkbox"; cb.checked = !!checked; cb.dataset.key = rep.key;
   if (off) { cb.disabled = true; cb.dataset.off = "1"; }
   const box = document.createElement("span");
   box.className = "checkbox"; box.appendChild(icon("i-check"));
@@ -597,7 +598,7 @@ function buildStatic() {
     const row = document.createElement("label");
     row.className = "option-row" + (i === 0 ? " checked" : "");
     const rb = document.createElement("input");
-    rb.type = "radio"; rb.name = "consReport"; rb.checked = i === 0; rb.dataset.idx = i;
+    rb.type = "radio"; rb.name = "consReport"; rb.checked = i === 0; rb.dataset.key = rep.key;
     const dot = document.createElement("span"); dot.className = "radio";
     const name = document.createElement("span");
     name.className = "option-name"; name.textContent = rep.label;
@@ -647,7 +648,7 @@ function buildStatic() {
     row.className = "option-row";
     row.dataset.group = rep.group || "";
     const rb = document.createElement("input");
-    rb.type = "radio"; rb.name = "compareReport"; rb.dataset.idx = i;
+    rb.type = "radio"; rb.name = "compareReport"; rb.dataset.key = rep.key;
     const dot = document.createElement("span"); dot.className = "radio";
     const name = document.createElement("span");
     name.className = "option-name"; name.textContent = rep.label;
@@ -701,19 +702,24 @@ function updateReportCount() {
 }
 
 // ------------------------------------------------------------- renders -----
-function selectedReportIdxs() {
-  return [...$("reportList").querySelectorAll("input")].filter((c) => c.checked).map((c) => +c.dataset.idx);
+// Selection travels by stable KEY now (P3), so a registry re-order never changes
+// what a tick resolves to. reportByKey maps an export-op key back to its payload.
+function reportByKey(key) {
+  return (S.init.reports || []).find((r) => r.key === key) || {};
+}
+function selectedReportKeys() {
+  return [...$("reportList").querySelectorAll("input")].filter((c) => c.checked).map((c) => c.dataset.key);
 }
 function consChoice() {
   const r = $("consList").querySelector("input:checked");
-  return r ? +r.dataset.idx : 0;
+  return r ? r.dataset.key : null;
 }
 function compareChoice() {
   const r = $("compareList").querySelector("input:checked");
-  return r ? +r.dataset.idx : 0;
+  return r ? r.dataset.key : null;
 }
 function currentCompareRep() {
-  return (S.init.compare_reports || [])[compareChoice()] || {};
+  return (S.init.compare_reports || []).find((r) => r.key === compareChoice()) || {};
 }
 function selectedDay() {
   return $("selDay").value || null;   // "" = legacy "(older exports)"
@@ -1018,7 +1024,7 @@ function renderPreflight() {
   if (tab === "export") {
     $("preflightTitle").textContent = "Ready to export";
     showTarget();
-    const labels = selectedReportIdxs().map((i) => ((S.init.reports || [])[i] || {}).label).filter(Boolean);
+    const labels = selectedReportKeys().map((k) => reportByKey(k).label).filter(Boolean);
     if (!labels.length) addRow("Reports", "Nothing selected — pick a report on the left", { warn: true });
     else addRow("Reports", labels.length === 1 ? labels[0] : `${labels.length} reports`, { title: true });
     addRow("Routes", pfRoutesSummary());
@@ -1136,8 +1142,8 @@ function renderEnvAccess() {
   // (warning only — the site may have changed since; the run will tell).
   const active = acc[`${$("selSource").value}-${$("selEnv").value}`];
   const reps = (active && active.reports) || {};
-  $("reportList").querySelectorAll(".option-row").forEach((row, i) => {
-    const label = ((S.init.reports || [])[i] || {}).label;
+  $("reportList").querySelectorAll(".option-row").forEach((row) => {
+    const label = reportByKey(row.querySelector("input").dataset.key).label;
     const state = label && reps[label];
     const off = state && state !== "ok";
     row.classList.toggle("report-off", !!off);
@@ -1175,8 +1181,8 @@ function renderBatchAccess() {
                : warn ? " Some report types may be unavailable here." : "")
       : "";
   });
-  $("batchReportList").querySelectorAll(".option-row").forEach((row, i) => {
-    const label = ((S.init.reports || [])[i] || {}).label;
+  $("batchReportList").querySelectorAll(".option-row").forEach((row) => {
+    const label = reportByKey(row.querySelector("input").dataset.key).label;
     const hits = [];                          // envs where this report is unavailable
     selectedKeys.forEach((key) => {
       const e = acc[key];
@@ -1580,7 +1586,7 @@ async function chooseRoutes() {
 }
 
 async function startExport() {
-  const reports = selectedReportIdxs();
+  const reports = selectedReportKeys();
   if (!reports.length) {
     showMessage("info", "Pick a report", "Tick at least one report to export.");
     return;
@@ -1643,7 +1649,7 @@ function renderBatchResume(resume) {
 async function startBatch(onlyReports) {
   const reports = (onlyReports && onlyReports.length) ? onlyReports
     : [...$("batchReportList").querySelectorAll("input")]
-        .filter((c) => c.checked).map((c) => +c.dataset.idx);
+        .filter((c) => c.checked).map((c) => c.dataset.key);
   if (!reports.length) {
     showMessage("info", "Pick a report type", "Tick at least one report type."); return;
   }
@@ -1696,7 +1702,7 @@ async function renderBatchLibrary() {
   const freshest = present.length ? Math.min(...present.map((r) => r.age_seconds)) : 0;
   const locked = !!(S.st && S.st.task);
   lib.textContent = "";
-  rows.forEach((r, i) => {
+  rows.forEach((r) => {
     const row = document.createElement("div");
     row.className = "lib-row" + (r.present ? "" : " missing");
     const name = document.createElement("span");
@@ -1714,7 +1720,7 @@ async function renderBatchLibrary() {
     btn.className = "btn btn-subtle btn-small";
     btn.textContent = r.present ? "Refresh" : "Export";
     btn.disabled = locked;
-    btn.onclick = () => startBatch([i]);
+    btn.onclick = () => startBatch([r.subdir]);   // export-op key = subdir (P3)
     row.append(name, age, btn);
     lib.appendChild(row);
   });
@@ -2725,9 +2731,9 @@ function updateDayMatrixProgress() {
 }
 
 async function startConsolidate() {
-  const idx = consChoice();
+  const key = consChoice();
   const day = selectedDay();
-  const info = await api.consolidate_info(idx, day);
+  const info = await api.consolidate_info(key, day);
   if (info.exists) {
     const ok = await showConfirm({
       title: "Overwrite?",
@@ -2737,7 +2743,7 @@ async function startConsolidate() {
     });
     if (!ok) { api.decline_overwrite(); return; }
   }
-  const res = await api.start_consolidate(idx, day);
+  const res = await api.start_consolidate(key, day);
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }
 
@@ -2750,8 +2756,11 @@ async function saveRunReport() {
 const CMP = { tsmis: null, tsn: null };
 
 function compareKind() {
-  const rep = (S.init.compare_reports || [])[compareChoice()];
-  return (rep && rep.kind) || "files";
+  // Resolve by KEY (P3) — compareChoice() returns a `cmp:*` key, so the old
+  // array[index] lookup always read undefined and defaulted every comparison to
+  // "files", routing folder compares to the file path. currentCompareRep() finds
+  // the row by key.
+  return currentCompareRep().kind || "files";
 }
 
 // Switch the Compare sub-tab: highlight the button, show only that group's
@@ -3705,28 +3714,32 @@ function makeMockApi() {
     if (i === 101) ROUTES.push("101U");
   }
   const REPORTS = [
-    { label: "TSAR: Ramp Summary", fmt: "PDF" },
-    { label: "TSAR: Ramp Detail", fmt: "Excel" },
-    { label: "Highway Sequence Listing", fmt: "Excel" },
-    { label: "Highway Log", fmt: "Excel" },
-    { label: "Highway Log (PDF)", fmt: "PDF" },
-    { label: "Intersection Summary", fmt: "Excel" },
-    { label: "Intersection Detail", fmt: "Excel" },
+    { key: "ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF" },
+    { key: "ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel" },
+    { key: "highway_sequence", label: "Highway Sequence Listing", fmt: "Excel" },
+    { key: "highway_log", label: "Highway Log", fmt: "Excel" },
+    { key: "highway_log_pdf", label: "Highway Log (PDF)", fmt: "PDF" },
+    { key: "intersection_summary", label: "Intersection Summary", fmt: "Excel" },
+    { key: "intersection_detail", label: "Intersection Detail", fmt: "Excel" },
   ];
-  // The Consolidate radios index into THIS list (matches reports.CONSOLIDATE_REPORTS,
-  // 8 rows incl. both Intersection consolidators as of v0.17.0) — NOT the 7-row
-  // export REPORTS above. consolidate_info/start_consolidate must use this so the
-  // preview's labels/out_paths mirror the real bridge.
+  // The Consolidate radios carry each row's stable `cons:*` key (P3) — this list
+  // matches reports.CONSOLIDATE_REPORTS (8 rows incl. both Intersection consolidators
+  // as of v0.17.0), NOT the 7-row export REPORTS above. consolidate_info/
+  // start_consolidate resolve by that key, so the preview mirrors the real bridge.
   const CONS_REPORTS = [
-    { label: "TSAR: Ramp Summary" },
-    { label: "TSAR: Ramp Detail" },
-    { label: "Highway Sequence Listing" },
-    { label: "Intersection Summary" },
-    { label: "Intersection Detail" },
-    { label: "TSMIS Highway Log (Excel)" },
-    { label: "TSMIS Highway Log (PDF)" },
-    { label: "TSN Highway Log (PDF)" },
+    { key: "cons:ramp_summary", label: "TSAR: Ramp Summary" },
+    { key: "cons:ramp_detail", label: "TSAR: Ramp Detail" },
+    { key: "cons:highway_sequence", label: "Highway Sequence Listing" },
+    { key: "cons:intersection_summary", label: "Intersection Summary" },
+    { key: "cons:intersection_detail", label: "Intersection Detail" },
+    { key: "cons:highway_log_excel", label: "TSMIS Highway Log (Excel)" },
+    { key: "cons:highway_log_pdf", label: "TSMIS Highway Log (PDF)" },
+    { key: "cons:tsn_highway_log", label: "TSN Highway Log (PDF)" },
   ];
+  // Mock selection travels by KEY too (P3), so the preview exercises the same
+  // bridge contract as production. These map a key back to its mock row.
+  const repByKey = (k) => REPORTS.find((r) => r.key === k) || {};
+  const consByKey = (k) => CONS_REPORTS.find((r) => r.key === k) || {};
   const st = {
     task: null, fast_run: false,
     authed: false, device_ok: false,
@@ -4116,9 +4129,9 @@ function makeMockApi() {
     st.task = "export"; st.fast_run = fast; st.last_summary = null;
     st.auth_dot = "busy";
     st.auth_text = reports.length > 1 ? `Exporting ${reports.length} report(s)…`
-                                      : `Exporting ${REPORTS[reports[0]].label}…`;
+                                      : `Exporting ${repByKey(reports[0]).label}…`;
     pushState();
-    const names = reports.map((i) => REPORTS[i].label).join(", ");
+    const names = reports.map((k) => repByKey(k).label).join(", ");
     const nWorkers = fast ? workers : 1;
     let msg = `Starting export: ${names}`;
     if (routes.length !== ROUTES.length) msg += `   ·   ${routes.length} routes`;
@@ -4140,8 +4153,9 @@ function makeMockApi() {
         push({ t: "log", text: "" },
              { t: "log", text: `Done. ${total} routes handled — saved ${counts.saved}, already had ${counts.exists}, empty ${counts.empty}, skipped ${counts.skipped}, failed ${counts.failed}.` });
         if (autoConsolidate) {
-          reports.filter((i) => i < 4).forEach((i) =>
-            push({ t: "log", text: `Auto-consolidating ${REPORTS[i].label}… done.` }));
+          const AUTO_CONS = ["ramp_summary", "ramp_detail", "highway_sequence", "highway_log"];
+          reports.filter((k) => AUTO_CONS.includes(k)).forEach((k) =>
+            push({ t: "log", text: `Auto-consolidating ${repByKey(k).label}… done.` }));
         }
         // P1: the producer-owned outcome, mirroring the backend's outcome.py +
         // _build_export_summary (a skipped/failed run is partial, all-empty is
@@ -4155,7 +4169,7 @@ function makeMockApi() {
         st.task = null; st.fast_run = false; st.can_save_report = true;
         const failedRoutes = routes.slice(0, counts.failed);
         st.last_summary = {
-          reports: reports.map((i, n) => ({ label: REPORTS[i].label, ...counts,
+          reports: reports.map((k, n) => ({ label: repByKey(k).label, ...counts,
             completion, artifact, failed_routes: n === 0 ? failedRoutes : [] })),
           totals: { ...counts }, failed_total: counts.failed, cancelled: false,
           completion, artifact,
@@ -4175,7 +4189,7 @@ function makeMockApi() {
       push({ t: "wstatus", w, text: `[${String(done).padStart(3)}/${total}] Route ${route}: working… (${(Math.random() * 60 + 3).toFixed(0)}s)` });
       if (status === "saved") push({ t: "log", text: `Route ${route}: saved (${(Math.random() * 3 + 0.4).toFixed(1)} MB, ${(Math.random() * 40 + 8).toFixed(0)}s)` });
       if (status === "failed") push({ t: "log", text: `Route ${route}: FAILED — TSMIS site error (see failures folder)` });
-      push({ t: "progress", p: { done, total, route, report: REPORTS[reports[0]].label, report_i: 1, report_n: reports.length, ...counts } });
+      push({ t: "progress", p: { done, total, route, report: repByKey(reports[0]).label, report_i: 1, report_n: reports.length, ...counts } });
     }, fast ? 120 : 350);
   }
 
@@ -4198,7 +4212,7 @@ function makeMockApi() {
       key, label: envLabel(key),
       state: j < curIdx ? "done" : j === curIdx ? "running" : "pending",
     }));
-    const reps = reports.map((r) => REPORTS[r]);
+    const reps = reports.map((k) => repByKey(k));
     const ROUTES_DEMO = ["005", "010", "099", "101"];
     let ei = 0;
     const nextEnv = () => {
@@ -4251,18 +4265,19 @@ function makeMockApi() {
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       // Mirror the real gate (now EMPTY — all reports enabled, incl. Intersection,
-      // which lives on the dev site). Each carries its STABLE index into the full
-      // registry; `disabled` stays for when a report is gated off again.
+      // which lives on the dev site). Each carries its stable export-op `key` (the
+      // selection contract, P3) plus display-order `idx`; `disabled` stays for when
+      // a report is gated off again.
       reports: REPORTS.map((r, i) => ({ idx: i, ...r, disabled: false })),
       cons_reports: [
-        { label: "TSAR: Ramp Summary", fmt: "PDF" },
-        { label: "TSAR: Ramp Detail", fmt: "Excel" },
-        { label: "Highway Sequence Listing", fmt: "Excel" },
-        { label: "Intersection Summary", fmt: "Excel" },
-        { label: "Intersection Detail", fmt: "Excel" },
-        { label: "TSMIS Highway Log (Excel)", fmt: "Excel" },
-        { label: "TSMIS Highway Log (PDF)", fmt: "PDF" },
-        { label: "TSN Highway Log (PDF)", fmt: "PDF" },
+        { key: "cons:ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF" },
+        { key: "cons:ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel" },
+        { key: "cons:highway_sequence", label: "Highway Sequence Listing", fmt: "Excel" },
+        { key: "cons:intersection_summary", label: "Intersection Summary", fmt: "Excel" },
+        { key: "cons:intersection_detail", label: "Intersection Detail", fmt: "Excel" },
+        { key: "cons:highway_log_excel", label: "TSMIS Highway Log (Excel)", fmt: "Excel" },
+        { key: "cons:highway_log_pdf", label: "TSMIS Highway Log (PDF)", fmt: "PDF" },
+        { key: "cons:tsn_highway_log", label: "TSN Highway Log (PDF)", fmt: "PDF" },
       ],
       compare_groups: [
         { id: "env", label: "Cross-environment" },
@@ -4270,31 +4285,32 @@ function makeMockApi() {
       ],
       // Mirrors the real reports.COMPARE_REPORTS (15 rows as of v0.17.0): every
       // report has a cross-env ("— between environments") AND a vs-TSN comparator,
-      // plus the Highway Log PDF↔Excel self-check. Order matches the registry so
-      // the radios index correctly.
+      // plus the Highway Log PDF↔Excel self-check. Each row carries its stable
+      // `cmp:*` key (P3), so selection/routing resolves by key — the order just
+      // mirrors the registry for display parity.
       compare_reports: [
-        { label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env" },
-        { label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env" },
-        { label: "Highway Sequence Listing — between environments", kind: "folders", group: "env" },
-        { label: "Highway Log — between environments", kind: "folders", group: "env" },
-        { label: "TSAR: Intersection Summary — between environments", kind: "folders", group: "env" },
-        { label: "TSAR: Intersection Detail — between environments", kind: "folders", group: "env" },
-        { label: "Highway Log (PDF) — between environments", kind: "folders", group: "env" },
-        { label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn",
+        { key: "cmp:ramp_summary:env", label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env" },
+        { key: "cmp:ramp_detail:env", label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env" },
+        { key: "cmp:highway_sequence:env", label: "Highway Sequence Listing — between environments", kind: "folders", group: "env" },
+        { key: "cmp:highway_log:env", label: "Highway Log — between environments", kind: "folders", group: "env" },
+        { key: "cmp:intersection_summary:env", label: "TSAR: Intersection Summary — between environments", kind: "folders", group: "env" },
+        { key: "cmp:intersection_detail:env", label: "TSAR: Intersection Detail — between environments", kind: "folders", group: "env" },
+        { key: "cmp:highway_log_pdf:env", label: "Highway Log (PDF) — between environments", kind: "folders", group: "env" },
+        { key: "cmp:highway_log:tsn", label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
-        { label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "tsn",
+        { key: "cmp:highway_log:pdf_vs_tsn", label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "tsn",
           file_a_label: "TSMIS (PDF)", file_b_label: "TSN (PDF)" },
-        { label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env",
+        { key: "cmp:highway_log:pdf_vs_excel", label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env",
           file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
-        { label: "TSAR: Ramp Detail — TSMIS vs TSN", kind: "files", group: "tsn",
+        { key: "cmp:ramp_detail:tsn", label: "TSAR: Ramp Detail — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
-        { label: "TSAR: Ramp Summary — TSMIS vs TSN", kind: "files", group: "tsn",
+        { key: "cmp:ramp_summary:tsn", label: "TSAR: Ramp Summary — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
-        { label: "TSAR: Intersection Summary — TSMIS vs TSN", kind: "files", group: "tsn",
+        { key: "cmp:intersection_summary:tsn", label: "TSAR: Intersection Summary — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
-        { label: "TSAR: Intersection Detail — TSMIS vs TSN", kind: "files", group: "tsn",
+        { key: "cmp:intersection_detail:tsn", label: "TSAR: Intersection Detail — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
-        { label: "Highway Sequence Listing — TSMIS vs TSN", kind: "files", group: "tsn",
+        { key: "cmp:highway_sequence:tsn", label: "Highway Sequence Listing — TSMIS vs TSN", kind: "files", group: "tsn",
           file_a_label: "TSMIS", file_b_label: "TSN" },
       ],
       batch_resume: null,
@@ -4584,14 +4600,15 @@ function makeMockApi() {
     retry_failed: async () => {
       const s = st.last_summary;
       if (!s || !s.failed_total) return { error: "There are no failed routes to retry." };
-      runMockExport([0], ROUTES.slice(0, Math.max(2, s.failed_total)), false, 1, false);
+      runMockExport(["ramp_summary"], ROUTES.slice(0, Math.max(2, s.failed_total)), false, 1, false);
       return { ok: true };
     },
     open_run_folder: async () => { push({ t: "log", text: "(mock) opened run folder" }); return { ok: true }; },
     resume_batch: async () => {
       const r = st.batch_resume || { pending: 1, reports: [] };
       st.batch_resume = null;
-      const reps = (r.reports && r.reports.length) ? r.reports : [0, 1, 2, 3];
+      const reps = (r.reports && r.reports.length) ? r.reports
+        : ["ramp_summary", "ramp_detail", "highway_sequence", "highway_log"];
       const envs = Array.from({ length: r.pending || 1 }, (_, i) => `env-${i + 1}`);
       runMockBatch(reps, envs, false, 1, true);
       return { ok: true };
@@ -4864,17 +4881,17 @@ function makeMockApi() {
         push({ t: "log", text: "Cancelled." });
       }, 600);
     },
-    consolidate_info: async (idx, day) => {
-      // Only index 7 (TSN Highway Log) reads from a dropped-in input folder (those
+    consolidate_info: async (key, day) => {
+      // Only "cons:tsn_highway_log" reads from a dropped-in input folder (those
       // district PDFs come from outside the app) — so it carries an input_note and
-      // the day picker is hidden. Index 6 (TSMIS Highway Log PDF) reads this app's
-      // own "Highway Log (PDF)" export, day-aware like the Excel one. (Indices
-      // shifted +2 in v0.17.0 when Intersection Summary/Detail joined the list.)
+      // the day picker is hidden. The others read this app's own exports, day-aware
+      // like the Excel one. Keyed by the stable consolidation-op key now (P3).
       const dropped = {
-        7: { note: "Drop the TSN district Highway Log PDFs into the input folder first.",
-             dir: "C:\\Tools\\TSMIS Exporter\\input\\tsn_highway_log",
-             out: "tsn_highway_log_consolidated.xlsx" },
-      }[idx];
+        "cons:tsn_highway_log": {
+          note: "Drop the TSN district Highway Log PDFs into the input folder first.",
+          dir: "C:\\Tools\\TSMIS Exporter\\input\\tsn_highway_log",
+          out: "tsn_highway_log_consolidated.xlsx" },
+      }[key];
       if (dropped) return {
         dest_dir: "C:\\Tools\\TSMIS Exporter\\output",
         out_path: "C:\\Tools\\TSMIS Exporter\\output\\" + dropped.out,
@@ -4884,8 +4901,8 @@ function makeMockApi() {
       };
       return {
         dest_dir: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated`,
-        out_path: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated\\${CONS_REPORTS[idx].label.replace(/[:\s]+/g, "_")}.xlsx`,
-        exists: idx === 0 && day === "2026-06-10",
+        out_path: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated\\${consByKey(key).label.replace(/[:\s]+/g, "_")}.xlsx`,
+        exists: key === "cons:ramp_summary" && day === "2026-06-10",
       };
     },
     open_consolidate_input: async () => push({ t: "log", text: "(mock) would open the input folder" }),
@@ -4897,7 +4914,7 @@ function makeMockApi() {
     pick_compare_folder: async () => ({
       path: "D:\\Archive\\2026-05-02 ssor-prod",
     }),
-    start_compare_env: async (_idx, dirA, dirB, wantFormulas, wantValues) => {
+    start_compare_env: async (_key, dirA, dirB, wantFormulas, wantValues) => {
       if (!wantFormulas && !wantValues) {
         return { error: "Tick at least one output (values and/or live formulas)." };
       }
@@ -4928,7 +4945,7 @@ function makeMockApi() {
       }, 2400);
       return { ok: true };
     },
-    start_compare: async (_idx, _t, _n, wantFormulas, wantValues) => {
+    start_compare: async (_key, _t, _n, wantFormulas, wantValues) => {
       if (!wantFormulas && !wantValues) {
         return { error: "Tick at least one output (values and/or live formulas)." };
       }
@@ -4953,12 +4970,12 @@ function makeMockApi() {
       return { ok: true };
     },
     decline_overwrite: async () => push({ t: "log", text: "Consolidation cancelled (kept existing file)." }),
-    start_consolidate: async (idx, day) => {
+    start_consolidate: async (key, day) => {
       st.task = "consolidate";
-      st.auth_dot = "busy"; st.auth_text = `Consolidating ${CONS_REPORTS[idx].label}…`;
+      st.auth_dot = "busy"; st.auth_text = `Consolidating ${consByKey(key).label}…`;
       pushState();
-      push({ t: "log", text: `Starting consolidation: ${CONS_REPORTS[idx].label}` + (day ? `   ·   ${day}` : "") },
-           { t: "run_started", mode: "consolidate", label: `Consolidating ${CONS_REPORTS[idx].label}…` });
+      push({ t: "log", text: `Starting consolidation: ${consByKey(key).label}` + (day ? `   ·   ${day}` : "") },
+           { t: "run_started", mode: "consolidate", label: `Consolidating ${consByKey(key).label}…` });
       setTimeout(() => {
         push({ t: "log", text: `Consolidated 31 file(s) -> Output: consolidated\\workbook.xlsx` }, { t: "run_ended" });
         st.task = null;

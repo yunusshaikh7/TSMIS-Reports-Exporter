@@ -73,20 +73,22 @@ def main():
         api = gui_api.GuiApi()
         hl_idx = _folders_idx("highway_log")
         check("a folders-kind highway_log comparison exists", hl_idx is not None)
+        hl_key = reports.COMPARE_KEYS[hl_idx]
         check("folders-kind filters to runs with the report",
-              api.get_compare_folders(hl_idx).get("folders")
+              api.get_compare_folders(hl_key).get("folders")
               == ["2026-06-16 ssor-prod"])
-        files_idx = next((i for i, r in enumerate(reports.COMPARE_REPORTS)
+        files_key = next((reports.COMPARE_KEYS[i]
+                          for i, r in enumerate(reports.COMPARE_REPORTS)
                           if r[2] == "files"), None)
         check("files-kind returns ALL folders (no dropdown filter)",
-              set(api.get_compare_folders(files_idx).get("folders"))
+              set(api.get_compare_folders(files_key).get("folders"))
               == set(paths.list_output_days()))
-        check("bad index falls back to all folders (never empty by mistake)",
-              set(api.get_compare_folders(999).get("folders"))
+        check("bad key falls back to all folders (never empty by mistake)",
+              set(api.get_compare_folders("__nope__").get("folders"))
               == set(paths.list_output_days()))
 
         print("start_compare_env preflight:")
-        res = api.start_compare_env(hl_idx, "2026-06-16 ssor-prod",
+        res = api.start_compare_env(hl_key, "2026-06-16 ssor-prod",
                                     "2026-06-16 ars-prod", True, False)
         check("rejects a side lacking the report's export",
               isinstance(res, dict) and bool(res.get("error")))

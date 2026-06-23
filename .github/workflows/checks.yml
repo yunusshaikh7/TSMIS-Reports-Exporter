@@ -68,6 +68,7 @@ jobs:
           python build/check_b1_pause.py
           python build/check_b2_autoconsolidate.py
           python build/check_b3_batch.py
+          python build/check_stable_ids.py
           python build/check_report_library.py
           python build/check_matrix.py
           python build/check_matrix_bridge.py
@@ -101,11 +102,17 @@ jobs:
           python build/check_artifact_store.py
           python build/check_p2_freshness.py
 
-      - name: Frontend matrix renderer check (blocking)
+      - name: Frontend renderer + routing checks (blocking)
         # P1-R01: a matrix cell built from PARTIAL consolidation inputs must render
         # distinctly from a fully-valid match (mxCellContent -> mx-partial, not the
-        # green mx-match). Pure Node (the runner ships Node) — no browser/server.
-        run: node build/check_mx_partial_render.js
+        # green mx-match). P3-B03: the Compare tab resolves a row's KIND by its
+        # stable cmp:* key and routes folders/files comparisons correctly. Pure Node
+        # (the runner ships Node) — no browser/server.
+        shell: bash
+        run: |
+          set -e
+          node build/check_mx_partial_render.js
+          node build/check_compare_routing.js
 
       - name: Packaging + console-flow checks (blocking)
         # Offline half of the exact-artifact gate (PA): APP_MODULES is the complete,

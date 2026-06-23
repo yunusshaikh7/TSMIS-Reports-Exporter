@@ -85,10 +85,11 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
   The Export- and Everything-tab report lists come from `export_reports_status()` (the FULL list with a
   per-report `disabled` flag), so Intersection still **appears, greyed and unpickable** (the JS
   `makeReportRow` renders `.option-static` + a disabled checkbox + `dataset.off` so the lock-sweep
-  can't re-enable it). `start_export` / `start_batch_export` reject a disabled index server-side; the
-  Saved-reports freshness library (`report_library_info` → `enabled_export_reports()`) and the matrix
-  (no cross-env adapter) still exclude them. **`EXPORT_REPORTS` indices stay stable** (the GUI passes
-  each report's real `idx`), so manifests / env-scan are unaffected. Flip back on by emptying the set.
+  can't re-enable it). `start_export` / `start_batch_export` reject a disabled report by its stable
+  export-op key server-side; the Saved-reports freshness library (`report_library_info` →
+  `enabled_export_reports()`) and the matrix (no cross-env adapter) still exclude them. As of P3 the
+  GUI/manifests pass **stable export-op KEYS** (= each report's `subdir`; `idx` is display-order
+  metadata only), so a registry re-order never mis-resumes. Flip back on by emptying the set.
   Locked by `build/check_intersection_gate.py`. The spec/empty-marker detail below still applies
   if/when they're re-enabled.
 - **Export-only** -- NO consolidator and NO comparison support. They are absent from `_CONSOLIDATOR_BY_SUBDIR`, so `consolidator_for_spec()` returns `None` and B2 auto-consolidate skips them.
@@ -145,7 +146,7 @@ See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for
 
 ## Recipe: add a new comparison type
 
-Add one row to `COMPARE_REPORTS` in `reports.py` and the module to `APP_MODULES` in `build/app.spec`. Rows are `(label, module_or_adapter, kind, group)`. The GUI's per-sub-tab type lists are generated from it; **selection is by index**, so the row order is what the UI radios and `start_compare*` calls key on.
+Add one row to `COMPARE_REPORTS` in `reports.py`, **a matching stable key at the same position in `COMPARE_KEYS`** (an import-time assert enforces the 1:1 length), and the module to `APP_MODULES` in `build/app.spec`. Rows are `(label, module_or_adapter, kind, group)`. The GUI's per-sub-tab type lists are generated from it; as of P3 (v0.18.0) **selection travels by each row's stable `cmp:*` key**, so the row order is only the UI-radio display order and never mis-resolves a `start_compare*` call.
 
 **`group`** is one of `COMPARE_GROUPS`' ids. The Compare pane renders one **sub-tab per group** (first = default), and a row shows only under its group's sub-tab. As of v0.16.1 the two registry sub-tabs are:
 

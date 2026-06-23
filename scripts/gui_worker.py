@@ -519,9 +519,19 @@ class BatchWorker(threading.Thread):
         self.pause = pause_event
 
     def _specs(self):
-        from reports import EXPORT_REPORTS
-        return [EXPORT_REPORTS[i][2] for i in self.manifest.get("reports", [])
-                if 0 <= i < len(EXPORT_REPORTS)]
+        # Resolve the manifest's export-op KEYS to specs (P3 / §C.5). The seam the
+        # lifecycle tests stub; the real impl never silently narrows — validity is
+        # the `_invalid_keys` set, and run() aborts all-or-nothing on any invalid key
+        # (F7). A v1 manifest was migrated to keys by batch_manifest.load.
+        from reports import resolve_export_keys
+        return resolve_export_keys(self.manifest.get("reports", []))[0]
+
+    def _invalid_keys(self):
+        """The saved keys that DON'T resolve — unknown, app-wide-disabled, or
+        duplicate. A non-empty result means the saved selection can't be honored;
+        run() aborts all-or-nothing rather than running a narrower batch (§C.5)."""
+        from reports import resolve_export_keys
+        return resolve_export_keys(self.manifest.get("reports", []))[1]
 
     def _step_views(self, cur_src, cur_env):
         """Ordered per-environment view for the progress stepper: each step's
@@ -557,6 +567,23 @@ class BatchWorker(threading.Thread):
                             is_cancelled=self.cancel.is_set)
         total = len(steps)
         done = sum(1 for s in steps if s.get("status") == "done")
+        if self._invalid_keys() or not specs:
+            # The saved selection can't be honored as-is — one or more report keys
+            # are unknown/disabled/duplicate, or none resolve (e.g. after an upgrade
+            # or registry change). Per §C.5 this is ALL-OR-NOTHING: abort WITHOUT
+            # marking any environment done (a narrower batch would silently drop the
+            # user's pending selection) and WITHOUT clearing the manifest (it stays
+            # resumable/discardable). Emit exactly ONE terminal — the user-visible
+            # `error`, mirroring the AuthError path — never a second `batch_done`
+            # (CT-10: one terminal per outcome; a stray second terminal could clobber
+            # an already-dispatched successor pre-P7a).
+            self.q.put(("log", "  This Export Everything batch can't run: one or more "
+                               "of its saved report types are no longer available."))
+            self.q.put(("error", ("general",
+                        "This Export Everything batch can't run — one or more of its "
+                        "saved report types are no longer available. Discard it and "
+                        "start a fresh Export Everything.")))
+            return
         original = get_site()
         try:
             for step in steps:

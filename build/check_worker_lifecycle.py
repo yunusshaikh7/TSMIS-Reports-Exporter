@@ -247,6 +247,25 @@ def _batch(outcome):
     return q.items
 
 
+def _batch_invalid():
+    """BatchWorker.run over a manifest whose saved KEYS can't all resolve (a
+    removed/renamed report). Must abort ALL-OR-NOTHING with EXACTLY ONE terminal
+    (`error`) — no `batch_done`, no env marked done — the invalid saved selection
+    can't run a narrower batch (P3-B01/B02 / §C.5)."""
+    q = _Q()
+    manifest = {"version": 2, "reports": ["__removed__", "ramp_summary"],
+                "steps": [{"src": "ssor", "env": "prod", "status": "pending"}],
+                "dest": None, "fast": False, "workers": 1, "auto_consolidate": False}
+    w = gw.BatchWorker(manifest, q, threading.Event(), threading.Event(),
+                       threading.Event())
+    with _patched((gw, "set_site", lambda *_a: None),
+                  (gw, "get_site", lambda: ("ssor", "prod")),
+                  (gw.batch_manifest, "mark_done",
+                   lambda *_a: (_ for _ in ()).throw(AssertionError("marked done!")))):
+        w.run()
+    return q.items
+
+
 def _matrix_export(outcome):
     q = _Q()
     spec = types.SimpleNamespace(label="Ramp Summary")
@@ -403,6 +422,7 @@ _SCENARIOS = [
     ("EnvScanWorker", "envscan", "env_access_done", "success", _envscan),
     ("BatchWorker", "batch", "batch_done", "success", lambda: _batch("success")),
     ("BatchWorker", "batch", "error", "expected-error", lambda: _batch("expected-error")),
+    ("BatchWorker", "batch", "error", "invalid-manifest", _batch_invalid),
     ("MatrixBatchExportWorker", "matrix", "matrix_export_done", "success", lambda: _matrix_export("success")),
     ("MatrixBatchExportWorker", "matrix", "error", "expected-error", lambda: _matrix_export("expected-error")),
     ("MatrixCompareWorker", "matrix", "matrix_done", "success", _matrix_compare),
@@ -509,10 +529,32 @@ def test_duplicate_late_active_successor():
           a._current_job is None)
 
 
+def test_invalid_manifest_batch_advances_successor():
+    print("P3-B02: an invalid-manifest batch's ONE terminal advances a queued successor:")
+    items = _batch_invalid()
+    check("invalid-manifest batch emits exactly one terminal = error",
+          _terminals(items) == ["error"])
+    check("no batch_done accompanies the error (one terminal per outcome)",
+          not any(k == "batch_done" for k, _p in items))
+    # Feed that single terminal through _handle WITH an already-dispatched successor:
+    # one terminal frees the gate and advances the queue — it cannot clobber the
+    # successor (there is no stray second terminal).
+    a = _api()
+    dispatched = []
+    a._dispatch_matrix_job = lambda job: (dispatched.append(job["label"]) or True)
+    _claim(a, "batch")
+    a._queue.append(_job("succ-after-invalid"))
+    kind, payload = next((k, p) for k, p in items if k in TERMINAL)
+    a._handle(kind, payload)
+    check("the single error terminal advanced the queued successor (not clobbered)",
+          dispatched == ["succ-after-invalid"] and a._task == "matrix")
+
+
 def main():
     test_producer_paths()
     test_terminal_payload_variants()
     test_queue_advances_on_terminal()
+    test_invalid_manifest_batch_advances_successor()
     test_duplicate_late_idle()
     test_duplicate_late_active_successor()
     print()

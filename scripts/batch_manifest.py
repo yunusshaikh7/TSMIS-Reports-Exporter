@@ -19,16 +19,69 @@ from paths import DATA_ROOT
 log = logging.getLogger("tsmis.batch")
 
 MANIFEST_PATH = DATA_ROOT / "batch_job.json"
-_VERSION = 1
+_VERSION = 2                       # v2 persists export-op KEYS (v1 was int indices)
+_SUPPORTED_VERSIONS = (1, 2)       # v1 still LOADS (migrated to v2 in memory)
+
+# v0.17 (manifest v1) stored INTEGER indices into EXPORT_REPORTS. This is the
+# FROZEN map from those indices to the stable export-op keys — never a live view
+# of EXPORT_REPORTS (which can re-order). A v1 manifest must always resolve to the
+# reports the user actually picked under v0.17, regardless of any later re-order.
+_V017_EXPORT_ORDER = (
+    "ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
+    "highway_log_pdf", "intersection_summary", "intersection_detail",
+)
+
+# Poison sentinel for a structurally-invalid saved entry. It is never a real export
+# key, so the all-or-nothing resolver (`reports.resolve_export_keys`) rejects it and
+# the batch aborts — rather than coercing or silently dropping the bad entry (§C.5).
+_INVALID_KEY = "__invalid_selection__"
 
 
-def build(report_idxs, combos, fast, workers, auto_consolidate, dest="", created=""):
-    """A fresh manifest: which reports, which (src, env) combos (all 'pending'),
-    the destination folder, and the run options. `combos` is an iterable of
-    (src, env) pairs; `dest` is the always-current folder to refresh into."""
+def _migrate_v1_reports(raw):
+    """v1 integer indices -> export-op keys via the frozen v0.17 order, **1:1 and
+    length-preserving**. A non-integer (bool/float/str — never coerced) or an
+    out-of-range entry maps to the poison `_INVALID_KEY`; duplicates are kept. So an
+    invalid or repeated legacy index rejects the whole saved selection downstream
+    instead of silently running a narrower batch (§C.5)."""
+    keys = []
+    for i in raw if isinstance(raw, list) else []:
+        if isinstance(i, bool) or not isinstance(i, int):
+            log.warning("v1 manifest report entry %r is not an integer index — rejected", i)
+            keys.append(_INVALID_KEY)
+        elif 0 <= i < len(_V017_EXPORT_ORDER):
+            keys.append(_V017_EXPORT_ORDER[i])
+        else:
+            log.warning("v1 manifest report index %r out of range — rejected", i)
+            keys.append(_INVALID_KEY)
+    return keys
+
+
+def _normalize_reports(data):
+    """The manifest's report selection as export-op KEYS, **1:1 with the saved list**
+    (length-preserving, duplicates kept). v1 int indices migrate via the frozen
+    order; a v2 entry that isn't a non-empty string maps to the poison `_INVALID_KEY`.
+    Nothing is coerced, de-duplicated, or dropped here — resolution is all-or-nothing
+    (§C.5), so any invalid/duplicate/unknown entry rejects the whole saved selection
+    (the batch aborts, the manifest is preserved, no environment is marked done)."""
+    raw = data.get("reports", [])
+    if data.get("version") == 1:
+        return _migrate_v1_reports(raw)
+    return [k if isinstance(k, str) and k else _INVALID_KEY
+            for k in (raw if isinstance(raw, list) else [])]
+
+
+def build(report_keys, combos, fast, workers, auto_consolidate, dest="", created=""):
+    """A fresh manifest (v2): which reports (by stable export-op KEY), which
+    (src, env) combos (all 'pending'), the destination folder, and the run
+    options. `combos` is an iterable of (src, env) pairs; `dest` is the
+    always-current folder to refresh into. Persisting KEYS — not list positions —
+    means a registry re-order never resumes the wrong report (F7 / §C.5)."""
     return {
         "version": _VERSION,
-        "reports": [int(i) for i in report_idxs],
+        # Canonical export-op KEYS, already validated + resolved by the caller
+        # (gui_api.start_batch_export). NOT coerced here — a malformed caller value
+        # would be caught by the all-or-nothing resolver, never silently stringified.
+        "reports": list(report_keys),
         "fast": bool(fast),
         "workers": int(workers),
         "auto_consolidate": bool(auto_consolidate),
@@ -58,10 +111,17 @@ def load(path=MANIFEST_PATH):
     except (OSError, ValueError) as e:
         log.warning("batch manifest unreadable (%s) — ignoring", type(e).__name__)
         return None
-    if (not isinstance(data, dict) or data.get("version") != _VERSION
+    if (not isinstance(data, dict)
+            or data.get("version") not in _SUPPORTED_VERSIONS
             or not isinstance(data.get("steps"), list)):
-        log.warning("batch manifest shape unexpected — ignoring")
+        log.warning("batch manifest shape/version unexpected — ignoring")
         return None
+    # Normalize the report selection to v2 export-op KEYS in memory, migrating a
+    # v1 int-index list through the FROZEN v0.17 order. The on-disk file is
+    # rewritten to v2 on the next save (mark_done), so a legacy batch resumes
+    # correctly and is upgraded forward exactly once (F7 / §C.5).
+    data["reports"] = _normalize_reports(data)
+    data["version"] = _VERSION
     return data
 
 

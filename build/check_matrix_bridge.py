@@ -152,7 +152,8 @@ def main():
         a._end_task()
 
         print("refresh_cell_export does NOT clobber a paused real batch:")
-        real = batch_manifest.build([0, 1], [("ssor", "prod"), ("ars", "prod")],
+        real = batch_manifest.build(["ramp_summary", "ramp_detail"],
+                                    [("ssor", "prod"), ("ars", "prod")],
                                     fast=False, workers=1, auto_consolidate=False)
         batch_manifest.save(real, mpath)
         before = batch_manifest.load(mpath)

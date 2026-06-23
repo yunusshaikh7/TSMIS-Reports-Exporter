@@ -104,12 +104,12 @@ def test_reset_token():
 
 
 def test_consolidate_index_before_claim():
-    print("start_consolidate validates index before claiming the slot:")
+    print("start_consolidate validates the report KEY before claiming the slot:")
     a = gui_api.GuiApi()
-    # A bad index must return an error AND leave the task slot free (not wedged).
-    res = a.start_consolidate(999, "")
-    check("bad index returns an error", res.get("error") is not None)
-    check("task slot left free after a bad index", a._try_claim_task("x") is True)
+    # A bad KEY must return an error AND leave the task slot free (not wedged).
+    res = a.start_consolidate("__nope__", "")
+    check("bad key returns an error", res.get("error") is not None)
+    check("task slot left free after a bad key", a._try_claim_task("x") is True)
     a._release_task()
 
 
@@ -117,10 +117,11 @@ def test_compare_dialog_error_releases():
     print("start_compare releases the slot if the save dialog errors:")
     import reports
     a = gui_api.GuiApi()
-    # Find a "files"-kind comparison index (start_compare's required kind).
-    files_idx = next((i for i, r in enumerate(reports.COMPARE_REPORTS)
+    # Find a "files"-kind comparison KEY (start_compare's required kind).
+    files_key = next((reports.COMPARE_KEYS[i]
+                      for i, r in enumerate(reports.COMPARE_REPORTS)
                       if r[2] == "files"), None)
-    if files_idx is None:
+    if files_key is None:
         check("a files-kind comparison exists", False)
         return
 
@@ -128,7 +129,7 @@ def test_compare_dialog_error_releases():
         raise RuntimeError("dialog blew up")
 
     a._save_dialog_for_compare = _boom        # claim happens, then the dialog throws
-    res = a.start_compare(files_idx, "a.xlsx", "b.xlsx", True, False)
+    res = a.start_compare(files_key, "a.xlsx", "b.xlsx", True, False)
     check("error surfaced to the caller", isinstance(res, dict) and res.get("error"))
     check("task slot released after a dialog error", a._try_claim_task("x") is True)
     a._release_task()

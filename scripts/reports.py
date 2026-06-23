@@ -11,6 +11,8 @@ Kept import-light and console-free: it only pulls in the thin `export_*`
 `ReportSpec` objects and the `consolidate_*` modules, so importing it never
 launches a browser or does any I/O.
 """
+import logging
+
 from export_ramp_summary import SPEC as _RAMP_SUMMARY_SPEC
 from export_ramp_detail import SPEC as _RAMP_DETAIL_SPEC
 from export_highway_sequence import SPEC as _HIGHWAY_SEQ_SPEC
@@ -37,6 +39,8 @@ import compare_intersection_summary_tsn as _cmp_int_summary_tsn
 import compare_intersection_detail_tsn as _cmp_int_detail_tsn
 import compare_highway_sequence_tsn as _cmp_highway_seq_tsn
 
+log = logging.getLogger("tsmis.reports")
+
 # Export tab / multi-export: (menu label, format hint, ReportSpec).
 # Order here is the display order in the GUI and the numbering in the console menu.
 EXPORT_REPORTS = [
@@ -56,6 +60,14 @@ EXPORT_REPORTS = [
     ("Intersection Summary", "Excel", _INT_SUMMARY_SPEC),
     ("Intersection Detail", "Excel", _INT_DETAIL_SPEC),
 ]
+
+# Stable export-op KEYS (P3 / §C.5): one per EXPORT_REPORTS row, in registry
+# order. Each equals the report-FAMILY key, which IS the export spec's output
+# `subdir` (ramp_summary … intersection_detail). These keys — never list
+# positions — are what `batch_job.json` persists and what start_export /
+# start_batch_export carry, so a later registry re-order can't resume the wrong
+# report (F7). Derived from the specs so they can never drift from the subdirs.
+EXPORT_KEYS = tuple(spec.subdir for _label, _fmt, spec in EXPORT_REPORTS)
 
 # Consolidate tab: (menu label, module). Same order as above. Each module
 # exposes consolidate(events, confirm_overwrite, day=None) plus
@@ -82,6 +94,21 @@ CONSOLIDATE_REPORTS = [
     #   come from OUTSIDE the app, so this one keeps an input folder + day ignored).
     ("TSN Highway Log (PDF)", _c_tsn_highway_log),
 ]
+
+# Stable consolidation-op KEYS (P3 / §C.5): one per CONSOLIDATE_REPORTS row, in
+# registry order. The three Highway Log consolidators split by source/format
+# (cons:highway_log_excel / cons:highway_log_pdf / cons:tsn_highway_log); the rest
+# are cons:<family>. Carried by the consolidate bridge methods instead of an index.
+CONSOLIDATE_KEYS = (
+    "cons:ramp_summary",
+    "cons:ramp_detail",
+    "cons:highway_sequence",
+    "cons:intersection_summary",
+    "cons:intersection_detail",
+    "cons:highway_log_excel",
+    "cons:highway_log_pdf",
+    "cons:tsn_highway_log",
+)
 
 # Compare tab SUB-TABS (GUI): the comparison types are grouped onto these sub-tabs
 # within the Compare pane, in this order (the FIRST is the default). Two registry
@@ -150,8 +177,10 @@ COMPARE_REPORTS = [
     ("Highway Log — TSMIS (PDF) vs TSMIS (Excel)",
      _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
     # v0.17.0 vs-TSN comparators (the reference recipe). Appended at the END so the
-    # registry indices above are unchanged (selection is by index). Each takes the
-    # consolidated TSMIS workbook + the TSN library file ("files" kind, group "tsn").
+    # registry ORDER above is unchanged; selection resolves by each row's stable
+    # `cmp:*` key (P3 / COMPARE_KEYS), so appending here is safe regardless of order.
+    # Each takes the consolidated TSMIS workbook + the TSN library file ("files" kind,
+    # group "tsn").
     ("TSAR: Ramp Detail — TSMIS vs TSN", _cmp_ramp_detail_tsn, "files", "tsn"),
     # Ramp Summary is the AGGREGATE recipe (statewide category counts, not per-row):
     # TSMIS consolidated workbook summed vs the TSN statewide PDF, keyed on category.
@@ -169,6 +198,29 @@ COMPARE_REPORTS = [
     # surface as one-sided rows (as for Highway Log).
     ("Highway Sequence Listing — TSMIS vs TSN", _cmp_highway_seq_tsn, "files", "tsn"),
 ]
+
+# Stable comparison-op KEYS (P3 / §C.5): one per COMPARE_REPORTS row, in registry
+# order — composite cmp:<family>:<flavor>. flavor = env (cross-environment), tsn
+# (TSMIS vs TSN), or the two PDF Highway Log checks (pdf_vs_tsn / pdf_vs_excel).
+# The Highway Log PDF cross-env row keeps the distinct family `highway_log_pdf`
+# (its own matrix subdir), so it never collides with the Excel highway_log:env.
+COMPARE_KEYS = (
+    "cmp:ramp_summary:env",
+    "cmp:ramp_detail:env",
+    "cmp:highway_sequence:env",
+    "cmp:highway_log:env",
+    "cmp:intersection_summary:env",
+    "cmp:intersection_detail:env",
+    "cmp:highway_log_pdf:env",
+    "cmp:highway_log:tsn",
+    "cmp:highway_log:pdf_vs_tsn",
+    "cmp:highway_log:pdf_vs_excel",
+    "cmp:ramp_detail:tsn",
+    "cmp:ramp_summary:tsn",
+    "cmp:intersection_summary:tsn",
+    "cmp:intersection_detail:tsn",
+    "cmp:highway_sequence:tsn",
+)
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each
 # EXPORTABLE report, keyed by the export ReportSpec's output subdir so this can't
@@ -217,10 +269,11 @@ def is_export_disabled(spec):
 
 
 def enabled_export_reports():
-    """`(idx, label, fmt, spec)` for each ENABLED export report, where `idx` is
-    the position in EXPORT_REPORTS (preserved so callers keep stable indices —
-    manifests / env-scan / start_export index into the full list). Drops the
-    app-wide-disabled reports (Intersection)."""
+    """`(idx, label, fmt, spec)` for each ENABLED export report, where `idx` is the
+    DISPLAY position in EXPORT_REPORTS (current-order metadata only). As of P3 the
+    GUI/persistence contract is the stable export-op KEY (= `spec.subdir`); manifests
+    / start_export travel by key, not this position. Drops the app-wide-disabled
+    reports (Intersection)."""
     return [(i, label, fmt, spec)
             for i, (label, fmt, spec) in enumerate(EXPORT_REPORTS)
             if not is_export_disabled(spec)]
@@ -228,10 +281,11 @@ def enabled_export_reports():
 
 def export_reports_status():
     """`(idx, label, fmt, spec, disabled)` for EVERY export report (the full
-    EXPORT_REPORTS, with its stable index). `disabled` flags the app-wide-disabled
-    reports (Intersection): the GUI shows these GREYED rather than hiding them, so
-    users can see they exist but can't pick them, while the start guards still
-    reject a disabled index server-side."""
+    EXPORT_REPORTS; `idx` is the DISPLAY position, current-order metadata only).
+    `disabled` flags the app-wide-disabled reports (Intersection): the GUI shows
+    these GREYED rather than hiding them, so users can see they exist but can't pick
+    them, while the start guards still reject a disabled report by its stable
+    export-op KEY server-side (P3)."""
     return [(i, label, fmt, spec, is_export_disabled(spec))
             for i, (label, fmt, spec) in enumerate(EXPORT_REPORTS)]
 
@@ -276,3 +330,78 @@ _TSN_MATRIX_EXTRA = []
 
 def tsn_matrix_extra_rows():
     return [(spec.subdir, label, spec.subdir) for label, spec in _TSN_MATRIX_EXTRA]
+
+
+# ---- Stable-ID lookups (P3 / §C.5) ------------------------------------------
+# The registry index is now only the DISPLAY order; the KEY is the contract that
+# selection/resume travel on, so a registry re-order never mis-resolves a saved
+# selection (F7). The matrix `row_key` is a separate, unchanged key (caches depend
+# on it) and is mapped to the family key additively, not renamed.
+
+def _index_of(keys, key):
+    """The position of `key` in the tuple `keys`, or None if absent."""
+    try:
+        return keys.index(key)
+    except ValueError:
+        return None
+
+
+def export_key_for_spec(spec):
+    """The export-op key for an export ReportSpec (its family key == subdir)."""
+    return getattr(spec, "subdir", None)
+
+
+def export_index_for_key(key):
+    """The EXPORT_REPORTS row index for an export-op key, or None."""
+    return _index_of(EXPORT_KEYS, key)
+
+
+def spec_for_export_key(key):
+    """The export ReportSpec for an export-op key, or None for an unknown key."""
+    i = export_index_for_key(key)
+    return EXPORT_REPORTS[i][2] if i is not None else None
+
+
+def resolve_export_keys(keys):
+    """Resolve a sequence of export-op keys to ``(specs, invalid)``, preserving
+    order. A key that is unknown, app-wide-disabled, OR a **duplicate** goes to
+    `invalid` (logged). Resolution is **all-or-nothing** (§C.5): any non-empty
+    `invalid` means the saved/selected set can't be honored as-is, so the caller
+    MUST reject the whole set — never silently run a narrower batch — preserving the
+    pending manifest and marking no environment done (F7). `specs` holds the known,
+    enabled reports in order (used only when `invalid` is empty)."""
+    specs, invalid, seen = [], [], set()
+    for key in keys or []:
+        if key in seen:
+            invalid.append(key)
+            log.warning("export-op key %r is a duplicate selection — rejected", key)
+            continue
+        seen.add(key)
+        spec = spec_for_export_key(key)
+        if spec is None or is_export_disabled(spec):
+            invalid.append(key)
+            log.warning("export-op key %r is unknown or disabled — rejected", key)
+        else:
+            specs.append(spec)
+    return specs, invalid
+
+
+def consolidate_index_for_key(key):
+    """The CONSOLIDATE_REPORTS row index for a consolidation-op key, or None."""
+    return _index_of(CONSOLIDATE_KEYS, key)
+
+
+def compare_index_for_key(key):
+    """The COMPARE_REPORTS row index for a comparison-op key, or None."""
+    return _index_of(COMPARE_KEYS, key)
+
+
+# Import-time integrity (a programming error if it trips, never user input):
+# every tier's keys are unique and 1:1 with its registry list. The export keys
+# ARE the subdirs (derived), so only length/uniqueness need asserting.
+assert len(EXPORT_KEYS) == len(EXPORT_REPORTS), "EXPORT_KEYS/EXPORT_REPORTS length drift"
+assert len(set(EXPORT_KEYS)) == len(EXPORT_KEYS), "duplicate EXPORT_KEYS"
+assert len(CONSOLIDATE_KEYS) == len(CONSOLIDATE_REPORTS), "CONSOLIDATE_KEYS length drift"
+assert len(set(CONSOLIDATE_KEYS)) == len(CONSOLIDATE_KEYS), "duplicate CONSOLIDATE_KEYS"
+assert len(COMPARE_KEYS) == len(COMPARE_REPORTS), "COMPARE_KEYS length drift"
+assert len(set(COMPARE_KEYS)) == len(COMPARE_KEYS), "duplicate COMPARE_KEYS"

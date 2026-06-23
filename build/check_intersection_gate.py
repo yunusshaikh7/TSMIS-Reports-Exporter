@@ -83,10 +83,10 @@ def test_gate_mechanism_still_works():
         disabled = {label for _i, label, _f, _s, d in status if d}
         check("exactly the re-disabled report flagged disabled",
               disabled == {"Intersection Summary"})
-        idx = next(i for i, (_l, _f, s) in enumerate(reports.EXPORT_REPORTS)
-                   if s.subdir == "intersection_summary")
         a = gui_api.GuiApi()
-        res = a.start_export([idx], "", False, 1)
+        # intersection_summary is the family key == export-op key (P3); when it's
+        # app-wide-disabled, the start guard must reject it server-side.
+        res = a.start_export(["intersection_summary"], "", False, 1)
         check("a disabled-only export is rejected (no worker launched)",
               bool(res.get("error")))
         check("no task was claimed", a._task is None)

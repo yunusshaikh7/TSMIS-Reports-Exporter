@@ -124,8 +124,9 @@ the file-based TSMIS-vs-TSN compares sit in `tsn` (HL today; other reports in 0.
 
 **`COMPARE_REPORTS`** — `(menu label, module/adapter, input kind, group)`. `kind` is
 `"files"` (two workbooks) or `"folders"` (two export run folders); `group` is one of
-`COMPARE_GROUPS`' ids (selection is by index, so this order is what the UI radios and
-`start_compare*` calls key on):
+`COMPARE_GROUPS`' ids. As of P3 (v0.18.0) selection travels by each row's stable
+`cmp:*` key (`COMPARE_KEYS`), so this order is only the UI-radio display order, not the
+contract `start_compare*` calls key on:
 
 | Label | Module / adapter | Kind | Group |
 |---|---|---|---|
