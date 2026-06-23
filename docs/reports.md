@@ -18,7 +18,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
 
-The registry (`scripts/reports.py`, `EXPORT_REPORTS`) is the single source of truth feeding both the GUI checkboxes and `export_multi.py`, so the list can't drift. The `.bat` menus are hand-edited text. Display order in the GUI / console numbering follows `EXPORT_REPORTS` order. Each row is `(menu label, format hint, ReportSpec)`.
+The catalog (`scripts/report_catalog.py`) is the single source of truth for report metadata (P4); `reports.py` derives `EXPORT_REPORTS` from it, feeding the GUI checkboxes and `export_multi.py`, so the list can't drift. The `.bat` menus keep their own text, with a registry-parity check for the consolidate menu (`build/check_report_catalog.py`). Display order in the GUI / console numbering follows `EXPORT_REPORTS` order. Each row is `(menu label, format hint, ReportSpec)`.
 
 ## `ReportSpec` -- what makes one report differ from another
 
@@ -122,8 +122,8 @@ For timeouts (`REPORT_TIMEOUT_MS`, `DOWNLOAD_START_TIMEOUT_MS`, etc.) and the fa
 
 1. **`scripts/export_<name>.py`** -- a `ReportSpec` (`label` = exact dropdown text, `subdir`, `filename`, `wait_js`, `is_empty`, `save` -- reuse `save_pdf_letter` / `save_via_export_button`) + `run_cli(SPEC, title=...)`.
 2. Add a branch to `3. run_export...bat` and `5. fast export...bat`.
-3. Add one entry to `EXPORT_REPORTS` in `reports.py` (feeds GUI + `export_multi`).
-4. List the module in `APP_MODULES` in `build/app.spec` (lazy imports need it).
+3. Add one `ExportEntry` to `report_catalog.py` (the metadata SoT — `reports.py` derives `EXPORT_REPORTS`; feeds GUI + `export_multi`). Update the frozen baseline in `build/check_report_catalog.py`.
+4. List the new export module **and** any new flat module in `APP_MODULES` in `build/app.spec` (lazy imports need it; `check_app_modules` enforces completeness).
 5. Add `output/<name>/.gitkeep`, whitelist in `.gitignore`.
 6. Document in the table at the top of this doc (and CLAUDE.md's Supported Reports table).
 
@@ -134,19 +134,19 @@ Implement `consolidate(events, confirm_overwrite) -> ConsolidateResult` -- **con
 - **For an XLSX report**, wrap `consolidate_xlsx_base.consolidate_xlsx` (set `INPUT_DIR`, `OUT_PATH`, `SHEET_NAME`, `REPORT_NAME`) like `consolidate_highway_log.py`.
 - **For a different input format** (like PDF Ramp Summary), write standalone.
 
-Then add the `__main__` -> `run_consolidate_cli`, wire `4. consolidate...bat`, add to `APP_MODULES` and `CONSOLIDATE_REPORTS`, and document here.
+Then add the `__main__` -> `run_consolidate_cli`, wire `4. consolidate...bat` (the parity check in `build/check_report_catalog.py` enforces the menu covers every registry consolidator), add to `APP_MODULES`, and add a `ConsolidateEntry` to `report_catalog.py` (`reports.py` derives `CONSOLIDATE_REPORTS`; update the frozen baseline). Document here.
 
 `CONSOLIDATE_REPORTS` (`reports.py`) is `(menu label, module)`. The three Highway Log consolidators are grouped with SOURCE-explicit, parallel labels -- `"<system> Highway Log (<format>)"` -- so the bare "Highway Log" can't be mistaken for one of the others:
 - `"TSMIS Highway Log (Excel)"` (`consolidate_highway_log`) -- reads the TSMIS "Highway Log" Excel export, day-aware.
 - `"TSMIS Highway Log (PDF)"` (`consolidate_tsmis_highway_log_pdf`) -- reads the app's own "Highway Log (PDF)" export, day-aware (NOT a dropped folder); parsed into the SAME 31-column format as the Excel export, the accurate substitute for the buggy vendor Excel.
 - `"TSN Highway Log (PDF)"` (`consolidate_tsn_highway_log`) -- TSN district PDFs the user drops into `input/tsn_highway_log/` (from OUTSIDE the app, so this one keeps an input folder + `day` ignored).
-- `"Intersection Detail"` (`consolidate_intersection_detail`, v0.17.0) -- a thin `consolidate_xlsx` wrapper (sheet "Intersection Detail", 36 cols), day-aware; also in `_CONSOLIDATOR_BY_SUBDIR` so it auto-consolidates on export finish and the matrix can build its vs-TSN cell. (Intersection Summary's consolidator — a category-count summer — is still to come.)
+- `"Intersection Detail"` (`consolidate_intersection_detail`, v0.17.0) -- a thin `consolidate_xlsx` wrapper (sheet "Intersection Detail", 36 cols), day-aware; also in `_CONSOLIDATOR_BY_SUBDIR` so it auto-consolidates on export finish and the matrix can build its vs-TSN cell. (Intersection Summary's consolidator — `consolidate_intersection_summary`, a category-count summer — is registered too.)
 
 See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for the Highway Log consolidator internals.
 
 ## Recipe: add a new comparison type
 
-Add one row to `COMPARE_REPORTS` in `reports.py`, **a matching stable key at the same position in `COMPARE_KEYS`** (an import-time assert enforces the 1:1 length), and the module to `APP_MODULES` in `build/app.spec`. Rows are `(label, module_or_adapter, kind, group)`. The GUI's per-sub-tab type lists are generated from it; as of P3 (v0.18.0) **selection travels by each row's stable `cmp:*` key**, so the row order is only the UI-radio display order and never mis-resolves a `start_compare*` call.
+Add one `CompareEntry` to `report_catalog.py` (the metadata SoT, P4 — its stable `cmp:*` key + label + adapter + `kind` + `group`); `reports.py` derives `COMPARE_REPORTS`/`COMPARE_KEYS` from it, an import-time assert enforces 1:1 keys, and you also update the frozen baseline in `build/check_report_catalog.py` and add the module to `APP_MODULES` in `build/app.spec`. The GUI's per-sub-tab type lists are generated from the derived rows `(label, module_or_adapter, kind, group)`; as of P3 (v0.18.0) **selection travels by each row's stable `cmp:*` key**, so the row order is only the UI-radio display order and never mis-resolves a `start_compare*` call.
 
 **`group`** is one of `COMPARE_GROUPS`' ids. The Compare pane renders one **sub-tab per group** (first = default), and a row shows only under its group's sub-tab. As of v0.16.1 the two registry sub-tabs are:
 
@@ -188,7 +188,7 @@ Current `COMPARE_REPORTS` rows:
 
 **Don't hand-roll workbook output**: build a `CompareSchema` and call `compare_core.run_compare` -- that's the approved workbook style for free, and the core's text/formulas are regression-locked. See [comparison-engine.md](comparison-engine.md) (engine + regression-lock harness) and [highway_log/comparison-study.md](highway_log/comparison-study.md) (the PDF-vs-Excel/TSN findings).
 
-**Extra steps for a `group="tsn"` (vs-TSN) report (v0.17.0):** beyond the `COMPARE_REPORTS` row + `APP_MODULES`, (1) register the report's TSN source in `tsn_library._REPORTS` (a `TsnReport` with its raw format + a `build_into` builder) so the matrices resolve it from the canonical library; (2) add the golden check (`check_compare_<report>_tsn.py`) to the blocking loop in `.github/workflows/checks.yml`; (3) reconcile both raw files by hand FIRST and lock the approved counts in [tsn-parsers.md](tsn-parsers.md). `compare_ramp_detail_tsn` is the **FLAT** reference: a `"files"` adapter whose two loaders project each side's own shape onto one shared, PM-keyed header, with the TSN-only columns marked `context_fields` (shown, never counted). `compare_ramp_summary_tsn` is the **AGGREGATE** reference: each side reduces to one statewide `{category: count}` table compared with `has_route=False` (key = category, field = count), and a familiar "Summary by Category" sheet is appended via `extra_sheet_writer=summary_layout.make_extra_sheet_writer(SPEC)` — the pattern the Intersection Summary will reuse. `compare_highway_sequence_tsn` shows the **composite-key** variant: when the natural key isn't unique (CA postmiles are county-relative), a `key_normalizer` returns a `"COUNTY POSTMILE"` token while County stays its own visible column — the same mechanism Highway Log uses for roadbed-canonical locations. To light a vs-TSN report up in BOTH matrices, the only required code step is adding it to `matrix.tsn_comparator_for(row_key)`.
+**Extra steps for a `group="tsn"` (vs-TSN) report (v0.17.0):** beyond the `COMPARE_REPORTS` row + `APP_MODULES`, (1) register the report's TSN source by adding a `TsnEntry` to `report_catalog.py` (its raw format + a `build_into` builder; `tsn_library._REPORTS` derives from it) so the matrices resolve it from the canonical library; (2) add the golden check (`check_compare_<report>_tsn.py`) to the blocking loop in `.github/workflows/checks.yml`; (3) reconcile both raw files by hand FIRST and lock the approved counts in [tsn-parsers.md](tsn-parsers.md). `compare_ramp_detail_tsn` is the **FLAT** reference: a `"files"` adapter whose two loaders project each side's own shape onto one shared, PM-keyed header, with the TSN-only columns marked `context_fields` (shown, never counted). `compare_ramp_summary_tsn` is the **AGGREGATE** reference: each side reduces to one statewide `{category: count}` table compared with `has_route=False` (key = category, field = count), and a familiar "Summary by Category" sheet is appended via `extra_sheet_writer=summary_layout.make_extra_sheet_writer(SPEC)` — the pattern the Intersection Summary will reuse. `compare_highway_sequence_tsn` shows the **composite-key** variant: when the natural key isn't unique (CA postmiles are county-relative), a `key_normalizer` returns a `"COUNTY POSTMILE"` token while County stays its own visible column — the same mechanism Highway Log uses for roadbed-canonical locations. To light a vs-TSN report up in BOTH matrices, the only required code step is adding it to `matrix.tsn_comparator_for(row_key)`.
 
 ## Verification
 

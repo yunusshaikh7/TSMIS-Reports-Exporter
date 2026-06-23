@@ -21,8 +21,10 @@ locations are honored as read-only fallbacks so existing installs keep working
 until imported.
 
 Console-free (no print / input / sys.exit): functions return dicts /
-ConsolidateResult or raise. Consolidator imports are LAZY (inside
-build_consolidated) so importing this module never pulls pdfplumber / openpyxl.
+ConsolidateResult or raise. The report's own builder/consolidator imports are LAZY
+(resolved inside build_consolidated). As of P4 this module imports `report_catalog`
+to derive its descriptors, which (like the registry) transitively pulls openpyxl /
+pdfplumber — so importing tsn_library is console-free but not dependency-light.
 """
 import importlib
 import shutil
@@ -31,6 +33,7 @@ from pathlib import Path
 
 import consolidation_meta
 import paths
+import report_catalog as _catalog
 from events import ConsolidateResult
 
 
@@ -46,59 +49,20 @@ class TsnReport:
     builder: str           # "module:function"; func(raw_dir, out_path, events, confirm_overwrite)
 
 
-# Registry — reports are added here as their library builder lands in v0.17.0.
-# Highway Log ships first (its builder already exists: consolidate_tsn_highway_log
-# .build_into). The format facts come from the raw 6.19 ground-truth set; see
-# docs/tsn-parsers.md.
+# Registry — DERIVED from report_catalog (the report-metadata SoT, P4), so each
+# report's TSN descriptor lives in exactly one place. Highway Log shipped first in
+# v0.17.0; the format facts come from the raw 6.19 ground-truth set (see
+# docs/tsn-parsers.md). Keyed by subdir, in catalog (registration) order.
 _REPORTS = {
-    "highway_log": TsnReport(
-        subdir="highway_log",
-        label="TSN Highway Log",
-        raw_glob="*.pdf",
-        raw_kind="district_pdfs",
-        consolidated_name="tsn_highway_log_consolidated.xlsx",
-        builder="consolidate_tsn_highway_log:build_into",
-    ),
-    "ramp_detail": TsnReport(
-        subdir="ramp_detail",
-        label="TSN Ramp Detail",
-        raw_glob="*.xlsx",
-        raw_kind="statewide_xlsx",
-        consolidated_name="tsn_ramp_detail_normalized.xlsx",
-        builder="tsn_load_ramp_detail:build_into",
-    ),
-    "ramp_summary": TsnReport(
-        subdir="ramp_summary",
-        label="TSN Ramp Summary",
-        raw_glob="*.pdf",
-        raw_kind="statewide_pdf",
-        consolidated_name="tsn_ramp_summary_normalized.xlsx",
-        builder="tsn_load_ramp_summary:build_into",
-    ),
-    "intersection_summary": TsnReport(
-        subdir="intersection_summary",
-        label="TSN Intersection Summary",
-        raw_glob="*.pdf",
-        raw_kind="statewide_pdf",
-        consolidated_name="tsn_intersection_summary_normalized.xlsx",
-        builder="tsn_load_intersection_summary:build_into",
-    ),
-    "intersection_detail": TsnReport(
-        subdir="intersection_detail",
-        label="TSN Intersection Detail",
-        raw_glob="*.xlsx",
-        raw_kind="statewide_xlsx",
-        consolidated_name="tsn_intersection_detail_normalized.xlsx",
-        builder="tsn_load_intersection_detail:build_into",
-    ),
-    "highway_sequence": TsnReport(
-        subdir="highway_sequence",
-        label="TSN Highway Sequence",
-        raw_glob="*.pdf",
-        raw_kind="district_pdfs",
-        consolidated_name="tsn_highway_sequence_normalized.xlsx",
-        builder="consolidate_tsn_highway_sequence:build_into",
-    ),
+    e.subdir: TsnReport(
+        subdir=e.subdir,
+        label=e.label,
+        raw_glob=e.raw_glob,
+        raw_kind=e.raw_kind,
+        consolidated_name=e.consolidated_name,
+        builder=e.builder,
+    )
+    for e in _catalog.tsn_entries()
 }
 
 

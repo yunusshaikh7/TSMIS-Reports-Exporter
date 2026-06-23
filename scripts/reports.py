@@ -1,240 +1,66 @@
-"""Single source of truth for the report registry.
+"""The report registry — the GUI- and console-facing VIEW over `report_catalog`.
 
-Every report type appears here exactly once, so adding one is a one-place change
-on the Python side: both the GUI (Export / Consolidate / Compare tabs,
-`gui_api.py`) and the console multi-exporter (`export_multi.py`) read these
-lists. (The `.bat`
-menus are static text and are still edited by hand — see CLAUDE.md "Adding a New
-Report Type".)
+`report_catalog.py` is the single source of truth for report metadata (P4); this
+module derives the registry lists the rest of the app reads (the GUI Export /
+Consolidate / Compare tabs via `gui_api.py`, the console multi-exporter via
+`export_multi.py`) and keeps the registry LOGIC that isn't pure metadata — the
+app-wide disable gate, the matrix-row derivation, and the stable-ID lookups.
 
-Kept import-light and console-free: it only pulls in the thin `export_*`
-`ReportSpec` objects and the `consolidate_*` modules, so importing it never
-launches a browser or does any I/O.
+The derived EXPORT / CONSOLIDATE / COMPARE lists + keys are proven equal to the
+v0.17 baseline by `build/check_report_catalog.py` (golden-assert), so deriving them
+from the catalog is behavior-neutral. The console `.bat` menu has its own parity
+check; adding a report is now a one-place change in `report_catalog.py`.
+
+Console-free: importing this never launches a browser or does application runtime I/O.
+It is **not** dependency-light — via `report_catalog` it eagerly imports the `export_*`
+/ `consolidate_*` / `compare_*` implementation modules (transitively openpyxl /
+pdfplumber / playwright), exactly as the literal registry always did.
 """
 import logging
 
-from export_ramp_summary import SPEC as _RAMP_SUMMARY_SPEC
-from export_ramp_detail import SPEC as _RAMP_DETAIL_SPEC
-from export_highway_sequence import SPEC as _HIGHWAY_SEQ_SPEC
-from export_highway_log import SPEC as _HIGHWAY_LOG_SPEC
-from export_highway_log_pdf import SPEC as _HIGHWAY_LOG_PDF_SPEC
-from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
-from export_intersection_detail import SPEC as _INT_DETAIL_SPEC
-
-import consolidate_ramp_summary as _c_ramp_summary
-import consolidate_ramp_detail as _c_ramp_detail
-import consolidate_highway_sequence as _c_highway_seq
-import consolidate_highway_log as _c_highway_log
-import consolidate_tsn_highway_log as _c_tsn_highway_log
-import consolidate_tsmis_highway_log_pdf as _c_tsmis_highway_log_pdf
-import consolidate_intersection_detail as _c_int_detail
-import consolidate_intersection_summary as _c_int_summary
-
-import compare_env as _cmp_env
-import compare_highway_log as _cmp_highway_log
-import compare_highway_log_pdf as _cmp_highway_log_pdf
-import compare_ramp_detail_tsn as _cmp_ramp_detail_tsn
-import compare_ramp_summary_tsn as _cmp_ramp_summary_tsn
-import compare_intersection_summary_tsn as _cmp_int_summary_tsn
-import compare_intersection_detail_tsn as _cmp_int_detail_tsn
-import compare_highway_sequence_tsn as _cmp_highway_seq_tsn
+import report_catalog as _catalog
 
 log = logging.getLogger("tsmis.reports")
 
-# Export tab / multi-export: (menu label, format hint, ReportSpec).
-# Order here is the display order in the GUI and the numbering in the console menu.
-EXPORT_REPORTS = [
-    ("TSAR: Ramp Summary", "PDF", _RAMP_SUMMARY_SPEC),
-    ("TSAR: Ramp Detail", "Excel", _RAMP_DETAIL_SPEC),
-    ("Highway Sequence Listing", "Excel", _HIGHWAY_SEQ_SPEC),
-    ("Highway Log", "Excel", _HIGHWAY_LOG_SPEC),
-    # Same "Highway Log" dropdown option, saved as a PDF via the page's Print
-    # layout (hl_printAll) instead of the Excel Export button. Export-only (the
-    # consolidator reads the .xlsx export; no consolidation for the PDF).
-    ("Highway Log (PDF)", "PDF", _HIGHWAY_LOG_PDF_SPEC),
-    # Intersection Summary/Detail now consolidate AND compare (cross-env + vs-TSN)
-    # as of v0.17.0 — live in both matrices. Labels verified against the live page
-    # source: NO "TSAR:" prefix, and Summary is an Excel export like Detail. The
-    # env check reads the dropdown for every row here, so a label drift shows up
-    # there as "missing".
-    ("Intersection Summary", "Excel", _INT_SUMMARY_SPEC),
-    ("Intersection Detail", "Excel", _INT_DETAIL_SPEC),
-]
+# Export tab / multi-export: (menu label, format hint, ReportSpec), in display order.
+EXPORT_REPORTS = _catalog.export_rows()
 
-# Stable export-op KEYS (P3 / §C.5): one per EXPORT_REPORTS row, in registry
-# order. Each equals the report-FAMILY key, which IS the export spec's output
-# `subdir` (ramp_summary … intersection_detail). These keys — never list
-# positions — are what `batch_job.json` persists and what start_export /
-# start_batch_export carry, so a later registry re-order can't resume the wrong
-# report (F7). Derived from the specs so they can never drift from the subdirs.
-EXPORT_KEYS = tuple(spec.subdir for _label, _fmt, spec in EXPORT_REPORTS)
+# Stable export-op KEYS (P3 / §C.5): one per EXPORT_REPORTS row, in registry order.
+# Each equals the report-FAMILY key == the export spec's output `subdir`. These keys
+# — never list positions — are what `batch_job.json` persists and what start_export /
+# start_batch_export carry, so a later re-order can't resume the wrong report (F7).
+EXPORT_KEYS = _catalog.export_keys()
 
-# Consolidate tab: (menu label, module). Same order as above. Each module
-# exposes consolidate(events, confirm_overwrite, day=None) plus
-# input_dir_for(day) / out_path_for(day) — paths are day-dependent now that
-# exports are grouped into output/<YYYY-MM-DD>/ folders, so the registry hands
-# out the module rather than a single precomputed OUT_PATH.
-CONSOLIDATE_REPORTS = [
-    ("TSAR: Ramp Summary", _c_ramp_summary),
-    ("TSAR: Ramp Detail", _c_ramp_detail),
-    ("Highway Sequence Listing", _c_highway_seq),
-    ("Intersection Summary", _c_int_summary),
-    ("Intersection Detail", _c_int_detail),
-    # The three Highway Log consolidators are grouped here, TSMIS before TSN.
-    # Labels are SOURCE-explicit and parallel — "<system> Highway Log (<format>)"
-    # — so the bare "Highway Log" can't be mistaken for one of the others.
-    #   Input = the TSMIS "Highway Log" Excel export, output/<run>/highway_log/ (day-aware).
-    ("TSMIS Highway Log (Excel)", _c_highway_log),
-    #   Input = the TSMIS "Highway Log (PDF)" export, output/<run>/highway_log_pdf/
-    #   (day-aware, this app's own export -- NOT a dropped folder) -- parsed into
-    #   the SAME 31-column format as the Excel export, then combined (the accurate
-    #   substitute for the buggy vendor Excel).
-    ("TSMIS Highway Log (PDF)", _c_tsmis_highway_log_pdf),
-    #   Input = TSN district PDFs the user drops into input/tsn_highway_log/ (these
-    #   come from OUTSIDE the app, so this one keeps an input folder + day ignored).
-    ("TSN Highway Log (PDF)", _c_tsn_highway_log),
-]
+# Consolidate tab: (menu label, module). Each module exposes
+# consolidate(events, confirm_overwrite, day=None) + input_dir_for(day) /
+# out_path_for(day) — paths are day-dependent, so the registry hands out the module.
+CONSOLIDATE_REPORTS = _catalog.consolidate_rows()
 
-# Stable consolidation-op KEYS (P3 / §C.5): one per CONSOLIDATE_REPORTS row, in
-# registry order. The three Highway Log consolidators split by source/format
-# (cons:highway_log_excel / cons:highway_log_pdf / cons:tsn_highway_log); the rest
-# are cons:<family>. Carried by the consolidate bridge methods instead of an index.
-CONSOLIDATE_KEYS = (
-    "cons:ramp_summary",
-    "cons:ramp_detail",
-    "cons:highway_sequence",
-    "cons:intersection_summary",
-    "cons:intersection_detail",
-    "cons:highway_log_excel",
-    "cons:highway_log_pdf",
-    "cons:tsn_highway_log",
-)
+# Stable consolidation-op KEYS (P3 / §C.5): one per CONSOLIDATE_REPORTS row. The
+# three Highway Log consolidators split by source/format (cons:highway_log_excel /
+# cons:highway_log_pdf / cons:tsn_highway_log); the rest are cons:<family>.
+CONSOLIDATE_KEYS = _catalog.consolidate_keys()
 
-# Compare tab SUB-TABS (GUI): the comparison types are grouped onto these sub-tabs
-# within the Compare pane, in this order (the FIRST is the default). Two registry
-# groups: "env" (Cross-environment — every report's between-environments compare,
-# Highway Log included) and "tsn" (vs TSN — the file-based TSMIS-vs-TSN compares;
-# every report as of v0.17.0). A THIRD
-# sub-tab, the "vs TSN Matrix" (the day-keyed matrix, group "tsn_by_day"), is
-# appended by the GUI itself — it is not a registry comparison type. A row's
-# `group` (below) names its sub-tab. (v0.16.1 staging: HL's cross-env compare
-# moved back to "env" and the "Highway Log" sub-tab became the general "vs TSN".)
-COMPARE_GROUPS = [
-    ("env", "Cross-environment"),
-    ("tsn", "vs TSN"),
-]
+# Compare tab SUB-TABS (the FIRST is the default): "env" (cross-environment) and
+# "tsn" (vs TSN). A third "vs TSN Matrix" sub-tab is appended by the GUI itself.
+COMPARE_GROUPS = _catalog.compare_groups()
 
-# Compare registry: (menu label, module/adapter, input kind, group). The GUI's
-# per-sub-tab type lists are generated from this; the kind decides which inputs the
-# pane asks for:
-#   "files"   -- two workbooks; the module exposes
-#                compare(path_a, path_b, out_path, events, confirm_overwrite,
-#                mode) -> ConsolidateResult and suggest_name(path_a).
-#   "folders" -- two export run folders; the adapter exposes
-#                compare_folders(dir_a, dir_b, out_path, events,
-#                confirm_overwrite, mode) -> ConsolidateResult and
-#                suggest_name(dir_a, dir_b). Used by the cross-environment
-#                comparisons (compare_env.py) -- no consolidation needed
-#                first; the per-route files are read straight from both
-#                run folders.
-# `group` is one of COMPARE_GROUPS' ids (its sub-tab). Selection is by index, so
-# this order is what the UI radios and start_compare* calls key on.
-COMPARE_REPORTS = [
-    ("TSAR: Ramp Summary — between environments", _cmp_env.RAMP_SUMMARY, "folders", "env"),
-    ("TSAR: Ramp Detail — between environments", _cmp_env.RAMP_DETAIL, "folders", "env"),
-    ("Highway Sequence Listing — between environments", _cmp_env.HIGHWAY_SEQUENCE, "folders", "env"),
-    # Highway Log's cross-environment compare now sits with the other cross-env
-    # reports under "env" (v0.16.1 staging — the old "highway_log" sub-tab became
-    # the general "vs TSN" group below).
-    ("Highway Log — between environments", _cmp_env.HIGHWAY_LOG, "folders", "env"),
-    # Intersection Summary cross-env (v0.17.0): the per-route category-summary sheet
-    # is compared the AGGREGATE way (one category-count row per route) — see
-    # compare_env.INTERSECTION_SUMMARY. Having a folders/env adapter promotes it from
-    # a TSN-only extra row to a full Everything-matrix + by-day matrix row.
-    ("TSAR: Intersection Summary — between environments",
-     _cmp_env.INTERSECTION_SUMMARY, "folders", "env"),
-    # Intersection Detail cross-env (v0.17.0): a flat per-route XLSX, route+PM key —
-    # the standard EnvCompare flat path (like Ramp Detail). Promotes it to a full
-    # Everything-matrix + by-day matrix row.
-    ("TSAR: Intersection Detail — between environments",
-     _cmp_env.INTERSECTION_DETAIL, "folders", "env"),
-    # Highway Log (PDF) cross-env (v0.17.0): both sides parsed from the app's PDF
-    # export (the accurate Highway Log source). Kept LAST among the env-folders rows
-    # so the matrix row order is unchanged (…, highway_log_pdf last). Its `subdir`
-    # ("highway_log_pdf") keeps it a distinct row from the Excel "highway_log".
-    ("Highway Log (PDF) — between environments",
-     _cmp_env.HIGHWAY_LOG_PDF, "folders", "env"),
-    # vs TSN (file-based). Highway Log Excel/PDF today; 0.17.0 adds the other
-    # reports' "<report> — TSMIS vs TSN" rows here once their comparators exist.
-    ("Highway Log — TSMIS vs TSN", _cmp_highway_log, "files", "tsn"),
-    # Both sides parsed from PDFs (accurate replacement for the Excel-based row —
-    # the "(PDF)" on BOTH sides makes the PDF-vs-PDF nature explicit).
-    ("Highway Log — TSMIS (PDF) vs TSN (PDF)", _cmp_highway_log_pdf.TSMIS_PDF_VS_TSN,
-     "files", "tsn"),
-    # TSMIS (PDF) vs TSMIS (Excel) is an internal consistency check (one system,
-    # one environment — the PDF export diffed against the vendor Excel to expose its
-    # bug), NOT a TSN comparison, so it lives under "env", not "tsn".
-    ("Highway Log — TSMIS (PDF) vs TSMIS (Excel)",
-     _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
-    # v0.17.0 vs-TSN comparators (the reference recipe). Appended at the END so the
-    # registry ORDER above is unchanged; selection resolves by each row's stable
-    # `cmp:*` key (P3 / COMPARE_KEYS), so appending here is safe regardless of order.
-    # Each takes the consolidated TSMIS workbook + the TSN library file ("files" kind,
-    # group "tsn").
-    ("TSAR: Ramp Detail — TSMIS vs TSN", _cmp_ramp_detail_tsn, "files", "tsn"),
-    # Ramp Summary is the AGGREGATE recipe (statewide category counts, not per-row):
-    # TSMIS consolidated workbook summed vs the TSN statewide PDF, keyed on category.
-    ("TSAR: Ramp Summary — TSMIS vs TSN", _cmp_ramp_summary_tsn, "files", "tsn"),
-    # Intersection Summary is AGGREGATE too (the Ramp Summary recipe with the
-    # intersection category taxonomy; CONTROL/INTERSECTION-TYPE codes diverge → one-sided).
-    ("TSAR: Intersection Summary — TSMIS vs TSN", _cmp_int_summary_tsn, "files", "tsn"),
-    # Intersection Detail is FLAT (the Ramp Detail recipe): route+PM key; TSMIS read
-    # by position; Y/N<->1/0 booleans normalized; cross-street attrs + Date of Record context.
-    ("TSAR: Intersection Detail — TSMIS vs TSN", _cmp_int_detail_tsn, "files", "tsn"),
-    # Highway Sequence is FLAT with a COUNTY+PM key (CA postmiles are county-relative):
-    # TSMIS consolidated read by position (prefix+PM+suffix re-glued) vs the TSN PDFs'
-    # normalized workbook. FT + Description compared; HG/City/Distance are context
-    # (completeness gaps + listing-granularity artifact). TSN's finer segment breaks
-    # surface as one-sided rows (as for Highway Log).
-    ("Highway Sequence Listing — TSMIS vs TSN", _cmp_highway_seq_tsn, "files", "tsn"),
-]
+# Compare registry: (menu label, module/adapter, input kind, group). `kind` is
+# "files" (two workbooks) or "folders" (two export run folders); `group` names the
+# sub-tab. Selection/routing resolve by each row's stable `cmp:*` key (P3), so this
+# order is only the display order, not the contract `start_compare*` calls key on.
+COMPARE_REPORTS = _catalog.compare_rows()
 
-# Stable comparison-op KEYS (P3 / §C.5): one per COMPARE_REPORTS row, in registry
-# order — composite cmp:<family>:<flavor>. flavor = env (cross-environment), tsn
-# (TSMIS vs TSN), or the two PDF Highway Log checks (pdf_vs_tsn / pdf_vs_excel).
-# The Highway Log PDF cross-env row keeps the distinct family `highway_log_pdf`
-# (its own matrix subdir), so it never collides with the Excel highway_log:env.
-COMPARE_KEYS = (
-    "cmp:ramp_summary:env",
-    "cmp:ramp_detail:env",
-    "cmp:highway_sequence:env",
-    "cmp:highway_log:env",
-    "cmp:intersection_summary:env",
-    "cmp:intersection_detail:env",
-    "cmp:highway_log_pdf:env",
-    "cmp:highway_log:tsn",
-    "cmp:highway_log:pdf_vs_tsn",
-    "cmp:highway_log:pdf_vs_excel",
-    "cmp:ramp_detail:tsn",
-    "cmp:ramp_summary:tsn",
-    "cmp:intersection_summary:tsn",
-    "cmp:intersection_detail:tsn",
-    "cmp:highway_sequence:tsn",
-)
+# Stable comparison-op KEYS (P3 / §C.5): one per COMPARE_REPORTS row — composite
+# cmp:<family>:<flavor>. The Highway Log PDF cross-env row keeps the distinct family
+# `highway_log_pdf` (its own matrix subdir), so it never collides with highway_log:env.
+COMPARE_KEYS = _catalog.compare_keys()
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each
-# EXPORTABLE report, keyed by the export ReportSpec's output subdir so this can't
-# drift from the lists above. Every exportable report is here EXCEPT Highway Log
-# (PDF) (highway_log_pdf) — it needs a scratch converted_dir, so the matrix and
-# auto-consolidate handle it specially (absent from the map -> None).
-_CONSOLIDATOR_BY_SUBDIR = {
-    _RAMP_SUMMARY_SPEC.subdir: _c_ramp_summary,
-    _RAMP_DETAIL_SPEC.subdir: _c_ramp_detail,
-    _HIGHWAY_SEQ_SPEC.subdir: _c_highway_seq,
-    _HIGHWAY_LOG_SPEC.subdir: _c_highway_log,
-    _INT_SUMMARY_SPEC.subdir: _c_int_summary,      # v0.17.0 (AGGREGATE category summer)
-    _INT_DETAIL_SPEC.subdir: _c_int_detail,        # v0.17.0
-}
+# EXPORTABLE report, keyed by the export ReportSpec's output subdir. Every exportable
+# report EXCEPT Highway Log (PDF) (highway_log_pdf) — it needs a scratch
+# converted_dir, so the matrix and auto-consolidate handle it specially (absent -> None).
+_CONSOLIDATOR_BY_SUBDIR = _catalog.consolidator_by_subdir()
 
 
 def consolidator_for_spec(spec):

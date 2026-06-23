@@ -128,7 +128,8 @@ run app (GUI preview).bat    dev launcher for the GUI
 version.py                   app name/version + pinned Playwright (single source of truth)
 scripts/                     the engine (console-free) + console & GUI drivers + UI
   common.py exporter.py exporter_parallel.py cli.py run_report.py events.py settings.py paths.py
-  reports.py                 the single report/consolidate/compare registry
+  report_catalog.py          the report-metadata source of truth (P4); reports.py derives from it
+  reports.py                 the report/consolidate/compare registry view + stable-ID lookups
   export_*.py                one thin ReportSpec per report type
   consolidate_*.py           per-route exports → one workbook (+ TSN / TSMIS-PDF parsers)
   compare_core.py            the regression-locked comparison-workbook engine

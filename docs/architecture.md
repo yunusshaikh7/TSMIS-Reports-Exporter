@@ -74,14 +74,19 @@ behavior, edit only its `ReportSpec`. See
 
 Each `export_<name>.py` module is thin (~30 lines): a `ReportSpec` + `run_cli`.
 
-## Single report registry (`scripts/reports.py`)
+## Single report registry (`report_catalog.py` → `reports.py`)
 
-One source of truth feeds both the GUI tabs and the console multi-exporter, so the
-lists can't drift. `export_multi.py` imports `EXPORT_REPORTS`; `gui_api.py` reads
-the registry lists (`EXPORT_REPORTS`, `CONSOLIDATE_REPORTS`, `COMPARE_REPORTS`) plus
-`COMPARE_GROUPS`. The `.bat` menus are static text and are still hand-edited
-separately. The module is import-light and console-free: importing it never
-launches a browser or does I/O.
+`report_catalog.py` is the single source of truth for report metadata (P4); `reports.py`
+**derives** the GUI/console registry lists from it, so the lists can't drift.
+`export_multi.py` imports `EXPORT_REPORTS`; `gui_api.py` reads the registry lists
+(`EXPORT_REPORTS`, `CONSOLIDATE_REPORTS`, `COMPARE_REPORTS`) plus `COMPARE_GROUPS`;
+`tsn_library` derives its TSN descriptors from the same catalog. The console
+`4. consolidate…bat` menu keeps its own text, but a parity check
+(`build/check_report_catalog.py`) now enforces that it covers exactly the registry's
+consolidators (a golden-equivalence baseline there also proves the derived lists equal the
+v0.17 snapshot). Both modules are console-free: importing them never launches a browser or
+does application runtime I/O — though (as the literal registry always did) they eagerly
+import the report implementation modules, transitively openpyxl/pdfplumber/playwright.
 
 Four data structures:
 
@@ -344,9 +349,11 @@ instead of scattering them across drop folders: `scripts/tsn_library.py` over
 PDFs / a statewide PDF / a statewide XLSX, the format is the report's own; `consolidated/`
 = the generated consolidated/normalized Excel, built once and reused since a couple of TSN
 reports are PDFs). Paths come from `paths.tsn_library_{dir,raw_dir,consolidated_path}`.
-The module is console-free with **lazy** consolidator imports (so importing it never pulls
-pdfplumber), and exposes `status`/`all_status` (raw present? consolidated present? current
-vs the raw?), `import_raw`, `build_consolidated` (reuses when current), and **`resolve`** —
+The module is console-free with **lazy** consolidator/builder *invocation* (the `build_into`
+parse is deferred to call time); as of P4 it imports `report_catalog`, which transitively pulls
+openpyxl/pdfplumber, so importing it is console-free but not dependency-light. It exposes
+`status`/`all_status` (raw present? consolidated present? current vs the raw?), `import_raw`,
+`build_consolidated` (reuses when current), and **`resolve`** —
 the matrices' single TSN entry point, returning the same `{kind: file|consolidated|pdfs|
 raw|none, …}` contract as before.
 

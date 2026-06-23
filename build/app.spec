@@ -69,7 +69,7 @@ APP_MODULES = [
     "consolidation_meta", "artifact_store",
     "exporter", "exporter_parallel",
     "run_report", "logging_setup", "settings", "cli", "login", "reports",
-    "updater", "batch_manifest",
+    "report_catalog", "updater", "batch_manifest",
     "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
     "export_highway_log", "export_highway_log_pdf", "export_intersection_summary",
     "export_intersection_detail", "export_multi",

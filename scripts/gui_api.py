@@ -125,6 +125,41 @@ def _api_method(fn):
     return wrapper
 
 
+def _report_list_payload():
+    """The report-list metadata the GUI bridge sends the frontend (the Export /
+    Consolidate / Compare tab lists). PURE — derived from the report registry, with
+    no `self`, no I/O, and no GuiApi construction — so it is BOTH the payload
+    `get_initial_state` ships AND a safe, read-only oracle for the catalog parity
+    check. (Constructing GuiApi would write the TSN library skeleton via
+    `ensure_layout` and start the worker threads — P4-R05.)"""
+    _export_fmt = {label: fmt for label, fmt, _spec in EXPORT_REPORTS}
+    return {
+        # Every export report, with `disabled` marking the app-wide-disabled ones
+        # (Intersection): the UI shows those GREYED (not hidden). `key` is the stable
+        # export-op key the UI passes back (P3 / §C.5); `idx` is display-order only.
+        "reports": [{"key": spec.subdir, "idx": i, "label": label, "fmt": fmt,
+                     "disabled": disabled}
+                    for i, label, fmt, spec, disabled in export_reports_status()],
+        # Each consolidate entry carries its INPUT file format for the tab badge: a
+        # module's own INPUT_FMT (the PDF-input consolidators) wins, else the matching
+        # export report's format, else Excel.
+        "cons_reports": [{"key": CONSOLIDATE_KEYS[i], "label": label,
+                          "fmt": (getattr(_mod, "INPUT_FMT", None)
+                                  or _export_fmt.get(label, "Excel"))}
+                         for i, (label, _mod) in enumerate(CONSOLIDATE_REPORTS)],
+        "compare_groups": [{"id": gid, "label": glabel}
+                           for gid, glabel in COMPARE_GROUPS],
+        "compare_reports": [{"key": COMPARE_KEYS[i], "label": label, "kind": kind,
+                             "group": group,
+                             "subdir": getattr(_mod, "subdir", None),
+                             # The two file-picker labels for "files" comparisons (so
+                             # PDF-vs-Excel doesn't mislabel both TSMIS sides).
+                             "file_a_label": getattr(_mod, "file_a_label", "TSMIS"),
+                             "file_b_label": getattr(_mod, "file_b_label", "TSN")}
+                            for i, (label, _mod, kind, group) in enumerate(COMPARE_REPORTS)],
+    }
+
+
 class GuiApi:
     """State + bridge behind the WebView UI. Public methods = the JS api."""
 
@@ -1037,39 +1072,15 @@ class GuiApi:
             self._start_checks_locked()
             self._start_update_check()       # quiet unless an update exists
             self._batch_resume = self._pending_batch()   # offer to resume an interrupted batch
-        _export_fmt = {label: fmt for label, fmt, _spec in EXPORT_REPORTS}
         return {
             "app_name": APP_NAME,
             "version": __version__,
             "output_root": str(OUTPUT_ROOT),
             "log_dir": str(LOG_DIR),
-            # Every export report, with `disabled` marking the app-wide-disabled
-            # ones (Intersection) — the UI shows those GREYED (not hidden) so they
-            # stay visible but unpickable; the start guards reject them anyway.
-            # `key` is the STABLE export-op key the UI passes back to start_export /
-            # start_batch_export (P3 / §C.5); `idx` is retained display-order
-            # metadata only (kept for P4's catalog), never the selection contract.
-            "reports": [{"key": spec.subdir, "idx": i, "label": label, "fmt": fmt,
-                         "disabled": disabled}
-                        for i, label, fmt, spec, disabled in export_reports_status()],
-            # Each consolidate entry carries its INPUT file format for the tab
-            # badge: a module's own INPUT_FMT (the PDF-input consolidators) wins,
-            # else the matching export report's format, else Excel.
-            "cons_reports": [{"key": CONSOLIDATE_KEYS[i], "label": label,
-                              "fmt": (getattr(_mod, "INPUT_FMT", None)
-                                      or _export_fmt.get(label, "Excel"))}
-                             for i, (label, _mod) in enumerate(CONSOLIDATE_REPORTS)],
-            "compare_groups": [{"id": gid, "label": glabel}
-                               for gid, glabel in COMPARE_GROUPS],
-            "compare_reports": [{"key": COMPARE_KEYS[i], "label": label, "kind": kind,
-                                 "group": group,
-                                 "subdir": getattr(_mod, "subdir", None),
-                                 # The two file-picker labels for "files"
-                                 # comparisons (so e.g. PDF-vs-Excel doesn't
-                                 # mislabel both TSMIS sides "TSMIS"/"TSN").
-                                 "file_a_label": getattr(_mod, "file_a_label", "TSMIS"),
-                                 "file_b_label": getattr(_mod, "file_b_label", "TSN")}
-                                for i, (label, _mod, kind, group) in enumerate(COMPARE_REPORTS)],
+            # The report-list metadata (Export / Consolidate / Compare tab lists) is
+            # built by the PURE module-level `_report_list_payload()` so it is also a
+            # safe read-only oracle for the catalog parity check (P4-R05).
+            **_report_list_payload(),
             "routes": list(ROUTES),
             "channels": [{"id": c, "label": CHANNEL_LABELS[c],
                           "short": _CHANNEL_SHORT.get(c, CHANNEL_LABELS[c])}
@@ -2182,7 +2193,7 @@ class GuiApi:
     def _tsn_library_status(self):
         """Per-report status rows for the Settings TSN-reports panel. Floats
         (mtimes) are dropped — the panel only needs the booleans/counts/label."""
-        import tsn_library                              # lazy (no pdfplumber pull)
+        import tsn_library                              # lazy import (tsn_library pulls pdfplumber via report_catalog)
         rows = []
         for s in tsn_library.all_status():
             rows.append({
@@ -2576,7 +2587,7 @@ class GuiApi:
         TSN data lives in <root>/<report>/). Seeds the per-report folders + hint
         files first so the user always lands on a populated, self-documenting
         tree (not an empty folder)."""
-        import tsn_library                              # lazy (no pdfplumber pull)
+        import tsn_library                              # lazy import (tsn_library pulls pdfplumber via report_catalog)
         root = tsn_library.ensure_layout()
         self._open_folder(root)
         return {"ok": True}
