@@ -130,6 +130,28 @@ the field bug + P1s first.
   `update_helper.log` rotation; dev WebView-cache clearing; the `_min_cost_pairs` greedy cliff at
   8+ duplicates; ramp-summary combined-sheet hard-coded coordinates; etc. — full list in the report.
 
+### Comparison-engine accuracy (found 2026-06-22, Intersection Detail (PDF) work)
+- [ ] **P2 `non-hl-loaders-dont-collapse-tab-whitespace`** — the comparison's whitespace normalizer
+  `compare_core._xl_trim` (`re.sub(" +", " ", v).strip(" ")`) collapses/strips the SPACE character
+  ONLY, not tabs (`\t`) or other whitespace. **Highway Log already works around this** — its loader
+  `compare_highway_log._hl_normalize` collapses `[\t\n\r\f\v]`→space at LOAD time so TRIM then folds
+  them — but, per [comparison-engine.md](comparison-engine.md) "Tab fix (HL loader only)", **every
+  other comparison goes through `normalize_value` directly and does NOT get that collapse.** So a
+  cell differing only by trailing/embedded tabs reads as a phantom difference everywhere except HL.
+  CONFIRMED on Intersection Detail: the TSMIS **Excel** export pads some Descriptions with trailing
+  tabs (raw `'HILLCREST RD\t\t'`) that the PDF rendering doesn't carry — the ONLY 8 cells where
+  TSMIS-PDF and TSMIS-Excel disagree statewide are exactly these (all Description, identical road
+  name, invisible), and they inflate Intersection Detail's **PDF-vs-TSN** count to 5,640 vs Excel's
+  5,632. The 8: routes 025/033/111×4/299×2. **Preferred fix: follow the HL precedent, not a core
+  change** — collapse `[\t\n\r\f\v]`→space in the affected report's LOADER (Intersection Detail's
+  `_project`/`normalize_value` path first; audit the other non-HL loaders for tab-padded sources).
+  This keeps the regression blast radius to the touched report's canary instead of widening
+  `_xl_trim`/`normalize_value` globally. **⚠ still regression-locked** — re-bless that report's
+  golden canary (`check_compare_intersection_detail_tsn`, etc.) via the `%TEMP%\tsmis_regress`
+  harness + COM recalc, with justification; don't force the count back. Sibling of the Med Wid
+  flavor-parity caveat (Standing § Dormant). Evidence:
+  `Downloads\TSMIS\_vs_tsn_findings\IntersectionDetail_PDF_vs_Excel.xlsx` (LOCAL only).
+
 ---
 
 ## v0.15.0 — the Everything comparison matrix  ✅ SHIPPED (2026-06-19)

@@ -305,6 +305,11 @@ characters, which Excel's TRIM (and `_xl_trim`) do NOT strip → an otherwise-id
 (`END BR 5-95` vs `END BR 5-95\t\t\t`) showed as a phantom difference. `compare_highway_log.
 _hl_normalize` collapses `[\t\n\r\f\v]` → space at LOAD time (HL loader only — other comparisons
 go through `normalize_value` directly), so TRIM then collapses them and both flavors agree.
+**The "other comparisons" gap is now CONFIRMED, not theoretical** (2026-06-22): Intersection Detail
+shows 8 phantom Description diffs from the SAME Excel tab-padding (the only 8 cells where its
+TSMIS-PDF and TSMIS-Excel sides disagree statewide). Tracked + fix recipe (apply the `_hl_normalize`
+collapse to the non-HL loaders rather than widening the regression-locked `_xl_trim`):
+[roadmap.md](roadmap.md) → `non-hl-loaders-dont-collapse-tab-whitespace`.
 
 ---
 
