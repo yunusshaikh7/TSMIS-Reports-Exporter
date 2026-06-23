@@ -93,11 +93,41 @@ def test_adapters_and_matrix():
     check("PDF row offers env + tsn + vs_excel modes", modes == {"env", "tsn", "vs_excel"})
 
 
+def test_matrix_consolidated_filenames():
+    # Regression for the v0.17.3 field crash: day_matrix_info -> consolidated_state
+    # -> _consolidated_filename raised ValueError for intersection_detail_pdf because
+    # it wasn't wired alongside highway_log_pdf (it's absent from _CONSOLIDATOR_BY_SUBDIR
+    # by design, needing a scratch converted_dir). Lock that EVERY matrix row — and
+    # every by-day row — resolves a consolidated filename + state without raising, so a
+    # future half-wired PDF row can't ship.
+    print("every matrix/by-day row resolves a consolidated filename (no crash):")
+    import tempfile
+    import day_matrix
+    from pathlib import Path
+    subdirs = {sub for _k, _l, sub, _i, _a in reports.matrix_rows()}
+    subdirs |= {sub for _k, _l, sub, *_ in day_matrix._day_rows()}
+    for sub in sorted(subdirs):
+        try:
+            fn = matrix._consolidated_filename(sub)
+            d = Path(tempfile.mkdtemp()) / "2026-06-22 ssor-prod" / sub
+            d.mkdir(parents=True)
+            matrix.consolidated_state(str(d), sub)        # the exact crashing call
+            ok = bool(fn)
+        except Exception as e:                            # noqa: BLE001
+            ok = False
+            print(f"      {sub}: {type(e).__name__}: {e}")
+        check(f"{sub}: consolidated filename + state resolve", ok)
+    check("intersection_detail_pdf filename is the PDF consolidator's",
+          matrix._consolidated_filename("intersection_detail_pdf")
+          == idpdf.FILENAME)
+
+
 def main():
     test_header()
     test_make_row_mapping()
     test_rowb_windows()
     test_adapters_and_matrix()
+    test_matrix_consolidated_filenames()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

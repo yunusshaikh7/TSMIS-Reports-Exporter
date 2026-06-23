@@ -678,20 +678,37 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, env=None):
 # (untouched) comparison adapters. compare_highway_log / compare_highway_log_pdf
 # are file-vs-file, so the per-route env folders are consolidated first.
 # --------------------------------------------------------------------------- #
+def _pdf_store_consolidator(subdir):
+    """The consolidator module for a PDF-sourced store report — Highway Log (PDF)
+    and Intersection Detail (PDF). Both parse PDFs into per-route workbooks in a
+    scratch converted_dir first, so they're deliberately ABSENT from
+    _CONSOLIDATOR_BY_SUBDIR and handled explicitly here (and in
+    _consolidated_filename). Returns None for any other report. Adding a future
+    PDF report in this ONE place wires both the store-consolidate path AND the
+    persistent-filename lookup — so a matrix row can't be half-wired."""
+    if subdir == "highway_log_pdf":
+        import consolidate_tsmis_highway_log_pdf as _m   # pdfplumber — lazy
+        return _m
+    if subdir == "intersection_detail_pdf":
+        import consolidate_tsmis_intersection_detail_pdf as _m
+        return _m
+    return None
+
+
 def _consolidate_store_folder(subdir, env_dir, out_path, events):
     """Consolidate one Export-Everything store folder (<env>/<subdir>/, per-route
     files) into a single workbook via the report's existing consolidator (with its
     additive input_dir/out_path override). Registry-driven via
-    reports.consolidator_for_subdir, so any consolidatable report works; the PDF
-    Highway Log is the one special case (needs a scratch converted_dir)."""
+    reports.consolidator_for_subdir, so any consolidatable report works; the two
+    PDF reports are the special case (they need a scratch converted_dir)."""
     out_path = Path(out_path)
-    if subdir == "highway_log_pdf":
-        import consolidate_tsmis_highway_log_pdf as _m   # pdfplumber — lazy
+    pdf_mod = _pdf_store_consolidator(subdir)
+    if pdf_mod is not None:
         conv = out_path.parent / f".{out_path.stem}_conv"
         try:
-            _m.consolidate(events=events, confirm_overwrite=lambda _p: True,
-                           input_dir=Path(env_dir), out_path=out_path,
-                           converted_dir=conv)
+            pdf_mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                input_dir=Path(env_dir), out_path=out_path,
+                                converted_dir=conv)
         finally:
             shutil.rmtree(conv, ignore_errors=True)
         return
@@ -727,9 +744,9 @@ def consolidate_tsn_pdfs(dest, subdir, events=None, confirm_overwrite=None):
 # re-consolidates; only changing the comparison mechanism (not the data) reuses
 # the existing consolidated. A force flag rebuilds it on demand.
 def _consolidated_filename(subdir):
-    if subdir == "highway_log_pdf":
-        import consolidate_tsmis_highway_log_pdf as _m
-        return _m.FILENAME
+    pdf_mod = _pdf_store_consolidator(subdir)        # the two PDF reports (HL, Int Detail)
+    if pdf_mod is not None:
+        return pdf_mod.FILENAME
     import reports                                   # lazy
     mod = reports.consolidator_for_subdir(subdir)
     if mod is None:
@@ -864,10 +881,16 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                                         mode["env_subdir"], events, force_consolidate)
         side_other = _ensure_consolidated(dest / cell_key / mode["other_subdir"],
                                           mode["other_subdir"], events, force_consolidate)
-        # the adapter fixes PDF=side A, Excel=side B regardless of the row.
-        pdf_c = side_env if mode["env_subdir"] == "highway_log_pdf" else side_other
-        excel_c = side_other if mode["env_subdir"] == "highway_log_pdf" else side_env
-        import compare_highway_log_pdf as _cmp_p
+        # the adapter fixes PDF=side A, Excel=side B regardless of the row; env_subdir
+        # is the PDF side for a *_pdf row (its vs_excel mode), the Excel side for the
+        # Excel row's vs_pdf mode — so key off the "_pdf" suffix, not a literal subdir.
+        is_pdf_env = mode["env_subdir"].endswith("_pdf")
+        pdf_c = side_env if is_pdf_env else side_other
+        excel_c = side_other if is_pdf_env else side_env
+        if mode["env_subdir"].startswith("intersection_detail"):
+            import compare_intersection_detail_pdf as _cmp_p
+        else:
+            import compare_highway_log_pdf as _cmp_p
         result = _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
             pdf_c, excel_c, out_path, events=events,
             confirm_overwrite=confirm_overwrite or (lambda _p: True), mode="values")

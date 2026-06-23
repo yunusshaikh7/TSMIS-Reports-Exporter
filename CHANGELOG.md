@@ -3,6 +3,16 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.17.4 — 2026-06-22
+
+- **Fixes a crash opening the by-day "vs TSN" matrix.** v0.17.3 added Intersection
+  Detail (PDF) as a matrix row but didn't finish wiring it into the matrix's
+  consolidated-workbook bookkeeping, so opening the by-day matrix tab failed with an
+  internal error (`no consolidated filename for intersection_detail_pdf`). It's now
+  wired the same way Highway Log (PDF) is — consolidate, cross-environment, vs-TSN,
+  and vs-Excel all work — and a regression check now covers every matrix row so this
+  can't slip through again.
+
 ## v0.17.3 — 2026-06-22
 
 - **Intersection Detail (PDF) now plugs into the rest of the app — consolidate, compare,
