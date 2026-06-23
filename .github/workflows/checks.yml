@@ -64,6 +64,7 @@ jobs:
         run: |
           set -e
           python build/check_gui_bridge.py
+          python build/check_persistence.py
           python build/check_a2_compare_filter.py
           python build/check_b1_pause.py
           python build/check_b2_autoconsolidate.py

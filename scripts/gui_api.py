@@ -3413,9 +3413,11 @@ class GuiApi:
         What it does NOT contain: the saved login / browser profiles / failure
         dumps (FAILURES_DIR) are never added. What it DOES contain, by design:
         the rotating logs and the manifest, which include this PC's name in file
-        paths, the OS version, and the current settings — diagnostics need those.
-        So it's safe to send to the TSMIS maintainer, not "safe to post
-        publicly"; the user-facing wording below says so plainly."""
+        paths, the OS version, and an ALLOWLISTED subset of diagnostic settings
+        (settings.support_bundle_settings(), not all_settings() — so no site_urls /
+        batch_dest / future sensitive key leaks) — diagnostics need those. So it's
+        safe to send to the TSMIS maintainer, not "safe to post publicly"; the
+        user-facing wording below says so plainly."""
         import io
         import platform
         import zipfile
@@ -3432,7 +3434,7 @@ class GuiApi:
         src, env = get_site()
         manifest.write(f"TSMIS Exporter support bundle\n"
                        f"NOTE: includes this PC's name in file paths, the OS\n"
-                       f"  version and current settings (diagnostics need them);\n"
+                       f"  version and selected diagnostic settings (diagnostics need them);\n"
                        f"  NO saved login, browser profile, or failure dumps.\n"
                        f"  Send it to the TSMIS maintainer, not a public forum.\n"
                        f"created:    {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -3446,7 +3448,7 @@ class GuiApi:
                        f"browsers:   {list(BROWSER_CHANNELS)} (picked: {self._channel})\n"
                        f"login:      {'saved file' if has_valid_auth() else 'none'}"
                        f"{' + device sign-in' if self._device_ok else ''}\n"
-                       f"settings:   {settings.all_settings()}\n"
+                       f"settings:   {settings.support_bundle_settings()}\n"
                        f"run folders: {list_output_days() or '(none)'}\n")
         added = 0
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -3469,9 +3471,9 @@ class GuiApi:
                     pass
         ui_log.info("support bundle saved: %s (%d files)", out, added)
         self._emit_log(f"Support bundle saved ({added} files): {out}")
-        self._emit_log("  It has logs, run reports and settings (and this PC's "
-                       "name in paths) — never your password or saved login. "
-                       "Send it to the TSMIS maintainer.")
+        self._emit_log("  It has logs, run reports and selected diagnostic settings "
+                       "(and this PC's name in paths) — never your password or saved "
+                       "login. Send it to the TSMIS maintainer.")
         return {"saved": str(out)}
 
     @_api_method

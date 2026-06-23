@@ -15,7 +15,9 @@ import logging
 import os
 import re
 import socket
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -393,16 +395,74 @@ def has_valid_auth():
         return False
 
 
-def save_auth_state(state):
-    """Write a Playwright storage_state (dict) to the shared auth file.
+def _restrict_to_owner(path):
+    """Best-effort: tighten `path`'s NTFS ACL to the current user only — remove
+    inherited ACEs and grant the owner full control — so the plaintext session file
+    isn't readable by other accounts even where the parent folder's ACL is broad.
+    Windows-only, via the built-in ``icacls`` (no admin needed for an owned file, no
+    console window). ANY failure is logged and ignored: the file already lives in the
+    user's own profile, and an ACL hiccup must never block sign-in; a total icacls
+    failure leaves the prior inherited (still user-readable) ACL, so there is no
+    lock-out risk. This is NOT DPAPI — it changes the file's permissions, not its
+    bytes, so storage_state stays portable (copying it to another machine simply
+    re-inherits that machine's default ACL)."""
+    if os.name != "nt":
+        return
+    user = os.environ.get("USERNAME", "")
+    # USERNAME is just an env var; accept only a structurally valid Windows account
+    # name (the char class is exactly what Windows forbids in a name) so a tampered /
+    # odd value can't mis-parse the icacls `account:perm` argument — a stray ':' or
+    # '\\' would silently break the grant. On reject we skip + log, leaving the file's
+    # inherited (still owner-readable) ACL rather than issuing a malformed grant.
+    if not re.fullmatch(r'[^"/\\\[\]:;|=,+*?<>]{1,104}', user):
+        log.info("auth: ACL tighten skipped (USERNAME missing or invalid: %r)", user)
+        return
+    try:
+        cp = subprocess.run(
+            ["icacls", str(path), "/inheritance:r", "/grant:r", f"{user}:F"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10, text=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), check=False)
+    except (OSError, subprocess.SubprocessError) as e:
+        log.info("auth: ACL tighten skipped (%s: %s)", type(e).__name__, e)
+        return
+    # icacls ran: a NON-ZERO return is a real ACL failure (e.g. access denied), distinct
+    # from an exception — log it (with rc + first output line) so the "one log upload
+    # answers it" contract holds, but DON'T fail the save (the file keeps its prior
+    # inherited, still owner-readable ACL — best-effort, no lock-out).
+    if cp.returncode != 0:
+        first = next((ln for ln in (cp.stdout or "").splitlines() if ln.strip()), "")
+        log.info("auth: ACL tighten reported a non-zero icacls result (rc=%s)%s; "
+                 "kept the prior inherited ACL", cp.returncode,
+                 f": {first.strip()}" if first else "")
 
-    AT REST: this is plaintext JSON (the session cookies), protected only by NTFS
+
+def save_auth_state(state):
+    """Write a Playwright storage_state (dict) to the shared auth file ATOMICALLY,
+    then tighten its ACL to the current user.
+
+    The write is temp file + ``os.replace`` (F9) so an interrupted / failed / locked
+    write never truncates a prior good session; the owner-only ACL is applied to the
+    TEMP file BEFORE the rename, so the cookies never sit at the well-known AUTH path
+    with a broad inherited ACL even briefly.
+
+    AT REST: this is plaintext JSON (the session cookies), protected by NTFS
     permissions in the user's own app folder, and is git-ignored + never added to
-    the support bundle. Windows DPAPI (CryptProtectData) at-rest encryption is the
-    candidate hardening if a future review requires it -- see docs/it-and-security.md."""
+    the support bundle. Windows DPAPI (CryptProtectData) at-rest ENCRYPTION is the
+    candidate further hardening — deferred because it binds to user+machine and would
+    break storage_state portability (gated on O2); see docs/it-and-security.md."""
     AUTH.parent.mkdir(parents=True, exist_ok=True)
-    with open(AUTH, "w", encoding="utf-8") as f:
-        json.dump(state, f)
+    fd, tmp = tempfile.mkstemp(dir=str(AUTH.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(state, f)
+        _restrict_to_owner(tmp)     # tighten the ACL on the temp BEFORE it becomes
+        os.replace(tmp, AUTH)       # AUTH, so AUTH is owner-only the instant it appears
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     try:
         log.info("auth: session saved -> %s (%d cookies, %d origins)",
                  AUTH, len(state.get("cookies", [])), len(state.get("origins", [])))

@@ -106,6 +106,27 @@ def _backup_corrupt_config():
                     type(e).__name__, e)
 
 
+def _atomic_write(data):
+    """Persist the settings dict atomically (temp file + ``os.replace``) and bust
+    the cache. The ONE writer every setter routes through (R1-N02 dedup): a crash
+    or lock mid-write can't truncate the prior good config, and on a write error the
+    temp is removed and the original error re-raised so the prior file is untouched."""
+    global _cache, _cache_mtime
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp, CONFIG_FILE)
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    _cache, _cache_mtime = None, None
+
+
 def _clamp(key, value):
     """Coerce + clamp a numeric setting; None when the value is unusable."""
     lo, hi = _RANGES[key]
@@ -133,12 +154,36 @@ def all_settings():
     return {k: get(k) for k in DEFAULTS}
 
 
+# Settings safe to put in a shareable diagnostic support bundle. An explicit
+# ALLOWLIST (not all_settings()) so adding a future DEFAULTS key that holds
+# something sensitive (a path with PII, a token, a username, ...) does NOT silently
+# leak into a bundle the user emails out: a new key must be listed here, after a
+# review, before it appears in the bundle (support-bundle-settings-future-leak,
+# R1-N02). The asymmetry (allowlist ⊆ DEFAULTS, not ==) is the safeguard.
+_SUPPORT_BUNDLE_KEYS = (
+    "report_timeout_min", "fast_timeout_min", "retry_timeout_min",
+    "county_timeout_s", "download_start_timeout_s", "fast_workers",
+    "debug_logging", "ui_devtools", "env_check_after_signin",
+    "env_check_after_start", "notify_on_finish",
+)
+assert set(_SUPPORT_BUNDLE_KEYS) <= set(DEFAULTS), \
+    "settings: support-bundle allowlist names an unknown setting"
+
+
+def support_bundle_settings():
+    """The allowlisted subset of settings safe to include in a shareable support
+    bundle (the reliability/debug knobs), each at its effective value. Excludes
+    site_urls / batch_dest / matrix_* and anything not explicitly allowlisted, so a
+    future sensitive setting is not auto-shared — the bundle calls THIS, never
+    all_settings()."""
+    return {k: get(k) for k in _SUPPORT_BUNDLE_KEYS}
+
+
 def update(changes):
     """Validate + persist `changes` (a dict of known keys), returning the new
     effective settings. Unknown keys are ignored with a log line; numeric
-    values are clamped into range. The write is temp-file + os.replace so a
-    crash can't truncate the config."""
-    global _cache, _cache_mtime
+    values are clamped into range. The write goes through `_atomic_write`
+    (temp file + os.replace) so a crash can't truncate the config."""
     data = dict(_read_file())
     for key, value in (changes or {}).items():
         if key not in DEFAULTS:
@@ -154,19 +199,7 @@ def update(changes):
             data[key] = bool(value)
         else:
             data[key] = value
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp, CONFIG_FILE)
-    except OSError:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-    _cache, _cache_mtime = None, None       # next get() re-reads
+    _atomic_write(data)
     log.info("settings: saved %s -> %s", dict(changes or {}), CONFIG_FILE)
     return all_settings()
 
@@ -250,7 +283,6 @@ def all_site_urls():
 def set_site_url(src, env, url):
     """Save (or, with an empty url, clear) one site's URL override.
     Raises ValueError with a user-safe message for an unusable URL."""
-    global _cache, _cache_mtime
     key = f"{src}-{env}"
     url = (url or "").strip()
     if url:
@@ -267,19 +299,7 @@ def set_site_url(src, env, url):
         data["site_urls"] = urls
     else:
         data.pop("site_urls", None)
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp, CONFIG_FILE)
-    except OSError:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-    _cache, _cache_mtime = None, None
+    _atomic_write(data)
     log.info("settings: site url %s -> %s", key, url or "(default)")
     return all_site_urls()
 
@@ -304,26 +324,13 @@ def get_batch_dest():
 def set_batch_dest(path):
     """Save (or, with an empty path, reset to default) the Export-Everything
     destination. Returns the new effective destination."""
-    global _cache, _cache_mtime
     path = (path or "").strip()
     data = dict(_read_file())
     if path:
         data["batch_dest"] = path
     else:
         data.pop("batch_dest", None)
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp, CONFIG_FILE)
-    except OSError:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-    _cache, _cache_mtime = None, None
+    _atomic_write(data)
     log.info("settings: batch_dest -> %s", path or "(default)")
     return get_batch_dest()
 
@@ -348,26 +355,13 @@ def get_matrix_baseline():
 def set_matrix_baseline(key):
     """Save (or, with an empty key, reset to default) the matrix baseline.
     Returns the new effective baseline."""
-    global _cache, _cache_mtime
     key = (key or "").strip()
     data = dict(_read_file())
     if key:
         data["matrix_baseline"] = key
     else:
         data.pop("matrix_baseline", None)
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp, CONFIG_FILE)
-    except OSError:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-    _cache, _cache_mtime = None, None
+    _atomic_write(data)
     log.info("settings: matrix_baseline -> %s", key or "(default)")
     return get_matrix_baseline()
 
@@ -404,25 +398,6 @@ def set_export_browser(channel):
 # Which report ROWS the matrix shows (and refreshes). Stored as the set of HIDDEN
 # row keys so any report type added later defaults to VISIBLE. Validation (key is
 # a known matrix row) lives in gui_api; settings just stores the list.
-
-def _atomic_write(data):
-    """Write the settings dict atomically (temp file + os.replace) and bust the
-    cache. Shared by the newer setters."""
-    global _cache, _cache_mtime
-    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(CONFIG_FILE.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-        os.replace(tmp, CONFIG_FILE)
-    except OSError:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
-    _cache, _cache_mtime = None, None
-
 
 def get_matrix_hidden_reports():
     """The list of matrix row keys the user has hidden (default: none hidden)."""
