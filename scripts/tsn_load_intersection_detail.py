@@ -6,83 +6,52 @@ columns, every route). "Consolidating" it = projecting it once to the shared
 comparison shape ([Route] + the vs-TSN header) so every comparison reads a small
 ready workbook instead of re-parsing the 16k-row dump. The projection (route from
 LOCATION, PM/date/boolean normalization) lives in compare_intersection_detail_tsn;
-this module drives it for the tsn_library builder contract: build_into(raw_dir, out_path, …).
+this module supplies the report-specific glue and delegates the shared
+find-raw/write/save skeleton to tsn_library.build_normalized (S04).
 
 Console-free; openpyxl only.
 """
-from pathlib import Path
-
 try:
-    from openpyxl import Workbook
-    from openpyxl.cell import WriteOnlyCell
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl import Workbook  # noqa: F401  (deps probe; tsn_library writes the workbook)
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
 
 import compare_intersection_detail_tsn as idt
-import artifact_store
-from events import ConsolidateResult, Events
+import tsn_library
+from events import ConsolidateResult
 
 RAW_GLOB = "*.xlsx"
 
 
-def _find_raw(raw_dir):
-    cands = [p for p in Path(raw_dir).glob(RAW_GLOB)
-             if p.is_file() and not p.name.startswith("~$")]
-    return max(cands, key=lambda p: p.stat().st_mtime) if cands else None
+def _project(raw_path):
+    """Read the statewide workbook into the consolidated [Route]+SHARED_HEADER rows
+    and build the success result (rows count + distinct routes)."""
+    rows = idt.tsn_rows_from_raw(raw_path)
+    n_routes = len({r[0] for r in rows})
+
+    def make_result(out_name):
+        return ConsolidateResult(
+            status="ok",
+            message=f"Normalized {len(rows)} TSN Intersection Detail rows ({n_routes} routes).",
+            summary_lines=[f"TSN Intersection Detail: {len(rows)} rows, {n_routes} routes "
+                           f"-> {out_name}"])
+
+    return rows, make_result
 
 
 def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
     """Project the raw TSN Intersection Detail statewide workbook in `raw_dir` into
     the normalized workbook at `out_path` (sheet idt.NORMALIZED_SHEET, header
     ['Route'] + idt.SHARED_HEADER). Returns a ConsolidateResult."""
-    events = events or Events()
-    if not _DEPS_OK:
-        return ConsolidateResult(status="error",
-                                 message="Required components are missing (openpyxl).")
-    raw = _find_raw(raw_dir)
-    if raw is None:
-        return ConsolidateResult(
-            status="error",
-            message=(f"No raw TSN Intersection Detail .xlsx found in:\n{raw_dir}\n\n"
-                     "Import the statewide 'TSAR - INTERSECTION DETAIL' TSN export first."))
-    out_path = Path(out_path)
-    confirm = confirm_overwrite or (lambda _p: True)
-    if out_path.exists() and not confirm(out_path):
-        return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
-
-    events.on_log(f"Normalizing TSN Intersection Detail: {raw.name}")
-    try:
-        rows = idt.tsn_rows_from_raw(str(raw))
-    except Exception as e:
-        return ConsolidateResult(status="error",
-                                 message=f"Could not read {raw.name}: {type(e).__name__}: {e}")
-
-    wb = Workbook(write_only=True)
-    ws = wb.create_sheet(idt.NORMALIZED_SHEET)
-    head_fill = PatternFill("solid", start_color="305496")
-    head_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
-    head_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    cells = []
-    for label in ["Route"] + idt.SHARED_HEADER:
-        c = WriteOnlyCell(ws, value=label)
-        c.fill, c.font, c.alignment = head_fill, head_font, head_align
-        cells.append(c)
-    ws.append(cells)
-    for r in rows:
-        ws.append(r)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        artifact_store.atomic_save(wb, out_path)    # F9: temp + os.replace (never truncate prior)
-    except PermissionError:
-        return ConsolidateResult(
-            status="error",
-            message=(f"Could not save {out_path.name}.\n\n"
-                     "The file is probably open in Excel. Close it and try again."))
-    n_routes = len({r[0] for r in rows})
-    return ConsolidateResult(
-        status="ok",
-        message=f"Normalized {len(rows)} TSN Intersection Detail rows ({n_routes} routes).",
-        summary_lines=[f"TSN Intersection Detail: {len(rows)} rows, {n_routes} routes "
-                       f"-> {out_path.name}"])
+    return tsn_library.build_normalized(
+        raw_dir, out_path, events=events, confirm_overwrite=confirm_overwrite,
+        glob=RAW_GLOB, deps_ok=_DEPS_OK,
+        deps_msg="Required components are missing (openpyxl).",
+        no_raw_what="TSN Intersection Detail .xlsx",
+        no_raw_hint="Import the statewide 'TSAR - INTERSECTION DETAIL' TSN export first.",
+        log_label="TSN Intersection Detail",
+        sheet=idt.NORMALIZED_SHEET,
+        header=["Route"] + idt.SHARED_HEADER,
+        header_align={"horizontal": "center", "vertical": "center", "wrap_text": True},
+        project=_project)

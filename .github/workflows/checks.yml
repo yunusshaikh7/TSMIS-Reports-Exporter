@@ -91,6 +91,7 @@ jobs:
           python build/check_export_summary_outcome.py
           python build/check_batch_outcome.py
           python build/check_tsn_outcome.py
+          python build/check_tsn_normalizer.py
 
       - name: Transactional artifact lifecycle checks (blocking)
         # P2: atomic single-file write (F9), journaled store promotion + startup

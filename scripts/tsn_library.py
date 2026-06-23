@@ -34,7 +34,7 @@ from pathlib import Path
 import consolidation_meta
 import paths
 import report_catalog as _catalog
-from events import ConsolidateResult
+from events import ConsolidateResult, Events
 
 
 @dataclass(frozen=True)
@@ -371,6 +371,105 @@ def build_consolidated(report, events=None, confirm_overwrite=None, force=False)
             message=(f"{spec.label}: the consolidation finished but its outcome could not "
                      "be recorded; the incomplete workbook was discarded — re-run."))
     return result
+
+
+# --------------------------------------------------------------------------- #
+# Shared single-file normalizer (the tsn_load_* family substrate, S04/R1-N01)
+#
+# The four single-file TSN loaders (tsn_load_ramp_summary / _ramp_detail /
+# _intersection_summary / _intersection_detail) all share ONE skeleton: find the
+# newest raw export in raw/, parse it via the report's own projector (which lives in
+# the matching compare_*_tsn module), then write a small normalized write-only
+# workbook (one sheet, a styled header, the projected rows) atomically. Only the
+# glob, projection, header, and result text differ per report — that per-report glue
+# stays in the thin tsn_load_* shim; this factory owns the rest. compare_core is
+# untouched and the builder strings (tsn_load_*:build_into) are preserved.
+# --------------------------------------------------------------------------- #
+def _newest_raw(rdir, glob):
+    """The newest non-temp file in `rdir` matching `glob` (the single statewide
+    export a tsn_load_* normalizes), or None."""
+    cands = [p for p in Path(rdir).glob(glob)
+             if p.is_file() and not p.name.startswith("~$")]
+    return max(cands, key=lambda p: p.stat().st_mtime) if cands else None
+
+
+def _write_normalized_workbook(sheet, header, header_align, rows):
+    """A write-only workbook: one `sheet`, the styled `header` row (the shared
+    TSN-library blue header + the report's own Alignment kwargs), then `rows`."""
+    from openpyxl import Workbook
+    from openpyxl.cell import WriteOnlyCell
+    from openpyxl.styles import Alignment, Font, PatternFill
+    wb = Workbook(write_only=True)
+    ws = wb.create_sheet(sheet)
+    head_fill = PatternFill("solid", start_color="305496")
+    head_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
+    align = Alignment(**header_align)
+    cells = []
+    for label in header:
+        c = WriteOnlyCell(ws, value=label)
+        c.fill, c.font, c.alignment = head_fill, head_font, align
+        cells.append(c)
+    ws.append(cells)
+    for r in rows:
+        ws.append(r)
+    return wb
+
+
+def build_normalized(raw_dir, out_path, *, glob, deps_ok, deps_msg, no_raw_what,
+                     no_raw_hint, log_label, sheet, header, header_align, project,
+                     events=None, confirm_overwrite=None):
+    """Shared driver for the single-file TSN normalizers (S04). Finds the newest
+    `glob` file in `raw_dir`, parses it via `project`, and writes the normalized
+    workbook (one `sheet`, the styled `header`, then the projected rows) to
+    `out_path` atomically (F9: temp + os.replace, never truncating a prior file).
+
+    `project(raw_path)` returns `(rows, make_result)`:
+      * `rows`                 -- the iterable of data rows appended under `header`;
+      * `make_result(out_name)` -- builds the success ConsolidateResult, so each
+        report keeps its own message / summary_lines / producer completion.
+    The deps gate (`deps_ok`/`deps_msg`), missing-raw message (`No raw {no_raw_what}
+    found ...` + `no_raw_hint`), overwrite-confirm, parse-error wrapping, and the
+    PermissionError save guard are identical across the family and live here.
+    Returns a ConsolidateResult; `compare_core` is untouched."""
+    events = events or Events()
+    if not deps_ok:
+        return ConsolidateResult(status="error", message=deps_msg)
+    raw = _newest_raw(raw_dir, glob)
+    if raw is None:
+        return ConsolidateResult(
+            status="error",
+            message=f"No raw {no_raw_what} found in:\n{raw_dir}\n\n{no_raw_hint}")
+    out_path = Path(out_path)
+    confirm = confirm_overwrite or (lambda _p: True)
+    if out_path.exists() and not confirm(out_path):
+        return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
+
+    events.on_log(f"Normalizing {log_label}: {raw.name}")
+    try:
+        rows, make_result = project(str(raw))
+    except Exception as e:
+        return ConsolidateResult(
+            status="error",
+            message=f"Could not read {raw.name}: {type(e).__name__}: {e}")
+
+    try:
+        wb = _write_normalized_workbook(sheet, header, header_align, rows)
+    except ImportError:
+        # The `deps_ok` probe is a single `from openpyxl import Workbook`; this is the
+        # centralized backstop for a partial/frozen-pruned openpyxl whose WriteOnlyCell /
+        # styles symbols are missing — return the shim's friendly deps message, never crash
+        # (P5-A01). Kept here (not 4 broadened probes) so the writing skeleton stays in one place.
+        return ConsolidateResult(status="error", message=deps_msg)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    import artifact_store
+    try:
+        artifact_store.atomic_save(wb, out_path)    # F9: temp + os.replace (never truncate prior)
+    except PermissionError:
+        return ConsolidateResult(
+            status="error",
+            message=(f"Could not save {out_path.name}.\n\n"
+                     "The file is probably open in Excel. Close it and try again."))
+    return make_result(out_path.name)
 
 
 # --------------------------------------------------------------------------- #
