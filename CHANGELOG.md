@@ -3,6 +3,29 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.17.6 — 2026-06-24
+
+- **Fixes "Signalized ≠ P" still showing in the Intersection comparison even though they
+  should match.** The app compares against a saved, normalized copy of the TSN data that
+  wasn't rebuilt after the v0.17.5 crosswalk was added, so it still held the old raw signal
+  codes. The crosswalk (and the other normalizations) is now re-applied whenever that saved
+  copy is read — so the comparison is correct immediately, with no need to re-import or
+  rebuild anything.
+- **The Intersection Detail comparison vs TSN is now a complete, mechanical diff — every
+  column the two systems share is compared and counted, nothing is hidden.** It previously
+  left the cross-street attributes and the Date of Record out of the count; they are now
+  compared like everything else. Where a whole column differs by its nature, the **Notes
+  sheet explains why** instead of hiding it (the Date of Record is a TSMIS refresh date vs
+  TSN's historical record date, so it differs on nearly every row; TSMIS leaves cross-street
+  detail blank for ~37% of intersections). Each workbook's Notes sheet now lists **every
+  normalization applied** — including the ones that make values match — so a match reads as
+  "equal after the stated normalization," not raw equality.
+- **The Intersection Summary now folds the TSN signal sub-types the same way the Detail
+  does.** The old TSN signal codes J–P merge into one "Signalized" category, so signalized
+  intersections compare directly (instead of as separate one-sided rows), and the "no data"
+  categories the TSN summary reports as zero are now compared too. Roundabout stays
+  one-sided — the TSN statewide summary doesn't tabulate it.
+
 ## v0.17.5 — 2026-06-24
 
 - **Signal control types now line up between TSMIS and the older TSN data.** The old TSN

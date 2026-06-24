@@ -467,19 +467,22 @@ P/V are TSN-only → TSMIS contributes 0 → they read as `0 ≠ 122` / `0 ≠ 8
 *Only in TSMIS* + the footer). Approved canary in [tsn-parsers.md](tsn-parsers.md): **31 categories
 both, 1 only-TSMIS, 27 diff cells, 4 identical; TSMIS 15215 vs TSN 15410**. Live in both matrices.
 
-### 9e. TSMIS vs TSN Intersection Summary — `compare_intersection_summary_tsn.py` (AGGREGATE, ONE-SIDED divergence)
+### 9e. TSMIS vs TSN Intersection Summary — `compare_intersection_summary_tsn.py` (AGGREGATE, signal fold)
 
 The AGGREGATE recipe applied to the intersection taxonomy. The category schema (`summary_layout.
-INTERSECTION_SUMMARY_SPEC`, 11 blocks, 72 categories) is the **union of both systems' taxonomies**;
-the spec-driven block-walk `summary_layout.counts_from_rows` maps a (count, code-text) stream to
-`{slug: count}` and is shared by BOTH sides (the TSMIS consolidator AND the TSN parser) so they can't
-drift. The TSN side is a **3-column statewide PDF** — split into left/middle/right x-bands, each
-block-walked independently (so each column's count+label rows pair correctly). **Two blocks DIVERGED**
-between the systems and show **one-sided** (user decision; no crosswalk), driven by `Cat.sides`
-("both" | "tsmis" | "tsn") + `SummarySpec.categories_for(side)`: CONTROL TYPES (TSN-only legacy signals
-J–P; TSMIS-only S/O/Q/R) and INTERSECTION TYPE (TSMIS-only Roundabout/Circular/Midblock). Keyed on
-`(block, code-letter)` because TSMIS reworded labels. Canary in [tsn-parsers.md](tsn-parsers.md):
-**72 union — 56 both / 10 only-TSMIS / 6 only-TSN; 52 diff; TSMIS 16473 vs TSN 16626**. Live in both matrices.
+INTERSECTION_SUMMARY_SPEC`, 11 blocks, **66 categories** after the signal fold) is the union of both
+systems' taxonomies; the spec-driven block-walk `summary_layout.counts_from_rows` maps a (count,
+code-text) stream to `{slug: count}` and is shared by BOTH sides (the TSMIS consolidator AND the TSN
+parser) so they can't drift. The TSN side is a **3-column statewide PDF** — split into left/middle/right
+x-bands, each block-walked independently. **CONTROL-TYPE signal fold (2026-06-24, matches the Detail
+crosswalk):** `counts_from_rows` folds the TSN sub-types **J–P → S** within the CONTROL TYPES block (both
+sides), so the shared **`S - SIGNALIZED (incl. TSN J-P)`** category compares directly (TSMIS 2,713 vs TSN
+2,648) instead of splitting one-sided. The codes the TSN summary genuinely doesn't tabulate stay
+one-sided via `Cat.sides`: CONTROL Roundabout R / PHB O / Flash Q; INTERSECTION TYPE R/C/P; left-chan Y.
+The `+ no data` buckets the TSN PDF reports as 0 are compared (e.g. num-lanes-`+` 265 vs 0). Keyed on
+`(block, code-letter)`; the familiar sheet carries a `notes` line documenting the fold. Canary in
+[tsn-parsers.md](tsn-parsers.md): **66 — 58 both / 8 only-TSMIS / 0 only-TSN; 54 diff; 16473 vs 16626**.
+Live in both matrices.
 
 ### 9f. TSMIS vs TSN Intersection Detail — `compare_intersection_detail_tsn.py` (FLAT, route+PM)
 
@@ -496,14 +499,19 @@ signalized codes are **normalized to one readable `Signalized` category** — so
 longer flags, and the word "Signalized" (vs the raw letter codes) shows the merge ON the comparison
 sheet, with the **Notes sheet** documenting it. Every other code (A/B/C/D/E/F/G/H/I/R/Z) is shared
 and compared unchanged; geometry/INT Type needs no crosswalk;
-**(3)** `context_fields` = PR + Date of Record (a TSMIS refresh date) + the **5 cross-street attrs**
-(TSMIS leaves them blank for ~37% of intersections, so counting them would bury the mainline diffs —
-shown, never counted). **(4)** Divided-highway routes carry a roadbed suffix (S/U) on TSN but not
-TSMIS — keyed on the BASE route so the same intersection still pairs, with the suffix surfaced as a
-compared `Roadbed` column so a suffix-only difference is flagged (match-and-indicate, 2026-06-20).
+**(3) COMPARE-EVERYTHING (user, 2026-06-24):** `context_fields = ()` — nothing is suppressed. Every
+column present in both systems is compared and counted (a mechanical diff), including PR, Date of
+Record (a TSMIS refresh date — the whole column differs from TSN's record date), and the 5
+cross-street attrs (TSMIS-blank for ~37% of intersections). The **Notes sheet** *comments* on the
+columns that differ wholesale instead of hiding them, and documents every normalization. **(4)**
+Divided-highway routes carry a roadbed suffix (S/U) on TSN but not TSMIS — keyed on the BASE route so
+the same intersection still pairs, with the suffix surfaced as a compared `Roadbed` column so a
+suffix-only difference is flagged (match-and-indicate, 2026-06-20).
 Canary (statewide, local): **16,211 both / 262 only-TSMIS / 415 only-TSN (routes one-sided
-NONE/NONE); 3,019 counted diffs after the control crosswalk (Control Type 2,614→1; was 5,632
-before); 16473 vs 16626**. Live in both matrices.
+NONE/NONE); 49,397 counted diffs** = Date of Record 16,211 (whole column, structural) + cross-street
+30,167 (mostly completeness gaps; 276 genuine conflicts) + mainline/identity 3,019 (post-crosswalk,
+Control Type 2,614→1); every matched row differs (Date of Record); **16473 vs 16626**. PDF flavor
+**49,405** (+8 Description trailing-tab cells). Live in both matrices.
 
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 

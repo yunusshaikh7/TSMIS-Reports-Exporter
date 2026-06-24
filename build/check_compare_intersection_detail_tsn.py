@@ -1,13 +1,14 @@
 """Golden check for the TSMIS-vs-TSN Intersection Detail comparator
 (scripts/compare_intersection_detail_tsn.py) — the FLAT recipe (route+PM).
 
-Locks: the CompareSchema wiring (PM key; the context_fields = PR + Date of Record
-+ the five cross-street attributes; boolean fields; the Notes legend_writer), the
-Y/N<->1/0 boolean normalization, route-from-LOCATION + PM/date normalization, the
-position-based TSMIS-consolidated loader, and end-to-end that a Y/1 boolean
-compares EQUAL while a control-type code change is a genuine diff, and that the
-context columns (cross-street + Date of Record) contribute ZERO diff cells even
-when one side is blank. No Excel; CI-safe.
+Locks: the CompareSchema wiring (PM key; NO context fields — every shared column is
+compared and counted; boolean fields; the Notes legend_writer), the Y/N<->1/0
+boolean normalization, the control-type crosswalk, route-from-LOCATION + PM/date
+normalization, the position-based TSMIS-consolidated loader, and end-to-end that a
+normalization still produces a MATCH (a Y/1 boolean and a crosswalked S/P compare
+EQUAL) while everything present in both systems IS counted — a non-signalized
+control change, the cross-street blank-vs-value gap, and the Date-of-Record
+refresh-vs-record column all flag as genuine diffs. No Excel; CI-safe.
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_compare_intersection_detail_tsn.py
@@ -91,11 +92,9 @@ def test_schema():
     sc = idt._SCHEMA
     check("key is PM", sc.header[sc.key_field] == "PM")
     check("side names TSMIS / TSN", sc.side_a == "TSMIS" and sc.side_b == "TSN")
-    check("context = PR + Date of Record + 5 cross-street attrs",
-          set(sc.context_fields) == {"PR", "Date of Record", "CS Mastarm",
-                                     "CS Left Chan", "CS Right Chan", "CS Traffic Flow",
-                                     "CS Num Lanes"})
-    check("Notes legend_writer set (the indicator)", sc.legend_writer is not None)
+    check("NO context fields — every shared column is compared and counted",
+          tuple(sc.context_fields) == ())
+    check("Notes legend_writer set (documents the normalizations)", sc.legend_writer is not None)
     check("boolean normalize Y/1->Y, N/0->N",
           idt._norm_bool("Y") == "Y" and idt._norm_bool("1") == "Y"
           and idt._norm_bool("N") == "N" and idt._norm_bool("0") == "N")
@@ -113,7 +112,7 @@ def test_schema():
 
 
 def test_end_to_end():
-    print("end-to-end (boolean normalize + context non-asserting):")
+    print("end-to-end (normalizations still match; every shared column counted):")
     root = Path(tempfile.mkdtemp(prefix="tsmis_id_tsn_"))
     tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
     # PM 0.204: signalized sub-type split (TSMIS S vs TSN P) — CROSSWALKED to equal,
@@ -148,31 +147,34 @@ def test_end_to_end():
     rc = header.index("ML Right Chan")
     ctrl = header.index("Control Type")
     nl = header.index("ML Num Lanes")
+    dor = header.index("Date of Record")
+    cs_sm = header.index("CS Mastarm")
     diffs_col = header.index("Diffs")
+    # Normalizations still produce a MATCH (the point of "make normalization clear,
+    # even though it leads to a match").
     check("Lighting Y(TSN)/1(TSMIS) normalized equal — no diff", DIFF not in by["0.204"][light])
     check("ML Mastarm Y/1 normalized equal — no diff", DIFF not in by["0.204"][mast])
     check("ML Right Chan N/0 normalized equal — no diff", DIFF not in by["0.204"][rc])
-    # CROSSWALK: TSMIS "S" and TSN "P" both fold into the readable "Signalized"
-    # category -> the counted Control Type matches (the label itself shows the merge).
     check("Control Type S(TSMIS)/P(TSN) crosswalk to Signalized — no diff",
           DIFF not in by["0.204"][ctrl] and by["0.204"][ctrl] == "Signalized")
-    check("the crosswalked cell is NOT counted (PM 0.204 has 0 counted diffs)",
-          by["0.204"][diffs_col] in ("0", "0.0"))
+    # Everything present in both systems is now COUNTED (no suppression):
+    # the cross-street blank-vs-value gap and the Date-of-Record refresh-vs-record
+    # column flag like any other diff.
+    check("CS Mastarm blank(TSMIS) vs N(TSN) is now a COUNTED diff (no coalescing)",
+          DIFF in by["0.204"][cs_sm])
+    check("Date of Record refresh(2021)/record(1973) is now a COUNTED diff",
+          DIFF in by["0.204"][dor])
+    check("PM 0.204 counts the 5 cross-street + 1 Date-of-Record diffs (6)",
+          by["0.204"][diffs_col] in ("6", "6.0"))
     # A NON-signalized control change (A vs B) is NOT crosswalked -> still a genuine diff.
     check("Control Type A(TSMIS) vs B(TSN) — non-signalized, still a genuine diff",
           DIFF in by["1.000"][ctrl])
-    check("ML Num Lanes 3 vs 4 is a genuine diff", DIFF in by["1.000"][nl])
-
-    # context columns NEVER carry a diff marker (incl. CS present-vs-blank, Date of Record).
-    ctx_cols = [header.index(c) for c in ("PR", "Date of Record", "CS Mastarm",
-                                          "CS Left Chan", "CS Right Chan",
-                                          "CS Traffic Flow", "CS Num Lanes")]
-    ctx_diffs = sum(1 for r in rows for i in ctx_cols if DIFF in r[i])
-    check("zero diff cells in any context column (CS blank-vs-N, Date refresh)", ctx_diffs == 0)
-    check("CS Mastarm context shows the TSN value (N) when TSMIS is blank",
-          by["0.204"][header.index("CS Mastarm")] == "N")
+    check("ML Num Lanes 4 vs 3 is a genuine diff", DIFF in by["1.000"][nl])
+    check("PM 1.000 counts Control + ML Num Lanes + Date of Record (3)",
+          by["1.000"][diffs_col] in ("3", "3.0"))
     total = sum(1 for r in rows for c in r if DIFF in c)
-    print(f"      (rows={len(rows)}, total diff cells={total}, context diff cells={ctx_diffs})")
+    check("total counted diff cells across both rows == 9", total == 9)
+    print(f"      (rows={len(rows)}, total diff cells={total})")
 
 
 def test_roadbed_match():
@@ -187,9 +189,11 @@ def test_roadbed_match():
         _tsmis_row("210", "R", "5.000", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
                    "1", "N", "0", "P", "3", "JCT 99"),
     ])
-    # TSN lists the SAME intersection under "210U" (divided-highway roadbed).
+    # TSN lists the SAME intersection under "210U" (divided-highway roadbed). Every
+    # other column (incl. Date of Record, now compared) is identical, so the suffix
+    # is the ONLY difference.
     _write_tsn(tsn, [
-        {"PP": "R", "POST_MILE": " 005.000", "LOCATION": "12 ORA 210U", "DATE_REC": "73-10-19",
+        {"PP": "R", "POST_MILE": " 005.000", "LOCATION": "12 ORA 210U", "DATE_REC": "21-12-31",
          "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "S", "LT_TY": "Y",
          "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
          "DESCRIPTION": "JCT 99"},
@@ -205,10 +209,43 @@ def test_roadbed_match():
     check("no other column differs (suffix is the only difference)", other == 0)
 
 
+def test_normalized_path_crosswalk():
+    """A normalized TSN-library workbook carrying RAW control codes (a library built
+    before the crosswalk existed — 'stale') must STILL get the crosswalk applied when
+    read: _load_tsn re-projects the normalized sheet at compare time. Regression lock
+    for the 'Signalized ≠ P' bug (the crosswalk used to be skipped on this path)."""
+    print("normalized-library path re-applies the crosswalk (stale-library repair):")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_id_norm_"))
+    norm = root / "tsn_norm.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = idt.NORMALIZED_SHEET
+    ws.append(["Route"] + idt.SHARED_HEADER)
+
+    def nrow(route, pm, ctrl, light="Y"):
+        d = {"PM": pm, "Control Type": ctrl, "Lighting": light}
+        return [route] + [d.get(f, "") for f in idt.SHARED_HEADER]
+
+    ws.append(nrow("001", "1.000", "P"))     # stale RAW signal sub-type
+    ws.append(nrow("001", "2.000", "J"))     # another stale RAW signal sub-type
+    ws.append(nrow("001", "3.000", "A"))     # non-signal, must stay "A"
+    wb.save(norm)
+    wb.close()
+    rows, _ = idt._load_tsn(norm)
+    pm_i = 1 + idt.SHARED_HEADER.index("PM")
+    ct_i = 1 + idt.SHARED_HEADER.index("Control Type")
+    by_pm = {r[pm_i]: r[ct_i] for r in rows}
+    check("raw 'P' in a normalized library workbook -> 'Signalized' on read",
+          by_pm.get("1.000") == "Signalized")
+    check("raw 'J' likewise -> 'Signalized'", by_pm.get("2.000") == "Signalized")
+    check("non-signal 'A' unchanged", by_pm.get("3.000") == "A")
+
+
 def main():
     test_schema()
     test_end_to_end()
     test_roadbed_match()
+    test_normalized_path_crosswalk()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

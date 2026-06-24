@@ -11,20 +11,30 @@ header. Reconciled by hand on route 1 (1,265 PMs aligned):
     `LOCATION` ("12 ORA 001" -> "001").
 
 Both store attribute values in (eff_date, type) order (the planning-phase
-"pair-order reversal" was a misread of the shifted TSMIS labels). Three real
-reconciliations:
+"pair-order reversal" was a misread of the shifted TSMIS labels).
+
+EVERY field present in both systems is COMPARED and COUNTED — this is a mechanical
+diff; the reader adds commentary, the tool never hides a column. Some columns differ
+on nearly every row by their nature (see below); they are still flagged, and the
+Notes sheet COMMENTS on why rather than suppressing them. Normalizations make some
+raw-different values compare equal; each is documented in the Notes sheet so a match
+is read as "equal after the stated normalization", not raw equality:
   1. **Boolean encoding** — mastarm / right-channelization / lighting are Y/N on
-     TSN but 1/0 on TSMIS. NORMALIZED here as Y≡1 / N≡0 (user decision) so only
-     genuine changes flag; a Notes sheet + header note INDICATE this is applied.
+     TSN but 1/0 on TSMIS. NORMALIZED here as Y≡1 / N≡0 so only genuine changes flag
+     (a TSMIS cell shown as "Y" was stored "1"); the Notes sheet states this.
   2. **Control-type crosswalk** — TSN records signalized under the legacy signal
      sub-types J/K/L/M/N/P, which TSNR/TSMIS collapses into the single category "S".
      Per the TSNR/MIRE reference, both sides' signalized codes are normalized to one
      readable "Signalized" category so the sub-type split stops flagging — and the
      word "Signalized" (vs the raw letter codes) makes the merge visible on the page;
-     a Notes sheet documents it. (Geometry/INT Type needs no crosswalk — both systems
-     share the F/M/S/T/Y/Z/R codes.)
-  3. **Date of Record** is a TSMIS refresh date (not the record date) -> a CONTEXT
-     field (shown, never counted), alongside the roadbed PR indicator.
+     the Notes sheet documents it. (Geometry/INT Type needs no crosswalk — both
+     systems share the F/M/S/T/Y/Z/R codes.)
+  3. **Date of Record** is a TSMIS refresh date (not the historical record date), so
+     the whole column differs from TSN — it is compared and counted like everything
+     else, and the Notes sheet comments on why the column differs wholesale.
+  4. **Cross-street (CS*) attributes** — TSMIS leaves them blank for ~37% of
+     intersections while TSN defaults them, so that column shows many blank-vs-value
+     differences; compared and counted, with the completeness gap noted.
 
 Console-free; engine in compare_core.
 """
@@ -56,14 +66,13 @@ SHARED_HEADER = [
     "CS Traffic Flow", "CS Num Lanes", "Date of Record",
 ]
 KEY_FIELD = SHARED_HEADER.index(KEY)      # 2 (after PR + the derived Roadbed column)
-# Shown but never counted: the roadbed indicator, the TSMIS refresh date, and the
-# CROSS-STREET attributes — TSMIS leaves cross-street detail blank for ~37% of
-# intersections while TSN defaults them (so a raw compare floods 30k blank-vs-N
-# cells that bury the substantive mainline differences). The mainline attributes +
-# types ARE compared; the cross-street values stay visible (context) so a reviewer
-# still sees the completeness gap without it dominating the diff count.
-CONTEXT_FIELDS = ("PR", "Date of Record", "CS Mastarm", "CS Left Chan",
-                  "CS Right Chan", "CS Traffic Flow", "CS Num Lanes")
+# Nothing is suppressed: every field present in both systems is compared and counted
+# (a mechanical diff). The roadbed PR indicator, the Date of Record, and the five
+# CROSS-STREET attributes are all compared. Two of those differ on nearly every row
+# by their nature (Date of Record = refresh-vs-record date; CS* = TSMIS ~37% blank vs
+# TSN defaults); they are flagged, and the Notes sheet COMMENTS on why rather than
+# hiding them. (Empty = no context coalescing; see compare_core CompareSchema.)
+CONTEXT_FIELDS = ()
 DATE_FIELDS = ("Date of Record",)
 # Y/N (TSN) vs 1/0 (TSMIS) booleans — normalized to Y/N so only real changes flag.
 BOOLEAN_FIELDS = ("Lighting", "ML Mastarm", "ML Right Chan", "CS Mastarm", "CS Right Chan")
@@ -215,6 +224,20 @@ def tsn_rows_from_raw(path):
         wb.close()
 
 
+def _normalized_row(r):
+    """Re-project one row from the normalized TSN-library sheet onto the shared
+    shape, RE-APPLYING the field normalizations (control-type crosswalk, booleans,
+    PM, date). The projections are idempotent on already-normalized values, so this
+    is a no-op for a freshly-built library BUT repairs a STALE one — a library
+    workbook built before a normalization change (e.g. before the J–P→Signalized
+    crosswalk) would otherwise feed raw codes straight through `_v` and flag a
+    phantom 'Signalized ≠ P'. Normalizing at COMPARE time means a normalization
+    change takes effect immediately, without rebuilding the library."""
+    vals = list(r)[:len(SHARED_HEADER) + 1]
+    vals += [None] * (len(SHARED_HEADER) + 1 - len(vals))
+    return [_v(vals[0])] + [_project(f, vals[i + 1]) for i, f in enumerate(SHARED_HEADER)]
+
+
 def _load_tsn(path):
     path = Path(path)
     try:
@@ -225,7 +248,7 @@ def _load_tsn(path):
         if NORMALIZED_SHEET in wb.sheetnames:
             it = wb[NORMALIZED_SHEET].iter_rows(values_only=True)
             next(it, None)
-            rows = [[_v(c) for c in list(r)[:len(SHARED_HEADER) + 1]]
+            rows = [_normalized_row(r)
                     for r in it if r and any(c not in (None, "") for c in r)]
             return rows, True
     finally:
@@ -263,14 +286,19 @@ def _load_tsmis(path):
 
 
 # --------------------------------------------------------------------------- #
-# Notes sheet — the INDICATOR that boolean normalization is applied
+# Notes sheet — documents every normalization applied (so a match is read as
+# "equal after the stated normalization", not raw equality) and comments on the
+# columns that differ wholesale. Nothing is suppressed: all shared fields are
+# compared and counted.
 # --------------------------------------------------------------------------- #
 def _write_notes_sheet(wb):
     ws = wb.create_sheet("Notes")
     ws.sheet_properties.tabColor = "ED7D31"
     write_only = getattr(wb, "write_only", False)
     title = Font(name="Arial", size=12, bold=True, color="FFFFFF")
+    head = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill = PatternFill("solid", start_color="1F3864")
+    sec_fill = PatternFill("solid", start_color="0070C0")
     body = Font(name="Arial", size=10)
     wrap = Alignment(vertical="top", wrap_text=True)
 
@@ -285,37 +313,54 @@ def _write_notes_sheet(wb):
             c.alignment = align
         return c
 
+    def section(text):
+        ws.append([cell(text, head, f=sec_fill)])
+
+    def note(text):
+        ws.append([cell(text, body, align=wrap)])
+
     ws.column_dimensions["A"].width = 110
     ws.append([cell("Intersection Detail — TSMIS vs TSN: comparison notes", title, fill)])
-    for line in (
-        "Boolean attributes (Lighting, ML Mastarm, ML Right Chan, CS Mastarm, CS Right "
-        "Chan) are encoded Y/N on TSN but 1/0 on TSMIS. They are NORMALIZED as Y≡1 / "
-        "N≡0 so only genuine changes are flagged (not the encoding); cells are shown as Y/N.",
-        "Control Type — CROSSWALK APPLIED (per the TSNR/MIRE reference 'TSNR - Intersection "
-        "Control and Geometry Type'): TSN records signalized intersections under the legacy "
-        "signal sub-types J/K/L/M/N/P (pretimed / semi- / full-actuated, 2- vs multi-phase), "
-        "which TSNR/TSMIS collapses into ONE category stored as 'S'. Both sides' signalized "
-        "codes are NORMALIZED to the single readable category 'Signalized', so the sub-type "
-        "split no longer flags as a difference. Wherever the Control Type cell reads "
-        "'Signalized' (rather than a raw letter code), the crosswalk was applied — that is how "
-        "to see, on this sheet, when the merge is in effect. Every other control code "
-        "(A/B/C/D/E/F/G/H/I/R/Z) is shared by both systems and is compared unchanged. Geometry "
-        "(INT Type) needs no crosswalk — both systems use the same F/M/S/T/Y/Z/R codes.",
-        "CONTEXT columns (shown for reference, never counted as a difference): the PR "
-        "roadbed indicator; Date of Record (a TSMIS refresh date, not the record date); and "
-        "the five CROSS-STREET attributes (CS Mastarm / Left Chan / Right Chan / Traffic Flow "
-        "/ Num Lanes) — TSMIS leaves cross-street detail blank for ~37% of intersections while "
-        "TSN defaults it, so counting them would bury the substantive mainline differences. The "
-        "cross-street values are still shown so the completeness gap is visible.",
-        "Rows are keyed on Route + Postmile (PM); attribute effective-dates are not compared.",
-        "California divided highways carry a roadbed suffix (S/U) on the route name that "
-        "TSN keeps but TSMIS often omits (TSN \"210U\" vs TSMIS \"210\"). Rows are matched on "
-        "the BASE route number so the same intersection still pairs across that label "
-        "difference; the suffix is shown in the 'Roadbed' column and — when it is the only "
-        "difference — is flagged there (TSN \"U\" vs TSMIS blank) rather than dropped to a "
-        "one-sided row or silently merged.",
-    ):
-        ws.append([cell(line, body, align=wrap)])
+    note("This is a MECHANICAL field-by-field diff. EVERY column present in both systems "
+         "is compared and counted — nothing is hidden. Some columns differ on nearly every "
+         "row by their nature; they are still flagged, and the reasons are noted below "
+         "(commentary belongs to the reader, not to suppressing a column).")
+
+    section("NORMALIZATIONS APPLIED  (these can make raw-different values compare EQUAL — "
+            "a match means 'equal after the normalization named here', not that the source "
+            "cells were byte-identical)")
+    note("• Control Type — CROSSWALK (per the TSNR/MIRE reference 'TSNR - Intersection "
+         "Control and Geometry Type'): TSN records signalized intersections under the legacy "
+         "signal sub-types J/K/L/M/N/P (pretimed / semi- / full-actuated, 2- vs multi-phase); "
+         "TSNR/TSMIS collapses them into ONE category stored as 'S'. Both sides' signalized "
+         "codes are normalized to the single readable category 'Signalized'. HOW TO SEE IT: "
+         "wherever the Control Type cell reads the word 'Signalized' (not a raw letter code), "
+         "the crosswalk was applied and a TSN J–P matched a TSMIS S. Every other control code "
+         "(A/B/C/D/E/F/G/H/I/R/Z) is shared and compared unchanged. INT Type needs no "
+         "crosswalk — both systems share the F/M/S/T/Y/Z/R codes.")
+    note("• Boolean encoding — Lighting, ML Mastarm, ML Right Chan, CS Mastarm, CS Right "
+         "Chan are stored Y/N on TSN but 1/0 on TSMIS. Normalized as Y≡1 / N≡0, so only a "
+         "genuine change flags (not the encoding). HOW TO SEE IT: a cell shown as 'Y' on the "
+         "TSMIS side was stored '1' (and 'N' was '0').")
+    note("• Postmile (PM) — leading zeros and spaces are stripped so the same postmile pairs "
+         "across formatting (TSN ' 004.901' ≡ TSMIS '4.901'). PM is the row key.")
+    note("• Roadbed suffix — California divided highways carry an S/U suffix on the route name "
+         "that TSN keeps but TSMIS often omits (TSN '210U' vs TSMIS '210'). Rows are matched on "
+         "the BASE route number so the same intersection still pairs; the suffix is compared in "
+         "the 'Roadbed' column (TSN 'U' vs TSMIS blank flags there) rather than dropping the row.")
+
+    section("COLUMNS THAT DIFFER WHOLESALE  (compared and counted like any other — the "
+            "difference is structural, explained here, NOT a per-intersection data error)")
+    note("• Date of Record — TSMIS stores a data-REFRESH date (typically 2019–2023) while TSN "
+         "stores the historical RECORD date (often 1964/1970/1977). The two therefore differ on "
+         "almost every matched row. The column is compared and counted; treat the count as 'the "
+         "field means different things in the two systems', not as thousands of corrections.")
+    note("• Cross-street attributes (CS Mastarm / Left Chan / Right Chan / Traffic Flow / Num "
+         "Lanes) — TSMIS leaves cross-street detail blank for ~37% of intersections while TSN "
+         "defaults it, so this group shows many blank-vs-value differences. They are compared "
+         "and counted; most differences here are a TSMIS completeness gap rather than a "
+         "value conflict.")
+    note("Rows are keyed on Route + Postmile (PM); attribute effective-dates are not compared.")
     return ws
 
 

@@ -68,6 +68,8 @@ class SummarySpec:
     sections: tuple
     total: Cat = None                 # the grand-total row (e.g. Total Number of Ramps)
     footnotes: tuple = field(default_factory=tuple)   # TSMIS-only extras (e.g. no-linework)
+    notes: tuple = field(default_factory=tuple)       # extra note lines on the familiar
+    #                                                   sheet (e.g. normalizations applied)
 
     def categories(self):
         """Every COMPARED category in display order (sections then total) as
@@ -160,10 +162,12 @@ RAMP_SUMMARY_SPEC = SummarySpec(
 # Intersection Summary canonical spec (UNION of the TSN + TSMIS taxonomies)
 # =============================================================================
 # 11 category blocks; the comparison keys on (block, code-letter) because TSMIS
-# reworded many labels ("STOP SIGN"->"STOP SIGNS", "FOUR-WAY"->"4-WAY"). Two
-# blocks DIVERGED between the systems (CONTROL TYPES: TSN J-P signals vs TSMIS
-# S/O/Q/R; INTERSECTION TYPE: TSMIS adds R/C/P) — those non-shared codes show
-# one-sided (user decision; no crosswalk). See docs/tsn-parsers.md.
+# reworded many labels ("STOP SIGN"->"STOP SIGNS", "FOUR-WAY"->"4-WAY"). CONTROL
+# TYPES: the TSN signal sub-types J–P fold into the shared "Signalized" (S) category
+# (see _CONTROL_SIGNAL_FOLD; matches the Detail crosswalk). The codes the TSN summary
+# genuinely doesn't tabulate (CONTROL R/O/Q; INTERSECTION TYPE R/C/P; left-chan Y)
+# stay one-sided; the "+ no data" buckets the TSN PDF reports as 0 are compared.
+# See docs/tsn-parsers.md.
 import re as _re
 
 
@@ -175,16 +179,26 @@ def _codeslug(code):
     return "plus" if code == "+" else code.lower().replace("-", "_")
 
 
-# Diverged codes the two systems don't share (confirmed on the 6.19 raw): these
-# show ONE-SIDED (user decision — no crosswalk). Everything else is shared.
-_IS_TSN_ONLY = {("CONTROL TYPES", c) for c in "JKLMNP"}      # legacy signal codes
+# CONTROL TYPES — signal crosswalk (matches compare_intersection_detail_tsn and the
+# TSNR/MIRE reference): TSN records signalized under the legacy sub-types J–P; TSMIS
+# stores one code S. counts_from_rows folds J–P -> S within the CONTROL TYPES block
+# (for BOTH sides, since they share the mapper), so the summary compares one shared
+# "Signalized" category instead of splitting it one-sided. (User, 2026-06-24.)
+_IS_CONTROL_TYPES = "CONTROL TYPES"
+_CONTROL_SIGNAL_FOLD = frozenset("JKLMNP")                   # -> "S" within CONTROL TYPES
+
+# Codes only ONE system's SUMMARY tabulates (confirmed on the 6.19 raw). With the
+# signal fold above there are no TSN-only control codes left. The remaining TSMIS-only
+# codes are genuinely absent from the TSN statewide summary PDF (e.g. it has no
+# roundabout row, no "Y - channelization not specified" left-chan row). Everything
+# else — including the "+ no data" buckets the TSN PDF reports as 0 — is shared and
+# compared.
+_IS_TSN_ONLY = set()
 _IS_TSMIS_ONLY = {
-    ("CONTROL TYPES", "R"), ("CONTROL TYPES", "S"), ("CONTROL TYPES", "O"),
-    ("CONTROL TYPES", "Q"),                                   # new control taxonomy
+    ("CONTROL TYPES", "R"), ("CONTROL TYPES", "O"), ("CONTROL TYPES", "Q"),
     ("INTERSECTION TYPE", "R"), ("INTERSECTION TYPE", "C"),
     ("INTERSECTION TYPE", "P"), ("INTERSECTION TYPE", "+"),   # new intersection types
-    ("MAINLINE NUM OF LANES", "+"),                           # TSN omits the no-data lane row
-    ("MAINLINE LEFT CHANNELIZATION", "Y"),                    # "channelization not specified"
+    ("MAINLINE LEFT CHANNELIZATION", "Y"),                    # TSN summary has no "Y" row
 }
 
 
@@ -230,16 +244,16 @@ INTERSECTION_SUMMARY_SPEC = SummarySpec(
               ("Z", "OTHER"), ("+", "NO DATA GIVEN")),
         _isec("LIGHTING TYPE",
               ("N", "NO LIGHTING"), ("Y", "LIGHTING"), ("+", "NO DATA GIVEN")),
+        # Signal sub-types J–P fold into "S - SIGNALIZED" (see _CONTROL_SIGNAL_FOLD),
+        # so they are NOT separate rows here — the single Signalized category carries
+        # TSMIS S vs TSN (J–P summed).
         _isec("CONTROL TYPES",
               ("A", "NO CONTROL"), ("B", "STOP SIGNS ON CROSS ST ONLY"),
               ("C", "STOP SIGNS ON MAINLINE ONLY"), ("D", "FOUR-WAY STOP SIGNS"),
               ("E", "4-WAY FLASHER (RED/CROSS ST)"), ("F", "4-WAY FLASHER (RED/MAINLINE)"),
               ("G", "4-WAY FLASHER (RED ON ALL)"), ("H", "YIELD SIGNS (CROSS ST ONLY)"),
               ("I", "YIELD SIGNS (MAIN LINE ONLY)"),
-              ("J", "SIGNAL PRETIMED (2-PHASE)"), ("K", "SIGNAL PRETIMED (MULTI-PHASE)"),
-              ("L", "SIGNALS SEMI-ACTUATED (2-PHASE)"), ("M", "SIGNALS SEMI-ACTUATED (MULTI-PHASE)"),
-              ("N", "SIGNALS FULL-ACTUATED (2-PHASE)"), ("P", "SIGNALS FULL-ACTUATED (MULTI-PHASE)"),
-              ("R", "YIELD ALL WAYS (ROUNDABOUT)"), ("S", "SIGNALIZED"),
+              ("R", "YIELD ALL WAYS (ROUNDABOUT)"), ("S", "SIGNALIZED (incl. TSN J-P)"),
               ("O", "PEDESTRIAN HYBRID BEACON"), ("Q", "FLASH BEACON"),
               ("Z", "OTHER"), ("+", "NO DATA GIVEN")),
         _isec("MAINLINE NUM OF LANES",
@@ -259,6 +273,13 @@ INTERSECTION_SUMMARY_SPEC = SummarySpec(
               ("Z", "OTHERS"), ("+", "NO DATA GIVEN")),
     ),
     total=Cat("total_intersections", "Total Intersections", "Total Intersections"),
+    notes=(
+        "Control Type — the TSN signal sub-types J–P (pretimed / semi- / full-actuated) "
+        "are folded into the single 'S - SIGNALIZED' category (matching the Detail "
+        "comparison and the TSNR/MIRE reference), so the signalized count compares "
+        "directly: TSMIS S vs TSN (J–P summed). Roundabout (R) stays one-sided — the TSN "
+        "statewide summary has no roundabout row.",
+    ),
 )
 
 
@@ -321,6 +342,8 @@ def counts_from_rows(spec, rows):
                 code = None
         else:
             code = _plain_code(t)
+            if cur.name == _IS_CONTROL_TYPES and code in _CONTROL_SIGNAL_FOLD:
+                code = "S"                       # fold TSN signal sub-types J–P -> S
         cat = by_block[cur.name].get(code) if code is not None else None
         if cat is not None:
             out[cat.slug] = out.get(cat.slug, 0) + int(count)
@@ -399,6 +422,8 @@ def _render(wb, ctx, spec):
                     "side (e.g. TSN-only ramp types P / V).", note_font)])
     if file_a or file_b:
         ws.append([cell(f"{side_a} = {file_a}    {side_b} = {file_b}", note_font)])
+    for n in spec.notes:
+        ws.append([cell(n, note_font)])
     ws.append([])
     ws.append([cell("Category", head_font), cell(side_a, head_font, align=right),
                cell(side_b, head_font, align=right), cell("Δ", head_font, align=right)])

@@ -141,8 +141,9 @@ the field bug + P1s first.
   CONFIRMED on Intersection Detail: the TSMIS **Excel** export pads some Descriptions with trailing
   tabs (raw `'HILLCREST RD\t\t'`) that the PDF rendering doesn't carry — the ONLY 8 cells where
   TSMIS-PDF and TSMIS-Excel disagree statewide are exactly these (all Description, identical road
-  name, invisible), and they inflate Intersection Detail's **PDF-vs-TSN** count to 5,640 vs Excel's
-  5,632. The 8: routes 025/033/111×4/299×2. **Preferred fix: follow the HL precedent, not a core
+  name, invisible), and they inflate Intersection Detail's **PDF-vs-TSN** count by 8 over Excel's
+  (under compare-everything: 49,405 vs 49,397; the same delta the pre-2026-06-24 mainline-only counts
+  showed, 5,640 vs 5,632). The 8: routes 025/033/111×4/299×2. **Preferred fix: follow the HL precedent, not a core
   change** — collapse `[\t\n\r\f\v]`→space in the affected report's LOADER (Intersection Detail's
   `_project`/`normalize_value` path first; audit the other non-HL loaders for tab-padded sources).
   This keeps the regression blast radius to the touched report's canary instead of widening
@@ -298,14 +299,18 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   (dev site, via Settings ▸ "Use development site"). **Done:** `consolidate_intersection_detail`
   (thin `consolidate_xlsx` wrapper); **`consolidate_intersection_summary`** (block-walk category summer,
   218 routes → 16,473) + **`compare_intersection_summary_tsn`** (AGGREGATE; 11-block union taxonomy;
-  the diverged CONTROL/INTERSECTION-TYPE codes show one-sided via `Cat.sides`; 3-column TSN PDF parser;
-  canary 72 union / 56 both / 10 only-TSMIS / 6 only-TSN; 16473 vs 16626) — live in both matrices, golden
+  **2026-06-24 signal fold: TSN J–P → shared `S - SIGNALIZED` (matches the Detail) so Signalized compares
+  2,713 vs 2,648; the `+ no data` buckets TSN reports as 0 are compared; Roundabout R stays one-sided**;
+  3-column TSN PDF parser; canary 66 categories / 58 both / 8 only-TSMIS / 0 only-TSN / 54 diff; 16473 vs
+  16626) — live in both matrices, golden
   `check_compare_intersection_summary_tsn.py` + `check_consolidate_intersection.py`. The shared
   `summary_layout.py` (spec + block-walk + familiar sheet) backs both Summary reports.
   **`compare_intersection_detail_tsn`** (FLAT; read TSMIS by position — the planning "pair-order
-  reversal" was a shifted-header misread; `Y↔1 / N↔0` boolean normalize + Notes indicator;
-  cross-street attrs + Date of Record context; **+ v0.17.5 control-type crosswalk J–P/S → `Signalized`
-  per the TSNR/MIRE reference → diffs 5,632 → 3,019, Control Type 2,614 → 1**) +
+  reversal" was a shifted-header misread; `Y↔1 / N↔0` boolean normalize; **v0.17.5 control-type
+  crosswalk J–P/S → `Signalized`** per the TSNR/MIRE reference → Control Type 2,614 → 1; **2026-06-24
+  COMPARE-EVERYTHING policy: `context_fields=()` — every shared column counted (mechanical diff), the
+  Notes sheet documents normalizations + comments on wholesale-different columns → total diffs 49,397**
+  = Date of Record 16,211 (structural) + cross-street 30,167 + mainline/identity 3,019) +
   `tsn_load_intersection_detail` + golden check — live in both matrices. **Intersection is now COMPLETE
   (both reports consolidate + compare vs TSN).** The vs-TSN comparators flip on in BOTH matrices via
   `matrix.tsn_comparator_for`.

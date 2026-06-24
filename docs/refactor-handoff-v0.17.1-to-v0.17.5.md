@@ -240,4 +240,73 @@ plumbing of §3, so it forward-ports independently.
 - **Merge note:** the golden canary INTENTIONALLY changed (count dropped). If the refactor
   restructured `compare_intersection_detail_tsn`, re-apply `_norm_control_type` to the
   `Control Type` projection and keep the Notes wording. compare_core itself is untouched
-  (regression lock intact).
+  (regression lock intact). **NOTE:** the 5,632→3,019 figures here are the *mainline-only*
+  counts under the pre-2026-06-24 context behavior; §9 (compare-everything) supersedes them.
+
+## 9. Post-v0.17.5 — COMPARE-EVERYTHING policy for Intersection Detail (2026-06-24)
+
+Another **localized** change to the same one module (`compare_intersection_detail_tsn`),
+born from an adversarial audit of the vs-TSN comparisons. Independent of §3 plumbing.
+
+- **What:** `CONTEXT_FIELDS = ()` — nothing is suppressed. Every field present in both
+  systems is compared and counted (a mechanical diff). Previously PR + Date of Record +
+  the 5 cross-street (CS*) attrs were `context_fields` (shown, coalesced to one side,
+  never counted); now they all count.
+- **Why (user):** "compare anything present on both reports, even if it leads to an entire
+  column of mismatches — note it down; the comparison is a mechanical look and comments are
+  made based on it." And: "make all normalization clear within the excel files even though
+  it may lead to a match."
+- **Normalization stays + is documented:** the crosswalk (§8), the Y≡1/N≡0 booleans, PM
+  and date normalization, and roadbed keying all REMAIN (they legitimately produce matches).
+  `_write_notes_sheet` was rewritten to enumerate every normalization (and how to recognize
+  it in a cell — e.g. the word "Signalized", a TSMIS "Y" that was "1") and to *comment* on
+  the columns that differ wholesale instead of hiding them.
+- **Impact (statewide canary):** Excel-vs-TSN diffs **3,019 → 49,397** = Date of Record
+  16,211 (whole column — refresh-vs-record date, structural) + cross-street 30,167 (mostly
+  TSMIS completeness gaps; 276 genuine value conflicts) + mainline/identity 3,019. Every
+  matched row now differs (Date of Record). PDF-vs-TSN **49,405** (+8 Description tab cells).
+- **Files:** `scripts/compare_intersection_detail_tsn.py` (`CONTEXT_FIELDS=()`, docstring,
+  Notes sheet rewrite), `build/check_compare_intersection_detail_tsn.py` (golden check now
+  asserts the previously-context columns ARE counted while normalizations still match), plus
+  doc updates (`comparison-engine.md`, `tsn-parsers.md`, `roadmap.md`).
+- **Merge note:** if the refactor restructured this module, keep `context_fields=()` and the
+  Notes-sheet normalization documentation. Other vs-TSN comparators (Ramp Detail, Highway
+  Sequence) KEEP their context fields — this policy is Intersection-Detail-specific.
+
+### 9b. Same date — Intersection SUMMARY signal fold (consistency with the Detail)
+
+To match the Detail and the user's "compare what's present on both", the Summary now folds
+the TSN signal sub-types **J–P → the shared `S - SIGNALIZED` category** so Signalized compares
+directly (TSMIS 2,713 vs TSN 2,648) instead of splitting one-sided, and the `+ no data` buckets
+the TSN PDF reports as 0 are now compared.
+
+- **Files:** `scripts/summary_layout.py` (`_CONTROL_SIGNAL_FOLD` + the fold in
+  `counts_from_rows`; removed J–P category rows; `S` relabeled "SIGNALIZED (incl. TSN J-P)" and
+  marked `both`; `num-of-lanes +` flipped to `both`; new `SummarySpec.notes` rendered on the
+  familiar sheet), `scripts/compare_intersection_summary_tsn.py` (docstring),
+  `build/check_compare_intersection_summary_tsn.py` (golden check: 66 categories, fold asserted,
+  58/8/0 split).
+- **Canary:** 66 categories — **58 both / 8 only-TSMIS / 0 only-TSN; 54 diff cells**; 16473 vs 16626.
+- **Merge note:** the fold is gated to the `CONTROL TYPES` block, so Ramp Summary (which has no
+  such block, and a default-empty `notes`) is byte-identical. Roundabout `R` stays one-sided —
+  the TSN statewide summary PDF has no roundabout row.
+
+### 9c. Same date — re-normalize the TSN library on READ (the "Signalized ≠ P" fix)
+
+**The bug:** the matrices compare against the cached TSN *library* workbook
+(`*_normalized.xlsx`), which `tsn_library.build_consolidated` **reuses, not rebuilds**, after a
+code change (it checks current-vs-RAW, not current-vs-code). A library built before the crosswalk
+kept raw codes, and the normalized read paths applied NO normalization → "Signalized ≠ P".
+
+**The fix — re-apply normalization at COMPARE time on the normalized-library read path** (so a
+normalization change takes effect immediately, no rebuild):
+- `compare_intersection_detail_tsn._load_tsn`: new `_normalized_row` re-projects each library row
+  through `_project` (idempotent for a fresh library; repairs a stale one).
+- `compare_intersection_summary_tsn._load_tsn`: new `_slug_for_key` folds stale `J–P` + old
+  `S - SIGNALIZED` keys into the Signalized slug, and counts are **summed** (was overwrite).
+- Locked by `check_compare_intersection_detail_tsn.test_normalized_path_crosswalk` and
+  `check_compare_intersection_summary_tsn.test_stale_library_fold`.
+
+**Merge note:** keep the read-time re-normalization. The general lesson (a cached normalized
+library is not rebuilt on code change) applies to Ramp Detail / Highway Sequence too — if any of
+their normalizations ever change, re-apply on read the same way (they have no such change today).
