@@ -1,8 +1,9 @@
 // P1-R01 renderer guard: a matrix cell whose comparison was built from PARTIAL
 // consolidation inputs MUST render distinctly from a fully-valid result, so a green
 // "✓ match" can never hide that inputs were left out. Extracts the self-contained
-// mxCellContent() from scripts/ui/app.js and exercises it in a vm sandbox (app.js is
-// a browser script, not a module, so it can't be `require`d directly).
+// mxCellContent() from scripts/ui/ui-matrix.js (the P9b matrix-renderer module; it
+// moved out of app.js) and exercises it in a vm sandbox (it's a browser script, not a
+// module, so it can't be `require`d directly).
 //
 // Run from the repo root:  node build/check_mx_partial_render.js
 "use strict";
@@ -10,12 +11,12 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const appjs = fs.readFileSync(
-  path.join(__dirname, "..", "scripts", "ui", "app.js"), "utf8");
-const mxHi = (appjs.match(/const\s+MX_HI\s*=\s*(\d+)/) || [])[1];
-const fnSrc = (appjs.match(/function mxCellContent\(cmp, tsnMeta\) \{[\s\S]*?\n\}/) || [])[0];
+const src = fs.readFileSync(
+  path.join(__dirname, "..", "scripts", "ui", "ui-matrix.js"), "utf8");
+const mxHi = (src.match(/const\s+MX_HI\s*=\s*(\d+)/) || [])[1];
+const fnSrc = (src.match(/function mxCellContent\(cmp, tsnMeta\) \{[\s\S]*?\n\}/) || [])[0];
 if (!mxHi || !fnSrc) {
-  console.error("FAIL: could not extract mxCellContent / MX_HI from app.js");
+  console.error("FAIL: could not extract mxCellContent / MX_HI from ui-matrix.js");
   process.exit(1);
 }
 const sandbox = { MX_HI: Number(mxHi) };

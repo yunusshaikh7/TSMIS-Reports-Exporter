@@ -63,9 +63,24 @@ def test_mock_carries_contract():
           re.search(r"contract:\s*window\.CONTRACT", mock) is not None)
 
 
+def test_ui_script_references_exist():
+    print("reference integrity: every <script src> index.html names exists in scripts/ui/:")
+    html = (UI / "index.html").read_text(encoding="utf-8")
+    # The classic-script srcs index.html loads (contract.js, the P9b ui-* modules,
+    # app.js) + the conditionally-injected mock.js. A new module that's referenced but
+    # missing from the bundle would 404 silently in WebView2 -- catch it offline.
+    refs = set(re.findall(r'src="([^"]+\.js)"', html))
+    refs.update(re.findall(r'\.src\s*=\s*"([^"]+\.js)"', html))   # the #mock createElement injection
+    check("index.html references the P9b ui-* modules",
+          {"ui-dom.js", "ui-matrix.js", "ui-settings.js"} <= refs)
+    for f in sorted(refs):
+        check(f"referenced ui asset exists (no 404): {f}", (UI / f).exists())
+
+
 def main():
     test_contract_enum_parity()
     test_mock_carries_contract()
+    test_ui_script_references_exist()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

@@ -1019,10 +1019,17 @@
 <div class="modal-overlay hidden" id="modalOverlay"></div>
 
 <!-- Classic <script> ordering on purpose (no ES modules; pywebview/file/frozen
-     parity). contract.js (the bridge-enum mirror) loads first; app.js runs the real
-     UI; mock.js is injected ONLY for the #mock browser preview, AFTER app.js, so the
-     mock owns its own boot and never races the real pywebview bridge. -->
+     parity). contract.js (the bridge-enum mirror) loads first; the ui-* feature
+     modules (DOM/dialog primitives, the matrix renderers, the Settings pane) load
+     next — they're plain classic scripts that share app.js's global scope, so their
+     functions are defined before app.js's boot() calls them; app.js (state + boot +
+     event wiring) runs last among the real-UI scripts; mock.js is injected ONLY for
+     the #mock browser preview, AFTER app.js, so the mock owns its own boot and never
+     races the real pywebview bridge. -->
 <script src="contract.js"></script>
+<script src="ui-dom.js"></script>
+<script src="ui-matrix.js"></script>
+<script src="ui-settings.js"></script>
 <script src="app.js"></script>
 <script>
   // Inject the browser-preview mock as a classic <script>, ONLY for #mock. Appended
