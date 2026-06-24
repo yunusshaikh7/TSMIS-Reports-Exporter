@@ -2,13 +2,14 @@
 
 **Read this before merging `refactor/v0.18.0-structural-overhaul` back into `main`.**
 
-The refactor branched from **v0.17.1**. While it was in flight, `main` shipped three
-patch releases (**v0.17.2 → v0.17.4**) plus follow-up commits. This document is the
+The refactor branched from **v0.17.1**. While it was in flight, `main` shipped four
+patch releases (**v0.17.2 → v0.17.5**) plus follow-up commits. This document is the
 complete record of that divergence so the merge can forward-port / reconcile every
 change — including the docs.
 
-- **Commit range:** `v0.17.1..main` (current tip `0155b39`).
-- **My work (the substance):** `d2ee353..main` — 5 commits, **32 files, +1,297 / −80**.
+- **Commit range:** `v0.17.1..main`.
+- **The substance:** the **Intersection Detail (PDF)** feature (v0.17.2–v0.17.4) plus the
+  **v0.17.5 control-type crosswalk** (a localized change to the vs-TSN comparison — see §8).
 - **Two commits in the range predate this work** (already on `main` at v0.17.1+,
   small): `d2ee353` *docs: reconcile roadmap to v0.17.1*, `4e38a63` *chore: harden
   .gitignore against legacy TSN output* (the latter also nudged
@@ -52,9 +53,10 @@ plumbing, preserve this wiring.
 | `b70a644` | CI fix (post-v0.17.3) | A golden check asserted HL-PDF was the *last* matrix row; the new row displaced it → assert membership instead. |
 | **v0.17.4** `180c6e4` | **crash hotfix** | Wired `intersection_detail_pdf` into the matrix's consolidated-workbook helpers (the by-day matrix crashed without it) + a regression check + cleanup parity. |
 | `0155b39` | docs (deferred issue) | Logged the `_xl_trim` tab-whitespace comparison gap (see §5). |
+| **v0.17.5** | **control-type crosswalk** | Intersection Detail vs-TSN: fold TSN signal sub-types J–P + TSMIS `S` into one "Signalized" category → diffs 5,632→3,019 (see §8). Localized to `compare_intersection_detail_tsn`. |
 
-All three releases were built + published by `release.yml` (frozen self-test gates
-passed); `checks.yml` is green on `main`.
+All releases were built + published by `release.yml` (frozen self-test gates passed);
+`checks.yml` is green on `main`.
 
 ---
 
@@ -190,10 +192,11 @@ it from **`docs/comparison-engine.md`**:
 | `CLAUDE.md` | Supported-reports table gained row **6b** (Intersection Detail (PDF)); the prose note updated from "export-only" → full consolidate/compare treatment. |
 | `README.md` | Reports table gained both PDF variants + a note that they're export-only renderings. |
 | `docs/reports.md` | Catalog row 6b; a "Report 6b" spec entry + a "Report 6b — consolidation" subsection (the two-row/zebra-shaded parser); the consolidator list + COMPARE_REPORTS table rows. |
-| `docs/roadmap.md` | The deferred `non-hl-loaders-dont-collapse-tab-whitespace` item (§5). |
-| `docs/comparison-engine.md` | The "Tab fix (HL loader only)" note upgraded from theoretical → confirmed, cross-referencing the roadmap item. |
-| `CHANGELOG.md` | v0.17.2, v0.17.3, v0.17.4 sections (source of the GitHub release bodies). |
-| `version.py` | `0.17.1` → `0.17.4`. **Merge note:** v0.18.0 is the refactor's own version; this only matters if the refactor rebases onto these patches rather than superseding them. |
+| `docs/roadmap.md` | The deferred `non-hl-loaders-dont-collapse-tab-whitespace` item (§5); the Intersection Detail backlog entry's canary updated for the v0.17.5 crosswalk. |
+| `docs/comparison-engine.md` | "Tab fix (HL loader only)" note → confirmed; the Intersection Detail TSN reconciliation list + canary updated for the v0.17.5 crosswalk. |
+| `docs/tsn-parsers.md` | Intersection Detail — TSN: the control-type "no crosswalk" note → the J–P→Signalized crosswalk + the new counts (v0.17.5). |
+| `CHANGELOG.md` | v0.17.2, v0.17.3, v0.17.4, v0.17.5 sections (source of the GitHub release bodies). |
+| `version.py` | `0.17.1` → `0.17.5`. **Merge note:** v0.18.0 is the refactor's own version; this only matters if the refactor rebases onto these patches rather than superseding them. |
 
 ---
 
@@ -207,3 +210,34 @@ it from **`docs/comparison-engine.md`**:
 - **Still owed (work-PC only — the dev PC can't reach TSMIS):** a live export of the
   PDF report against the site, and the live matrix consolidate/compare for the new row.
   Same standing caveat as every other report's live verification.
+
+---
+
+## 8. v0.17.5 — control-type crosswalk (separate from the PDF feature)
+
+A small, **localized** change to ONE module — does not touch the matrix/registry
+plumbing of §3, so it forward-ports independently.
+
+- **What:** in `scripts/compare_intersection_detail_tsn.py`, the TSN→TSNR control-type
+  crosswalk from the reference "TSNR - Intersection Control and Geometry Type": TSN
+  records signalized intersections under the legacy signal sub-types **J/K/L/M/N/P**,
+  which TSMIS collapses into one category (stored `S`). A new `_norm_control_type`
+  folds both sides' signalized codes (`{J,K,L,M,N,P,S}`) into the readable label
+  **`Signalized`**, applied to the `Control Type` field in `_project`. Geometry
+  (INT Type) needs no crosswalk — both systems share F/M/S/T/Y/Z/R.
+- **Transparency (the user's requirement):** the merge shows on the page — wherever the
+  crosswalk applied, the `Control Type` cell reads `Signalized` (a category word, vs
+  the raw letter codes), and the Notes sheet documents the mapping. (An earlier attempt
+  added a "Ctrl Type (raw)" context column, but compare_core coalesces context fields to
+  one side, so it couldn't show both raw codes — reverted in favor of the label.)
+- **Impact:** Excel-vs-TSN diffs **5,632 → 3,019** (Control Type 2,614 → 1); same for
+  PDF-vs-TSN (5,640 → 3,027). This module is **reused by `compare_intersection_detail_pdf`**
+  (PDF-vs-TSN side) and both matrices, so the crosswalk applies everywhere automatically.
+- **Files:** `scripts/compare_intersection_detail_tsn.py` (the normalizer + Notes),
+  `build/check_compare_intersection_detail_tsn.py` (the golden check now asserts S/P→
+  Signalized matches, a non-signalized A/B still flags, and the crosswalked cell is not
+  counted), plus the doc updates in §6.
+- **Merge note:** the golden canary INTENTIONALLY changed (count dropped). If the refactor
+  restructured `compare_intersection_detail_tsn`, re-apply `_norm_control_type` to the
+  `Control Type` projection and keep the Notes wording. compare_core itself is untouched
+  (regression lock intact).

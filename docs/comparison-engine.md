@@ -489,14 +489,21 @@ Both sides store attribute pairs in (eff_date, type) order (the planning-phase "
 was a misread of that shifted header). Three reconciliations, all locked: **(1)** mastarm /
 right-channelization / lighting are `Y/N` on TSN but `1/0` on TSMIS — **normalized `Y≡1 / N≡0`**
 (user decision) so only genuine changes flag, with a **Notes sheet** (`legend_writer`) indicating it;
-**(2)** Control Type diverges taxonomically (TSN legacy vs TSMIS `S`) — no crosswalk → genuine diffs;
+**(2)** Control Type — TSN spreads signalized across the legacy signal sub-types **J–P** (pretimed /
+semi- / full-actuated, 2- vs multi-phase), which TSNR/TSMIS collapses into ONE category (stored `S`).
+Per the TSNR/MIRE reference ("TSNR - Intersection Control and Geometry Type", 2026-06-24), both sides'
+signalized codes are **normalized to one readable `Signalized` category** — so the sub-type split no
+longer flags, and the word "Signalized" (vs the raw letter codes) shows the merge ON the comparison
+sheet, with the **Notes sheet** documenting it. Every other code (A/B/C/D/E/F/G/H/I/R/Z) is shared
+and compared unchanged; geometry/INT Type needs no crosswalk;
 **(3)** `context_fields` = PR + Date of Record (a TSMIS refresh date) + the **5 cross-street attrs**
 (TSMIS leaves them blank for ~37% of intersections, so counting them would bury the mainline diffs —
 shown, never counted). **(4)** Divided-highway routes carry a roadbed suffix (S/U) on TSN but not
 TSMIS — keyed on the BASE route so the same intersection still pairs, with the suffix surfaced as a
 compared `Roadbed` column so a suffix-only difference is flagged (match-and-indicate, 2026-06-20).
-Canary in [tsn-parsers.md](tsn-parsers.md): **16,211 both / 262 only-TSMIS / 415 only-TSN (routes
-one-sided NONE/NONE); 5,632 counted diffs incl. Roadbed 31 (0 in context); 16473 vs 16626**. Live in both matrices.
+Canary (statewide, local): **16,211 both / 262 only-TSMIS / 415 only-TSN (routes one-sided
+NONE/NONE); 3,019 counted diffs after the control crosswalk (Control Type 2,614→1; was 5,632
+before); 16473 vs 16626**. Live in both matrices.
 
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 

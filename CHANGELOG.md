@@ -3,6 +3,20 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.17.5 — 2026-06-24
+
+- **Signal control types now line up between TSMIS and the older TSN data.** The old TSN
+  system recorded signalized intersections under six detailed sub-types (pretimed,
+  semi-/full-actuated, 2- vs multi-phase — codes J through P), which TSMIS rolls up into a
+  single "Signalized" category. The Intersection Detail comparison vs TSN now applies that
+  official crosswalk, so those stop being flagged as differences — **cutting the reported
+  discrepancies roughly in half** (~2,600 fewer; control-type differences went from ~2,614
+  to 1). It stays transparent: wherever the crosswalk merged the codes, the Control Type
+  cell reads "Signalized" (instead of a raw code) so it's clear on the comparison page that
+  the normalization was applied, and the Notes sheet spells out the mapping. Applies to both
+  the Excel and the PDF vs-TSN comparisons, and both matrices. Geometry/intersection type
+  needed no crosswalk — both systems already use the same codes.
+
 ## v0.17.4 — 2026-06-22
 
 - **Fixes a crash opening the by-day "vs TSN" matrix.** v0.17.3 added Intersection

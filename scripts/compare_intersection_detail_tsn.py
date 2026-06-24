@@ -16,8 +16,13 @@ reconciliations:
   1. **Boolean encoding** — mastarm / right-channelization / lighting are Y/N on
      TSN but 1/0 on TSMIS. NORMALIZED here as Y≡1 / N≡0 (user decision) so only
      genuine changes flag; a Notes sheet + header note INDICATE this is applied.
-  2. **Control-type taxonomy divergence** — TSN legacy codes (e.g. P) vs TSMIS new
-     (S = signalized). No crosswalk (user decision) -> shows as genuine diffs.
+  2. **Control-type crosswalk** — TSN records signalized under the legacy signal
+     sub-types J/K/L/M/N/P, which TSNR/TSMIS collapses into the single category "S".
+     Per the TSNR/MIRE reference, both sides' signalized codes are normalized to one
+     readable "Signalized" category so the sub-type split stops flagging — and the
+     word "Signalized" (vs the raw letter codes) makes the merge visible on the page;
+     a Notes sheet documents it. (Geometry/INT Type needs no crosswalk — both systems
+     share the F/M/S/T/Y/Z/R codes.)
   3. **Date of Record** is a TSMIS refresh date (not the record date) -> a CONTEXT
      field (shown, never counted), alongside the roadbed PR indicator.
 
@@ -62,6 +67,16 @@ CONTEXT_FIELDS = ("PR", "Date of Record", "CS Mastarm", "CS Left Chan",
 DATE_FIELDS = ("Date of Record",)
 # Y/N (TSN) vs 1/0 (TSMIS) booleans — normalized to Y/N so only real changes flag.
 BOOLEAN_FIELDS = ("Lighting", "ML Mastarm", "ML Right Chan", "CS Mastarm", "CS Right Chan")
+# Control-type crosswalk (per the TSNR/MIRE reference "TSNR - Intersection Control
+# and Geometry Type"): TSN spreads "Signalized" across the legacy signal sub-types
+# J–P (J/K/L/M/N/P), which TSNR/TSMIS collapses into the single category TSMIS stores
+# as "S". Both sides' signalized codes normalize to the readable category label
+# below — so the compared Control Type shows the word "Signalized" (visibly a merged
+# category, distinct from the raw single-letter codes) wherever the crosswalk applied,
+# and the sub-type split stops flagging as a difference. The Notes sheet documents the
+# crosswalk. Geometry (INT Type) needs NO crosswalk — both systems share F/M/S/T/Y/Z/R.
+_SIGNALIZED_CODES = {"J", "K", "L", "M", "N", "P", "S"}
+_SIGNALIZED_LABEL = "Signalized"
 
 # TSN raw column name for each shared field (key + fields).
 _TSN_COL = {
@@ -145,6 +160,16 @@ def _norm_bool(v):
     return _BOOL.get(str(v or "").strip().upper(), str(v or "").strip())
 
 
+def _norm_control_type(v):
+    """Apply the TSN→TSNR control-type crosswalk: the legacy signal sub-types J–P
+    (TSN) and TSMIS's combined "S" all fold into the single readable category
+    "Signalized", so the sub-type split no longer reads as a difference and the
+    merge is visible on the page (the word "Signalized" vs the raw letter codes).
+    Every other code is left as-is (both systems share A/B/C/D/E/F/G/H/I/R/Z)."""
+    s = str(v or "").strip().upper()
+    return _SIGNALIZED_LABEL if s in _SIGNALIZED_CODES else _v(v)
+
+
 def _v(x):
     return normalize_value(x)
 
@@ -153,6 +178,8 @@ def _project(field, raw):
     """Normalize one raw cell for `field` into the shared, comparable form."""
     if field in BOOLEAN_FIELDS:
         return _norm_bool(raw)
+    if field == "Control Type":
+        return _norm_control_type(raw)
     if field == "PM":
         return _norm_pm(raw)
     if field == "Date of Record":
@@ -264,9 +291,16 @@ def _write_notes_sheet(wb):
         "Boolean attributes (Lighting, ML Mastarm, ML Right Chan, CS Mastarm, CS Right "
         "Chan) are encoded Y/N on TSN but 1/0 on TSMIS. They are NORMALIZED as Y≡1 / "
         "N≡0 so only genuine changes are flagged (not the encoding); cells are shown as Y/N.",
-        "Control Type uses different code sets between the systems (TSN legacy signal codes "
-        "vs TSMIS S=Signalized etc.) — NO crosswalk is applied, so a code change reads as a "
-        "genuine difference.",
+        "Control Type — CROSSWALK APPLIED (per the TSNR/MIRE reference 'TSNR - Intersection "
+        "Control and Geometry Type'): TSN records signalized intersections under the legacy "
+        "signal sub-types J/K/L/M/N/P (pretimed / semi- / full-actuated, 2- vs multi-phase), "
+        "which TSNR/TSMIS collapses into ONE category stored as 'S'. Both sides' signalized "
+        "codes are NORMALIZED to the single readable category 'Signalized', so the sub-type "
+        "split no longer flags as a difference. Wherever the Control Type cell reads "
+        "'Signalized' (rather than a raw letter code), the crosswalk was applied — that is how "
+        "to see, on this sheet, when the merge is in effect. Every other control code "
+        "(A/B/C/D/E/F/G/H/I/R/Z) is shared by both systems and is compared unchanged. Geometry "
+        "(INT Type) needs no crosswalk — both systems use the same F/M/S/T/Y/Z/R codes.",
         "CONTEXT columns (shown for reference, never counted as a difference): the PR "
         "roadbed indicator; Date of Record (a TSMIS refresh date, not the record date); and "
         "the five CROSS-STREET attributes (CS Mastarm / Left Chan / Right Chan / Traffic Flow "

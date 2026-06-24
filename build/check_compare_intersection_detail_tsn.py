@@ -99,6 +99,9 @@ def test_schema():
     check("boolean normalize Y/1->Y, N/0->N",
           idt._norm_bool("Y") == "Y" and idt._norm_bool("1") == "Y"
           and idt._norm_bool("N") == "N" and idt._norm_bool("0") == "N")
+    check("control-type crosswalk: TSN J-P + TSMIS S -> Signalized; others unchanged",
+          all(idt._norm_control_type(c) == "Signalized" for c in "JKLMNPS")
+          and idt._norm_control_type("A") == "A" and idt._norm_control_type("B") == "B")
     check("route from LOCATION '12 ORA 001' -> '001'", idt._norm_route("12 ORA 001") == "001")
     check("roadbed split '12 ORA 210U' -> ('210','U')", idt._split_route("12 ORA 210U") == ("210", "U"))
     check("roadbed split '12 ORA. 210' -> ('210','')", idt._split_route("12 ORA. 210") == ("210", ""))
@@ -113,12 +116,14 @@ def test_end_to_end():
     print("end-to-end (boolean normalize + context non-asserting):")
     root = Path(tempfile.mkdtemp(prefix="tsmis_id_tsn_"))
     tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
-    # PM 0.204: control-type diverges (P vs S); booleans equal across encodings;
-    #   CS present on TSN, blank on TSMIS (context). PM 1.000: a real ML Num Lanes diff.
+    # PM 0.204: signalized sub-type split (TSMIS S vs TSN P) — CROSSWALKED to equal,
+    #   raw codes kept in context; booleans equal across encodings; CS present on TSN,
+    #   blank on TSMIS (context). PM 1.000: a NON-signalized control diff (A vs B, NOT
+    #   crosswalked) + a real ML Num Lanes diff.
     _write_tsmis(tsmis, [
         _tsmis_row("001", "R", "0.204", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
                    "1", "N", "0", "P", "3", "JCT 5"),
-        _tsmis_row("001", "R", "1.000", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
+        _tsmis_row("001", "R", "1.000", "21-12-31", "D", "DAPT", "U", "T", "A", "1",
                    "1", "N", "0", "P", "4", "JCT 6"),
     ])
     _write_tsn(tsn, [
@@ -127,7 +132,7 @@ def test_end_to_end():
          "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
          "DESCRIPTION": "JCT 5", "CS_SM": "N", "CS_LC": "N", "CS_RC": "N", "CS_TF": "P", "CS_NL": 2},
         {"PP": "R", "POST_MILE": " 001.000", "LOCATION": "12 ORA 001", "DATE_REC": "73-10-19",
-         "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "S", "LT_TY": "Y",
+         "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "B", "LT_TY": "Y",
          "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
          "DESCRIPTION": "JCT 6"},
     ])
@@ -143,10 +148,19 @@ def test_end_to_end():
     rc = header.index("ML Right Chan")
     ctrl = header.index("Control Type")
     nl = header.index("ML Num Lanes")
+    diffs_col = header.index("Diffs")
     check("Lighting Y(TSN)/1(TSMIS) normalized equal — no diff", DIFF not in by["0.204"][light])
     check("ML Mastarm Y/1 normalized equal — no diff", DIFF not in by["0.204"][mast])
     check("ML Right Chan N/0 normalized equal — no diff", DIFF not in by["0.204"][rc])
-    check("Control Type P vs S is a genuine diff", DIFF in by["0.204"][ctrl])
+    # CROSSWALK: TSMIS "S" and TSN "P" both fold into the readable "Signalized"
+    # category -> the counted Control Type matches (the label itself shows the merge).
+    check("Control Type S(TSMIS)/P(TSN) crosswalk to Signalized — no diff",
+          DIFF not in by["0.204"][ctrl] and by["0.204"][ctrl] == "Signalized")
+    check("the crosswalked cell is NOT counted (PM 0.204 has 0 counted diffs)",
+          by["0.204"][diffs_col] in ("0", "0.0"))
+    # A NON-signalized control change (A vs B) is NOT crosswalked -> still a genuine diff.
+    check("Control Type A(TSMIS) vs B(TSN) — non-signalized, still a genuine diff",
+          DIFF in by["1.000"][ctrl])
     check("ML Num Lanes 3 vs 4 is a genuine diff", DIFF in by["1.000"][nl])
 
     # context columns NEVER carry a diff marker (incl. CS present-vs-blank, Date of Record).

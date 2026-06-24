@@ -304,7 +304,8 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   `summary_layout.py` (spec + block-walk + familiar sheet) backs both Summary reports.
   **`compare_intersection_detail_tsn`** (FLAT; read TSMIS by position — the planning "pair-order
   reversal" was a shifted-header misread; `Y↔1 / N↔0` boolean normalize + Notes indicator;
-  cross-street attrs + Date of Record context; canary 16180 both / 5520 diff; 16473 vs 16626) +
+  cross-street attrs + Date of Record context; **+ v0.17.5 control-type crosswalk J–P/S → `Signalized`
+  per the TSNR/MIRE reference → diffs 5,632 → 3,019, Control Type 2,614 → 1**) +
   `tsn_load_intersection_detail` + golden check — live in both matrices. **Intersection is now COMPLETE
   (both reports consolidate + compare vs TSN).** The vs-TSN comparators flip on in BOTH matrices via
   `matrix.tsn_comparator_for`.

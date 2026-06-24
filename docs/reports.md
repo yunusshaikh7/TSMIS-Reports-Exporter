@@ -195,7 +195,7 @@ Current `COMPARE_REPORTS` rows:
 | TSAR: Ramp Detail -- TSMIS vs TSN (v0.17.0) | `compare_ramp_detail_tsn` | files | tsn |
 | TSAR: Ramp Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE) | `compare_ramp_summary_tsn` | files | tsn |
 | TSAR: Intersection Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE, one-sided divergence) | `compare_intersection_summary_tsn` | files | tsn |
-| TSAR: Intersection Detail -- TSMIS vs TSN (v0.17.0, FLAT, Y/N<->1/0 normalized) | `compare_intersection_detail_tsn` | files | tsn |
+| TSAR: Intersection Detail -- TSMIS vs TSN (v0.17.0, FLAT, Y/N<->1/0 + control J–P→Signalized crosswalk v0.17.5) | `compare_intersection_detail_tsn` | files | tsn |
 | Highway Sequence Listing -- TSMIS vs TSN (v0.17.0, FLAT, route+**county**+PM) | `compare_highway_sequence_tsn` | files | tsn |
 | TSAR: Intersection Detail (PDF) -- between environments (v0.17.3, both sides PDF-parsed) | `compare_env.INTERSECTION_DETAIL_PDF` | folders | env |
 | Intersection Detail -- TSMIS (PDF) vs TSN (v0.17.3) | `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
