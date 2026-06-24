@@ -310,3 +310,28 @@ normalization change takes effect immediately, no rebuild):
 **Merge note:** keep the read-time re-normalization. The general lesson (a cached normalized
 library is not rebuilt on code change) applies to Ramp Detail / Highway Sequence too — if any of
 their normalizations ever change, re-apply on read the same way (they have no such change today).
+
+### 9d. v0.17.7 — the omitted columns added + 2 greyed context columns
+
+**What changed (Intersection Detail vs TSN only):** the comparison previously dropped 15 of the 36
+columns. After vetting each mapping against real rows with the user, the FINAL set:
+- **Added (compared):** the 5 effective dates — INT/Control/Lighting → `EFF_DATE_INT`/`_CT`/`_LT`;
+  **Mainline → `MAIN_EFF_DATE`, Cross-street → `EFF_DATE`** (the RECENT TSN dates; the historical
+  `EFF_DATE_ML`/`CROSS_BEGIN_DATE` are a 59-year mismatch — do NOT pair the eff-dates to them). All
+  five are a **systematic 1-day offset** (TSMIS Dec 31 ↔ TSN Jan 1) → flag raw on that offset (user:
+  "compare raw, flag the offset"). Plus **Main Line Length** (`MAIN_OVERRIDE`) and the
+  **intersecting-route block** (`CROSS_ROUTE_NAME`/`_PM_PREFIX`/`_POSTMILE`/`_PM_SUFFIX`). ⚠ the
+  route **PM suffix is at consolidated pos 35** (the `Xing Rte` value), NOT pos 31 (always blank).
+- **Greyed `context_fields` (shown, not counted):** `ML 2nd Eff-Date` (pos 21) + `Int St Eff-Date`
+  (pos 30) — a uniform `2024` bulk stamp with no TSN counterpart. New opt-in `CompareSchema.context_fill`
+  (`"D9D9D9"`) greys them via conditional formatting on matched rows — default `None` keeps every other
+  comparison byte-identical (Route-1=969 HL canary unchanged; verified by `check_compare_audit`).
+- **`SHARED_HEADER` reordered to mirror the printed report** (each eff-date next to its type). Name-based
+  access throughout, so the canary diff *counts* are order-independent.
+- **Canary:** **131,948** counted diffs (Excel) / **131,956** (PDF, +8 Description tabs). Locked by
+  `check_compare_intersection_detail_tsn` (`test_added_columns` asserts the eff-date flags + Main Line
+  Length/route match; `test_schema` asserts the 2 context fields + suffix pos 35).
+
+**Merge note:** the `context_fill` field is a clean opt-in on `compare_core` — preserve it; it only
+fires when a schema sets it. The eff-date↔recent-TSN-column pairing is the non-obvious part: don't
+"correct" it back to the historical columns.

@@ -13,12 +13,18 @@ header. Reconciled by hand on route 1 (1,265 PMs aligned):
 Both store attribute values in (eff_date, type) order (the planning-phase
 "pair-order reversal" was a misread of the shifted TSMIS labels).
 
-EVERY field present in both systems is COMPARED and COUNTED — this is a mechanical
-diff; the reader adds commentary, the tool never hides a column. Some columns differ
-on nearly every row by their nature (see below); they are still flagged, and the
-Notes sheet COMMENTS on why rather than suppressing them. Normalizations make some
-raw-different values compare equal; each is documented in the Notes sheet so a match
-is read as "equal after the stated normalization", not raw equality:
+Every field present in both systems is COMPARED and COUNTED — a mechanical diff; the
+reader adds commentary, the tool never hides a column — EXCEPT two columns that are
+SHOWN BUT NOT COUNTED (greyed): the second mainline eff-date and the int-street
+eff-date are a uniform "2024" bulk-load stamp on the TSMIS side with no comparable TSN
+date, so they appear for reference but never flag. Columns ordered to mirror the source
+report. The five real effective dates (INT / Control / Lighting / Mainline / Cross-street),
+Main Line Length, and the intersecting-route block ARE compared (previously omitted); the
+eff-dates are a systematic ~1 day apart and flag on that offset. Some columns differ on
+nearly every row by their nature (see below); they are still flagged, and the Notes sheet
+COMMENTS on why rather than suppressing them. Normalizations make some raw-different
+values compare equal; each is documented in the Notes sheet so a match is read as "equal
+after the stated normalization", not raw equality:
   1. **Boolean encoding** — mastarm / right-channelization / lighting are Y/N on
      TSN but 1/0 on TSMIS. NORMALIZED here as Y≡1 / N≡0 so only genuine changes flag
      (a TSMIS cell shown as "Y" was stored "1"); the Notes sheet states this.
@@ -59,21 +65,33 @@ TSN_SHEET = "Sheet 1"                     # raw statewide DB dump
 NORMALIZED_SHEET = "Intersection Detail (TSN)"
 
 KEY = "PM"
+# Column order mirrors the source report (each effective-date next to its type, the
+# mainline block, then the cross-street block, then the intersecting route). Every
+# field present in both systems is compared EXCEPT the two CONTEXT_FIELDS below.
 SHARED_HEADER = [
-    "PR", "Roadbed", "PM", "HG", "City Code", "R/U", "INT Type", "Control Type",
-    "Lighting", "ML Mastarm", "ML Left Chan", "ML Right Chan", "ML Traffic Flow",
-    "ML Num Lanes", "Description", "CS Mastarm", "CS Left Chan", "CS Right Chan",
-    "CS Traffic Flow", "CS Num Lanes", "Date of Record",
+    "PR", "Roadbed", "PM", "Date of Record", "HG", "City Code", "R/U",
+    "INT Type Eff-Date", "INT Type",
+    "Control Type Eff-Date", "Control Type",
+    "Lighting Eff-Date", "Lighting",
+    "ML Eff-Date", "ML Mastarm", "ML Left Chan", "ML Right Chan",
+    "ML Traffic Flow", "ML Num Lanes", "ML 2nd Eff-Date",
+    "Description", "Main Line Length",
+    "CS Eff-Date", "CS Mastarm", "CS Left Chan", "CS Right Chan",
+    "CS Traffic Flow", "CS Num Lanes", "Int St Eff-Date",
+    "Intrte Route", "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix",
 ]
 KEY_FIELD = SHARED_HEADER.index(KEY)      # 2 (after PR + the derived Roadbed column)
-# Nothing is suppressed: every field present in both systems is compared and counted
-# (a mechanical diff). The roadbed PR indicator, the Date of Record, and the five
-# CROSS-STREET attributes are all compared. Two of those differ on nearly every row
-# by their nature (Date of Record = refresh-vs-record date; CS* = TSMIS ~37% blank vs
-# TSN defaults); they are flagged, and the Notes sheet COMMENTS on why rather than
-# hiding them. (Empty = no context coalescing; see compare_core CompareSchema.)
-CONTEXT_FIELDS = ()
-DATE_FIELDS = ("Date of Record",)
+# Two columns are SHOWN BUT NOT COUNTED (context): the second mainline eff-date and the
+# int-street eff-date are a uniform "2024" bulk-load stamp on the TSMIS side with no
+# comparable TSN counterpart — they appear (greyed) for reference but never flag. The
+# five real eff-dates (INT/Control/Lighting/Mainline/Cross-street) ARE compared: each is
+# systematically ~1 day apart (TSMIS Dec 31 vs TSN Jan 1) and flags on that offset (raw,
+# user decision); the Notes sheet documents it. Everything else present in both systems
+# is compared and counted (a mechanical diff).
+CONTEXT_FIELDS = ("ML 2nd Eff-Date", "Int St Eff-Date")
+DATE_FIELDS = ("Date of Record", "INT Type Eff-Date", "Control Type Eff-Date",
+               "Lighting Eff-Date", "ML Eff-Date", "ML 2nd Eff-Date", "CS Eff-Date",
+               "Int St Eff-Date")
 # Y/N (TSN) vs 1/0 (TSMIS) booleans — normalized to Y/N so only real changes flag.
 BOOLEAN_FIELDS = ("Lighting", "ML Mastarm", "ML Right Chan", "CS Mastarm", "CS Right Chan")
 # Control-type crosswalk (per the TSNR/MIRE reference "TSNR - Intersection Control
@@ -95,6 +113,15 @@ _TSN_COL = {
     "ML Traffic Flow": "MAIN_TF", "ML Num Lanes": "MAIN_NL", "Description": "DESCRIPTION",
     "CS Mastarm": "CS_SM", "CS Left Chan": "CS_LC", "CS Right Chan": "CS_RC",
     "CS Traffic Flow": "CS_TF", "CS Num Lanes": "CS_NL", "Date of Record": "DATE_REC",
+    # added columns (TSN counterpart verified across 16k paired rows). The eff-dates map
+    # to the RECENT TSN dates (98% a clean 1-day offset); the two context columns map to
+    # the leftover historical TSN dates (shown, not counted).
+    "INT Type Eff-Date": "EFF_DATE_INT", "Control Type Eff-Date": "EFF_DATE_CT",
+    "Lighting Eff-Date": "EFF_DATE_LT", "ML Eff-Date": "MAIN_EFF_DATE",
+    "CS Eff-Date": "EFF_DATE", "Main Line Length": "MAIN_OVERRIDE",
+    "ML 2nd Eff-Date": "EFF_DATE_ML", "Int St Eff-Date": "CROSS_BEGIN_DATE",
+    "Intrte Route": "CROSS_ROUTE_NAME", "Intrte PM Prefix": "CROSS_PM_PREFIX",
+    "Intrte Postmile": "CROSS_POSTMILE", "Intrte PM Suffix": "CROSS_PM_SUFFIX",
 }
 # Consolidated-TSMIS VALUE position for each shared field (Route at 0; header is
 # column-shifted so position — not label — is authoritative; verified on route 1).
@@ -104,6 +131,13 @@ _TSMIS_POS = {
     "ML Right Chan": 18, "ML Traffic Flow": 19, "ML Num Lanes": 20, "Description": 22,
     "CS Mastarm": 25, "CS Left Chan": 26, "CS Right Chan": 27, "CS Traffic Flow": 28,
     "CS Num Lanes": 29, "Date of Record": 5,
+    # added columns — the consolidated VALUE position (header labels are shifted; the
+    # eff-date sits one column LEFT of its type value). Verified across 16k paired rows.
+    # NB the intersecting-route PM suffix is at pos 35 (the 'Xing Rte' label), not 31.
+    "INT Type Eff-Date": 9, "Control Type Eff-Date": 11, "Lighting Eff-Date": 13,
+    "ML Eff-Date": 15, "ML 2nd Eff-Date": 21, "Main Line Length": 23, "CS Eff-Date": 24,
+    "Int St Eff-Date": 30, "Intrte Route": 32, "Intrte PM Prefix": 33,
+    "Intrte Postmile": 34, "Intrte PM Suffix": 35,
 }
 _TSMIS_ROUTE_POS = 4                       # consolidated "Location" column ("12 ORA 001")
 
@@ -191,7 +225,7 @@ def _project(field, raw):
         return _norm_control_type(raw)
     if field == "PM":
         return _norm_pm(raw)
-    if field == "Date of Record":
+    if field in DATE_FIELDS:
         return _iso_date(raw)
     return _v(raw)
 
@@ -360,7 +394,22 @@ def _write_notes_sheet(wb):
          "defaults it, so this group shows many blank-vs-value differences. They are compared "
          "and counted; most differences here are a TSMIS completeness gap rather than a "
          "value conflict.")
-    note("Rows are keyed on Route + Postmile (PM); attribute effective-dates are not compared.")
+    note("• Effective-date columns (INT Type / Control Type / Lighting / Mainline / Cross-street "
+         "Eff-Date) — COMPARED. All five sit a SYSTEMATIC ~1 day apart (TSMIS stores Dec 31, TSN "
+         "stores Jan 1: '1973-10-18' vs '1973-10-19', or '2021-12-31' vs '2022-01-01') — an "
+         "encoding convention, not per-intersection edits. They flag on that 1-day offset by "
+         "design (raw comparison); read the count as the convention, not thousands of changes. "
+         "Mainline maps to TSN MAIN_EFF_DATE, cross-street to EFF_DATE (the recent dates).")
+    note("• Intersecting-route block (Intrte Route / PM Prefix / Postmile / PM Suffix) + Main "
+         "Line Length — also compared. The intersecting route is mostly blank on both (only ~10 "
+         "intersections cross another state route); differences are genuine where present.")
+
+    section("SHOWN BUT NOT COUNTED  (greyed columns — present for reference, never flagged)")
+    note("• ML 2nd Eff-Date and Int St Eff-Date are a uniform '2024' bulk-load stamp on the "
+         "TSMIS side with no comparable TSN date, so they are shown (greyed) but never count as a "
+         "difference. TSMIS's roadbed 'S' / second 'Xing' route stubs are blank and omitted; TSN's "
+         "ADT columns (MAIN_ADT / CROSS_ADT) have no TSMIS counterpart and are not shown.")
+    note("Rows are keyed on Route + Postmile (PM).")
     return ws
 
 
@@ -379,6 +428,7 @@ _SCHEMA = CompareSchema(
     one_sided_note_extra=" (intersections one system lists at a postmile the other doesn't)",
     key_field=KEY_FIELD,
     context_fields=CONTEXT_FIELDS,
+    context_fill="D9D9D9",          # grey the 2 shown-but-not-counted columns
     legend_writer=_write_notes_sheet,
 )
 

@@ -66,7 +66,11 @@ def _write_tsn(path, rows):
     ws.title = idt.TSN_SHEET
     cols = ["PP", "POST_MILE", "LOCATION", "DATE_REC", "HG", "CITY_CODE", "RU",
             "TY_INT", "TY_CT", "LT_TY", "MAIN_SM", "MAIN_LC", "MAIN_RC", "MAIN_TF",
-            "MAIN_NL", "DESCRIPTION", "CS_SM", "CS_LC", "CS_RC", "CS_TF", "CS_NL"]
+            "MAIN_NL", "DESCRIPTION", "CS_SM", "CS_LC", "CS_RC", "CS_TF", "CS_NL",
+            # added columns the comparison now reads
+            "EFF_DATE_INT", "EFF_DATE_CT", "EFF_DATE_LT", "EFF_DATE_ML", "MAIN_EFF_DATE",
+            "MAIN_OVERRIDE", "CROSS_BEGIN_DATE", "EFF_DATE", "CROSS_ROUTE_NAME",
+            "CROSS_PM_PREFIX", "CROSS_POSTMILE", "CROSS_PM_SUFFIX"]
     ws.append(cols)
     for r in rows:
         ws.append([r.get(c) for c in cols])
@@ -92,8 +96,17 @@ def test_schema():
     sc = idt._SCHEMA
     check("key is PM", sc.header[sc.key_field] == "PM")
     check("side names TSMIS / TSN", sc.side_a == "TSMIS" and sc.side_b == "TSN")
-    check("NO context fields — every shared column is compared and counted",
-          tuple(sc.context_fields) == ())
+    check("context fields = the 2 single-year bulk columns (shown, not counted)",
+          tuple(sc.context_fields) == ("ML 2nd Eff-Date", "Int St Eff-Date"))
+    check("the 5 real eff-dates + Main Line Length + intersecting route ARE compared",
+          all(f in sc.header and f not in sc.context_fields for f in (
+              "INT Type Eff-Date", "Control Type Eff-Date", "Lighting Eff-Date",
+              "ML Eff-Date", "CS Eff-Date", "Main Line Length", "Intrte Route",
+              "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix")))
+    check("ML Eff-Date -> MAIN_EFF_DATE, CS Eff-Date -> EFF_DATE (recent TSN dates)",
+          idt._TSN_COL["ML Eff-Date"] == "MAIN_EFF_DATE" and idt._TSN_COL["CS Eff-Date"] == "EFF_DATE")
+    check("intersecting-route PM suffix reads from pos 35 (not the blank pos 31)",
+          idt._TSMIS_POS["Intrte PM Suffix"] == 35)
     check("Notes legend_writer set (documents the normalizations)", sc.legend_writer is not None)
     check("boolean normalize Y/1->Y, N/0->N",
           idt._norm_bool("Y") == "Y" and idt._norm_bool("1") == "Y"
@@ -241,11 +254,44 @@ def test_normalized_path_crosswalk():
     check("non-signal 'A' unchanged", by_pm.get("3.000") == "A")
 
 
+def test_added_columns():
+    """The previously-omitted columns are now compared (v0.17.7): an effective-date
+    difference flags, and the intersecting-route block + Main Line Length compare
+    (matching where equal). Lock against silently dropping them again."""
+    print("added columns (eff-dates, intersecting route, main line length):")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_id_add_"))
+    tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
+    r = _tsmis_row("001", "R", "0.204", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
+                   "1", "N", "0", "P", "3", "JCT 5")
+    r[9] = "73-10-18"      # INT Type Eff-Date — 1 day before TSN (systematic offset)
+    r[23] = "100"          # Main Line Length — matches TSN
+    r[32] = "005"          # Intrte Route — matches TSN
+    _write_tsmis(tsmis, [r])
+    _write_tsn(tsn, [{
+        "PP": "R", "POST_MILE": " 000.204", "LOCATION": "12 ORA 001", "DATE_REC": "21-12-31",
+        "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "S", "LT_TY": "Y",
+        "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
+        "DESCRIPTION": "JCT 5", "EFF_DATE_INT": "73-10-19", "MAIN_OVERRIDE": "100",
+        "CROSS_ROUTE_NAME": "005",
+    }])
+    res = idt.compare(tsmis, tsn, out, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
+    check("compare ok", res.status == "ok")
+    header, rows, _ = _comparison(out)
+    row = {r[header.index("PM")]: r for r in rows}["0.204"]
+    check("INT Type Eff-Date is COMPARED and flags (1973-10-18 vs 1973-10-19)",
+          DIFF in row[header.index("INT Type Eff-Date")])
+    check("Main Line Length is COMPARED and matches (100=100)",
+          DIFF not in row[header.index("Main Line Length")])
+    check("Intrte Route is COMPARED and matches (005=005)",
+          DIFF not in row[header.index("Intrte Route")])
+
+
 def main():
     test_schema()
     test_end_to_end()
     test_roadbed_match()
     test_normalized_path_crosswalk()
+    test_added_columns()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

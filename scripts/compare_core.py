@@ -165,6 +165,10 @@ class CompareSchema:
     # is always False, so every existing comparison (and the regression-locked
     # Route-1=969 Highway Log canary) is byte-identical.
     context_fields: tuple = ()
+    # Optional GREY FILL (hex, no '#') for context columns on matched rows — a visual
+    # "shown but not part of the diff" cue. Default None -> no fill added, so every
+    # existing comparison (and the Route-1=969 Highway Log canary) is byte-identical.
+    context_fill: str = None
     # Optional EXTRA sheet writer: callable(wb, ctx) run after the standard sheets,
     # before save — like legend_writer but with a context dict ({rows_a, rows_b,
     # has_route, sc, side_a, side_b}) so a report can append a FAMILIAR-LAYOUT sheet
@@ -895,6 +899,18 @@ def _write_comparison(wb, union, lay, events, vals=None):
     ws.conditional_formatting.add(f"{lay.c_diffs}2:{lay.c_diffs}{last}", CellIsRule(
         operator="greaterThan", formula=["0"],
         font=Font(color="C00000", bold=True)))
+    # Opt-in: grey CONTEXT columns on matched rows so they read as "shown, not part of
+    # the diff". Added only when the schema sets context_fill (default None) — so every
+    # other comparison stays byte-identical. Scoped to "Both" rows, so a one-sided row
+    # keeps its yellow/blue status colour; context cells never carry the ≠ marker, so the
+    # red diff rule never fires on them.
+    if sc.context_fill and sc.context_fields:
+        _grey = PatternFill(bgColor=sc.context_fill)
+        for _f in lay.field_indices:
+            if sc.is_context(_f):
+                _col = lay.field_col(_f)
+                ws.conditional_formatting.add(f"{_col}2:{_col}{last}", FormulaRule(
+                    formula=[f'${lay.c_status}2="Both"'], fill=_grey))
 
     link_font = _link_font()
     link_cols = {3, 4} if lay.has_route else {2, 3}   # trow / nrow positions

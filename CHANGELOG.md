@@ -3,6 +3,24 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.17.7 — 2026-06-24
+
+- **The Intersection Detail comparison vs TSN now covers every shared column, ordered to
+  match the printed report.** It previously left out the five effective dates (INT type,
+  control type, lighting, mainline, cross-street), the Main Line Length, and the
+  intersecting-route block (route / postmile / prefix / suffix) — these are now compared
+  and counted like everything else. The five effective dates are stored exactly **one day
+  apart** between the two systems (TSMIS records Dec 31 where TSN records Jan 1) — a
+  consistent encoding convention rather than thousands of edits — so they flag on that
+  one-day offset and the **Notes sheet explains it**. The intersecting-route postmile
+  suffix now reads from the correct column.
+- **Two "2024" date columns are shown but greyed out and never counted.** The report carries
+  a second mainline effective-date and an int-street effective-date that are a uniform
+  bulk-load stamp with no matching TSN field, so they appear in the comparison **greyed for
+  reference** and never count as a difference. The Notes sheet lists them, and **every
+  normalization applied is still spelled out** so a match reads as "equal after the stated
+  normalization," not raw equality.
+
 ## v0.17.6 — 2026-06-24
 
 - **Fixes "Signalized ≠ P" still showing in the Intersection comparison even though they
