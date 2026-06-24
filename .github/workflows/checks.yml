@@ -66,6 +66,7 @@ jobs:
         run: |
           set -e
           python build/check_gui_bridge.py
+          python build/check_ui_contract.py
           python build/check_persistence.py
           python build/check_a2_compare_filter.py
           python build/check_b1_pause.py
@@ -118,6 +119,7 @@ jobs:
           set -e
           node build/check_mx_partial_render.js
           node build/check_compare_routing.js
+          node build/check_ui_boot.js
 
       - name: Packaging + console-flow checks (blocking)
         # Offline half of the exact-artifact gate (PA): APP_MODULES is the complete,

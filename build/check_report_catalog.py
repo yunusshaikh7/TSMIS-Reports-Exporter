@@ -439,27 +439,27 @@ def test_mock_parity():
     print("MOCK PARITY: #mock report lists == the PURE bridge payload, field-for-field:")
     import gui_api
     be = gui_api._report_list_payload()                              # pure; NO GuiApi (P4-R05)
-    appjs = (ROOT / "scripts" / "ui" / "app.js").read_text(encoding="utf-8")
+    mockjs = (ROOT / "scripts" / "ui" / "mock.js").read_text(encoding="utf-8")  # P9: mock moved app.js -> mock.js
 
     # The mock export `disabled` literal lives in the init `.map(...)`, idx is the position.
-    dm = re.search(r"reports:\s*REPORTS\.map\([^\n]*disabled:\s*(\w+)", appjs)
+    dm = re.search(r"reports:\s*REPORTS\.map\([^\n]*disabled:\s*(\w+)", mockjs)
     disabled = {"true": True, "false": False}.get(dm.group(1) if dm else "", None)
-    rep = _mock_objs(appjs, r"const REPORTS = \[(.*?)\];")
+    rep = _mock_objs(mockjs, r"const REPORTS = \[(.*?)\];")
     fe_export = [(o["key"], i, o["label"], o["fmt"], disabled) for i, o in enumerate(rep or [])]
     be_export = [(r["key"], r["idx"], r["label"], r["fmt"], r["disabled"]) for r in be["reports"]]
     check("mock export (key, idx, label, fmt, disabled) == bridge", fe_export == be_export)
 
-    cons = _mock_objs(appjs, r"cons_reports:\s*\[(.*?)\],")
+    cons = _mock_objs(mockjs, r"cons_reports:\s*\[(.*?)\],")
     fe_cons = [(o["key"], o["label"], o["fmt"]) for o in (cons or [])]
     be_cons = [(r["key"], r["label"], r["fmt"]) for r in be["cons_reports"]]
     check("mock consolidate (key, label, fmt) == bridge", fe_cons == be_cons)
 
-    grp = _mock_objs(appjs, r"compare_groups:\s*\[(.*?)\],")
+    grp = _mock_objs(mockjs, r"compare_groups:\s*\[(.*?)\],")
     fe_grp = [(o["id"], o["label"]) for o in (grp or [])]
     be_grp = [(g["id"], g["label"]) for g in be["compare_groups"]]
     check("mock compare groups (id, label) == bridge", fe_grp == be_grp)
 
-    cmp_ = _mock_objs(appjs, r"compare_reports:\s*\[(.*?)\],")
+    cmp_ = _mock_objs(mockjs, r"compare_reports:\s*\[(.*?)\],")
     fe_cmp = [(o["key"], o["label"], o["kind"], o["group"],
                o.get("file_a_label", "TSMIS"), o.get("file_b_label", "TSN")) for o in (cmp_ or [])]
     be_cmp = [(r["key"], r["label"], r["kind"], r["group"], r["file_a_label"], r["file_b_label"])
@@ -467,7 +467,7 @@ def test_mock_parity():
     check("mock compare (key, label, kind, group, file_a, file_b) == bridge", fe_cmp == be_cmp)
 
     # The mock's SEPARATE CONS_REPORTS routing list (used by consByKey) must equal the registry.
-    routing = _mock_objs(appjs, r"const CONS_REPORTS = \[(.*?)\];")
+    routing = _mock_objs(mockjs, r"const CONS_REPORTS = \[(.*?)\];")
     fe_routing = [(o["key"], o["label"]) for o in (routing or [])]
     check("mock CONS_REPORTS routing (key, label) == catalog consolidate",
           fe_routing == [(c.key, c.label) for c in cat.CONSOLIDATE])

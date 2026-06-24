@@ -111,8 +111,9 @@ if os.path.exists(ICON):
 # them at runtime via sys._MEIPASS/ui/. Ship ONLY real web assets -- the extension
 # allowlist guards against a stray file (an editor backup, a .py, a __pycache__
 # dir) silently riding into the bundle. Today the folder is exactly index.html +
-# app.css + app.js (P9 adds mock.js); the allowlist also covers fonts/images for
-# any future asset.
+# app.css + app.js + contract.js + mock.js (P9 split the #mock browser preview into
+# mock.js + the bridge-enum mirror contract.js); the allowlist also covers fonts/
+# images for any future asset.
 UI_DIR = os.path.join(SCRIPTS, "ui")
 _UI_ASSET_EXTS = {".html", ".htm", ".css", ".js", ".mjs", ".svg",
                   ".png", ".ico", ".gif", ".woff", ".woff2", ".json"}

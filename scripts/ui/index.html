@@ -1018,6 +1018,22 @@
 <!-- Modal host: message / confirm / route picker dialogs are built here. -->
 <div class="modal-overlay hidden" id="modalOverlay"></div>
 
+<!-- Classic <script> ordering on purpose (no ES modules; pywebview/file/frozen
+     parity). contract.js (the bridge-enum mirror) loads first; app.js runs the real
+     UI; mock.js is injected ONLY for the #mock browser preview, AFTER app.js, so the
+     mock owns its own boot and never races the real pywebview bridge. -->
+<script src="contract.js"></script>
 <script src="app.js"></script>
+<script>
+  // Inject the browser-preview mock as a classic <script>, ONLY for #mock. Appended
+  // after app.js (which has already run), so mock.js sees app.js's globals (boot, S)
+  // and owns the mock boot. createElement/appendChild (not document.write) loads it
+  // reliably regardless of parse timing, under file:// + WebView2 + frozen alike.
+  if (/[?#&]mock\b/.test(location.search + location.hash)) {
+    var mockScript = document.createElement("script");
+    mockScript.src = "mock.js";
+    document.head.appendChild(mockScript);
+  }
+</script>
 </body>
 </html>
