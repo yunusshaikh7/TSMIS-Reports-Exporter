@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import openpyxl  # noqa: E402
 
 import common  # noqa: E402
+import auth_nav  # noqa: E402  (P8b: dump_auth_failure / require_site_params live in auth_nav now)
 import exporter  # noqa: E402
 from common import ReportUnavailableError, select_report  # noqa: E402
 from exporter import (  # noqa: E402
@@ -482,7 +483,7 @@ def test_report_error_text():
 
 def test_require_site_params(monkeypatch):
     print("require_site_params env backstop:")
-    monkeypatch(common, "dump_auth_failure", lambda *a, **k: None)
+    monkeypatch(auth_nav, "dump_auth_failure", lambda *a, **k: None)
     # P8a moved the site globals (_data_source/_environment) into site_target; pin the
     # selected site through the public API (what require_site_params reads via get_site).
     common.set_site("ssor", "prod")

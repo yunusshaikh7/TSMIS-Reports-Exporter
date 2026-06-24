@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import settings                            # noqa: E402
-import common                              # noqa: E402
+import auth_nav                            # noqa: E402  (P8b: the auth-file lifecycle moved common -> auth_nav)
 
 _fail = []
 
@@ -117,17 +117,17 @@ def test_auth_atomic_and_acl():
     print("auth: atomic write (no-truncate) + owner ACL (icacls, best-effort, not DPAPI):")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_p6auth_"))
     state = {"cookies": [{"name": "session", "value": "x"}], "origins": [{"origin": "https://a"}]}
-    with _patch(common, "AUTH", tmp / "tsmis_auth.json"):
+    with _patch(auth_nav, "AUTH", tmp / "tsmis_auth.json"):
         # normal save: content round-trips (portable plaintext JSON) + ACL attempted
         recorded = []
 
         def _rec_run(cmd, *a, **k):
             recorded.append(list(cmd))
             return _Completed()
-        with _patch(common.subprocess, "run", _rec_run):
-            common.save_auth_state(state)
+        with _patch(auth_nav.subprocess, "run", _rec_run):
+            auth_nav.save_auth_state(state)
         check("auth content written + round-trips as the same JSON (portable)",
-              json.loads(common.AUTH.read_text(encoding="utf-8")) == state)
+              json.loads(auth_nav.AUTH.read_text(encoding="utf-8")) == state)
         if os.name == "nt":
             cmd = recorded[0] if recorded else []
             tmp_arg = cmd[1] if len(cmd) > 1 else ""
@@ -135,47 +135,47 @@ def test_auth_atomic_and_acl():
             # to the live AUTH path — so the cookies are never briefly broad at AUTH
             ok = bool(recorded) and cmd[0] == "icacls" \
                 and "/inheritance:r" in cmd and "/grant:r" in cmd \
-                and str(common.AUTH.parent) in tmp_arg and tmp_arg.endswith(".tmp")
+                and str(auth_nav.AUTH.parent) in tmp_arg and tmp_arg.endswith(".tmp")
             check("ACL: icacls (/inheritance:r + /grant:r) hits the TEMP before the rename", ok)
         else:
             check("ACL: no-op off Windows (icacls not invoked)", recorded == [])
         # ACL is best-effort: an icacls EXCEPTION must NOT break the save
-        with _patch(common.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError("no icacls"))):
-            common.save_auth_state(state)
-        check("auth save survives an icacls exception (best-effort ACL)", common.AUTH.is_file())
+        with _patch(auth_nav.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError("no icacls"))):
+            auth_nav.save_auth_state(state)
+        check("auth save survives an icacls exception (best-effort ACL)", auth_nav.AUTH.is_file())
         # P6-R01: a NON-ZERO icacls return (a real ACL failure, not an exception) is LOGGED
         # as a best-effort failure (rc + reason) and the save still succeeds
         logged = []
-        with _patch(common.subprocess, "run",
+        with _patch(auth_nav.subprocess, "run",
                     lambda *a, **k: _Completed(5, "icacls: Access is denied.\n")), \
-             _patch(common.log, "info", lambda m, *a, **k: logged.append(m % a if a else m)):
-            common.save_auth_state(state)
+             _patch(auth_nav.log, "info", lambda m, *a, **k: logged.append(m % a if a else m)):
+            auth_nav.save_auth_state(state)
         check("a non-zero icacls return is logged (rc) as best-effort failure, save still ok (P6-R01)",
-              any("non-zero icacls result" in m and "rc=5" in m for m in logged) and common.AUTH.is_file())
+              any("non-zero icacls result" in m and "rc=5" in m for m in logged) and auth_nav.AUTH.is_file())
         # _restrict_to_owner no-ops with no USERNAME (no crash, no icacls)
         rec2 = []
-        with _patch(common.subprocess, "run", lambda cmd, *a, **k: rec2.append(cmd)), \
-             _patch(common.os, "environ", {}):
-            common._restrict_to_owner(common.AUTH)
+        with _patch(auth_nav.subprocess, "run", lambda cmd, *a, **k: rec2.append(cmd)), \
+             _patch(auth_nav.os, "environ", {}):
+            auth_nav._restrict_to_owner(auth_nav.AUTH)
         check("ACL: no USERNAME -> skipped (no icacls call)", rec2 == [])
         # ...and a structurally invalid USERNAME (would mis-parse the icacls account arg)
         rec3 = []
-        with _patch(common.subprocess, "run", lambda cmd, *a, **k: rec3.append(cmd)), \
-             _patch(common.os, "environ", {"USERNAME": "ev:il"}):
-            common._restrict_to_owner(common.AUTH)
+        with _patch(auth_nav.subprocess, "run", lambda cmd, *a, **k: rec3.append(cmd)), \
+             _patch(auth_nav.os, "environ", {"USERNAME": "ev:il"}):
+            auth_nav._restrict_to_owner(auth_nav.AUTH)
         check("ACL: an invalid USERNAME (contains ':') -> skipped (no malformed grant)", rec3 == [])
         # atomic: a failed os.replace raises, prior session kept, no temp left
-        common.AUTH.write_text(json.dumps({"prior": True}), encoding="utf-8")
-        before = common.AUTH.read_bytes()
+        auth_nav.AUTH.write_text(json.dumps({"prior": True}), encoding="utf-8")
+        before = auth_nav.AUTH.read_bytes()
         raised = False
-        with _patch(common.os, "replace", _boom), _patch(common.subprocess, "run", _rec_run):
+        with _patch(auth_nav.os, "replace", _boom), _patch(auth_nav.subprocess, "run", _rec_run):
             try:
-                common.save_auth_state(state)
+                auth_nav.save_auth_state(state)
             except OSError:
                 raised = True
-        tmps = [p.name for p in common.AUTH.parent.iterdir() if p.name.endswith(".tmp")]
+        tmps = [p.name for p in auth_nav.AUTH.parent.iterdir() if p.name.endswith(".tmp")]
         check("a failed os.replace raises, prior session intact, no temp left",
-              raised and common.AUTH.read_bytes() == before and tmps == [])
+              raised and auth_nav.AUTH.read_bytes() == before and tmps == [])
     shutil.rmtree(tmp, ignore_errors=True)
 
 

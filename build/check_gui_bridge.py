@@ -224,10 +224,11 @@ def test_env_verdict():
 def test_export_browser():
     print("export-browser setting + indicator (v0.17.0):")
     import common
+    import browser_channels  # P8b: channel resolution + the _preferred_channel cache live here
     import settings
     a = gui_api.GuiApi()
     orig = settings.get_export_browser()
-    orig_pref = common._preferred_channel
+    orig_pref = browser_channels._preferred_channel
     try:
         check("rejects msedge as an export browser",
               a.set_export_browser("msedge").get("error") is not None)
@@ -255,21 +256,22 @@ def test_export_browser():
 def test_channel_order():
     print("browser channel order (Chrome-first; Edge implicit):")
     import common
-    orig_pref = common._preferred_channel
+    import browser_channels  # P8b: channel resolution + the _preferred_channel cache live here
+    orig_pref = browser_channels._preferred_channel
     try:
         ch = list(common.BROWSER_CHANNELS)
         check("msedge is LAST in the default order", ch[-1] == "msedge")
         check("chrome comes before edge", ch.index("chrome") < ch.index("msedge"))
         common.set_preferred_channel(None)
         check("_candidate_channels() == default order with no pick",
-              list(common._candidate_channels()) == ch)
+              list(browser_channels._candidate_channels()) == ch)
         common.set_preferred_channel("msedge")
         check("set_preferred_channel('msedge') is rejected -> None",
-              common._preferred_channel is None)
+              browser_channels._preferred_channel is None)
         common.set_preferred_channel("chrome")
-        check("a chrome pick is tried first", common._candidate_channels()[0] == "chrome")
+        check("a chrome pick is tried first", browser_channels._candidate_channels()[0] == "chrome")
         common.set_preferred_channel("msedge")        # -> None again
-        par = list(common._parallel_candidates())
+        par = list(browser_channels._parallel_candidates())
         check("parallel order never STARTS with edge", par[0] != "msedge")
         if "msedge" in ch:
             check("parallel order keeps edge LAST", par[-1] == "msedge")
