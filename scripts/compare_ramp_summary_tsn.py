@@ -29,10 +29,10 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import compare_tsn_common as ctc
 import consolidate_ramp_summary as rs
 import summary_layout
-from compare_core import CompareSchema, run_compare
-from events import ConsolidateResult, Events
+from compare_core import CompareSchema
 from paths import today_str
 
 REPORT_NAME = "Ramp Summary"
@@ -186,45 +186,29 @@ def suggest_name(tsmis_path):
     return f"TSMIS_vs_TSN_RampSummary_Comparison {today_str()}.xlsx"
 
 
-def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas"):
-    """Build the Ramp Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s).
-    `tsmis_path` is the consolidated TSMIS Ramp Summary workbook; `tsn_path` the
-    TSN statewide PDF (or the library's normalized workbook)."""
-    events = events or Events()
-    if not _DEPS_OK:
-        return ConsolidateResult(status="error",
-                                 message="Required components are missing (pdfplumber, openpyxl).")
-    tsmis_path, tsn_path = Path(tsmis_path), Path(tsn_path)
-    for p, side in ((tsmis_path, "TSMIS"), (tsn_path, "TSN")):
-        if not p.is_file():
-            return ConsolidateResult(status="error",
-                                     message=f"The {side} file doesn't exist:\n{p}")
-
-    events.on_log("=" * 60)
-    events.on_log("Ramp Summary Comparison — TSMIS vs TSN (statewide category counts)")
-    events.on_log("=" * 60)
-    events.on_log(f"TSMIS: {tsmis_path.name}")
-    events.on_log(f"TSN:   {tsn_path.name}")
-    events.on_log("")
-
-    try:
-        tsmis_counts = _load_tsmis(tsmis_path)
-        tsn_counts = _load_tsn(tsn_path)
-    except ValueError as e:
-        return ConsolidateResult(status="error", message=str(e))
-
-    # A statewide TSN page should fill every category; flag any the parser missed
-    # so an incomplete parse can't masquerade as a clean comparison.
+def _load_pair(tsmis_path, tsn_path):
+    """(rows_t, rows_n, warnings) for the shared driver. A statewide TSN page should
+    fill every category; flag any the parser missed so an incomplete parse can't
+    masquerade as a clean comparison. The TSMIS-only footnote metrics ride the TSMIS side."""
+    tsmis_counts = _load_tsmis(tsmis_path)
+    tsn_counts = _load_tsn(tsn_path)
     warnings = []
     missing = [key for key, slug in _CATEGORIES if tsn_counts.get(slug) is None]
     if missing:
         warnings.append(f"TSN parse did not find {len(missing)} categor"
                         f"{'y' if len(missing) == 1 else 'ies'}: "
                         + ", ".join(missing[:6]) + ("…" if len(missing) > 6 else ""))
+    return _rows(tsmis_counts, with_footnotes=True), _rows(tsn_counts), warnings
 
-    rows_t, rows_n = _rows(tsmis_counts, with_footnotes=True), _rows(tsn_counts)
-    return run_compare(_SCHEMA, rows_t, rows_n, False, out_path,
-                       events=events, confirm_overwrite=confirm_overwrite,
-                       mode=mode, name_a=tsmis_path.name, name_b=tsn_path.name,
-                       warnings=warnings)
+
+def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
+            mode="formulas"):
+    """Build the Ramp Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s).
+    `tsmis_path` is the consolidated TSMIS Ramp Summary workbook; `tsn_path` the
+    TSN statewide PDF (or the library's normalized workbook)."""
+    return ctc.run_files_compare(
+        _SCHEMA, tsmis_path, tsn_path, out_path,
+        banner="Ramp Summary Comparison — TSMIS vs TSN (statewide category counts)",
+        has_route=False, loader=_load_pair, deps_ok=_DEPS_OK,
+        deps_msg="Required components are missing (pdfplumber, openpyxl).",
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode)

@@ -31,8 +31,8 @@ try:
 except ImportError:
     _DEPS_OK = False
 
-from compare_core import CompareSchema, normalize_value, run_compare
-from events import ConsolidateResult, Events
+import compare_tsn_common as ctc
+from compare_core import CompareSchema, normalize_value
 from paths import today_str
 
 REPORT_NAME = "Ramp Detail"
@@ -79,33 +79,11 @@ def _norm_route(tok):
     return f"{int(m.group(1)):03d}{m.group(2)}" if m else t
 
 
-def _norm_pm(pm):
-    """Postmile to one canon: strip the zero-padding TSN prints (' 000.606')
-    while keeping the decimal ('0.606' stays distinct from '000.606')."""
-    s = str(pm or "").strip()
-    if not s:
-        return ""
-    neg = s.startswith("-")
-    s = s.lstrip("-")
-    s = s.lstrip("0") or "0"
-    if s.startswith("."):
-        s = "0" + s
-    return ("-" + s) if neg else s
-
-
-def _iso_date(d):
-    """Both sides' Date of Record to YYYY-MM-DD (TSMIS '02/25/1976', TSN
-    '1992-09-28 00:00:00')."""
-    s = str(d or "").strip()
-    if not s:
-        return ""
-    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
-    if m:
-        return f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
-    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
-    if m:
-        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
-    return s
+# PM + Date-of-Record canon shared with Intersection Detail, homed in
+# compare_tsn_common (P5b/S04). The rd._norm_pm / rd._iso_date names are kept so the
+# loaders, importers, and the golden canary still resolve them.
+_norm_pm = ctc.norm_pm
+_iso_date = ctc.iso_date
 
 
 def _strip_desc_prefix(text):
@@ -226,34 +204,22 @@ def suggest_name(tsmis_path):
     return f"TSMIS_vs_TSN_RampDetail_{tag}_Comparison {today_str()}.xlsx"
 
 
+def _load_pair(tsmis_path, tsn_path):
+    """(rows_t, rows_n, warnings) for the shared driver — the FLAT detail pair carries
+    no input warnings, so run_compare uses its () default."""
+    rows_t, _ = _load_tsmis(tsmis_path)
+    rows_n, _ = _load_tsn(tsn_path)
+    return rows_t, rows_n, None
+
+
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
             mode="formulas"):
     """Build the Ramp Detail TSMIS-vs-TSN comparison workbook(s). `tsmis_path` is the
     consolidated TSMIS Ramp Detail workbook; `tsn_path` the TSN statewide (raw or
     normalized) workbook. Returns a ConsolidateResult."""
-    events = events or Events()
-    if not _DEPS_OK:
-        return ConsolidateResult(status="error",
-                                 message="Required components are missing (openpyxl).")
-    tsmis_path, tsn_path = Path(tsmis_path), Path(tsn_path)
-    for p, side in ((tsmis_path, "TSMIS"), (tsn_path, "TSN")):
-        if not p.is_file():
-            return ConsolidateResult(status="error",
-                                     message=f"The {side} file doesn't exist:\n{p}")
-
-    events.on_log("=" * 60)
-    events.on_log("Ramp Detail Comparison — TSMIS vs TSN")
-    events.on_log("=" * 60)
-    events.on_log(f"TSMIS: {tsmis_path.name}")
-    events.on_log(f"TSN:   {tsn_path.name}")
-    events.on_log("")
-
-    try:
-        rows_t, route_t = _load_tsmis(tsmis_path)
-        rows_n, route_n = _load_tsn(tsn_path)
-    except ValueError as e:
-        return ConsolidateResult(status="error", message=str(e))
-
-    return run_compare(_SCHEMA, rows_t, rows_n, True, out_path,
-                       events=events, confirm_overwrite=confirm_overwrite,
-                       mode=mode, name_a=tsmis_path.name, name_b=tsn_path.name)
+    return ctc.run_files_compare(
+        _SCHEMA, tsmis_path, tsn_path, out_path,
+        banner="Ramp Detail Comparison — TSMIS vs TSN", has_route=True,
+        loader=_load_pair, deps_ok=_DEPS_OK,
+        deps_msg="Required components are missing (openpyxl).",
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode)

@@ -28,14 +28,12 @@ from pathlib import Path
 
 try:
     from openpyxl import load_workbook
-    from openpyxl.cell import WriteOnlyCell
-    from openpyxl.styles import Alignment, Font, PatternFill
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
 
-from compare_core import CompareSchema, normalize_value, run_compare
-from events import ConsolidateResult, Events
+import compare_tsn_common as ctc
+from compare_core import CompareSchema, normalize_value
 from paths import today_str
 
 REPORT_NAME = "Intersection Detail"
@@ -109,33 +107,11 @@ def _norm_route(tok):
     return _split_route(tok)[0]
 
 
-def _norm_pm(pm):
-    s = str(pm or "").strip()
-    if not s:
-        return ""
-    neg = s.startswith("-")
-    s = s.lstrip("-").lstrip("0") or "0"
-    if s.startswith("."):
-        s = "0" + s
-    return ("-" + s) if neg else s
-
-
-def _iso_date(d):
-    s = str(d or "").strip()
-    if not s:
-        return ""
-    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
-    if m:
-        return f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
-    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
-    if m:
-        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
-    m = re.match(r"(\d{2})-(\d{2})-(\d{2})$", s)        # TSN '73-10-19' (YY-MM-DD)
-    if m:
-        yy = int(m.group(1))
-        cc = 1900 if yy >= 30 else 2000                # 2-digit-year window
-        return f"{cc + yy}-{m.group(2)}-{m.group(3)}"
-    return s
+# PM + Date-of-Record canon shared with Ramp Detail, homed in compare_tsn_common
+# (P5b/S04); iso_date also handles this report's 2-digit TSN year. Names kept so the
+# loaders, importers, and the golden canary still resolve idt._norm_pm / idt._iso_date.
+_norm_pm = ctc.norm_pm
+_iso_date = ctc.iso_date
 
 
 _BOOL = {"Y": "Y", "N": "N", "1": "Y", "0": "N"}
@@ -238,29 +214,9 @@ def _load_tsmis(path):
 # --------------------------------------------------------------------------- #
 # Notes sheet — the INDICATOR that boolean normalization is applied
 # --------------------------------------------------------------------------- #
-def _write_notes_sheet(wb):
-    ws = wb.create_sheet("Notes")
-    ws.sheet_properties.tabColor = "ED7D31"
-    write_only = getattr(wb, "write_only", False)
-    title = Font(name="Arial", size=12, bold=True, color="FFFFFF")
-    fill = PatternFill("solid", start_color="1F3864")
-    body = Font(name="Arial", size=10)
-    wrap = Alignment(vertical="top", wrap_text=True)
-
-    def cell(value, font=body, f=None, align=None):
-        if not write_only:
-            return value
-        c = WriteOnlyCell(ws, value=value)
-        c.font = font
-        if f:
-            c.fill = f
-        if align:
-            c.alignment = align
-        return c
-
-    ws.column_dimensions["A"].width = 110
-    ws.append([cell("Intersection Detail — TSMIS vs TSN: comparison notes", title, fill)])
-    for line in (
+_write_notes_sheet = ctc.make_notes_writer(
+    "Intersection Detail — TSMIS vs TSN: comparison notes",
+    (
         "Boolean attributes (Lighting, ML Mastarm, ML Right Chan, CS Mastarm, CS Right "
         "Chan) are encoded Y/N on TSN but 1/0 on TSMIS. They are NORMALIZED as Y≡1 / "
         "N≡0 so only genuine changes are flagged (not the encoding); cells are shown as Y/N.",
@@ -280,9 +236,7 @@ def _write_notes_sheet(wb):
         "difference; the suffix is shown in the 'Roadbed' column and — when it is the only "
         "difference — is flagged there (TSN \"U\" vs TSMIS blank) rather than dropped to a "
         "one-sided row or silently merged.",
-    ):
-        ws.append([cell(line, body, align=wrap)])
-    return ws
+    ))
 
 
 _SCHEMA = CompareSchema(
@@ -315,34 +269,22 @@ def suggest_name(tsmis_path):
     return f"TSMIS_vs_TSN_IntersectionDetail_{tag}_Comparison {today_str()}.xlsx"
 
 
+def _load_pair(tsmis_path, tsn_path):
+    """(rows_t, rows_n, warnings) for the shared driver — no input warnings on this
+    FLAT detail pair, so run_compare uses its () default."""
+    rows_t, _ = _load_tsmis(tsmis_path)
+    rows_n, _ = _load_tsn(tsn_path)
+    return rows_t, rows_n, None
+
+
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
             mode="formulas"):
     """Build the Intersection Detail TSMIS-vs-TSN comparison workbook(s). `tsmis_path`
     is the consolidated TSMIS Intersection Detail workbook; `tsn_path` the TSN
     statewide (raw or normalized) workbook."""
-    events = events or Events()
-    if not _DEPS_OK:
-        return ConsolidateResult(status="error",
-                                 message="Required components are missing (openpyxl).")
-    tsmis_path, tsn_path = Path(tsmis_path), Path(tsn_path)
-    for p, side in ((tsmis_path, "TSMIS"), (tsn_path, "TSN")):
-        if not p.is_file():
-            return ConsolidateResult(status="error",
-                                     message=f"The {side} file doesn't exist:\n{p}")
-
-    events.on_log("=" * 60)
-    events.on_log("Intersection Detail Comparison — TSMIS vs TSN")
-    events.on_log("=" * 60)
-    events.on_log(f"TSMIS: {tsmis_path.name}")
-    events.on_log(f"TSN:   {tsn_path.name}")
-    events.on_log("")
-
-    try:
-        rows_t, route_t = _load_tsmis(tsmis_path)
-        rows_n, route_n = _load_tsn(tsn_path)
-    except ValueError as e:
-        return ConsolidateResult(status="error", message=str(e))
-
-    return run_compare(_SCHEMA, rows_t, rows_n, True, out_path,
-                       events=events, confirm_overwrite=confirm_overwrite,
-                       mode=mode, name_a=tsmis_path.name, name_b=tsn_path.name)
+    return ctc.run_files_compare(
+        _SCHEMA, tsmis_path, tsn_path, out_path,
+        banner="Intersection Detail Comparison — TSMIS vs TSN", has_route=True,
+        loader=_load_pair, deps_ok=_DEPS_OK,
+        deps_msg="Required components are missing (openpyxl).",
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode)

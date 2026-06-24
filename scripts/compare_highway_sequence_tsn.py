@@ -28,15 +28,13 @@ from pathlib import Path
 
 try:
     from openpyxl import load_workbook
-    from openpyxl.cell import WriteOnlyCell
-    from openpyxl.styles import Alignment, Font, PatternFill
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
 
+import compare_tsn_common as ctc
 import consolidate_tsn_highway_sequence as tsn_hsl
-from compare_core import CompareSchema, normalize_value, run_compare
-from events import ConsolidateResult, Events
+from compare_core import CompareSchema, normalize_value
 from paths import today_str
 
 REPORT_NAME = "Highway Sequence"
@@ -197,29 +195,9 @@ def _load_tsn(path):
 # --------------------------------------------------------------------------- #
 # Notes sheet — the INDICATOR for the context fields + key
 # --------------------------------------------------------------------------- #
-def _write_notes_sheet(wb):
-    ws = wb.create_sheet("Notes")
-    ws.sheet_properties.tabColor = "ED7D31"
-    write_only = getattr(wb, "write_only", False)
-    title = Font(name="Arial", size=12, bold=True, color="FFFFFF")
-    fill = PatternFill("solid", start_color="1F3864")
-    body = Font(name="Arial", size=10)
-    wrap = Alignment(vertical="top", wrap_text=True)
-
-    def cell(value, font=body, f=None, align=None):
-        if not write_only:
-            return value
-        c = WriteOnlyCell(ws, value=value)
-        c.font = font
-        if f:
-            c.fill = f
-        if align:
-            c.alignment = align
-        return c
-
-    ws.column_dimensions["A"].width = 110
-    ws.append([cell("Highway Sequence — TSMIS vs TSN: comparison notes", title, fill)])
-    for line in (
+_write_notes_sheet = ctc.make_notes_writer(
+    "Highway Sequence — TSMIS vs TSN: comparison notes",
+    (
         "Rows are keyed on Route + County + Postmile. California postmiles are "
         "county-relative (a route restarts at 000.000 in each county it crosses), so "
         "the postmile alone is not unique across a route — County is part of the key.",
@@ -235,9 +213,7 @@ def _write_notes_sheet(wb):
         "its gap is usually smaller, an artifact of listing granularity rather than a real "
         "disagreement). Counting these would bury the substantive differences. FT and "
         "Description (with the TSMIS leading \"<route>/\" prefix stripped) ARE compared.",
-    ):
-        ws.append([cell(line, body, align=wrap)])
-    return ws
+    ))
 
 
 _SCHEMA = CompareSchema(
@@ -270,34 +246,22 @@ def suggest_name(tsmis_path):
     return f"TSMIS_vs_TSN_HighwaySequence_{tag}_Comparison {today_str()}.xlsx"
 
 
+def _load_pair(tsmis_path, tsn_path):
+    """(rows_t, rows_n, warnings) for the shared driver — no input warnings here, so
+    run_compare uses its () default."""
+    rows_t, _ = _load_tsmis(tsmis_path)
+    rows_n, _ = _load_tsn(tsn_path)
+    return rows_t, rows_n, None
+
+
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
             mode="formulas"):
     """Build the Highway Sequence TSMIS-vs-TSN comparison workbook(s). `tsmis_path`
     is the consolidated TSMIS Highway Sequence workbook; `tsn_path` the normalized
     TSN workbook (from consolidate_tsn_highway_sequence)."""
-    events = events or Events()
-    if not _DEPS_OK:
-        return ConsolidateResult(status="error",
-                                 message="Required components are missing (openpyxl).")
-    tsmis_path, tsn_path = Path(tsmis_path), Path(tsn_path)
-    for p, side in ((tsmis_path, "TSMIS"), (tsn_path, "TSN")):
-        if not p.is_file():
-            return ConsolidateResult(status="error",
-                                     message=f"The {side} file doesn't exist:\n{p}")
-
-    events.on_log("=" * 60)
-    events.on_log("Highway Sequence Comparison — TSMIS vs TSN")
-    events.on_log("=" * 60)
-    events.on_log(f"TSMIS: {tsmis_path.name}")
-    events.on_log(f"TSN:   {tsn_path.name}")
-    events.on_log("")
-
-    try:
-        rows_t, route_t = _load_tsmis(tsmis_path)
-        rows_n, route_n = _load_tsn(tsn_path)
-    except ValueError as e:
-        return ConsolidateResult(status="error", message=str(e))
-
-    return run_compare(_SCHEMA, rows_t, rows_n, True, out_path,
-                       events=events, confirm_overwrite=confirm_overwrite,
-                       mode=mode, name_a=tsmis_path.name, name_b=tsn_path.name)
+    return ctc.run_files_compare(
+        _SCHEMA, tsmis_path, tsn_path, out_path,
+        banner="Highway Sequence Comparison — TSMIS vs TSN", has_route=True,
+        loader=_load_pair, deps_ok=_DEPS_OK,
+        deps_msg="Required components are missing (openpyxl).",
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode)

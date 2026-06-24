@@ -27,9 +27,9 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import compare_tsn_common as ctc
 import summary_layout
-from compare_core import CompareSchema, run_compare
-from events import ConsolidateResult, Events
+from compare_core import CompareSchema
 from paths import today_str
 
 REPORT_NAME = "Intersection Summary"
@@ -193,35 +193,12 @@ def suggest_name(tsmis_path):
     return f"TSMIS_vs_TSN_IntersectionSummary_Comparison {today_str()}.xlsx"
 
 
-def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas"):
-    """Build the Intersection Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s)."""
-    events = events or Events()
-    if not _DEPS_OK:
-        return ConsolidateResult(status="error",
-                                 message="Required components are missing (pdfplumber, openpyxl).")
-    tsmis_path, tsn_path = Path(tsmis_path), Path(tsn_path)
-    for p, side in ((tsmis_path, "TSMIS"), (tsn_path, "TSN")):
-        if not p.is_file():
-            return ConsolidateResult(status="error",
-                                     message=f"The {side} file doesn't exist:\n{p}")
-
-    events.on_log("=" * 60)
-    events.on_log("Intersection Summary Comparison — TSMIS vs TSN (statewide category counts)")
-    events.on_log("=" * 60)
-    events.on_log(f"TSMIS: {tsmis_path.name}")
-    events.on_log(f"TSN:   {tsn_path.name}")
-    events.on_log("")
-
-    try:
-        tsmis_counts = _load_tsmis(tsmis_path)
-        tsn_counts = _load_tsn(tsn_path)
-    except ValueError as e:
-        return ConsolidateResult(status="error", message=str(e))
-
-    # A parse-integrity warning, scoped to the categories TSN ACTUALLY classifies
-    # (the TSN-applicable set) — the TSMIS-only codes are legitimately absent from
-    # the TSN PDF and must NOT be flagged.
+def _load_pair(tsmis_path, tsn_path):
+    """(rows_t, rows_n, warnings) for the shared driver. The parse-integrity warning is
+    scoped to the categories TSN ACTUALLY classifies (the TSN-applicable set) — the
+    TSMIS-only codes are legitimately absent from the TSN PDF and must NOT be flagged."""
+    tsmis_counts = _load_tsmis(tsmis_path)
+    tsn_counts = _load_tsn(tsn_path)
     warnings = []
     if tsn_counts.get("total_intersections") is None:
         warnings.append("TSN parse did not find the 'Total Intersections' figure — "
@@ -232,9 +209,15 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         warnings.append(f"TSN parse did not find {len(missing)} expected categor"
                         f"{'y' if len(missing) == 1 else 'ies'}: "
                         + ", ".join(missing[:6]) + ("…" if len(missing) > 6 else ""))
+    return _rows(tsmis_counts, "tsmis"), _rows(tsn_counts, "tsn"), warnings
 
-    return run_compare(_SCHEMA, _rows(tsmis_counts, "tsmis"), _rows(tsn_counts, "tsn"),
-                       False, out_path,
-                       events=events, confirm_overwrite=confirm_overwrite,
-                       mode=mode, name_a=tsmis_path.name, name_b=tsn_path.name,
-                       warnings=warnings)
+
+def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
+            mode="formulas"):
+    """Build the Intersection Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s)."""
+    return ctc.run_files_compare(
+        _SCHEMA, tsmis_path, tsn_path, out_path,
+        banner="Intersection Summary Comparison — TSMIS vs TSN (statewide category counts)",
+        has_route=False, loader=_load_pair, deps_ok=_DEPS_OK,
+        deps_msg="Required components are missing (pdfplumber, openpyxl).",
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode)
