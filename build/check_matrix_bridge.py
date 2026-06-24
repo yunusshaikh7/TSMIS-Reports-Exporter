@@ -24,6 +24,7 @@ sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import batch_manifest
 import gui_api
+import gui_matrix
 import settings
 
 _fail = []
@@ -53,12 +54,14 @@ def _touch(p):
 def main():
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mxb_"))
     cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_mxbcfg_"))
-    saved = (gui_api.MatrixCompareWorker, gui_api.MatrixBatchExportWorker,
-             gui_api.MatrixTsnConsolidateWorker, gui_api.clear_auth,
+    # The matrix workers now live in gui_matrix (P7c) — patch them there, where the
+    # mixin dispatch resolves them; clear_auth stays in gui_api.
+    saved = (gui_matrix.MatrixCompareWorker, gui_matrix.MatrixBatchExportWorker,
+             gui_matrix.MatrixTsnConsolidateWorker, gui_api.clear_auth,
              settings.get_batch_dest, settings.CONFIG_FILE)
-    gui_api.MatrixCompareWorker = _FakeWorker
-    gui_api.MatrixBatchExportWorker = _FakeWorker
-    gui_api.MatrixTsnConsolidateWorker = _FakeWorker
+    gui_matrix.MatrixCompareWorker = _FakeWorker
+    gui_matrix.MatrixBatchExportWorker = _FakeWorker
+    gui_matrix.MatrixTsnConsolidateWorker = _FakeWorker
     gui_api.clear_auth = lambda: None     # no auth-file side effects in the test
     settings.get_batch_dest = lambda: str(dest)
     settings.CONFIG_FILE = cfgdir / "config.json"
@@ -347,8 +350,8 @@ def main():
         check("stop-all on an empty/idle queue is a no-op",
               a.matrix_stop_all().get("cleared") == 0)
     finally:
-        (gui_api.MatrixCompareWorker, gui_api.MatrixBatchExportWorker,
-         gui_api.MatrixTsnConsolidateWorker, gui_api.clear_auth,
+        (gui_matrix.MatrixCompareWorker, gui_matrix.MatrixBatchExportWorker,
+         gui_matrix.MatrixTsnConsolidateWorker, gui_api.clear_auth,
          settings.get_batch_dest, settings.CONFIG_FILE) = saved
         settings._cache = settings._cache_mtime = None
         shutil.rmtree(dest, ignore_errors=True)

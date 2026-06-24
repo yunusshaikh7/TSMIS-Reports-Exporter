@@ -156,12 +156,40 @@ def test_begin_compare_unify():
           and "lambda: adapter.suggest_name(pa, pb)" in s)
 
 
+def test_matrix_grouping():
+    print("the Matrix cluster lives in gui_matrix.GuiMatrixMixin (P7c):")
+    import gui_matrix
+    check("GuiApi inherits GuiMatrixMixin", gui_matrix.GuiMatrixMixin in gui_api.GuiApi.__mro__)
+    mixin = vars(gui_matrix.GuiMatrixMixin)
+    ga = vars(gui_api.GuiApi)
+    # A representative cross-section of the moved cluster: public endpoints (matrix,
+    # by-day, TSN-library), the dispatch/queue machinery, and the matrix _on_* handlers.
+    MOVED = ["matrix_info", "set_matrix_baseline", "recompute_matrix", "refresh_cell_export",
+             "refresh_cell_comparison", "open_cell_comparison", "consolidate_matrix_tsn",
+             "tsn_library_status", "import_tsn_raw", "rebuild_tsn_library", "matrix_queue_clear",
+             "matrix_stop_all", "set_matrix_fast", "day_matrix_info", "build_day_cell",
+             "export_day_column", "rebuild_day_matrix", "open_tsn_library_folder",
+             "_dispatch_matrix_job", "_try_start_next_matrix_job", "_make_job",
+             "_resolve_export_steps", "_resolve_day_export_steps",
+             "_on_matrix_cell", "_on_matrix_done", "_on_matrix_export_done"]
+    for m in MOVED:
+        check(f"{m}: defined in GuiMatrixMixin", m in mixin)
+        check(f"{m}: NO LONGER defined on GuiApi (truly moved)", m not in ga)
+        check(f"{m}: still resolves on GuiApi via the mixin (façade intact)",
+              hasattr(gui_api.GuiApi, m))
+    # the moved PUBLIC endpoints are still in the frozen 98-name façade (no rename/drop)
+    moved_public = {m for m in MOVED if not m.startswith("_")}
+    check("every moved public matrix endpoint stays in the frozen façade",
+          moved_public <= FROZEN_API)
+
+
 def main():
     test_surface_identity()
     test_touched_endpoint_signatures()
     test_gui_win32_module()
     test_gui_api_delegates()
     test_begin_compare_unify()
+    test_matrix_grouping()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

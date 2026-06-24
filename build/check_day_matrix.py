@@ -19,6 +19,7 @@ sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import day_matrix
 import gui_api
+import gui_matrix
 import matrix
 import paths
 import settings
@@ -59,12 +60,14 @@ def main():
     out = Path(tempfile.mkdtemp(prefix="tsmis_day_out_"))
     dest = Path(tempfile.mkdtemp(prefix="tsmis_day_dest_"))
     cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_day_cfg_"))
-    saved = (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, gui_api.DayMatrixCompareWorker,
-             gui_api.MatrixCompareWorker, settings.get_batch_dest, settings.CONFIG_FILE)
+    # The matrix workers now live in gui_matrix (P7c) — patch them where the mixin
+    # dispatch resolves them.
+    saved = (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, gui_matrix.DayMatrixCompareWorker,
+             gui_matrix.MatrixCompareWorker, settings.get_batch_dest, settings.CONFIG_FILE)
     paths.OUTPUT_ROOT = out
     day_matrix.OUTPUT_ROOT = out
-    gui_api.DayMatrixCompareWorker = _FakeWorker
-    gui_api.MatrixCompareWorker = _FakeWorker
+    gui_matrix.DayMatrixCompareWorker = _FakeWorker
+    gui_matrix.MatrixCompareWorker = _FakeWorker
     settings.get_batch_dest = lambda: str(dest)
     settings.CONFIG_FILE = cfgdir / "config.json"
     settings._cache = settings._cache_mtime = None
@@ -198,8 +201,8 @@ def main():
         print("gui_api bridge — by-day EXPORT (today only) + export->compare chain:")
         today = paths.today_str()
         _touch(out / f"{today} ssor-prod" / "highway_log" / "r1.xlsx")   # today's HL pull
-        saved_mbe = gui_api.MatrixBatchExportWorker
-        gui_api.MatrixBatchExportWorker = _FakeWorker
+        saved_mbe = gui_matrix.MatrixBatchExportWorker
+        gui_matrix.MatrixBatchExportWorker = _FakeWorker
         try:
             settings.set_day_matrix_days([])
             check("snapshot exposes today (the one exportable column)",
@@ -228,7 +231,7 @@ def main():
                   a._current_job is None or a._current_job["kind"] != "compare")
             a._end_task()
         finally:
-            gui_api.MatrixBatchExportWorker = saved_mbe
+            gui_matrix.MatrixBatchExportWorker = saved_mbe
         settings.set_day_matrix_days(["2026-06-17", "2026-06-18"])   # restore for open guards
 
         print("gui_api bridge — open guards:")
@@ -244,8 +247,8 @@ def main():
               a.open_day_comparisons_folder().get("ok") is True
               and opened[-1] == day_matrix.byday_root())
     finally:
-        (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, gui_api.DayMatrixCompareWorker,
-         gui_api.MatrixCompareWorker, settings.get_batch_dest, settings.CONFIG_FILE) = saved
+        (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, gui_matrix.DayMatrixCompareWorker,
+         gui_matrix.MatrixCompareWorker, settings.get_batch_dest, settings.CONFIG_FILE) = saved
         settings._cache = settings._cache_mtime = None
         for d in (out, dest, cfgdir):
             shutil.rmtree(d, ignore_errors=True)
