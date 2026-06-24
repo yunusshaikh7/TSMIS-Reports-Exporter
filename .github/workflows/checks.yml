@@ -55,6 +55,7 @@ jobs:
         shell: bash
         run: |
           set -e
+          python build/check_engine_leaves.py
           python build/check_export_engine.py
           python build/check_parallel_reconcile.py
           python build/check_intersection_gate.py

@@ -483,8 +483,9 @@ def test_report_error_text():
 def test_require_site_params(monkeypatch):
     print("require_site_params env backstop:")
     monkeypatch(common, "dump_auth_failure", lambda *a, **k: None)
-    monkeypatch(common, "_data_source", "ssor")
-    monkeypatch(common, "_environment", "prod")
+    # P8a moved the site globals (_data_source/_environment) into site_target; pin the
+    # selected site through the public API (what require_site_params reads via get_site).
+    common.set_site("ssor", "prod")
 
     class FakeCfgPage:
         def __init__(self, cfg, raises=False):

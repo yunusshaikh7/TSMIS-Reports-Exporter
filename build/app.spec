@@ -65,7 +65,8 @@ VERSION_INFO = VSVersionInfo(
 ICON     = os.path.join(SPECPATH, "app.ico")        # built once with Pillow (see CLAUDE.md)
 MANIFEST = os.path.join(SPECPATH, "app.manifest")
 APP_MODULES = [
-    "version", "paths", "common", "events", "outcome", "cache_envelope",
+    "version", "paths", "common", "errors", "site_target", "timeouts", "routes",
+    "events", "outcome", "cache_envelope",
     "consolidation_meta", "artifact_store", "contract", "task_coordinator",
     "exporter", "exporter_parallel",
     "run_report", "logging_setup", "settings", "cli", "login", "reports",

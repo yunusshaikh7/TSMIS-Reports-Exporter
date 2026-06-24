@@ -1,14 +1,21 @@
-"""Shared helpers used by every TSMIS export script.
+"""Shared engine helpers for every TSMIS export script — and, since the v0.18.0
+engine decomposition (P8a), the re-export SHIM over the extracted pure leaves.
 
-Keeps one copy of: the report URL, the route list, auth file location,
-auth validation, and the Playwright navigation helpers. Report-specific
-logic (which report to pick, how to save the result) lives in ReportSpec
-objects (see exporter.py) so a change to one report does not affect the
-others.
+The leaves now live in their own flat modules and are RE-EXPORTED here, so
+`from common import ROUTES` (and every other name) is unchanged for all callers:
+  * `errors`      — the exception types (AuthError, PreflightError, …)
+  * `site_target` — site/env selection + the report-page URL (get_url, set_site, …)
+  * `timeouts`    — timeout defaults + the Settings-backed accessors
+  * `routes`      — the route list + the free-text parser
+What still lives here: the auth-file lifecycle and the Playwright page /
+browser-channel / Edge-device / session helpers (P8b moves those along the
+verified acyclic DAG). Report-specific logic (which report to pick, how to save
+the result) lives in ReportSpec objects (see exporter.py), so a change to one
+report does not affect the others.
 
 This module is console-free: auth problems raise AuthError and progress is
 reported through an Events sink, so the same helpers back both the console
-shim (cli.py) and the future GUI.
+shim (cli.py) and the GUI.
 """
 import json
 import logging
@@ -18,7 +25,6 @@ import socket
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 from pathlib import Path
 from urllib.parse import quote, urlsplit
@@ -29,158 +35,30 @@ except ImportError:
     PlaywrightTimeoutError = Exception  # only hit if Playwright isn't installed yet
 
 
-class AuthError(Exception):
-    """Raised when the saved TSMIS session is missing, expired, or corrupt.
-
-    The core raises this; the caller (the console shim in cli.py, or the GUI)
-    decides how to tell the user and whether to clear the stale file.
-    """
-
-
-class PreflightError(Exception):
-    """Raised when the TSMIS page doesn't look as expected before a run (likely
-    a site change). Its message is user-safe and UI-neutral, so callers can show
-    it as-is."""
-
-
-class SiteUnreachableError(PreflightError):
-    """Raised when the TSMIS page can't be opened at all (network/VPN/DNS), so
-    the user sees "check your connection" instead of a raw Playwright error.
-    Subclasses PreflightError because every driver already handles that as
-    "the run can't start; show the message as-is"."""
-
-
-class ReportUnavailableError(PreflightError):
-    """Raised when the chosen report is greyed out on the live site (the site
-    marks it `cs-disabled` -- TSMIS can temporarily disable a report from
-    exporting by design). Subclasses PreflightError so every driver shows the
-    message as-is, but says "this report is currently unavailable" rather than
-    the generic "the page looks different" -- and it's caught BEFORE the inert
-    dropdown click would stall ~30 s into a preflight failure."""
-
-
-class BrowserNotFoundError(Exception):
-    """Raised when no usable Chromium-based browser (Edge or Chrome) is installed
-    on the machine. The app drives the browser already present rather than
-    bundling one, so this is the "please install Edge" case. Message is user-safe
-    and UI-neutral."""
-
-
-class RunCancelled(Exception):
-    """Raised mid-route when the user cancels (events.is_cancelled() goes True
-    while we're waiting on a report). Lets Cancel interrupt the *current* route's
-    wait instead of only taking effect between routes. The engines catch it and
-    stop the run cleanly -- it is NOT a route failure or a worker crash."""
-
-
-class ReportError(Exception):
-    """Raised when the TSMIS site itself renders a fatal error for a route -- its
-    #rampResults box goes into an `error` state (e.g. "Cannot read properties of
-    undefined (reading 'size')") instead of producing a report or a clean "no
-    results". Detected during the post-Generate wait so the route fails FAST with
-    the site's own message, instead of silently waiting out the whole per-route
-    timeout (and then the long retry) on something the site simply can't build."""
-
-
-# The TSMIS report site. One page serves every combination of data source
-# (SSOR / ARS) and environment (prod / test / dev) via query parameters; the
-# user picks both in the GUI header (set_site) or via TSMIS_SRC / TSMIS_ENV in
-# the console flow. Defaults: SSOR + prod.
-TSMIS_HOST = "tsmis.dot.ca.gov"
-# The development host (same path + ?env=/?src= scheme). The dev site offers
-# report types still greyed in production (Intersection Summary/Detail), so the
-# Settings "use development site" preset points all six combos here.
-TSMIS_DEV_HOST = "tsmis-dev.dot.ca.gov"
-DATA_SOURCES = ("ssor", "ars")
-ENVIRONMENTS = ("prod", "test", "dev")
-DATA_SOURCE_LABELS = {"ssor": "SSOR", "ars": "ARS"}
-ENVIRONMENT_LABELS = {"prod": "Prod", "test": "Test", "dev": "Dev"}
-
-
-def _env_choice(var, valid, default):
-    v = os.environ.get(var, "").strip().lower()
-    return v if v in valid else default
-
-
-_data_source = _env_choice("TSMIS_SRC", DATA_SOURCES, "ssor")
-_environment = _env_choice("TSMIS_ENV", ENVIRONMENTS, "prod")
-
-
-def set_site(source=None, environment=None):
-    """Record which data source / environment the next navigation should use.
-    Invalid values are ignored (the current choice is kept)."""
-    global _data_source, _environment
-    if source and source.lower() in DATA_SOURCES:
-        _data_source = source.lower()
-    if environment and environment.lower() in ENVIRONMENTS:
-        _environment = environment.lower()
-    log.info("site: set to src=%s env=%s", _data_source, _environment)
-
-
-# The env-access scan probes several src/env combos in PARALLEL worker
-# threads; a process-wide set_site would race (and fight the user's header
-# selection). A scanner thread pins its own target here instead — every
-# site-aware helper (get_url, expected_host, _site_params_ok, the signed-in
-# host check) flows through get_site(), so the pin retargets all of them for
-# that thread only. Engine/export/login threads never set this and keep
-# following the global selection.
-_thread_site = threading.local()
-
-
-def set_thread_site(source=None, environment=None):
-    """Pin THIS thread's site target (both None = clear the pin). A partial pin
-    (exactly one of source/environment given) is treated as "clear" rather than
-    crashing on a None.lower() -- callers always pass both or neither."""
-    if not source or not environment:
-        _thread_site.pair = None
-    else:
-        _thread_site.pair = (source.lower(), environment.lower())
-
-
-def get_site():
-    """The active (data_source, environment) pair — this thread's pin when
-    one is set (env-access scan workers), else the global selection."""
-    pair = getattr(_thread_site, "pair", None)
-    return pair if pair else (_data_source, _environment)
-
-
-def default_site_url(source, environment):
-    """The built-in report-page URL for one data source / environment."""
-    return f"https://{TSMIS_HOST}/index.html?env={environment}&src={source}"
-
-
-def dev_site_url(source, environment):
-    """The DEVELOPMENT-host report-page URL for one data source / environment —
-    the Settings 'use development site' preset (where Intersection reports live)."""
-    return f"https://{TSMIS_DEV_HOST}/index.html?env={environment}&src={source}"
-
-
-def get_url():
-    """The full report-page URL for the active data source / environment
-    (this thread's pin when set — see set_thread_site). A Settings-tab
-    override (settings.get_site_url — the "site moved before an app update
-    shipped" stopgap) wins over the built-in pattern and applies to the very
-    next navigation."""
-    src, env = get_site()
-    try:
-        import settings
-        override = settings.get_site_url(src, env)
-    except Exception:                    # settings must never stop a run
-        override = None
-    if override:
-        log.info("site: using custom URL for %s-%s: %s", src, env, override)
-        return override
-    return default_site_url(src, env)
-
-
-def expected_host():
-    """Hostname the ACTIVE site URL points at. The signed-in detector and the
-    navigation breadcrumbs compare page hosts against this (not the built-in
-    TSMIS_HOST), so a custom URL override moves them along with it."""
-    try:
-        return urlsplit(get_url()).hostname or TSMIS_HOST
-    except (ValueError, TypeError):
-        return TSMIS_HOST
+# --- P8a (engine leaf extraction): the pure leaves -- the exception types,
+# the site/env selection + URL builders, the timeout defaults + accessors, and the
+# route list + parser -- now live in their own flat modules. common.py RE-EXPORTS
+# them so `from common import X` is unchanged for every consumer (the 14-module
+# import surface) and the helpers below reference them as module globals exactly as
+# before. The auth-file lifecycle + the page/channel/edge/session helpers stay here;
+# P8b moves those along the verified acyclic DAG.
+#
+# `site_target` is the plan's `site` leaf, renamed: a flat `site.py` would be
+# shadowed by the Python standard-library `site` module (see site_target.py).
+from errors import (AuthError, PreflightError, SiteUnreachableError,
+                    ReportUnavailableError, BrowserNotFoundError, RunCancelled,
+                    ReportError)
+from site_target import (TSMIS_HOST, TSMIS_DEV_HOST, DATA_SOURCES, ENVIRONMENTS,
+                         DATA_SOURCE_LABELS, ENVIRONMENT_LABELS, set_site,
+                         set_thread_site, get_site, default_site_url, dev_site_url,
+                         get_url, expected_host)
+from timeouts import (REPORT_TIMEOUT_MS, SKIP_PROMPT_AFTER_MS,
+                      COUNTY_ENABLE_TIMEOUT_MS, DOWNLOAD_START_TIMEOUT_MS,
+                      FAST_REPORT_TIMEOUT_MS, RETRY_REPORT_TIMEOUT_MS, RETRY_COUNT,
+                      report_timeout_ms, fast_report_timeout_ms,
+                      retry_report_timeout_ms, county_enable_timeout_ms,
+                      download_start_timeout_ms)
+from routes import ROUTES, normalize_route, parse_routes
 
 
 # The shared auth file path is resolved by paths.py, which is frozen-aware: in
@@ -192,161 +70,6 @@ def expected_host():
 from paths import AUTH, EDGE_LOGIN_PROFILE_DIR, FAILURES_DIR
 
 log = logging.getLogger("tsmis.auth")
-
-# Timeouts (milliseconds). Increase these if reports are timing out.
-#
-#   REPORT_TIMEOUT_MS      Hard ceiling for a single route to render or
-#                          download. Some routes (e.g. Route 5 Ramp Detail)
-#                          legitimately take minutes, so this is generous.
-#   SKIP_PROMPT_AFTER_MS   How long to wait before the soft "still working"
-#                          status fires and the skip escape-hatch opens. The
-#                          hard timeout still applies independently.
-#   COUNTY_ENABLE_TIMEOUT_MS  Wait for the County dropdown to enable after
-#                          District is set.
-REPORT_TIMEOUT_MS = 360_000
-SKIP_PROMPT_AFTER_MS = 60_000
-COUNTY_ENABLE_TIMEOUT_MS = 60_000
-
-# How long to wait for the Export *download* to begin after the report has
-# already rendered. The site builds every Excel export client-side (SheetJS
-# serializes the already-fetched, already-rendered rows synchronously), so a
-# non-empty report's download fires within a second of the click -- the per-route
-# ceilings above size the report-GENERATION wait, not this. A rendered route
-# whose Export produces no download is the site's "nothing to export" no-op
-# (e.g. an empty Intersection Detail), so capping this window lets the engine
-# record the route as empty in seconds instead of waiting out the full ceiling
-# (and then the 15-min retry) on a download that will never start. Generous on
-# purpose; settings-backed (download_start_timeout_s) but with no Settings-tab
-# control yet -- raise it by hand-editing data/config.json only if a real report
-# legitimately needs longer.
-DOWNLOAD_START_TIMEOUT_MS = 60_000
-
-# Fast mode runs several browsers at once, so the shared TSMIS server is under a
-# heavier load and big reports (e.g. Highway Sequence) take noticeably longer to
-# render/download. Give each route a more generous ceiling there than in the
-# one-browser flow, or they time out purely because of the concurrency.
-FAST_REPORT_TIMEOUT_MS = 600_000          # 10 min per route under parallel load
-
-# Routes that still failed after the main run get one slow, serial second chance
-# (see the retry pass in exporter.py). It runs one route at a time -- so the
-# server isn't loaded by other browsers -- with the most generous window.
-RETRY_REPORT_TIMEOUT_MS = 900_000         # 15 min per route in the retry pass
-
-# Extra attempts per route after a transient (non-timeout) failure. 1 = retry
-# once before recording the route as failed. A hard timeout is NOT retried (the
-# user already had a skip window during the wait).
-RETRY_COUNT = 1
-
-
-# The constants above are the DEFAULTS; the Settings tab can override the
-# ceilings (persisted via settings.py). Engines call these accessors at RUN
-# time, so a changed setting applies to the next run without a restart.
-def _settings_ms(key, default_ms, unit_ms):
-    try:
-        import settings
-        return settings.get(key) * unit_ms
-    except Exception as e:                       # settings must never stop a run
-        log.warning("settings read failed for %s (%s: %s); using default",
-                    key, type(e).__name__, e)
-        return default_ms
-
-
-def report_timeout_ms():
-    """Effective per-route ceiling for the sequential flow (Settings tab can
-    raise it; default REPORT_TIMEOUT_MS)."""
-    return _settings_ms("report_timeout_min", REPORT_TIMEOUT_MS, 60_000)
-
-
-def fast_report_timeout_ms():
-    """Effective per-route ceiling under fast mode's concurrent load."""
-    return _settings_ms("fast_timeout_min", FAST_REPORT_TIMEOUT_MS, 60_000)
-
-
-def retry_report_timeout_ms():
-    """Effective per-route ceiling for the end-of-run serial retry pass."""
-    return _settings_ms("retry_timeout_min", RETRY_REPORT_TIMEOUT_MS, 60_000)
-
-
-def county_enable_timeout_ms():
-    """Effective wait for the County dropdown to enable."""
-    return _settings_ms("county_timeout_s", COUNTY_ENABLE_TIMEOUT_MS, 1_000)
-
-
-def download_start_timeout_ms():
-    """Effective wait for the Export download to start after a rendered report
-    (settings-backed via download_start_timeout_s — config.json only, no Settings
-    UI; default DOWNLOAD_START_TIMEOUT_MS). See the constant's note: this bounds
-    the download, NOT report generation."""
-    return _settings_ms("download_start_timeout_s", DOWNLOAD_START_TIMEOUT_MS, 1_000)
-
-ROUTES = [
-    "001","002","003","004","005","005S","006","007","008","008U","009","010","010S",
-    "011","012","013","014","014U","015","015S","016","017","018","020","022","023",
-    "024","025","026","027","028","029","032","033","034","035","036","037","038",
-    "039","040","041","043","044","045","046","047","049","050","051","052","053",
-    "054","055","056","057","058","058U","059","060","061","062","063","065","066",
-    "067","068","070","071","072","073","074","075","076","077","078","079","080",
-    "082","083","084","085","086","087","088","089","090","091","092","094","095",
-    "096","097","098","099","101","101U","103","104","105","107","108","109","110",
-    "111","112","113","114","115","116","118","119","120","121","123","124","125",
-    "126","127","128","129","130","131","132","133","134","135","136","137","138",
-    "139","140","142","144","145","146","147","149","150","151","152","153","154",
-    "155","156","158","160","161","162","163","164","165","166","167","168","169",
-    "170","172","173","174","175","177","178","178S","180","182","183","184","185",
-    "186","187","188","189","190","191","192","193","197","198","199","200","201",
-    "202","203","204","205","207","210","210U","211","213","215","216","217","218",
-    "219","220","221","222","223","227","229","232","233","236","237","238","241",
-    "242","243","244","245","246","247","253","254","255","259","260","261","262",
-    "263","265","266","267","269","270","271","273","275","280","281","282","283",
-    "284","299","330","371","380","395","405","505","580","605","680","710","780",
-    "805","880","880S","905","980",
-]
-
-_ROUTES_SET = set(ROUTES)
-
-
-def normalize_route(token):
-    """Normalize one user-typed route token to its canonical ROUTES form.
-
-    Accepts loose input -- any casing or zero-padding, with an optional letter
-    suffix -- so '5', '05', '005', '5s', and '005S' all map to their canonical
-    spelling ('005', '005S'). Returns the canonical route string if it matches a
-    known route, else None.
-    """
-    t = token.strip().upper()
-    m = re.fullmatch(r"(\d+)([A-Z]*)", t)
-    if not m:
-        return None
-    digits, suffix = m.groups()
-    candidate = f"{int(digits):03d}{suffix}"
-    return candidate if candidate in _ROUTES_SET else None
-
-
-def parse_routes(text):
-    """Parse free-text into a validated route list in canonical ROUTES order.
-
-    Routes may be separated by commas, spaces, semicolons, or newlines, in any
-    casing or zero-padding ('5', '005', '5s', '005S'). Returns the matched
-    routes de-duplicated and ordered as in ROUTES (so export order stays stable
-    regardless of how the user typed them).
-
-    Raises ValueError -- with a user-safe, UI-neutral message -- if no routes
-    were given or if any token doesn't match a known route. Callers decide
-    whether "no input" should instead mean "all routes" before calling this.
-    """
-    tokens = [t for t in re.split(r"[\s,;]+", text.strip()) if t]
-    if not tokens:
-        raise ValueError("No routes entered.")
-    chosen, unknown = set(), []
-    for tok in tokens:
-        norm = normalize_route(tok)
-        if norm is None:
-            unknown.append(tok)
-        else:
-            chosen.add(norm)
-    if unknown:
-        raise ValueError("Not valid route(s): " + ", ".join(unknown))
-    return [r for r in ROUTES if r in chosen]
 
 
 def clear_auth():
@@ -631,7 +354,6 @@ def navigate_with_auth(page, *, budget_s=60, should_cancel=None):
              int(time.monotonic() - start), auth_state(page).get("url"))
     if not signed:
         log.info("auth: signals after navigate: %s", auth_state(page).get("signals"))
-
 
 
 # Signed-in detection for the report page. The page ships its whole form
