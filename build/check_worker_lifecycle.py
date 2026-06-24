@@ -386,7 +386,8 @@ def _login(outcome):
         def launch(**_kw): raise RuntimeError("no chrome/chromium")
         w._try_edge_persistent_login = lambda _p, _log: {"cookies": []}
         patches += [(pw, "sync_playwright", lambda: _login_pw(launch)),
-                    (gw, "storage_state_is_portable", lambda _p, _s: False)]
+                    # **_k tolerates the P8c should_cancel kwarg now threaded in.
+                    (gw, "storage_state_is_portable", lambda _p, _s, **_k: False)]
     else:                                              # MAIN path: a browser launches
         def launch(**_kw): return _FakeBrowser()
         patches.append((pw, "sync_playwright", lambda: _login_pw(launch)))

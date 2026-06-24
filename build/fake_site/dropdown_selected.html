@@ -1,0 +1,24 @@
+<!doctype html>
+<!--
+The #customReport dropdown AFTER a report has been selected: the cs-value shows
+the chosen report's text (the real cs-select widget writes the picked label into
+.cs-value). Used to prove current_report_label() reads the armed selection, so the
+per-route stale-form re-arm guard (select-report-not-rearmed-between-routes, P8c)
+no-ops on the happy path and only re-selects when the form has drifted. Authored
+synthetic reconstruction -- not a copy of the Caltrans source.
+-->
+<html>
+<head><meta charset="utf-8"><title>dropdown: selected</title></head>
+<body>
+  <div class="cs" id="customReport">
+    <div class="cs-trigger">
+      <span class="cs-value">Highway Log</span>
+      <span class="cs-arrow">&#9660;</span>
+    </div>
+    <ul class="cs-list">
+      <li class="cs-option" data-value="highway_log">Highway Log</li>
+      <li class="cs-option" data-value="highway_sequence">Highway Sequence Listing</li>
+    </ul>
+  </div>
+</body>
+</html>

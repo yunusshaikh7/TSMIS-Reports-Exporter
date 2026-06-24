@@ -47,8 +47,9 @@ from auth_nav import (clear_auth, require_valid_auth, has_valid_auth,
                       navigate_with_auth, is_logged_in, require_signed_in,
                       require_site_params, dump_auth_failure, _CONFIG_JS,
                       page_url_for_display)
-from report_nav import (ERROR_JS, EXPORT_READY_JS, maybe_screenshot, preflight,
-                        report_error_text, select_report, wait_with_skip_option)
+from report_nav import (ERROR_JS, EXPORT_READY_JS, current_report_label,
+                        maybe_screenshot, preflight, report_error_text,
+                        select_report, wait_with_skip_option)
 from edge_device import (capture_edge_login_state_from_profiles,
                          capture_edge_login_state_over_cdp,
                          capture_storage_state_if_logged_in,

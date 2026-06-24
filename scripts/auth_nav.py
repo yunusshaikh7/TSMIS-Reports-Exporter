@@ -266,8 +266,8 @@ def navigate_with_auth(page, *, budget_s=60, should_cancel=None):
             if btn.count() > 0 and btn.first.is_visible():
                 note("clicking 'Sign In with ArcGIS'")
                 btn.first.click(timeout=2000)
-        except Exception:
-            pass
+        except Exception as e:
+            note(f"arcgis-click step error: {type(e).__name__}")
         # The portal sign-in page.
         try:
             idp = page.get_by_text("Caltrans Azure AD")

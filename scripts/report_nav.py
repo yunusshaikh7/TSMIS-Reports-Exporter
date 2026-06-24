@@ -24,6 +24,41 @@ from auth_nav import dump_auth_failure, page_url_for_display
 log = logging.getLogger("tsmis.auth")
 
 
+def _find_exact_option(page, report_label):
+    """Return the single #customReport option whose text is EXACTLY report_label.
+
+    Raises PreflightError (a "the page changed" condition) when zero or more than
+    one option matches — an exact-match guard against the old substring read that
+    could pick the wrong report when one label is a substring of another."""
+    options = page.locator("#customReport li.cs-option")
+    try:
+        count = options.count()
+    except Exception as e:
+        log.warning("select_report: could not read the report list (%s)",
+                    type(e).__name__)
+        raise PreflightError(
+            "The TSMIS report list didn't load as expected — the page may have "
+            "changed. Please contact the maintainer."
+        ) from e
+    matches = []
+    for i in range(count):
+        opt = options.nth(i)
+        try:
+            text = (opt.text_content() or "").strip()
+        except Exception:
+            continue                              # a transient read; skip this row
+        if text == report_label:
+            matches.append(opt)
+    if len(matches) != 1:
+        log.warning("select_report: expected exactly one %r option, found %d of %d",
+                    report_label, len(matches), count)
+        raise PreflightError(
+            f"The TSMIS report list didn't offer exactly one “{report_label}” entry "
+            "(it may have changed). Please contact the maintainer."
+        )
+    return matches[0]
+
+
 def select_report(page, report_label):
     """Pick a report from the #customReport dropdown then fan out
     District/County/Route to -- ALL --.
@@ -37,7 +72,14 @@ def select_report(page, report_label):
     Detecting it here turns that into one clear "currently unavailable" message.
     """
     page.locator("#customReport").click()
-    option = page.locator("#customReport li.cs-option", has_text=report_label).first
+    # EXACT-match the dropdown option by its text. The old read used
+    # has_text=report_label -- a SUBSTRING match -- then took .first, so when one
+    # report's label is contained in another's (e.g. "Highway Log" inside "Highway
+    # Log (PDF)" / "Detailed Highway Log") it could silently pick the WRONG option,
+    # and with several matches it picked an arbitrary one. Enumerate the options and
+    # compare the trimmed text exactly; fail fast and clearly on zero or multiple
+    # matches (a changed page) so a run can never silently export the wrong report.
+    option = _find_exact_option(page, report_label)
     # The site greys a temporarily-disabled report with the cs-disabled class.
     try:
         classes = (option.get_attribute("class") or "").split()
@@ -60,6 +102,24 @@ def select_report(page, report_label):
         timeout=county_enable_timeout_ms(),
     )
     page.locator("#districtCountySelect").select_option(label="-- ALL --")
+
+
+def current_report_label(page):
+    """Best-effort: the report label the #customReport dropdown currently shows
+    (its .cs-value text), or '' when it can't be read.
+
+    Lets the export loop cheaply re-confirm the form still has the intended report
+    selected before each route, so a silently-reset / stale form is caught instead
+    of generating every remaining route against the wrong report. '' means
+    "couldn't tell" — callers must treat that as OK and never act on uncertainty."""
+    try:
+        loc = page.locator("#customReport .cs-value")
+        if loc.count() > 0:
+            return (loc.first.inner_text() or "").strip()
+    except Exception as e:
+        log.info("current_report_label: could not read the selection (%s)",
+                 type(e).__name__)
+    return ""
 
 
 # Every report renders a fatal error into the shared #rampResults box by adding
@@ -139,6 +199,13 @@ def preflight(page, report_label):
         # A greyed-out report is a clear, specific condition (select_report
         # already logged + crafted the message) -- surface it as-is, not as the
         # generic "page looks different".
+        raise
+    except PreflightError as e:
+        # select_report's exact-match guard already crafted a precise "report list
+        # changed" message -- capture the diagnostic dump, then surface that message
+        # as-is rather than re-wrapping it into the generic one.
+        log.warning("preflight failed while %s for %r: %s", step, report_label, e)
+        dump_auth_failure(page, f"preflight: {step} failed", stem="preflight_fail")
         raise
     except Exception as e:
         log.warning("preflight failed while %s for %r: %s: %s",

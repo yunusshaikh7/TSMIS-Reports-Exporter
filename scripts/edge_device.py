@@ -38,11 +38,15 @@ def _first_or_new_page(ctx):
     return pages[0] if pages else ctx.new_page()
 
 
-def capture_storage_state_if_logged_in(ctx, *, navigate=False, timeout_ms=15_000):
+def capture_storage_state_if_logged_in(ctx, *, navigate=False, timeout_ms=15_000,
+                                       should_cancel=None):
     """Return Playwright storage_state from `ctx` only after a real TSMIS login.
 
     `navigate=True` is for recapture attempts: reopen an Edge profile, navigate
     to the report URL, and see whether the profile already carries the session.
+    `should_cancel` (optional) is threaded into that recapture `navigate_with_auth`
+    so a Stop landing while this nested sign-in is in flight bails promptly instead
+    of waiting out the sign-in budget; default None keeps console callers unchanged.
     """
     try:
         pages = [pg for pg in ctx.pages if not pg.is_closed()]
@@ -69,29 +73,46 @@ def capture_storage_state_if_logged_in(ctx, *, navigate=False, timeout_ms=15_000
         # app token, and the profile's silent Azure session only helps if the
         # chain is actually clicked through.
         page = _first_or_new_page(ctx)
-        navigate_with_auth(page)
+        navigate_with_auth(page, should_cancel=should_cancel)
         if is_logged_in(page):
             return ctx.storage_state()
-    except Exception:
+    except Exception as e:
+        # Don't swallow silently: this is the recapture sign-in path, and a failure
+        # here is the difference between a saved session and "please log in". Log
+        # the reason so one uploaded log answers why the recapture didn't take.
+        log.info("auth: recapture navigate failed (%s: %s)", type(e).__name__,
+                 str(e).splitlines()[0] if str(e) else "")
         return None
     return None
 
 
-def launch_edge_login_context(p):
+def launch_edge_login_context(p, *, enable_cdp=False):
     """Open headed Edge with an app-owned persistent profile for SSO.
 
     Managed Edge can abandon Playwright's temporary profile when it switches into
     a work profile. This launches Edge with a durable user data directory so a
     later recapture pass can reopen the same profile tree and extract cookies.
-    A CDP port is also enabled; if Edge preserves it across the switch, callers
-    can attach to the live relaunched browser before falling back to disk.
+
+    By default NO remote-debugging port is opened. A `--remote-debugging-port`
+    exposes an UNAUTHENTICATED CDP endpoint on 127.0.0.1 that any local process
+    could attach to and drive (reading the signed-in session) for the entire time
+    the sign-in window is up. The common capture path doesn't need it — it reads
+    storage_state straight from the live context, and the headless profile
+    recapture (capture_edge_login_state_from_profiles) covers the rest — so the
+    port stays CLOSED unless a caller explicitly opts in with `enable_cdp=True`.
+    When opted in, it is opened on demand and the caller closes the context (and
+    with it the port) as soon as it has captured the state ("close on capture").
+
+    Returns (ctx, cdp_url); cdp_url is None when no debug port was opened.
     """
     EDGE_LOGIN_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-    port = _free_local_port()
-    args = _LNA_ARGS + [
-        "--profile-directory=Default",
-        f"--remote-debugging-port={port}",
-    ]
+    args = _LNA_ARGS + ["--profile-directory=Default"]
+    cdp_url = None
+    if enable_cdp:
+        port = _free_local_port()
+        args = args + [f"--remote-debugging-port={port}"]
+        cdp_url = f"http://127.0.0.1:{port}"
+        log.info("auth: Edge login CDP debug port opened on demand (127.0.0.1:%d)", port)
     # Pre-grant local-network-access like every other automated context (the
     # permission dialog otherwise opens as an extra tab in the sign-in window);
     # fall back without the kwarg for browsers that don't know the name.
@@ -112,7 +133,7 @@ def launch_edge_login_context(p):
         )
     page = _first_or_new_page(ctx)
     page.goto(get_url())
-    return ctx, f"http://127.0.0.1:{port}"
+    return ctx, cdp_url
 
 
 def _known_edge_profile_names():
@@ -126,12 +147,24 @@ def _known_edge_profile_names():
     return list(dict.fromkeys(names))
 
 
-def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000):
-    """Try to attach to a live relaunched Edge and capture its storage_state."""
+def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000, should_cancel=None):
+    """Try to attach to a live relaunched Edge and capture its storage_state.
+
+    A no-op when `cdp_url` is None (the default login launch no longer opens an
+    unauthenticated debug port — see launch_edge_login_context); callers fall
+    through to the headless profile recapture, which captures the same on-disk
+    session without exposing a CDP endpoint. `should_cancel` is polled each pass so
+    a Stop during login bails promptly instead of waiting out the deadline."""
+    if not cdp_url:
+        log.info("auth: CDP re-attach skipped (no debug port was opened)")
+        return None
     log.info("auth: trying CDP re-attach to Edge at %s (up to %ds)",
              cdp_url, timeout_ms // 1000)
     deadline = time.monotonic() + (timeout_ms / 1000)
     while time.monotonic() < deadline:
+        if should_cancel is not None and should_cancel():
+            log.info("auth: CDP re-attach stopped (cancelled)")
+            return None
         browser = None
         try:
             browser = p.chromium.connect_over_cdp(
@@ -141,7 +174,8 @@ def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000):
                 no_defaults=True,
             )
             for ctx in browser.contexts:
-                state = capture_storage_state_if_logged_in(ctx, navigate=True)
+                state = capture_storage_state_if_logged_in(
+                    ctx, navigate=True, should_cancel=should_cancel)
                 if state:
                     return state
         except Exception:
@@ -156,15 +190,20 @@ def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000):
     return None
 
 
-def capture_edge_login_state_from_profiles(p, *, timeout_ms=20_000):
+def capture_edge_login_state_from_profiles(p, *, timeout_ms=20_000, should_cancel=None):
     """Reopen the app-owned Edge profile tree and look for a saved TSMIS login.
 
-    Returns `(state, profile_name)` or `(None, None)`.
+    Returns `(state, profile_name)` or `(None, None)`. `should_cancel` is polled
+    each pass so a Stop during login bails promptly instead of waiting out the
+    per-profile deadline.
     """
     deadline = time.monotonic() + (timeout_ms / 1000)
     for profile_name in _known_edge_profile_names():
         log.info("auth: recapture: reopening Edge profile %r headless", profile_name)
         while time.monotonic() < deadline:
+            if should_cancel is not None and should_cancel():
+                log.info("auth: profile recapture stopped (cancelled)")
+                return None, None
             ctx = None
             try:
                 ctx = p.chromium.launch_persistent_context(
@@ -173,7 +212,8 @@ def capture_edge_login_state_from_profiles(p, *, timeout_ms=20_000):
                     headless=True,
                     args=[f"--profile-directory={profile_name}"],
                 )
-                state = capture_storage_state_if_logged_in(ctx, navigate=True)
+                state = capture_storage_state_if_logged_in(
+                    ctx, navigate=True, should_cancel=should_cancel)
                 if state:
                     return state, profile_name
                 break
@@ -288,7 +328,7 @@ def try_device_sso_login(p):
                 pass
 
 
-def storage_state_is_portable(p, state):
+def storage_state_is_portable(p, state, *, should_cancel=None):
     """True if `state` actually signs into TSMIS when restored into a FRESH
     headless context -- the exact way the export engine will use it.
 
@@ -298,7 +338,14 @@ def storage_state_is_portable(p, state):
     jar carries only stub Azure tokens (an ESTSAUTH header with no payload), so
     restoring it into any fresh context silently fails to log in. Saving a state
     like that would strand the user with exports that can't sign in, so callers
-    must test a capture here before writing the auth file."""
+    must test a capture here before writing the auth file.
+
+    `should_cancel` is checked up front and threaded into the sign-in wait so a
+    Stop during this up-to-budget portability probe is honored promptly (a
+    cancelled check returns False — not portable — so nothing gets saved)."""
+    if should_cancel is not None and should_cancel():
+        log.info("auth: portability check skipped (cancelled)")
+        return False
     browser = None
     try:
         log.info("auth: portability check: restoring capture into a fresh "
@@ -306,7 +353,7 @@ def storage_state_is_portable(p, state):
         browser = launch_browser(p, headless=True, args=_LNA_ARGS)
         ctx = _new_app_context(browser, storage_state=state)
         page = ctx.new_page()
-        navigate_with_auth(page)
+        navigate_with_auth(page, should_cancel=should_cancel)
         portable = is_logged_in(page)
         log.info("auth: portability check: %s",
                  "PORTABLE (safe to save)" if portable

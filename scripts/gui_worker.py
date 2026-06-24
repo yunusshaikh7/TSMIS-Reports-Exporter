@@ -1377,7 +1377,8 @@ class LoginWorker(threading.Thread):
                     # way the engine will use it before saving it.
                     self.q.put(("log", "Checking that the captured sign-in can be "
                                        "reused for exports..."))
-                    if storage_state_is_portable(p, edge_state):
+                    if storage_state_is_portable(p, edge_state,
+                                                 should_cancel=self.cancel.is_set):
                         self._save_state(edge_state)
                         self.q.put(("login_saved", None))
                         log.info("login: SAVED via Edge recapture")
@@ -1433,14 +1434,16 @@ class LoginWorker(threading.Thread):
 
         self.q.put(("log", "Edge did not expose a live session; trying to recapture "
                            "the work-profile state..."))
-        state = capture_edge_login_state_over_cdp(p, cdp_url)
+        state = capture_edge_login_state_over_cdp(p, cdp_url,
+                                                  should_cancel=self.cancel.is_set)
         if state:
             self._safe_close_context(ctx)
             log.info("login: experimental Edge captured over CDP")
             return state
 
         self._safe_close_context(ctx)
-        state, profile_name = capture_edge_login_state_from_profiles(p)
+        state, profile_name = capture_edge_login_state_from_profiles(
+            p, should_cancel=self.cancel.is_set)
         if state:
             log.info("login: experimental Edge captured from profile %s", profile_name)
             return state

@@ -1,0 +1,40 @@
+<!doctype html>
+<!--
+The #customReport dropdown with SUBSTRING / DUPLICATE / DISABLED near-misses, to
+prove select_report's EXACT-match guard (AUDIT-P2-substr, P8c). The live widget's
+old read was page.locator("#customReport li.cs-option", has_text=label).first --
+a SUBSTRING match that .first-picks the wrong option when a label is contained in
+another (e.g. "Highway Log" is inside "Highway Log (PDF)" and "Detailed Highway
+Log"). Ordered so a substring read would pick "Highway Log (PDF)" FIRST.
+
+Each option's click records its exact text into window.__picked and the cs-value
+(mirroring the real cs-select widget), so a test can confirm WHICH option was
+chosen. Authored synthetic reconstruction -- not a copy of the Caltrans source.
+-->
+<html>
+<head><meta charset="utf-8"><title>dropdown: ambiguous</title></head>
+<body>
+  <div class="cs" id="customReport">
+    <div class="cs-trigger">
+      <span class="cs-value">-- Select report --</span>
+      <span class="cs-arrow">&#9660;</span>
+    </div>
+    <ul class="cs-list">
+      <li class="cs-option" data-value="highway_log_pdf" onclick="pick(this)">Highway Log (PDF)</li>
+      <li class="cs-option" data-value="detailed_highway_log" onclick="pick(this)">Detailed Highway Log</li>
+      <li class="cs-option" data-value="highway_log" onclick="pick(this)">Highway Log</li>
+      <li class="cs-option" data-value="highway_sequence" onclick="pick(this)">Highway Sequence Listing</li>
+      <li class="cs-option cs-disabled" data-value="Ramp_Detail" onclick="pick(this)">TSAR: Ramp Detail</li>
+      <li class="cs-option" data-value="dup_a" onclick="pick(this)">Duplicated Report</li>
+      <li class="cs-option" data-value="dup_b" onclick="pick(this)">Duplicated Report</li>
+    </ul>
+  </div>
+  <script>
+    window.__picked = null;
+    function pick(el) {
+      window.__picked = (el.textContent || '').trim();
+      document.querySelector('#customReport .cs-value').textContent = window.__picked;
+    }
+  </script>
+</body>
+</html>

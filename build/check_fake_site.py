@@ -225,6 +225,68 @@ def test_cs_disabled(page):
     check("select_report does NOT block an enabled report", gate == "passed")
 
 
+def test_exact_match(page):
+    print("select_report EXACT-match guard (substring / duplicate / 0-match):")
+    # "Highway Log" is a substring of "Highway Log (PDF)" and "Detailed Highway
+    # Log", which appear FIRST in the list -- the old has_text + .first read
+    # would click the wrong one. The fixture records the clicked option text in
+    # window.__picked.
+    page.goto(_fixture_url("dropdown_ambiguous.html"))
+    page.set_default_timeout(2000)
+    try:
+        select_report(page, "Highway Log")
+    except Exception:  # noqa: BLE001  -- fails later at the missing District control
+        pass
+    finally:
+        picked = page.evaluate("() => window.__picked")
+        page.set_default_timeout(30000)
+    check("exact 'Highway Log' clicked the exact option, not a substring near-miss",
+          picked == "Highway Log")
+
+    # A cs-disabled option, matched EXACTLY, still raises ReportUnavailableError.
+    page.goto(_fixture_url("dropdown_ambiguous.html"))
+    raised = None
+    try:
+        select_report(page, "TSAR: Ramp Detail")
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("exact match of a cs-disabled report -> ReportUnavailableError",
+          isinstance(raised, ReportUnavailableError))
+
+    # Zero matches (report not offered / page changed) -> PreflightError.
+    page.goto(_fixture_url("dropdown_ambiguous.html"))
+    raised = None
+    try:
+        select_report(page, "No Such Report")
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("unknown report -> PreflightError",
+          isinstance(raised, common.PreflightError))
+
+    # Multiple exact matches (ambiguous list) -> PreflightError.
+    page.goto(_fixture_url("dropdown_ambiguous.html"))
+    raised = None
+    try:
+        select_report(page, "Duplicated Report")
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("duplicate report entries -> PreflightError",
+          isinstance(raised, common.PreflightError))
+
+
+def test_current_report_label(page):
+    print("current_report_label reads the armed #customReport .cs-value:")
+    page.goto(_fixture_url("dropdown_selected.html"))
+    check("reads the selected report label",
+          common.current_report_label(page) == "Highway Log")
+    page.goto(_fixture_url("dropdown.html"))
+    check("reads the unselected placeholder",
+          common.current_report_label(page) == "-- Select report --")
+    page.goto(_fixture_url("blank.html"))
+    check("returns '' when there's no dropdown",
+          common.current_report_label(page) == "")
+
+
 def test_highway_log_pdf_save(page):
     print("Highway Log PDF save: invokes the Print layout and writes a real PDF:")
     from exporter import save_highway_log_pdf
@@ -255,6 +317,50 @@ def test_highway_log_pdf_save(page):
     check("missing hl_printAll -> ReportError (no silent truncated PDF)",
           isinstance(raised, ReportError))
 
+    # A built layout with ZERO data rows (only the spanning empty notice) is the
+    # marker-independent empty case: EmptyExport, never a contentless PDF.
+    from exporter import EmptyExport
+    page.goto(_fixture_url("highway_log_print_empty.html"))
+    out_e = Path(tempfile.gettempdir()) / "_hl_pdf_empty.pdf"
+    if out_e.exists():
+        out_e.unlink()
+    raised = None
+    try:
+        save_highway_log_pdf(page, out_e)
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("empty HL print layout -> EmptyExport (no blank PDF)",
+          isinstance(raised, EmptyExport))
+    check("no PDF written for the empty HL layout", not out_e.exists())
+
+
+def test_ramp_summary_pdf_empty(page):
+    print("Ramp Summary PDF empty backstop (action bar present == has data):")
+    from exporter import save_pdf_letter, EmptyExport
+    # Data: the action bar is present -> a real PDF is written.
+    page.goto(_fixture_url("ramp_summary_data.html"))
+    out = Path(tempfile.gettempdir()) / "_rs_pdf_data.pdf"
+    if out.exists():
+        out.unlink()
+    save_pdf_letter(page, out)
+    check("data ramp summary writes a non-empty PDF",
+          out.exists() and out.read_bytes()[:4] == b"%PDF")
+    if out.exists():
+        out.unlink()
+    # Empty: no action bar -> EmptyExport, never a contentless PDF.
+    page.goto(_fixture_url("ramp_summary_empty.html"))
+    out_e = Path(tempfile.gettempdir()) / "_rs_pdf_empty.pdf"
+    if out_e.exists():
+        out_e.unlink()
+    raised = None
+    try:
+        save_pdf_letter(page, out_e)
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("empty ramp summary -> EmptyExport (no blank PDF)",
+          isinstance(raised, EmptyExport))
+    check("no PDF written for the empty ramp summary", not out_e.exists())
+
 
 def main():
     print("Fake-site selector-contract checks")
@@ -273,7 +379,10 @@ def main():
             test_is_empty(page)
             test_error_js(page)
             test_cs_disabled(page)
+            test_exact_match(page)
+            test_current_report_label(page)
             test_highway_log_pdf_save(page)
+            test_ramp_summary_pdf_empty(page)
         finally:
             try:
                 browser.close()

@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Highway Log PRINT layout for a route with NO rows: hl_printAll() still
+     builds a cover page + a print section, but the only row is the spanning
+     "No results" placeholder (<td colspan> .hl-empty) -- ZERO real data rows.
+
+     This is the marker-INDEPENDENT empty trap the PDF save path must catch
+     (unlogged-no-download-empty-on-pdf-and-misc, P8c): the action bar / Print
+     control are present (so wait_js resolves), hl_printAll builds a layout (so
+     the old 'no-layout' guard passes), yet there is nothing to print. The
+     backstop keys on data-row STRUCTURE (a real row has per-column <td>s; the
+     empty notice is one colspan cell), NOT on the "No results" wording, so it
+     fires even if that empty-text marker drifts. Authored synthetic
+     reconstruction -- not a copy of the Caltrans source. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  #controls { color: #333; }
+  @media print {
+    #controls { display: none !important; }
+    #rampResults { display: block !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="controls">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="hl_exportToExcel()">Export</button>
+      <button class="export-btn" onclick="hl_printAll()">Print</button>
+    </div>
+  </div>
+
+  <div id="rampResults" class="ramp-results">
+    <div class="hl-table-wrap">Page 1 of 1 (paginated on-screen view)</div>
+  </div>
+
+  <script>
+    function hl_exportToExcel() { /* no-op for the fixture */ }
+
+    function hl_printAll() {
+      const box = document.getElementById('rampResults');
+      const saved = box.innerHTML;
+      // A cover page + one section that holds only the spanning empty notice.
+      let html = '<div class="hl-cover-page">California State Highway Log</div>';
+      html += '<div class="hl-print-section">'
+            + '<div class="hl-print-page-header"><span>Route 005</span><span>Page 2</span></div>'
+            + '<table class="hl-table"><tbody>'
+            + '<tr><td colspan="30" class="hl-empty">No results found in this segment.</td></tr>'
+            + '</tbody></table>'
+            + '</div>';
+      box.innerHTML = html;
+      window.print();          // overridden window.print() throws -> restore skipped
+      box.innerHTML = saved;
+    }
+  </script>
+</body>
+</html>

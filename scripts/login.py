@@ -176,8 +176,8 @@ def _try_edge_persistent_login(p):
         if state:
             _safe_close_context(ctx)
             return state
-    except Exception:
-        pass
+    except Exception as e:
+        log.info("login: live Edge context capture failed (%s)", type(e).__name__)
 
     print("Edge did not expose a live session; trying CDP/profile recapture...")
     state = capture_edge_login_state_over_cdp(p, cdp_url)

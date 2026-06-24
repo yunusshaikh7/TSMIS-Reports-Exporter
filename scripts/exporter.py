@@ -26,6 +26,7 @@ from common import (
     AuthError,
     ReportError,
     RunCancelled,
+    current_report_label,
     download_start_timeout_ms,
     get_site,
     get_url,
@@ -163,6 +164,18 @@ def save_pdf_letter(page, out_path, timeout_ms=None):
     """Render the current report to a Letter PDF (TSAR Ramp Summary). The page is
     already rendered, so timeout_ms is unused -- accepted for a uniform save
     signature."""
+    # Marker-INDEPENDENT empty backstop: the inline report renders its action bar
+    # only when it has data (the empty path renders just a short placeholder span).
+    # If no action bar is present, treat the route as empty -- recorded `empty`
+    # (retried once), never saved as a contentless PDF -- so a drifted empty-text
+    # marker can't slip a blank page through unlogged. (is_empty runs first in
+    # _attempt_route; this is the second-opinion net for when that marker drifts.)
+    if not page.evaluate(
+            "() => { const b = document.getElementById('rampResults'); "
+            "return !!(b && b.querySelector('.report-action-bar')); }"):
+        log.info("ramp PDF: no report action bar rendered for %s; treating as empty",
+                 out_path.name)
+        raise EmptyExport()
     page.pdf(
         path=str(out_path),
         format="Letter",
@@ -225,16 +238,37 @@ def save_highway_log_pdf(page, out_path, timeout_ms=None):
     function is gone/renamed, rather than silently saving the one paginated page."""
     built = page.evaluate(
         """() => {
-            if (typeof hl_printAll !== 'function') return 'no-print-fn';
+            if (typeof hl_printAll !== 'function') return {status: 'no-print-fn', rows: 0};
             window.print = () => { throw new Error('skip-print'); };
             try { hl_printAll(); } catch (e) { /* the throw skips hl_printAll's restore */ }
             const box = document.getElementById('rampResults');
-            return (box && box.querySelector('.hl-print-section')) ? 'ok' : 'no-layout';
+            if (!box || !box.querySelector('.hl-print-section'))
+                return {status: 'no-layout', rows: 0};
+            // Marker-INDEPENDENT data-row count: a real row carries per-column <td>s,
+            // while the "No results" placeholder is a single spanning (colspan) cell.
+            // Counting the non-spanning rows lets the empty backstop fire even if the
+            // empty-text wording drifts.
+            let rows = 0;
+            for (const tr of box.querySelectorAll('.hl-print-section table tbody tr')) {
+                const tds = tr.querySelectorAll('td');
+                if (!tds.length) continue;
+                if ([...tds].some(td => td.hasAttribute('colspan'))) continue;
+                rows++;
+            }
+            return {status: 'ok', rows: rows};
         }""")
-    if built != "ok":
+    status = built.get("status") if isinstance(built, dict) else built
+    if status != "ok":
         raise ReportError(
             "Couldn't build the Highway Log print layout for the PDF "
-            f"(the site's Print control changed: {built}).")
+            f"(the site's Print control changed: {status}).")
+    if not (built.get("rows") if isinstance(built, dict) else 0):
+        # The layout built but holds no data rows (only the spanning empty notice).
+        # Marker-INDEPENDENT empty backstop: record the route `empty` (retried once)
+        # instead of saving a contentless PDF, even if the empty-text marker drifted.
+        log.info("highway_log PDF: print layout has no data rows for %s; treating "
+                 "as empty", out_path.name)
+        raise EmptyExport()
     page.pdf(
         path=str(out_path),
         format="Letter",
@@ -267,12 +301,14 @@ def _fmt_size(n_bytes):
     return f"{n_bytes / 1_000:.0f} KB"
 
 
-def _recover(page, spec):
+def _recover(page, spec, should_cancel=None):
     """Re-navigate and re-arm the form after a skip or per-route error.
 
-    Raises AuthError if the session has died so the run stops cleanly.
+    Raises AuthError if the session has died so the run stops cleanly. `should_cancel`
+    is threaded into the sign-in re-navigation so a Stop during recovery aborts within
+    ~1s instead of waiting out the whole sign-in budget.
     """
-    navigate_with_auth(page)
+    navigate_with_auth(page, should_cancel=should_cancel)
     require_signed_in(page, "Session expired partway through the batch.")
     select_report(page, spec.label)
 
@@ -282,7 +318,7 @@ def _recover_or_stop(page, spec, events):
     Re-raises AuthError so the run ends cleanly."""
     try:
         events.on_status(events.worker_no, "Recovering (reloading the report page)…")
-        _recover(page, spec)
+        _recover(page, spec, should_cancel=events.is_cancelled)
         return True
     except AuthError:
         raise
@@ -317,11 +353,29 @@ def _capture_failure(page, spec, route, events):
         log.warning("could not capture failure screenshot: %s", e)
 
 
+def _ensure_report_armed(page, spec, prefix, events):
+    """Re-confirm the report dropdown still shows spec.label before a route.
+
+    The report is selected once at preflight and only re-armed by _recover after a
+    skip/error; if the site silently reset the dropdown between routes (a stale
+    form), the per-route Route selection + Generate would run against the WRONG
+    report. This cheap guard re-selects when the shown label has drifted. It
+    no-ops on the happy path (the label already matches) and never acts on an
+    unreadable selection (current_report_label returns '' = unknown)."""
+    shown = current_report_label(page)
+    if shown and shown != spec.label:
+        log.warning("%s report form shows %r, expected %r -- re-selecting",
+                    prefix, shown, spec.label)
+        events.on_log(f"{prefix} report form drifted; re-selecting {spec.label}")
+        select_report(page, spec.label)
+
+
 def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     """One attempt at a route. Returns 'saved' | 'empty' | 'skipped'.
     Raises on any failure; the caller decides whether to retry. timeout_ms is the
     hard ceiling for both the report-generation wait and the save/download."""
     events.on_status(events.worker_no, f"{prefix} generating…")
+    _ensure_report_armed(page, spec, prefix, events)   # P8c: stale-form re-arm guard
     page.get_by_label("Route", exact=True).select_option(route)
     page.get_by_role("button", name="Generate").click()
     # Wait for the report to be ready/empty OR for the site to render an error

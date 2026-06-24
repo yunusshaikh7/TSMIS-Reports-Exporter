@@ -378,28 +378,42 @@ def test_markers():
 
 # --- cs-disabled detection in select_report ----------------------------------
 
-class _OptionLoc:
-    def __init__(self, cls):
-        self._cls = cls
+class _Opt:
+    """One #customReport li.cs-option: exact text + class attribute."""
 
-    @property
-    def first(self):
-        return self
+    def __init__(self, text, cls):
+        self._text, self._cls = text, cls
+
+    def text_content(self):
+        return self._text
 
     def get_attribute(self, name):
         return self._cls if name == "class" else None
 
-    def __getattr__(self, name):
+    def __getattr__(self, name):              # click(), etc. -> no-op chain
         return lambda *a, **k: self
 
 
+class _OptionList:
+    def __init__(self, opts):
+        self._opts = opts
+
+    def count(self):
+        return len(self._opts)
+
+    def nth(self, i):
+        return self._opts[i]
+
+
 class FakeDropdownPage:
-    def __init__(self, option_cls):
-        self.option_cls = option_cls
+    """A dropdown of (text, class) options for select_report's exact-match read."""
+
+    def __init__(self, options):
+        self._opts = [_Opt(t, c) for t, c in options]
 
     def locator(self, sel, **k):
         if "li.cs-option" in sel:
-            return _OptionLoc(self.option_cls)
+            return _OptionList(self._opts)
         return _NoopChain()
 
     def get_by_role(self, *a, **k):
@@ -412,18 +426,90 @@ class FakeDropdownPage:
         return None
 
 
+# A dropdown with substring + duplicate + disabled near-misses (the pure-Python
+# mirror of build/fake_site/dropdown_ambiguous.html). "Highway Log" is a substring
+# of two other options and "Duplicated Report" appears twice.
+_DROPDOWN = [
+    ("Highway Log (PDF)", "cs-option"),
+    ("Detailed Highway Log", "cs-option"),
+    ("Highway Log", "cs-option"),
+    ("TSAR: Ramp Detail", "cs-option cs-disabled"),
+    ("Duplicated Report", "cs-option"),
+    ("Duplicated Report", "cs-option"),
+]
+
+
 def test_cs_disabled():
-    print("select_report cs-disabled handling:")
+    print("select_report exact-match + cs-disabled handling:")
+    # cs-disabled, matched EXACTLY -> ReportUnavailableError (unchanged behavior).
     expect_raises("cs-disabled report -> ReportUnavailableError",
                   ReportUnavailableError,
-                  lambda: select_report(FakeDropdownPage("cs-option cs-disabled"),
-                                        "TSAR: Ramp Detail"))
-    # An enabled report must NOT raise (it runs through the rest of the no-op fakes).
+                  lambda: select_report(FakeDropdownPage(_DROPDOWN), "TSAR: Ramp Detail"))
+    # EXACT match wins over substrings: "Highway Log" must NOT pick "Highway Log
+    # (PDF)" / "Detailed Highway Log" (the old has_text + .first bug), and proceeds.
     try:
-        select_report(FakeDropdownPage("cs-option"), "Highway Log")
-        check("enabled report proceeds without error", True)
+        select_report(FakeDropdownPage(_DROPDOWN), "Highway Log")
+        check("exact 'Highway Log' proceeds (not a substring near-miss)", True)
     except Exception as e:  # noqa: BLE001
-        check(f"enabled report proceeds (raised {type(e).__name__})", False)
+        check(f"exact 'Highway Log' proceeds (raised {type(e).__name__})", False)
+    # Zero matches (report not offered / page changed) -> PreflightError.
+    expect_raises("unknown report -> PreflightError", common.PreflightError,
+                  lambda: select_report(FakeDropdownPage(_DROPDOWN), "No Such Report"))
+    # Multiple exact matches (ambiguous list) -> PreflightError.
+    expect_raises("duplicate report entries -> PreflightError", common.PreflightError,
+                  lambda: select_report(FakeDropdownPage(_DROPDOWN), "Duplicated Report"))
+
+
+def test_ensure_report_armed(monkeypatch):
+    print("per-route stale-form re-arm guard (_ensure_report_armed):")
+    from events import Events
+    spec = exporter.ReportSpec(
+        label="Highway Log", subdir="x", filename=lambda r: "x.xlsx",
+        wait_js=lambda r: "() => true", is_empty=lambda p: False, save=lambda *a: None)
+    calls = {"select": 0}
+    monkeypatch(exporter, "select_report",
+                lambda page, label: calls.__setitem__("select", calls["select"] + 1))
+
+    # Happy path: the shown label already matches -> NO re-arm.
+    monkeypatch(exporter, "current_report_label", lambda page: "Highway Log")
+    exporter._ensure_report_armed(object(), spec, "[t]", Events())
+    check("matching selection does NOT re-arm", calls["select"] == 0)
+
+    # Drifted: a different label is shown -> re-arm (select_report called once).
+    monkeypatch(exporter, "current_report_label", lambda page: "-- Select report --")
+    exporter._ensure_report_armed(object(), spec, "[t]", Events())
+    check("drifted selection re-arms (select_report called)", calls["select"] == 1)
+
+    # Unknown (''): can't tell -> never act (no spurious re-arm).
+    monkeypatch(exporter, "current_report_label", lambda page: "")
+    exporter._ensure_report_armed(object(), spec, "[t]", Events())
+    check("unreadable selection does NOT re-arm", calls["select"] == 1)
+
+
+def test_pdf_empty_backstop():
+    print("PDF save marker-independent empty backstop (EmptyExport before page.pdf):")
+    from exporter import save_pdf_letter, save_highway_log_pdf
+
+    class _RSPage:                      # Ramp Summary: action-bar probe -> absent
+        def evaluate(self, js):
+            return False
+
+    expect_raises("ramp PDF: no action bar -> EmptyExport", EmptyExport,
+                  lambda: save_pdf_letter(_RSPage(), Path("x.pdf")))
+
+    class _HLEmpty:                     # Highway Log: layout built, zero data rows
+        def evaluate(self, js):
+            return {"status": "ok", "rows": 0}
+
+    expect_raises("HL PDF: zero data rows -> EmptyExport", EmptyExport,
+                  lambda: save_highway_log_pdf(_HLEmpty(), Path("x.pdf")))
+
+    class _HLNoLayout:                  # Highway Log: print control gone -> ReportError
+        def evaluate(self, js):
+            return {"status": "no-layout", "rows": 0}
+
+    expect_raises("HL PDF: no layout -> ReportError", common.ReportError,
+                  lambda: save_highway_log_pdf(_HLNoLayout(), Path("x.pdf")))
 
 
 def test_report_error_text():
@@ -599,6 +685,8 @@ def main():
         test_process_route_empty_retry(monkeypatch, tmp)
         test_markers()
         test_cs_disabled()
+        test_ensure_report_armed(monkeypatch)
+        test_pdf_empty_backstop()
         test_report_error_text()
         test_require_site_params(monkeypatch)
         test_auth_url_redaction()
