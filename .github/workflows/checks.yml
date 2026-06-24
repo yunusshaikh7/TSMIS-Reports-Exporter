@@ -66,6 +66,7 @@ jobs:
         run: |
           set -e
           python build/check_gui_bridge.py
+          python build/check_gui_api_surface.py
           python build/check_ui_contract.py
           python build/check_persistence.py
           python build/check_a2_compare_filter.py

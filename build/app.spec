@@ -86,7 +86,7 @@ APP_MODULES = [
     "compare_core", "compare_tsn_common", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
     "compare_ramp_detail_tsn", "compare_ramp_summary_tsn", "compare_intersection_summary_tsn",
     "compare_intersection_detail_tsn", "compare_highway_sequence_tsn",
-    "gui_main", "gui_api", "gui_worker",
+    "gui_main", "gui_api", "gui_worker", "gui_win32",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are
     # collected today via a transitive static import, but the "list every flat

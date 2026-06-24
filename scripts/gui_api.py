@@ -24,7 +24,6 @@ in the log pane is mirrored to the `tsmis.ui` logger, every user decision and
 every swallowed exception is logged with its reason.
 """
 import collections
-import ctypes
 import json
 import logging
 import os
@@ -76,6 +75,7 @@ import matrix
 import day_matrix
 import outcome
 import contract
+import gui_win32
 from task_coordinator import TaskCoordinator
 
 log = logging.getLogger("tsmis.gui")
@@ -449,41 +449,10 @@ class GuiApi:
     # ---- window lifecycle ----------------------------------------------------
 
     def _find_own_window(self, title):
-        """The top-level window owned by THIS process with `title`, or None.
-
-        FindWindowW(None, title) matches the FIRST window with that title across
-        ALL processes -- another app, another instance, even an Explorer window
-        named 'TSMIS Exporter' -- so it could WM_SETICON the wrong process's
-        window. Enumerating and matching on our own PID fixes that."""
-        from ctypes import wintypes
-        u32 = ctypes.windll.user32
-        u32.GetWindowThreadProcessId.restype = wintypes.DWORD
-        u32.GetWindowThreadProcessId.argtypes = [wintypes.HWND,
-                                                 ctypes.POINTER(wintypes.DWORD)]
-        # Type the HWND-taking text calls too so a 64-bit handle is never
-        # default-marshalled as a 32-bit int.
-        u32.GetWindowTextLengthW.restype = ctypes.c_int
-        u32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
-        u32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
-        my_pid = os.getpid()
-        found = []
-
-        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-        def _cb(hwnd, _lparam):
-            pid = wintypes.DWORD(0)
-            u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-            if pid.value != my_pid:
-                return True
-            n = u32.GetWindowTextLengthW(hwnd)
-            buf = ctypes.create_unicode_buffer(n + 1)
-            u32.GetWindowTextW(hwnd, buf, n + 1)
-            if buf.value == title:
-                found.append(hwnd)
-                return False                          # stop enumerating
-            return True
-
-        u32.EnumWindows(_cb, 0)
-        return found[0] if found else None
+        """The top-level window owned by THIS process with `title`, or None
+        (gui_win32.find_own_window — PID-matched so we never WM_SETICON another
+        process's same-titled window)."""
+        return gui_win32.find_own_window(title)
 
     def _set_window_icon_late(self):
         """Give the window the app icon (the packaged exe icon does not
@@ -492,14 +461,9 @@ class GuiApi:
         marshals WM_SETICON safely. Best-effort: a missing icon must never
         affect the app."""
         try:
-            from ctypes import wintypes
             ico = _app_icon_path()
             if not ico:
                 return
-            u32 = ctypes.windll.user32
-            u32.LoadImageW.restype = wintypes.HANDLE
-            u32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT,
-                                         wintypes.WPARAM, wintypes.LPARAM]
             hwnd = None
             deadline = time.monotonic() + 20            # window appears ~1-2s in
             while time.monotonic() < deadline and not hwnd:
@@ -510,12 +474,7 @@ class GuiApi:
                 log.info("window icon not set (this process's %r window not found)",
                          APP_NAME)
                 return
-            LR_LOADFROMFILE, IMAGE_ICON, WM_SETICON = 0x10, 1, 0x80
-            for which, size in ((0, 16), (1, 32)):      # ICON_SMALL, ICON_BIG
-                hicon = u32.LoadImageW(None, str(ico), IMAGE_ICON, size, size,
-                                       LR_LOADFROMFILE)
-                if hicon:
-                    u32.SendMessageW(hwnd, WM_SETICON, which, hicon)
+            gui_win32.set_window_icon(hwnd, ico)
         except Exception as e:
             log.info("window icon not set (%s: %s)", type(e).__name__, e)
 
@@ -895,25 +854,10 @@ class GuiApi:
         try:
             if not settings.get("notify_on_finish"):
                 return
-            from ctypes import wintypes
-            u32 = ctypes.windll.user32
             hwnd = self._find_own_window(APP_NAME)
             if not hwnd:
                 return
-            u32.GetForegroundWindow.restype = wintypes.HWND
-            if u32.GetForegroundWindow() == hwnd:
-                return                                  # already in front -- no nudge
-
-            class FLASHWINFO(ctypes.Structure):
-                _fields_ = [("cbSize", wintypes.UINT), ("hwnd", wintypes.HWND),
-                            ("dwFlags", wintypes.DWORD), ("uCount", wintypes.UINT),
-                            ("dwTimeout", wintypes.DWORD)]
-            u32.FlashWindowEx.argtypes = [ctypes.POINTER(FLASHWINFO)]
-            u32.FlashWindowEx.restype = wintypes.BOOL
-            FLASHW_TRAY, FLASHW_TIMERNOFG = 0x2, 0xC      # taskbar; until focused
-            info = FLASHWINFO(ctypes.sizeof(FLASHWINFO), hwnd,
-                              FLASHW_TRAY | FLASHW_TIMERNOFG, 0, 0)
-            u32.FlashWindowEx(ctypes.byref(info))
+            gui_win32.flash_taskbar(hwnd)
         except Exception as e:
             log.info("taskbar flash skipped (%s: %s)", type(e).__name__, e)
 
@@ -3105,6 +3049,27 @@ class GuiApi:
                           lambda _p: True).start()
         return {"ok": True}
 
+    def _begin_compare(self, label, mode, save_dir, suggest, build):
+        """Shared claim → save-dialog → launch tail for the two compare endpoints
+        (P7b unify of start_compare / start_compare_env). Claims the single-task gate
+        BEFORE the blocking save dialog so a second click is rejected at once. `suggest`
+        is a *lazy* default-name callable evaluated INSIDE the claim (preserving the
+        pre-P7b ordering where suggest_name ran after the claim), so a suggest-name /
+        dialog / launch-prep error releases the gate and can never wedge it.
+        `build(out_path, events, confirm_overwrite, day)` is the comparator call
+        (`mod.compare` / `adapter.compare_folders`)."""
+        if not self._try_claim_task("compare"):
+            return {"error": "A task is already running."}
+        try:
+            out = self._save_dialog_for_compare(save_dir, suggest())
+            if out is None:
+                self._release_task()
+                return {"cancelled": True}
+            return self._launch_compare(label, mode, out, build)
+        except Exception:
+            self._release_task()        # a suggest-name/dialog/launch error must not wedge the gate
+            raise
+
     @_api_method
     def start_compare(self, report_key, tsmis_path, tsn_path,
                       want_formulas=True, want_values=False):
@@ -3119,24 +3084,12 @@ class GuiApi:
         mode = self._compare_mode(want_formulas, want_values)
         if mode is None:
             return {"error": "Tick at least one output (values and/or live formulas)."}
-        # Claim the slot BEFORE the (blocking) save dialog so a second click is
-        # rejected immediately; release it if the user cancels the dialog.
-        if not self._try_claim_task("compare"):
-            return {"error": "A task is already running."}
-        try:
-            out = self._save_dialog_for_compare(Path(tsmis_path).parent,
-                                                mod.suggest_name(tsmis_path))
-            if out is None:
-                self._release_task()
-                return {"cancelled": True}
-            return self._launch_compare(
-                label, mode, out,
-                lambda out_path, events=None, confirm_overwrite=None, day=None:
-                    mod.compare(tsmis_path, tsn_path, out_path, events=events,
-                                confirm_overwrite=confirm_overwrite, mode=mode))
-        except Exception:
-            self._release_task()        # a dialog/suggest_name error must not wedge the gate
-            raise
+        return self._begin_compare(
+            label, mode, Path(tsmis_path).parent,
+            lambda: mod.suggest_name(tsmis_path),
+            lambda out_path, events=None, confirm_overwrite=None, day=None:
+                mod.compare(tsmis_path, tsn_path, out_path, events=events,
+                            confirm_overwrite=confirm_overwrite, mode=mode))
 
     @_api_method
     def get_compare_folders(self, report_key):
@@ -3196,23 +3149,13 @@ class GuiApi:
             return {"error": "Tick at least one output (values and/or live formulas)."}
         import compare_env
         compare_env.DEFAULT_OUT_DIR.mkdir(parents=True, exist_ok=True)
-        if not self._try_claim_task("compare"):
-            return {"error": "A task is already running."}
-        try:
-            out = self._save_dialog_for_compare(compare_env.DEFAULT_OUT_DIR,
-                                                adapter.suggest_name(pa, pb))
-            if out is None:
-                self._release_task()
-                return {"cancelled": True}
-            return self._launch_compare(
-                label, mode, out,
-                lambda out_path, events=None, confirm_overwrite=None, day=None:
-                    adapter.compare_folders(pa, pb, out_path, events=events,
-                                            confirm_overwrite=confirm_overwrite,
-                                            mode=mode))
-        except Exception:
-            self._release_task()        # a dialog/suggest_name error must not wedge the gate
-            raise
+        return self._begin_compare(
+            label, mode, compare_env.DEFAULT_OUT_DIR,
+            lambda: adapter.suggest_name(pa, pb),
+            lambda out_path, events=None, confirm_overwrite=None, day=None:
+                adapter.compare_folders(pa, pb, out_path, events=events,
+                                        confirm_overwrite=confirm_overwrite,
+                                        mode=mode))
 
     # ---- settings & maintenance -----------------------------------------------
 
@@ -3677,7 +3620,7 @@ class GuiApi:
 def _fatal_box(text):
     """Last-resort error surface for a windowed .exe (no console, no window)."""
     try:
-        ctypes.windll.user32.MessageBoxW(0, text, APP_NAME, 0x10)  # MB_ICONERROR
+        gui_win32.message_box(text, APP_NAME)        # MB_ICONERROR
     except Exception:
         pass
 
