@@ -79,7 +79,7 @@ def _stream_data_rows(path, sheet_name):
 
 
 def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
-                     events=None, confirm_overwrite=None,
+                     events=None, confirm_overwrite=None, existed_at_confirm=None,
                      header_override=None, header_comment=None,
                      decorate_workbook=None):
     """Combine every per-route XLSX in `input_dir` (reading worksheet
@@ -121,9 +121,16 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
                      f"Export the {report_name} report first, then consolidate."),
         )
 
-    # Confirm overwrite before reading any inputs.
-    if out_path.exists() and not confirm(out_path):
-        return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
+    # Confirm overwrite before reading any inputs. A caller that ALREADY prompted
+    # (a per-route converter that confirmed before its long parse) passes the
+    # existence it saw at THAT prompt via `existed_at_confirm`; we then skip the
+    # initial prompt and only run the pre-replace re-check below (atomic_save_if)
+    # with the real confirm — so a late appearance is still caught at the final
+    # replace WITHOUT a double prompt for the already-confirmed pre-existing case.
+    if existed_at_confirm is None:
+        existed_at_confirm = out_path.exists()
+        if existed_at_confirm and not confirm(out_path):
+            return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
 
     events.on_log("=" * 60)
     events.on_log(f"{title} - {len(files)} file(s)")
@@ -258,8 +265,13 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
     try:
         # F9: write to a temp sibling + os.replace, so an interrupted/failed write
         # never truncates a prior good consolidated workbook (the destination open in
-        # Excel still surfaces as PermissionError, handled below).
-        artifact_store.atomic_save(wb, out_path)
+        # Excel still surfaces as PermissionError, handled below). P12 TOCTOU: the
+        # replace is GATED on a re-check (atomic_save_if) — the workbook is already
+        # serialized to the temp, so if the destination APPEARED while we combined
+        # inputs we ask before overwriting it, without abandoning a half-streamed wb.
+        committed = artifact_store.atomic_save_if(
+            wb, out_path,
+            lambda: artifact_store.confirm_late_overwrite(out_path, existed_at_confirm, confirm))
     except PermissionError:
         return ConsolidateResult(
             status="error",
@@ -267,6 +279,8 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
                      "The file is probably open in Excel. Close it and try again.\n"
                      "(Your exported files were not changed.)"),
         )
+    if not committed:
+        return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
 
     # Skipped/failed inputs mean the combined workbook is INCOMPLETE — lead with a
     # loud warning so a partial result is never mistaken for a full one. P1 makes

@@ -11,6 +11,12 @@ logic is unchanged — this only proves the reconciliation is wired and visible.
 parse_pdf is monkeypatched (no real PDF needed, CI-safe) so the check exercises
 the consolidate() surfacing path with synthetic anomaly counts.
 
+P12 extends this with the INDEPENDENT expected-row oracle (pdf_row_oracle): it
+reconciles against the SAME parse_pdf 3-tuple contract by a different method (text
+lines vs cell rectangles), so a row drop is flagged for the P13 evidence kit. Per
+RM04 the oracle + capture path ship in v0.18.0; proving the parser correct against
+REAL returned PDFs is v0.18.1 acceptance.
+
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_tsmis_pdf_reconcile.py
 """
@@ -58,6 +64,29 @@ def _run(in_files):
         M.parse_pdf = saved
 
 
+def oracle_cross_check():
+    """The independent oracle reconciles against the SAME parse_pdf 3-tuple the
+    consolidator produces — a row drop is flagged for the P13 evidence kit, with the
+    parser's own drop stats surfaced. Counts only; no cell contents (RM05)."""
+    import pdf_row_oracle as O
+
+    def parse_stub(path, events, pdf_name=""):
+        rows = [["%03d.000" % i] + ["x"] * 30 for i in range(2)]   # parser emits 2
+        return "001", rows, {"emitted": 2, "pages": 1,
+                             "skipped_no_geometry": 3, "stale_geometry_pages": 0}
+
+    def five_postmile_lines(_path):
+        yield ["%03d.001  a  b  c" % i for i in range(5)]          # oracle sees 5
+
+    rec = O.capture_evidence("r001.pdf", parse_stub, page_lines_fn=five_postmile_lines)
+    check("oracle reconciles the parse_pdf 3-tuple: a 3-row drop is flagged",
+          rec.get("flagged") is True and rec.get("delta") == 3)
+    check("oracle evidence surfaces the parser's skip stat",
+          rec.get("parser_skipped_no_geometry") == 3)
+    check("oracle evidence is privacy-safe (counts only, no cell contents)",
+          not any(k in rec for k in ("rows", "cells", "content", "text")))
+
+
 def main():
     print("TSMIS Highway Log (PDF) row-drop reconciliation:")
 
@@ -89,6 +118,8 @@ def main():
     check("clean run succeeds", clean.status == "ok")
     check("clean run has NO anomaly banners",
           not any(s.startswith("⚠") for s in clean.summary_lines))
+
+    oracle_cross_check()
 
     print()
     if _fail:

@@ -69,13 +69,14 @@ APP_MODULES = [
     "browser_channels", "auth_nav", "report_nav", "edge_device", "session",
     "events", "outcome", "cache_envelope",
     "consolidation_meta", "artifact_store", "contract", "task_coordinator",
+    "safe_delete", "owned_dir",          # P12 fs-safety: junction-safe reset + M03 ownership marker
     "exporter", "exporter_parallel",
     "run_report", "logging_setup", "settings", "cli", "login", "reports",
     "report_catalog", "updater", "batch_manifest",
     "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
     "export_highway_log", "export_highway_log_pdf", "export_intersection_summary",
     "export_intersection_detail", "export_multi",
-    "highway_log_columns",
+    "highway_log_columns", "pdf_row_oracle",   # P12: independent PDF expected-row oracle (P13 evidence kit)
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
     "consolidate_tsn_highway_log", "consolidate_tsmis_highway_log_pdf",

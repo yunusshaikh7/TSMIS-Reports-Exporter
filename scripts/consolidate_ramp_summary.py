@@ -632,8 +632,11 @@ def build_combined_sheet(wb, records, col_letters):
     wb.active = wb.index(ws)
 
 
-def build_workbook(records, out_path):
-    """Write a styled, audited workbook with one row per record."""
+def build_workbook(records, out_path, proceed=None):
+    """Write a styled, audited workbook with one row per record. `proceed` (P12) is
+    the pre-replace overwrite gate — atomic_save_if evaluates it AFTER serializing the
+    workbook to the temp and JUST BEFORE the os.replace; returns True iff committed (a
+    declined `proceed` discards the temp and leaves the prior file untouched)."""
     THIN = Side(style="thin", color="CCCCCC")
     BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
     HEADER_FILL = PatternFill("solid", start_color="305496")
@@ -765,7 +768,9 @@ def build_workbook(records, out_path):
     build_combined_sheet(wb, records, col_letters)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    artifact_store.atomic_save(wb, out_path)        # F9: temp + os.replace (never truncate prior)
+    # F9 temp + os.replace (never truncate prior) + the P12 TOCTOU gate at the
+    # replace: a destination that appeared during the build is caught here.
+    return artifact_store.atomic_save_if(wb, out_path, proceed or (lambda: True))
 
 
 # =============================================================================
@@ -810,8 +815,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                      f"Export the {REPORT_NAME} report first, then consolidate."),
         )
 
-    # Confirm overwrite *before* spending time parsing PDFs.
-    if out_path.exists() and not confirm(out_path):
+    # Confirm overwrite *before* spending time parsing PDFs. Record existence for
+    # the P12 pre-write re-check (a file that APPEARS during parsing must not be
+    # silently clobbered).
+    existed_at_confirm = out_path.exists()
+    if existed_at_confirm and not confirm(out_path):
         return ConsolidateResult(status="cancelled",
                                  message="Cancelled. Existing file kept.")
 
@@ -858,7 +866,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     events.on_log("")
     events.on_log("Writing consolidated workbook...")
     try:
-        build_workbook(records, out_path)
+        # P12 TOCTOU: the overwrite gate is INSIDE build_workbook, at the os.replace
+        # (atomic_save_if) — so a destination that appears during the BUILD, not just
+        # during parsing, is caught before the final write.
+        committed = build_workbook(records, out_path, proceed=lambda: artifact_store.confirm_late_overwrite(
+            out_path, existed_at_confirm, confirm))
     except PermissionError:
         return ConsolidateResult(
             status="error",
@@ -866,6 +878,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                      "The file is probably open in Excel. Close it and try again.\n"
                      "(Your exported files were not changed.)"),
         )
+    if not committed:
+        return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
 
     # Loud incomplete banner when anything was left out, so a partial result is
     # never mistaken for a full one.

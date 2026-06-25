@@ -499,7 +499,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         )
 
     # Confirm overwrite *before* spending time parsing PDFs.
-    if out.exists() and not confirm(out):
+    existed_at_confirm = out.exists()
+    if existed_at_confirm and not confirm(out):
         return ConsolidateResult(status="cancelled",
                                  message="Cancelled. Existing file kept.")
 
@@ -589,12 +590,15 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     events.on_log("")
 
     # Combine all converted per-route files with the shared XLSX core (header
-    # lock-in, Route column from the filename, streaming write). Overwrite was
-    # already confirmed above.
+    # lock-in, Route column from the filename, streaming write). P12 TOCTOU: pass the
+    # REAL confirm + the existence we saw at the early prompt down into consolidate_xlsx
+    # so its pre-replace gate (atomic_save_if) catches a destination that APPEARED
+    # after that prompt — at the final os.replace — without re-prompting for the
+    # already-confirmed pre-existing case.
     result = consolidate_xlsx(
         input_dir=conv, out_path=out, sheet_name=SHEET_NAME,
         report_name=REPORT_NAME, title="TSMIS Highway Log (PDF) Consolidation",
-        events=events, confirm_overwrite=lambda _p: True,
+        events=events, confirm_overwrite=confirm, existed_at_confirm=existed_at_confirm,
         header_override=hlc.HEADER, header_comment=hlc.comment_for,
         decorate_workbook=hlc.write_legend_sheet,
     )

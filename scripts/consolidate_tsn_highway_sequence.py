@@ -232,7 +232,7 @@ def _row_values(route, d):
             d["dist"], d["description"]]
 
 
-def _write_workbook(all_rows, out_path):
+def _write_workbook(all_rows, out_path, proceed=None):
     """Write every (route, row_dict) into one normalized workbook (write_only so
     the statewide ~46k rows never exhaust memory)."""
     header_fill = PatternFill("solid", start_color="305496")
@@ -266,7 +266,8 @@ def _write_workbook(all_rows, out_path):
             else:
                 cells.append(v)
         ws.append(cells)
-    artifact_store.atomic_save(wb, out_path)        # F9: temp + os.replace (never truncate prior)
+    # F9 temp + os.replace + the P12 TOCTOU gate at the replace.
+    return artifact_store.atomic_save_if(wb, out_path, proceed or (lambda: True))
 
 
 # =============================================================================
@@ -308,7 +309,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                      f"Put the district Highway Sequence PDFs (e.g. "
                      f"D01 HSL TSN.pdf) there, then run again."))
 
-    if out.exists() and not confirm(out):
+    existed_at_confirm = out.exists()
+    if existed_at_confirm and not confirm(out):
         return ConsolidateResult(status="cancelled",
                                  message="Cancelled. Existing file kept.")
 
@@ -357,12 +359,18 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     events.on_log("")
     events.on_log("Writing normalized workbook...")
     try:
-        _write_workbook(all_rows, out)
+        # P12 TOCTOU: the overwrite gate is INSIDE _write_workbook, at the os.replace
+        # (atomic_save_if) — a destination that appears during the BUILD is caught.
+        committed = _write_workbook(all_rows, out, proceed=lambda: artifact_store.confirm_late_overwrite(
+            out, existed_at_confirm, confirm))
     except PermissionError:
         return ConsolidateResult(
             status="error",
             message=(f"Could not save {out.name}.\n\n"
                      "The file is probably open in Excel. Close it and try again."))
+    if not committed:
+        return ConsolidateResult(status="cancelled",
+                                 message="Cancelled. Existing file kept.")
 
     summary_lines = []
     if failed:

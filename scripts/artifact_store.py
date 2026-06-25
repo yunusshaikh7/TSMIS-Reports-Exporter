@@ -1,11 +1,13 @@
 """Transactional artifact lifecycle (P2) — one leaf module for three concerns:
 
-  * **Atomic single-file write** (`atomic_save`, `commit_workbook`) — write to a temp
-    sibling, validate, then ``os.replace`` it onto the final path, so an interrupted /
-    failed / locked write NEVER truncates the prior good artifact (F9). The wrapper is
-    handed a TEMP path and finalizes it, so the regression-locked ``compare_core`` is
-    untouched — it just writes to the path it is given; the wrapper rewrites any leaked
-    temp name back out of the returned result.
+  * **Atomic single-file write** (`atomic_save`, `atomic_save_if`, `commit_workbook`) —
+    write to a temp sibling, validate, then ``os.replace`` it onto the final path, so an
+    interrupted / failed / locked write NEVER truncates the prior good artifact (F9). The
+    wrapper is handed a TEMP path and finalizes it, so the regression-locked
+    ``compare_core`` is untouched — it just writes to the path it is given; the wrapper
+    rewrites any leaked temp name back out of the returned result. `confirm_late_overwrite`
+    + `atomic_save_if` add the P12 pre-commit re-check that closes the consolidate
+    confirm-then-appears TOCTOU window (the truncation half is already covered by F9).
 
   * **Journaled store promotion + startup recovery** (`promote_store`,
     `recover_promotions`) — the Export-Everything store swap (`live` <- `staging`) is
@@ -96,6 +98,32 @@ def atomic_save(workbook, out_path):
         raise
 
 
+def atomic_save_if(workbook, out_path, proceed):
+    """Like `atomic_save`, but the final ``os.replace`` is GATED on `proceed()` —
+    a 0-arg callback evaluated AFTER the workbook is fully serialized to the temp
+    sibling and JUST BEFORE the replace. If `proceed()` is falsy the temp is removed
+    and `out_path` is left untouched; returns True iff the replace happened.
+
+    This lets a producer run its final TOCTOU re-check (confirm_late_overwrite) at
+    the NARROWEST possible point — the workbook is already written to the temp, so
+    there is no half-streamed ``write_only`` workbook to abandon (which would leave
+    an open temp + a dangling row generator). Same F9 guarantee as `atomic_save`: a
+    prior good `out_path` is never truncated; the temp is removed on any exit."""
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out_path.with_name(f"{out_path.stem}.tmp-{_new_token()}{out_path.suffix}")
+    try:
+        workbook.save(tmp)
+        if not proceed():
+            _silent_unlink(tmp)
+            return False
+        os.replace(tmp, out_path)
+        return True
+    except BaseException:
+        _silent_unlink(tmp)
+        raise
+
+
 def _openable_xlsx(path, expect_sheet=None):
     """A produced workbook is committable iff openpyxl can actually OPEN it — so a corrupt
     ZIP or a malformed workbook part (e.g. ``xl/workbook.xml`` = ``b"not xml"``) is
@@ -165,6 +193,31 @@ def _rewrite_paths(result, mapping):
     return result
 
 
+def confirm_late_overwrite(dest, existed_at_confirm, confirm):
+    """TOCTOU re-check (P12): close the confirm-then-appears window.
+
+    A destination that did NOT exist when the user was first asked about
+    overwriting (so they were never prompted for it) can APPEAR while the producer
+    runs — parsing a folder of PDFs or building a large workbook takes seconds. The
+    original code then ran ``os.replace`` and silently clobbered the file the user
+    never agreed to overwrite. Re-checked here, just before the commit: if it
+    appeared, ask now. Returns True to proceed (it didn't appear, or the user
+    re-confirmed) or False to abort (the user declined the newly-appeared file).
+
+    This NARROWS the window from the whole producer runtime to the microseconds
+    between this check and ``os.replace``; it cannot ATOMICALLY eliminate it (there
+    is no "replace only if still absent" for our deliberate overwrite-after-confirm
+    case). The TRUNCATION half of the original TOCTOU is already closed — the
+    producer writes a temp sibling and we atomically ``os.replace`` it, so a prior
+    good artifact is never truncated (F9/P2). `confirm(dest)->bool` is the SAME
+    callback used for the first prompt (default: overwrite freely)."""
+    if existed_at_confirm:
+        return True                          # already confirmed at the first ask
+    if not Path(dest).exists():
+        return True                          # still absent — nothing appeared
+    return bool(confirm(dest))               # appeared during produce — ask now
+
+
 def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validate=None,
                     confirm_overwrite=None):
     """Run `produce_fn(temp_path)` — the EXISTING writer (compare_core via an adapter),
@@ -192,8 +245,13 @@ def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validat
     validate = validate or (lambda p: _openable_xlsx(p, expect_sheet))
     confirm = confirm_overwrite or (lambda _p: True)
     final_twin = _values_twin(final) if twin else None
+    # Record which destinations existed at the FIRST ask, so the pre-commit TOCTOU
+    # re-check (confirm_late_overwrite) only re-prompts for one that APPEARED while
+    # produce_fn ran — never for one the user already decided on.
+    existed_at_confirm = {}
     for dest in ([final, final_twin] if twin else [final]):
-        if dest.exists() and not confirm(dest):
+        existed_at_confirm[dest] = dest.exists()
+        if existed_at_confirm[dest] and not confirm(dest):
             return ConsolidateResult(status="cancelled",
                                      message="Cancelled. Existing file kept.")
     token = _new_token()
@@ -219,6 +277,13 @@ def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validat
         return _rewrite_paths(result, mapping)   # P2-R02: never leak the deleted temp name
     # The VALUES workbook is the single transactional artifact (twin), else the lone file.
     primary_tmp, primary_final = (tmp_twin, final_twin) if twin else (tmp, final)
+    # P12 TOCTOU: the single transactional artifact must not silently clobber a file
+    # that APPEARED at its destination while produce_fn ran (the user was never asked).
+    if not confirm_late_overwrite(primary_final, existed_at_confirm[primary_final], confirm):
+        _silent_unlink(tmp)
+        _silent_unlink(tmp_twin)
+        return ConsolidateResult(status="cancelled",
+                                 message="Cancelled. Existing file kept.")
     if not _commit_one(primary_tmp, primary_final, validate):
         _silent_unlink(tmp)
         _silent_unlink(tmp_twin)
@@ -227,20 +292,29 @@ def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validat
             message=(f"Could not finalize {primary_final.name} — the produced workbook "
                      "was missing/invalid or the destination is open in Excel. The "
                      "previous file (if any) was left unchanged."))
-    if twin and not _commit_one(tmp, final, validate):   # formulas sibling: best-effort
-        log.warning("comparison: the live-formulas workbook for %s was not finalized; the "
-                    "values workbook is committed", final.name)
-        result = _rewrite_paths(result, mapping)
-        # P2-R03: be TRUTHFUL — the formulas file was not written. Point output_path at the
-        # committed values workbook and turn the formulas line into a not-refreshed warning
-        # (any pre-existing formulas file at `final` is stale, not this comparison).
-        result.output_path = str(final_twin)
-        result.summary_lines = [
-            ("Live-formulas file: NOT refreshed (best-effort write failed; the values "
-             "workbook above is the canonical output)")
-            if s.startswith("Live-formulas file:") else s
-            for s in (result.summary_lines or [])]
-        return result
+    if twin:
+        # The formulas sibling is best-effort. Don't clobber a formulas file that
+        # APPEARED during produce either — a decline (like a failed commit) leaves the
+        # already-committed values workbook as the canonical, truthful output.
+        if not confirm_late_overwrite(final, existed_at_confirm[final], confirm):
+            _silent_unlink(tmp)
+            committed_formulas = False
+        else:
+            committed_formulas = _commit_one(tmp, final, validate)
+        if not committed_formulas:
+            log.warning("comparison: the live-formulas workbook for %s was not finalized; the "
+                        "values workbook is committed", final.name)
+            result = _rewrite_paths(result, mapping)
+            # P2-R03: be TRUTHFUL — the formulas file was not written. Point output_path at the
+            # committed values workbook and turn the formulas line into a not-refreshed warning
+            # (any pre-existing formulas file at `final` is stale, not this comparison).
+            result.output_path = str(final_twin)
+            result.summary_lines = [
+                ("Live-formulas file: NOT refreshed (best-effort write failed; the values "
+                 "workbook above is the canonical output)")
+                if s.startswith("Live-formulas file:") else s
+                for s in (result.summary_lines or [])]
+            return result
     return _rewrite_paths(result, mapping)
 
 

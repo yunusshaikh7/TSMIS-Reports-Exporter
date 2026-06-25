@@ -77,6 +77,8 @@ from common import (
 import artifact_store
 import batch_manifest
 import dataclasses
+import owned_dir
+import safe_delete
 import consolidation_meta
 import day_matrix
 import matrix
@@ -132,10 +134,15 @@ def reset_targets(include_input=False):
         known = {f"{s}-{e}" for s in DATA_SOURCES for e in ENVIRONMENTS}
         if bdest.is_dir():
             for child in sorted(bdest.iterdir()):
-                # The known <src-env> export folders AND the matrix's own
-                # "comparisons" tree are app-owned; foreign files stay untouched.
-                if child.is_dir() and (child.name in known
-                                       or child.name == "comparisons"):
+                if not child.is_dir():
+                    continue
+                # M03: prefer the ownership MARKER (proves the app created this dir,
+                # whatever its name); fall back to the legacy known <src-env> /
+                # "comparisons" NAMES for dirs created before the marker existed.
+                # Foreign files/dirs the user keeps alongside the store stay untouched.
+                if (owned_dir.is_owned(child)
+                        or child.name in known
+                        or child.name == "comparisons"):
                     targets.append(
                         (f"Export Everything store: {child.name}", child))
     except Exception:
@@ -345,6 +352,13 @@ class ExportWorker(threading.Thread):
         B2 auto-consolidate; does NOT post export_done/error — the caller owns the
         run lifecycle (run() for one export; BatchWorker once per environment for
         B3). Appends as it goes so a mid-run exception still leaves partials."""
+        # M03: the Export-Everything store's <src>-<env> folder is a directory the
+        # app creates inside a USER-CHOSEN destination. Stamp it app-owned ONCE here
+        # (before the per-report loop) so "Delete all reports" / store recovery can
+        # prove ownership by marker, not by name alone. The marker survives the
+        # per-report stage->swap (that only renames child report subdirs).
+        if self.out_base is not None:
+            owned_dir.ensure_owned_dir(self.out_base, kind="store")
         for i, spec in enumerate(self.specs, 1):
             if self.cancel.is_set():
                 break
@@ -718,7 +732,6 @@ class ResetWorker(threading.Thread):
         self.cancel = cancel_event
 
     def run(self):
-        import shutil
         targets = reset_targets(self.include_input)
         files, size = measure_targets(targets)
         errors = []
@@ -742,7 +755,12 @@ class ResetWorker(threading.Thread):
                 if path.is_file():
                     path.unlink()
                 else:
-                    shutil.rmtree(path, onerror=on_error)
+                    # Junction/symlink-safe: a reparse point INSIDE (or AS) a
+                    # target is unlinked, never recursed through, so "Delete all
+                    # reports" can never escape into a link's target outside the
+                    # folder being cleared (safe_delete; same onerror contract as
+                    # shutil.rmtree so locked files are still reported).
+                    safe_delete.scoped_rmtree(path, onerror=on_error)
             except OSError as e:
                 failures.append(f"{path} ({type(e).__name__})")
             if failures:
@@ -1839,6 +1857,11 @@ class MatrixCompareWorker(threading.Thread):
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
                         on_log=lambda m: self.q.put(("log", m)))
+        # M03: the comparisons tree the matrix writes under the user-chosen
+        # destination is app-created — stamp it owned (by marker, not by name).
+        if self.dest:
+            owned_dir.ensure_owned_dir(Path(self.dest) / matrix.COMPARISONS_DIRNAME,
+                                       kind="comparisons")
         total = len(self.cells)
         done = errors = 0
         try:
@@ -1898,6 +1921,11 @@ class DayMatrixCompareWorker(threading.Thread):
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
                         on_log=lambda m: self.q.put(("log", m)))
+        # M03: the comparisons/tsn tree the by-day matrix writes under the
+        # user-chosen destination is app-created — stamp it owned.
+        if self.dest:
+            owned_dir.ensure_owned_dir(Path(self.dest) / matrix.COMPARISONS_DIRNAME,
+                                       kind="comparisons")
         total = len(self.cells)
         done = errors = 0
         try:

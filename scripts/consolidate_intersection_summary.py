@@ -150,8 +150,11 @@ def _build_combined(wb, statewide, total):
     wb.active = wb.index(ws)
 
 
-def build_workbook(records, out_path):
-    """Per-route sheet (Route, Total, one column per category key) + Combined."""
+def build_workbook(records, out_path, proceed=None):
+    """Per-route sheet (Route, Total, one column per category key) + Combined.
+    `proceed` (P12) is the pre-replace overwrite gate atomic_save_if evaluates JUST
+    BEFORE the os.replace; returns True iff committed (a declined `proceed` keeps the
+    prior file)."""
     wb = Workbook()
     ws = wb.active
     ws.title = SHEET_NAME
@@ -182,7 +185,8 @@ def build_workbook(records, out_path):
     total_all = sum(r.get("total") or 0 for r in records)
     _build_combined(wb, statewide, total_all)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    artifact_store.atomic_save(wb, out_path)        # F9: temp + os.replace (never truncate prior)
+    # F9 temp + os.replace + the P12 TOCTOU gate at the replace.
+    return artifact_store.atomic_save_if(wb, out_path, proceed or (lambda: True))
 
 
 # --------------------------------------------------------------------------- #
@@ -213,7 +217,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             status="error",
             message=(f"No {REPORT_NAME} files were found in:\n{input_dir}\n\n"
                      f"Export the {REPORT_NAME} report first, then consolidate."))
-    if out_path.exists() and not confirm(out_path):
+    existed_at_confirm = out_path.exists()
+    if existed_at_confirm and not confirm(out_path):
         return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
 
     events.on_log("=" * 60)
@@ -248,12 +253,17 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     events.on_log("")
     events.on_log("Writing consolidated workbook...")
     try:
-        build_workbook(records, out_path)
+        # P12 TOCTOU: the overwrite gate is INSIDE build_workbook, at the os.replace
+        # (atomic_save_if) — a destination that appears during the BUILD is caught.
+        committed = build_workbook(records, out_path, proceed=lambda: artifact_store.confirm_late_overwrite(
+            out_path, existed_at_confirm, confirm))
     except PermissionError:
         return ConsolidateResult(
             status="error",
             message=(f"Could not save {out_path.name}.\n\n"
                      "The file is probably open in Excel. Close it and try again."))
+    if not committed:
+        return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
 
     incomplete = bool(failed or blank)
     summary_lines = []

@@ -82,6 +82,8 @@ jobs:
           python build/check_matrix_tsn.py
           python build/check_day_matrix.py
           python build/check_worker_lifecycle.py
+          python build/check_reset_safety.py
+          python build/check_owned_dir.py
           python build/check_import_direction.py
 
       - name: Outcome contract + cache-envelope checks (blocking)
@@ -109,6 +111,7 @@ jobs:
           set -e
           python build/check_artifact_store.py
           python build/check_p2_freshness.py
+          python build/check_consolidate_toctou.py
 
       - name: Frontend renderer + routing checks (blocking)
         # P1-R01: a matrix cell built from PARTIAL consolidation inputs must render
@@ -162,6 +165,7 @@ jobs:
                    check_compare_dupmatch check_compare_ditto check_ramp_summary_partial \
                    check_ramp_summary_schema check_consolidate_intersection \
                    check_tsn_description_leak check_tsmis_pdf_parse check_tsmis_pdf_reconcile \
+                   check_pdf_row_oracle \
                    check_highway_log_columns check_highway_log_ditto check_highway_log_roadbed \
                    check_a1_filenames; do
             echo "::group::$c"

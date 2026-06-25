@@ -101,8 +101,16 @@ def test_producers():
             return {"1": [{"row": 1}]}
 
         # The workbook content is irrelevant here (only the completion is) — stub the
-        # writer so the test doesn't depend on the row-dict schema.
-        with _patch(hs, "_write_workbook", lambda rows, out: Path(out).write_text("wb")):
+        # writer so the test doesn't depend on the row-dict schema. The writer now takes
+        # the P12 `proceed` overwrite gate and returns committed=True (mirrors
+        # atomic_save_if): honor proceed, write, report success.
+        def _fake_write(rows, out, proceed=None):
+            if proceed is not None and not proceed():
+                return False
+            Path(out).write_text("wb")
+            return True
+
+        with _patch(hs, "_write_workbook", _fake_write):
             with _patch(hs, "parse_pdf", _parse_both_ok):
                 r = hs.consolidate(input_dir=hsraw, out_path=tmp / "hs_full.xlsx", events=Events())
             check("highway sequence, all PDFs parse -> complete / 0 failed",
