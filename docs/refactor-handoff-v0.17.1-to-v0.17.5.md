@@ -2,14 +2,19 @@
 
 **Read this before merging `refactor/v0.18.0-structural-overhaul` back into `main`.**
 
-The refactor branched from **v0.17.1**. While it was in flight, `main` shipped four
-patch releases (**v0.17.2 → v0.17.5**) plus follow-up commits. This document is the
+The refactor branched from **v0.17.1**. While it was in flight, `main` shipped seven
+patch releases (**v0.17.2 → v0.17.8**) plus follow-up commits. This document is the
 complete record of that divergence so the merge can forward-port / reconcile every
 change — including the docs.
 
 - **Commit range:** `v0.17.1..main`.
-- **The substance:** the **Intersection Detail (PDF)** feature (v0.17.2–v0.17.4) plus the
-  **v0.17.5 control-type crosswalk** (a localized change to the vs-TSN comparison — see §8).
+- **The substance:** the **Intersection Detail (PDF)** feature (v0.17.2–v0.17.4, §1–§7); the
+  **v0.17.5 control-type crosswalk** (§8); then a run of **localized Intersection-Detail vs-TSN
+  comparison** changes (v0.17.6–v0.17.8, §9) — compare-everything, the summary signal fold, the
+  stale-library fix, the added + **position-aligned** date columns, numeric-padding normalization,
+  and the new **"Report View"** replica sheet. Everything in §8–§9 touches ONE module
+  (`compare_intersection_detail_tsn`; the summary fold in §9b also touches `summary_layout`) and
+  forward-ports independently of the §3 matrix/registry plumbing.
 - **Two commits in the range predate this work** (already on `main` at v0.17.1+,
   small): `d2ee353` *docs: reconcile roadmap to v0.17.1*, `4e38a63` *chore: harden
   .gitignore against legacy TSN output* (the latter also nudged
@@ -54,6 +59,9 @@ plumbing, preserve this wiring.
 | **v0.17.4** `180c6e4` | **crash hotfix** | Wired `intersection_detail_pdf` into the matrix's consolidated-workbook helpers (the by-day matrix crashed without it) + a regression check + cleanup parity. |
 | `0155b39` | docs (deferred issue) | Logged the `_xl_trim` tab-whitespace comparison gap (see §5). |
 | **v0.17.5** | **control-type crosswalk** | Intersection Detail vs-TSN: fold TSN signal sub-types J–P + TSMIS `S` into one "Signalized" category → diffs 5,632→3,019 (see §8). Localized to `compare_intersection_detail_tsn`. |
+
+(The later patches **v0.17.6 → v0.17.8** are localized Intersection-Detail vs-TSN comparison
+changes — documented in **§9b–§9e**, not as PDF-feature rows above.)
 
 All releases were built + published by `release.yml` (frozen self-test gates passed);
 `checks.yml` is green on `main`.
@@ -335,3 +343,70 @@ columns. After vetting each mapping against real rows with the user, the FINAL s
 **Merge note:** the `context_fill` field is a clean opt-in on `compare_core` — preserve it; it only
 fires when a schema sets it. The eff-date↔recent-TSN-column pairing is the non-obvious part: don't
 "correct" it back to the historical columns.
+
+> **⚠ SUPERSEDED by §9e (v0.17.8):** the user re-aligned the date columns **by report position** — so
+> ML/CS *first* eff-dates now DO map to the geometry `EFF_DATE_ML`/`CROSS_BEGIN_DATE` (the opposite of
+> the note just above), the two greyed context columns are now compared (`context_fill` dropped from the
+> Detail schema), and the control label is now `S`, not `Signalized`. The v0.17.8 canary (163,353)
+> supersedes the 131,948 here. **Read §9e for the current state of this module.**
+
+### 9e. v0.17.8 — position-aligned dates, numeric-padding norm, "S" label + the Report View
+
+The final pre-refactor state of `compare_intersection_detail_tsn`. Still **one module** (+ its golden
+check + docs); independent of §3 plumbing. **This subsection is the current source of truth for the
+module — it supersedes the eff-date alignment, the greyed columns, and the "Signalized" label of §8/§9d.**
+
+- **Date columns compared BY REPORT POSITION (supersedes §9d value-alignment).** Each report column is
+  matched to the SAME column in the other report (user: "just have everything where it is in the pdfs
+  and compare with what is in the other pdf"). `_TSN_COL` now maps: INT/Control/Lighting →
+  `EFF_DATE_INT`/`_CT`/`_LT` (geometry, the ~1-day offset); **Mainline 1st → `EFF_DATE_ML`,
+  Cross-street 1st → `CROSS_BEGIN_DATE`** (the geometry/original dates — TSMIS shows its refresh date
+  here, so a structural refresh-vs-original diff like Date of Record); **Mainline 2nd → `MAIN_EFF_DATE`,
+  Int St → `EFF_DATE`** (the recent dates). ⚠ This is the REVERSE of §9d — do NOT "fix" ML/CS 1st back
+  to the recent dates.
+- **Nothing greyed — `context_fill` dropped from `_SCHEMA`** (`context_fields` stays `()`). The two
+  former `2024` context columns (ML 2nd / Int St Eff-Date) are now compared. The `context_fill` opt-in
+  REMAINS in `compare_core` (retained, now with no live user — keep it; clean default-`None` no-op).
+- **Numeric-padding normalization.** New `_norm_num` + `NUMERIC_FIELDS = ("Main Line Length",
+  "Intrte Route", "Intrte Postmile")`, applied in `_project`: strips leading AND trailing zeros
+  (`058`→`58`, `9.560`→`9.56`) so padding doesn't flag. Dropped Main Line Length 1,398→436, Intrte
+  Postmile 98→43.
+- **Control-type label `Signalized` → `S`** (`_SIGNALIZED_LABEL = "S"`, the code TSMIS stores) —
+  supersedes §8. **NOTE:** the Summary (§9b) keeps its `S - SIGNALIZED` *category* label; only the
+  Detail's per-cell control value changed.
+- **NEW second sheet — "Report View"**, a faithful two-line replica of the printed Intersection Detail
+  record, for visual inspection against the PDF. Appended via the EXISTING `extra_sheet_writer` opt-in
+  (the same one the Summary uses): the base `_SCHEMA` leaves it `None`; `compare()` builds a per-call
+  schema with `dataclasses.replace(_SCHEMA, extra_sheet_writer=lambda wb, ctx: _write_report_view(...))`.
+  Config lives in module constants `_RV_GRID` (the 23-column 2-line grid), `_RV_AUX` (Major/Diffs/Route),
+  `_RV_FILLS`/`_RV_FONTCOL` (palettes), `_RV_COMMENTS` (header hover-notes). Behavior: every diff renders
+  **red** (`_rv_classify`: date diffs → `soft` = red but EXCLUDED from the per-record **Major** count;
+  non-date → `hard` = counted as Major; both count toward **Diffs**); records alternate **white ↔ grey**
+  (`_RV_FILLS["eq"][0]="FFFFFF"`); TSN-only columns (X-Ovr/ADT, from `_tsn_onesided`) in blue; locations
+  from `_tsmis_locations`.
+- **⚠ Write-only-mode techniques the merge MUST preserve** (the comparison workbook is streamed): the
+  4-row merged header uses `ws.merged_cells.ranges.add(CellRange(min_col=, min_row=, max_col=, max_row=))`
+  (NOT `ws.merge_cells`, which is unavailable in write_only); header hover-comments use
+  `WriteOnlyCell.comment = Comment(...)`; **`freeze_panes` is set BEFORE the rows stream** (setting it
+  after the appends silently drops it). All cells are appended in order (4 header rows, then 2 data
+  rows/record).
+- **Notes sheet** reconciled to the position-alignment story (no "greyed/shown-but-not-counted" section;
+  the eff-date split documented; a Report-View section added).
+- **Canary (supersedes §9d):** Excel-vs-TSN **163,353** counted diffs (eight date columns × 16,211 =
+  129,688 + cross-street 30,167 + mainline/identity 3,019 + Main Line Length 436 + Intrte Postmile 43);
+  both 16,211 / only-TSMIS 262 / only-TSN 415; identical 0. PDF-vs-TSN **163,361** (+8 Description tabs).
+- **Files:** `scripts/compare_intersection_detail_tsn.py` (position-aligned `_TSN_COL`/`_TSMIS_POS`,
+  `_norm_num`+`NUMERIC_FIELDS`, `_SIGNALIZED_LABEL="S"`, the `_RV_*` config + `_write_report_view` +
+  `_rv_classify`/`_tsn_onesided`/`_tsmis_locations`, Notes + docstring, `context_fill` removed),
+  `build/check_compare_intersection_detail_tsn.py` (golden check: `context_fields==()`, position-aligned
+  mappings, `S` crosswalk, + Report-View locks — `soft` shares the hard RED palette, the normal band is
+  white, a date diff classifies `soft`, a non-date `hard`, and the sheet is appended), doc updates
+  (`tsn-parsers.md`, `comparison-engine.md`, `roadmap.md`), `CHANGELOG.md` (v0.17.8), `version.py`
+  `0.17.7`→`0.17.8`.
+- **Merge note:** if the refactor restructured this module or the comparison-workbook writing,
+  (1) keep the position-aligned `_TSN_COL` mapping (don't revert to recent-date pairing);
+  (2) keep `_SIGNALIZED_LABEL="S"`; (3) carry the Report View — it relies on the `extra_sheet_writer`
+  opt-in and the write-only techniques above (if the refactor stopped writing the comparison workbook in
+  write_only mode, the merges/comments/freeze can use the normal-mode APIs instead). The Report View is
+  Intersection-Detail-specific (no other report has one). compare_core is untouched (regression lock
+  intact — the Route-1=969 HL canary and all compare_core checks stay green).
