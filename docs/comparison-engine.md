@@ -115,7 +115,7 @@ types override the data-shape fields and side names.
 | `ditto_resolver` | `None` | DISPLAY-only resolver: tint + comment each ditto cell with its paired value (HL only) |
 | `key_normalizer` | `None` | `callable(row, off, key_field)->str` canonical identity token IN PLACE OF the raw key (HL roadbed key) — [§6](#6-roadbed-aware-key-normalizer-tsmis-vs-tsn-only) |
 | `context_fields` | `()` | field NAMES shown but NON-ASSERTING — never count as a diff, never get the ≠ mark; the cell coalesces to whichever side has a value (v0.17.0; Ramp Detail's TSN-only DB columns) |
-| `context_fill` | `None` | hex (no `#`) grey fill applied to `context_fields` cells on matched (`"Both"`) rows — a visual "shown, not part of the diff" cue (v0.17.7; Intersection Detail's 2 bulk-`2024` date columns). One-sided rows keep their yellow/blue status colour; context cells never carry the ≠ marker, so the red diff rule never fires on them |
+| `context_fill` | `None` | hex (no `#`) grey fill applied to `context_fields` cells on matched (`"Both"`) rows — a visual "shown, not part of the diff" cue (added v0.17.7 for Intersection Detail's 2 bulk-`2024` columns; ID dropped it in v0.17.8 when it went position-aligned, so the feature is retained but currently has no live user). One-sided rows keep their yellow/blue status colour; context cells never carry the ≠ marker, so the red diff rule never fires on them |
 | `extra_sheet_writer` | `None` | `callable(wb, ctx)` run after the sheets, before save — appends a familiar-layout rollup sheet (v0.17.0; the Summary reports). `ctx = {rows_a, rows_b, has_route, sc, side_a, side_b}` |
 
 Both v0.17.0 fields keep the lock: default `()`/`None` → `is_context` is always False / no extra
@@ -496,28 +496,31 @@ right-channelization / lighting are `Y/N` on TSN but `1/0` on TSMIS — **normal
 **(2)** Control Type — TSN spreads signalized across the legacy signal sub-types **J–P** (pretimed /
 semi- / full-actuated, 2- vs multi-phase), which TSNR/TSMIS collapses into ONE category (stored `S`).
 Per the TSNR/MIRE reference ("TSNR - Intersection Control and Geometry Type", 2026-06-24), both sides'
-signalized codes are **normalized to one readable `Signalized` category** — so the sub-type split no
-longer flags, and the word "Signalized" (vs the raw letter codes) shows the merge ON the comparison
-sheet, with the **Notes sheet** documenting it. Every other code (A/B/C/D/E/F/G/H/I/R/Z) is shared
-and compared unchanged; geometry/INT Type needs no crosswalk;
-**(3) COMPARE-EVERYTHING + eff-dates (user, 2026-06-24; columns reordered to mirror the printed
-report in v0.17.7):** every column present in both systems is compared and counted (a mechanical
-diff) — PR, Date of Record (a TSMIS refresh date — the whole column differs), the 5 cross-street
-attrs (TSMIS-blank for ~37%), Main Line Length, the intersecting-route block (PM **suffix from pos
-35**), and the **5 effective dates** (INT/Control/Lighting → their `EFF_DATE_*`; Mainline →
-`MAIN_EFF_DATE`; Cross-street → `EFF_DATE` — the RECENT TSN dates), which sit a **systematic 1-day
-apart** and flag raw on that offset. Only **2 columns are greyed `context_fields`** (`ML 2nd
-Eff-Date`, `Int St Eff-Date` — uniform `2024` bulk stamps with no TSN counterpart; `context_fill=
-"D9D9D9"`). The **Notes sheet** *comments* on the columns that differ wholesale and documents every
-normalization. **(4)** Divided-highway routes carry a roadbed suffix (S/U) on TSN but not TSMIS —
+signalized codes are **normalized to the single code `S`** (the code TSMIS itself stores; was the word
+"Signalized" through v0.17.7) — so the sub-type split no longer flags, and the shared `S` (vs the raw
+letter codes) shows the merge ON the comparison sheet, with the **Notes sheet** documenting it. Every
+other code (A/B/C/D/E/F/G/H/I/R/Z) is shared and compared unchanged; geometry/INT Type needs no crosswalk;
+**(3) COMPARE-EVERYTHING, POSITION-ALIGNED + eff-dates (user, 2026-06-24; columns reordered to mirror
+the printed report in v0.17.7, position-aligned in v0.17.8):** every column present in both systems is
+compared and counted (a mechanical diff) — PR, Date of Record (a TSMIS refresh date — the whole column
+differs), the 5 cross-street attrs (TSMIS-blank for ~37%), Main Line Length, the intersecting-route
+block (PM **suffix from pos 35**), and **all 8 effective dates compared BY REPORT POSITION** (INT/
+Control/Lighting → their geometry `EFF_DATE_*`, the **~1-day** offset; Mainline / Cross-street **1st** →
+TSN's *original* `EFF_DATE_ML` / `CROSS_BEGIN_DATE` — TSMIS shows its refresh date here, a structural
+refresh-vs-original diff; Mainline / Cross **2nd** → recent `MAIN_EFF_DATE` / `EFF_DATE`). **Nothing is
+greyed** — `context_fields = ()` (the two former `2024` context columns are now compared). The **Notes
+sheet** *comments* on the columns that differ wholesale and documents every normalization, and a second
+**`Report View`** sheet (`extra_sheet_writer`) replicates the printed two-line record — every diff in
+red, white/grey record bands, per-record `Major` / `Diffs` — for visual inspection against the PDF. **(4)** Divided-highway routes carry a roadbed suffix (S/U) on TSN but not TSMIS —
 keyed on the BASE route so the same intersection still pairs, with the suffix surfaced as a compared
 `Roadbed` column so a suffix-only difference is flagged (match-and-indicate, 2026-06-20).
 Canary (statewide, local): **16,211 both / 262 only-TSMIS / 415 only-TSN (routes one-sided
-NONE/NONE); 131,948 counted diffs** = six whole-column date diffs at 16,211 (Date of Record structural
-+ the 5 eff-dates' 1-day offset = 97,266) + cross-street 30,167 (mostly completeness gaps; 276
-genuine conflicts) + Main Line Length 1,398 + mainline/identity 3,019 (post-crosswalk, Control Type
-2,614→1) + Intrte Postmile 98; context columns count 0; every matched row differs; **16473 vs
-16626**. PDF flavor **131,956** (+8 Description trailing-tab cells). Live in both matrices.
+NONE/NONE); 163,353 counted diffs** = eight whole-column date diffs at 16,211 (Date of Record + the
+mainline/cross-street 1st & 2nd eff-dates, structural refresh-vs-original; + INT/Control/Lighting's
+~1-day geometry offset = 129,688) + cross-street 30,167 (mostly completeness gaps) + mainline/identity
+3,019 (post-crosswalk, Control Type 2,614→1) + Main Line Length 436 (was 1,398 pre zero-padding norm)
++ Intrte Postmile 43 (was 98); nothing greyed/context — every shared column counts; every matched row
+differs; **16473 vs 16626**. PDF flavor **163,361** (+8 Description trailing-tab cells). Live in both matrices.
 
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 

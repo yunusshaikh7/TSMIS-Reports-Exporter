@@ -96,24 +96,42 @@ def test_schema():
     sc = idt._SCHEMA
     check("key is PM", sc.header[sc.key_field] == "PM")
     check("side names TSMIS / TSN", sc.side_a == "TSMIS" and sc.side_b == "TSN")
-    check("context fields = the 2 single-year bulk columns (shown, not counted)",
-          tuple(sc.context_fields) == ("ML 2nd Eff-Date", "Int St Eff-Date"))
-    check("the 5 real eff-dates + Main Line Length + intersecting route ARE compared",
+    check("position-aligned: NO context fields (nothing suppressed or greyed)",
+          tuple(sc.context_fields) == ())
+    check("all 8 date cols + Main Line Length + intersecting route ARE compared "
+          "(incl. the former context columns ML 2nd / Int St Eff-Date)",
           all(f in sc.header and f not in sc.context_fields for f in (
-              "INT Type Eff-Date", "Control Type Eff-Date", "Lighting Eff-Date",
-              "ML Eff-Date", "CS Eff-Date", "Main Line Length", "Intrte Route",
+              "Date of Record", "INT Type Eff-Date", "Control Type Eff-Date",
+              "Lighting Eff-Date", "ML Eff-Date", "ML 2nd Eff-Date", "CS Eff-Date",
+              "Int St Eff-Date", "Main Line Length", "Intrte Route",
               "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix")))
-    check("ML Eff-Date -> MAIN_EFF_DATE, CS Eff-Date -> EFF_DATE (recent TSN dates)",
-          idt._TSN_COL["ML Eff-Date"] == "MAIN_EFF_DATE" and idt._TSN_COL["CS Eff-Date"] == "EFF_DATE")
+    check("position-aligned eff-dates: ML/CS Eff-Date -> geometry EFF_DATE_ML/CROSS_BEGIN_DATE; "
+          "ML 2nd/Int St Eff-Date -> recent MAIN_EFF_DATE/EFF_DATE",
+          idt._TSN_COL["ML Eff-Date"] == "EFF_DATE_ML"
+          and idt._TSN_COL["CS Eff-Date"] == "CROSS_BEGIN_DATE"
+          and idt._TSN_COL["ML 2nd Eff-Date"] == "MAIN_EFF_DATE"
+          and idt._TSN_COL["Int St Eff-Date"] == "EFF_DATE")
     check("intersecting-route PM suffix reads from pos 35 (not the blank pos 31)",
           idt._TSMIS_POS["Intrte PM Suffix"] == 35)
     check("Notes legend_writer set (documents the normalizations)", sc.legend_writer is not None)
+    check("Report View extra_sheet_writer set (the printed two-line replica)",
+          sc.extra_sheet_writer is None)   # base schema is clean; the closure is added per-call in compare()
     check("boolean normalize Y/1->Y, N/0->N",
           idt._norm_bool("Y") == "Y" and idt._norm_bool("1") == "Y"
           and idt._norm_bool("N") == "N" and idt._norm_bool("0") == "N")
-    check("control-type crosswalk: TSN J-P + TSMIS S -> Signalized; others unchanged",
-          all(idt._norm_control_type(c) == "Signalized" for c in "JKLMNPS")
+    check("control-type crosswalk: TSN J-P + TSMIS S -> 'S' (signalized); others unchanged",
+          all(idt._norm_control_type(c) == "S" for c in "JKLMNPS")
           and idt._norm_control_type("A") == "A" and idt._norm_control_type("B") == "B")
+    # Report View (v0.17.8): every date difference renders RED like a genuine conflict but is
+    # kept OUT of the per-record Major count; the lighter alternating band is WHITE (user, 2026-06-24).
+    check("Report View: date 'soft' diffs share the hard RED palette (all dates red)",
+          idt._RV_FILLS["soft"] == idt._RV_FILLS["hard"])
+    check("Report View: the normal (lighter) alternating band is WHITE",
+          idt._RV_FILLS["eq"][0] == "FFFFFF" and idt._RV_FILLS["id"][0] == "FFFFFF")
+    check("Report View: a date diff classifies 'soft' (red, excluded from Major)",
+          idt._rv_classify("Date of Record", "2021-12-31", "1973-10-19") == "soft")
+    check("Report View: a non-date attribute diff classifies 'hard' (counts as Major)",
+          idt._rv_classify("Control Type", "S", "A") == "hard")
     check("route from LOCATION '12 ORA 001' -> '001'", idt._norm_route("12 ORA 001") == "001")
     check("roadbed split '12 ORA 210U' -> ('210','U')", idt._split_route("12 ORA 210U") == ("210", "U"))
     check("roadbed split '12 ORA. 210' -> ('210','')", idt._split_route("12 ORA. 210") == ("210", ""))
@@ -152,6 +170,7 @@ def test_end_to_end():
     check("compare ok", res.status == "ok")
     header, rows, sheets = _comparison(out)
     check("Notes sheet present (the indicator)", "Notes" in sheets)
+    check("Report View sheet appended (the printed two-line replica)", "Report View" in sheets)
     pm = header.index("PM")
     by = {r[pm]: r for r in rows}
 
@@ -168,8 +187,8 @@ def test_end_to_end():
     check("Lighting Y(TSN)/1(TSMIS) normalized equal — no diff", DIFF not in by["0.204"][light])
     check("ML Mastarm Y/1 normalized equal — no diff", DIFF not in by["0.204"][mast])
     check("ML Right Chan N/0 normalized equal — no diff", DIFF not in by["0.204"][rc])
-    check("Control Type S(TSMIS)/P(TSN) crosswalk to Signalized — no diff",
-          DIFF not in by["0.204"][ctrl] and by["0.204"][ctrl] == "Signalized")
+    check("Control Type S(TSMIS)/P(TSN) crosswalk to 'S' — no diff",
+          DIFF not in by["0.204"][ctrl] and by["0.204"][ctrl] == "S")
     # Everything present in both systems is now COUNTED (no suppression):
     # the cross-street blank-vs-value gap and the Date-of-Record refresh-vs-record
     # column flag like any other diff.
@@ -248,9 +267,9 @@ def test_normalized_path_crosswalk():
     pm_i = 1 + idt.SHARED_HEADER.index("PM")
     ct_i = 1 + idt.SHARED_HEADER.index("Control Type")
     by_pm = {r[pm_i]: r[ct_i] for r in rows}
-    check("raw 'P' in a normalized library workbook -> 'Signalized' on read",
-          by_pm.get("1.000") == "Signalized")
-    check("raw 'J' likewise -> 'Signalized'", by_pm.get("2.000") == "Signalized")
+    check("raw 'P' in a normalized library workbook -> 'S' on read",
+          by_pm.get("1.000") == "S")
+    check("raw 'J' likewise -> 'S'", by_pm.get("2.000") == "S")
     check("non-signal 'A' unchanged", by_pm.get("3.000") == "A")
 
 

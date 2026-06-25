@@ -3,6 +3,34 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.17.8 — 2026-06-24
+
+- **New "Report View" tab on the Intersection Detail comparison vs TSN — the comparison laid
+  out exactly like the printed report, for checking against the PDFs at a glance.** Each
+  intersection appears as the same two stacked lines the report uses, under a matching
+  two-row header. Every difference is shown in **red** right in the cell (the TSMIS value ≠
+  the TSN value); columns only one system has are colour-coded (blue = TSN-only); and records
+  alternate white / grey so each one reads as a distinct segment. Two counts head every
+  record: **Major** (genuine attribute conflicts) and **Diffs** (every difference, the
+  structural date offsets included). Header cells carry hover-notes spelling out each
+  normalization (the J–P→S signal crosswalk, the Y/N≡1/0 booleans, the ignored zero-padding)
+  so a match reads as "equal after this rule," not raw equality. The original flat comparison
+  sheet is unchanged and still present.
+- **The Intersection Detail date columns now line up the way the printed reports do — position
+  for position.** Previously the five effective dates were matched to TSN's *recent* dates (so
+  they read as a uniform one-day offset) and two "2024" columns were greyed out and skipped.
+  Now every column is compared **by its place in the report** — each column against the same
+  column in the other report — so nothing is hidden or greyed: the mainline and cross-street
+  effective dates compare against TSN's original geometry dates (the same structural
+  "TSMIS shows its refresh date, TSN keeps the original" difference as Date of Record), the two
+  former "2024" columns are compared too, and the INT / Control / Lighting dates stay the
+  one-day geometry offset. The Notes sheet explains each case.
+- **Zero-padding no longer counts as a difference** on the Main Line Length and intersecting-route
+  numbers — `58` now matches `058`, and `9.560` matches `9.56` — so those columns flag only on
+  genuine value changes (e.g. Main Line Length dropped from ~1,400 to ~440 flagged cells statewide).
+- **The signalized control type now shows as "S"** — matching the code TSMIS itself stores —
+  instead of the word "Signalized," wherever the J–P→S crosswalk applied.
+
 ## v0.17.7 — 2026-06-24
 
 - **The Intersection Detail comparison vs TSN now covers every shared column, ordered to

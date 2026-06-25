@@ -142,8 +142,9 @@ the field bug + P1s first.
   tabs (raw `'HILLCREST RD\t\t'`) that the PDF rendering doesn't carry — the ONLY 8 cells where
   TSMIS-PDF and TSMIS-Excel disagree statewide are exactly these (all Description, identical road
   name, invisible), and they inflate Intersection Detail's **PDF-vs-TSN** count by 8 over Excel's
-  (under compare-everything + eff-dates v0.17.7: 131,956 vs 131,948; was 49,405 vs 49,397 pre-eff-date;
-  the same delta the pre-2026-06-24 mainline-only counts showed, 5,640 vs 5,632). The 8: routes 025/033/111×4/299×2. **Preferred fix: follow the HL precedent, not a core
+  (position-aligned v0.17.8: 163,361 vs 163,353; compare-everything + eff-dates v0.17.7: 131,956 vs 131,948;
+  was 49,405 vs 49,397 pre-eff-date; the same +8 delta the pre-2026-06-24 mainline-only counts showed,
+  5,640 vs 5,632). The 8: routes 025/033/111×4/299×2. **Preferred fix: follow the HL precedent, not a core
   change** — collapse `[\t\n\r\f\v]`→space in the affected report's LOADER (Intersection Detail's
   `_project`/`normalize_value` path first; audit the other non-HL loaders for tab-padded sources).
   This keeps the regression blast radius to the touched report's canary instead of widening
