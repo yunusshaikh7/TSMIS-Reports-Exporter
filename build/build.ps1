@@ -14,6 +14,7 @@
 param(
     [switch]$SelfTest,        # after building+pruning, gate the EXACT windowed exe via `--self-test` (R1-B04)
     [switch]$BundleChromium,  # ships Playwright's own Chromium inside the bundle (the with-browser variant)
+    [switch]$RecreateVenv,    # delete + recreate build\.venv for a clean, reproducible env (P10/R1-R10)
     [switch]$Sign,            # sign the built .exe with a self-signed cert (interim, local trust only)
     [string]$CertSubject = "CN=TSMIS Exporter (self-signed)"
 )
@@ -26,19 +27,36 @@ $VenvDir  = Join-Path $BuildDir ".venv"
 $VenvPy   = Join-Path $VenvDir  "Scripts\python.exe"
 $WorkDir  = Join-Path $BuildDir "pyi-work"
 $DistDir  = Join-Path $RepoRoot "dist"
+$LockFile = Join-Path $RepoRoot "requirements-build.lock.txt"
+$CheckEnv = Join-Path $BuildDir "check_build_env.py"
 
 function Assert-LastExit($what) {
     if ($LASTEXITCODE -ne 0) { throw "$what failed (exit $LASTEXITCODE)" }
 }
 
-# --- 1. Isolated build venv ----------------------------------------------
+# --- 1. Isolated, reproducible build venv (hash-pinned lock + env verification) ---
+# Install the EXACT, hash-verified dependency tree from requirements-build.lock.txt
+# with --require-hashes, then fail if the resulting environment doesn't match the
+# lock (unexpected / missing / drifted packages) -- so the artifact is built from a
+# verified, reproducible tree (P10 / R1-R10). -RecreateVenv forces a clean rebuild;
+# CI runners are fresh, so the recreate matters mainly for local hygiene.
+if ($RecreateVenv -and (Test-Path $VenvDir)) {
+    Write-Host "==> Removing build venv for a clean recreate"
+    Remove-Item -Recurse -Force $VenvDir
+}
 if (-not (Test-Path $VenvPy)) {
     Write-Host "==> Creating build venv"
     python -m venv $VenvDir; Assert-LastExit "venv creation"
 }
-Write-Host "==> Installing pinned build dependencies"
+Write-Host "==> Checking dependency integrity (version.py <-> requirements <-> lock parity)"
+& $VenvPy -X utf8 $CheckEnv; Assert-LastExit "dependency-integrity check"
+Write-Host "==> Installing the hash-pinned build dependencies (--require-hashes)"
 & $VenvPy -m pip install --upgrade pip --quiet; Assert-LastExit "pip upgrade"
-& $VenvPy -m pip install -r (Join-Path $RepoRoot "requirements-build.txt"); Assert-LastExit "pip install"
+& $VenvPy -m pip install --require-hashes -r $LockFile; Assert-LastExit "pip install (hash-pinned)"
+Write-Host "==> Verifying the build venv matches the lock exactly (fail on unexpected packages)"
+# --verify-installed self-runs `pip freeze` inside THIS venv (no native pipe, which
+# can corrupt the first line with a BOM under Windows PowerShell).
+& $VenvPy -X utf8 $CheckEnv --verify-installed; Assert-LastExit "build-venv lock verification"
 
 # NOTE: by default no Chromium is downloaded or bundled. The app drives the
 # machine's installed Microsoft Edge / Google Chrome (channel="msedge"/

@@ -126,13 +126,15 @@ jobs:
       - name: Packaging + console-flow checks (blocking)
         # Offline half of the exact-artifact gate (PA): APP_MODULES is the complete,
         # reachable flat-module inventory (F6 tripwire), and the source-ZIP console
-        # menu→module dispatch imports + resolves. The FROZEN exe half runs in
-        # frozen-gate.yml / release.yml.
+        # menu→module dispatch imports + resolves. check_build_env asserts the
+        # version/requirements/lock dependency integrity (P10). The FROZEN exe half
+        # runs in frozen-gate.yml / release.yml.
         shell: bash
         run: |
           set -e
           python build/check_app_modules.py
           python build/check_source_zip_smoke.py
+          python build/check_build_env.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py

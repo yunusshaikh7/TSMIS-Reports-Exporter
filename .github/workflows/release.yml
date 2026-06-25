@@ -130,6 +130,30 @@ jobs:
             Write-Host "$hash  $($_.Name)"
           }
 
+      - name: Verify every variant artifact + its .sha256 was produced (fails, never skips)
+        shell: pwsh
+        # Per-variant acceptance is ENFORCED here: each of the three published zips
+        # AND its companion .sha256 must exist before the release is created. A
+        # variant whose build/gate failed, or a missing checksum, FAILS the release
+        # instead of silently shipping a partial set (R1-T06 / R1-M02). The earlier
+        # -SelfTest (windowed exes) and console smoke (source zip) gates already fail
+        # on a broken capability; this is the final artifact-completeness backstop.
+        run: |
+          $zips = @(
+            "TSMIS-Exporter-$env:TAG-win64.zip",
+            "TSMIS-Exporter-$env:TAG-win64-with-browser.zip",
+            "TSMIS-Exporter-$env:TAG-batch-source.zip"
+          )
+          $missing = @()
+          foreach ($z in $zips) {
+            if (-not (Test-Path $z))          { $missing += $z }
+            if (-not (Test-Path "$z.sha256")) { $missing += "$z.sha256" }
+          }
+          if ($missing.Count) {
+            throw "Release artifacts missing (a build/gate/checksum step failed): $($missing -join ', ')"
+          }
+          Write-Host "OK: all 3 variant zips + their .sha256 checksums are present."
+
       - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -83,6 +83,11 @@ _BUNDLE_ITEMS = (_EXE_NAME, "_internal", "Start Here.txt", "IT-README.txt")
 _CHUNK = 256 * 1024
 _API_TIMEOUT_S = 20
 _DL_TIMEOUT_S = 60          # socket timeout per read while streaming the zip
+_DL_RETRY_ATTEMPTS = 3      # bounded retries for a transient network failure mid-download
+# /releases is paginated (per_page=100). Follow rel="next" up to this many pages so a
+# revert target older than the newest 100 releases is still found; the cap is a safety
+# bound far past any real release history (50 * 100 = 5000 releases).
+_RELEASES_PAGE_CAP = 50
 
 
 class UpdateError(Exception):
@@ -252,6 +257,39 @@ def _asset_info_from_release(release, remote, tag, want):
     )
 
 
+def _next_link(link_header):
+    """The rel="next" URL from a GitHub `Link` response header, or '' when there is
+    no next page. Link header form: `<url>; rel="next", <url>; rel="last"`."""
+    for part in (link_header or "").split(","):
+        seg = [s.strip() for s in part.split(";")]
+        if len(seg) < 2:
+            continue
+        url = seg[0].strip("<>")
+        if any(p.replace(" ", "").lower() in ('rel="next"', "rel=next") for p in seg[1:]):
+            return url
+    return ""
+
+
+def _fetch_release_list():
+    """Every published release, following GitHub's pagination past the per_page=100
+    cap (releases-list-capped-100 blindspot — a revert target older than the newest
+    100 releases would otherwise be invisible). Raises the same urllib/JSON errors as
+    a single fetch, for the caller to translate."""
+    url = _API_RELEASES
+    out = []
+    for _ in range(_RELEASES_PAGE_CAP):
+        with _http_get(url, _API_TIMEOUT_S) as resp:
+            page = json.load(resp)
+            nxt = _next_link((resp.headers or {}).get("Link"))
+        if not isinstance(page, list):
+            break
+        out.extend(page)
+        if not nxt:
+            break
+        url = nxt
+    return out
+
+
 def resolve_previous_release(current_version=None, variant=None):
     """The newest FULL release strictly OLDER than this build, as an UpdateInfo
     for the current variant — the target of the Settings "revert to previous
@@ -269,8 +307,7 @@ def resolve_previous_release(current_version=None, variant=None):
     log.info("revert: resolving newest release older than v%s, variant %s",
              current_version or __version__, want)
     try:
-        with _http_get(_API_RELEASES, _API_TIMEOUT_S) as resp:
-            data = json.load(resp)
+        data = _fetch_release_list()
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return None
@@ -335,6 +372,89 @@ def _expected_sha256(info):
     return None
 
 
+def _sha256_file(path):
+    """The SHA-256 (lowercase hex) of a file, streamed so a ~150 MB exe needn't be
+    read into memory."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(_CHUNK), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _bundle_digest(staged):
+    """One SHA-256 over the ENTIRE launchable/installable staged bundle — every file
+    under each `_BUNDLE_ITEMS` entry that exists (the exe AND the code-bearing
+    `_internal/**` tree AND the readmes), folded in by sorted POSIX relative path so
+    the result is order-stable. This is the trust record the swap re-verifies, so
+    tampering with ANY launched/installed file in the user-writable staged folder —
+    not just the exe — is detected before the swap. Returns the hex digest, or None
+    when the staged tree can't be fully read (treated as unverifiable = refuse)."""
+    staged = Path(staged)
+    entries = []                          # (posix_relpath, abspath)
+    try:
+        for name in _BUNDLE_ITEMS:
+            item = staged / name
+            if item.is_dir():
+                entries.extend((p.relative_to(staged).as_posix(), p)
+                               for p in item.rglob("*") if p.is_file())
+            elif item.is_file():
+                entries.append((item.relative_to(staged).as_posix(), item))
+    except OSError:
+        return None
+    entries.sort(key=lambda t: t[0])
+    h = hashlib.sha256()
+    try:
+        for rel, p in entries:
+            h.update(rel.encode("utf-8") + b"\0" + _sha256_file(p).encode("ascii") + b"\0")
+    except OSError:
+        return None
+    return h.hexdigest()
+
+
+def _write_staged_record(digest):
+    """Write the staged bundle's trust digest next to (not inside) the staged tree.
+    Separated so a test can force a write failure; the caller fails staging if it raises."""
+    (UPDATE_DIR / "staged.sha256").write_text(digest, encoding="ascii")
+
+
+def _stream_to_file(info, zip_path, on_progress):
+    """One download attempt: stream info's asset into zip_path, returning
+    (sha256_hex, bytes_written). The socket read timeout (_DL_TIMEOUT_S) bounds any
+    single read; download_and_stage wraps this in a bounded retry."""
+    done = 0
+    hasher = hashlib.sha256()
+    with _http_get(info.asset_url, _DL_TIMEOUT_S) as resp, open(zip_path, "wb") as out:
+        total = info.asset_size or int(resp.headers.get("Content-Length") or 0)
+        while True:
+            chunk = resp.read(_CHUNK)
+            if not chunk:
+                break
+            out.write(chunk)
+            hasher.update(chunk)
+            done += len(chunk)
+            if on_progress:
+                on_progress(done, total)
+    return hasher.hexdigest(), done
+
+
+def _safe_zip_members(zf, dest):
+    """Reject a zip-slip package BEFORE any byte is written: every member must
+    extract to a path contained inside `dest` (no absolute paths, drive letters, or
+    `..` traversal). zipfile sanitizes most of this on modern Python, but a
+    self-updater that then RUNS the extracted exe must not depend on that — validate
+    explicitly and refuse the whole package on any escaping member."""
+    dest_resolved = dest.resolve()
+    for name in zf.namelist():
+        target = (dest / name).resolve()
+        try:
+            target.relative_to(dest_resolved)
+        except ValueError:
+            log.warning("update: refusing package — member escapes the extract dir: %r", name)
+            raise UpdateError("the downloaded package contains an unsafe file path "
+                              "and was rejected") from None
+
+
 def download_and_stage(info, on_progress=None):
     """Download `info`'s zip and extract a verified bundle tree to
     UPDATE_DIR/staged (returned). Heavy — run on a worker thread.
@@ -363,51 +483,58 @@ def download_and_stage(info, on_progress=None):
 
     zip_path = UPDATE_DIR / (info.asset_name or "update.zip")
     log.info("downloading %s (%d bytes) -> %s", info.asset_url, info.asset_size, zip_path)
-    done = 0
-    hasher = hashlib.sha256()
-    try:
-        with _http_get(info.asset_url, _DL_TIMEOUT_S) as resp, open(zip_path, "wb") as out:
-            total = info.asset_size or int(resp.headers.get("Content-Length") or 0)
-            while True:
-                chunk = resp.read(_CHUNK)
-                if not chunk:
-                    break
-                out.write(chunk)
-                hasher.update(chunk)
-                done += len(chunk)
-                if on_progress:
-                    on_progress(done, total)
-    except OSError as e:
-        log.warning("download failed after %d bytes: %s: %s", done, type(e).__name__, e)
+    # A flaky link (corporate proxy, Wi‑Fi hiccup) gets a few bounded retries; each
+    # attempt restarts the stream from scratch (fresh file + hash). The socket read
+    # timeout (_DL_TIMEOUT_S) keeps any single attempt from hanging.
+    actual = done = None
+    last_err = None
+    for attempt in range(1, _DL_RETRY_ATTEMPTS + 1):
+        try:
+            actual, done = _stream_to_file(info, zip_path, on_progress)
+            break
+        except OSError as e:
+            last_err = e
+            log.warning("download attempt %d/%d failed: %s: %s",
+                        attempt, _DL_RETRY_ATTEMPTS, type(e).__name__, e)
+            zip_path.unlink(missing_ok=True)
+    if actual is None:
+        log.warning("download failed after %d attempt(s): %s: %s",
+                    _DL_RETRY_ATTEMPTS, type(last_err).__name__, last_err)
         raise UpdateError("the update download failed — "
-                          "check the internet connection and try again") from e
+                          "check the internet connection and try again") from last_err
     if info.asset_size and done != info.asset_size:
         raise UpdateError(f"the update download was incomplete "
                           f"({done // 1_000_000} of {info.asset_size // 1_000_000} MB) "
                           "— try again")
 
-    # Verify the download against its published SHA-256 before trusting it. A
-    # mismatch (corruption, a truncated/wrong asset) refuses the install rather
-    # than extracting and swapping in unverified bytes.
-    actual = hasher.hexdigest()
+    # Verify the download against its published SHA-256 before trusting it, and
+    # REFUSE to install when there is nothing to verify against — never extract and
+    # swap in unverified bytes (size alone is not integrity). release.yml publishes
+    # an <asset>.sha256 for every zip, so the verified path IS the normal path.
     expected = _expected_sha256(info)
-    if expected:
-        if actual != expected:
-            zip_path.unlink(missing_ok=True)
-            log.warning("update: SHA-256 mismatch (expected %s, got %s)",
-                        expected, actual)
-            raise UpdateError("the downloaded update didn't match its published "
-                              "checksum (it may be corrupted) — please try again")
-        log.info("update: SHA-256 verified (%s)", actual)
-    else:
-        log.warning("update: no published checksum to verify against; proceeding "
-                    "on size only (download SHA-256 %s)", actual)
+    if not expected:
+        zip_path.unlink(missing_ok=True)
+        log.warning("update: no published checksum for %s — refusing to install "
+                    "unverified bytes (download SHA-256 %s)", info.asset_name, actual)
+        raise UpdateError("this update could not be verified (no published "
+                          "checksum), so it was not installed — install it manually "
+                          "from the releases page")
+    if actual != expected:
+        zip_path.unlink(missing_ok=True)
+        log.warning("update: SHA-256 mismatch (expected %s, got %s)", expected, actual)
+        raise UpdateError("the downloaded update didn't match its published "
+                          "checksum (it may be corrupted) — please try again")
+    log.info("update: SHA-256 verified (%s)", actual)
 
     extract_dir = UPDATE_DIR / "extract"
     log.info("extracting %s (%d bytes)", zip_path.name, done)
     try:
         with zipfile.ZipFile(zip_path) as zf:
+            _safe_zip_members(zf, extract_dir)      # zip-slip guard (raises UpdateError)
             zf.extractall(extract_dir)
+    except UpdateError:
+        zip_path.unlink(missing_ok=True)
+        raise
     except (zipfile.BadZipFile, OSError) as e:
         log.warning("extract failed: %s: %s", type(e).__name__, e)
         raise UpdateError("the downloaded file is not a valid app package") from e
@@ -434,7 +561,27 @@ def download_and_stage(info, on_progress=None):
 
     if not (staged / _EXE_NAME).is_file() or not (staged / "_internal").is_dir():
         raise UpdateError("the downloaded package is missing expected app files")
-    log.info("update %s staged at %s", info.tag, staged)
+    # Record a trust digest over the WHOLE staged bundle (exe + _internal/** + the
+    # readmes) NEXT TO (not inside) the staged tree, so apply_update_and_restart can
+    # re-verify the entire launchable/installable content in the TRUSTED original
+    # process before the swap — the staged tree sits in a user-writable folder
+    # between download and swap. Recording it is MANDATORY: if the digest can't be
+    # computed or written, the stage FAILS and the staging area is removed, so no
+    # unverifiable staged tree is ever left for apply to launch.
+    digest = _bundle_digest(staged)
+    if digest is None:
+        shutil.rmtree(UPDATE_DIR, ignore_errors=True)
+        raise UpdateError("the downloaded update could not be verified after "
+                          "extraction — please try again")
+    try:
+        _write_staged_record(digest)
+    except OSError as e:
+        log.warning("update: could not record the staged trust digest: %s: %s",
+                    type(e).__name__, e)
+        shutil.rmtree(UPDATE_DIR, ignore_errors=True)
+        raise UpdateError("the downloaded update could not be secured after "
+                          "extraction — please try again") from e
+    log.info("update %s staged at %s (bundle digest %s)", info.tag, staged, digest[:12])
     return staged
 
 
@@ -462,6 +609,28 @@ SWAP_FLAG = "--apply-update"
 _SWAP_TIMEOUT_S = 120        # max wait for the old app's PID to exit
 _RETRY_ATTEMPTS = 12         # Defender / slow handle release after exit
 _RETRY_DELAY_S = 0.5
+_DEATH_CHECK_TOTAL_S = 2.0       # watch a freshly-launched swap process this long for an immediate death
+_DEATH_CHECK_INTERVAL_S = 0.25   # poll cadence within that window
+
+
+def _staged_hash(staged):
+    """The bundle trust digest recorded at download time (the sibling staged.sha256
+    file — see `_bundle_digest`), or None when it is absent or garbled (→ fail closed)."""
+    path = Path(staged).parent / "staged.sha256"
+    try:
+        token = path.read_text(encoding="ascii").strip().lower()
+    except OSError:
+        return None
+    return token if re.fullmatch(r"[0-9a-f]{64}", token) else None
+
+
+def _launch_detached(cmd, cwd, flags):
+    """Spawn `cmd` detached — no console, own process group, no inherited std
+    streams. Separated so a test can stand in a fake process."""
+    return subprocess.Popen(
+        cmd, creationflags=flags, close_fds=True, cwd=str(cwd),
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL)
 
 
 def apply_update_and_restart(staged_dir):
@@ -481,25 +650,50 @@ def apply_update_and_restart(staged_dir):
         raise UpdateError("the downloaded update is no longer on disk — "
                           "download it again")
 
+    # Re-verify the WHOLE staged bundle (exe + _internal/** + readmes) against the
+    # digest recorded at download time, in the ORIGINAL (trusted) process BEFORE the
+    # staged exe is ever launched — the staged tree sat in a user-writable folder, so
+    # a re-hash here catches tampering with ANY launched/installed file rather than
+    # trusting the staged exe to vet itself. FAIL CLOSED: a missing or malformed trust
+    # record, an unreadable tree, or any content mismatch refuses the swap (the app
+    # stays on the old version; the user re-downloads).
+    expected = _staged_hash(staged)
+    if expected is None:
+        log.warning("update: no valid staged trust record — refusing to apply")
+        raise UpdateError("the staged update could not be verified (its security "
+                          "record is missing) and was not applied — download it again")
+    actual = _bundle_digest(staged)
+    if actual != expected:
+        log.warning("update: staged bundle digest changed since download "
+                    "(expected %s, got %s) — refusing to launch it", expected, actual)
+        raise UpdateError("the staged update changed on disk and was not "
+                          "applied — download it again")
+    log.info("update: staged bundle re-verified before swap (%s)", actual[:12])
+
     helper_log = LOG_DIR / "update_helper.log"
     flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
     try:
-        proc = subprocess.Popen(
+        proc = _launch_detached(
             [str(new_exe), SWAP_FLAG, str(install_dir()), str(os.getpid()),
              str(helper_log)],
-            creationflags=flags, close_fds=True, cwd=str(staged),
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL)
+            staged, flags)
     except OSError as e:
         log.warning("swap process failed to start: %s: %s", type(e).__name__, e)
         raise UpdateError("the update process could not be started — "
                           "install the new version manually from the "
                           "releases page") from e
-    # A blocked/broken exe dies within moments; catch that while the app is
-    # still open instead of closing into a swap that never happens (the
-    # silent-failure mode the PowerShell helper had).
-    time.sleep(1.5)
-    rc = proc.poll()
+    # A blocked/broken exe dies within moments; watch for that across a short
+    # WINDOW (not a single instant) while the app is still open, so a death at any
+    # point in the window is caught instead of closing into a swap that never
+    # happens (the silent-failure mode the PowerShell helper had). Still fail-safe:
+    # only a process OBSERVED dead raises; a live one proceeds.
+    polls = max(1, int(_DEATH_CHECK_TOTAL_S / _DEATH_CHECK_INTERVAL_S))
+    rc = None
+    for _ in range(polls):
+        time.sleep(_DEATH_CHECK_INTERVAL_S)
+        rc = proc.poll()
+        if rc is not None:
+            break
     if rc is not None:
         log.warning("swap process exited immediately (code %s)", rc)
         raise UpdateError("the update process exited before it could start "
@@ -531,9 +725,29 @@ def run_swap_mode(argv):
     os._exit(0 if ok else 1)
 
 
+_HELPER_LOG_MAX_BYTES = 256 * 1024   # rotate update_helper.log past this (keep one .1 backup)
+
+
+def _rotate_swap_log(log_file):
+    """Keep update_helper.log bounded across many updates: once it passes the cap,
+    move it aside to <log>.1 (replacing any previous backup) and start fresh.
+    Best-effort — a rotation failure must never block the swap log itself."""
+    try:
+        if log_file.is_file() and log_file.stat().st_size >= _HELPER_LOG_MAX_BYTES:
+            backup = log_file.with_name(log_file.name + ".1")
+            try:
+                backup.unlink()
+            except OSError:
+                pass
+            log_file.rename(backup)
+    except OSError:
+        pass
+
+
 def _swap_log(log_file, message):
     try:
         log_file.parent.mkdir(parents=True, exist_ok=True)
+        _rotate_swap_log(log_file)
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}  {message}\n")
     except OSError:
@@ -700,8 +914,7 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
                             "previous version PARTIALLY restored - reinstall "
                             "the app from the releases page")
         if show_dialog:
-            _message_box("The update could not be applied, so the previous "
-                         f"version was kept.\nDetails: {log_file}")
+            _message_box(_rollback_dialog_text(restored, log_file))
 
     if relaunch:
         _relaunch(app_dir, log_file)
@@ -725,6 +938,18 @@ def _relaunch(app_dir, log_file):
     except OSError as e:
         _swap_log(log_file, f"relaunch FAILED: {type(e).__name__}: {e} - "
                             "start the app manually")
+
+
+def _rollback_dialog_text(restored, log_file):
+    """The swap-failure dialog text, reflecting the ACTUAL rollback outcome: a
+    PARTIAL restore must not read as 'the previous version was kept' (the bug this
+    closes) so the user knows to reinstall."""
+    if restored:
+        return ("The update could not be applied, so the previous version was "
+                f"kept.\nDetails: {log_file}")
+    return ("The update could not be applied, and the previous version was only "
+            "partially restored. Please reinstall the app from the releases "
+            f"page.\nDetails: {log_file}")
 
 
 def _message_box(text):
@@ -769,9 +994,10 @@ def _clear_webview_caches():
     CACHED app.js/index.html after the files on disk changed: a just-updated
     app then shows the OLD interface under the NEW version number (field
     report, v0.10.2 update — "says 0.10.2 but features missing"). The caches
-    only ever hold the app's own three UI files, so clearing on every launch
-    is cheap and kills the whole staleness class (manual zip-overwrite
-    installs included)."""
+    only ever hold the app's own three UI files, so clearing on every FROZEN
+    launch is cheap and kills the whole staleness class (manual zip-overwrite
+    installs included). cleanup_leftovers only calls this for packaged builds —
+    a dev launch serves scripts/ui live and never needs it."""
     try:
         from paths import WEBVIEW_PROFILE_DIR
         profile = Path(WEBVIEW_PROFILE_DIR)
@@ -874,10 +1100,16 @@ def cleanup_leftovers():
     store-promotion recovery sweep (artifact_store) so an interrupted Export-Everything
     swap is repaired from its backup before any store is read.
     Best-effort and cheap; called on every GUI launch, before the CLR loads."""
-    _clear_webview_caches()
+    # Store-promotion recovery is independent of the update mechanism and must run
+    # for dev/console launches too (it repairs an interrupted Export-Everything swap
+    # before any store is read), so it runs BEFORE the frozen-only gate.
     _recover_store_promotions()                  # P2/F2 — independent of the update mechanism
     if not is_frozen():
         return
+    # The WebView2 cache-clear only matters for a PACKAGED build that just swapped
+    # its UI files on disk (or a manual zip-overwrite install); a dev launch serves
+    # scripts/ui live, so clearing it every dev launch was wasted work — frozen-only.
+    _clear_webview_caches()
     targets = [UPDATE_DIR] + [install_dir() / (name + suffix)
                               for name in _BUNDLE_ITEMS
                               for suffix in (".old", ".new")]

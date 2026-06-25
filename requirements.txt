@@ -1,13 +1,23 @@
 # Runtime dependencies for TSMIS Reports Exporter (pinned for reproducible builds).
 #
+# These are the DIRECT runtime deps (hand-edited). The packaged build installs the
+# fully hash-pinned transitive closure from requirements-build.lock.txt with
+# --require-hashes; this file remains the human-facing source the .bat setup uses and
+# the lock is regenerated from. Built + locked for Windows + CPython 3.11.
+#
 # NOTE: no browser is bundled. The app drives the machine's installed Microsoft
 # Edge / Google Chrome via channel="msedge"/"chrome" (see
 # scripts/common.launch_browser), so the Playwright pin only fixes the bundled
 # Node DRIVER (node.exe) -- there is no Chromium revision to keep in lockstep.
 # Playwright's CDP is stable across evergreen Edge/Chrome; bump this only if a
-# browser update ever outruns the driver (then rebuild).
+# browser update ever outruns the driver (then rebuild). version.py
+# PLAYWRIGHT_VERSION must match this pin (build/check_build_env.py asserts it).
 playwright==1.60.0
 pdfplumber==0.11.9
+# pdfplumber -> pdfminer.six -> cryptography. Pin the EXISTING transitive (NOT a new
+# dependency -- RR1-C2) so the hash-locked build has a stable, explicit anchor for it.
+# Bump in lockstep with pdfminer.six.
+cryptography==48.0.1
 openpyxl==3.1.5
 # GUI shell: renders scripts/ui in an Edge WebView2 window (gui_main/gui_api).
 # Pulls pythonnet + clr_loader on Windows. The .bat console flow never imports
