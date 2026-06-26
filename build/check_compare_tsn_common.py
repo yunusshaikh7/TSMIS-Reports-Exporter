@@ -198,12 +198,20 @@ def test_detail_aliases():
 
 
 def test_notes_delegation():
-    print("Highway Sequence + Intersection Detail build Notes via make_notes_writer:")
+    print("Highway Sequence builds Notes via make_notes_writer; Intersection Detail has its own:")
     from openpyxl import Workbook
     import compare_highway_sequence_tsn as hs
     import compare_intersection_detail_tsn as idt
+    # Highway Sequence still uses the shared (flat) make_notes_writer.
+    check("highway_sequence: source uses make_notes_writer",
+          "make_notes_writer" in _src(hs.__name__))
+    # Intersection Detail OUTGREW the shared writer (v0.17.8 / CR-002 §9e): its Notes sheet
+    # has SECTIONS (normalizations applied / columns that differ wholesale / Report View)
+    # that the flat make_notes_writer can't express, so it defines its OWN _write_notes_sheet.
+    check("intersection_detail: defines its own sectioned _write_notes_sheet (not make_notes_writer)",
+          "def _write_notes_sheet" in _src(idt.__name__)
+          and "make_notes_writer" not in _src(idt.__name__))
     for mod, label in ((hs, "highway_sequence"), (idt, "intersection_detail")):
-        check(f"{label}: source uses make_notes_writer", "make_notes_writer" in _src(mod.__name__))
         check(f"{label}: schema legend_writer is wired", mod._SCHEMA.legend_writer is not None)
         wb = Workbook()
         mod._SCHEMA.legend_writer(wb)

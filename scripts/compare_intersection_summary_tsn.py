@@ -13,9 +13,13 @@ summary_layout (INTERSECTION_SUMMARY_SPEC), shared with the consolidator.
     band block-walked with the SAME summary_layout.counts_from_rows the TSMIS
     consolidator uses, so the two sides can't drift.
 
-Reconciled on the 6.19 ground truth: TSMIS 16473 vs TSN 16626; CONTROL TYPES
-(TSN J-P signals vs TSMIS S/O/Q/R) and INTERSECTION TYPE (TSMIS R/C/P) diverge →
-those codes compare one-sided (no crosswalk; user decision). Console-free.
+Reconciled on the 6.19 ground truth: TSMIS 16473 vs TSN 16626. CONTROL TYPES: the
+TSN signal sub-types J–P fold into the shared "Signalized" (S) category — the same
+crosswalk the Detail uses (per the TSNR/MIRE reference), applied in
+summary_layout.counts_from_rows for BOTH sides — so Signalized compares directly
+(TSMIS S vs TSN J–P summed). The remaining codes the TSN summary genuinely doesn't
+tabulate (CONTROL Roundabout R / PHB O / Flash Q; INTERSECTION TYPE R/C/P) stay
+one-sided; the "+ no data" buckets the TSN PDF reports as 0 ARE compared. Console-free.
 """
 import re
 from pathlib import Path
@@ -45,6 +49,29 @@ _KEY_TO_SLUG[_SPEC.total.key] = _SPEC.total.slug
 # 3-column band boundaries on the statewide page (calibrated to the raw geometry).
 _BAND_LEFT, _BAND_RIGHT = 190, 495
 _TOTAL_RE = re.compile(r"Total Intersections\s*=\s*([\d,]+)", re.IGNORECASE)
+
+# Slug the folded "Signalized" category lands in (resolved from the spec, not hardcoded).
+_SIGNALIZED_SLUG = next(
+    (c.slug for sec in _SPEC.sections if sec.name == summary_layout._IS_CONTROL_TYPES
+     for c in sec.cats if c.code == "S"), "is_control_types_s")
+_STALE_SIGNAL_KEY = re.compile(r"CONTROL TYPES:\s*([A-Za-z])\b")
+
+
+def _slug_for_key(key_to_slug, key):
+    """Resolve a normalized-workbook category key to its slug, tolerating a STALE
+    library built before the J–P→Signalized fold (the library is REUSED, not rebuilt,
+    after a code change — see tsn_library.build_consolidated). The legacy signal
+    sub-type keys (CONTROL TYPES J–P) and the old 'S - SIGNALIZED' key all route to
+    the folded Signalized slug, so a reused pre-fold library still compares correctly
+    (their counts are summed)."""
+    direct = key_to_slug.get(key)
+    if direct is not None:
+        return direct
+    m = _STALE_SIGNAL_KEY.match(key)
+    if m and m.group(1).upper() in summary_layout._CONTROL_SIGNAL_FOLD | {"S"}:
+        return _SIGNALIZED_SLUG
+    return None
+
 
 _SCHEMA = CompareSchema(
     report_name=REPORT_NAME,
@@ -134,11 +161,11 @@ def _load_tsn(path):
         it = wb[sn].iter_rows(values_only=True)
         next(it, None)
         for r in it:
-            if not r or r[0] is None:
+            if not r or r[0] is None or len(r) <= 1 or not isinstance(r[1], (int, float)):
                 continue
-            slug = key_to_slug.get(str(r[0]).strip())
-            if slug is not None and len(r) > 1 and isinstance(r[1], (int, float)):
-                rec[slug] = int(r[1])
+            slug = _slug_for_key(key_to_slug, str(r[0]).strip())
+            if slug is not None:
+                rec[slug] = rec.get(slug, 0) + int(r[1])   # sum: stale J–P keys fold into S
         return rec
     finally:
         wb.close()

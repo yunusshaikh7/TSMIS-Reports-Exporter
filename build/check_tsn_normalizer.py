@@ -86,10 +86,17 @@ _RS_SHEET = "Ramp Summary (TSN)"
 _IS_SHEET = "Intersection Summary (TSN)"
 _RD_HEADER = ["Route", "PR", "PM", "Date of Record", "HG", "Area 4", "City Code", "R/U",
               "Description", "Ramp Name", "On/Off", "Ramp Type", "ADT"]
-_ID_HEADER = ["Route", "PR", "Roadbed", "PM", "HG", "City Code", "R/U", "INT Type",
-              "Control Type", "Lighting", "ML Mastarm", "ML Left Chan", "ML Right Chan",
-              "ML Traffic Flow", "ML Num Lanes", "Description", "CS Mastarm", "CS Left Chan",
-              "CS Right Chan", "CS Traffic Flow", "CS Num Lanes", "Date of Record"]
+# Re-blessed to the v0.17.8 position-aligned 33-column layout (CR-002 §9e): each
+# effective-date column sits next to its type, the mainline/cross blocks carry both
+# eff-dates, and the intersecting-route block is added. Hand-written (the golden
+# tripwire stays independent of idt.SHARED_HEADER), so a future header drift is caught.
+_ID_HEADER = ["Route", "PR", "Roadbed", "PM", "Date of Record", "HG", "City Code", "R/U",
+              "INT Type Eff-Date", "INT Type", "Control Type Eff-Date", "Control Type",
+              "Lighting Eff-Date", "Lighting", "ML Eff-Date", "ML Mastarm", "ML Left Chan",
+              "ML Right Chan", "ML Traffic Flow", "ML Num Lanes", "ML 2nd Eff-Date",
+              "Description", "Main Line Length", "CS Eff-Date", "CS Mastarm", "CS Left Chan",
+              "CS Right Chan", "CS Traffic Flow", "CS Num Lanes", "Int St Eff-Date",
+              "Intrte Route", "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix"]
 _SUM_HEADER = ["Category", "Count"]
 _DEPS_XLSX = "Required components are missing (openpyxl)."
 _DEPS_PDF = "Required components are missing (pdfplumber, openpyxl)."
