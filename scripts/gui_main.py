@@ -110,6 +110,64 @@ def _run_self_test():
     return code
 
 
+def _arg_value(flag):
+    """The value after `flag` in argv (``--evidence-dir C:\\path``), or None. Tolerates
+    the flag being absent or trailing (no value)."""
+    try:
+        i = sys.argv.index(flag)
+    except ValueError:
+        return None
+    return sys.argv[i + 1] if i + 1 < len(sys.argv) else None
+
+
+def _run_collect_evidence():
+    """``--collect-evidence``: gather a CREDENTIAL-SAFE work-PC evidence bundle (logs,
+    run reports, the offline self-test output, and any real files the user explicitly
+    placed via ``--evidence-dir``) into one zip — no admin / cmd / scheduled tasks
+    needed. NEVER collects the saved login, the Edge profile, failure dumps, or the
+    report data (RM05). Returns a process exit code (0 = the bundle was written).
+
+    A windowed release exe has no console, so progress mirrors to the log and the
+    final path is shown in a message box; dev/console runs also see it on stderr."""
+    log = logging.getLogger("tsmis.evidence")
+
+    def emit(line=""):
+        text = str(line)
+        if text.strip():
+            log.info("%s", text)
+        if sys.stderr:
+            try:
+                print(text, file=sys.stderr)
+            except Exception:
+                pass
+
+    try:
+        import evidence
+        res = evidence.collect(extra_dir=_arg_value("--evidence-dir"), emit=emit)
+    except Exception as e:                       # collection must not crash the exe
+        log.exception("evidence collection failed")
+        msg = f"Evidence collection failed: {type(e).__name__}: {e}"
+        emit(msg)
+        _message_box(msg)
+        return 1
+    ok = bool(res.get("ok"))
+    _message_box(("Evidence bundle saved:\n" + res.get("path", "")
+                  + "\n\nSend it to the TSMIS maintainer. It has no saved login, "
+                    "profile, or report data.") if ok
+                 else ("Could not save the evidence bundle.\n" + res.get("message", "")))
+    return 0 if ok else 1
+
+
+def _message_box(text):
+    """Best-effort Windows message box (the windowed exe has no console). No-op
+    where ctypes/user32 isn't available."""
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, str(text), "TSMIS Exporter", 0x40)
+    except Exception:
+        pass
+
+
 def main():
     # Self-update swap mode (v0.10.1): the one-click update launches the
     # STAGED new exe with this flag; it swaps itself into the install folder
@@ -134,6 +192,12 @@ def main():
         # real window. Update housekeeping below is skipped -- it mutates the
         # install and is not a boot/import concern.
         raise SystemExit(_run_self_test())
+    if "--collect-evidence" in sys.argv:
+        # Work-PC validation (P13): gather a credential-safe evidence bundle (logs,
+        # run reports, the self-test output, and any user-placed --evidence-dir files)
+        # and exit — no admin/cmd/scheduled tasks, never the saved login/profile/report
+        # data (RM05). Skip the update housekeeping below (not a collection concern).
+        raise SystemExit(_run_collect_evidence())
     try:
         # Finish any one-click update: drop the *.old bundle pieces the swap
         # helper couldn't delete while this (new) app was already starting,

@@ -84,6 +84,7 @@ jobs:
           python build/check_worker_lifecycle.py
           python build/check_reset_safety.py
           python build/check_owned_dir.py
+          python build/check_evidence_bundle.py
           python build/check_import_direction.py
 
       - name: Outcome contract + cache-envelope checks (blocking)

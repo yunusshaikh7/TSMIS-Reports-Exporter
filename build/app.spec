@@ -101,6 +101,8 @@ APP_MODULES = [
     # Shared comprehensive self-test body, run by gui_main --self-test (the frozen
     # exact-artifact release gate) and build/full_smoke.py.
     "self_test",
+    # P13 work-PC evidence collector (gui_main --collect-evidence) — credential-safe.
+    "evidence",
 ]
 
 datas, binaries, hiddenimports = [], [], list(APP_MODULES)
