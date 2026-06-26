@@ -8,7 +8,7 @@ Files in scope:
 |---|---|
 | `scripts/exporter.py` | Sequential engine + `ReportSpec` + the three save strategies + the integrity gate + the per-route loop, recovery, and retry pass. Everything reusable. |
 | `scripts/exporter_parallel.py` | Fast mode: N browsers off a shared queue. **Imports** the per-route mechanics from `exporter.py`; only concurrency is new. |
-| `scripts/common.py` | `preflight`, `select_report`, `wait_with_skip_option`, `launch_browser`/channel resolution, `new_authed_browser`, the report-ready/error JS, `report_error_text`, `maybe_screenshot`, `report_*_timeout_ms()` accessors. |
+| `scripts/common.py` | `preflight`, `select_report`, `wait_with_skip_option`, `launch_browser`/channel resolution, `new_authed_browser`, the report-ready/error JS, `report_error_text`, `maybe_screenshot`, `report_*_timeout_ms()` accessors. **(v0.18.0: `common.py` is now a re-export SHIM over the acyclic engine leaves — `auth_nav`/`report_nav`/`session`/`site_target`/`routes`/`errors`/`timeouts`/`browser_channels`/`edge_device`. `from common import X` is unchanged, so the symbols + `common.py:NNN` line refs in this doc resolve through the shim; the live implementation sits in the named leaf.)** |
 | `scripts/events.py` | `Events` sink (the engine↔driver seam) + `RunResult`. |
 
 ---

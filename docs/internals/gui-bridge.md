@@ -4,6 +4,18 @@ Code-level walkthrough of the Python⇄JS bridge, the two-queue message pipeline
 
 Files: `scripts/gui_main.py` (entry/bootstrap), `scripts/gui_api.py` (the `GuiApi` js_api bridge + state + pumps), `scripts/gui_worker.py` (worker threads), `scripts/ui/app.js` (frontend), `scripts/ui/index.html` (static shell). The control seam between core and GUI is the `Events` sink (`scripts/events.py:Events`).
 
+> **v0.18.0 structural changes (read before trusting the line refs below).** The GUI was
+> reorganized by concern, so some `gui_api.py:NNN` anchors in this deep-dive have drifted —
+> navigate by symbol name. The substantive changes: (1) **`task_coordinator.py` owns task/gate
+> state** — a monotonic claim **epoch** stamps every worker message (a `_StampedQueue`), so a
+> straggler terminal from a superseded task can't clobber an already-started successor
+> (exactly-once terminal delivery). (2) The **message-kind strings + completion vocab live ONCE
+> in `scripts/contract.py`** (+ the `ui/contract.js` mirror); `_handle` is built as a
+> contract-keyed **dispatch dict**, not a long `if/elif`. (3) The **Matrix endpoints + handlers
+> are `gui_matrix.GuiMatrixMixin`** (and `gui_endpoint` / `gui_win32`), mixed into `GuiApi` —
+> the `matrix_*` handlers live there, not inline in `gui_api.py`. (4) The front-end is split:
+> `app.js` + `mock.js` (fixtures) + `ui-dom.js` / `ui-matrix.js` / `ui-settings.js` + `contract.js`.
+
 ---
 
 ## 1. The big picture — three threads of control, two queues

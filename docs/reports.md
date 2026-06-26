@@ -1,6 +1,6 @@
 ﻿# Reports
 
-What this doc covers: the full TSMIS report catalog (the seven exportable types incl. Highway Log (PDF)), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
+What this doc covers: the full TSMIS report catalog (the **eight** exportable types, incl. the Highway Log (PDF) and Intersection Detail (PDF) print editions), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
 
 Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- the corrected 31-column labels in [highway_log/columns.md](highway_log/columns.md), PDF/TSN parsing in [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md), and the PDF-vs-Excel/TSN study in [highway_log/comparison-study.md](highway_log/comparison-study.md). The comparison workbook engine is owned by [comparison-engine.md](comparison-engine.md).
 
@@ -15,6 +15,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
+| 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
 
@@ -40,6 +41,7 @@ Each thin `scripts/export_<name>.py` module is ~30 lines: a `SPEC = ReportSpec(.
 - **`save_pdf_letter(page, out_path, timeout_ms=None)`** -- `page.pdf(format="Letter", print_background=True, margin 0.4in)`. The report is already rendered inline, so `timeout_ms` is unused. Used by Ramp Summary.
 - **`save_via_export_button(page, out_path, timeout_ms=None)`** -- clicks `button.export-btn` (`has_text="Export"`, `.first`) and saves the download. Bounds the download wait at `min(download_start_timeout_ms(), ceiling)`; a rendered route whose Export produces no download (the site's no-op for "nothing to export") raises `EmptyExport` in seconds instead of hanging the full ceiling + 15-min retry. If `report_error_text(page)` is set it raises `ReportError` instead. Used by Ramp Detail, Highway Sequence, Highway Log, both Intersection reports.
 - **`save_highway_log_pdf(page, out_path, timeout_ms=None)`** -- see [Highway Log (PDF)](#report-4b--highway-log-pdf) below.
+- **`save_intersection_detail_pdf(page, out_path, timeout_ms=None)`** -- the Intersection Detail parallel (`intd_printAll`); see [Report 6b](#report-6b--intersection-detail-pdf) below.
 
 Every save calls `_verify_saved_file` (magic-byte integrity check: `.xlsx` must start `PK\x03\x04`, `.pdf` must start `%PDF`; a truncated/0-byte file is deleted and the route fails so resume re-pulls it). See [engine-and-reliability.md](engine-and-reliability.md) for the resume integrity gate.
 
@@ -78,25 +80,34 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 - **Export-only** -- no consolidator on the PDF path itself. The TSMIS Highway Log (PDF) **consolidator** (`consolidate_tsmis_highway_log_pdf.py`) reads this export folder day-aware; see [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md). (Historically the Excel-path consolidator reads the `.xlsx` export.)
 - Verified against the real site source + a headless `page.pdf()` fixture (`build/check_fake_site.py`). **Live-export verification against TSMIS is still pending** (the dev PC can't reach the site).
 
-### Reports 5-6 -- Intersection Summary / Intersection Detail (XLSX, EXPORT-ONLY)
-- **APP-WIDE DISABLED — shown GREYED, not hidden.** While the site's Intersection feature is still
-  under development, both are disabled across the GUI via ONE gate in `reports.py`:
-  `DISABLED_EXPORT_SUBDIRS = {"intersection_summary", "intersection_detail"}` + `is_export_disabled()`.
-  The Export- and Everything-tab report lists come from `export_reports_status()` (the FULL list with a
-  per-report `disabled` flag), so Intersection still **appears, greyed and unpickable** (the JS
-  `makeReportRow` renders `.option-static` + a disabled checkbox + `dataset.off` so the lock-sweep
-  can't re-enable it). `start_export` / `start_batch_export` reject a disabled report by its stable
-  export-op key server-side; the Saved-reports freshness library (`report_library_info` →
-  `enabled_export_reports()`) and the matrix (no cross-env adapter) still exclude them. As of P3 the
-  GUI/manifests pass **stable export-op KEYS** (= each report's `subdir`; `idx` is display-order
-  metadata only), so a registry re-order never mis-resumes. Flip back on by emptying the set.
-  Locked by `build/check_intersection_gate.py`. The spec/empty-marker detail below still applies
-  if/when they're re-enabled.
-- **Export-only** -- NO consolidator and NO comparison support. They are absent from `_CONSOLIDATOR_BY_SUBDIR`, so `consolidator_for_spec()` returns `None` and B2 auto-consolidate skips them.
-- Labels + formats verified against the live page source (v0.10.4): **NO `"TSAR:"` prefix** (unlike the ramp pair), both Excel via the shared Export button.
+### Reports 5-6 -- Intersection Summary / Intersection Detail (XLSX)
+- **Enabled since v0.17.0** (on the **development** site — Settings ▸ "Use development site"). Both
+  export, **consolidate, and compare** (cross-environment + vs-TSN) like every other report, and live
+  in both matrices. The old app-wide disable gate still EXISTS as defensive groundwork —
+  `reports.is_export_disabled()` over `DISABLED_EXPORT_SUBDIRS` (a set, now **empty**),
+  `export_reports_status()`'s per-report `disabled` flag, the JS `.option-static` rendering — but with
+  the set empty nothing is greyed. As of P3 the GUI/manifests pass **stable export-op KEYS** (= each
+  report's `subdir`; `idx` is display-order metadata only), so a registry re-order never mis-resumes.
+  Locked by `build/check_intersection_gate.py` (now registry-derived).
+- **Consolidate + compare:** `consolidate_intersection_summary` (category-count summer) and
+  `consolidate_intersection_detail` (a thin `consolidate_xlsx` wrapper, sheet "Intersection Detail",
+  36 cols) auto-consolidate on export finish (both in `_CONSOLIDATOR_BY_SUBDIR`); the vs-TSN +
+  cross-env comparators are wired per the registry (see [comparison-engine.md](comparison-engine.md)
+  §9e / §9f). The **PDF edition** of Intersection Detail has its own consolidator + comparators (Report 6b).
+- Labels + formats verified against the live page source: **NO `"TSAR:"` prefix** (unlike the ramp pair), both Excel via the shared Export button.
 - **Intersection Summary**: `label="Intersection Summary"`, `subdir="intersection_summary"`, `filename=intersection_summary_route_<ROUTE>.xlsx`. The page never renders an empty notice -- it ALWAYS shows `Total Intersections = N` (including `= 0`) and always offers a working Export. `wait_js` = `EXPORT_READY_JS` or `.ints-total` present. `is_empty` matches the regex `total intersections\s*=\s*0\b` (a zero total; not `= 10`/`= 20`). No hang risk: a drifted marker just reverts to the old benign all-zeros-file behavior, never a stall.
 - **Intersection Detail**: `label="Intersection Detail"`, `subdir="intersection_detail"`, `filename=intersection_detail_route_<ROUTE>.xlsx`. The action bar (Export button) renders even for an empty route, plus an empty table row `<td class="hl-empty">No results found.</td>`. `wait_js` = `EXPORT_READY_JS` or `td.hl-empty` present. `is_empty` = `page.locator("td.hl-empty").count() > 0` (structural, robust to wording drift) OR `"no results found"` in body (text fallback). The engine's general no-download fast-fail (`save_via_export_button` -> `EmptyExport`) is the marker-independent backstop.
 - **Caveat:** the site's Intersection feature is still under active development -- its empty strings / DOM are a MOVING TARGET. The fixes key on the robust structural signals (`td.hl-empty`, `Total Intersections = 0`) plus the general empty/no-download fast-fail, and must be re-verified once the feature is finalized. Do not hard-lock to `"No results found."`.
+
+### Report 6b -- Intersection Detail (PDF)
+
+The exact parallel of Report 4b (Highway Log (PDF)), forward-ported in v0.18.0 (CR-002).
+- **Same dropdown option as #6** -- `label="Intersection Detail"` -- saved as a PDF via the page's own Print layout instead of the Excel Export button. Module `export_intersection_detail_pdf.py`; `subdir="intersection_detail_pdf"`; Letter, **landscape**. The registry's **menu label** is `"Intersection Detail (PDF)"`, but the `ReportSpec`'s `label` stays `"Intersection Detail"` (the dropdown text `select_report` clicks) — the two must not be conflated.
+- **Appended LAST** in the export catalog so the seven existing export-op keys keep positions 0–6 — the manifest-v1 integer-index compatibility contract (CR-002-RM4; `batch_manifest._V017_EXPORT_ORDER` index 7 = `intersection_detail_pdf`).
+- `wait_js` / `is_empty` are identical to the Excel Intersection Detail (`td.hl-empty` / `"no results found"`); `is_empty` runs BEFORE save, so the PDF render only runs for routes with rows.
+- `save=save_intersection_detail_pdf` (in `exporter.py`) — the same print-capture mechanism as `save_highway_log_pdf`: the site's `intd_printAll()` builds the full multi-page layout, `window.print` is overridden to raise so the on-screen restore never runs, then `page.pdf()` captures it; it fails loudly with `ReportError` if the print fn or layout is missing.
+- **Consolidator:** `consolidate_tsmis_intersection_detail_pdf.py` parses the PDF route exports into the SAME 36-column format (`intersection_detail_columns.HEADER`, Description at index 21) as the Excel export — a two-row-per-record / zebra-shaded PDF parser. Like HL-PDF it is NOT auto-consolidated inline (it needs a scratch convert dir — the matrix handles it). **Comparators:** `compare_intersection_detail_pdf` — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, reusing the Excel Intersection Detail's vs-TSN schema/loaders.
+- Verified offline against the fake-site fixture (`build/check_intersection_detail_pdf.py`, `build/fake_site/intersection_detail_print.html`). **Live-export verification against TSMIS is owed in v0.18.1** (the dev PC can't reach the dev site).
 
 ## `cs-disabled` -- the site can temporarily disable a report (EXPECTED)
 
@@ -124,8 +135,11 @@ For timeouts (`REPORT_TIMEOUT_MS`, `DOWNLOAD_START_TIMEOUT_MS`, etc.) and the fa
 2. Add a branch to `3. run_export...bat` and `5. fast export...bat`.
 3. Add one `ExportEntry` to `report_catalog.py` (the metadata SoT — `reports.py` derives `EXPORT_REPORTS`; feeds GUI + `export_multi`). Update the frozen baseline in `build/check_report_catalog.py`.
 4. List the new export module **and** any new flat module in `APP_MODULES` in `build/app.spec` (lazy imports need it; `check_app_modules` enforces completeness).
-5. Add `output/<name>/.gitkeep`, whitelist in `.gitignore`.
-6. Document in the table at the top of this doc (and CLAUDE.md's Supported Reports table).
+5. Add the report's fixtures to `scripts/ui/mock.js` (the `#mock` GUI preview reads its report lists from there, **not** `app.js`; `check_report_catalog` checks mock parity).
+6. Add `output/<name>/.gitkeep`, whitelist in `.gitignore`.
+7. Document in the table at the top of this doc (and CLAUDE.md's Supported Reports table).
+
+For a PDF print-edition of an existing report (like Highway Log (PDF) / Intersection Detail (PDF)), keep the dropdown `label` of the Excel report, give it a distinct `subdir` + menu label, **append it LAST** in the catalog (so existing export-op keys keep their manifest-v1 positions — CR-002-RM4), and mirror every PDF-edition special-case in `matrix.py` / `day_matrix.py` / `gui_worker.py` (not just the labels).
 
 ## Recipe: add a new consolidator
 
@@ -156,8 +170,8 @@ COMPARE_GROUPS = [
     ("tsn", "vs TSN"),
 ]
 ```
-- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, **and Highway Log**), plus the HL TSMIS-PDF-vs-Excel consistency check.
-- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. v0.17.0 COMPLETE: all 6 reports + HL-PDF (Highway Log Excel/PDF, Ramp Detail, Ramp Summary, Intersection Summary, Intersection Detail, Highway Sequence).
+- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, Highway Log, **Intersection Summary/Detail**, and the two **PDF editions** — Highway Log (PDF) + Intersection Detail (PDF)), plus the two **PDF-vs-Excel** consistency self-checks (Highway Log + Intersection Detail) which also live in `env`.
+- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. COMPLETE: all 8 export types (Highway Log Excel/PDF, Ramp Detail, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence). The two PDF editions' PDF-vs-Excel self-checks live under `env`, not `tsn`.
 - The GUI also appends a **third** sub-tab on its own, the day-keyed **"vs TSN Matrix"** (group id `tsn_by_day`) — not a registry comparison type.
 
 A new cross-environment comparison is `group="env"`; a new TSMIS-vs-TSN one is `group="tsn"`; a brand-new family can add its own sub-tab by appending to `COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input plumbing is untouched. (v0.16.1 staging moved HL's cross-env row from the old `highway_log` group to `env` and renamed that sub-tab to `tsn`.)
@@ -177,13 +191,16 @@ Current `COMPARE_REPORTS` rows:
 | TSAR: Intersection Summary -- between environments (v0.17.0, AGGREGATE per route) | `compare_env.INTERSECTION_SUMMARY` | folders | env |
 | TSAR: Intersection Detail -- between environments (v0.17.0, flat route+PM) | `compare_env.INTERSECTION_DETAIL` | folders | env |
 | Highway Log (PDF) -- between environments (v0.17.0, flat, both sides PDF-parsed) | `compare_env.HIGHWAY_LOG_PDF` | folders | env |
+| Intersection Detail (PDF) -- between environments (v0.18.0, flat, both sides PDF-parsed) | `compare_env.INTERSECTION_DETAIL_PDF` | folders | env |
 | Highway Log -- TSMIS vs TSN | `compare_highway_log` | files | tsn |
 | Highway Log -- TSMIS (PDF) vs TSN (PDF) | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
 | Highway Log -- TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
 | TSAR: Ramp Detail -- TSMIS vs TSN (v0.17.0) | `compare_ramp_detail_tsn` | files | tsn |
 | TSAR: Ramp Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE) | `compare_ramp_summary_tsn` | files | tsn |
-| TSAR: Intersection Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE, one-sided divergence) | `compare_intersection_summary_tsn` | files | tsn |
-| TSAR: Intersection Detail -- TSMIS vs TSN (v0.17.0, FLAT, Y/N<->1/0 normalized) | `compare_intersection_detail_tsn` | files | tsn |
+| TSAR: Intersection Summary -- TSMIS vs TSN (v0.17.8, AGGREGATE, 66-cat signal fold) | `compare_intersection_summary_tsn` | files | tsn |
+| TSAR: Intersection Detail -- TSMIS vs TSN (v0.17.8, FLAT, compare-everything + S crosswalk) | `compare_intersection_detail_tsn` | files | tsn |
+| Intersection Detail -- TSMIS (PDF) vs TSN | `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| Intersection Detail -- TSMIS (PDF) vs TSMIS (Excel) | `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
 | Highway Sequence Listing -- TSMIS vs TSN (v0.17.0, FLAT, route+**county**+PM) | `compare_highway_sequence_tsn` | files | tsn |
 
 **Don't hand-roll workbook output**: build a `CompareSchema` and call `compare_core.run_compare` -- that's the approved workbook style for free, and the core's text/formulas are regression-locked. See [comparison-engine.md](comparison-engine.md) (engine + regression-lock harness) and [highway_log/comparison-study.md](highway_log/comparison-study.md) (the PDF-vs-Excel/TSN findings).

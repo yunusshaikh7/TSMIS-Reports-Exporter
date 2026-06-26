@@ -8,7 +8,7 @@ For the engine the GUI drives, see [engine-and-reliability.md](engine-and-reliab
 
 ## UI stack
 
-The packaged product is a **pywebview window using the Edge WebView2 backend**, rendering `scripts/ui/` (`index.html` + `app.css` + `app.js`) — **plain HTML/CSS/JS, no framework and no build step**. Static files ship in the bundle; end-user setup stays global-pip. This replaced the original Tkinter window (v0.8.0): Tk could neither match the approved design (Windows-11 look, dark titlebar, two-column layout) nor stop cutting off on small screens. A web layout is responsive (stacks + scrolls below ~980px wide; theme = System/Light/Dark header toggle persisted in `localStorage`, resolved to an effective `html[data-theme]` before first paint).
+The packaged product is a **pywebview window using the Edge WebView2 backend**, rendering `scripts/ui/` — **plain HTML/CSS/JS, no framework and no build step**. As of v0.18.0 the front-end is split into `index.html` + `app.css` + `app.js` (orchestration) + `mock.js` (the `#mock` fixtures, a SEPARATE file — never edit fixtures in `app.js`) + `ui-dom.js` / `ui-matrix.js` / `ui-settings.js` (renderer modules) + `contract.js` (the bridge enum mirror of `scripts/contract.py`). Static files ship in the bundle; end-user setup stays global-pip. This replaced the original Tkinter window (v0.8.0): Tk could neither match the approved design (Windows-11 look, dark titlebar, two-column layout) nor stop cutting off on small screens. A web layout is responsive (stacks + scrolls below ~980px wide; theme = System/Light/Dark header toggle persisted in `localStorage`, resolved to an effective `html[data-theme]` before first paint).
 
 WebView2 is a safe dependency here: it ships with Windows 10/11 and evergreen Edge — the same Edge this tool already requires. `tkinter`/`_tkinter` are **excluded** from the bundle.
 
@@ -19,13 +19,16 @@ webview.start(gui="edgechromium", debug=debug,
               private_mode=False, storage_path=str(WEBVIEW_PROFILE_DIR))
 ```
 
-Three Python modules own the GUI; the engines underneath stay console-free:
+The GUI is owned by a small set of Python modules (v0.18.0 split the old monolith out by concern); the engines underneath stay console-free:
 
 | Module | Role |
 |---|---|
-| `scripts/gui_main.py` | Entry point. `_bootstrap()` dev import paths; swap-mode branch; `_unblock_dotnet_assemblies()`; `setup_logging(enable_faulthandler=False)`; `updater.cleanup_leftovers()`; then `gui_api.run()`. |
-| `scripts/gui_api.py` | The `GuiApi` js_api bridge + GUI state + the worker-queue pump + `run()` (creates the window, starts the webview loop). |
-| `scripts/gui_worker.py` | The worker threads (`ExportWorker`, `LoginWorker`, `CheckWorker`, `ConsolidateWorker`, `BatchWorker`, `EnvCheckWorker`, `EnvScanWorker`, `ChromiumWorker`, `ResetWorker`, `UpdateWorker`). **Unchanged across the Tk→WebView rewrite.** |
+| `scripts/gui_main.py` | Entry point. `_bootstrap()` dev import paths; swap-mode branch; the `--self-test` / `--collect-evidence` CLI branches; `_unblock_dotnet_assemblies()`; `setup_logging(enable_faulthandler=False)`; `updater.cleanup_leftovers()`; then `gui_api.run()`. |
+| `scripts/gui_api.py` | The `GuiApi` js_api bridge + the worker-queue pump + `run()` (creates the window, starts the webview loop). Mixes in `gui_matrix.GuiMatrixMixin`; delegates task/gate state to `task_coordinator`. |
+| `scripts/task_coordinator.py` | **The single owner of task/gate state** (P7a). A monotonic claim **epoch** stamps every worker message so a straggler terminal from a superseded task can't clobber an already-started successor (exactly-once terminal delivery). |
+| `scripts/contract.py` + `scripts/ui/contract.js` | The Python⇄JS **bridge enum SSOT** — message kinds, completion states, etc. — so the two sides can't drift. |
+| `scripts/gui_endpoint.py` / `gui_matrix.py` / `gui_win32.py` | Extracted endpoint groups (P7b/P7c): the endpoint base, the Matrix feature endpoints (the mixin), and the pywebview/win32 window concerns. |
+| `scripts/gui_worker.py` | The worker threads — `ExportWorker`, `LoginWorker`, `CheckWorker`, `ConsolidateWorker`, `BatchWorker`, `EnvCheckWorker`, `ActiveEnvCheckWorker`, `EnvScanWorker`, `ChromiumWorker`, `ResetWorker`, `UpdateWorker`, plus the matrix workers `MatrixBatchExportWorker` / `MatrixCompareWorker` / `DayMatrixCompareWorker` / `MatrixTsnConsolidateWorker`. **Not** force-split. |
 
 Only `cli.py` and `gui_*.py` touch `print`/`input`/`msvcrt`/the window. Core code (`common.py`, `exporter.py`, the consolidator cores) reports via the `Events` sink (`scripts/events.py`) and raises exceptions — never `print`/`input`/`sys.exit`.
 
@@ -37,7 +40,7 @@ Only `cli.py` and `gui_*.py` touch `print`/`input`/`msvcrt`/the window. Core cod
 
 Playwright's sync API is **thread-affine** — only the thread that created a page may touch it. So all browser work runs on worker threads. The message flow:
 
-1. **Workers → GUI:** each worker thread posts `(kind, payload)` tuples onto `GuiApi._q` (a `queue.Queue`). The full per-message protocol is documented at the top of `gui_worker.py`, and `gui_api._handle` is the exhaustive dispatcher. The handled kinds are `log`, `progress`, `worker_status`, `preview_shot`, `env_shot`, `env_access`, `env_access_done`, `reset_done`, `chromium_done`, `export_done`, `export_partial`, `consolidate_done`, `login_open`, `login_saved`, `login_device_ok`, `login_failed`, `cancelled`, `batch_progress`, `batch_done`, `update_status`, `check`, `checks_done`, `error` — note the `gui_worker.py` docstring itself omits the last four (`check`/`checks_done` from `CheckWorker`; `batch_progress`/`batch_done` from `BatchWorker`).
+1. **Workers → GUI:** each worker thread posts `(kind, payload)` tuples onto `GuiApi._q` (a `queue.Queue`). The full per-message protocol is documented at the top of `gui_worker.py`, and `gui_api._handle` is the exhaustive dispatcher. The handled kinds are `log`, `progress`, `worker_status`, `preview_shot`, `env_shot`, `env_access`, `env_access_done`, `reset_done`, `chromium_done`, `export_done`, `export_partial`, `consolidate_done`, `login_open`, `login_saved`, `login_device_ok`, `login_failed`, `cancelled`, `batch_progress`, `batch_done`, `update_status`, `check`, `checks_done`, `matrix_cell`, `matrix_done`, `matrix_export_done`, `active_env_done`, `error` (the kind strings + the completion vocab now live ONCE in `scripts/contract.py` / `ui/contract.js`, so Python and JS can't drift; `run_ended` / the export summary additionally carry the `completion` + `artifact` outcome fields).
 2. **The pump:** `GuiApi._worker_pump` (thread `gui-pump`) drains `_q` and dispatches each message through `_handle(kind, payload)` — the state machine that mutates GUI state and enqueues JS events. (This is the WebView reimplementation of the old Tk `gui_app._handle`.)
 3. **GUI → JS, single ordered path:** `_handle`/api methods enqueue events onto a SECOND queue `_out`. **One** sender thread (`gui-send`, `GuiApi._sender`) drains `_out`, batches up to **200** events, and delivers them as one JSON array via `evaluate_js("window.__tsmis && window.__tsmis.dispatch(...)")`. Because everything to JS goes through this one ordered queue, log lines, progress, and state snapshots can never interleave out of order. `json.dumps(batch, default=str)` so a future non-JSON payload degrades to a string instead of killing the whole batch.
 4. **JS → Python:** `app.js` calls back through `window.pywebview.api.<method>()` (the public `GuiApi` methods), each returning a Promise.
@@ -67,7 +70,7 @@ Every `GuiApi` public method is wrapped by `_api_method`: an uncaught exception 
 
 ## Persistent WebView2 profile
 
-The GUI window uses a persistent **app-owned** user-data folder, `paths.WEBVIEW_PROFILE_DIR` (`data\webview2`), via `webview.start(private_mode=False, storage_path=…)`. pywebview's default private mode writes a **fresh Chromium profile into `%TEMP%` on EVERY launch** (tens of MB, leaked when the process is killed) and cold-starts the browser each time. One stable folder avoids both, and the UI stores nothing sensitive in it. (`updater._clear_webview_caches()` drops the WebView2 HTTP caches every launch so an update's new `app.js` is never served stale; Local Storage/theme are untouched.)
+The GUI window uses a persistent **app-owned** user-data folder, `paths.WEBVIEW_PROFILE_DIR` (`data\webview2`), via `webview.start(private_mode=False, storage_path=…)`. pywebview's default private mode writes a **fresh Chromium profile into `%TEMP%` on EVERY launch** (tens of MB, leaked when the process is killed) and cold-starts the browser each time. One stable folder avoids both, and the UI stores nothing sensitive in it. (`updater._clear_webview_caches()` drops the WebView2 HTTP caches on every **frozen** launch — it sits below the `is_frozen()` guard in `cleanup_leftovers`, since a dev launch serves `scripts/ui` live — so an update's new `app.js` is never served stale; Local Storage/theme are untouched.)
 
 ## Data location (option A)
 

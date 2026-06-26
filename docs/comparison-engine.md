@@ -48,6 +48,14 @@ callers with different schemas.
 `compare_core` is **regression-locked**: any change to its formula or label text must be proven
 **cell-for-cell identical** for the TSMIS-vs-TSN flavor before shipping.
 
+> **v0.18.0 held the lock.** The structural overhaul left `compare_core.py`
+> **byte-for-byte unmodified** (`git diff origin/main…HEAD -- scripts/compare_core.py` is
+> empty); the dormant `context_fill` opt-in that the `main` branch added in v0.17.8 was
+> **deliberately NOT forward-ported** (it had no live user — CR-002-RM3), so `git grep
+> context_fill` is **0**. All new comparison behavior in v0.18.0 (the Intersection Detail
+> "Report View", its control-type crosswalk) rides the existing opt-in `CompareSchema`
+> fields (notably `extra_sheet_writer`) that default to the no-op original.
+
 **Why:** the per-route comparison format is approved from the user's Route-1 sample. The v0.10.0
 extraction was only accepted because **756,892 cell positions** (values, formulas, fonts, fills,
 number formats, widths, conditional-formatting rules, calc mode) matched exactly across 4
@@ -115,7 +123,7 @@ types override the data-shape fields and side names.
 | `ditto_resolver` | `None` | DISPLAY-only resolver: tint + comment each ditto cell with its paired value (HL only) |
 | `key_normalizer` | `None` | `callable(row, off, key_field)->str` canonical identity token IN PLACE OF the raw key (HL roadbed key) — [§6](#6-roadbed-aware-key-normalizer-tsmis-vs-tsn-only) |
 | `context_fields` | `()` | field NAMES shown but NON-ASSERTING — never count as a diff, never get the ≠ mark; the cell coalesces to whichever side has a value (v0.17.0; Ramp Detail's TSN-only DB columns) |
-| `extra_sheet_writer` | `None` | `callable(wb, ctx)` run after the sheets, before save — appends a familiar-layout rollup sheet (v0.17.0; the Summary reports). `ctx = {rows_a, rows_b, has_route, sc, side_a, side_b}` |
+| `extra_sheet_writer` | `None` | `callable(wb, ctx)` run after the sheets, before save — appends a custom sheet: the familiar-layout rollup (v0.17.0; the Summary reports) and the Intersection Detail **"Report View"** replica (v0.17.8 / §9f). `ctx = {rows_a, rows_b, has_route, sc, side_a, side_b}` |
 
 Both v0.17.0 fields keep the lock: default `()`/`None` → `is_context` is always False / no extra
 sheet, so every existing comparison (and the Route-1=969 HL canary) is byte-identical.
@@ -380,6 +388,16 @@ row `(label, module_or_adapter, kind, group)` shows only under its group. `kind`
 (file-vs-file) or `"folders"` (folder-vs-folder) — independent of `group`. See
 [reports.md](reports.md) for the registry + sub-tab wiring.
 
+> **Shared substrate (`compare_tsn_common`, imported as `ctc`).** The five non-HL vs-TSN
+> FILE comparators (§9c Ramp Detail, §9d Ramp Summary, §9e Intersection Summary, §9f
+> Intersection Detail, §9g Highway Sequence) share one substrate: `ctc.norm_pm` /
+> `ctc.iso_date` (the postmile/date normalizers), `ctc.make_notes_writer` (the Notes-sheet
+> builder), and `ctc.run_files_compare` (the load-both-sides-then-`compare_core` driver). A
+> comparator supplies its own loaders + `CompareSchema` and calls `ctc.run_files_compare`;
+> Highway Log keeps its own (older) driver. **Intersection Detail (PDF)** adds
+> `compare_intersection_detail_pdf` — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, reusing
+> §9f's schema and loaders, the exact parallel of §9b's Highway Log (PDF) pair.
+
 ### 9a. TSMIS vs TSN Highway Log — `compare_highway_log.py` (`"files"`, group `highway_log`)
 
 Schema + loaders + `suggest_name`. Takes a TSMIS Highway Log and a TSN Highway Log — **either two
@@ -465,33 +483,42 @@ both, 1 only-TSMIS, 27 diff cells, 4 identical; TSMIS 15215 vs TSN 15410**. Live
 ### 9e. TSMIS vs TSN Intersection Summary — `compare_intersection_summary_tsn.py` (AGGREGATE, ONE-SIDED divergence)
 
 The AGGREGATE recipe applied to the intersection taxonomy. The category schema (`summary_layout.
-INTERSECTION_SUMMARY_SPEC`, 11 blocks, 72 categories) is the **union of both systems' taxonomies**;
-the spec-driven block-walk `summary_layout.counts_from_rows` maps a (count, code-text) stream to
-`{slug: count}` and is shared by BOTH sides (the TSMIS consolidator AND the TSN parser) so they can't
-drift. The TSN side is a **3-column statewide PDF** — split into left/middle/right x-bands, each
-block-walked independently (so each column's count+label rows pair correctly). **Two blocks DIVERGED**
-between the systems and show **one-sided** (user decision; no crosswalk), driven by `Cat.sides`
-("both" | "tsmis" | "tsn") + `SummarySpec.categories_for(side)`: CONTROL TYPES (TSN-only legacy signals
-J–P; TSMIS-only S/O/Q/R) and INTERSECTION TYPE (TSMIS-only Roundabout/Circular/Midblock). Keyed on
-`(block, code-letter)` because TSMIS reworded labels. Canary in [tsn-parsers.md](tsn-parsers.md):
-**72 union — 56 both / 10 only-TSMIS / 6 only-TSN; 52 diff; TSMIS 16473 vs TSN 16626**. Live in both matrices.
+INTERSECTION_SUMMARY_SPEC`, 11 blocks, **66 categories** after the v0.17.8 signal fold) is the union
+of both systems' taxonomies; the spec-driven block-walk `summary_layout.counts_from_rows` maps a
+(count, code-text) stream to `{slug: count}` and is shared by BOTH sides (the TSMIS consolidator AND
+the TSN parser) so they can't drift. The TSN side is a **3-column statewide PDF** — split into
+left/middle/right x-bands, each block-walked independently. **The v0.17.8 §9b fold** brought CONTROL
+TYPES into line with the Detail: TSN's legacy signal sub-types **J–P fold into the single
+`S - SIGNALIZED` category**, so Signalized now compares on **both** sides and **no TSN-only categories
+remain** (`_IS_TSN_ONLY == ()`). The genuinely TSMIS-only codes stay one-sided — CONTROL **O/Q/R** and
+INTERSECTION TYPE **Roundabout/Circular/Midblock** — driven by `Cat.sides` ("both" | "tsmis" | "tsn")
++ `SummarySpec.categories_for(side)`. Keyed on `(block, code-letter)` because TSMIS reworded labels.
+Note the distinction from §9f: the **Summary keeps the category LABEL "S - SIGNALIZED"**, while the
+Detail's per-cell control value renders as the code **`S`**. Canary in [tsn-parsers.md](tsn-parsers.md):
+**66 categories — 58 both / 8 only-TSMIS / 0 only-TSN; TSMIS 16473 vs TSN 16626**. Live in both matrices.
 
 ### 9f. TSMIS vs TSN Intersection Detail — `compare_intersection_detail_tsn.py` (FLAT, route+PM)
 
-The Ramp Detail FLAT recipe for Intersection Detail. TSMIS side = the consolidated workbook read
-**by position** (its header is column-shifted — the "INT Type" label sits over the eff-date value).
-Both sides store attribute pairs in (eff_date, type) order (the planning-phase "pair-order reversal"
-was a misread of that shifted header). Three reconciliations, all locked: **(1)** mastarm /
-right-channelization / lighting are `Y/N` on TSN but `1/0` on TSMIS — **normalized `Y≡1 / N≡0`**
-(user decision) so only genuine changes flag, with a **Notes sheet** (`legend_writer`) indicating it;
-**(2)** Control Type diverges taxonomically (TSN legacy vs TSMIS `S`) — no crosswalk → genuine diffs;
-**(3)** `context_fields` = PR + Date of Record (a TSMIS refresh date) + the **5 cross-street attrs**
-(TSMIS leaves them blank for ~37% of intersections, so counting them would bury the mainline diffs —
-shown, never counted). **(4)** Divided-highway routes carry a roadbed suffix (S/U) on TSN but not
-TSMIS — keyed on the BASE route so the same intersection still pairs, with the suffix surfaced as a
-compared `Roadbed` column so a suffix-only difference is flagged (match-and-indicate, 2026-06-20).
-Canary in [tsn-parsers.md](tsn-parsers.md): **16,211 both / 262 only-TSMIS / 415 only-TSN (routes
-one-sided NONE/NONE); 5,632 counted diffs incl. Roadbed 31 (0 in context); 16473 vs 16626**. Live in both matrices.
+The Ramp Detail FLAT recipe for Intersection Detail, forward-ported in v0.18.0 to its **v0.17.8**
+state (P15). TSMIS side = the consolidated workbook read **by position** (its header is column-shifted
+— the "INT Type" label sits over the eff-date value). Both sides store attribute pairs in (eff_date,
+type) order. The v0.17.8 policy is **compare-everything, position-aligned** — `CONTEXT_FIELDS = ()`,
+so every shared column (incl. PR, Date of Record, and the 5 cross-street attrs) IS counted; nothing is
+suppressed as "context" any more. The locked reconciliations: **(1)** mastarm / right-channelization /
+lighting are `Y/N` on TSN but `1/0` on TSMIS — **normalized `Y≡1 / N≡0`** so only genuine changes flag;
+**(2)** a **control-type crosswalk** now folds TSN's legacy signalized sub-types (J–P) and "signalized"
+into TSMIS's single code **`S`** (`_norm_control_type`) — so an S-vs-P pairing no longer flags, while a
+genuinely non-signalized control change (A vs B) still does; **(3)** three numeric fields (Main Line
+Length / Intrte Route / Intrte Postmile) are **zero-pad normalized** (`058≡58`, `9.560≡9.56`); **(4)**
+divided-highway routes carry a roadbed suffix (S/U) on TSN but not TSMIS — keyed on the BASE route so
+the same intersection still pairs, with the suffix surfaced as a compared `Roadbed` column. The TSN
+side is **re-normalized at compare time** (so a library cached before a normalization change can't mask
+it), and a **"Report View" replica sheet** — wired through the opt-in `extra_sheet_writer` — renders
+the printed two-line record, classifying date differences as "soft" (rendered red but excluded from the
+Major count) vs hard attribute diffs. Because every column now counts, the statewide diff total rises
+sharply: the **v0.18.1-confirmed real-data canary is ≈163,353 diff cells (Excel) / 163,361 (PDF)**; the
+offline lock is `check_compare_intersection_detail_tsn.py`'s synthetic behavior fixture (the S-crosswalk,
+the Y/N↔1/0 norm, Date-of-Record now counted, the Report View soft/hard split). Live in both matrices.
 
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 
@@ -539,12 +566,14 @@ limit and falls back to "Side A"/"Side B" on collision).
 | `INTERSECTION_SUMMARY` | Intersection Summary | `intersection_summary` / category sheet | route (first col) | **AGGREGATE per route** (v0.17.0): the per-route export is a CATEGORY-summary sheet, not a flat table, so a `side_loader` (`_load_intersection_summary_side`) parses each file into ONE `[route, total, *category counts]` row via the consolidator's own `parse_route` block-walk (`has_route=False`, `agg_header=IS_HEADER`) — the XLSX analog of `RAMP_SUMMARY`'s PDF path |
 | `INTERSECTION_DETAIL` | Intersection Detail | `intersection_detail` / "Intersection Detail" | `Post Mile` | **flat** (v0.17.0): a normal per-route XLSX, consolidated shape, route+PM key (the export header is offset within each type/eff-date pair, but both env sides share the layout so the position-wise compare is valid) |
 | `HIGHWAY_LOG_PDF` | Highway Log (PDF) | `highway_log_pdf` / "Highway Log" | Location | **flat, PDF-sourced** (v0.17.0): a `flat_pdf_loader` (`_load_highway_log_pdf_side`) converts each side's PDFs to per-route XLSX (the HL-PDF consolidator's parser) then reads them flat; reuses the Highway Log schema (`_HL_BASE`, `force_header`, Med Wid, ditto/roadbed). The PDF is the accurate HL source, so this is the preferred cross-env Highway Log |
+| `INTERSECTION_DETAIL_PDF` | Intersection Detail (PDF) | `intersection_detail_pdf` / "Intersection Detail" | `Post Mile` | **flat, PDF-sourced** (v0.18.0): the exact parallel of `HIGHWAY_LOG_PDF` — a `flat_pdf_loader` (`_load_intersection_detail_pdf_side`) parses each side's PDFs to per-route XLSX (the Int-Detail-PDF consolidator's parser) then reads them flat; reuses the Intersection Detail layout |
 
 `EnvCompare` has three shapes: the **flat** path (Ramp Detail / Highway Sequence / Highway Log /
 Intersection Detail — read the per-route sheet rows in consolidated shape); a **flat, PDF-sourced**
-variant (`flat_pdf_loader` — Highway Log (PDF), which parses each side's PDFs to per-route XLSX first);
-and the **aggregate-per-route** path (a `side_loader` yielding one row per route — Ramp Summary's PDFs,
-Intersection Summary's category sheets). Ramp Detail / Highway Sequence / Intersection Detail lock their
+variant (`flat_pdf_loader` — Highway Log (PDF) **and Intersection Detail (PDF)**, which parse each
+side's PDFs to per-route XLSX first); and the **aggregate-per-route** path (a `side_loader` yielding
+one row per route — Ramp Summary's PDFs, Intersection Summary's category sheets). Ramp Detail /
+Highway Sequence / Intersection Detail lock their
 layout from the files (both folders must agree, else a clear error); Highway Log (both formats) pins
 `EXPECTED_HEADER` + the Med Wid rule. Verified with
 planted-difference fixtures and a real-Excel COM recalc (all SELF-CHECK rows OK). GUI: folder
@@ -634,20 +663,25 @@ strictly **ADDITIVE / orchestration-only**: `matrix.py` NEVER edits the manual c
 adapters. The foundation it sits on was audited cell-accurate over the full 6-env batch (2026-06-18; see
 [roadmap.md](roadmap.md) closed findings).
 
-- **Rows** = `reports.matrix_rows()` — **all 7 reports**: Ramp Summary, Ramp Detail, Highway Sequence,
-  **Highway Log (Excel)**, **Intersection Summary**, **Intersection Detail**, and **Highway Log (PDF)**
-  (HL is two rows, keyed by subdir `highway_log` / `highway_log_pdf`). As of v0.17.0 **every cell of the
-  matrix is coded — nothing is greyed**: both Intersection reports gained a cross-env adapter
-  (`compare_env.INTERSECTION_SUMMARY` AGGREGATE-per-route + `INTERSECTION_DETAIL` flat), and the **HL-PDF
-  row's cross-env mode** is now `compare_env.HIGHWAY_LOG_PDF` (both sides parsed from the PDF export — the
-  accurate Highway Log source). `reports.tsn_matrix_extra_rows()` is empty (every report is a full row).
+- **Rows** = `reports.matrix_rows()` — **all 8 reports**: Ramp Summary, Ramp Detail, Highway Sequence,
+  **Highway Log (Excel)**, **Intersection Summary**, **Intersection Detail**, **Highway Log (PDF)**, and
+  **Intersection Detail (PDF)** (the two reports with PDF editions are two rows each, keyed by subdir
+  `highway_log`/`highway_log_pdf` and `intersection_detail`/`intersection_detail_pdf`). **Every cell of
+  the matrix is coded — nothing is greyed**: both Intersection reports gained a cross-env adapter
+  (`compare_env.INTERSECTION_SUMMARY` AGGREGATE-per-route + `INTERSECTION_DETAIL` flat) in v0.17.0, the
+  **HL-PDF** row's cross-env mode is `compare_env.HIGHWAY_LOG_PDF`, and v0.18.0 added the **Intersection
+  Detail (PDF)** row with `compare_env.INTERSECTION_DETAIL_PDF` (both PDF rows parse both sides from the
+  PDF export). `reports.tsn_matrix_extra_rows()` is empty (every report is a full row).
 - **Per-row comparison MODE** (`matrix._row_modes`, picked via a dropdown under each row's name,
   persisted in `settings.matrix_row_modes`):
-  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). All rows but HL-PDF.
-  - `tsn` — vs TSN. HL-Excel: `compare_highway_log` (TSMIS Excel vs TSN); HL-PDF: `compare_highway_log_pdf.TSMIS_PDF_VS_TSN`.
-    TSN is ONE dataset for both, dropped in `<dest>/_tsn_input/highway_log/`. RS/RD/HSL show a greyed `tsn` placeholder.
-  - `vs_pdf` / `vs_excel` — TSMIS PDF vs Excel (`compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL`, the one
-    comparison framed from each HL row's side).
+  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). **All 8 rows.**
+  - `tsn` — vs TSN, for **every** report (`matrix.tsn_comparator_for(row_key)`): the FLAT/AGGREGATE
+    `compare_*_tsn` comparators for RS/RD/HSL/Int-Summary/Int-Detail, `compare_highway_log` for HL-Excel,
+    and the PDF-sourced `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` / `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN`
+    for the two PDF rows. Each PDF row **shares its Excel sibling's TSN subdir** (`highway_log_pdf`→`highway_log`,
+    `intersection_detail_pdf`→`intersection_detail`), so one TSN dataset serves both rows.
+  - `vs_excel` — the two **PDF-vs-Excel self-checks** (`compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` and
+    `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL`), available only on the two PDF-edition rows.
   A global "set all comparisons to…" (env|tsn) lives in the config zone.
 - **build_comparison** dispatches by mode: env → `build_cell_comparison`; tsn/self → consolidate the env's
   store folder(s) on the fly (`consolidate_highway_log` / `consolidate_tsmis_highway_log_pdf` — the PDF
@@ -697,16 +731,17 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 > automatically (`_row_modes` + `day_matrix._day_rows` + `available_days` all gate on it).
 > `day_matrix.TSN_SUBDIR` is GONE → per-row `tsn_subdir`; `consolidate_and_compare_tsn` is
 > keyed on `(row_key, subdir)` and consolidates via `reports.consolidator_for_subdir`. **Live
-> today: ALL reports — HL Excel/PDF + Ramp Detail & Intersection Detail & Highway Sequence (FLAT)
-> + Ramp Summary & Intersection Summary (AGGREGATE)**. Nothing greyed (v0.17.0 complete).
+> today: ALL 8 reports — HL Excel/PDF + Ramp Detail + Intersection Detail (Excel + PDF) + Highway
+> Sequence (FLAT) + Ramp Summary & Intersection Summary (AGGREGATE)**. The Intersection Detail (PDF)
+> row was added in v0.18.0 (its `tsn_subdir` shares `intersection_detail`). Nothing greyed.
 
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
-cross-environment, no live re-export** (it compares specific historical exports). **ALL reports are
-live (v0.17.0 complete)** — HL Excel/PDF + Ramp Detail + Ramp Summary + Intersection Summary +
-Intersection Detail + Highway Sequence; nothing greyed. Like `matrix.py`, it NEVER edits the manual
-compare code — it only orchestrates.
+cross-environment, no live re-export** (it compares specific historical exports). **ALL 8 reports are
+live** — HL Excel/PDF + Ramp Detail + Ramp Summary + Intersection Summary + Intersection Detail
+(Excel + PDF) + Highway Sequence; nothing greyed (v0.17.0/v0.18.0 complete). Like `matrix.py`, it
+NEVER edits the manual compare code — it only orchestrates.
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
   (the same path `build_comparison`'s tsn branch uses, now keyed on `(row_key, subdir)`) over the

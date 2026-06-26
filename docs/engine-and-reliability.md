@@ -65,6 +65,50 @@ A pre-existing file only counts as "done" if it passes a **magic-byte check** an
 
 ---
 
+## Completion & artifact outcomes (v0.18.0)
+
+A run's result now carries two ORTHOGONAL, **producer-owned** axes (`scripts/outcome.py`), set from
+structured counts, NEVER inferred from human-readable `summary_lines`:
+
+- **completion** — `complete` | `partial` | `no_data` | `cancelled` | `failed`. A run is complete only
+  when it covered everything; any failed/skipped input → `partial`; a signed-in env that yields nothing
+  for every route → `no_data`. `reduce_completion` rolls per-report completions into one run-level value
+  (a mix of complete + no_data is `partial`, never green; an `aborted` multi-report run that didn't
+  finish every report is never complete).
+- **artifact** — `promoted` | `new_unpromoted` | `previous_preserved` | `none`. Only a **complete**
+  refresh `promoted`s into an always-current store; anything else **keeps last-good**
+  (`previous_preserved`).
+
+Gates key on these, never on text: `promotable()` (= complete only) guards store-promote (F1) and
+cache (F3); `comparable()` lets a partial feed a comparison but flags it. So a **partial run can never be
+promoted, cached, or shown green** — the matrix renders a distinct amber **`mx-partial`** cell.
+
+**Transactional consolidation.** Consolidated workbooks are written temp-then-`os.replace`; each carries
+a producer-set completion **sidecar** (`scripts/consolidation_meta.py`) written through a fail-safe
+ladder (a corrupt/locked/missing sidecar reads as conservative `partial`, never a false green).
+`scripts/cache_envelope.py` versions the matrix/by-day caches (one forward rebuild on a schema bump);
+`scripts/artifact_store.py` owns the staged store-promote + its interrupted-swap recovery (run on every
+launch, before any store is read). The Highway Log PDF consolidator escalates a `skipped_no_geometry`
+drop to `partial` (P1), so dropped-line output is never promoted as complete.
+
+## Engine module structure (v0.18.0 — `common.py` is a shim)
+
+`common.py` is now a **re-export shim** over an acyclic set of engine **leaf** modules (`auth_nav`,
+`report_nav`, `session`, `site_target`, `routes`, `errors`, `timeouts`, `browser_channels`,
+`edge_device`). Existing `from common import X` callers are unchanged; import direction is guarded by
+`build/check_import_direction.py`. The fast-fail error classes live in `errors.py` (`ReportError`,
+`ReportUnavailableError`) and `exporter.py` (`EmptyExport`); the timeout **accessors**
+(`report_timeout_ms()` etc., which read Settings at run time) live in `timeouts.py`.
+
+**P8c live-path hardening (offline-proven; live acceptance owed to v0.18.1).** `select_report` uses an
+**exact** option match (no substring mis-pick); every route re-confirms the report dropdown before
+Generate (`_ensure_report_armed`, the stale-form guard); the sign-in busy-wait gained an **in-loop
+cancel check** (`navigate_with_auth(..., should_cancel=…)` polls ~1 s so Stop/Clear interrupt a stuck
+login); the Edge sign-in CDP port is opened **on demand** and **closed on capture**; the no-download
+empty backstop is marker-independent. See [internals/export-engine.md](internals/export-engine.md).
+
+---
+
 ## Skip a slow route
 
 Console `S` key / GUI Skip button → `events.should_skip()`, polled inside `wait_with_skip_option` (in `common.py`). The wait polls `page.wait_for_function` in 5-second chunks so it can honor skip, emit a "still working" status, and enforce the hard timeout independently.

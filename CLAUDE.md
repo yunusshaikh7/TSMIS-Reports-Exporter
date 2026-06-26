@@ -30,19 +30,23 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
+| 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
 Reports 5–6 (Intersection): export is **enabled** but the report lives on the
 **development** TSMIS site — switch via Settings ▸ "Use development site"
-(`tsmis-dev.dot.ca.gov`). v0.17.0 brought all reports to parity: **every report now
-consolidates AND compares vs TSN** — all 6 reports + the PDF Highway Log have a
+(`tsmis-dev.dot.ca.gov`). Highway Log and Intersection Detail each ship in **two
+editions** — the Excel export and a print-layout **PDF** edition (4b / 6b; 6b was
+forward-ported in v0.18.0 as an exact parallel of 4b). v0.17.0 brought all reports to
+parity: **every report consolidates AND compares vs TSN** — all 8 export types have a
 vs-TSN comparator, live in both the Everything and by-day matrices (see
 [docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md) for
-the per-report schema + locked canaries). Two consolidate-only
-Highway Log sources exist too — **TSN** district PDFs (dropped into
-`input/tsn_highway_log/`) and the app's own **Highway Log (PDF)** export. The
-**Compare** tab diffs every report **TSMIS-vs-TSN** (the two PDF-sourced Highway Log
-flavors among them) and runs cross-environment comparisons.
+the per-report schema + locked canaries). Consolidate-only sources exist too — **TSN**
+Highway Log district PDFs (dropped into `input/tsn_highway_log/`) and the app's own
+**Highway Log (PDF)** and **Intersection Detail (PDF)** exports. The **Compare** tab
+diffs every report **TSMIS-vs-TSN** (the PDF-sourced Highway Log and Intersection
+Detail among them, each also offering a **PDF-vs-Excel** self-check) and runs
+cross-environment comparisons.
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
 [docs/reports.md](docs/reports.md). Highway Log columns / PDF parsing / comparisons:
@@ -96,6 +100,26 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   new behavior is added through **opt-in** `CompareSchema` fields that default to the
   no-op original (so non-HL comparisons stay byte-identical). See
   [docs/comparison-engine.md](docs/comparison-engine.md).
+- **Completion is producer-owned; a partial never promotes.** `outcome.py` is the
+  vocabulary (completion ∈ complete/partial/no_data/cancelled/failed × artifact ∈
+  promoted/new_unpromoted/previous_preserved/none) — set it from structured counts,
+  **never** inferred from `summary_lines` text. Only a **complete** result may be
+  promoted to the live store, cached, or shown green. See
+  [docs/engine-and-reliability.md](docs/engine-and-reliability.md).
+- **Consolidated artifacts are transactional.** Write to a temp then `os.replace`;
+  a partial/failed/cancelled refresh **keeps last-good** (never clobbers it). Each
+  persistent workbook carries a producer-set `consolidation_meta` completion sidecar
+  whose read is **fail-safe** (corrupt/locked ⇒ conservative partial, never a false
+  green). `cache_envelope.py` versions the matrix/by-day caches.
+- **Read comparison counts by HEADER LABEL, not column position.** `read_counts`
+  locates Status/Diffs from the workbook header so flat vs grouped layouts both work
+  (the F4/O4 fix); never hard-code A1/column indices.
+- **`report_catalog.py` is the report-metadata SoT**; `reports.py` is **derived** from
+  it (EXPORT/CONSOLIDATE/COMPARE lists, matrix rows, stable-ID lookups). Stable IDs are
+  immutable string keys; `batch_manifest._V017_EXPORT_ORDER` (the v1-index→key map) is
+  **append-only** — positions 0–6 are frozen, new reports append (Intersection Detail
+  (PDF) = index 7). Add a report by editing the catalog; `check_report_catalog` proves
+  the derivation. See [docs/reports.md](docs/reports.md).
 - **Sync Playwright API** (not async); Playwright is **thread-affine** — only the
   owning thread may touch a page.
 - **Call the timeout ACCESSORS** (`report_timeout_ms()` etc.) in engine code, not the
@@ -127,16 +151,24 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
 run app (GUI preview).bat    dev launcher for the GUI
 version.py                   app name/version + pinned Playwright (single source of truth)
 scripts/                     the engine (console-free) + console & GUI drivers + UI
-  common.py exporter.py exporter_parallel.py cli.py run_report.py events.py settings.py paths.py
+  common.py                  a re-export SHIM over the acyclic engine leaves below
+  auth_nav.py report_nav.py session.py site_target.py routes.py errors.py timeouts.py
+  browser_channels.py edge_device.py   the extracted engine leaves common.py re-exports
+  exporter.py exporter_parallel.py export_multi.py run_report.py cli.py events.py settings.py paths.py
+  outcome.py cache_envelope.py consolidation_meta.py artifact_store.py   the outcome/transaction contracts
   report_catalog.py          the report-metadata source of truth (P4); reports.py derives from it
   reports.py                 the report/consolidate/compare registry view + stable-ID lookups
-  export_*.py                one thin ReportSpec per report type
+  export_*.py                one thin ReportSpec per report type (incl. *_pdf editions)
   consolidate_*.py           per-route exports → one workbook (+ TSN / TSMIS-PDF parsers)
   compare_core.py            the regression-locked comparison-workbook engine
-  compare_env.py compare_highway_log*.py   the comparison families over compare_core
-  highway_log_columns.py     one source of truth for the corrected 31-column labels
-  gui_main.py gui_api.py gui_worker.py  GUI entry / js_api bridge + state / worker threads
-  ui/                        index.html + app.css + app.js (vanilla; + the #mock API)
+  compare_tsn_common.py      the shared vs-TSN file-comparator substrate (P5b)
+  compare_env.py compare_highway_log*.py compare_*_tsn.py   the comparison families over compare_core
+  highway_log_columns.py intersection_detail_columns.py   the corrected per-report column labels
+  gui_main.py gui_api.py gui_worker.py   GUI entry / js_api bridge / worker threads
+  task_coordinator.py contract.py        GUI task-state owner / Python⇄JS bridge enum SSOT
+  gui_endpoint.py gui_matrix.py gui_win32.py   extracted GUI endpoint groups (P7b/P7c)
+  ui/                        index.html app.css app.js + mock.js (#mock fixtures) + ui-*.js + contract.js
+  self_test.py evidence.py pdf_row_oracle.py owned_dir.py safe_delete.py   self-test / evidence / safety
   updater.py login.py logging_setup.py batch_manifest.py report_library.py
 build/                       build.ps1, app.spec, prune_bundle.ps1, full_smoke.py, check_*.py
   gen_release_notes.py release_notes_header.md backfill_release_notes.ps1   per-version release notes

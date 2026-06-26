@@ -2,7 +2,7 @@
 
 > Bulk-export Caltrans TSMIS reports for every California state route — from a single click.
 
-[![Version](https://img.shields.io/badge/version-0.14.2-blue)](version.py)
+[![Version](https://img.shields.io/badge/version-0.18.0-blue)](version.py)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](#)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](#)
 [![Automation](https://img.shields.io/badge/automation-Playwright-2EAD33?logo=microsoftedge&logoColor=white)](#)
@@ -48,7 +48,8 @@ of `.bat` scripts for development and as a fallback.
 
 ## Features
 
-- **Six report types, any combination.** Export one, several, or all at once.
+- **Eight report types, any combination.** Six base reports plus PDF editions of
+  Highway Log and Intersection Detail — export one, several, or all at once.
 - **One login for everything.** A single SSO + MFA sign-in covers every report.
 - **Pick your routes.** Run all routes by default, or narrow to a subset
   (`5, 99, 101` — any casing/zero-padding, suffixes like `101U` accepted).
@@ -82,19 +83,25 @@ of `.bat` scripts for development and as a fallback.
 | TSAR: Ramp Detail | XLSX | `output/<date>/ramp_detail/` |
 | Highway Sequence Listing | XLSX | `output/<date>/highway_sequence/` |
 | Highway Log | XLSX | `output/<date>/highway_log/` |
+| Highway Log (PDF) | PDF (Letter, landscape) | `output/<date>/highway_log_pdf/` |
 | Intersection Summary | XLSX | `output/<date>/intersection_summary/` |
 | Intersection Detail | XLSX | `output/<date>/intersection_detail/` |
+| Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<date>/intersection_detail_pdf/` |
 
-The two Intersection reports live on the **development** TSMIS site (switch via
-Settings ▸ "Use development site"); as of v0.17.0 they consolidate, compare
-cross-environment, and compare vs TSN like every other report.
+Highway Log and Intersection Detail each ship in two editions — the regular Excel
+export and a print-layout **PDF** edition (added for Intersection Detail in v0.18.0,
+matching the one Highway Log already had). The two Intersection reports live on the
+**development** TSMIS site (switch via Settings ▸ "Use development site"); as of
+v0.17.0 every report — both editions included — consolidates, compares
+cross-environment, and compares vs TSN.
 
 Consolidate-only: **TSN Highway Log** (drop district PDFs into
-`input/tsn_highway_log/`) and **TSMIS Highway Log (PDF)** (drop the "Highway Log
-(PDF)" route exports into `input/tsmis_highway_log_pdf/`) — both produce
-TSMIS-format per-route files + one combined workbook under `output/`. The
-**Compare** tab turns two Highway Logs into a formula-driven discrepancy
-workbook (TSMIS vs TSN, TSMIS-PDF vs TSN-PDF, or TSMIS-PDF vs TSMIS-Excel).
+`input/tsn_highway_log/`), **TSMIS Highway Log (PDF)**, and **TSMIS Intersection
+Detail (PDF)** (drop the matching PDF route exports into their `input/…` folders) —
+each produces TSMIS-format per-route files + one combined workbook under `output/`.
+The **Compare** tab diffs every report TSMIS-vs-TSN and cross-environment; the
+PDF-sourced Highway Log and Intersection Detail also offer a **PDF-vs-Excel**
+self-check (the PDF route sidesteps the vendor Excel export's bug).
 
 ---
 
@@ -177,8 +184,9 @@ equivalents directly (Python 3.11):
 
 Setup downloads a Built-in Chromium that becomes the default browser; if that
 download is skipped or fails, the tool falls back to the system Edge/Chrome.
-There are no automated tests; verification is a live export against TSMIS
-(requires login) or running a consolidator over existing per-route files.
+Offline verification is a suite of golden checks under `build/check_*.py` (run with
+the build venv; CI runs them all) plus the frozen-bundle self-test; the live-export
+path against TSMIS still requires a login to exercise end to end.
 
 ## Building the app
 
@@ -213,15 +221,17 @@ bundle hygiene, and the DLP guard.
 
 ```
 scripts/        Core engine (console-free) + console & GUI drivers
-  common.py       URL, routes, timeouts, auth/nav helpers, browser launch
+  common.py       Compatibility shim re-exporting the engine leaves (auth_nav,
+                  report_nav, session, site_target, routes, timeouts, …)
   exporter.py     The shared per-route export loop (+ parallel variant)
+  report_catalog.py  The report-metadata source of truth; reports.py derives from it
   cli.py          Console adapters backing the .bat flow
   gui_main.py     Desktop app entry (pywebview / Edge WebView2 window)
-  gui_api.py      GUI state + the JS bridge; gui_worker.py = worker threads
+  gui_api.py      GUI bridge; task_coordinator.py owns task state; gui_worker.py = threads
   ui/             The interface itself (plain HTML/CSS/JS, no build step)
   export_*.py     One thin file per report type (a ReportSpec)
   consolidate_*.py  Combine per-route exports into one workbook
-  compare_highway_log.py  TSMIS-vs-TSN discrepancy workbook (live formulas)
+  compare_core.py   The regression-locked discrepancy-workbook engine
 build/          Reproducible PyInstaller build (build.ps1, app.spec, prune, self-test)
 output/         Per-report output folders + consolidated/ + run_reports/
 *.bat           Numbered launchers for the console workflow
@@ -229,10 +239,11 @@ CLAUDE.md       Router → conventions + an index into the docs/ library
 docs/           In-depth knowledge library (start at docs/INDEX.md)
 ```
 
-A single report registry (`scripts/reports.py`) drives both the GUI and the
-multi-report selector, so the two never drift. For the full design — the
-`Events`/`ReportSpec` seam, retry logic, fast mode, and packaging — see
-[`CLAUDE.md`](CLAUDE.md) and the [`docs/`](docs/INDEX.md) knowledge library.
+A single report catalog (`scripts/report_catalog.py`) is the metadata source of
+truth; `scripts/reports.py` derives the GUI and the multi-report selector from it,
+so the two never drift. For the full design — the `Events`/`ReportSpec` seam, retry
+logic, fast mode, and packaging — see [`CLAUDE.md`](CLAUDE.md) and the
+[`docs/`](docs/INDEX.md) knowledge library.
 
 ## Tech stack
 

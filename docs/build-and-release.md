@@ -52,20 +52,24 @@ Produces the windowed `dist\TSMIS Exporter\` (~148 MB; double-click
 
 | Switch | Effect |
 |---|---|
-| `-SelfTest` | Builds a **headless console** self-test exe AND runs it over the pruned bundle — the real release gate (see step 3b). |
+| `-SelfTest` | After building + pruning, runs the **EXACT shipped windowed exe**'s `--self-test` gate (P10/R1-B04). No longer a separate console exe — the artifact that ships is the artifact that passed (see step 3b). |
+| `-RecreateVenv` | Deletes + recreates `build\.venv` for a clean, reproducible install from the lock (P10). |
 | `-BundleChromium` | Additionally ships Playwright's own Chromium inside `_internal\ms-playwright` (the with-browser variant). |
 | `-Sign` | **Self-signs** the built `.exe` (SHA-256 + timestamp) with a self-signed cert (auto-created in `Cert:\CurrentUser\My`; override `-CertSubject`). Interim/local only — other PCs won't trust it; real signing is SignPath in CI. See [it-and-security.md §7](it-and-security.md). |
 
 Steps:
 
-1. **Isolated build venv** — creates `build\.venv` if absent, then
-   `pip install -r requirements-build.txt` into it. (End-user setup uses global
-   pip; only the build uses a venv.)
+1. **Isolated, hash-verified build venv** — creates `build\.venv` (`-RecreateVenv`
+   deletes + rebuilds it first), then installs the EXACT dependency tree from
+   `requirements-build.lock.txt` with `pip install --require-hashes`, and runs
+   `build/check_build_env.py` to fail if the resulting environment doesn't match the
+   lock (version.py ↔ requirements ↔ lock parity; fail on unexpected/missing/
+   mismatched). This makes the build **reproducible** — a polluted env can't produce a
+   shipped artifact. (End-user setup uses global pip; only the build uses a venv.)
 2. **PyInstaller** — runs `app.spec` with `--distpath dist --workpath build\pyi-work --noconfirm`.
-   `build.ps1` sets three env vars the spec reads: `TSMIS_ENTRY`
-   (`scripts\gui_main.py` for the app, `build\full_smoke.py` for `-SelfTest`),
-   `TSMIS_APP_NAME` (`TSMIS Exporter` / `TSMIS SelfTest`), `TSMIS_CONSOLE`
-   (`0` windowed / `1` console).
+   `TSMIS_ENTRY` is **always** `scripts\gui_main.py` (the exact shipped windowed app) —
+   `-SelfTest` no longer builds a separate exe, it runs THIS exe's `--self-test` gate
+   afterward. `TSMIS_APP_NAME` = `TSMIS Exporter`; `TSMIS_CONSOLE` = `0` (windowed).
 2b. **Optional Chromium bundle** (`-BundleChromium`, done BEFORE the prune so its
    locale trimming applies to the browser too): sets
    `PLAYWRIGHT_BROWSERS_PATH` at `<AppDir>\_internal\ms-playwright` and runs
@@ -74,12 +78,16 @@ Steps:
    mode, so one binary serves headed sign-in AND headless exports.
 3. **Prune + DLP guard** — runs `prune_bundle.ps1 -Target <AppDir>` (see below);
    fails the build if DLP-blocked content remains.
-3b. **Run the frozen self-test** (only with `-SelfTest`) — runs the built
-   self-test exe; a nonzero exit fails the build. Building proves it *links*;
-   running proves the PRUNED frozen bundle exercises every real code path
-   (system browser `page.pdf()` + download, pdfplumber text/table extraction,
-   openpyxl round-trip, GUI construction through the real JS bridge).
-   `-SelfTest -BundleChromium` gates the bundled-Chromium path.
+3b. **Run the frozen exact-artifact self-test** (only with `-SelfTest`) — runs the
+   EXACT shipped windowed `TSMIS Exporter.exe --self-test` over the PRUNED bundle; a
+   nonzero exit fails the build. The self-test body lives in `scripts/self_test.py`
+   (shared by `gui_main --self-test` and `build/full_smoke.py`); the windowed exe has
+   no stdout, so it mirrors a human-readable result to `TSMIS_SELFTEST_OUT`. Building
+   proves it *links*; running proves the PRUNED frozen bundle exercises every real code
+   path (system browser `page.pdf()` + download, pdfplumber text/table extraction,
+   openpyxl round-trip, the matrix modules, GUI construction through the real JS
+   bridge). `-SelfTest -BundleChromium` gates the bundled-Chromium path. The artifact
+   that ships is the artifact that passed.
 4. **Report** — copies `dist_readme.txt` in as `Start Here.txt` and
    `it_readme.txt` in as `IT-README.txt` (the IT/security handout), windowed
    builds only, and prints the onefolder size.
@@ -165,9 +173,17 @@ points:
 - **`collect_data_files('pdfminer')`** — the pdfminer CMap data is the classic
   frozen trap (text extraction breaks without it). `collect_all('pdfplumber'/'openpyxl')`.
   `cryptography` is a hard pdfminer import and **must stay**.
-- **`APP_MODULES`** lists every flat `scripts/` module as a hidden import (many
-  are imported lazily inside functions). New report/consolidator/comparison
-  modules MUST be added here.
+- **`APP_MODULES`** lists every flat `scripts/` module as a hidden import (many are
+  imported lazily inside functions); **`build/check_app_modules.py` enforces
+  completeness** (every flat module declared, no strays, no dups). New
+  report/consolidator/comparison modules MUST be added here — v0.18.0 added the
+  contract/outcome leaves (`outcome`, `cache_envelope`, `consolidation_meta`,
+  `artifact_store`, `contract`, `task_coordinator`), the comparator substrate
+  (`compare_tsn_common`), the GUI split (`gui_endpoint`, `gui_matrix`, `gui_win32`),
+  `self_test`, `evidence`, `pdf_row_oracle`, `intersection_detail_columns`, the four
+  `*intersection_detail_pdf` modules, and the engine leaves (`auth_nav`, `report_nav`,
+  `session`, `site_target`, `routes`, `errors`, `timeouts`, `browser_channels`,
+  `edge_device`, `export_multi`).
 - **`excludes=['PIL','pypdfium2','pypdfium2_raw','tkinter','_tkinter']`** — image
   libs the runtime paths (text/table extraction + plain workbooks) don't need,
   plus Tk/Tcl. NOTE: openpyxl imports Pillow *eagerly* at import time, so PIL
@@ -281,20 +297,26 @@ the system proxy from the registry. **DO NOT switch this to requests/certifi.**
      the CLR-blocking MOTW field failure that motivated
      `gui_main._unblock_dotnet_assemblies()` can't happen on this path.
    - **Verifies SHA-256 against the published checksum** (`_expected_sha256`):
-     prefers the companion `<asset>.sha256` file (which the release publishes and
-     a user can verify by hand), then the GitHub API's own `digest`. A mismatch
-     deletes the zip and **refuses to install** — guards against
-     corruption/truncation/wrong-asset, NOT a forged release (that is
-     code-signing's job, the planned next step). No published checksum ⇒ proceed
-     on size only with a warning.
-   - Extracts to `data\update\extract`, renames the inner bundle root to
-     `data\update\staged`, and asserts the staged tree has the exe + `_internal`.
+     prefers the companion `<asset>.sha256` file (which the release publishes and a
+     user can verify by hand), then the GitHub API's own `digest`. A mismatch deletes
+     the zip and **refuses to install**. **No published checksum ⇒ FAIL-CLOSED (P10)** —
+     the install aborts and shows the release page; there is **no size-only fallback**
+     any more. The checksum guards corruption/truncation/wrong-asset, NOT a forged
+     release (that is code-signing's job, the planned next step).
+   - The download has a socket timeout + **bounded retry**, so a flaky proxy/Wi-Fi link
+     doesn't hang or fail on the first hiccup.
+   - Extracts to `data\update\extract` with an explicit **zip-slip guard** (every member
+     path validated to stay inside the destination before `extractall`), renames the
+     inner bundle root to `data\update\staged`, asserts the staged tree has the exe +
+     `_internal`, and records a digest over the WHOLE staged tree (`staged.sha256`) for
+     the **re-hash before swap** (step 3 re-verifies it before launching the swap exe).
 3. **`apply_update_and_restart(staged_dir)`** — launches the **STAGED NEW EXE**
    in swap mode (`SWAP_FLAG = "--apply-update"`, detached, `CREATE_NO_WINDOW`),
    passing the install dir, this app's PID, and the helper-log path. The caller
-   then closes the app. If the swap exe dies within ~1.5 s (a policy blocked it),
-   it raises `UpdateError` and the app **stays open on the old version** — the
-   silent-failure mode the old PowerShell helper had.
+   then closes the app. The swap exe is watched across a **~2.0 s window (polling
+   every 0.25 s)** (P10-hardened from a single ~1.5 s check); if it dies in that window
+   (a policy blocked it), it raises `UpdateError` and the app **stays open on the old
+   version** — the silent-failure mode the old PowerShell helper had.
 4. **`cleanup_leftovers()`** (every GUI launch, before the CLR loads) — removes
    `data\update` staging and stale `*.old`/`*.new` bundle pieces. Deliberately
    removes a staged-but-never-applied download so stale versions are re-offered
@@ -367,14 +389,16 @@ update is `staged` (it would clobber the staged download). Locked by
 
 ### `_clear_webview_caches()`
 
-Runs in `cleanup_leftovers()` on every launch. Drops the WebView2 HTTP caches
-(`Cache`/`Code Cache`/`GPUCache`/`Service Worker` under `data\webview2`) but
-NEVER Local Storage (the theme choice lives there). The persistent profile could
-otherwise serve a cached `app.js`/`index.html` after an update — a just-updated
-app showing the OLD interface under the NEW version number (v0.10.2 field
-report: "says 0.10.2 but features missing"). The caches only ever hold the app's
-own three UI files, so clearing every launch is cheap and kills the staleness
-class (manual zip-overwrite installs included).
+Runs in `cleanup_leftovers()` on every **frozen** launch (it sits below the
+`is_frozen()` guard — a dev launch serves `scripts/ui` live, so there is nothing to
+clear, and clearing it every dev launch was wasted work; moved below the guard in
+P10). Drops the WebView2 HTTP caches (`Cache`/`Code Cache`/`GPUCache`/`Service Worker`
+under `data\webview2`) but NEVER Local Storage (the theme choice lives there). The
+persistent profile could otherwise serve a cached `app.js`/`index.html` after an
+update — a just-updated app showing the OLD interface under the NEW version number
+(v0.10.2 field report: "says 0.10.2 but features missing"). The caches only ever hold
+the app's own UI files, so clearing them on a frozen launch is cheap and kills the
+staleness class (manual zip-overwrite installs included).
 
 ### `safe_release_url()`
 
@@ -386,11 +410,33 @@ only when it is an `https://github.com/<this repo>/…` link, else falls back to
 the hardcoded releases page (which lands on the same place since updates only
 target the latest release).
 
+### Work-PC evidence kit (`--collect-evidence`, P13)
+
+A GUI-only CLI flag that gathers a **credential-safe** diagnostics zip on a locked-down
+work PC (no admin/cmd needed — a desktop shortcut with the flag works). `gui_main.py`
+branches to `evidence.collect()` before any heavy init. The bundle is an **allowlist**
+— `manifest.txt`, the offline `self_test.txt`, rotating logs, recent run-report
+summaries, and any report/TSN source files placed via `--evidence-dir` (PDF/XLSX/XLS
+only; a positive allowlist that **refuses** copied cookie stores / login DBs / saved
+`.html` / any other type). It NEVER contains the saved login, the Edge profile, failure
+dumps, exported report data, or the TSN inputs. Packaged via the `evidence` module in
+`APP_MODULES`; locked by `build/check_evidence_bundle.py` (adversarial credential-leak
+fixtures). Full handoff: [work-pc-validation.md](work-pc-validation.md).
+
+### Two-tier release (v0.18.0 candidate → v0.18.1 close-out)
+
+**v0.18.0 is the offline-validated candidate** — every phase provable from CI/offline
+(the exact-artifact self-test, the golden checks). **v0.18.1 is the field-validated
+close-out**: the user runs v0.18.0 on the work PC, returns the evidence kit, and v0.18.1
+lands any real-data fixes and claims operational sign-off. "Enterprise-ready" = the
+v0.18.1 sign-off, never v0.18.0. Both ship through the same `release.yml` flow.
+
 ---
 
 ## Releasing — push a `v*` tag
 
-Bump `version.py` first; nothing is published if any gate fails.
+Bump `version.py` first (v0.18.0 sets it; the tag must be `v<__version__>`); nothing is
+published if any gate fails.
 
 ```
 git push origin refs/tags/v0.14.2
@@ -421,7 +467,10 @@ git push origin refs/tags/v0.14.2
    set (post-approval); otherwise skipped. See [it-and-security.md §7](it-and-security.md).
 4. **Publish SHA-256 checksums** — one `<asset>.sha256` per zip (sha256sum
    format `"<hash>  <name>"`, ASCII = no BOM, since a BOM would corrupt the
-   hash). These are what the updater verifies against.
+   hash). These are what the updater verifies against. The workflow **FAILS (never
+   skips)** if any variant's zip OR its `.sha256` is missing — per-variant artifact
+   completeness is a hard gate (P10), so the updater's fail-closed checksum path is
+   always the normal path.
 5. **Assemble per-version notes** — `gen_release_notes.py "$TAG" -o notes.md`
    joins the shared `build/release_notes_header.md` (download table) with the
    matching `## <tag>` section from `CHANGELOG.md`. Runs *before* the build so a

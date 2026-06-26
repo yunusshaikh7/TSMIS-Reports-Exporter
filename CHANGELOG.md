@@ -3,6 +3,35 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.18.0 — 2026-06-26
+
+A big under-the-hood overhaul for reliability and maintainability — plus one new
+report. The day-to-day workflow is unchanged; what changed is how carefully the tool
+treats your results when something goes wrong, and how the app is built and updated.
+
+- **New report: Intersection Detail (PDF).** Alongside the Excel "Intersection Detail",
+  you can now export it as a PDF — exactly the way Highway Log already offers both. It
+  consolidates into one workbook and compares (between environments, vs TSN, and
+  PDF-vs-Excel) like every other report, and it appears on both matrices.
+- **A partial run never looks "finished" anymore.** If some routes or inputs fail or
+  come back empty, the result is now clearly marked **incomplete** (amber on the matrix)
+  instead of green — and an incomplete refresh is never cached or compared as if it were
+  complete. You always know whether a column is the full picture.
+- **A failed refresh never clobbers your last good copy.** Consolidated workbooks are now
+  written transactionally (write-then-swap): if a refresh is interrupted or fails midway,
+  the previous good file is kept intact rather than left half-written.
+- **A safer self-updater.** An update now **refuses to install** unless its download
+  matches a published checksum (no more "install it anyway"), re-checks the staged files
+  one last time right before swapping them in, rejects any tampered archive, retries a
+  flaky download, and can still roll back to an older version far down the release list.
+- **Reset stays inside the app's own folders.** "Reset" / cleanup now refuses to follow a
+  junction or symlink out of the app's data area, so it can only ever clear what it owns.
+- **Under the hood.** The engine, the GUI bridge, and the report registry were
+  reorganized into many small, single-purpose modules with a single report catalog as the
+  source of truth; the full automated test suite now runs against the **exact** packaged
+  executable, and the build is pinned to a verified dependency set so every release is
+  reproducible. No change you need to do anything about — just a sturdier foundation.
+
 ## v0.17.1 — 2026-06-21
 
 A quick fix-up of issues found using v0.17.0 on the matrices.

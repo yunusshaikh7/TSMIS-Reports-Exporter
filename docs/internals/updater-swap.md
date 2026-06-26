@@ -112,7 +112,7 @@ Numbered flow:
    - `done += len(chunk)`, fire `on_progress(done, total)` where `total = asset_size or Content-Length`.
    `OSError` mid-stream → `UpdateError("the update download failed…")`.
 5. **Completeness** — if `asset_size` known and `done != asset_size` → `UpdateError` "incomplete".
-6. **SHA-256 verify** (see §3.1) — mismatch deletes the zip and raises; no checksum → warn + proceed on size only.
+6. **SHA-256 verify** (see §3.1) — mismatch deletes the zip and raises; **no checksum → FAIL-CLOSED** (abort + show the release page; no size-only fallback).
 7. **Extract** — `zipfile.ZipFile(zip_path).extractall(extract_dir)`; `BadZipFile`/`OSError` → `UpdateError("not a valid app package")`. **Then `zip_path.unlink()` immediately** — frees ~150 MB before the app keeps running.
 8. **Locate + rename the bundle root** — `_bundle_root(extract_dir)` (§3.2), then `_retry(lambda: root.rename(staged))` (instant — same volume). Clean up `extract_dir` if it wasn't the root itself, via `_retry(rmtree)` with a best-effort `ignore_errors` fallback so leftover-cleanup trouble can't abort an otherwise-good stage.
 9. **Sanity assert** — `staged/_EXE_NAME` is a file AND `staged/_internal` is a dir, else `UpdateError("missing expected app files")`.
@@ -140,12 +140,14 @@ Numbered flow:
 2. **Fallback: GitHub API's own `digest`** (`asset_digest`, format `"sha256:HEX"`): strip the prefix, accept iff 64 hex chars.
 3. Neither → `None`.
 
-Back in `download_and_stage` (L390–402): `actual = hasher.hexdigest()`; `expected = _expected_sha256(info)`.
+Back in `download_and_stage`: `actual = hasher.hexdigest()`; `expected = _expected_sha256(info)`.
 - `expected` present and `actual != expected` → `zip_path.unlink(missing_ok=True)` + `UpdateError("didn't match its published checksum…")`. **Refuses to extract or swap unverified bytes.**
 - `expected` present and matches → log "SHA-256 verified".
-- **`expected` is `None` → log a warning and proceed on size only** (the *size-only fallback*; see GOTCHAS). This is what happens if the `.sha256` companion is missing/unreadable *and* the API omits `digest`.
+- **`expected` is `None` → FAIL-CLOSED (P10).** The download is deleted and `UpdateError("this update could not be verified (no published checksum)…install it manually from the releases page")` is raised — the install **aborts** and shows the release page. There is **no size-only fallback any more** (the v0.17.x "proceed on size only" was removed in P10). Because `release.yml` publishes a `.sha256` for every variant and the API `digest` is the backup, the verified path is the normal path; only a truly checksum-less release fails closed.
 
 > **Scope of the guard (stated in the docstring):** the checksum arrives over the *same* TLS as the rest of the check, so it protects against a corrupted / truncated / wrong-asset download — **NOT a forged release**. A forged release would carry a matching forged checksum. Code-signing is the planned complete fix.
+>
+> **Staged re-hash before swap (P10).** After a clean extract, `download_and_stage` records a digest over the ENTIRE launchable bundle tree (`staged.sha256`); `apply_update_and_restart` re-verifies it immediately **before** launching the swap exe, so tampering with the staged tree while it sat in a user-writable folder is caught (fail-closed). Extraction is also guarded against zip-slip (every member path validated before `extractall`), and the download has a socket timeout + bounded retry.
 
 ### 3.2 `_bundle_root` — the `Compress-Archive` wrapper
 
@@ -173,7 +175,7 @@ Flow:
    ```
    `helper_log = LOG_DIR/update_helper.log`. `new_exe` is the **staged** exe (a complete copy of the new app) — it applies itself.
 4. `subprocess.Popen(..., creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP, close_fds=True, cwd=staged, stdin/out/err=DEVNULL)`. Detached, no console window. `OSError` (a policy blocks running it) → `UpdateError("the update process could not be started — install manually")`.
-5. **The ~1.5 s death check** — `time.sleep(1.5); rc = proc.poll()`. If the swap process already exited, raise `UpdateError("exited before it could start — install manually")`. **This is the key fix for the old silent-failure mode:** a blocked/broken exe is caught *while the app is still open on the old version* instead of closing the app into a swap that never happens.
+5. **The ~2.0 s windowed death check (P10)** — polls `proc.poll()` every `_DEATH_CHECK_INTERVAL_S = 0.25 s` across `_DEATH_CHECK_TOTAL_S = 2.0 s` (hardened from a single `sleep(1.5); poll()`). If the swap process exits anywhere in that window, raise `UpdateError("exited before it could start — install manually")`. **This is the key fix for the old silent-failure mode:** a blocked/broken exe is caught *while the app is still open on the old version* instead of closing the app into a swap that never happens.
 
 After this returns, `GuiApi.update_apply` spawns `_close_for_update` (`gui_api.py:979`): `sleep(1.2)` to flush the goodbye log line, then `self._window.destroy()` (returns from `webview.start()`, process exits) — falling back to `os._exit(0)` if destroy throws, so the helper can always proceed.
 
@@ -228,7 +230,7 @@ rc = kernel32.WaitForSingleObject(handle, timeout_s*1000)
 return rc != WAIT_TIMEOUT
 ```
 
-The safety argument (docstring L535–543): `apply_update_and_restart` launches the swap process **while the app is still alive** (it stays up ~1.5 s+ after the launch), and `OpenProcess` here is the swap's *very first* action — so the handle is taken against the *live original* process. **A held process handle keeps the kernel process object (and thus the PID) reserved until the handle is closed**, so the PID can't be recycled out from under the wait. If `OpenProcess` instead *fails*, the original already exited → returning `True` to proceed is correct. The only residual case (swap exe so slow to start that the app exits AND the PID is reused by a live process before `OpenProcess`) merely lets the wait time out → reports "not applied", old version intact, logged — **fail-safe, never a half-swap.**
+The safety argument (docstring L535–543): `apply_update_and_restart` launches the swap process **while the app is still alive** (it stays up ~2.0 s+ after the launch, across the death-check window), and `OpenProcess` here is the swap's *very first* action — so the handle is taken against the *live original* process. **A held process handle keeps the kernel process object (and thus the PID) reserved until the handle is closed**, so the PID can't be recycled out from under the wait. If `OpenProcess` instead *fails*, the original already exited → returning `True` to proceed is correct. The only residual case (swap exe so slow to start that the app exits AND the PID is reused by a live process before `OpenProcess`) merely lets the wait time out → reports "not applied", old version intact, logged — **fail-safe, never a half-swap.**
 
 ### 6.2 Phase 1 — COPY to `*.new` (the slow, abortable part)
 
@@ -287,16 +289,17 @@ If every rollback rename succeeds → "previous version restored"; if any fails 
 
 ---
 
-## 7. `cleanup_leftovers()` + `_clear_webview_caches()` — every launch, before the CLR
+## 7. `cleanup_leftovers()` + `_clear_webview_caches()` — store recovery every launch / cache + staging frozen-only, before the CLR
 
 `gui_main.py:main` calls `updater.cleanup_leftovers()` right after `_unblock_dotnet_assemblies`, before `import gui_api` (L88–90), wrapped so any exception is logged-not-fatal.
 
-`cleanup_leftovers()` (`updater.py:780`):
-1. **Always** calls `_clear_webview_caches()` first (runs even in dev).
-2. If `not is_frozen()` → return (nothing else to clean in dev).
-3. Targets = `[UPDATE_DIR]` + every `install_dir()/(name+suffix)` for `name in _BUNDLE_ITEMS`, `suffix in (".old", ".new")`. Removes each (rmtree dir / unlink file); failures are logged "will retry next launch" — **never raises**. Deliberately removes a **staged-but-never-applied download** so an abandoned stale version is re-offered fresh rather than silently applied later.
+`cleanup_leftovers()` — the order matters (P2/P10):
+1. **Always** calls `_recover_store_promotions()` **first** (runs even in dev) — the P2/F2 store-promotion recovery sweep, independent of the update mechanism, so an interrupted Export-Everything swap is repaired from its backup before any store is read.
+2. If `not is_frozen()` → **return** (a dev launch serves `scripts/ui` live and has no bundle to clean — so the cache clear + staging removal below are **frozen-only**; the cache clear was moved below this gate in P10).
+3. `_clear_webview_caches()` (frozen only).
+4. Targets = `[UPDATE_DIR]` + every `install_dir()/(name+suffix)` for `name in _BUNDLE_ITEMS`, `suffix in (".old", ".new")`. Removes each (rmtree dir / unlink file); failures are logged "will retry next launch" — **never raises**. Deliberately removes a **staged-but-never-applied download** so an abandoned stale version is re-offered fresh rather than silently applied later.
 
-`_clear_webview_caches()` (`updater.py:751`): under `WEBVIEW_PROFILE_DIR` (`data\webview2`), globs and rmtrees `Cache`/`Code Cache`/`GPUCache`/`Service Worker` (plus `*/`, `*/*/` nestings) — **never Local Storage** (the theme choice lives there). Rationale: the persistent WebView2 profile could serve a *cached* `app.js`/`index.html` after the on-disk files changed, so a just-updated app would show the OLD UI under the NEW version number. The cache only ever holds the app's own three UI files, so clearing it every launch is cheap and kills the whole staleness class (manual zip-overwrite installs included). Wrapped in a bare `except Exception` — a cache-clear failure must never block startup.
+`_clear_webview_caches()`: under `WEBVIEW_PROFILE_DIR` (`data\webview2`), globs and rmtrees `Cache`/`Code Cache`/`GPUCache`/`Service Worker` (plus `*/`, `*/*/` nestings) — **never Local Storage** (the theme choice lives there). Rationale: the persistent WebView2 profile could serve a *cached* `app.js`/`index.html` after the on-disk files changed, so a just-updated app would show the OLD UI under the NEW version number. The cache only ever holds the app's own UI files, so clearing it on a **frozen** launch is cheap and kills the whole staleness class (manual zip-overwrite installs included). Wrapped in a bare `except Exception` — a cache-clear failure must never block startup.
 
 ---
 
@@ -347,7 +350,7 @@ gui_api.update_start (user clicks "Update to vX")
 gui_api.update_apply (user clicks "Restart to update"; gated on no task)
   -> updater.apply_update_and_restart(staged)
        -> Popen staged exe --apply-update <install> <pid> <helperlog>
-       -> sleep 1.5s; poll() -> UpdateError if dead   (stay on old version)
+       -> poll() every 0.25s across a 2.0s window -> UpdateError if dead   (stay on old version)
   -> _close_for_update(): window.destroy() -> process exits
 [staged exe, swap mode]
 gui_main.main: SWAP_FLAG in argv -> updater.run_swap_mode(argv)   # BEFORE any init
@@ -368,7 +371,7 @@ gui_main.main: cleanup_leftovers()           # removes *.old/*.new + staged + we
 | `check_for_update` | network/SSL/timeout | `UpdateError` → `phase:"failed"` (logged; quiet unless manual) |
 | `download_and_stage` | SHA mismatch | zip deleted, `UpdateError`, nothing staged |
 | `download_and_stage` | bad zip / disk full / incomplete | `UpdateError`, nothing staged |
-| `apply_update_and_restart` | swap exe blocked/dies in 1.5 s | `UpdateError`; **app stays open on old version** |
+| `apply_update_and_restart` | swap exe blocked/dies in the ~2.0 s window | `UpdateError`; **app stays open on old version** |
 | `perform_swap` phase 1 | copy `OSError` | abort, delete `.new`, old version intact, relaunch old |
 | `perform_swap` phase 2 | rename `OSError` | rename-rollback to old version; `last_swap_failure` reports it next launch |
 | `_wait_pid_exit` | old PID never exits in 120 s | "update NOT applied", old version intact |
@@ -383,7 +386,7 @@ The updater's verification only works because of what `.github/workflows/release
 2. **Two self-test gates** before any zip is built — a broken bundle can't ship the variant the updater will hand to `perform_swap`.
 3. **Three zips, exact suffixes** — `*-win64.zip`, `*-win64-with-browser.zip`, `*-batch-source.zip`. `_asset_info_from_release`'s `-{want}.zip` match and `current_variant()` depend on these exact suffixes.
 4. **One `<asset>.sha256` per zip** (`release.yml:82–92`): sha256sum format `"<hash>  <name>"`, **`-Encoding ascii` (no BOM — a BOM would corrupt the hash)**. This is exactly what `_expected_sha256` parses (first whitespace token, `[0-9a-f]{64}`).
-5. **`gh release create` publishes all six assets** (`release.yml:94–108`) — 3 zips + 3 `.sha256`. If a `.sha256` is ever dropped, the updater silently falls back to the GitHub API `digest`, and if that's absent too, to size-only (the §3.1 fallback chain).
+5. **`gh release create` publishes all six assets** — 3 zips + 3 `.sha256`. The workflow FAILS (never skips) if any zip or `.sha256` is missing (P10 per-variant gate). If a `.sha256` were ever dropped, the updater falls back to the GitHub API `digest`; if that's absent too, the install **fails closed** (no size-only fallback).
 
 > **Coupling to remember:** `Compress-Archive -Path "dist\TSMIS Exporter"` is what wraps the bundle in one top-level folder, which is exactly what `_bundle_root` unwraps. If the zip layout ever changes (e.g. a different archiver that doesn't wrap), `_bundle_root` must change with it.
 
@@ -400,7 +403,7 @@ The updater's verification only works because of what `.github/workflows/release
 
 **Add update state to the UI:** the worker→GUI protocol is a single `("update_status", dict)` message with a `phase` field; add new phases by extending `UpdateWorker.run`'s posts and `gui_api._on_update_status`'s branches. The dict is the GUI's whole update state — keep `_info` out of anything serialized to JS (it's popped in `_on_update_status`, L729).
 
-**A different verification source:** `_expected_sha256` is the single place trust is established; its two-tier (companion `.sha256` → API `digest`) order and the size-only fallback are all here. Code-signing would slot in as a *new* check alongside (not replacing) it.
+**A different verification source:** `_expected_sha256` is the single place trust is established; its two-tier (companion `.sha256` → API `digest`) order is all here, and when both are absent the install **fails closed** (no size-only fallback). Code-signing would slot in as a *new* check alongside (not replacing) it.
 
 ---
 
@@ -408,9 +411,9 @@ The updater's verification only works because of what `.github/workflows/release
 
 - **Swap mode must stay the first thing in `gui_main.main`.** Anything that resolves a path via `paths.py` (logging, config, the CLR) before the `SWAP_FLAG` branch would aim at the *staged* tree, not the install. Don't move `import logging_setup`/`setup_logging` above it, and don't let any import at module top trigger `paths.py` work that the swap process shouldn't do.
 - **No PowerShell / cmd / scripts / admin / scheduled tasks anywhere in the swap.** This is a hard constraint from locked-down Caltrans PCs (the v0.9.0 PowerShell helper was silently killed → nothing swapped). The design's only requirement is "exes run from user-writable folders". A change that reaches for any of those will silently fail on the work PC. See [../it-and-security.md](../it-and-security.md).
-- **Size-only fallback when no checksum.** If both the `.sha256` companion and the API `digest` are absent, `download_and_stage` proceeds verifying *only* byte count (`asset_size`/`Content-Length`). That's by design but it's the weakest mode — make sure `release.yml` keeps publishing the `.sha256` assets.
+- **Fail-closed when no checksum (P10).** If both the `.sha256` companion and the API `digest` are absent, `download_and_stage` **aborts the install** (deletes the zip, raises `UpdateError`, shows the release page) — it does NOT proceed on byte count. The old size-only fallback was removed. `release.yml` enforces `.sha256` publication (fails-not-skips), so the verified path is the normal path; the fail-closed branch only triggers on a genuinely checksum-less release.
 - **`os._exit` in swap mode.** `run_swap_mode`/`perform_swap` finish with `os._exit` — **no** atexit handlers, no flush of the `tsmis.update` logger (which isn't even set up here). All swap-side logging is the manual `_swap_log` appends; don't expect normal logging to appear in swap mode.
 - **Leftovers are cleaned by the *next* app, not the swap.** `perform_swap` cannot delete the `.old` tree (Defender may hold the just-renamed `_internal.old`) or the `staged` tree it runs from. If you add a step expecting them gone immediately, you'll be wrong — they're removed at the relaunched app's `cleanup_leftovers()`.
 - **`asset_size == 0` disables two guards.** When the API omits `size`, the disk-space check (`if info.asset_size:`) and the completeness check (`if info.asset_size and done != info.asset_size`) both no-op. The download still verifies via SHA-256 (when available) and via a valid-zip extract, so it's not unguarded — but don't assume `asset_size` is always present.
-- **`_clear_webview_caches` runs in dev too** (it's called unconditionally before the `is_frozen()` gate). On a dev run with a `data\webview2` profile it will clear caches — intended, but note it's not frozen-only like the rest of cleanup.
-- **The 1.5 s death check is a heuristic, not a guarantee.** A swap exe that dies *after* 1.5 s (e.g. crashes during phase 1) won't be caught by `apply_update_and_restart`; that failure surfaces only via `update_helper.log` + `last_swap_failure` on the next launch. The 1.5 s window only catches *immediate* launch refusals.
+- **`_clear_webview_caches` is frozen-only (P10).** It sits **below** the `is_frozen()` gate in `cleanup_leftovers`, so a dev run (which serves `scripts/ui` live) does NOT clear it. Only `_recover_store_promotions()` runs before the gate, on every launch.
+- **The ~2.0 s windowed death check is a heuristic, not a guarantee.** A swap exe that dies *after* the 2.0 s window (e.g. crashes during phase 1) won't be caught by `apply_update_and_restart`; that failure surfaces only via `update_helper.log` + `last_swap_failure` on the next launch. The window only catches *near-immediate* launch refusals (polled every 0.25 s).

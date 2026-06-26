@@ -2,7 +2,8 @@
 
 How the TSMIS Reports Exporter is structured — one console-free core driven by two
 front-ends, the single report registry, route/run plumbing, the on-disk run-folder
-and data-location model, and the high-level v0.12/v0.13 feature buckets. Runtime
+and data-location model, and the high-level feature buckets through the v0.18.0
+structural overhaul. Runtime
 *behavior* (the export loop, recovery, resume, skip/cancel, timeouts) lives in
 [engine-and-reliability.md](engine-and-reliability.md); GUI internals (threading,
 pywebview traps, snapshots) live in [gui.md](gui.md).
@@ -99,22 +100,26 @@ display order and console menu numbering:
 | `TSAR: Ramp Detail` | Excel | |
 | `Highway Sequence Listing` | Excel | |
 | `Highway Log` | Excel | |
-| `Highway Log (PDF)` | PDF | Same "Highway Log" dropdown option, saved via the page's Print layout (`hl_printAll`) instead of the Excel Export button. Export-only — the consolidator reads the `.xlsx`. |
-| `Intersection Summary` | Excel | Export-only (no consolidation/comparison). No `TSAR:` prefix. |
-| `Intersection Detail` | Excel | Export-only. |
+| `Highway Log (PDF)` | PDF | Same "Highway Log" dropdown option, saved via the page's Print layout (`hl_printAll`) instead of the Excel Export button. Has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares (it is NOT auto-consolidated inline — the matrix handles it via a scratch convert dir). |
+| `Intersection Summary` | Excel | Consolidates + compares (cross-env + vs-TSN) since v0.17.0. No `TSAR:` prefix. |
+| `Intersection Detail` | Excel | Consolidates + compares (cross-env + vs-TSN) since v0.17.0. |
+| `Intersection Detail (PDF)` | PDF | Same "Intersection Detail" dropdown option, saved via Print layout (`intd_printAll`) — the exact parallel of Highway Log (PDF), forward-ported in v0.18.0. **Appended LAST** so the 7 existing export-op keys keep positions 0–6 (the manifest-v1 integer-index compat contract, CR-002-RM4). Has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares. |
 
 **`CONSOLIDATE_REPORTS`** — `(menu label, module)`. Each module exposes
 `consolidate(events, confirm_overwrite, day=None)` plus `input_dir_for(day)` /
 `out_path_for(day)` (paths are day-dependent now that exports group into run
 folders, so the registry hands out the module, not a precomputed `OUT_PATH`).
-Three Highway Log consolidators are grouped TSMIS-before-TSN with source-explicit
-labels:
+Each PDF-sourced consolidator is grouped next to its Excel sibling; the three
+Highway Log consolidators are TSMIS-before-TSN with source-explicit labels:
 
 | Label | Module | Input |
 |---|---|---|
 | `TSAR: Ramp Summary` | `consolidate_ramp_summary` | |
 | `TSAR: Ramp Detail` | `consolidate_ramp_detail` | |
 | `Highway Sequence Listing` | `consolidate_highway_sequence` | |
+| `Intersection Summary` | `consolidate_intersection_summary` | TSMIS "Intersection Summary" Excel export (day-aware). |
+| `Intersection Detail` | `consolidate_intersection_detail` | TSMIS "Intersection Detail" Excel export (day-aware). |
+| `TSMIS Intersection Detail (PDF)` | `consolidate_tsmis_intersection_detail_pdf` | this app's own "Intersection Detail (PDF)" export, parsed into the same 36-column format (the print-layout substitute for the Excel export). |
 | `TSMIS Highway Log (Excel)` | `consolidate_highway_log` | TSMIS "Highway Log" Excel export, `output/<run>/highway_log/` (day-aware). |
 | `TSMIS Highway Log (PDF)` | `consolidate_tsmis_highway_log_pdf` | TSMIS "Highway Log (PDF)" export, `output/<run>/highway_log_pdf/` (day-aware, this app's own export). |
 | `TSN Highway Log (PDF)` | `consolidate_tsn_highway_log` | TSN district PDFs dropped in `input/tsn_highway_log/` (from outside the app, so this one keeps an input folder + `day` ignored). |
@@ -124,8 +129,9 @@ PDF parsers.
 
 **`COMPARE_GROUPS`** — the Compare-pane sub-tabs, in order (first = default). As of
 v0.16.1: `("env", "Cross-environment")` and `("tsn", "vs TSN")` (the GUI appends a
-third, the "vs TSN Matrix"). HL's cross-env compare sits in `env` with the others;
-the file-based TSMIS-vs-TSN compares sit in `tsn` (HL today; other reports in 0.17.0).
+third, the "vs TSN Matrix"). Cross-env compares sit in `env`; the file-based
+TSMIS-vs-TSN compares sit in `tsn`; the two PDF-vs-Excel self-checks (one system, one
+environment) sit in `env`, not `tsn`. Every report is wired as of v0.17.0/v0.18.0.
 
 **`COMPARE_REPORTS`** — `(menu label, module/adapter, input kind, group)`. `kind` is
 `"files"` (two workbooks) or `"folders"` (two export run folders); `group` is one of
@@ -133,23 +139,41 @@ the file-based TSMIS-vs-TSN compares sit in `tsn` (HL today; other reports in 0.
 `cmp:*` key (`COMPARE_KEYS`), so this order is only the UI-radio display order, not the
 contract `start_compare*` calls key on:
 
+The full set (18 rows; the env-folder rows first, since they drive the matrix, then
+the file-based vs-TSN / self rows — `cmp:*` key shown for the stable contract):
+
 | Label | Module / adapter | Kind | Group |
 |---|---|---|---|
 | `TSAR: Ramp Summary — between environments` | `compare_env.RAMP_SUMMARY` | folders | env |
 | `TSAR: Ramp Detail — between environments` | `compare_env.RAMP_DETAIL` | folders | env |
 | `Highway Sequence Listing — between environments` | `compare_env.HIGHWAY_SEQUENCE` | folders | env |
 | `Highway Log — between environments` | `compare_env.HIGHWAY_LOG` | folders | env |
+| `TSAR: Intersection Summary — between environments` | `compare_env.INTERSECTION_SUMMARY` | folders | env |
+| `TSAR: Intersection Detail — between environments` | `compare_env.INTERSECTION_DETAIL` | folders | env |
+| `Highway Log (PDF) — between environments` | `compare_env.HIGHWAY_LOG_PDF` | folders | env |
+| `Intersection Detail (PDF) — between environments` | `compare_env.INTERSECTION_DETAIL_PDF` | folders | env |
 | `Highway Log — TSMIS vs TSN` | `compare_highway_log` | files | tsn |
 | `Highway Log — TSMIS (PDF) vs TSN (PDF)` | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
 | `Highway Log — TSMIS (PDF) vs TSMIS (Excel)` | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
+| `TSAR: Ramp Detail — TSMIS vs TSN` | `compare_ramp_detail_tsn` | files | tsn |
+| `TSAR: Ramp Summary — TSMIS vs TSN` | `compare_ramp_summary_tsn` | files | tsn |
+| `TSAR: Intersection Summary — TSMIS vs TSN` | `compare_intersection_summary_tsn` | files | tsn |
+| `TSAR: Intersection Detail — TSMIS vs TSN` | `compare_intersection_detail_tsn` | files | tsn |
+| `Intersection Detail — TSMIS (PDF) vs TSN` | `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| `Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)` | `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
+| `Highway Sequence Listing — TSMIS vs TSN` | `compare_highway_sequence_tsn` | files | tsn |
 
 The comparison engine itself is owned by
-[comparison-engine.md](comparison-engine.md).
+[comparison-engine.md](comparison-engine.md); the five non-HL file comparators share
+the `compare_tsn_common` substrate (`norm_pm` / `iso_date` / `make_notes_writer` /
+`run_files_compare`).
 
-**`_CONSOLIDATOR_BY_SUBDIR` / `consolidator_for_spec(spec)`** — used by B2
+**`consolidator_by_subdir()` / `consolidator_for_spec(spec)`** — used by B2
 auto-consolidate; maps an export `ReportSpec` to its consolidate module **by the
-spec's output subdir** so it can't drift from the lists above. Intersection
-Summary/Detail are export-only and absent from the map (→ None).
+spec's output subdir** so it can't drift from the lists above. The map holds the six
+Excel-export families (incl. Intersection Summary/Detail since v0.17.0); the two PDF
+editions (`highway_log_pdf`, `intersection_detail_pdf`) are absent (→ None) because
+they need a scratch convert dir — the matrix / auto-consolidate handles them specially.
 
 ## Route selection
 
@@ -266,7 +290,7 @@ mechanics are owned by [engine-and-reliability.md](engine-and-reliability.md) an
 | **A1 self-describing filenames** | Consolidated workbooks stamp the run's `<date> <src>-<env>` into the filename; both comparison families append a generated-on date in `suggest_name`. TSN Highway Log exempt (no src/env, undated input); legacy flat layout keeps its fixed name. `compare_core/_SCHEMA` text untouched (regression-locked). | `paths.stamped_consolidated_filename` via every `consolidate_*.out_path_for`. Lock: `build/check_a1_filenames.py`. |
 | **A2 compare-folder filter** | Cross-env compare folder dropdowns list only runs that actually contain the chosen report (server-side; Browse paths skip the filter). | `paths.list_output_days_for_report` + `GuiApi.get_compare_folders`; `start_compare_env` preflights it. Lock: `build/check_a2_compare_filter.py`. |
 | **B1 Pause/Resume** | Holds BETWEEN routes (never inside a thread-affine Playwright wait), in both sequential and parallel engines — so it WORKS in fast mode (all workers park), unlike Skip. | `Events.is_paused` (8th callback) + shared `exporter._wait_while_paused`; `GuiApi.pause_or_resume` toggles `pause_event`, cleared on cancel and at end-of-task. Lock: `build/check_b1_pause.py`. |
-| **B2 auto-consolidate** | One Export-tab toggle; `ExportWorker` runs the matching consolidator INLINE after each spec's export (reuses the held task slot + same Events sink). Highway Log (PDF) has no auto-consolidator → skipped (every other report, incl. both Intersection reports, consolidates as of v0.17.0); failures logged, never fatal. | `reports.consolidator_for_spec` maps export→consolidate by subdir. Lock: `build/check_b2_autoconsolidate.py`. |
+| **B2 auto-consolidate** | One Export-tab toggle; `ExportWorker` runs the matching consolidator INLINE after each spec's export (reuses the held task slot + same Events sink). The two PDF editions (Highway Log (PDF) + Intersection Detail (PDF)) have no inline auto-consolidator → skipped (they need a scratch convert dir, so the matrix / auto-consolidate handles them specially; every other report, incl. both Intersection **Excel** reports, consolidates inline as of v0.17.0); failures logged, never fatal. | `reports.consolidator_for_spec` maps export→consolidate by subdir. Lock: `build/check_b2_autoconsolidate.py`. |
 | **B3 Export Everything (always-current store)** | The **Everything** tab runs selected report types × selected environments SEQUENTIALLY into a configurable, UNDATED, overwritten-in-place destination (always holds the latest of every report), laid out `<dest>/<src-env>/<report>/` (+ `consolidated/`). Each report+env folder is refreshed via **STAGE-AND-SWAP** (`_swap_store_dir`): the export writes into a `.staging` sibling and replaces the live folder only on a clean finish (discarded on cancel/crash), so a failed refresh never destroys the last-good copy — the Phase-3 fix for `auto-consolidate-rmtree-out-dir-before-export`. Reuses B1 pause + B2 auto-consolidate. | `gui_worker.BatchWorker` (per-env, reusing `ExportWorker._run_specs`); per-env targeting via process-global `common.set_site` (NOT `set_thread_site` — a single sequential orchestrator under the single-task gate; original restored at end). Dest = `settings.get/set_batch_dest`. Saved-reports freshness library via `report_library.report_ages` + `GuiApi.report_library_info`. Progress persists to `batch_manifest` (`DATA_ROOT/batch_job.json`, atomic, untouched by Delete-all-reports) → resumes across restarts (startup Resume/Discard banner). Locks: `build/check_b3_batch.py` + `check_report_library.py`. |
 
 A3 (results tab) was deferred. **The current GUI is a stopgap** — a full GUI
@@ -309,8 +333,9 @@ A report × environment **comparison matrix** lives on its own **sub-tab** of th
 Everything tab (sibling to *Refresh & export*) and goes full-width (the activity
 column animates down to a slim log + a config zone). It sits ON TOP of the
 always-current store and **orchestrates the existing comparison adapters
-(`compare_env` / `compare_highway_log` / `compare_highway_log_pdf`) without editing
-them**. **5 rows** at the time (**7 as of v0.17.0** — every report; nothing greyed),
+(`compare_env` / `compare_highway_log` / `compare_highway_log_pdf` /
+`compare_intersection_detail_pdf`) without editing them**. **5 rows** at the time
+(**8 as of v0.18.0** — every report incl. Intersection Detail (PDF); nothing greyed),
 each with a per-row
 **comparison-mode** dropdown: cross-environment, **vs TSN** (Excel/PDF flavors), and
 **TSMIS PDF-vs-Excel** (the "greyed where no code exists" is now defensive — all coded). Cells show the **discrepancy
@@ -362,9 +387,33 @@ raw|none, …}` contract as before.
 fallbacks (`<dest>/_tsn_input/<report>/`, then the global console-flow
 `input/tsn_highway_log/` + `output/tsn_highway_log_consolidated.xlsx`) so existing installs
 keep working until imported. The report key IS the per-row **`tsn_subdir`**
-(`matrix.tsn_subdir_for`): both Highway Log rows share `highway_log`, every other report
-uses its own. This replaced `day_matrix.TSN_SUBDIR` (deleted) — the by-day matrix now
+(`matrix.tsn_subdir_for`): **each PDF edition shares its Excel sibling's subdir** — both Highway Log
+rows share `highway_log` and `intersection_detail_pdf` shares `intersection_detail` — so one TSN
+dataset serves both rows of a report; every other report uses its own. This replaced
+`day_matrix.TSN_SUBDIR` (deleted) — the by-day matrix now
 resolves TSN per row, so plugging in a report is just registering it + flipping `supported`.
+
+### v0.18.0 — structural & engineering overhaul (this release)
+
+A maintainability/reliability release: few user-visible features (one new report), a
+large internal restructuring, and packaging/updater hardening. The day-to-day behavior
+is preserved; the structure and the safety contracts changed. The "what changed and
+where it lives" map — each item owned by the doc named:
+
+| Area | What changed | Owner doc |
+|---|---|---|
+| **Outcome contract** | An orthogonal, producer-owned completion × artifact model (`outcome.py`): a partial/failed/cancelled run is never promoted, cached, or shown green; counts (not text) decide. | [engine-and-reliability.md](engine-and-reliability.md) |
+| **Transactional artifacts** | Consolidated workbooks write temp-then-`os.replace` and keep last-good on failure; a fail-safe producer sidecar (`consolidation_meta.py`) records completion; `cache_envelope.py` versions the matrix caches; `artifact_store.py` owns the staged store-promote. | [engine-and-reliability.md](engine-and-reliability.md) |
+| **Engine leaf split** | `common.py` became a re-export **shim** over an acyclic set of engine leaves (`auth_nav`, `report_nav`, `session`, `site_target`, `routes`, `errors`, `timeouts`, `browser_channels`, `edge_device`); `from common import X` is unchanged. Import direction is guarded (`build/check_import_direction.py`). | [engine-and-reliability.md](engine-and-reliability.md) |
+| **GUI restructuring** | `task_coordinator.py` is the single owner of task/gate state (exactly-once terminal delivery); `contract.py` + `ui/contract.js` are the Python⇄JS bridge enum SSOT; endpoint groups split into `gui_endpoint` / `gui_matrix` / `gui_win32`. | [gui.md](gui.md) |
+| **Front-end split** | `scripts/ui/` is now `index.html` + `app.css` + `app.js` + `mock.js` (the `#mock` fixtures, a separate file) + `ui-dom.js` / `ui-matrix.js` / `ui-settings.js` + `contract.js`. | [gui.md](gui.md) |
+| **Comparator substrate** | The five non-HL vs-TSN file comparators share `compare_tsn_common`; `compare_core` stays **byte-for-byte unmodified** (the dormant `context_fill` hook on `main` was deliberately not ported). | [comparison-engine.md](comparison-engine.md) |
+| **New report (CR-002)** | Intersection Detail (PDF) forward-ported as an exact parallel of Highway Log (PDF) — see the registry tables above. | [reports.md](reports.md) |
+| **Packaging / updater** | Updater hardened (fail-closed checksum, staged re-hash before swap, zip-slip guard, bounded retry, revert pagination, log rotation, frozen-only cache clear); a hash-pinned reproducible build; `release.yml` per-variant `.sha256` enforcement; the exact **windowed** exe runs the self-test gate; a credential-safe work-PC **evidence kit** (`evidence.py`, `--collect-evidence`). | [build-and-release.md](build-and-release.md), [work-pc-validation.md](work-pc-validation.md) |
+
+**Two-tier release model:** v0.18.0 is the **offline-validated candidate** (every phase
+provable from CI/offline); **v0.18.1** is the **field-validated close-out** after the
+work-PC evidence comes back. Operational sign-off is claimed at v0.18.1, never v0.18.0.
 
 ## See also
 

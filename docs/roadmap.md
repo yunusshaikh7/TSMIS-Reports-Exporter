@@ -4,6 +4,19 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
+> **v0.18.0 — structural & engineering overhaul (the offline-validated CANDIDATE).** A large internal
+> refactor (engine leaf split / `common.py` shim, the outcome + transactional-artifact contracts, a
+> report-catalog SoT, the GUI endpoint split + front-end modularization, the regression-locked
+> `compare_core` left byte-identical) **plus** the **Intersection Detail (PDF)** report family
+> (forward-ported from v0.17.8, CR-002) and packaging/updater hardening (fail-closed checksum, staged
+> re-hash, hash-pinned reproducible build, the work-PC evidence kit). The **Phase-3 audit is reconciled
+> below (§J2 dispositions)** — every still-open finding is individually marked Resolved / v0.18.1
+> evidence-driven / hard-deferred. **Two-tier release:** v0.18.0 is offline-provable; **v0.18.1** is the
+> field-validated close-out (work-PC acceptance via the evidence kit — see
+> [work-pc-validation.md](work-pc-validation.md)). "Enterprise-ready" = v0.18.1, never v0.18.0.
+>
+> ---
+>
 > **v0.17.1 SHIPPED — hotfix on v0.17.0.** v0.17.0 brought **all-report TSN comparison +
 > consolidation** (every report compares **vs TSN** AND **cross-environment** in both matrices;
 > Intersection reports **consolidate**; a **canonical TSN library** + **Settings ▸ TSN reports**
@@ -44,7 +57,70 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
+## v0.18.0 — audit reconciliation (§J2 dispositions)
+
+v0.18.0 pulled in the offline-doable Phase-3 audit residue and dispositioned the rest. Every
+still-open finding at the v0.17.1 baseline now has an individual outcome (this supersedes the open
+checkboxes in the *Next patch* section below — that list is the historical worklist):
+
+**Resolved in v0.18.0** (a phase implements + locks it):
+- **P0** — `handle-no-default-branch` (the `_handle` else-log), `gui-worker-stale-tkinter-docstring`,
+  `env-compare-side-label-cap-truncates-distinguisher`, `ramp-summary-combined-sheet-hardcoded-coordinates`
+  (schema-length guard).
+- **P1** — `run-report-only-written-when-per-route-nonempty`; `pdf-page-skip-unlogged-when-no-prior-geometry`
+  + `pdf-stale-geometry-carryforward-silent-corruption` escalated to a producer-owned **partial** so dropped
+  output is never promoted/cached as complete.
+- **P6** — `support-bundle-settings-future-leak` (the diagnostic-settings allowlist).
+- **P7a** — `device-ok-inferred-from-any-completed-run`, `reset-token-consumed-before-task-gate`.
+- **P8c** (offline-proven code; **live acceptance → v0.18.1**) — `select-report-substring-match-no-exact-guard`
+  (exact-match guard), `edge-login-cdp-port-unauthenticated-loopback` (open-on-demand / close-on-capture),
+  `select-report-not-rearmed-between-routes-on-stale-form`, `login-busywait-no-cancel-check`,
+  `unlogged-no-download-empty-on-pdf-and-misc`.
+- **P10 / §J updater set** — `size-and-checksum-guards-both-skippable` → **fail-closed** checksum,
+  `extractall-zip-slip-relies-on-stdlib`, `staged-exe-launched-from-user-writable-dir-no-recheck` (re-hash
+  before swap), `no-rollback-when-relaunch-launches-partial-tree`, `swap-log-grows-unbounded` (rotate),
+  `webview-cache-cleared-on-every-dev-launch` (frozen-only), `immediate-death-check-narrow-window` (hardened
+  window), `dl-socket-timeout-may-fail-slow-large-downloads` (timeout + bounded retry),
+  `releases-list-capped-100-revert-blindspot` (paginate). Plus a hash-pinned reproducible build +
+  `release.yml` per-variant `.sha256` enforcement.
+- **P12** — `reset-follows-junctions-symlinks` (junction/symlink guard, dev-PC verified) **and the M03
+  destination-ownership marker, NOW IMPLEMENTED** (the deferred R1-M03 item); `consolidate-overwrite-toctou`
+  (confirm-then-appears re-check at the final replace); the independent **PDF expected-row oracle** harness.
+
+**v0.18.1 evidence-driven** (offline harness shipped; **real-PDF / work-PC acceptance owed** — RM04):
+- `ramp-summary-parse-failure-misattributed-to-source`, `ramp-summary-duplicate-pop-pattern-misassignment`,
+  `pdf-consolidator-no-row-count-verification` (the P12 row oracle), and the stale-geometry **emit**
+  elimination — closed only when a committed fixture reproduces the exact failure, else real-PDF acceptance.
+- The carried live-verify set (P1 partial-keeps-last-good, P2 stage-and-swap, P3 resume-across-restart, the
+  P8c live paths, the P10 v0.17→v0.18 self-update, **and the Intersection Detail (PDF) live reconciliation**).
+  Full checklist: [work-pc-validation.md](work-pc-validation.md) §3.
+
+**Discovered during P11 (docs reconciliation) — NOT closed in code:**
+- `wait-js-fstring-interpolation-unvalidated` (P3) — the plan's §J2 recorded this as Resolved in P8b, but at
+  HEAD `exporter.py` still interpolates `spec.wait_js(route)` into the wait JS with **no config-error
+  validation** (no validator; no locking check). A malformed spec still reads as a route timeout. **Carried
+  forward** to v0.18.1 hardening — do not claim it resolved until the validator + a `check_export_engine`
+  case land.
+- `non-hl-loaders-dont-collapse-tab-whitespace` (CR-002) — the Highway Log and Highway Sequence vs-TSN
+  loaders collapse tab/whitespace at load, but **Ramp Detail and Intersection Detail do not**. A known
+  normalization inconsistency; **deferred** (low impact — the locked counts stand). Revisit if a tab-bearing
+  value ever causes a spurious diff.
+
+**Hard-deferred (each needs an explicit separate user decision — RM06):**
+- **DPAPI at-rest auth** (O2 / `auth-file-plaintext-no-acl-dpapi`) — DPAPI breaks `storage_state_is_portable`;
+  v0.18.0 did the ACL/atomic-write half (P6), not encryption.
+- **Runtime signature / code-signing cert** (A03 / `update-trust-is-tls-plus-sibling-sha-only`) — blocked on
+  the SignPath cert; workflow signing parity only, no runtime signature verification yet.
+- **`compare_core` `min-cost-pairs` greedy-not-optimal** — inside the regression-locked engine; any fix needs
+  a full cell-for-cell re-proof and the 8+ duplicate-key-group frequency is unquantified.
+
+---
+
 ## Next patch — code-review fixes (Phase 3 review, 2026-06-18)
+
+> **Reconciled by v0.18.0 — see the §J2 dispositions above.** The open `- [ ]` items below are the
+> historical Phase-3 worklist; their v0.18.0 outcome (Resolved / v0.18.1 evidence-driven / hard-deferred)
+> is recorded in that section. Kept here for the code anchors + the field-verify notes.
 
 A read-only review (6 risk-domain auditors + adversarial refutation) over commit `0a4c071`
 confirmed **45 findings (5 P1 · 17 P2 · 23 P3)**; 12 candidates were rejected on refutation. Full
@@ -392,7 +468,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.17.0)
+### Version buckets — reconciled to reality (current: v0.18.0 candidate)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -403,6 +479,8 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.15.0** ✅ | Jun 19 | The **Everything comparison matrix** (report × env, cross-env + vs-TSN, two Highway Log rows) + an app-wide UI/motion polish pass. |
 | **v0.16.0–0.16.1** ✅ | Jun 19 | Matrix **queue + fast mode**; the Compare-tab **vs-TSN-by-day** matrix; pause/skip/preview, reused consolidated, opt-in formulas; Intersection **export** + dev-site switch. |
 | **v0.17.0** ✅ | Jun 20 | **All-report TSN + cross-env comparison** (every report × {env, TSN} + HL PDF↔Excel); Intersection **consolidators**; **canonical TSN library** + Settings panel; one-stop **Export-today** by-day column; **login/browser overhaul** + **env-check matrix flags**; drag-reorder. |
+| **v0.17.1** ✅ | Jun 21 | Matrix-tab blank-space + cramped-options fixes; Stop/Clear interrupts a stuck sign-in; TSN picker default + self-documenting TSN library; gitignore security fixes. |
+| **v0.18.0** ◻ candidate | — | **Structural & engineering overhaul** (engine leaf split / `common.py` shim, the outcome + transactional-artifact contracts, report-catalog SoT, GUI endpoint split + front-end modularization, `compare_core` byte-identical) + **Intersection Detail (PDF)** (CR-002) + updater/packaging hardening + the work-PC evidence kit. **Offline-validated candidate; field sign-off → v0.18.1.** |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're
