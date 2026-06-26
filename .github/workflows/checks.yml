@@ -165,7 +165,7 @@ jobs:
                    check_compare_dupmatch check_compare_ditto check_ramp_summary_partial \
                    check_ramp_summary_schema check_consolidate_intersection \
                    check_tsn_description_leak check_tsmis_pdf_parse check_tsmis_pdf_reconcile \
-                   check_pdf_row_oracle \
+                   check_pdf_row_oracle check_intersection_detail_pdf \
                    check_highway_log_columns check_highway_log_ditto check_highway_log_roadbed \
                    check_a1_filenames; do
             echo "::group::$c"

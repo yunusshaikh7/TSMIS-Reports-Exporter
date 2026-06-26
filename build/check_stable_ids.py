@@ -64,8 +64,9 @@ def test_uniqueness_and_roundtrip():
           and reports.spec_for_export_key("nope") is None
           and reports.consolidate_index_for_key("nope") is None
           and reports.compare_index_for_key("nope") is None)
-    # The frozen v0.17 order the migration relies on must still equal today's
-    # export keys (the v0.17 report set is the same seven, in the same order).
+    # The frozen v0.17 order the migration relies on must still equal today's export
+    # keys (the v0.17.x report set is the same eight — the original seven plus the
+    # v0.17.2 Intersection Detail (PDF), all in the same order; CR002-RM4 append-only).
     check("frozen _V017_EXPORT_ORDER == today's export keys",
           batch_manifest._V017_EXPORT_ORDER == reports.EXPORT_KEYS)
 
@@ -100,6 +101,33 @@ def test_v1_v2_normalization():
     check("v2: duplicate KEPT, non-string 9 + empty -> poison (1:1 length)",
           batch_manifest._normalize_reports(v2)
           == ["ramp_summary", "ramp_summary", "highway_log", P, P])
+
+
+def test_v017_append_only_compat():
+    print("CR002-RM4: _V017_EXPORT_ORDER is append-only; v1 manifests (pre- AND post-Int-PDF) resolve:")
+    order = batch_manifest._V017_EXPORT_ORDER
+    # Positions 0-6 are the ORIGINAL v0.17.1 export order and must never move.
+    check("positions 0-6 unchanged (the original seven export keys)",
+          order[:7] == ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
+                        "highway_log_pdf", "intersection_summary", "intersection_detail"))
+    check("intersection_detail_pdf appended at index 7 (only the new key added)",
+          len(order) == 8 and order[7] == "intersection_detail_pdf")
+    # A v1 (integer-index) manifest from the PRE-Intersection-PDF shape (v0.17.1: seven
+    # reports, indices 0-6) still migrates to the seven original keys, 1:1.
+    pre = {"version": 1, "reports": [0, 1, 2, 3, 4, 5, 6], "steps": []}
+    check("pre-Int-PDF v1 manifest migrates to the seven original keys",
+          batch_manifest._normalize_reports(pre) == list(order[:7]))
+    # A v1 manifest written by a v0.17.8 user (the new 8th report, index 7) resolves
+    # to intersection_detail_pdf — NOT poisoned as out-of-range (the append fixed that).
+    post = {"version": 1, "reports": [6, 7], "steps": []}
+    check("v0.17.8-era v1 index 7 migrates to intersection_detail_pdf",
+          batch_manifest._normalize_reports(post)
+          == ["intersection_detail", "intersection_detail_pdf"])
+    # End-to-end: the migrated keys resolve to real, enabled specs (round-trip).
+    specs, invalid = reports.resolve_export_keys(batch_manifest._normalize_reports(post))
+    check("the migrated v0.17.8 keys resolve to real specs (no invalid)",
+          invalid == []
+          and [s.subdir for s in specs] == ["intersection_detail", "intersection_detail_pdf"])
 
 
 def test_reorder_proof():
@@ -217,6 +245,7 @@ def main():
     test_uniqueness_and_roundtrip()
     test_resolve_export_keys()
     test_v1_v2_normalization()
+    test_v017_append_only_compat()
     test_reorder_proof()
     test_resume_resolution()
     test_invalid_or_empty_aborts_single_terminal()

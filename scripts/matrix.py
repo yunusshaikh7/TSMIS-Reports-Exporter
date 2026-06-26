@@ -357,6 +357,13 @@ def _row_modes(row_key, subdir, adapter):
                  "env_subdir": "highway_log_pdf", "tsn_subdir": "highway_log", "fmt": "pdf"},
                 {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
                  "env_subdir": "highway_log_pdf", "other_subdir": "highway_log"}]
+    if row_key == "intersection_detail_pdf":   # the exact parallel of highway_log_pdf
+        return [env,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                 "env_subdir": "intersection_detail_pdf",
+                 "tsn_subdir": "intersection_detail", "fmt": "pdf"},
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                 "env_subdir": "intersection_detail_pdf", "other_subdir": "intersection_detail"}]
     return [env,
             {"id": "tsn", "label": "vs TSN", "kind": "tsn",
              "supported": tsn_supported(row_key),
@@ -381,6 +388,9 @@ def tsn_comparator_for(row_key):
     if row_key == "highway_log_pdf":
         import compare_highway_log_pdf as _m
         return _m.TSMIS_PDF_VS_TSN
+    if row_key == "intersection_detail_pdf":
+        import compare_intersection_detail_pdf as _m
+        return _m.TSMIS_PDF_VS_TSN
     if row_key == "ramp_detail":
         import compare_ramp_detail_tsn as _m
         return _m
@@ -397,6 +407,20 @@ def tsn_comparator_for(row_key):
         import compare_highway_sequence_tsn as _m       # FLAT (county+PM key)
         return _m
     return None
+
+
+def _pdf_self_comparator(pdf_subdir):
+    """The PDF-vs-Excel self-comparison adapter for a PDF report subdir (the internal
+    TSMIS PDF↔Excel consistency check). Generalizes the self mode so a second PDF
+    report (Intersection Detail) resolves the same way Highway Log does, instead of a
+    literal `compare_highway_log_pdf` reference."""
+    if pdf_subdir == "highway_log_pdf":
+        import compare_highway_log_pdf as _m
+        return _m.TSMIS_PDF_VS_EXCEL
+    if pdf_subdir == "intersection_detail_pdf":
+        import compare_intersection_detail_pdf as _m
+        return _m.TSMIS_PDF_VS_EXCEL
+    raise ValueError(f"no PDF-vs-Excel comparator for {pdf_subdir}")
 
 
 def tsn_supported(row_key):
@@ -784,6 +808,22 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, env=None):
 # (untouched) comparison adapters. compare_highway_log / compare_highway_log_pdf
 # are file-vs-file, so the per-route env folders are consolidated first.
 # --------------------------------------------------------------------------- #
+def _pdf_store_consolidator(subdir):
+    """The consolidator module for a PDF-sourced report — Highway Log (PDF) and
+    Intersection Detail (PDF), the two reports deliberately absent from
+    reports.consolidator_for_subdir because they need a scratch converted_dir to
+    parse the PDFs first. Used by BOTH _consolidate_store_folder and
+    _consolidated_filename so a PDF report is wired in ONE place — a matrix/by-day row
+    whose subdir resolved no consolidated filename was the v0.17.4 by-day crash class."""
+    if subdir == "highway_log_pdf":
+        import consolidate_tsmis_highway_log_pdf as _m       # pdfplumber — lazy
+        return _m
+    if subdir == "intersection_detail_pdf":
+        import consolidate_tsmis_intersection_detail_pdf as _m
+        return _m
+    return None
+
+
 def _consolidate_store_folder(subdir, env_dir, out_path, events):
     """Consolidate one Export-Everything store folder (<env>/<subdir>/, per-route
     files) into a single workbook via the report's existing consolidator (with its
@@ -799,13 +839,16 @@ def _consolidate_store_folder(subdir, env_dir, out_path, events):
     # can refuse to certify the workbook "fresh" if an external writer changed the source folder
     # mid-build (the GUI task lock already serializes our own writers).
     fp_before = artifact_store.fingerprint(env_dir)
-    if subdir == "highway_log_pdf":
-        import consolidate_tsmis_highway_log_pdf as _m   # pdfplumber — lazy
+    pdf_mod = _pdf_store_consolidator(subdir)
+    if pdf_mod is not None:
+        # Highway Log (PDF) / Intersection Detail (PDF): parse the per-route PDFs into
+        # a scratch converted_dir first, then combine — they have no entry in
+        # consolidator_for_subdir for exactly this reason.
         conv = out_path.parent / f".{out_path.stem}_conv"
         try:
-            res = _m.consolidate(events=events, confirm_overwrite=lambda _p: True,
-                                 input_dir=Path(env_dir), out_path=out_path,
-                                 converted_dir=conv)
+            res = pdf_mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                      input_dir=Path(env_dir), out_path=out_path,
+                                      converted_dir=conv)
         finally:
             shutil.rmtree(conv, ignore_errors=True)
     else:
@@ -875,9 +918,9 @@ def consolidate_tsn_pdfs(dest, subdir, events=None, confirm_overwrite=None):
 # re-consolidates; only changing the comparison mechanism (not the data) reuses
 # the existing consolidated. A force flag rebuilds it on demand.
 def _consolidated_filename(subdir):
-    if subdir == "highway_log_pdf":
-        import consolidate_tsmis_highway_log_pdf as _m
-        return _m.FILENAME
+    pdf_mod = _pdf_store_consolidator(subdir)
+    if pdf_mod is not None:
+        return pdf_mod.FILENAME
     import reports                                   # lazy
     mod = reports.consolidator_for_subdir(subdir)
     if mod is None:
@@ -1056,19 +1099,23 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                                                   mode["env_subdir"], events, force_consolidate)
         side_other, comp_other = _ensure_consolidated(dest / cell_key / mode["other_subdir"],
                                                       mode["other_subdir"], events, force_consolidate)
-        # the adapter fixes PDF=side A, Excel=side B regardless of the row.
-        pdf_c = side_env if mode["env_subdir"] == "highway_log_pdf" else side_other
-        excel_c = side_other if mode["env_subdir"] == "highway_log_pdf" else side_env
-        import compare_highway_log_pdf as _cmp_p
+        # the adapter fixes PDF=side A, Excel=side B regardless of the row. The PDF
+        # side is whichever subdir ends with `_pdf` (env on the …_pdf row, other on the
+        # Excel row); the comparator is that family's PDF-vs-Excel adapter.
+        env_is_pdf = mode["env_subdir"].endswith("_pdf")
+        pdf_subdir = mode["env_subdir"] if env_is_pdf else mode["other_subdir"]
+        pdf_c = side_env if env_is_pdf else side_other
+        excel_c = side_other if env_is_pdf else side_env
+        _self_cmp = _pdf_self_comparator(pdf_subdir)
         result = artifact_store.commit_workbook(
             out_path,
-            lambda tmp: _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
+            lambda tmp: _self_cmp.compare(
                 pdf_c, excel_c, tmp, events=events,
                 confirm_overwrite=lambda _p: True, mode="values"),
             expect_sheet="Comparison",
             confirm_overwrite=confirm_overwrite or (lambda _p: True))
         if also_formulas and result.status == "ok":
-            _try_formulas(lambda fp: _cmp_p.TSMIS_PDF_VS_EXCEL.compare(
+            _try_formulas(lambda fp: _self_cmp.compare(
                 pdf_c, excel_c, fp, events=events,
                 confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
         # P1-R01: a PARTIAL side means the self comparison diffed INCOMPLETE inputs —

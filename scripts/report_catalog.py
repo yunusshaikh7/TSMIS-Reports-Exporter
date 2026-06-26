@@ -33,6 +33,7 @@ from export_highway_log import SPEC as _HIGHWAY_LOG_SPEC
 from export_highway_log_pdf import SPEC as _HIGHWAY_LOG_PDF_SPEC
 from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
 from export_intersection_detail import SPEC as _INT_DETAIL_SPEC
+from export_intersection_detail_pdf import SPEC as _INT_DETAIL_PDF_SPEC
 
 import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
@@ -41,11 +42,13 @@ import consolidate_highway_log as _c_highway_log
 import consolidate_tsn_highway_log as _c_tsn_highway_log
 import consolidate_tsmis_highway_log_pdf as _c_tsmis_highway_log_pdf
 import consolidate_intersection_detail as _c_int_detail
+import consolidate_tsmis_intersection_detail_pdf as _c_tsmis_int_detail_pdf
 import consolidate_intersection_summary as _c_int_summary
 
 import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
 import compare_highway_log_pdf as _cmp_highway_log_pdf
+import compare_intersection_detail_pdf as _cmp_int_detail_pdf
 import compare_ramp_detail_tsn as _cmp_ramp_detail_tsn
 import compare_ramp_summary_tsn as _cmp_ramp_summary_tsn
 import compare_intersection_summary_tsn as _cmp_int_summary_tsn
@@ -80,6 +83,11 @@ EXPORT = (
     # NO "TSAR:" prefix, and Summary is an Excel export like Detail.
     ExportEntry("intersection_summary", "Intersection Summary", "Excel", _INT_SUMMARY_SPEC),
     ExportEntry("intersection_detail", "Intersection Detail", "Excel", _INT_DETAIL_SPEC),
+    # Same "Intersection Detail" dropdown option, saved as a PDF via the page's Print
+    # layout (intd_printAll) instead of the Excel Export button — the exact parallel of
+    # Highway Log (PDF). Appended LAST so the 7 existing export-op keys keep positions
+    # 0–6 (the manifest-v1 integer-index compatibility contract, CR002-RM4).
+    ExportEntry("intersection_detail_pdf", "Intersection Detail (PDF)", "PDF", _INT_DETAIL_PDF_SPEC),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -92,6 +100,11 @@ CONSOLIDATE = (
     ConsolidateEntry("cons:highway_sequence", "Highway Sequence Listing", _c_highway_seq),
     ConsolidateEntry("cons:intersection_summary", "Intersection Summary", _c_int_summary),
     ConsolidateEntry("cons:intersection_detail", "Intersection Detail", _c_int_detail),
+    #   Input = this app's own "Intersection Detail (PDF)" export, parsed into the SAME
+    #   36-column format (the print-layout substitute for the Excel export). Grouped
+    #   next to its Excel sibling, like the two Highway Log consolidators below.
+    ConsolidateEntry("cons:intersection_detail_pdf", "TSMIS Intersection Detail (PDF)",
+                     _c_tsmis_int_detail_pdf),
     #   Input = the TSMIS "Highway Log" Excel export, output/<run>/highway_log/.
     ConsolidateEntry("cons:highway_log_excel", "TSMIS Highway Log (Excel)", _c_highway_log),
     #   Input = this app's own "Highway Log (PDF)" export, parsed into the SAME
@@ -133,6 +146,12 @@ COMPARE = (
     # distinct family `highway_log_pdf` keeps it a separate row from the Excel one.
     CompareEntry("cmp:highway_log_pdf:env", "Highway Log (PDF) — between environments",
                  _cmp_env.HIGHWAY_LOG_PDF, "folders", "env"),
+    # Intersection Detail (PDF) cross-env — both sides parsed from the app's PDF
+    # export. Kept LAST among the env-folders rows so the existing matrix row order is
+    # unchanged; its distinct family `intersection_detail_pdf` keeps it a separate row
+    # from the Excel one (the exact parallel of Highway Log (PDF) above).
+    CompareEntry("cmp:intersection_detail_pdf:env", "Intersection Detail (PDF) — between environments",
+                 _cmp_env.INTERSECTION_DETAIL_PDF, "folders", "env"),
     # vs TSN (file-based).
     CompareEntry("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN",
                  _cmp_highway_log, "files", "tsn"),
@@ -151,6 +170,13 @@ COMPARE = (
                  _cmp_int_summary_tsn, "files", "tsn"),
     CompareEntry("cmp:intersection_detail:tsn", "TSAR: Intersection Detail — TSMIS vs TSN",
                  _cmp_int_detail_tsn, "files", "tsn"),
+    # Intersection Detail PDF-sourced comparisons — the exact parallel of the two
+    # Highway Log PDF file-rows above. PDF-vs-TSN is a vs-TSN check ("tsn"); PDF-vs-Excel
+    # is an internal one-system consistency check, so it lives under "env" like HL's.
+    CompareEntry("cmp:intersection_detail:pdf_vs_tsn", "Intersection Detail — TSMIS (PDF) vs TSN",
+                 _cmp_int_detail_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:intersection_detail:pdf_vs_excel", "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_int_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
     CompareEntry("cmp:highway_sequence:tsn", "Highway Sequence Listing — TSMIS vs TSN",
                  _cmp_highway_seq_tsn, "files", "tsn"),
 )

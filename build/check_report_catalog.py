@@ -54,6 +54,7 @@ from export_highway_log import SPEC as _S_highway_log
 from export_highway_log_pdf import SPEC as _S_highway_log_pdf
 from export_intersection_summary import SPEC as _S_intersection_summary
 from export_intersection_detail import SPEC as _S_intersection_detail
+from export_intersection_detail_pdf import SPEC as _S_intersection_detail_pdf
 import consolidate_ramp_summary as _con_ramp_summary
 import consolidate_ramp_detail as _con_ramp_detail
 import consolidate_highway_sequence as _con_highway_sequence
@@ -62,9 +63,11 @@ import consolidate_tsmis_highway_log_pdf as _con_tsmis_pdf
 import consolidate_tsn_highway_log as _con_tsn_hl
 import consolidate_intersection_summary as _con_int_summary
 import consolidate_intersection_detail as _con_int_detail
+import consolidate_tsmis_intersection_detail_pdf as _con_tsmis_int_detail_pdf
 import compare_env as _ce
 import compare_highway_log as _chl
 import compare_highway_log_pdf as _chlp
+import compare_intersection_detail_pdf as _cidp
 import compare_ramp_detail_tsn as _crd_tsn
 import compare_ramp_summary_tsn as _crs_tsn
 import compare_intersection_summary_tsn as _cis_tsn
@@ -91,6 +94,7 @@ _EXPORT = [  # (key, label, fmt, expected ReportSpec)
     ("highway_log_pdf", "Highway Log (PDF)", "PDF", _S_highway_log_pdf),
     ("intersection_summary", "Intersection Summary", "Excel", _S_intersection_summary),
     ("intersection_detail", "Intersection Detail", "Excel", _S_intersection_detail),
+    ("intersection_detail_pdf", "Intersection Detail (PDF)", "PDF", _S_intersection_detail_pdf),
 ]
 _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:ramp_summary", "TSAR: Ramp Summary", _con_ramp_summary),
@@ -98,6 +102,7 @@ _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:highway_sequence", "Highway Sequence Listing", _con_highway_sequence),
     ("cons:intersection_summary", "Intersection Summary", _con_int_summary),
     ("cons:intersection_detail", "Intersection Detail", _con_int_detail),
+    ("cons:intersection_detail_pdf", "TSMIS Intersection Detail (PDF)", _con_tsmis_int_detail_pdf),
     ("cons:highway_log_excel", "TSMIS Highway Log (Excel)", _con_highway_log),
     ("cons:highway_log_pdf", "TSMIS Highway Log (PDF)", _con_tsmis_pdf),
     ("cons:tsn_highway_log", "TSN Highway Log (PDF)", _con_tsn_hl),
@@ -110,6 +115,7 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:intersection_summary:env", "TSAR: Intersection Summary — between environments", "folders", "env", _ce.INTERSECTION_SUMMARY),
     ("cmp:intersection_detail:env", "TSAR: Intersection Detail — between environments", "folders", "env", _ce.INTERSECTION_DETAIL),
     ("cmp:highway_log_pdf:env", "Highway Log (PDF) — between environments", "folders", "env", _ce.HIGHWAY_LOG_PDF),
+    ("cmp:intersection_detail_pdf:env", "Intersection Detail (PDF) — between environments", "folders", "env", _ce.INTERSECTION_DETAIL_PDF),
     ("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN", "files", "tsn", _chl),
     ("cmp:highway_log:pdf_vs_tsn", "Highway Log — TSMIS (PDF) vs TSN (PDF)", "files", "tsn", _chlp.TSMIS_PDF_VS_TSN),
     ("cmp:highway_log:pdf_vs_excel", "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chlp.TSMIS_PDF_VS_EXCEL),
@@ -117,6 +123,8 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:ramp_summary:tsn", "TSAR: Ramp Summary — TSMIS vs TSN", "files", "tsn", _crs_tsn),
     ("cmp:intersection_summary:tsn", "TSAR: Intersection Summary — TSMIS vs TSN", "files", "tsn", _cis_tsn),
     ("cmp:intersection_detail:tsn", "TSAR: Intersection Detail — TSMIS vs TSN", "files", "tsn", _cid_tsn),
+    ("cmp:intersection_detail:pdf_vs_tsn", "Intersection Detail — TSMIS (PDF) vs TSN", "files", "tsn", _cidp.TSMIS_PDF_VS_TSN),
+    ("cmp:intersection_detail:pdf_vs_excel", "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _cidp.TSMIS_PDF_VS_EXCEL),
     ("cmp:highway_sequence:tsn", "Highway Sequence Listing — TSMIS vs TSN", "files", "tsn", _chs_tsn),
 ]
 _AUTO_CONS = {

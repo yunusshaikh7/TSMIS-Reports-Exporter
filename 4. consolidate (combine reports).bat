@@ -18,29 +18,31 @@ echo     2.  TSAR: Ramp Detail         (XLSX -^> XLSX)
 echo     3.  Highway Sequence Listing  (XLSX -^> XLSX)
 echo     4.  Intersection Summary      (XLSX -^> XLSX)
 echo     5.  Intersection Detail       (XLSX -^> XLSX)
-echo     6.  TSMIS Highway Log (Excel) (Excel export from output\...\highway_log -^> XLSX)
-echo     7.  TSMIS Highway Log (PDF)   (PDF export from output\...\highway_log_pdf -^> XLSX)
-echo     8.  TSN Highway Log (PDF)     (district PDFs from input\tsn_highway_log -^> XLSX)
+echo     6.  TSMIS Intersection Detail (PDF) (PDF export from output\...\intersection_detail_pdf -^> XLSX)
+echo     7.  TSMIS Highway Log (Excel) (Excel export from output\...\highway_log -^> XLSX)
+echo     8.  TSMIS Highway Log (PDF)   (PDF export from output\...\highway_log_pdf -^> XLSX)
+echo     9.  TSN Highway Log (PDF)     (district PDFs from input\tsn_highway_log -^> XLSX)
 echo.
 echo     Q.  Quit
 echo.
 echo ================================================================
 echo.
 set "choice="
-set /p choice="Enter your choice [1-8, Q]: "
+set /p choice="Enter your choice [1-9, Q]: "
 
 if /i "%choice%"=="1" goto ramp_summary
 if /i "%choice%"=="2" goto ramp_detail
 if /i "%choice%"=="3" goto highway_sequence
 if /i "%choice%"=="4" goto intersection_summary
 if /i "%choice%"=="5" goto intersection_detail
-if /i "%choice%"=="6" goto highway_log
-if /i "%choice%"=="7" goto tsmis_highway_log_pdf
-if /i "%choice%"=="8" goto tsn_highway_log
+if /i "%choice%"=="6" goto tsmis_intersection_detail_pdf
+if /i "%choice%"=="7" goto highway_log
+if /i "%choice%"=="8" goto tsmis_highway_log_pdf
+if /i "%choice%"=="9" goto tsn_highway_log
 if /i "%choice%"=="Q" exit /b 0
 if /i "%choice%"=="quit" exit /b 0
 echo.
-echo Invalid choice "%choice%". Please pick 1-8, or Q.
+echo Invalid choice "%choice%". Please pick 1-9, or Q.
 echo.
 pause
 goto menu
@@ -67,6 +69,11 @@ exit /b 0
 
 :intersection_detail
 python scripts\consolidate_intersection_detail.py
+pause
+exit /b 0
+
+:tsmis_intersection_detail_pdf
+python scripts\consolidate_tsmis_intersection_detail_pdf.py
 pause
 exit /b 0
 

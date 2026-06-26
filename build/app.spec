@@ -75,18 +75,21 @@ APP_MODULES = [
     "report_catalog", "updater", "batch_manifest",
     "export_ramp_summary", "export_ramp_detail", "export_highway_sequence",
     "export_highway_log", "export_highway_log_pdf", "export_intersection_summary",
-    "export_intersection_detail", "export_multi",
-    "highway_log_columns", "pdf_row_oracle",   # P12: independent PDF expected-row oracle (P13 evidence kit)
+    "export_intersection_detail", "export_intersection_detail_pdf", "export_multi",
+    "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
+    "pdf_row_oracle",   # P12: independent PDF expected-row oracle (P13 evidence kit)
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
     "consolidate_tsn_highway_log", "consolidate_tsmis_highway_log_pdf",
+    "consolidate_tsmis_intersection_detail_pdf",   # CR-002: Int-Detail-PDF parser (HL-PDF parallel)
     "consolidate_tsn_highway_sequence",
     "consolidate_intersection_detail", "consolidate_intersection_summary",
     "tsn_library", "tsn_load_ramp_detail", "tsn_load_ramp_summary",
     "tsn_load_intersection_summary", "tsn_load_intersection_detail", "summary_layout",
     "compare_core", "compare_tsn_common", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
     "compare_ramp_detail_tsn", "compare_ramp_summary_tsn", "compare_intersection_summary_tsn",
-    "compare_intersection_detail_tsn", "compare_highway_sequence_tsn",
+    "compare_intersection_detail_tsn", "compare_intersection_detail_pdf",
+    "compare_highway_sequence_tsn",
     "gui_main", "gui_api", "gui_worker", "gui_win32", "gui_endpoint", "gui_matrix",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are

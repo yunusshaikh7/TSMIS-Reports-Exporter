@@ -26,9 +26,16 @@ _SUPPORTED_VERSIONS = (1, 2)       # v1 still LOADS (migrated to v2 in memory)
 # FROZEN map from those indices to the stable export-op keys — never a live view
 # of EXPORT_REPORTS (which can re-order). A v1 manifest must always resolve to the
 # reports the user actually picked under v0.17, regardless of any later re-order.
+#
+# Indices 0–6 are the original v0.17.1 export order and MUST stay fixed (positions
+# 0–6 preserved, CR002-RM4). Index 7 (`intersection_detail_pdf`) is APPEND-ONLY: the
+# v0.17.2–v0.17.8 line shipped it as the 8th export (the last int-index-format
+# release), so a v0.17.8 user's v1 manifest can carry index 7 — and it must migrate
+# to the right key, not be poisoned. Never re-order or insert; only append.
 _V017_EXPORT_ORDER = (
     "ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
     "highway_log_pdf", "intersection_summary", "intersection_detail",
+    "intersection_detail_pdf",
 )
 
 # Poison sentinel for a structurally-invalid saved entry. It is never a real export

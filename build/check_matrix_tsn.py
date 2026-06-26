@@ -45,16 +45,18 @@ def test_paths_and_modes():
           matrix.tsn_comparisons_root(d).as_posix().endswith("comparisons/tsn"))
     check("highway_log is tsn_capable", matrix.tsn_capable("highway_log"))
     check("highway_log_pdf is tsn_capable", matrix.tsn_capable("highway_log_pdf"))
+    check("intersection_detail_pdf is tsn_capable (CR-002, the HL-PDF parallel)",
+          matrix.tsn_capable("intersection_detail_pdf"))
     check("ramp_summary is tsn_capable (v0.17.0 AGGREGATE)",
           matrix.tsn_capable("ramp_summary"))
     check("highway_sequence is tsn_capable (v0.17.0 FLAT, county+PM key)",
           matrix.tsn_capable("highway_sequence"))
 
     defs = matrix._row_defs()
-    check("seven matrix rows — every report (both HL formats + both Intersection)",
+    check("eight matrix rows — every report (both HL + both Intersection formats)",
           set(defs) == {"ramp_summary", "ramp_detail", "highway_sequence",
                         "highway_log", "highway_log_pdf", "intersection_summary",
-                        "intersection_detail"})
+                        "intersection_detail", "intersection_detail_pdf"})
 
     def modes(rk):
         _l, sub, _i, adapter, _hr = defs[rk]
@@ -73,6 +75,13 @@ def test_paths_and_modes():
           and hp["tsn"]["supported"] and hp["vs_excel"]["supported"])
     check("HL PDF tsn shares the highway_log TSN folder (one TSN dataset)",
           hp["tsn"]["fmt"] == "pdf" and hp["tsn"]["tsn_subdir"] == "highway_log")
+    idp = modes("intersection_detail_pdf")
+    check("Int-Detail PDF row modes: env + tsn + vs_excel, ALL supported (CR-002 — the HL-PDF parallel)",
+          set(idp) == {"env", "tsn", "vs_excel"}
+          and idp["env"]["supported"]
+          and idp["tsn"]["supported"] and idp["vs_excel"]["supported"])
+    check("Int-Detail PDF tsn shares the intersection_detail TSN dataset (its Excel sibling)",
+          idp["tsn"]["fmt"] == "pdf" and idp["tsn"]["tsn_subdir"] == "intersection_detail")
     rs = modes("ramp_summary")
     check("ramp_summary: env + tsn supported (v0.17.0 AGGREGATE)",
           rs["env"]["supported"] and rs["tsn"]["supported"])

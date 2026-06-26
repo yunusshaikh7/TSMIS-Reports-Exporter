@@ -2,13 +2,18 @@
 (reports.DISABLED_EXPORT_SUBDIRS / is_export_disabled / enabled_export_reports /
 export_reports_status + the GUI wiring).
 
-As of v0.16.x the gate is EMPTY — all seven export reports, INCLUDING Intersection
-Summary/Detail, are enabled (they live on the development site; users switch via
-Settings ▸ "Use development site"). This check locks (a) the default all-enabled
-state and (b) that the gate MECHANISM still works: a subdir added back to the set
-is SHOWN GREYED (not hidden), excluded from the saved-reports library, and
-rejected by the start_* guards server-side — with EXPORT_REPORTS indices kept
-stable (manifests / env-scan / start_* index into the full list).
+As of v0.16.x the gate is EMPTY — every export report, INCLUDING Intersection
+Summary/Detail (and, as of CR-002, Intersection Detail (PDF)), is enabled (they
+live on the development site; users switch via Settings ▸ "Use development site").
+This check locks (a) the default all-enabled state and (b) that the gate MECHANISM
+still works: a subdir added back to the set is SHOWN GREYED (not hidden), excluded
+from the saved-reports library, and rejected by the start_* guards server-side —
+with EXPORT_REPORTS indices kept stable (manifests / env-scan / start_* index into
+the full list).
+
+The expected count is DERIVED from the registry (`len(reports.EXPORT_REPORTS)`), not
+hard-coded, so adding a report (CR-002's Int-Detail-PDF) doesn't require bumping a
+literal here — the gate behavior is what's under test, not the count.
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_intersection_gate.py
@@ -24,6 +29,10 @@ import gui_api
 
 _fail = []
 
+# DERIVED expected count — every export report is enabled by default (the gate is
+# empty). Adding a report flows through here without a literal edit.
+N_REPORTS = len(reports.EXPORT_REPORTS)
+
 
 def check(name, cond):
     print(f"  [{'OK ' if cond else 'FAIL'}] {name}")
@@ -32,28 +41,28 @@ def check(name, cond):
 
 
 def test_default_all_enabled():
-    print("default gate is empty — all seven reports enabled (incl. Intersection):")
+    print(f"default gate is empty — all {N_REPORTS} reports enabled (incl. Intersection):")
     check("DISABLED_EXPORT_SUBDIRS is empty by default",
           reports.DISABLED_EXPORT_SUBDIRS == set())
     enabled = reports.enabled_export_reports()
-    check("all seven export reports enabled", len(enabled) == 7)
+    check(f"all {N_REPORTS} export reports enabled", len(enabled) == N_REPORTS)
     subdirs = {spec.subdir for _i, _l, _f, spec in enabled}
-    check("Intersection Summary + Detail are now included",
-          {"intersection_summary", "intersection_detail"} <= subdirs)
+    check("Intersection Summary + Detail (+ the PDF variant) are now included",
+          {"intersection_summary", "intersection_detail", "intersection_detail_pdf"} <= subdirs)
     status = reports.export_reports_status()
-    check("all seven present, none flagged disabled",
-          len(status) == 7 and not any(d for *_rest, d in status))
+    check(f"all {N_REPORTS} present, none flagged disabled",
+          len(status) == N_REPORTS and not any(d for *_rest, d in status))
     check("each idx maps back to its own EXPORT_REPORTS row",
           all(reports.EXPORT_REPORTS[i] == (label, fmt, spec)
               for i, label, fmt, spec, _d in status))
 
 
 def test_gui_initial_state_all_enabled():
-    print("gui_api.get_initial_state (all seven offered, none greyed):")
+    print(f"gui_api.get_initial_state (all {N_REPORTS} offered, none greyed):")
     a = gui_api.GuiApi()
     a._started = True            # skip the one-time check/update worker launch
     init = a.get_initial_state()
-    check("seven reports offered", len(init["reports"]) == 7)
+    check(f"{N_REPORTS} reports offered", len(init["reports"]) == N_REPORTS)
     check("none greyed by default", not any(r["disabled"] for r in init["reports"]))
     check("Intersection shown AND pickable",
           any("Intersection" in r["label"] and not r["disabled"]
@@ -67,7 +76,7 @@ def test_report_library_includes_all():
     print("gui_api.report_library_info now includes Intersection:")
     a = gui_api.GuiApi()
     info = a.report_library_info()
-    check("saved-reports library lists all seven", len(info["reports"]) == 7)
+    check(f"saved-reports library lists all {N_REPORTS}", len(info["reports"]) == N_REPORTS)
 
 
 def test_gate_mechanism_still_works():
@@ -78,7 +87,7 @@ def test_gate_mechanism_still_works():
         enabled = reports.enabled_export_reports()
         ensub = {spec.subdir for _i, _l, _f, spec in enabled}
         check("re-disabled subdir dropped from enabled",
-              "intersection_summary" not in ensub and len(enabled) == 6)
+              "intersection_summary" not in ensub and len(enabled) == N_REPORTS - 1)
         status = reports.export_reports_status()
         disabled = {label for _i, label, _f, _s, d in status if d}
         check("exactly the re-disabled report flagged disabled",
@@ -96,11 +105,11 @@ def test_gate_mechanism_still_works():
         check("re-disabled report is SHOWN greyed (not hidden)",
               any(r["label"] == "Intersection Summary" and r["disabled"]
                   for r in init["reports"])
-              and len(init["reports"]) == 7)
+              and len(init["reports"]) == N_REPORTS)
     finally:
         reports.DISABLED_EXPORT_SUBDIRS = saved
-    check("restored to all seven enabled",
-          len(reports.enabled_export_reports()) == 7)
+    check("restored to all enabled",
+          len(reports.enabled_export_reports()) == N_REPORTS)
 
 
 def main():

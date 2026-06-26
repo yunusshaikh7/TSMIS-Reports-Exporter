@@ -50,8 +50,15 @@ def test_wiring():
     check("registered as a folders/env row",
           any(adapter is a and kind == "folders" and group == "env"
               for _l, adapter, kind, group in reports.COMPARE_REPORTS))
-    check("highway_log_pdf is a matrix row (kept LAST so order is unchanged)",
-          [r[0] for r in reports.matrix_rows()][-1] == "highway_log_pdf")
+    # MEMBERSHIP, not last-position: CR-002 appended intersection_detail_pdf AFTER the
+    # HL-PDF env row (the exact b70a644 reconciliation), so HL-PDF is no longer the last
+    # matrix row — but the existing order is unchanged (the new row is appended after it).
+    _mrows = [r[0] for r in reports.matrix_rows()]
+    check("highway_log_pdf is a matrix row (membership; CR-002 appended a row after it)",
+          "highway_log_pdf" in _mrows)
+    check("existing matrix order unchanged — intersection_detail_pdf appended LAST, after HL-PDF",
+          _mrows[-1] == "intersection_detail_pdf"
+          and _mrows[_mrows.index("highway_log_pdf") + 1] == "intersection_detail_pdf")
     defs = matrix._row_defs()
     hp = {m["id"]: m for m in matrix._row_modes("highway_log_pdf", "highway_log_pdf",
                                                 defs["highway_log_pdf"][3])}
