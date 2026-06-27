@@ -48,16 +48,9 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > fixes (`tsn_library/` was never ignored; belt-and-suspenders `output/tsn_*`). Per-version detail:
 > `CHANGELOG.md`; v0.17.0 build journal: **[v0.17.0-prompt.md](v0.17.0-prompt.md)**.
 >
-> **Owed:** **work-PC live verification** (dev PC can't reach TSMIS — live export/compare, the
-> background one-click check, updater field-test) · the **gh-pages** landing-page regen · two
-> **deferred v0.17.1 follow-ups:** (1) **cancel-latency** — Stop now interrupts the `navigate_with_auth`
-> sign-in wait, but `preflight`/`select_report` (the ~60s county-enable `wait_for_function`) and
-> `_recover` (mid-batch re-login) still aren't cancel-polled, so a Stop in those after-sign-in /
-> recovery windows can wait up to the budget (chunking those field-hardened waits is risky to ship
-> unverified — same opt-in `should_cancel` pattern when tackled); (2) **narrow-mode** (<980 CSS px,
-> e.g. 1366×768 @150% DPI) **matrix-tab polish** — the wide layout's card-hide / height-fill /
-> config-uncap rules live inside `@media (min-width:980px)`, so a small/high-DPI laptop shows stray
-> idle cards + a cramped (but present) Matrix-options panel on the matrix sub-tabs.
+> **Owed (now consolidated in *Next version (v0.18.2)* above):** the work-PC live verification, the
+> **gh-pages** landing-page regen, and the two deferred v0.17.1 follow-ups — **cancel-latency** and
+> **narrow-mode** (<980 CSS px) matrix-tab polish.
 
 ## How to maintain this file
 
@@ -74,6 +67,47 @@ The single forward list — bugs to fix, features to add, and standing concerns.
   decides *where* deferred items go next.
 - This is the backlog, **not** the changelog — keep "done" notes to one line; detail lives in
   `CHANGELOG.md` and the docs.
+
+---
+
+## Next version (v0.18.2) — what's actually owed
+
+> The single live worklist. Almost everything still owed collapses into ONE effort — the **work-PC
+> field sign-off** (the dev PC can't reach TSMIS). The §J2 dispositions + the Phase-3 list below are
+> the historical reconciliation record; *Feature backlog* / *Standing* hold the longer tail.
+> v0.18.0's final review found **no offline leftover** — the only product TODO is this field gate;
+> everything else is already **Shipped** (§ below) or an explicit **deferral** (the minor opportunistic
+> carry-overs from the overhaul are under *Standing → Restructure leftovers*).
+
+**1 — Work-PC field sign-off (GATES v0.18.2).** One session on the locked-down PC: run v0.18.1,
+`--collect-evidence`, and confirm the live paths the dev PC can't. Full checklist + acceptance
+criteria: [work-pc-validation.md](work-pc-validation.md) §3.
+- [ ] The two **v0.18.1 field bugs** live — Intersection export selects on the **nested dev menu**
+  (`data-value`); the matrix / by-day **queue clears** after a job drains; the flat **prod** menu still selects.
+- [ ] **Carried live paths** — partial **keeps last-good**; stage-and-swap under Defender/lock; a real
+  **paused-batch resume across a restart**; the **v0.17→v0.18 self-update**; both frozen exes + the source ZIP run.
+- [ ] **P8c** — exact `select_report`, CDP open-on-demand / close-on-capture, cancel-in-recover latency.
+- [ ] **Intersection Detail (PDF)** live — export → consolidate → PDF-vs-TSN / PDF-vs-Excel on the real files.
+- [ ] **Evidence-driven parser fixes** (need the returned real PDFs) — ramp-summary parse-failure
+  misattribution + duplicate-pop misassignment, via the P12 row-oracle. Land offline-RED-proven, then re-bless.
+
+→ Cut **v0.18.2** as the operational sign-off ("enterprise-ready" is claimed here, never before).
+
+**2 — Small & ready (ride along with the sign-off run):**
+- [ ] **gh-pages landing-page regen** — owed since v0.17.0; website only ([website.md](website.md)).
+- [ ] **cancel-latency** [S] — poll `should_cancel` in `preflight` / `select_report` (the ~60 s county-enable
+  wait) / `_recover` (mid-batch re-login) so Stop interrupts the after-sign-in / recovery windows (same opt-in
+  `should_cancel` pattern; verify live — the waits are field-hardened). *(v0.17.1 follow-up.)*
+- [ ] **narrow-mode** [S] — (<980 CSS px, e.g. 1366×768 @150% DPI) matrix-tab polish: the card-hide /
+  height-fill / config-uncap rules live in `@media (min-width:980px)`, so a small/high-DPI laptop shows stray
+  idle cards + a cramped Matrix-options panel on the matrix sub-tabs. *(v0.17.1 follow-up.)*
+
+**Site-gated (not on our schedule):** **Highway Detail / Highway Summary enablement** — groundwork shipped
+in v0.18.1; flip on when TSMIS turns them on (see *Feature backlog*).
+
+**Parked — pull in only by a separate decision:** code-signing (SignPath cert), DPAPI at-rest auth,
+`compare_core` min-cost-pairs, the A3 / C1 / D1 / F1 feature backlog, the dormant Med Wid watch, and the two
+upstream TSMIS-team reports (all in *Standing & cross-cutting* / *Feature backlog* below).
 
 ---
 
@@ -459,17 +493,6 @@ or accept as someday.**
 
 ## Standing & cross-cutting (open)
 
-### Branch / release hygiene
-- [ ] **Reconcile `main` to v0.18.x** — `origin/main` is still ≈ **v0.17.8** and **diverged**: the
-  v0.17.2–v0.17.8 Intersection-Detail line was **forward-ported** (re-implemented commit-by-commit) onto the
-  `refactor/v0.18.0-structural-overhaul` branch, not merged, so histories split at `d2ee353` (the branch is
-  **27 ahead / 11 behind** `origin/main`). **v0.18.0 + v0.18.1 were released from the branch** (both tags
-  pushed; the releases are live). Make `main` = v0.18.x via an **`-s ours` supersede merge** (no force-push;
-  the v0.17.x commits stay reachable on their tags) OR a **force-update** (`git branch -f main <tip>` +
-  `push --force`; the v0.17.x commits then live only on their tags). **Never a blind `git merge`** — it
-  conflicts and risks reintroducing the pre-refactor structure the overhaul dismantled. A separate decision
-  when the user is ready.
-
 ### Security / IT
 - [ ] **Code-sign the executable** — the one big remaining IT lever (removes most Defender / DLP /
   SmartScreen friction on the unsigned `.exe`, and is the real fix for the P1 auto-update-trust
@@ -488,13 +511,28 @@ or accept as someday.**
   Confirm live it doesn't false-positive on a slow-but-valid load.
 - [ ] **Intersection empty markers** (`td.hl-empty` / `Total Intersections = 0`) — verify against the
   live site once intersections finalize (still site-side development; markers may drift).
-- Several **Next-patch** fixes also need a live re-test here (the wrong-env backstop, the
-  empty-routes UX, the staging retry, `report_error_text`/Highway-Sequence empty).
+- *(The bulk of this — plus the carried §J2 live-verify set: the wrong-env backstop, the empty-routes UX,
+  the staging retry, `report_error_text`/Highway-Sequence empty — is consolidated as the **work-PC field
+  sign-off** in [Next version](#next-version-v0182--whats-actually-owed) above.)*
 
 ### Upstream / external (report to the TSMIS team)
 - [ ] Site hardcodes `highway_sequence_listing.xlsx` as *Ramp Detail*'s export filename (cosmetic
   for us — we rename via `save_as`).
 - [ ] Ramp Summary **source-data** inconsistency on 9 routes (see the Shipped record — not our bug).
+
+### Restructure leftovers (opportunistic — low priority, none release-blocking)
+> v0.18.0's final review found the branch **offline-complete** (no product-code leftover). These are the
+> only minor hygiene / conditional carry-overs from the overhaul — do them opportunistically.
+- [ ] **Non-HL tab/whitespace normalization** — the Highway Log & Highway Sequence vs-TSN loaders collapse
+  tab/whitespace at load; **Ramp Detail & Intersection Detail do not** (the disposition is recorded in §J2
+  above). Low impact — the locked counts stand; revisit only if a tab-bearing value ever causes a spurious diff.
+- [ ] **P11 doc/comment line-ref drift** — the v0.18.0 leaf-split moved code, so some `docs/internals/*`
+  inline `file:line` refs + a few source comments still point at pre-split locations (the deeper per-row
+  churn the P11 docs reconciliation explicitly deferred; the v0.18.1 docs pass fixed `export-engine.md` §6).
+  Fix opportunistically when you next touch those files.
+- [ ] **Cold-start / matrix-snapshot perf baselines** (R1-A01) — the import-cost baseline shipped
+  (`build/measure_baselines.py`); the runtime cold-start / matrix-snapshot baselines were deferred to the
+  first phase that touches a hot path. Measure then, not before.
 
 ### Dormant / watch (no action unless the data changes)
 - [ ] **Med Wid flavor-parity gap** (`compare_core._medwid_norm` vs `_medwid_ref`) — Excel `VALUE()`
@@ -530,6 +568,11 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 > now in the Feature backlog above, flagged 3×-deferred.
 
 ### Closed findings & decisions (record)
+- [x] **`main` reconciled to v0.18.1** (2026-06-27) — a `-s ours` supersede merge (`9514359` = `d775ca0`
+  v0.18.1 + `068b697` v0.17.8) fast-forwarded `origin/main` to the v0.18.1 tree; **no force-push**, the
+  forward-ported v0.17.2–v0.17.8 line preserved as ancestry, `v0.18.0`/`v0.18.1` tags intact; the merged
+  `refactor/v0.18.0-structural-overhaul` branch retired (local + origin). The diverged-histories problem
+  (the CR-002 forward-port) is closed.
 - [x] **Stage-1 foundation audit — consolidate + cross-env compare VERIFIED on the full 6-env
   batch** (2026-06-18; HSL / Ramp Detail / Ramp Summary). 18/18 consolidations + 15/15 cross-env
   comparisons (baseline SSOR-PROD) proven cell-accurate ≥3 independent ways (independent
