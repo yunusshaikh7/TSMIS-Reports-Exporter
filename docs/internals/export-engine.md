@@ -222,24 +222,25 @@ Mechanics (`exporter.py:225-243`):
 
 ---
 
-## 6. `preflight` and `select_report` (`common.py`)
+## 6. `preflight` and `select_report` (`report_nav.py`, re-exported by `common.py`)
 
-### 6.1 `preflight(page, report_label)` (`common.py:741`)
+### 6.1 `preflight(page, report_label, data_value=None)` (`report_nav.py:226`)
 
 Runs after sign-in, before the loop. Four checks, each a fast-fail with a `preflight_fail_*` page dump:
 
 1. `#customReport` dropdown present (`count() == 0` ⇒ `PreflightError` + dump, `:749-756`).
-2. `select_report(page, report_label)` (`:759`) — arms the form; itself raises `ReportUnavailableError` on a `cs-disabled` report.
+2. `select_report(page, report_label, data_value)` (`:244`) — arms the form (picking by the spec's stable `data_value` when present); itself raises `ReportUnavailableError` on a `cs-disabled` report.
 3. Route control attaches within 15 s: `page.get_by_label("Route", exact=True).wait_for(state="attached", timeout=15000)` (`:761`).
 4. Generate button attaches within 15 s (`:763`).
 
-A `step` string is tracked so the log names the failed step (`:757,760,762`). `ReportUnavailableError` is re-raised **as-is** (`:765-769`) — it's a clear, specific condition, not the generic "page looks different". Any other exception ⇒ generic `PreflightError` (`:770-779`). `SiteUnreachableError` and `ReportUnavailableError` both subclass `PreflightError` (`common.py:44,51`), so every driver shows the message verbatim.
+A `step` string is tracked so the log names the failed step (`:757,760,762`). `ReportUnavailableError` is re-raised **as-is** (`:765-769`) — it's a clear, specific condition, not the generic "page looks different". Any other exception ⇒ generic `PreflightError` (`:770-779`). `SiteUnreachableError` and `ReportUnavailableError` both subclass `PreflightError` (`errors.py`), so every driver shows the message verbatim.
 
-### 6.2 `select_report(page, report_label)` (`common.py:661`)
+### 6.2 `select_report(page, report_label, data_value=None)` (`report_nav.py:108`)
 
-1. Click `#customReport`, locate the `li.cs-option` whose text matches `report_label` (`:673-674`).
-2. **Read the option's classes**; if `cs-disabled` is present ⇒ `ReportUnavailableError` (`:682-688`). The disabled `<li>` has no `pointer-events:none`, so a Playwright click would silently no-op and stall ~30 s into a generic preflight error — detecting the class here turns that into one clear "currently unavailable" message. The class read is wrapped so the probe itself can never stop a run (`:676-681`).
-3. Click the option, then **fan out District/County/Route to `-- ALL --`** (`:689-696`): click "District / County / Route", select District `-- ALL --`, `wait_for_function` that `#districtCountySelect` is no longer disabled (bounded at `county_enable_timeout_ms()`, default 60 s), then select that to `-- ALL --`. The county-enable wait is the only place `COUNTY_ENABLE_TIMEOUT_MS` is used.
+1. Click `#customReport`, then `_find_exact_option(page, report_label, data_value)` (`:27`) picks the one option: it reads every `li.cs-option` as `(locator, text, data-value, data-label)` and matches **by the stable `data-value` first** (the value the site writes into its hidden native `<select>` — identical on the old flat menu and the new nested flyout, and proof against a relabelled leaf), falling back to an **exact** match on the visible text OR `data-label`. Zero or multiple matches ⇒ `PreflightError` — the exact-match guard that replaced the old substring `has_text=…`.first read (which could silently pick the wrong report when one label was contained in another, e.g. "Highway Log" inside "Highway Log (PDF)").
+2. **Read the option's classes**; if `cs-disabled` is present ⇒ `ReportUnavailableError` (`:140`). The disabled `<li>` has no `pointer-events:none`, so a Playwright click would silently no-op and stall ~30 s into a generic preflight error — detecting the class here turns that into one clear "currently unavailable" message. The class read is wrapped so the probe itself can never stop a run (the site marks the not-yet-available Highway group this way on the nested menu).
+3. `_reveal_submenu_if_leaf` (`:83`): on the nested menu a `cs-leaf` stays `display:none` until its `cs-parent` row is hovered (a CSS `:hover` rule, no JS), so it hovers the parent to open the flyout before the click; a flat top-level option needs nothing (best-effort — a missing/unhoverable parent just lets the click proceed).
+4. Click the option, then **fan out District/County/Route to `-- ALL --`** (`:150-156`): click "District / County / Route", select District `-- ALL --`, `wait_for_function` that `#districtCountySelect` is no longer disabled (bounded at `county_enable_timeout_ms()`, default 60 s), then select that to `-- ALL --`. The county-enable wait is the only place `COUNTY_ENABLE_TIMEOUT_MS` is used.
 
 ### 6.3 The report-ready / error JS
 
@@ -300,7 +301,7 @@ So the **only** error retried in-loop is a transient non-timeout, non-report exc
 
 ### 8.1 `_recover` / `_recover_or_stop` (`exporter.py:269-291`)
 
-`_recover(page, spec)` (`:269`): `navigate_with_auth(page)` → `require_signed_in(…)` → `select_report(page, spec.label)`. Raises `AuthError` if the session died mid-batch (ends the run cleanly). This is the mid-run re-auth path — `navigate_with_auth` re-mints an expired memory-only token via a fresh silent SAML round-trip (see [../auth-and-signin.md](../auth-and-signin.md)).
+`_recover(page, spec)` (`:269`): `navigate_with_auth(page)` → `require_signed_in(…)` → `select_report(page, spec.label, spec.data_value)`. Raises `AuthError` if the session died mid-batch (ends the run cleanly). This is the mid-run re-auth path — `navigate_with_auth` re-mints an expired memory-only token via a fresh silent SAML round-trip (see [../auth-and-signin.md](../auth-and-signin.md)).
 
 `_recover_or_stop(page, spec, events)` (`:279`): wraps `_recover` in `try`, emits a "Recovering…" status, returns `True` on success. **Re-raises `AuthError`** (`:286-287`) but swallows any other exception with a log line and returns `False` (`:288-291`) — a failed re-arm stops the whole run rather than crashing it.
 
@@ -354,7 +355,7 @@ Validates auth + the report form **a single time**, before launching N browsers,
 Each `worker(idx)` (one per thread, named `export-w{idx+1}`, daemon) owns its **own** `sync_playwright()` instance, browser, context, and page (Playwright is thread-affine — nothing Playwright is shared across threads). Its `RunResult` lands in `worker_results[idx]`, and it gets a per-worker `Events` from `_worker_events(events, stop, idx+1)`.
 
 Body:
-1. `new_authed_browser(p, parallel=True)` → `navigate_with_auth` → `require_signed_in` → `select_report(page, spec.label)` to arm this worker's form (`:250-259`).
+1. `new_authed_browser(p, parallel=True)` → `navigate_with_auth` → `require_signed_in` → `select_report(page, spec.label, spec.data_value)` to arm this worker's form (`:250-259`).
 2. `while not stop.is_set():` (`:260`):
    - `_wait_while_paused(events)` (shared sink, so all workers park together) (`:261`).
    - `events.is_cancelled()` ⇒ `stop.set(); break` (`:262-264`).
@@ -423,7 +424,7 @@ Two channel orders:
 | `SiteUnreachableError` (PreflightError) | `navigate_with_auth` when `page.goto` fails (`common.py:471`) | run aborts |
 | `AuthError` | `require_signed_in` (`common.py:658`); `_recover` via it; parallel after join (`exporter_parallel.py:315`) | never recorded failed; run ends cleanly, driver clears the file |
 | `PreflightError` | `preflight` (`common.py:753,776`) | run aborts before the loop |
-| `ReportUnavailableError` (PreflightError) | `select_report` on `cs-disabled` (`common.py:684`) | surfaced at preflight, before the loop |
+| `ReportUnavailableError` (PreflightError) | `select_report` on `cs-disabled` (`report_nav.py:142`) | surfaced at preflight, before the loop |
 | `ReportError` | `report_error_text` non-empty in `_attempt_route` (`exporter.py:339`); `save_via_export_button` no-download + site error (`exporter.py:198`); `save_highway_log_pdf` layout-build failure (`exporter.py:234`) | `failed` (in seconds; one fast retry in the end-of-run pass) |
 | `EmptyExport` | `save_via_export_button` no-download + no site error (`exporter.py:202`) | `empty` (~60 s) |
 | `RunCancelled` | `wait_with_skip_option` (`common.py:857`); `_attempt_route` post-wait re-check (`exporter.py:336`) | not a failure; clean partial stop |

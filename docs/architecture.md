@@ -3,7 +3,7 @@
 How the TSMIS Reports Exporter is structured — one console-free core driven by two
 front-ends, the single report registry, route/run plumbing, the on-disk run-folder
 and data-location model, and the high-level feature buckets through the v0.18.0
-structural overhaul. Runtime
+structural overhaul and the v0.18.1 close-out. Runtime
 *behavior* (the export loop, recovery, resume, skip/cancel, timeouts) lives in
 [engine-and-reliability.md](engine-and-reliability.md); GUI internals (threading,
 pywebview traps, snapshots) live in [gui.md](gui.md).
@@ -64,9 +64,9 @@ to harmless no-ops, so `Events()` is a valid silent sink.
 
 ## One shared loop, per-report `ReportSpec`
 
-Each report's differences live in a `ReportSpec` — `label` (exact dropdown text),
-output filename, `subdir`, post-Generate `wait_js`, `is_empty` check, and `save`
-strategy. The proven per-route loop, recovery, and skip/cancel logic live **once**
+Each report's differences live in a `ReportSpec` — `label` (the option text / `data-label`),
+`data_value` (the stable option id, matched first — v0.18.1), output filename, `subdir`,
+post-Generate `wait_js`, `is_empty` check, and `save` strategy. The proven per-route loop, recovery, and skip/cancel logic live **once**
 in `exporter.py` (`run_export(spec, events)`, `save_pdf_letter` /
 `save_via_export_button`, `_recover`, `_retry_failed_routes`). To fix one report's
 behavior, edit only its `ReportSpec`. See
@@ -91,8 +91,10 @@ import the report implementation modules, transitively openpyxl/pdfplumber/playw
 
 Four data structures:
 
-**`EXPORT_REPORTS`** — `(menu label, format hint, ReportSpec)`; order is the GUI
-display order and console menu numbering:
+**`EXPORT_REPORTS`** — `(menu label, format hint, ReportSpec)`. Console menu numbering
+follows this order; the **GUI picker** order is the catalog's `_PICKER_ORDER` (website-style
+grouping, v0.18.1 — see [reports.md](reports.md)). The last two rows are **reserved-disabled**
+groundwork:
 
 | Label | Format | Notes |
 |---|---|---|
@@ -103,7 +105,9 @@ display order and console menu numbering:
 | `Highway Log (PDF)` | PDF | Same "Highway Log" dropdown option, saved via the page's Print layout (`hl_printAll`) instead of the Excel Export button. Has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares (it is NOT auto-consolidated inline — the matrix handles it via a scratch convert dir). |
 | `Intersection Summary` | Excel | Consolidates + compares (cross-env + vs-TSN) since v0.17.0. No `TSAR:` prefix. |
 | `Intersection Detail` | Excel | Consolidates + compares (cross-env + vs-TSN) since v0.17.0. |
-| `Intersection Detail (PDF)` | PDF | Same "Intersection Detail" dropdown option, saved via Print layout (`intd_printAll`) — the exact parallel of Highway Log (PDF), forward-ported in v0.18.0. **Appended LAST** so the 7 existing export-op keys keep positions 0–6 (the manifest-v1 integer-index compat contract, CR-002-RM4). Has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares. |
+| `Intersection Detail (PDF)` | PDF | Same "Intersection Detail" dropdown option, saved via Print layout (`intd_printAll`) — the exact parallel of Highway Log (PDF), forward-ported in v0.18.0. **Appended at index 7** so the 7 existing export-op keys keep positions 0–6 (the manifest-v1 integer-index compat contract, CR-002-RM4); the reserved Highway pair follows at 8/9. Has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares. |
+| `Highway Detail` | Excel | **Reserved — DISABLED (v0.18.1 groundwork).** Append-only stable id **8**; stub `export_highway_detail` whose `save` raises; greyed in the picker via `DISABLED_EXPORT_SUBDIRS`; no consolidator/comparator, so absent from matrix / Compare / Consolidate. Switches on when the site enables it. |
+| `Highway Summary` | Excel | **Reserved — DISABLED (v0.18.1 groundwork).** Append-only stable id **9**; the `export_highway_summary` parallel of the above. |
 
 **`CONSOLIDATE_REPORTS`** — `(menu label, module)`. Each module exposes
 `consolidate(events, confirm_overwrite, day=None)` plus `input_dir_for(day)` /
@@ -414,6 +418,34 @@ where it lives" map — each item owned by the doc named:
 **Two-tier release model:** v0.18.0 is the **offline-validated candidate** (every phase
 provable from CI/offline); **v0.18.1** is the **field-validated close-out** after the
 work-PC evidence comes back. Operational sign-off is claimed at v0.18.1, never v0.18.0.
+
+### v0.18.1 — site-menu-safe selection, report grouping, Highway groundwork
+
+The field close-out tracks the TSMIS site's report-menu migration (flat → grouped fly-outs,
+live on dev) **without** breaking the current flat prod menu. Three structural changes; the
+detail lives in [reports.md](reports.md) → *Report grouping & site-menu-safe selection*:
+
+- **Selection by stable `data_value`.** `ReportSpec` gained a `data_value` field (the
+  option's `data-value` == the hidden `<select>` id); `report_nav._find_exact_option` matches
+  it FIRST, falling back to exact text / `data-label`, and `_reveal_submenu_if_leaf` opens the
+  nested `cs-submenu` fly-out before the click. **Prod-safe:** an unset/unmatched `data_value`
+  behaves exactly as the old text match, so the flat prod menu is unaffected while the nested
+  dev menu works. The env-scan probe matches the same way.
+- **Catalog-driven picker grouping.** `ExportEntry` gained `group` + `short_label`;
+  `report_catalog._PICKER_ORDER` / `picker_order()` fixes the GUI display sequence (flat Highway
+  Log / PDF / Sequence, then the Ramp + Intersection families — mirroring the site).
+  `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload
+  by it and sets `idx` = display position (metadata only — the contract keys on stable subdir /
+  `cmp:*` keys). Console numbering still follows `EXPORT_REPORTS` order.
+- **Reserved Highway Detail/Summary (DISABLED).** Two append-only catalog entries at stable ids
+  **8 / 9** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`) with stub
+  `export_highway_*` modules whose `save` raises; `reports.DISABLED_EXPORT_SUBDIRS =
+  {"highway_detail", "highway_summary"}` greys them and rejects them server-side; with no
+  consolidator/comparator they're absent from the matrices / Compare / Consolidate. Groundwork
+  for when the site enables them.
+
+`compare_core` and the comparison families are untouched by v0.18.1 — the only comparison change
+is a label rename (Intersection Detail's "Roadbed" → "Route Suffix").
 
 ## See also
 

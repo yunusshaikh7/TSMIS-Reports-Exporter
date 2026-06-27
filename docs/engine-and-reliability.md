@@ -101,7 +101,10 @@ drop to `partial` (P1), so dropped-line output is never promoted as complete.
 (`report_timeout_ms()` etc., which read Settings at run time) live in `timeouts.py`.
 
 **P8c live-path hardening (offline-proven; live acceptance owed to v0.18.1).** `select_report` uses an
-**exact** option match (no substring mis-pick); every route re-confirms the report dropdown before
+**exact** option match (no substring mis-pick) — and, as of **v0.18.1**, matches by the option's stable
+`data-value` first (falling back to exact text / `data-label`) and reveals the nested `cs-submenu` flyout,
+so selection survives the site's flat→nested report-menu migration without breaking the flat prod menu;
+every route re-confirms the report dropdown before
 Generate (`_ensure_report_armed`, the stale-form guard); the sign-in busy-wait gained an **in-loop
 cancel check** (`navigate_with_auth(..., should_cancel=…)` polls ~1 s so Stop/Clear interrupt a stuck
 login); the Edge sign-in CDP port is opened **on demand** and **closed on capture**; the no-download

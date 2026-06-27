@@ -3,8 +3,8 @@
 How a one-day console script became a portable, self-updating Windows desktop
 app — told from the repository.
 
-**By the numbers:** 277 commits · 39 pull requests · 38 tagged releases ·
-7 report types · **May 20 → June 20, 2026**.
+**By the numbers:** 313 commits · 39 pull requests · 48 tagged releases ·
+8 report types · **May 20 → June 26, 2026**.
 
 This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
 "how it works and why") and [`CHANGELOG.md`](../CHANGELOG.md)
@@ -44,6 +44,9 @@ that rewrote the design.
 | `v0.16.0` | Jun 19 | Matrix job **queue** + **fast mode**; a Compare-tab **vs-TSN-by-day** matrix |
 | `v0.16.1` | Jun 19 | Matrix polish: pause/skip/preview, reused consolidated, opt-in formulas, Intersection export + dev-site switch |
 | `v0.17.0` | Jun 20 | **Every report compares vs TSN + cross-env**; Intersection consolidators; canonical TSN library; one-stop Export-today; login/browser overhaul |
+| `v0.17.1` | Jun 21 | Matrix-tab hotfix — blank-space + cramped-options fixes, Stop/Clear interrupts a stuck sign-in, self-documenting TSN library |
+| `v0.18.0` | Jun 26 | **The structural overhaul** — engine-leaf split, the outcome + transactional-artifact contracts, a report-catalog SoT, GUI/front-end modularization; + Intersection Detail (PDF), the 8th report; + updater/build hardening |
+| `v0.18.1` | Jun 26 | **Site-menu-safe selection** (pick by stable `data-value`, reveal the fly-out) + website-style report grouping + Highway Detail/Summary groundwork + matrix-queue + Route-Suffix fixes |
 
 ---
 
@@ -245,6 +248,68 @@ background; the Browser dropdown became a read-only "what's exporting" indicator
 real choice moved into Settings; and both matrices learned to **flag** a report the
 environment check found missing, before you waste an export on it.
 
+## Chapter 12 — The engineering close-out (June 21 → 26) · `v0.17.1` → `v0.18.1`
+
+With the feature surface complete, the last stretch turned inward — a hotfix, then the
+largest *non-feature* release in the project, then a field-driven close-out that kept the
+exporter working as TSMIS itself began to move again.
+
+**`v0.17.1` — the matrix-tab hotfix.** Using v0.17.0 in anger surfaced the usual
+post-big-release rough edges: the matrix tabs scrolled into a band of blank space (the
+recurring `sr-only`-containing-block bug, now Lesson 10), the Matrix-options panel was
+crushed on short screens, and **Stop / Clear** wouldn't interrupt a sign-in that was
+hanging. All fixed, plus a self-documenting TSN library (a ready-made folder tree that
+says where each report's file goes) and two `.gitignore` tightenings.
+
+**`v0.18.0` — the structural overhaul.** This is the one release with almost nothing for a
+user to click and the most change underneath. The engine `common.py` was dissolved into an
+acyclic set of single-purpose leaves (`auth_nav`, `report_nav`, `session`, `site_target`,
+`routes`, `errors`, `timeouts`, `browser_channels`, `edge_device`), with `common.py` left
+as a re-export shim so every `from common import X` still works while the import graph
+became *guardable*. Three safety contracts were made explicit and producer-owned: an
+**outcome** model where a partial / failed / cancelled run can never be promoted, cached,
+or shown green (counts decide, never summary text); **transactional artifacts** that
+write-then-`os.replace` and keep the last-good copy on failure, each carrying a fail-safe
+completion sidecar; and a single **report-catalog** source of truth that `reports.py` now
+*derives* from, so the registry can't drift. The GUI was split the same way (a
+task-coordinator owning gate state, a Python⇄JS enum SSOT, endpoint groups, and `app.js`
+broken into cohesive `ui-*` modules). One new report rode along — **Intersection Detail
+(PDF)**, the eighth type, an exact parallel of Highway Log (PDF) — and the packaging /
+updater were hardened to fail-closed (checksum-or-refuse, a staged re-hash right before the
+swap, a zip-slip guard, a hash-pinned reproducible build, and a credential-safe work-PC
+**evidence kit**). Through all of it `compare_core` was left **byte-for-byte unmodified** —
+the regression lock held.
+
+That eighth report arrived by an unusual route. While the refactor was underway, the
+*original* line kept evolving the Intersection Detail vs-TSN comparison across
+`v0.17.2`–`v0.17.8` (position-aligned dates, the signal-type crosswalk, a printed-report
+"Report View"). Rather than merge that line into the refactor and risk dragging back the
+structure it had just dismantled, every one of those commits was **forward-ported** —
+re-implemented on the refactor branch. The two histories diverged for good: `main` still
+reads v0.17.8, while the refactor branch carries the real present. v0.18.0 also introduced
+the project's **two-tier release model** — it is the *offline-validated candidate*
+(everything provable from CI), with operational sign-off reserved for a field run on a real
+locked-down work PC. That sign-off is v0.18.1.
+
+**`v0.18.1` — the field-validated close-out, and the site moves again.** The work-PC run
+surfaced a live break: TSMIS had begun migrating its report dropdown from a flat list to
+grouped fly-out menus (already live on the dev site), where a leaf's visible text is just
+"Detail" / "Summary" and the report's real identity lives in a stable `data-value`. The
+exporter had always matched the menu by visible text, so Intersection export broke the
+moment the menu changed. The fix matches by **`data-value` first** (falling back to text
+for the old flat menu) and reveals the fly-out before clicking — so exports keep working on
+**both** the current production menu and the new grouped one, with nothing for the user to
+do when prod follows. The same migration was the cue to reorganize the app's own picker to
+**mirror the website's grouping** (flat Highway Log / PDF / Sequence, then Ramp and
+Intersection families) and to lay **reserved-but-disabled groundwork** for the two reports
+the site is about to add — **Highway Detail** and **Highway Summary**, listed greyed as
+"coming soon," with append-only stable ids, rejected server-side until the site enables
+them. Two smaller things rode along: the matrix job queue no longer leaves a phantom chip
+after a drained job, and a comparison column mislabeled "Roadbed" was corrected to **"Route
+Suffix"** (it flags a route's letter suffix, e.g. 210U vs 210 — figures unchanged).
+Released from the branch; the `main` reconciliation was deliberately left as a separate
+decision.
+
 ---
 
 ## Three threads that run through all of it
@@ -253,10 +318,13 @@ environment check found missing, before you waste an export on it.
    window, Mark-of-the-Web crashing the CLR on download, PowerShell-blocked PCs
    breaking the updater — three separate "worked on my machine, then a real
    Caltrans PC ate it" failures, each now a permanent design constraint.
-2. **Refactor toward one core.** One `ReportSpec` loop serves six reports; one
-   `compare_core` serves two comparison families; one registry feeds both the GUI
+2. **Refactor toward one core.** One `ReportSpec` loop serves eight reports; one
+   `compare_core` serves two comparison families; one catalog feeds both the GUI
    and the console. The shells (Tkinter → WebView2) were swappable *because* the
-   engine stayed console-free.
+   engine stayed console-free — and v0.18.0 took the idea furthest, dissolving
+   `common.py` into an acyclic set of guardable leaves and deriving the entire
+   registry from a single source of truth, all with `compare_core` left
+   byte-for-byte intact.
 3. **It's honest about dead ends.** The reverts aren't hidden — five Edge-login
    attempts were tried, reverted, parked as a known issue, and later beaten
    properly.

@@ -10,6 +10,17 @@
 > This doc is the **handoff**: how to gather evidence on the work PC, the manual fallback, the
 > per-item acceptance checklist, and the v0.18.1 plan that consumes the evidence.
 
+> **STATUS — v0.18.1 SHIPPED (2026-06-26).** The close-out release is committed, tagged, and published
+> from the branch (commit `e2bfade`; `release.yml` published the 3 zips + `.sha256`). It fixed **two
+> work-PC field bugs** found on the v0.18.0 build — **(1)** the Intersection dropdown break on the site's
+> new nested report menu (now selected by stable `data-value` + a `cs-submenu` fly-out reveal; prod-safe),
+> and **(2)** the matrix queue phantom — plus three layered asks (website-style report grouping, Highway
+> Detail/Summary reserved-disabled groundwork, `wait_js` validation) and the Intersection Detail
+> "Roadbed"→"Route Suffix" rename. All offline checks + both frozen self-tests passed; `compare_core` is
+> untouched. **Still owed (the actual field sign-off):** the §3 live acceptance below — now including a
+> **live confirmation of the two field-bug fixes** on the work PC — plus the `main` reconciliation
+> ([roadmap.md](roadmap.md) → *Branch / release hygiene*). §4 below is the process that was followed.
+
 The work PC reality (why this is needed): real users run locked-down Caltrans PCs — no
 PowerShell, cmd, admin, temp scripts, or scheduled tasks; only "an unsigned exe from a
 user-writable folder." The personal dev PC can't reach the TSMIS intranet, so the live export /
@@ -102,6 +113,12 @@ Those are the credential / private-content paths the collector deliberately excl
 v0.18.1 is accepted when the returned evidence confirms each item. Disposable destinations only
 (no disk-full induction); never live-credential / profile access in dev.
 
+- [ ] **v0.18.1 field-bug fixes (live)** — confirm on the work PC against the live dev site:
+      **Intersection export now selects** on the nested `cs-submenu` report menu (the `data-value` fix),
+      and the **matrix / by-day queue chip clears** after a job drains (the queue-phantom fix). These are
+      the two original field bugs; the offline fixtures (`dropdown_nested.html`, the `check_matrix_bridge`
+      push-spy) are locked — this confirms them on the real site. Re-confirm the flat **prod** menu still
+      selects, too.
 - [ ] **P8c live paths** — exact `select_report` (no substring mis-pick), CDP open-on-demand then
       close-on-capture, cancel-in-recover latency — verified against the returned logs.
 - [ ] **Carried live-verify (§M)** — P1 partial-keeps-last-good on a **real** refresh; P2

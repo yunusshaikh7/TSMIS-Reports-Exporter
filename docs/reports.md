@@ -19,7 +19,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
 
-The catalog (`scripts/report_catalog.py`) is the single source of truth for report metadata (P4); `reports.py` derives `EXPORT_REPORTS` from it, feeding the GUI checkboxes and `export_multi.py`, so the list can't drift. The `.bat` menus keep their own text, with a registry-parity check for the consolidate menu (`build/check_report_catalog.py`). Display order in the GUI / console numbering follows `EXPORT_REPORTS` order. Each row is `(menu label, format hint, ReportSpec)`.
+The catalog (`scripts/report_catalog.py`) is the single source of truth for report metadata (P4); `reports.py` derives `EXPORT_REPORTS` from it, feeding the GUI checkboxes and `export_multi.py`, so the list can't drift. The `.bat` menus keep their own text, with a registry-parity check for the consolidate menu (`build/check_report_catalog.py`). Each row is `(menu label, format hint, ReportSpec)`. **Console** numbering follows `EXPORT_REPORTS` order; the **GUI picker** is grouped to mirror the website — its order comes from the catalog's `_PICKER_ORDER` / `picker_order()` and each entry's optional `group` + `short_label` (v0.18.1; see [Report grouping & site-menu-safe selection](#report-grouping--site-menu-safe-selection-v0181) below).
 
 ## `ReportSpec` -- what makes one report differ from another
 
@@ -27,7 +27,8 @@ Defined in `scripts/exporter.py`. Each report's differences live in a `ReportSpe
 
 | Field | Type | Meaning |
 |---|---|---|
-| `label` | str | EXACT `#customReport` dropdown text (e.g. `"TSAR: Ramp Summary"`) |
+| `label` | str | the `#customReport` option's full text / `data-label` (e.g. `"TSAR: Ramp Summary"`); used as the **fallback** match when `data_value` is unset/unmatched, and as the menu-display label |
+| `data_value` | str \| None | the site's **stable option id** — the `<li>`'s `data-value` (== the hidden native `<select>` value, e.g. `"Ramp_Summary"`, `"intersection_detail"`). Matched **FIRST** (v0.18.1) so selection survives the site's flat→nested report-menu migration; `None` ⇒ fall back to `label` text/`data-label`. |
 | `subdir` | str | output subfolder name (`output/<run>/<subdir>/`) |
 | `filename` | `route -> str` | output file name for a route |
 | `wait_js` | `route -> str` | JS that resolves when the report is READY **or** empty (post-Generate wait) |
@@ -84,9 +85,10 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 - **Enabled since v0.17.0** (on the **development** site — Settings ▸ "Use development site"). Both
   export, **consolidate, and compare** (cross-environment + vs-TSN) like every other report, and live
   in both matrices. The old app-wide disable gate still EXISTS as defensive groundwork —
-  `reports.is_export_disabled()` over `DISABLED_EXPORT_SUBDIRS` (a set, now **empty**),
-  `export_reports_status()`'s per-report `disabled` flag, the JS `.option-static` rendering — but with
-  the set empty nothing is greyed. As of P3 the GUI/manifests pass **stable export-op KEYS** (= each
+  `reports.is_export_disabled()` over `DISABLED_EXPORT_SUBDIRS`,
+  `export_reports_status()`'s per-report `disabled` flag, the JS `.option-static` rendering. Intersection is
+  **not** in the set (enabled since v0.17.0); as of v0.18.1 the set holds the two reserved **Highway
+  Detail/Summary** subdirs, which it greys (see [Report grouping & site-menu-safe selection](#report-grouping--site-menu-safe-selection-v0181) above). As of P3 the GUI/manifests pass **stable export-op KEYS** (= each
   report's `subdir`; `idx` is display-order metadata only), so a registry re-order never mis-resumes.
   Locked by `build/check_intersection_gate.py` (now registry-derived).
 - **Consolidate + compare:** `consolidate_intersection_summary` (category-count summer) and
@@ -109,11 +111,36 @@ The exact parallel of Report 4b (Highway Log (PDF)), forward-ported in v0.18.0 (
 - **Consolidator:** `consolidate_tsmis_intersection_detail_pdf.py` parses the PDF route exports into the SAME 36-column format (`intersection_detail_columns.HEADER`, Description at index 21) as the Excel export — a two-row-per-record / zebra-shaded PDF parser. Like HL-PDF it is NOT auto-consolidated inline (it needs a scratch convert dir — the matrix handles it). **Comparators:** `compare_intersection_detail_pdf` — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, reusing the Excel Intersection Detail's vs-TSN schema/loaders.
 - Verified offline against the fake-site fixture (`build/check_intersection_detail_pdf.py`, `build/fake_site/intersection_detail_print.html`). **Live-export verification against TSMIS is owed in v0.18.1** (the dev PC can't reach the dev site).
 
+## Report grouping & site-menu-safe selection (v0.18.1)
+
+Two related changes track how TSMIS presents its report dropdown, which is migrating from a **flat** list to **grouped fly-out menus** (live on the dev site; prod to follow).
+
+### Selecting a report by stable `data_value`, not visible text
+
+The `#customReport` dropdown is moving from flat `li.cs-option` rows (whose visible text **was** the full report name) to nested **`cs-parent` → `cs-submenu`** fly-outs, where a leaf's visible text is just **"Detail" / "Summary"**, the full name sits in `data-label`, and the report's stable id sits in **`data-value`** (== the hidden native `<select>` value). Matching by visible text broke the moment the menu changed (a leaf reads "Detail", not "Intersection Detail").
+
+`report_nav._find_exact_option(page, label, data_value=None)` now matches by **`data-value` first** (exactly one hit wins), falling back to exact `text` / `data-label` for the old flat menu. `_reveal_submenu_if_leaf` hovers the option's `cs-parent` ancestor to open the fly-out before clicking (submenus reveal on CSS `:hover` only). `select_report` / `preflight` thread the spec's `data_value` through; the env-scan probe (`gui_worker._REPORT_OPTIONS_JS` + `check_one`) matches the same way and weighs the parent fly-out's disabled class. **Prod-safe by construction:** a `data_value` match is preferred, but an unset/unmatched `data_value` behaves exactly as the old text match — so the current flat prod menu is unaffected, and exports keep working across the changeover with nothing for the user to do. Locked by the synthetic `build/fake_site/dropdown_nested.html` (driven by `check_fake_site` + `check_export_engine`); each `ReportSpec` carries its `data_value` (see the field table above). The `cs-disabled` rule below is unchanged.
+
+### The picker is grouped like the website
+
+The GUI report picker mirrors the site's own grouping: **flat** Highway Log, Highway Log (PDF), and Highway Sequence at the top (the site's order), then the **Ramp** and **Intersection** families under their own headings. Order + grouping are catalog-driven, not UI-hardcoded: each `ExportEntry` carries an optional `group` + `short_label`, and `report_catalog._PICKER_ORDER` (exposed as `picker_order()`, import-asserted to cover every export key) fixes the display sequence. `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload by `PICKER_ORDER` and sets each entry's `idx` = its **display position** (no app code reads `idx` — it's parity-check metadata only), plus `group` and `short` (the short leaf label, e.g. "Detail"). `ui/app.js` emits an `.option-group` header on each group change and shows `short || label` (indented under its group). Both the Export picker and Export-Everything use the one `fillReportList()`.
+
+### Highway Detail / Highway Summary — reserved, DISABLED groundwork
+
+The site is about to add two more TSAR reports, **Highway Detail** and **Highway Summary**. v0.18.1 scaffolds them across the app but leaves them **not usable**, mirroring the site's own `cs-disabled`:
+
+- **Stub modules** `export_highway_detail.py` / `export_highway_summary.py` — each a valid `ReportSpec` (label, `subdir`, `data_value` = the site id, placeholder `wait_js`/`is_empty` modeled on Highway Log) but with `save = _save_not_implemented`, which **raises** (fail-loud if prematurely enabled); `__main__` refuses to run.
+- **Catalog** appends two `ExportEntry` (group `"Highway"`, short "Detail"/"Summary") — **append-only** stable ids at positions **8 / 9** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`); `_PICKER_ORDER` lists them last. `app.spec` `APP_MODULES` +2.
+- **One gate** greys them: `reports.DISABLED_EXPORT_SUBDIRS = {"highway_detail", "highway_summary"}` — shown greyed ("— not yet available") in the picker, dropped from the enabled / library lists, and rejected server-side by the `start_*` guards.
+- They have **no consolidator / comparator / TSN entry**, so they're absent from the matrices, Consolidate, and Compare (the env matrix stays 8 rows). Locked by `check_intersection_gate` (gate premise: holds exactly the reserved Highway pair, N−2 enabled, the pair greyed), `check_stable_ids` (append-only 8/9), and `check_report_catalog`.
+
+To enable later: drop them from `DISABLED_EXPORT_SUBDIRS`, finalize each stub spec against the live page, and add their consolidators + comparators + `tsn_library` entries (tracked in [roadmap.md](roadmap.md)).
+
 ## `cs-disabled` -- the site can temporarily disable a report (EXPECTED)
 
 TSMIS can temporarily disable individual reports from exporting, **by design (server-side)**. The site greys a disabled report's `<li>` with the `cs-disabled` class. This is NOT a bug -- on the live build the TSAR Ramp Summary + Ramp Detail `<li>` carried `cs-disabled` (observed in the captured live-site source — off-repo, not in this codebase), and the maintainer confirmed this is the intended on-site mechanism. If a report shows up greyed, that's normal, not breakage.
 
-- **`select_report` (`common.py`)** clicks `#customReport`, finds the report's `li.cs-option`, reads its classes, and if `cs-disabled` is present **raises `ReportUnavailableError`** (a `PreflightError` subclass) with a specific message: *"<report> is currently unavailable on the TSMIS site (the report is temporarily turned off there). Try another report, or try this one again later."* A disabled `<li>` has no `pointer-events:none`, so a Playwright click would silently no-op and the run would stall ~30 s into a generic preflight error -- `ReportUnavailableError` turns that into one clear "currently unavailable" message, surfaced as-is by `preflight` (it does not re-wrap it as "the page looks different").
+- **`select_report` (`report_nav`, re-exported by `common.py`)** clicks `#customReport`, locates the report's option (by `data-value` first, then exact text / `data-label` — see [Report grouping & site-menu-safe selection](#report-grouping--site-menu-safe-selection-v0181)), reveals the `cs-submenu` fly-out if it's a leaf, reads the option's classes (and its parent fly-out's), and if `cs-disabled` is present **raises `ReportUnavailableError`** (a `PreflightError` subclass) with a specific message: *"<report> is currently unavailable on the TSMIS site (the report is temporarily turned off there). Try another report, or try this one again later."* A disabled `<li>` has no `pointer-events:none`, so a Playwright click would silently no-op and the run would stall ~30 s into a generic preflight error -- `ReportUnavailableError` turns that into one clear "currently unavailable" message, surfaced as-is by `preflight` (it does not re-wrap it as "the page looks different").
 - **The env-access scan** (Settings > Check all environments) reads the dropdown's per-report availability for every `EXPORT_REPORTS` row, so any label drift or temporary disable shows up there as "missing"/greyed without running an export. Owned by [it-and-security.md](it-and-security.md); also see the env scan / `EmptyExport` / no-download fast-fail details in [engine-and-reliability.md](engine-and-reliability.md).
 
 ## Report-related Common Issues
@@ -131,9 +158,9 @@ For timeouts (`REPORT_TIMEOUT_MS`, `DOWNLOAD_START_TIMEOUT_MS`, etc.) and the fa
 
 ## Recipe: add a new report type
 
-1. **`scripts/export_<name>.py`** -- a `ReportSpec` (`label` = exact dropdown text, `subdir`, `filename`, `wait_js`, `is_empty`, `save` -- reuse `save_pdf_letter` / `save_via_export_button`) + `run_cli(SPEC, title=...)`.
+1. **`scripts/export_<name>.py`** -- a `ReportSpec` (`label` = the option's text / `data-label`, **`data_value`** = the option's stable `data-value` id, `subdir`, `filename`, `wait_js`, `is_empty`, `save` -- reuse `save_pdf_letter` / `save_via_export_button`) + `run_cli(SPEC, title=...)`.
 2. Add a branch to `3. run_export...bat` and `5. fast export...bat`.
-3. Add one `ExportEntry` to `report_catalog.py` (the metadata SoT — `reports.py` derives `EXPORT_REPORTS`; feeds GUI + `export_multi`). Update the frozen baseline in `build/check_report_catalog.py`.
+3. Add one `ExportEntry` to `report_catalog.py` (the metadata SoT — `reports.py` derives `EXPORT_REPORTS`; feeds GUI + `export_multi`; set an optional **`group` + `short_label`** to place it under a picker family + add it to `_PICKER_ORDER`, else it lists flat). Update the frozen baseline in `build/check_report_catalog.py`.
 4. List the new export module **and** any new flat module in `APP_MODULES` in `build/app.spec` (lazy imports need it; `check_app_modules` enforces completeness).
 5. Add the report's fixtures to `scripts/ui/mock.js` (the `#mock` GUI preview reads its report lists from there, **not** `app.js`; `check_report_catalog` checks mock parity).
 6. Add `output/<name>/.gitkeep`, whitelist in `.gitignore`.

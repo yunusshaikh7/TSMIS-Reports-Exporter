@@ -4,6 +4,26 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
+> **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
+> the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published
+> the 3 zips + `.sha256`). **(A)** report-dropdown selection by stable **`data-value`** + reveal the nested
+> `cs-submenu` fly-out — survives the TSMIS site's flat→nested report-menu migration (live on **dev**, prod
+> to follow) WITHOUT breaking the flat **prod** menu; **(B)** the matrix **queue-phantom** fix (push state
+> on every queue mutation); **(C)** **`wait_js`** config-error validation (the §J2 carried-forward item,
+> now CLOSED in code — see below); **(D)** **website-style report grouping** (flat Highway Log/PDF/Sequence
+> + Ramp/Intersection groups; catalog `_PICKER_ORDER` + short leaf labels); **(E)** **Highway
+> Detail/Summary reserved-DISABLED groundwork** (append-only stable ids 8/9, stub specs that refuse to save,
+> greyed "coming soon" picker, absent from matrix/compare/consolidate); + the Intersection Detail
+> **"Roadbed"→"Route Suffix"** comparison-column rename. All offline checks + both frozen self-tests green;
+> **`compare_core` untouched**.
+>
+> **Still owed (each a separate, user-gated decision):** **`main` reconciliation** — `origin/main` is still
+> ≈ v0.17.8 and diverged (the v0.17.2–v0.17.8 line was forward-ported, not merged; branch 27 ahead / 11
+> behind, split at `d2ee353`); make `main` = v0.18.x via an **`-s ours` supersede merge** OR a
+> **force-update**, **never a blind merge** (see *Standing* below) · **work-PC LIVE verification** of the
+> two field bugs (Intersection export on the nested dev menu; the matrix queue clears) · **Highway
+> Detail/Summary enablement** when the site turns them on (see *Feature backlog*).
+
 > **v0.18.0 — structural & engineering overhaul (the offline-validated CANDIDATE).** A large internal
 > refactor (engine leaf split / `common.py` shim, the outcome + transactional-artifact contracts, a
 > report-catalog SoT, the GUI endpoint split + front-end modularization, the regression-locked
@@ -95,16 +115,18 @@ checkboxes in the *Next patch* section below — that list is the historical wor
   P8c live paths, the P10 v0.17→v0.18 self-update, **and the Intersection Detail (PDF) live reconciliation**).
   Full checklist: [work-pc-validation.md](work-pc-validation.md) §3.
 
-**Discovered during P11 (docs reconciliation) — NOT closed in code:**
-- `wait-js-fstring-interpolation-unvalidated` (P3) — the plan's §J2 recorded this as Resolved in P8b, but at
-  HEAD `exporter.py` still interpolates `spec.wait_js(route)` into the wait JS with **no config-error
-  validation** (no validator; no locking check). A malformed spec still reads as a route timeout. **Carried
-  forward** to v0.18.1 hardening — do not claim it resolved until the validator + a `check_export_engine`
-  case land.
+**Discovered during P11 (docs reconciliation):**
+- `wait-js-fstring-interpolation-unvalidated` (P3) — **RESOLVED in v0.18.1.** The plan's §J2 had recorded
+  this Resolved in P8b, but at the v0.18.0 HEAD `exporter.py` still interpolated `spec.wait_js(route)` with
+  **no config-error validation**. v0.18.1 added `exporter._build_wait_condition(spec, route)`, which
+  validates the spec's `wait_js` is a non-empty JS arrow string before interpolating and otherwise raises a
+  clear `PreflightError` + `log.error` (instead of a cryptic Playwright eval error / a full route timeout).
+  `route` is app-controlled, so this is a config tripwire, not input sanitization. Locked by
+  `check_export_engine.test_wait_condition_validation`.
 - `non-hl-loaders-dont-collapse-tab-whitespace` (CR-002) — the Highway Log and Highway Sequence vs-TSN
   loaders collapse tab/whitespace at load, but **Ramp Detail and Intersection Detail do not**. A known
-  normalization inconsistency; **deferred** (low impact — the locked counts stand). Revisit if a tab-bearing
-  value ever causes a spurious diff.
+  normalization inconsistency; **still deferred** (low impact — the locked counts stand). Revisit if a
+  tab-bearing value ever causes a spurious diff.
 
 **Hard-deferred (each needs an explicit separate user decision — RM06):**
 - **DPAPI at-rest auth** (O2 / `auth-file-plaintext-no-acl-dpapi`) — DPAPI breaks `storage_state_is_portable`;
@@ -423,10 +445,30 @@ or accept as someday.**
   district→routes / county→routes mapping, likely sourced live from how the site repopulates the
   route dropdown after a district/county pick. **Most research-heavy — do a small site-behavior
   spike before committing to a UX.**
+- [ ] **Highway Detail / Highway Summary — enable** [M] — the TSMIS site is adding two new TSAR reports
+  (`highway_detail` / `highway_summary`); **v0.18.1 shipped the reserved-DISABLED groundwork** (append-only
+  stable ids 8/9; stub `export_highway_detail.py` / `export_highway_summary.py` whose `save` raises; a greyed
+  "coming soon" picker entry under the Highway group; absent from matrix / Compare / Consolidate; in
+  `reports.DISABLED_EXPORT_SUBDIRS`). **To enable when the site turns them on:** drop both from
+  `DISABLED_EXPORT_SUBDIRS`, finalize each stub `ReportSpec` (`save` / `wait_js` / `is_empty`) against the
+  live page, and add their consolidators + vs-TSN / cross-env comparators + `tsn_library` entries. Until
+  then they stay greyed (mirrors the site's own `cs-disabled`). The selection path already handles their
+  `data_value` (v0.18.1).
 
 ---
 
 ## Standing & cross-cutting (open)
+
+### Branch / release hygiene
+- [ ] **Reconcile `main` to v0.18.x** — `origin/main` is still ≈ **v0.17.8** and **diverged**: the
+  v0.17.2–v0.17.8 Intersection-Detail line was **forward-ported** (re-implemented commit-by-commit) onto the
+  `refactor/v0.18.0-structural-overhaul` branch, not merged, so histories split at `d2ee353` (the branch is
+  **27 ahead / 11 behind** `origin/main`). **v0.18.0 + v0.18.1 were released from the branch** (both tags
+  pushed; the releases are live). Make `main` = v0.18.x via an **`-s ours` supersede merge** (no force-push;
+  the v0.17.x commits stay reachable on their tags) OR a **force-update** (`git branch -f main <tip>` +
+  `push --force`; the v0.17.x commits then live only on their tags). **Never a blind `git merge`** — it
+  conflicts and risks reintroducing the pre-refactor structure the overhaul dismantled. A separate decision
+  when the user is ready.
 
 ### Security / IT
 - [ ] **Code-sign the executable** — the one big remaining IT lever (removes most Defender / DLP /
@@ -468,7 +510,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.18.0 candidate)
+### Version buckets — reconciled to reality (current: v0.18.1, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -480,7 +522,8 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.16.0–0.16.1** ✅ | Jun 19 | Matrix **queue + fast mode**; the Compare-tab **vs-TSN-by-day** matrix; pause/skip/preview, reused consolidated, opt-in formulas; Intersection **export** + dev-site switch. |
 | **v0.17.0** ✅ | Jun 20 | **All-report TSN + cross-env comparison** (every report × {env, TSN} + HL PDF↔Excel); Intersection **consolidators**; **canonical TSN library** + Settings panel; one-stop **Export-today** by-day column; **login/browser overhaul** + **env-check matrix flags**; drag-reorder. |
 | **v0.17.1** ✅ | Jun 21 | Matrix-tab blank-space + cramped-options fixes; Stop/Clear interrupts a stuck sign-in; TSN picker default + self-documenting TSN library; gitignore security fixes. |
-| **v0.18.0** ◻ candidate | — | **Structural & engineering overhaul** (engine leaf split / `common.py` shim, the outcome + transactional-artifact contracts, report-catalog SoT, GUI endpoint split + front-end modularization, `compare_core` byte-identical) + **Intersection Detail (PDF)** (CR-002) + updater/packaging hardening + the work-PC evidence kit. **Offline-validated candidate; field sign-off → v0.18.1.** |
+| **v0.18.0** ✅ | Jun 26 | **Structural & engineering overhaul** (engine leaf split / `common.py` shim, the outcome + transactional-artifact contracts, report-catalog SoT, GUI endpoint split + front-end modularization, `compare_core` byte-identical) + **Intersection Detail (PDF)** (CR-002) + updater/packaging hardening + the work-PC evidence kit. Released as the offline-validated candidate. |
+| **v0.18.1** ✅ | Jun 26 | **Field-validated close-out** — site-menu-safe selection (pick by stable `data-value` + reveal the `cs-submenu` fly-out; prod-safe), website-style report grouping, Highway Detail/Summary reserved-disabled groundwork (stable ids 8/9), the matrix queue-phantom fix, `wait_js` validation, and the Intersection Detail "Roadbed"→"Route Suffix" rename. `compare_core` untouched. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're
