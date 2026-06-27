@@ -285,8 +285,9 @@ That eighth report arrived by an unusual route. While the refactor was underway,
 `v0.17.2`–`v0.17.8` (position-aligned dates, the signal-type crosswalk, a printed-report
 "Report View"). Rather than merge that line into the refactor and risk dragging back the
 structure it had just dismantled, every one of those commits was **forward-ported** —
-re-implemented on the refactor branch. The two histories diverged for good: `main` still
-reads v0.17.8, while the refactor branch carries the real present. v0.18.0 also introduced
+re-implemented on the refactor branch. The two histories diverged — `main` lagged at
+v0.17.8 while the refactor branch carried the real present — and stayed split until a
+post-v0.18.1 supersede merge finally reconciled them (below). v0.18.0 also introduced
 the project's **two-tier release model** — it is the *offline-validated candidate*
 (everything provable from CI), with operational sign-off reserved for a field run on a real
 locked-down work PC. That sign-off is v0.18.1.
@@ -307,8 +308,11 @@ the site is about to add — **Highway Detail** and **Highway Summary**, listed 
 them. Two smaller things rode along: the matrix job queue no longer leaves a phantom chip
 after a drained job, and a comparison column mislabeled "Roadbed" was corrected to **"Route
 Suffix"** (it flags a route's letter suffix, e.g. 210U vs 210 — figures unchanged).
-Released from the branch; the `main` reconciliation was deliberately left as a separate
-decision.
+Released from the branch. The long-standing `main` divergence was then closed for good: a
+`-s ours` **supersede merge** fast-forwarded `main` up to the v0.18.1 tree — no force-push,
+the forward-ported v0.17.2–v0.17.8 commits preserved as ancestry — and the now-redundant
+refactor branch was retired. `main` is the single line once more, caught up to the present
+it had been chasing since the overhaul began.
 
 ---
 
