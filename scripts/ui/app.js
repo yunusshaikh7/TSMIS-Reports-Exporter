@@ -195,7 +195,8 @@ document.addEventListener("contextmenu", (e) => e.preventDefault());
 // unpickable (disabled input + dataset.off so the lock-sweep leaves it alone).
 function makeReportRow(rep, checked, off, onChange) {
   const row = document.createElement("label");
-  row.className = "option-row" + (checked ? " checked" : "") + (off ? " option-static" : "");
+  row.className = "option-row" + (checked ? " checked" : "") + (off ? " option-static" : "")
+    + (rep.group ? " option-indent" : "");
   const cb = document.createElement("input");
   // dataset.key is the STABLE export-op key (rep.key), not the row position — so
   // selection no longer depends on registry order (P3), even though disabled rows
@@ -205,10 +206,12 @@ function makeReportRow(rep, checked, off, onChange) {
   const box = document.createElement("span");
   box.className = "checkbox"; box.appendChild(icon("i-check"));
   const name = document.createElement("span");
-  name.className = "option-name"; name.textContent = rep.label;
+  // Grouped reports show the short leaf label (e.g. "Detail") under their family
+  // header; flat top-level reports show the full label. (P-D)
+  name.className = "option-name"; name.textContent = rep.short || rep.label;
   if (off) {
     const note = document.createElement("span");
-    note.className = "option-static-note"; note.textContent = " — export-only (unavailable)";
+    note.className = "option-static-note"; note.textContent = " — not yet available";
     name.appendChild(note);
   }
   const chip = document.createElement("span");
@@ -222,6 +225,24 @@ function makeReportRow(rep, checked, off, onChange) {
   return row;
 }
 
+// Fill a report checklist from init.reports — already in PICKER order (the flat
+// top-level reports first in the TSMIS site's order, then each family contiguously).
+// Emit a family header (.option-group) whenever the group changes; flat reports get
+// none. `checkedFor(rep)` decides the initial tick; `onChange` fires on toggle. (P-D)
+function fillReportList(container, checkedFor, onChange) {
+  let lastGroup = null;
+  (S.init.reports || []).forEach((rep) => {
+    const g = rep.group || null;
+    if (g && g !== lastGroup) {
+      const head = document.createElement("div");
+      head.className = "option-group"; head.textContent = g;
+      container.appendChild(head);
+    }
+    lastGroup = g;
+    container.appendChild(makeReportRow(rep, checkedFor(rep), !!rep.disabled, onChange));
+  });
+}
+
 // ------------------------------------------------------ one-time build -----
 function buildStatic() {
   const init = S.init;
@@ -231,26 +252,19 @@ function buildStatic() {
   $("outputRoot").textContent = init.output_root;
   document.title = init.app_name;
 
-  // report checkboxes (first ticked by default, same as the old GUI).
-  // App-wide-disabled reports (rep.disabled — none today; the gate is empty since
-  // Intersection moved to the dev site) are SHOWN but greyed/unpickable:
-  // .option-static keeps them dim even when no task is running, and dataset.off
-  // keeps the lock-sweep from re-enabling them. Kept for any future gated report.
-  const list = $("reportList");
-  init.reports.forEach((rep, i) => {
-    const off = !!rep.disabled;
-    const row = makeReportRow(rep, !off && i === 0, off, updateReportCount);
-    list.appendChild(row);
-  });
+  // report checkboxes — grouped by family (P-D): flat reports first, then each
+  // family (Ramp / Intersection / Highway) under a header, mirroring the TSMIS
+  // site's grouped dropdown. App-wide-disabled reports (rep.disabled) are SHOWN
+  // but greyed/unpickable (.option-static + dataset.off). The first ENABLED report
+  // is ticked by default — the same default report as the old flat list.
+  const firstKey = (init.reports.find((r) => !r.disabled) || {}).key;
+  fillReportList($("reportList"),
+                 (rep) => !rep.disabled && rep.key === firstKey,
+                 updateReportCount);
   updateReportCount();
 
-  // B3: Export Everything — report-type + environment checklists (all enabled
-  // ones ticked; disabled ones shown greyed, never ticked).
-  init.reports.forEach((rep) => {
-    const off = !!rep.disabled;
-    const row = makeReportRow(rep, !off, off, updateBatchCount);
-    $("batchReportList").appendChild(row);
-  });
+  // B3: Export Everything — same grouping; every enabled report ticked, disabled greyed.
+  fillReportList($("batchReportList"), (rep) => !rep.disabled, updateBatchCount);
   (init.sources || []).forEach((s) => (init.envs || []).forEach((e) => {
     const row = document.createElement("label");
     row.className = "option-row checked";

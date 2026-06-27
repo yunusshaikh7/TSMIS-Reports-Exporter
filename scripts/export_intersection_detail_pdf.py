@@ -31,6 +31,7 @@ from exporter import ReportSpec, save_intersection_detail_pdf
 SPEC = ReportSpec(
     label="Intersection Detail",          # same dropdown option as the Excel export
     subdir="intersection_detail_pdf",
+    data_value="intersection_detail",     # same #customReport id as the Excel export
     filename=lambda route: f"intersection_detail_route_{route}.pdf",
     # Renders the SAME way as the Excel export: the action bar (Export button)
     # appears even on an empty route, plus the empty table row. Ready = Export

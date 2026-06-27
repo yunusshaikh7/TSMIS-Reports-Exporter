@@ -90,7 +90,7 @@ _RD_HEADER = ["Route", "PR", "PM", "Date of Record", "HG", "Area 4", "City Code"
 # effective-date column sits next to its type, the mainline/cross blocks carry both
 # eff-dates, and the intersecting-route block is added. Hand-written (the golden
 # tripwire stays independent of idt.SHARED_HEADER), so a future header drift is caught.
-_ID_HEADER = ["Route", "PR", "Roadbed", "PM", "Date of Record", "HG", "City Code", "R/U",
+_ID_HEADER = ["Route", "PR", "Route Suffix", "PM", "Date of Record", "HG", "City Code", "R/U",
               "INT Type Eff-Date", "INT Type", "Control Type Eff-Date", "Control Type",
               "Lighting Eff-Date", "Lighting", "ML Eff-Date", "ML Mastarm", "ML Left Chan",
               "ML Right Chan", "ML Traffic Flow", "ML Num Lanes", "ML 2nd Eff-Date",

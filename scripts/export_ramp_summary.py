@@ -16,6 +16,7 @@ from exporter import ReportSpec, save_pdf_letter
 SPEC = ReportSpec(
     label="TSAR: Ramp Summary",
     subdir="ramp_summary",
+    data_value="Ramp_Summary",            # stable #customReport id (flat + nested)
     filename=lambda route: f"tsar_ramp_summary_route_{route}.pdf",
     # Renders inline: ready when the route title appears, or "No ramps found".
     wait_js=lambda route: (

@@ -379,16 +379,19 @@ def test_markers():
 # --- cs-disabled detection in select_report ----------------------------------
 
 class _Opt:
-    """One #customReport li.cs-option: exact text + class attribute."""
+    """One #customReport li.cs-option: exact text + class, plus the optional
+    data-value (stable id) / data-label (full name) the nested flyout leaves carry."""
 
-    def __init__(self, text, cls):
+    def __init__(self, text, cls, data_value="", data_label=""):
         self._text, self._cls = text, cls
+        self._dv, self._dl = data_value, data_label
 
     def text_content(self):
         return self._text
 
     def get_attribute(self, name):
-        return self._cls if name == "class" else None
+        return {"class": self._cls, "data-value": self._dv,
+                "data-label": self._dl}.get(name)
 
     def __getattr__(self, name):              # click(), etc. -> no-op chain
         return lambda *a, **k: self
@@ -406,10 +409,11 @@ class _OptionList:
 
 
 class FakeDropdownPage:
-    """A dropdown of (text, class) options for select_report's exact-match read."""
+    """A dropdown of (text, class[, data-value, data-label]) options for
+    select_report's exact-match read."""
 
     def __init__(self, options):
-        self._opts = [_Opt(t, c) for t, c in options]
+        self._opts = [_Opt(*o) for o in options]
 
     def locator(self, sel, **k):
         if "li.cs-option" in sel:
@@ -460,6 +464,70 @@ def test_cs_disabled():
                   lambda: select_report(FakeDropdownPage(_DROPDOWN), "Duplicated Report"))
 
 
+# A nested-flyout dropdown (the pure-Python mirror of dropdown_nested.html): a
+# flat option plus leaves whose VISIBLE text is just "Detail"/"Summary", with the
+# full name in data-label and the stable id in data-value. Two visible "Detail"
+# rows prove the text read alone is ambiguous -- only data-value disambiguates.
+_DROPDOWN_NESTED = [
+    ("Highway Log", "cs-option", "highway_log", ""),
+    ("Detail", "cs-option cs-leaf", "intersection_detail", "Intersection Detail"),
+    ("Summary", "cs-option cs-leaf", "intersection_summary", "Intersection Summary"),
+    ("Detail", "cs-option cs-leaf cs-disabled", "highway_detail", "Highway Detail"),
+    ("Summary", "cs-option cs-leaf cs-disabled", "highway_summary", "Highway Summary"),
+]
+
+
+def test_data_value_match():
+    print("select_report data-value matching + data-label fallback (nested leaves):")
+    from report_nav import _find_exact_option
+    page = FakeDropdownPage(_DROPDOWN_NESTED)
+    # data-value picks the right leaf despite the duplicate visible text "Detail".
+    opt = _find_exact_option(page, "Intersection Detail", data_value="intersection_detail")
+    check("data-value picks the intersection_detail leaf",
+          opt.get_attribute("data-value") == "intersection_detail")
+    # No data_value -> fall back to data-label (the full name carried on a leaf).
+    opt2 = _find_exact_option(page, "Intersection Summary")
+    check("data-label fallback matches the full name (no data_value)",
+          opt2.get_attribute("data-value") == "intersection_summary")
+    # A data_value that matches nothing falls through to text/label; all-unknown
+    # -> PreflightError (a changed page), never a silent wrong pick.
+    expect_raises("unknown report -> PreflightError", common.PreflightError,
+                  lambda: _find_exact_option(page, "No Such Report", data_value="nope"))
+
+
+def test_nested_disabled():
+    print("select_report cs-disabled detection on a nested flyout leaf:")
+    page = FakeDropdownPage(_DROPDOWN_NESTED)
+    # The Highway group ships cs-disabled ("coming soon"); selecting it by its
+    # data-value still raises ReportUnavailableError at the class gate.
+    expect_raises("cs-disabled Highway leaf -> ReportUnavailableError",
+                  ReportUnavailableError,
+                  lambda: select_report(page, "Highway Detail", data_value="highway_detail"))
+
+
+def test_wait_condition_validation():
+    print("wait_js config-error validation (_build_wait_condition):")
+    from exporter import _build_wait_condition
+    good = ReportSpec(label="X", subdir="x", filename=lambda r: "x.xlsx",
+                      wait_js=lambda r: "() => true", is_empty=lambda p: False,
+                      save=lambda *a: None)
+    js = _build_wait_condition(good, "005")
+    check("valid arrow wait_js builds the wrapped condition",
+          js.startswith("() =>") and "=>" in js)
+    # A spec that forgot the arrow wrapper (returns a bare expression that the engine
+    # would try to CALL) is a config error — caught clearly, not as a route timeout.
+    bad = ReportSpec(label="BadReport", subdir="x", filename=lambda r: "x.xlsx",
+                     wait_js=lambda r: "document.ready", is_empty=lambda p: False,
+                     save=lambda *a: None)
+    expect_raises("non-arrow wait_js -> PreflightError (clear config error)",
+                  common.PreflightError, lambda: _build_wait_condition(bad, "005"))
+    # An empty wait_js likewise (never silently wrapped into broken JS).
+    bad2 = ReportSpec(label="BadReport2", subdir="x", filename=lambda r: "x.xlsx",
+                      wait_js=lambda r: "", is_empty=lambda p: False, save=lambda *a: None)
+    expect_raises("empty wait_js -> PreflightError", common.PreflightError,
+                  lambda: _build_wait_condition(bad2, "005"))
+
+
 def test_ensure_report_armed(monkeypatch):
     print("per-route stale-form re-arm guard (_ensure_report_armed):")
     from events import Events
@@ -468,7 +536,8 @@ def test_ensure_report_armed(monkeypatch):
         wait_js=lambda r: "() => true", is_empty=lambda p: False, save=lambda *a: None)
     calls = {"select": 0}
     monkeypatch(exporter, "select_report",
-                lambda page, label: calls.__setitem__("select", calls["select"] + 1))
+                lambda page, label, data_value=None:
+                    calls.__setitem__("select", calls["select"] + 1))
 
     # Happy path: the shown label already matches -> NO re-arm.
     monkeypatch(exporter, "current_report_label", lambda page: "Highway Log")
@@ -685,6 +754,9 @@ def main():
         test_process_route_empty_retry(monkeypatch, tmp)
         test_markers()
         test_cs_disabled()
+        test_data_value_match()
+        test_nested_disabled()
+        test_wait_condition_validation()
         test_ensure_report_armed(monkeypatch)
         test_pdf_empty_backstop()
         test_report_error_text()

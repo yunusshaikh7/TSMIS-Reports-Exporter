@@ -62,10 +62,10 @@ from common import (
 )
 from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPORTS, CONSOLIDATE_KEYS,
-                     CONSOLIDATE_REPORTS, EXPORT_REPORTS, compare_index_for_key,
-                     consolidate_index_for_key, enabled_export_reports,
-                     export_reports_status, is_export_disabled,
-                     resolve_export_keys)
+                     CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_REPORTS, PICKER_ORDER,
+                     compare_index_for_key, consolidate_index_for_key,
+                     enabled_export_reports, export_reports_status,
+                     is_export_disabled, resolve_export_keys)
 import artifact_store
 import outcome
 import contract
@@ -142,11 +142,19 @@ def _report_list_payload():
     _export_fmt = {label: fmt for label, fmt, _spec in EXPORT_REPORTS}
     return {
         # Every export report, with `disabled` marking the app-wide-disabled ones
-        # (Intersection): the UI shows those GREYED (not hidden). `key` is the stable
-        # export-op key the UI passes back (P3 / §C.5); `idx` is display-order only.
-        "reports": [{"key": spec.subdir, "idx": i, "label": label, "fmt": fmt,
-                     "disabled": disabled}
-                    for i, label, fmt, spec, disabled in export_reports_status()],
+        # (none today). The UI shows disabled rows GREYED (not hidden). `key` is the
+        # stable export-op key the UI passes back (P3 / §C.5); `idx` is the DISPLAY
+        # position in this list (not the registry order) — the UI keys off `key`, so
+        # idx is metadata only. `group`/`short` (P-D) drive the family-grouped picker.
+        # The list is ordered by PICKER_ORDER (flat reports first in the site's order,
+        # then the family groups), distinct from the registry order.
+        "reports": [{"key": spec.subdir, "idx": pos, "label": label, "fmt": fmt,
+                     "disabled": disabled,
+                     "group": EXPORT_DISPLAY.get(spec.subdir, (None, None))[0],
+                     "short": EXPORT_DISPLAY.get(spec.subdir, (None, None))[1]}
+                    for pos, (_i, label, fmt, spec, disabled) in enumerate(sorted(
+                        export_reports_status(),
+                        key=lambda t: PICKER_ORDER.index(t[3].subdir)))],
         # Each consolidate entry carries its INPUT file format for the tab badge: a
         # module's own INPUT_FMT (the PDF-input consolidators) wins, else the matching
         # export report's format, else Excel.

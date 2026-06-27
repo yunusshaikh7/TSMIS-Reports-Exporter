@@ -36,6 +36,11 @@ _V017_EXPORT_ORDER = (
     "ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
     "highway_log_pdf", "intersection_summary", "intersection_detail",
     "intersection_detail_pdf",
+    # v0.18.1 reserved groundwork (DISABLED) — appended, never inserted/reordered, to
+    # keep this == reports.EXPORT_KEYS. A v1 manifest could never carry these indices
+    # (they postdate the int-index era); if one somehow did, the loader rejects the
+    # disabled key rather than poisoning it.
+    "highway_detail", "highway_summary",
 )
 
 # Poison sentinel for a structurally-invalid saved entry. It is never a real export

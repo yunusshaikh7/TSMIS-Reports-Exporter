@@ -561,6 +561,14 @@ button, input, select { font-family: inherit; }
 .option-static-note { font-size: 11px; font-weight: 400; color: var(--muted-foreground); }
 .option-name { flex: 1; font-size: 13px; font-weight: 500; }
 
+/* family group headers in the report picker (Ramp / Intersection / Highway) and
+   the indented rows beneath them — mirrors the TSMIS site's grouped dropdown (P-D). */
+.option-group {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--muted-foreground); padding: 8px 4px 1px;
+}
+.option-row.option-indent { margin-left: 14px; }
+
 /* format chips */
 .chip {
   border-radius: 999px; padding: 2px 8px;

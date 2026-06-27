@@ -115,11 +115,19 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   locates Status/Diffs from the workbook header so flat vs grouped layouts both work
   (the F4/O4 fix); never hard-code A1/column indices.
 - **`report_catalog.py` is the report-metadata SoT**; `reports.py` is **derived** from
-  it (EXPORT/CONSOLIDATE/COMPARE lists, matrix rows, stable-ID lookups). Stable IDs are
-  immutable string keys; `batch_manifest._V017_EXPORT_ORDER` (the v1-index→key map) is
-  **append-only** — positions 0–6 are frozen, new reports append (Intersection Detail
-  (PDF) = index 7). Add a report by editing the catalog; `check_report_catalog` proves
-  the derivation. See [docs/reports.md](docs/reports.md).
+  it (EXPORT/CONSOLIDATE/COMPARE lists, matrix rows, stable-ID lookups, the picker
+  `group`/`short_label` + `_PICKER_ORDER`). Stable IDs are immutable string keys;
+  `batch_manifest._V017_EXPORT_ORDER` (== `EXPORT_KEYS`) is **append-only** — positions
+  0–7 frozen; v0.18.1 appended the reserved-but-**DISABLED** Highway Detail/Summary
+  groundwork at 8/9 (in `DISABLED_EXPORT_SUBDIRS`: shown greyed, rejected server-side,
+  absent from matrix/compare/consolidate). Add a report by editing the catalog;
+  `check_report_catalog` proves the derivation. See [docs/reports.md](docs/reports.md).
+- **Select reports by stable `data_value`, not visible text** (v0.18.1). `select_report`
+  and the env-scan probe match the `#customReport` option by its `data-value` (the site's
+  stable id) and reveal the `cs-submenu` flyout for a leaf, falling back to exact text/
+  `data-label`. This keeps exports working as the site migrates its report dropdown from a
+  flat list to grouped fly-outs (live on **dev**) WITHOUT breaking the current flat **prod**
+  menu. Each `ReportSpec` carries its `data_value`; the picker is grouped to mirror the site.
 - **Sync Playwright API** (not async); Playwright is **thread-affine** — only the
   owning thread may touch a page.
 - **Call the timeout ACCESSORS** (`report_timeout_ms()` etc.) in engine code, not the

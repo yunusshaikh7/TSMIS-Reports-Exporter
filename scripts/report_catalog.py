@@ -34,6 +34,9 @@ from export_highway_log_pdf import SPEC as _HIGHWAY_LOG_PDF_SPEC
 from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
 from export_intersection_detail import SPEC as _INT_DETAIL_SPEC
 from export_intersection_detail_pdf import SPEC as _INT_DETAIL_PDF_SPEC
+# Reserved groundwork (v0.18.1) — the coming "Highway" TSAR group; DISABLED, see below.
+from export_highway_detail import SPEC as _HIGHWAY_DETAIL_SPEC
+from export_highway_summary import SPEC as _HIGHWAY_SUMMARY_SPEC
 
 import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
@@ -57,7 +60,13 @@ import compare_highway_sequence_tsn as _cmp_highway_seq_tsn
 
 # Per-tier descriptors. `key` is the stable export/consolidation/comparison-op key
 # (P3 / §C.5); the rest is display + the module/adapter the op runs.
-ExportEntry = namedtuple("ExportEntry", "key label fmt spec")
+# `group` / `short_label` are report-PICKER display metadata (P-D, v0.18.1): the
+# family a report nests under (Ramp / Intersection / Highway) and the leaf label
+# shown under that header, or None for a flat top-level report shown by its full
+# label. Display-only — the stable key, EXPORT order, and the matrix/consolidate/
+# compare derivations are unaffected.
+ExportEntry = namedtuple("ExportEntry", "key label fmt spec group short_label",
+                         defaults=(None, None))
 ConsolidateEntry = namedtuple("ConsolidateEntry", "key label module")
 CompareEntry = namedtuple("CompareEntry", "key label adapter kind group")
 TsnEntry = namedtuple("TsnEntry", "subdir label raw_glob raw_kind consolidated_name builder")
@@ -70,8 +79,10 @@ TsnEntry = namedtuple("TsnEntry", "subdir label raw_glob raw_kind consolidated_n
 # Export tab / multi-export. The export-op key == the report-FAMILY key == the
 # spec's output `subdir` (asserted below).
 EXPORT = (
-    ExportEntry("ramp_summary", "TSAR: Ramp Summary", "PDF", _RAMP_SUMMARY_SPEC),
-    ExportEntry("ramp_detail", "TSAR: Ramp Detail", "Excel", _RAMP_DETAIL_SPEC),
+    ExportEntry("ramp_summary", "TSAR: Ramp Summary", "PDF", _RAMP_SUMMARY_SPEC,
+                group="Ramp", short_label="Summary"),
+    ExportEntry("ramp_detail", "TSAR: Ramp Detail", "Excel", _RAMP_DETAIL_SPEC,
+                group="Ramp", short_label="Detail"),
     ExportEntry("highway_sequence", "Highway Sequence Listing", "Excel", _HIGHWAY_SEQ_SPEC),
     ExportEntry("highway_log", "Highway Log", "Excel", _HIGHWAY_LOG_SPEC),
     # Same "Highway Log" dropdown option, saved as a PDF via the page's Print layout
@@ -81,13 +92,26 @@ EXPORT = (
     # Intersection Summary/Detail consolidate AND compare (cross-env + vs-TSN) as of
     # v0.17.0 — live in both matrices. Labels verified against the live page source:
     # NO "TSAR:" prefix, and Summary is an Excel export like Detail.
-    ExportEntry("intersection_summary", "Intersection Summary", "Excel", _INT_SUMMARY_SPEC),
-    ExportEntry("intersection_detail", "Intersection Detail", "Excel", _INT_DETAIL_SPEC),
+    ExportEntry("intersection_summary", "Intersection Summary", "Excel", _INT_SUMMARY_SPEC,
+                group="Intersection", short_label="Summary"),
+    ExportEntry("intersection_detail", "Intersection Detail", "Excel", _INT_DETAIL_SPEC,
+                group="Intersection", short_label="Detail"),
     # Same "Intersection Detail" dropdown option, saved as a PDF via the page's Print
     # layout (intd_printAll) instead of the Excel Export button — the exact parallel of
     # Highway Log (PDF). Appended LAST so the 7 existing export-op keys keep positions
     # 0–6 (the manifest-v1 integer-index compatibility contract, CR002-RM4).
-    ExportEntry("intersection_detail_pdf", "Intersection Detail (PDF)", "PDF", _INT_DETAIL_PDF_SPEC),
+    ExportEntry("intersection_detail_pdf", "Intersection Detail (PDF)", "PDF", _INT_DETAIL_PDF_SPEC,
+                group="Intersection", short_label="Detail (PDF)"),
+    # Reserved groundwork (v0.18.1): the coming "Highway" TSAR group (Highway Detail /
+    # Summary), cs-disabled on the dev site as of 2026-06-25. Appended LAST (stable-id
+    # append-only) and app-wide DISABLED (reports.DISABLED_EXPORT_SUBDIRS) — shown
+    # greyed in the picker, rejected server-side, and absent from the matrices /
+    # consolidate / compare (they have no adapter or consolidator yet). fmt is a
+    # placeholder (Excel) until the site enables the report.
+    ExportEntry("highway_detail", "Highway Detail", "Excel", _HIGHWAY_DETAIL_SPEC,
+                group="Highway", short_label="Detail"),
+    ExportEntry("highway_summary", "Highway Summary", "Excel", _HIGHWAY_SUMMARY_SPEC,
+                group="Highway", short_label="Summary"),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -230,6 +254,35 @@ def export_keys():
     return tuple(e.key for e in EXPORT)
 
 
+def export_display():
+    """`{export key: (group, short_label)}` — the report-PICKER grouping metadata.
+    `group` is the family a report nests under (Ramp / Intersection / Highway), or
+    None for a flat top-level report (Highway Log / Highway Log (PDF) / Highway
+    Sequence). `short_label` is the leaf label shown under a group header (e.g.
+    "Detail"), or None to show the full label. Display-only — the stable export key,
+    EXPORT order, and the matrix/consolidate/compare derivations are unaffected."""
+    return {e.key: (e.group, e.short_label) for e in EXPORT}
+
+
+# Report-PICKER display order (P-D): the order the Export-tab checklists render — the
+# flat top-level reports first in the TSMIS SITE's order (Highway Log, its PDF, then
+# Highway Sequence), then the TSAR family groups (Ramp, Intersection) in registry
+# order. DISTINCT from the registry/matrix order (the matrix keeps the PDF rows last);
+# every EXPORT key appears exactly once (asserted at import).
+_PICKER_ORDER = (
+    "highway_log", "highway_log_pdf", "highway_sequence",
+    "ramp_summary", "ramp_detail",
+    "intersection_summary", "intersection_detail", "intersection_detail_pdf",
+    # The reserved (disabled) Highway group renders last — "coming soon", greyed.
+    "highway_detail", "highway_summary",
+)
+
+
+def picker_order():
+    """The export keys in report-PICKER display order (see `_PICKER_ORDER`)."""
+    return _PICKER_ORDER
+
+
 def consolidate_rows():
     """`[(label, module), ...]` — the CONSOLIDATE_REPORTS shape."""
     return [(c.label, c.module) for c in CONSOLIDATE]
@@ -295,3 +348,7 @@ _assert_unique("COMPARE", compare_keys(), len(COMPARE))
 assert export_keys() == tuple(e.spec.subdir for e in EXPORT), "EXPORT key != spec.subdir"
 # Every auto-consolidator subdir is a real exportable family.
 assert {s for s, _m in _AUTO_CONSOLIDATOR} <= set(export_keys()), "auto-consolidator subdir is not an export key"
+# Every export key appears in the picker order exactly once (so a new report can't be
+# silently dropped from the Export-tab checklists).
+assert set(_PICKER_ORDER) == set(export_keys()) and len(_PICKER_ORDER) == len(EXPORT), \
+    "_PICKER_ORDER must cover every EXPORT key exactly once"

@@ -37,6 +37,7 @@ _ZERO_TOTAL = re.compile(r"total intersections\s*=\s*0\b")
 SPEC = ReportSpec(
     label="Intersection Summary",
     subdir="intersection_summary",
+    data_value="intersection_summary",    # stable #customReport id (flat + nested)
     filename=lambda route: f"intersection_summary_route_{route}.xlsx",
     # Ready when the Export button or the summary total line has rendered (the
     # summary is always shown, even at zero).

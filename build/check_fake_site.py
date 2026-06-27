@@ -279,6 +279,75 @@ def test_exact_match(page):
           isinstance(raised, common.PreflightError))
 
 
+def test_nested_menu(page):
+    print("nested flyout #customReport: select a leaf by data-value + reveal submenu:")
+    # The site is migrating #customReport to a nested menu: Highway Log / Highway
+    # Sequence stay flat, while Ramp / Intersection / Highway are flyout parents
+    # whose leaves have VISIBLE text "Detail"/"Summary", the full name in
+    # data-label, and the stable id in data-value. A leaf is hidden until its
+    # parent is hovered. select_report must match by data-value and reveal the
+    # flyout before clicking.
+    def _drive(label, data_value):
+        page.goto(_fixture_url("dropdown_nested.html"))
+        page.set_default_timeout(3000)
+        try:
+            select_report(page, label, data_value=data_value)
+        except Exception:  # noqa: BLE001 -- fails later at the missing District control
+            pass
+        finally:
+            picked = page.evaluate("() => window.__picked")
+            page.set_default_timeout(30000)
+        return picked
+
+    # Enabled leaf: chosen by data-value though its visible text is only "Detail".
+    check("nested: intersection_detail leaf selected via data-value",
+          _drive("Intersection Detail", "intersection_detail") == "Intersection Detail")
+    # A leaf whose stable id differs from our spec label (Ramp_Summary vs the
+    # "TSAR: Ramp Summary" display label, visible text just "Summary").
+    check("nested: Ramp_Summary leaf selected via data-value",
+          _drive("TSAR: Ramp Summary", "Ramp_Summary") == "Ramp Summary")
+    # A flat top-level option on the nested menu still selects with no flyout.
+    check("nested: flat highway_log selects without a flyout",
+          _drive("Highway Log", "highway_log") == "Highway Log")
+
+    # A cs-disabled leaf (the "coming soon" Highway group) -> ReportUnavailableError,
+    # raised at the class gate before any flyout reveal is needed.
+    page.goto(_fixture_url("dropdown_nested.html"))
+    raised = None
+    try:
+        select_report(page, "Highway Detail", data_value="highway_detail")
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("nested: cs-disabled Highway leaf -> ReportUnavailableError",
+          isinstance(raised, ReportUnavailableError))
+
+
+def test_env_scan_probe(page):
+    print("env-scan dropdown probe (_REPORT_OPTIONS_JS) on the nested menu:")
+    from gui_worker import _REPORT_OPTIONS_JS
+    page.goto(_fixture_url("dropdown_nested.html"))
+    # The background env scan probes #customReport by (label, data-value). On the
+    # nested menu a grouped leaf's visible text is only "Detail"/"Summary", so it
+    # must be found by data-value, and the cs-disabled Highway group read greyed.
+    probe = [
+        {"label": "Intersection Detail", "value": "intersection_detail"},
+        {"label": "TSAR: Ramp Summary",  "value": "Ramp_Summary"},
+        {"label": "Highway Log",         "value": "highway_log"},   # flat, no flyout
+        {"label": "Highway Detail",      "value": "highway_detail"},  # cs-disabled group
+        {"label": "Nonexistent Report",  "value": "nope"},
+    ]
+    opts = page.evaluate(_REPORT_OPTIONS_JS, probe)
+    check("grouped Intersection leaf found via data-value -> ok",
+          opts.get("Intersection Detail", {}).get("state") == "ok")
+    check("grouped Ramp leaf found via data-value -> ok",
+          opts.get("TSAR: Ramp Summary", {}).get("state") == "ok")
+    check("flat highway_log -> ok", opts.get("Highway Log", {}).get("state") == "ok")
+    check("disabled Highway group leaf -> greyed",
+          opts.get("Highway Detail", {}).get("state") == "greyed")
+    check("a report not on the menu -> missing",
+          opts.get("Nonexistent Report", {}).get("state") == "missing")
+
+
 def test_current_report_label(page):
     print("current_report_label reads the armed #customReport .cs-value:")
     page.goto(_fixture_url("dropdown_selected.html"))
@@ -421,6 +490,8 @@ def main():
             test_error_js(page)
             test_cs_disabled(page)
             test_exact_match(page)
+            test_nested_menu(page)
+            test_env_scan_probe(page)
             test_current_report_label(page)
             test_highway_log_pdf_save(page)
             test_intersection_detail_pdf_save(page)

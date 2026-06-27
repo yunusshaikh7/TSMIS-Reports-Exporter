@@ -1,0 +1,91 @@
+<!doctype html>
+<!--
+AUTHORED SYNTHETIC reconstruction of the NEW nested #customReport dropdown the
+TSMIS site is migrating to (seen on the dev site, BUILD_DATE 2026-06-25). NOT a
+copy of the Caltrans-internal source: it carries only the class names, data-*
+attributes, and flyout :hover behavior that select_report depends on.
+
+Mirrors the live structure:
+  * Highway Log / Highway Sequence Listing stay FLAT top-level cs-option rows.
+  * A non-selectable "TSAR Reports" cs-header.
+  * Highway / Intersection / Ramp are cs-parent flyout rows, each holding a
+    cs-submenu of cs-leaf options whose VISIBLE text is just "Detail"/"Summary",
+    the full name in data-label, and the stable id in data-value (== the value
+    the live page writes into its hidden native <select>).
+  * The Highway group ships cs-disabled (the "coming soon" Highway Detail/Summary).
+
+A leaf is hidden (display:none) until its parent row is hovered (CSS :hover only,
+no JS) -- so a selector that does not reveal the flyout cannot click a leaf. This
+is exactly the contract select_report's submenu-reveal must satisfy.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>dropdown: nested</title>
+  <style>
+    .cs-list { display: none; list-style: none; margin: 0; padding: 0; }
+    .cs.is-open .cs-list { display: block; }
+    .cs-option, .cs-parent, .cs-header { padding: 0.4rem 1.25rem; }
+    .cs-header { font-weight: 700; cursor: default; }
+    .cs-disabled { color: #9ca3af; cursor: default; }
+    /* Flyout parent rows and their submenus -- revealed on hover only. */
+    .cs-parent { position: relative; cursor: default; }
+    .cs-submenu {
+      display: none; position: absolute; left: 100%; top: -1px;
+      min-width: 11rem; background: #fff; border: 1px solid #003484;
+      list-style: none; margin: 0; padding: 0.25rem 0;
+    }
+    .cs-parent:hover > .cs-submenu { display: block; }
+  </style>
+</head>
+<body>
+  <div class="cs" id="customReport">
+    <div class="cs-trigger">
+      <span class="cs-value">-- Select report --</span>
+      <span class="cs-arrow">&#9660;</span>
+    </div>
+    <ul class="cs-list">
+      <li class="cs-option" data-value="highway_log">Highway Log</li>
+      <li class="cs-option" data-value="highway_sequence">Highway Sequence Listing</li>
+      <li class="cs-header">TSAR Reports</li>
+      <li class="cs-sub cs-parent cs-disabled">Highway
+        <ul class="cs-submenu">
+          <li class="cs-option cs-leaf cs-disabled" data-value="highway_detail"  data-label="Highway Detail">Detail</li>
+          <li class="cs-option cs-leaf cs-disabled" data-value="highway_summary" data-label="Highway Summary">Summary</li>
+        </ul>
+      </li>
+      <li class="cs-sub cs-parent">Intersection
+        <ul class="cs-submenu">
+          <li class="cs-option cs-leaf" data-value="intersection_detail"  data-label="Intersection Detail">Detail</li>
+          <li class="cs-option cs-leaf" data-value="intersection_summary" data-label="Intersection Summary">Summary</li>
+        </ul>
+      </li>
+      <li class="cs-sub cs-parent">Ramp
+        <ul class="cs-submenu">
+          <li class="cs-option cs-leaf" data-value="Ramp_Detail"  data-label="Ramp Detail">Detail</li>
+          <li class="cs-option cs-leaf" data-value="Ramp_Summary" data-label="Ramp Summary">Summary</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+  <script>
+    // Mirror the live widget: a click on an ENABLED option records its full name
+    // (data-label, else the visible text) into window.__picked and the cs-value,
+    // so a test can confirm WHICH option was chosen. Disabled options get no
+    // handler -- a click is a no-op there, as on the real page.
+    window.__picked = null;
+    const cs = document.getElementById('customReport');
+    const csValue = cs.querySelector('.cs-value');
+    cs.querySelector('.cs-trigger').addEventListener('click',
+      () => cs.classList.toggle('is-open'));
+    cs.querySelectorAll('.cs-option:not(.cs-disabled)').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const name = opt.dataset.label || (opt.textContent || '').trim();
+        window.__picked = name;
+        csValue.textContent = name;
+        cs.classList.remove('is-open');
+      });
+    });
+  </script>
+</body>
+</html>

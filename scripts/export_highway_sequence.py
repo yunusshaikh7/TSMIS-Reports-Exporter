@@ -23,6 +23,7 @@ _EMPTY_RE = re.compile(r"No \w+ found", re.I)
 SPEC = ReportSpec(
     label="Highway Sequence Listing",
     subdir="highway_sequence",
+    data_value="highway_sequence",        # stable #customReport id (flat + nested)
     filename=lambda route: f"highway_sequence_route_{route}.xlsx",
     wait_js=lambda route: (
         "() => { const t = document.body.innerText; "

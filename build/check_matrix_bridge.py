@@ -350,6 +350,29 @@ def main():
               a._task is None and not a._state_snapshot()["matrix_queue"])
         check("stop-all on an empty/idle queue is a no-op",
               a.matrix_stop_all().get("cleared") == 0)
+
+        print("no-work drop pushes fresh state (queue-phantom regression, v0.18.1):")
+        # The phantom: a job popped then DROPPED (no-work / dispatch error) mutated
+        # the queue but didn't push, so the frontend kept rendering the drained
+        # job's chip. The TRUE state is correct (checked above) — the gap is the
+        # missing NOTIFICATION. Spy the pushes and assert the LAST frontend-facing
+        # snapshot has no stale job. (The last push before the fix is _end_task's,
+        # taken BEFORE the no-work job is popped+dropped, so it still shows it.)
+        pushes = []
+        _orig_push = a._push_state
+        a._push_state = lambda: (pushes.append(a._state_snapshot()), _orig_push())[1]
+        try:
+            a.refresh_cell_export("ramp_detail", "ssor-prod")    # running
+            a.recompute_matrix("all", row="highway_log")         # no-work job queued
+            pushes.clear()                                       # only watch the drain
+            a._end_task()                                        # drains -> drop no-work job
+        finally:
+            a._push_state = _orig_push
+        check("a state push followed the no-work drop", len(pushes) >= 1)
+        check("the last pushed snapshot shows the queue cleared (no phantom chip)",
+              bool(pushes) and not pushes[-1]["matrix_queue"]
+              and pushes[-1]["matrix_current"] is None)
+        a._end_task() if a._task else None
     finally:
         (gui_matrix.MatrixCompareWorker, gui_matrix.MatrixBatchExportWorker,
          gui_matrix.MatrixTsnConsolidateWorker, gui_api.clear_auth,

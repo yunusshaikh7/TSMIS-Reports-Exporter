@@ -55,6 +55,8 @@ from export_highway_log_pdf import SPEC as _S_highway_log_pdf
 from export_intersection_summary import SPEC as _S_intersection_summary
 from export_intersection_detail import SPEC as _S_intersection_detail
 from export_intersection_detail_pdf import SPEC as _S_intersection_detail_pdf
+from export_highway_detail import SPEC as _S_highway_detail
+from export_highway_summary import SPEC as _S_highway_summary
 import consolidate_ramp_summary as _con_ramp_summary
 import consolidate_ramp_detail as _con_ramp_detail
 import consolidate_highway_sequence as _con_highway_sequence
@@ -95,6 +97,9 @@ _EXPORT = [  # (key, label, fmt, expected ReportSpec)
     ("intersection_summary", "Intersection Summary", "Excel", _S_intersection_summary),
     ("intersection_detail", "Intersection Detail", "Excel", _S_intersection_detail),
     ("intersection_detail_pdf", "Intersection Detail (PDF)", "PDF", _S_intersection_detail_pdf),
+    # v0.18.1 reserved Highway groundwork (DISABLED) — appended.
+    ("highway_detail", "Highway Detail", "Excel", _S_highway_detail),
+    ("highway_summary", "Highway Summary", "Excel", _S_highway_summary),
 ]
 _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:ramp_summary", "TSAR: Ramp Summary", _con_ramp_summary),
@@ -437,7 +442,9 @@ def _mock_objs(text, block_re):
         return None
     objs = []
     for chunk in m.group(1).split("}"):
-        fields = dict(re.findall(r'(\w+):\s*"([^"]*)"', chunk))
+        fields = dict(re.findall(r'(\w+):\s*"([^"]*)"', chunk))        # quoted string fields
+        for k, v in re.findall(r'(\w+):\s*(true|false)\b', chunk):     # boolean fields (e.g. disabled)
+            fields[k] = (v == "true")
         if fields:
             objs.append(fields)
     return objs
@@ -449,11 +456,11 @@ def test_mock_parity():
     be = gui_api._report_list_payload()                              # pure; NO GuiApi (P4-R05)
     mockjs = (ROOT / "scripts" / "ui" / "mock.js").read_text(encoding="utf-8")  # P9: mock moved app.js -> mock.js
 
-    # The mock export `disabled` literal lives in the init `.map(...)`, idx is the position.
-    dm = re.search(r"reports:\s*REPORTS\.map\([^\n]*disabled:\s*(\w+)", mockjs)
-    disabled = {"true": True, "false": False}.get(dm.group(1) if dm else "", None)
+    # idx is the position in the (picker-ordered) REPORTS array; `disabled` is per-entry
+    # (the map defaults it false, each entry may override — e.g. the reserved Highway pair).
     rep = _mock_objs(mockjs, r"const REPORTS = \[(.*?)\];")
-    fe_export = [(o["key"], i, o["label"], o["fmt"], disabled) for i, o in enumerate(rep or [])]
+    fe_export = [(o["key"], i, o["label"], o["fmt"], bool(o.get("disabled", False)))
+                 for i, o in enumerate(rep or [])]
     be_export = [(r["key"], r["idx"], r["label"], r["fmt"], r["disabled"]) for r in be["reports"]]
     check("mock export (key, idx, label, fmt, disabled) == bridge", fe_export == be_export)
 

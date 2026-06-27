@@ -17,6 +17,7 @@ from exporter import ReportSpec, save_via_export_button
 SPEC = ReportSpec(
     label="TSAR: Ramp Detail",
     subdir="ramp_detail",
+    data_value="Ramp_Detail",             # stable #customReport id (flat + nested)
     filename=lambda route: f"tsar_ramp_detail_route_{route}.xlsx",
     # Ready when the Export (download) button appears, or "No ramps found".
     wait_js=lambda route: (

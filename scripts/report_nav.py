@@ -24,12 +24,21 @@ from auth_nav import dump_auth_failure, page_url_for_display
 log = logging.getLogger("tsmis.auth")
 
 
-def _find_exact_option(page, report_label):
-    """Return the single #customReport option whose text is EXACTLY report_label.
+def _find_exact_option(page, report_label, data_value=None):
+    """Return the single #customReport option for this report.
 
-    Raises PreflightError (a "the page changed" condition) when zero or more than
-    one option matches — an exact-match guard against the old substring read that
-    could pick the wrong report when one label is a substring of another."""
+    Matches by the stable ``data-value`` first when the spec carries one. That
+    attribute is the value the site writes into its hidden native <select>, so it
+    is identical on the old FLAT menu and the new NESTED flyout, and it survives
+    the site relabelling a leaf's visible text (on the nested menu an
+    "Intersection Detail" leaf shows just "Detail", with the full name in
+    ``data-label``). Falls back to an EXACT match on the visible text OR the
+    ``data-label`` — the pre-existing guard, and the only path when the site
+    exposes no data-value.
+
+    Raises PreflightError (a "the page changed" condition) when the chosen key
+    matches zero or more than one option — a guard against the old substring read
+    that could pick the wrong report when one label is a substring of another."""
     options = page.locator("#customReport li.cs-option")
     try:
         count = options.count()
@@ -40,46 +49,87 @@ def _find_exact_option(page, report_label):
             "The TSMIS report list didn't load as expected — the page may have "
             "changed. Please contact the maintainer."
         ) from e
-    matches = []
+    # Read each option once: (locator, trimmed text, data-value, data-label).
+    rows = []
     for i in range(count):
         opt = options.nth(i)
         try:
             text = (opt.text_content() or "").strip()
+            dv = (opt.get_attribute("data-value") or "").strip()
+            dl = (opt.get_attribute("data-label") or "").strip()
         except Exception:
             continue                              # a transient read; skip this row
-        if text == report_label:
-            matches.append(opt)
-    if len(matches) != 1:
+        rows.append((opt, text, dv, dl))
+    # Priority 1: the stable data-value (flat + nested; relabel-proof).
+    if data_value:
+        hits = [opt for opt, _t, dv, _dl in rows if dv == data_value]
+        if len(hits) == 1:
+            return hits[0]
+        log.warning("select_report: data-value %r matched %d of %d options; "
+                    "falling back to the label text", data_value, len(hits), count)
+    # Priority 2: exact visible text OR data-label full name (the old behavior,
+    # plus data-label so a nested leaf showing only "Detail" still matches).
+    hits = [opt for opt, t, _dv, dl in rows if report_label in (t, dl)]
+    if len(hits) != 1:
         log.warning("select_report: expected exactly one %r option, found %d of %d",
-                    report_label, len(matches), count)
+                    report_label, len(hits), count)
         raise PreflightError(
             f"The TSMIS report list didn't offer exactly one “{report_label}” entry "
             "(it may have changed). Please contact the maintainer."
         )
-    return matches[0]
+    return hits[0]
 
 
-def select_report(page, report_label):
+def _reveal_submenu_if_leaf(page, option):
+    """Open the flyout for a nested-menu leaf so it can be clicked.
+
+    On the new nested #customReport, Ramp / Intersection / Highway are flyout
+    parents whose leaf <li> stays display:none until the parent row is hovered (a
+    CSS :hover rule, no JS) — so a click on a hidden leaf would time out. A flat
+    top-level option needs nothing. Best-effort: if the option isn't a leaf, or
+    the parent can't be found/hovered, just return and let the click proceed (it
+    surfaces a clear actionability error if the leaf really is hidden)."""
+    try:
+        classes = (option.get_attribute("class") or "").split()
+    except Exception:
+        return
+    if "cs-leaf" not in classes:
+        return                                    # a flat top-level option
+    try:
+        parent = option.locator(
+            "xpath=ancestor::li[contains(concat(' ', normalize-space(@class), ' '),"
+            " ' cs-parent ')][1]")
+        if parent.count() > 0:
+            parent.first.hover()                  # CSS :hover reveals the cs-submenu
+    except Exception as e:                        # never let the reveal stop a run
+        log.info("select_report: flyout reveal skipped (%s)", type(e).__name__)
+
+
+def select_report(page, report_label, data_value=None):
     """Pick a report from the #customReport dropdown then fan out
     District/County/Route to -- ALL --.
 
     report_label is the exact dropdown text, e.g. "TSAR: Ramp Summary".
+    data_value (optional) is the report's stable #customReport id (the value the
+    site writes into its hidden native <select>) — matched first when present so
+    selection is robust to the site's flat→nested menu migration and to a leaf's
+    visible text being relabelled.
 
     Raises ReportUnavailableError if the site has greyed the report out
-    (`cs-disabled`): TSMIS can temporarily disable a report from exporting, and
+    (`cs-disabled`): TSMIS can temporarily disable a report from exporting (and
+    marks the not-yet-available Highway group this way on the nested menu), and
     its disabled `<li>` has no `pointer-events:none`, so a Playwright click would
     silently no-op and the run would stall ~30 s into a generic preflight error.
     Detecting it here turns that into one clear "currently unavailable" message.
     """
     page.locator("#customReport").click()
-    # EXACT-match the dropdown option by its text. The old read used
-    # has_text=report_label -- a SUBSTRING match -- then took .first, so when one
-    # report's label is contained in another's (e.g. "Highway Log" inside "Highway
-    # Log (PDF)" / "Detailed Highway Log") it could silently pick the WRONG option,
-    # and with several matches it picked an arbitrary one. Enumerate the options and
-    # compare the trimmed text exactly; fail fast and clearly on zero or multiple
-    # matches (a changed page) so a run can never silently export the wrong report.
-    option = _find_exact_option(page, report_label)
+    # Match by the stable data-value when the spec carries one, else EXACT-match by
+    # text/data-label. The old read used has_text=report_label -- a SUBSTRING match
+    # then .first -- so when one report's label was contained in another's (e.g.
+    # "Highway Log" inside "Highway Log (PDF)" / "Detailed Highway Log") it could
+    # silently pick the WRONG option. _find_exact_option fails fast and clearly on
+    # zero or multiple matches so a run can never silently export the wrong report.
+    option = _find_exact_option(page, report_label, data_value)
     # The site greys a temporarily-disabled report with the cs-disabled class.
     try:
         classes = (option.get_attribute("class") or "").split()
@@ -94,6 +144,8 @@ def select_report(page, report_label):
             "(the report is temporarily turned off there). Try another report, "
             "or try this one again later."
         )
+    # On the nested menu a leaf is hidden until its parent flyout is hovered.
+    _reveal_submenu_if_leaf(page, option)
     option.click()
     page.get_by_role("button", name="District / County / Route").click()
     page.get_by_label("District").select_option(label="-- ALL --")
@@ -171,13 +223,13 @@ def report_error_text(page):
     return None
 
 
-def preflight(page, report_label):
+def preflight(page, report_label, data_value=None):
     """Confirm the report form looks as expected before a long run.
 
-    Selects the report, then verifies the Route control and Generate button are
-    present. Raises PreflightError (UI-neutral message) if anything is missing,
-    so a TSMIS change fails fast with one clear error instead of every route
-    failing cryptically.
+    Selects the report (by data_value when given), then verifies the Route control
+    and Generate button are present. Raises PreflightError (UI-neutral message) if
+    anything is missing, so a TSMIS change fails fast with one clear error instead
+    of every route failing cryptically.
     """
     if page.locator("#customReport").count() == 0:
         log.warning("preflight: #customReport (the report dropdown) is missing")
@@ -189,7 +241,7 @@ def preflight(page, report_label):
         )
     step = "selecting the report"
     try:
-        select_report(page, report_label)
+        select_report(page, report_label, data_value)
         step = "finding the Route control"
         page.get_by_label("Route", exact=True).wait_for(state="attached", timeout=15000)
         step = "finding the Generate button"

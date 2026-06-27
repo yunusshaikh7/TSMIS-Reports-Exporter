@@ -29,9 +29,12 @@ import gui_api
 
 _fail = []
 
-# DERIVED expected count — every export report is enabled by default (the gate is
-# empty). Adding a report flows through here without a literal edit.
+# DERIVED counts — adding a report flows through here without a literal edit. The
+# gate now holds the v0.18.1 reserved Highway groundwork (disabled), so NOT every
+# report is enabled.
 N_REPORTS = len(reports.EXPORT_REPORTS)
+_RESERVED = {"highway_detail", "highway_summary"}   # v0.18.1 disabled groundwork
+N_ENABLED = N_REPORTS - len(_RESERVED)
 
 
 def check(name, cond):
@@ -41,42 +44,52 @@ def check(name, cond):
 
 
 def test_default_all_enabled():
-    print(f"default gate is empty — all {N_REPORTS} reports enabled (incl. Intersection):")
-    check("DISABLED_EXPORT_SUBDIRS is empty by default",
-          reports.DISABLED_EXPORT_SUBDIRS == set())
+    print(f"default gate = the reserved Highway pair; the other {N_ENABLED} reports enabled:")
+    check("DISABLED_EXPORT_SUBDIRS == the reserved Highway groundwork",
+          reports.DISABLED_EXPORT_SUBDIRS == _RESERVED)
     enabled = reports.enabled_export_reports()
-    check(f"all {N_REPORTS} export reports enabled", len(enabled) == N_REPORTS)
+    check(f"{N_ENABLED} export reports enabled (all but the reserved Highway pair)",
+          len(enabled) == N_ENABLED)
     subdirs = {spec.subdir for _i, _l, _f, spec in enabled}
-    check("Intersection Summary + Detail (+ the PDF variant) are now included",
+    check("Intersection Summary + Detail (+ the PDF variant) are enabled",
           {"intersection_summary", "intersection_detail", "intersection_detail_pdf"} <= subdirs)
+    check("the reserved Highway reports are NOT enabled", not (_RESERVED & subdirs))
     status = reports.export_reports_status()
-    check(f"all {N_REPORTS} present, none flagged disabled",
-          len(status) == N_REPORTS and not any(d for *_rest, d in status))
-    check("each idx maps back to its own EXPORT_REPORTS row",
+    disabled = {label for _i, label, _f, _s, d in status if d}
+    check(f"all {N_REPORTS} present; exactly the Highway pair flagged disabled",
+          len(status) == N_REPORTS and disabled == {"Highway Detail", "Highway Summary"})
+    check("each report's row maps back to its own EXPORT_REPORTS entry",
           all(reports.EXPORT_REPORTS[i] == (label, fmt, spec)
               for i, label, fmt, spec, _d in status))
 
 
 def test_gui_initial_state_all_enabled():
-    print(f"gui_api.get_initial_state (all {N_REPORTS} offered, none greyed):")
+    print(f"gui_api.get_initial_state (all {N_REPORTS} offered; the Highway pair greyed):")
     a = gui_api.GuiApi()
     a._started = True            # skip the one-time check/update worker launch
     init = a.get_initial_state()
     check(f"{N_REPORTS} reports offered", len(init["reports"]) == N_REPORTS)
-    check("none greyed by default", not any(r["disabled"] for r in init["reports"]))
+    check("exactly the reserved Highway pair greyed",
+          {r["label"] for r in init["reports"] if r["disabled"]}
+          == {"Highway Detail", "Highway Summary"})
     check("Intersection shown AND pickable",
           any("Intersection" in r["label"] and not r["disabled"]
               for r in init["reports"]))
-    check("idx values match EXPORT_REPORTS labels",
-          all(reports.EXPORT_REPORTS[r["idx"]][0] == r["label"]
-              for r in init["reports"]))
+    # Each payload report's label matches its stable KEY's registry row. The list is
+    # in PICKER display order now, so idx is NOT a registry index — verify by key.
+    _label_by_key = {spec.subdir: label for label, _f, spec in reports.EXPORT_REPORTS}
+    check("each report's label matches its stable key's registry row",
+          all(_label_by_key.get(r["key"]) == r["label"] for r in init["reports"]))
+    check("idx is the display position (0..N-1 in list order)",
+          [r["idx"] for r in init["reports"]] == list(range(N_REPORTS)))
 
 
 def test_report_library_includes_all():
-    print("gui_api.report_library_info now includes Intersection:")
+    print(f"gui_api.report_library_info lists the {N_ENABLED} enabled reports (Highway excluded):")
     a = gui_api.GuiApi()
     info = a.report_library_info()
-    check(f"saved-reports library lists all {N_REPORTS}", len(info["reports"]) == N_REPORTS)
+    check(f"saved-reports library lists the {N_ENABLED} enabled reports",
+          len(info["reports"]) == N_ENABLED)
 
 
 def test_gate_mechanism_still_works():
@@ -108,8 +121,8 @@ def test_gate_mechanism_still_works():
               and len(init["reports"]) == N_REPORTS)
     finally:
         reports.DISABLED_EXPORT_SUBDIRS = saved
-    check("restored to all enabled",
-          len(reports.enabled_export_reports()) == N_REPORTS)
+    check("restored to the default gate (the Highway pair reserved)",
+          len(reports.enabled_export_reports()) == N_ENABLED)
 
 
 def main():

@@ -20,17 +20,22 @@ function makeMockApi() {
     if (i === 14) ROUTES.push("014U");
     if (i === 101) ROUTES.push("101U");
   }
+  // In PICKER display order (P-D), mirroring the real init.reports: flat top-level
+  // reports first in the TSMIS site's order (Highway Log, its PDF, then Sequence),
+  // then the TSAR family groups. group/short carry the family header + leaf label
+  // (omitted for a flat report). Stable keys live in report_catalog, not here.
   const REPORTS = [
-    { key: "ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF" },
-    { key: "ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel" },
-    { key: "highway_sequence", label: "Highway Sequence Listing", fmt: "Excel" },
     { key: "highway_log", label: "Highway Log", fmt: "Excel" },
     { key: "highway_log_pdf", label: "Highway Log (PDF)", fmt: "PDF" },
-    { key: "intersection_summary", label: "Intersection Summary", fmt: "Excel" },
-    { key: "intersection_detail", label: "Intersection Detail", fmt: "Excel" },
-    // CR-002: the Intersection Detail (PDF) export — the exact parallel of Highway Log
-    // (PDF), appended last so the 7 existing export keys keep positions 0–6 (RM4).
-    { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", fmt: "PDF" },
+    { key: "highway_sequence", label: "Highway Sequence Listing", fmt: "Excel" },
+    { key: "ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF", group: "Ramp", short: "Summary" },
+    { key: "ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel", group: "Ramp", short: "Detail" },
+    { key: "intersection_summary", label: "Intersection Summary", fmt: "Excel", group: "Intersection", short: "Summary" },
+    { key: "intersection_detail", label: "Intersection Detail", fmt: "Excel", group: "Intersection", short: "Detail" },
+    { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", fmt: "PDF", group: "Intersection", short: "Detail (PDF)" },
+    // v0.18.1 reserved groundwork — the coming "Highway" TSAR group, DISABLED (greyed).
+    { key: "highway_detail", label: "Highway Detail", fmt: "Excel", group: "Highway", short: "Detail", disabled: true },
+    { key: "highway_summary", label: "Highway Summary", fmt: "Excel", group: "Highway", short: "Summary", disabled: true },
   ];
   // The Consolidate radios carry each row's stable `cons:*` key (P3) — this list
   // matches reports.CONSOLIDATE_REPORTS (9 rows as of CR-002: both Intersection
@@ -592,11 +597,11 @@ function makeMockApi() {
       app_name: "TSMIS Exporter", version: "0.14.2 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
-      // Mirror the real gate (now EMPTY — all reports enabled, incl. Intersection,
-      // which lives on the dev site). Each carries its stable export-op `key` (the
-      // selection contract, P3) plus display-order `idx`; `disabled` stays for when
-      // a report is gated off again.
-      reports: REPORTS.map((r, i) => ({ idx: i, ...r, disabled: false })),
+      // Mirror the real gate: Intersection is enabled (dev site); the reserved Highway
+      // pair is DISABLED groundwork (greyed). Each carries its stable export-op `key`
+      // (the selection contract, P3) plus display-order `idx`; `disabled` defaults false
+      // and each entry may override it (the Highway pair sets it true).
+      reports: REPORTS.map((r, i) => ({ idx: i, disabled: false, ...r })),
       cons_reports: [
         { key: "cons:ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF" },
         { key: "cons:ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel" },

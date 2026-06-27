@@ -34,6 +34,7 @@ from exporter import ReportSpec, save_via_export_button
 SPEC = ReportSpec(
     label="Intersection Detail",
     subdir="intersection_detail",
+    data_value="intersection_detail",     # stable #customReport id (flat + nested)
     filename=lambda route: f"intersection_detail_route_{route}.xlsx",
     # The action bar (Export button) renders even for an empty route, so readiness
     # is "Export button present OR the empty row appeared". Either means the

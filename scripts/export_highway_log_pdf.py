@@ -21,6 +21,7 @@ from exporter import ReportSpec, save_highway_log_pdf
 SPEC = ReportSpec(
     label="Highway Log",                 # same dropdown option as the Excel export
     subdir="highway_log_pdf",
+    data_value="highway_log",            # same #customReport id as the Excel export
     filename=lambda route: f"highway_log_route_{route}.pdf",
     # The report renders the SAME way for the Excel button and the Print layout,
     # so the ready signal is identical to the Excel export: the action bar (with

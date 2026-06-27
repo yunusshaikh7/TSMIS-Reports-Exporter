@@ -24,6 +24,7 @@ from common import (
     RETRY_COUNT,
     ROUTES,
     AuthError,
+    PreflightError,
     ReportError,
     RunCancelled,
     current_report_label,
@@ -70,6 +71,11 @@ class ReportSpec:
     wait_js: Callable[[str], str]           # route -> JS that resolves when ready OR empty
     is_empty: Callable[[object], bool]      # (page) -> True if the route has no data
     save: Callable[[object, Path, int], None]  # (page, out_path, timeout_ms) -> write the file
+    # The report's stable #customReport id (the value the site writes into its
+    # hidden native <select>). Matched first by select_report so selection is
+    # robust to the site's flat→nested menu migration and a leaf's visible text
+    # being relabelled. None = match by label text only (the pre-nested behavior).
+    data_value: str = None
 
 
 # --- saved-file integrity -----------------------------------------------------
@@ -357,7 +363,7 @@ def _recover(page, spec, should_cancel=None):
     """
     navigate_with_auth(page, should_cancel=should_cancel)
     require_signed_in(page, "Session expired partway through the batch.")
-    select_report(page, spec.label)
+    select_report(page, spec.label, spec.data_value)
 
 
 def _recover_or_stop(page, spec, events):
@@ -414,7 +420,29 @@ def _ensure_report_armed(page, spec, prefix, events):
         log.warning("%s report form shows %r, expected %r -- re-selecting",
                     prefix, shown, spec.label)
         events.on_log(f"{prefix} report form drifted; re-selecting {spec.label}")
-        select_report(page, spec.label)
+        select_report(page, spec.label, spec.data_value)
+
+
+def _build_wait_condition(spec, route):
+    """Build the post-Generate wait JS for one route: invoke the report's wait_js
+    arrow and OR in the shared error check (so a route the site can't build fails in
+    seconds instead of waiting out the whole timeout).
+
+    `spec.wait_js(route)` MUST be a JS arrow-function string. A spec that returns a
+    non-string, an empty string, or a non-arrow is a CONFIG error (a misauthored
+    ReportSpec) — caught here with a clear message + an error log, rather than read
+    as a cryptic Playwright evaluation error or a full per-route timeout on every
+    route. (route is app-controlled, not user input, so this is a configuration
+    tripwire, not input sanitization.)"""
+    ready_js = spec.wait_js(route)
+    if not isinstance(ready_js, str) or "=>" not in ready_js:
+        log.error("report %r produced an invalid wait_js for route %s: %r",
+                  getattr(spec, "label", "?"), route, ready_js)
+        raise PreflightError(
+            "Internal error: this report's readiness check is misconfigured. "
+            "Please contact the maintainer."
+        )
+    return f"() => (({ready_js}))() || ({ERROR_JS})"
 
 
 def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
@@ -425,12 +453,10 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     _ensure_report_armed(page, spec, prefix, events)   # P8c: stale-form re-arm guard
     page.get_by_label("Route", exact=True).select_option(route)
     page.get_by_role("button", name="Generate").click()
-    # Wait for the report to be ready/empty OR for the site to render an error
-    # (so a route the site can't build fails in seconds instead of waiting out
-    # the whole timeout). spec.wait_js(route) is a full arrow function; invoke it
-    # and OR in the shared error check.
-    ready_js = spec.wait_js(route)
-    wait_js = f"() => (({ready_js}))() || ({ERROR_JS})"
+    # Wait for the report to be ready/empty OR for the site to render an error.
+    # _build_wait_condition validates the spec's wait_js (a config tripwire) and
+    # wraps it with the shared error check.
+    wait_js = _build_wait_condition(spec, route)
     if not wait_with_skip_option(page, wait_js, prefix, events,
                                  hard_timeout_ms=timeout_ms):
         return "skipped"
@@ -698,7 +724,7 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
 
             events.on_log("Logged in. Checking the report form...")
             events.on_status(events.worker_no, "Checking the report form…")
-            preflight(page, spec.label)
+            preflight(page, spec.label, spec.data_value)
             events.on_log("Ready. Starting export.")
 
             for i, route in enumerate(routes, 1):

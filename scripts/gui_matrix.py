@@ -187,14 +187,18 @@ class GuiMatrixMixin:
                 self._coord.release()
                 self._emit_log(f"ERROR: couldn't start '{job['label']}': "
                                f"{type(e).__name__}: {e} (details are in the log file)")
+                self._push_state()               # drained the job -> refresh the queue panel
                 continue                         # drop this job, try the next
             if started:
                 self._push_state()
                 return
             # Nothing to do (e.g. the cells were rebuilt by an earlier job) —
-            # release the gate, drop the job, and try the next one.
+            # release the gate, drop the job, and try the next one. Push so the
+            # frontend stops showing the just-drained job (the queue-phantom fix):
+            # without it the last push is _end_task's, taken before this pop.
             self._coord.release()
             self._emit_log(f"Skipped (nothing to do): {job['label']}.")
+            self._push_state()
 
     def _dispatch_matrix_job(self, job):
         """Resolve a claimed job's targets and start its worker. Returns True if a

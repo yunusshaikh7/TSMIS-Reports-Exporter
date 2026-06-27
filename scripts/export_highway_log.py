@@ -17,6 +17,7 @@ from exporter import ReportSpec, save_via_export_button
 SPEC = ReportSpec(
     label="Highway Log",
     subdir="highway_log",
+    data_value="highway_log",             # stable #customReport id (flat + nested)
     filename=lambda route: f"highway_log_route_{route}.xlsx",
     # Highway Log always renders its action bar (with the Export button) once the
     # report finishes -- even for a route with no rows -- so "Export button

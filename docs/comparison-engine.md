@@ -510,8 +510,9 @@ lighting are `Y/N` on TSN but `1/0` on TSMIS — **normalized `Y≡1 / N≡0`** 
 into TSMIS's single code **`S`** (`_norm_control_type`) — so an S-vs-P pairing no longer flags, while a
 genuinely non-signalized control change (A vs B) still does; **(3)** three numeric fields (Main Line
 Length / Intrte Route / Intrte Postmile) are **zero-pad normalized** (`058≡58`, `9.560≡9.56`); **(4)**
-divided-highway routes carry a roadbed suffix (S/U) on TSN but not TSMIS — keyed on the BASE route so
-the same intersection still pairs, with the suffix surfaced as a compared `Roadbed` column. The TSN
+routes can carry an alpha route suffix (S/U — the report's "S" column) on TSN but not TSMIS — keyed on
+the BASE route so the same intersection still pairs, with the suffix surfaced as a compared `Route
+Suffix` column (renamed from the v0.18.0 misnomer "Roadbed" in v0.18.1; figures unchanged). The TSN
 side is **re-normalized at compare time** (so a library cached before a normalization change can't mask
 it), and a **"Report View" replica sheet** — wired through the opt-in `extra_sheet_writer` — renders
 the printed two-line record, classifying date differences as "soft" (rendered red but excluded from the

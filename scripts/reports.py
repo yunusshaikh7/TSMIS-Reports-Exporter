@@ -25,6 +25,15 @@ log = logging.getLogger("tsmis.reports")
 # Export tab / multi-export: (menu label, format hint, ReportSpec), in display order.
 EXPORT_REPORTS = _catalog.export_rows()
 
+# Report-PICKER grouping metadata: {export key: (group, short_label)} (P-D, v0.18.1).
+# Used only to render the Export-tab checklists grouped by family; everything else
+# keys off the stable export key as before.
+EXPORT_DISPLAY = _catalog.export_display()
+
+# Report-PICKER display order (export keys) — distinct from the registry/matrix
+# order: flat reports first in the TSMIS site's order, then the TSAR family groups.
+PICKER_ORDER = _catalog.picker_order()
+
 # Stable export-op KEYS (P3 / §C.5): one per EXPORT_REPORTS row, in registry order.
 # Each equals the report-FAMILY key == the export spec's output `subdir`. These keys
 # — never list positions — are what `batch_job.json` persists and what start_export /
@@ -86,7 +95,11 @@ def consolidator_for_subdir(subdir):
 # dev addresses via Settings ▸ "Use development site" to export them. As of
 # v0.17.0 they ALSO consolidate and compare (cross-env + vs-TSN), live in both
 # matrices. To disable a report app-wide again, add its subdir back to this set.
-DISABLED_EXPORT_SUBDIRS = set()
+# (v0.18.1) Highway Detail / Highway Summary are RESERVED groundwork — registered in
+# the catalog (the family-grouped picker shows them under a greyed "Highway" group)
+# but disabled here because the site has them cs-disabled and their export isn't
+# implemented yet; remove them from this set once the report is finalized.
+DISABLED_EXPORT_SUBDIRS = {"highway_detail", "highway_summary"}
 
 
 def is_export_disabled(spec):

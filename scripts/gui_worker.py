@@ -968,15 +968,23 @@ class EnvCheckWorker(threading.Thread):
 # log so a different convention shows up in one upload. Returns null when the
 # option list can't be read at all (callers must treat that as "unknown",
 # never as "everything is missing").
-_REPORT_OPTIONS_JS = """(labels) => {
-  const items = Array.from(document.querySelectorAll('#customReport li.cs-option'));
-  if (!items.length) return null;
+_REPORT_OPTIONS_JS = """(items) => {
+  const els = Array.from(document.querySelectorAll('#customReport li.cs-option'));
+  if (!els.length) return null;
   const out = {};
-  for (const label of labels) {
-    const el = items.find((li) => (li.textContent || '').trim() === label)
-            || items.find((li) => (li.textContent || '').includes(label));
+  for (const item of items) {
+    const label = item.label, value = item.value;
+    // Match by the stable data-value first (robust to the flat->nested menu
+    // migration, where a grouped report's leaf text is just "Detail"/"Summary"),
+    // then fall back to exact / substring text for a menu without data-value.
+    let el = value ? els.find((li) => li.getAttribute('data-value') === value) : null;
+    if (!el) el = els.find((li) => (li.textContent || '').trim() === label);
+    if (!el) el = els.find((li) => (li.textContent || '').includes(label));
     if (!el) { out[label] = { state: 'missing' }; continue; }
-    const cls = el.className || '';
+    // On the nested menu a leaf is disabled by greying its parent flyout row
+    // (the Highway "coming soon" group), so weigh the parent's class too.
+    const parent = el.closest('.cs-parent');
+    const cls = (el.className || '') + (parent ? ' ' + (parent.className || '') : '');
     const greyed = /(^|[\\s_-])disabled([\\s_-]|$)/i.test(cls)
       || el.hasAttribute('disabled')
       || el.getAttribute('aria-disabled') === 'true'
@@ -1047,14 +1055,15 @@ class EnvScanWorker(threading.Thread):
         # same "Highway Log" the Excel export uses (the PDF is that report saved a
         # different way), so probing the registry label would never match the
         # dropdown and would falsely flag it "missing" on every environment.
-        report_specs = [(label, getattr(spec, "label", None) or label)
+        report_specs = [(label, getattr(spec, "label", None) or label,
+                         getattr(spec, "data_value", None))
                         for label, _fmt, spec in EXPORT_REPORTS]
         combos = [(s, e) for s in DATA_SOURCES for e in ENVIRONMENTS]
         n = min(self.MAX_SCANNERS, len(combos)) if has_valid_auth() else 1
         if n > 1:
             n = self._parallel_scanners(n)
         log.info("env scan: starting (%d combos, %d scanner browser(s), "
-                 "report types %s)", len(combos), n, [r for r, _d in report_specs])
+                 "report types %s)", len(combos), n, [r for r, _d, _v in report_specs])
         work = queue_mod.Queue()
         for combo in combos:
             work.put(combo)
@@ -1207,7 +1216,8 @@ class EnvScanWorker(threading.Thread):
             # PDF Highway Log share one "Highway Log" option), and key the verdict
             # by the registry label the UI reads. None readable = unknown (keep the
             # old first-report probe), never "all missing".
-            probe = list(dict.fromkeys(drop for _reg, drop in report_labels))
+            pairs = list(dict.fromkeys((drop, dv) for _reg, drop, dv in report_labels))
+            probe = [{"label": d, "value": v} for d, v in pairs]
             options = None
             try:
                 options = page.evaluate(_REPORT_OPTIONS_JS, probe)
@@ -1216,19 +1226,19 @@ class EnvScanWorker(threading.Thread):
                          out["key"], type(e).__name__)
             if options:
                 out["reports"] = {reg: options.get(drop, {}).get("state", "missing")
-                                  for reg, drop in report_labels}
-                for reg, drop in report_labels:
+                                  for reg, drop, _dv in report_labels}
+                for reg, drop, _dv in report_labels:
                     state = out["reports"][reg]
                     if state != "ok":
                         log.info("env scan: %s report %r is %s (class=%r)",
                                  out["key"], reg, state,
                                  options.get(drop, {}).get("cls", ""))
-            # An AVAILABLE dropdown option text, for the preflight round-trip
-            # (preflight SELECTS the report, so it takes the option text).
-            avail_drop = [drop for reg, drop in report_labels
-                          if out["reports"].get(reg) == "ok"]
+            # An AVAILABLE (option text, data-value) pair, for the preflight
+            # round-trip (preflight SELECTS the report by text + stable id).
+            avail = [(drop, dv) for reg, drop, dv in report_labels
+                     if out["reports"].get(reg) == "ok"]
             off = [reg for reg, state in out["reports"].items() if state != "ok"]
-            if options and not avail_drop:
+            if options and not avail:
                 out["status"] = "no_reports"
                 out["detail"] = ("Signs in, but every report type is greyed "
                                  "out or missing here.")
@@ -1237,7 +1247,9 @@ class EnvScanWorker(threading.Thread):
                 # The data probe, on the first AVAILABLE report type: County
                 # only enables once the site's own route/county round-trip
                 # answers (the form itself is static).
-                preflight(page, avail_drop[0] if avail_drop else probe[0])
+                sel_drop, sel_dv = (avail[0] if avail
+                                    else (probe[0]["label"], probe[0]["value"]))
+                preflight(page, sel_drop, sel_dv)
             except PreflightError:
                 out["status"] = "no_reports"
                 out["detail"] = ("Signs in, but the report form couldn't load "
@@ -1296,7 +1308,8 @@ class ActiveEnvCheckWorker(threading.Thread):
     def run(self):
         from reports import EXPORT_REPORTS
         from playwright.sync_api import sync_playwright
-        report_specs = [(label, getattr(spec, "label", None) or label)
+        report_specs = [(label, getattr(spec, "label", None) or label,
+                         getattr(spec, "data_value", None))
                         for label, _fmt, spec in EXPORT_REPORTS]
         key = f"{self.src}-{self.env}"
         had_file = has_valid_auth()        # classify device vs saved-file sign-in

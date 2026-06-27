@@ -79,7 +79,7 @@ KEY = "PM"
 # field present in both systems is compared and counted — nothing is suppressed
 # (CONTEXT_FIELDS is empty, below; the position-aligned policy compares every column).
 SHARED_HEADER = [
-    "PR", "Roadbed", "PM", "Date of Record", "HG", "City Code", "R/U",
+    "PR", "Route Suffix", "PM", "Date of Record", "HG", "City Code", "R/U",
     "INT Type Eff-Date", "INT Type",
     "Control Type Eff-Date", "Control Type",
     "Lighting Eff-Date", "Lighting",
@@ -90,7 +90,7 @@ SHARED_HEADER = [
     "CS Traffic Flow", "CS Num Lanes", "Int St Eff-Date",
     "Intrte Route", "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix",
 ]
-KEY_FIELD = SHARED_HEADER.index(KEY)      # 2 (after PR + the derived Roadbed column)
+KEY_FIELD = SHARED_HEADER.index(KEY)      # 2 (after PR + the derived Route Suffix column)
 # Position-aligned comparison (user decision 2026-06-24): every report column is compared
 # to the same column in the other report — nothing is suppressed. The mainline/cross
 # eff-date columns differ structurally (TSMIS stores a refresh date where TSN stores the
@@ -162,15 +162,15 @@ _TSMIS_ROUTE_POS = 4                       # consolidated "Location" column ("12
 # normalization
 # --------------------------------------------------------------------------- #
 def _split_route(tok):
-    """Split a LOCATION token into (base_route, roadbed_suffix):
+    """Split a LOCATION token into (base_route, route_suffix):
     '12 ORA 210U' -> ('210', 'U'); '12 ORA. 210' -> ('210', '').
 
-    California divided highways carry a roadbed letter (S/U) on the route name that
-    TSN keeps but TSMIS often omits. Keying on the BASE route lets the same
-    intersection still pair across that label difference, while the suffix is
-    surfaced as the compared 'Roadbed' column — so a suffix-only difference is
-    flagged there (TSN 'U' vs TSMIS blank) rather than the rows being dropped to
-    one-sided OR silently merged."""
+    A California route name can carry an alpha route SUFFIX (e.g. S/U — the printed
+    report's "S" column) that TSN keeps but TSMIS often omits. Keying on the BASE
+    route lets the same intersection still pair across that label difference, while
+    the suffix is surfaced as the compared 'Route Suffix' column — so a suffix-only
+    difference is flagged there (TSN 'U' vs TSMIS blank) rather than the rows being
+    dropped to one-sided OR silently merged."""
     t = str(tok or "").strip().upper().replace("-", " ")
     parts = t.split()
     last = parts[-1] if parts else ""
@@ -179,7 +179,7 @@ def _split_route(tok):
 
 
 def _norm_route(tok):
-    """The base route number (roadbed suffix stripped) — the row key. See _split_route."""
+    """The base route number (route suffix stripped) — the row key. See _split_route."""
     return _split_route(tok)[0]
 
 
@@ -248,8 +248,8 @@ def _tsn_row(r, h):
     def g(name):
         i = h.get(name)
         return r[i] if i is not None and i < len(r) else None
-    base, roadbed = _split_route(g("LOCATION"))
-    return [base] + [roadbed if f == "Roadbed" else _project(f, g(_TSN_COL[f]))
+    base, route_suffix = _split_route(g("LOCATION"))
+    return [base] + [route_suffix if f == "Route Suffix" else _project(f, g(_TSN_COL[f]))
                      for f in SHARED_HEADER]
 
 
@@ -305,8 +305,8 @@ def _load_tsn(path):
 def _tsmis_row(r):
     def at(i):
         return r[i] if i < len(r) else None
-    base, roadbed = _split_route(at(_TSMIS_ROUTE_POS))
-    return [base] + [roadbed if f == "Roadbed" else _project(f, at(_TSMIS_POS[f]))
+    base, route_suffix = _split_route(at(_TSMIS_ROUTE_POS))
+    return [base] + [route_suffix if f == "Route Suffix" else _project(f, at(_TSMIS_POS[f]))
                      for f in SHARED_HEADER]
 
 
@@ -390,10 +390,11 @@ def _write_notes_sheet(wb):
          "TSMIS side was stored '1' (and 'N' was '0').")
     note("• Postmile (PM) — leading zeros and spaces are stripped so the same postmile pairs "
          "across formatting (TSN ' 004.901' ≡ TSMIS '4.901'). PM is the row key.")
-    note("• Roadbed suffix — California divided highways carry an S/U suffix on the route name "
-         "that TSN keeps but TSMIS often omits (TSN '210U' vs TSMIS '210'). Rows are matched on "
-         "the BASE route number so the same intersection still pairs; the suffix is compared in "
-         "the 'Roadbed' column (TSN 'U' vs TSMIS blank flags there) rather than dropping the row.")
+    note("• Route suffix — a California route name can carry an alpha suffix (e.g. S/U — the "
+         "printed report's 'S' column) that TSN keeps but TSMIS often omits (TSN '210U' vs TSMIS "
+         "'210'). Rows are matched on the BASE route number so the same intersection still pairs; "
+         "the suffix is compared in the 'Route Suffix' column (TSN 'U' vs TSMIS blank flags there) "
+         "rather than dropping the row.")
 
     section("COLUMNS THAT DIFFER WHOLESALE  (compared and counted like any other — the "
             "difference is structural, explained here, NOT a per-intersection data error)")
@@ -419,7 +420,7 @@ def _write_notes_sheet(wb):
          "Line Length — also compared. The intersecting route is mostly blank on both (only ~10 "
          "intersections cross another state route); differences are genuine where present.")
     note("• Nothing is greyed-out or shown-but-not-counted — under position alignment every shared "
-         "column is compared and counted. (TSMIS's blank roadbed 'S' / second 'Xing' route stubs "
+         "column is compared and counted. (TSMIS's blank route-suffix 'S' / second 'Xing' route stubs "
          "are omitted; TSN's ADT columns MAIN_ADT / CROSS_ADT have no TSMIS counterpart and aren't "
          "compared — they appear, for reference, only on the Report View.)")
 

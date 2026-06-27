@@ -156,7 +156,7 @@ def _preflight_once(spec, events):
                 "or automatic sign-in isn't available on this PC. Please log in.",
             )
             events.on_log("Logged in. Checking the report form...")
-            preflight(page, spec.label)
+            preflight(page, spec.label, spec.data_value)
         finally:
             browser.close()
 
@@ -304,7 +304,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                         "Sign-in didn't complete - the session may have "
                         "expired. Please log in.",
                     )
-                    select_report(page, spec.label)         # arm this worker's form
+                    select_report(page, spec.label, spec.data_value)  # arm this worker's form
                     while not stop.is_set():
                         _wait_while_paused(events)       # B1: hold between routes
                         if events.is_cancelled():

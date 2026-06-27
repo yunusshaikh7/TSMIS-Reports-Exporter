@@ -3,6 +3,29 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.18.1 — 2026-06-26
+
+A field-validated follow-up to v0.18.0: it keeps exports working as the TSMIS site
+changes its report menu, tidies the report list, and fixes two issues found in use.
+
+- **Keeps working as the TSMIS site reorganizes its report menu.** The site is moving its
+  report dropdown to grouped fly-out menus (Ramp / Highway / Intersection), already live on
+  the development site. The exporter now picks each report by its stable id, so it works on
+  both the current production menu and the new grouped one — your exports keep running
+  through the changeover, with nothing for you to do.
+- **The report list is grouped like the website.** Highway Log, Highway Log (PDF) and
+  Highway Sequence stay at the top; the Ramp and Intersection reports are tucked under their
+  own headings, matching how the TSMIS site now lists them.
+- **Highway Detail and Highway Summary are listed as "coming soon."** The site is adding two
+  new reports; you'll see them greyed under a "Highway" heading so you know they're on the
+  way — they switch on here as soon as the site enables them.
+- **The matrix queue clears properly.** After a matrix or by-day job finished, a leftover
+  item could linger in the queue and couldn't be cleared or cancelled. The queue now always
+  reflects what's actually running.
+- **Clearer comparison heading.** In the Intersection Detail comparison, the column that
+  flags a route's letter suffix (e.g. "210U" vs "210") is now labelled **"Route Suffix"**
+  instead of "Roadbed" — the figures are unchanged, only the heading is clearer.
+
 ## v0.18.0 — 2026-06-26
 
 A big under-the-hood overhaul for reliability and maintainability — plus one new
