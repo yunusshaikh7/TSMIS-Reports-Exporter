@@ -65,7 +65,8 @@ except ImportError:
 
 import compare_tsn_common as ctc
 from compare_core import (CompareSchema, normalize_value, keys_for,
-                          pair_occurrences_by_similarity, union_keys)
+                          pair_occurrences_by_similarity, union_keys,
+                          _PROGRESS_EVERY)
 from paths import today_str
 
 REPORT_NAME = "Intersection Detail"
@@ -483,6 +484,11 @@ _RV_AUX = ("Major", "Diffs", "Route")       # frozen-left aux columns
 # INT ST + INTERSECTING ROUTE + XING under MAINLINE. Each entry is
 # (g1, l1, s1, g2, l2, s2): line-1 group/label/spec stacked over line-2's. spec=(kind,ref).
 _RV_GRID = [
+    # Route Suffix sits with the route (frozen, immediately right of the aux Route column).
+    # Compared like every other cmp cell — a TSN-U-vs-TSMIS-blank suffix difference flags
+    # RED — but classified 'soft' (see _rv_classify) so the systematic gap doesn't inflate
+    # the per-record Major count.
+    ("", "SFX", ("cmp", "Route Suffix"), "", "", ("blank", None)),
     ("", "P", ("cmp", "PR"), "", "", ("blank", None)),
     ("", "POST MILE", ("pm", None), "", "", ("blank", None)),
     ("", "S", ("blank", None), "", "", ("blank", None)),
@@ -551,7 +557,12 @@ def _rv_classify(field, tm, tn):
     a position-aligned eff-date, or an INT/Control/Lighting geometry date within the
     systematic 1-day offset): it renders RED like a genuine conflict but is kept OUT of
     the per-record Major count. 'hard' = a genuine 'Major' discrepancy. Everything that
-    isn't one of those date cases is hard. (Both soft and hard count toward Diffs.)"""
+    isn't one of those date cases (or the route suffix, below) is hard. (Both soft and
+    hard count toward Diffs.)"""
+    if field == "Route Suffix":
+        # TSMIS systematically leaves the alpha route suffix blank where TSN carries U/S —
+        # a structural/completeness gap, not a geometry conflict: red, but not Major.
+        return "soft"
     if field in _RV_SOFT_ALWAYS:
         return "soft"
     if field in _RV_EFFDATES:
@@ -621,11 +632,17 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
     on both physical rows so a filter keeps the 2-row records intact — the streaming
     workbook can't vertically merge the data cells (header cells it can, below)."""
     sc = ctx["sc"]
+    events = ctx.get("events")
     rows_a, rows_b = ctx["rows_a"], ctx["rows_b"]
     ka = keys_for(rows_a, True, key_field=sc.key_field)
     kb = keys_for(rows_b, True, key_field=sc.key_field)
     ka, kb = pair_occurrences_by_similarity(sc, rows_a, rows_b, ka, kb, True)
     union = union_keys(ka, kb)
+    # This rollup re-lays-out every record as two styled physical rows (~2x the union),
+    # the slowest stretch of the largest comparison. Narrate it (header + per-N progress
+    # below) so it isn't a silent multi-minute gap that reads as a freeze.
+    if events is not None:
+        events.on_log(f"  Building the Report View tab ({len(union):,} records)…")
     amap = {k: i for i, k in enumerate(ka)}
     bmap = {k: j for j, k in enumerate(kb)}
     fi = {name: 1 + i for i, name in enumerate(sc.header)}      # +1 for leading route col
@@ -654,8 +671,9 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
 
     ws = wb.create_sheet("Report View")
     ws.sheet_properties.tabColor = "21344F"
-    ws.freeze_panes = "H5"      # MUST precede the streamed rows in write-only mode; keeps
-                                # Major/Diffs/Route + P/PostMile/S/Location + the 4 header rows
+    ws.freeze_panes = "I5"      # MUST precede the streamed rows in write-only mode; keeps
+                                # Major/Diffs/Route + Route Suffix + P/PostMile/S/Location
+                                # + the 4 header rows (one wider than before: the SFX column)
 
     def value(spec, ra, rb, one):
         """Resolve a grid spec to (text, status). 'cmp' compares the normalized TSMIS
@@ -729,6 +747,8 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
 
     # ---- data: two physical rows per record, whole-record alternating band ----
     for n, key in enumerate(union):
+        if events is not None and n and n % _PROGRESS_EVERY == 0:
+            events.on_log(f"  Report View: {n:,} of {len(union):,} records…")
         ra = rows_a[amap[key]] if key in amap else None
         rb = rows_b[bmap[key]] if key in bmap else None
         one = (tsn_one[bmap[key]] if (tsn_one and key in bmap and bmap[key] < len(tsn_one)) else {})
@@ -786,7 +806,7 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
     ws.auto_filter.ref = f"A4:{get_column_letter(NC)}{4 + 2 * len(union)}"
     for h, ht in {1: 13, 2: 22, 3: 13, 4: 14}.items():
         ws.row_dimensions[h].height = ht
-    WG = {"P": 3.5, "POST MILE": 8, "S": 3, "LOCATION": 13, "DATE OF REC": 9.5,
+    WG = {"SFX": 5, "P": 3.5, "POST MILE": 8, "S": 3, "LOCATION": 13, "DATE OF REC": 9.5,
           "H/G": 4, "CITY": 6, "R/U": 5}
     for ci, w in {1: 5.5, 2: 5.5, 3: 8}.items():
         ws.column_dimensions[get_column_letter(ci)].width = w

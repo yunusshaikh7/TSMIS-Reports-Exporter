@@ -762,6 +762,14 @@ NEVER edits the manual compare code — it only orchestrates.
   Settings (all persist across sessions): `day_matrix_source` / `day_matrix_days` / `day_matrix_hidden` /
   **`day_matrix_formulas`** (its OWN live-formulas toggle, independent of the Everything matrix's
   `matrix_formulas`; the TSN file reuses `matrix_tsn_files`).
+- **Large-report formulas-twin cap (v0.18.2):** even with a formulas toggle ON, both matrices
+  SKIP the live-formulas twin for very large comparisons — over `matrix._FORMULAS_TWIN_MAX_ROWS`
+  (12,000) Comparison rows, e.g. Intersection Detail's ~17k. The twin there is millions of live
+  formulas and minutes of work on top of the values workbook, which already holds every value. The
+  skip is announced (events log + file log) and applies only to the bulk matrix paths (all three
+  funnel through `matrix._try_formulas`, which probes the just-written values workbook via
+  `_comparison_row_count`); the manual Compare tab still honors its checkboxes, so a single
+  explicitly-requested live-formulas comparison is never dropped.
 - **Full-width + own config corner (v0.16.x):** selecting the sub-tab calls `applyMatrixWide()` so the
   by-day matrix fills the screen like the Everything matrix; its corner controls (queue, add-day,
   live-formulas, report toggles) live in a mirrored corner `#dayMatrixConfig` (shown via

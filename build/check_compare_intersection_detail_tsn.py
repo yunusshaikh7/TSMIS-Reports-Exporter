@@ -132,6 +132,12 @@ def test_schema():
           idt._rv_classify("Date of Record", "2021-12-31", "1973-10-19") == "soft")
     check("Report View: a non-date attribute diff classifies 'hard' (counts as Major)",
           idt._rv_classify("Control Type", "S", "A") == "hard")
+    # Route Suffix is surfaced in the Report View too (next to Route), compared like any
+    # cell but 'soft' (red, not Major) since TSMIS is systematically blank vs TSN's U/S.
+    check("Report View: Route Suffix is a compared grid column (next to Route)",
+          any(c[2] == ("cmp", "Route Suffix") for c in idt._RV_GRID))
+    check("Report View: a route-suffix diff classifies 'soft' (red, excluded from Major)",
+          idt._rv_classify("Route Suffix", "", "U") == "soft")
     check("route from LOCATION '12 ORA 001' -> '001'", idt._norm_route("12 ORA 001") == "001")
     check("route-suffix split '12 ORA 210U' -> ('210','U')", idt._split_route("12 ORA 210U") == ("210", "U"))
     check("route-suffix split '12 ORA. 210' -> ('210','')", idt._split_route("12 ORA. 210") == ("210", ""))

@@ -66,7 +66,11 @@ _TAB_COLORS = {"summary": "808080", "spot": "7030A0", "comparison": "C00000",
                "side_a": "4472C4", "side_b": "70AD47"}
 _DIFF_MARK = " ≠ "          # appears ONLY in differing cells; counts key on it
 
-_PROGRESS_EVERY = 10_000    # log + cancel-check cadence on big workbooks
+_PROGRESS_EVERY = 2_500     # log + cancel-check cadence on big workbooks. Tight
+                            # enough that the largest report (Intersection Detail,
+                            # ~17k rows per sheet) never goes minutes without a
+                            # progress line — long silences read as a hang and get
+                            # cancelled. Also makes cancel land sooner (same check).
 
 XL_MAX_ROWS, XL_MAX_COLS = 1_048_576, 16_384   # Excel worksheet hard limits
 
@@ -1873,7 +1877,10 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         if sc.extra_sheet_writer is not None:  # append a familiar-layout rollup sheet
             sc.extra_sheet_writer(wb, {"rows_a": rows_t, "rows_b": rows_n,
                                        "has_route": has_route, "sc": sc,
-                                       "side_a": name_a, "side_b": name_b})
+                                       "side_a": name_a, "side_b": name_b,
+                                       # events lets a big rollup report progress so it
+                                       # isn't a multi-minute silent gap before "Saving…".
+                                       "events": events})
         events.on_log("Saving…")
         path.parent.mkdir(parents=True, exist_ok=True)
         try:

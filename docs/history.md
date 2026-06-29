@@ -3,8 +3,8 @@
 How a one-day console script became a portable, self-updating Windows desktop
 app — told from the repository.
 
-**By the numbers:** 313 commits · 39 pull requests · 48 tagged releases ·
-8 report types · **May 20 → June 26, 2026**.
+**By the numbers:** 313 commits · 39 pull requests · 49 tagged releases ·
+8 report types · **May 20 → June 29, 2026**.
 
 This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
 "how it works and why") and [`CHANGELOG.md`](../CHANGELOG.md)
@@ -47,6 +47,7 @@ that rewrote the design.
 | `v0.17.1` | Jun 21 | Matrix-tab hotfix — blank-space + cramped-options fixes, Stop/Clear interrupts a stuck sign-in, self-documenting TSN library |
 | `v0.18.0` | Jun 26 | **The structural overhaul** — engine-leaf split, the outcome + transactional-artifact contracts, a report-catalog SoT, GUI/front-end modularization; + Intersection Detail (PDF), the 8th report; + updater/build hardening |
 | `v0.18.1` | Jun 26 | **Site-menu-safe selection** (pick by stable `data-value`, reveal the fly-out) + website-style report grouping + Highway Detail/Summary groundwork + matrix-queue + Route-Suffix fixes |
+| `v0.18.2` | Jun 29 | **Field-driven hotfix** — the big comparison stops looking frozen (progress through the silent "Report View" build; faster Stop), huge bulk rebuilds skip the live-formulas twin, and Route Suffix shows in the Report View |
 
 ---
 
@@ -313,6 +314,19 @@ Released from the branch. The long-standing `main` divergence was then closed fo
 the forward-ported v0.17.2–v0.17.8 commits preserved as ancestry — and the now-redundant
 refactor branch was retired. `main` is the single line once more, caught up to the present
 it had been chasing since the overhaul began.
+
+**`v0.18.2` — when "working" reads as "frozen."** A work-PC log showed the Intersection
+Detail vs-TSN comparison apparently failing to build its values workbook — repeatedly
+started, then cancelled. Nothing was broken: it's the largest comparison the app makes
+(~17,000 rows), and its final "Report View" rollup re-lays-out every record as two styled
+rows with **no progress output**, so it sat silent for two-and-a-half minutes and looked
+hung — so it kept getting cancelled before it could finish. The fix was honesty, not speed:
+narrate the silent stretch (and tighten the progress/cancel cadence so Stop lands sooner),
+**skip** the optional millions-of-formulas live-formulas twin on the giant bulk rebuilds
+(the values copy already holds every value, and the skip says so), and — caught in the same
+pass — surface the **Route Suffix** in the Report View, where the v0.18.1 rename had only
+reached the Comparison tab. A reminder that on a locked-down PC a user can't tell "slow"
+from "stuck," so the tool has to.
 
 ---
 

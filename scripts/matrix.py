@@ -700,13 +700,62 @@ def _formulas_sibling(out_path):
     return out_path.with_name(f"{out_path.stem} (formulas){out_path.suffix}")
 
 
-def _try_formulas(compare_call, out_path):
+# The live-formulas twin rewrites the whole comparison as live formulas; for the largest
+# report (Intersection Detail, ~17k rows) that is millions of formulas and minutes of
+# wall-clock ON TOP OF the values workbook that already holds every value. Past this many
+# Comparison-sheet rows the matrix skips the twin and says so — keeping the bulk rebuild
+# responsive. (The manual Compare tab path doesn't go through here, so an explicitly
+# requested single live-formulas comparison is unaffected.)
+_FORMULAS_TWIN_MAX_ROWS = 12_000
+
+
+def _comparison_row_count(values_path):
+    """Data-row count of a values workbook's Comparison sheet (read-only — the dimension
+    is read from the sheet, not by scanning cells), or None if it can't be read. None ⇒
+    the caller writes the twin anyway (never skip the twin on an uncertain probe)."""
+    try:
+        wb = load_workbook(values_path, read_only=True)
+    except Exception as e:                       # noqa: BLE001 (best-effort probe)
+        log.debug("formulas-twin probe: can't open %s (%s: %s)",
+                  values_path, type(e).__name__, e)
+        return None
+    try:
+        ws = wb["Comparison"] if "Comparison" in wb.sheetnames else wb.worksheets[0]
+        n = ws.max_row
+    except Exception as e:                       # noqa: BLE001
+        log.debug("formulas-twin probe: can't size %s (%s: %s)",
+                  values_path, type(e).__name__, e)
+        n = None
+    finally:
+        try:
+            wb.close()
+        except Exception:                        # noqa: BLE001
+            pass
+    return (n - 1) if isinstance(n, int) and n > 0 else None   # minus the header row
+
+
+def _try_formulas(compare_call, out_path, events=None):
     """Run `compare_call(formulas_path)` (mode='formulas') beside the values copy,
     committed ATOMICALLY (the adapter writes a temp; commit_workbook validates +
     os.replace) so an interrupted formulas write never truncates a prior good sibling
     (F9). Best-effort: a failure here must NOT fail the already-written values cell — but it
     is LOGGED (P2-A03: a validation/finalization failure RETURNS status='error' rather than
-    raising, so the returned result is inspected, not just exceptions)."""
+    raising, so the returned result is inspected, not just exceptions).
+
+    Skipped for very large comparisons (`_FORMULAS_TWIN_MAX_ROWS`): there the twin is
+    millions of formulas and minutes of work, and the values workbook — already committed —
+    holds every value. The skip is announced (events + log) so the absent twin is never a
+    silent surprise."""
+    rows = _comparison_row_count(out_path)
+    if rows is not None and rows > _FORMULAS_TWIN_MAX_ROWS:
+        msg = (f"Skipping the live-formulas copy of {Path(out_path).name} "
+               f"({rows:,} rows, over the {_FORMULAS_TWIN_MAX_ROWS:,}-row limit). The "
+               f"values workbook has every value; build a live-formulas copy of this "
+               f"comparison on its own if you need one.")
+        if events is not None:
+            events.on_log(msg)
+        log.info("matrix: %s", msg)
+        return
     try:
         res = artifact_store.commit_workbook(_formulas_sibling(out_path),
                                              lambda tmp: compare_call(tmp),
@@ -757,7 +806,7 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
     if also_formulas and result.status == "ok":
         _try_formulas(lambda fp: adapter.compare_folders(
             dest / cell_key, dest / baseline_key, fp, events=events,
-            confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
+            confirm_overwrite=lambda _p: True, mode="formulas"), out_path, events)
 
     if result.status == "ok" and out_path.exists():
         # O4: detect the layout from the produced workbook, not the row's declared
@@ -1018,7 +1067,7 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
     if also_formulas and result.status == "ok":
         _try_formulas(lambda fp: cmp_mod.compare(
             consolidated, str(tsn_path), fp, events=events,
-            confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
+            confirm_overwrite=lambda _p: True, mode="formulas"), out_path, events)
     # P1-R01: a PARTIAL TSMIS consolidation (inputs left out) still compares, but the
     # diff is over INCOMPLETE inputs — flag the comparison so the caller records the
     # cell as partial. `cres` is set only when we (re)consolidated THIS call; when the
@@ -1117,7 +1166,7 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         if also_formulas and result.status == "ok":
             _try_formulas(lambda fp: _self_cmp.compare(
                 pdf_c, excel_c, fp, events=events,
-                confirm_overwrite=lambda _p: True, mode="formulas"), out_path)
+                confirm_overwrite=lambda _p: True, mode="formulas"), out_path, events)
         # P1-R01: a PARTIAL side means the self comparison diffed INCOMPLETE inputs —
         # propagate it (either side partial -> the cell records partial) so a self
         # comparison can't hide that one side was built from incomplete inputs.

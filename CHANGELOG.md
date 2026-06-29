@@ -3,6 +3,26 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.18.2 — 2026-06-29
+
+A small follow-up to v0.18.1: it makes the largest comparison (Intersection Detail vs TSN)
+feel responsive instead of frozen, speeds up bulk comparison rebuilds, and surfaces the
+route's letter suffix in the Intersection Detail "Report View".
+
+- **The big comparison no longer looks stuck.** Building the Intersection Detail vs-TSN
+  workbook (by far the largest — about 17,000 rows) used to go quiet for a few minutes during
+  its final "Report View" step, which looked like a freeze. It now shows steady progress the
+  whole way through, so you can see it's still working — and **Stop takes effect sooner**.
+- **Faster bulk comparison rebuilds.** When the matrix rebuilds comparisons, the optional
+  live-formulas copy is now skipped for very large reports (it's millions of live formulas and
+  several minutes of extra work). The normal workbook still contains **every value**, and the
+  log notes when the copy was skipped. You can still build a live-formulas copy of a single
+  comparison yourself from the Compare tab.
+- **Route Suffix now shows in the Intersection Detail "Report View".** The route's letter
+  suffix (e.g. the "U" in "210U") now sits next to the route in the printed-style Report View
+  and turns red when TSMIS and TSN disagree — matching the "Route Suffix" column already on the
+  Comparison tab.
+
 ## v0.18.1 — 2026-06-26
 
 A field-validated follow-up to v0.18.0: it keeps exports working as the TSMIS site

@@ -70,7 +70,12 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
-## Next version (v0.18.2) — what's actually owed
+## Next version (v0.18.3) — what's actually owed
+
+> **v0.18.2 shipped early as a field-driven hotfix (2026-06-29)** — comparison progress feedback, the
+> large-report formulas-twin skip, and Route Suffix in the Report View (see the *Shipped* table). It did
+> NOT complete the work-PC field sign-off below, so that sign-off (plus the small ride-alongs) now cuts as
+> **v0.18.3**, and the "operational / enterprise-ready" claim moves with it.
 
 > The single live worklist. Almost everything still owed collapses into ONE effort — the **work-PC
 > field sign-off** (the dev PC can't reach TSMIS). The §J2 dispositions + the Phase-3 list below are
@@ -79,7 +84,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > everything else is already **Shipped** (§ below) or an explicit **deferral** (the minor opportunistic
 > carry-overs from the overhaul are under *Standing → Restructure leftovers*).
 
-**1 — Work-PC field sign-off (GATES v0.18.2).** One session on the locked-down PC: run v0.18.1,
+**1 — Work-PC field sign-off (GATES v0.18.3).** One session on the locked-down PC: run v0.18.2,
 `--collect-evidence`, and confirm the live paths the dev PC can't. Full checklist + acceptance
 criteria: [work-pc-validation.md](work-pc-validation.md) §3.
 - [ ] The two **v0.18.1 field bugs** live — Intersection export selects on the **nested dev menu**
@@ -91,7 +96,7 @@ criteria: [work-pc-validation.md](work-pc-validation.md) §3.
 - [ ] **Evidence-driven parser fixes** (need the returned real PDFs) — ramp-summary parse-failure
   misattribution + duplicate-pop misassignment, via the P12 row-oracle. Land offline-RED-proven, then re-bless.
 
-→ Cut **v0.18.2** as the operational sign-off ("enterprise-ready" is claimed here, never before).
+→ Cut **v0.18.3** as the operational sign-off ("enterprise-ready" is claimed here, never before).
 
 **2 — Small & ready (ride along with the sign-off run):**
 - [ ] **gh-pages landing-page regen** — owed since v0.17.0; website only ([website.md](website.md)).
@@ -548,7 +553,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.18.1, shipped)
+### Version buckets — reconciled to reality (current: v0.18.2, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -562,6 +567,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.17.1** ✅ | Jun 21 | Matrix-tab blank-space + cramped-options fixes; Stop/Clear interrupts a stuck sign-in; TSN picker default + self-documenting TSN library; gitignore security fixes. |
 | **v0.18.0** ✅ | Jun 26 | **Structural & engineering overhaul** (engine leaf split / `common.py` shim, the outcome + transactional-artifact contracts, report-catalog SoT, GUI endpoint split + front-end modularization, `compare_core` byte-identical) + **Intersection Detail (PDF)** (CR-002) + updater/packaging hardening + the work-PC evidence kit. Released as the offline-validated candidate. |
 | **v0.18.1** ✅ | Jun 26 | **Field-validated close-out** — site-menu-safe selection (pick by stable `data-value` + reveal the `cs-submenu` fly-out; prod-safe), website-style report grouping, Highway Detail/Summary reserved-disabled groundwork (stable ids 8/9), the matrix queue-phantom fix, `wait_js` validation, and the Intersection Detail "Roadbed"→"Route Suffix" rename. `compare_core` untouched. |
+| **v0.18.2** ✅ | Jun 29 | **Hotfix** (field-driven) — comparison **progress feedback** (the ~17k-row Intersection Detail vs-TSN build narrates its formerly-silent "Report View" stretch; `_PROGRESS_EVERY` 10k→2.5k ⇒ Stop lands sooner), **skip the live-formulas twin** for huge bulk matrix rebuilds (> `_FORMULAS_TWIN_MAX_ROWS` Comparison rows; the values copy is still complete, the skip is logged, the manual Compare tab is unaffected), and **Route Suffix surfaced in the Report View** (soft: red, not Major). `compare_core` output byte-identical. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're
