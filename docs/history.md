@@ -3,7 +3,7 @@
 How a one-day console script became a portable, self-updating Windows desktop
 app — told from the repository.
 
-**By the numbers:** 313 commits · 39 pull requests · 49 tagged releases ·
+**By the numbers:** 313 commits · 39 pull requests · 50 tagged releases ·
 8 report types · **May 20 → June 29, 2026**.
 
 This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
@@ -48,6 +48,7 @@ that rewrote the design.
 | `v0.18.0` | Jun 26 | **The structural overhaul** — engine-leaf split, the outcome + transactional-artifact contracts, a report-catalog SoT, GUI/front-end modularization; + Intersection Detail (PDF), the 8th report; + updater/build hardening |
 | `v0.18.1` | Jun 26 | **Site-menu-safe selection** (pick by stable `data-value`, reveal the fly-out) + website-style report grouping + Highway Detail/Summary groundwork + matrix-queue + Route-Suffix fixes |
 | `v0.18.2` | Jun 29 | **Field-driven hotfix** — the big comparison stops looking frozen (progress through the silent "Report View" build; faster Stop), huge bulk rebuilds skip the live-formulas twin, and Route Suffix shows in the Report View |
+| `v0.18.3` | Jun 29 | **Field-driven hotfix** — Intersection Detail vs-TSN: intersecting-route postmile stops false-flagging where both sides are 0 (TSN's numeric 0 was read as blank), and one-sided intersections are marked "Only in TSMIS/TSN" in the Report View instead of an all-red row |
 
 ---
 
@@ -327,6 +328,18 @@ narrate the silent stretch (and tighten the progress/cancel cadence so Stop land
 pass — surface the **Route Suffix** in the Report View, where the v0.18.1 rename had only
 reached the Comparison tab. A reminder that on a locked-down PC a user can't tell "slow"
 from "stuck," so the tool has to.
+
+**`v0.18.3` — two zeros that weren't equal.** Field use of the same Intersection Detail
+comparison surfaced a column — the intersecting route's postmile — that flagged a difference
+at exactly the handful of intersections where the value existed. The cause was a one-character
+habit: `str(v or "")`. A postmile of `0` is falsy, so `0 or "" → ""` quietly turned TSN's
+numeric `0` into a blank, while TSMIS's text `"0.000"` normalized to `"0"` — two spellings of
+the same zero, forced to disagree. Preserving a real `0` (`"" if v is None else str(v)`) made
+the matching zeros line up and dropped 43 phantom cells from the statewide canary, touching no
+other field. The same pass fixed a sibling oversight the user spotted: an intersection that
+exists in only one system was being rendered in the "Report View" as an ordinary record with
+every field bleeding red, instead of a calm "Only in TSMIS / TSN" band like the main sheet
+already showed. Both small; both the field, again, finding what no offline test had thought to.
 
 ---
 

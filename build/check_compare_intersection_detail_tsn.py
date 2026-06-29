@@ -144,6 +144,14 @@ def test_schema():
     check("Route Suffix is a COMPARED column (not context)",
           "Route Suffix" in sc.header and "Route Suffix" not in sc.context_fields)
     check("PM ' 000.204' -> '0.204'", idt._norm_pm(" 000.204") == "0.204")
+    # Numeric 0 must canonicalize to '0', not blank: TSN stores a numeric-0 intersecting-route
+    # postmile where TSMIS stores text '0.000'; the old `str(v or "")` blanked the 0 and flagged
+    # a phantom 0-vs-blank diff. None/'' stay blank so a real value-vs-missing still flags.
+    check("numeric 0 -> '0' (preserved; matches text '0.000')",
+          idt._norm_num(0) == "0" and idt._norm_num(0.0) == "0" and idt._norm_num("0.000") == "0")
+    check("blank stays blank (None/'' -> '')",
+          idt._norm_num(None) == "" and idt._norm_num("") == "")
+    check("numeric-0 boolean -> 'N' (not blank)", idt._norm_bool(0) == "N")
     check("date ISO from YY-MM-DD ('73-10-19' -> '1973-10-19')",
           idt._iso_date("73-10-19") == "1973-10-19")
 

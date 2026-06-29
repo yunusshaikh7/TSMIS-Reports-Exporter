@@ -195,13 +195,20 @@ _BOOL = {"Y": "Y", "N": "N", "1": "Y", "0": "N"}
 
 
 def _norm_bool(v):
-    return _BOOL.get(str(v or "").strip().upper(), str(v or "").strip())
+    # None-safe like _norm_num: a numeric 0 must read as "0" (-> 'N'), not "" — the
+    # `v or ""` coercion would drop a real 0 to blank and flag a phantom diff.
+    s = ("" if v is None else str(v)).strip()
+    return _BOOL.get(s.upper(), s)
 
 
 def _norm_num(v):
     """Canonicalize a zero-padded number: '058'->'58', '9.560'->'9.56', '0.000'->'0'.
-    Non-numeric values are returned unchanged (so e.g. a route name with letters is safe)."""
-    s = str(v or "").strip()
+    Non-numeric values are returned unchanged (so e.g. a route name with letters is safe).
+    A real numeric 0/0.0 canonicalizes to '0', NOT blank: `str(v or "")` coerces a
+    numeric 0 to "" (0 is falsy), so TSN's numeric-0 intersecting-route postmile read as
+    blank while TSMIS's text '0.000' read as '0' — a phantom 0-vs-blank diff. None/"" stay
+    blank, so a genuine value-vs-missing difference still flags."""
+    s = ("" if v is None else str(v)).strip()
     if not s or not re.fullmatch(r"-?\d+(\.\d+)?", s):
         return s
     neg, s = s.startswith("-"), s.lstrip("-")
@@ -759,6 +766,39 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
             location = one.get("LOC", "")
         pmval = aval(ra, "PM") or aval(rb, "PM") or (key[1] if len(key) > 1 else "")
         alt = (n % 2 == 1)
+        # A location present in only ONE system isn't a row of field conflicts — mirror the
+        # Comparison sheet's "Only in TSMIS/TSN": show the present side's values as a solid
+        # side-colored band (orange=TSMIS-only via 'tm', blue=TSN-only via 'tn'), label it in
+        # the count columns ("TSMIS"/"TSN" + "only"), and keep it OUT of the Major/Diffs tally
+        # (a presence gap, not field disagreements). Identity repeats on both physical rows so
+        # a filter keeps the 2-row record intact.
+        if ra is None or rb is None:
+            side = "tm" if rb is None else "tn"          # tm = TSMIS-only, tn = TSN-only
+            present = ra if rb is None else rb
+            label = sc.side_a if rb is None else sc.side_b
+            for li in (0, 1):
+                bottom = (li == 1)
+                row = [woc(label, side, alt, bottom=bottom),
+                       woc("only", side, alt, bottom=bottom),
+                       woc(key[0], side, alt, bottom=bottom)]
+                for col in _RV_GRID:
+                    spec = col[2] if li == 0 else col[5]
+                    kind, ref = spec
+                    if kind == "loc":
+                        text = location
+                    elif kind == "pm":
+                        text = pmval
+                    elif kind == "blank":
+                        text = ""
+                    elif kind == "tn":                   # TSN-only source column
+                        v = one.get(ref, "") if (side == "tn" and one) else ""
+                        text = _iso_date(v) if ref in _RV_DATEONE else v
+                    else:                                # 'cmp'/'tm' -> the present side's value
+                        text = aval(present, ref)
+                    align = lft if (li == 1 and col[4] == "DESCRIPTION") else None
+                    row.append(woc(text, side, alt, bottom=bottom, align=align))
+                ws.append(row)
+            continue
         # pass 1 — Major (genuine conflicts) + Diffs (every difference) counts
         maj = dif = 0
         for li in (0, 1):

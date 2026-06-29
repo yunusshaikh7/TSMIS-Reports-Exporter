@@ -3,6 +3,19 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.18.3 — 2026-06-29
+
+Two corrections to the Intersection Detail vs-TSN comparison, found in field use.
+
+- **No more false "intersecting-route postmile" differences.** When a crossing route's postmile
+  is 0 in both systems, the comparison was flagging it as a difference — TSN's numeric 0 was being
+  read as blank while TSMIS showed "0.000". It now reads 0 on both sides and matches; a genuinely
+  missing value still flags as before.
+- **One-sided intersections are now labelled, not shown as all-red.** In the Intersection Detail
+  "Report View", an intersection that exists in only one system is marked **"TSMIS only" / "TSN
+  only"** (a coloured band) instead of appearing as an ordinary row with every field flagged red —
+  matching how the main comparison sheet already shows them.
+
 ## v0.18.2 — 2026-06-29
 
 A small follow-up to v0.18.1: it makes the largest comparison (Intersection Detail vs TSN)
