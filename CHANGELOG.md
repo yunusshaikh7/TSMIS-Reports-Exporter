@@ -3,6 +3,16 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.18.4 — 2026-06-29
+
+A fix for the comparison matrices' job queue.
+
+- **The queue no longer shows a finished job as still "running."** After a matrix or by-day
+  (vs-TSN) comparison finished — or was cancelled — its row could stay in the queue panel
+  marked "running" (in both the Everything and by-day matrices) until you started another job,
+  and it couldn't be cleared. The work always actually finished; only the panel was stale. It
+  now updates the moment a job ends.
+
 ## v0.18.3 — 2026-06-29
 
 Two corrections to the Intersection Detail vs-TSN comparison, found in field use.

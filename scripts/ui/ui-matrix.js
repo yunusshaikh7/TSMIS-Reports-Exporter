@@ -71,12 +71,15 @@ function renderQueuePanel(groupId, listId, countId) {
   const st = S.st || {};
   const cur = st.matrix_current || null;
   const pending = st.matrix_queue || [];
+  const list = $(listId);
+  // Clear the list in EVERY path: hiding the group isn't enough to drop a finished
+  // job's row (a hidden .mc-group must also be emptied), else it lingers if anything
+  // re-shows the group without repopulating it.
+  if (list) list.textContent = "";
   if (!cur && !pending.length) { group.hidden = true; return; }
   group.hidden = false;
   const count = $(countId);
   if (count) count.textContent = pending.length ? `(${pending.length} waiting)` : "";
-  const list = $(listId);
-  list.textContent = "";
   if (cur) list.appendChild(mxQueueRow(cur, true, 0, 1));
   pending.forEach((job, i) => list.appendChild(mxQueueRow(job, false, i, pending.length)));
 }

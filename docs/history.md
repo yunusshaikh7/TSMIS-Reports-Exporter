@@ -3,7 +3,7 @@
 How a one-day console script became a portable, self-updating Windows desktop
 app — told from the repository.
 
-**By the numbers:** 313 commits · 39 pull requests · 50 tagged releases ·
+**By the numbers:** 313 commits · 39 pull requests · 51 tagged releases ·
 8 report types · **May 20 → June 29, 2026**.
 
 This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
@@ -49,6 +49,7 @@ that rewrote the design.
 | `v0.18.1` | Jun 26 | **Site-menu-safe selection** (pick by stable `data-value`, reveal the fly-out) + website-style report grouping + Highway Detail/Summary groundwork + matrix-queue + Route-Suffix fixes |
 | `v0.18.2` | Jun 29 | **Field-driven hotfix** — the big comparison stops looking frozen (progress through the silent "Report View" build; faster Stop), huge bulk rebuilds skip the live-formulas twin, and Route Suffix shows in the Report View |
 | `v0.18.3` | Jun 29 | **Field-driven hotfix** — Intersection Detail vs-TSN: intersecting-route postmile stops false-flagging where both sides are 0 (TSN's numeric 0 was read as blank), and one-sided intersections are marked "Only in TSMIS/TSN" in the Report View instead of an all-red row |
+| `v0.18.4` | Jun 29 | **Field-driven hotfix** — the matrix job-queue phantom: a finished/cancelled comparison stayed in the queue marked "running" (both matrices) until the next job; a `.mc-group`'s `display:flex` was silently overriding `[hidden]` |
 
 ---
 
