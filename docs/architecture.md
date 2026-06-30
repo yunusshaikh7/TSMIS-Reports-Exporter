@@ -416,8 +416,9 @@ where it lives" map — each item owned by the doc named:
 | **Packaging / updater** | Updater hardened (fail-closed checksum, staged re-hash before swap, zip-slip guard, bounded retry, revert pagination, log rotation, frozen-only cache clear); a hash-pinned reproducible build; `release.yml` per-variant `.sha256` enforcement; the exact **windowed** exe runs the self-test gate; a credential-safe work-PC **evidence kit** (`evidence.py`, `--collect-evidence`). | [build-and-release.md](build-and-release.md), [work-pc-validation.md](work-pc-validation.md) |
 
 **Two-tier release model:** v0.18.0 is the **offline-validated candidate** (every phase
-provable from CI/offline); **v0.18.1** is the **field-validated close-out** after the
-work-PC evidence comes back. Operational sign-off is claimed at v0.18.1, never v0.18.0.
+provable from CI/offline); **v0.18.1** was the **field-validated close-out** of the overhaul.
+The full work-PC **operational sign-off** was deferred past it — v0.18.2/3/4 shipped further
+field-driven hotfixes — and now cuts as **v0.18.5** (never at v0.18.0).
 
 ### v0.18.1 — site-menu-safe selection, report grouping, Highway groundwork
 

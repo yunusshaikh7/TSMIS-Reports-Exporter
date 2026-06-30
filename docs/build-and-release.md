@@ -423,13 +423,14 @@ dumps, exported report data, or the TSN inputs. Packaged via the `evidence` modu
 `APP_MODULES`; locked by `build/check_evidence_bundle.py` (adversarial credential-leak
 fixtures). Full handoff: [work-pc-validation.md](work-pc-validation.md).
 
-### Two-tier release (v0.18.0 candidate → v0.18.1 close-out)
+### Two-tier release (v0.18.0 candidate → v0.18.1 close-out → owed operational sign-off)
 
 **v0.18.0 is the offline-validated candidate** — every phase provable from CI/offline
-(the exact-artifact self-test, the golden checks). **v0.18.1 is the field-validated
-close-out**: the user runs v0.18.0 on the work PC, returns the evidence kit, and v0.18.1
-lands any real-data fixes and claims operational sign-off. "Enterprise-ready" = the
-v0.18.1 sign-off, never v0.18.0. Both ship through the same `release.yml` flow.
+(the exact-artifact self-test, the golden checks). **v0.18.1 was the field-validated
+close-out** of the overhaul (it fixed two work-PC field bugs found on v0.18.0). The full
+work-PC **operational sign-off** was DEFERRED past v0.18.1; v0.18.2/3/4 then shipped further
+field-driven hotfixes, so "enterprise-ready" now cuts as **v0.18.5** (see
+[work-pc-validation.md](work-pc-validation.md)). All ship through the same `release.yml` flow.
 
 ---
 

@@ -17,12 +17,11 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > **"Roadbed"→"Route Suffix"** comparison-column rename. All offline checks + both frozen self-tests green;
 > **`compare_core` untouched**.
 >
-> **Still owed (each a separate, user-gated decision):** **`main` reconciliation** — `origin/main` is still
-> ≈ v0.17.8 and diverged (the v0.17.2–v0.17.8 line was forward-ported, not merged; branch 27 ahead / 11
-> behind, split at `d2ee353`); make `main` = v0.18.x via an **`-s ours` supersede merge** OR a
-> **force-update**, **never a blind merge** (see *Standing* below) · **work-PC LIVE verification** of the
-> two field bugs (Intersection export on the nested dev menu; the matrix queue clears) · **Highway
-> Detail/Summary enablement** when the site turns them on (see *Feature backlog*).
+> **Status (updated 2026-06-30):** `main` reconciliation is **DONE** — `main` was superseded onto the
+> v0.18.x tree (`-s ours` merge `9514359`) and is now at **v0.18.4**, with the v0.18.2/3/4 field hotfixes
+> shipped on top (see the *Shipped* table). The remaining owed item is the **work-PC operational sign-off**,
+> tracked under *Next version (v0.18.5)* below (live verification of the field fixes + the §3 checklist).
+> **Highway Detail/Summary enablement** stays site-gated.
 
 > **v0.18.0 — structural & engineering overhaul (the offline-validated CANDIDATE).** A large internal
 > refactor (engine leaf split / `common.py` shim, the outcome + transactional-artifact contracts, a
@@ -32,8 +31,9 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > re-hash, hash-pinned reproducible build, the work-PC evidence kit). The **Phase-3 audit is reconciled
 > below (§J2 dispositions)** — every still-open finding is individually marked Resolved / v0.18.1
 > evidence-driven / hard-deferred. **Two-tier release:** v0.18.0 is offline-provable; **v0.18.1** is the
-> field-validated close-out (work-PC acceptance via the evidence kit — see
-> [work-pc-validation.md](work-pc-validation.md)). "Enterprise-ready" = v0.18.1, never v0.18.0.
+> field-validated close-out OF THE OVERHAUL. The full work-PC **operational sign-off**
+> ("enterprise-ready") was DEFERRED past v0.18.1 and now cuts as **v0.18.5** (see *Next version* +
+> [work-pc-validation.md](work-pc-validation.md)) — not yet claimed.
 >
 > ---
 >

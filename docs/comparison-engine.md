@@ -517,9 +517,11 @@ side is **re-normalized at compare time** (so a library cached before a normaliz
 it), and a **"Report View" replica sheet** — wired through the opt-in `extra_sheet_writer` — renders
 the printed two-line record, classifying date differences as "soft" (rendered red but excluded from the
 Major count) vs hard attribute diffs. Because every column now counts, the statewide diff total rises
-sharply: the **v0.18.1-confirmed real-data canary is ≈163,353 diff cells (Excel) / 163,361 (PDF)**; the
-offline lock is `check_compare_intersection_detail_tsn.py`'s synthetic behavior fixture (the S-crosswalk,
-the Y/N↔1/0 norm, Date-of-Record now counted, the Report View soft/hard split). Live in both matrices.
+sharply: the real-data canary is **≈163,310 diff cells (Excel)** (v0.18.3, after the numeric-0
+intersecting-route-postmile fix dropped 43 phantom 0-vs-blank cells; was 163,353 at v0.18.1 — the PDF
+edition shifts by the same fix). The offline lock is `check_compare_intersection_detail_tsn.py`'s synthetic
+behavior fixture (the S-crosswalk, the Y/N↔1/0 norm, Date-of-Record counted, the numeric-0→'0' canon, the
+Report View soft/hard split + one-sided "Only in TSMIS/TSN" rows). Live in both matrices.
 
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 

@@ -1,11 +1,12 @@
-# Work-PC validation handoff & v0.18.1 close-out plan
+# Work-PC validation handoff & operational sign-off plan (cuts as v0.18.5)
 
 > **Two-tier release model.** **v0.18.0** is the *offline-validated candidate* — every phase is
 > provable from CI/offline before it ships, but anything that needs the live TSMIS site or the
-> locked-down Caltrans work PC is **not** yet field-validated. **v0.18.1** is the *field-validated
-> close-out*: the user runs the v0.18.0 candidate on the work PC, returns evidence via the kit
-> below, and v0.18.1 lands any real-data fixes and claims operational sign-off. "Enterprise-ready"
-> = the v0.18.1 sign-off, never v0.18.0.
+> locked-down Caltrans work PC is **not** yet field-validated. **v0.18.1** was the *field-validated
+> close-out* of the overhaul (it fixed two work-PC field bugs). The full **operational sign-off** — the
+> §3 checklist below — was **DEFERRED** past v0.18.1; v0.18.2/3/4 then shipped further field-driven
+> hotfixes, so the sign-off now cuts as **v0.18.5**. "Enterprise-ready" = that sign-off, never v0.18.0
+> (and not yet claimed at v0.18.1–v0.18.4).
 >
 > This doc is the **handoff**: how to gather evidence on the work PC, the manual fallback, the
 > per-item acceptance checklist, and the v0.18.1 plan that consumes the evidence.
@@ -17,9 +18,10 @@
 > and **(2)** the matrix queue phantom — plus three layered asks (website-style report grouping, Highway
 > Detail/Summary reserved-disabled groundwork, `wait_js` validation) and the Intersection Detail
 > "Roadbed"→"Route Suffix" rename. All offline checks + both frozen self-tests passed; `compare_core` is
-> untouched. **Still owed (the actual field sign-off):** the §3 live acceptance below — now including a
-> **live confirmation of the two field-bug fixes** on the work PC — plus the `main` reconciliation
-> ([roadmap.md](roadmap.md) → *Branch / release hygiene*). §4 below is the process that was followed.
+> untouched. **`main` reconciliation is now DONE** (superseded onto the v0.18.x tree; `main` is at v0.18.4
+> after the v0.18.2/3/4 hotfixes). **Still owed (the actual field sign-off → v0.18.5):** the §3 live
+> acceptance below, including a live confirmation of the v0.18.1–v0.18.4 field fixes on the work PC. §4 is
+> the process (followed for v0.18.1; the template for the v0.18.5 sign-off).
 
 The work PC reality (why this is needed): real users run locked-down Caltrans PCs — no
 PowerShell, cmd, admin, temp scripts, or scheduled tasks; only "an unsigned exe from a
@@ -108,7 +110,7 @@ Those are the credential / private-content paths the collector deliberately excl
 
 ---
 
-## 3. v0.18.1 work-PC acceptance checklist (§K2 — the final 8-report shape)
+## 3. Work-PC acceptance checklist (§K2 — the final 8-report shape; gates the v0.18.5 sign-off)
 
 v0.18.1 is accepted when the returned evidence confirms each item. Disposable destinations only
 (no disk-full induction); never live-credential / profile access in dev.
@@ -132,14 +134,15 @@ v0.18.1 is accepted when the returned evidence confirms each item. Disposable de
       **export → consolidate → PDF-vs-TSN / PDF-vs-Excel / cross-env**, re-confirming the handoff's
       218/218-route, 0-content-diff reconciliation, **and** the v0.17.8 vs-TSN behavior (the
       position-aligned dates, the `S` control crosswalk, the Report View) against the returned real
-      PDFs/Excel/TSN. The offline canaries (Excel 163,353 / PDF 163,361) are already locked in P15;
-      this confirms them on real data.
+      PDFs/Excel/TSN. The offline canary shifted with the v0.18.3 numeric-0 fix — Excel is now **≈163,310**
+      (was 163,353; the PDF edition shifts by the same fix), locked in `check_compare_intersection_detail_tsn`;
+      this confirms it on real data.
 - [ ] **No regressions** — the full offline `build/check_*.py` suite still green; every v0.18.1
       code fix is itself offline-RED-proven first.
 
 ---
 
-## 4. v0.18.1 close-out plan
+## 4. Sign-off process (the v0.18.1 template — now applies to the owed v0.18.5 sign-off)
 
 1. **Collect** — the user runs `--collect-evidence` on the work PC (or the manual fallback) for
    each report against the live site and returns the zip(s) + any requested real source files.
@@ -149,11 +152,11 @@ v0.18.1 is accepted when the returned evidence confirms each item. Disposable de
    the PDF/parser corrections against the returned PDFs, and any Intersection Detail (PDF) live
    reconciliation. Each fix re-bless touches only its own report's canary; `compare_core` stays
    regression-locked.
-4. **Re-run the full offline suite** green, set `version.py` to `0.18.1`, update `CHANGELOG.md`,
-   and cut the v0.18.1 release via the existing `release.yml` (the same hash-pinned, `.sha256`-
-   enforced flow as v0.18.0).
-5. **Sign off** — with the checklist in §3 complete, v0.18.1 is the operationally-validated
-   close-out of the refactor; "enterprise-ready" is claimed here.
+4. **Re-run the full offline suite** green, set `version.py` to the sign-off version (now **0.18.5**),
+   update `CHANGELOG.md`, and cut the release via the existing `release.yml` (the same hash-pinned,
+   `.sha256`-enforced flow as v0.18.0).
+5. **Sign off** — with the §3 checklist complete, the sign-off release (v0.18.5) is the operationally-
+   validated milestone; "enterprise-ready" is claimed there.
 
 > The hard-deferrals stay deferred unless the user separately opts in: DPAPI at-rest auth (O2),
 > a runtime signature / code-signing cert (A03), and the `compare_core` `min-cost-pairs` optimum.
