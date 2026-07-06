@@ -3,7 +3,7 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
-## v0.19.0 — unreleased
+## v0.19.0 — 2026-07-06
 
 Usability and trust improvements, plus the structural cleanup groundwork. No change to how any
 comparison is calculated (the numbers are identical to v0.18.5 — re-blessed).
