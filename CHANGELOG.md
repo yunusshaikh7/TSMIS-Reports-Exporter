@@ -3,6 +3,25 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.19.0 — unreleased
+
+Usability and trust improvements, plus the structural cleanup groundwork. No change to how any
+comparison is calculated (the numbers are identical to v0.18.5 — re-blessed).
+
+- **One-click validation.** A new **Settings ▸ "Validate & package results"** button runs every
+  report already on this PC through the real comparison pipeline and saves everything a maintainer
+  needs — outcomes, TSN freshness, logs, and a per-comparison summary — into one file. It confirms
+  first (it refreshes those comparison cells and can take a few minutes), shows progress, and can
+  be cancelled. This replaces the old command-line evidence step.
+- **The same report organization everywhere.** The Consolidate and Compare tabs now group reports
+  into the same Ramp / Intersection / Highway families as the Export tab, so a report sits in the
+  same place on every tab.
+- **Add today to the by-day matrix before exporting.** Today's column now appears in the vs-TSN
+  by-day matrix even before you've exported anything for it — so you can export straight into it
+  from the matrix instead of having to export elsewhere first.
+- **Matrix panels stay usable while a comparison runs.** On smaller/laptop screens the two panels
+  on the right no longer shrink to unusable sizes when a job is in progress.
+
 ## v0.18.5 — 2026-07-03
 
 The audit release: every confirmed finding from the full-repo audit, with no new features.

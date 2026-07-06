@@ -30,14 +30,26 @@ consolidate / compare paths and the IT/DLP behavior can **only** be verified on 
 
 ---
 
-## 1. Gathering evidence — the credential-safe collector
+## 1. Gathering evidence
 
-The collector is the shipped exe run with one flag — no admin, no install, **and no cmd or
-PowerShell required** (the work PC has none). Two ways to run it:
+### The one-click button (v0.19.0+, preferred)
 
-**A. The no-cmd way (a desktop shortcut — preferred on a locked PC).** In the app folder,
-right-click `TSMIS Exporter.exe` → **Create shortcut**. Right-click the new shortcut →
-**Properties**, and in **Target** append the flag after the quoted exe path:
+**Settings ▸ "Validate & package results".** One click runs every sample already on this PC
+through the REAL comparison pipeline (each report × each environment with data, vs TSN — the same
+transactional path the matrix Refresh uses, so it also refreshes those matrix cells and rebuilds a
+stale TSN library), then packages everything a maintainer needs — the run outcomes, TSN freshness,
+logs, settings, and a per-comparison manifest (`validation.txt` + `validation.json`, counts and
+folder names only, never report data) — into one credential-safe zip. It confirms before running,
+shows progress, and can be cancelled. This is the automated replacement for the old
+`--collect-evidence` command line: no shortcut editing, no ad-hoc exports. The completion dialog
+names the saved zip; send that file.
+
+### The `--collect-evidence` command line (maintainer / dev reproduction only)
+
+Still available for a headless/scripted run OUTSIDE the GUI (it additionally runs the offline
+self-test, which the in-GUI button deliberately does NOT — the self-test launches a browser and a
+second window, unsafe from inside a running app). No admin, no install, and no cmd/PowerShell
+strictly required (a desktop-shortcut form works on a locked PC — see the collapsed note):
 
 ```
 "…\TSMIS Exporter.exe" --collect-evidence

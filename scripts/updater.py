@@ -868,7 +868,7 @@ def _recover_interrupted_swap(journal=None):
     # name (no separators / '..').
     try:
         same_install = app_dir.resolve() == install_dir().resolve()
-    except OSError:
+    except OSError:   # silent-ok: an unresolvable path fails CLOSED (rejected + logged below)
         same_install = False
     bad_pieces = [n for n in pieces
                   if n not in _BUNDLE_ITEMS or "/" in n or "\\" in n or n in ("..", ".")]
