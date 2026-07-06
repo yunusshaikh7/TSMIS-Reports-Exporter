@@ -25,7 +25,7 @@ try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
-    from openpyxl.formatting.rule import CellIsRule, FormulaRule
+    from openpyxl.formatting.rule import FormulaRule
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False

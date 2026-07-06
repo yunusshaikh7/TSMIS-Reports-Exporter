@@ -8,9 +8,7 @@ gui_worker re-exports these so every existing import keeps working.
 import base64
 import dataclasses
 import logging
-import re
 import threading
-import time
 from pathlib import Path
 
 import artifact_store
@@ -19,11 +17,11 @@ import outcome
 import consolidation_meta
 import owned_dir
 from common import (ROUTES, AuthError, BrowserNotFoundError, PreflightError,
-                    SiteUnreachableError, DATA_SOURCE_LABELS,
+                    DATA_SOURCE_LABELS,
                     ENVIRONMENT_LABELS, get_site, set_site)
 from events import Events
 from exporter import run_export, _wait_while_paused
-from paths import FAILURES_DIR, OUTPUT_ROOT, env_tagged_filename, parse_run_folder
+from paths import env_tagged_filename
 
 log = logging.getLogger("tsmis.gui")
 

@@ -9,15 +9,12 @@ are looked up through the facade AT CALL TIME (`_m.<name>`), so patching
 these internal calls exactly as it did before the split.
 """
 import logging
-import os
 import shutil
-import time
 from pathlib import Path
 
 import consolidation_meta
 import outcome
 import reports
-from events import Events
 
 import artifact_store
 from matrix_state import (_cell_input_fingerprint, _mode_by_id,
@@ -325,7 +322,6 @@ def _consolidated_filename(subdir):
     pdf_mod = _pdf_store_consolidator(subdir)
     if pdf_mod is not None:
         return pdf_mod.FILENAME
-    import reports                                   # lazy
     mod = reports.consolidator_for_subdir(subdir)
     if mod is None:
         raise ValueError(f"no consolidated filename for {subdir}")

@@ -16,7 +16,7 @@ from common import (
     PreflightError, SiteUnreachableError, BROWSER_CHANNELS, CHANNEL_LABELS,
     DATA_SOURCES, DATA_SOURCE_LABELS,
     ENVIRONMENTS, ENVIRONMENT_LABELS, resolve_parallel_channel,
-    auth_state, check_browsers, get_site, get_url, has_valid_auth,
+    auth_state, get_site, get_url, has_valid_auth,
     is_logged_in,
     capture_edge_login_state_from_profiles, capture_edge_login_state_over_cdp,
     capture_storage_state_if_logged_in, get_preferred_channel,
@@ -24,7 +24,6 @@ from common import (
     new_login_context, page_url_for_display, preflight,
     save_auth_state, set_thread_site, storage_state_is_portable,
 )
-from events import Events
 
 log = logging.getLogger("tsmis.gui")
 

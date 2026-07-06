@@ -301,7 +301,6 @@ class ChromiumWorker(threading.Thread):
         """Run the bundled driver's installer. Returns False when cancelled."""
         import os
         import subprocess
-        import time
 
         from playwright._impl._driver import compute_driver_executable
         try:

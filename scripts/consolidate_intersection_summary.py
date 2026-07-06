@@ -22,7 +22,6 @@ from pathlib import Path
 try:
     from openpyxl import Workbook, load_workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-    from openpyxl.utils import get_column_letter
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False

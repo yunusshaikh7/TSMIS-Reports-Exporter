@@ -15,7 +15,6 @@ except ImportError:
     # killed a windowed exe silently (exit 1, no dialog).
     raise
 
-from cli import run_cli
 from exporter import ReportSpec, save_pdf_letter
 
 SPEC = ReportSpec(
@@ -33,4 +32,5 @@ SPEC = ReportSpec(
 )
 
 if __name__ == "__main__":
+    from cli import run_cli
     run_cli(SPEC, title="TSMIS Ramp Summary Bulk Export")

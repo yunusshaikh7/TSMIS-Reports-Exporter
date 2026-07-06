@@ -188,9 +188,10 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: ruff (error rules — advisory)
-        continue-on-error: true
-        run: ruff check scripts --select E9,F63,F7,F82 --output-format=github
+      - name: ruff (error rules — BLOCKING; T2/ARC-01)
+        # F821 everywhere (the BUG-01 NameError class), F811, F401 (shims
+        # exempted in pyproject). The select set lives in pyproject.toml.
+        run: ruff check scripts --output-format=github
 
       - name: bandit (high severity / high confidence — advisory)
         continue-on-error: true

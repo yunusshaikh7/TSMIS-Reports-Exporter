@@ -9,16 +9,13 @@ import logging
 import threading
 from pathlib import Path
 
-import consolidation_meta
 import owned_dir
 import day_matrix
 import matrix
 import outcome
 from common import AuthError, BrowserNotFoundError, get_site, set_site
 from events import Events
-from exporter import run_export
 from gui_worker_export import ExportWorker
-from paths import OUTPUT_ROOT
 
 log = logging.getLogger("tsmis.gui")
 

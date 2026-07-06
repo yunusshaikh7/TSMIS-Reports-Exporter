@@ -32,7 +32,6 @@ except ImportError:
     # killed a windowed exe silently (exit 1, no dialog).
     raise
 
-from cli import run_cli
 from common import EXPORT_READY_JS
 from exporter import ReportSpec, save_via_export_button
 
@@ -56,4 +55,5 @@ SPEC = ReportSpec(
 )
 
 if __name__ == "__main__":
+    from cli import run_cli
     run_cli(SPEC, title="TSMIS Intersection Summary Bulk Export")

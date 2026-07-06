@@ -37,10 +37,23 @@ def _import_time_deps(tree, local):
     are KEPT (so a self-import is detectable)."""
     deps = set()
 
+    def _is_main_guard(node):
+        """True for `if __name__ == "__main__":` — that block never executes on
+        import, so its imports are NOT import-time edges (T2)."""
+        if not isinstance(node, ast.If):
+            return False
+        t = node.test
+        return (isinstance(t, ast.Compare)
+                and isinstance(t.left, ast.Name) and t.left.id == "__name__"
+                and any(isinstance(c, ast.Constant) and c.value == "__main__"
+                        for c in t.comparators))
+
     def visit(node):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 continue                       # body runs at call time, not import time
+            if _is_main_guard(child):
+                continue                       # __main__ tail: never runs on import
             if isinstance(child, ast.Import):
                 for alias in child.names:
                     top = alias.name.split(".")[0]
@@ -138,6 +151,20 @@ def main():
     check("no module-level import cycles", not cycles)
     for c in cycles:
         print("   cycle:", " <-> ".join(c))
+
+    # T2 (v0.19.0): LAYER direction — the console-free core must never import
+    # the GUI layer (gui_* / cli), and the matrix state side must not import
+    # its build side (only the facade may). A violation here means UI concerns
+    # leaked into the engine (the "core is console-free" convention).
+    gui_layer = {m for m in graph if m.startswith("gui_") or m == "cli"}
+    core = set(graph) - gui_layer
+    upward = sorted(f"{m} -> {d}" for m in core for d in graph.get(m, ())
+                    if d in gui_layer)
+    check("no core module imports the GUI layer (gui_*/cli)", not upward)
+    for e in upward:
+        print("   upward import:", e)
+    check("matrix_state never imports matrix_build (only the facade may)",
+          "matrix_build" not in graph.get("matrix_state", set()))
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

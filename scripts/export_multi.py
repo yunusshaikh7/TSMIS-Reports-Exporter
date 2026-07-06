@@ -18,7 +18,6 @@ except ImportError:
     # killed a windowed exe silently (exit 1, no dialog).
     raise
 
-from cli import run_cli_multi
 from reports import EXPORT_REPORTS
 
 # (label, ReportSpec) in menu order, derived from the shared registry so it can't
@@ -26,4 +25,5 @@ from reports import EXPORT_REPORTS
 REPORTS = [(label, spec) for label, _fmt, spec in EXPORT_REPORTS]
 
 if __name__ == "__main__":
+    from cli import run_cli_multi
     run_cli_multi(REPORTS, title="TSMIS Multi-Report Export")

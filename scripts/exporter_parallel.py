@@ -62,7 +62,6 @@ from events import Events, RunResult
 # sequential engine, so a per-report fix benefits both.
 from exporter import (
     _can_resume,
-    _capture_failure,
     _process_route,
     _record,
     _retry_failed_routes,
