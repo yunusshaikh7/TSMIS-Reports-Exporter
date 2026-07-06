@@ -133,6 +133,52 @@ def _ui_index_path():
 
 
 
+def _export_report_rows():
+    """Export-picker rows in PICKER_ORDER (flat reports first, then family groups);
+    `group`/`short` drive the grouped picker, `key` is the stable op key, `idx` is
+    display position only."""
+    ordered = sorted(export_reports_status(),
+                     key=lambda t: PICKER_ORDER.index(t[3].subdir))
+    out = []
+    for pos, (_i, label, fmt, spec, disabled) in enumerate(ordered):
+        group, short = EXPORT_DISPLAY.get(spec.subdir, (None, None))
+        out.append({"key": spec.subdir, "idx": pos, "label": label, "fmt": fmt,
+                    "disabled": disabled, "group": group, "short": short})
+    return out
+
+
+def _cons_report_rows():
+    """Consolidate rows in CONSOLIDATE_DISPLAY order/grouping (W2 — same families
+    as the Export picker). The INPUT format badge: a module's own INPUT_FMT wins,
+    else the matching export report's format, else Excel."""
+    export_fmt = {label: fmt for label, fmt, _spec in EXPORT_REPORTS}
+    by_key = dict(zip(CONSOLIDATE_KEYS, CONSOLIDATE_REPORTS))
+    _order, meta = CONSOLIDATE_DISPLAY
+    out = []
+    for key in _order:
+        label, mod = by_key[key]
+        group, short = meta[key]
+        out.append({"key": key, "label": label, "group": group, "short": short,
+                    "fmt": getattr(mod, "INPUT_FMT", None) or export_fmt.get(label, "Excel")})
+    return out
+
+
+def _compare_report_rows():
+    """Compare rows in COMPARE_DISPLAY order (W2 — family-ordered within each
+    comparison-type sub-tab). `group` is the SUB-TAB id; `family_group` is the
+    Export-picker family header; the two file labels avoid mislabeling PDF-vs-Excel."""
+    by_key = dict(zip(COMPARE_KEYS, COMPARE_REPORTS))
+    _order, meta = COMPARE_DISPLAY
+    out = []
+    for key in _order:
+        label, mod, kind, group = by_key[key]
+        out.append({"key": key, "label": label, "kind": kind, "group": group,
+                    "family_group": meta[key], "subdir": getattr(mod, "subdir", None),
+                    "file_a_label": getattr(mod, "file_a_label", "TSMIS"),
+                    "file_b_label": getattr(mod, "file_b_label", "TSN")})
+    return out
+
+
 def _report_list_payload():
     """The report-list metadata the GUI bridge sends the frontend (the Export /
     Consolidate / Compare tab lists). PURE — derived from the report registry, with
@@ -140,54 +186,11 @@ def _report_list_payload():
     `get_initial_state` ships AND a safe, read-only oracle for the catalog parity
     check. (Constructing GuiApi would write the TSN library skeleton via
     `ensure_layout` and start the worker threads — P4-R05.)"""
-    _export_fmt = {label: fmt for label, fmt, _spec in EXPORT_REPORTS}
-    _cons_by_key = {CONSOLIDATE_KEYS[i]: row
-                    for i, row in enumerate(CONSOLIDATE_REPORTS)}
-    _cmp_by_key = {COMPARE_KEYS[i]: row for i, row in enumerate(COMPARE_REPORTS)}
     return {
-        # Every export report, with `disabled` marking the app-wide-disabled ones
-        # (none today). The UI shows disabled rows GREYED (not hidden). `key` is the
-        # stable export-op key the UI passes back (P3 / §C.5); `idx` is the DISPLAY
-        # position in this list (not the registry order) — the UI keys off `key`, so
-        # idx is metadata only. `group`/`short` (P-D) drive the family-grouped picker.
-        # The list is ordered by PICKER_ORDER (flat reports first in the site's order,
-        # then the family groups), distinct from the registry order.
-        "reports": [{"key": spec.subdir, "idx": pos, "label": label, "fmt": fmt,
-                     "disabled": disabled,
-                     "group": EXPORT_DISPLAY.get(spec.subdir, (None, None))[0],
-                     "short": EXPORT_DISPLAY.get(spec.subdir, (None, None))[1]}
-                    for pos, (_i, label, fmt, spec, disabled) in enumerate(sorted(
-                        export_reports_status(),
-                        key=lambda t: PICKER_ORDER.index(t[3].subdir)))],
-        # Each consolidate entry carries its INPUT file format for the tab badge: a
-        # module's own INPUT_FMT (the PDF-input consolidators) wins, else the matching
-        # export report's format, else Excel. W2: ordered + grouped like the Export
-        # picker (CONSOLIDATE_DISPLAY); selection stays key-based, so display order
-        # is free to differ from the registry order.
-        "cons_reports": [
-            (lambda label, _mod, key: {
-                "key": key, "label": label,
-                "group": CONSOLIDATE_DISPLAY[1][key][0],
-                "short": CONSOLIDATE_DISPLAY[1][key][1],
-                "fmt": (getattr(_mod, "INPUT_FMT", None)
-                        or _export_fmt.get(label, "Excel"))})
-            (*_cons_by_key[key], key)
-            for key in CONSOLIDATE_DISPLAY[0]],
-        "compare_groups": [{"id": gid, "label": glabel}
-                           for gid, glabel in COMPARE_GROUPS],
-        # W2: family-ordered within each comparison-type sub-tab; `family_group`
-        # is the Export-picker family header (`group` stays the SUB-TAB id).
-        "compare_reports": [
-            (lambda label, _mod, kind, group, key: {
-                "key": key, "label": label, "kind": kind, "group": group,
-                "family_group": COMPARE_DISPLAY[1][key],
-                "subdir": getattr(_mod, "subdir", None),
-                # The two file-picker labels for "files" comparisons (so
-                # PDF-vs-Excel doesn't mislabel both TSMIS sides).
-                "file_a_label": getattr(_mod, "file_a_label", "TSMIS"),
-                "file_b_label": getattr(_mod, "file_b_label", "TSN")})
-            (*_cmp_by_key[key], key)
-            for key in COMPARE_DISPLAY[0]],
+        "reports": _export_report_rows(),
+        "cons_reports": _cons_report_rows(),
+        "compare_groups": [{"id": gid, "label": glabel} for gid, glabel in COMPARE_GROUPS],
+        "compare_reports": _compare_report_rows(),
     }
 
 
