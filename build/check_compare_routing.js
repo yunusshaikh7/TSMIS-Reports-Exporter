@@ -13,7 +13,10 @@ const path = require("path");
 const vm = require("vm");
 
 const appjs = fs.readFileSync(
-  path.join(__dirname, "..", "scripts", "ui", "app.js"), "utf8");
+  path.join(__dirname, "..", "scripts", "ui", "app.js"), "utf8")
+  // S5: the compare cluster moved to ui-compare.js (same global scope) — the
+  // extracted-function sandbox reads both.
+  + fs.readFileSync(path.join(__dirname, "..", "scripts", "ui", "ui-compare.js"), "utf8");
 
 function extract(re, label) {
   const m = appjs.match(re);
