@@ -544,6 +544,7 @@ def test_interrupted_swap_recovery(monkeypatch_wait):
     orig_update_dir = updater.UPDATE_DIR
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_swapj_"))
     updater.UPDATE_DIR = tmp / "update"
+    orig_install_dir = updater.install_dir
     try:
         # --- an ORDERLY swap leaves no journal behind -----------------------
         app = tmp / "app-ok"
@@ -572,6 +573,7 @@ def test_interrupted_swap_recovery(monkeypatch_wait):
             {"version": 1, "app_dir": str(app2),
              "pieces": [updater._EXE_NAME, "_internal", "IT-README.txt"]}),
             encoding="utf-8")
+        updater.install_dir = lambda: app2      # the same-install guard (security fix)
         outcome = updater._recover_interrupted_swap()
         check("gap tree recovers FORWARD", outcome == "completed")
         check("...the gap piece is back (new bytes)",
@@ -590,6 +592,7 @@ def test_interrupted_swap_recovery(monkeypatch_wait):
         journal.write_text(json.dumps(
             {"version": 1, "app_dir": str(app3),
              "pieces": [updater._EXE_NAME, "_internal"]}), encoding="utf-8")
+        updater.install_dir = lambda: app3
         outcome = updater._recover_interrupted_swap()
         check("unfinishable tree ROLLS BACK", outcome == "rolled-back")
         check("...old exe restored",
@@ -602,7 +605,35 @@ def test_interrupted_swap_recovery(monkeypatch_wait):
         journal.write_text("{not json", encoding="utf-8")
         check("corrupt journal -> None, removed",
               updater._recover_interrupted_swap() is None and not journal.exists())
+
+        # --- a TAMPERED journal is REJECTED, never acted on (fail-closed) ------
+        orig_install = updater.install_dir
+        victim = tmp / "victim"
+        _make_tree(victim, b"VICTIM-EXE", b"VICTIM-DLL")
+        (victim / (updater._EXE_NAME + ".old")).write_bytes(b"OLD")
+        try:
+            # app_dir points AWAY from this install -> reject (don't rename victim)
+            updater.install_dir = lambda: tmp / "real-install"
+            journal.write_text(json.dumps(
+                {"version": 1, "app_dir": str(victim),
+                 "pieces": [updater._EXE_NAME]}), encoding="utf-8")
+            out = updater._recover_interrupted_swap()
+            check("foreign app_dir journal -> rejected (None), removed",
+                  out is None and not journal.exists())
+            check("...the foreign tree was NOT touched",
+                  (victim / updater._EXE_NAME).read_bytes() == b"VICTIM-EXE")
+            # a traversal piece name -> reject even for the right install
+            updater.install_dir = lambda: victim
+            journal.write_text(json.dumps(
+                {"version": 1, "app_dir": str(victim),
+                 "pieces": ["..\\..\\Windows\\System32\\evil"]}), encoding="utf-8")
+            out = updater._recover_interrupted_swap()
+            check("traversal piece-name journal -> rejected (None), removed",
+                  out is None and not journal.exists())
+        finally:
+            updater.install_dir = orig_install
     finally:
+        updater.install_dir = orig_install_dir
         updater.UPDATE_DIR = orig_update_dir
 
 

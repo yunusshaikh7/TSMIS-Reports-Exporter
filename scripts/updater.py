@@ -861,6 +861,22 @@ def _recover_interrupted_swap(journal=None):
                     type(e).__name__, e)
         _clear_swap_journal(journal)
         return None
+    # Fail CLOSED on a tampered/foreign journal (defense-in-depth, mirroring the
+    # phase-1 allowlist): recovery RENAMES files, so a planted journal must not
+    # point it at an arbitrary directory or a path outside the known bundle. The
+    # app_dir MUST be this install, and every piece MUST be a bare _BUNDLE_ITEMS
+    # name (no separators / '..').
+    try:
+        same_install = app_dir.resolve() == install_dir().resolve()
+    except OSError:
+        same_install = False
+    bad_pieces = [n for n in pieces
+                  if n not in _BUNDLE_ITEMS or "/" in n or "\\" in n or n in ("..", ".")]
+    if not same_install or bad_pieces:
+        log.warning("update: REJECTING a swap journal (app_dir=%s vs %s, "
+                    "bad_pieces=%s); removing it", app_dir, install_dir(), bad_pieces)
+        _clear_swap_journal(journal)
+        return None
     log.warning("update: an INTERRUPTED swap was found (%d pieces in %s) - "
                 "recovering before the leftover sweep", len(pieces), app_dir)
     outcome = "failed"
