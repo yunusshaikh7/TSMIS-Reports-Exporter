@@ -1139,6 +1139,18 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         src = tsn_source(dest, mode["tsn_subdir"], tsn_files.get(mode["tsn_subdir"]))
         if src.get("kind") not in ("file", "consolidated"):
             raise ValueError("no consolidated TSN workbook available")
+        if src.get("kind") == "consolidated":
+            # D2 auto-heal: a version/mtime-stale library rebuilds from raw
+            # BEFORE the comparison reads it (else a normalizer fix silently
+            # "looks unfixed" until a manual Settings rebuild).
+            import tsn_library                           # lazy: no import cycle
+            healed = tsn_library.ensure_current(mode["tsn_subdir"], events)
+            if healed is not None:
+                if healed.status != "ok":
+                    raise ValueError(healed.message
+                                     or "the TSN library rebuild failed")
+                src = tsn_source(dest, mode["tsn_subdir"],
+                                 tsn_files.get(mode["tsn_subdir"]))
         result = consolidate_and_compare_tsn(
             dest / cell_key / mode["env_subdir"], src["path"], out_path,
             row_key, mode["env_subdir"], events, confirm_overwrite=confirm_overwrite,

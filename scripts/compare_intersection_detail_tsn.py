@@ -175,7 +175,7 @@ def _split_route(tok):
     the suffix is surfaced as the compared 'Route Suffix' column — so a suffix-only
     difference is flagged there (TSN 'U' vs TSMIS blank) rather than the rows being
     dropped to one-sided OR silently merged."""
-    t = str(tok or "").strip().upper().replace("-", " ")
+    t = ("" if tok is None else str(tok)).strip().upper().replace("-", " ")
     parts = t.split()
     last = parts[-1] if parts else ""
     m = re.fullmatch(r"(\d+)([A-Z]?)", last)
@@ -229,7 +229,7 @@ def _norm_control_type(v):
     category TSMIS stores), so the sub-type split no longer reads as a difference. The
     compared cell therefore shows "S" wherever the crosswalk applied. Every other code
     is left as-is (both systems share A/B/C/D/E/F/G/H/I/R/Z)."""
-    s = str(v or "").strip().upper()
+    s = ("" if v is None else str(v)).strip().upper()
     return _SIGNALIZED_LABEL if s in _SIGNALIZED_CODES else _v(v)
 
 
@@ -555,7 +555,7 @@ _RV_COMMENTS = {
 
 
 def _rv_pdate(s):
-    m = re.match(r"(\d{4})-(\d{2})-(\d{2})$", str(s or ""))
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})$", "" if s is None else str(s))
     try:
         return date(int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
     except (ValueError, AttributeError):  # silent-ok: a value normalizer; malformed dates read as blank

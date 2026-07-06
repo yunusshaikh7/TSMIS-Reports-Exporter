@@ -50,6 +50,7 @@ class TsnReport:
     raw_kind: str          # "district_pdfs" | "statewide_pdf" | "statewide_xlsx"
     consolidated_name: str # filename written into consolidated/
     builder: str           # "module:function"; func(raw_dir, out_path, events, confirm_overwrite)
+    normalization_version: int = 1   # bumped in the CATALOG when the normalizer changes (D2)
 
 
 # Registry — DERIVED from report_catalog (the report-metadata SoT, P4), so each
@@ -64,6 +65,7 @@ _REPORTS = {
         raw_kind=e.raw_kind,
         consolidated_name=e.consolidated_name,
         builder=e.builder,
+        normalization_version=e.normalization_version,
     )
     for e in _catalog.tsn_entries()
 }
@@ -291,8 +293,17 @@ def status(report):
     cons = consolidated_path(report)
     cons_exists = cons.is_file()
     cons_mtime = _safe_mtime(cons) if cons_exists else None
+    # D2: the library stores ALREADY-NORMALIZED values, so "current" also means
+    # "built by the CURRENT normalizer". An absent/mismatched stamp (every
+    # pre-stamp library, or any library built before a normalizer fix) reads
+    # STALE — fail-safe; ensure_current()/build_consolidated then rebuild from
+    # the retained raw instead of silently comparing stale values (the
+    # v0.17.6 / v0.18.3 "looks unfixed" trap).
+    norm_current = bool(cons_exists and consolidation_meta.read_extra(
+        cons, "tsn_normalization_version") == spec.normalization_version)
     current = bool(cons_exists and raws and cons_mtime is not None
-                   and raw_newest is not None and cons_mtime >= raw_newest)
+                   and raw_newest is not None and cons_mtime >= raw_newest
+                   and norm_current)
     return {
         "report": report,
         "label": spec.label,
@@ -303,6 +314,7 @@ def status(report):
         "consolidated_present": cons_exists,
         "consolidated_path": str(cons),
         "consolidated_mtime": cons_mtime,
+        "normalization_current": norm_current,
         "current": current,
     }
 
@@ -375,12 +387,36 @@ def build_consolidated(report, events=None, confirm_overwrite=None, force=False)
     # False return = a non-complete normalization's flag could NOT be recorded
     # (publication failed): the build cannot claim a safely persisted artifact, so report
     # an error result rather than the success-shaped one (the worker/UI surfaces it).
-    if not consolidation_meta.write_outcome(out, result):
+    if not consolidation_meta.write_outcome(
+            out, result,
+            extra={"tsn_normalization_version": spec.normalization_version}):
         return ConsolidateResult(
             status="error",
             message=(f"{spec.label}: the consolidation finished but its outcome could not "
                      "be recorded; the incomplete workbook was discarded — re-run."))
     return result
+
+
+def ensure_current(report, events=None):
+    """Auto-heal hook the compare paths call before READING the library's
+    consolidated workbook (D2): a stale library — normalizer version mismatch or
+    raw newer than the build — rebuilds itself from the retained raw, announced.
+    Returns the rebuild's ConsolidateResult, or None when nothing needed doing
+    (current / unregistered / nothing built yet / no raw to rebuild from — the
+    not-yet-built flow keeps its explicit import-and-build UX, and Settings
+    keeps flagging a stale library that has no raw)."""
+    if not is_registered(report):
+        return None
+    st = status(report)
+    if st["current"] or not st["consolidated_present"] or not st["raw_present"]:
+        return None
+    ev = events or Events()
+    spec = get(report)
+    why = ("normalization updated" if not st.get("normalization_current")
+           else "raw files changed")
+    ev.on_log(f"TSN library: rebuilding {spec.label} ({why})…")
+    log.info("tsn library: auto-rebuild %s (%s)", report, why)
+    return build_consolidated(report, events=events)
 
 
 # --------------------------------------------------------------------------- #

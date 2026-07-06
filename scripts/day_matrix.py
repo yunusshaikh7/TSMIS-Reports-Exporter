@@ -362,6 +362,13 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     src_tsn = matrix.tsn_source(dest, tsn_subdir, tsn_files.get(tsn_subdir))
     if src_tsn.get("kind") not in ("file", "consolidated"):
         raise ValueError("no consolidated TSN workbook available")
+    if src_tsn.get("kind") == "consolidated":
+        import tsn_library                               # lazy: no import cycle
+        healed = tsn_library.ensure_current(tsn_subdir, events)
+        if healed is not None:
+            if healed.status != "ok":
+                raise ValueError(healed.message or "the TSN library rebuild failed")
+            src_tsn = matrix.tsn_source(dest, tsn_subdir, tsn_files.get(tsn_subdir))
 
     out_path = day_out_path(date, source, row_key)
     result = matrix.consolidate_and_compare_tsn(

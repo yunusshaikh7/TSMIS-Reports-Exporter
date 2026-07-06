@@ -137,7 +137,7 @@ def _quarantine(consolidated):
         return False
 
 
-def write_outcome(consolidated, result):
+def write_outcome(consolidated, result, extra=None):
     """Record `result`'s producer completion beside its workbook, ATOMICALLY — the
     boundary every persistent-consolidated writer calls right after a successful write.
 
@@ -161,6 +161,11 @@ def write_outcome(consolidated, result):
         "failed_inputs": int(getattr(result, "failed_inputs", 0) or 0),
         "built_at_mtime": _safe_mtime(consolidated),
     }
+    if extra:
+        payload.update(extra)          # additive producer metadata (e.g. the TSN
+                                       # normalization version, D2); readers are
+                                       # tolerant, so unknown keys are harmless
+
     p = meta_path(consolidated)
     tmp = p.with_name(p.name + ".tmp")
     try:
@@ -201,6 +206,24 @@ def write_outcome(consolidated, result):
                      "sentinel, or quarantine the incomplete workbook; a later reuse could "
                      "read it as complete", consolidated.name)
         return False
+
+
+def read_extra(consolidated, key, default=None):
+    """A single additive payload field from the workbook's sidecar, tolerantly:
+    absent sidecar / unreadable / corrupt / missing key -> `default`. Used for
+    producer metadata like the TSN normalization version (D2) — the FAIL-SAFE
+    direction is the default (an unstampable read counts as stale)."""
+    p = meta_path(Path(consolidated))
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+    except OSError:                    # silent-ok: absent sidecar is the normal pre-stamp state
+        return default
+    except ValueError as e:
+        log.info("sidecar for %s unreadable for %r (%s: %s); using the default",
+                 Path(consolidated).name, key, type(e).__name__, e)
+        return default
+    return data.get(key, default) if isinstance(data, dict) else default
 
 
 def read_completion(consolidated):

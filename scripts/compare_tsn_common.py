@@ -35,8 +35,11 @@ from events import ConsolidateResult, Events
 # --------------------------------------------------------------------------- #
 def norm_pm(pm):
     """Postmile to one canon: strip the zero-padding TSN prints (' 000.606')
-    while keeping the decimal ('0.606' stays distinct from '000.606')."""
-    s = str(pm or "").strip()
+    while keeping the decimal ('0.606' stays distinct from '000.606'). A real
+    numeric 0/0.0 canonicalizes to '0', NOT blank — `pm or ""` was the falsy-zero
+    idiom (v0.18.3's phantom-diff root cause), and THIS normalizer feeds the
+    row-ALIGNMENT keys, so a blanked 0 mis-aligned rows, not just cells."""
+    s = ("" if pm is None else str(pm)).strip()
     if not s:
         return ""
     neg = s.startswith("-")
@@ -50,7 +53,7 @@ def iso_date(d):
     """A Date of Record to YYYY-MM-DD across the formats the two systems print:
     TSMIS 'MM/DD/YYYY', TSN 'YYYY-MM-DD[ HH:MM:SS]', and TSN's 2-digit 'YY-MM-DD'
     (windowed at 30: >=30 -> 19xx, else 20xx)."""
-    s = str(d or "").strip()
+    s = ("" if d is None else str(d)).strip()
     if not s:
         return ""
     m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)

@@ -122,6 +122,9 @@ def test_schema():
     check("control-type crosswalk: TSN J-P + TSMIS S -> 'S' (signalized); others unchanged",
           all(idt._norm_control_type(c) == "S" for c in "JKLMNPS")
           and idt._norm_control_type("A") == "A" and idt._norm_control_type("B") == "B")
+    check("route token: numeric 0 keys as '000', never blank (falsy-zero D1 — "
+          "_split_route feeds the alignment key)",
+          idt._split_route(0) == ("000", ""))
     # Report View (v0.17.8): every date difference renders RED like a genuine conflict but is
     # kept OUT of the per-record Major count; the lighter alternating band is WHITE (user, 2026-06-24).
     check("Report View: date 'soft' diffs share the hard RED palette (all dates red)",

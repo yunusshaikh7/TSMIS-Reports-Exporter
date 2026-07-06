@@ -69,7 +69,14 @@ ExportEntry = namedtuple("ExportEntry", "key label fmt spec group short_label",
                          defaults=(None, None))
 ConsolidateEntry = namedtuple("ConsolidateEntry", "key label module")
 CompareEntry = namedtuple("CompareEntry", "key label adapter kind group")
-TsnEntry = namedtuple("TsnEntry", "subdir label raw_glob raw_kind consolidated_name builder")
+# normalization_version: bump WHENEVER a report's TSN normalizer/parser changes
+# behavior. The library stores ALREADY-NORMALIZED values, so an old build must
+# read as stale and auto-rebuild from raw (D2) — a silent mismatch shipped wrong
+# comparison numbers twice (v0.17.6, v0.18.3).
+TsnEntry = namedtuple(
+    "TsnEntry",
+    "subdir label raw_glob raw_kind consolidated_name builder normalization_version",
+    defaults=(1,))
 
 # ----------------------------------------------------------------------------- #
 # The authoritative, ORDERED report metadata. Order == display order (the GUI
@@ -225,17 +232,17 @@ _AUTO_CONSOLIDATOR = (
 # pull openpyxl/pdfplumber, so the catalog is console-free but not dependency-light).
 TSN = (
     TsnEntry("highway_log", "TSN Highway Log", "*.pdf", "district_pdfs",
-             "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into"),
+             "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into", normalization_version=2),
     TsnEntry("ramp_detail", "TSN Ramp Detail", "*.xlsx", "statewide_xlsx",
-             "tsn_ramp_detail_normalized.xlsx", "tsn_load_ramp_detail:build_into"),
+             "tsn_ramp_detail_normalized.xlsx", "tsn_load_ramp_detail:build_into", normalization_version=2),
     TsnEntry("ramp_summary", "TSN Ramp Summary", "*.pdf", "statewide_pdf",
-             "tsn_ramp_summary_normalized.xlsx", "tsn_load_ramp_summary:build_into"),
+             "tsn_ramp_summary_normalized.xlsx", "tsn_load_ramp_summary:build_into", normalization_version=2),
     TsnEntry("intersection_summary", "TSN Intersection Summary", "*.pdf", "statewide_pdf",
-             "tsn_intersection_summary_normalized.xlsx", "tsn_load_intersection_summary:build_into"),
+             "tsn_intersection_summary_normalized.xlsx", "tsn_load_intersection_summary:build_into", normalization_version=2),
     TsnEntry("intersection_detail", "TSN Intersection Detail", "*.xlsx", "statewide_xlsx",
-             "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into"),
+             "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into", normalization_version=2),
     TsnEntry("highway_sequence", "TSN Highway Sequence", "*.pdf", "district_pdfs",
-             "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into"),
+             "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into", normalization_version=2),
 )
 
 

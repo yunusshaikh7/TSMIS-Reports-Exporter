@@ -74,7 +74,7 @@ _DESC_PREFIX = re.compile(r"^\s*\d+\s*/\s*")     # TSMIS "001/NB OFF…" -> "NB 
 # normalization (shared by both loaders)
 # --------------------------------------------------------------------------- #
 def _norm_route(tok):
-    t = str(tok or "").strip().upper()
+    t = ("" if tok is None else str(tok)).strip().upper()
     m = re.fullmatch(r"(\d+)([A-Z]?)", t)
     return f"{int(m.group(1)):03d}{m.group(2)}" if m else t
 
@@ -87,7 +87,7 @@ _iso_date = ctc.iso_date
 
 
 def _strip_desc_prefix(text):
-    return _DESC_PREFIX.sub("", str(text or "").strip())
+    return _DESC_PREFIX.sub("", ("" if text is None else str(text)).strip())
 
 
 def _v(x):
@@ -102,7 +102,8 @@ def _tsn_raw_row(r, h):
     def g(name):
         i = h.get(name)
         return r[i] if i is not None and i < len(r) else None
-    loc = str(g("LOCATION") or "")
+    _loc_raw = g("LOCATION")
+    loc = "" if _loc_raw is None else str(_loc_raw)
     m = _ROUTE_FROM_LOCATION.match(loc)
     route = _norm_route(m.group(1)) if m else loc.strip().upper()
     return [route,

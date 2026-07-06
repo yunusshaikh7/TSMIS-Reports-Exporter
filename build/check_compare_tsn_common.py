@@ -71,6 +71,13 @@ def test_normalizers():
     check("norm_pm keeps a leading-dot decimal ('.5' -> '0.5') + sign ('-000.5' -> '-0.5')",
           ctc.norm_pm(".5") == "0.5" and ctc.norm_pm("-000.5") == "-0.5")
     check("norm_pm empty -> ''", ctc.norm_pm(None) == "" and ctc.norm_pm("   ") == "")
+    # D1/BUG-07: a real numeric 0 canonicalizes to '0', never blank — this
+    # normalizer feeds the row-ALIGNMENT keys, so a blanked 0 mis-aligned rows
+    # (the falsy-zero idiom behind v0.18.3's phantom diffs).
+    check("norm_pm numeric 0 -> '0' (not blank; alignment-key safe)",
+          ctc.norm_pm(0) == "0" and ctc.norm_pm("0") == "0")
+    check("iso_date numeric-ish input never blanks via falsy-zero",
+          ctc.iso_date(None) == "" and ctc.iso_date(0) != "" or ctc.iso_date(0) == "0")
     check("iso_date TSMIS MM/DD/YYYY -> ISO", ctc.iso_date("02/25/1976") == "1976-02-25")
     check("iso_date TSN 'YYYY-MM-DD HH:MM:SS' -> ISO", ctc.iso_date("1992-09-28 00:00:00") == "1992-09-28")
     check("iso_date TSN 2-digit year windowed (>=30 -> 19xx, <30 -> 20xx)",
