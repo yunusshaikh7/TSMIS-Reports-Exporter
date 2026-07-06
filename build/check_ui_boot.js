@@ -50,6 +50,9 @@ const html = read("index.html");
 const uiDom = read("ui-dom.js");
 const uiMatrix = read("ui-matrix.js");
 const uiSettings = read("ui-settings.js");
+const uiExport = read("ui-export.js");      // S5: the per-tab splits
+const uiBatch = read("ui-batch.js");
+const uiCompare = read("ui-compare.js");
 
 // 2. The mock moved OUT of app.js; production boot only.
 check("app.js no longer DEFINES makeMockApi (it moved to mock.js)",
@@ -113,10 +116,14 @@ for (const f of ["contract.js", "ui-dom.js", "ui-matrix.js", "ui-settings.js", "
 //    keeps the entry points (boot/bindEvents/buildStatic/S/WANT_MOCK -- locked above).
 const MODULES = {
   "ui-dom.js": { src: uiDom, fns: ["setDot", "icon", "appendLog", "buildModal", "showConfirm", "showRoutePicker"] },
+  "ui-export.js": { src: uiExport, fns: ["openPreviewModal", "renderPreflight", "startExport"] },
+  "ui-batch.js": { src: uiBatch, fns: ["startBatch", "renderBatchLibrary", "startConsolidate"] },
+  "ui-compare.js": { src: uiCompare, fns: ["selectCompareGroup", "applyMatrixWide", "startCompare"] },
   "ui-matrix.js": { src: uiMatrix, fns: ["renderMatrix", "renderDayMatrix", "mxCellContent", "renderMatrixConfig", "dndAttach"] },
   "ui-settings.js": { src: uiSettings, fns: ["fillSettings", "renderTsnLibrary", "renderExportBrowser", "verifyEnvironment"] },
 };
-const allUi = app + uiDom + uiMatrix + uiSettings;   // all real-UI scripts, one scope
+const allUi = app + uiDom + uiMatrix + uiSettings
+            + uiExport + uiBatch + uiCompare;         // all real-UI scripts, one scope
 // "wiring intact" = a reference EXISTS BEYOND the declaration: a call `fn(...)` OR a
 // handler/value use (`= fn`, `fn,`). The declaration is STRIPPED first, so the check
 // can't pass on the declaration alone -- the old `\bfn\s*\(` matched `function fn(`

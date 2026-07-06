@@ -107,10 +107,10 @@
       <!-- Which site the export targets, and whether it's reachable -->
       <div class="target-group">
         <label class="tb-field">Data source
-          <span class="tb-select"><select id="selSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+          <span class="tb-select"><select id="selSource" data-lock-when-busy></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
         </label>
         <label class="tb-field">Environment
-          <span class="tb-select"><select id="selEnv"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+          <span class="tb-select"><select id="selEnv" data-lock-when-busy></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
         </label>
         <button class="btn btn-titlebar" id="btnEnvAccess"
                 title="Sign-in + report access across all six environments — run the check from Settings ▸ TSMIS site addresses">
@@ -142,7 +142,7 @@
             </button>
           </div>
         </div>
-        <button class="btn-icon" id="btnVerifyEnv"
+        <button class="btn-icon" id="btnVerifyEnv" data-lock-when-busy
                 aria-label="Verify environment — open the selected site and show a screenshot"
                 title="Open TSMIS on the selected source/environment (signs in in the background) and show a screenshot — proof exports hit the right site">
           <svg class="ic"><use href="#i-camera"/></svg>
@@ -194,9 +194,9 @@
         <div class="card-section">
           <div class="section-head"><span class="section-label">Routes</span></div>
           <div class="routes-row">
-            <input type="text" class="input" id="routesInput" autocomplete="off"
+            <input type="text" class="input" id="routesInput" data-lock-when-busy autocomplete="off"
                    spellcheck="false" placeholder="e.g. 5, 99, 101 — leave blank for all">
-            <button class="btn btn-standard" id="btnChooseRoutes">
+            <button class="btn btn-standard" id="btnChooseRoutes" data-lock-when-busy>
               <svg class="ic"><use href="#i-folder-open"/></svg>Choose…
             </button>
           </div>
@@ -230,7 +230,7 @@
         </div>
 
         <div class="card-section actions-row">
-          <button class="btn btn-accent" id="btnStartExport">
+          <button class="btn btn-accent" id="btnStartExport" data-lock-when-busy>
             <svg class="ic"><use href="#i-play"/></svg>Start export
           </button>
           <button class="btn btn-subtle" id="btnSkip" disabled>
@@ -268,7 +268,7 @@
           <div class="section-head"><span class="section-label">Destination</span></div>
           <div class="dest-row">
             <span class="dest-path" id="batchDest" title="">—</span>
-            <button class="btn btn-standard" id="btnPickBatchDest">
+            <button class="btn btn-standard" id="btnPickBatchDest" data-lock-when-busy>
               <svg class="ic"><use href="#i-folder-open"/></svg>Change…
             </button>
           </div>
@@ -317,7 +317,7 @@
           <p class="hint">Exports every ticked report type for every ticked environment, one after another, into the destination folder below (one subfolder per environment, refreshed in place — not dated run folders). The job is saved to disk, so you can pause and pick up later — even after closing the app.</p>
         </div>
         <div class="card-section actions-row">
-          <button class="btn btn-accent" id="btnStartBatch">
+          <button class="btn btn-accent" id="btnStartBatch" data-lock-when-busy>
             <svg class="ic"><use href="#i-refresh"/></svg>Refresh everything
           </button>
           <button class="btn btn-subtle" id="btnPauseBatch" disabled>
@@ -409,7 +409,7 @@
         <div class="card-section" id="consDaySection">
           <div class="section-head"><span class="section-label">Export day</span></div>
           <div class="day-row">
-            <span class="tb-select select-light"><select id="selDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+            <span class="tb-select select-light"><select id="selDay" data-lock-when-busy></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
             <span class="hint">(newest first)</span>
           </div>
         </div>
@@ -425,7 +425,7 @@
         </div>
 
         <div class="card-section actions-row">
-          <button class="btn btn-accent" id="btnStartCons">
+          <button class="btn btn-accent" id="btnStartCons" data-lock-when-busy>
             <svg class="ic"><use href="#i-layers"/></svg>Start consolidation
           </button>
           <button class="btn btn-subtle" id="btnCancelCons" disabled>
@@ -642,14 +642,14 @@
             </label>
           </div>
           <div class="actions-row" style="margin-top:10px">
-            <button class="btn btn-standard" id="btnValidate"
+            <button class="btn btn-standard" id="btnValidate" data-lock-when-busy
                     title="Process every sample on this PC through the real comparison pipeline and package the results">
               <svg class="ic"><use href="#i-check"/></svg>Validate &amp; package results
             </button>
             <button class="btn btn-subtle hidden" id="btnValidateCancel">
               <svg class="ic"><use href="#i-x"/></svg>Cancel validation
             </button>
-            <button class="btn btn-standard" id="btnSupportBundle">
+            <button class="btn btn-standard" id="btnSupportBundle" data-lock-when-busy>
               <svg class="ic"><use href="#i-package"/></svg>Save support bundle…
             </button>
             <button class="btn btn-standard" id="btnOpenFailures">
@@ -679,7 +679,7 @@
             parameters unless the new site drops them).
           </p>
           <div class="actions-row" style="margin-bottom:8px">
-            <button class="btn btn-standard" id="btnCheckEnvs"
+            <button class="btn btn-standard" id="btnCheckEnvs" data-lock-when-busy
                     title="Open each of the six sites headless (signs in like an export) and verify the report form can load its data and every report type is offered">
               <svg class="ic"><use href="#i-refresh"/></svg>Check all environments
             </button>
@@ -724,10 +724,10 @@
           <div class="chromium-row">
             <span class="chromium-state" id="chromiumState">—</span>
             <span class="spacer"></span>
-            <button class="btn btn-standard" id="btnChromiumDownload">
+            <button class="btn btn-standard" id="btnChromiumDownload" data-lock-when-busy>
               <svg class="ic"><use href="#i-package"/></svg>Download (~170 MB)
             </button>
-            <button class="btn btn-standard hidden" id="btnChromiumDelete">
+            <button class="btn btn-standard hidden" id="btnChromiumDelete" data-lock-when-busy>
               <svg class="ic"><use href="#i-trash"/></svg>Remove
             </button>
             <button class="btn btn-subtle hidden" id="btnChromiumCancel">
@@ -768,11 +768,11 @@
             <button class="btn btn-standard" id="btnOpenOutput2">
               <svg class="ic"><use href="#i-folder-open"/></svg>Output folder
             </button>
-            <button class="btn btn-standard" id="btnClearLogin">
+            <button class="btn btn-standard" id="btnClearLogin" data-lock-when-busy>
               <svg class="ic"><use href="#i-login"/></svg>Forget saved login
             </button>
             <span class="spacer"></span>
-            <button class="btn btn-danger" id="btnDeleteReports">
+            <button class="btn btn-danger" id="btnDeleteReports" data-lock-when-busy>
               <svg class="ic"><use href="#i-trash"/></svg>Delete all reports…
             </button>
           </div>
@@ -1035,6 +1035,9 @@
      races the real pywebview bridge. -->
 <script src="contract.js"></script>
 <script src="ui-dom.js"></script>
+<script src="ui-export.js"></script>
+<script src="ui-batch.js"></script>
+<script src="ui-compare.js"></script>
 <script src="ui-matrix.js"></script>
 <script src="ui-settings.js"></script>
 <script src="app.js"></script>
