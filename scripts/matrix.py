@@ -713,6 +713,7 @@ def _comparison_row_count(values_path):
     """Data-row count of a values workbook's Comparison sheet (read-only — the dimension
     is read from the sheet, not by scanning cells), or None if it can't be read. None ⇒
     the caller writes the twin anyway (never skip the twin on an uncertain probe)."""
+    from openpyxl import load_workbook           # lazy: openpyxl stays off GUI startup
     try:
         wb = load_workbook(values_path, read_only=True)
     except Exception as e:                       # noqa: BLE001 (best-effort probe)

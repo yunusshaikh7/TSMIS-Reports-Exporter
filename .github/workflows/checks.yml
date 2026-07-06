@@ -80,6 +80,7 @@ jobs:
           python build/check_matrix.py
           python build/check_matrix_bridge.py
           python build/check_matrix_tsn.py
+          python build/check_formulas_twin_guard.py
           python build/check_day_matrix.py
           python build/check_worker_lifecycle.py
           python build/check_reset_safety.py
