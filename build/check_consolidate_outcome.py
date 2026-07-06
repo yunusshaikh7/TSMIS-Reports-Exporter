@@ -403,7 +403,7 @@ def main():
                                      completion=oc.PARTIAL, skipped_inputs=1)
 
         with _patch(_cli, "_resolve_day_console", lambda: None), \
-             _patch(_cli, "setup_logging", lambda: None):
+             _patch(_cli, "setup_logging", lambda *a, **k: None):
             _cli.run_consolidate_cli(_cli_consolidate)
         check("run_consolidate_cli persists the producer outcome (console bypass closed)",
               cm.read_completion(cc_out) == oc.PARTIAL)
@@ -500,7 +500,7 @@ def main():
         buf = _io.StringIO()
         with _ctxlib.redirect_stdout(buf), \
              _patch(_cli2, "_resolve_day_console", lambda: None), \
-             _patch(_cli2, "setup_logging", lambda: None), \
+             _patch(_cli2, "setup_logging", lambda *a, **k: None), \
              _patch(cm.os, "replace", _raise_replace2):
             try:
                 _cli2.run_consolidate_cli(_cli_part)
