@@ -670,8 +670,40 @@ def test_active_check_soft_busy():
 
 
 
+def test_cancel_never_leaks_to_next_queued_job():
+    """BUG-10 (E2): a cancel targeting the RUNNING matrix job must never leak
+    into the next queued one. The endpoints read+set under the lock, and the
+    queue advance clears the control events under its claim before dispatch."""
+    print("cancel/skip vs queue-advance interleaving (E2):")
+    a = _api()
+    # job A runs (kind matrix); the user clicks Cancel
+    assert a._try_claim_task("matrix")
+    a.cancel_event.clear()
+    a.pause_event.set()                      # a paused run: cancel must unblock it
+    a.cancel_run()
+    check("cancel targets the running matrix job", a.cancel_event.is_set())
+    check("...and unblocks a paused run", not a.pause_event.is_set())
+    # A ends; the stale cancel is still set. B starts through the REAL
+    # dispatcher (kind dispatcher stubbed): the clear must happen before start.
+    a._coord.release()
+    assert a._try_claim_task("matrix")       # B's claim (take_next equivalent)
+    a._dispatch_compare_job = lambda job: True
+    started = a._dispatch_matrix_job({"kind": "compare", "label": "B"})
+    check("B dispatches", started is True)
+    check("the stale cancel did NOT leak into B", not a.cancel_event.is_set())
+    check("...nor a stale skip/pause",
+          not a.skip_event.is_set() and not a.pause_event.is_set())
+    a._coord.release()
+    # cancel with nothing running: a clean no-op (no event stamped for later)
+    a.cancel_event.clear()
+    a.cancel_run()
+    check("cancel with no task running stamps nothing", not a.cancel_event.is_set())
+
+
+
 def main():
     test_active_check_soft_busy()
+    test_cancel_never_leaks_to_next_queued_job()
     test_producer_paths()
     test_terminal_payload_variants()
     test_queue_advances_on_terminal()

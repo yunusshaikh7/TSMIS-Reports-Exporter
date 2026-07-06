@@ -1683,8 +1683,15 @@ class GuiApi(GuiMatrixMixin):
 
     @_api_method
     def skip_route(self):
-        if self._task == "export" or self._matrix_export_running():
-            self.skip_event.set()
+        # Read+set under the lock: the unlocked pair could race _end_task + the
+        # matrix queue advance and stamp the NEXT job with a skip meant for the
+        # one that just ended (BUG-10). The queue advance clears the control
+        # events under its claim, so a stale set can no longer leak forward.
+        with self._lock:
+            hit = self._task == "export" or self._matrix_export_running()
+            if hit:
+                self.skip_event.set()
+        if hit:
             self._emit_log("Skip requested — will move on once the current wait ends.")
         return {"ok": True}
 
@@ -1692,12 +1699,19 @@ class GuiApi(GuiMatrixMixin):
     def cancel_run(self):
         # Tasks that honor cancel_event between steps. (login has its own cancel;
         # envcheck is a single short headless verify that can't stop partway.)
-        if self._task in ("export", "batch", "consolidate", "compare", "chromium",
-                          "envscan", "reset", "matrix"):
-            self.cancel_event.set()
-            self.pause_event.clear()      # unblock a paused run so cancel lands
+        # Read+set under the lock (BUG-10): unlocked, this could race _end_task
+        # and the matrix queue advance, cancelling the NEXT queued job instead of
+        # the one the user targeted.
+        with self._lock:
+            task = self._task
+            if task in ("export", "batch", "consolidate", "compare", "chromium",
+                        "envscan", "reset", "matrix"):
+                self.cancel_event.set()
+                self.pause_event.clear()  # unblock a paused run so cancel lands
+        if task in ("export", "batch", "consolidate", "compare", "chromium",
+                    "envscan", "reset", "matrix"):
             self._emit_log("Cancel requested…")
-        elif self._task == "envcheck":
+        elif task == "envcheck":
             self._emit_log("The environment check can't be stopped partway — "
                            "it'll finish in a moment.")
         return {"ok": True}
@@ -1710,13 +1724,20 @@ class GuiApi(GuiMatrixMixin):
         it works there too. Also pauses an Export Everything batch (between
         routes, and between environments) and a matrix re-export. No-op unless one
         is running."""
-        if self._task not in ("export", "batch") and not self._matrix_export_running():
-            return {"error": "No export is running."}
-        if self.pause_event.is_set():
-            self.pause_event.clear()
+        # Toggle under the lock (BUG-10): matches _end_task's locked
+        # pause_event.clear(), so a toggle can't interleave a run transition.
+        with self._lock:
+            if (self._task not in ("export", "batch")
+                    and not self._matrix_export_running()):
+                return {"error": "No export is running."}
+            resumed = self.pause_event.is_set()
+            if resumed:
+                self.pause_event.clear()
+            else:
+                self.pause_event.set()
+        if resumed:
             self._emit_log("Resumed.")
         else:
-            self.pause_event.set()
             self._emit_log("Paused — finishing the current route(s), then holding. "
                            "Click Resume to continue.")
         self._push_state()
