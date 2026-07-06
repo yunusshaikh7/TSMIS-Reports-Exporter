@@ -21,6 +21,16 @@ comparison is calculated (the numbers are identical to v0.18.5 — re-blessed).
   from the matrix instead of having to export elsewhere first.
 - **Matrix panels stay usable while a comparison runs.** On smaller/laptop screens the two panels
   on the right no longer shrink to unusable sizes when a job is in progress.
+- **Under the hood: the structural cleanup.** The whole codebase was reorganized for the next
+  features without changing behavior: every comparator now rides one shared engine skeleton, the
+  PDF parsers share one table library, the big GUI files split into focused modules, and adding a
+  new report family (Highway Detail/Summary is reserved) is now a proven recipe with its own
+  automated check. The comparison engine's numbers were re-verified cell-for-cell against the real
+  statewide data (2.79M cells identical; the approved counts unchanged).
+- **Safety hardening.** "Delete all reports" now only ever deletes folders this app itself created
+  (a look-alike folder is flagged and left alone); an update re-verifies its download's integrity
+  one final time right before installing; and the Export Everything destination is validated when
+  you pick it (a network share or missing folder is refused with a clear message).
 
 ## v0.18.5 — 2026-07-03
 

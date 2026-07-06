@@ -169,15 +169,20 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   export_*.py                one thin ReportSpec per report type (incl. *_pdf editions)
   consolidate_*.py           per-route exports → one workbook (+ TSN / TSMIS-PDF parsers)
   compare_core.py            the regression-locked comparison-workbook engine
-  compare_tsn_common.py      the shared vs-TSN file-comparator substrate (P5b)
+  compare_tsn_common.py      the shared FILE-comparator substrate (P5b; every comparator rides it since v0.19.0)
   compare_env.py compare_highway_log*.py compare_*_tsn.py   the comparison families over compare_core
-  matrix.py day_matrix.py summary_layout.py   the Everything/by-day matrix engines + the familiar summary sheet
+  pdf_table_lib.py           the shared PDF-table machinery (clusterer/columns/writer/convert loop, R2)
+  matrix.py                  the matrix FACADE (patch matrix.<name>) over matrix_state.py + matrix_build.py
+  matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary
   tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
   highway_log_columns.py intersection_detail_columns.py   the corrected per-report column labels
-  gui_main.py gui_api.py gui_worker.py   GUI entry / js_api bridge / worker threads
+  gui_main.py gui_api.py     GUI entry / the bridge core (state, pump, gate)
+  gui_export_api.py gui_auth_api.py gui_compare_api.py gui_settings_api.py gui_update.py   the endpoint mixins (S1)
+  gui_worker.py              re-export SHIM over gui_worker_export/_env/_maint/_matrix.py (S2)
   task_coordinator.py contract.py        GUI task-state owner / Python⇄JS bridge enum SSOT
-  gui_endpoint.py gui_matrix.py gui_win32.py   extracted GUI endpoint groups (P7b/P7c)
-  ui/                        index.html app.css app.js + mock.js (#mock fixtures) + ui-*.js + contract.js
+  gui_endpoint.py gui_matrix.py gui_win32.py   the endpoint envelope (+_task_endpoint/pick_path) / matrix mixin / Win32
+  validation.py              the one-click Settings validation (W1)
+  ui/                        index.html app.css app.js + ui-export/-batch/-compare/-matrix/-settings/-dom.js + mock.js + contract.js
   self_test.py evidence.py pdf_row_oracle.py owned_dir.py safe_delete.py   self-test / evidence / safety
   updater.py login.py logging_setup.py batch_manifest.py report_library.py
 build/                       build.ps1, app.spec, prune_bundle.ps1, full_smoke.py, check_*.py

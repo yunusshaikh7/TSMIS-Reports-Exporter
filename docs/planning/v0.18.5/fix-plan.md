@@ -361,7 +361,49 @@ reset-preview pass. **Commit:** `stamp legacy Export-Everything dirs with the ow
 > by-day matrix always offers today (+ the Build button gated on an export present); **W4** matrix
 > side panes stay usable mid-run on laptops. Also hardened the v0.18.5 swap-journal recovery
 > (fail-closed on a tampered app_dir/piece names). version → 0.19.0, CHANGELOG + work-pc-validation
-> updated. The structural waves R–V below are NOT yet started.
+> updated. **The structural waves R–V ALL LANDED (2026-07-06, ~20 commits after W1–W4):**
+>
+> * **R1** every file comparator rides `compare_tsn_common.run_files_compare` (side labels +
+>   dynamic route-ness became opt-in params); `suggest_route_name`/`row_has_data`/
+>   `load_consolidated_rows` dedupe 9+10+3 copies; new golden `check_compare_highway_log`.
+> * **R2** `pdf_table_lib.py` extracted (y-clusterer ×4, column assigner ×2, window math ×2,
+>   route-workbook writer ×3, the ~110-line convert loop ×2); the four `_norm_route` copies
+>   reconciled — TSN HL switches zfill→regex (short-suffixed tokens now pad), PROVEN identical on
+>   all 263 real routes; `highway_log` TSN `normalization_version` **2→3** (defensive D2 re-key).
+> * **R3** `check_report_recipe.py` — the add-a-report recipe proven END-TO-END on the reserved
+>   Highway Detail/Summary ids (catalog registration, W2 grouping, a 20-line run_files_compare
+>   stub comparator, the PDF route-workbook writer). **The feature-ready milestone.**
+> * **S1** gui_api.py 2754→1384: five endpoint mixins (export/auth/compare/settings/update).
+>   **S2** gui_worker.py 2095→82-line re-export shim over 4 per-cluster modules (all <800);
+>   checks patch the OWNING module. **S3** `_task_endpoint` decorator + `pick_path`/`pick_paths`
+>   (the one dialog unwrap) + `contract.CANCELLABLE` (E2's kind list, one home). **S4** matrix.py
+>   → state/build behind a facade with a lazy `_m` proxy (every `matrix.<name>` patch point
+>   preserved; module-level cycle avoided); ONE `_staleness` reader behind both cell states.
+>   **S5** app.js 2103→1430 + ui-export/ui-batch/ui-compare.js; the five hand-kept lock-ID lists
+>   became one `data-lock-when-busy` sweep (#mock-verified). *Deviation:* the bindEvents per-tab
+>   binder split was deliberately NOT done (cutting event wiring risks silent dead buttons; the
+>   file splits landed).
+> * **T1** settings toggle/list pairs → `_get_flag`/`_set_flag` + `_get_str_list`/`_set_str_list`.
+>   **T2** ruff error rules now BLOCK CI (F821 everywhere — the BUG-01 class is statically
+>   impossible — + F811/F401 with the re-export shims exempted in pyproject); the import-direction
+>   check gained the core-never-imports-GUI layer rule + `__main__`-guard awareness; the export
+>   modules' top-level `cli` import moved into their `__main__` guards. **T3** SEC-02 retired: the
+>   reset store-child delete REQUIRES the ownership marker (look-alikes warn, never stamped);
+>   *deviation:* `_tsn_input` stays name-based under include_input — the app never creates it, so
+>   a marker cannot exist (documented in the code). **T4** SEC-05 the swap re-verifies the staged
+>   digest pre-install (fail closed); SEC-06 `set_batch_dest` validates at the boundary
+>   (existing/writable/local; UNC + device names refused). **T5** PRF-02 snapshot fs reads hoisted
+>   out of the lock; the Chromium size cached (invalidated on download/delete).
+> * **U1** checks.yml collapsed to ONE `run_checks.py -j 4 -k` step — the check list lives ONLY in
+>   the runner's glob; `check_ci_manifest` now pins the runner gate (blocking in checks.yml AND
+>   release.yml) + the glob discovery. **U2** `check_gui_endpoint.py` covers the envelope directly.
+>   **U3** the dead `set_batch_dest` endpoint + mock fixture DELETED (98-name facade); the mock's
+>   updater phase sequence already existed. **U4** `build/_checklib.py` for new checks.
+> * **V1** `compared_cell` extracted behind `_row_diff_count`/`count_diffs`/`_field_value` —
+>   **re-blessed on the real statewide pair: 2,789,732 cells IDENTICAL (digest-equal), canary
+>   163,310 / 677 unchanged** (the same run also proves R1's loader dedup on real data).
+>
+> Suite: 89 checks green (4 new). The silent-swallow baseline burned down 124→122.
 
 
 > Branch `refactor/v0.19.0-structure` off the v0.18.5 tag. Same program rules: every wave a green
