@@ -56,18 +56,16 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 try:
     import pdfplumber
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    import openpyxl  # noqa: F401 — the gate covers both the PDF and XLSX deps
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
 
-from compare_core import is_formula_injection   # shared formula-injection guard
-from consolidate_xlsx_base import consolidate_xlsx
-from events import ConsolidateResult, Events
 from intersection_detail_columns import HEADER as INTD_HEADER
 import outcome
+from pdf_table_lib import (assign_columns, cluster_by_top, contiguous_windows,
+                           median, norm_route, run_pdf_conversion,
+                           write_route_workbook)
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
 
@@ -132,27 +130,15 @@ LOCATION_RE = re.compile(r"\d{2}\s+[A-Z]")
 ROUTE_FROM_NAME = re.compile(r"route[_ -]*([0-9]+[A-Za-z]?)", re.IGNORECASE)
 
 
-def _norm_route(token):
-    """'4' -> '004' (TSMIS zero-pads to 3 digits); suffixed routes ('101U',
-    '010S') keep their letter, upper-cased."""
-    m = re.fullmatch(r"(\d+)([A-Za-z]?)", token)
-    if not m:
-        return token.upper()
-    return f"{int(m.group(1)):03d}{m.group(2).upper()}"
+# The canonical route-token normalizer (pdf_table_lib reconciled the 4 copies;
+# this module's behavior is unchanged).
+_norm_route = norm_route
 
 
 def _cluster_lines(page):
     """Cluster the page's non-space characters into logical lines (tolerating the
     small baseline jitter of a row). Returns [(top, [chars sorted by x0]), ...]."""
-    clusters = []                     # [(anchor_top, [char, ...]), ...]
-    for c in sorted(page.chars, key=lambda c: (c["top"], c["x0"])):
-        if not c["text"].strip():
-            continue
-        if clusters and abs(c["top"] - clusters[-1][0]) <= Y_TOLERANCE:
-            clusters[-1][1].append(c)
-        else:
-            clusters.append((c["top"], [c]))
-    return [(top, sorted(chars, key=lambda c: c["x0"])) for top, chars in clusters]
+    return cluster_by_top((c for c in page.chars if c["text"].strip()), Y_TOLERANCE)
 
 
 def _shaded_column_windows(pdf):
@@ -180,18 +166,9 @@ def _shaded_column_windows(pdf):
     if not bands:
         return None
 
-    def median(values):
-        s = sorted(values)
-        return s[len(s) // 2]
-
     lo = [median([b[i]["x0"] for b in bands]) for i in range(N_COLS)]
     hi = [median([b[i]["x1"] for b in bands]) for i in range(N_COLS)]
-    windows = []
-    for i in range(N_COLS):
-        a = float("-inf") if i == 0 else (hi[i - 1] + lo[i]) / 2
-        b = float("inf") if i == N_COLS - 1 else (hi[i] + lo[i + 1]) / 2
-        windows.append((a, b))
-    return windows
+    return contiguous_windows(lo, hi)
 
 
 def _rowb_windows(windows):
@@ -207,21 +184,9 @@ def _rowb_windows(windows):
 
 
 def _assign_columns(chars, windows):
-    """Map each character of a line to its column by horizontal center, inserting a
-    space inside a column where the x-gap >= WORD_GAP opens a new token (so
-    '04'/'SOL'/'780' -> '04 SOL 780' and 'LEMON'/'ST' -> 'LEMON ST')."""
-    vals = ["" for _ in windows]
-    last_x1 = [None] * len(windows)
-    for c in chars:                   # x-sorted by _cluster_lines
-        center = (c["x0"] + c["x1"]) / 2
-        for i, (lo, hi) in enumerate(windows):
-            if lo <= center < hi:
-                if vals[i] and c["x0"] - last_x1[i] >= WORD_GAP:
-                    vals[i] += " "
-                vals[i] += c["text"]
-                last_x1[i] = c["x1"]
-                break
-    return [v.strip() for v in vals]
+    """Map each character of a line to its column (pdf_table_lib), stripped —
+    '04'/'SOL'/'780' -> '04 SOL 780' and 'LEMON'/'ST' -> 'LEMON ST'."""
+    return [v.strip() for v in assign_columns(chars, windows, WORD_GAP)]
 
 
 def _is_rowA(vals):
@@ -318,31 +283,7 @@ def parse_pdf(path, events):
 def _write_route_workbook(rows, out_path):
     """Write one route's rows as a TSMIS-format Intersection Detail workbook (same
     sheet name + 36 columns the Excel export uses)."""
-    header_fill = PatternFill("solid", start_color="305496")
-    header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = SHEET_NAME
-    ws.append(INTD_HEADER)
-    for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = header_align
-    ws.freeze_panes = "A2"
-    for i, name in enumerate(INTD_HEADER, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = \
-            40 if name == "Description" else 12
-
-    for row in rows:
-        ws.append(row)
-        # Neutralize any formula-looking text (e.g. a Description starting with "=")
-        # so it can't execute when the workbook is opened.
-        for cell in ws[ws.max_row]:
-            if is_formula_injection(cell.value):
-                cell.data_type = "s"
-    wb.save(out_path)
+    write_route_workbook(rows, out_path, sheet_name=SHEET_NAME, header=INTD_HEADER)
 
 
 # =============================================================================
@@ -356,151 +297,70 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     `day` picks which export run folder of "Intersection Detail (PDF)" exports to
     read; None means the newest run folder, falling back to the legacy flat layout.
-    Console-free; honors events.is_cancelled() between pages.
+    Console-free; honors events.is_cancelled() between pages. The convert-loop
+    skeleton lives in pdf_table_lib.run_pdf_conversion; this module supplies the
+    layout knowledge: the per-PDF step (route from the FILENAME — the print layout
+    carries no route label; orphan reconciliation) and the ⚠-note /
+    PARTIAL-escalation policy.
     """
     day = day or latest_output_day()
     in_dir = Path(input_dir) if input_dir else input_dir_for(day)
     out = Path(out_path) if out_path else out_path_for(day)
     conv = Path(converted_dir) if converted_dir else CONVERTED_DIR
-    events = events or Events()
-    if not _DEPS_OK:
-        return ConsolidateResult(
-            status="error",
-            message="Required components are missing (pdfplumber, openpyxl).",
-        )
-    confirm = confirm_overwrite or (lambda _p: True)
 
-    try:
-        in_dir.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        pass
-
-    pdfs = sorted(in_dir.glob("*.pdf"))
-    if not pdfs:
-        return ConsolidateResult(
-            status="error",
-            message=(f"No {REPORT_NAME} files were found in:\n{in_dir}\n\n"
-                     f"Export the 'Intersection Detail (PDF)' report first (it saves "
-                     f"the per-route PDFs there), then run this again."),
-        )
-
-    # Confirm overwrite *before* spending time parsing PDFs.
-    existed_at_confirm = out.exists()
-    if existed_at_confirm and not confirm(out):
-        return ConsolidateResult(status="cancelled",
-                                 message="Cancelled. Existing file kept.")
-
-    events.on_log("=" * 60)
-    events.on_log(f"TSMIS Intersection Detail (PDF) Conversion - {len(pdfs)} route PDF(s)")
-    events.on_log("=" * 60)
-    events.on_log("")
-
-    # The combined workbook reflects exactly THIS run's PDFs: clear previously
-    # converted files so routes removed from the input folder don't linger.
-    conv.mkdir(parents=True, exist_ok=True)
-    stale = list(conv.glob("tsmis_intersection_detail_pdf_*.xlsx"))
-    for p in stale:
-        try:
-            p.unlink()
-        except OSError:
-            return ConsolidateResult(
-                status="error",
-                message=(f"Could not replace {p.name}.\n\n"
-                         "The file is probably open in Excel. Close it and try again."),
-            )
-    if stale:
-        events.on_log(f"Cleared {len(stale)} previously converted file(s).")
-
-    converted = 0
-    total_rows = 0
-    total_orphans = 0               # rowA lines that never paired with a rowB
-    failed = []
-    written = set()
-    for i, p in enumerate(pdfs, 1):
-        if events.is_cancelled():
-            return ConsolidateResult(status="cancelled", message="Cancelled by user.")
-        prefix = f"[{i}/{len(pdfs)}] {p.name}"
-        events.on_log(f"{prefix} parsing…")
+    def convert_one(p, prefix, ev, ctx):
         name_m = ROUTE_FROM_NAME.search(p.stem)
         route = _norm_route(name_m.group(1)) if name_m else None
         if not route:
-            events.on_log(f"{prefix} no route in filename; skipping")
-            failed.append(p.name)
-            continue
-        try:
-            rows, pstats = parse_pdf(str(p), events)
-        except Exception as e:                       # noqa: BLE001
-            events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
-            failed.append(p.name)
-            continue
+            ev.on_log(f"{prefix} no route in filename; skipping")
+            ctx["failed"].append(p.name)
+            return ("skip",)
+        rows, pstats = parse_pdf(str(p), ev)
         if rows is None:                             # cancelled mid-PDF
-            return ConsolidateResult(status="cancelled", message="Cancelled by user.")
+            return ("cancelled",)
         if pstats:
-            total_orphans += pstats["orphans"]
+            ctx["orphans"] = ctx.get("orphans", 0) + pstats["orphans"]
             if pstats["orphans"]:
-                events.on_log(f"  WARNING: {pstats['orphans']} unpaired row(s) in {p.name} "
-                              "(a record's two lines didn't pair) — see the log.")
+                ev.on_log(f"  WARNING: {pstats['orphans']} unpaired row(s) in {p.name} "
+                          "(a record's two lines didn't pair) — see the log.")
         if not rows:
-            events.on_log(f"{prefix} no intersection data found; skipping")
-            failed.append(p.name)
-            continue
-        out_file = conv / f"tsmis_intersection_detail_pdf_route_{route}.xlsx"
-        if out_file.name in written:
-            events.on_log(f"  WARNING: route {route} already converted from an earlier "
-                          f"PDF; {p.name} replaces it.")
-        written.add(out_file.name)
-        try:
-            _write_route_workbook(rows, out_file)
-        except PermissionError:
-            return ConsolidateResult(
-                status="error",
-                message=(f"Could not save {out_file.name}.\n\n"
-                         "The file is probably open in Excel. Close it and try again."),
-            )
-        events.on_log(f"  route {route}: {len(rows)} rows -> {out_file.name}")
-        converted += 1
-        total_rows += len(rows)
+            ev.on_log(f"{prefix} no intersection data found; skipping")
+            ctx["failed"].append(p.name)
+            return ("skip",)
+        return ("ok", route, rows)
 
-    if converted == 0:
-        return ConsolidateResult(
-            status="error",
-            message=(f"None of the PDFs in:\n{in_dir}\n\ncontained readable "
-                     f"{REPORT_NAME} data. Are they the TSMIS Intersection Detail PDFs "
-                     "(the 'Intersection Detail (PDF)' export)?"),
-        )
-
-    events.on_log("")
-
-    # Combine all converted per-route files with the shared XLSX core. P12 TOCTOU:
-    # pass the REAL confirm + the existence we saw at the early prompt down into
-    # consolidate_xlsx so its pre-replace gate (atomic_save_if) catches a destination
-    # that APPEARED after that prompt — at the final os.replace — without re-prompting
-    # for the already-confirmed pre-existing case (mirrors consolidate_tsmis_highway_log_pdf).
-    result = consolidate_xlsx(
-        input_dir=conv, out_path=out, sheet_name=SHEET_NAME,
-        report_name=REPORT_NAME, title="TSMIS Intersection Detail (PDF) Consolidation",
-        events=events, confirm_overwrite=confirm, existed_at_confirm=existed_at_confirm,
-    )
-    if result.status == "ok":
+    def finalize(result, ctx):
+        orphans = ctx.get("orphans", 0)
         notes = []
-        if total_orphans:
-            notes.append(f"⚠ {total_orphans} unpaired row line(s) — verify (see the log).")
-        result.summary_lines = notes + [
-            f"Route PDFs:   {len(pdfs) - len(failed)} converted"
-            + (f", {len(failed)} failed {failed}" if failed else ""),
-            f"Route files:  {converted} (in {conv})",
-        ] + result.summary_lines
-        # RR2-B1 / D18 parity with the HL-PDF consolidator: every converted per-route
-        # file may have combined cleanly (consolidate_xlsx -> complete), yet the
-        # PDF->row parse left a record unpaired (orphan) or a whole PDF failed. Those
-        # losses are NOT visible to the XLSX consolidator, so ESCALATE to a
-        # producer-owned partial here — the incomplete output must not be promoted /
+        if orphans:
+            notes.append(f"⚠ {orphans} unpaired row line(s) — verify (see the log).")
+        result.summary_lines = notes + result.summary_lines
+        # RR2-B1 / D18 parity with the HL-PDF consolidator: an unpaired record or
+        # a failed PDF is invisible to the XLSX consolidator, so ESCALATE to a
+        # producer-owned partial — the incomplete output must not be promoted /
         # cached / compared as complete.
-        if total_orphans or failed:
+        if orphans or ctx["failed"]:
             result.completion = outcome.PARTIAL
-            result.skipped_inputs = max(result.skipped_inputs, total_orphans)
-            result.failed_inputs = max(result.failed_inputs, len(failed))
-    return result
+            result.skipped_inputs = max(result.skipped_inputs, orphans)
+            result.failed_inputs = max(result.failed_inputs, len(ctx["failed"]))
+
+    return run_pdf_conversion(
+        in_dir=in_dir, out=out, conv=conv, deps_ok=_DEPS_OK,
+        events=events, confirm_overwrite=confirm_overwrite,
+        report_name=REPORT_NAME,
+        banner_title="TSMIS Intersection Detail (PDF) Conversion",
+        export_hint=("Export the 'Intersection Detail (PDF)' report first (it saves "
+                     "the per-route PDFs there), then run this again."),
+        unreadable_hint=("Are they the TSMIS Intersection Detail PDFs "
+                         "(the 'Intersection Detail (PDF)' export)?"),
+        converted_prefix="tsmis_intersection_detail_pdf",
+        convert_one=convert_one, write_one=_write_route_workbook,
+        finalize=finalize,
+        consolidate_kwargs=dict(
+            sheet_name=SHEET_NAME, report_name=REPORT_NAME,
+            title="TSMIS Intersection Detail (PDF) Consolidation"),
+    )
+
 
 
 if __name__ == "__main__":

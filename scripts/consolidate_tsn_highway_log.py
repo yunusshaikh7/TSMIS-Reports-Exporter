@@ -52,16 +52,14 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 try:
     import pdfplumber
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    import openpyxl  # noqa: F401 — the gate covers both the PDF and XLSX deps
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
 
 import highway_log_columns as hlc               # the corrected column labels
-from compare_core import is_formula_injection   # shared formula-injection guard
 from consolidate_xlsx_base import consolidate_xlsx
+from pdf_table_lib import char_lines, norm_route, write_route_workbook
 import outcome
 from events import ConsolidateResult, Events
 from paths import INPUT_ROOT, OUTPUT_ROOT
@@ -227,34 +225,12 @@ def _is_totals_line(text):
 
 
 def _lines(page):
-    """Cluster the page's characters into logical lines (tolerating the 1pt
-    baseline jitter of wrapped data rows). Each line yields word tokens (for
-    classifying the line) AND the raw characters (for column parsing).
-
-    Data values are assigned to columns CHARACTER by character, never word by
-    word: adjacent columns can sit closer than any word-segmentation tolerance
-    (the county odometer ends ~2pt before the city code begins, so pdfplumber's
-    word extraction fuses them into one token like '042.010LKPT')."""
-    clusters = []                     # [(anchor_top, [char, ...]), ...]
-    for c in sorted(page.chars, key=lambda c: (c["top"], c["x0"])):
-        if not c["text"].strip():
-            continue                  # literal space characters carry no data
-        if clusters and abs(c["top"] - clusters[-1][0]) <= Y_TOLERANCE:
-            clusters[-1][1].append(c)
-        else:
-            clusters.append((c["top"], [c]))
-    lines = []
-    for top, chars in clusters:
-        chars.sort(key=lambda c: c["x0"])
-        words = []
-        for c in chars:
-            if words and c["x0"] - words[-1]["x1"] < WORD_GAP:
-                words[-1]["text"] += c["text"]
-                words[-1]["x1"] = c["x1"]
-            else:
-                words.append({"text": c["text"], "x0": c["x0"], "x1": c["x1"]})
-        lines.append((top, words, chars))
-    return lines
+    """Cluster the page's characters into logical lines — word tokens for
+    classifying the line AND raw characters for column parsing (values are
+    assigned char by char: adjacent columns can sit closer than any
+    word-segmentation tolerance, so pdfplumber's word extraction would fuse
+    them, e.g. '042.010LKPT'). pdf_table_lib.char_lines."""
+    return char_lines(page, Y_TOLERANCE, WORD_GAP)
 
 
 def _parse_data_line(chars):
@@ -291,9 +267,14 @@ def _normalize_row(row):
             row[key] = v.lstrip("0").rjust(2, "0")
 
 
-def _norm_route(token):
-    """'1' -> '001' (TSMIS zero-pads); suffixed routes ('101U') kept as-is."""
-    return token.zfill(3) if token.isdigit() else token.upper()
+# The canonical route-token normalizer. RECONCILED (v0.19.0 R2): this module's
+# old copy was `token.zfill(3) if token.isdigit() else token.upper()`, which
+# never padded a SHORT SUFFIXED token ('5S' stayed '5S' while the TSMIS side
+# prints '005S' — a latent row-misalignment) and kept over-padded digits
+# ('0001'). Real district PDFs print the 'n'/'nn'/'nnn'/'nnnX' forms where the
+# two agree; the highway_log TSN `normalization_version` is bumped anyway (D2)
+# so any stored library re-keys itself on the next use.
+_norm_route = norm_route
 
 
 def parse_pdf(path, events, pdf_name=""):
@@ -386,33 +367,10 @@ def parse_pdf(path, events, pdf_name=""):
 
 def _write_route_workbook(rows, out_path):
     """Write one route's rows as a TSMIS-format Highway Log workbook."""
-    header_fill = PatternFill("solid", start_color="305496")
-    header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = SHEET_NAME
-    ws.append(TSMIS_HEADER)
-    for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = header_align
-    hlc.apply_header_tooltips(ws)            # hover any header for its meaning
-    ws.freeze_panes = "A2"
-    for i, name in enumerate(TSMIS_HEADER, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = \
-            40 if name == "Description" else 12
-
-    for row in rows:
-        ws.append([row.get(k) for k in ROW_KEYS])
-        # Neutralize any formula-looking text (e.g. a Description that starts
-        # with "=") so it can't execute when the workbook is opened.
-        for cell in ws[ws.max_row]:
-            if is_formula_injection(cell.value):
-                cell.data_type = "s"
-    hlc.write_legend_sheet(wb)               # a "Legend" tab explaining every column
-    wb.save(out_path)
+    write_route_workbook(rows, out_path, sheet_name=SHEET_NAME, header=TSMIS_HEADER,
+                         row_values=lambda row: [row.get(k) for k in ROW_KEYS],
+                         apply_tooltips=hlc.apply_header_tooltips,
+                         decorate=hlc.write_legend_sheet)
 
 
 # =============================================================================

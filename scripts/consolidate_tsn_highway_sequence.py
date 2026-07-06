@@ -54,6 +54,7 @@ except ImportError:
 
 from compare_core import is_formula_injection
 from events import ConsolidateResult, Events
+from pdf_table_lib import cluster_by_top, norm_route
 import outcome
 import artifact_store
 from paths import INPUT_ROOT, OUTPUT_ROOT
@@ -119,19 +120,12 @@ def _cluster_lines(words):
     """Group words into logical lines, tolerating the ~1pt baseline jitter of the
     proportional font (a plain round(top) splits a single row across two buckets
     when its words straddle x.5, dropping rows that then lack a county or PM)."""
-    clusters = []                     # [(anchor_top, [word, ...]), ...]
-    for w in sorted(words, key=lambda w: (w["top"], w["x0"])):
-        if clusters and abs(w["top"] - clusters[-1][0]) <= Y_TOLERANCE:
-            clusters[-1][1].append(w)
-        else:
-            clusters.append((w["top"], [w]))
-    return [sorted(ws, key=lambda w: w["x0"]) for _, ws in clusters]
+    return [ws for _top, ws in cluster_by_top(words, Y_TOLERANCE)]
 
 
-def _norm_route(token):
-    """'1' -> '001' (TSMIS zero-pads); suffixed routes ('5S') kept as '005S'."""
-    m = re.fullmatch(r"(\d+)([A-Z]?)", token.upper())
-    return f"{int(m.group(1)):03d}{m.group(2)}" if m else token.upper()
+# The canonical route-token normalizer (pdf_table_lib; behavior unchanged —
+# this module's copy was already the reconciled regex form).
+_norm_route = norm_route
 
 
 def _parse_line(ws):

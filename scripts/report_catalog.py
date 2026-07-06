@@ -231,8 +231,13 @@ _AUTO_CONSOLIDATOR = (
 # tsn_load_* normalizers eagerly (the consolidate_*/compare_* modules above already
 # pull openpyxl/pdfplumber, so the catalog is console-free but not dependency-light).
 TSN = (
+    # v3: the route-token normalizer was reconciled onto pdf_table_lib.norm_route
+    # (a short SUFFIXED token now pads like TSMIS: '5S' -> '005S'; over-padded
+    # digits collapse). Identical on the ordinary 'n/nn/nnn[X]' tokens real
+    # district PDFs print, but the route KEYS the stored library, so the bump
+    # re-keys any stored library on its next use (D2 auto-rebuild).
     TsnEntry("highway_log", "TSN Highway Log", "*.pdf", "district_pdfs",
-             "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into", normalization_version=2),
+             "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into", normalization_version=3),
     TsnEntry("ramp_detail", "TSN Ramp Detail", "*.xlsx", "statewide_xlsx",
              "tsn_ramp_detail_normalized.xlsx", "tsn_load_ramp_detail:build_into", normalization_version=2),
     TsnEntry("ramp_summary", "TSN Ramp Summary", "*.pdf", "statewide_pdf",
