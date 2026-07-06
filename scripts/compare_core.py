@@ -1878,6 +1878,11 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
             sc.extra_sheet_writer(wb, {"rows_a": rows_t, "rows_b": rows_n,
                                        "has_route": has_route, "sc": sc,
                                        "side_a": name_a, "side_b": name_b,
+                                       # F1 (additive): the pairing run_compare already
+                                       # computed, so a big rollup needn't redo it.
+                                       # Writers may ignore these; output unaffected.
+                                       "keys_a": keys_t, "keys_b": keys_n,
+                                       "union": union,
                                        # events lets a big rollup report progress so it
                                        # isn't a multi-minute silent gap before "Saving…".
                                        "events": events})

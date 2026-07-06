@@ -313,10 +313,19 @@ function showRoutePicker(current) {
     const c = document.createElement("div");
     c.className = "route-cell" + (chosen.has(r) ? " on" : "");
     c.textContent = r;
-    c.onclick = () => {
+    // Keyboard access (FE-04): cells used to be mouse-only bare divs.
+    c.tabIndex = 0;
+    c.setAttribute("role", "checkbox");
+    c.setAttribute("aria-checked", chosen.has(r) ? "true" : "false");
+    const toggle = () => {
       if (chosen.has(r)) { chosen.delete(r); c.classList.remove("on"); }
       else { chosen.add(r); c.classList.add("on"); }
+      c.setAttribute("aria-checked", chosen.has(r) ? "true" : "false");
       meta.textContent = metaText();
+    };
+    c.onclick = toggle;
+    c.onkeydown = (e) => {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(); }
     };
     cells.set(r, c);
     grid.appendChild(c);

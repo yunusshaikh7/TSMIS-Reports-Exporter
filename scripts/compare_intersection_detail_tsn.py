@@ -650,10 +650,15 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
     sc = ctx["sc"]
     events = ctx.get("events")
     rows_a, rows_b = ctx["rows_a"], ctx["rows_b"]
-    ka = keys_for(rows_a, True, key_field=sc.key_field)
-    kb = keys_for(rows_b, True, key_field=sc.key_field)
-    ka, kb = pair_occurrences_by_similarity(sc, rows_a, rows_b, ka, kb, True)
-    union = union_keys(ka, kb)
+    # F1: reuse the pairing run_compare just computed (identical inputs for this
+    # family: key_field, has_route=True, no key_normalizer); recompute only under
+    # an older core that doesn't pass it.
+    ka, kb, union = ctx.get("keys_a"), ctx.get("keys_b"), ctx.get("union")
+    if ka is None or kb is None or union is None:
+        ka = keys_for(rows_a, True, key_field=sc.key_field)
+        kb = keys_for(rows_b, True, key_field=sc.key_field)
+        ka, kb = pair_occurrences_by_similarity(sc, rows_a, rows_b, ka, kb, True)
+        union = union_keys(ka, kb)
     # This rollup re-lays-out every record as two styled physical rows (~2x the union),
     # the slowest stretch of the largest comparison. Narrate it (header + per-N progress
     # below) so it isn't a silent multi-minute gap that reads as a freeze.
@@ -684,6 +689,15 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
               "soft": dict(color=_RV_FONTCOL["soft"], bold=True),
               "tn": dict(color=_RV_FONTCOL["tn"]), "tm": dict(color=_RV_FONTCOL["tm"]),
               "id": dict(bold=True), "count": dict(bold=True)}
+    # F1: openpyxl styles are immutable and shareable — build every distinct
+    # Border/Fill/Font ONCE instead of ~3 fresh objects per cell (~1.3M cells on
+    # the statewide rollup). The serialized workbook is identical.
+    _BD_NORM = Border(left=thin, right=thin)
+    _BD_BOTTOM = Border(left=thin, right=thin, bottom=med)
+    _FILL_CACHE = {(st, a): fill(cols[1 if a else 0])
+                   for st, cols in _RV_FILLS.items() for a in (False, True)}
+    _FONT_CACHE = {st: Fn(**kw) for st, kw in _FONTS.items()}
+    _FONT_DEFAULT = Fn()
 
     ws = wb.create_sheet("Report View")
     ws.sheet_properties.tabColor = "21344F"
@@ -714,9 +728,10 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
         status falls to 'eq' so a blank cell takes its record's band, not a stray shade."""
         c = WriteOnlyCell(ws, value=val)
         c.alignment = align or (lft if status == "id" else ctr)
-        c.border = Border(left=thin, right=thin, bottom=(med if bottom else None))
-        c.fill = fill(_RV_FILLS.get(status, _RV_FILLS["eq"])[1 if alt else 0])
-        c.font = Fn(**_FONTS.get(status, {}))
+        c.border = _BD_BOTTOM if bottom else _BD_NORM
+        c.fill = _FILL_CACHE.get((status, bool(alt)),
+                                 _FILL_CACHE[("eq", bool(alt))])
+        c.font = _FONT_CACHE.get(status, _FONT_DEFAULT)
         return c
 
     def hcell(val, fillc, font, align, comment_ref=None):
@@ -808,29 +823,26 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
                     row.append(woc(text, side, alt, bottom=bottom, align=align))
                 ws.append(row)
             continue
-        # pass 1 — Major (genuine conflicts) + Diffs (every difference) counts
-        maj = dif = 0
-        for li in (0, 1):
-            for col in _RV_GRID:
-                _, st = value(col[2] if li == 0 else col[5], ra, rb, one)
-                if st in ("soft", "hard"):
-                    dif += 1
-                    maj += (st == "hard")
-        # pass 2 — assemble + append both physical rows
+        # F1: evaluate each grid cell ONCE (it used to run twice — a counting
+        # pass then a rendering pass), count from the cached results, render from
+        # them. Same values, same statuses, half the evaluation work.
+        vals = {(li, ci): value(col[2] if li == 0 else col[5], ra, rb, one)
+                for li in (0, 1) for ci, col in enumerate(_RV_GRID)}
+        maj = sum(1 for _t, st in vals.values() if st == "hard")
+        dif = sum(1 for _t, st in vals.values() if st in ("soft", "hard"))
         for li in (0, 1):
             bottom = (li == 1)
             row = [woc(maj, "hard" if maj else "count", alt, bottom=bottom),
                    woc(dif, "count", alt, bottom=bottom),
                    woc(key[0], "count", alt, bottom=bottom)]
-            for col in _RV_GRID:
-                spec = col[2] if li == 0 else col[5]
-                kind = spec[0]
+            for ci, col in enumerate(_RV_GRID):
+                kind = (col[2] if li == 0 else col[5])[0]
                 if kind == "loc":
                     text, st = location, "id"
                 elif kind == "pm":
                     text, st = pmval, "id"
                 else:
-                    text, st = value(spec, ra, rb, one)
+                    text, st = vals[(li, ci)]
                 align = lft if (li == 1 and col[4] == "DESCRIPTION") else None
                 row.append(woc(text, st, alt, bottom=bottom, align=align))
             ws.append(row)

@@ -177,6 +177,22 @@ function updateWorkerStatus(w, text) {
   if (el) { el.textContent = text; el.title = text; }
 }
 
+// ARIA tabs arrow-key pattern (FE-04): Left/Right move + activate within any
+// role=tablist (the main tab bar + the Everything sub-tabs). Tabs are real
+// buttons, so Enter/Space/Tab already work; this adds the expected arrows.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const bar = e.target.closest && e.target.closest('[role="tablist"]');
+  if (!bar) return;
+  const tabs = [...bar.querySelectorAll('[role="tab"]:not(:disabled)')];
+  const i = tabs.indexOf(e.target);
+  if (i < 0) return;
+  e.preventDefault();
+  const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+  next.focus();
+  next.click();
+});
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && modalResolve) closeModal(null);
   // Block page reloads: WebView2 honors F5/Ctrl+R, and reloading mid-run
