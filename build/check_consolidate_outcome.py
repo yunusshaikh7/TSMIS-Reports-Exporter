@@ -79,6 +79,22 @@ def main():
         check("...completion = complete (producer-owned)", r.completion == oc.COMPLETE)
         check("...no skipped/failed inputs", r.skipped_inputs == 0 and r.failed_inputs == 0)
 
+        # an Excel owner-lock stub (~$foo.xlsx, present whenever a per-route file
+        # is open in Excel) must be invisible: NOT an unreadable input, NOT a
+        # false PARTIAL (a partial never promotes, so this blocked the pipeline).
+        locked = tmp / "locked"
+        locked.mkdir()
+        _xlsx(locked / "r005.xlsx", ["A", "B", "C"])
+        _xlsx(locked / "r099.xlsx", ["A", "B", "C"])
+        (locked / "~$r005.xlsx").write_bytes(b"\x00" * 165)   # real stubs are tiny junk
+        r = consolidate_xlsx(input_dir=locked, out_path=tmp / "locked.xlsx", sheet_name=_SHEET,
+                             report_name="Test", title="T", events=Events())
+        check("an Excel ~$ lock stub is ignored -> status ok", r.status == "ok")
+        check("...completion stays COMPLETE (no false partial)",
+              r.completion == oc.COMPLETE)
+        check("...no skipped/failed inputs from the stub",
+              r.skipped_inputs == 0 and r.failed_inputs == 0)
+
         # one file's header disagrees -> it is SKIPPED -> producer-owned PARTIAL.
         part = tmp / "part"
         part.mkdir()

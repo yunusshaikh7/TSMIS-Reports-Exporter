@@ -113,7 +113,11 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
                      f"Export the {report_name} report first, then consolidate."),
         )
 
-    files = sorted(input_dir.glob("*.xlsx"))
+    # Skip Excel owner-lock stubs (~$foo.xlsx appears the moment a per-route
+    # export is open in Excel): they are not workbooks, and counting one as an
+    # unreadable input falsely demoted the whole consolidation to PARTIAL.
+    files = sorted(p for p in input_dir.glob("*.xlsx")
+                   if not p.name.startswith("~$"))
     if not files:
         return ConsolidateResult(
             status="error",
