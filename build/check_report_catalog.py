@@ -198,6 +198,25 @@ def test_reports_derive_from_catalog():
     check("COMPARE_GROUPS == catalog.compare_groups()", reports.COMPARE_GROUPS == cat.compare_groups())
     check("COMPARE_REPORTS == catalog.compare_rows()", reports.COMPARE_REPORTS == cat.compare_rows())
     check("COMPARE_KEYS == catalog.compare_keys()", reports.COMPARE_KEYS == cat.compare_keys())
+    # W2: the display views (one family organization across every tab's picker)
+    check("CONSOLIDATE_DISPLAY == catalog.consolidate_display()",
+          reports.CONSOLIDATE_DISPLAY == cat.consolidate_display())
+    check("COMPARE_DISPLAY == catalog.compare_display()",
+          reports.COMPARE_DISPLAY == cat.compare_display())
+    cd_order, cd_meta = cat.consolidate_display()
+    cp_order, cp_meta = cat.compare_display()
+    check("consolidate display order is a permutation of the registry keys",
+          sorted(cd_order) == sorted(cat.consolidate_keys()))
+    check("compare display order is a permutation of the registry keys",
+          sorted(cp_order) == sorted(cat.compare_keys()))
+    po = cat.picker_order()
+    def _fam_positions(order):
+        return [po.index(cat._picker_family(k)) for k in order
+                if cat._picker_family(k) in po]
+    check("consolidate display follows the Export picker's family order",
+          _fam_positions(cd_order) == sorted(_fam_positions(cd_order)))
+    check("compare display follows the Export picker's family order",
+          _fam_positions(cp_order) == sorted(_fam_positions(cp_order)))
     check("_CONSOLIDATOR_BY_SUBDIR == catalog.consolidator_by_subdir()",
           reports._CONSOLIDATOR_BY_SUBDIR == cat.consolidator_by_subdir())
     check("tsn_library._REPORTS derives from catalog.tsn_entries()",

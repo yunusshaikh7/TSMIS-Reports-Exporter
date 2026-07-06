@@ -290,6 +290,63 @@ def picker_order():
     return _PICKER_ORDER
 
 
+# ----------------------------------------------------------------------------- #
+# W2 (v0.19.0): ONE family organization across every tab's report picker — the
+# Consolidate radios and the Compare radios mirror the Export picker: flat
+# top-level reports first in the SITE's order, then the family groups, each
+# family's entries contiguous. Display-only: the registry orders (matrix rows,
+# batch manifest, stable keys) are untouched.
+# ----------------------------------------------------------------------------- #
+_PICKER_FAMILY_ALIAS = {
+    # The Consolidate tab's Highway Log INPUT VARIANTS all belong to the
+    # highway_log family slot for ordering (their labels carry the variant).
+    "highway_log_excel": "highway_log",
+    "tsn_highway_log": "highway_log",
+}
+
+
+def _picker_family(key):
+    """The EXPORT family a cons:/cmp: key belongs to for picker grouping/order
+    ('cons:highway_log_excel' -> 'highway_log'; 'cmp:ramp_detail:tsn' ->
+    'ramp_detail'). An unknown family sorts after every known one, flat."""
+    token = key.split(":", 2)[1] if ":" in key else key
+    return _PICKER_FAMILY_ALIAS.get(token, token)
+
+
+def _picker_pos(key):
+    fam = _picker_family(key)
+    return _PICKER_ORDER.index(fam) if fam in _PICKER_ORDER else len(_PICKER_ORDER)
+
+
+def consolidate_display():
+    """(ordered keys, {key: (group, short_label)}) for the Consolidate tab —
+    the Export picker's family order + grouping. An exact-family consolidator
+    inherits the family's group/short; the Highway Log input variants stay flat
+    with their full (variant-naming) labels."""
+    disp = export_display()
+    keys = consolidate_keys()
+    order = tuple(sorted(keys, key=lambda k: (_picker_pos(k), keys.index(k))))
+    meta = {}
+    for k in keys:
+        token = k.split(":", 2)[1]
+        fam = _picker_family(k)
+        g, s = disp.get(fam, (None, None))
+        meta[k] = (g, s) if (token == fam and fam in disp) else (g, None)
+    return order, meta
+
+
+def compare_display():
+    """(ordered keys, {key: family_group}) for the Compare tab's radio lists —
+    the same family order/grouping WITHIN each comparison-type sub-tab. Labels
+    stay full (several flavors of one family can share a sub-tab, so a family
+    short would collide); the family header + order carry the organization."""
+    disp = export_display()
+    keys = compare_keys()
+    order = tuple(sorted(keys, key=lambda k: (_picker_pos(k), keys.index(k))))
+    meta = {k: disp.get(_picker_family(k), (None, None))[0] for k in keys}
+    return order, meta
+
+
 def consolidate_rows():
     """`[(label, module), ...]` — the CONSOLIDATE_REPORTS shape."""
     return [(c.label, c.module) for c in CONSOLIDATE]

@@ -305,14 +305,25 @@ function buildStatic() {
   // INPUT file format (PDF or Excel) — shown as a badge so the PDF-input
   // consolidators (TSN / TSMIS Highway Log PDF) are labeled like the rest.
   const cl = $("consList");
+  let consLastGroup = null;
   init.cons_reports.forEach((rep, i) => {
+    // W2: same family organization as the Export picker — a header when the
+    // group changes, indented short-labeled leaves under it.
+    const g = rep.group || null;
+    if (g && g !== consLastGroup) {
+      const head = document.createElement("div");
+      head.className = "option-group"; head.textContent = g;
+      cl.appendChild(head);
+    }
+    consLastGroup = g;
     const row = document.createElement("label");
-    row.className = "option-row" + (i === 0 ? " checked" : "");
+    row.className = "option-row" + (i === 0 ? " checked" : "")
+      + (g ? " option-indent" : "");
     const rb = document.createElement("input");
     rb.type = "radio"; rb.name = "consReport"; rb.checked = i === 0; rb.dataset.key = rep.key;
     const dot = document.createElement("span"); dot.className = "radio";
     const name = document.createElement("span");
-    name.className = "option-name"; name.textContent = rep.label;
+    name.className = "option-name"; name.textContent = rep.short || rep.label;
     row.append(rb, dot, name);
     if (rep.fmt) {
       const chip = document.createElement("span");
@@ -354,9 +365,23 @@ function buildStatic() {
   subStrip.appendChild(dayTab);
 
   const cl2 = $("compareList");
+  // W2: family headers inside each comparison-type sub-tab; tracked PER SUB-TAB
+  // (the payload interleaves a family's env/tsn flavors, so consecutive-row
+  // tracking would emit duplicate headers). The header carries the SUB-TAB's
+  // dataset.group so selectCompareGroup filters it with its rows.
+  const cmpLastFamilyByGroup = {};
   (init.compare_reports || []).forEach((rep, i) => {
+    const sub = rep.group || "";
+    if (rep.family_group && cmpLastFamilyByGroup[sub] !== rep.family_group) {
+      const head = document.createElement("div");
+      head.className = "option-group";
+      head.dataset.group = sub;
+      head.textContent = rep.family_group;
+      cl2.appendChild(head);
+    }
+    cmpLastFamilyByGroup[sub] = rep.family_group || null;
     const row = document.createElement("label");
-    row.className = "option-row";
+    row.className = "option-row" + (rep.family_group ? " option-indent" : "");
     row.dataset.group = rep.group || "";
     const rb = document.createElement("input");
     rb.type = "radio"; rb.name = "compareReport"; rb.dataset.key = rep.key;
@@ -1508,6 +1533,10 @@ function selectCompareGroup(groupId) {
   $("dayMatrixSection")?.classList.toggle("hidden", !dayMode);
   applyMatrixWide();
   if (dayMode) { renderDayMatrix(); return; }
+  // family headers (W2) filter with their sub-tab, like the rows
+  $("compareList").querySelectorAll(".option-group").forEach((h) => {
+    h.classList.toggle("hidden", h.dataset.group !== groupId);
+  });
   const rows = [...$("compareList").querySelectorAll(".option-row")];
   let firstVisible = null, checkedVisible = false;
   rows.forEach((r) => {

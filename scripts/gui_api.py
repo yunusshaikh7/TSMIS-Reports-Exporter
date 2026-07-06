@@ -61,7 +61,8 @@ from common import (
     require_valid_auth, set_preferred_channel, set_site,
 )
 from paths import EDGE_LOGIN_PROFILE_DIR
-from reports import (COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPORTS, CONSOLIDATE_KEYS,
+from reports import (COMPARE_DISPLAY, COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPORTS,
+                     CONSOLIDATE_DISPLAY, CONSOLIDATE_KEYS,
                      CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_REPORTS, PICKER_ORDER,
                      compare_index_for_key, consolidate_index_for_key,
                      enabled_export_reports, export_reports_status,
@@ -139,6 +140,9 @@ def _report_list_payload():
     check. (Constructing GuiApi would write the TSN library skeleton via
     `ensure_layout` and start the worker threads — P4-R05.)"""
     _export_fmt = {label: fmt for label, fmt, _spec in EXPORT_REPORTS}
+    _cons_by_key = {CONSOLIDATE_KEYS[i]: row
+                    for i, row in enumerate(CONSOLIDATE_REPORTS)}
+    _cmp_by_key = {COMPARE_KEYS[i]: row for i, row in enumerate(COMPARE_REPORTS)}
     return {
         # Every export report, with `disabled` marking the app-wide-disabled ones
         # (none today). The UI shows disabled rows GREYED (not hidden). `key` is the
@@ -156,21 +160,33 @@ def _report_list_payload():
                         key=lambda t: PICKER_ORDER.index(t[3].subdir)))],
         # Each consolidate entry carries its INPUT file format for the tab badge: a
         # module's own INPUT_FMT (the PDF-input consolidators) wins, else the matching
-        # export report's format, else Excel.
-        "cons_reports": [{"key": CONSOLIDATE_KEYS[i], "label": label,
-                          "fmt": (getattr(_mod, "INPUT_FMT", None)
-                                  or _export_fmt.get(label, "Excel"))}
-                         for i, (label, _mod) in enumerate(CONSOLIDATE_REPORTS)],
+        # export report's format, else Excel. W2: ordered + grouped like the Export
+        # picker (CONSOLIDATE_DISPLAY); selection stays key-based, so display order
+        # is free to differ from the registry order.
+        "cons_reports": [
+            (lambda label, _mod, key: {
+                "key": key, "label": label,
+                "group": CONSOLIDATE_DISPLAY[1][key][0],
+                "short": CONSOLIDATE_DISPLAY[1][key][1],
+                "fmt": (getattr(_mod, "INPUT_FMT", None)
+                        or _export_fmt.get(label, "Excel"))})
+            (*_cons_by_key[key], key)
+            for key in CONSOLIDATE_DISPLAY[0]],
         "compare_groups": [{"id": gid, "label": glabel}
                            for gid, glabel in COMPARE_GROUPS],
-        "compare_reports": [{"key": COMPARE_KEYS[i], "label": label, "kind": kind,
-                             "group": group,
-                             "subdir": getattr(_mod, "subdir", None),
-                             # The two file-picker labels for "files" comparisons (so
-                             # PDF-vs-Excel doesn't mislabel both TSMIS sides).
-                             "file_a_label": getattr(_mod, "file_a_label", "TSMIS"),
-                             "file_b_label": getattr(_mod, "file_b_label", "TSN")}
-                            for i, (label, _mod, kind, group) in enumerate(COMPARE_REPORTS)],
+        # W2: family-ordered within each comparison-type sub-tab; `family_group`
+        # is the Export-picker family header (`group` stays the SUB-TAB id).
+        "compare_reports": [
+            (lambda label, _mod, kind, group, key: {
+                "key": key, "label": label, "kind": kind, "group": group,
+                "family_group": COMPARE_DISPLAY[1][key],
+                "subdir": getattr(_mod, "subdir", None),
+                # The two file-picker labels for "files" comparisons (so
+                # PDF-vs-Excel doesn't mislabel both TSMIS sides).
+                "file_a_label": getattr(_mod, "file_a_label", "TSMIS"),
+                "file_b_label": getattr(_mod, "file_b_label", "TSN")})
+            (*_cmp_by_key[key], key)
+            for key in COMPARE_DISPLAY[0]],
     }
 
 

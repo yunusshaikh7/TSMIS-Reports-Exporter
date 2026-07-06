@@ -33,6 +33,9 @@ EXPORT_DISPLAY = _catalog.export_display()
 # Report-PICKER display order (export keys) — distinct from the registry/matrix
 # order: flat reports first in the TSMIS site's order, then the TSAR family groups.
 PICKER_ORDER = _catalog.picker_order()
+# W2: one family organization across every tab's picker (display-only views).
+CONSOLIDATE_DISPLAY = _catalog.consolidate_display()   # (ordered keys, {key: (group, short)})
+COMPARE_DISPLAY = _catalog.compare_display()           # (ordered keys, {key: family_group})
 
 # Stable export-op KEYS (P3 / §C.5): one per EXPORT_REPORTS row, in registry order.
 # Each equals the report-FAMILY key == the export spec's output `subdir`. These keys
