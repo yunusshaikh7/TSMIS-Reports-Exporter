@@ -9,7 +9,10 @@ common.py re-exports the public names.
 Console-free; the `"tsmis.auth"` logger name is preserved.
 """
 import logging
+import os
+import re
 import socket
+import subprocess
 import time
 
 from paths import EDGE_LOGIN_PROFILE_DIR
@@ -19,6 +22,40 @@ from browser_channels import _LNA_ARGS, _new_app_context, launch_browser
 from auth_nav import auth_state, is_logged_in, navigate_with_auth
 
 log = logging.getLogger("tsmis.auth")
+
+
+def _ensure_profile_dir():
+    """Create the sign-in profile dir and, ONCE (on creation), tighten its NTFS
+    ACL to the current user — the profile's Cookies DB holds the same live TSMIS
+    session the saved-login file gets this treatment for (SEC-04). (OI)(CI)
+    makes new children inherit the owner-only ACE, so everything Edge writes in
+    here stays owner-only. Best-effort like the auth-file hardening: any failure
+    logs and keeps the inherited (still user-readable) ACL."""
+    existed = EDGE_LOGIN_PROFILE_DIR.is_dir()
+    EDGE_LOGIN_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    if existed or os.name != "nt":
+        return
+    user = os.environ.get("USERNAME", "")
+    if not re.fullmatch(r'[^"/\\\[\]:;|=,+*?<>]{1,104}', user):
+        log.info("auth: profile ACL tighten skipped (USERNAME missing/invalid: %r)",
+                 user)
+        return
+    try:
+        cp = subprocess.run(
+            ["icacls", str(EDGE_LOGIN_PROFILE_DIR), "/inheritance:r",
+             "/grant:r", f"{user}:(OI)(CI)F"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10,
+            text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            check=False)
+        if cp.returncode != 0:
+            first = next((ln for ln in (cp.stdout or "").splitlines()
+                          if ln.strip()), "")
+            log.info("auth: profile ACL tighten non-zero (rc=%s)%s; kept the "
+                     "inherited ACL", cp.returncode,
+                     f": {first.strip()}" if first else "")
+    except (OSError, subprocess.SubprocessError) as e:
+        log.info("auth: profile ACL tighten skipped (%s: %s)", type(e).__name__, e)
+
 
 
 def _free_local_port():
@@ -105,7 +142,7 @@ def launch_edge_login_context(p, *, enable_cdp=False):
 
     Returns (ctx, cdp_url); cdp_url is None when no debug port was opened.
     """
-    EDGE_LOGIN_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_profile_dir()
     args = _LNA_ARGS + ["--profile-directory=Default"]
     cdp_url = None
     if enable_cdp:
@@ -247,7 +284,7 @@ def open_edge_device_context(p, *, headless=True):
     profile can only be open in ONE browser at a time -- callers must not hold
     two of these concurrently.
     """
-    EDGE_LOGIN_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_profile_dir()
     profiles = _known_edge_profile_names()
     attempts = []
     for profile_name in profiles:
