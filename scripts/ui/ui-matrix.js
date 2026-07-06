@@ -893,11 +893,16 @@ async function renderDayMatrix() {
               if (r && r.error) showMessage("error", "Can't export", r.error);
             }));
         }
-        acts.appendChild(mxActBtn("i-compare", "Build / rebuild this comparison vs TSN",
-          false, async () => {
-            const r = await api.build_day_cell(rk, d);
-            if (r && r.error) showMessage("error", "Can't build", r.error);
-          }));
+        // The comparison needs the TSMIS export present (W3: an export-less
+        // 'today' column now always shows, so don't offer a Build that would
+        // just consolidate an empty folder — export first via the action above).
+        if (c.export.present) {
+          acts.appendChild(mxActBtn("i-compare", "Build / rebuild this comparison vs TSN",
+            false, async () => {
+              const r = await api.build_day_cell(rk, d);
+              if (r && r.error) showMessage("error", "Can't build", r.error);
+            }));
+        }
         if (cmp && cmp.built) {
           const ob = mxActBtn("i-external", "Open this comparison workbook (values copy)",
             false, async () => {

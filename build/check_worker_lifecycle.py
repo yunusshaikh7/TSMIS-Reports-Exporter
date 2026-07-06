@@ -649,6 +649,22 @@ def test_invalid_manifest_batch_advances_successor():
           dispatched == ["succ-after-invalid"] and a._task == "matrix")
 
 
+def test_validate_terminal_frees_gate():
+    """W1: the validate task claims the single-task gate and its terminal
+    (validate_done) MUST free it — a lost terminal wedges every other action.
+    The producer's exactly-one-terminal is covered by check_validation; here we
+    lock the CONSUMER: _on_validate_done releases the gate on both outcomes."""
+    print("validate task frees the gate on its terminal (W1):")
+    for ok in (True, False):
+        a = _api()
+        assert a._try_claim_task("validate"), "fresh gate should claim validate"
+        check(f"gate held while validating (ok={ok})", not _gate_free(a))
+        a._on_validate_done({"ok": ok, "comparisons_run": 3, "comparisons_ok": 3,
+                             "comparisons_partial": 0, "path": "x.zip",
+                             "message": "boom"})
+        check(f"validate_done (ok={ok}) frees the gate", _gate_free(a))
+
+
 def test_active_check_soft_busy():
     """B8: a user claim during the quiet background env check gets a clear soft
     message (never a browser-launch crash), supersedes the check, and works
@@ -702,6 +718,7 @@ def test_cancel_never_leaks_to_next_queued_job():
 
 
 def main():
+    test_validate_terminal_frees_gate()
     test_active_check_soft_busy()
     test_cancel_never_leaks_to_next_queued_job()
     test_producer_paths()

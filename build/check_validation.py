@@ -241,6 +241,51 @@ def test_trust_semantics():
           "counts could not be read" in dig)
 
 
+def test_tsn_stage_heals_stale_library():
+    """_tsn_stage (the D2 auto-heal stage) is the only state-MUTATING stage;
+    exercise it directly (the other tests patch reports() to []). A stale
+    present-raw library heals; a current one is left alone."""
+    print("validation _tsn_stage — freshness + D2 heal:")
+    import tsn_library as _tsn
+
+    class _Spec:
+        def __init__(self, subdir, nv):
+            self.subdir, self.normalization_version, self.label = subdir, nv, subdir
+
+    statuses = {
+        "stale_lib": {"consolidated_present": True, "raw_present": True,
+                      "current": False, "raw_count": 5},
+        "fresh_lib": {"consolidated_present": True, "raw_present": True,
+                      "current": True, "raw_count": 3},
+    }
+    healed = []
+
+    def status(sub):
+        # after a heal the stale one reports current
+        s = dict(statuses[sub])
+        if sub == "stale_lib" and healed:
+            s["current"] = True
+        return s
+
+    def ensure_current(sub, events=None):
+        healed.append(sub)
+        return ConsolidateResult(status="ok", message="rebuilt")
+
+    with _Patch(_tsn, "reports", lambda: [_Spec("stale_lib", 2), _Spec("fresh_lib", 2)]), \
+         _Patch(_tsn, "status", status), \
+         _Patch(_tsn, "ensure_current", ensure_current):
+        rows = validation._tsn_stage(Events())
+
+    by = {r["report"]: r for r in rows}
+    check("a stale present-raw library is HEALED and reads current after",
+          by["stale_lib"]["healed"] == "ok" and by["stale_lib"]["current_after"] is True
+          and healed == ["stale_lib"])
+    check("a already-current library is left alone (no heal)",
+          by["fresh_lib"]["healed"] is None)
+    check("each row records the normalization version",
+          by["stale_lib"]["normalization_version"] == 2)
+
+
 def test_worker_always_posts_terminal():
     """The ValidationWorker MUST post exactly one validate_done no matter what
     fails — an un-posted terminal wedges the single-task gate. Drive it with an
@@ -270,6 +315,7 @@ if __name__ == "__main__":
     test_degrades_on_family_error()
     test_evidence_carries_manifest()
     test_trust_semantics()
+    test_tsn_stage_heals_stale_library()
     test_worker_always_posts_terminal()
     if _fail:
         print(f"\n{len(_fail)} check(s) FAILED")

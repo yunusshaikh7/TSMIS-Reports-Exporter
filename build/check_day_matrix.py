@@ -127,6 +127,16 @@ def main():
         check("an export-less source still offers TODAY (W3: the matrix exports "
               "into today itself)",
               day_matrix.available_days("ars-dev") == [_today])
+        # W3: a TODAY column with NO export renders every cell export-absent (so
+        # the UI hides Build and shows only the Export action) — the snapshot
+        # must not choke on the not-yet-exported day.
+        snap_today = day_matrix.day_matrix_snapshot("ssor-prod", [_today], dest=str(dest),
+                                                    today=_today)
+        tcell = snap_today["cells"]["highway_log"][_today]
+        check("export-less today: cell renders export-absent, comparison unbuilt",
+              tcell["export"]["present"] is False and tcell["cmp"]["built"] is False)
+        check("export-less today: it IS the exportable column (today == the column)",
+              snap_today["today"] == _today and snap_today["days"] == [_today])
 
         print("day_matrix snapshot — cells, greyed rows, TSN source:")
         snap = day_matrix.day_matrix_snapshot(
