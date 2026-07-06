@@ -553,6 +553,7 @@ function renderState() {
   $("btnChromiumDownload").disabled = locked;
   $("btnChromiumDelete").disabled = locked;
   $("btnChromiumCancel").classList.toggle("hidden", st.task !== "chromium");
+  $("btnValidateCancel").classList.toggle("hidden", st.task !== "validate");
   // dataset.off rows (app-wide-disabled reports) stay disabled regardless of lock.
   $("reportList").querySelectorAll("input").forEach((c) => { c.disabled = locked || c.dataset.off === "1"; });
   $("reportList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
@@ -1880,6 +1881,18 @@ function bindEvents() {
   $("setEnvCheckStart").addEventListener("change", () => onSettingToggle("setEnvCheckStart", "env_check_after_start"));
   $("setNotifyFinish").addEventListener("change", () => onSettingToggle("setNotifyFinish", "notify_on_finish"));
   $("btnValidate").onclick = async () => {
+    // Disclose the side effect: validation re-runs each sample vs-TSN comparison
+    // against the live store, refreshing those matrix cells (and rebuilding a
+    // stale TSN library) — so the mutation is expected, not hidden.
+    const ok = await showConfirm({
+      title: "Validate & package results?",
+      message: "This re-runs each sample report's comparison against TSN using the "
+        + "reports already on this PC, then saves everything a maintainer needs into "
+        + "one file.\n\nIt refreshes those comparison cells in the matrix and can take "
+        + "several minutes. You can cancel it while it runs.",
+      confirmLabel: "Validate",
+    });
+    if (!ok) return;
     const res = await api.run_validation();
     if (res && res.error) showMessage("error", "Can't validate right now", res.error);
     // Progress + the completion modal arrive via run_started/log/validate_done.
@@ -1937,6 +1950,7 @@ function bindEvents() {
   $("btnChromiumDownload").onclick = downloadChromium;
   $("btnChromiumDelete").onclick = deleteChromium;
   $("btnChromiumCancel").onclick = () => api.cancel_run();
+  $("btnValidateCancel").onclick = () => api.cancel_run();
 
   $("btnPickTsmis").onclick = () => pickCompareFile("tsmis");
   $("btnPickTsn").onclick = () => pickCompareFile("tsn");

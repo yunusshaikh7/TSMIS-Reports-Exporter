@@ -186,6 +186,61 @@ def test_evidence_carries_manifest():
         check("json round-trips the manifest", rt["totals"]["comparisons_ok"] == 1)
 
 
+def test_trust_semantics():
+    """A PARTIAL comparison is NOT counted as a full OK; a present-but-raw TSN
+    library is HEALED (not errored); unreadable counts are flagged, not shown as
+    a clean success. These are the trust properties the bundle exists to prove."""
+    print("validation trust semantics — partial/heal/unreadable-counts:")
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_valtrust_"))
+    dest = tmp / "store"
+    _store(dest, {"ssor-prod": ["highway_log", "intersection_detail"]})
+
+    import matrix as _matrix
+    import settings as _settings
+    import tsn_library as _tsn
+    import reports as _reports
+
+    # highway_log -> a PARTIAL ok; intersection_detail -> ok but counts unreadable
+    def build(dest_, row, env, mode, baseline, events, **kw):
+        if row == "highway_log":
+            return ConsolidateResult(status="ok", completion=outcome.PARTIAL,
+                                     output_path=str(dest / "p.xlsx"))
+        return ConsolidateResult(status="ok", completion=outcome.COMPLETE,
+                                 output_path=str(dest / "c.xlsx"))
+
+    healed = {"n": 0}
+
+    def ensure_current(sub, events=None):
+        healed["n"] += 1
+        return ConsolidateResult(status="ok", message="rebuilt")
+
+    with _Patch(_settings, "get_batch_dest", lambda: str(dest)), \
+         _Patch(_settings, "get_matrix_baseline", lambda: "ssor-prod"), \
+         _Patch(_matrix, "build_comparison", build), \
+         _Patch(_matrix, "read_counts",
+                lambda p: (None, None) if p.endswith("c.xlsx") else (3, 0)), \
+         _Patch(_reports, "matrix_rows",
+                lambda: [("highway_log", "Highway Log", "highway_log", 0, object()),
+                         ("intersection_detail", "Int Detail", "intersection_detail", 1, object())]), \
+         _Patch(_tsn, "is_registered", lambda r: True), \
+         _Patch(_tsn, "resolve",
+                lambda r: {"kind": "raw"} if r == "highway_log" else {"kind": "consolidated"}), \
+         _Patch(_tsn, "ensure_current", ensure_current), \
+         _Patch(_tsn, "reports", lambda: []):
+        man = validation.run_validation(events=Events())
+
+    t = man["totals"]
+    check("a PARTIAL comparison is NOT a full OK (partial tallied separately)",
+          t["comparisons_ok"] == 1 and t["comparisons_partial"] == 1
+          and t["comparisons_run"] == 2, f"totals={t}")
+    check("a present-but-raw TSN library is HEALED before comparing (not errored)",
+          healed["n"] >= 1)
+    dig = "\n".join(validation.summary_lines(man))
+    check("digest flags the PARTIAL cell", "PARTIAL inputs" in dig)
+    check("digest flags unreadable counts (not a bare success)",
+          "counts could not be read" in dig)
+
+
 def test_worker_always_posts_terminal():
     """The ValidationWorker MUST post exactly one validate_done no matter what
     fails — an un-posted terminal wedges the single-task gate. Drive it with an
@@ -214,6 +269,7 @@ if __name__ == "__main__":
     test_manifest_and_cancel()
     test_degrades_on_family_error()
     test_evidence_carries_manifest()
+    test_trust_semantics()
     test_worker_always_posts_terminal()
     if _fail:
         print(f"\n{len(_fail)} check(s) FAILED")

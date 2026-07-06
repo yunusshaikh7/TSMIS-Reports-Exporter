@@ -1723,11 +1723,11 @@ class GuiApi(GuiMatrixMixin):
         with self._lock:
             task = self._task
             if task in ("export", "batch", "consolidate", "compare", "chromium",
-                        "envscan", "reset", "matrix"):
+                        "envscan", "reset", "matrix", "validate"):
                 self.cancel_event.set()
                 self.pause_event.clear()  # unblock a paused run so cancel lands
         if task in ("export", "batch", "consolidate", "compare", "chromium",
-                    "envscan", "reset", "matrix"):
+                    "envscan", "reset", "matrix", "validate"):
             self._emit_log("Cancel requested…")
         elif task == "envcheck":
             self._emit_log("The environment check can't be stopped partway — "
@@ -2489,15 +2489,18 @@ class GuiApi(GuiMatrixMixin):
 
     def _on_validate_done(self, payload):
         if payload.get("ok"):
-            ran, ok = payload.get("comparisons_run", 0), payload.get("comparisons_ok", 0)
+            ran = payload.get("comparisons_run", 0)
+            ok = payload.get("comparisons_ok", 0)
+            partial = payload.get("comparisons_partial", 0)
             tail = " (cancelled early)" if payload.get("cancelled") else ""
+            ptail = f", {partial} on partial inputs" if partial else ""
             self._emit_log(f"Validation complete{tail}: {ok} of {ran} sample "
-                           "comparisons OK. Evidence bundle saved:")
+                           f"comparisons fully OK{ptail}. Evidence bundle saved:")
             self._emit_log(f"  {payload.get('path')}")
             self._emit_modal("info", "Validation complete",
-                             f"Processed {ran} sample comparison(s); {ok} succeeded"
-                             f"{tail}.\n\nThe evidence bundle (everything a "
-                             "maintainer needs) was saved to:\n"
+                             f"Processed {ran} sample comparison(s); {ok} fully "
+                             f"succeeded{ptail}{tail}.\n\nThe evidence bundle "
+                             "(everything a maintainer needs) was saved to:\n"
                              f"{payload.get('path')}")
         else:
             self._emit_log("Validation could not complete: "

@@ -749,18 +749,27 @@ class ValidationWorker(threading.Thread):
     def run(self):
         import validation
         import evidence
-        events = Events(on_log=lambda t: self.q.put(("log", t)))
         should_cancel = (lambda: self.cancel is not None and self.cancel.is_set())
+        # is_cancelled lets a long SINGLE comparison stop mid-flight (compare_core
+        # polls it); should_cancel stops BETWEEN cells. Both read the one event.
+        events = Events(on_log=lambda t: self.q.put(("log", t)),
+                        is_cancelled=should_cancel)
         # ONE terminal is guaranteed no matter what fails (validation OR the bundle
         # build) — an un-posted validate_done would wedge the single-task gate.
         terminal = {"ok": False, "message": "validation did not complete"}
         try:
             manifest = validation.run_validation(events=events,
                                                  should_cancel=should_cancel)
-            self.q.put(("log", "Building the evidence bundle (self-test + logs + "
-                               "the validation manifest)…"))
+            self.q.put(("log", "Building the evidence bundle (logs + the "
+                               "validation manifest)…"))
+            # run_self_test=False: the validation manifest IS this button's
+            # evidence. The offline self-test launches a browser + a SECOND
+            # WebView2 window, which is unsafe to do from a worker thread while
+            # the live GUI already owns the main-thread webview loop. The
+            # standalone `--collect-evidence` process keeps the self-test (it
+            # exits before any window opens).
             res = evidence.collect(emit=lambda ln: self.q.put(("log", ln)),
-                                   run_self_test=True, validation=manifest)
+                                   run_self_test=False, validation=manifest)
             totals = manifest.get("totals", {})
             terminal = {
                 "ok": bool(res.get("ok")),
