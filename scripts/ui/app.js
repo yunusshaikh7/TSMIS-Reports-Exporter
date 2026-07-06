@@ -1540,9 +1540,14 @@ function fillCompareDirSelect(sel, custom, preferred, days) {
     sel.appendChild(o);
   }
   const options = [...sel.options].map((o) => o.value);
-  if (custom) sel.value = custom;
-  else if (prev && options.includes(prev)) sel.value = prev;
-  else if (preferred) sel.value = preferred;
+  // The user's CURRENT selection survives every re-render; the Browse… path is
+  // just an extra OPTION, not an override (it used to win here on every state
+  // re-render, silently stomping a later dropdown pick — the comparison then
+  // ran against the stale custom folder). Browse takes effect via
+  // pickCompareFolder setting the value explicitly, once.
+  if (prev && options.includes(prev)) sel.value = prev;
+  else if (preferred && options.includes(preferred)) sel.value = preferred;
+  else if (custom) sel.value = custom;
 }
 
 async function renderCompareDirs() {
@@ -1609,7 +1614,10 @@ async function pickCompareFolder(side) {
   const res = await api.pick_compare_folder(side.toUpperCase());
   if (res && res.path) {
     CMP_DIRS[side] = res.path;
-    renderCompareDirs();
+    await renderCompareDirs();
+    // Browsing IS an explicit selection (once) — later dropdown picks stick.
+    $(side === "a" ? "cmpDirA" : "cmpDirB").value = res.path;
+    syncCompareButton();
   }
 }
 

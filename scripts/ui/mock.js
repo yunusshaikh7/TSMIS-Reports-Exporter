@@ -408,8 +408,12 @@ function makeMockApi() {
     setTimeout(() => {
       const finished = st.matrix_current;
       st.task = null; st.matrix = null; st.matrix_current = null;
+      // PRODUCTION order (v0.18.4 lesson): run_ended -> state -> matrix_refresh.
+      // The mock used to push state first, which made order-sensitive bugs
+      // (the queue-phantom) unreproducible in #mock.
+      push({ t: "run_ended" });
       pushState();
-      push({ t: "run_ended" }, { t: "matrix_refresh" });
+      push({ t: "matrix_refresh" });
       // A by-day EXPORT chains a compare for the same scope (mirrors the real
       // bridge's export -> consolidate -> compare so the column fills itself).
       if (finished && finished.kind === "export" && finished.which === "day") {

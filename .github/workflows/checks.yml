@@ -127,6 +127,7 @@ jobs:
           node build/check_mx_partial_render.js
           node build/check_compare_routing.js
           node build/check_ui_boot.js
+          node build/check_mock_event_order.js
 
       - name: Packaging + console-flow checks (blocking)
         # Offline half of the exact-artifact gate (PA): APP_MODULES is the complete,

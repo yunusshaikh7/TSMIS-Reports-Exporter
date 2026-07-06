@@ -484,11 +484,20 @@ function applyMatrixEnvFlags() {
   }
 }
 
+// Stale-response guards: renderMatrix/renderDayMatrix fire twice per run end
+// (run_ended + matrix_refresh) with no sequencing on the awaits — a slower,
+// OLDER snapshot could resolve last and repaint stale over the newer one. Each
+// render takes a token; a response whose token is no longer current is dropped.
+let _matrixRenderSeq = 0;
+let _dayRenderSeq = 0;
+
 async function renderMatrix() {
   const grid = $("matrixGrid");
   if (!grid) return;
+  const seq = ++_matrixRenderSeq;
   let snap;
   try { snap = await api.matrix_info(); } catch (e) { return; }
+  if (seq !== _matrixRenderSeq) return;   // a newer render started; drop this one
   if (!snap || !snap.rows) return;
   const envs = snap.envs, locked = !!(S.st && S.st.task);
   // All rows or all columns hidden (only reachable via a hand-edited config — the
@@ -701,8 +710,10 @@ async function renderMatrix() {
 async function renderDayMatrix() {
   const grid = $("dayMatrixGrid");
   if (!grid) return;
+  const seq = ++_dayRenderSeq;
   let snap;
   try { snap = await api.day_matrix_info(); } catch (e) { return; }
+  if (seq !== _dayRenderSeq) return;      // a newer render started; drop this one
   if (!snap) return;
   const days = snap.days || [], locked = !!(S.st && S.st.task);
   const today = snap.today;          // the one EXPORTABLE column (past = locked)
