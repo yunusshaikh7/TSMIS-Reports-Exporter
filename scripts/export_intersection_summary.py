@@ -24,8 +24,13 @@ import sys
 try:
     from playwright.sync_api import sync_playwright  # noqa: F401  (fail early, clearly)
 except ImportError:
-    print('ERROR: Playwright is not installed. Run "1. setup (one time).bat" first.')
-    sys.exit(1)
+    if __name__ == "__main__":     # console run: friendly .bat guidance, clean exit
+        print('ERROR: Playwright is not installed. Run "1. setup (one time).bat" first.')
+        sys.exit(1)
+    # Imported (the GUI reaches here via report_catalog -> SPEC): raise a REAL
+    # error the caller's fatal-path can SHOW -- print+sys.exit at import time
+    # killed a windowed exe silently (exit 1, no dialog).
+    raise
 
 from cli import run_cli
 from common import EXPORT_READY_JS
