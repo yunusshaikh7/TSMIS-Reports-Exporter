@@ -1372,8 +1372,8 @@ class ActiveEnvCheckWorker(threading.Thread):
                             log.info("active env check: browser close failed "
                                      "(%s: %s)", type(e).__name__,
                                      str(e).splitlines()[0] if str(e) else "")
-        except _Superseded:
-            pass                    # already logged at the yield point
+        except _Superseded:  # silent-ok: the yield point above already logged it
+            pass
         except Exception as e:
             log.info("active env check: %s quiet failure (%s: %s)", key,
                      type(e).__name__, str(e).splitlines()[0] if str(e) else "")
