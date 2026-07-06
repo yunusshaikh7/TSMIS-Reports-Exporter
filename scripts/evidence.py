@@ -208,7 +208,8 @@ def _manifest(contents, unreadable, skipped_user, roots):
     return "\n".join(lines) + "\n"
 
 
-def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True):
+def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
+            validation=None):
     """Build the credential-safe evidence zip. Returns a result dict:
     `{ok, path, files, excluded, skipped_user, message}`.
 
@@ -244,6 +245,21 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True):
         st_lines.append("self-test skipped (run --collect-evidence on the work PC to capture it).")
     self_test_text = "\n".join(st_lines) + "\n"
 
+    # W1: the one-click validation manifest (counts/outcomes/folder names only —
+    # never report data, per RM05). Both a readable digest and the raw JSON ride
+    # in the bundle so a maintainer sees exactly what the samples produced.
+    validation_txt = validation_json = None
+    if validation is not None:
+        try:
+            import importlib
+            import json as _json
+            _val_mod = importlib.import_module("validation")   # not `import validation` — the param shadows it
+            validation_txt = "\n".join(_val_mod.summary_lines(validation)) + "\n"
+            validation_json = _json.dumps(validation, indent=2, default=str)
+        except Exception as e:                   # noqa: BLE001 — the bundle still ships
+            validation_txt = f"validation summary unavailable ({type(e).__name__}: {e})\n"
+            log.warning("evidence: validation render failed (%s)", type(e).__name__)
+
     entries, skipped_user = _allowlisted_entries(extra_dir, roots, emit)
 
     # P13-A01: write the data entries FIRST, recording the files ACTUALLY written and
@@ -253,6 +269,10 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True):
     try:
         with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("self_test.txt", self_test_text)
+            if validation_txt is not None:
+                zf.writestr("validation.txt", validation_txt)
+            if validation_json is not None:
+                zf.writestr("validation.json", validation_json)
             for src, arc in entries:
                 try:
                     zf.write(src, arc)
@@ -261,7 +281,9 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True):
                     unreadable.append((arc, type(e).__name__))
                     emit(f"  SKIPPED (unreadable): {src} ({type(e).__name__})")
                     log.info("evidence: skipped %s (%s: %s)", src, type(e).__name__, e)
-            contents = ["manifest.txt", "self_test.txt"] + written
+            _val_files = (["validation.txt"] if validation_txt is not None else []) \
+                + (["validation.json"] if validation_json is not None else [])
+            contents = ["manifest.txt", "self_test.txt"] + _val_files + written
             manifest_text = _manifest(contents, unreadable, skipped_user, roots)
             zf.writestr("manifest.txt", manifest_text)
     except OSError as e:

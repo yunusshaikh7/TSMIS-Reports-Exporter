@@ -25,12 +25,14 @@ class Task:
     RESET = "reset"
     CHROMIUM = "chromium"
     COMPARE = "compare"
+    VALIDATE = "validate"       # W1: one-click sample validation
 
 
 # Every gate task kind (for validation / the lifecycle checks).
 TASKS = frozenset({
     Task.EXPORT, Task.CONSOLIDATE, Task.LOGIN, Task.BATCH, Task.MATRIX,
     Task.ENVCHECK, Task.ENVSCAN, Task.RESET, Task.CHROMIUM, Task.COMPARE,
+    Task.VALIDATE,
 })
 
 
@@ -42,6 +44,7 @@ class Msg:
     EXPORT_DONE = "export_done"
     CONSOLIDATE_DONE = "consolidate_done"
     RESET_DONE = "reset_done"
+    VALIDATE_DONE = "validate_done"
     CHROMIUM_DONE = "chromium_done"
     BATCH_DONE = "batch_done"
     MATRIX_DONE = "matrix_done"
@@ -78,6 +81,7 @@ TERMINAL = frozenset({
     Msg.BATCH_DONE, Msg.MATRIX_DONE, Msg.MATRIX_EXPORT_DONE, Msg.ENV_SHOT,
     Msg.ENV_ACCESS_DONE, Msg.ERROR, Msg.CANCELLED,
     Msg.LOGIN_SAVED, Msg.LOGIN_DEVICE_OK, Msg.LOGIN_FAILED,
+    Msg.VALIDATE_DONE,
 })
 
 

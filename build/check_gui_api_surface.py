@@ -4,7 +4,7 @@ endpoints share one claim->dialog->launch tail.
 
 Two halves:
   * SURFACE IDENTITY (RM08) — GuiApi's public method set (the methods pywebview exposes
-    to JS) equals a FROZEN list of 98 names. A moved/renamed/dropped/added endpoint fails
+    to JS) equals a FROZEN list of 99 names. A moved/renamed/dropped/added endpoint fails
     here; this is the invariant the mechanical move must preserve. The two touched
     endpoints (start_compare / start_compare_env) additionally have their exact source
     `def` signature asserted (the @_api_method wrapper hides arity from inspect, so the
@@ -62,7 +62,7 @@ FROZEN_API = {
     "rebuild_day_matrix", "rebuild_tsn_library", "recompute_matrix", "refresh_cell_comparison",
     "refresh_cell_export", "refresh_column_export", "refresh_row_export", "remove_day_matrix_day",
     "report_library_info", "request_preview", "reset_preview", "resume_batch", "retry_failed",
-    "revert_to_previous", "save_run_report", "save_support_bundle", "set_all_matrix_modes",
+    "revert_to_previous", "run_validation", "save_run_report", "save_support_bundle", "set_all_matrix_modes",
     "set_batch_dest", "set_day_matrix_formulas", "set_day_matrix_report",
     "set_day_matrix_row_order", "set_day_matrix_source", "set_export_browser",
     "set_matrix_baseline", "set_matrix_env", "set_matrix_env_order", "set_matrix_fast",
@@ -177,7 +177,7 @@ def test_matrix_grouping():
         check(f"{m}: NO LONGER defined on GuiApi (truly moved)", m not in ga)
         check(f"{m}: still resolves on GuiApi via the mixin (façade intact)",
               hasattr(gui_api.GuiApi, m))
-    # the moved PUBLIC endpoints are still in the frozen 98-name façade (no rename/drop)
+    # the moved PUBLIC endpoints are still in the frozen 99-name façade (no rename/drop)
     moved_public = {m for m in MOVED if not m.startswith("_")}
     check("every moved public matrix endpoint stays in the frozen façade",
           moved_public <= FROZEN_API)

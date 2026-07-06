@@ -15,12 +15,12 @@ window.CONTRACT = {
   // The single-task-gate task kinds (contract.Task), sorted -- mirrors
   // initial_state_enums().tasks.
   tasks: ["batch", "chromium", "compare", "consolidate", "envcheck",
-          "envscan", "export", "login", "matrix", "reset"],
+          "envscan", "export", "login", "matrix", "reset", "validate"],
   // The worker messages that END a task (contract.TERMINAL), sorted.
   terminal_kinds: ["batch_done", "cancelled", "chromium_done", "consolidate_done",
                    "env_access_done", "env_shot", "error", "export_done",
                    "login_device_ok", "login_failed", "login_saved", "matrix_done",
-                   "matrix_export_done", "reset_done"],
+                   "matrix_export_done", "reset_done", "validate_done"],
   // Per-environment access verdicts (contract.EnvAccess), in the backend's
   // declared order.
   env_access: ["ok", "unverified", "reports_off", "no_reports", "denied",

@@ -863,6 +863,25 @@ function makeMockApi() {
       }, 1800);
       return { ok: true };
     },
+    run_validation: async () => {
+      st.task = "validate"; st.auth_dot = "busy"; st.auth_text = "Validating…";
+      pushState();
+      push({ t: "log", text: "Validating: processing the samples on this PC…" },
+           { t: "run_started", mode: "consolidate", label: "Validating the samples…" });
+      setTimeout(() => {
+        push({ t: "log", text: "Validation: TSN highway_log library current (raw files: 12)." },
+             { t: "log", text: "Validation: comparing highway_log (ssor-prod) vs TSN… 969 diff cells [4.2s]" },
+             { t: "log", text: "Validation complete: 6 of 6 sample comparisons OK. Evidence bundle saved:" },
+             { t: "log", text: "  C:\\Users\\you\\AppData\\Local\\TSMIS Exporter\\tsmis_evidence_20260706_141530.zip" },
+             { t: "run_ended" },
+             { t: "state", s: st },
+             { t: "modal", kind: "info", title: "Validation complete",
+               message: "Processed 6 sample comparison(s); 6 succeeded.\n\nThe evidence bundle (everything a maintainer needs) was saved to:\nC:\\Users\\you\\AppData\\Local\\TSMIS Exporter\\tsmis_evidence_20260706_141530.zip" });
+        st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 1400);
+      return { ok: true };
+    },
     save_support_bundle: async () => {
       push({ t: "log", text: "Support bundle saved (12 files): C:\\Users\\you\\Desktop\\tsmis_support.zip" });
       return { saved: true };

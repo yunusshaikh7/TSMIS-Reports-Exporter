@@ -152,6 +152,7 @@ jobs:
           python build/check_build_env.py
           python build/check_ci_manifest.py
           python build/check_export_stub_guard.py
+          python build/check_validation.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py

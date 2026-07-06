@@ -44,6 +44,7 @@ import updater
 from gui_worker import (ActiveEnvCheckWorker, BatchWorker, CheckWorker,
                         ChromiumWorker, ConsolidateWorker, EnvCheckWorker,
                         EnvScanWorker, ExportWorker, LoginWorker, ResetWorker,
+                        ValidationWorker,
                         UpdateWorker, measure_targets, reset_targets)
 from exporter_parallel import MAX_WORKERS, default_worker_count
 from logging_setup import active_log_file, set_debug_logging
@@ -220,6 +221,7 @@ class GuiApi(GuiMatrixMixin):
             contract.Msg.ENV_ACCESS_DONE: self._on_env_scan_done,
             contract.Msg.ACTIVE_ENV_DONE: self._on_active_env_done,
             contract.Msg.RESET_DONE: self._on_reset_done,
+            contract.Msg.VALIDATE_DONE: self._on_validate_done,
             contract.Msg.CHROMIUM_DONE: self._on_chromium_done,
             contract.Msg.EXPORT_DONE: self._finish_export,
             contract.Msg.EXPORT_PARTIAL: self._on_export_partial,
@@ -2463,6 +2465,45 @@ class GuiApi(GuiMatrixMixin):
             self._emit_log(f"Done — deleted {payload['files']} file(s), "
                            f"freed {payload['mb']} MB. Logs, your login and "
                            "settings were kept.")
+        self._set_dot("ok" if self._authed else "bad", "Done")
+        self._end_task()
+
+    @_api_method
+    def run_validation(self):
+        """W1: one-click validation — process every on-disk sample through the
+        REAL comparison pipeline, then package the outcomes into the
+        credential-safe evidence bundle. The automated replacement for the manual
+        work-PC ride-along (no command line, no ad-hoc exports). Cancellable."""
+        err = self._claim_task_error("validate")
+        if err:
+            return err
+        self.cancel_event.clear()
+        self._emit_log("Validating: processing the samples on this PC…")
+        self._set_dot("busy", "Validating…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Validating the samples…"})
+        self._push_state()
+        ValidationWorker(self._gated_queue(),
+                         cancel_event=self.cancel_event).start()
+        return {"ok": True}
+
+    def _on_validate_done(self, payload):
+        if payload.get("ok"):
+            ran, ok = payload.get("comparisons_run", 0), payload.get("comparisons_ok", 0)
+            tail = " (cancelled early)" if payload.get("cancelled") else ""
+            self._emit_log(f"Validation complete{tail}: {ok} of {ran} sample "
+                           "comparisons OK. Evidence bundle saved:")
+            self._emit_log(f"  {payload.get('path')}")
+            self._emit_modal("info", "Validation complete",
+                             f"Processed {ran} sample comparison(s); {ok} succeeded"
+                             f"{tail}.\n\nThe evidence bundle (everything a "
+                             "maintainer needs) was saved to:\n"
+                             f"{payload.get('path')}")
+        else:
+            self._emit_log("Validation could not complete: "
+                           f"{payload.get('message', 'unknown error')}")
+            self._emit_modal("warning", "Validation didn't finish",
+                             payload.get("message", "See the log for details."))
         self._set_dot("ok" if self._authed else "bad", "Done")
         self._end_task()
 

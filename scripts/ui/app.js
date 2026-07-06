@@ -542,7 +542,7 @@ function renderState() {
   const locked = st.task != null;
   ["selSource", "selEnv", "routesInput", "btnChooseRoutes", "selDay",
    "btnVerifyEnv", "btnDeleteReports", "btnClearLogin", "btnSupportBundle",
-   "btnCheckEnvs"]
+   "btnValidate", "btnCheckEnvs"]
     .forEach((id) => { $(id).disabled = locked; });
   Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
   ["setDebugLog", "setDevtools", "setEnvCheckSignin", "setEnvCheckStart", "setNotifyFinish"].forEach((id) => {
@@ -1879,6 +1879,11 @@ function bindEvents() {
   $("setEnvCheckSignin").addEventListener("change", () => onSettingToggle("setEnvCheckSignin", "env_check_after_signin"));
   $("setEnvCheckStart").addEventListener("change", () => onSettingToggle("setEnvCheckStart", "env_check_after_start"));
   $("setNotifyFinish").addEventListener("change", () => onSettingToggle("setNotifyFinish", "notify_on_finish"));
+  $("btnValidate").onclick = async () => {
+    const res = await api.run_validation();
+    if (res && res.error) showMessage("error", "Can't validate right now", res.error);
+    // Progress + the completion modal arrive via run_started/log/validate_done.
+  };
   $("btnSupportBundle").onclick = async () => {
     const res = await api.save_support_bundle();
     if (res && res.error) showMessage("error", "Could not save the bundle", res.error);

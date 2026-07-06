@@ -100,6 +100,9 @@ APP_MODULES = [
     # and the frozen `--self-test` gate now enforce that every flat scripts/ module
     # is declared here.
     "matrix", "day_matrix", "report_library",
+    # W1 (v0.19.0): the one-click Settings validation — processes the on-disk
+    # samples through the real pipeline; its manifest ships in the evidence zip.
+    "validation",
     # Shared comprehensive self-test body, run by gui_main --self-test (the frozen
     # exact-artifact release gate) and build/full_smoke.py.
     "self_test",
