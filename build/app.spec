@@ -89,7 +89,9 @@ APP_MODULES = [
     "gui_worker_export",
     "gui_worker_env",
     "gui_worker_maint",
-    "gui_worker_matrix",   # P12: independent PDF expected-row oracle (P13 evidence kit)
+    "gui_worker_matrix",
+    "matrix_state",
+    "matrix_build",   # P12: independent PDF expected-row oracle (P13 evidence kit)
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
     "consolidate_tsn_highway_log", "consolidate_tsmis_highway_log_pdf",

@@ -128,7 +128,7 @@ def main():
         tsn_library.importlib = _imp
 
     # the compare paths stay WIRED to the heal (source tripwire)
-    for mod in ("matrix.py", "day_matrix.py"):
+    for mod in ("matrix_build.py", "day_matrix.py"):   # S4: the compare site moved to the build side
         src = (Path(__file__).resolve().parent.parent / "scripts" / mod
                ).read_text(encoding="utf-8")
         check(f"{mod} calls tsn_library.ensure_current before the TSN compare",
