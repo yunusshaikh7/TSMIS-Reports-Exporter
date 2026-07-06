@@ -180,6 +180,11 @@ function closeModal(value) {
   $("modalOverlay").textContent = "";
   const r = modalResolve; modalResolve = null;
   if (r) r(value);
+  // Restore focus to whatever opened the modal (a destroyed opener is a no-op).
+  if (modalOpener && typeof modalOpener.focus === "function") {
+    try { modalOpener.focus(); } catch (e) { /* removed from the DOM */ }
+    modalOpener = null;
+  }
 }
 
 function openModal(node) {
@@ -193,10 +198,38 @@ function openModal(node) {
   }
   const ov = $("modalOverlay");
   ov.textContent = "";
+  // Dialog semantics + a focus trap (FE-03): without these, Tab walked out of
+  // an open modal into the disabled-looking background UI. Focus returns to
+  // the opener on close (see closeModal).
+  node.setAttribute("role", "dialog");
+  node.setAttribute("aria-modal", "true");
+  modalOpener = document.activeElement;
   ov.appendChild(node);
   ov.classList.remove("hidden");
   return new Promise((resolve) => { modalResolve = resolve; });
 }
+
+let modalOpener = null;   // the element to restore focus to when a modal closes
+
+// Keep Tab/Shift-Tab cycling INSIDE the open modal.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Tab" || !modalResolve) return;
+  const ov = $("modalOverlay");
+  // a[href], not bare [href]: the bare form also matches SVG <use href> icons,
+  // which can't take focus — first.focus() then silently no-ops.
+  const focusables = ov.querySelectorAll(
+    'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), '
+    + 'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])');
+  if (!focusables.length) { e.preventDefault(); return; }
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  const inside = ov.contains(document.activeElement);
+  if (e.shiftKey) {
+    if (!inside || document.activeElement === first) { last.focus(); e.preventDefault(); }
+  } else if (!inside || document.activeElement === last) {
+    first.focus(); e.preventDefault();
+  }
+});
 
 function buildModal({ title, iconName, headClass, wide }) {
   const m = document.createElement("div");

@@ -687,7 +687,11 @@ function pfRoutesSummary() {
 }
 function renderPreflight() {
   const card = $("preflightCard");
-  if (!card || card.classList.contains("hidden")) return;   // hidden while running
+  // Bail when hidden DIRECTLY (while running) or via an ANCESTOR (matrix mode
+  // hides the whole tab; offsetParent is null anywhere under display:none) —
+  // the class check alone kept recomputing the table invisibly (FE-08).
+  if (!card || card.classList.contains("hidden")
+      || card.offsetParent === null) return;
   const tab = S.tab || "export";
   const rows = $("preflightRows");
   const targetEl = $("preflightTarget");
@@ -1762,8 +1766,16 @@ function bindEvents() {
   };
   document.querySelectorAll(".popover-host").forEach(attachPopover);
   // keep the pre-flight summary live as the user edits any control
-  document.body.addEventListener("change", renderPreflight);
-  document.body.addEventListener("input", renderPreflight);
+  // Debounced (FE-08): these fire on EVERY keystroke/toggle anywhere in the
+  // body; the preflight table itself only needs the settled value (the routes
+  // input already debounces its own handler at 200 ms).
+  let preflightTimer = null;
+  const debouncedPreflight = () => {
+    clearTimeout(preflightTimer);
+    preflightTimer = setTimeout(renderPreflight, 150);
+  };
+  document.body.addEventListener("change", debouncedPreflight);
+  document.body.addEventListener("input", debouncedPreflight);
 
   $("selSource").onchange = () => {
     api.set_site($("selSource").value, $("selEnv").value);
