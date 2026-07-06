@@ -186,11 +186,35 @@ def test_evidence_carries_manifest():
         check("json round-trips the manifest", rt["totals"]["comparisons_ok"] == 1)
 
 
+def test_worker_always_posts_terminal():
+    """The ValidationWorker MUST post exactly one validate_done no matter what
+    fails — an un-posted terminal wedges the single-task gate. Drive it with an
+    evidence.collect that RAISES (the path outside the old try/except)."""
+    print("ValidationWorker guarantees a terminal (gate-safety):")
+    import queue as _queue
+    import gui_worker
+    import validation as _val
+    import evidence as _ev
+
+    q = _queue.Queue()
+    with _Patch(_val, "run_validation", lambda events=None, should_cancel=None: {"totals": {}}), \
+         _Patch(_ev, "collect", lambda **k: (_ for _ in ()).throw(RuntimeError("bundle boom"))):
+        w = gui_worker.ValidationWorker(q)
+        w.run()   # synchronous run (no .start()) so the queue is fully drained
+    kinds = []
+    while not q.empty():
+        kinds.append(q.get_nowait()[0])
+    terminals = [k for k in kinds if k == "validate_done"]
+    check("a raising evidence.collect still posts exactly one validate_done",
+          len(terminals) == 1, f"terminals={terminals} all={kinds}")
+
+
 if __name__ == "__main__":
     print("W1 one-click validation:")
     test_manifest_and_cancel()
     test_degrades_on_family_error()
     test_evidence_carries_manifest()
+    test_worker_always_posts_terminal()
     if _fail:
         print(f"\n{len(_fail)} check(s) FAILED")
         sys.exit(1)

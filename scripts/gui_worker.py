@@ -751,28 +751,31 @@ class ValidationWorker(threading.Thread):
         import evidence
         events = Events(on_log=lambda t: self.q.put(("log", t)))
         should_cancel = (lambda: self.cancel is not None and self.cancel.is_set())
+        # ONE terminal is guaranteed no matter what fails (validation OR the bundle
+        # build) — an un-posted validate_done would wedge the single-task gate.
+        terminal = {"ok": False, "message": "validation did not complete"}
         try:
             manifest = validation.run_validation(events=events,
                                                  should_cancel=should_cancel)
-        except Exception as e:                   # noqa: BLE001 — never crash the gate
+            self.q.put(("log", "Building the evidence bundle (self-test + logs + "
+                               "the validation manifest)…"))
+            res = evidence.collect(emit=lambda ln: self.q.put(("log", ln)),
+                                   run_self_test=True, validation=manifest)
+            totals = manifest.get("totals", {})
+            terminal = {
+                "ok": bool(res.get("ok")),
+                "path": res.get("path"),
+                "comparisons_run": totals.get("comparisons_run", 0),
+                "comparisons_ok": totals.get("comparisons_ok", 0),
+                "cancelled": totals.get("cancelled", False),
+            }
+        except Exception as e:                   # noqa: BLE001 — never wedge the gate
             log.warning("validation worker failed (%s: %s)", type(e).__name__,
                         str(e).splitlines()[0] if str(e) else "")
             self.q.put(("log", f"Validation could not run: {type(e).__name__}."))
-            self.q.put(("validate_done", {"ok": False,
-                        "message": f"{type(e).__name__}: {e}"}))
-            return
-        self.q.put(("log", "Building the evidence bundle (self-test + logs + "
-                           "the validation manifest)…"))
-        res = evidence.collect(emit=lambda ln: self.q.put(("log", ln)),
-                               run_self_test=True, validation=manifest)
-        totals = manifest.get("totals", {})
-        self.q.put(("validate_done", {
-            "ok": bool(res.get("ok")),
-            "path": res.get("path"),
-            "comparisons_run": totals.get("comparisons_run", 0),
-            "comparisons_ok": totals.get("comparisons_ok", 0),
-            "cancelled": totals.get("cancelled", False),
-        }))
+            terminal = {"ok": False, "message": f"{type(e).__name__}: {e}"}
+        finally:
+            self.q.put(("validate_done", terminal))
 
 
 class ResetWorker(threading.Thread):
