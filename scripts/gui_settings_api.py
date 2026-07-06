@@ -17,7 +17,7 @@ from common import (BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES,
                     clear_auth, default_site_url, dev_site_url, get_site,
                     has_valid_auth)
 from exporter_parallel import MAX_WORKERS
-from gui_endpoint import _api_method      # the shared js_api decorator
+from gui_endpoint import _api_method, _task_endpoint, pick_path
 from gui_worker import (ChromiumWorker, ResetWorker, ValidationWorker,
                         measure_targets, reset_targets)
 from logging_setup import active_log_file, set_debug_logging
@@ -326,15 +326,12 @@ class GuiSettingsMixin:
         self._set_dot("ok" if self._authed else "bad", "Done")
         self._end_task()
 
-    @_api_method
+    @_task_endpoint("validate")
     def run_validation(self):
         """W1: one-click validation — process every on-disk sample through the
         REAL comparison pipeline, then package the outcomes into the
         credential-safe evidence bundle. The automated replacement for the manual
         work-PC ride-along (no command line, no ad-hoc exports). Cancellable."""
-        err = self._claim_task_error("validate")
-        if err:
-            return err
         self.cancel_event.clear()
         self._emit_log("Validating: processing the samples on this PC…")
         self._set_dot("busy", "Validating…")
@@ -386,12 +383,12 @@ class GuiSettingsMixin:
         import zipfile
 
         default = f"tsmis_support_{time.strftime('%Y%m%d_%H%M%S')}.zip"
-        picked = self._window.create_file_dialog(
+        picked = pick_path(self._window,
             webview.SAVE_DIALOG, save_filename=default,
             file_types=("Zip archive (*.zip)",))
         if not picked:
             return {"cancelled": True}
-        out = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+        out = Path(picked)
 
         manifest = io.StringIO()
         src, env = get_site()

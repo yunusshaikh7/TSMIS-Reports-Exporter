@@ -55,7 +55,7 @@ from reports import (COMPARE_DISPLAY, COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPO
                      CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_REPORTS, PICKER_ORDER,
                      consolidate_index_for_key, export_reports_status)
 import outcome
-from gui_endpoint import _api_method      # the shared js_api decorator
+from gui_endpoint import _api_method, pick_path   # the shared js_api decorator + dialog unwrap
 import contract
 import gui_win32
 from task_coordinator import TaskCoordinator
@@ -1252,12 +1252,12 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
             default = f"run_report_{spec.subdir}_{time.strftime('%Y%m%d_%H%M%S')}.csv"
         else:
             default = f"run_report_multi_{time.strftime('%Y%m%d_%H%M%S')}.csv"
-        picked = self._window.create_file_dialog(
+        picked = pick_path(self._window, 
             webview.SAVE_DIALOG, save_filename=default,
             file_types=("CSV file (*.csv)",))
         if not picked:
             return {"cancelled": True}
-        path = Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+        path = Path(picked)
         if len(results) == 1:
             spec, result = results[0]
             run_report.write_run_report(result, spec.label, path)

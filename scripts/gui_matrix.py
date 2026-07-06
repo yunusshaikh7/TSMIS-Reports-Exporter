@@ -16,7 +16,7 @@ import day_matrix
 import matrix
 import settings
 from exporter_parallel import MAX_WORKERS, default_worker_count
-from gui_endpoint import _api_method
+from gui_endpoint import _api_method, pick_path, pick_paths
 from gui_worker import (ConsolidateWorker, DayMatrixCompareWorker,
                         MatrixBatchExportWorker, MatrixCompareWorker,
                         MatrixTsnConsolidateWorker)
@@ -598,15 +598,14 @@ class GuiMatrixMixin:
             start.mkdir(parents=True, exist_ok=True)
         except OSError:
             start = TSN_LIBRARY_ROOT
-        picked = self._window.create_file_dialog(
+        picked = pick_path(self._window,
             webview.OPEN_DIALOG, allow_multiple=False, directory=str(start),
             file_types=("Excel workbook (*.xlsx)",))
         if not picked:
             return {"cancelled": True}
-        path = picked[0] if isinstance(picked, (list, tuple)) else picked
-        settings.set_matrix_tsn_file(subdir, str(path))
+        settings.set_matrix_tsn_file(subdir, picked)
         self._push_state()
-        return {"ok": True, "path": str(path)}
+        return {"ok": True, "path": picked}
 
     @_api_method
     def consolidate_matrix_tsn(self, subdir):
@@ -653,11 +652,10 @@ class GuiMatrixMixin:
         spec = tsn_library.get(report)
         is_pdf = spec.raw_glob.lower().endswith("pdf")
         ftype = ("PDF document (*.pdf)" if is_pdf else "Excel workbook (*.xlsx)")
-        picked = self._window.create_file_dialog(
+        srcs = pick_paths(self._window,
             webview.OPEN_DIALOG, allow_multiple=True, file_types=(ftype,))
-        if not picked:
+        if not srcs:
             return {"cancelled": True}
-        srcs = list(picked) if isinstance(picked, (list, tuple)) else [picked]
         try:
             landed = tsn_library.import_raw(report, srcs)
         except (OSError, ValueError) as e:

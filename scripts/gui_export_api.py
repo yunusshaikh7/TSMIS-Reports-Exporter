@@ -12,9 +12,10 @@ import batch_manifest
 import outcome
 import report_library
 import settings
+import contract
 from common import DATA_SOURCES, ENVIRONMENTS, ROUTES, parse_routes
 from exporter_parallel import MAX_WORKERS, default_worker_count
-from gui_endpoint import _api_method      # the shared js_api decorator
+from gui_endpoint import _api_method, pick_path   # + the dialog unwrap
 from gui_worker import BatchWorker, ExportWorker
 from paths import OUTPUT_ROOT
 from reports import enabled_export_reports, resolve_export_keys
@@ -260,11 +261,10 @@ class GuiExportMixin:
         """Native folder dialog to choose the always-current destination."""
         cur = settings.get_batch_dest()
         start = cur if Path(cur).is_dir() else str(OUTPUT_ROOT)
-        picked = self._window.create_file_dialog(webview.FOLDER_DIALOG, directory=start)
+        picked = pick_path(self._window, webview.FOLDER_DIALOG, directory=start)
         if not picked:
             return {"cancelled": True}
-        path = picked[0] if isinstance(picked, (list, tuple)) else picked
-        dest = settings.set_batch_dest(str(path))
+        dest = settings.set_batch_dest(picked)
         self._emit_log(f"Export Everything destination: {dest}")
         self._push_state()
         return {"dest": dest}
@@ -385,19 +385,16 @@ class GuiExportMixin:
 
     @_api_method
     def cancel_run(self):
-        # Tasks that honor cancel_event between steps. (login has its own cancel;
-        # envcheck is a single short headless verify that can't stop partway.)
+        # contract.CANCELLABLE is the ONE home of the cancellable-kind list (E2).
         # Read+set under the lock (BUG-10): unlocked, this could race _end_task
         # and the matrix queue advance, cancelling the NEXT queued job instead of
         # the one the user targeted.
         with self._lock:
             task = self._task
-            if task in ("export", "batch", "consolidate", "compare", "chromium",
-                        "envscan", "reset", "matrix", "validate"):
+            if task in contract.CANCELLABLE:
                 self.cancel_event.set()
                 self.pause_event.clear()  # unblock a paused run so cancel lands
-        if task in ("export", "batch", "consolidate", "compare", "chromium",
-                    "envscan", "reset", "matrix", "validate"):
+        if task in contract.CANCELLABLE:
             self._emit_log("Cancel requested…")
         elif task == "envcheck":
             self._emit_log("The environment check can't be stopped partway — "

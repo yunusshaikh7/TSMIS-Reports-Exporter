@@ -9,7 +9,7 @@ from pathlib import Path
 import webview
 
 import artifact_store
-from gui_endpoint import _api_method      # the shared js_api decorator
+from gui_endpoint import _api_method, pick_path   # + the dialog unwrap
 from gui_worker import ConsolidateWorker
 from paths import OUTPUT_ROOT, list_output_days, list_output_days_for_report
 from reports import (COMPARE_REPORTS, CONSOLIDATE_REPORTS,
@@ -93,38 +93,36 @@ class GuiCompareMixin:
     def pick_compare_file(self, side):
         """Native open dialog for one comparison input. `side` is "TSMIS" or
         "TSN" (display only). Returns {"path": ...} or {"cancelled": True}."""
-        picked = self._window.create_file_dialog(
+        picked = pick_path(self._window, 
             webview.OPEN_DIALOG, allow_multiple=False,
             file_types=("Excel workbook (*.xlsx)",))
         if not picked:
             return {"cancelled": True}
-        path = picked[0] if isinstance(picked, (list, tuple)) else picked
-        ui_log.info("compare: %s file picked: %s", side, path)
-        return {"path": str(path)}
+        ui_log.info("compare: %s file picked: %s", side, picked)
+        return {"path": picked}
 
     @_api_method
     def pick_compare_folder(self, side):
         """Native folder dialog for one cross-environment comparison side
         (for folders outside output/ — the dropdowns list the run folders)."""
-        picked = self._window.create_file_dialog(
+        picked = pick_path(self._window, 
             webview.FOLDER_DIALOG, directory=str(OUTPUT_ROOT))
         if not picked:
             return {"cancelled": True}
-        path = picked[0] if isinstance(picked, (list, tuple)) else picked
-        ui_log.info("compare: side %s folder picked: %s", side, path)
-        return {"path": str(path)}
+        ui_log.info("compare: side %s folder picked: %s", side, picked)
+        return {"path": picked}
 
     def _save_dialog_for_compare(self, directory, suggested):
         """Shared save dialog — the native dialog also owns the overwrite
         question. Returns a Path or None (cancelled)."""
-        picked = self._window.create_file_dialog(
+        picked = pick_path(self._window, 
             webview.SAVE_DIALOG, directory=str(directory),
             save_filename=suggested,
             file_types=("Excel workbook (*.xlsx)",))
         if not picked:
             ui_log.info("compare: save dialog cancelled")
             return None
-        return Path(picked[0] if isinstance(picked, (list, tuple)) else picked)
+        return Path(picked)
 
     @staticmethod
     def _compare_mode(want_formulas, want_values):

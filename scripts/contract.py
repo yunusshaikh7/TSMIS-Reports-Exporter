@@ -36,6 +36,15 @@ TASKS = frozenset({
 })
 
 
+# The kinds cancel_run may cancel (E2's kind-check, ONE home): every gated task
+# that honors cancel_event between steps. login has its own cancel flow;
+# envcheck is a single short headless verify that can't stop partway.
+CANCELLABLE = frozenset({
+    Task.EXPORT, Task.BATCH, Task.CONSOLIDATE, Task.COMPARE, Task.CHROMIUM,
+    Task.ENVSCAN, Task.RESET, Task.MATRIX, Task.VALIDATE,
+})
+
+
 class Msg:
     """Worker → main-thread message kinds posted on the pump queue and dispatched
     by `GuiApi._handle`. TERMINAL kinds end the task that owns the gate (exactly
