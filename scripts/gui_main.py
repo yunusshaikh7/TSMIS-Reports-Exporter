@@ -184,7 +184,7 @@ def main():
     # access violations (pythonnet/WebView2) and deadlocks the window -- see
     # setup_logging's docstring. Python-level crashes are still logged by the
     # excepthooks and the GuiApi method wrapper.
-    setup_logging(enable_faulthandler=False)
+    setup_logging(enable_faulthandler=False, name="gui")
     _unblock_dotnet_assemblies()           # must run BEFORE the CLR loads
     if "--self-test" in sys.argv:
         # Packaging gate (build.ps1 -SelfTest): prove THIS exact exe imports every

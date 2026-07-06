@@ -36,7 +36,7 @@ log = logging.getLogger("tsmis.login")
 
 def main():
     from logging_setup import setup_logging
-    setup_logging()
+    setup_logging(name="login")
     print()
     print("#" * 64)
     print("#" + " " * 62 + "#")

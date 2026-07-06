@@ -148,7 +148,7 @@ def run_cli(spec, title):
     If the TSMIS_FAST_WORKERS environment variable is set to a number > 1
     (e.g. by '5. fast export (experimental).bat'), the experimental parallel
     engine runs several browsers at once instead of the proven sequential one."""
-    setup_logging()
+    setup_logging(name="cli")
     workers = _resolve_workers()
 
     routes = _resolve_routes_console()          # None = all routes
@@ -239,7 +239,7 @@ def run_cli_multi(report_options, title="TSMIS Multi-Report Export"):
     ordered list of (label, spec). Prompts which reports + which routes once, then
     runs each selected report with the proven engine (sequential, or fast mode if
     TSMIS_FAST_WORKERS is set). Backs the 'Several / all report types' BAT option."""
-    setup_logging()
+    setup_logging(name="cli")
     workers = _resolve_workers()
 
     chosen = _select_reports_console(report_options)
@@ -356,7 +356,7 @@ def run_consolidate_cli(consolidate_fn):
     The consolidator logs its own progress through Events.on_log and returns a
     ConsolidateResult; this shim renders the outcome and sets the exit code.
     """
-    setup_logging()
+    setup_logging(name="cli")
     day = _resolve_day_console()
     log.info("consolidate start: %s (day=%s)",
              getattr(consolidate_fn, "__module__", consolidate_fn),

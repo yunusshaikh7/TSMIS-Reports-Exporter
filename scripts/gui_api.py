@@ -46,7 +46,7 @@ from gui_worker import (ActiveEnvCheckWorker, BatchWorker, CheckWorker,
                         EnvScanWorker, ExportWorker, LoginWorker, ResetWorker,
                         UpdateWorker, measure_targets, reset_targets)
 from exporter_parallel import MAX_WORKERS, default_worker_count
-from logging_setup import LOG_FILE, set_debug_logging
+from logging_setup import active_log_file, set_debug_logging
 
 from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
                    FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, TSN_LIBRARY_ROOT,
@@ -2234,7 +2234,7 @@ class GuiApi(GuiMatrixMixin):
                             if "chromium" in BROWSER_CHANNELS else "system browser"),
                 "data_root": str(DATA_ROOT),
                 "output_root": str(OUTPUT_ROOT),
-                "log_file": str(LOG_FILE),
+                "log_file": str(active_log_file()),
                 "failures_dir": str(FAILURES_DIR),
                 "auth_state": auth_state,
                 "max_workers": MAX_WORKERS,

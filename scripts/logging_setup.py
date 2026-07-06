@@ -28,8 +28,16 @@ from logging.handlers import RotatingFileHandler
 
 from paths import DATA_ROOT, LOG_DIR, OUTPUT_ROOT, is_frozen
 
-LOG_FILE = LOG_DIR / "tsmis.log"
+LOG_FILE = LOG_DIR / "tsmis.log"   # the default (name-less) target; see setup_logging(name=...)
 CRASH_FILE = LOG_DIR / "crash.log"
+_log_file = None                    # the ACTIVE file once setup_logging ran
+
+
+def active_log_file():
+    """The log file THIS process actually writes (per-entry-point since E3:
+    tsmis-gui.log / tsmis-cli.log / tsmis-login.log), or the legacy default
+    before setup_logging has run."""
+    return _log_file if _log_file is not None else LOG_FILE
 _configured = False
 _crash_file_handle = None      # kept alive for faulthandler
 
@@ -74,7 +82,7 @@ def _log_banner(log):
         from version import __version__ as app_version
     except Exception:  # silent-ok: the banner still prints, with version 'unknown'
         app_version = "unknown"
-    log.info("=== logging started (app v%s) -> %s ===", app_version, LOG_FILE)
+    log.info("=== logging started (app v%s) -> %s ===", app_version, active_log_file())
     log.info("env: %s build | python %s | %s",
              "frozen" if is_frozen() else "dev",
              platform.python_version(), platform.platform())
@@ -94,10 +102,16 @@ def set_debug_logging(on):
                                     "DEBUG" if on else "INFO")
 
 
-def setup_logging(level=logging.INFO, enable_faulthandler=True):
+def setup_logging(level=logging.INFO, enable_faulthandler=True, name=""):
     """Configure the root logger's rotating file handler once. Returns the log
     file path. The saved 'verbose logging' setting (settings.py) upgrades the
     level to DEBUG.
+
+    `name` picks a PER-ENTRY-POINT file (tsmis-<name>.log): the GUI, the console
+    flow and the login window each write their own — two processes sharing one
+    rotating file silently DROPPED records after a 2 MB rotation while the other
+    process held the old inode (BUG-14). Same rotation policy per file; the
+    evidence bundle collects the whole tsmis*.log* family.
 
     enable_faulthandler=False is for the GUI process ONLY: faulthandler's
     Windows handler intercepts access violations FIRST-chance, and the .NET CLR
@@ -106,9 +120,9 @@ def setup_logging(level=logging.INFO, enable_faulthandler=True):
     all threads mid-CLR-exception-dispatch on the GUI thread and the window
     deadlocks ("Not responding", WER AppHangB1) before the page ever loads.
     Console entry points never load the CLR and keep the crash dumps."""
-    global _configured
+    global _configured, _log_file
     if _configured:
-        return LOG_FILE
+        return active_log_file()
     try:
         import settings
         if settings.get("debug_logging"):
@@ -116,8 +130,9 @@ def setup_logging(level=logging.INFO, enable_faulthandler=True):
     except Exception:  # silent-ok: settings must never block logging setup itself
         pass
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    _log_file = LOG_DIR / (f"tsmis-{name}.log" if name else "tsmis.log")
     handler = RotatingFileHandler(
-        LOG_FILE, maxBytes=2_000_000, backupCount=5, encoding="utf-8"
+        _log_file, maxBytes=2_000_000, backupCount=5, encoding="utf-8"
     )
     # Thread names tag every line; show the main thread as [main] so the common
     # case reads cleanly. Rewrite it in the LOG RECORD only -- renaming the
@@ -146,4 +161,4 @@ def setup_logging(level=logging.INFO, enable_faulthandler=True):
         logging.getLogger("tsmis").info(
             "faulthandler disabled in this process (incompatible with the "
             "CLR's first-chance exceptions; see setup_logging docstring)")
-    return LOG_FILE
+    return _log_file

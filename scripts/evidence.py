@@ -123,7 +123,9 @@ def _allowlisted_entries(extra_dir, roots, emit):
     or a non-evidence format) — so the RM05 promise can't be undone by what the user
     drops in the folder (P13-B01)."""
     entries = []
-    for pattern in ("tsmis.log*", "crash.log", "update_helper.log"):
+    # tsmis*.log* covers the per-entry-point family (tsmis-gui/cli/login.log)
+    # AND the legacy shared tsmis.log from older installs.
+    for pattern in ("tsmis*.log*", "crash.log", "update_helper.log"):
         for f in sorted(Path(paths.LOG_DIR).glob(pattern)):
             if f.is_file():
                 entries.append((f, f"logs/{f.name}"))
