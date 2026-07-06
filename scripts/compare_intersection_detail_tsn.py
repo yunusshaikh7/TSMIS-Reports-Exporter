@@ -65,10 +65,11 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_tsn_common as ctc
+from compare_tsn_common import (load_consolidated_rows, row_has_data,
+                                suggest_route_name)
 from compare_core import (CompareSchema, normalize_value, keys_for,
                           pair_occurrences_by_similarity, union_keys,
                           _PROGRESS_EVERY)
-from paths import today_str
 
 
 log = logging.getLogger("tsmis.compare")
@@ -275,7 +276,7 @@ def tsn_rows_from_raw(path):
             raise ValueError("the TSN Intersection Detail workbook is missing "
                              "LOCATION/POST_MILE — pick the raw 'TSAR - INTERSECTION DETAIL' export.")
         return [_tsn_row(list(r), h) for r in it
-                if r and any(c is not None and str(c).strip() != "" for c in r)]
+                if row_has_data(r)]
     finally:
         wb.close()
 
@@ -322,24 +323,12 @@ def _tsmis_row(r):
 
 
 def _load_tsmis(path):
-    name = Path(path).name
-    try:
-        wb = load_workbook(path, read_only=True, data_only=True)
-    except Exception as e:
-        raise ValueError(f"Could not open {name}: {type(e).__name__}: {e}")
-    try:
-        if TSMIS_SHEET not in wb.sheetnames:
-            raise ValueError(f"{name} has no '{TSMIS_SHEET}' sheet — pick the "
-                             "consolidated TSMIS Intersection Detail workbook.")
-        it = wb[TSMIS_SHEET].iter_rows(values_only=True)
-        header = [str(c).strip() if c is not None else "" for c in (next(it, []) or [])]
-        if not header or header[0] != "Route":
-            raise ValueError(f"{name} isn't a CONSOLIDATED Intersection Detail workbook "
-                             "(expected a leading 'Route' column) — consolidate first.")
-        return [_tsmis_row(list(r)) for r in it
-                if r and any(c is not None and str(c).strip() != "" for c in r)], True
-    finally:
-        wb.close()
+    return load_consolidated_rows(
+        path, TSMIS_SHEET,
+        missing_sheet_hint="pick the consolidated TSMIS Intersection Detail workbook.",
+        bad_header_msg="isn't a CONSOLIDATED Intersection Detail workbook "
+                       "(expected a leading 'Route' column) — consolidate first.",
+        row_transform=_tsmis_row)
 
 
 # --------------------------------------------------------------------------- #
@@ -604,7 +593,7 @@ def _tsn_onesided(path):
         h = {str(n).strip(): i for i, n in enumerate(hdr) if n is not None}
         out = []
         for r in it:
-            if not (r and any(c is not None and str(c).strip() != "" for c in r)):
+            if not row_has_data(r):
                 continue
             out.append({k: ("" if h.get(col) is None or h[col] >= len(r) or r[h[col]] is None
                             else str(r[h[col]]).strip())
@@ -629,7 +618,7 @@ def _tsmis_locations(path):
         next(it, None)
         out = []
         for r in it:
-            if not (r and any(c is not None and str(c).strip() != "" for c in r)):
+            if not row_has_data(r):
                 continue
             out.append("" if len(r) <= 4 or r[4] is None else str(r[4]).strip())
         return out
@@ -883,11 +872,8 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
 # adapter surface
 # --------------------------------------------------------------------------- #
 def suggest_name(tsmis_path):
-    stem = Path(tsmis_path).stem
-    m = re.search(r"route[ _-]*([0-9]+[A-Za-z]?)", stem, re.IGNORECASE)
-    tag = (f"Route{m.group(1).lstrip('0') or '0'}" if m
-           else "Consolidated" if "consolidated" in stem.lower() else "Intersection_Detail")
-    return f"TSMIS_vs_TSN_IntersectionDetail_{tag}_Comparison {today_str()}.xlsx"
+    return suggest_route_name(tsmis_path, "Intersection_Detail",
+                              "TSMIS_vs_TSN_IntersectionDetail")
 
 
 def _load_pair(tsmis_path, tsn_path):

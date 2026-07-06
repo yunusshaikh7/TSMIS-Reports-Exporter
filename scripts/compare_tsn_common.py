@@ -28,6 +28,60 @@ from pathlib import Path
 
 from compare_core import run_compare
 from events import ConsolidateResult, Events
+from paths import today_str
+
+
+# --------------------------------------------------------------------------- #
+# shared row/name helpers (v0.19.0 R1 — the idioms every comparator copied)
+# --------------------------------------------------------------------------- #
+def row_has_data(row):
+    """True when the row holds at least one non-blank cell — the emptiness
+    predicate every loader wrote inline (`any(c is not None and str(c).strip()
+    != "" ...)`); one spelling so they can't drift."""
+    return bool(row) and any(c is not None and str(c).strip() != "" for c in row)
+
+
+_ROUTE_TOKEN_RE = re.compile(r"route[ _-]*([0-9]+[A-Za-z]?)", re.IGNORECASE)
+
+
+def suggest_route_name(path, fallback_tag, name_tag):
+    """Output-filename suggestion shared by the route-aware comparators:
+    '<name_tag>_<RouteN|Consolidated|fallback_tag>_Comparison <today>.xlsx'.
+    The trailing generated-on date stamps when the comparison was built (A1)."""
+    stem = Path(path).stem
+    m = _ROUTE_TOKEN_RE.search(stem)
+    tag = (f"Route{m.group(1).lstrip('0') or '0'}" if m
+           else "Consolidated" if "consolidated" in stem.lower() else fallback_tag)
+    return f"{name_tag}_{tag}_Comparison {today_str()}.xlsx"
+
+
+def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_msg,
+                           header_ok=None, row_transform=list):
+    """The consolidated-workbook loader skeleton three vs-TSN comparators wrote
+    verbatim: open (user-safe ValueError on failure) -> require `sheet_name` ->
+    read + strip the header -> demand a leading 'Route' column (plus the
+    report's `header_ok(header)` drift guard) -> the non-empty data rows through
+    `row_transform(list(row))`. Returns `(rows, True)` — the consolidated shape
+    is always route-keyed. openpyxl is imported here (lazily), matching the
+    module's deps posture."""
+    from openpyxl import load_workbook
+
+    name = Path(path).name
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception as e:
+        raise ValueError(f"Could not open {name}: {type(e).__name__}: {e}")
+    try:
+        if sheet_name not in wb.sheetnames:
+            raise ValueError(f"{name} has no '{sheet_name}' sheet — {missing_sheet_hint}")
+        it = wb[sheet_name].iter_rows(values_only=True)
+        header = [str(c).strip() if c is not None else "" for c in (next(it, []) or [])]
+        if (not header or header[0] != "Route"
+                or (header_ok is not None and not header_ok(header))):
+            raise ValueError(f"{name} {bad_header_msg}")
+        return [row_transform(list(r)) for r in it if row_has_data(r)], True
+    finally:
+        wb.close()
 
 
 # --------------------------------------------------------------------------- #
@@ -118,18 +172,29 @@ def make_notes_writer(title, lines, *, tab_color="ED7D31", col_width=110):
 def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_route,
                       loader, deps_ok=True,
                       deps_msg="Required components are missing (openpyxl).",
+                      side_a="TSMIS", side_b="TSN",
                       events=None, confirm_overwrite=None, mode="formulas"):
-    """The registry "files"-kind `compare()` skeleton shared by the five vs-TSN file
-    comparators: a deps gate -> path coercion + existence checks -> the log banner ->
-    `loader(tsmis_path, tsn_path)` (may raise ValueError for a bad input shape) ->
-    `compare_core.run_compare`. `loader` returns `(rows_t, rows_n, warnings)`; a
-    `warnings` of None is the `run_compare` default (no unreadable inputs). Returns a
-    `ConsolidateResult`, the same contract the GUI/console drive identically."""
+    """The registry "files"-kind `compare()` skeleton shared by every file
+    comparator: a deps gate -> path coercion + existence checks -> the log banner ->
+    `loader(path_a, path_b)` (may raise ValueError for a bad input shape) ->
+    `compare_core.run_compare`. `loader` returns `(rows_a, rows_b, warnings)`; a
+    `warnings` of None is the `run_compare` default (no unreadable inputs). Two
+    opt-in extensions (defaults = the original vs-TSN behavior, so the five P5b
+    comparators are untouched):
+
+      * `side_a`/`side_b` — the two side labels used in the existence-check
+        message and the banner's file lines (the PDF-sourced flavors label their
+        pickers "TSMIS (PDF)" / "TSMIS (Excel)").
+      * `has_route=None` — the route-ness is DYNAMIC (per-route vs consolidated
+        inputs); the loader then returns `(rows_a, rows_b, warnings, has_route)`.
+
+    Returns a `ConsolidateResult`, the same contract the GUI/console drive
+    identically."""
     events = events or Events()
     if not deps_ok:
         return ConsolidateResult(status="error", message=deps_msg)
     tsmis_path, tsn_path = Path(tsmis_path), Path(tsn_path)
-    for p, side in ((tsmis_path, "TSMIS"), (tsn_path, "TSN")):
+    for p, side in ((tsmis_path, side_a), (tsn_path, side_b)):
         if not p.is_file():
             return ConsolidateResult(status="error",
                                      message=f"The {side} file doesn't exist:\n{p}")
@@ -137,14 +202,19 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
     events.on_log("=" * 60)
     events.on_log(banner)
     events.on_log("=" * 60)
-    events.on_log(f"TSMIS: {tsmis_path.name}")
-    events.on_log(f"TSN:   {tsn_path.name}")
+    pad = max(len(side_a), len(side_b)) + 1
+    events.on_log(f"{side_a + ':':<{pad}} {tsmis_path.name}")
+    events.on_log(f"{side_b + ':':<{pad}} {tsn_path.name}")
     events.on_log("")
 
     try:
-        rows_t, rows_n, warnings = loader(tsmis_path, tsn_path)
+        loaded = loader(tsmis_path, tsn_path)
     except ValueError as e:
         return ConsolidateResult(status="error", message=str(e))
+    if has_route is None:
+        rows_t, rows_n, warnings, has_route = loaded
+    else:
+        rows_t, rows_n, warnings = loaded
 
     return run_compare(schema, rows_t, rows_n, has_route, out_path,
                        events=events, confirm_overwrite=confirm_overwrite,

@@ -20,14 +20,10 @@ artifacts (the Excel preserves source double-spaces the PDF render collapses) do
 flag as differences. The GUI's Compare tab drives these through COMPARE_REPORTS
 ("files" input kind); `file_a_label`/`file_b_label` name the two file pickers.
 """
-import re
 from dataclasses import replace
-from pathlib import Path
 
 import compare_intersection_detail_tsn as _id
-from compare_core import run_compare
-from events import ConsolidateResult, Events
-from paths import today_str
+from compare_tsn_common import run_files_compare, suggest_route_name
 
 
 class _IntDetailFileCompare:
@@ -35,7 +31,9 @@ class _IntDetailFileCompare:
     + suggest_name(path_a), with the two side labels carried through to the
     workbook and the GUI's file pickers. `load_b` is the loader for the SECOND
     file (the TSN loader for vs-TSN, the consolidated-TSMIS loader for vs-Excel);
-    the first file is always the PDF-consolidated TSMIS workbook."""
+    the first file is always the PDF-consolidated TSMIS workbook. The compare()
+    skeleton lives in compare_tsn_common — this class is the schema override +
+    the loader pairing."""
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
                  one_sided_note_extra=None, drop_notes=False):
@@ -54,41 +52,22 @@ class _IntDetailFileCompare:
         self._schema = schema
 
     def suggest_name(self, path_a):
-        stem = Path(path_a).stem
-        m = re.search(r"route[ _-]*([0-9]+[A-Za-z]?)", stem, re.IGNORECASE)
-        tag = (f"Route{m.group(1).lstrip('0') or '0'}" if m
-               else "Consolidated" if "consolidated" in stem.lower() else "Intersection_Detail")
-        return f"{self._name_tag}_{tag}_Comparison {today_str()}.xlsx"
+        return suggest_route_name(path_a, "Intersection_Detail", self._name_tag)
+
+    def _load_pair(self, path_a, path_b):
+        rows_a, _ = _id._load_tsmis(path_a)   # PDF side: same 36-col consolidated layout
+        rows_b, _ = self._load_b(path_b)
+        return rows_a, rows_b, None
 
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
                 mode="formulas"):
-        events = events or Events()
-        if not _id._DEPS_OK:
-            return ConsolidateResult(
-                status="error", message="Required components are missing (openpyxl).")
-        a, b = Path(path_a), Path(path_b)
-        for p, side in ((a, self.file_a_label), (b, self.file_b_label)):
-            if not p.is_file():
-                return ConsolidateResult(
-                    status="error", message=f"The {side} file doesn't exist:\n{p}")
-
-        events.on_log("=" * 60)
-        events.on_log(f"Intersection Detail Comparison — {self.file_a_label} vs "
-                      f"{self.file_b_label}")
-        events.on_log("=" * 60)
-        events.on_log(f"{self.file_a_label}: {a.name}")
-        events.on_log(f"{self.file_b_label}: {b.name}")
-        events.on_log("")
-
-        try:
-            rows_a, _ = _id._load_tsmis(a)      # PDF side: same 36-col consolidated layout
-            rows_b, _ = self._load_b(b)
-        except ValueError as e:
-            return ConsolidateResult(status="error", message=str(e))
-
-        return run_compare(self._schema, rows_a, rows_b, True, out_path,
-                           events=events, confirm_overwrite=confirm_overwrite,
-                           mode=mode, name_a=a.name, name_b=b.name)
+        return run_files_compare(
+            self._schema, path_a, path_b, out_path,
+            banner=(f"Intersection Detail Comparison — {self.file_a_label} vs "
+                    f"{self.file_b_label}"),
+            has_route=True, loader=self._load_pair, deps_ok=_id._DEPS_OK,
+            side_a=self.file_a_label, side_b=self.file_b_label,
+            events=events, confirm_overwrite=confirm_overwrite, mode=mode)
 
 
 TSMIS_PDF_VS_TSN = _IntDetailFileCompare(

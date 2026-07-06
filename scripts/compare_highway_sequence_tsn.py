@@ -33,9 +33,10 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_tsn_common as ctc
+from compare_tsn_common import (load_consolidated_rows, row_has_data,
+                                suggest_route_name)
 import consolidate_tsn_highway_sequence as tsn_hsl
 from compare_core import CompareSchema, normalize_value
-from paths import today_str
 
 REPORT_NAME = "Highway Sequence"
 TSMIS_SHEET = "Highway Locations"          # consolidated sheet (Route prepended)
@@ -140,24 +141,12 @@ def _tsmis_row(r):
 
 
 def _load_tsmis(path):
-    name = Path(path).name
-    try:
-        wb = load_workbook(path, read_only=True, data_only=True)
-    except Exception as e:
-        raise ValueError(f"Could not open {name}: {type(e).__name__}: {e}")
-    try:
-        if TSMIS_SHEET not in wb.sheetnames:
-            raise ValueError(f"{name} has no '{TSMIS_SHEET}' sheet — pick the "
-                             "consolidated TSMIS Highway Sequence workbook.")
-        it = wb[TSMIS_SHEET].iter_rows(values_only=True)
-        header = [str(c).strip() if c is not None else "" for c in (next(it, []) or [])]
-        if not header or header[0] != "Route":
-            raise ValueError(f"{name} isn't a CONSOLIDATED Highway Sequence workbook "
-                             "(expected a leading 'Route' column) — consolidate first.")
-        return [_tsmis_row(list(r)) for r in it
-                if r and any(c is not None and str(c).strip() != "" for c in r)], True
-    finally:
-        wb.close()
+    return load_consolidated_rows(
+        path, TSMIS_SHEET,
+        missing_sheet_hint="pick the consolidated TSMIS Highway Sequence workbook.",
+        bad_header_msg="isn't a CONSOLIDATED Highway Sequence workbook "
+                       "(expected a leading 'Route' column) — consolidate first.",
+        row_transform=_tsmis_row)
 
 
 def _load_tsn(path):
@@ -180,7 +169,7 @@ def _load_tsn(path):
         desc_idx = 1 + SHARED_HEADER.index("Description")
         rows = []
         for r in it:
-            if not r or not any(c is not None and str(c).strip() != "" for c in r):
+            if not row_has_data(r):
                 continue
             r = list(r)[:width] + [None] * max(0, width - len(r))
             row = [_v(c) for c in r]
@@ -239,11 +228,8 @@ _SCHEMA = CompareSchema(
 # adapter surface
 # --------------------------------------------------------------------------- #
 def suggest_name(tsmis_path):
-    stem = Path(tsmis_path).stem
-    m = re.search(r"route[ _-]*([0-9]+[A-Za-z]?)", stem, re.IGNORECASE)
-    tag = (f"Route{m.group(1).lstrip('0') or '0'}" if m
-           else "Consolidated" if "consolidated" in stem.lower() else "Highway_Sequence")
-    return f"TSMIS_vs_TSN_HighwaySequence_{tag}_Comparison {today_str()}.xlsx"
+    return suggest_route_name(tsmis_path, "Highway_Sequence",
+                              "TSMIS_vs_TSN_HighwaySequence")
 
 
 def _load_pair(tsmis_path, tsn_path):

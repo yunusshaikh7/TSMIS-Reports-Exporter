@@ -19,20 +19,18 @@ stays intact. The GUI's Compare tab drives these through COMPARE_REPORTS
 ("files" input kind); `file_a_label`/`file_b_label` name the two file pickers so
 the PDF-vs-Excel pair doesn't mislabel both TSMIS sides as "TSMIS"/"TSN".
 """
-import re
 from dataclasses import replace
-from pathlib import Path
 
 import compare_highway_log as _hl
-from compare_core import run_compare
-from events import ConsolidateResult, Events
-from paths import today_str
+from compare_tsn_common import run_files_compare, suggest_route_name
 
 
 class _HighwayLogFileCompare:
     """One Highway-Log file-vs-file comparison: compare(path_a, path_b, …) +
     suggest_name(path_a), with the two side labels carried through to the
-    workbook and the GUI's file pickers."""
+    workbook and the GUI's file pickers. The compare() skeleton and the pair
+    loader live in compare_tsn_common / compare_highway_log — this class is
+    just the schema override + the labels."""
 
     def __init__(self, report_name, side_a, side_b, name_tag,
                  one_sided_note_extra="", trim_note_extra=""):
@@ -50,57 +48,19 @@ class _HighwayLogFileCompare:
     def suggest_name(self, path_a):
         """Output filename suggestion, route- / consolidated-aware, with a
         generated-on date stamp (A1)."""
-        stem = Path(path_a).stem
-        m = re.search(r"route[ _-]*([0-9]+[A-Za-z]?)", stem, re.IGNORECASE)
-        if m:
-            tag = f"Route{m.group(1).lstrip('0') or '0'}"
-        elif "consolidated" in stem.lower():
-            tag = "Consolidated"
-        else:
-            tag = "Highway_Log"
-        return f"{self._name_tag}_{tag}_Comparison {today_str()}.xlsx"
+        return suggest_route_name(path_a, "Highway_Log", self._name_tag)
 
     def compare(self, path_a, path_b, out_path, events=None,
                 confirm_overwrite=None, mode="formulas"):
         """Build the comparison workbook(s). Same contract as the other
         comparison modules (ConsolidateResult returned)."""
-        events = events or Events()
-        if not _hl._DEPS_OK:
-            return ConsolidateResult(
-                status="error",
-                message="Required components are missing (openpyxl).")
-        a, b = Path(path_a), Path(path_b)
-        for p, side in ((a, self.file_a_label), (b, self.file_b_label)):
-            if not p.is_file():
-                return ConsolidateResult(
-                    status="error",
-                    message=f"The {side} file doesn't exist:\n{p}")
-
-        events.on_log("=" * 60)
-        events.on_log(f"Highway Log Comparison — {self.file_a_label} vs "
-                      f"{self.file_b_label}")
-        events.on_log("=" * 60)
-        events.on_log(f"{self.file_a_label}: {a.name}")
-        events.on_log(f"{self.file_b_label}: {b.name}")
-        events.on_log("")
-
-        try:
-            rows_a, route_a = _hl._load_input(a)
-            rows_b, route_b = _hl._load_input(b)
-        except ValueError as e:
-            return ConsolidateResult(status="error", message=str(e))
-        if route_a != route_b:
-            per, con = ((b, a) if route_a else (a, b))
-            return ConsolidateResult(
-                status="error",
-                message=(f"The two files have different shapes: {con.name} is a "
-                         f"consolidated workbook (has a Route column) but "
-                         f"{per.name} is per-route. Pick two per-route files or "
-                         f"two consolidated files."))
-
-        return run_compare(self._schema, rows_a, rows_b, route_a, out_path,
-                           events=events, confirm_overwrite=confirm_overwrite,
-                           mode=mode, name_a=a.name, name_b=b.name)
+        return run_files_compare(
+            self._schema, path_a, path_b, out_path,
+            banner=(f"Highway Log Comparison — {self.file_a_label} vs "
+                    f"{self.file_b_label}"),
+            has_route=None, loader=_hl._load_pair, deps_ok=_hl._DEPS_OK,
+            side_a=self.file_a_label, side_b=self.file_b_label,
+            events=events, confirm_overwrite=confirm_overwrite, mode=mode)
 
 
 TSMIS_PDF_VS_TSN = _HighwayLogFileCompare(

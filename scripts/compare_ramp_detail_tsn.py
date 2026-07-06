@@ -32,8 +32,9 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_tsn_common as ctc
+from compare_tsn_common import (load_consolidated_rows, row_has_data,
+                                suggest_route_name)
 from compare_core import CompareSchema, normalize_value
-from paths import today_str
 
 REPORT_NAME = "Ramp Detail"
 TSMIS_SHEET = "TSAR - Ramp Detail"       # the consolidated/per-route TSMIS sheet
@@ -125,7 +126,7 @@ def tsn_rows_from_raw(path):
             raise ValueError("the TSN Ramp Detail workbook is missing LOCATION/PM "
                              "columns — pick the raw 'TSAR - RAMPS DETAIL' export.")
         rows = [_tsn_raw_row(list(r), h) for r in it
-                if r and any(c is not None and str(c).strip() != "" for c in r)]
+                if row_has_data(r)]
         return rows
     finally:
         wb.close()
@@ -172,37 +173,21 @@ def _load_tsmis(path):
     """TSMIS side -> (rows, has_route=True). The CONSOLIDATED Ramp Detail workbook
     (a leading 'Route' column). Columns are read by position (the export's header
     row is column-shifted); a header sanity-check guards against layout drift."""
-    name = Path(path).name
-    try:
-        wb = load_workbook(path, read_only=True, data_only=True)
-    except Exception as e:
-        raise ValueError(f"Could not open {name}: {type(e).__name__}: {e}")
-    try:
-        if TSMIS_SHEET not in wb.sheetnames:
-            raise ValueError(f"{name} has no '{TSMIS_SHEET}' sheet — pick the "
-                             "consolidated TSMIS Ramp Detail workbook.")
-        it = wb[TSMIS_SHEET].iter_rows(values_only=True)
-        header = [str(c).strip() if c is not None else "" for c in (next(it, []) or [])]
-        if not header or header[0] != "Route" or "PM" not in header[:5]:
-            raise ValueError(f"{name} isn't a CONSOLIDATED Ramp Detail workbook "
-                             "(expected a leading 'Route' column) — consolidate the "
-                             "per-route exports first.")
-        rows = [_tsmis_row(list(r)) for r in it
-                if r and any(c is not None and str(c).strip() != "" for c in r)]
-        return rows, True
-    finally:
-        wb.close()
+    return load_consolidated_rows(
+        path, TSMIS_SHEET,
+        missing_sheet_hint="pick the consolidated TSMIS Ramp Detail workbook.",
+        bad_header_msg="isn't a CONSOLIDATED Ramp Detail workbook "
+                       "(expected a leading 'Route' column) — consolidate the "
+                       "per-route exports first.",
+        header_ok=lambda h: "PM" in h[:5],
+        row_transform=_tsmis_row)
 
 
 # --------------------------------------------------------------------------- #
 # adapter surface (registry "files" kind)
 # --------------------------------------------------------------------------- #
 def suggest_name(tsmis_path):
-    stem = Path(tsmis_path).stem
-    m = re.search(r"route[ _-]*([0-9]+[A-Za-z]?)", stem, re.IGNORECASE)
-    tag = (f"Route{m.group(1).lstrip('0') or '0'}" if m
-           else "Consolidated" if "consolidated" in stem.lower() else "Ramp_Detail")
-    return f"TSMIS_vs_TSN_RampDetail_{tag}_Comparison {today_str()}.xlsx"
+    return suggest_route_name(tsmis_path, "Ramp_Detail", "TSMIS_vs_TSN_RampDetail")
 
 
 def _load_pair(tsmis_path, tsn_path):

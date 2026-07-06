@@ -28,9 +28,9 @@ except ImportError:
     _DEPS_OK = False
 
 import highway_log_columns as hlc       # the corrected column labels (one source)
-from compare_core import CompareSchema, normalize_value, run_compare
-from events import ConsolidateResult, Events
-from paths import today_str
+from compare_core import CompareSchema, normalize_value
+from compare_tsn_common import (row_has_data, run_files_compare,
+                                suggest_route_name)
 
 REPORT_NAME = "Highway Log"          # registry label (comparison type)
 SHEET_NAME = "Highway Log"           # required sheet in both inputs
@@ -72,16 +72,7 @@ _SCHEMA = CompareSchema(
 def suggest_name(tsmis_path):
     """Output filename suggestion: 'TSMIS_vs_TSN_Route<id>_Comparison.xlsx'
     when the picked file carries a route token, consolidated-aware otherwise."""
-    stem = Path(tsmis_path).stem
-    m = re.search(r"route[ _-]*([0-9]+[A-Za-z]?)", stem, re.IGNORECASE)
-    if m:
-        tag = f"Route{m.group(1).lstrip('0') or '0'}"
-    elif "consolidated" in stem.lower():
-        tag = "Consolidated"
-    else:
-        tag = "Highway_Log"
-    # Trailing generated-on date (A1): stamps when the comparison was built.
-    return f"TSMIS_vs_TSN_{tag}_Comparison {today_str()}.xlsx"
+    return suggest_route_name(tsmis_path, "Highway_Log", "TSMIS_vs_TSN")
 
 
 _HL_WS_RE = re.compile(r"[\t\n\r\f\v]")
@@ -132,11 +123,27 @@ def _load_input(path):
         rows = []
         for r in rows_iter:
             r = list(r)[:n] + [None] * max(0, n - len(r))
-            if any(v is not None and str(v).strip() != "" for v in r):
+            if row_has_data(r):
                 rows.append([_hl_normalize(v) for v in r])
         return rows, has_route
     finally:
         wb.close()
+
+
+def _load_pair(path_a, path_b):
+    """Load both Highway Log sides for the shared driver; both must have the
+    SAME shape (per-route or consolidated). Also used by the two PDF-sourced
+    flavors (compare_highway_log_pdf), which accept the identical layouts."""
+    rows_a, route_a = _load_input(path_a)
+    rows_b, route_b = _load_input(path_b)
+    if route_a != route_b:
+        per, con = ((path_b, path_a) if route_a else (path_a, path_b))
+        raise ValueError(
+            f"The two files have different shapes: {con.name} is a "
+            f"consolidated workbook (has a Route column) but "
+            f"{per.name} is per-route. Pick two per-route files or "
+            f"two consolidated files.")
+    return rows_a, rows_b, None, route_a
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
@@ -148,39 +155,8 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     "values" (same sheets and look, but the bulk is plain computed RESULTS —
     opens instantly, no F9), or "both" (two files: the picked name for the
     formulas copy and '<name> (values).xlsx' next to it)."""
-    events = events or Events()
-    if not _DEPS_OK:
-        return ConsolidateResult(status="error",
-                                 message="Required components are missing (openpyxl).")
-    tsmis_path, tsn_path = Path(tsmis_path), Path(tsn_path)
-
-    for p, side in ((tsmis_path, "TSMIS"), (tsn_path, "TSN")):
-        if not p.is_file():
-            return ConsolidateResult(
-                status="error",
-                message=f"The {side} file doesn't exist:\n{p}")
-
-    events.on_log("=" * 60)
-    events.on_log("Highway Log Comparison — TSMIS vs TSN")
-    events.on_log("=" * 60)
-    events.on_log(f"TSMIS: {tsmis_path.name}")
-    events.on_log(f"TSN:   {tsn_path.name}")
-    events.on_log("")
-
-    try:
-        rows_t, route_t = _load_input(tsmis_path)
-        rows_n, route_n = _load_input(tsn_path)
-    except ValueError as e:
-        return ConsolidateResult(status="error", message=str(e))
-    if route_t != route_n:
-        per, con = ((tsn_path, tsmis_path) if route_t else (tsmis_path, tsn_path))
-        return ConsolidateResult(
-            status="error",
-            message=(f"The two files have different shapes: {con.name} is a "
-                     f"consolidated workbook (has a Route column) but "
-                     f"{per.name} is per-route. Pick two per-route files or "
-                     f"two consolidated files."))
-
-    return run_compare(_SCHEMA, rows_t, rows_n, route_t, out_path,
-                       events=events, confirm_overwrite=confirm_overwrite,
-                       mode=mode, name_a=tsmis_path.name, name_b=tsn_path.name)
+    return run_files_compare(
+        _SCHEMA, tsmis_path, tsn_path, out_path,
+        banner="Highway Log Comparison — TSMIS vs TSN",
+        has_route=None, loader=_load_pair, deps_ok=_DEPS_OK,
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode)
