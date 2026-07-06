@@ -349,6 +349,21 @@ reset-preview pass. **Commit:** `stamp legacy Export-Everything dirs with the ow
 
 # PART 2 — v0.19.0: the structural cleanup (ALL remaining audit findings)
 
+> **v0.19.0 IN PROGRESS on `refactor/v0.19.0-structure`.** Four user-requested UX features
+> (W1–W4) landed FIRST (ahead of the structural waves), each verified + checked and then
+> re-audited by a fresh 8-dimension adversarial pass (30 confirmed findings, all addressed):
+> **W1** one-click Settings "Validate & package results" (scripts/validation.py → real
+> matrix.build_comparison over the on-disk samples → credential-safe evidence bundle;
+> ValidationWorker/run_validation/contract VALIDATE; the audit-driven hardening: no in-GUI browser
+> self-test, cancellable via UI + mid-comparison, guaranteed-terminal gate safety, PARTIAL/heal
+> trust semantics, a consent dialog); **W2** one family organization across the Export/Consolidate/
+> Compare pickers (report_catalog display views, parity-locked incl. grouping metadata); **W3** the
+> by-day matrix always offers today (+ the Build button gated on an export present); **W4** matrix
+> side panes stay usable mid-run on laptops. Also hardened the v0.18.5 swap-journal recovery
+> (fail-closed on a tampered app_dir/piece names). version → 0.19.0, CHANGELOG + work-pc-validation
+> updated. The structural waves R–V below are NOT yet started.
+
+
 > Branch `refactor/v0.19.0-structure` off the v0.18.5 tag. Same program rules: every wave a green
 > checkpoint; behavior-identical unless stated; `check_gui_api_surface`/`check_ui_contract`/the
 > golden families lock each move. Estimated ~2 weeks focused.
