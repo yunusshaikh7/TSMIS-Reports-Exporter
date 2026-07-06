@@ -182,8 +182,14 @@ button, input, select { font-family: inherit; }
      to a compact status strip. Previously the log kept flex:1 (hogging the space
      while mostly empty) and the options were crammed into max-height:46% with
      most controls hidden behind a tiny internal scroll — i.e. "not usable". */
-  body.matrix-wide .col-activity .log-card { flex: 0 1 auto; min-height: 92px; max-height: 32%; }
-  body.matrix-wide .matrix-config { flex: 1 1 auto; min-height: 0; max-height: none; }
+  /* W4 (v0.19.0): while a run is in progress the queue group unhides inside
+     .matrix-config — on a 768px-tall laptop that used to shrink the log toward
+     its 92px floor AND clip ~100px of the config's own controls. The log keeps
+     a USABLE floor, the queue list caps + scrolls internally, and the config
+     card scrolls (never clips) when the column is genuinely short. */
+  body.matrix-wide .col-activity .log-card { flex: 0 1 auto; min-height: 150px; max-height: 32%; }
+  body.matrix-wide .matrix-config { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
+  body.matrix-wide .mx-queue { max-height: 118px; overflow-y: auto; }
 
   /* Fill the height too — no wasted space, no scrolling at full screen: the
      matrix pane and grid stretch to the column and the data rows share the
