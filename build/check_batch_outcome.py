@@ -181,16 +181,17 @@ def _b02_no_stale_leak():
     a = _lifecycle_api()
     # Run 1: a successful batch finishes -> run_ended complete/promoted.
     a._task = "batch"
-    with _patch(ga.batch_manifest, "clear", lambda: None):
+    import gui_export_api as gxa               # S1: the batch endpoints' home
+    with _patch(gxa.batch_manifest, "clear", lambda: None):
         a._on_batch_done({"complete": True, "done": 1, "total": 1, "completion": oc.COMPLETE})
     re1 = _last_run_ended(a)
     check("run 1 (success) -> run_ended completion=complete", re1.get("completion") == oc.COMPLETE)
     check("...the success outcome is retained for run_ended", a._last_batch_outcome is not None)
 
     # Run 2 STARTS via the real resume path -> the previous outcome MUST be cleared.
-    with _patch(ga, "BatchWorker", _FakeBatchWorker), \
-         _patch(ga.batch_manifest, "load", lambda: fake_manifest), \
-         _patch(ga.batch_manifest, "pending", lambda _m: fake_manifest["steps"]):
+    with _patch(gxa, "BatchWorker", _FakeBatchWorker), \
+         _patch(gxa.batch_manifest, "load", lambda: fake_manifest), \
+         _patch(gxa.batch_manifest, "pending", lambda _m: fake_manifest["steps"]):
         a.resume_batch()
     check("starting/resuming a new batch CLEARS the prior outcome (P1-B02)",
           a._last_batch_outcome is None)

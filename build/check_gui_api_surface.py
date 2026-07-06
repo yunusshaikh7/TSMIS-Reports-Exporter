@@ -98,7 +98,7 @@ def test_surface_identity():
 
 def test_touched_endpoint_signatures():
     print("the two touched endpoints keep their exact source signature (arity lock):")
-    s = _src("gui_api")
+    s = _src("gui_compare_api")          # S1: the compare endpoints' home
     check("start_compare(self, report_key, tsmis_path, tsn_path, want_formulas=True, want_values=False)",
           "def start_compare(self, report_key, tsmis_path, tsn_path,\n"
           "                      want_formulas=True, want_values=False):" in s)
@@ -137,8 +137,8 @@ def test_gui_api_delegates():
 
 def test_begin_compare_unify():
     print("_begin_compare unifies start_compare / start_compare_env:")
-    s = _src("gui_api")
-    check("gui_api defines _begin_compare", "def _begin_compare(self," in s)
+    s = _src("gui_compare_api")          # S1: the compare endpoints' home
+    check("the compare mixin defines _begin_compare", "def _begin_compare(self," in s)
     check("start_compare/start_compare_env route through _begin_compare (2 call sites)",
           s.count("self._begin_compare(") == 2)
     # The duplicated claim→dialog→launch tails are gone from the two endpoints (the gate

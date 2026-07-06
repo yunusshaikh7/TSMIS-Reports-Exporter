@@ -96,12 +96,13 @@ class _FakeBatchWorker:
 def test_gui_api_batch():
     print("GuiApi batch bridge (stubbed worker, in-memory manifest):")
     store = {"m": None}
-    bm = gui_api.batch_manifest
-    saved = (bm.save, bm.load, bm.clear, gui_api.BatchWorker)
+    import gui_export_api                       # S1: the batch endpoints' home
+    bm = gui_export_api.batch_manifest
+    saved = (bm.save, bm.load, bm.clear, gui_export_api.BatchWorker)
     bm.save = lambda m, path=None: store.__setitem__("m", m)
     bm.load = lambda path=None: store["m"]
     bm.clear = lambda path=None: store.__setitem__("m", None)
-    gui_api.BatchWorker = _FakeBatchWorker
+    gui_export_api.BatchWorker = _FakeBatchWorker
     _FakeBatchWorker.instances = []
     try:
         a = gui_api.GuiApi()
@@ -142,7 +143,7 @@ def test_gui_api_batch():
         check("nothing resumable after discard", a._pending_batch() is None)
         check("resume with nothing -> error", a.resume_batch().get("error"))
     finally:
-        bm.save, bm.load, bm.clear, gui_api.BatchWorker = saved
+        bm.save, bm.load, bm.clear, gui_export_api.BatchWorker = saved
 
 
 def test_reset_scopes_batch_dest():

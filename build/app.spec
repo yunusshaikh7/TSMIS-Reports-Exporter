@@ -80,7 +80,12 @@ APP_MODULES = [
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
     "pdf_row_oracle",
-    "pdf_table_lib",   # P12: independent PDF expected-row oracle (P13 evidence kit)
+    "pdf_table_lib",
+    "gui_update",
+    "gui_export_api",
+    "gui_auth_api",
+    "gui_compare_api",
+    "gui_settings_api",   # P12: independent PDF expected-row oracle (P13 evidence kit)
     "consolidate_xlsx_base", "consolidate_ramp_summary", "consolidate_ramp_detail",
     "consolidate_highway_sequence", "consolidate_highway_log",
     "consolidate_tsn_highway_log", "consolidate_tsmis_highway_log_pdf",

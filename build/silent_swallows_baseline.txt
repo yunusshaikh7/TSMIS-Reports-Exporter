@@ -30,8 +30,6 @@ cli.py:_drain_skip_key:1
 cli.py:_resolve_day_console:1
 cli.py:_resolve_routes_console:1
 compare_core.py:_apply_field_widths:1
-consolidate_tsmis_highway_log_pdf.py:consolidate:1
-consolidate_tsmis_intersection_detail_pdf.py:consolidate:1
 consolidate_tsn_highway_log.py:consolidate:1
 consolidate_tsn_highway_sequence.py:consolidate:1
 consolidation_meta.py:_safe_mtime:1
@@ -64,7 +62,7 @@ gui_api.py:_pick_report:1
 gui_api.py:_refresh_auth:1
 gui_api.py:_sender:1
 gui_api.py:run:1
-gui_api.py:start_compare_env:1
+gui_compare_api.py:start_compare_env:1
 gui_endpoint.py:wrapper:1
 gui_main.py:_arg_value:1
 gui_main.py:_message_box:1
