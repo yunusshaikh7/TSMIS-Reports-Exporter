@@ -854,9 +854,11 @@ class GuiMatrixMixin:
 
     @_api_method
     def add_day_matrix_day(self, date):
-        """Add a day COLUMN (a date that has a Highway Log export for the source)."""
+        """Add a day COLUMN: a date with an export for the source, or TODAY
+        (always addable — the matrix exports into today itself, W3)."""
         if date not in day_matrix.available_days(settings.get_day_matrix_source()):
-            return {"error": "That day has no Highway Log export for this source."}
+            return {"error": "That day has no export for this source (only "
+                             "exported days — or today — can be added)."}
         days = settings.get_day_matrix_days()
         if date not in days:
             settings.set_day_matrix_days(days + [date])

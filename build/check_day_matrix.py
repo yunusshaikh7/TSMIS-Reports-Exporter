@@ -119,12 +119,14 @@ def main():
         check("every report row supported (v0.17.0 — ramp_detail/ramp_summary/highway_sequence)",
               rows["ramp_detail"][4] and rows["ramp_summary"][4]
               and rows["highway_sequence"][4])
-        check("available days for ssor-prod (newest first, both HL days)",
-              day_matrix.available_days("ssor-prod") == ["2026-06-18", "2026-06-17"])
-        check("available days for ars-prod scoped to that source",
-              day_matrix.available_days("ars-prod") == ["2026-06-17"])
-        check("available days for an export-less source is empty",
-              day_matrix.available_days("ars-dev") == [])
+        _today = day_matrix.today_str()
+        check("available days for ssor-prod (today first, then both HL days)",
+              day_matrix.available_days("ssor-prod") == [_today, "2026-06-18", "2026-06-17"])
+        check("available days for ars-prod scoped to that source (+ today)",
+              day_matrix.available_days("ars-prod") == [_today, "2026-06-17"])
+        check("an export-less source still offers TODAY (W3: the matrix exports "
+              "into today itself)",
+              day_matrix.available_days("ars-dev") == [_today])
 
         print("day_matrix snapshot — cells, greyed rows, TSN source:")
         snap = day_matrix.day_matrix_snapshot(

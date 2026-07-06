@@ -179,9 +179,15 @@ def available_days(source):
     """Dates (newest first) under output/ that have an export for ANY supported
     vs-TSN report for `source` — the add-day picker's options. Supported subdirs
     come from _day_rows (every report with a coded comparator — all of them as of
-    v0.17.0)."""
+    v0.17.0).
+
+    TODAY is always offered, exports or not (W3): today's column is the one the
+    matrix itself can export INTO, so requiring an export first was circular —
+    the user had to run an export elsewhere just to make the column appear. An
+    export-less today renders every cell as missing-its-export with the per-cell
+    Export action live."""
     supported_subs = [r[2] for r in _day_rows() if r[4]]
-    out, seen = [], set()
+    out, seen = [today_str()], {today_str()}
     for name in list_output_days():
         parsed = parse_run_folder(name)
         if not parsed:
