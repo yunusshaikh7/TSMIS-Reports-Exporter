@@ -132,13 +132,16 @@ jobs:
         # reachable flat-module inventory (F6 tripwire), and the source-ZIP console
         # menu→module dispatch imports + resolves. check_build_env asserts the
         # version/requirements/lock dependency integrity (P10). The FROZEN exe half
-        # runs in frozen-gate.yml / release.yml.
+        # runs in frozen-gate.yml / release.yml. check_ci_manifest closes the loop
+        # on THIS file: every build/check_* on disk must be wired in here (a new
+        # check that never runs in CI is a red, not a silent gap).
         shell: bash
         run: |
           set -e
           python build/check_app_modules.py
           python build/check_source_zip_smoke.py
           python build/check_build_env.py
+          python build/check_ci_manifest.py
 
       - name: Updater regression checks (blocking)
         run: python build/check_updater.py
