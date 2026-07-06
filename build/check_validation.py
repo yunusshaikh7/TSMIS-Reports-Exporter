@@ -62,7 +62,12 @@ def test_manifest_and_cancel():
     print("validation manifest — real pipeline, counts only, cancellable:")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_val_"))
     dest = tmp / "store"
-    _store(dest, {"ssor-prod": ["highway_log"], "ssor-dev": ["highway_log"]})
+    # `_tsn_input` + `comparisons` are DECOYS: real stores hold these
+    # non-environment children, and a workbook inside them must never be
+    # validated as a TSMIS export (the v0.19.0 field bug — the TSN drop folder
+    # became phantom environment "_tsn_input").
+    _store(dest, {"ssor-prod": ["highway_log"], "ssor-dev": ["highway_log"],
+                  "_tsn_input": ["highway_log"], "comparisons": ["highway_log"]})
 
     calls = []
 
@@ -93,6 +98,9 @@ def test_manifest_and_cancel():
           == [("highway_log", "ssor-dev"), ("highway_log", "ssor-prod")]
           or sorted((c["row"], c["env"]) for c in ran)
           == [("highway_log", "ssor-dev"), ("highway_log", "ssor-prod")])
+    check("non-environment store children are NOT phantom envs (_tsn_input bug)",
+          not [c for c in ran if c.get("env") in ("_tsn_input", "comparisons")],
+          f"phantom cells: {[(c['row'], c.get('env')) for c in ran]}")
     check("counts recorded (969 diff cells), status ok",
           all(c.get("diff_cells") == 969 and c["status"] == "ok" for c in ran))
     check("totals tally", man["totals"]["comparisons_ok"] == 2

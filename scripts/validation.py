@@ -39,6 +39,7 @@ import tsn_library
 import version
 from events import Events
 from paths import is_frozen
+from site_target import DATA_SOURCES, ENVIRONMENTS
 
 log = logging.getLogger("tsmis.validation")
 
@@ -110,10 +111,19 @@ def _tsn_stage(events):
 
 
 def _envs_with_data(dest, subdir):
-    """The store's <src-env> children that hold files for `subdir` (names only)."""
+    """The store's <src>-<env> children that hold files for `subdir` (names only).
+
+    Only REAL environment folders count. The store also holds non-environment
+    children — the `_tsn_input` TSN drop folder, `comparisons` — and a TSN
+    workbook sitting under one of those must never be validated as if it were a
+    TSMIS export (the v0.19.0 field bug: `_tsn_input/highway_log/` became a
+    phantom environment and its TSN file failed the layout check).
+    """
+    known = {f"{s}-{e}" for s in DATA_SOURCES for e in ENVIRONMENTS}
     found = []
     try:
-        children = sorted(p for p in Path(dest).iterdir() if p.is_dir())
+        children = sorted(p for p in Path(dest).iterdir()
+                          if p.is_dir() and p.name in known)
     except OSError as e:
         log.info("validation: store unreadable (%s: %s)", type(e).__name__, e)
         return found
