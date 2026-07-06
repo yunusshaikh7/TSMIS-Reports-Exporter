@@ -249,14 +249,6 @@ class GuiExportMixin:
         return {"dest": dest, "reports": report_library.report_ages(dest, reports)}
 
     @_api_method
-    def set_batch_dest(self, path):
-        """Set (or, with an empty path, reset) the Export Everything destination."""
-        dest = settings.set_batch_dest(path)
-        self._emit_log(f"Export Everything destination: {dest}")
-        self._push_state()
-        return {"dest": dest}
-
-    @_api_method
     def pick_batch_dest(self):
         """Native folder dialog to choose the always-current destination."""
         cur = settings.get_batch_dest()

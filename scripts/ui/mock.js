@@ -1176,10 +1176,6 @@ function makeMockApi() {
       push({ t: "log", text: "(mock) open by-day comparisons folder" });
       return { ok: true };
     },
-    set_batch_dest: async (p) => {
-      st.batch_dest = p || "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)";
-      pushState(); return { dest: st.batch_dest };
-    },
     pick_batch_dest: async () => {
       st.batch_dest = "C:\\Users\\you\\Desktop\\All Reports";
       pushState(); return { dest: st.batch_dest };
