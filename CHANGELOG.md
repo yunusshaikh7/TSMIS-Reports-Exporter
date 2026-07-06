@@ -3,6 +3,37 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.18.5 — 2026-07-03
+
+The audit release: every confirmed finding from the full-repo audit, with no new features.
+Highlights (the full map is `docs/planning/fable5-repo-improvement-audit.md`):
+
+- **Comparisons self-heal after app updates.** The TSN library now records which
+  normalization version built it; when an update improves the comparison rules, the affected
+  report rebuilds itself from your raw TSN files the next time a comparison runs (previously a
+  fix could silently "look unfixed" until a manual Settings ▸ Rebuild).
+- **A real 0 never reads as blank.** The remaining places where a numeric zero (a postmile,
+  a route token) could blank out — mis-aligning or falsely flagging rows — now keep it.
+  Verified cell-for-cell identical on the real statewide data (canary unchanged).
+- **Big comparisons skip the live-formulas twin again.** The v0.18.2 skip for 12k+-row
+  comparisons had shipped inert; it now actually skips (and is locked by a test that runs it
+  against a real workbook). The Intersection Detail "Report View" also builds faster.
+- **Consolidating with a file open in Excel no longer reads incomplete.** Excel's `~$` lock
+  stubs were being counted as unreadable inputs, demoting a healthy consolidation to partial.
+- **Compare tab: Browse… no longer overrides your later folder picks.** A custom folder
+  stays available in the dropdown but never silently wins over a run folder you selected after.
+- **Starting a task during the background sign-in check now says so** ("try again in a few
+  seconds") instead of failing with a browser error — and the check steps aside for you.
+- **An interrupted update can no longer strand a mixed install.** If the swap is killed
+  mid-rename (power loss), the next launch completes it or rolls it back — it used to delete
+  the recovery pieces.
+- **Quieter, more answerable logs.** The GUI, console and login flows write separate log
+  files (simultaneous runs used to silently drop lines), every swallowed error now logs its
+  reason, and the delete-all preview warns if part of the store couldn't be inspected.
+- **Quality-of-life:** modals keep keyboard focus; route pickers and tabs are
+  keyboard-operable; empty TSN imports error instead of producing an empty "complete"
+  library; the release pipeline now refuses to publish if any check fails.
+
 ## v0.18.4 — 2026-06-29
 
 A fix for the comparison matrices' job queue.
