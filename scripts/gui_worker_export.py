@@ -1,0 +1,556 @@
+"""The export-side GUI workers (S2 / ARC-02, split from gui_worker.py).
+
+ExportWorker (one or more bulk exports, engine Events -> GUI messages),
+BatchWorker (Export Everything with the resumable manifest + the journaled
+store swap), ConsolidateWorker (one consolidation run). Verbatim moves;
+gui_worker re-exports these so every existing import keeps working.
+"""
+import base64
+import dataclasses
+import logging
+import re
+import threading
+import time
+from pathlib import Path
+
+import artifact_store
+import batch_manifest
+import outcome
+import consolidation_meta
+import owned_dir
+from common import (ROUTES, AuthError, BrowserNotFoundError, PreflightError,
+                    SiteUnreachableError, DATA_SOURCE_LABELS,
+                    ENVIRONMENT_LABELS, get_site, set_site)
+from events import Events
+from exporter import run_export, _wait_while_paused
+from paths import FAILURES_DIR, OUTPUT_ROOT, env_tagged_filename, parse_run_folder
+
+log = logging.getLogger("tsmis.gui")
+
+def _swap_store_dir(live, staged):
+    """Replace `live` with the freshly-exported `staged` store folder, JOURNALED (P2/F2).
+
+    The Export-Everything store used to rmtree the live folder BEFORE re-export, so a
+    failed/crashed refresh destroyed the last-good copy. v0.18.0 delegates to
+    `artifact_store.promote_store`: a journaled rename (live -> backup -> staging -> live)
+    so a crash BETWEEN the renames is recovered on the next launch from the retained
+    backup — there is never a window with zero copies, and a locked `live` keeps the
+    last-good (the refresh is discarded), never a half-merged folder. Caller already
+    gated on a COMPLETE producer outcome (F1) before promoting."""
+    return artifact_store.promote_store(live, staged)
+
+
+class ExportWorker(threading.Thread):
+    """Runs one OR MORE bulk exports, translating engine Events into GUI messages.
+
+    `specs` may be a single ReportSpec or a list. Multiple report types run one
+    after another (each reuses the proven engine), so in fast mode only `workers`
+    browsers are ever open at once. Posts ('export_done', [(spec, RunResult), ...])
+    when all selected reports finish (the list is partial if cancelled)."""
+
+    def __init__(self, specs, queue, cancel_event, skip_event, workers=1, routes=None,
+                 pause_event=None, auto_consolidate=False, out_base=None):
+        super().__init__(daemon=True, name="export")
+        # Accept a single spec or a list, so callers can't trip on the shape.
+        self.specs = list(specs) if isinstance(specs, (list, tuple)) else [specs]
+        self.q = queue
+        self.cancel = cancel_event
+        self.skip = skip_event
+        self.pause = pause_event or threading.Event()    # B1: between-route hold
+        self.auto_consolidate = bool(auto_consolidate)   # B2: combine after each
+        self.out_base = Path(out_base) if out_base else None   # B3: always-current dest base
+        self.workers = workers              # >1 -> experimental parallel "fast mode"
+        # None means "all routes"; otherwise the chosen subset. Stored as a
+        # concrete list so the engine and the progress total agree.
+        self.routes = list(routes) if routes is not None else list(ROUTES)
+        self._total = len(self.routes)
+        # route -> latest status, so the end-of-run retry pass (which re-reports a
+        # route, e.g. failed -> saved) updates counts in place rather than
+        # double-counting. Counts are derived from this map on each update. Reset
+        # per report type so each report's progress starts clean.
+        self._route_status = {}
+        self._tally_lock = threading.Lock()  # fast mode: several threads call _on_route
+        self._cur_label = ""               # report currently running (shown in progress)
+        self._report_i = 0                 # 1-based index of the current report
+        self._report_n = len(self.specs)   # how many reports this run will do
+        # Live-preview requests: worker numbers whose browser should be
+        # screenshotted at its next safe poll point. Set from the GUI thread
+        # (request_screenshot), drained by the engine threads — hence the lock.
+        self._shot_lock = threading.Lock()
+        self._shot_requests = set()
+
+    def request_screenshot(self, worker_no):
+        """GUI thread: ask browser `worker_no` (1-based) for a live screenshot.
+        Answered via a ('preview_shot', ...) message at the worker's next safe
+        poll point (≤ ~5 s during a report wait)."""
+        with self._shot_lock:
+            self._shot_requests.add(int(worker_no))
+
+    def _shot_wanted(self, worker_no):
+        """Engine threads: one request = one screenshot."""
+        with self._shot_lock:
+            if worker_no in self._shot_requests:
+                self._shot_requests.discard(worker_no)
+                return True
+            return False
+
+    def _on_screenshot(self, worker_no, image, note, url=""):
+        b64 = base64.b64encode(image).decode("ascii") if image else None
+        self.q.put(("preview_shot", (worker_no, b64, note, url)))
+
+    def _auto_consolidate(self, spec, result, events):
+        """B2: build `spec`'s combined workbook right after its export, reusing
+        the same Events sink so progress flows into the log. Runs inline on this
+        worker thread (the single-task gate already holds the 'export' slot, so a
+        separate ConsolidateWorker would deadlock). Skipped for export-only
+        reports (no consolidator) and when nothing was saved. A consolidation
+        failure is logged, never fatal — the export itself already succeeded."""
+        from pathlib import Path
+        from reports import consolidator_for_spec
+        mod = consolidator_for_spec(spec)
+        if mod is None:
+            self.q.put(("log", f"  Auto-consolidate: {spec.label} has no "
+                               "consolidator — skipped."))
+            return
+        if not (result.saved or result.exists):
+            self.q.put(("log", f"  Auto-consolidate: nothing to combine for "
+                               f"{spec.label} — skipped."))
+            return
+        if self.out_base is not None:
+            # The per-route files in input_dir carry an "<src-env> " name prefix
+            # (env_tagged_filename) — fine for the consolidators, which discover
+            # inputs by '*.xlsx'/'*.pdf' glob and pull the route from the END of
+            # the name (or, for Ramp Summary, from the PDF text). The combined
+            # workbook gets the same prefix so it self-labels in the store too.
+            day, input_dir = None, self.out_base / spec.subdir
+            out_path = (self.out_base / "consolidated"
+                        / env_tagged_filename(mod.FILENAME, self.out_base.name))
+        else:
+            day = Path(result.output_dir).parent.name if result.output_dir else None
+            input_dir = out_path = None
+        self.q.put(("log", ""))
+        self.q.put(("log", f"Auto-consolidating {spec.label}…"))
+        try:
+            res = mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                  day=day, input_dir=input_dir, out_path=out_path)
+            # P1-R01: persist the producer completion beside the workbook this writer
+            # produced (the same reusable consolidated the matrix later reuses), through
+            # the shared boundary — so an auto-consolidate partial can't be reused green.
+            # A False return = the partial flag couldn't be recorded (the incomplete
+            # combined file was discarded); surface it in the log (non-fatal — the export
+            # itself already succeeded).
+            if not consolidation_meta.write_outcome(res.output_path or out_path, res):
+                self.q.put(("log", "  Auto-consolidate: the outcome could not be recorded; "
+                                   "the incomplete combined file was discarded (it will rebuild)."))
+            lines = res.summary_lines or ([res.message] if res.message else [])
+            for line in lines:
+                self.q.put(("log", f"  {line}"))
+        except Exception as e:
+            log.exception("auto-consolidate failed for %s", spec.label)
+            self.q.put(("log", f"  Auto-consolidate failed: {type(e).__name__} "
+                               "(details in the log)."))
+
+    def _on_route(self, route, status):
+        with self._tally_lock:              # in fast mode this fires from many threads
+            self._route_status[route] = status      # latest status wins (retry re-reports)
+            counts = {"saved": 0, "empty": 0, "skipped": 0, "failed": 0, "exists": 0}
+            for st in self._route_status.values():
+                if st in counts:
+                    counts[st] += 1
+            msg = {"done": len(self._route_status), **counts}
+        msg["total"] = self._total
+        msg["route"] = route
+        msg["report"] = self._cur_label
+        msg["report_i"] = self._report_i
+        msg["report_n"] = self._report_n
+        self.q.put(("progress", msg))
+
+    def _should_skip(self):
+        if self.skip.is_set():
+            self.skip.clear()               # one press skips one route
+            return True
+        return False
+
+    def _build_events(self):
+        """The Events sink for this worker — shared by run() (one export) and by
+        BatchWorker, which reuses _run_specs once per environment (B3)."""
+        return Events(
+            on_log=lambda t: self.q.put(("log", t)),
+            on_route=self._on_route,
+            should_skip=self._should_skip,
+            is_cancelled=self.cancel.is_set,
+            on_status=lambda w, t: self.q.put(("worker_status", (w, t))),
+            screenshot_wanted=self._shot_wanted,
+            on_screenshot=self._on_screenshot,
+            is_paused=self.pause.is_set,
+        )
+
+    def _run_specs(self, events, results):
+        """Run every selected report once against the CURRENT site, appending
+        (spec, RunResult) to `results`. Posts log/progress/worker_status and the
+        B2 auto-consolidate; does NOT post export_done/error — the caller owns the
+        run lifecycle (run() for one export; BatchWorker once per environment for
+        B3). Appends as it goes so a mid-run exception still leaves partials."""
+        # M03: the Export-Everything store's <src>-<env> folder is a directory the
+        # app creates inside a USER-CHOSEN destination. Stamp it app-owned ONCE here
+        # (before the per-report loop) so "Delete all reports" / store recovery can
+        # prove ownership by marker, not by name alone. The marker survives the
+        # per-report stage->swap (that only renames child report subdirs).
+        if self.out_base is not None:
+            owned_dir.ensure_owned_dir(self.out_base, kind="store")
+        for i, spec in enumerate(self.specs, 1):
+            if self.cancel.is_set():
+                break
+            self._report_i = i
+            self._cur_label = spec.label
+            with self._tally_lock:
+                self._route_status = {}         # fresh counts for this report
+            if self._report_n > 1:
+                self.q.put(("log", ""))
+                self.q.put(("log", f"===== Report {i} of {self._report_n}: {spec.label} ====="))
+            # Reset the progress bar/counts for this report so the GUI doesn't
+            # show the previous report's tally while this one spins up.
+            self.q.put(("progress", {
+                "done": 0, "total": self._total, "route": "—",
+                "saved": 0, "empty": 0, "skipped": 0, "failed": 0, "exists": 0,
+                "report": spec.label, "report_i": i, "report_n": self._report_n,
+            }))
+            # B3: when an always-current destination is set, write each report
+            # into <dest>/<src-env>/<subdir>. STAGE-AND-SWAP: export into a fresh
+            # `.staging` sibling (so the run re-pulls everything — a refresh, not a
+            # resume-skip) and replace the live folder only on a clean finish, so a
+            # failed/crashed/cancelled refresh never destroys the last-good copy.
+            out_dir = (self.out_base / spec.subdir) if self.out_base else None
+            stage_dir = None
+            if out_dir is not None:
+                import shutil
+                stage_dir = out_dir.with_name(out_dir.name + ".staging")
+                shutil.rmtree(stage_dir, ignore_errors=True)
+                stage_dir.mkdir(parents=True, exist_ok=True)
+            # B3: in the always-current store, prefix every output file with the
+            # src-env tag (the dest's <src-env> subfolder name) so a file lifted
+            # out still says which environment it came from. Wrapping spec.filename
+            # covers the sequential + parallel engines AND both retry passes in one
+            # place — they all name files via spec.filename(route). The original
+            # spec (label/subdir, consolidator mapping) is kept for results/auto-
+            # consolidate; only the per-route NAME changes.
+            run_spec = spec
+            if self.out_base is not None:
+                tag = self.out_base.name
+                run_spec = dataclasses.replace(
+                    spec,
+                    filename=lambda r, _f=spec.filename, _t=tag: env_tagged_filename(_f(r), _t))
+            run_dir = stage_dir if stage_dir is not None else out_dir
+            try:
+                if self.workers and self.workers > 1:
+                    from exporter_parallel import run_export_parallel  # lazy
+                    result = run_export_parallel(run_spec, events, workers=self.workers,
+                                                 routes=self.routes, out_dir=run_dir)
+                else:
+                    result = run_export(run_spec, events, routes=self.routes, out_dir=run_dir)
+            except Exception:
+                # A crash must NOT cost the last-good copy: drop staging, leave the
+                # live folder as it was, and let the caller handle the error.
+                if stage_dir is not None:
+                    import shutil
+                    shutil.rmtree(stage_dir, ignore_errors=True)
+                raise
+            # F1: ONLY a complete refresh may replace the last-good store copy. The
+            # producer-owned completion (saved/empty/failed/skipped + cancel) decides:
+            # complete -> promote (swap staging in); partial / no_data / cancelled /
+            # failed -> discard staging and keep the previous live copy, so a run
+            # where routes failed or returned nothing never clobbers last-good.
+            cancelled = self.cancel.is_set()
+            in_store = stage_dir is not None
+            if in_store and result.exists:
+                # §C.1: a FRESH staging dir (rmtree'd + remade above) must never
+                # report "already had" files. If it does, the staging is untrustworthy
+                # — REJECT the promotion (force a failed outcome) so it can't replace
+                # last-good, and log the anomaly. (`exists` stays valid for ordinary
+                # resume / non-store runs — this guard is in_store only.)
+                log.warning("store refresh for %s saw %d 'exists' route(s) in a FRESH "
+                            "staging dir (anomaly) — rejecting promotion, keeping last-good",
+                            spec.subdir, len(result.exists))
+                result.completion = outcome.FAILED
+            else:
+                result.completion = outcome.run_completion(result, cancelled=cancelled)
+            promoted = False
+            # P2-A04: a prior store counts only if it's a USABLE store (holds a report artifact) —
+            # the same contract recovery uses — so an empty/foreign leftover dir doesn't make a
+            # failed first promotion falsely report previous_preserved.
+            had_prior = bool(in_store and artifact_store.is_usable_store(out_dir))
+            if in_store:
+                if outcome.promotable(result.completion):
+                    promoted = _swap_store_dir(out_dir, stage_dir)
+                    if not promoted:
+                        # P2-B01: a COMPLETE export whose journaled swap failed (locked /
+                        # crash) did NOT promote — the previous live copy is intact. It must
+                        # NOT read as promoted, so the frontend, auto-consolidate, and the
+                        # batch env-done gate all see previous_preserved (or none on a first run).
+                        log.warning("store refresh for %s: promotion FAILED — kept last-good, "
+                                    "NOT promoted", spec.subdir)
+                else:
+                    import shutil
+                    shutil.rmtree(stage_dir, ignore_errors=True)
+                    log.info("store refresh for %s was %s — kept last-good, discarded staging",
+                             spec.subdir, result.completion)
+            # Artifact reflects the ACTUAL store outcome: a successful in-store swap promotes;
+            # a failed swap with a prior keeps last-good (previous_preserved); a failed FIRST
+            # promotion (no prior) leaves NO canonical artifact (none) — never falsely claim a
+            # prior was preserved (P2-B06); a non-store dated run is new_unpromoted.
+            if in_store and not promoted:
+                result.artifact = outcome.PREVIOUS_PRESERVED if had_prior else outcome.NONE
+            else:
+                result.artifact = outcome.artifact_after_store(result.completion, in_store)
+            results.append((spec, result))
+            # B2 auto-consolidate after the export. For a STORE refresh only a run that
+            # actually PROMOTED (completion=complete, artifact=promoted) may consolidate:
+            # a partial/failed/cancelled store refresh discarded its staging and KEPT
+            # last-good, so consolidating now would rebuild a derived artifact from the
+            # OLD live store and present stale data as freshly produced (P1-B03). A
+            # non-store (dated-run) export is unchanged — it consolidates whatever routes
+            # it got (partial included), the long-standing supported behavior.
+            store_ok = (not in_store) or result.artifact == outcome.PROMOTED
+            if self.auto_consolidate and not self.cancel.is_set() and store_ok:
+                self._auto_consolidate(spec, result, events)
+        return results
+
+    def run(self):
+        events = self._build_events()
+        results = []
+        try:
+            self._run_specs(events, results)
+            self.q.put(("export_done", results))
+            return
+        except AuthError as e:
+            log.warning("export worker stopped: AuthError: %s", e)
+            err = ("auth", str(e))
+        except (PreflightError, BrowserNotFoundError) as e:
+            log.warning("export worker stopped: %s: %s", type(e).__name__, e)
+            err = ("general", str(e))               # message is already user-safe
+        except Exception as e:
+            # The full traceback MUST land in the log -- the GUI can only show
+            # one line, and "TypeError: ..." with no context is undebuggable.
+            log.exception("export worker crashed")
+            err = ("general", f"{type(e).__name__}: {e}")
+        # An error aborted a multi-report run partway. Hand the GUI whatever
+        # reports DID finish so "Save run report…" still covers them (each is also
+        # auto-saved under output/run_reports/), then surface the error.
+        if results:
+            self.q.put(("export_partial", results))
+        self.q.put(("error", err))
+
+
+class BatchWorker(threading.Thread):
+    """B3 "Export Everything": run selected report types across selected
+    environments, sequentially, reusing the proven export engine. Each
+    environment is exported into its normal run folder (output/<date src-env>/
+    <report>/) by reusing ExportWorker._run_specs, so resume/idempotency, fast
+    mode, pause (B1) and auto-consolidate (B2) all come for free.
+
+    Per-env targeting uses the PROCESS-GLOBAL common.set_site (NOT
+    set_thread_site): the batch is a single sequential orchestrator and the
+    single-task gate guarantees no other export runs, so mutating the global is
+    safe — and the user's original selection is restored when the batch ends.
+    (set_thread_site is only for the parallel env-scanner, where several browsers
+    target different environments at once.) Progress is persisted after every
+    environment, so a batch survives an app restart and resumes at the next
+    pending environment.
+
+    Posts ("batch_progress", dict) before each environment and ("batch_done",
+    dict) at the end; the per-report log/progress/worker_status come from the
+    reused ExportWorker. A fatal sign-in/browser problem ends the batch with an
+    ("error", …) and KEEPS the manifest so the cause can be fixed and resumed.
+    """
+
+    def __init__(self, manifest, queue, cancel_event, skip_event, pause_event):
+        super().__init__(daemon=True, name="batch")
+        self.manifest = manifest
+        self.q = queue
+        self.cancel = cancel_event
+        self.skip = skip_event
+        self.pause = pause_event
+
+    def _specs(self):
+        # Resolve the manifest's export-op KEYS to specs (P3 / §C.5). The seam the
+        # lifecycle tests stub; the real impl never silently narrows — validity is
+        # the `_invalid_keys` set, and run() aborts all-or-nothing on any invalid key
+        # (F7). A v1 manifest was migrated to keys by batch_manifest.load.
+        from reports import resolve_export_keys
+        return resolve_export_keys(self.manifest.get("reports", []))[0]
+
+    def _invalid_keys(self):
+        """The saved keys that DON'T resolve — unknown, app-wide-disabled, or
+        duplicate. A non-empty result means the saved selection can't be honored;
+        run() aborts all-or-nothing rather than running a narrower batch (§C.5)."""
+        from reports import resolve_export_keys
+        return resolve_export_keys(self.manifest.get("reports", []))[1]
+
+    def _step_views(self, cur_src, cur_env):
+        """Ordered per-environment view for the progress stepper: each step's
+        friendly label + whether it's `done` / `running` now / still `pending`.
+        Read from the manifest (the source of truth across a resume), so the
+        already-finished envs read `done` and the (cur_src, cur_env) about to
+        export reads `running`."""
+        views = []
+        for s in self.manifest.get("steps", []):
+            ssrc, senv = s.get("src"), s.get("env")
+            if s.get("status") == "done":
+                state = "done"
+            elif ssrc == cur_src and senv == cur_env:
+                state = "running"
+            else:
+                state = "pending"
+            views.append({
+                "key": f"{ssrc}-{senv}",
+                "label": f"{DATA_SOURCE_LABELS.get(ssrc, ssrc)} / "
+                         f"{ENVIRONMENT_LABELS.get(senv, senv)}",
+                "state": state,
+            })
+        return views
+
+    def run(self):
+        specs = self._specs()
+        steps = self.manifest.get("steps", [])
+        fast = self.manifest.get("fast", False)
+        workers = self.manifest.get("workers", 1) if fast else 1
+        auto = self.manifest.get("auto_consolidate", False)
+        dest = self.manifest.get("dest")
+        pause_sink = Events(is_paused=self.pause.is_set,
+                            is_cancelled=self.cancel.is_set)
+        total = len(steps)
+        done = sum(1 for s in steps if s.get("status") == "done")
+        if self._invalid_keys() or not specs:
+            # The saved selection can't be honored as-is — one or more report keys
+            # are unknown/disabled/duplicate, or none resolve (e.g. after an upgrade
+            # or registry change). Per §C.5 this is ALL-OR-NOTHING: abort WITHOUT
+            # marking any environment done (a narrower batch would silently drop the
+            # user's pending selection) and WITHOUT clearing the manifest (it stays
+            # resumable/discardable). Emit exactly ONE terminal — the user-visible
+            # `error`, mirroring the AuthError path — never a second `batch_done`
+            # (CT-10: one terminal per outcome; a stray second terminal could clobber
+            # an already-dispatched successor pre-P7a).
+            self.q.put(("log", "  This Export Everything batch can't run: one or more "
+                               "of its saved report types are no longer available."))
+            self.q.put(("error", ("general",
+                        "This Export Everything batch can't run — one or more of its "
+                        "saved report types are no longer available. Discard it and "
+                        "start a fresh Export Everything.")))
+            return
+        original = get_site()
+        try:
+            for step in steps:
+                if step.get("status") == "done":
+                    continue
+                _wait_while_paused(pause_sink)          # B1: hold between envs
+                if self.cancel.is_set():
+                    break
+                src, env = step["src"], step["env"]
+                set_site(src, env)
+                self.q.put(("batch_progress", {
+                    "src": src, "env": env,
+                    "label": f"{DATA_SOURCE_LABELS.get(src, src)} / "
+                             f"{ENVIRONMENT_LABELS.get(env, env)}",
+                    "done": done, "total": total,
+                    "steps": self._step_views(src, env)}))
+                self.q.put(("log", ""))
+                self.q.put(("log", f"========== {src.upper()}-{env.upper()}  "
+                                   f"({done + 1} of {total}) =========="))
+                out_base = (Path(dest) / f"{src}-{env}") if dest else None
+                ew = ExportWorker(specs, self.q, self.cancel, self.skip,
+                                  workers=workers, routes=None,
+                                  pause_event=self.pause, auto_consolidate=auto,
+                                  out_base=out_base)
+                crashed = False
+                results = []
+                try:
+                    ew._run_specs(ew._build_events(), results)
+                except (AuthError, BrowserNotFoundError) as e:
+                    # Every environment would hit this — stop and keep the
+                    # manifest so the user can fix the cause and resume.
+                    log.warning("batch stopped on %s-%s: %s: %s", src, env,
+                                type(e).__name__, e)
+                    self.q.put(("error",
+                                ("auth" if isinstance(e, AuthError) else "general",
+                                 str(e))))
+                    return                              # finally restores the site
+                except Exception as e:
+                    crashed = True
+                    log.exception("batch: %s-%s crashed", src, env)
+                    self.q.put(("log", f"  {src}-{env} stopped unexpectedly "
+                                       f"({type(e).__name__}); leaving it pending and "
+                                       "moving on (details in the log)."))
+                if self.cancel.is_set():
+                    break
+                if crashed:
+                    continue                            # leave pending for a resume
+                # §C.1 + P2-B01: mark an environment DONE only when every selected report
+                # was actually PROMOTED (completion=complete AND the store swap succeeded).
+                # A partial / no_data / failed report, a short result set, OR a complete
+                # report whose promotion FAILED (locked/crash, artifact=previous_preserved)
+                # leaves the env PENDING so a resume re-pulls it — last-good is intact.
+                bad = [s.label for s, r in results
+                       if getattr(r, "artifact", None) != outcome.PROMOTED]
+                if len(results) == len(specs) and not bad:
+                    step["status"] = "done"
+                    batch_manifest.mark_done(self.manifest, src, env)
+                    done += 1
+                else:
+                    miss = bad or [s.label for s in specs[len(results):]]
+                    self.q.put(("log", f"  {src}-{env}: left PENDING — "
+                                       f"{len(miss)} report(s) not complete "
+                                       f"({', '.join(miss) or 'none ran'}); kept last-good. "
+                                       "Resume to retry."))
+            complete = batch_manifest.is_complete(self.manifest)
+            batch_completion = (outcome.CANCELLED if self.cancel.is_set()
+                                else outcome.COMPLETE if complete else outcome.PARTIAL)
+            self.q.put(("batch_done", {
+                "done": done, "total": total,
+                "cancelled": self.cancel.is_set(),
+                "complete": complete, "completion": batch_completion}))
+        finally:
+            set_site(*original)
+
+
+class ConsolidateWorker(threading.Thread):
+    """Runs one consolidator. Overwrite is resolved by the GUI before start,
+    so the injected confirm callback just returns the pre-decided answer.
+    `day` is the dated export folder to read (YYYY-MM-DD), or None for the
+    legacy flat layout."""
+
+    def __init__(self, consolidate_fn, queue, cancel_event, confirm, day=None):
+        super().__init__(daemon=True, name="consolidate")
+        self.consolidate_fn = consolidate_fn
+        self.q = queue
+        self.cancel = cancel_event
+        self.confirm = confirm
+        self.day = day
+
+    def run(self):
+        events = Events(
+            on_log=lambda t: self.q.put(("log", t)),
+            is_cancelled=self.cancel.is_set,
+        )
+        log.info("consolidate start: %s (day=%s)",
+                 getattr(self.consolidate_fn, "__module__", self.consolidate_fn),
+                 self.day or "legacy/newest")
+        try:
+            result = self.consolidate_fn(events=events, confirm_overwrite=self.confirm,
+                                         day=self.day)
+            log.info("consolidate done: status=%s output=%s message=%s",
+                     result.status, result.output_path or "-", result.message or "-")
+            # P1-R01: the GUI/console Consolidate tab writes the SAME reusable workbook
+            # the matrix reuses — persist its producer completion through the shared
+            # boundary so a partial consolidation here can't later read as green. A False
+            # return means the partial flag could NOT be recorded (publication failed) and
+            # the workbook was invalidated — report a degraded terminal, not success.
+            if not consolidation_meta.write_outcome(result.output_path, result):
+                self.q.put(("error", ("general",
+                            "Consolidation finished but its outcome could not be recorded; "
+                            "the incomplete output was discarded. Close any open copy and "
+                            "run it again.")))
+                return
+            self.q.put(("consolidate_done", result))
+        except Exception as e:
+            log.exception("consolidate worker crashed")
+            self.q.put(("error", ("general", f"{type(e).__name__}: {e}")))

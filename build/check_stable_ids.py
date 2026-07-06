@@ -167,10 +167,11 @@ def _run_batch_worker(manifest):
     q, marked = _Q(), []
     w = gw.BatchWorker(manifest, q, threading.Event(), threading.Event(),
                        threading.Event())
-    saved = (gw.set_site, gw.get_site, gw.batch_manifest.mark_done,
+    import gui_worker_export as gwx
+    saved = (gwx.set_site, gwx.get_site, gw.batch_manifest.mark_done,
              gw.batch_manifest.is_complete, gw.ExportWorker._run_specs)
-    gw.set_site = lambda *_a: None
-    gw.get_site = lambda: ("ssor", "prod")
+    gwx.set_site = lambda *_a: None
+    gwx.get_site = lambda: ("ssor", "prod")
     gw.batch_manifest.mark_done = lambda _m, s, e: marked.append((s, e))
     gw.batch_manifest.is_complete = lambda _m: bool(marked)
 
@@ -184,7 +185,7 @@ def _run_batch_worker(manifest):
     try:
         w.run()
     finally:
-        (gw.set_site, gw.get_site, gw.batch_manifest.mark_done,
+        (gwx.set_site, gwx.get_site, gw.batch_manifest.mark_done,
          gw.batch_manifest.is_complete, gw.ExportWorker._run_specs) = saved
     return marked, q.items
 

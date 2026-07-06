@@ -51,7 +51,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import gui_api  # noqa: E402
-import gui_worker as gw  # noqa: E402
+import gui_worker as gw
+import gui_worker_env as gwe  # noqa: E402
+import gui_worker_export as gwx  # noqa: E402
+import gui_worker_maint as gwm  # noqa: E402
+import gui_worker_matrix as gwmx  # noqa: E402  # noqa: E402
 import events as ev  # noqa: E402
 import playwright.sync_api as pw  # noqa: E402
 
@@ -177,8 +181,8 @@ def _reset(outcome):
     else:                                              # cancel: break before delete
         targets = [("Run folders", Path("X-never-touched"))]
         cancel.set()
-    with _patched((gw, "reset_targets", lambda _i: targets),
-                  (gw, "measure_targets", lambda t: (len(t), 100))):
+    with _patched((gwm, "reset_targets", lambda _i: targets),
+                  (gwm, "measure_targets", lambda t: (len(t), 100))):
         gw.ResetWorker(q, False, cancel).run()
     return q.items
 
@@ -204,13 +208,13 @@ def _envcheck(outcome):
     if outcome == "expected-error":
         def nab(_p, **_k): raise gw.AuthError("no session")
         patches = [(pw, "sync_playwright", _fake_playwright),
-                   (gw, "new_authed_browser", nab)]
+                   (gwe, "new_authed_browser", nab)]
     else:                                              # success
         patches = [(pw, "sync_playwright", _fake_playwright),
-                   (gw, "new_authed_browser", lambda _p, **_k: (_FakeBrowser(), None, _FakePage())),
-                   (gw, "navigate_with_auth", lambda _p, **_k: None),
-                   (gw, "is_logged_in", lambda _p: True),
-                   (gw, "page_url_for_display", lambda _p: "https://tsmis/x")]
+                   (gwe, "new_authed_browser", lambda _p, **_k: (_FakeBrowser(), None, _FakePage())),
+                   (gwe, "navigate_with_auth", lambda _p, **_k: None),
+                   (gwe, "is_logged_in", lambda _p: True),
+                   (gwe, "page_url_for_display", lambda _p: "https://tsmis/x")]
     with _patched(*patches):
         w.run()
     return q.items
@@ -222,9 +226,9 @@ def _envscan():
     w.check_one = lambda _page, src, env, _specs: {
         "key": f"{src}-{env}", "source": src, "environment": env,
         "label": "L", "status": "ok", "detail": "", "url": "", "reports": {}}
-    with _patched((gw, "has_valid_auth", lambda: False),     # -> 1 scanner, no parallel pre-check
+    with _patched((gwe, "has_valid_auth", lambda: False),     # -> 1 scanner, no parallel pre-check
                   (pw, "sync_playwright", _fake_playwright),
-                  (gw, "new_authed_browser", lambda _p, **_k: (_FakeBrowser(), None, _FakePage()))):
+                  (gwe, "new_authed_browser", lambda _p, **_k: (_FakeBrowser(), None, _FakePage()))):
         w.run()
     return q.items
 
@@ -246,8 +250,8 @@ def _batch(outcome):
     else:
         def rs(_self, _e, _r): raise gw.AuthError("no session")
     with _patched((gw.ExportWorker, "_run_specs", rs),
-                  (gw, "set_site", lambda *_a: None),
-                  (gw, "get_site", lambda: ("ssor", "prod")),
+                  (gwx, "set_site", lambda *_a: None),
+                  (gwx, "get_site", lambda: ("ssor", "prod")),
                   (gw.batch_manifest, "mark_done", lambda *_a: None),
                   (gw.batch_manifest, "is_complete", lambda _m: True)):
         w.run()
@@ -265,8 +269,8 @@ def _batch_invalid():
                 "dest": None, "fast": False, "workers": 1, "auto_consolidate": False}
     w = gw.BatchWorker(manifest, q, threading.Event(), threading.Event(),
                        threading.Event())
-    with _patched((gw, "set_site", lambda *_a: None),
-                  (gw, "get_site", lambda: ("ssor", "prod")),
+    with _patched((gwx, "set_site", lambda *_a: None),
+                  (gwx, "get_site", lambda: ("ssor", "prod")),
                   (gw.batch_manifest, "mark_done",
                    lambda *_a: (_ for _ in ()).throw(AssertionError("marked done!")))):
         w.run()
@@ -282,9 +286,9 @@ def _matrix_export(outcome):
         def step(*_a, **_k): return None
     else:
         def step(*_a, **_k): raise gw.AuthError("no session")
-    with _patched((gw, "_run_matrix_export_step", step),
-                  (gw, "set_site", lambda *_a: None),
-                  (gw, "get_site", lambda: ("ssor", "prod"))):
+    with _patched((gwmx, "_run_matrix_export_step", step),
+                  (gwmx, "set_site", lambda *_a: None),
+                  (gwmx, "get_site", lambda: ("ssor", "prod"))):
         w.run()
     return q.items
 
@@ -380,33 +384,33 @@ def _login(outcome):
     cancel = threading.Event()
     w = gw.LoginWorker(q, _AlwaysDone(), cancel)       # always "done" -> no hang
     w._save_state = lambda _s: None                    # never write the auth file
-    patches = [(gw, "get_preferred_channel", lambda: None),
-               (gw, "get_url", lambda: "https://tsmis/login")]
+    patches = [(gwe, "get_preferred_channel", lambda: None),
+               (gwe, "get_url", lambda: "https://tsmis/login")]
     if outcome == "device_ok":                         # EDGE fallback: no Chrome/Chromium opens
         def launch(**_kw): raise RuntimeError("no chrome/chromium")
         w._try_edge_persistent_login = lambda _p, _log: {"cookies": []}
         patches += [(pw, "sync_playwright", lambda: _login_pw(launch)),
                     # **_k tolerates the P8c should_cancel kwarg now threaded in.
-                    (gw, "storage_state_is_portable", lambda _p, _s, **_k: False)]
+                    (gwe, "storage_state_is_portable", lambda _p, _s, **_k: False)]
     else:                                              # MAIN path: a browser launches
         def launch(**_kw): return _FakeBrowser()
         patches.append((pw, "sync_playwright", lambda: _login_pw(launch)))
         if outcome == "saved":
-            patches += [(gw, "new_login_context", lambda _b: _FakeLoginCtx()),
-                        (gw, "is_logged_in", lambda _pg: True)]
+            patches += [(gwe, "new_login_context", lambda _b: _FakeLoginCtx()),
+                        (gwe, "is_logged_in", lambda _pg: True)]
         elif outcome == "failed":
-            patches += [(gw, "new_login_context", lambda _b: _FakeLoginCtx()),
-                        (gw, "is_logged_in", lambda _pg: False)]
+            patches += [(gwe, "new_login_context", lambda _b: _FakeLoginCtx()),
+                        (gwe, "is_logged_in", lambda _pg: False)]
         elif outcome == "cancel":
             cancel.set()                               # cancel also unblocks the done-wait
-            patches += [(gw, "new_login_context", lambda _b: _FakeLoginCtx()),
-                        (gw, "is_logged_in", lambda _pg: False)]
+            patches += [(gwe, "new_login_context", lambda _b: _FakeLoginCtx()),
+                        (gwe, "is_logged_in", lambda _pg: False)]
         elif outcome == "expected-error":
             def nlc(_b): raise gw.BrowserNotFoundError("no usable browser")
-            patches.append((gw, "new_login_context", nlc))
+            patches.append((gwe, "new_login_context", nlc))
         else:                                          # unexpected-error
             def nlc(_b): raise RuntimeError("kaboom")
-            patches.append((gw, "new_login_context", nlc))
+            patches.append((gwe, "new_login_context", nlc))
     with _patched(*patches):
         w.run()
     return q.items

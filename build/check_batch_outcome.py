@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT))
 
-import gui_worker as gw                 # noqa: E402
+import gui_worker as gw
+import gui_worker_export as gwx  # noqa: E402                 # noqa: E402
 import gui_api as ga                    # noqa: E402
 import outcome as oc                    # noqa: E402
 from events import RunResult            # noqa: E402
@@ -98,8 +99,8 @@ def _run_batch(report_results, promote=True):
             results.append((s, r))
 
     with _patch(gw.ExportWorker, "_run_specs", rs), \
-         _patch(gw, "set_site", lambda *_a: None), \
-         _patch(gw, "get_site", lambda: ("ssor", "prod")), \
+         _patch(gwx, "set_site", lambda *_a: None), \
+         _patch(gwx, "get_site", lambda: ("ssor", "prod")), \
          _patch(gw.batch_manifest, "mark_done", lambda _m, s, e: marked.append((s, e))), \
          _patch(gw.batch_manifest, "is_complete", lambda _m: bool(marked)):
         w.run()
@@ -134,8 +135,8 @@ def _run_instore(run_result, auto=False, promote=True, had_prior=True, prior_emp
     def _swap(live, staged):
         swaps.append((live, staged))
         return promote                               # the boolean _run_specs must honor (P2-B01)
-    with _patch(gw, "run_export", lambda *_a, **_k: run_result), \
-         _patch(gw, "_swap_store_dir", _swap):
+    with _patch(gwx, "run_export", lambda *_a, **_k: run_result), \
+         _patch(gwx, "_swap_store_dir", _swap):
         results = []
         ew._run_specs(ew._build_events(), results)
     import shutil
@@ -238,8 +239,8 @@ def _b02_two_env_partial():
                 st["status"] = "done"
 
     with _patch(gw.ExportWorker, "_run_specs", rs), \
-         _patch(gw, "set_site", lambda *_a: None), \
-         _patch(gw, "get_site", lambda: ("ssor", "prod")), \
+         _patch(gwx, "set_site", lambda *_a: None), \
+         _patch(gwx, "get_site", lambda: ("ssor", "prod")), \
          _patch(gw.batch_manifest, "mark_done", _mark), \
          _patch(gw.batch_manifest, "is_complete",
                 lambda m: all(s["status"] == "done" for s in m["steps"])):
