@@ -649,7 +649,29 @@ def test_invalid_manifest_batch_advances_successor():
           dispatched == ["succ-after-invalid"] and a._task == "matrix")
 
 
+def test_active_check_soft_busy():
+    """B8: a user claim during the quiet background env check gets a clear soft
+    message (never a browser-launch crash), supersedes the check, and works
+    normally once the check is done."""
+    print("active-check exclusion (B8):")
+    a = _api()
+    a._active_check = True
+    a._active_check_supersede.clear()
+    err = a._claim_task_error("export")
+    check("claim during the check -> soft busy message",
+          bool(err) and "background" in err["error"])
+    check("...the check was superseded", a._active_check_supersede.is_set())
+    check("...the task gate was NOT taken", a._coord.task is None)
+    a._active_check = False
+    err = a._claim_task_error("export")
+    check("claim after the check -> gate taken normally", err is None
+          and a._coord.task == "export")
+    a._coord.release()
+
+
+
 def main():
+    test_active_check_soft_busy()
     test_producer_paths()
     test_terminal_payload_variants()
     test_queue_advances_on_terminal()

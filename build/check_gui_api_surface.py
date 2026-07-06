@@ -144,7 +144,7 @@ def test_begin_compare_unify():
     # The duplicated claim→dialog→launch tails are gone from the two endpoints (the gate
     # claim + the dialog-cancel release now live once in _begin_compare).
     check("the duplicated 'A task is already running.' claim tail collapsed to one helper",
-          s.count('self._try_claim_task("compare")') == 1)
+          s.count('self._claim_task_error("compare")') == 1)
     # P7b-A01: the default name is a LAZY callable evaluated INSIDE the claim (preserving
     # the pre-P7b claim-before-suggest_name ordering), so a suggest-name error releases the
     # gate just like the baseline rather than running before any claim.

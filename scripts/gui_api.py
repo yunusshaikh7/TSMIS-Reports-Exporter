@@ -228,6 +228,7 @@ class GuiApi(GuiMatrixMixin):
         # lightweight flag + a supersede token for a newer env switch.
         self._active_check = False
         self._active_check_seq = 0
+        self._active_check_supersede = threading.Event()
         self._fast_run = False       # running export is fast mode (Skip is off)
         self._authed = False
         self._device_ok = False      # silent device sign-in proven to work
@@ -696,6 +697,26 @@ class GuiApi(GuiMatrixMixin):
         workers."""
         return self._coord.try_claim(name)
 
+    def _claim_task_error(self, name):
+        """Claim the single task slot, or return WHY it can't be claimed
+        (None on success). The quiet background env check deliberately does NOT
+        hold the task gate (that would lock the whole UI for its ~20-60 s on
+        every device-mode app start) — but it DOES hold the single-instance
+        Edge sign-in profile, so a user task launched mid-check used to fail
+        with a bare browser-launch error (the one-way exclusion, B8). Now the
+        user gets a soft busy message and the check is SUPERSEDED so a retry a
+        few seconds later wins."""
+        with self._lock:
+            active = self._active_check
+        if active:
+            self._active_check_supersede.set()
+            log.info("claim %s deferred: background env check running "
+                     "(superseding it)", name)
+            return {"error": "Checking the sign-in status in the background — try again in a few seconds."}
+        if not self._try_claim_task(name):
+            return {"error": "A task is already running."}
+        return None
+
     def _release_task(self):
         """Drop a slot claimed by _try_claim_task before a worker actually
         started (e.g. the user cancelled the save dialog), so the next action
@@ -957,8 +978,10 @@ class GuiApi(GuiMatrixMixin):
             self._active_check = True
             self._active_check_seq += 1
             seq = self._active_check_seq
+            self._active_check_supersede.clear()
         log.info("active env check: %s (%s-%s)", reason, src, env)
-        ActiveEnvCheckWorker(self._q, src, env, seq).start()
+        ActiveEnvCheckWorker(self._q, src, env, seq,
+                             supersede=self._active_check_supersede).start()
 
     def _on_active_env_done(self, payload):
         """The quiet active-env check finished. Drop a stale result (a newer env
@@ -1355,8 +1378,9 @@ class GuiApi(GuiMatrixMixin):
             except (TypeError, ValueError):
                 n_workers = max(2, default_worker_count())
 
-        if not self._try_claim_task("export"):
-            return {"error": "A task is already running."}
+        err = self._claim_task_error("export")
+        if err:
+            return err
         with self._lock:
             self._fast_run = n_workers > 1
             self._last_summary = None       # the previous run's card clears now
@@ -1409,8 +1433,9 @@ class GuiApi(GuiMatrixMixin):
         # so the retry stays complete without the engine needing per-spec lists.
         routes = sorted({r for _, fr in failing for r in fr})
 
-        if not self._try_claim_task("export"):
-            return {"error": "A task is already running."}
+        err = self._claim_task_error("export")
+        if err:
+            return err
         with self._lock:
             self._fast_run = False
             self._last_summary = None
@@ -1493,8 +1518,9 @@ class GuiApi(GuiMatrixMixin):
                 n_workers = max(2, min(int(workers), MAX_WORKERS))
             except (TypeError, ValueError):
                 n_workers = max(2, default_worker_count())
-        if not self._try_claim_task("batch"):
-            return {"error": "A task is already running."}
+        err = self._claim_task_error("batch")
+        if err:
+            return err
         self.cancel_event.clear()
         self.skip_event.clear()
         self.pause_event.clear()
@@ -1561,8 +1587,9 @@ class GuiApi(GuiMatrixMixin):
         m = batch_manifest.load()
         if not m or not batch_manifest.pending(m):
             return {"error": "There's no saved batch to resume."}
-        if not self._try_claim_task("batch"):
-            return {"error": "A task is already running."}
+        err = self._claim_task_error("batch")
+        if err:
+            return err
         self.cancel_event.clear()
         self.skip_event.clear()
         self.pause_event.clear()
@@ -1702,6 +1729,9 @@ class GuiApi(GuiMatrixMixin):
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
+            if self._active_check:
+                self._active_check_supersede.set()   # the check yields; retry wins
+                return {"error": "Checking the sign-in status in the background — try again in a few seconds."}
             self._coord.claim_direct("login")   # claim + bump epoch (gate already checked)
             self._login_phase = "starting"
         self.login_done.clear()
@@ -1741,6 +1771,9 @@ class GuiApi(GuiMatrixMixin):
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
+            if self._active_check:
+                self._active_check_supersede.set()   # the check yields; retry wins
+                return {"error": "Checking the sign-in status in the background — try again in a few seconds."}
             self._coord.claim_direct("envcheck")   # claim + bump epoch (gate already checked)
         src, env = get_site()
         label = f"{DATA_SOURCE_LABELS[src]} / {ENVIRONMENT_LABELS[env]}"
@@ -1793,6 +1826,9 @@ class GuiApi(GuiMatrixMixin):
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
+            if self._active_check:
+                self._active_check_supersede.set()   # the check yields; retry wins
+                return {"error": "Checking the sign-in status in the background — try again in a few seconds."}
             self._coord.claim_direct("envscan")   # claim + bump epoch (gate already checked)
             for src in DATA_SOURCES:
                 for env in ENVIRONMENTS:
@@ -1900,8 +1936,9 @@ class GuiApi(GuiMatrixMixin):
         except ValueError as e:
             return {"error": str(e)}
         label, mod = row
-        if not self._try_claim_task("consolidate"):
-            return {"error": "A task is already running."}
+        err = self._claim_task_error("consolidate")
+        if err:
+            return err
         self.cancel_event.clear()
         self._emit_log(f"Starting consolidation: {label}" + (f"   ·   {day}" if day else ""))
         self._set_dot("busy", f"Consolidating {label}…")
@@ -1997,8 +2034,9 @@ class GuiApi(GuiMatrixMixin):
         dialog / launch-prep error releases the gate and can never wedge it.
         `build(out_path, events, confirm_overwrite, day)` is the comparator call
         (`mod.compare` / `adapter.compare_folders`)."""
-        if not self._try_claim_task("compare"):
-            return {"error": "A task is already running."}
+        err = self._claim_task_error("compare")
+        if err:
+            return err
         try:
             out = self._save_dialog_for_compare(save_dir, suggest())
             if out is None:
@@ -2239,6 +2277,9 @@ class GuiApi(GuiMatrixMixin):
         with self._lock:
             if self._task:
                 return {"error": "A task is already running."}
+            if self._active_check:
+                self._active_check_supersede.set()   # the check yields; retry wins
+                return {"error": "Checking the sign-in status in the background — try again in a few seconds."}
             self._coord.claim_direct("chromium")   # claim + bump epoch (gate already checked)
         self.cancel_event.clear()
         self._emit_log(start_log)
@@ -2352,8 +2393,9 @@ class GuiApi(GuiMatrixMixin):
                            "must be shown first)")
             return {"error": "Please confirm the delete from the dialog "
                              "(open 'Delete all reports' again)."}
-        if not self._try_claim_task("reset"):
-            return {"error": "A task is already running."}
+        err = self._claim_task_error("reset")
+        if err:
+            return err
         ui_log.info("reset: user confirmed delete-all-reports (input=%s)",
                     include_input)
         self.cancel_event.clear()

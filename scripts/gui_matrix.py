@@ -681,8 +681,9 @@ class GuiMatrixMixin:
         if not self._tsn_library_status_for(report)["raw_present"]:
             return {"error": f"No raw {spec.label} files are imported yet — "
                              "import the raw TSN file(s) first."}
-        if not self._try_claim_task("consolidate"):
-            return {"error": "A task is already running."}
+        err = self._claim_task_error("consolidate")
+        if err:
+            return err
         self.cancel_event.clear()
         self._emit_log(f"Rebuilding TSN library: {spec.label}…")
         self._set_dot("busy", f"Rebuilding {spec.label}…")

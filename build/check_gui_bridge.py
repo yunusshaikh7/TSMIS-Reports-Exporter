@@ -286,8 +286,9 @@ def test_active_env_check_gates():
     started = []
 
     class _FakeWorker:
-        def __init__(self, q, src, env, seq):
+        def __init__(self, q, src, env, seq, supersede=None):
             started.append((src, env, seq))
+            self.supersede = supersede
 
         def start(self):
             pass

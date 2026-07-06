@@ -1297,6 +1297,10 @@ class EnvScanWorker(threading.Thread):
                      out["status"], time.monotonic() - t0, out["detail"] or "-")
 
 
+class _Superseded(Exception):
+    """Internal: the quiet env check yielded to a user task (B8)."""
+
+
 class ActiveEnvCheckWorker(threading.Thread):
     """The QUIET, single-combo env check for the CURRENTLY selected site, run
     unprompted on app start and after an env switch. Where EnvScanWorker probes
@@ -1317,12 +1321,15 @@ class ActiveEnvCheckWorker(threading.Thread):
 
     BUDGET_S = 20        # sign-in budget: enough for silent SSO, short on failure
 
-    def __init__(self, queue, src, env, seq):
+    def __init__(self, queue, src, env, seq, supersede=None):
         super().__init__(daemon=True, name="activeenv")
         self.q = queue
         self.src = src
         self.env = env
         self.seq = seq
+        # B8: a user task wanting the Edge profile sets this; the check yields
+        # at its next seam instead of holding the profile for the full budget.
+        self.supersede = supersede or threading.Event()
 
     def run(self):
         from reports import EXPORT_REPORTS
@@ -1335,6 +1342,9 @@ class ActiveEnvCheckWorker(threading.Thread):
         signed_in = False
         set_thread_site(self.src, self.env)
         try:
+            if self.supersede.is_set():
+                log.info("active env check: superseded before launch; yielding")
+                raise _Superseded()
             with sync_playwright() as p:
                 browser = None
                 try:
@@ -1342,13 +1352,18 @@ class ActiveEnvCheckWorker(threading.Thread):
                     # no file → the device Edge context (the path that PROVES the
                     # one-click). Either way a 3-tuple whose first item .close()s.
                     browser, _ctx, page = new_authed_browser(p)
+                    if self.supersede.is_set():
+                        log.info("active env check: superseded after launch; "
+                                 "yielding the Edge profile")
+                        raise _Superseded()
                     verdict = EnvScanWorker.check_one(page, self.src, self.env,
                                                       report_specs,
                                                       budget_s=self.BUDGET_S)
                     verdict["quiet"] = True    # suppress the per-combo scan log line
-                    self.q.put(("env_access", verdict))
-                    signed_in = verdict["status"] not in (
-                        "no_signin", "denied", "unreachable", "error")
+                    if not self.supersede.is_set():
+                        self.q.put(("env_access", verdict))
+                        signed_in = verdict["status"] not in (
+                            "no_signin", "denied", "unreachable", "error")
                 finally:
                     if browser is not None:
                         try:
@@ -1357,6 +1372,8 @@ class ActiveEnvCheckWorker(threading.Thread):
                             log.info("active env check: browser close failed "
                                      "(%s: %s)", type(e).__name__,
                                      str(e).splitlines()[0] if str(e) else "")
+        except _Superseded:
+            pass                    # already logged at the yield point
         except Exception as e:
             log.info("active env check: %s quiet failure (%s: %s)", key,
                      type(e).__name__, str(e).splitlines()[0] if str(e) else "")
