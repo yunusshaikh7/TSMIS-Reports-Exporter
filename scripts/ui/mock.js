@@ -608,8 +608,8 @@ function makeMockApi() {
       reports: REPORTS.map((r, i) => ({ idx: i, disabled: false, ...r })),
       cons_reports: [
         { key: "cons:highway_log_excel", label: "TSMIS Highway Log (Excel)", group: null, short: null, fmt: "Excel" },
-        { key: "cons:tsn_highway_log", label: "TSN Highway Log (PDF)", group: null, short: null, fmt: "PDF" },
         { key: "cons:highway_log_pdf", label: "TSMIS Highway Log (PDF)", group: null, short: null, fmt: "PDF" },
+        { key: "cons:tsn_highway_log", label: "TSN Highway Log (PDF)", group: null, short: null, fmt: "PDF" },
         { key: "cons:highway_sequence", label: "Highway Sequence Listing", group: null, short: null, fmt: "Excel" },
         { key: "cons:ramp_summary", label: "TSAR: Ramp Summary", group: "Ramp", short: "Summary", fmt: "PDF" },
         { key: "cons:ramp_detail", label: "TSAR: Ramp Detail", group: "Ramp", short: "Detail", fmt: "Excel" },
@@ -628,10 +628,10 @@ function makeMockApi() {
       // mirrors the registry for display parity.
       compare_reports: [
         { key: "cmp:highway_log:env", label: "Highway Log — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_log", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_log_pdf:env", label: "Highway Log (PDF) — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_log_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:highway_log:tsn", label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:highway_log:pdf_vs_tsn", label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN (PDF)" },
         { key: "cmp:highway_log:pdf_vs_excel", label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
-        { key: "cmp:highway_log_pdf:env", label: "Highway Log (PDF) — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_log_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:highway_sequence:env", label: "Highway Sequence Listing — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_sequence", file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:highway_sequence:tsn", label: "Highway Sequence Listing — TSMIS vs TSN", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:ramp_summary:env", label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_summary", file_a_label: "TSMIS", file_b_label: "TSN" },

@@ -217,6 +217,23 @@ def test_reports_derive_from_catalog():
           _fam_positions(cd_order) == sorted(_fam_positions(cd_order)))
     check("compare display follows the Export picker's family order",
           _fam_positions(cp_order) == sorted(_fam_positions(cp_order)))
+    # W2 GROUPING METADATA (not just order): an exact-family consolidator inherits
+    # its family's (group, short); a Highway Log input variant stays flat (no group);
+    # a compare key's family_group is the Export family header.
+    ed = cat.export_display()
+    check("cons TSAR entries carry their family (group, short); HL variants flat",
+          cd_meta["cons:ramp_summary"] == ed["ramp_summary"]
+          and cd_meta["cons:intersection_detail"] == ed["intersection_detail"]
+          and cd_meta["cons:highway_log_excel"][0] is None
+          and cd_meta["cons:highway_log_pdf"][0] is None
+          and cd_meta["cons:tsn_highway_log"][0] is None)
+    check("the three Highway Log consolidators group contiguously (W2 alias)",
+          [k for k in cd_order if cat._picker_family(k) == "highway_log"]
+          == ["cons:highway_log_excel", "cons:highway_log_pdf", "cons:tsn_highway_log"])
+    check("compare family_group is the Export family header (Ramp/Intersection/None)",
+          cp_meta["cmp:ramp_detail:tsn"] == ed["ramp_detail"][0]
+          and cp_meta["cmp:intersection_detail:env"] == ed["intersection_detail"][0]
+          and cp_meta["cmp:highway_log:tsn"] is None)
     check("_CONSOLIDATOR_BY_SUBDIR == catalog.consolidator_by_subdir()",
           reports._CONSOLIDATOR_BY_SUBDIR == cat.consolidator_by_subdir())
     check("tsn_library._REPORTS derives from catalog.tsn_entries()",
@@ -484,9 +501,9 @@ def test_mock_parity():
     check("mock export (key, idx, label, fmt, disabled) == bridge", fe_export == be_export)
 
     cons = _mock_objs(mockjs, r"cons_reports:\s*\[(.*?)\],")
-    fe_cons = [(o["key"], o["label"], o["fmt"]) for o in (cons or [])]
-    be_cons = [(r["key"], r["label"], r["fmt"]) for r in be["cons_reports"]]
-    check("mock consolidate (key, label, fmt) == bridge", fe_cons == be_cons)
+    fe_cons = [(o["key"], o["label"], o.get("group"), o.get("short"), o["fmt"]) for o in (cons or [])]
+    be_cons = [(r["key"], r["label"], r["group"], r["short"], r["fmt"]) for r in be["cons_reports"]]
+    check("mock consolidate (key, label, group, short, fmt) == bridge", fe_cons == be_cons)
 
     grp = _mock_objs(mockjs, r"compare_groups:\s*\[(.*?)\],")
     fe_grp = [(o["id"], o["label"]) for o in (grp or [])]
@@ -494,11 +511,12 @@ def test_mock_parity():
     check("mock compare groups (id, label) == bridge", fe_grp == be_grp)
 
     cmp_ = _mock_objs(mockjs, r"compare_reports:\s*\[(.*?)\],")
-    fe_cmp = [(o["key"], o["label"], o["kind"], o["group"],
+    fe_cmp = [(o["key"], o["label"], o["kind"], o["group"], o.get("family_group"),
                o.get("file_a_label", "TSMIS"), o.get("file_b_label", "TSN")) for o in (cmp_ or [])]
-    be_cmp = [(r["key"], r["label"], r["kind"], r["group"], r["file_a_label"], r["file_b_label"])
-              for r in be["compare_reports"]]
-    check("mock compare (key, label, kind, group, file_a, file_b) == bridge", fe_cmp == be_cmp)
+    be_cmp = [(r["key"], r["label"], r["kind"], r["group"], r["family_group"],
+               r["file_a_label"], r["file_b_label"]) for r in be["compare_reports"]]
+    check("mock compare (key, label, kind, group, family_group, file_a, file_b) == bridge",
+          fe_cmp == be_cmp)
 
     # The mock's SEPARATE CONS_REPORTS routing list (used by consByKey) must equal the registry.
     routing = _mock_objs(mockjs, r"const CONS_REPORTS = \[(.*?)\];")

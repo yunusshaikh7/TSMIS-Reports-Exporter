@@ -299,8 +299,10 @@ def picker_order():
 # ----------------------------------------------------------------------------- #
 _PICKER_FAMILY_ALIAS = {
     # The Consolidate tab's Highway Log INPUT VARIANTS all belong to the
-    # highway_log family slot for ordering (their labels carry the variant).
+    # highway_log family slot for ordering (their labels carry the variant), so
+    # the three HL consolidators (Excel, PDF, TSN PDF) group contiguously.
     "highway_log_excel": "highway_log",
+    "highway_log_pdf": "highway_log",
     "tsn_highway_log": "highway_log",
 }
 
