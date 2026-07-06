@@ -452,6 +452,18 @@ def build_normalized(raw_dir, out_path, *, glob, deps_ok, deps_msg, no_raw_what,
             status="error",
             message=f"Could not read {raw.name}: {type(e).__name__}: {e}")
 
+    # A statewide export that parses but projects ZERO rows is a layout change
+    # (a renamed sheet / moved header), not a legitimate empty dataset — writing
+    # an "ok" header-only workbook here silently turned EVERY comparison row into
+    # "Only in TSMIS". Error out; the previous normalized file stays in place.
+    rows = list(rows)
+    if not rows:
+        return ConsolidateResult(
+            status="error",
+            message=(f"{raw.name} parsed but produced 0 rows — the {log_label} "
+                     "layout may have changed. Nothing was written; the previous "
+                     "normalized file (if any) was kept."))
+
     try:
         wb = _write_normalized_workbook(sheet, header, header_align, rows)
     except ImportError:

@@ -246,6 +246,18 @@ def test_shared_skeleton():
             r = rd_load.build_into(raw, tmp / "y.xlsx", events=_events()[0])
         check("projection raises -> exact 'Could not read s.xlsx: ValueError: bad parse'",
               r.status == "error" and r.message == "Could not read s.xlsx: ValueError: bad parse")
+        # zero-row projection -> error, nothing written, prior normalized kept
+        # (a TSN layout change must not become an "ok" EMPTY library that turns
+        # every comparison row into "Only in TSMIS").
+        prev = tmp / "prev.xlsx"
+        prev.write_bytes(b"prior-normalized")
+        with _patch(rd, "tsn_rows_from_raw", lambda _p: []):
+            r = rd_load.build_into(raw, prev, events=_events()[0],
+                                   confirm_overwrite=lambda _p: True)
+        check("zero-row projection -> error suggesting a layout change",
+              r.status == "error" and "produced 0 rows" in r.message)
+        check("...previous normalized bytes kept",
+              prev.read_bytes() == b"prior-normalized")
         # atomic-save PermissionError -> exact friendly message; prior artifact retained; no .tmp-* left.
         # Drive the REAL artifact_store.atomic_save (it saves the workbook to a `.tmp-*` sibling of
         # out_path, then os.replace); force os.replace to raise -> atomic_save removes its temp and
