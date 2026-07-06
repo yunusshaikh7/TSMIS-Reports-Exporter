@@ -536,6 +536,76 @@ def test_resolve_previous_paginates():
         updater._http_get = orig
 
 
+def test_interrupted_swap_recovery(monkeypatch_wait):
+    """E1: a hard interrupt mid-phase-2 leaves swap.inprogress; the next launch
+    completes the swap (or rolls back when completion is impossible) INSTEAD of
+    deleting the .old/.new recovery pieces. Orderly swaps leave no journal."""
+    print("interrupted-swap journal recovery (E1, fake trees):")
+    orig_update_dir = updater.UPDATE_DIR
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_swapj_"))
+    updater.UPDATE_DIR = tmp / "update"
+    try:
+        # --- an ORDERLY swap leaves no journal behind -----------------------
+        app = tmp / "app-ok"
+        staged = tmp / "staged-ok"
+        _make_tree(app, b"OLD-EXE", b"OLD-DLL")
+        _make_tree(staged, b"NEW-EXE", b"NEW-DLL")
+        monkeypatch_wait(lambda pid, t: True)
+        ok = updater.perform_swap(staged, app, pid=1, log_file=tmp / "s1.log",
+                                  relaunch=False, show_dialog=False)
+        check("orderly swap succeeds", ok)
+        check("...and clears its journal", not updater._swap_journal_path().exists())
+
+        # --- FORWARD recovery: exe swapped, _internal caught in the gap ------
+        app2 = tmp / "app-fwd"
+        _make_tree(app2, b"NEW-EXE", b"OLD-DLL")          # exe already swapped
+        (app2 / (updater._EXE_NAME + ".old")).write_bytes(b"OLD-EXE")
+        # _internal: dest -> .old done, .new not yet renamed in (THE gap)
+        (app2 / "_internal").rename(app2 / "_internal.old")
+        (app2 / "_internal.new").mkdir()
+        (app2 / "_internal.new" / "app.dll").write_bytes(b"NEW-DLL")
+        # IT-README: untouched, .new still waiting
+        (app2 / "IT-README.txt.new").write_text("readme-NEW-EXE", encoding="utf-8")
+        journal = updater._swap_journal_path()
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        journal.write_text(json.dumps(
+            {"version": 1, "app_dir": str(app2),
+             "pieces": [updater._EXE_NAME, "_internal", "IT-README.txt"]}),
+            encoding="utf-8")
+        outcome = updater._recover_interrupted_swap()
+        check("gap tree recovers FORWARD", outcome == "completed")
+        check("...the gap piece is back (new bytes)",
+              (app2 / "_internal" / "app.dll").read_bytes() == b"NEW-DLL")
+        check("...the waiting piece was renamed in",
+              (app2 / "IT-README.txt").read_text(encoding="utf-8") == "readme-NEW-EXE")
+        check("...exe untouched (already swapped)",
+              (app2 / updater._EXE_NAME).read_bytes() == b"NEW-EXE")
+        check("...journal cleared after recovery", not journal.exists())
+
+        # --- ROLLBACK: completion impossible (a gap piece's .new vanished) ---
+        app3 = tmp / "app-back"
+        _make_tree(app3, b"NEW-EXE", b"OLD-DLL")          # exe swapped forward
+        (app3 / (updater._EXE_NAME + ".old")).write_bytes(b"OLD-EXE")
+        (app3 / "_internal").rename(app3 / "_internal.old")   # gap, and NO .new
+        journal.write_text(json.dumps(
+            {"version": 1, "app_dir": str(app3),
+             "pieces": [updater._EXE_NAME, "_internal"]}), encoding="utf-8")
+        outcome = updater._recover_interrupted_swap()
+        check("unfinishable tree ROLLS BACK", outcome == "rolled-back")
+        check("...old exe restored",
+              (app3 / updater._EXE_NAME).read_bytes() == b"OLD-EXE")
+        check("...old _internal restored",
+              (app3 / "_internal" / "app.dll").read_bytes() == b"OLD-DLL")
+        check("...journal cleared after recovery", not journal.exists())
+
+        # --- an unreadable journal is dropped, nothing touched ----------------
+        journal.write_text("{not json", encoding="utf-8")
+        check("corrupt journal -> None, removed",
+              updater._recover_interrupted_swap() is None and not journal.exists())
+    finally:
+        updater.UPDATE_DIR = orig_update_dir
+
+
 def test_webview_clear_frozen_only():
     print("cleanup_leftovers clears the WebView2 cache for FROZEN builds only (§J):")
     calls = {"cache": 0, "recover": 0}
@@ -867,6 +937,7 @@ def main():
         test_download_retries_transient()
         test_retry_recovers_transient_oserror()
         test_stage_rename_retries()
+        test_interrupted_swap_recovery(monkeypatch_wait)
         test_staged_allowlist(monkeypatch_wait)
         test_missing_exe_aborts(monkeypatch_wait)
         test_webview_clear_frozen_only()

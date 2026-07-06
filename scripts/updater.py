@@ -801,6 +801,115 @@ def _remove_tree(path):
         path.unlink()
 
 
+
+_SWAP_JOURNAL_NAME = "swap.inprogress"
+
+
+def _swap_journal_path():
+    return UPDATE_DIR / _SWAP_JOURNAL_NAME
+
+
+def _write_swap_journal(journal, app_dir, pieces, log_file):
+    """Phase-2 intent record (E1): which pieces are about to rename-swap in
+    `app_dir`. Written AFTER phase 1 (every .new staged beside its target),
+    removed on ANY orderly outcome — success or the handled rename-rollback.
+    Its presence at the next launch therefore means a HARD interrupt (kill /
+    power loss) mid-phase-2: cleanup_leftovers then completes or rolls back
+    from the .old/.new pieces instead of DELETING them (the old behavior
+    destroyed the only recovery material a mixed tree had)."""
+    try:
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        journal.write_text(json.dumps(
+            {"version": 1, "app_dir": str(app_dir), "pieces": list(pieces)}),
+            encoding="utf-8")
+        _swap_log(log_file, f"swap journal written ({len(pieces)} pieces)")
+    except OSError as e:
+        # No journal = no recovery net; proceed anyway (pre-E1 behavior).
+        _swap_log(log_file, f"swap journal NOT written ({type(e).__name__}: {e})"
+                            " - proceeding without a recovery net")
+
+
+def _clear_swap_journal(journal, log_file=None):
+    try:
+        journal.unlink(missing_ok=True)
+    except OSError as e:
+        if log_file is not None:
+            _swap_log(log_file,
+                      f"swap journal not removed ({type(e).__name__}: {e})")
+
+
+def _recover_interrupted_swap(journal=None):
+    """Complete-or-roll-back a phase-2 swap a hard interrupt left mixed (E1).
+
+    Runs at the next launch, BEFORE the leftover sweep. Forward completion is
+    preferred (the staged tree was digest-verified and phase 1 finished): each
+    journaled piece still carrying a .new is renamed in, exactly like phase 2.
+    If the tree can't be completed (a piece's .new vanished), everything is
+    rolled back to the .old copies — renames only, both directions. The journal
+    is cleared after ONE attempt either way; the ordinary sweep then handles
+    the remnants. Returns "completed" / "rolled-back" / "failed" / None (no or
+    unreadable journal)."""
+    journal = journal or _swap_journal_path()
+    if not journal.is_file():
+        return None
+    try:
+        data = json.loads(journal.read_text(encoding="utf-8"))
+        app_dir = Path(data["app_dir"])
+        pieces = [str(n) for n in data["pieces"]]
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        log.warning("update: unreadable swap journal (%s: %s); removing it",
+                    type(e).__name__, e)
+        _clear_swap_journal(journal)
+        return None
+    log.warning("update: an INTERRUPTED swap was found (%d pieces in %s) - "
+                "recovering before the leftover sweep", len(pieces), app_dir)
+    outcome = "failed"
+    try:
+        for name in pieces:
+            dest = app_dir / name
+            new = app_dir / (name + ".new")
+            bak = app_dir / (name + ".old")
+            if not new.exists():
+                continue                     # already swapped in (or never staged)
+            if dest.exists():
+                if bak.exists():
+                    _retry(lambda b=bak: _remove_tree(b))
+                _retry(lambda d=dest, b=bak: d.rename(b))
+            _retry(lambda n=new, d=dest: n.rename(d))
+        still_missing = [n for n in pieces if not (app_dir / n).exists()]
+        if still_missing:
+            raise OSError(f"pieces missing after completion: {still_missing}")
+        log.warning("update: interrupted swap COMPLETED (new version in place)")
+        outcome = "completed"
+    except OSError as e:
+        log.warning("update: forward completion failed (%s: %s) - rolling back "
+                    "to the previous version", type(e).__name__, e)
+        try:
+            for name in reversed(pieces):
+                dest = app_dir / name
+                new = app_dir / (name + ".new")
+                bak = app_dir / (name + ".old")
+                if not bak.exists():
+                    continue                 # piece never left the old version
+                if new.exists() and dest.exists():
+                    continue                 # untouched piece (stale .old only)
+                if dest.exists():            # dest holds a NEW piece: park it back
+                    _retry(lambda d=dest, n=new: d.rename(n))
+                _retry(lambda b=bak, d=dest: b.rename(d))
+            missing = [n for n in pieces if not (app_dir / n).exists()]
+            if missing:
+                raise OSError(f"pieces missing after rollback: {missing}")
+            log.warning("update: interrupted swap ROLLED BACK "
+                        "(previous version restored)")
+            outcome = "rolled-back"
+        except OSError as e2:
+            log.error("update: recovery FAILED both directions (%s: %s) - "
+                      "reinstall the app from the releases page",
+                      type(e2).__name__, e2)
+    _clear_swap_journal(journal)
+    return outcome
+
+
 def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
                  wait_timeout_s=_SWAP_TIMEOUT_S, show_dialog=True):
     """The swap itself (separated from run_swap_mode so a sandbox test can
@@ -876,6 +985,8 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
             return False
 
     # ---- phase 2: rename-swap each piece (instant; rollback = renames) -----
+    journal = _swap_journal_path()
+    _write_swap_journal(journal, app_dir, [n for n, _ in news], log_file)
     moved = []                           # (dest, bak) pairs renamed to .old
     failed = None
     for name, new in news:
@@ -921,6 +1032,10 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
     # Leftover *.old/*.new pieces and the staged tree THIS process runs from
     # are removed by cleanup_leftovers() at the relaunched app's next startup
     # (this process exits immediately, releasing its own files).
+    # Both orderly outcomes leave a coherent tree — the journal's job is done.
+    # Only a hard interrupt (kill/power loss) skips this line, and that is
+    # exactly when the next launch must find it.
+    _clear_swap_journal(journal, log_file)
     _swap_log(log_file, "swap done" if not failed else "swap failed")
     return failed is None
 
@@ -1109,6 +1224,9 @@ def cleanup_leftovers():
     # its UI files on disk (or a manual zip-overwrite install); a dev launch serves
     # scripts/ui live, so clearing it every dev launch was wasted work — frozen-only.
     _clear_webview_caches()
+    # E1: an interrupted phase-2 swap is repaired FIRST — the sweep below would
+    # otherwise delete the very .old/.new pieces recovery needs.
+    _recover_interrupted_swap()
     targets = [UPDATE_DIR] + [install_dir() / (name + suffix)
                               for name in _BUNDLE_ITEMS
                               for suffix in (".old", ".new")]
