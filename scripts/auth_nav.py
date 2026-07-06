@@ -138,7 +138,7 @@ def save_auth_state(state):
     except OSError:
         try:
             os.unlink(tmp)
-        except OSError:
+        except OSError:  # silent-ok: cleanup inside a re-raising handler; the raise reports
             pass
         raise
     try:
@@ -295,7 +295,7 @@ def navigate_with_auth(page, *, budget_s=60, should_cancel=None):
             host = _page_host(page)
             if host and host != expected_host():
                 note(f"waiting at {host} ({page.title()!r})")
-        except Exception:
+        except Exception:  # silent-ok: a best-effort breadcrumb; the sign-in loop itself reports
             pass
         try:
             page.wait_for_timeout(1000)

@@ -214,7 +214,7 @@ def _probe_channel(p, channel):
     finally:
         try:
             browser.close()
-        except Exception:
+        except Exception:  # silent-ok: probe teardown; the probe verdict above is the report
             pass
 
 

@@ -220,7 +220,7 @@ def _login_with_browser(browser, label):
             if is_logged_in(pg):
                 logged_in = True
                 break
-        except Exception:
+        except Exception:  # silent-ok: a per-page probe; the aggregate outcome is printed + logged below
             continue
 
     print()
@@ -236,7 +236,7 @@ def _login_with_browser(browser, label):
     print()
     try:
         browser.close()
-    except Exception:
+    except Exception:  # silent-ok: console flow teardown; the outcome was already printed + logged
         pass
     input("Press Enter to exit...")
 
@@ -244,7 +244,7 @@ def _login_with_browser(browser, label):
 def _safe_close_context(ctx):
     try:
         ctx.close()
-    except Exception:
+    except Exception:  # silent-ok: teardown of an already-reported session
         pass
 
 

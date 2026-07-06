@@ -141,7 +141,7 @@ def clear(path=MANIFEST_PATH):
     """Remove the manifest (best-effort) — a finished or discarded batch."""
     try:
         Path(path).unlink(missing_ok=True)
-    except OSError:
+    except OSError:  # silent-ok: best-effort cleanup; a leftover manifest just re-offers resume
         pass
 
 

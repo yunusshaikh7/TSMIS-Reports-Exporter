@@ -72,7 +72,7 @@ def _log_banner(log):
     log-based diagnosis starts with."""
     try:
         from version import __version__ as app_version
-    except Exception:
+    except Exception:  # silent-ok: the banner still prints, with version 'unknown'
         app_version = "unknown"
     log.info("=== logging started (app v%s) -> %s ===", app_version, LOG_FILE)
     log.info("env: %s build | python %s | %s",
@@ -113,8 +113,8 @@ def setup_logging(level=logging.INFO, enable_faulthandler=True):
         import settings
         if settings.get("debug_logging"):
             level = logging.DEBUG
-    except Exception:
-        pass                       # settings must never block logging setup
+    except Exception:  # silent-ok: settings must never block logging setup itself
+        pass
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     handler = RotatingFileHandler(
         LOG_FILE, maxBytes=2_000_000, backupCount=5, encoding="utf-8"

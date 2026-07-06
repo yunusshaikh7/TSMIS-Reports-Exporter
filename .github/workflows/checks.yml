@@ -51,6 +51,12 @@ jobs:
         # Fails the build if the product name is ever mis-typed — it is always TSMIS.
         run: python build/check_no_misspelling.py
 
+      - name: Silent-swallow tripwire (blocking)
+        # Every swallowed exception logs, raises, converts to a result, or is
+        # waived in place (# silent-ok) — new silent swallows can't land. The
+        # committed baseline grandfathers pre-audit sites as burn-down debt.
+        run: python build/check_silent_swallows.py
+
       - name: Export-engine regression checks (blocking)
         shell: bash
         run: |

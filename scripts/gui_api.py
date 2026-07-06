@@ -920,7 +920,9 @@ class GuiApi(GuiMatrixMixin):
         try:
             if not settings.get(key):
                 return
-        except Exception:
+        except Exception as e:
+            log.info("autoscan skipped: settings unreadable (%s: %s)",
+                     type(e).__name__, str(e).splitlines()[0] if str(e) else "")
             return
         with self._lock:
             if self._task or self._env_access:
@@ -2319,12 +2321,16 @@ class GuiApi(GuiMatrixMixin):
         gate: the delete can't run unless a preview was shown for the same
         include_input)."""
         include_input = bool(include_input)
-        targets = reset_targets(include_input)
+        warns = []
+        targets = reset_targets(include_input, warnings=warns)
         files, size = measure_targets(targets)
         token = secrets.token_urlsafe(16)
         with self._lock:
             self._reset_token = (token, include_input)
-        return {"targets": [label for label, _p in targets],
+        # Enumeration warnings ride the LABEL list only (no path -> the dialog
+        # renders them as plain lines); the delete path never sees them.
+        return {"targets": [label for label, _p in targets]
+                           + [f"⚠ {w}" for w in warns],
                 # The concrete paths too, so the confirm dialog shows EXACTLY
                 # what will be deleted (the labels alone hid the real location of
                 # the user-chosen Export Everything store).
@@ -2595,8 +2601,9 @@ def run():
     if not debug:
         try:
             debug = bool(settings.get("ui_devtools"))   # Settings-tab toggle
-        except Exception:
-            pass
+        except Exception as e:
+            log.info("devtools toggle unreadable (%s: %s); staying off",
+                     type(e).__name__, str(e).splitlines()[0] if str(e) else "")
     log.info("starting webview (window %dx%d, ui=%s, profile=%s%s)",
              width, height, index, WEBVIEW_PROFILE_DIR, ", debug" if debug else "")
     try:

@@ -300,7 +300,7 @@ def maybe_screenshot(page, events, note=""):
             events.on_screenshot(events.worker_no, None,
                                  "The screenshot couldn't be taken right now "
                                  "(the browser was busy) — try again.", url)
-        except Exception:
+        except Exception:  # silent-ok: the events sink itself failed; nothing left to report to
             pass
 
 

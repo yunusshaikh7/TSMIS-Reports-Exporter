@@ -125,7 +125,7 @@ def _verify_saved_file(out_path):
     log.warning("saved file failed integrity check: %s (%d bytes)", out_path, size)
     try:
         out_path.unlink()
-    except OSError:
+    except OSError:  # silent-ok: the integrity failure above is the report; a leftover partial re-pulls
         pass
     raise RuntimeError(
         "The downloaded file looked incomplete (it may have been interrupted) — "
@@ -157,7 +157,7 @@ def _can_resume(out_path):
     log.warning("resume: existing file is incomplete; re-pulling: %s", out_path)
     try:
         out_path.unlink()
-    except OSError:
+    except OSError:  # silent-ok: the re-pull decision above is already logged
         pass
     return False
 
@@ -398,7 +398,7 @@ def _capture_failure(page, spec, route, events):
         page.screenshot(path=str(png), full_page=False)
         try:
             (FAILURES_DIR / f"{stem}.html").write_text(page.content(), encoding="utf-8")
-        except Exception:
+        except Exception:  # silent-ok: the PNG + its log line are the diagnostic; the HTML twin is a bonus
             pass
         log.info("failure screenshot saved: %s", png)
         events.on_log(f"  diagnostic screenshot saved ({png.name})")

@@ -100,7 +100,7 @@ _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_detail", "highway_sequence",
                        "tsmis_intersection_detail_pdf", "run_reports", "comparisons")
 
 
-def reset_targets(include_input=False):
+def reset_targets(include_input=False, warnings=None):
     """The folders/files "Delete all reports" removes, as (label, Path) pairs
     that currently exist. Reports only — logs, the saved login, the Edge
     sign-in profile and the app's settings are NEVER in this list."""
@@ -147,8 +147,15 @@ def reset_targets(include_input=False):
                         or child.name == "comparisons"):
                     targets.append(
                         (f"Export Everything store: {child.name}", child))
-    except Exception:
-        pass
+    except Exception as e:
+        # The delete list is a PROMISE -- if the store can't be enumerated the
+        # preview must say so, not silently omit it (the user would believe
+        # everything was removed).
+        log.warning("reset: could not inspect the Export Everything store "
+                    "(%s: %s)", type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        if warnings is not None:
+            warnings.append("the Export Everything store could not be "
+                            "inspected — its reports may not be listed")
     if FAILURES_DIR.is_dir():
         targets.append(("failure screenshots", FAILURES_DIR))
     if include_input:
@@ -163,8 +170,12 @@ def reset_targets(include_input=False):
             tsn_in = Path(get_batch_dest()) / "_tsn_input"
             if tsn_in.is_dir():
                 targets.append(("Export Everything store: _tsn_input", tsn_in))
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("reset: could not inspect the store's _tsn_input "
+                        "(%s: %s)", type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+            if warnings is not None:
+                warnings.append("the store's _tsn_input folder could not be "
+                                "inspected — TSN drops may not be listed")
     return targets
 
 
@@ -1097,8 +1108,10 @@ class EnvScanWorker(threading.Thread):
                         if browser is not None:
                             try:
                                 browser.close()
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                log.info("env scan: browser close failed "
+                                         "(%s: %s)", type(e).__name__,
+                                         str(e).splitlines()[0] if str(e) else "")
             except (AuthError, BrowserNotFoundError) as e:
                 # This scanner is out; the others keep draining the queue.
                 log.warning("env scan: scanner %d stopped (%s: %s)",
@@ -1198,8 +1211,9 @@ class EnvScanWorker(threading.Thread):
             got = None
             try:
                 got = page.evaluate(_CONFIG_JS)          # [env, src] or None
-            except Exception:
-                pass
+            except Exception as e:
+                log.info("env check: CONFIG probe failed (%s: %s)",
+                         type(e).__name__, str(e).splitlines()[0] if str(e) else "")
             # _CONFIG_JS returns null when the site's CONFIG can't be read (a
             # future rename), so None here = "couldn't confirm the environment".
             config_readable = got is not None
@@ -1334,8 +1348,10 @@ class ActiveEnvCheckWorker(threading.Thread):
                     if browser is not None:
                         try:
                             browser.close()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            log.info("active env check: browser close failed "
+                                     "(%s: %s)", type(e).__name__,
+                                     str(e).splitlines()[0] if str(e) else "")
         except Exception as e:
             log.info("active env check: %s quiet failure (%s: %s)", key,
                      type(e).__name__, str(e).splitlines()[0] if str(e) else "")

@@ -27,6 +27,7 @@ to derive its descriptors, which (like the registry) transitively pulls openpyxl
 pdfplumber — so importing tsn_library is console-free but not dependency-light.
 """
 import importlib
+import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +36,8 @@ import consolidation_meta
 import paths
 import report_catalog as _catalog
 from events import ConsolidateResult, Events
+
+log = logging.getLogger("tsmis.tsn_library")
 
 
 @dataclass(frozen=True)
@@ -100,7 +103,7 @@ def consolidated_path(report):
 def _safe_mtime(p):
     try:
         return Path(p).stat().st_mtime
-    except OSError:
+    except OSError:               # silent-ok: a pure mtime probe; None = unknown
         return None
 
 
@@ -110,7 +113,11 @@ def _raw_files(report):
     try:
         return sorted(p for p in raw_dir(report).glob(get(report).raw_glob)
                       if p.is_file() and not p.name.startswith("~$"))
-    except OSError:
+    except OSError as e:
+        # An unreadable raw/ used to report as "no raw files -- import first"
+        # with zero log trail; the WHY goes to the log.
+        log.warning("TSN raw folder unreadable for %s (%s: %s)",
+                    report, type(e).__name__, e)
         return []
 
 
@@ -181,26 +188,29 @@ def ensure_layout():
     root = paths.TSN_LIBRARY_ROOT
     try:
         root.mkdir(parents=True, exist_ok=True)
-    except OSError:
+    except OSError as e:
+        log.info("TSN library root not creatable (%s: %s)", type(e).__name__, e)
         return root
     for spec in reports():
         rd = raw_dir(spec.subdir)
         try:
             rd.mkdir(parents=True, exist_ok=True)
-        except OSError:
+        except OSError as e:
+            log.info("TSN raw dir not creatable for %s (%s: %s)",
+                     spec.subdir, type(e).__name__, e)
             continue
         if not _raw_files(spec.subdir):                  # only hint an empty raw/
             hint = rd / _RAW_HINT_NAME
             if not hint.exists():
                 try:
                     hint.write_text(_raw_hint_text(spec), encoding="utf-8")
-                except OSError:
+                except OSError:   # silent-ok: the hint file is cosmetic guidance
                     pass
     readme = root / _README_NAME
     if not readme.exists():
         try:
             readme.write_text(_readme_text(), encoding="utf-8")
-        except OSError:
+        except OSError:           # silent-ok: the README is cosmetic guidance
             pass
     return root
 
@@ -252,8 +262,8 @@ def _resolve_dest_drop(legacy_dest, report):
                 xlsx.append(e)
             elif sfx == ".pdf":
                 pdfs += 1
-    except OSError:
-        pass
+    except OSError as e:
+        log.info("TSN drop folder unreadable (%s: %s)", type(e).__name__, e)
     if xlsx:
         newest = max(xlsx, key=lambda q: _safe_mtime(q) or 0)
         return {"kind": "consolidated", "path": str(newest),

@@ -48,6 +48,7 @@ after the stated normalization", not raw equality:
 Console-free; engine in compare_core.
 """
 import dataclasses
+import logging
 import re
 from datetime import date
 from pathlib import Path
@@ -69,6 +70,8 @@ from compare_core import (CompareSchema, normalize_value, keys_for,
                           _PROGRESS_EVERY)
 from paths import today_str
 
+
+log = logging.getLogger("tsmis.compare")
 REPORT_NAME = "Intersection Detail"
 TSMIS_SHEET = "Intersection Detail"      # consolidated sheet (Route prepended)
 TSN_SHEET = "Sheet 1"                     # raw statewide DB dump
@@ -555,7 +558,7 @@ def _rv_pdate(s):
     m = re.match(r"(\d{4})-(\d{2})-(\d{2})$", str(s or ""))
     try:
         return date(int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError):  # silent-ok: a value normalizer; malformed dates read as blank
         return None
 
 
@@ -586,7 +589,11 @@ def _tsn_onesided(path):
     shows the TSN-only cells blank."""
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
-    except Exception:
+    except Exception as e:
+        # An unreadable input silently degraded the Report View to blanks --
+        # the WHY goes to the log (compare_core output is untouched).
+        log.info("report view: TSN one-sided read failed (%s: %s)",
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
         return None
     try:
         if NORMALIZED_SHEET in wb.sheetnames:
@@ -611,7 +618,9 @@ def _tsmis_locations(path):
     """Consolidated TSMIS 'Location' (pos 4), aligned to the rows `_load_tsmis` yields."""
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
-    except Exception:
+    except Exception as e:
+        log.info("report view: TSMIS locations read failed (%s: %s)",
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
         return []
     try:
         if TSMIS_SHEET not in wb.sheetnames:
