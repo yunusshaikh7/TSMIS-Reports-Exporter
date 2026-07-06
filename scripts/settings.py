@@ -401,24 +401,12 @@ def set_export_browser(channel):
 
 def get_matrix_hidden_reports():
     """The list of matrix row keys the user has hidden (default: none hidden)."""
-    raw = _read_file().get("matrix_hidden_reports")
-    if isinstance(raw, list):
-        return [k for k in raw if isinstance(k, str)]
-    return []
+    return _get_str_list("matrix_hidden_reports")
 
 
 def set_matrix_hidden_reports(keys):
-    """Persist the hidden matrix row keys (a list of strings). Empty -> cleared.
-    Returns the new effective list."""
-    data = dict(_read_file())
-    keys = [k for k in (keys or []) if isinstance(k, str)]
-    if keys:
-        data["matrix_hidden_reports"] = sorted(set(keys))
-    else:
-        data.pop("matrix_hidden_reports", None)
-    _atomic_write(data)
-    log.info("settings: matrix_hidden_reports -> %s", keys or "(none)")
-    return get_matrix_hidden_reports()
+    """Persist the hidden matrix row keys. Empty -> cleared."""
+    return _set_str_list("matrix_hidden_reports", keys)
 
 
 # ---- Comparison-matrix modes / env visibility / TSN files ------------------
@@ -457,23 +445,12 @@ def set_matrix_row_mode(row_key, mode_id):
 
 def get_matrix_hidden_envs():
     """Env (column) keys the user has hidden on the matrix (default: none)."""
-    raw = _read_file().get("matrix_hidden_envs")
-    if isinstance(raw, list):
-        return [k for k in raw if isinstance(k, str)]
-    return []
+    return _get_str_list("matrix_hidden_envs")
 
 
 def set_matrix_hidden_envs(keys):
-    """Persist the hidden env-column keys. Empty -> cleared. Returns the new list."""
-    data = dict(_read_file())
-    keys = [k for k in (keys or []) if isinstance(k, str)]
-    if keys:
-        data["matrix_hidden_envs"] = sorted(set(keys))
-    else:
-        data.pop("matrix_hidden_envs", None)
-    _atomic_write(data)
-    log.info("settings: matrix_hidden_envs -> %s", keys or "(none)")
-    return get_matrix_hidden_envs()
+    """Persist the hidden env-column keys. Empty -> cleared."""
+    return _set_str_list("matrix_hidden_envs", keys)
 
 
 # ---- Matrix ROW / COLUMN ORDER (drag-to-reorder) ---------------------------
@@ -576,60 +553,76 @@ def set_matrix_tsn_file(subdir, path):
 # matrix-local toggle, NOT a Settings-tab knob — it reuses the global
 # "fast_workers" count for N, so it lives here (not in DEFAULTS/all_settings).
 
+def _get_flag(key):
+    """A boolean toggle (stored only when on; default off)."""
+    return bool(_read_file().get(key, False))
+
+
+def _set_flag(key, on):
+    """Persist a boolean toggle (cleared when off — T1: the shape every toggle
+    pair hand-rolled). Returns the new effective value."""
+    data = dict(_read_file())
+    if on:
+        data[key] = True
+    else:
+        data.pop(key, None)
+    _atomic_write(data)
+    log.info("settings: %s -> %s", key, bool(on))
+    return _get_flag(key)
+
+
+def _get_str_list(key):
+    """A stored list of strings (default empty; non-strings dropped)."""
+    raw = _read_file().get(key)
+    if isinstance(raw, list):
+        return [k for k in raw if isinstance(k, str)]
+    return []
+
+
+def _set_str_list(key, keys):
+    """Persist a de-duplicated, sorted string list (empty -> cleared — T1: the
+    shape every hidden-keys pair hand-rolled). Returns the new effective list."""
+    data = dict(_read_file())
+    keys = [k for k in (keys or []) if isinstance(k, str)]
+    if keys:
+        data[key] = sorted(set(keys))
+    else:
+        data.pop(key, None)
+    _atomic_write(data)
+    log.info("settings: %s -> %s", key, keys or "(none)")
+    return _get_str_list(key)
+
+
 def get_matrix_fast():
     """Whether matrix re-exports run in fast (parallel) mode (default off)."""
-    return bool(_read_file().get("matrix_fast", False))
+    return _get_flag("matrix_fast")
 
 
 def set_matrix_fast(on):
-    """Persist the matrix fast-mode toggle (cleared when off). Returns the new
-    effective value."""
-    data = dict(_read_file())
-    if on:
-        data["matrix_fast"] = True
-    else:
-        data.pop("matrix_fast", None)
-    _atomic_write(data)
-    log.info("settings: matrix_fast -> %s", bool(on))
-    return get_matrix_fast()
+    """Persist the matrix fast-mode toggle (cleared when off)."""
+    return _set_flag("matrix_fast", on)
 
 
 def get_matrix_formulas():
     """Whether matrix comparisons ALSO write a live-formulas workbook beside the
     values copy (default off; the values copy always wins for the offline counts)."""
-    return bool(_read_file().get("matrix_formulas", False))
+    return _get_flag("matrix_formulas")
 
 
 def set_matrix_formulas(on):
-    """Persist the matrix formulas-workbook toggle (cleared when off). Returns the
-    new effective value."""
-    data = dict(_read_file())
-    if on:
-        data["matrix_formulas"] = True
-    else:
-        data.pop("matrix_formulas", None)
-    _atomic_write(data)
-    log.info("settings: matrix_formulas -> %s", bool(on))
-    return get_matrix_formulas()
+    """Persist the matrix formulas-workbook toggle (cleared when off)."""
+    return _set_flag("matrix_formulas", on)
 
 
 def get_day_matrix_formulas():
     """Whether the by-day matrix ALSO writes a live-formulas workbook (its own
     toggle, independent of the Everything matrix's; default off)."""
-    return bool(_read_file().get("day_matrix_formulas", False))
+    return _get_flag("day_matrix_formulas")
 
 
 def set_day_matrix_formulas(on):
-    """Persist the by-day matrix formulas-workbook toggle (cleared when off).
-    Returns the new effective value."""
-    data = dict(_read_file())
-    if on:
-        data["day_matrix_formulas"] = True
-    else:
-        data.pop("day_matrix_formulas", None)
-    _atomic_write(data)
-    log.info("settings: day_matrix_formulas -> %s", bool(on))
-    return get_day_matrix_formulas()
+    """Persist the by-day matrix formulas-workbook toggle (cleared when off)."""
+    return _set_flag("day_matrix_formulas", on)
 
 
 # ---- Compare-tab "TSN by day" matrix ---------------------------------------
@@ -683,23 +676,12 @@ def set_day_matrix_days(days):
 
 def get_day_matrix_hidden():
     """Hidden report-row keys on the by-day matrix (default: none)."""
-    raw = _read_file().get("day_matrix_hidden")
-    if isinstance(raw, list):
-        return [k for k in raw if isinstance(k, str)]
-    return []
+    return _get_str_list("day_matrix_hidden")
 
 
 def set_day_matrix_hidden(keys):
-    """Persist the hidden by-day report rows. Empty -> cleared. Returns the list."""
-    data = dict(_read_file())
-    keys = [k for k in (keys or []) if isinstance(k, str)]
-    if keys:
-        data["day_matrix_hidden"] = sorted(set(keys))
-    else:
-        data.pop("day_matrix_hidden", None)
-    _atomic_write(data)
-    log.info("settings: day_matrix_hidden -> %s", keys or "(none)")
-    return get_day_matrix_hidden()
+    """Persist the hidden by-day report rows. Empty -> cleared."""
+    return _set_str_list("day_matrix_hidden", keys)
 
 
 def reset():
