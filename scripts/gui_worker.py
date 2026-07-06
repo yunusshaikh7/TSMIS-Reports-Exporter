@@ -142,9 +142,14 @@ def reset_targets(include_input=False, warnings=None):
                 # whatever its name); fall back to the legacy known <src-env> /
                 # "comparisons" NAMES for dirs created before the marker existed.
                 # Foreign files/dirs the user keeps alongside the store stay untouched.
-                if (owned_dir.is_owned(child)
-                        or child.name in known
-                        or child.name == "comparisons"):
+                by_name = child.name in known or child.name == "comparisons"
+                if owned_dir.is_owned(child) or by_name:
+                    if by_name:
+                        # SEC-02 migration: stamp legacy dirs the moment the name
+                        # fallback recognizes one, so the fallback (which a user
+                        # folder named e.g. 'ssor-prod' could collide with) can be
+                        # RETIRED once installs have re-stamped. Best-effort.
+                        owned_dir.mark_owned(child)
                     targets.append(
                         (f"Export Everything store: {child.name}", child))
     except Exception as e:
