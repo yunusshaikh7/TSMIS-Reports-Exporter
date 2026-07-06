@@ -373,20 +373,32 @@ _PAIR_GROUP_CAP = 100_000     # product len_t*len_n above which we keep file ord
 _PAIR_EXACT_PERMS = 5040      # exact (brute-force) assignment up to 7! permutations
 
 
+def compared_cell(sc, f, rt, rn, off):
+    """The ONE compared-cell reader (V1/ARC-04): TRIM both sides of field `f`,
+    decide assertiveness, normalize, compare. Returns `(va, vb, verdict)` where
+    `va`/`vb` are the TRIMmed display values and `verdict` is None for a
+    NON-ASSERTING cell (a context field, or a `+`-run ditto when the schema
+    treats dittos as non-asserting), else the Med-Wid-normalized equality.
+    `_row_diff_count`, `count_diffs` and `_field_value` all read through this,
+    so the three can never drift (they used to carry the block verbatim)."""
+    va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
+    if sc.is_context(f):
+        return va, vb, None              # context = non-asserting (never a diff)
+    if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
+        return va, vb, None              # ditto = non-asserting
+    if sc.is_medwid(f):
+        return va, vb, _medwid_norm(va) == _medwid_norm(vb)
+    return va, vb, va == vb
+
+
 def _row_diff_count(sc, rt, rn, off):
     """Differing compared-fields between two rows, using the comparison's own
     normalization (TRIM + Med Wid) — identical to the per-row diff the workbook
     counts. This is the similarity cost: lower = more alike."""
     d = 0
     for f in sc.field_indices:
-        if sc.is_context(f):
-            continue                     # context = non-asserting (never a diff)
-        va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
-        if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
-            continue                     # ditto = non-asserting
-        if sc.is_medwid(f):
-            va, vb = _medwid_norm(va), _medwid_norm(vb)
-        if va != vb:
+        _va, _vb, eq = compared_cell(sc, f, rt, rn, off)
+        if eq is False:
             d += 1
     return d
 
@@ -521,14 +533,8 @@ def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route):
             rs["matched"] += 1
         row_diffs = 0
         for f in sc.field_indices:                # every column but the key
-            if sc.is_context(f):
-                continue                          # context = non-asserting (never a diff)
-            va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
-            if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
-                continue                          # ditto = non-asserting
-            if sc.is_medwid(f):
-                va, vb = _medwid_norm(va), _medwid_norm(vb)
-            if va != vb:
+            _va, _vb, eq = compared_cell(sc, f, rt, rn, off)
+            if eq is False:
                 row_diffs += 1
                 field_diffs[f] += 1
         diff_cells += row_diffs
@@ -716,15 +722,12 @@ def _field_value(sc, rt, rn, off, f):
         return _xl_trim(rn[f + off])
     if rn is None:                       # A-only row
         return _xl_trim(rt[f + off])
-    va, vb = _xl_trim(rt[f + off]), _xl_trim(rn[f + off])
+    va, vb, eq = compared_cell(sc, f, rt, rn, off)
     if sc.is_context(f):
         return va if va else vb          # context = non-asserting: coalesce, never ≠
-    if sc.ditto_nonasserting and (_is_plus_run(va) or _is_plus_run(vb)):
+    if eq is None:
         return va                        # ditto = non-asserting: show side A's value
-    ca, cb = va, vb
-    if sc.is_medwid(f):
-        ca, cb = _medwid_norm(va), _medwid_norm(vb)
-    if ca == cb:
+    if eq:
         return va
     return f"{va or '(blank)'}{_DIFF_MARK}{vb or '(blank)'}"
 
