@@ -1,13 +1,18 @@
 # The audit fix program: v0.18.5 (all fixes) + v0.19.0 (all structure)
 
-> **Execution status (2026-07-03):** Waves 0, A, B (incl. B3a/B8), E (E1/E2/E3),
-> F (F1–F6) and D1+D2 are **LANDED** on `fix/v0.18.5-audit-polish` (~26 commits,
-> suite green at 86 checks). **D3 re-bless: the real-pair before/after harness is
-> running** (before = v0.18.4 @ 238 s on the statewide Intersection Detail pair;
-> after/diff pending — the byte-identity + canary gate for D1/D2/F1). Wave C:
-> docs batch + CONTRIBUTING + pyproject landed; REMAINING: CHANGELOG + version
-> bump (after D3 greens), gh-pages batch (C5/C6/C8), work-PC ride-alongs.
-> Part 2 (v0.19.0) not started.
+> **Execution status (2026-07-03): PART 1 (v0.18.5) CODE-COMPLETE.** All waves
+> landed on `fix/v0.18.5-audit-polish` (~29 commits, suite green at 85 checks,
+> incl. 6 new goldens). **D3 re-bless PASSED on the real statewide pair:**
+> ~2.79M cells cell-for-cell IDENTICAL before(v0.18.4)/after, canary unchanged
+> at **163,310 diff cells / 677 one-sided**; the F1 rollup rework cut the
+> statewide compare **238s -> 168s (-30%)** at byte-identical output. gh-pages
+> polish + fresh v0.18.5 screenshots committed on the local `gh-pages` branch
+> (worktree). **HUMAN-GATED remainder:** merge -> tag `v0.18.5` -> push (branch,
+> tag, gh-pages), watch release.yml's new offline-checks gate, then the work-PC
+> ride-alongs (in-app update 0.18.4->0.18.5; operational sign-off with
+> `--collect-evidence`; observe the twin-skip log line, the soft-busy message,
+> and the TSN auto-rebuild announcement). Part 2 (v0.19.0 structure) starts on
+> `refactor/v0.19.0-structure` off the tag.
 
 **Source:** [`docs/planning/fable5-repo-improvement-audit.md`](../fable5-repo-improvement-audit.md)
 (the 2026-07-01 audit; finding IDs refer to it). **Baseline:** `main` @ `0fa1cd5` (v0.18.4).
