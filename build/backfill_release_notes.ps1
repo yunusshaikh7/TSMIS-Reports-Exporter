@@ -30,6 +30,12 @@ foreach ($tag in $versions) {
     $tmp = New-TemporaryFile
     try {
         python build\gen_release_notes.py $tag -o $tmp.FullName
+        # $ErrorActionPreference = "Stop" does NOT stop on a native command's
+        # nonzero exit in PS 5.1 -- without this check a generation failure
+        # would blank the release's notes.
+        if ($LASTEXITCODE -ne 0) {
+            throw "gen_release_notes.py failed for $tag (exit $LASTEXITCODE); notes NOT updated."
+        }
         if ($PSCmdlet.ShouldProcess($tag, "update release notes")) {
             gh release edit $tag --notes-file $tmp.FullName
             Write-Host "  updated $tag"

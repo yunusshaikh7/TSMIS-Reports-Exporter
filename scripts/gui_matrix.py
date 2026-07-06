@@ -545,7 +545,6 @@ class GuiMatrixMixin:
     def set_matrix_row_mode(self, row_key, mode_id):
         """Set one report row's comparison mode (the dropdown under its name).
         Validated against that row's available, SUPPORTED modes."""
-        dest = settings.get_batch_dest()
         snap = self._matrix_snapshot(self._current_baseline())
         avail = {m["id"]: m for m in snap.get("row_modes", {}).get(row_key, [])}
         if not avail:

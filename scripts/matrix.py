@@ -39,7 +39,7 @@ BASELINE_DEFAULT = "ssor-prod"
 COMPARISONS_DIRNAME = "comparisons"
 _RESULTS_FILE = "_results.json"
 _NEQ = " ≠ "                       # the compare_core diff marker (read-only here)
-_MTIME_TOL_S = 1.0                 # float-mtime equality tolerance for the cache
+_MTIME_TOL_S = consolidation_meta._MTIME_TOL_S   # single home: the sidecar layer owns the tolerance
 
 
 # --------------------------------------------------------------------------- #

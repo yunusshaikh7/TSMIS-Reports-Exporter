@@ -100,7 +100,15 @@ def _load_tsn(path):
     path = Path(path)
     name = path.name
     if path.suffix.lower() == ".pdf":
-        return parse_tsn_pdf(path)
+        # The loader contract is ValueError-on-unreadable (run_files_compare
+        # catches exactly that); a corrupt PDF must not escape as a raw
+        # pdfplumber exception.
+        try:
+            return parse_tsn_pdf(path)
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Could not read {name}: {type(e).__name__}: {e}")
     # normalized library workbook: a Category|Count sheet keyed on the compare key.
     try:
         wb = load_workbook(path, read_only=True, data_only=True)

@@ -300,7 +300,7 @@ def set_site_url(src, env, url):
     else:
         data.pop("site_urls", None)
     _atomic_write(data)
-    log.info("settings: site url %s -> %s", key, url or "(default)")
+    log.info("settings: site url %s %s", key, "set" if url else "reset to default")
     return all_site_urls()
 
 
@@ -331,7 +331,7 @@ def set_batch_dest(path):
     else:
         data.pop("batch_dest", None)
     _atomic_write(data)
-    log.info("settings: batch_dest -> %s", path or "(default)")
+    log.info("settings: batch_dest %s", "set" if path else "reset to default")
     return get_batch_dest()
 
 

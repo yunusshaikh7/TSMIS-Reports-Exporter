@@ -61,8 +61,10 @@ def _enable_faulthandler():
     try:
         _crash_file_handle = open(CRASH_FILE, "a", encoding="utf-8")
         faulthandler.enable(file=_crash_file_handle, all_threads=True)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.getLogger("tsmis").info(
+            "faulthandler disabled: crash.log unavailable (%s: %s)",
+            type(e).__name__, e)
 
 
 def _log_banner(log):

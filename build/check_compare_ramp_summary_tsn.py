@@ -173,10 +173,28 @@ def test_end_to_end():
     print(f"      (both={both}, TSMIS-only={tsmis_only}, diffs={ndiff})")
 
 
+def test_corrupt_pdf_is_valueerror():
+    """A corrupt/truncated statewide PDF must honor the loader contract:
+    ValueError (run_files_compare reports it cleanly), never a raw pdfplumber
+    exception escaping into the matrix path."""
+    import tempfile
+    bad = Path(tempfile.mkdtemp()) / "TSN statewide.pdf"
+    bad.write_bytes(b"%PDF-1.4 not really a pdf, just junk bytes with no xref")
+    try:
+        cmp._load_tsn(bad)
+        check("corrupt PDF raises", False)
+    except ValueError as e:
+        check("corrupt PDF -> ValueError (loader contract)", True)
+        check("...message names the file", "TSN statewide.pdf" in str(e))
+    except Exception as e:  # noqa: BLE001 — the point of the test
+        check(f"corrupt PDF -> ValueError, not {type(e).__name__}", False)
+
+
 def main():
     test_schema_and_categories()
     test_tsmis_loader_sums()
     test_end_to_end()
+    test_corrupt_pdf_is_valueerror()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

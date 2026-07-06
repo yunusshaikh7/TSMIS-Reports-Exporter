@@ -149,7 +149,14 @@ def _load_tsn(path):
     Category|Count workbook."""
     path = Path(path)
     if path.suffix.lower() == ".pdf":
-        return parse_tsn_pdf(path)
+        # ValueError-on-unreadable, like the XLSX branch below (the shared
+        # comparator catches ValueError and reports it cleanly).
+        try:
+            return parse_tsn_pdf(path)
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Could not read {path.name}: {type(e).__name__}: {e}")
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
     except Exception as e:

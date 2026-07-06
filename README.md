@@ -2,7 +2,7 @@
 
 > Bulk-export Caltrans TSMIS reports for every California state route — from a single click.
 
-[![Version](https://img.shields.io/badge/version-0.18.0-blue)](version.py)
+[![Version](https://img.shields.io/github/v/release/yunusshaikh7/TSMIS-Reports-Exporter?label=version&color=blue)](https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](#)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](#)
 [![Automation](https://img.shields.io/badge/automation-Playwright-2EAD33?logo=microsoftedge&logoColor=white)](#)

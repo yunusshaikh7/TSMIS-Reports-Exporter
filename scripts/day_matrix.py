@@ -156,13 +156,17 @@ def _folder_newest_mtime(p):
     """Newest non-temp file mtime in a folder, or None when empty/absent."""
     newest = None
     try:
-        for e in Path(p).iterdir():
+        entries = list(Path(p).iterdir())
+    except OSError:
+        return None
+    for e in entries:
+        try:
             if e.is_file() and not e.name.startswith("~$"):
                 m = e.stat().st_mtime
                 if newest is None or m > newest:
                     newest = m
-    except OSError:
-        pass
+        except OSError:
+            continue          # a locked/vanished entry contributes nothing
     return newest
 
 

@@ -111,3 +111,10 @@ spike/
 # tracked docs/code-review-prompt.md; per-run reports quote code +
 # internal detail, so they stay local (never committed).
 /code-review/
+
+# A corrupt config.json is preserved next to the original for recovery; the
+# evidence bundle lands in DATA_ROOT (dev: the repo root). Both can carry user
+# paths/URLs -- never committable.
+/config.json.corrupt
+/data/config.json.corrupt
+/tsmis_evidence_*.zip

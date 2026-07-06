@@ -36,7 +36,7 @@ import outcome
 log = logging.getLogger("tsmis.consolidation_meta")
 
 SCHEMA_VERSION = 1
-_MTIME_TOL_S = 1.0                 # match matrix's float-mtime equality tolerance
+_MTIME_TOL_S = 1.0                 # THE float-mtime equality tolerance (matrix imports this)
 
 
 def meta_path(consolidated):

@@ -32,7 +32,7 @@ def _writable(directory: Path) -> bool:
     """True if we can create a file in `directory` (creating it if needed)."""
     try:
         directory.mkdir(parents=True, exist_ok=True)
-        probe = directory / ".write_test"
+        probe = directory / f".write_test-{os.getpid()}"   # pid-unique: concurrent launches must not race
         probe.write_text("ok", encoding="utf-8")
         probe.unlink()
         return True

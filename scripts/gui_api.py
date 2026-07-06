@@ -65,9 +65,10 @@ from reports import (COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPORTS, CONSOLIDATE_
                      CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_REPORTS, PICKER_ORDER,
                      compare_index_for_key, consolidate_index_for_key,
                      enabled_export_reports, export_reports_status,
-                     is_export_disabled, resolve_export_keys)
+                     resolve_export_keys)
 import artifact_store
 import outcome
+from gui_endpoint import _api_method      # the shared js_api decorator
 import contract
 import gui_win32
 from task_coordinator import TaskCoordinator
@@ -128,8 +129,6 @@ def _ui_index_path():
         return Path(base) / "ui" / "index.html"
     return Path(__file__).resolve().parent / "ui" / "index.html"
 
-
-from gui_endpoint import _api_method      # the shared js_api decorator (P7c cycle-break)
 
 
 def _report_list_payload():
@@ -642,7 +641,7 @@ class GuiApi(GuiMatrixMixin):
         key, status, text = payload
         with self._lock:
             if key in self._checks:
-                self._checks[key] = {"status": "ok" if status == "ok" else status, "text": text}
+                self._checks[key] = {"status": status, "text": text}
         self._push_state()
 
     def _on_cancelled(self, payload):

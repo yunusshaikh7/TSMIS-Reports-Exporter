@@ -507,7 +507,7 @@ def build_combined_sheet(wb, records, col_letters):
     last_data_row = max(3, 2 + n_routes)
 
     # --- styles (match the uploaded template) ---
-    thin = Side(style="thin", color="BFBFBFBF")
+    thin = Side(style="thin", color="BFBFBF")
     box_border = Border(left=thin, right=thin, top=thin, bottom=thin)
     section_border = Border(left=thin, top=thin, bottom=thin)
     section_fill = PatternFill("solid", start_color="0070C0")

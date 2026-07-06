@@ -56,7 +56,36 @@ def _raises(fn):
         return True
 
 
+def test_newest_mtime_survives_a_bad_entry():
+    """One transiently-locked/vanished file must not abort the whole mtime fold
+    (it used to mark the day's export 'not present'). Simulated by swapping
+    day_matrix.Path for a stub whose second entry raises OSError on stat."""
+    good = Path(tempfile.mkdtemp(prefix="tsmis_day_mt_")) / "r001.xlsx"
+    _touch(good)
+
+    class _BadEntry:
+        name = "r002.xlsx"
+        def is_file(self):
+            raise OSError("locked / vanished mid-scan")
+
+    class _FakeDir:
+        def __init__(self, _p):
+            pass
+        def iterdir(self):
+            return [good, _BadEntry()]
+
+    saved = day_matrix.Path
+    day_matrix.Path = _FakeDir
+    try:
+        got = day_matrix._folder_newest_mtime("ignored")
+    finally:
+        day_matrix.Path = saved
+    check("a locked entry doesn't abort the fold (good file's mtime returned)",
+          got == good.stat().st_mtime)
+
+
 def main():
+    test_newest_mtime_survives_a_bad_entry()
     out = Path(tempfile.mkdtemp(prefix="tsmis_day_out_"))
     dest = Path(tempfile.mkdtemp(prefix="tsmis_day_dest_"))
     cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_day_cfg_"))

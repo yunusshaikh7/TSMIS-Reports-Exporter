@@ -46,6 +46,12 @@ if ($RecreateVenv -and (Test-Path $VenvDir)) {
 }
 if (-not (Test-Path $VenvPy)) {
     Write-Host "==> Creating build venv"
+    # The hash lock is Windows + CPython 3.11 ONLY -- venv-ing whatever python is
+    # on PATH would fail later (or worse, build from unpinned wheels). Fail here.
+    $pyVer = & python --version
+    if ("$pyVer" -notmatch "^Python 3\.11\.") {
+        throw "Build requires CPython 3.11 on PATH (found '$pyVer'); requirements-build.lock.txt is 3.11-only."
+    }
     python -m venv $VenvDir; Assert-LastExit "venv creation"
 }
 Write-Host "==> Checking dependency integrity (version.py <-> requirements <-> lock parity)"
