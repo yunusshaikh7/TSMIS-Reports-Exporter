@@ -267,9 +267,10 @@ logic, fast mode, and packaging — see [`CLAUDE.md`](CLAUDE.md) and the
 
 ## Contributing
 
-Issues and pull requests are welcome. Before contributing, please read
-[`CLAUDE.md`](CLAUDE.md) — it documents the architecture and the conventions that
-keep the codebase maintainable, notably:
+Issues and pull requests are welcome. Start with
+[`CONTRIBUTING.md`](CONTRIBUTING.md) (setup, the one-command check suite, the
+three rules people trip on), then [`CLAUDE.md`](CLAUDE.md) — it documents the
+architecture and the conventions that keep the codebase maintainable, notably:
 
 - The core engine is **console-free** — report progress via the `Events` sink and
   raise exceptions; never `print`/`input`/`sys.exit` in core modules.

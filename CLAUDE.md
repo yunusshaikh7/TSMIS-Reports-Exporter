@@ -171,6 +171,8 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   compare_core.py            the regression-locked comparison-workbook engine
   compare_tsn_common.py      the shared vs-TSN file-comparator substrate (P5b)
   compare_env.py compare_highway_log*.py compare_*_tsn.py   the comparison families over compare_core
+  matrix.py day_matrix.py summary_layout.py   the Everything/by-day matrix engines + the familiar summary sheet
+  tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
   highway_log_columns.py intersection_detail_columns.py   the corrected per-report column labels
   gui_main.py gui_api.py gui_worker.py   GUI entry / js_api bridge / worker threads
   task_coordinator.py contract.py        GUI task-state owner / Python⇄JS bridge enum SSOT

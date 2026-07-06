@@ -1,0 +1,16 @@
+# Tooling config only — the app is not a package (it ships as a PyInstaller
+# onefolder; see build/). This file exists so local `ruff check .` matches CI
+# exactly (the rule set used to live only inline in checks.yml, scripts/ only).
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["build/.venv", "build/pyi-work", "dist", "code-review"]
+
+[tool.ruff.lint]
+# The CI-blocking* set: real-error rules only (syntax errors, invalid prints,
+# undefined names in comprehensions/f-strings, unused-import-adjacent errors).
+# *advisory in checks.yml today — never blocks a push — but identical locally.
+# F821 (undefined names everywhere) joins the list once the function-local
+# import cleanup lands (Part 2 / ARC-01): today's deliberate lazy-import idiom
+# would false-positive it.
+select = ["E9", "F63", "F7", "F82"]

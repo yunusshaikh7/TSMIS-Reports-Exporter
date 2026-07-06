@@ -43,8 +43,16 @@ can run off the work PC; the top rung is owed work (see
 
 ## Golden `check_*.py` catalog
 
-Plain runnable guards (no login). Run them with the build venv interpreter after
-any Python edit:
+Plain runnable guards (no login). **Run the whole suite with one command** (the
+same globbed set CI runs; `check_ci_manifest.py` guards the workflow list against
+drift, so the glob IS the canonical list):
+
+```
+build\.venv\Scripts\python.exe buildun_checks.py           # stop on first failure
+build\.venv\Scripts\python.exe buildun_checks.py -j 4 -k   # parallel, keep going
+```
+
+One check at a time (e.g. while iterating on it):
 
 ```
 build\.venv\Scripts\python.exe build\check_<name>.py

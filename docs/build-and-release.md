@@ -493,6 +493,25 @@ own regeneration tooling (`tools/screenshots.py`). Full detail: [website.md](web
 
 ---
 
+## CI: three workflows
+
+CI is **three** workflows, not two:
+
+- **`checks.yml`** — the fast blocking gate below, every push/PR.
+- **`release.yml`** — tag-triggered; builds + gates the three variants. Since
+  v0.18.5 it FIRST re-runs the whole offline suite in an `offline-checks` job
+  (`python build/run_checks.py -j 4`) that the build job `needs:` — a tag on a
+  red suite can no longer produce artifacts (the v0.17.3 gate gap).
+- **`frozen-gate.yml`** — the slow exact-artifact packaging tripwire: builds the
+  real frozen exe for each windowed variant and runs THAT exe's `--self-test`
+  over the pruned bundle, plus the source-ZIP console smoke. Heavy, so it runs
+  nightly (~07:00 UTC), on `workflow_dispatch`, or when a PR carries the
+  `frozen-gate` label — NOT on every push.
+
+The check LIST lives in exactly one place — the `build/check_*.{py,js}` glob:
+`build/run_checks.py` runs it locally, and `check_ci_manifest.py` fails the
+build if checks.yml ever misses a check on disk (or lists a deleted one).
+
 ## CI: `checks.yml` — golden regression gate
 
 `.github/workflows/checks.yml` runs on every push/PR (separate from the release
