@@ -29,7 +29,36 @@ permissions:
   contents: write
 
 jobs:
+  # The offline regression suite gates every release (v0.17.3 lesson: checks.yml
+  # runs on push but a tag never WAITED on it, so a red suite could ship). This
+  # job re-runs the full blocking suite via build/run_checks.py — the same
+  # globbed set check_ci_manifest.py pins to checks.yml — and the build job
+  # `needs` it, so a tag on a red suite cannot produce artifacts.
+  offline-checks:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONIOENCODING: utf-8            # the " ≠ " diff marker vs cp1252 stdout
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install runtime deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Install Chromium for the fake-site selector tests
+        # Best-effort, mirroring checks.yml: check_fake_site falls back to the
+        # runner's system Edge and skips cleanly if no browser is drivable.
+        continue-on-error: true
+        run: python -m playwright install chromium
+      - name: Run the full offline check suite
+        run: python build/run_checks.py -j 4
+
   build-and-release:
+    needs: offline-checks
     runs-on: windows-latest
     timeout-minutes: 90
     env:
