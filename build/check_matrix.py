@@ -167,6 +167,30 @@ def test_staleness():
         miss = state(None, t - 100)
         check("baseline side absent -> missing_side baseline",
               miss["missing_side"] == "baseline")
+
+        # P1-R01 parity: a trusted record's producer COMPLETION surfaces in the
+        # env-mode snapshot too (it used to be dropped here while the TSN-mode
+        # _cmp_state carried it — a PARTIAL-input cell rendered as full green).
+        cmp_p.write_bytes(b"PK")
+        os.utime(cmp_p, (t, t))
+        rec = {"ramp_detail": {"ars-prod": {
+            "verdict": "diffs", "diff_cells": 3, "one_sided": 0,
+            "built_at_mtime": t, "completion": "partial"}}}
+        got = matrix.comparison_state(dest, "ssor-prod", "ramp_detail",
+                                      "ars-prod", sub,
+                                      {"ssor-prod": {sub: {"mtime": t - 100}},
+                                       "ars-prod": {sub: {"mtime": t - 100}}}, rec)
+        check("trusted record's completion surfaces (partial)",
+              got["completion"] == "partial" and got["verdict"] == "diffs")
+        stale_rec = {"ramp_detail": {"ars-prod": {
+            "verdict": "diffs", "diff_cells": 3, "one_sided": 0,
+            "built_at_mtime": t - 999, "completion": "partial"}}}
+        got2 = matrix.comparison_state(dest, "ssor-prod", "ramp_detail",
+                                       "ars-prod", sub,
+                                       {"ssor-prod": {sub: {"mtime": t - 100}},
+                                        "ars-prod": {sub: {"mtime": t - 100}}}, stale_rec)
+        check("untrusted record -> completion stays None (unknown, not green)",
+              got2["completion"] is None)
     finally:
         shutil.rmtree(dest, ignore_errors=True)
 

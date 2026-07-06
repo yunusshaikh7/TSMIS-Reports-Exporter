@@ -264,7 +264,7 @@ def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
         cmp_m = None
     built = cmp_m is not None
 
-    verdict = diff_cells = one_sided = None
+    verdict = diff_cells = one_sided = completion = None
     rec = (results.get(row_key, {}) or {}).get(cell_key)
     rec_trusted = bool(built and rec
                        and abs(float(rec.get("built_at_mtime", -1)) - cmp_m) < _MTIME_TOL_S)
@@ -272,6 +272,10 @@ def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
         verdict = rec.get("verdict")
         diff_cells = rec.get("diff_cells")
         one_sided = rec.get("one_sided")
+        # P1-R01 parity with _cmp_state: record_result persists the producer
+        # completion, and the env-mode snapshot must surface it too — a cell
+        # built from PARTIAL inputs may not render as a full green match.
+        completion = rec.get("completion", outcome.COMPLETE)
 
     if not built:
         stale, reason = True, "missing"
@@ -291,7 +295,8 @@ def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
             stale, reason = False, "fresh"
     return {"supported": True, "built": built, "mtime": cmp_m, "stale": stale,
             "reason": reason, "missing_side": missing_side, "verdict": verdict,
-            "diff_cells": diff_cells, "one_sided": one_sided}
+            "diff_cells": diff_cells, "one_sided": one_sided,
+            "completion": completion}
 
 
 # --------------------------------------------------------------------------- #
