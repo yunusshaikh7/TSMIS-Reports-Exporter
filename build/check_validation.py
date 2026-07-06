@@ -153,6 +153,27 @@ def test_degrades_on_family_error():
           cell["status"] == "error" and "RuntimeError" in cell["message"])
     check("totals count the failure", man["totals"]["comparisons_failed"] == 1)
 
+    # An error MESSAGE is copied into the bundle — it must stay credential-safe
+    # (RM05: paths/names are allowed; auth tokens / cookies / report data are not).
+    def boom_creds(*a, **k):
+        raise RuntimeError("could not read C:\\Users\\bob\\r.xlsx; "
+                           "access_token=SECRETXYZ cookie=SID=abc123")
+    with _Patch(_matrix, "build_comparison", boom_creds), \
+         _Patch(_settings, "get_batch_dest", lambda: str(dest)), \
+         _Patch(_settings, "get_matrix_baseline", lambda: "ssor-prod"), \
+         _Patch(_reports, "matrix_rows",
+                lambda: [("highway_log", "Highway Log", "highway_log", 0, object())]), \
+         _Patch(_tsn, "is_registered", lambda r: True), \
+         _Patch(_tsn, "resolve", lambda r: {"kind": "consolidated"}), \
+         _Patch(_tsn, "reports", lambda: []):
+        man2 = validation.run_validation(events=Events())
+    blob = (json.dumps(man2) + "\n".join(validation.summary_lines(man2))).lower()
+    check("error-message credential VALUES are redacted from the manifest",
+          "secretxyz" not in blob and "abc123" not in blob and "[redacted]" in blob,
+          "an error message leaked a token/cookie value into the credential-safe bundle")
+    check("the harmless path in the same message is preserved (RM05: paths OK)",
+          "r.xlsx" in blob)
+
 
 def test_evidence_carries_manifest():
     print("evidence.collect ships validation.txt + validation.json:")

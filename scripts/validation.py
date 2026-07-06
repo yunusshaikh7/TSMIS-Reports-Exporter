@@ -27,6 +27,7 @@ should_cancel poll cancels BETWEEN cells and the events sink's is_cancelled
 """
 import logging
 import platform
+import re
 import time
 from pathlib import Path
 
@@ -43,6 +44,25 @@ log = logging.getLogger("tsmis.validation")
 
 # The vs-TSN mode id every registered comparison row is validated through.
 _TSN_MODE = "tsn"
+
+# Credential-like fragments scrubbed from any error message before it enters the
+# shipped bundle (RM05: paths/names are allowed; tokens/cookies/URL-hash tokens
+# are not). Defense-in-depth — comparison errors are "could not read/save X"
+# today, but a message is copied verbatim, so redact the moment one ever isn't.
+_CRED_RE = re.compile(
+    r"(?i)(access_token|token|cookie|sid|authorization|password|pwd|secret|bearer)"
+    r"\s*[=:]\s*\S+")
+_HASH_TOKEN_RE = re.compile(r"#\S{16,}")           # a token-in-URL-hash fragment
+
+
+def _scrub(msg):
+    """Redact credential-like fragments from a user/error message."""
+    if not msg:
+        return msg
+    msg = _CRED_RE.sub(r"\1=[redacted]", msg)
+    return _HASH_TOKEN_RE.sub("#[redacted]", msg)
+
+
 # tsn_library.resolve kinds that mean "TSN data is present for this report".
 _TSN_PRESENT_KINDS = ("consolidated", "file", "pdfs", "raw")
 
@@ -141,15 +161,15 @@ def _run_one(dest, row_key, env, baseline, events):
             if diff_cells is None:
                 rec["counts_unreadable"] = True
         elif res.status != "ok":
-            rec["message"] = (res.message or "").splitlines()[0][:200]
+            rec["message"] = _scrub((res.message or "").splitlines()[0][:200])
     except ValueError as e:
         rec["status"] = "error"
-        rec["message"] = str(e).splitlines()[0][:200]
+        rec["message"] = _scrub(str(e).splitlines()[0][:200])
     except Exception as e:  # noqa: BLE001 — one family must not sink the run
         log.warning("validation: %s/%s raised (%s: %s)", row_key, env,
                     type(e).__name__, e)
         rec["status"] = "error"
-        rec["message"] = f"{type(e).__name__}: {str(e).splitlines()[0][:160]}"
+        rec["message"] = _scrub(f"{type(e).__name__}: {str(e).splitlines()[0][:160]}")
     rec["seconds"] = round(time.monotonic() - t0, 1)
     return rec
 

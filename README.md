@@ -69,6 +69,9 @@ of `.bat` scripts for development and as a fallback.
   (Excel)** — the PDF-sourced ones sidestep the vendor Excel export's bug.
 - **Run reports.** Every run records a per-route outcome CSV (saved / empty /
   skipped / failed).
+- **One-click validation.** Settings ▸ *Validate & package results* runs every
+  report already on this PC through the real comparison pipeline and saves the
+  outcomes, TSN freshness, and logs into one credential-safe file for support.
 - **Optional fast mode.** Run several browsers in parallel for a 2.5–3×+ speedup.
 - **Browser, your way.** The standard download uses the machine's installed
   Edge/Chrome, keeping it small (~148 MB); the with-browser download adds a
