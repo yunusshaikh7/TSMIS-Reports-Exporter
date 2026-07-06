@@ -62,6 +62,9 @@
     }
 
     * { box-sizing: border-box; transition: background-color .35s ease, border-color .35s ease, color .35s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
+    }
     html, body { height: 100%; }
     body {
       margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
@@ -183,7 +186,7 @@
         <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter/blob/main/CHANGELOG.md">Changelog</a>
         <a href="https://github.com/yunusshaikh7/TSMIS-Reports-Exporter">GitHub</a>
       </nav>
-      <button class="theme-btn" id="themeBtn" type="button" aria-label="Toggle theme"></button>
+      <button class="theme-btn" id="themeBtn" type="button" aria-label="Theme: system"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></button>
     </div>
   </header>
 
@@ -263,7 +266,12 @@
           var a = (rel.assets || []).find(function (x) { return /-win64\.zip$/.test(x.name); });
           if (a) document.getElementById("dl").href = a.browser_download_url;
           if (rel.tag_name) {
-            document.getElementById("ver").innerHTML = "Latest release: <b>" + rel.tag_name + "</b>";
+            // textContent, not innerHTML: the tag comes from the API response
+            var ver = document.getElementById("ver");
+            ver.textContent = "Latest release: ";
+            var b = document.createElement("b");
+            b.textContent = rel.tag_name;
+            ver.appendChild(b);
           }
         })
         .catch(function () { /* keep the releases-page fallback */ });
