@@ -21,6 +21,7 @@ unknown keys survive round-trips, and writes go through a temp file so a
 crash mid-write can't leave half a JSON file.
 """
 import json
+from pathlib import Path
 import logging
 import os
 import tempfile
@@ -323,8 +324,33 @@ def get_batch_dest():
 
 def set_batch_dest(path):
     """Save (or, with an empty path, reset to default) the Export-Everything
-    destination. Returns the new effective destination."""
+    destination. Returns the new effective destination.
+
+    SEC-06 (v0.19.0): the destination is validated AT THE BOUNDARY — it must be
+    an existing, writable local directory. Device paths (`\.\`, CON/NUL-style
+    names) are rejected outright; UNC shares are rejected because the store
+    swap/ownership machinery assumes one local volume (atomic os.replace).
+    Raises ValueError with a user-safe message."""
     path = (path or "").strip()
+    if path:
+        norm = path.replace("/", "\\")
+        if norm.startswith("\\\\"):
+            raise ValueError("Network (UNC) paths can't be the Export Everything "
+                             "destination — pick a folder on this PC.")
+        base = Path(path).name.split(".")[0].upper()
+        if base in ("CON", "PRN", "AUX", "NUL") or base.startswith(("COM", "LPT")) and base[3:].isdigit():
+            raise ValueError("That name is reserved by Windows — pick a normal folder.")
+        p = Path(path)
+        if not p.is_dir():
+            raise ValueError("That folder doesn't exist — create it first, then "
+                             "pick it again.")
+        probe = p / ".tsmis_write_test"
+        try:
+            probe.write_text("", encoding="ascii")
+            probe.unlink()
+        except OSError:
+            raise ValueError("That folder isn't writable — pick one you can "
+                             "save files into.")
     data = dict(_read_file())
     if path:
         data["batch_dest"] = path

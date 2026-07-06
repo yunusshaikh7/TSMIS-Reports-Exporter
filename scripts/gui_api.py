@@ -339,6 +339,14 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         self._emit({"t": "modal", "kind": kind, "title": title, "message": message})
 
     def _state_snapshot(self):
+        # PRF-02 (v0.19.0): every filesystem read (the output-days listing, the
+        # settings json) happens OUTSIDE the lock — a slow/AV-scanned disk must
+        # not stall every thread touching the task gate while a snapshot builds.
+        days = list_output_days()
+        matrix_fast = {"on": settings.get_matrix_fast(),
+                       "workers": settings.get("fast_workers")}
+        matrix_formulas = settings.get_matrix_formulas()
+        day_matrix_formulas = settings.get_day_matrix_formulas()
         with self._lock:
             return {
                 "task": self._task,
@@ -353,7 +361,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
                 "login_label": "Re-login" if self._authed else "Log in",
                 "checks": {k: dict(v) for k, v in self._checks.items()},
                 "checks_running": self._checks_running,
-                "days": list_output_days(),
+                "days": days,
                 "can_save_report": bool(self._last_results),
                 "last_summary": self._last_summary,
                 "batch": self._batch,
@@ -362,10 +370,9 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
                 "matrix_queue": [self._job_view(j) for j in self._queue],
                 "matrix_current": (self._job_view(self._current_job)
                                    if self._current_job else None),
-                "matrix_fast": {"on": settings.get_matrix_fast(),
-                                "workers": settings.get("fast_workers")},
-                "matrix_formulas": settings.get_matrix_formulas(),
-                "day_matrix_formulas": settings.get_day_matrix_formulas(),
+                "matrix_fast": matrix_fast,
+                "matrix_formulas": matrix_formulas,
+                "day_matrix_formulas": day_matrix_formulas,
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},
                 "logins": self._login_states(),

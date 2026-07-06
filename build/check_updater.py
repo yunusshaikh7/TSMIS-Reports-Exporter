@@ -200,6 +200,14 @@ def _make_tree(base, exe_bytes, internal_bytes, extras=None):
         (base / name).write_bytes(data)
 
 
+def _bless(staged):
+    """Write the staged trust record for a fake tree — SEC-05 makes perform_swap
+    re-verify the bundle digest pre-install, so a test tree must carry the same
+    record download_and_stage writes."""
+    (staged.parent / "staged.sha256").write_text(
+        updater._bundle_digest(staged), encoding="ascii")
+
+
 def test_staged_allowlist(monkeypatch_wait):
     print("swap staged-items allowlist (fake trees):")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_upd_"))
@@ -213,6 +221,7 @@ def test_staged_allowlist(monkeypatch_wait):
     _make_tree(staged, b"NEW-EXE", b"NEW-DLL", extras={"evil.dll": b"PWN"})
 
     monkeypatch_wait(lambda pid, t: True)       # pretend the old app already exited
+    _bless(staged)
     ok = updater.perform_swap(staged, app, pid=1, log_file=log,
                               relaunch=False, show_dialog=False)
     check("swap reported success", ok)
@@ -402,6 +411,7 @@ def test_missing_exe_aborts(monkeypatch_wait):
     staged.mkdir(parents=True)
     (staged / "_internal").mkdir()              # staged tree with NO exe
     monkeypatch_wait(lambda pid, t: True)
+    _bless(staged)
     ok = updater.perform_swap(staged, app, pid=1, log_file=log,
                               relaunch=False, show_dialog=False)
     check("swap refused (missing exe)", ok is False)
@@ -552,6 +562,7 @@ def test_interrupted_swap_recovery(monkeypatch_wait):
         _make_tree(app, b"OLD-EXE", b"OLD-DLL")
         _make_tree(staged, b"NEW-EXE", b"NEW-DLL")
         monkeypatch_wait(lambda pid, t: True)
+        _bless(staged)
         ok = updater.perform_swap(staged, app, pid=1, log_file=tmp / "s1.log",
                                   relaunch=False, show_dialog=False)
         check("orderly swap succeeds", ok)
@@ -938,6 +949,7 @@ def test_rollback_message_reflects_outcome(monkeypatch_wait):
     updater._swap_log = spy_log
     updater._retry = boom_retry
     try:
+        _bless(staged)
         ok = updater.perform_swap(staged, app, pid=1, log_file=log,
                                   relaunch=False, show_dialog=True)
         check("the swap reported failure", ok is False)

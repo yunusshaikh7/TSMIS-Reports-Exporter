@@ -35,9 +35,21 @@ def test_batch_dest_setting():
     settings._cache, settings._cache_mtime = None, None
     try:
         check("unset -> default", settings.get_batch_dest() == settings.default_batch_dest())
-        settings.set_batch_dest(r"D:\My Reports")
-        check("set persists", settings.get_batch_dest() == r"D:\My Reports")
-        check("survives a fresh read", settings.get_batch_dest() == r"D:\My Reports")
+        # SEC-06 (v0.19.0): the destination is validated at the boundary — it
+        # must be an existing writable local dir; UNC/device paths are rejected.
+        real = tmp / "My Reports"
+        real.mkdir()
+        settings.set_batch_dest(str(real))
+        check("set persists", settings.get_batch_dest() == str(real))
+        check("survives a fresh read", settings.get_batch_dest() == str(real))
+        for bad in (str(tmp / "does-not-exist"), "\\\\server\\share", "NUL"):
+            try:
+                settings.set_batch_dest(bad)
+                check(f"SEC-06 rejects {bad!r}", False)
+            except ValueError:
+                check(f"SEC-06 rejects an invalid destination ({bad[:12]}...)", True)
+        check("a rejected set leaves the stored value untouched",
+              settings.get_batch_dest() == str(real))
         settings.set_batch_dest("")
         check("empty -> back to default",
               settings.get_batch_dest() == settings.default_batch_dest())

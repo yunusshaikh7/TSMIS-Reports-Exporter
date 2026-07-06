@@ -80,7 +80,8 @@ def test_settings_dedup_and_atomicity():
         with _patch(settings, "_atomic_write", _rec):
             settings.update({"fast_workers": 7})
             settings.set_site_url("ssor", "prod", _VALID_URL)
-            settings.set_batch_dest("C:/Out")
+            out1 = tempfile.mkdtemp(prefix="tsmis_out1_")
+            settings.set_batch_dest(out1)
             settings.set_matrix_baseline("ars-test")
         check("update + set_site_url + set_batch_dest + set_matrix_baseline all call _atomic_write",
               len(calls) == 4)
@@ -89,13 +90,14 @@ def test_settings_dedup_and_atomicity():
         settings._cache = settings._cache_mtime = None
         settings.update({"debug_logging": True})
         settings.set_site_url("ssor", "prod", _VALID_URL)
-        settings.set_batch_dest("C:/Out2")
+        out2 = tempfile.mkdtemp(prefix="tsmis_out2_")
+        settings.set_batch_dest(out2)
         settings.set_matrix_baseline("ssor-prod")
         data = json.loads(settings.CONFIG_FILE.read_text(encoding="utf-8"))
         check("unknown keys survive all four writers (round-trip preserved)",
               data.get("unknown_future") == "KEEP")
         check("...and the writers' own values persisted",
-              data.get("debug_logging") is True and data.get("batch_dest") == "C:/Out2"
+              data.get("debug_logging") is True and data.get("batch_dest") == out2
               and data.get("matrix_baseline") == "ssor-prod" and "site_urls" in data)
         # atomic: a failed os.replace raises, leaves the prior config intact, no .tmp sibling
         before = settings.CONFIG_FILE.read_bytes()
@@ -103,7 +105,7 @@ def test_settings_dedup_and_atomicity():
         raised = False
         with _patch(settings.os, "replace", _boom):
             try:
-                settings.set_batch_dest("C:/ShouldNotLand")
+                settings.set_batch_dest(tempfile.mkdtemp(prefix="tsmis_noland_"))
             except OSError:
                 raised = True
         tmps = [p.name for p in settings.CONFIG_FILE.parent.iterdir() if p.suffix == ".tmp"]

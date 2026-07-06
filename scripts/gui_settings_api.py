@@ -52,6 +52,11 @@ class GuiSettingsMixin:
                 })
         return rows
 
+    _chromium_size_cache = None      # (downloaded, size_mb) — PRF-02; a full
+                                     # rglob over ~10k browser files costs ~0.5 s,
+                                     # and the answer only changes on download/
+                                     # delete (ChromiumWorker invalidates it).
+
     def _chromium_state(self):
         """What the Settings tab's Built-in Chromium section shows."""
         bundled = bool(BUNDLED_BROWSERS_DIR and BUNDLED_BROWSERS_DIR.is_dir())
@@ -61,10 +66,15 @@ class GuiSettingsMixin:
             if DOWNLOADED_BROWSERS_DIR.is_dir():
                 downloaded = any(DOWNLOADED_BROWSERS_DIR.glob("chromium-*"))
                 if downloaded:
-                    size_mb = round(sum(
-                        f.stat().st_size
-                        for f in DOWNLOADED_BROWSERS_DIR.rglob("*") if f.is_file()
-                    ) / 1e6)
+                    cached = type(self)._chromium_size_cache
+                    if cached is not None and cached[0] == downloaded:
+                        size_mb = cached[1]
+                    else:
+                        size_mb = round(sum(
+                            f.stat().st_size
+                            for f in DOWNLOADED_BROWSERS_DIR.rglob("*") if f.is_file()
+                        ) / 1e6)
+                        type(self)._chromium_size_cache = (downloaded, size_mb)
         except OSError as e:
             # best-effort sizing — the Settings panel still renders (downloaded may
             # read False / 0 MB); log so a recurring read failure is diagnosable (P7a).
@@ -212,6 +222,8 @@ class GuiSettingsMixin:
             "delete", "Removing the downloaded Built-in Chromium…")
 
     def _on_chromium_done(self, payload):
+        # PRF-02: a download/delete changed the browser tree — drop the size cache.
+        type(self)._chromium_size_cache = None
         if payload.get("cancelled"):
             self._emit_log("Built-in Chromium download cancelled.")
         elif not payload.get("ok"):

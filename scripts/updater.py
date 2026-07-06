@@ -960,6 +960,22 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
                             "update NOT applied")
         return False
 
+    # SEC-05 (v0.19.0): re-verify the staged bundle against the trust record ONE
+    # more time HERE, after the app exited and immediately before any file is
+    # installed — the tree sat in a user-writable folder for the whole pid-wait
+    # since the pre-launch verification. FAIL CLOSED: a missing/garbled record
+    # or any content change aborts with the old version intact.
+    expected = _staged_hash(staged)
+    if expected is None:
+        _swap_log(log_file, "staged trust record missing/garbled - update NOT applied")
+        return False
+    actual = _bundle_digest(staged)
+    if actual != expected:
+        _swap_log(log_file, f"staged bundle changed since download (expected "
+                            f"{expected[:12]}, got {actual[:12]}) - update NOT applied")
+        return False
+    _swap_log(log_file, f"staged bundle re-verified pre-install ({actual[:12]})")
+
     # ---- phase 1: copy everything in as *.new (old app untouched) ----------
     # Install ONLY the known bundle items (the same allowlist cleanup_leftovers
     # uses), never whatever else happens to sit in the staged tree -- a tampered
