@@ -65,20 +65,24 @@ def reset_targets(include_input=False, warnings=None):
             for child in sorted(bdest.iterdir()):
                 if not child.is_dir():
                     continue
-                # M03: prefer the ownership MARKER (proves the app created this dir,
-                # whatever its name); fall back to the legacy known <src-env> /
-                # "comparisons" NAMES for dirs created before the marker existed.
-                # Foreign files/dirs the user keeps alongside the store stay untouched.
+                # SEC-02 (v0.19.0): the ownership MARKER is now REQUIRED — it
+                # proves the app created this dir, whatever its name. The legacy
+                # name fallback (retired; it stamped-on-sight through v0.18.x) let
+                # a user folder that merely LOOKED like a store dir (e.g. their
+                # own 'ssor-prod') be deleted. An unmarked dir with a store-like
+                # name is now SURFACED as a warning and left untouched.
                 by_name = child.name in known or child.name == "comparisons"
-                if owned_dir.is_owned(child) or by_name:
-                    if by_name:
-                        # SEC-02 migration: stamp legacy dirs the moment the name
-                        # fallback recognizes one, so the fallback (which a user
-                        # folder named e.g. 'ssor-prod' could collide with) can be
-                        # RETIRED once installs have re-stamped. Best-effort.
-                        owned_dir.mark_owned(child)
+                if owned_dir.is_owned(child):
                     targets.append(
                         (f"Export Everything store: {child.name}", child))
+                elif by_name:
+                    log.warning("reset: %s looks like a store folder but has no "
+                                "ownership marker; leaving it untouched", child)
+                    if warnings is not None:
+                        warnings.append(
+                            f"'{child.name}' looks like a store folder but isn't "
+                            "marked as created by this app — left untouched "
+                            "(delete it manually if it is one)")
     except Exception as e:
         # The delete list is a PROMISE -- if the store can't be enumerated the
         # preview must say so, not silently omit it (the user would believe
@@ -97,6 +101,10 @@ def reset_targets(include_input=False, warnings=None):
         # The Export-Everything store's TSN drops (user-placed TSN datasets) are
         # inputs too, so they only clear with include_input (the generated TSN
         # comparison sheets under comparisons/tsn are covered by "comparisons").
+        # Deliberately NAME-based (unlike the store children above): the app never
+        # CREATES _tsn_input — the user drops files into it — so an ownership
+        # marker can't exist; the include_input gate + the preview line make this
+        # an explicit, visible choice.
         try:
             from settings import get_batch_dest
             tsn_in = Path(get_batch_dest()) / "_tsn_input"

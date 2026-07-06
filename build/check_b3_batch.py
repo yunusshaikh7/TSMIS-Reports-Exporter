@@ -151,9 +151,14 @@ def test_reset_scopes_batch_dest():
     import gui_worker
     import settings
     dest = Path(tempfile.mkdtemp(prefix="tsmis_store_"))
+    import owned_dir
     (dest / "ssor-prod" / "ramp_detail").mkdir(parents=True)   # app-owned
     (dest / "ars-test" / "consolidated").mkdir(parents=True)   # app-owned
     (dest / "comparisons" / "ssor-prod").mkdir(parents=True)   # app-owned (matrix)
+    # SEC-02 (v0.19.0): app-created children CARRY the ownership marker (the
+    # batch writer stamps them at creation); the name alone no longer qualifies.
+    for d in ("ssor-prod", "ars-test", "comparisons"):
+        owned_dir.mark_owned(dest / d)
     (dest / "My Personal Files").mkdir()                       # foreign — keep
     (dest / "important.txt").write_text("keep me", encoding="utf-8")  # foreign — keep
     saved = settings.get_batch_dest

@@ -97,11 +97,13 @@ def reset_targets_integration():
 
     store_names = {lbl.split(": ", 1)[1] for lbl, _p in targets
                    if lbl.startswith("Export Everything store:")}
-    check("known-named UNMARKED dir included (legacy name fallback)",
-          "ssor-prod" in store_names)
+    check("known-named UNMARKED dir EXCLUDED (SEC-02: the marker is required; "
+          "the legacy name fallback is retired)",
+          "ssor-prod" not in store_names)
     check("MARKED non-known-named dir included (marker is the deciding factor)",
           "my-custom-export" in store_names)
-    check("'comparisons' included (name)", "comparisons" in store_names)
+    check("UNMARKED 'comparisons' excluded too (marker required)",
+          "comparisons" not in store_names)
     check("UNMARKED foreign dir NOT included (user data preserved)",
           "user-data" not in store_names)
 

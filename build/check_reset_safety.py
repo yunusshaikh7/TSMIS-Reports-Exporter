@@ -87,30 +87,36 @@ def _shutil_rmtree_outcome(path):
     return ("raised" if raised else "completed"), Path(path).exists()
 
 
-def test_legacy_store_dir_gets_stamped():
-    """SEC-02 migration: the name fallback stamps legacy store dirs on sight, so
-    the fallback (which a user folder named 'ssor-prod' could collide with) can
-    be retired once installs have re-stamped."""
-    print("SEC-02 migration - legacy-named store dirs get the ownership marker:")
+def test_owned_marker_required():
+    """SEC-02 RETIRED (v0.19.0): the ownership marker is REQUIRED. A user folder
+    that merely LOOKS like a store dir ('ssor-prod') is never deleted — it is
+    surfaced as a warning and left unstamped; a marker-carrying dir is listed."""
+    print("SEC-02 retired - the ownership marker is required for store children:")
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
     import gui_worker
     import owned_dir
     import settings
     dest = Path(tempfile.mkdtemp(prefix="tsmis_reset_stamp_"))
-    legacy = dest / "ssor-prod"
-    legacy.mkdir()
+    foreign = dest / "ssor-prod"                 # the user's own folder
+    foreign.mkdir()
+    owned = dest / "ars-dev"                     # an app-created store child
+    owned.mkdir()
+    owned_dir.mark_owned(owned)
     saved = settings.get_batch_dest
     settings.get_batch_dest = lambda: str(dest)
     try:
         warns = []
         targets = gui_worker.reset_targets(warnings=warns)
         names = [lbl for lbl, _p in targets]
-        check("legacy-named dir listed via the name fallback",
-              any("ssor-prod" in n for n in names))
-        check("...and now carries the ownership marker (fallback retirable later)",
-              owned_dir.is_owned(legacy))
-        check("no enumeration warnings on the happy path", warns == [])
+        check("an UNMARKED store-named dir is NOT listed for deletion",
+              not any(n == "Export Everything store: ssor-prod" for n in names))
+        check("...and is NOT stamped on sight (no more mark-on-recognize)",
+              not owned_dir.is_owned(foreign))
+        check("...but IS surfaced as a warning (the preview names it)",
+              any("ssor-prod" in w for w in warns))
+        check("a marker-carrying store child IS listed",
+              any(n == "Export Everything store: ars-dev" for n in names))
     finally:
         settings.get_batch_dest = saved
         shutil.rmtree(dest, ignore_errors=True)
@@ -204,7 +210,7 @@ def main():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    test_legacy_store_dir_gets_stamped()
+    test_owned_marker_required()
 
     print()
     if _skips:
