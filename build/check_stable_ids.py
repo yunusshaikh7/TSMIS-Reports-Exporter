@@ -112,8 +112,8 @@ def test_v017_append_only_compat():
                         "highway_log_pdf", "intersection_summary", "intersection_detail"))
     check("intersection_detail_pdf at index 7 (v0.17.8 append)",
           order[7] == "intersection_detail_pdf")
-    check("v0.18.1 reserved Highway groundwork appended at 8-9 (append-only)",
-          order[8:] == ("highway_detail", "highway_summary"))
+    check("Highway group appended at 8-10 (append-only): Detail/Summary v0.18.1, Detail(PDF) v0.19.2",
+          order[8:] == ("highway_detail", "highway_summary", "highway_detail_pdf"))
     # A v1 (integer-index) manifest from the PRE-Intersection-PDF shape (v0.17.1: seven
     # reports, indices 0-6) still migrates to the seven original keys, 1:1.
     pre = {"version": 1, "reports": [0, 1, 2, 3, 4, 5, 6], "steps": []}

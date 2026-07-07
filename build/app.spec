@@ -77,6 +77,7 @@ APP_MODULES = [
     "export_highway_log", "export_highway_log_pdf", "export_intersection_summary",
     "export_intersection_detail", "export_intersection_detail_pdf",
     "export_highway_detail", "export_highway_summary",   # export enabled v0.19.1
+    "export_highway_detail_pdf",                          # Highway Detail (PDF), v0.19.2
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
     "pdf_row_oracle",

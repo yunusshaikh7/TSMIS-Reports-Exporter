@@ -34,9 +34,10 @@ from export_highway_log_pdf import SPEC as _HIGHWAY_LOG_PDF_SPEC
 from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
 from export_intersection_detail import SPEC as _INT_DETAIL_SPEC
 from export_intersection_detail_pdf import SPEC as _INT_DETAIL_PDF_SPEC
-# Reserved groundwork (v0.18.1) — the coming "Highway" TSAR group; DISABLED, see below.
+# The "Highway" TSAR group — see the ExportEntry block below.
 from export_highway_detail import SPEC as _HIGHWAY_DETAIL_SPEC
 from export_highway_summary import SPEC as _HIGHWAY_SUMMARY_SPEC
+from export_highway_detail_pdf import SPEC as _HIGHWAY_DETAIL_PDF_SPEC
 
 import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
@@ -119,6 +120,12 @@ EXPORT = (
                 group="Highway", short_label="Detail"),
     ExportEntry("highway_summary", "Highway Summary", "Excel", _HIGHWAY_SUMMARY_SPEC,
                 group="Highway", short_label="Summary"),
+    # Highway Detail (PDF), v0.19.2 — same "Highway Detail" dropdown option saved via
+    # the site's Print layout (hd_printAll), the exact parallel of Highway Log (PDF).
+    # Confirmed live on the 7.7 dev capture. Appended LAST (stable id 10, batch order
+    # frozen). Also consolidate/compare-ABSENT until the Highway integration lands.
+    ExportEntry("highway_detail_pdf", "Highway Detail (PDF)", "PDF", _HIGHWAY_DETAIL_PDF_SPEC,
+                group="Highway", short_label="Detail (PDF)"),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -285,8 +292,10 @@ _PICKER_ORDER = (
     "highway_log", "highway_log_pdf", "highway_sequence",
     "ramp_summary", "ramp_detail",
     "intersection_summary", "intersection_detail", "intersection_detail_pdf",
-    # The newest Highway group renders last (export enabled in v0.19.1).
-    "highway_detail", "highway_summary",
+    # The newest Highway group renders last; the PDF variant sits next to its Excel
+    # sibling (like Intersection Detail + its PDF). Detail export enabled v0.19.1,
+    # the PDF v0.19.2; Summary export-enabled but still site-greyed.
+    "highway_detail", "highway_detail_pdf", "highway_summary",
 )
 
 

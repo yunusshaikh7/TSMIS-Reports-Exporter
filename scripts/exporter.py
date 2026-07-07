@@ -332,6 +332,63 @@ def save_intersection_detail_pdf(page, out_path, timeout_ms=None):
     _verify_saved_file(out_path)
 
 
+def save_highway_detail_pdf(page, out_path, timeout_ms=None):
+    """Render the FULL Highway Detail to a Landscape PDF -- the twin of
+    save_highway_log_pdf.
+
+    The on-screen Highway Detail is PAGINATED (`hd_renderPage`), so a bare
+    `page.pdf()` would capture one page. The site's global `hd_printAll()` builds a
+    cover page + legend + EVERY row page into #rampResults using the SAME
+    `.hl-print-section` markup Highway Log's print layout uses, then calls
+    `window.print()` and SYNCHRONOUSLY restores the on-screen view. We override
+    `window.print` to raise FIRST, so that restore never runs and the complete
+    layout stays in the DOM for `page.pdf()` (which emulates print media; the
+    site's `@media print` shows only #rampResults). 27 roadbed-grouped columns ->
+    Landscape.
+
+    is_empty ran first, so this is never an empty route; the layout is built
+    client-side, so timeout_ms is unused (kept for the uniform save signature).
+    Recognised by the `.hl-print-section` marker. The empty backstop counts data
+    rows by their `.hd-row1` class -- Highway Detail's grouped columns use colspan
+    on real data rows, so Highway Log's "count non-colspan rows" heuristic doesn't
+    apply here (it would skip every record and false-flag empty). Fails loudly with
+    ReportError if the site's Print function is gone/renamed."""
+    built = page.evaluate(
+        """() => {
+            if (typeof hd_printAll !== 'function') return {status: 'no-print-fn', rows: 0};
+            window.print = () => { throw new Error('skip-print'); };
+            try { hd_printAll(); } catch (e) { /* the throw skips hd_printAll's restore */ }
+            const box = document.getElementById('rampResults');
+            if (!box || !box.querySelector('.hl-print-section'))
+                return {status: 'no-layout', rows: 0};
+            // Data rows carry `hd-row1`; the empty placeholder (`td.hl-empty`,
+            // colspan) and the district/county/route headers don't -- so a zero
+            // count is a marker-light empty backstop even though HD's grouped
+            // columns put colspan on real rows.
+            const rows = box.querySelectorAll('.hl-print-section tr.hd-row1').length;
+            return {status: 'ok', rows: rows};
+        }""")
+    status = built.get("status") if isinstance(built, dict) else built
+    if status != "ok":
+        raise ReportError(
+            "Couldn't build the Highway Detail print layout for the PDF "
+            f"(the site's Print control changed: {status}).")
+    if not (built.get("rows") if isinstance(built, dict) else 0):
+        # The layout built but holds no data rows -- marker-independent empty
+        # backstop (record `empty`, retried once) rather than a contentless PDF.
+        log.info("highway_detail PDF: print layout has no data rows for %s; treating "
+                 "as empty", out_path.name)
+        raise EmptyExport()
+    page.pdf(
+        path=str(out_path),
+        format="Letter",
+        landscape=True,
+        print_background=True,
+        margin={"top": "0.4in", "bottom": "0.4in", "left": "0.4in", "right": "0.4in"},
+    )
+    _verify_saved_file(out_path)
+
+
 # --- the engine ---------------------------------------------------------------
 
 def _record(result, events, route, status):
