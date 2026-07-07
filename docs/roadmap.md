@@ -492,15 +492,15 @@ or accept as someday.**
   district→routes / county→routes mapping, likely sourced live from how the site repopulates the
   route dropdown after a district/county pick. **Most research-heavy — do a small site-behavior
   spike before committing to a UX.**
-- [ ] **Highway Detail / Highway Summary — enable** [M] — the TSMIS site is adding two new TSAR reports
-  (`highway_detail` / `highway_summary`); **v0.18.1 shipped the reserved-DISABLED groundwork** (append-only
-  stable ids 8/9; stub `export_highway_detail.py` / `export_highway_summary.py` whose `save` raises; a greyed
-  "coming soon" picker entry under the Highway group; absent from matrix / Compare / Consolidate; in
-  `reports.DISABLED_EXPORT_SUBDIRS`). **To enable when the site turns them on:** drop both from
-  `DISABLED_EXPORT_SUBDIRS`, finalize each stub `ReportSpec` (`save` / `wait_js` / `is_empty`) against the
-  live page, and add their consolidators + vs-TSN / cross-env comparators + `tsn_library` entries. Until
-  then they stay greyed (mirrors the site's own `cs-disabled`). The selection path already handles their
-  `data_value` (v0.18.1).
+- [~] **Highway Detail / Highway Summary — EXPORT enabled (v0.19.1); consolidate/compare still owed** [M] —
+  the TSMIS site is adding two new TSAR reports (`highway_detail` / `highway_summary`). **v0.18.1 shipped the
+  reserved-DISABLED groundwork; v0.19.1 enabled their EXPORT** — real `ReportSpec`s modeled on the Excel
+  siblings (`save_via_export_button`, dual empty-marker detection), lifted from
+  `reports.DISABLED_EXPORT_SUBDIRS` (now empty). Where the live site still greys them, `select_report` fails
+  fast (`ReportUnavailableError` / config error) rather than stalling. **Still owed (the next feature):**
+  their consolidators + vs-TSN / cross-env comparators + `tsn_library` entries + matrix rows — build them via
+  the proven recipe in `build/check_report_recipe.py`. Live-export verification against the site is owed
+  (the dev PC can't reach it).
 
 ---
 

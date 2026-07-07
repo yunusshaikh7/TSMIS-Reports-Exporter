@@ -86,9 +86,9 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
   export, **consolidate, and compare** (cross-environment + vs-TSN) like every other report, and live
   in both matrices. The old app-wide disable gate still EXISTS as defensive groundwork —
   `reports.is_export_disabled()` over `DISABLED_EXPORT_SUBDIRS`,
-  `export_reports_status()`'s per-report `disabled` flag, the JS `.option-static` rendering. Intersection is
-  **not** in the set (enabled since v0.17.0); as of v0.18.1 the set holds the two reserved **Highway
-  Detail/Summary** subdirs, which it greys (see [Report grouping & site-menu-safe selection](#report-grouping--site-menu-safe-selection-v0181) above). As of P3 the GUI/manifests pass **stable export-op KEYS** (= each
+  `export_reports_status()`'s per-report `disabled` flag, the JS `.option-static` rendering. The set is
+  **empty** again as of **v0.19.1** (every export report enabled) — Intersection enabled since v0.17.0,
+  the Highway Detail/Summary pair since v0.19.1 (see [Report grouping & site-menu-safe selection](#report-grouping--site-menu-safe-selection-v0181) above). As of P3 the GUI/manifests pass **stable export-op KEYS** (= each
   report's `subdir`; `idx` is display-order metadata only), so a registry re-order never mis-resumes.
   Locked by `build/check_intersection_gate.py` (now registry-derived).
 - **Consolidate + compare:** `consolidate_intersection_summary` (category-count summer) and
@@ -125,16 +125,16 @@ The `#customReport` dropdown is moving from flat `li.cs-option` rows (whose visi
 
 The GUI report picker mirrors the site's own grouping: **flat** Highway Log, Highway Log (PDF), and Highway Sequence at the top (the site's order), then the **Ramp** and **Intersection** families under their own headings. Order + grouping are catalog-driven, not UI-hardcoded: each `ExportEntry` carries an optional `group` + `short_label`, and `report_catalog._PICKER_ORDER` (exposed as `picker_order()`, import-asserted to cover every export key) fixes the display sequence. `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload by `PICKER_ORDER` and sets each entry's `idx` = its **display position** (no app code reads `idx` — it's parity-check metadata only), plus `group` and `short` (the short leaf label, e.g. "Detail"). `ui/app.js` emits an `.option-group` header on each group change and shows `short || label` (indented under its group). Both the Export picker and Export-Everything use the one `fillReportList()`.
 
-### Highway Detail / Highway Summary — reserved, DISABLED groundwork
+### Highway Detail / Highway Summary — export ENABLED (v0.19.1)
 
-The site is about to add two more TSAR reports, **Highway Detail** and **Highway Summary**. v0.18.1 scaffolds them across the app but leaves them **not usable**, mirroring the site's own `cs-disabled`:
+The site is adding two more TSAR reports, **Highway Detail** and **Highway Summary**. v0.18.1 scaffolded them across the app as reserved-DISABLED groundwork; **v0.19.1 enables their EXPORT** (consolidation / comparison / matrix integration is a later feature — see [roadmap.md](roadmap.md)):
 
-- **Stub modules** `export_highway_detail.py` / `export_highway_summary.py` — each a valid `ReportSpec` (label, `subdir`, `data_value` = the site id, placeholder `wait_js`/`is_empty` modeled on Highway Log) but with `save = _save_not_implemented`, which **raises** (fail-loud if prematurely enabled); `__main__` refuses to run.
-- **Catalog** appends two `ExportEntry` (group `"Highway"`, short "Detail"/"Summary") — **append-only** stable ids at positions **8 / 9** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`); `_PICKER_ORDER` lists them last. `app.spec` `APP_MODULES` +2.
-- **One gate** greys them: `reports.DISABLED_EXPORT_SUBDIRS = {"highway_detail", "highway_summary"}` — shown greyed ("— not yet available") in the picker, dropped from the enabled / library lists, and rejected server-side by the `start_*` guards.
-- They have **no consolidator / comparator / TSN entry**, so they're absent from the matrices, Consolidate, and Compare (the env matrix stays 8 rows). Locked by `check_intersection_gate` (gate premise: holds exactly the reserved Highway pair, N−2 enabled, the pair greyed), `check_stable_ids` (append-only 8/9), and `check_report_catalog`.
+- **Real modules** `export_highway_detail.py` / `export_highway_summary.py` — each a genuine `ReportSpec` modeled on the Excel siblings (`save = save_via_export_button`). `data_value` = the site id (verified against the dev-site capture). Readiness/empty accept **both** site conventions — the structural empty row `td.hl-empty` and the loose `No … found` text — since the pair's final markup wasn't captured; the engine's no-download fast-fail is the marker-independent backstop.
+- **Catalog** carries two `ExportEntry` (group `"Highway"`, short "Detail"/"Summary") — **append-only** stable ids at positions **8 / 9** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`); `_PICKER_ORDER` lists them last. `app.spec` `APP_MODULES` +2.
+- **The gate is empty** (`reports.DISABLED_EXPORT_SUBDIRS = set()`): both are pickable in the Export picker and ticked in Export Everything. Where the **live site** still marks them `cs-disabled` (production may lag the dev site), `select_report` fails fast — `ReportUnavailableError` for cs-disabled, a config error for a missing option — instead of stalling per route.
+- They have **no consolidator / comparator / TSN entry yet**, so they stay absent from the matrices, Consolidate, and Compare (the env matrix stays 8 rows). Locked by `check_intersection_gate` (empty gate; every report enabled), `check_report_recipe` (export-enabled, consolidate/compare-absent), `check_stable_ids` (append-only 8/9), and `check_report_catalog`.
 
-To enable later: drop them from `DISABLED_EXPORT_SUBDIRS`, finalize each stub spec against the live page, and add their consolidators + comparators + `tsn_library` entries (tracked in [roadmap.md](roadmap.md)).
+To integrate the consolidator/comparison later: add their consolidators + comparators + `tsn_library` entries per the proven recipe in `build/check_report_recipe.py` (tracked in [roadmap.md](roadmap.md)).
 
 ## `cs-disabled` -- the site can temporarily disable a report (EXPECTED)
 

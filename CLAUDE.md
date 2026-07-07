@@ -118,9 +118,10 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   it (EXPORT/CONSOLIDATE/COMPARE lists, matrix rows, stable-ID lookups, the picker
   `group`/`short_label` + `_PICKER_ORDER`). Stable IDs are immutable string keys;
   `batch_manifest._V017_EXPORT_ORDER` (== `EXPORT_KEYS`) is **append-only** — positions
-  0–7 frozen; v0.18.1 appended the reserved-but-**DISABLED** Highway Detail/Summary
-  groundwork at 8/9 (in `DISABLED_EXPORT_SUBDIRS`: shown greyed, rejected server-side,
-  absent from matrix/compare/consolidate). Add a report by editing the catalog;
+  0–7 frozen; v0.18.1 appended Highway Detail/Summary at 8/9 as reserved-DISABLED
+  groundwork, **v0.19.1 enabled their EXPORT** (`DISABLED_EXPORT_SUBDIRS` now empty;
+  real Excel-sibling specs). They stay **absent from matrix/compare/consolidate** until
+  that integration lands (a later feature). Add a report by editing the catalog;
   `check_report_catalog` proves the derivation. See [docs/reports.md](docs/reports.md).
 - **Select reports by stable `data_value`, not visible text** (v0.18.1). `select_report`
   and the env-scan probe match the `#customReport` option by its `data-value` (the site's

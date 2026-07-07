@@ -3,6 +3,20 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.19.1 — 2026-07-06
+
+Two things: the Highway Detail / Highway Summary exports go live, and a validation glitch found
+on the work PC is fixed. Comparison numbers are unchanged.
+
+- **Highway Detail and Highway Summary can now be exported.** These two reports — previously listed
+  as "coming soon" — are now on the Export tab and in Export Everything, exactly like the others.
+  (Consolidating and comparing them against TSN comes in a later update.) Where the site still has
+  them turned off, the app says so clearly and skips them instead of stalling.
+- **"Validate & package results" no longer reports a phantom error.** On a PC that keeps TSN
+  Highway Log files inside the export store, validation mistakenly treated that drop folder as an
+  export environment and flagged a false error for it. Validation now only checks real export
+  environments.
+
 ## v0.19.0 — 2026-07-06
 
 Usability and trust improvements, plus the structural cleanup groundwork. No change to how any
