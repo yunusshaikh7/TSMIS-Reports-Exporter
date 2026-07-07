@@ -20,7 +20,7 @@ from common import (ROUTES, AuthError, BrowserNotFoundError, PreflightError,
                     DATA_SOURCE_LABELS,
                     ENVIRONMENT_LABELS, get_site, set_site)
 from events import Events
-from exporter import run_export, _wait_while_paused
+from exporter import run_export, run_export_combined, _wait_while_paused
 from paths import env_tagged_filename
 
 log = logging.getLogger("tsmis.gui")
@@ -36,6 +36,36 @@ def _swap_store_dir(live, staged):
     last-good (the refresh is discarded), never a half-merged folder. Caller already
     gated on a COMPLETE producer outcome (F1) before promoting."""
     return artifact_store.promote_store(live, staged)
+
+
+def _coalesce_groups(specs):
+    """Group selected specs so both EDITIONS of one on-site report run together.
+
+    Two selected reports coalesce when they share a `data_value` (the stable
+    #customReport id) — i.e. they are the same on-site report saved two ways (the
+    Excel export + the print-layout PDF: Highway Log, Intersection Detail, Highway
+    Detail). Preserves first-occurrence order; a report with only one edition
+    selected stays a group of one. Returns a list of spec-lists."""
+    groups, index = [], {}
+    for spec in specs:
+        dv = getattr(spec, "data_value", None)
+        if dv is not None and dv in index:
+            index[dv].append(spec)
+        else:
+            g = [spec]
+            groups.append(g)
+            if dv is not None:
+                index[dv] = g
+    return groups
+
+
+def _group_label(group):
+    """Progress/log label for a coalesced group: the base report name, noting that
+    both editions run together when a pair is coalesced (their spec.label is the
+    shared dropdown text, e.g. 'Highway Log')."""
+    if len(group) == 1:
+        return group[0].label
+    return f"{group[0].label} (Excel + PDF)"
 
 
 class ExportWorker(threading.Thread):
@@ -188,130 +218,146 @@ class ExportWorker(threading.Thread):
         (spec, RunResult) to `results`. Posts log/progress/worker_status and the
         B2 auto-consolidate; does NOT post export_done/error — the caller owns the
         run lifecycle (run() for one export; BatchWorker once per environment for
-        B3). Appends as it goes so a mid-run exception still leaves partials."""
+        B3). Appends as it goes so a mid-run exception still leaves partials.
+
+        When BOTH editions of one on-site report are selected (same data_value,
+        e.g. Highway Log Excel + Highway Log PDF), the standard (sequential) path
+        COALESCES them — the report is generated once per route and both files are
+        saved off that single render (run_export_combined) instead of generating it
+        twice. Fast mode keeps each edition its own PARALLEL pass (its route
+        parallelism is the speed lever there; coalescing it is a follow-up)."""
         # M03: the Export-Everything store's <src>-<env> folder is a directory the
         # app creates inside a USER-CHOSEN destination. Stamp it app-owned ONCE here
-        # (before the per-report loop) so "Delete all reports" / store recovery can
-        # prove ownership by marker, not by name alone. The marker survives the
-        # per-report stage->swap (that only renames child report subdirs).
+        # (before the loop) so "Delete all reports" / store recovery can prove
+        # ownership by marker, not by name alone. The marker survives the per-report
+        # stage->swap (that only renames child report subdirs).
         if self.out_base is not None:
             owned_dir.ensure_owned_dir(self.out_base, kind="store")
-        for i, spec in enumerate(self.specs, 1):
+        fast = bool(self.workers and self.workers > 1)
+        # Coalesce dual-edition pairs in the sequential path (a clear ~2x win); in
+        # fast mode every group is a singleton so behavior is unchanged.
+        groups = [[s] for s in self.specs] if fast else _coalesce_groups(self.specs)
+        self._report_n = len(groups)
+        for gi, group in enumerate(groups, 1):
             if self.cancel.is_set():
                 break
-            self._report_i = i
-            self._cur_label = spec.label
+            self._report_i = gi
+            self._cur_label = _group_label(group)
             with self._tally_lock:
                 self._route_status = {}         # fresh counts for this report
             if self._report_n > 1:
                 self.q.put(("log", ""))
-                self.q.put(("log", f"===== Report {i} of {self._report_n}: {spec.label} ====="))
+                self.q.put(("log", f"===== Report {gi} of {self._report_n}: {self._cur_label} ====="))
             # Reset the progress bar/counts for this report so the GUI doesn't
             # show the previous report's tally while this one spins up.
             self.q.put(("progress", {
                 "done": 0, "total": self._total, "route": "—",
                 "saved": 0, "empty": 0, "skipped": 0, "failed": 0, "exists": 0,
-                "report": spec.label, "report_i": i, "report_n": self._report_n,
+                "report": self._cur_label, "report_i": gi, "report_n": self._report_n,
             }))
-            # B3: when an always-current destination is set, write each report
-            # into <dest>/<src-env>/<subdir>. STAGE-AND-SWAP: export into a fresh
-            # `.staging` sibling (so the run re-pulls everything — a refresh, not a
-            # resume-skip) and replace the live folder only on a clean finish, so a
-            # failed/crashed/cancelled refresh never destroys the last-good copy.
-            out_dir = (self.out_base / spec.subdir) if self.out_base else None
-            stage_dir = None
-            if out_dir is not None:
-                import shutil
-                stage_dir = out_dir.with_name(out_dir.name + ".staging")
-                shutil.rmtree(stage_dir, ignore_errors=True)
-                stage_dir.mkdir(parents=True, exist_ok=True)
-            # B3: in the always-current store, prefix every output file with the
-            # src-env tag (the dest's <src-env> subfolder name) so a file lifted
-            # out still says which environment it came from. Wrapping spec.filename
-            # covers the sequential + parallel engines AND both retry passes in one
-            # place — they all name files via spec.filename(route). The original
-            # spec (label/subdir, consolidator mapping) is kept for results/auto-
-            # consolidate; only the per-route NAME changes.
-            run_spec = spec
-            if self.out_base is not None:
-                tag = self.out_base.name
-                run_spec = dataclasses.replace(
-                    spec,
-                    filename=lambda r, _f=spec.filename, _t=tag: env_tagged_filename(_f(r), _t))
-            run_dir = stage_dir if stage_dir is not None else out_dir
+            # B3 stage-and-swap: prep each edition's live dir + fresh `.staging`
+            # sibling + env-tagged run_spec (see _prep_edition).
+            preps = [self._prep_edition(spec) for spec in group]
             try:
-                if self.workers and self.workers > 1:
+                if len(group) == 1 and fast:
                     from exporter_parallel import run_export_parallel  # lazy
-                    result = run_export_parallel(run_spec, events, workers=self.workers,
-                                                 routes=self.routes, out_dir=run_dir)
+                    _o, _s, run_spec, run_dir = preps[0]
+                    edition_results = [run_export_parallel(
+                        run_spec, events, workers=self.workers, routes=self.routes, out_dir=run_dir)]
+                elif len(group) == 1:
+                    _o, _s, run_spec, run_dir = preps[0]
+                    edition_results = [run_export(
+                        run_spec, events, routes=self.routes, out_dir=run_dir)]
                 else:
-                    result = run_export(run_spec, events, routes=self.routes, out_dir=run_dir)
+                    # Coalesced: generate each route once, save every edition.
+                    edition_results = run_export_combined(
+                        [p[2] for p in preps], events, routes=self.routes,
+                        out_dirs=[p[3] for p in preps])
             except Exception:
-                # A crash must NOT cost the last-good copy: drop staging, leave the
-                # live folder as it was, and let the caller handle the error.
-                if stage_dir is not None:
-                    import shutil
-                    shutil.rmtree(stage_dir, ignore_errors=True)
+                # A crash must NOT cost the last-good copy: drop every staging dir,
+                # leave the live folders as they were, let the caller handle it.
+                for _o, stage_dir, _rs, _rd in preps:
+                    if stage_dir is not None:
+                        import shutil
+                        shutil.rmtree(stage_dir, ignore_errors=True)
                 raise
-            # F1: ONLY a complete refresh may replace the last-good store copy. The
-            # producer-owned completion (saved/empty/failed/skipped + cancel) decides:
-            # complete -> promote (swap staging in); partial / no_data / cancelled /
-            # failed -> discard staging and keep the previous live copy, so a run
-            # where routes failed or returned nothing never clobbers last-good.
-            cancelled = self.cancel.is_set()
-            in_store = stage_dir is not None
-            if in_store and result.exists:
-                # §C.1: a FRESH staging dir (rmtree'd + remade above) must never
-                # report "already had" files. If it does, the staging is untrustworthy
-                # — REJECT the promotion (force a failed outcome) so it can't replace
-                # last-good, and log the anomaly. (`exists` stays valid for ordinary
-                # resume / non-store runs — this guard is in_store only.)
-                log.warning("store refresh for %s saw %d 'exists' route(s) in a FRESH "
-                            "staging dir (anomaly) — rejecting promotion, keeping last-good",
-                            spec.subdir, len(result.exists))
-                result.completion = outcome.FAILED
-            else:
-                result.completion = outcome.run_completion(result, cancelled=cancelled)
-            promoted = False
-            # P2-A04: a prior store counts only if it's a USABLE store (holds a report artifact) —
-            # the same contract recovery uses — so an empty/foreign leftover dir doesn't make a
-            # failed first promotion falsely report previous_preserved.
-            had_prior = bool(in_store and artifact_store.is_usable_store(out_dir))
-            if in_store:
-                if outcome.promotable(result.completion):
-                    promoted = _swap_store_dir(out_dir, stage_dir)
-                    if not promoted:
-                        # P2-B01: a COMPLETE export whose journaled swap failed (locked /
-                        # crash) did NOT promote — the previous live copy is intact. It must
-                        # NOT read as promoted, so the frontend, auto-consolidate, and the
-                        # batch env-done gate all see previous_preserved (or none on a first run).
-                        log.warning("store refresh for %s: promotion FAILED — kept last-good, "
-                                    "NOT promoted", spec.subdir)
-                else:
-                    import shutil
-                    shutil.rmtree(stage_dir, ignore_errors=True)
-                    log.info("store refresh for %s was %s — kept last-good, discarded staging",
-                             spec.subdir, result.completion)
-            # Artifact reflects the ACTUAL store outcome: a successful in-store swap promotes;
-            # a failed swap with a prior keeps last-good (previous_preserved); a failed FIRST
-            # promotion (no prior) leaves NO canonical artifact (none) — never falsely claim a
-            # prior was preserved (P2-B06); a non-store dated run is new_unpromoted.
-            if in_store and not promoted:
-                result.artifact = outcome.PREVIOUS_PRESERVED if had_prior else outcome.NONE
-            else:
-                result.artifact = outcome.artifact_after_store(result.completion, in_store)
-            results.append((spec, result))
-            # B2 auto-consolidate after the export. For a STORE refresh only a run that
-            # actually PROMOTED (completion=complete, artifact=promoted) may consolidate:
-            # a partial/failed/cancelled store refresh discarded its staging and KEPT
-            # last-good, so consolidating now would rebuild a derived artifact from the
-            # OLD live store and present stale data as freshly produced (P1-B03). A
-            # non-store (dated-run) export is unchanged — it consolidates whatever routes
-            # it got (partial included), the long-standing supported behavior.
-            store_ok = (not in_store) or result.artifact == outcome.PROMOTED
-            if self.auto_consolidate and not self.cancel.is_set() and store_ok:
-                self._auto_consolidate(spec, result, events)
+            for spec, (out_dir, stage_dir, _rs, _rd), result in zip(group, preps, edition_results):
+                self._finish_edition(spec, result, out_dir, stage_dir, events, results)
         return results
+
+    def _prep_edition(self, spec):
+        """Prep ONE report edition's output: the live `<dest>/<src-env>/<subdir>`
+        dir, a fresh `.staging` sibling (store refreshes stage-and-swap so a
+        failed/cancelled refresh never destroys last-good), and an env-tagged
+        run_spec (every output file carries the <src-env> tag so a lifted file still
+        says which environment it came from). Returns (out_dir, stage_dir, run_spec,
+        run_dir). Factored out so a coalesced group preps every edition the same way
+        the single path did."""
+        out_dir = (self.out_base / spec.subdir) if self.out_base else None
+        stage_dir = None
+        if out_dir is not None:
+            import shutil
+            stage_dir = out_dir.with_name(out_dir.name + ".staging")
+            shutil.rmtree(stage_dir, ignore_errors=True)
+            stage_dir.mkdir(parents=True, exist_ok=True)
+        run_spec = spec
+        if self.out_base is not None:
+            tag = self.out_base.name
+            run_spec = dataclasses.replace(
+                spec,
+                filename=lambda r, _f=spec.filename, _t=tag: env_tagged_filename(_f(r), _t))
+        run_dir = stage_dir if stage_dir is not None else out_dir
+        return out_dir, stage_dir, run_spec, run_dir
+
+    def _finish_edition(self, spec, result, out_dir, stage_dir, events, results):
+        """Post-process one finished edition: decide completion, promote or discard
+        the staging (store refresh), set the artifact, append (spec, result), and B2
+        auto-consolidate. The same logic the single path ran, per edition — so each
+        edition of a coalesced pair still stages/swaps and consolidates on its own."""
+        cancelled = self.cancel.is_set()
+        in_store = stage_dir is not None
+        # F1: ONLY a complete refresh may replace the last-good store copy.
+        if in_store and result.exists:
+            # §C.1: a FRESH staging dir must never report "already had" files. If it
+            # does, the staging is untrustworthy — REJECT the promotion so it can't
+            # replace last-good, and log the anomaly.
+            log.warning("store refresh for %s saw %d 'exists' route(s) in a FRESH "
+                        "staging dir (anomaly) — rejecting promotion, keeping last-good",
+                        spec.subdir, len(result.exists))
+            result.completion = outcome.FAILED
+        else:
+            result.completion = outcome.run_completion(result, cancelled=cancelled)
+        promoted = False
+        # P2-A04: a prior store counts only if it's a USABLE store (holds an artifact).
+        had_prior = bool(in_store and artifact_store.is_usable_store(out_dir))
+        if in_store:
+            if outcome.promotable(result.completion):
+                promoted = _swap_store_dir(out_dir, stage_dir)
+                if not promoted:
+                    # P2-B01: a COMPLETE export whose journaled swap failed did NOT
+                    # promote — the previous live copy is intact; must read as
+                    # previous_preserved (or none on a first run).
+                    log.warning("store refresh for %s: promotion FAILED — kept last-good, "
+                                "NOT promoted", spec.subdir)
+            else:
+                import shutil
+                shutil.rmtree(stage_dir, ignore_errors=True)
+                log.info("store refresh for %s was %s — kept last-good, discarded staging",
+                         spec.subdir, result.completion)
+        # Artifact reflects the ACTUAL store outcome (P2-B06: never falsely claim a
+        # prior was preserved).
+        if in_store and not promoted:
+            result.artifact = outcome.PREVIOUS_PRESERVED if had_prior else outcome.NONE
+        else:
+            result.artifact = outcome.artifact_after_store(result.completion, in_store)
+        results.append((spec, result))
+        # B2 auto-consolidate: for a STORE refresh only a run that actually PROMOTED
+        # may consolidate (a partial/failed/cancelled refresh kept last-good, so
+        # consolidating now would rebuild from the OLD store — P1-B03). A non-store
+        # dated run consolidates whatever it got.
+        store_ok = (not in_store) or result.artifact == outcome.PROMOTED
+        if self.auto_consolidate and not self.cancel.is_set() and store_ok:
+            self._auto_consolidate(spec, result, events)
 
     def run(self):
         events = self._build_events()

@@ -389,11 +389,46 @@ def save_highway_detail_pdf(page, out_path, timeout_ms=None):
     _verify_saved_file(out_path)
 
 
+# Saves that REBUILD the page DOM: the site's Print layout replaces #rampResults
+# (the on-screen restore is what the PDF capture deliberately skips). In a combined
+# dual-edition run these must save LAST -- after the Export-button save, which needs
+# the normal action bar + Export button still in the DOM.
+_PAGE_REBUILDING_SAVES = frozenset({
+    save_highway_log_pdf, save_intersection_detail_pdf, save_highway_detail_pdf,
+})
+
+
+def _save_rebuilds_page(spec):
+    """True if `spec`'s save rebuilds the page (a Print-layout PDF capture) -- so a
+    combined run orders it after the DOM-preserving Export-button saves."""
+    return spec.save in _PAGE_REBUILDING_SAVES
+
+
 # --- the engine ---------------------------------------------------------------
 
 def _record(result, events, route, status):
     """Record a route's final outcome (for the run report) and notify the UI."""
     result.per_route.append((route, status))
+    events.on_route(route, status)
+
+
+def _tally_all(results, events, route, status):
+    """Record `route`'s SHARED outcome into EVERY edition's result of a combined
+    run, notifying the UI ONCE. The editions come from ONE generation, so the route
+    counts as a single unit of progress even though several files were written.
+    `status` in saved | empty | skipped | failed | exists."""
+    for r in results:
+        if status == "saved":
+            r.saved += 1
+        elif status == "empty":
+            r.empty.append(route)
+        elif status == "skipped":
+            r.user_skipped.append(route)
+        elif status == "failed":
+            r.failed.append(route)
+        elif status == "exists":
+            r.exists.append(route)
+        r.per_route.append((route, status))
     events.on_route(route, status)
 
 
@@ -502,10 +537,14 @@ def _build_wait_condition(spec, route):
     return f"() => (({ready_js}))() || ({ERROR_JS})"
 
 
-def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
-    """One attempt at a route. Returns 'saved' | 'empty' | 'skipped'.
-    Raises on any failure; the caller decides whether to retry. timeout_ms is the
-    hard ceiling for both the report-generation wait and the save/download."""
+def _generate_route(page, spec, route, prefix, events, timeout_ms):
+    """Arm the form, pick the route, click Generate, and wait for the report to be
+    ready OR empty. Returns 'ready' | 'empty' | 'skipped'. Raises RunCancelled on a
+    cancel that lands during the wait, ReportError on a site error, and lets the
+    wait's PlaywrightTimeoutError propagate. This is the SHARED generation step:
+    the single-edition path (_attempt_route) and the combined dual-edition path
+    (run_export_combined) both call it, so a coalesced run generates each route
+    ONCE and then saves every selected edition off that one render."""
     events.on_status(events.worker_no, f"{prefix} generating…")
     _ensure_report_armed(page, spec, prefix, events)   # P8c: stale-form re-arm guard
     page.get_by_label("Route", exact=True).select_option(route)
@@ -524,6 +563,16 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
         raise ReportError(err)
     if spec.is_empty(page):
         return "empty"
+    return "ready"
+
+
+def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
+    """One attempt at a route. Returns 'saved' | 'empty' | 'skipped'.
+    Raises on any failure; the caller decides whether to retry. timeout_ms is the
+    hard ceiling for both the report-generation wait and the save/download."""
+    outcome = _generate_route(page, spec, route, prefix, events, timeout_ms)
+    if outcome != "ready":
+        return outcome
     page.wait_for_timeout(1000)
     # One last look before the save grabs the page (a download wait can't
     # answer preview requests until it returns).
@@ -842,3 +891,237 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
             log.warning("could not write run report: %s", e)
 
     return result
+
+
+# --- combined (dual-edition) export ------------------------------------------
+# When the user selects BOTH editions of one on-site report (e.g. Highway Log
+# Excel + Highway Log PDF -- same #customReport option / data_value), generating
+# the report twice is wasteful. These run it ONCE per route and save every edition
+# off that single render. The single-edition engine above is untouched.
+
+def _process_route_combined(page, base_spec, route, prefix, targets, events, results, timeout_ms):
+    """Combined per-route: GENERATE ONCE (base_spec's on-site report), then save
+    EVERY edition in `targets` off that single render (`targets` is pre-ordered so a
+    page-rebuilding Print-layout save runs last). Records the SHARED route outcome
+    into each of `results` via _tally_all. Retries the whole route once on a
+    transient error (regenerate + re-save all), mirroring _process_route. Returns
+    True to keep going, False to stop the whole run."""
+    t0 = time.monotonic()
+
+    def took():
+        return int(time.monotonic() - t0)
+
+    for attempt in range(1 + RETRY_COUNT):
+        try:
+            gen = _generate_route(page, base_spec, route, prefix, events, timeout_ms)
+            if gen == "ready":
+                page.wait_for_timeout(1000)
+                maybe_screenshot(page, events, note=prefix.strip())
+                events.on_status(events.worker_no, f"{prefix} saving…")
+                for spec, out_path in targets:      # Export-button saves first, PDF last
+                    spec.save(page, out_path, timeout_ms)
+        except (AuthError, RunCancelled):
+            raise
+        except ReportError as e:
+            events.on_log(f"{prefix} TSMIS site error -- {e}")
+            log.warning("%s site error after %ds: %s", prefix, took(), e)
+            _capture_failure(page, base_spec, route, events)
+            _tally_all(results, events, route, "failed")
+            return _recover_or_stop(page, base_spec, events)
+        except PlaywrightTimeoutError:
+            events.on_log(f"{prefix} timed out after {took()}s "
+                          f"(limit {timeout_ms // 1000}s) -- recording as failed")
+            log.warning("%s timed out after %ds (limit %ds)", prefix, took(), timeout_ms // 1000)
+            _capture_failure(page, base_spec, route, events)
+            _tally_all(results, events, route, "failed")
+            return _recover_or_stop(page, base_spec, events)
+        except EmptyExport:
+            # No download in the export-click window on an edition -- indistinguishable
+            # from a transient flake on the first try, so retry once (regenerating);
+            # record `empty` only if it reproduces (matches _process_route).
+            if attempt < RETRY_COUNT:
+                events.on_log(f"{prefix} no data on first try -- retrying once "
+                              "to rule out a transient export hiccup")
+                log.info("%s no-download empty on attempt %d/%d; retrying",
+                         prefix, attempt + 1, 1 + RETRY_COUNT)
+                if not _recover_or_stop(page, base_spec, events):
+                    return False
+                continue
+            events.on_log(f"{prefix} empty, skip")
+            _tally_all(results, events, route, "empty")
+            log.info("%s empty after retry (%ds)", prefix, took())
+            return True
+        except Exception as e:
+            log.exception("%s attempt %d/%d failed after %ds",
+                          prefix, attempt + 1, 1 + RETRY_COUNT, took())
+            if attempt < RETRY_COUNT:
+                events.on_log(f"{prefix} error -- {_brief(e)} -- retrying once")
+                if not _recover_or_stop(page, base_spec, events):
+                    return False
+                continue
+            events.on_log(f"{prefix} FAILED -- {_brief(e)}")
+            _capture_failure(page, base_spec, route, events)
+            _tally_all(results, events, route, "failed")
+            return _recover_or_stop(page, base_spec, events)
+        else:
+            if gen == "skipped":
+                _tally_all(results, events, route, "skipped")
+                log.info("%s skipped by user after %ds", prefix, took())
+                return _recover_or_stop(page, base_spec, events)
+            if gen == "empty":
+                events.on_log(f"{prefix} empty, skip")
+                _tally_all(results, events, route, "empty")
+                log.info("%s empty (%ds)", prefix, took())
+                return True
+            n = len(targets)
+            events.on_log(f"{prefix} saved {n} edition{'s' if n != 1 else ''} ({took()}s)")
+            _tally_all(results, events, route, "saved")
+            log.info("%s saved %d editions (%ds)", prefix, n, took())
+            return True
+    return True
+
+
+def _retry_failed_combined(page, base_spec, targets_for, results, events, timeout_ms):
+    """Slow, serial second-chance pass over the combined run's failed routes (the
+    fail set is SHARED across editions), re-running each route combined with a more
+    generous timeout. Mirrors _retry_failed_routes: drops the first-pass 'failed'
+    bookkeeping before re-running so a now-succeeding route is recorded once.
+    `targets_for(route)` yields the ordered [(spec, out_path)] for a route."""
+    to_retry = list(results[0].failed)          # failed is identical across editions
+    if not to_retry:
+        return
+    retry_set = set(to_retry)
+    events.on_log(f"Retrying {len(to_retry)} failed route(s) once more (slower)…")
+    for r in results:
+        r.failed = [x for x in r.failed if x not in retry_set]
+        r.per_route = [(rt, st) for (rt, st) in r.per_route
+                       if not (rt in retry_set and st == "failed")]
+    total = len(to_retry)
+    for i, route in enumerate(to_retry, 1):
+        _wait_while_paused(events)
+        if events.is_cancelled():
+            break
+        prefix = f"[retry {i:>3}/{total}] Route {route}:"
+        if not _process_route_combined(page, base_spec, route, prefix,
+                                       targets_for(route), events, results, timeout_ms):
+            break
+
+
+def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
+                        retry_timeout_ms=None, out_dirs=None):
+    """Export several EDITIONS of the SAME on-site report in ONE pass: the report is
+    generated once per route and every edition is saved off that single render (e.g.
+    Highway Log Excel + Highway Log PDF). Returns a RunResult per spec, in the SAME
+    order as `specs`. `out_dirs`, when given, overrides each spec's dated run folder
+    (parallel to `specs` -- the always-current store passes its staging dirs).
+
+    Console-free; mirrors run_export's lifecycle (sign-in, preflight, per-route
+    resume-skip, retry-once, end-of-run slow retry, per-edition run reports) but
+    SHARES the generation. All `specs` must share the on-site report (data_value);
+    a page-rebuilding Print-layout save is ordered LAST so the Export-button save
+    still sees the normal action bar. Raises AuthError / PreflightError like
+    run_export."""
+    events = events or Events()
+    if len(specs) < 2:
+        raise ValueError("run_export_combined needs 2+ editions; use run_export for one report")
+    base = specs[0]
+    if any(s.data_value != base.data_value for s in specs):
+        raise ValueError("run_export_combined: all editions must share the same on-site "
+                         f"report (data_value); got {[s.data_value for s in specs]}")
+    if not has_valid_auth():
+        events.on_log("No saved session - will try signing in automatically "
+                      "using this PC's work account (Microsoft Edge).")
+    timeout_ms = timeout_ms or report_timeout_ms()
+    retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
+    src, env = get_site()
+    # Save order puts page-rebuilding (PDF) saves last; results stay in `specs` order.
+    save_order = sorted(range(len(specs)), key=lambda i: _save_rebuilds_page(specs[i]))
+    dirs, results = [], []
+    for i, spec in enumerate(specs):
+        d = Path(out_dirs[i]) if out_dirs else output_run_dir(src, env) / spec.subdir
+        d.mkdir(parents=True, exist_ok=True)
+        dirs.append(d)
+        results.append(RunResult(output_dir=str(d)))
+    total = len(routes)
+    run_t0 = time.monotonic()
+    subdirs = ", ".join(specs[i].subdir for i in save_order)
+    log.info("combined export start: %s [%s] (%d routes)", base.label, subdirs, total)
+    log.info("combined export config: site=%s auth_file=%s timeout=%ds retry_timeout=%ds",
+             get_url(), has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
+
+    def targets_for(route):
+        return [(specs[i], dirs[i] / specs[i].filename(route)) for i in save_order]
+
+    ordered_results = [results[i] for i in save_order]
+
+    events.on_status(events.worker_no, "Starting browser…")
+    with sync_playwright() as p:
+        browser, _ctx, page = new_authed_browser(p)
+        try:
+            events.on_status(events.worker_no, "Opening TSMIS + signing in…")
+            navigate_with_auth(page, should_cancel=events.is_cancelled)
+            if events.is_cancelled():
+                events.on_log("Cancelled by user.")
+                log.info("cancelled by user during sign-in")
+                return results
+            require_signed_in(
+                page,
+                "Sign-in didn't complete - the saved session may be expired, "
+                "or automatic sign-in isn't available on this PC. Please log in.",
+            )
+            require_site_params(page)
+            events.on_log("Logged in. Checking the report form...")
+            preflight(page, base.label, base.data_value)
+            events.on_log(f"Ready. Exporting {len(specs)} editions together "
+                          f"({subdirs}) — each route is generated once.")
+
+            for i, route in enumerate(routes, 1):
+                _wait_while_paused(events)
+                if events.is_cancelled():
+                    events.on_log("Cancelled by user.")
+                    log.info("cancelled by user at route %s", route)
+                    break
+                prefix = f"[{i:>3}/{total}] Route {route}:"
+                maybe_screenshot(page, events, note=f"Route {route}")
+                targets = targets_for(route)
+                # Route-level resume: skip only when EVERY edition is already on disk
+                # (else regenerate + re-save all -- an idempotent overwrite).
+                if all(_can_resume(out_path) for _, out_path in targets):
+                    events.on_log(f"{prefix} all editions exist, skip")
+                    _tally_all(ordered_results, events, route, "exists")
+                    continue
+                try:
+                    if not _process_route_combined(page, base, route, prefix, targets,
+                                                   events, ordered_results, timeout_ms):
+                        break
+                except RunCancelled:
+                    events.on_log("Cancelled by user.")
+                    log.info("cancelled by user during route %s", route)
+                    break
+
+            events.on_status(events.worker_no, "Finishing up…")
+            if not events.is_cancelled():
+                try:
+                    _retry_failed_combined(page, base, targets_for, ordered_results,
+                                           events, retry_timeout_ms)
+                except AuthError:
+                    raise
+                except Exception:
+                    log.exception("combined retry pass failed")
+                    events.on_log("Retry pass stopped unexpectedly (details in the log).")
+        finally:
+            browser.close()
+
+    for spec, result in zip(specs, results):
+        log.info("combined export done [%s] in %ds: saved=%d empty=%d skipped=%d "
+                 "failed=%d exists=%d", spec.subdir, int(time.monotonic() - run_t0),
+                 result.saved, len(result.empty), len(result.user_skipped),
+                 len(result.failed), len(result.exists))
+        if result.per_route:
+            try:
+                report_path = write_run_report(
+                    result, spec.label, auto_report_path(spec.subdir, f"{src}-{env}"))
+                result.report_path = str(report_path)
+            except Exception as e:
+                log.warning("could not write run report for %s: %s", spec.subdir, e)
+    return results
