@@ -87,7 +87,7 @@ in-repo golden checks (`build/check_compare_*.py`) lock the engine on synthetic 
 [verification-and-testing.md](verification-and-testing.md).
 
 **Verification flow** (the only "test suite" this no-tests repo has for the comparison): real
-input pairs live at `C:\Users\Yunus\Downloads\TSMIS\inputs` (per-route `tsmis_highway_log_route
+input pairs live at `C:\Users\Yunus\Downloads\TSMIS\ground-truth\inputs` (per-route `tsmis_highway_log_route
 1.xlsx` + `tsn_…`, and consolidated `…consolidated 1.xlsx`, 50k/60k rows — both-flavors
 generate+verify ≈ 12 min, run in background). A throwaway `%TEMP%` verifier regenerates the
 workbook and checks every cell against expectations rebuilt from the module's own helpers plus a

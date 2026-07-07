@@ -178,8 +178,8 @@ comparison engine.
 
 ### Real input pairs (LOCAL ONLY)
 
-Live under `C:\Users\Yunus\Downloads\TSMIS\inputs` (moved there from the
-Downloads root):
+Live under `C:\Users\Yunus\Downloads\TSMIS\ground-truth\inputs` (the `Downloads\TSMIS`
+folder was organized into categories on 2026-07-07 — see its `_INDEX.md`):
 
 - **Per-route (fast):** `tsmis_highway_log_route 1.xlsx` + `tsn_highway_log_route 1.xlsx`.
 - **Consolidated (50k/60k rows):** `tsmis_highway_log_consolidated 1.xlsx` +
