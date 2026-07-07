@@ -97,7 +97,7 @@ _EXPORT = [  # (key, label, fmt, expected ReportSpec)
     ("intersection_summary", "Intersection Summary", "Excel", _S_intersection_summary),
     ("intersection_detail", "Intersection Detail", "Excel", _S_intersection_detail),
     ("intersection_detail_pdf", "Intersection Detail (PDF)", "PDF", _S_intersection_detail_pdf),
-    # v0.18.1 reserved Highway groundwork (DISABLED) — appended.
+    # The Highway group — export enabled v0.19.1 (appended, ids 8/9 frozen).
     ("highway_detail", "Highway Detail", "Excel", _S_highway_detail),
     ("highway_summary", "Highway Summary", "Excel", _S_highway_summary),
 ]
