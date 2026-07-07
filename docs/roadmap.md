@@ -492,15 +492,19 @@ or accept as someday.**
   district→routes / county→routes mapping, likely sourced live from how the site repopulates the
   route dropdown after a district/county pick. **Most research-heavy — do a small site-behavior
   spike before committing to a UX.**
-- [~] **Highway Detail / Highway Summary — EXPORT enabled (v0.19.1); consolidate/compare still owed** [M] —
-  the TSMIS site is adding two new TSAR reports (`highway_detail` / `highway_summary`). **v0.18.1 shipped the
-  reserved-DISABLED groundwork; v0.19.1 enabled their EXPORT** — real `ReportSpec`s modeled on the Excel
-  siblings (`save_via_export_button`, dual empty-marker detection), lifted from
-  `reports.DISABLED_EXPORT_SUBDIRS` (now empty). Where the live site still greys them, `select_report` fails
-  fast (`ReportUnavailableError` / config error) rather than stalling. **Still owed (the next feature):**
-  their consolidators + vs-TSN / cross-env comparators + `tsn_library` entries + matrix rows — build them via
-  the proven recipe in `build/check_report_recipe.py`. Live-export verification against the site is owed
-  (the dev PC can't reach it).
+- [~] **Highway Detail / Highway Summary — EXPORT shipped; consolidate/compare still owed** [M] —
+  **v0.18.1** reserved-DISABLED groundwork; **v0.19.1** enabled the Excel EXPORT; **v0.19.2** added the
+  **Highway Detail (PDF)** print edition (`hd_printAll`, confirmed on the 7.7 dev capture). Where the live
+  site still greys a report (Highway Summary is still `cs-disabled`), `select_report` fails fast rather than
+  stalling. **Still owed (the next feature):** their consolidators + vs-TSN / cross-env comparators +
+  `tsn_library` entries + matrix rows — build via the proven recipe in `build/check_report_recipe.py`.
+  Live-export verification against the site is owed (the dev PC can't reach it).
+- [ ] **Coalescing — extend to fast mode + the console CLI** [S] — v0.19.2 coalesces dual-edition exports
+  (Excel + PDF of one report → generated once, both saved) in the **standard sequential** GUI path
+  (`run_export_combined`). **Fast mode** still runs each edition as its own parallel pass (route-parallel
+  double-generation), and the console `run_cli_multi` (`.bat` multi-export) isn't coalesced. Extend the
+  parallel engine to save both editions per route, and share `_coalesce_groups` (move it off
+  `gui_worker_export` to a neutral module) so the CLI can group too.
 
 ---
 
@@ -561,7 +565,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.19.1, shipped)
+### Version buckets — reconciled to reality (current: v0.19.2, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -581,6 +585,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.18.5** ✅ | Jul 6 | **The audit release** — every confirmed full-repo-audit finding, no new features: TSN library **normalization-version stamp + auto-rebuild from raw** (comparisons self-heal after an update), a real `0` never reads as blank (the `str(v or "")` sites), and the offline check suite now **gates every release** (`run_checks.py` + `release.yml needs: offline-checks`). `compare_core` re-blessed (2.79M cells identical). |
 | **v0.19.0** ✅ | Jul 6 | **Usability + trust + structural cleanup** — one-click **"Validate & package results"**; the same report grouping on every tab; add-today to the by-day matrix; laptop side-pane fix; + the R–V structural waves (shared comparator/PDF substrates, `gui_api`/`gui_worker`/`matrix`/`app.js` splits, ruff F821 blocking CI, `checks.yml` = one runner step, SEC-02/05/06 hardening, `compared_cell` re-blessed 2,789,732 cells identical). Work-PC sign-off received. |
 | **v0.19.1** ✅ | Jul 7 | **Highway Detail/Summary EXPORT enabled** (the v0.18.1 reserved pair; export-only — consolidate/compare still owed) + **validation phantom-env fix** (`_envs_with_data` walked the store's `_tsn_input` TSN-drop folder as an environment → the Validate run now reads 18/18). |
+| **v0.19.2** ✅ | Jul 7 | **Highway Detail (PDF)** print edition (stable id 10, `hd_printAll` — confirmed on the 7.7 dev capture) + **dual-edition coalescing** (selecting both editions of one report generates it once and saves both; `run_export_combined`, standard path — fast mode + CLI are follow-ups). Locked by `check_coalesce_editions`. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

@@ -53,6 +53,7 @@ that rewrote the design.
 | `v0.18.5` | Jul 6 | **The audit release** — every confirmed finding from the full-repo audit, no new features: comparisons self-heal after an update (TSN normalization-version stamp + auto-rebuild from raw), a real `0` never reads as blank, and the offline check suite now gates every release in CI |
 | `v0.19.0` | Jul 6 | **Usability + trust + the structural cleanup** — one-click "Validate & package results"; the same report grouping on every tab; add-today to the by-day matrix; the codebase reorganized (shared comparator/PDF substrates, GUI/worker/matrix/app.js splits, a proven add-a-report recipe) with `compare_core` re-blessed cell-for-cell; safety hardening (owned-folder-only reset, pre-install digest re-verify, batch-dest validation) |
 | `v0.19.1` | Jul 7 | **Highway Detail/Summary export goes live** (the v0.18.1 reserved pair, export-only for now) + a validation phantom-env fix (the store's TSN drop folder was miscounted as an export environment) |
+| `v0.19.2` | Jul 7 | **Highway Detail (PDF)** print edition (the vendor shipped the report on the dev site) + **dual-edition coalescing** — selecting both editions of a report generates it once and saves both instead of twice |
 
 ---
 
@@ -383,6 +384,19 @@ groundwork back in v0.18.1 — went **live**, with real specs modeled on their E
 out of the disable gate. Their consolidation and comparison are a later feature; where the site
 still greys the pair, selection fails fast instead of stalling.
 
+**`v0.19.2` — the report arrives, and stop doing the work twice.** The vendor shipped Highway
+Detail on the dev site (a fresh capture confirmed `highway_detail.js` — its `hd_printAll` builds
+the same print layout Highway Log uses), so the report got its **print-layout PDF edition** — the
+third report, after Highway Log and Intersection Detail, to ship in both Excel and PDF. That third
+pair prompted the second half: **coalescing**. Selecting both editions of a report used to load
+every route twice — once for the Excel export, once for the PDF — which is wasteful and doubles the
+load on the TSMIS server. Now the standard export path generates each route **once** and saves both
+files off that single render, the Export-button save first and the DOM-rebuilding Print capture last
+(the print layout replaces the page, so it has to go second). Each edition still keeps its own
+result, staging, and consolidation. A design note the field would recognize: the win is real in the
+default sequential path, but *fast mode's* parallelism is a different speed lever, so coalescing it
+is left as a follow-up rather than forced to fit.
+
 ---
 
 ## Three threads that run through all of it
@@ -391,7 +405,7 @@ still greys the pair, selection fails fast instead of stalling.
    window, Mark-of-the-Web crashing the CLR on download, PowerShell-blocked PCs
    breaking the updater — three separate "worked on my machine, then a real
    Caltrans PC ate it" failures, each now a permanent design constraint.
-2. **Refactor toward one core.** One `ReportSpec` loop serves ten reports; one
+2. **Refactor toward one core.** One `ReportSpec` loop serves eleven reports; one
    `compare_core` serves two comparison families; one catalog feeds both the GUI
    and the console. The shells (Tkinter → WebView2) were swappable *because* the
    engine stayed console-free — and v0.18.0 took the idea furthest, dissolving

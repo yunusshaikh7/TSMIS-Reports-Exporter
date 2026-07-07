@@ -32,6 +32,7 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 | 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 | 7 | Highway Detail | XLSX | `output/<run>/highway_detail/` |
+| 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
 | 8 | Highway Summary | XLSX | `output/<run>/highway_summary/` |
 
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
@@ -39,15 +40,18 @@ Reports 5–6 (Intersection): export is **enabled** but the report lives on the
 **development** TSMIS site — switch via Settings ▸ "Use development site"
 (`tsmis-dev.dot.ca.gov`). Highway Log and Intersection Detail each ship in **two
 editions** — the Excel export and a print-layout **PDF** edition (4b / 6b; 6b was
-forward-ported in v0.18.0 as an exact parallel of 4b). v0.17.0 brought reports 1–6b to
-parity: the **8 fully-integrated export types consolidate AND compare vs TSN** — each has a
-vs-TSN comparator and lives in both the Everything and by-day matrices (see
-[docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md) for
-the per-report schema + locked canaries). Reports **7–8 (Highway Detail/Summary)** are
-**export-only as of v0.19.1** — the site's newest TSAR pair, enabled from the v0.18.1
-reserved groundwork; their consolidator/comparison/matrix integration is a later feature,
-so they're absent from Consolidate/Compare/the matrices for now. Where the live site still
-greys them, `select_report` fails fast rather than stalling. Consolidate-only sources exist too — **TSN**
+forward-ported in v0.18.0 as an exact parallel of 4b; **7b** is Highway Detail's, v0.19.2).
+v0.17.0 brought reports 1–6b to parity: the **8 fully-integrated export types consolidate AND
+compare vs TSN** — each has a vs-TSN comparator and lives in both the Everything and by-day
+matrices (see [docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md)
+for the per-report schema + locked canaries). Reports **7 / 7b / 8 (Highway Detail + its PDF /
+Highway Summary)** are **export-only** — the site's newest TSAR report (Detail export v0.19.1,
+its PDF v0.19.2; Summary export-enabled app-side but still site-greyed); consolidator/comparison/
+matrix integration is a later feature, so they're absent from Consolidate/Compare/the matrices.
+Where the live site still greys a report, `select_report` fails fast rather than stalling.
+**Selecting both editions of one report (Excel + PDF, same `data_value`) coalesces** — the route
+is generated **once** and both files saved off it (`run_export_combined`, v0.19.2; standard path
+only, not fast mode). Consolidate-only sources exist too — **TSN**
 Highway Log district PDFs (dropped into `input/tsn_highway_log/`) and the app's own
 **Highway Log (PDF)** and **Intersection Detail (PDF)** exports. The **Compare** tab
 diffs every report **TSMIS-vs-TSN** (the PDF-sourced Highway Log and Intersection

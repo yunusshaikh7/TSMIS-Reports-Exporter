@@ -48,8 +48,9 @@ of `.bat` scripts for development and as a fallback.
 
 ## Features
 
-- **Ten report types, any combination.** Eight base reports plus PDF editions of
-  Highway Log and Intersection Detail — export one, several, or all at once.
+- **Eleven report types, any combination.** Eight base reports plus print-layout PDF
+  editions of Highway Log, Intersection Detail, and Highway Detail — export one, several, or
+  all at once. Tick both editions of a report and it's generated once, saved both ways.
 - **One login for everything.** A single SSO + MFA sign-in covers every report.
 - **Pick your routes.** Run all routes by default, or narrow to a subset
   (`5, 99, 101` — any casing/zero-padding, suffixes like `101U` accepted).
@@ -91,13 +92,14 @@ of `.bat` scripts for development and as a fallback.
 | Intersection Detail | XLSX | `output/<date>/intersection_detail/` |
 | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<date>/intersection_detail_pdf/` |
 | Highway Detail | XLSX | `output/<date>/highway_detail/` |
+| Highway Detail (PDF) | PDF (Letter, landscape) | `output/<date>/highway_detail_pdf/` |
 | Highway Summary | XLSX | `output/<date>/highway_summary/` |
 
-Highway Log and Intersection Detail each ship in two editions — the regular Excel
-export and a print-layout **PDF** edition (added for Intersection Detail in v0.18.0,
-matching the one Highway Log already had). **Highway Detail and Highway Summary** are the
-site's newest TSAR pair, **export-enabled in v0.19.1** (their consolidation/comparison is a
-later addition). The two Intersection reports live on the **development** TSMIS site (switch
+Highway Log, Intersection Detail, and Highway Detail each ship in two editions — the regular
+Excel export and a print-layout **PDF** edition (Intersection Detail's added in v0.18.0,
+Highway Detail's in v0.19.2). Ticking both editions of a report generates it once and saves
+both. **Highway Detail and Highway Summary** are the site's newest TSAR report, **export-enabled
+in v0.19.1** (Highway Detail's PDF in v0.19.2; their consolidation/comparison is a later addition). The two Intersection reports live on the **development** TSMIS site (switch
 via Settings ▸ "Use development site"); as of v0.17.0 every fully-integrated report — both
 editions included — consolidates, compares
 cross-environment, and compares vs TSN.

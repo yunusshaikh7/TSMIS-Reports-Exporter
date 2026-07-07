@@ -3,6 +3,20 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.19.2 — 2026-07-07
+
+Two export improvements for the new Highway Detail report.
+
+- **Highway Detail can now be exported as a PDF.** Alongside its Excel export (added in v0.19.1),
+  Highway Detail now has a print-layout **PDF** edition — the same page-per-route Print output that
+  Highway Log and Intersection Detail already offer. It appears next to the Excel version on the
+  Export tab.
+- **Selecting both editions of a report no longer runs it twice.** When you tick both the Excel and
+  the PDF version of the same report (Highway Log, Intersection Detail, or Highway Detail), the app
+  now loads each route **once** and saves both files from that single result — instead of generating
+  the whole report a second time. Faster, and easier on the TSMIS server. (Fast mode still runs each
+  edition on its own for now.)
+
 ## v0.19.1 — 2026-07-06
 
 Two things: the Highway Detail / Highway Summary exports go live, and a validation glitch found
