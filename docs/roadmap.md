@@ -565,7 +565,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.19.2, shipped)
+### Version buckets — reconciled to reality (current: v0.19.3, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -586,6 +586,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.19.0** ✅ | Jul 6 | **Usability + trust + structural cleanup** — one-click **"Validate & package results"**; the same report grouping on every tab; add-today to the by-day matrix; laptop side-pane fix; + the R–V structural waves (shared comparator/PDF substrates, `gui_api`/`gui_worker`/`matrix`/`app.js` splits, ruff F821 blocking CI, `checks.yml` = one runner step, SEC-02/05/06 hardening, `compared_cell` re-blessed 2,789,732 cells identical). Work-PC sign-off received. |
 | **v0.19.1** ✅ | Jul 7 | **Highway Detail/Summary EXPORT enabled** (the v0.18.1 reserved pair; export-only — consolidate/compare still owed) + **validation phantom-env fix** (`_envs_with_data` walked the store's `_tsn_input` TSN-drop folder as an environment → the Validate run now reads 18/18). |
 | **v0.19.2** ✅ | Jul 7 | **Highway Detail (PDF)** print edition (stable id 10, `hd_printAll` — confirmed on the 7.7 dev capture) + **dual-edition coalescing** (selecting both editions of one report generates it once and saves both; `run_export_combined`, standard path — fast mode + CLI are follow-ups). Locked by `check_coalesce_editions`. |
+| **v0.19.3** ✅ | Jul 7 | **Hotfix** (field-driven) — the per-route stale-form guard (`_ensure_report_armed`) false-"drifted" on **every** route for a grouped-menu report: it compared the visible `.cs-value` (the short leaf label "Detail") to the full `spec.label` ("Highway Detail") and re-selected each route (correct exports, but log spam + wasted work). Fix = key on the hidden `#reportSelect`'s stable `data-value` (`current_report_value`), text read only as fallback. Affects both Highway Detail editions. Regression-covered in `check_export_engine` + `check_fake_site` (new `test_current_report_value`); `compare_core` untouched. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

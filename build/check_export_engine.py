@@ -531,28 +531,66 @@ def test_wait_condition_validation():
 def test_ensure_report_armed(monkeypatch):
     print("per-route stale-form re-arm guard (_ensure_report_armed):")
     from events import Events
-    spec = exporter.ReportSpec(
-        label="Highway Log", subdir="x", filename=lambda r: "x.xlsx",
-        wait_js=lambda r: "() => true", is_empty=lambda p: False, save=lambda *a: None)
     calls = {"select": 0}
     monkeypatch(exporter, "select_report",
                 lambda page, label, data_value=None:
                     calls.__setitem__("select", calls["select"] + 1))
 
+    # --- Legacy fallback path: a spec with NO data_value uses the visible label. ---
+    spec = exporter.ReportSpec(
+        label="Highway Log", subdir="x", filename=lambda r: "x.xlsx",
+        wait_js=lambda r: "() => true", is_empty=lambda p: False, save=lambda *a: None)
+    monkeypatch(exporter, "current_report_value", lambda page: "")   # no stable id
+
     # Happy path: the shown label already matches -> NO re-arm.
     monkeypatch(exporter, "current_report_label", lambda page: "Highway Log")
     exporter._ensure_report_armed(object(), spec, "[t]", Events())
-    check("matching selection does NOT re-arm", calls["select"] == 0)
+    check("no-data_value: matching label does NOT re-arm", calls["select"] == 0)
 
     # Drifted: a different label is shown -> re-arm (select_report called once).
     monkeypatch(exporter, "current_report_label", lambda page: "-- Select report --")
     exporter._ensure_report_armed(object(), spec, "[t]", Events())
-    check("drifted selection re-arms (select_report called)", calls["select"] == 1)
+    check("no-data_value: drifted label re-arms", calls["select"] == 1)
 
     # Unknown (''): can't tell -> never act (no spurious re-arm).
     monkeypatch(exporter, "current_report_label", lambda page: "")
     exporter._ensure_report_armed(object(), spec, "[t]", Events())
-    check("unreadable selection does NOT re-arm", calls["select"] == 1)
+    check("no-data_value: unreadable selection does NOT re-arm", calls["select"] == 1)
+
+    # --- Stable-id path: a spec WITH data_value compares the hidden #reportSelect. ---
+    # Highway Detail is a nested-menu leaf: its VISIBLE label is the short "Detail",
+    # never the full spec.label. The guard must key on the stable id, not the text.
+    calls["select"] = 0
+    hd = exporter.ReportSpec(
+        label="Highway Detail", subdir="x", data_value="highway_detail",
+        filename=lambda r: "x.xlsx", wait_js=lambda r: "() => true",
+        is_empty=lambda p: False, save=lambda *a: None)
+
+    # THE REGRESSION: armed id matches even though the visible leaf text is "Detail"
+    # (which the old text compare would have re-selected on EVERY route) -> NO re-arm.
+    monkeypatch(exporter, "current_report_value", lambda page: "highway_detail")
+    monkeypatch(exporter, "current_report_label", lambda page: "Detail")
+    exporter._ensure_report_armed(object(), hd, "[t]", Events())
+    check("data_value: matching id ignores short leaf text (no re-arm)",
+          calls["select"] == 0)
+
+    # Genuine drift: the form armed a DIFFERENT report id -> re-arm.
+    monkeypatch(exporter, "current_report_value", lambda page: "highway_log")
+    exporter._ensure_report_armed(object(), hd, "[t]", Events())
+    check("data_value: different armed id re-arms", calls["select"] == 1)
+
+    # Stable id unreadable ('') -> fall back to the label text: mismatch re-arms...
+    monkeypatch(exporter, "current_report_value", lambda page: "")
+    monkeypatch(exporter, "current_report_label", lambda page: "-- Select report --")
+    exporter._ensure_report_armed(object(), hd, "[t]", Events())
+    check("data_value: unreadable id falls back to label (mismatch re-arms)",
+          calls["select"] == 2)
+
+    # ...and a matching label under an unreadable id does NOT re-arm.
+    monkeypatch(exporter, "current_report_label", lambda page: "Highway Detail")
+    exporter._ensure_report_armed(object(), hd, "[t]", Events())
+    check("data_value: unreadable id, matching label does NOT re-arm",
+          calls["select"] == 2)
 
 
 def test_pdf_empty_backstop():

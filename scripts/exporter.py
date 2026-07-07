@@ -28,6 +28,7 @@ from common import (
     ReportError,
     RunCancelled,
     current_report_label,
+    current_report_value,
     download_start_timeout_ms,
     get_site,
     get_url,
@@ -499,14 +500,31 @@ def _capture_failure(page, spec, route, events):
 
 
 def _ensure_report_armed(page, spec, prefix, events):
-    """Re-confirm the report dropdown still shows spec.label before a route.
+    """Re-confirm the report dropdown still has spec's report armed before a route.
 
     The report is selected once at preflight and only re-armed by _recover after a
     skip/error; if the site silently reset the dropdown between routes (a stale
     form), the per-route Route selection + Generate would run against the WRONG
-    report. This cheap guard re-selects when the shown label has drifted. It
-    no-ops on the happy path (the label already matches) and never acts on an
-    unreadable selection (current_report_label returns '' = unknown)."""
+    report. This cheap guard re-selects when the armed report has drifted.
+
+    Prefer the STABLE id (the hidden #reportSelect's data-value) over the visible
+    .cs-value TEXT: on the site's nested menu a leaf displays a SHORT label
+    ("Detail"), which never equals the full spec.label ("Highway Detail"), so a
+    text compare would false-"drift" and re-select on EVERY route (a real field
+    report -- correct exports, but log spam + a needless re-select per route). The
+    id matches on the happy path regardless of the display text. Fall back to the
+    label-text check only when there's no data_value or the id can't be read; never
+    act on an unreadable selection (both readers return '' = unknown)."""
+    if spec.data_value:
+        armed = current_report_value(page)
+        if armed:
+            if armed != spec.data_value:
+                log.warning("%s report form armed %r, expected %r -- re-selecting",
+                            prefix, armed, spec.data_value)
+                events.on_log(f"{prefix} report form drifted; re-selecting {spec.label}")
+                select_report(page, spec.label, spec.data_value)
+            return                       # id matched (no-op) or we handled the drift
+        # armed == '' (couldn't read the hidden id): fall through to the text check.
     shown = current_report_label(page)
     if shown and shown != spec.label:
         log.warning("%s report form shows %r, expected %r -- re-selecting",

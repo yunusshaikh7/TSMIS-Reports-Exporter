@@ -163,13 +163,42 @@ def current_report_label(page):
     Lets the export loop cheaply re-confirm the form still has the intended report
     selected before each route, so a silently-reset / stale form is caught instead
     of generating every remaining route against the wrong report. '' means
-    "couldn't tell" — callers must treat that as OK and never act on uncertainty."""
+    "couldn't tell" — callers must treat that as OK and never act on uncertainty.
+
+    NOTE: the VISIBLE text is fragile on the nested menu — a leaf shows a SHORT
+    label ("Detail") and the sites even disagree on what to display there (prod
+    writes opt.textContent = "Detail"; dev writes opt.dataset.label = "Highway
+    Detail"). Prefer current_report_value (the stable id) to confirm the armed
+    report; this text read is the fallback for when there's no stable id."""
     try:
         loc = page.locator("#customReport .cs-value")
         if loc.count() > 0:
             return (loc.first.inner_text() or "").strip()
     except Exception as e:
         log.info("current_report_label: could not read the selection (%s)",
+                 type(e).__name__)
+    return ""
+
+
+def current_report_value(page):
+    """Best-effort: the STABLE data-value of the report the form currently has
+    armed (the hidden #reportSelect's value), or '' when it can't be read.
+
+    The site mirrors each picked report's data-value into a hidden native
+    <select id="reportSelect"> (main.js: `hidden.value = opt.dataset.value`) on
+    BOTH the flat prod menu and the nested dev flyout, and that <select> carries a
+    real <option value="…"> per report so the assignment sticks. This is the
+    relabel-proof way to confirm WHICH report is armed — unlike the visible
+    .cs-value, whose nested-leaf text is the short "Detail" (never the full
+    "Highway Detail"), which would make the per-route re-arm guard fire on EVERY
+    route. '' means "couldn't tell"; callers must treat that as OK and never act
+    on uncertainty."""
+    try:
+        loc = page.locator("#reportSelect")
+        if loc.count() > 0:
+            return (loc.first.input_value() or "").strip()
+    except Exception as e:
+        log.info("current_report_value: could not read the selection (%s)",
                  type(e).__name__)
     return ""
 

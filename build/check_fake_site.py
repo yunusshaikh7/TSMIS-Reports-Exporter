@@ -361,6 +361,34 @@ def test_current_report_label(page):
           common.current_report_label(page) == "")
 
 
+def test_current_report_value(page):
+    print("current_report_value reads the armed report's STABLE id (#reportSelect):")
+    # A selected form: the hidden native select holds the armed report's data-value.
+    page.goto(_fixture_url("dropdown_selected.html"))
+    check("reads the armed report's stable id",
+          common.current_report_value(page) == "highway_log")
+
+    # THE REGRESSION on the nested menu: after picking the Intersection Detail leaf
+    # (whose VISIBLE text is only "Detail"), the hidden select still holds the full
+    # stable id "intersection_detail" -- so the per-route re-arm guard keys on the
+    # id, immune to the short leaf label that used to false-"drift" on every route.
+    page.goto(_fixture_url("dropdown_nested.html"))
+    page.set_default_timeout(3000)
+    try:
+        select_report(page, "Intersection Detail", data_value="intersection_detail")
+    except Exception:  # noqa: BLE001 -- fails later at the missing District control
+        pass
+    finally:
+        page.set_default_timeout(30000)
+    check("nested leaf armed -> stable id intersection_detail",
+          common.current_report_value(page) == "intersection_detail")
+
+    # No #reportSelect on the page -> '' (can't tell; callers treat that as OK).
+    page.goto(_fixture_url("blank.html"))
+    check("returns '' when there's no hidden select",
+          common.current_report_value(page) == "")
+
+
 def test_highway_log_pdf_save(page):
     print("Highway Log PDF save: invokes the Print layout and writes a real PDF:")
     from exporter import save_highway_log_pdf
@@ -493,6 +521,7 @@ def main():
             test_nested_menu(page)
             test_env_scan_probe(page)
             test_current_report_label(page)
+            test_current_report_value(page)
             test_highway_log_pdf_save(page)
             test_intersection_detail_pdf_save(page)
             test_ramp_summary_pdf_empty(page)

@@ -104,8 +104,11 @@ drop to `partial` (P1), so dropped-line output is never promoted as complete.
 **exact** option match (no substring mis-pick) — and, as of **v0.18.1**, matches by the option's stable
 `data-value` first (falling back to exact text / `data-label`) and reveals the nested `cs-submenu` flyout,
 so selection survives the site's flat→nested report-menu migration without breaking the flat prod menu;
-every route re-confirms the report dropdown before
-Generate (`_ensure_report_armed`, the stale-form guard); the sign-in busy-wait gained an **in-loop
+every route re-confirms the report dropdown before Generate (`_ensure_report_armed`, the stale-form
+guard — as of **v0.19.3** it keys on the hidden `#reportSelect`'s stable `data-value` via
+`current_report_value`, **not** the visible `.cs-value` text, so a grouped-menu leaf whose display
+label is the short "Detail" no longer false-"drifts" and re-selects on every route; the text read is
+the fallback when there's no `data_value`); the sign-in busy-wait gained an **in-loop
 cancel check** (`navigate_with_auth(..., should_cancel=…)` polls ~1 s so Stop/Clear interrupt a stuck
 login); the Edge sign-in CDP port is opened **on demand** and **closed on capture**; the no-download
 empty backstop is marker-independent. See [internals/export-engine.md](internals/export-engine.md).

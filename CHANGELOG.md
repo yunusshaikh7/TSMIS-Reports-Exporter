@@ -3,6 +3,18 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.19.3 — 2026-07-07
+
+A field fix for the new Highway Detail export.
+
+- **Highway Detail no longer re-selects the report on every route.** Because Highway Detail sits in
+  the site's new grouped "Highway ▸ Detail" menu, the app's per-route safety check kept mistaking the
+  short menu label ("Detail") for a changed selection and re-picking the report on every single route
+  — flooding the log with "report form drifted" and slowing the run. The check now confirms the report
+  by its stable id instead of the on-screen text, so it stays quiet on the happy path while still
+  catching a genuinely reset form. Exports were always correct; this just removes the wasted work and
+  the noise. (Applies to both the Excel and PDF editions of Highway Detail.)
+
 ## v0.19.2 — 2026-07-07
 
 Two export improvements for the new Highway Detail report.

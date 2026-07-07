@@ -2,14 +2,24 @@
 <!--
 The #customReport dropdown AFTER a report has been selected: the cs-value shows
 the chosen report's text (the real cs-select widget writes the picked label into
-.cs-value). Used to prove current_report_label() reads the armed selection, so the
-per-route stale-form re-arm guard (select-report-not-rearmed-between-routes, P8c)
-no-ops on the happy path and only re-selects when the form has drifted. Authored
-synthetic reconstruction -- not a copy of the Caltrans source.
+.cs-value) AND the hidden native <select id="reportSelect"> holds that report's
+stable data-value (the real widget mirrors `opt.dataset.value` into it). Used to
+prove current_report_label() reads the visible selection AND current_report_value()
+reads the stable id, so the per-route stale-form re-arm guard
+(select-report-not-rearmed-between-routes, P8c) no-ops on the happy path and only
+re-selects when the form has genuinely drifted. Authored synthetic reconstruction
+-- not a copy of the Caltrans source.
 -->
 <html>
 <head><meta charset="utf-8"><title>dropdown: selected</title></head>
 <body>
+  <!-- The hidden native select the real page keeps in sync with the custom widget;
+       "highway_log" is the armed report's stable id. -->
+  <select id="reportSelect" style="display:none;">
+    <option value="" disabled hidden>-- Select report --</option>
+    <option value="highway_log" selected>Highway Log</option>
+    <option value="highway_sequence">Highway Sequence Listing</option>
+  </select>
   <div class="cs" id="customReport">
     <div class="cs-trigger">
       <span class="cs-value">Highway Log</span>

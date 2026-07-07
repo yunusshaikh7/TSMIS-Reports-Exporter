@@ -39,6 +39,22 @@ is exactly the contract select_report's submenu-reveal must satisfy.
   </style>
 </head>
 <body>
+  <!-- The hidden native select the real page keeps in sync with the custom widget:
+       a click on a leaf writes its data-value here (main.js: hidden.value =
+       opt.dataset.value), and it carries a real <option> per report so the value
+       sticks. current_report_value() reads this to confirm the armed report by its
+       STABLE id -- immune to the nested leaf's short visible text. -->
+  <select id="reportSelect" style="display:none;">
+    <option value="" disabled selected hidden>-- Select report --</option>
+    <option value="highway_log">Highway Log</option>
+    <option value="highway_sequence">Highway Sequence Listing</option>
+    <option value="highway_detail">Highway Detail</option>
+    <option value="highway_summary">Highway Summary</option>
+    <option value="intersection_detail">Intersection Detail</option>
+    <option value="intersection_summary">Intersection Summary</option>
+    <option value="Ramp_Detail">Ramp Detail</option>
+    <option value="Ramp_Summary">Ramp Summary</option>
+  </select>
   <div class="cs" id="customReport">
     <div class="cs-trigger">
       <span class="cs-value">-- Select report --</span>
@@ -76,6 +92,7 @@ is exactly the contract select_report's submenu-reveal must satisfy.
     window.__picked = null;
     const cs = document.getElementById('customReport');
     const csValue = cs.querySelector('.cs-value');
+    const hidden = document.getElementById('reportSelect');
     cs.querySelector('.cs-trigger').addEventListener('click',
       () => cs.classList.toggle('is-open'));
     cs.querySelectorAll('.cs-option:not(.cs-disabled)').forEach(opt => {
@@ -83,6 +100,7 @@ is exactly the contract select_report's submenu-reveal must satisfy.
         const name = opt.dataset.label || (opt.textContent || '').trim();
         window.__picked = name;
         csValue.textContent = name;
+        hidden.value = opt.dataset.value;   // mirror the stable id, as main.js does
         cs.classList.remove('is-open');
       });
     });

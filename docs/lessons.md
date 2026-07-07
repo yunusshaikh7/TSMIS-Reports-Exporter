@@ -211,6 +211,26 @@ laid-out DOM), so the inline CSS comment carries the warning; verify in the
 
 ---
 
+## 11. Read a form's state by its stable id, never its visible label
+
+The site is migrating `#customReport` from a flat list to a grouped fly-out where a
+leaf *displays* a short label — "Detail", not "Highway Detail". v0.18.1 learned this
+for **selecting** a report (match the `data-value`, not the text). v0.19.3 learned it
+again for **reading** the selection: the per-route stale-form guard
+(`_ensure_report_armed`) compared the visible `.cs-value` to the full `spec.label`, so
+the moment Highway Detail moved into the grouped menu the guard saw "Detail" ≠ "Highway
+Detail" and re-selected on **every** route — correct exports, but log spam and ~250
+needless re-selects per run. The two sites even *render* the leaf differently (prod
+writes `opt.textContent`, dev writes `opt.dataset.label`), so the visible text is not a
+reliable identity anywhere. **Rule: any check on "which report/option is active" reads
+the stable id** — the hidden `<select id="reportSelect">`'s `data-value` via
+`current_report_value` — **and treats the visible label as a last-resort fallback.**
+This class of bug (visible text ≠ stable identity) is invisible until a report enters
+the grouped menu, which is exactly where the whole catalog is heading — so audit every
+`.cs-value`/label-text read the same way. → [engine-and-reliability.md](engine-and-reliability.md).
+
+---
+
 ### Quick index of the lessons
 
 | # | Lesson | Owns the detail |
@@ -225,3 +245,4 @@ laid-out DOM), so the inline CSS comment carries the warning; verify in the
 | 8 | Two-agent parallel work on a shared branch | — (this doc) |
 | 9 | Work-PC reality shapes every feature | it-and-security |
 | 10 | A hidden input with no positioned parent escapes its clip | gui |
+| 11 | Read a form's state by its stable id, never its visible label | engine-and-reliability |

@@ -54,6 +54,7 @@ that rewrote the design.
 | `v0.19.0` | Jul 6 | **Usability + trust + the structural cleanup** — one-click "Validate & package results"; the same report grouping on every tab; add-today to the by-day matrix; the codebase reorganized (shared comparator/PDF substrates, GUI/worker/matrix/app.js splits, a proven add-a-report recipe) with `compare_core` re-blessed cell-for-cell; safety hardening (owned-folder-only reset, pre-install digest re-verify, batch-dest validation) |
 | `v0.19.1` | Jul 7 | **Highway Detail/Summary export goes live** (the v0.18.1 reserved pair, export-only for now) + a validation phantom-env fix (the store's TSN drop folder was miscounted as an export environment) |
 | `v0.19.2` | Jul 7 | **Highway Detail (PDF)** print edition (the vendor shipped the report on the dev site) + **dual-edition coalescing** — selecting both editions of a report generates it once and saves both instead of twice |
+| `v0.19.3` | Jul 7 | **Hotfix** — Highway Detail stopped re-selecting the report on every route (the site's grouped menu shows the short label "Detail"; the per-route stale-form check now confirms the report by its stable id, not the on-screen text) |
 
 ---
 
@@ -396,6 +397,20 @@ files off that single render, the Export-button save first and the DOM-rebuildin
 result, staging, and consolidation. A design note the field would recognize: the win is real in the
 default sequential path, but *fast mode's* parallelism is a different speed lever, so coalescing it
 is left as a follow-up rather than forced to fit.
+
+**`v0.19.3` — the guard that cried drift.** The first real run of the new Highway Detail export
+came back from the field flooding the log with "report form drifted" — the per-route safety check
+re-selecting the report on *every* route. It was a false alarm born of the site's own menu
+migration: Highway Detail lives in the new grouped "Highway ▸ Detail" fly-out, whose selected leaf
+*displays* the short label "Detail", and the guard was comparing that visible text to the full
+"Highway Detail" it expected — a mismatch on every route. The exports were always correct (it
+re-picked the right report by its stable id each time), but it re-opened the menu and re-fanned the
+route selection ~250 times per run for nothing. The fix is the same lesson the codebase already
+learned for *selecting* reports: trust the stable id, not the on-screen text. The guard now reads
+the hidden `#reportSelect`'s `data-value` and only falls back to the visible label when there is no
+id — so it stays silent on the happy path while still catching a genuinely reset form. A one-line
+class of bug (visible text ≠ stable identity) that only surfaces once a report moves into the
+grouped menu, which is exactly where the whole report catalog is headed.
 
 ---
 
