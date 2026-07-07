@@ -48,7 +48,7 @@ of `.bat` scripts for development and as a fallback.
 
 ## Features
 
-- **Eight report types, any combination.** Six base reports plus PDF editions of
+- **Ten report types, any combination.** Eight base reports plus PDF editions of
   Highway Log and Intersection Detail — export one, several, or all at once.
 - **One login for everything.** A single SSO + MFA sign-in covers every report.
 - **Pick your routes.** Run all routes by default, or narrow to a subset
@@ -90,12 +90,16 @@ of `.bat` scripts for development and as a fallback.
 | Intersection Summary | XLSX | `output/<date>/intersection_summary/` |
 | Intersection Detail | XLSX | `output/<date>/intersection_detail/` |
 | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<date>/intersection_detail_pdf/` |
+| Highway Detail | XLSX | `output/<date>/highway_detail/` |
+| Highway Summary | XLSX | `output/<date>/highway_summary/` |
 
 Highway Log and Intersection Detail each ship in two editions — the regular Excel
 export and a print-layout **PDF** edition (added for Intersection Detail in v0.18.0,
-matching the one Highway Log already had). The two Intersection reports live on the
-**development** TSMIS site (switch via Settings ▸ "Use development site"); as of
-v0.17.0 every report — both editions included — consolidates, compares
+matching the one Highway Log already had). **Highway Detail and Highway Summary** are the
+site's newest TSAR pair, **export-enabled in v0.19.1** (their consolidation/comparison is a
+later addition). The two Intersection reports live on the **development** TSMIS site (switch
+via Settings ▸ "Use development site"); as of v0.17.0 every fully-integrated report — both
+editions included — consolidates, compares
 cross-environment, and compares vs TSN.
 
 Consolidate-only: **TSN Highway Log** (drop district PDFs into

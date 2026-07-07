@@ -741,10 +741,11 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
-cross-environment, no live re-export** (it compares specific historical exports). **ALL 8 reports are
-live** — HL Excel/PDF + Ramp Detail + Ramp Summary + Intersection Summary + Intersection Detail
-(Excel + PDF) + Highway Sequence; nothing greyed (v0.17.0/v0.18.0 complete). Like `matrix.py`, it
-NEVER edits the manual compare code — it only orchestrates.
+cross-environment, no live re-export** (it compares specific historical exports). **ALL 8
+comparison-integrated reports are live** — HL Excel/PDF + Ramp Detail + Ramp Summary + Intersection
+Summary + Intersection Detail (Excel + PDF) + Highway Sequence; nothing greyed (v0.17.0/v0.18.0
+complete). (The v0.19.1 Highway Detail/Summary pair is export-only — no comparator yet, so it isn't
+a matrix row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orchestrates.
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
   (the same path `build_comparison`'s tsn branch uses, now keyed on `(row_key, subdir)`) over the

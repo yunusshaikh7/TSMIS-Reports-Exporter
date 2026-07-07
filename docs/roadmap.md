@@ -561,7 +561,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.18.4, shipped)
+### Version buckets — reconciled to reality (current: v0.19.1, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -578,6 +578,9 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.18.2** ✅ | Jun 29 | **Hotfix** (field-driven) — comparison **progress feedback** (the ~17k-row Intersection Detail vs-TSN build narrates its formerly-silent "Report View" stretch; `_PROGRESS_EVERY` 10k→2.5k ⇒ Stop lands sooner), **skip the live-formulas twin** for huge bulk matrix rebuilds (> `_FORMULAS_TWIN_MAX_ROWS` Comparison rows; the values copy is still complete, the skip is logged, the manual Compare tab is unaffected), and **Route Suffix surfaced in the Report View** (soft: red, not Major). `compare_core` output byte-identical. |
 | **v0.18.3** ✅ | Jun 29 | **Hotfix** (field-driven) — two Intersection Detail vs-TSN comparison fixes: the **intersecting-route postmile** no longer false-flags where both sides are 0 (`_norm_num`/`_norm_bool` preserve a numeric 0 instead of blanking it via `str(v or "")`, so TSN's numeric-0 reads `0` and matches TSMIS's `'0.000'`; statewide canary **163,353→163,310**, −43, only that field), and the **Report View marks one-sided locations** "Only in TSMIS/TSN" (a side-colored band, kept out of the Major/Diffs tally) instead of an all-red row. `compare_core` untouched. |
 | **v0.18.4** ✅ | Jun 29 | **Hotfix** (field-driven) — the **matrix job-queue phantom**: a finished/cancelled compare lingered in the queue panel marked "running" (BOTH matrices) until the next job replaced it. Backend was correct (the job released + state pushed); the panel is a `.mc-group` whose bare `display:flex` outranked the UA `[hidden]{display:none}`, so `group.hidden=true` never hid it, and `renderQueuePanel` didn't clear the row list on the empty path. Fix = `.mc-group[hidden]{display:none}` + clear the list every path. Frontend-only; reproduced + verified in `#mock` with the production event order (which the mock's own order masked). |
+| **v0.18.5** ✅ | Jul 6 | **The audit release** — every confirmed full-repo-audit finding, no new features: TSN library **normalization-version stamp + auto-rebuild from raw** (comparisons self-heal after an update), a real `0` never reads as blank (the `str(v or "")` sites), and the offline check suite now **gates every release** (`run_checks.py` + `release.yml needs: offline-checks`). `compare_core` re-blessed (2.79M cells identical). |
+| **v0.19.0** ✅ | Jul 6 | **Usability + trust + structural cleanup** — one-click **"Validate & package results"**; the same report grouping on every tab; add-today to the by-day matrix; laptop side-pane fix; + the R–V structural waves (shared comparator/PDF substrates, `gui_api`/`gui_worker`/`matrix`/`app.js` splits, ruff F821 blocking CI, `checks.yml` = one runner step, SEC-02/05/06 hardening, `compared_cell` re-blessed 2,789,732 cells identical). Work-PC sign-off received. |
+| **v0.19.1** ✅ | Jul 7 | **Highway Detail/Summary EXPORT enabled** (the v0.18.1 reserved pair; export-only — consolidate/compare still owed) + **validation phantom-env fix** (`_envs_with_data` walked the store's `_tsn_input` TSN-drop folder as an environment → the Validate run now reads 18/18). |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

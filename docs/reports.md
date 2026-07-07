@@ -198,7 +198,7 @@ COMPARE_GROUPS = [
 ]
 ```
 - `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, Highway Log, **Intersection Summary/Detail**, and the two **PDF editions** — Highway Log (PDF) + Intersection Detail (PDF)), plus the two **PDF-vs-Excel** consistency self-checks (Highway Log + Intersection Detail) which also live in `env`.
-- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. COMPLETE: all 8 export types (Highway Log Excel/PDF, Ramp Detail, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence). The two PDF editions' PDF-vs-Excel self-checks live under `env`, not `tsn`.
+- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. COMPLETE for all 8 comparison-integrated export types (Highway Log Excel/PDF, Ramp Detail, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence). The two PDF editions' PDF-vs-Excel self-checks live under `env`, not `tsn`. (The v0.19.1 Highway Detail/Summary pair is export-only — no vs-TSN comparator yet, so it isn't here.)
 - The GUI also appends a **third** sub-tab on its own, the day-keyed **"vs TSN Matrix"** (group id `tsn_by_day`) — not a registry comparison type.
 
 A new cross-environment comparison is `group="env"`; a new TSMIS-vs-TSN one is `group="tsn"`; a brand-new family can add its own sub-tab by appending to `COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input plumbing is untouched. (v0.16.1 staging moved HL's cross-env row from the old `highway_log` group to `env` and renamed that sub-tab to `tsn`.)

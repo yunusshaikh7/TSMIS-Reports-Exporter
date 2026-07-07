@@ -50,6 +50,9 @@ that rewrote the design.
 | `v0.18.2` | Jun 29 | **Field-driven hotfix** — the big comparison stops looking frozen (progress through the silent "Report View" build; faster Stop), huge bulk rebuilds skip the live-formulas twin, and Route Suffix shows in the Report View |
 | `v0.18.3` | Jun 29 | **Field-driven hotfix** — Intersection Detail vs-TSN: intersecting-route postmile stops false-flagging where both sides are 0 (TSN's numeric 0 was read as blank), and one-sided intersections are marked "Only in TSMIS/TSN" in the Report View instead of an all-red row |
 | `v0.18.4` | Jun 29 | **Field-driven hotfix** — the matrix job-queue phantom: a finished/cancelled comparison stayed in the queue marked "running" (both matrices) until the next job; a `.mc-group`'s `display:flex` was silently overriding `[hidden]` |
+| `v0.18.5` | Jul 6 | **The audit release** — every confirmed finding from the full-repo audit, no new features: comparisons self-heal after an update (TSN normalization-version stamp + auto-rebuild from raw), a real `0` never reads as blank, and the offline check suite now gates every release in CI |
+| `v0.19.0` | Jul 6 | **Usability + trust + the structural cleanup** — one-click "Validate & package results"; the same report grouping on every tab; add-today to the by-day matrix; the codebase reorganized (shared comparator/PDF substrates, GUI/worker/matrix/app.js splits, a proven add-a-report recipe) with `compare_core` re-blessed cell-for-cell; safety hardening (owned-folder-only reset, pre-install digest re-verify, batch-dest validation) |
+| `v0.19.1` | Jul 7 | **Highway Detail/Summary export goes live** (the v0.18.1 reserved pair, export-only for now) + a validation phantom-env fix (the store's TSN drop folder was miscounted as an export environment) |
 
 ---
 
@@ -342,6 +345,44 @@ exists in only one system was being rendered in the "Report View" as an ordinary
 every field bleeding red, instead of a calm "Only in TSMIS / TSN" band like the main sheet
 already showed. Both small; both the field, again, finding what no offline test had thought to.
 
+**`v0.18.4` — the phantom that wouldn't leave.** Another work-PC log, another frontend-only
+truth: a finished or cancelled comparison kept sitting in the matrix queue marked "running" —
+in *both* matrices — until the next job replaced it, and couldn't be cleared. The backend was
+correct all along (the log showed a clean finish and gate release). The cause was CSS: a
+`.mc-group { display:flex }` rule outranked the browser's `[hidden] { display:none }`, so
+setting `hidden` never actually hid the panel — and a render path early-returned without
+clearing the row list. Two durable lessons banked: a `hidden` toggle silently fails if a
+class-level `display` rule outranks it, and the mock emits completion events in a *different
+order* than production, so order-sensitive frontend bugs only reproduce by replaying the real
+order.
+
+**`v0.19.0` — usability, trust, and the big cleanup.** The release that turned the manual
+work-PC ride-along into a button: **"Validate & package results"** runs every report already on
+the PC through the real comparison pipeline and ships the outcomes, TSN freshness, and logs in
+one credential-safe file — replacing the old command-line evidence step. Alongside it, three
+smaller usability asks (the same report grouping on every tab; today's column available in the
+by-day matrix before anything is exported; matrix side-panels that stay usable on a laptop
+mid-run) and a large **structural cleanup** that changed no behavior: every comparator now rides
+one shared file-comparator skeleton, the PDF parsers share one table library, the big GUI files
+split into focused modules, and "add a report family" became a *proven* recipe with its own
+automated check. The comparison engine was re-blessed cell-for-cell against the real statewide
+data (2.79M cells identical). Safety hardening rode along: "delete all reports" now only removes
+folders the app itself created, an update re-verifies its download's integrity one last time
+right before installing, and the Export-Everything destination is validated when you pick it.
+The **work-PC sign-off arrived the same day** — the 0.18.4→0.19.0 self-update, the TSN
+auto-rebuild, and the Validate button all proven in the field — and it surfaced exactly one bug.
+
+**`v0.19.1` — the reserved pair goes live.** The Validate button's field run had flagged a
+single phantom: validation was walking *every* child folder of the export store and counting any
+that held report files as an "environment" — so the store's `_tsn_input` TSN-drop folder became a
+bogus environment, and its TSN workbook got fed into the comparison as if it were a TSMIS export
+(the layout check then correctly rejected it). Constraining the walk to real `<src>-<env>` folder
+names dropped the phantom and made the run read a clean 18-of-18. Shipping in the same release:
+the **Highway Detail and Highway Summary** exports the site was adding — reserved as disabled
+groundwork back in v0.18.1 — went **live**, with real specs modeled on their Excel siblings, lifted
+out of the disable gate. Their consolidation and comparison are a later feature; where the site
+still greys the pair, selection fails fast instead of stalling.
+
 ---
 
 ## Three threads that run through all of it
@@ -350,7 +391,7 @@ already showed. Both small; both the field, again, finding what no offline test 
    window, Mark-of-the-Web crashing the CLR on download, PowerShell-blocked PCs
    breaking the updater — three separate "worked on my machine, then a real
    Caltrans PC ate it" failures, each now a permanent design constraint.
-2. **Refactor toward one core.** One `ReportSpec` loop serves eight reports; one
+2. **Refactor toward one core.** One `ReportSpec` loop serves ten reports; one
    `compare_core` serves two comparison families; one catalog feeds both the GUI
    and the console. The shells (Tkinter → WebView2) were swappable *because* the
    engine stayed console-free — and v0.18.0 took the idea furthest, dissolving

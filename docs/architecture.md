@@ -93,8 +93,8 @@ Four data structures:
 
 **`EXPORT_REPORTS`** — `(menu label, format hint, ReportSpec)`. Console menu numbering
 follows this order; the **GUI picker** order is the catalog's `_PICKER_ORDER` (website-style
-grouping, v0.18.1 — see [reports.md](reports.md)). The last two rows are **reserved-disabled**
-groundwork:
+grouping, v0.18.1 — see [reports.md](reports.md)). The last two rows (Highway Detail/Summary)
+are **export-enabled but not yet consolidated/compared** (v0.19.1):
 
 | Label | Format | Notes |
 |---|---|---|
@@ -105,9 +105,9 @@ groundwork:
 | `Highway Log (PDF)` | PDF | Same "Highway Log" dropdown option, saved via the page's Print layout (`hl_printAll`) instead of the Excel Export button. Has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares (it is NOT auto-consolidated inline — the matrix handles it via a scratch convert dir). |
 | `Intersection Summary` | Excel | Consolidates + compares (cross-env + vs-TSN) since v0.17.0. No `TSAR:` prefix. |
 | `Intersection Detail` | Excel | Consolidates + compares (cross-env + vs-TSN) since v0.17.0. |
-| `Intersection Detail (PDF)` | PDF | Same "Intersection Detail" dropdown option, saved via Print layout (`intd_printAll`) — the exact parallel of Highway Log (PDF), forward-ported in v0.18.0. **Appended at index 7** so the 7 existing export-op keys keep positions 0–6 (the manifest-v1 integer-index compat contract, CR-002-RM4); the reserved Highway pair follows at 8/9. Has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares. |
-| `Highway Detail` | Excel | **Reserved — DISABLED (v0.18.1 groundwork).** Append-only stable id **8**; stub `export_highway_detail` whose `save` raises; greyed in the picker via `DISABLED_EXPORT_SUBDIRS`; no consolidator/comparator, so absent from matrix / Compare / Consolidate. Switches on when the site enables it. |
-| `Highway Summary` | Excel | **Reserved — DISABLED (v0.18.1 groundwork).** Append-only stable id **9**; the `export_highway_summary` parallel of the above. |
+| `Intersection Detail (PDF)` | PDF | Same "Intersection Detail" dropdown option, saved via Print layout (`intd_printAll`) — the exact parallel of Highway Log (PDF), forward-ported in v0.18.0. **Appended at index 7** so the 7 existing export-op keys keep positions 0–6 (the manifest-v1 integer-index compat contract, CR-002-RM4); the Highway pair follows at 8/9. Has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares. |
+| `Highway Detail` | Excel | **Export-enabled (v0.19.1); consolidate/compare pending.** Append-only stable id **8**; a real `export_highway_detail` spec (`save_via_export_button`, dual empty-marker detection) modeled on the Excel siblings — lifted from `DISABLED_EXPORT_SUBDIRS` (now empty). No consolidator/comparator yet, so still absent from matrix / Compare / Consolidate. Where the live site still greys it, `select_report` fails fast (`ReportUnavailableError`) rather than stalling. |
+| `Highway Summary` | Excel | **Export-enabled (v0.19.1); consolidate/compare pending.** Append-only stable id **9**; the `export_highway_summary` parallel of the above. |
 
 **`CONSOLIDATE_REPORTS`** — `(menu label, module)`. Each module exposes
 `consolidate(events, confirm_overwrite, day=None)` plus `input_dir_for(day)` /
@@ -438,12 +438,12 @@ detail lives in [reports.md](reports.md) → *Report grouping & site-menu-safe s
   `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload
   by it and sets `idx` = display position (metadata only — the contract keys on stable subdir /
   `cmp:*` keys). Console numbering still follows `EXPORT_REPORTS` order.
-- **Reserved Highway Detail/Summary (DISABLED).** Two append-only catalog entries at stable ids
-  **8 / 9** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`) with stub
-  `export_highway_*` modules whose `save` raises; `reports.DISABLED_EXPORT_SUBDIRS =
-  {"highway_detail", "highway_summary"}` greys them and rejects them server-side; with no
-  consolidator/comparator they're absent from the matrices / Compare / Consolidate. Groundwork
-  for when the site enables them.
+- **Highway Detail/Summary (export-enabled v0.19.1).** Two append-only catalog entries at stable
+  ids **8 / 9** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`) with real
+  `export_highway_*` specs (`save_via_export_button`, dual empty-marker detection) modeled on the
+  Excel siblings; `reports.DISABLED_EXPORT_SUBDIRS` is now empty. With no consolidator/comparator
+  yet they're still absent from the matrices / Compare / Consolidate — that integration is a later
+  feature (build it via the proven `build/check_report_recipe.py` recipe).
 
 `compare_core` and the comparison families are untouched by v0.18.1 — the only comparison change
 is a label rename (Intersection Detail's "Roadbed" → "Route Suffix").

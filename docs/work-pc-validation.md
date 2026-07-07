@@ -86,7 +86,7 @@ cannot accidentally leak a credential or internal page source through this folde
 
 | In the bundle | Why |
 |---|---|
-| `manifest.txt` | this PC's name in paths, OS / version / build, login **status** (not the login), the allowlisted diagnostic settings, the run-folder list, the 8-report live-verify set, and a listing of **every** file in the zip |
+| `manifest.txt` | this PC's name in paths, OS / version / build, login **status** (not the login), the allowlisted diagnostic settings, the run-folder list, the export-report live-verify set (derived from the registry — every export report, incl. the v0.19.1 Highway pair), and a listing of **every** file in the zip |
 | `self_test.txt` | the offline self-test output — proves the **exact** frozen exe boots and runs every real code path (browser + `page.pdf()` + pdfplumber + openpyxl + the matrix modules + the GUI bridge) on this PC; the failing output, if it fails, **is** the evidence |
 | `logs/…` | the rotating diagnostic logs (the "one log upload answers it" contract) |
 | `run_reports/…` | recent per-route **summaries** (saved / empty / failed) — not report content |
