@@ -10,7 +10,7 @@ docs/work-pc-validation.md; this mode only GATHERS the evidence.)
 ALLOWLIST, not denylist — the bundle contains ONLY:
   * `manifest.txt` — this PC's name in paths, OS/version/build, login STATUS (never
     the saved login itself), the allowlisted diagnostic settings, the run-folder
-    list, the 8-report live-verify set, and a listing of EVERY file in the bundle;
+    list, the export-report live-verify set, and a listing of EVERY file in the bundle;
   * the rotating diagnostic logs (the "one log upload answers it" contract);
   * the recent run reports (per-route saved/empty/failed SUMMARIES — not report data);
   * `self_test.txt` — the offline self-test output (proves the EXACT frozen exe boots
@@ -90,8 +90,8 @@ def _is_sensitive(f, roots):
 
 def _report_set():
     """The export-report families to live-verify on the work PC, derived from the
-    registry (so the 8-report shape — incl. Intersection Detail (PDF) — is automatic,
-    never a hand-maintained list; CR002-RM5)."""
+    registry (so the set — every export report, incl. the v0.19.1 Highway pair —
+    is automatic, never a hand-maintained list; CR002-RM5)."""
     try:
         import reports
         return [label for label, _fmt, _spec in reports.EXPORT_REPORTS]
@@ -153,7 +153,7 @@ def _allowlisted_entries(extra_dir, roots, emit):
 
 
 def _manifest(contents, unreadable, skipped_user, roots):
-    """The manifest text: provenance + safety statement + the 8-report live-verify
+    """The manifest text: provenance + safety statement + the export-report live-verify
     set + a listing of every file ACTUALLY in the bundle (RM05 — 'the manifest lists
     every included file'), plus the evidence-folder files refused and any allowlisted
     file that was unreadable (P13-A01 — so the listing is never diagnostically false).
@@ -180,7 +180,7 @@ def _manifest(contents, unreadable, skipped_user, roots):
         f"login:       {'saved login file present on this PC — DELIBERATELY EXCLUDED' if auth_present else 'none'}",
         f"settings:    {settings.support_bundle_settings()}",
         "",
-        "LIVE-VERIFY SET (the 8-report v0.18.0 shape — see docs/work-pc-validation.md):",
+        "LIVE-VERIFY SET (every export report — see docs/work-pc-validation.md):",
     ]
     for r in _report_set():
         lines.append(f"  - {r}")

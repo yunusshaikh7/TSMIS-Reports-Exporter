@@ -1,12 +1,13 @@
 """R3 (v0.19.0): the "add a report family" recipe is PROVEN, not just documented.
 
-The user's next feature is the Highway Detail / Highway Summary comparison
-(reserved-but-DISABLED stable ids 8/9 since v0.18.1). This check dry-runs the
-docs/reports.md recipe end-to-end against the v0.19.0 substrate WITHOUT enabling
-anything, so the moment the feature starts, every extension point is known-good:
+The user's next feature is the Highway Detail / Highway Summary consolidator +
+comparison (their EXPORT went live in v0.19.1; the stable ids 8/9 are v0.18.1
+reserved groundwork). This check dry-runs the docs/reports.md recipe end-to-end
+against the v0.19.0 substrate, so the moment the feature starts, every extension
+point is known-good:
 
-  1. the reserved groundwork is intact (ids at frozen positions 8/9, app-wide
-     disabled, greyed in the picker, absent from consolidate/compare);
+  1. the export enablement is intact (ids at frozen positions 8/9, real
+     Excel-sibling specs wired, still absent from consolidate/compare);
   2. a hypothetical Highway Detail family REGISTERS through the catalog: the
      display views group it under the existing Highway family, the consolidator
      map and TSN entries accept it (in-memory patch — product tuples untouched);
@@ -46,28 +47,25 @@ def check(name, cond, detail=""):
 
 
 def test_reserved_groundwork():
-    print("the reserved Highway Detail/Summary ids (8/9) are intact + disabled:")
+    print("the Highway Detail/Summary ids (8/9) are intact + export-ENABLED:")
     keys = [e.key for e in cat.EXPORT]
     check("stable ids at the frozen positions 8/9",
           keys[8] == "highway_detail" and keys[9] == "highway_summary", str(keys))
     check("batch manifest order matches (append-only contract)",
           list(batch_manifest._V017_EXPORT_ORDER[8:10])
           == ["highway_detail", "highway_summary"])
-    check("both are app-wide DISABLED (greyed, rejected server-side)",
-          {"highway_detail", "highway_summary"} <= set(reports.DISABLED_EXPORT_SUBDIRS))
-    check("their stub specs refuse to save",
-          _raises(lambda: cat.EXPORT[8].spec.save(None, None, None)))
+    check("both are export-ENABLED (v0.19.1 — no longer app-wide DISABLED)",
+          not ({"highway_detail", "highway_summary"}
+               & set(reports.DISABLED_EXPORT_SUBDIRS)))
+    check("their specs save via the shared Excel export-button flow (not stubs)",
+          cat.EXPORT[8].spec.save.__name__ == "save_via_export_button"
+          and cat.EXPORT[9].spec.save.__name__ == "save_via_export_button")
+    check("their site dropdown ids are intact",
+          cat.EXPORT[8].spec.data_value == "highway_detail"
+          and cat.EXPORT[9].spec.data_value == "highway_summary")
     check("absent from consolidate/compare until the feature lands",
           not any("highway_detail" in e.key or "highway_summary" in e.key
                   for e in cat.CONSOLIDATE + cat.COMPARE))
-
-
-def _raises(fn):
-    try:
-        fn()
-        return False
-    except Exception:
-        return True
 
 
 class _Patch:

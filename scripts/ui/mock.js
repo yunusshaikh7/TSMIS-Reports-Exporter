@@ -33,9 +33,9 @@ function makeMockApi() {
     { key: "intersection_summary", label: "Intersection Summary", fmt: "Excel", group: "Intersection", short: "Summary" },
     { key: "intersection_detail", label: "Intersection Detail", fmt: "Excel", group: "Intersection", short: "Detail" },
     { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", fmt: "PDF", group: "Intersection", short: "Detail (PDF)" },
-    // v0.18.1 reserved groundwork — the coming "Highway" TSAR group, DISABLED (greyed).
-    { key: "highway_detail", label: "Highway Detail", fmt: "Excel", group: "Highway", short: "Detail", disabled: true },
-    { key: "highway_summary", label: "Highway Summary", fmt: "Excel", group: "Highway", short: "Summary", disabled: true },
+    // The "Highway" TSAR group — reserved v0.18.1 groundwork, export ENABLED in v0.19.1.
+    { key: "highway_detail", label: "Highway Detail", fmt: "Excel", group: "Highway", short: "Detail" },
+    { key: "highway_summary", label: "Highway Summary", fmt: "Excel", group: "Highway", short: "Summary" },
   ];
   // The Consolidate radios carry each row's stable `cons:*` key (P3) — this list
   // matches reports.CONSOLIDATE_REPORTS (9 rows as of CR-002: both Intersection

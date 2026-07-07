@@ -109,12 +109,12 @@ EXPORT = (
     # 0–6 (the manifest-v1 integer-index compatibility contract, CR002-RM4).
     ExportEntry("intersection_detail_pdf", "Intersection Detail (PDF)", "PDF", _INT_DETAIL_PDF_SPEC,
                 group="Intersection", short_label="Detail (PDF)"),
-    # Reserved groundwork (v0.18.1): the coming "Highway" TSAR group (Highway Detail /
-    # Summary), cs-disabled on the dev site as of 2026-06-25. Appended LAST (stable-id
-    # append-only) and app-wide DISABLED (reports.DISABLED_EXPORT_SUBDIRS) — shown
-    # greyed in the picker, rejected server-side, and absent from the matrices /
-    # consolidate / compare (they have no adapter or consolidator yet). fmt is a
-    # placeholder (Excel) until the site enables the report.
+    # The "Highway" TSAR group (Highway Detail / Summary): reserved DISABLED
+    # groundwork in v0.18.1 (cs-disabled on the dev site 2026-06-25), EXPORT
+    # ENABLED in v0.19.1 as the site opens the pair. Appended LAST (stable-id
+    # append-only, batch positions 8/9 frozen). Still ABSENT from the matrices /
+    # consolidate / compare — that integration waits for the report's real
+    # schema (a later feature).
     ExportEntry("highway_detail", "Highway Detail", "Excel", _HIGHWAY_DETAIL_SPEC,
                 group="Highway", short_label="Detail"),
     ExportEntry("highway_summary", "Highway Summary", "Excel", _HIGHWAY_SUMMARY_SPEC,
@@ -285,7 +285,7 @@ _PICKER_ORDER = (
     "highway_log", "highway_log_pdf", "highway_sequence",
     "ramp_summary", "ramp_detail",
     "intersection_summary", "intersection_detail", "intersection_detail_pdf",
-    # The reserved (disabled) Highway group renders last — "coming soon", greyed.
+    # The newest Highway group renders last (export enabled in v0.19.1).
     "highway_detail", "highway_summary",
 )
 

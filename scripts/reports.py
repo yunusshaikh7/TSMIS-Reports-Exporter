@@ -98,11 +98,13 @@ def consolidator_for_subdir(subdir):
 # dev addresses via Settings ▸ "Use development site" to export them. As of
 # v0.17.0 they ALSO consolidate and compare (cross-env + vs-TSN), live in both
 # matrices. To disable a report app-wide again, add its subdir back to this set.
-# (v0.18.1) Highway Detail / Highway Summary are RESERVED groundwork — registered in
-# the catalog (the family-grouped picker shows them under a greyed "Highway" group)
-# but disabled here because the site has them cs-disabled and their export isn't
-# implemented yet; remove them from this set once the report is finalized.
-DISABLED_EXPORT_SUBDIRS = {"highway_detail", "highway_summary"}
+# (v0.18.1) Highway Detail / Highway Summary were RESERVED groundwork here;
+# (v0.19.1) their EXPORT is now enabled (specs finalized on the Excel-sibling
+# model). Where the live site still greys or lacks the pair, select_report fails
+# fast per run — no per-route stall. They stay consolidate/compare/matrix-ABSENT
+# until that later feature lands. The set stays as the app-wide kill switch: to
+# disable a report app-wide again, add its subdir back.
+DISABLED_EXPORT_SUBDIRS = set()
 
 
 def is_export_disabled(spec):
