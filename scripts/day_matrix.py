@@ -345,6 +345,33 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
     return todo
 
 
+def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
+                          examples=None):
+    """On-demand evidence for one by-day cell's EXISTING vs-TSN comparison.
+    Resolves the same paths build_day_cell uses — but consolidates nothing,
+    compares nothing, and does NOT heal the TSN library (a heal would rebuild
+    it newer than the comparison and the freshness gate would then rightly
+    refuse; a version-stale library needs a comparison refresh anyway)."""
+    rows = _row_lookup()
+    if row_key not in rows:
+        raise ValueError(f"unknown by-day matrix row: {row_key}")
+    if not parse_run_folder(day_folder_name(date, source)):
+        raise ValueError(f"invalid date\\source for the by-day matrix: {date!r} / {source!r}")
+    _k, _label, subdir, _fmt, supported, tsn_subdir = rows[row_key]
+    if not supported:
+        raise ValueError(f"no TSN comparison for {row_key} yet")
+    tsn_files = tsn_files or {}
+    src_tsn = matrix.tsn_source(dest, tsn_subdir, tsn_files.get(tsn_subdir))
+    if src_tsn.get("kind") not in ("file", "consolidated"):
+        raise ValueError("no consolidated TSN workbook available")
+    import visual_evidence                               # lazy: pulls PIL/pdfium
+    return matrix.run_evidence_only(
+        row_key, tsmis_dir(date, source, subdir), subdir, src_tsn["path"],
+        day_out_path(date, source, row_key),
+        tsmis_dir(date, source, visual_evidence.pdf_subdir_for(row_key)),
+        events, examples=examples)
+
+
 def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
                    confirm_overwrite=None, force_consolidate=False,
                    also_formulas=False, evidence=None):

@@ -68,7 +68,8 @@ from gui_worker_maint import (CheckWorker, ChromiumWorker, ResetWorker,        #
                               UpdateWorker, ValidationWorker,
                               measure_targets, reset_targets)
 from gui_worker_matrix import (DayMatrixCompareWorker, MatrixBatchExportWorker,  # noqa: F401
-                               MatrixCompareWorker, MatrixTsnConsolidateWorker,
+                               MatrixCompareWorker, MatrixEvidenceWorker,
+                               MatrixTsnConsolidateWorker,
                                _run_matrix_export_step)
 
 # Collaborators historically reachable AS gui_worker attributes (the checks and

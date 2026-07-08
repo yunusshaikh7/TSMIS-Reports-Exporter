@@ -259,6 +259,49 @@ class DayMatrixCompareWorker(threading.Thread):
                                         "cancelled": self.cancel.is_set()}))
 
 
+class MatrixEvidenceWorker(threading.Thread):
+    """Run the ON-DEMAND evidence generation for ONE cell's EXISTING vs-TSN
+    comparison (either matrix — the caller pre-binds the resolver). No browser,
+    no consolidation, no compare: matrix.evidence_for_cell /
+    day_matrix.evidence_for_day_cell gate on freshness and then render the
+    evidence set beside the comparison workbook. Posts the same
+    ('matrix_cell', …) / ('matrix_done', …) events as the compare workers so
+    the bridge lifecycle is identical."""
+
+    def __init__(self, run_fn, row_key, cell_label, queue, cancel_event):
+        super().__init__(daemon=True, name="matrix-evidence")
+        self.run_fn = run_fn                   # (events) -> ConsolidateResult
+        self.row_key = row_key
+        self.cell_label = cell_label           # env key or date (display only)
+        self.q = queue
+        self.cancel = cancel_event
+
+    def run(self):
+        events = Events(is_cancelled=self.cancel.is_set,
+                        on_log=lambda m: self.q.put(("log", m)))
+        errors = 0
+        self.q.put(("matrix_cell", {"row": self.row_key, "cell": self.cell_label,
+                                    "status": "running", "done": 0, "total": 1}))
+        try:
+            res = self.run_fn(events)
+            status = res.status
+            if status != "ok":
+                errors = 1
+                self.q.put(("log", f"  {self.cell_label} {self.row_key}: {res.message}"))
+        except Exception as e:                       # noqa: BLE001
+            log.exception("matrix evidence %s/%s crashed", self.row_key, self.cell_label)
+            status, errors = "error", 1
+            msg = str(e).splitlines()[0] if str(e) else type(e).__name__
+            self.q.put(("log", f"  evidence images — {msg}"))
+        finally:
+            self.q.put(("matrix_cell", {"row": self.row_key, "cell": self.cell_label,
+                                        "status": "error" if errors else "ok",
+                                        "done": 1, "total": 1}))
+            self.q.put(("matrix_done", {"done": 1 - errors, "total": 1,
+                                        "errors": errors,
+                                        "cancelled": self.cancel.is_set()}))
+
+
 class MatrixTsnConsolidateWorker(threading.Thread):
     """Consolidate the district TSN PDFs the user dropped in _tsn_input/<subdir>/
     into one TSN workbook (the 'consolidate these PDFs?' prompt path), so the TSN

@@ -39,4 +39,5 @@ from matrix_build import (                                       # noqa: F401
     _formulas_sibling, _pdf_store_consolidator, _try_formulas,
     build_cell_comparison, build_comparison, cells_to_rebuild,
     consolidate_and_compare_tsn, consolidate_tsn_pdfs, consolidated_state,
-    consolidated_store_path, evidence_opts_for)
+    consolidated_store_path, evidence_for_cell, evidence_opts_for,
+    run_evidence_only)

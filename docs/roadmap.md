@@ -590,7 +590,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.22.1, shipped)
+### Version buckets — reconciled to reality (current: v0.23.0, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -617,6 +617,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.21.1** ✅ | Jul 8 | **Hotfix** (field-driven) — the `tsn_library/highway_detail/pdf/` drop folder v0.21.0 pointed at but never created: `TsnEntry.evidence_pdfs` drives `ensure_layout` (folder + hint file; README refreshes when its generated text changes), and `matrix_info`/`day_matrix_info` re-push state so dropping the PDFs + re-entering a tab un-greys the evidence toggle without a restart. |
 | **v0.22.0** ✅ | Jul 8 | **Intersection Detail July-2026 format + evidence** — the site's report overhaul absorbed end-to-end: 35-column SoT, the PDF parser rewritten for the reshaped print (cover pages, rowB bands + print-only intersection numbers, padded postmiles; pre-update workbooks/PDFs refused with re-export hints), the vs-TSN comparison re-baselined against the same-run 7.8 statewide bundle (parity 217/217 routes / 576k cells / 0 real diffs; canary 163,310 → **21,675**; Notes + Report-View Major classification rewritten to the data — soft = Int St/ML/CS Eff-Date + Route Suffix), `Xing Line Lgth`↔`X_CROSS_OVERRIDE` newly compared, TSN library **v3** (new shape + District/County sidecar), and **evidence images for both ID rows** via `evidence_intersection_detail` (the statewide TASAS print on a fixed monospace template, indexed once + cached; 16,584/16,584 records, 30/32 fields 100.00% parse-back). `availability()` went per-report; `compare_core` untouched. |
 | **v0.22.1** ✅ | Jul 8 | **Evidence workbook: both layouts** — "… (evidence).xlsx" gains a second image tab: **Evidence (stacked)** + **Evidence (side-by-side)** (previously stacked-only; the pair files lived only in the images folder). Engine-level (`_image_sheet`), so HD + ID both get it. |
+| **v0.23.0** ✅ | Jul 8 | **On-demand per-cell evidence** — a camera action on built, fresh vs-TSN cells (both matrices) generates/refreshes the evidence set for the EXISTING comparison: no re-compare, toggle-independent (`matrix.run_evidence_only` + `evidence_for_cell`/`evidence_for_day_cell`, an `evidence` queue job, endpoints `matrix_evidence_cell`/`day_matrix_evidence_cell`). The freshness gate refuses when the store/consolidated/TSN moved past the comparison ("refresh the comparison" hint) so images can't illustrate a diff set the workbook doesn't carry; `availability()` gains the `row_reports` map the JS gate reads. Verified e2e on the 7.8 mini-store (real compare → on-demand run → warm-cache re-run → staleness refusal). |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

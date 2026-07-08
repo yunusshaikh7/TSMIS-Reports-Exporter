@@ -214,6 +214,18 @@ function syncDayMatrixEvidence() {
     "dayMatrixEvidenceCount", "dayMatrixEvidenceHint");
 }
 
+// Whether a row can run the ON-DEMAND per-cell evidence action right now:
+// deps in the build, the row has an adapter, and ITS report's TSN prints are
+// dropped in (per-report since v0.22.0). Returns the report info (for the
+// tooltip) or null.
+function evidenceActionInfo(rowKey) {
+  const ev = (S.st && S.st.evidence) || {};
+  if (!ev.deps_ok || !(ev.rows || []).includes(rowKey)) return null;
+  const repKey = (ev.row_reports || {})[rowKey];
+  const rep = (ev.reports || []).find((r) => r.key === repKey);
+  return rep && rep.tsn_pdfs ? rep : null;
+}
+
 function mxCellContent(cmp, tsnMeta) {
   // Returns {cls, main, sub} for a non-baseline cell from its unified `cmp` state.
   cmp = cmp || {};
@@ -693,6 +705,19 @@ async function renderMatrix() {
               if (r && r.error) showMessage("error", "Can't open", r.error);
             });
           ob.classList.add("mx-open"); acts.appendChild(ob);
+          // On-demand evidence images for the EXISTING vs-TSN comparison (no
+          // re-compare; works with the Evidence images toggle off). Fresh
+          // tsn-mode cells of evidence-capable rows only — a stale cell needs
+          // a comparison rebuild first (which regenerates evidence itself
+          // when the toggle is on).
+          if (snap.modes[rk] === "tsn" && !cmp.stale && evidenceActionInfo(rk)) {
+            acts.appendChild(mxActBtn("i-camera",
+              "Generate/refresh the evidence images for this comparison (no re-compare)",
+              false, async () => {
+                const r = await api.matrix_evidence_cell(rk, env);
+                if (r && r.error) showMessage("error", "Can't run evidence", r.error);
+              }));
+          }
         }
       }
       cell.appendChild(acts);
@@ -956,6 +981,16 @@ async function renderDayMatrix() {
               if (r && r.error) showMessage("error", "Can't open", r.error);
             });
           ob.classList.add("mx-open"); acts.appendChild(ob);
+          // On-demand evidence for the EXISTING comparison (by-day cells are
+          // always vs-TSN). Fresh cells of evidence-capable rows only.
+          if (!cmp.stale && evidenceActionInfo(rk)) {
+            acts.appendChild(mxActBtn("i-camera",
+              "Generate/refresh the evidence images for this comparison (no re-compare)",
+              false, async () => {
+                const r = await api.day_matrix_evidence_cell(rk, d);
+                if (r && r.error) showMessage("error", "Can't run evidence", r.error);
+              }));
+          }
         }
         cell.appendChild(acts);
       }

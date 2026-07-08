@@ -127,6 +127,11 @@ function makeMockApi() {
         { key: "intersection_detail", label: "Intersection Detail", tsn_pdfs: 1,
           dir: "C:\\demo\\tsn_library\\intersection_detail\\pdf" },
       ],
+      row_reports: {
+        highway_detail: "highway_detail", highway_detail_pdf: "highway_detail",
+        intersection_detail: "intersection_detail",
+        intersection_detail_pdf: "intersection_detail",
+      },
     },
   };
   const mockSettings = {
@@ -181,7 +186,7 @@ function makeMockApi() {
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
       meta: {
-        version: "0.22.1 (preview)", build: "portable app",
+        version: "0.23.0 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
@@ -614,7 +619,7 @@ function makeMockApi() {
       // P9: mirror the backend's bridge-enum surface (gui_api.get_initial_state ->
       // contract.initial_state_enums) so the preview's init payload matches production.
       contract: window.CONTRACT,
-      app_name: "TSMIS Exporter", version: "0.22.1 (preview)",
+      app_name: "TSMIS Exporter", version: "0.23.0 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       // Mirror the real gate: Intersection is enabled (dev site); the reserved Highway
@@ -1114,6 +1119,8 @@ function makeMockApi() {
       mockEnqueue("export", "column", `Re-export all reports — ${env}`, { fast: st.matrix_fast.on }),
     refresh_cell_comparison: async (rk, env) =>
       mockEnqueue("compare", "cell", `Rebuild ${rk} — ${env}`, { total: 1 }),
+    matrix_evidence_cell: async (rk, env) =>
+      mockEnqueue("evidence", "cell", `Evidence images ${rk} — ${env}`, { total: 1 }),
     recompute_matrix: async (scope, row, env) => {
       const n = row ? 5 : env ? 4 : scope === "all" ? 18 : 6;
       const label = row ? `Rebuild ${row} — all environments`
@@ -1177,6 +1184,9 @@ function makeMockApi() {
     },
     build_day_cell: async (rk, d) =>
       mockEnqueue("compare", "cell", `Rebuild ${rk} — ${d} vs TSN`, { total: 1 }),
+    day_matrix_evidence_cell: async (rk, d) =>
+      mockEnqueue("evidence", "cell", `Evidence images ${rk} — ${d}`,
+                  { which: "day", total: 1 }),
     rebuild_day_matrix: async (scope, row, date) => {
       if (!(st.day_matrix_days || []).length) return { ok: true, nothing: true };
       const n = row ? (st.day_matrix_days || []).length : date ? 2 : 4;
@@ -1382,7 +1392,7 @@ function makeMockApi() {
         push({ t: "log", text: "An update is already downloaded — click ‘Restart to update’ in the title bar to install it." });
       } else {
         push({ t: "log", text: "Checking for updates…" });
-        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.22.1 preview)." }), 600);
+        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.23.0 preview)." }), 600);
       }
       return { ok: true };
     },
