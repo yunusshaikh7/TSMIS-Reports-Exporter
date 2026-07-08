@@ -57,7 +57,12 @@ Highway Log district PDFs (dropped into `input/tsn_highway_log/`) and the app's 
 **Highway Log (PDF)**, **Intersection Detail (PDF)** and **Highway Detail (PDF)**
 exports. The **Compare** tab diffs every report **TSMIS-vs-TSN** (the PDF-sourced
 editions among them, each also offering a **PDF-vs-Excel** self-check) and runs
-cross-environment comparisons.
+cross-environment comparisons. **Visual evidence (v0.21.0):** Highway Detail vs-TSN
+comparisons can also render sampled diffs as highlighted snippets from BOTH PDFs
+(parse-back-verified; `… (evidence).xlsx` + a two-layout image folder beside the
+comparison) — one shared toggle+count on both matrix pages, enabled once the TSN
+district PDFs sit in `tsn_library/highway_detail/pdf/`. See
+[docs/comparison-engine.md](docs/comparison-engine.md) §13.
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
 [docs/reports.md](docs/reports.md). Highway Log columns / PDF parsing / comparisons:
@@ -183,6 +188,7 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   compare_core.py            the regression-locked comparison-workbook engine
   compare_tsn_common.py      the shared FILE-comparator substrate (P5b; every comparator rides it since v0.19.0)
   compare_env.py compare_highway_log*.py compare_*_tsn.py   the comparison families over compare_core
+  visual_evidence.py evidence_highway_detail.py   the evidence-images engine + HD adapter (v0.21.0)
   pdf_table_lib.py           the shared PDF-table machinery (clusterer/columns/writer/convert loop, R2)
   matrix.py                  the matrix FACADE (patch matrix.<name>) over matrix_state.py + matrix_build.py
   matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary
@@ -215,7 +221,9 @@ matching `docs/` file (see the table above).
 
 `version.py` / `requirements*.txt`: `playwright==1.60.0` (Node driver only — no
 Chromium ships in the default build), `pdfplumber==0.11.9`
-(→ `pdfminer.six==20251230`), `openpyxl==3.1.5`, `pywebview==6.2.1`
+(→ `pdfminer.six==20251230`; its `pillow==12.2.0` + `pypdfium2==5.9.0`
+transitives are LOAD-BEARING since v0.21.0 — the evidence-image render stack —
+and pinned explicitly), `openpyxl==3.1.5`, `pywebview==6.2.1`
 (→ `pythonnet`/`clr_loader`), `pyinstaller==6.20.0`,
 `pyinstaller-hooks-contrib==2026.5`. Built/tested on **Python 3.11**. Rationale +
 the three release variants: [docs/build-and-release.md](docs/build-and-release.md).

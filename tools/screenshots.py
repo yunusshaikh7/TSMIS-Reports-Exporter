@@ -21,6 +21,7 @@ Requires Playwright (already a project dependency) with Chromium installed:
 """
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -42,7 +43,16 @@ CLEAN_JS = """
 
 
 def og_html(dark_shot: Path) -> str:
-    """The 1200x630 Open Graph card, embedding the dark screenshot."""
+    """The 1200x630 Open Graph card, embedding the dark screenshot.
+
+    The screenshot is inlined as a data: URI — the card is rendered via
+    page.set_content(), whose about:blank origin means Chromium BLOCKS file://
+    subresources, so a file:// <img> silently renders as a broken-image glyph
+    (the bug that shipped an empty app window in the social card until
+    v0.21.0). main() additionally asserts the image decoded.
+    """
+    b64 = base64.b64encode(dark_shot.read_bytes()).decode("ascii")
+    shot_src = f"data:image/png;base64,{b64}"
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
@@ -78,7 +88,7 @@ def og_html(dark_shot: Path) -> str:
     <div class="tags"><span class="tag">Open source</span><span class="tag">Windows</span></div>
   </div>
   <div class="right"><div class="shot"><div class="bar"><i></i><i></i><i></i></div>
-    <img src="{dark_shot.as_uri()}"></div></div>
+    <img src="{shot_src}"></div></div>
 </body></html>"""
 
 
@@ -106,6 +116,11 @@ def main() -> None:
         page = ctx.new_page()
         page.set_content(og_html(OUT / "screenshot-dark.png"), wait_until="networkidle")
         page.wait_for_timeout(800)
+        # The whole point of the card is the app window — refuse to write a
+        # card whose screenshot didn't decode (see og_html's docstring).
+        if not page.evaluate("() => { const i = document.querySelector('.shot img');"
+                             " return !!i && i.naturalWidth > 0; }"):
+            raise SystemExit("og-image: the embedded screenshot failed to load")
         page.screenshot(path=str(OUT / "og-image.png"))
         ctx.close()
         print("wrote docs/og-image.png")

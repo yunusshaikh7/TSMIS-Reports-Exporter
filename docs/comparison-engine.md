@@ -815,3 +815,52 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
 - **Locked by** `build/check_day_matrix.py` (rows/sources, available-day detection, snapshot + greyed
   cells, scoped rebuild list, build guards, and the gui_api bridge incl. the shared queue). **Owed on
   the work PC:** building two real days vs TSN end-to-end.
+
+## 13. Visual evidence (`scripts/visual_evidence.py` + `evidence_highway_detail.py`, v0.21.0)
+
+The manual "screenshot the cell in both PDFs and circle it" workflow, automated, as a
+**decoration of a finished vs-TSN comparison** — it never changes the comparison's
+status/completion/counts, and any evidence failure only logs + adds a summary note.
+
+- **What it produces**, next to the comparison workbook (the `(formulas).xlsx` sibling family):
+  `<comparison> (evidence).xlsx` (a Summary sheet + every stacked image embedded) and
+  `<comparison> (evidence images)/` with each example in BOTH layouts (`*_stacked.png` for
+  reading, `*_pair.png` side-by-side for pasting into docs). Keep-last-good: the images render
+  into a temp folder and swap in only after the workbook wrote; a locked-open previous set
+  diverts to `.new` with a note instead of failing.
+- **Sampling:** for every differing column, up to N (user setting, 1–10, default 2) random
+  example rows across random routes, keys restricted to UNIQUE-per-route on both sides so a
+  highlight is THE row. Each run logs its sample seed.
+- **The trust contract:** an example is only used when the value parsed back OUT of each PDF —
+  normalized with the comparator's OWN projections — equals the value the comparison compared.
+  So an image can never illustrate something other than what was diffed, and each rendered pair
+  doubles as an end-to-end spot-check of the comparison at that cell. Failed candidates are
+  skipped with a per-column reason (recorded in the workbook), e.g. the TSMIS PDF/Excel
+  site-build skew or a TSN reference-date skew.
+- **Sources:** TSMIS side = the per-route **Highway Detail (PDF)** export (the Everything matrix
+  resolves the row's cell store, the by-day matrix that day's `highway_detail_pdf/` run folder);
+  TSN side = the district prints in `tsn_library/highway_detail/pdf/` (any filenames — the
+  district is read from each file's own DIST-CNTY-ROUTE header). The **v2 normalized TSN library
+  appends TSN District/County sidecar columns** (`tsn_load_highway_detail.SIDECAR_HEADER`) so
+  evidence can find a row's print; `_normalized_row` slices to the shared width, so the
+  comparison itself never sees them (a pre-v2 library is refused with a rebuild hint, and the D2
+  version bump rebuilds it automatically).
+- **Locators:** the TSMIS locator mirrors `consolidate_tsmis_highway_detail_pdf.parse_pdf` step
+  for step (per-page windows, row groups, the postmile test, the date-token guard, cross-page
+  carry) while capturing positions — **keep them in LOCKSTEP**; records on a fallback-grid page
+  or split across pages are rejected as not evidence-grade. The TSN locator parses the TASAS
+  print line-anchored with word positions (the two-line regexes cross-checked ≥99.9% against the
+  statewide extract), boxing an optional group that didn't print as the gap between its
+  neighbors.
+- **Wiring:** ONE hook in `matrix.consolidate_and_compare_tsn(evidence_opts=)` covers both
+  matrices; callers resolve their own store layout through `matrix.evidence_opts_for` (the shared
+  gate — toggle on + `visual_evidence.capable(row_key)`). The user toggle is ONE persisted pair
+  (`evidence_images` + `evidence_examples`, endpoints `set_evidence_images` /
+  `set_evidence_examples`) surfaced under *Comparison output* on BOTH matrix pages, greyed with a
+  drop-hint until the TSN prints are in place (`visual_evidence.availability()` rides the state
+  push). The render stack (Pillow + pypdfium2) SHIPS since v0.21.0 — see
+  [build-and-release.md](build-and-release.md).
+- **Locked by** `build/check_visual_evidence.py` (registry/sources/clamp, the caller gate, the
+  LOCKSTEP pins, the TSN print regexes, span→box math, verification projections, unique-key diff
+  enumeration, and the TSN loader sidecar contract — `tsn_rows_with_dcr` row-identical to the
+  locked raw loader); the frozen self-test proves the render stack itself.

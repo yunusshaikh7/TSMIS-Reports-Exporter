@@ -4,7 +4,8 @@ endpoints share one claim->dialog->launch tail.
 
 Two halves:
   * SURFACE IDENTITY (RM08) — GuiApi's public method set (the methods pywebview exposes
-    to JS) equals a FROZEN list of 98 names (U3 deleted the dead set_batch_dest). A moved/renamed/dropped/added endpoint fails
+    to JS) equals a FROZEN list of 100 names (U3 deleted the dead set_batch_dest;
+    v0.21.0 added the two evidence-toggle endpoints). A moved/renamed/dropped/added endpoint fails
     here; this is the invariant the mechanical move must preserve. The two touched
     endpoints (start_compare / start_compare_env) additionally have their exact source
     `def` signature asserted (the @_api_method wrapper hides arity from inspect, so the
@@ -19,7 +20,6 @@ skeleton). Offline, CI-safe. Run from the repo root:
     build\\.venv\\Scripts\\python.exe build\\check_gui_api_surface.py
 """
 import inspect
-import os
 import sys
 from pathlib import Path
 
@@ -64,7 +64,8 @@ FROZEN_API = {
     "report_library_info", "request_preview", "reset_preview", "resume_batch", "retry_failed",
     "revert_to_previous", "run_validation", "save_run_report", "save_support_bundle", "set_all_matrix_modes",
     "set_day_matrix_formulas", "set_day_matrix_report",
-    "set_day_matrix_row_order", "set_day_matrix_source", "set_export_browser",
+    "set_day_matrix_row_order", "set_day_matrix_source", "set_evidence_examples",
+    "set_evidence_images", "set_export_browser",
     "set_matrix_baseline", "set_matrix_env", "set_matrix_env_order", "set_matrix_fast",
     "set_matrix_formulas", "set_matrix_report", "set_matrix_row_mode", "set_matrix_row_order",
     "set_matrix_tsn_file", "set_setting", "set_site", "set_site_url", "skip_route",

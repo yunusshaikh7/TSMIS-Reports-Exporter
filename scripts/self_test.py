@@ -13,8 +13,8 @@ thing (DRY):
     this before any real window is created; this is the build.ps1 -SelfTest
     release gate, exercising the precise artifact that ships (not a different
     console build -- the prior gate built a separate `full_smoke` exe).
-  * build/full_smoke.py                 -- the dev/venv tool (also proves
-    PIL/pypdfium2 stay unimported, so they can be excluded from the bundle).
+  * build/full_smoke.py                 -- the dev/venv tool (same body; the
+    render-stack step proves PIL/pypdfium2 WORK — they ship since v0.21.0).
 
 `run(emit)` returns 0 on success and RAISES on any MANDATORY failure (import /
 asset / registry / browser / pdf / openpyxl / dynamic-module). Only the hidden
@@ -50,7 +50,9 @@ HTML = """
 # a frozen bundle MUST carry -- the F6 trio. Importing them here is the runtime
 # half of build/check_app_modules.py's offline packaging contract: if the bundle
 # ever drops one, the exact shipped exe fails its own gate with a precise error.
-_DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "report_library")
+# v0.21.0 adds the lazily-imported visual-evidence pair to the contract.
+_DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "report_library",
+                           "visual_evidence", "evidence_highway_detail")
 
 
 def run(emit=None):
@@ -115,11 +117,27 @@ def _exercise(tmp, emit):
     assert wb2.active["C2"].value == 1234, "openpyxl round-trip failed"
     emit("openpyxl: write/read round-trip ok")
 
-    # 4. Optional libraries that should NOT be needed -- the excludes/prune proof
-    #    (openpyxl imports Pillow eagerly, so PIL may be present; what this proves
-    #    is that the used code paths above ran with PIL excludable -- see app.spec).
-    opt = {m: (m in sys.modules) for m in ("PIL", "pypdfium2", "pypdfium2_raw")}
-    emit(f"optional libs loaded: {opt}")
+    # 4. The visual-evidence render stack (SHIPS since v0.21.0 -- the excludes
+    #    proof this step used to be is inverted): rasterize a PDF page
+    #    (pdfplumber.to_image -> pypdfium2), draw the highlight box (PIL), and
+    #    embed the PNG in a workbook (openpyxl's image insert needs PIL). These
+    #    are exactly the calls visual_evidence makes, so a bundle missing any
+    #    piece fails ITS OWN gate here, not the user's first evidence run.
+    from PIL import ImageDraw
+    from openpyxl.drawing.image import Image as XLImage
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        img = pdf.pages[0].to_image(resolution=72).original.convert("RGB")
+    ImageDraw.Draw(img).rectangle([10, 10, 60, 30], outline=(220, 20, 20), width=3)
+    png = tmp / "evidence.png"
+    img.save(str(png))
+    assert png.stat().st_size > 0, "PDF page render produced nothing"
+    wbe = openpyxl.Workbook()
+    wbe.active.add_image(XLImage(str(png)), "A1")
+    ev_xlsx = tmp / "evidence.xlsx"
+    wbe.save(str(ev_xlsx))
+    assert ev_xlsx.stat().st_size > 0, "evidence-workbook image embed failed"
+    emit(f"evidence render stack: page->PNG {png.stat().st_size} bytes, "
+         "highlight + workbook embed ok")
     emit(f"cryptography loaded (required by pdfminer): {'cryptography' in sys.modules}")
 
     # 5. The F6 trio: prove the frozen bundle carries the dynamically-imported
@@ -188,7 +206,4 @@ def _exercise(tmp, emit):
 
     emit("")
     emit("SMOKE OK -- every app-required code path works.")
-    # Signal to the caller (venv run) whether the excludable libs stayed out.
-    if any(opt.values()):
-        emit(f"NOTE: optional libs were imported: {[k for k, v in opt.items() if v]}")
     return 0

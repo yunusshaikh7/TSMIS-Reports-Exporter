@@ -919,6 +919,20 @@
             <svg class="ic"><use href="#i-file-text"/></svg>
             <span>Also write a live-formulas copy</span>
           </label>
+          <label class="mc-fast" id="matrixEvidenceRow"
+                 title="Also render highlighted PDF snippets for sampled differences (Highway Detail vs TSN) — an '… (evidence).xlsx' + images beside each comparison. Needs the TSN district PDFs in the TSN library's pdf folder and the Highway Detail (PDF) export.">
+            <input type="checkbox" id="matrixEvidence">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-camera"/></svg>
+            <span>Evidence images (Highway Detail)</span>
+          </label>
+          <div class="mc-workers" id="matrixEvidenceCountRow">
+            <span>sample</span>
+            <input type="number" class="input input-num" id="matrixEvidenceCount" min="1" max="10"
+                   aria-label="Examples per differing column">
+            <span>per differing column</span>
+          </div>
+          <p class="hint" id="matrixEvidenceHint" style="margin:6px 0 0" hidden></p>
         </div>
 
         <div class="mc-group">
@@ -995,6 +1009,20 @@
             <svg class="ic"><use href="#i-file-text"/></svg>
             <span>Also write a live-formulas copy</span>
           </label>
+          <label class="mc-fast" id="dayMatrixEvidenceRow"
+                 title="Also render highlighted PDF snippets for sampled differences (Highway Detail vs TSN) — an '… (evidence).xlsx' + images beside each comparison. Needs the TSN district PDFs in the TSN library's pdf folder and that day's Highway Detail (PDF) export.">
+            <input type="checkbox" id="dayMatrixEvidence">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-camera"/></svg>
+            <span>Evidence images (Highway Detail)</span>
+          </label>
+          <div class="mc-workers" id="dayMatrixEvidenceCountRow">
+            <span>sample</span>
+            <input type="number" class="input input-num" id="dayMatrixEvidenceCount" min="1" max="10"
+                   aria-label="Examples per differing column">
+            <span>per differing column</span>
+          </div>
+          <p class="hint" id="dayMatrixEvidenceHint" style="margin:6px 0 0" hidden></p>
         </div>
 
         <div class="mc-group">

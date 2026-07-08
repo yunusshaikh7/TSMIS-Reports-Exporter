@@ -184,12 +184,15 @@ points:
   `*intersection_detail_pdf` modules, and the engine leaves (`auth_nav`, `report_nav`,
   `session`, `site_target`, `routes`, `errors`, `timeouts`, `browser_channels`,
   `edge_device`, `export_multi`).
-- **`excludes=['PIL','pypdfium2','pypdfium2_raw','tkinter','_tkinter']`** — image
-  libs the runtime paths (text/table extraction + plain workbooks) don't need,
-  plus Tk/Tcl. NOTE: openpyxl imports Pillow *eagerly* at import time, so PIL
-  *is* loaded in a normal install (`full_smoke.py` reports `PIL: True` against
-  the venv); what makes excluding it safe is the FROZEN `-SelfTest` passing with
-  it gone, not the import being absent. Trims ~20 MB.
+- **`excludes=['tkinter','_tkinter']`** — Tk/Tcl went with the old Tk GUI.
+  **Pillow + pypdfium2 SHIP since v0.21.0** (`collect_all` for both + a
+  `pypdfium2_raw` hidden import — pdfplumber imports pypdfium2 *lazily* inside
+  `to_image`, so static analysis alone can miss it): the visual-evidence
+  generator rasterizes PDF pages, draws the highlight boxes, and embeds images
+  in the evidence workbook. That reverses the v0.14.x–v0.20.x exclusion
+  (~20 MB back), and the frozen `-SelfTest` now proves the render stack
+  *works* (a page→PNG→highlight→workbook-embed round-trip in
+  `self_test.py` step 4) instead of proving the imports are absent.
 - **Trust metadata** (reduces IT/Defender/DLP/SmartScreen false-positives on the
   unsigned exe): version-info resource from `version.py` (`version.py` is the
   single source of truth for the version), `app.ico`, `app.manifest`
@@ -225,8 +228,9 @@ working):
 - Loose `*.d.ts` anywhere in the driver (driver-scoped); `*.md` is stripped here
   **and** bundle-wide by the later pass (see the all-prose-docs bullet below).
 - Chromium locale packs: keep `en-US.pak`, drop the other ~220 locales (~42 MB).
-- Safety net for the PyInstaller excludes: drop `PIL`/`Pillow`/`pypdfium2`/
-  `pypdfium2_raw` package dirs + their dist-info if a hook re-bundled them.
+- Render-stack guard (v0.21.0 — the INVERSE of the old excludes safety net):
+  **fail the prune** if `_internal\PIL` or `_internal\pypdfium2` is missing, so
+  a stale spec can't ship a build whose evidence option dies at first use.
 - Generic dead weight: `tests`/`test` dirs and `*.pyi` stubs (skipping the
   `ms-playwright` tree).
 - **All prose docs bundle-wide** (`*.md`/`*.markdown`/`*.rst` + stray

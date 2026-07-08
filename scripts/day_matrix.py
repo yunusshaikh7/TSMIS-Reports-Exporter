@@ -347,7 +347,7 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
 
 def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
                    confirm_overwrite=None, force_consolidate=False,
-                   also_formulas=False):
+                   also_formulas=False, evidence=None):
     """Build ONE (day, report) vs-TSN comparison: resolve the shared TSN dataset,
     consolidate that day's per-route export (reusing the day folder's persistent
     consolidated unless stale or `force_consolidate`), compare vs TSN, write the
@@ -381,7 +381,9 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     result = matrix.consolidate_and_compare_tsn(
         tsmis_dir(date, source, subdir), src_tsn["path"], out_path, row_key, subdir,
         events, confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
-        also_formulas=also_formulas)
+        also_formulas=also_formulas,
+        evidence_opts=matrix.evidence_opts_for(
+            evidence, row_key, lambda sub: tsmis_dir(date, source, sub)))
     # P1-B05: reduce the TSN side too — a partial TSN consolidation (categories /
     # district PDFs left out) flags the by-day cell partial just like a partial TSMIS side.
     if result.status == "ok" and src_tsn.get("completion") == outcome.PARTIAL:

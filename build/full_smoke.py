@@ -4,8 +4,10 @@ Thin wrapper: the self-test body lives in scripts/self_test.py so the EXACT
 shipped windowed exe runs the identical exercise via `gui_main --self-test` (the
 build.ps1 -SelfTest release gate). This entry keeps the dev/venv use:
 
-  * Against the build venv, to prove PIL/pypdfium2 are never loaded on the app's
-    real code paths (so they can be excluded from the bundle) -- run it directly:
+  * Against the build venv, exercising every bundled-library path the app uses —
+    including the visual-evidence render stack (pdfplumber.to_image → pypdfium2,
+    PIL highlight drawing, openpyxl image embed; SHIPPED since v0.21.0) —
+    run it directly:
         build\\.venv\\Scripts\\python.exe build\\full_smoke.py
 
 The frozen release gate no longer builds a SEPARATE console exe from this file;

@@ -565,7 +565,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.20.0, shipped)
+### Version buckets — reconciled to reality (current: v0.21.0, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -588,6 +588,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.19.2** ✅ | Jul 7 | **Highway Detail (PDF)** print edition (stable id 10, `hd_printAll` — confirmed on the 7.7 dev capture) + **dual-edition coalescing** (selecting both editions of one report generates it once and saves both; `run_export_combined`, standard path — fast mode + CLI are follow-ups). Locked by `check_coalesce_editions`. |
 | **v0.19.3** ✅ | Jul 7 | **Hotfix** (field-driven) — the per-route stale-form guard (`_ensure_report_armed`) false-"drifted" on **every** route for a grouped-menu report: it compared the visible `.cs-value` (the short leaf label "Detail") to the full `spec.label` ("Highway Detail") and re-selected each route (correct exports, but log spam + wasted work). Fix = key on the hidden `#reportSelect`'s stable `data-value` (`current_report_value`), text read only as fallback. Affects both Highway Detail editions. Regression-covered in `check_export_engine` + `check_fake_site` (new `test_current_report_value`); `compare_core` untouched. |
 | **v0.20.0** ✅ | Jul 7 | **Highway Detail full integration** — consolidators (Excel `consolidate_highway_detail` + PDF-sourced `consolidate_tsmis_highway_detail_pdf` on `pdf_table_lib`), the **vs-TSN comparator** (`compare_highway_detail_tsn`: new opt-in `CompareSchema`, canonical roadbed-aware PM key, PS column, NA/zero-pad/length/WDA normalizations, ID-style **Report View** + **Notes**), the PDF flavors (PDF↔TSN + PDF↔Excel), a `tsn_library` statewide-xlsx entry, both matrices + by-day rows, catalog/`.bat`/mock parity. Schema verified against the full statewide bundle (252 routes / 51,243 rows vs the 60,083-row TSN extract; TSN PDFs cross-checked ≥99.9% vs the extract → the Excel is the library source). `compare_core` untouched (byte-identical; new behavior rides the new schema). Highway Summary stays export-only. |
+| **v0.21.0** ✅ | Jul 8 | **Visual evidence** — the manual "screenshot both PDFs and circle the cell" workflow automated as a decoration of the Highway Detail vs-TSN comparisons: per differing column, N (1–10) random verified example rows rendered as highlighted snippets from BOTH PDFs (the app's (PDF) export + the TSN district prints in `tsn_library/highway_detail/pdf/`), each example parse-back-verified against the compared values before it's shown; `… (evidence).xlsx` + a two-layout image folder beside each comparison (keep-last-good). One shared toggle+count on both matrix pages (`evidence_images`/`evidence_examples`), ONE hook in `consolidate_and_compare_tsn`. TSN library v2 appends the District/County sidecar (D2 auto-rebuild). Pillow + pypdfium2 now SHIP (~20 MB; the frozen self-test proves the render path). Locked by `check_visual_evidence`. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're
