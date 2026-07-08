@@ -364,13 +364,28 @@ def _consolidated_stale(consolidated, store_dir):
     return not artifact_store.consolidated_fresh(consolidated, store_dir)
 
 
+def evidence_opts_for(evidence, row_key, dir_for_subdir):
+    """Resolve one cell's visual-evidence request: None unless the user toggle
+    is on AND the row supports evidence. `dir_for_subdir` maps a TSMIS export
+    subdir to THIS cell's folder for it (the Everything matrix and the by-day
+    matrix lay their stores out differently — each caller passes its own
+    mapping, the resolution logic lives once here)."""
+    if not (evidence and evidence.get("enabled")):
+        return None
+    import visual_evidence                               # lazy: pulls PIL/pdfium
+    if not visual_evidence.capable(row_key):
+        return None
+    return {"tsmis_pdf_dir": dir_for_subdir(visual_evidence.pdf_subdir_for(row_key)),
+            "examples": visual_evidence.clamp_examples(evidence.get("examples"))}
+
+
 # Producer-completion persistence for the persistent consolidated workbook lives in
 # the shared `consolidation_meta` boundary (P1-R01) — every persistent writer (matrix
 # store consolidation, auto-consolidate, the GUI/console Consolidate tab, TSN-library
 # builds) records the outcome there, and reuse recovers it, so no writer can bypass it.
 def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, subdir,
                                 events, confirm_overwrite=None, force_consolidate=False,
-                                also_formulas=False):
+                                also_formulas=False, evidence_opts=None):
     """The SHARED TSN compare path used by BOTH matrices (the Everything matrix's
     latest-store cells AND the Compare tab's by-day cells).
 
@@ -433,6 +448,26 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
                 else consolidation_meta.read_completion(consolidated))
         if comp == outcome.PARTIAL:
             result.completion = outcome.PARTIAL
+    # Visual evidence is a DECORATION of a finished comparison: it renders
+    # highlighted PDF snippets for sampled diffs next to the workbook. It never
+    # changes the comparison's status/completion/counts, and any failure only
+    # logs + notes (the comparison already succeeded). `evidence_opts` is set by
+    # the callers when the user's toggle is on AND the row supports it.
+    if result.status == "ok" and evidence_opts:
+        try:
+            import visual_evidence                       # lazy: pulls PIL/pdfium
+            ev = visual_evidence.generate(
+                row_key, consolidated, tsn_path, out_path,
+                evidence_opts["tsmis_pdf_dir"], events,
+                examples=evidence_opts.get("examples"))
+            if ev.get("note"):
+                result.summary_lines = list(result.summary_lines) + [ev["note"]]
+        except Exception as e:                           # noqa: BLE001
+            log.warning("evidence generation for %s skipped", row_key, exc_info=True)
+            msg = str(e).splitlines()[0] if str(e) else type(e).__name__
+            events.on_log(f"  evidence images skipped — {msg}")
+            result.summary_lines = list(result.summary_lines) + [
+                f"evidence images skipped — {msg}"]
     return result
 
 
@@ -458,14 +493,15 @@ def _ensure_consolidated(store_dir, subdir, events, force):
 
 def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                      tsn_files=None, confirm_overwrite=None, row_defs=None,
-                     force_consolidate=False, also_formulas=False):
+                     force_consolidate=False, also_formulas=False, evidence=None):
     """(Re)build one cell's comparison for the row's SELECTED mode, write the VALUES
     workbook, and cache its counts. Dispatches to the existing comparison adapters
     (never edits them). Returns the ConsolidateResult. Raises ValueError for an
     unknown row or an unsupported/greyed mode; an absent input side yields the
     adapter's clean error result. `force_consolidate` rebuilds the persistent
     consolidated even when it looks fresh; `also_formulas` writes a live-formulas
-    twin beside the values copy."""
+    twin beside the values copy. `evidence` ({'enabled','examples'}) requests the
+    visual-evidence decoration on a TSN-mode cell of a supported row."""
     rows = row_defs if row_defs is not None else _row_defs()
     if row_key not in rows:
         raise ValueError(f"unknown matrix row: {row_key}")
@@ -502,7 +538,9 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         result = _m.consolidate_and_compare_tsn(
             dest / cell_key / mode["env_subdir"], src["path"], out_path,
             row_key, mode["env_subdir"], events, confirm_overwrite=confirm_overwrite,
-            force_consolidate=force_consolidate, also_formulas=also_formulas)
+            force_consolidate=force_consolidate, also_formulas=also_formulas,
+            evidence_opts=evidence_opts_for(evidence, row_key,
+                                            lambda sub: dest / cell_key / sub))
         # P1-B05: the TSN side can ALSO be partial (a TSN builder left categories /
         # district PDFs out). consolidate_and_compare_tsn reduced the TSMIS side; reduce
         # the TSN side here (its completion rides on the resolved source) so the cell

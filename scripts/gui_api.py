@@ -338,6 +338,20 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         ui_log.info("dialog (%s) %s: %s", kind, title, message)
         self._emit({"t": "modal", "kind": kind, "title": title, "message": message})
 
+    def _evidence_view(self):
+        """The visual-evidence block for the UI: the persisted toggle+count
+        plus whether the TSN district prints are in place. The probe can never
+        break a state push (it only greys the toggle)."""
+        try:
+            import visual_evidence           # lazy: first call pays the import
+            avail = visual_evidence.availability()
+        except Exception:                    # noqa: BLE001 — probe-only
+            log.warning("evidence availability probe failed", exc_info=True)
+            avail = {"rows": [], "tsn_pdfs": 0, "ready": False, "dir": "",
+                     "deps_ok": False}
+        return {"on": settings.get_evidence_images(),
+                "examples": settings.get_evidence_examples(), **avail}
+
     def _state_snapshot(self):
         # PRF-02 (v0.19.0): every filesystem read (the output-days listing, the
         # settings json) happens OUTSIDE the lock — a slow/AV-scanned disk must
@@ -347,6 +361,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
                        "workers": settings.get("fast_workers")}
         matrix_formulas = settings.get_matrix_formulas()
         day_matrix_formulas = settings.get_day_matrix_formulas()
+        evidence = self._evidence_view()
         with self._lock:
             return {
                 "task": self._task,
@@ -373,6 +388,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
                 "matrix_fast": matrix_fast,
                 "matrix_formulas": matrix_formulas,
                 "day_matrix_formulas": day_matrix_formulas,
+                "evidence": evidence,
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},
                 "logins": self._login_states(),

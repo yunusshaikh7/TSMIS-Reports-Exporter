@@ -116,6 +116,11 @@ function makeMockApi() {
     day_matrix_hidden: [],
     day_matrix_row_order: [],    // drag-to-reorder row preference (by-day)
     day_matrix_formulas: false,
+    evidence: {                  // v0.21.0 visual-evidence toggle (shared)
+      on: false, examples: 2, ready: true, deps_ok: true, tsn_pdfs: 12,
+      rows: ["highway_detail", "highway_detail_pdf"],
+      dir: "C:\\demo\\tsn_library\\highway_detail\\pdf",
+    },
   };
   const mockSettings = {
     report_timeout_min: 6, fast_timeout_min: 10, retry_timeout_min: 15,
@@ -169,7 +174,7 @@ function makeMockApi() {
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
       meta: {
-        version: "0.20.0 (preview)", build: "portable app",
+        version: "0.21.0 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
@@ -602,7 +607,7 @@ function makeMockApi() {
       // P9: mirror the backend's bridge-enum surface (gui_api.get_initial_state ->
       // contract.initial_state_enums) so the preview's init payload matches production.
       contract: window.CONTRACT,
-      app_name: "TSMIS Exporter", version: "0.20.0 (preview)",
+      app_name: "TSMIS Exporter", version: "0.21.0 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       // Mirror the real gate: Intersection is enabled (dev site); the reserved Highway
@@ -1081,6 +1086,19 @@ function makeMockApi() {
       pushState();
       return { ok: true, on: !!on };
     },
+    set_evidence_images: async (on) => {
+      st.evidence = { ...st.evidence, on: !!on };
+      push({ t: "log", text: `Evidence images ${on ? "on" : "off"}.` });
+      pushState();
+      return { ok: true, on: !!on };
+    },
+    set_evidence_examples: async (n) => {
+      const v = Math.max(1, Math.min(10, n | 0 || 2));
+      st.evidence = { ...st.evidence, examples: v };
+      push({ t: "log", text: `Evidence images: ${v} example(s) per column.` });
+      pushState();
+      return { ok: true, examples: v };
+    },
     refresh_cell_export: async (rk, env) =>
       mockEnqueue("export", "cell", `Re-export ${rk} — ${env}`, { fast: st.matrix_fast.on }),
     refresh_row_export: async (rk) =>
@@ -1357,7 +1375,7 @@ function makeMockApi() {
         push({ t: "log", text: "An update is already downloaded — click ‘Restart to update’ in the title bar to install it." });
       } else {
         push({ t: "log", text: "Checking for updates…" });
-        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.20.0 preview)." }), 600);
+        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.21.0 preview)." }), 600);
       }
       return { ok: true };
     },

@@ -56,6 +56,7 @@ that rewrote the design.
 | `v0.19.2` | Jul 7 | **Highway Detail (PDF)** print edition (the vendor shipped the report on the dev site) + **dual-edition coalescing** — selecting both editions of a report generates it once and saves both instead of twice |
 | `v0.19.3` | Jul 7 | **Hotfix** — Highway Detail stopped re-selecting the report on every route (the site's grouped menu shows the short label "Detail"; the per-route stale-form check now confirms the report by its stable id, not the on-screen text) |
 | `v0.20.0` | Jul 7 | **Highway Detail fully integrated** — consolidators (Excel + PDF-sourced), the vs-TSN comparison (canonical roadbed-aware key, Report View replica, Notes), the PDF↔Excel export self-check, the TSN library entry, both matrices; schema verified against the full statewide bundle + the 60k-row TSN extract (the TSN PDFs cross-checked ≥99.9% against it) |
+| `v0.21.0` | Jul 8 | **Visual evidence** — the manual screenshot-and-circle workflow automated: per differing column, random verified example rows rendered as highlighted snippets from BOTH PDFs, written beside the comparison in two layouts; one shared toggle on both matrix pages; Pillow + pypdfium2 join the bundle |
 
 ---
 
@@ -434,6 +435,23 @@ compare-everything, nothing suppressed, a Notes sheet that names every normaliza
 printed two-line TASAS Report View with red diffs and a Major count that ignores the structural
 date columns. `compare_core` was never touched: the whole family rides a new opt-in
 `CompareSchema`, and the locked canaries proved it byte-identical.
+
+**`v0.21.0` — The evidence makes itself.** For every comparison before this one, "prove it" meant
+a human opening both PDFs, finding the same row in each, screenshotting both, and circling the
+cell — one or two examples per differing column, by hand. The user asked whether that could be
+automated; a same-day prototype against the dev bundle answered yes (34 of 34 columns located,
+boxed and verified on the first full run), and the feature shipped as a decoration of the
+Highway Detail vs-TSN comparisons: sampled random rows per differing column, the exact cell found
+in BOTH the app's own (PDF) export and the TSN district print, boxed in red with the record
+outlined, composed into captioned images in two layouts, and written beside the comparison with
+an `(evidence).xlsx` embedding the lot. The trust rule is the point: every example is parsed back
+OUT of each PDF and re-normalized with the comparator's own projections before it may appear — an
+image can never show anything but what was compared, so the evidence set doubles as a per-cell
+end-to-end audit of the comparison itself. The TSN library learned to record each row's district
+(v2 sidecar, auto-rebuilt), the district prints gained an optional `pdf/` home in the library,
+and the bundle finally ships Pillow + pypdfium2 — reversing a two-era-old size optimization whose
+premise ("the app never renders") stopped being true, with the frozen self-test flipped from
+proving the imports absent to proving the render path works.
 
 ---
 

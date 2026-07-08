@@ -167,6 +167,14 @@ def tsn_library_consolidated_path(report, filename):
     return tsn_library_dir(report) / "consolidated" / filename
 
 
+def tsn_library_pdf_dir(report):
+    """OPTIONAL: the report's TSN district-print PDFs (dropped by the user, like
+    raw/), read only by the visual-evidence generator — a report whose TSN raw
+    is an XLSX keeps its printed edition here so evidence images can show the
+    actual TSN page. Absent folder = the evidence toggle stays unavailable."""
+    return tsn_library_dir(report) / "pdf"
+
+
 def output_day_dir(day=None):
     """output/<day>/ — `day` is a run-folder name (or a legacy bare date);
     None means today's bare date. Kept for the consolidators, which treat the

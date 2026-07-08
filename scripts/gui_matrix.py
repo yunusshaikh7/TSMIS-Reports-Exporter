@@ -265,7 +265,8 @@ class GuiMatrixMixin:
         MatrixCompareWorker(dest, base, cells, self._gated_queue(), self.cancel_event,
                             tsn_files=settings.get_matrix_tsn_files(),
                             force_consolidate=job.get("force", False),
-                            also_formulas=settings.get_matrix_formulas()).start()
+                            also_formulas=settings.get_matrix_formulas(),
+                            evidence=self._evidence_request()).start()
         return True
 
     def _dispatch_day_compare_job(self, job):
@@ -284,8 +285,17 @@ class GuiMatrixMixin:
         DayMatrixCompareWorker(source, cells, dest, self._gated_queue(), self.cancel_event,
                                tsn_files=settings.get_matrix_tsn_files(),
                                force_consolidate=job.get("force", False),
-                               also_formulas=settings.get_day_matrix_formulas()).start()
+                               also_formulas=settings.get_day_matrix_formulas(),
+                               evidence=self._evidence_request()).start()
         return True
+
+    @staticmethod
+    def _evidence_request():
+        """The user's persisted evidence toggle+count, read at dispatch time
+        (like the formulas toggles). The engine ignores it for rows without
+        evidence support; the count is engine-clamped downstream."""
+        return {"enabled": settings.get_evidence_images(),
+                "examples": settings.get_evidence_examples()}
 
     def _matrix_worker_count(self):
         """Fast-mode browser count for matrix re-exports (the shared fast_workers
@@ -733,6 +743,28 @@ class GuiMatrixMixin:
                           if val else "."))
         self._push_state()
         return {"ok": True, "on": val}
+
+    @_api_method
+    def set_evidence_images(self, on):
+        """Toggle visual-evidence generation for vs-TSN comparisons of
+        evidence-capable reports (persisted; ONE toggle shared by the
+        Everything matrix and the by-day matrix)."""
+        val = settings.set_evidence_images(bool(on))
+        self._emit_log("Evidence images " + ("on" if val else "off")
+                       + (" — each supported vs-TSN comparison also writes an "
+                          "'… (evidence).xlsx' + highlighted PDF snippets."
+                          if val else "."))
+        self._push_state()
+        return {"ok": True, "on": val}
+
+    @_api_method
+    def set_evidence_examples(self, n):
+        """Persist how many examples per differing column the evidence set
+        samples (engine-clamped to 1–10)."""
+        val = settings.set_evidence_examples(n)
+        self._emit_log(f"Evidence images: {val} example(s) per column.")
+        self._push_state()
+        return {"ok": True, "examples": val}
 
     @_api_method
     def matrix_queue_remove(self, job_id):

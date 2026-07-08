@@ -215,6 +215,14 @@ strips DLP-blocked content from the bundle (the Playwright docs once shipped a t
 credit-card number that corporate DLP blocks — see
 [build-and-release.md](build-and-release.md)).
 
+Since **v0.21.0** the bundle also carries **Pillow + pypdfium2** (`pdfium.dll`, the
+PDF rasterizer behind the evidence images) — an unsigned in-folder native DLL like
+the pythonnet/WebView2 loaders the app already ships, loaded from `_internal\` with
+no elevation, no temp-script, no new network behavior. Work-PC hypothesis (untested
+until a field run): Defender treats it like the other bundled DLLs. If a managed PC
+ever blocks it, only the evidence option degrades — exports/comparisons are
+unaffected (the imports are lazy).
+
 ### 8.2 Read-only audit, 2026-06-15 (v0.10.4 / SHA `0643fe2`)
 
 A ruthless read-only audit (7-domain subagent fan-out + lead re-verification) was run

@@ -55,6 +55,7 @@ function updateMatrixProgress() {
   renderMatrixQueue();
   syncMatrixFast();
   syncMatrixFormulas();
+  syncMatrixEvidence();
 }
 
 // The live job-queue panel (driven from each state push, so reorder/remove/
@@ -166,6 +167,40 @@ function syncMatrixFormulas() {
 }
 function syncDayMatrixFormulas() {
   syncFormulasToggle("dayMatrixFormulas", "day_matrix_formulas");
+}
+
+// Reflect the SHARED evidence-images option (one persisted setting surfaced on
+// both matrix pages). Ready = the TSN district PDFs are in the library's pdf
+// folder; until then the toggle greys out and the hint says where to drop them.
+function syncEvidenceControls(cbId, countRowId, countId, hintId) {
+  const ev = (S.st && S.st.evidence) || {};
+  const cb = $(cbId);
+  if (cb) {
+    cb.checked = !!ev.on;
+    cb.disabled = !ev.ready;
+  }
+  const row = $(countRowId);
+  if (row) row.style.display = ev.on && ev.ready ? "" : "none";
+  const count = $(countId);
+  if (count && document.activeElement !== count) count.value = ev.examples || 2;
+  const hint = $(hintId);
+  if (hint) {
+    if (ev.ready) { hint.hidden = true; }
+    else {
+      hint.hidden = false;
+      hint.textContent = !ev.deps_ok
+        ? "Evidence images aren't available in this build."
+        : `To enable, drop the TSN Highway Detail district PDFs in ${ev.dir || "the TSN library's pdf folder"}.`;
+    }
+  }
+}
+function syncMatrixEvidence() {
+  syncEvidenceControls("matrixEvidence", "matrixEvidenceCountRow",
+    "matrixEvidenceCount", "matrixEvidenceHint");
+}
+function syncDayMatrixEvidence() {
+  syncEvidenceControls("dayMatrixEvidence", "dayMatrixEvidenceCountRow",
+    "dayMatrixEvidenceCount", "dayMatrixEvidenceHint");
 }
 
 function mxCellContent(cmp, tsnMeta) {
@@ -1025,5 +1060,6 @@ function updateDayMatrixProgress() {
   }
   renderQueuePanel("dayQueueGroup", "dayQueue", "dayQueueCount");
   syncDayMatrixFormulas();
+  syncDayMatrixEvidence();
   syncDayMatrixFast();
 }

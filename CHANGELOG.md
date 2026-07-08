@@ -3,6 +3,36 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.21.0 — 2026-07-08
+
+**Evidence images** — the manual "screenshot both PDFs and circle the cell" workflow, automated.
+When a Highway Detail vs-TSN comparison finds differences, the app can now render the proof for
+you: for every differing column it samples random example rows (random routes, not just the first),
+finds that exact cell in **both** source PDFs — the TSMIS "Highway Detail (PDF)" export and the TSN
+district print — and produces captioned images with the cell boxed in red on each side.
+
+- **Turn it on from either matrix page.** A shared "Evidence images" option (with a per-column
+  example count, 1–10) lives under *Comparison output* on the Everything matrix and the Compare
+  tab's by-day matrix. When it's on, each supported vs-TSN comparison also writes a
+  **"… (evidence).xlsx"** — a summary plus every image embedded — and a **"… (evidence images)"**
+  folder holding each example in two layouts: stacked (easy reading) and side-by-side (ready to
+  paste into a report). Both writes keep the previous set if anything fails or a file is open.
+- **What you need in place.** Drop the TSN Highway Detail **district PDFs** into the TSN library's
+  `highway_detail/pdf/` folder (any filenames — the app reads each file's own district header),
+  and have the day's **Highway Detail (PDF)** export alongside the Excel one. The option stays
+  greyed with a hint until the PDFs are in place. Rebuild the TSN library once after updating
+  (Settings ▸ TSN reports — the app will prompt; the library now records each row's district so
+  evidence can find the right print).
+- **Every example is verified before it's shown.** The cell is parsed back out of each PDF and
+  normalized exactly like the comparison — an image can never show something other than what was
+  compared, so the evidence set doubles as an end-to-end spot-check of the comparison itself.
+  Candidates that fail (for example the known case where the PDF and Excel exports came from
+  different site builds) are skipped, with the reason recorded in the workbook.
+- Applies to both Highway Detail rows (Excel-based and PDF-based vs TSN). Other reports can join
+  once they have PDF editions on both sides.
+- The portable app now ships the PDF-rendering pieces this needs (about 20 MB larger); the
+  build's self-test proves the render path works before anything is released.
+
 ## v0.20.0 — 2026-07-07
 
 Highway Detail is now a fully integrated report: consolidate it, compare it against TSN, check its

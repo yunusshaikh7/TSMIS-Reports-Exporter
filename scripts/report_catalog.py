@@ -288,10 +288,14 @@ TSN = (
     # Highway Detail (v0.20.0): the statewide 56-column "TSAR - HIGHWAY DETAIL"
     # Excel extract. Verified consistent with the TSN district PDFs (57,647
     # records cross-checked, every shared field ≥99.9% identical), so the
-    # machine-readable Excel is the library source; the PDFs stay reference-only.
+    # machine-readable Excel is the library source; the PDFs stay reference-only
+    # (the OPTIONAL library pdf/ folder feeds the visual-evidence images).
+    # v2 (v0.21.0): the normalized sheet appends the TSN District/County sidecar
+    # columns — evidence locates a row's district print with them; the
+    # comparison loader slices to the shared width and never sees them.
     TsnEntry("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
              "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into",
-             normalization_version=1),
+             normalization_version=2),
 )
 
 

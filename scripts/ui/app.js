@@ -1099,6 +1099,23 @@ function bindEvents() {
     if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
     syncDayMatrixFormulas();
   });
+  // Evidence images — ONE shared persisted setting, surfaced on both matrix
+  // pages (the checkboxes/counts are mirrors, resynced from each state push).
+  for (const [cbId, countId, resync] of [
+    ["matrixEvidence", "matrixEvidenceCount", () => syncMatrixEvidence()],
+    ["dayMatrixEvidence", "dayMatrixEvidenceCount", () => syncDayMatrixEvidence()],
+  ]) {
+    $(cbId)?.addEventListener("change", async (e) => {
+      const r = await api.set_evidence_images(e.target.checked);
+      if (r && r.error) showMessage("error", "Can't set evidence option", r.error);
+      resync();
+    });
+    $(countId)?.addEventListener("change", async (e) => {
+      const r = await api.set_evidence_examples(e.target.value | 0);
+      if (r && r.error) { showMessage("error", "Can't set evidence option", r.error); return; }
+      if (r && r.examples) e.target.value = r.examples;      // reflect clamping
+    });
+  }
   // By-day Export-speed controls — the SAME shared fast knob the Everything matrix /
   // Export pane / Settings use (set_matrix_fast + the one fast_workers count).
   $("dayMatrixFast")?.addEventListener("change", async (e) => {

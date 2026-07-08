@@ -18,6 +18,13 @@ pdfplumber==0.11.9
 # dependency -- RR1-C2) so the hash-locked build has a stable, explicit anchor for it.
 # Bump in lockstep with pdfminer.six.
 cryptography==48.0.1
+# pdfplumber's OTHER transitives, LOAD-BEARING since v0.21.0: the visual-evidence
+# generator rasterizes PDF pages (pdfplumber.to_image -> pypdfium2) and draws/embeds
+# the highlight images (Pillow; openpyxl's image insert needs it too). Explicit
+# anchors like cryptography above -- already in the hash lock at these versions.
+# Bump in lockstep with pdfplumber.
+pillow==12.2.0
+pypdfium2==5.9.0
 openpyxl==3.1.5
 # GUI shell: renders scripts/ui in an Edge WebView2 window (gui_main/gui_api).
 # Pulls pythonnet + clr_loader on Windows. The .bat console flow never imports

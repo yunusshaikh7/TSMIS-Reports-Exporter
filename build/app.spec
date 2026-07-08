@@ -111,6 +111,9 @@ APP_MODULES = [
     "compare_intersection_detail_tsn", "compare_intersection_detail_pdf",
     "compare_highway_sequence_tsn",
     "compare_highway_detail_tsn", "compare_highway_detail_pdf",
+    # v0.21.0 visual evidence: the report-agnostic engine + the Highway Detail
+    # adapter (lazy-imported by matrix_build/gui_api, so they MUST be declared).
+    "visual_evidence", "evidence_highway_detail",
     "gui_main", "gui_api", "gui_worker", "gui_win32", "gui_endpoint", "gui_matrix",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are
@@ -170,19 +173,22 @@ for _pkg in ("pdfplumber", "openpyxl"):
     _d, _b, _h = collect_all(_pkg)
     datas += _d; binaries += _b; hiddenimports += _h
 
-# Drop optional image libraries the app never needs at runtime: Pillow (PIL) and
-# pypdfium2 (pdfplumber.to_image). IMPORTANT: openpyxl imports Pillow EAGERLY at
-# import time, so in a normal install PIL *is* loaded -- it is not "never
-# imported" (build/full_smoke.py reports `PIL: True` against the venv). What makes
-# excluding it safe is that the code paths the app actually uses -- text/table
-# extraction and writing plain workbooks, never image insert or rasterizing a PDF
-# -- don't need it, and openpyxl tolerates a missing Pillow. The proof is not that
-# the import is absent but that the FROZEN self-test (build.ps1 -SelfTest runs
-# full_smoke.py) still passes every real code path with PIL excluded. pypdfium2 is
-# only touched by pdfplumber.to_image, which the app never calls. Trims ~20 MB.
+# Pillow + pypdfium2 SHIP since v0.21.0 (~20 MB): the visual-evidence generator
+# rasterizes PDF pages (pdfplumber.to_image -> pypdfium2), draws the highlight
+# boxes (PIL) and embeds the images in the evidence workbook (openpyxl's image
+# insert needs PIL). Both were EXCLUDED v0.14.x–v0.20.x as never-used weight —
+# that premise is gone, and the frozen self-test now proves the render path
+# WORKS instead of proving the imports are absent. collect_all because
+# pdfplumber imports pypdfium2 lazily inside to_image (static analysis alone
+# can miss it) and pdfium is a binary the hook must place.
+for _pkg in ("PIL", "pypdfium2"):
+    _d, _b, _h = collect_all(_pkg)
+    datas += _d; binaries += _b; hiddenimports += _h
+hiddenimports += ["pypdfium2_raw"]
+
 # tkinter went with the old Tk GUI (the UI is a WebView now) -- excluding it
 # also drops the Tcl/Tk runtime from the bundle.
-EXCLUDES = ["PIL", "pypdfium2", "pypdfium2_raw", "tkinter", "_tkinter"]
+EXCLUDES = ["tkinter", "_tkinter"]
 _excl = set(EXCLUDES)
 hiddenimports = [h for h in hiddenimports if h.split(".")[0] not in _excl]
 

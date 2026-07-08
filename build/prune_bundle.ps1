@@ -115,17 +115,18 @@ if (-not $GuardOnly) {
             ForEach-Object { Remove-Item $_.FullName -Force; $removed++ }
     }
 
-    # Safety net for the PyInstaller `excludes` (Pillow / pypdfium2): if a hook
-    # re-bundled them, drop the package dir + its dist-info. (openpyxl imports
-    # Pillow eagerly, so it loads when present -- but the app's used code paths,
-    # text/table extraction + plain workbooks, don't need it and tolerate its
-    # absence; excluding it is verified safe by the frozen self-test,
-    # build/full_smoke.py.)
+    # Pillow + pypdfium2 SHIP since v0.21.0 (the visual-evidence generator
+    # rasterizes and annotates PDF pages) -- the old exclude-safety-net that
+    # deleted them here is gone. GUARD the opposite way now: fail loudly if
+    # they are missing, so a stale spec can't silently ship a build whose
+    # evidence option dies at first use. (ASCII only: PS 5.1 parses this
+    # BOM-less file as ANSI, so a UTF-8 dash mangles and breaks the parse.)
     $internal = Join-Path $Target "_internal"
-    foreach ($name in @("PIL", "Pillow", "pypdfium2", "pypdfium2_raw")) {
-        Get-ChildItem $internal -Directory -ErrorAction Ignore |
-            Where-Object { $_.Name -eq $name -or $_.Name -like "$name-*" } |
-            ForEach-Object { Remove-Item $_.FullName -Recurse -Force; $removed++; Log "  - removed _internal\$($_.Name)" }
+    foreach ($name in @("PIL", "pypdfium2")) {
+        if (-not (Get-ChildItem $internal -Directory -ErrorAction Ignore |
+                  Where-Object { $_.Name -eq $name })) {
+            throw "prune_bundle: _internal\$name is missing -- the visual-evidence render stack must ship (app.spec collect_all)."
+        }
     }
 
     # Generic dead weight in bundled Python packages: test suites and type stubs

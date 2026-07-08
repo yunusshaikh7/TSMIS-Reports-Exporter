@@ -160,8 +160,12 @@ plus greyed / needs-export / needs-TSN / "consolidate N PDFs" / stale states —
 compact **icon** actions (`↻ export` / `↻ compare` / `↗ open`, gated on support+built).
 The **config zone** (`#matrixConfig`, a card under the slim activity log, shown via
 `body.matrix-wide:not(.mw-day)`) holds the report + **environment-column** show/hide toggles,
-the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the live queue, and
-the **fast-mode browser-count spinner** (`#matrixWorkers`, the `.mc-workers` row): it writes the
+the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the **evidence-images
+toggle + per-column count** (`#matrixEvidence` / `#matrixEvidenceCount` — ONE shared persisted
+pair `evidence_images`/`evidence_examples` mirrored on the by-day corner, synced by
+`syncMatrixEvidence` off the state's `evidence` block; greyed with a drop-hint until the TSN
+district prints are in place — [comparison-engine.md](comparison-engine.md) §13), the live
+queue, and the **fast-mode browser-count spinner** (`#matrixWorkers`, the `.mc-workers` row): it writes the
 shared `fast_workers` setting via `set_setting`, so the matrix corner, the Export pane
 (`#fastWorkers`) and the Settings tab (`#setFastWorkers`) stay on one value; `syncMatrixFast`
 reflects it (and greys the row when fast mode is off). A baseline `<select>` (switch → confirm →
@@ -216,7 +220,9 @@ out of the grid section so the grid area is as
 lean as the Everything matrix's (fits ~5 rows at 1440×720 without scrolling). The by-day
 live-formulas toggle is its **own** setting (`day_matrix_formulas`, snapshot key + bridge
 `set_day_matrix_formulas`, synced by `syncDayMatrixFormulas`) — independent of the Everything
-matrix's `matrix_formulas`. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
+matrix's `matrix_formulas`; the **evidence-images pair** (`#dayMatrixEvidence` +
+`#dayMatrixEvidenceCount`, `syncDayMatrixEvidence`) is by contrast the SAME shared setting as
+the Everything matrix's. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
 Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs TSN Matrix).
 
 ### One-stop EXPORT on the by-day matrix (v0.17.0)

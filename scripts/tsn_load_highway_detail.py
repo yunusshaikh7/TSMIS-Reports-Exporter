@@ -13,7 +13,7 @@ skeleton to tsn_library.build_normalized (S04).
 Console-free; openpyxl only.
 """
 try:
-    from openpyxl import Workbook  # noqa: F401  (deps probe; tsn_library writes the workbook)
+    from openpyxl import Workbook, load_workbook  # noqa: F401  (deps probe; tsn_library writes the workbook)
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
@@ -24,11 +24,48 @@ from events import ConsolidateResult
 
 RAW_GLOB = "*.xlsx"
 
+# Sidecar columns APPENDED after the shared header (normalization_version 2):
+# each row's TSN district + county. The comparison's loader slices them off
+# (compare_highway_detail_tsn._normalized_row reads exactly the shared width);
+# the visual-evidence generator reads them to find a row's district print.
+SIDECAR_HEADER = ["TSN District", "TSN County"]
+
+
+def tsn_rows_with_dcr(path):
+    """The raw statewide projection (hdt.tsn_rows_from_raw's rows, same order)
+    PLUS each row's (district, county) — a separate loop so the comparator's
+    regression-locked loader stays untouched."""
+    _s = hdt._s
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        sn = hdt.TSN_SHEET if hdt.TSN_SHEET in wb.sheetnames else wb.sheetnames[0]
+        it = wb[sn].iter_rows(values_only=True)
+        header = list(next(it, []) or [])
+        h = {str(n).strip(): i for i, n in enumerate(header) if n is not None}
+        if "POSTMILE" not in h or "RTE" not in h:
+            raise ValueError("the TSN Highway Detail workbook is missing "
+                             "RTE/POSTMILE — pick the raw 'TSAR - HIGHWAY "
+                             "DETAIL' statewide export.")
+        rows, dcr = [], []
+        di, ci = h.get("DIST"), h.get("CNTY")
+        for raw in it:
+            r = list(raw)
+            if not any(c not in (None, "") for c in r):
+                continue
+            rows.append(hdt._tsn_row(r, h))
+            dist = _s(r[di]) if di is not None and di < len(r) else ""
+            cnty = _s(r[ci]).rstrip(".") if ci is not None and ci < len(r) else ""
+            dcr.append((dist, cnty))
+        return rows, dcr
+    finally:
+        wb.close()
+
 
 def _project(raw_path):
     """Read the statewide workbook into the consolidated [Route]+SHARED_HEADER
-    rows and build the success result (rows count + distinct routes)."""
-    rows = hdt.tsn_rows_from_raw(raw_path)
+    (+ sidecar) rows and build the success result (rows count + routes)."""
+    base, dcr = tsn_rows_with_dcr(raw_path)
+    rows = [row + list(dc) for row, dc in zip(base, dcr)]
     n_routes = len({r[0] for r in rows})
 
     def make_result(out_name):
@@ -53,6 +90,6 @@ def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
         no_raw_hint="Import the statewide 'TSAR - HIGHWAY DETAIL' TSN export first.",
         log_label="TSN Highway Detail",
         sheet=hdt.NORMALIZED_SHEET,
-        header=["Route"] + hdt.SHARED_HEADER,
+        header=["Route"] + hdt.SHARED_HEADER + SIDECAR_HEADER,
         header_align={"horizontal": "center", "vertical": "center", "wrap_text": True},
         project=_project)

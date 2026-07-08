@@ -640,6 +640,43 @@ def set_matrix_formulas(on):
     return _set_flag("matrix_formulas", on)
 
 
+def get_evidence_images():
+    """Whether vs-TSN comparisons of evidence-capable reports ALSO render the
+    visual-evidence set (highlighted PDF snippets per differing column; default
+    off). One toggle shared by the Everything matrix and the by-day matrix."""
+    return _get_flag("evidence_images")
+
+
+def set_evidence_images(on):
+    """Persist the visual-evidence toggle (cleared when off)."""
+    return _set_flag("evidence_images", on)
+
+
+def get_evidence_examples():
+    """The persisted per-column example count for the evidence set. Read raw
+    (default 2) — visual_evidence.clamp_examples is the authoritative 1–10
+    clamp and every consumer applies it, so this getter stays import-light for
+    the state snapshot."""
+    try:
+        return int(_read_file().get("evidence_examples"))
+    except (TypeError, ValueError):  # silent-ok: absent/garbage -> the default
+        return 2
+
+
+def set_evidence_examples(n):
+    """Persist the per-column example count (engine-clamped; default clears)."""
+    import visual_evidence                    # lazy: only on a settings change
+    n = visual_evidence.clamp_examples(n)
+    data = dict(_read_file())
+    if n == visual_evidence.DEFAULT_EXAMPLES:
+        data.pop("evidence_examples", None)
+    else:
+        data["evidence_examples"] = n
+    _atomic_write(data)
+    log.info("settings: evidence_examples -> %s", n)
+    return n
+
+
 def get_day_matrix_formulas():
     """Whether the by-day matrix ALSO writes a live-formulas workbook (its own
     toggle, independent of the Everything matrix's; default off)."""
