@@ -267,6 +267,40 @@ check("reason summarizer dedupes and caps",
 check("evidence never keys off visible text (regex sanity: safe filename)",
       re.sub(r"[^A-Za-z0-9]+", "_", "Med V/WDA").strip("_") == "Med_V_WDA")
 
+# ----------------------------------------------------------------------------- #
+print("the pdf/ drop folder exists for the user (v0.21.1 — the update-day gap)")
+import paths                                              # noqa: E402
+import report_catalog                                     # noqa: E402
+import tsn_library                                        # noqa: E402
+check("every engine TSN-PDF source is catalog-flagged evidence_pdfs (and only those)",
+      {report_catalog.TSN[[e.subdir for e in report_catalog.TSN].index(r)].evidence_pdfs
+       for r in set(ve.TSN_PDF_REPORT.values())} == {True}
+      and {e.subdir for e in report_catalog.TSN if e.evidence_pdfs}
+      == set(ve.TSN_PDF_REPORT.values()))
+_tmp = Path(tempfile.mkdtemp())
+_old_root = paths.TSN_LIBRARY_ROOT
+try:
+    paths.TSN_LIBRARY_ROOT = _tmp / "tsn_library"
+    root = tsn_library.ensure_layout()
+    pdf = root / "highway_detail" / "pdf"
+    check("ensure_layout creates highway_detail/pdf/ + drops the hint",
+          pdf.is_dir() and any(pdf.glob("_PUT TSN DISTRICT PDFS HERE.txt")))
+    check("…and the pdf/ path == the engine's tsn_pdf_dir (one location)",
+          pdf == ve.tsn_pdf_dir("highway_detail") == tsn_library.pdf_dir("highway_detail"))
+    readme = root / tsn_library._README_NAME
+    check("the root README documents the pdf/ folder",
+          readme.is_file()
+          and "highway_detail/pdf/" in readme.read_text(encoding="utf-8"))
+    # an OUTDATED readme (an updated install) refreshes on the next launch
+    readme.write_text("old text from a previous version\n", encoding="utf-8")
+    tsn_library.ensure_layout()
+    check("a stale README from an older install is refreshed",
+          "highway_detail/pdf/" in readme.read_text(encoding="utf-8"))
+finally:
+    paths.TSN_LIBRARY_ROOT = _old_root
+    import shutil as _sh
+    _sh.rmtree(_tmp, ignore_errors=True)
+
 print()
 if _fail:
     print(f"FAILED: {len(_fail)} check(s):")
