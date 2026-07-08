@@ -505,6 +505,18 @@ or accept as someday.**
   double-generation), and the console `run_cli_multi` (`.bat` multi-export) isn't coalesced. Extend the
   parallel engine to save both editions per route, and share `_coalesce_groups` (move it off
   `gui_worker_export` to a neutral module) so the CLI can group too.
+- [x] **Visual evidence — SHIPPED (v0.21.0)** for Highway Detail vs-TSN (both matrix toggles; see
+  [comparison-engine.md](comparison-engine.md) §13). **Follow-ups, none started:**
+  - [ ] **Highway Log evidence adapter** [M] — the natural second report: its TSN district PDFs
+    already live in the library and its TSMIS (PDF) export exists; needs an HL locator pair on the
+    `evidence_highway_detail` pattern (mind the `+`/`++` ditto domain — HL is where it comes from).
+  - [ ] **TSN district-parse cache** [S] — a statewide evidence run spends ~10–20 min re-extracting
+    words from ~4,300 print pages; cache per-district locate indexes keyed on file mtime.
+  - [ ] **PDF-vs-Excel self-check evidence** [M] — needs a synthetic render of the Excel side (no
+    second PDF exists); park until someone actually asks for it.
+  - [ ] **Evidence on the Compare tab's direct file-pair flow** [S] — the matrix surfaces were the
+    ask; the manual pick-two-files compare has no toggle (its TSMIS-PDF folder can't be inferred
+    from the picked files — needs a picker or the standard-location assumption).
 
 ---
 

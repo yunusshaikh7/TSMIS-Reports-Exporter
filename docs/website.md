@@ -52,8 +52,15 @@ built-in `#mock` mode, both themes at 3× device scale, and composes the OG card
 outputs to `docs/` (`screenshot-light.png`, `screenshot-dark.png`, `og-image.png`).
 The README uses the `docs/` copies; the website keeps its own copies at the
 `gh-pages` root. After regenerating, copy the three files onto `gh-pages` (steps in
-`tools/README.md`). Requires Playwright + Chromium (`python -m playwright install
-chromium`).
+`tools/README.md`) **and bump the `?v=` query on the two `og-image.png` meta URLs**
+(`og:image` + `twitter:image`; currently `?v=2`) so social scrapers re-fetch the
+card instead of serving their cached copy. Requires Playwright + Chromium
+(`python -m playwright install chromium`).
+
+The card embeds the dark screenshot as a **data: URI** and the script asserts the
+image actually decoded — the v0.19.2–v0.20.x cards shipped with an EMPTY app
+window because a `file://` `<img>` on a `set_content` (about:blank-origin) page is
+silently blocked by Chromium (fixed v0.21.0; see `docs/lessons.md` §12).
 
 ## SEO / discoverability
 

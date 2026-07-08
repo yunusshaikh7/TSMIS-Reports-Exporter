@@ -229,6 +229,30 @@ This class of bug (visible text ≠ stable identity) is invisible until a report
 the grouped menu, which is exactly where the whole catalog is heading — so audit every
 `.cs-value`/label-text read the same way. → [engine-and-reliability.md](engine-and-reliability.md).
 
+## 12. Invisible bytes break real gates — keep the toolchain ASCII-safe
+
+Three failures in one day (v0.21.0), all caused by bytes no diff review shows:
+
+- **A PowerShell 5.1 `Set-Content -Encoding utf8` rewrite of `mock.js`** added a UTF-8
+  **BOM** and re-flowed line endings; the mock↔bridge **parity check failed** on a file
+  whose *content* was "identical". Rule: never bulk-rewrite tracked text via PS 5.1
+  cmdlets — use surgical edits, and when a file is mangled, `git checkout --` it and
+  redo the edits properly.
+- **An em-dash in a `.ps1` string** killed the build: PowerShell 5.1 parses BOM-less
+  files as **ANSI**, so a UTF-8 dash decodes as `Ã¢â‚¬â€` mid-string and the *parser*
+  errors (the failure names a token, not an encoding). Rule: `.ps1` edits are
+  ASCII-only.
+- **The OG card shipped with an empty app window for two releases** because Chromium
+  silently blocks `file://` images on a `set_content` (about:blank-origin) page — the
+  only symptom was a 16px broken-image glyph nobody looked at. Rule: a generator whose
+  whole point is an embedded artifact must **assert the artifact decoded**
+  (`img.naturalWidth > 0`), not just that the render "completed".
+
+The common thread: these failures pass every eyeball review and fail only at a machine
+boundary — so encode the boundary's rule where it runs (ASCII in `.ps1`, an assertion in
+the generator) instead of relying on memory. → [build-and-release.md](build-and-release.md),
+`tools/screenshots.py`.
+
 ---
 
 ### Quick index of the lessons
@@ -246,3 +270,4 @@ the grouped menu, which is exactly where the whole catalog is heading — so aud
 | 9 | Work-PC reality shapes every feature | it-and-security |
 | 10 | A hidden input with no positioned parent escapes its clip | gui |
 | 11 | Read a form's state by its stable id, never its visible label | engine-and-reliability |
+| 12 | Invisible bytes break real gates — keep the toolchain ASCII-safe | build-and-release + tools/screenshots.py |
