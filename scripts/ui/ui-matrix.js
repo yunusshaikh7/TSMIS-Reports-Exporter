@@ -170,8 +170,10 @@ function syncDayMatrixFormulas() {
 }
 
 // Reflect the SHARED evidence-images option (one persisted setting surfaced on
-// both matrix pages). Ready = the TSN district PDFs are in the library's pdf
-// folder; until then the toggle greys out and the hint says where to drop them.
+// both matrix pages). Ready = at least one report's TSN PDFs sit in its library
+// pdf folder; until then the toggle greys out and the hint says where to drop
+// them. A partially-ready state (one report stocked, another empty) keeps the
+// toggle live and the hint names what's still missing.
 function syncEvidenceControls(cbId, countRowId, countId, hintId) {
   const ev = (S.st && S.st.evidence) || {};
   const cb = $(cbId);
@@ -185,12 +187,21 @@ function syncEvidenceControls(cbId, countRowId, countId, hintId) {
   if (count && document.activeElement !== count) count.value = ev.examples || 2;
   const hint = $(hintId);
   if (hint) {
-    if (ev.ready) { hint.hidden = true; }
-    else {
+    const missing = (ev.reports || []).filter((r) => !r.tsn_pdfs);
+    if (!ev.deps_ok) {
       hint.hidden = false;
-      hint.textContent = !ev.deps_ok
-        ? "Evidence images aren't available in this build."
-        : `To enable, drop the TSN Highway Detail district PDFs in ${ev.dir || "the TSN library's pdf folder"}.`;
+      hint.textContent = "Evidence images aren't available in this build.";
+    } else if (!ev.ready) {
+      hint.hidden = false;
+      hint.textContent = missing.length
+        ? missing.map((r) => `To enable ${r.label}, drop its TSN PDFs in ${r.dir}.`).join(" ")
+        : `To enable, drop the TSN PDFs in ${ev.dir || "the TSN library's pdf folders"}.`;
+    } else if (missing.length) {
+      hint.hidden = false;
+      hint.textContent = missing.map((r) =>
+        `${r.label} has no TSN PDFs yet (drop them in ${r.dir}).`).join(" ");
+    } else {
+      hint.hidden = true;
     }
   }
 }

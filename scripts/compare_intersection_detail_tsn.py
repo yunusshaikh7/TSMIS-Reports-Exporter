@@ -2,11 +2,15 @@
 
 The Ramp Detail FLAT recipe applied to Intersection Detail: both sides are XLSX in
 different shapes, each with its own loader projecting onto ONE shared PM-keyed
-header. Reconciled by hand on route 1 (1,265 PMs aligned):
+header. Reconciled by hand on route 1, then re-reconciled statewide (16,200 paired
+rows) against the July 2026 site update, which reshaped the export:
 
   * TSMIS side — the CONSOLIDATED Intersection Detail workbook (leading Route
-    column + the 36 source columns). Its header is column-shifted (the "INT Type"
-    label sits over the eff-date value, etc.), so columns are read BY POSITION.
+    column + the 35 source columns of the July-2026 format). Some header labels
+    still sit shifted against their values (the "INT Type" label is over the
+    eff-date, etc.), so columns are read BY POSITION; PRE-update workbooks (the
+    old 36-column layout with the duplicated second 'ML Eff-Date') are REFUSED
+    with a re-export hint rather than mis-read.
   * TSN side — the statewide raw `Sheet 1` (36 named DB columns); route from
     `LOCATION` ("12 ORA 001" -> "001").
 
@@ -17,40 +21,38 @@ Every field present in both systems is COMPARED and COUNTED — a mechanical dif
 reader adds commentary, the tool never hides a column. Columns are ordered to mirror the
 source report and every column is compared BY REPORT POSITION — each report column to the
 same column in the other report (user decision 2026-06-24); nothing is suppressed. The
-eight date columns split two ways: Date of Record and the mainline / cross-street eff-dates
-(first AND second) are a STRUCTURAL refresh-vs-original difference — TSMIS stores a recent
-refresh date or a "2024" bulk stamp where TSN keeps the original/recent geometry date — so
-they differ on nearly every row; the INT / Control / Lighting eff-dates are geometry-vs-
-geometry and sit a systematic ~1 day apart. Main Line Length and the intersecting-route
-block are compared too. Some columns differ on nearly every row by their nature (see below);
-they are still flagged, and the Notes sheet COMMENTS on why rather than suppressing them. A
-second "Report View" sheet replicates the printed two-line record and shows every difference
-in red (date offsets included, but kept out of its per-record "Major" count). Normalizations
-make some raw-different
-values compare equal; each is documented in the Notes sheet so a match is read as "equal
-after the stated normalization", not raw equality:
-  1. **Boolean encoding** — mastarm / right-channelization / lighting are Y/N on
-     TSN but 1/0 on TSMIS. NORMALIZED here as Y≡1 / N≡0 so only genuine changes flag
-     (a TSMIS cell shown as "Y" was stored "1"); the Notes sheet states this.
-  2. **Control-type crosswalk** — TSN records signalized under the legacy signal
+July 2026 update fixed most of the old structural date classes (Date of Record and the
+INT / Control / Lighting eff-dates now match TSN on ≥99.9% of rows — the old ~1-day
+offset is gone; the booleans are natively Y/N; the postmiles print zero-padded; the
+Location now carries the route suffix): what REMAINS structural is Int St Eff-Date
+(TSN stores a bulk refresh stamp — '2022-01-01' on ~99% of rows — where TSMIS keeps the
+historical date) and, to a lesser degree, ML / CS Eff-Date (~12% / ~3%: TSN tracks a
+LATER resurvey date where TSMIS keeps the original). 'Xing Line Lgth' (TSN's
+X_CROSS_OVERRIDE) is newly exported and newly compared; TSMIS no longer exports the
+second ML Eff-Date, so TSN's MAIN_EFF_DATE is now a TSN-only reference column (blue on
+the Report View, like the ADT pair). A second "Report View" sheet replicates the printed
+two-line record and shows every difference in red; the three structural date columns and
+the route suffix stay OUT of its per-record "Major" count (user decision 2026-07-08 —
+the data-driven soft set). Normalizations make some raw-different values compare equal;
+each is documented in the Notes sheet so a match is read as "equal after the stated
+normalization", not raw equality:
+  1. **Control-type crosswalk** — TSN records signalized under the legacy signal
      sub-types J/K/L/M/N/P, which TSNR/TSMIS collapses into the single category TSMIS
      stores as the code "S". Per the TSNR/MIRE reference, both sides' signalized codes
      are normalized to that one code "S" (the Signalized category) so the sub-type
      split stops flagging; the Notes sheet documents it. (Geometry/INT Type needs no
      crosswalk — both systems share the F/M/S/T/Y/Z/R codes.)
-  3. **Date of Record** is a TSMIS refresh date (not the historical record date), so
-     the whole column differs from TSN — it is compared and counted like everything
-     else, and the Notes sheet comments on why the column differs wholesale.
-  4. **Cross-street (CS*) attributes** — TSMIS leaves them blank for ~37% of
-     intersections while TSN defaults them, so that column shows many blank-vs-value
-     differences; compared and counted, with the completeness gap noted.
+  2. **Boolean encoding** — both systems now store Y/N; PRE-update TSMIS data stored
+     1/0, and the same Y≡1 / N≡0 normalization still applies so only genuine changes
+     flag wherever legacy-encoded values appear.
+  3. **Numeric zero-padding** — Main Line Length, the intersecting-route block and
+     Xing Line Lgth canonicalize ('058'≡'58', '9.560'≡'9.56') so padding never flags.
 
 Console-free; engine in compare_core.
 """
 import dataclasses
 import logging
 import re
-from datetime import date
 from pathlib import Path
 
 try:
@@ -89,28 +91,32 @@ SHARED_HEADER = [
     "Control Type Eff-Date", "Control Type",
     "Lighting Eff-Date", "Lighting",
     "ML Eff-Date", "ML Mastarm", "ML Left Chan", "ML Right Chan",
-    "ML Traffic Flow", "ML Num Lanes", "ML 2nd Eff-Date",
+    "ML Traffic Flow", "ML Num Lanes",
     "Description", "Main Line Length",
     "CS Eff-Date", "CS Mastarm", "CS Left Chan", "CS Right Chan",
     "CS Traffic Flow", "CS Num Lanes", "Int St Eff-Date",
     "Intrte Route", "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix",
+    "Xing Line Lgth",
 ]
 KEY_FIELD = SHARED_HEADER.index(KEY)      # 2 (after PR + the derived Route Suffix column)
 # Position-aligned comparison (user decision 2026-06-24): every report column is compared
-# to the same column in the other report — nothing is suppressed. The mainline/cross
-# eff-date columns differ structurally (TSMIS stores a refresh date where TSN stores the
-# original) and so flag on nearly every row; the Notes sheet documents it. INT/Control/
-# Lighting are geometry-vs-geometry (the systematic ~1-day offset).
+# to the same column in the other report — nothing is suppressed. Since the July 2026
+# export update only Int St Eff-Date differs structurally (TSN's bulk refresh stamp vs
+# TSMIS's historical date) plus a smaller ML/CS eff-date resurvey-tracking gap; the Notes
+# sheet documents them. TSMIS no longer exports the second ML Eff-Date, so TSN's
+# MAIN_EFF_DATE is a Report-View-only reference column now (with the ADT pair).
 CONTEXT_FIELDS = ()
 DATE_FIELDS = ("Date of Record", "INT Type Eff-Date", "Control Type Eff-Date",
-               "Lighting Eff-Date", "ML Eff-Date", "ML 2nd Eff-Date", "CS Eff-Date",
+               "Lighting Eff-Date", "ML Eff-Date", "CS Eff-Date",
                "Int St Eff-Date")
-# Y/N (TSN) vs 1/0 (TSMIS) booleans — normalized to Y/N so only real changes flag.
+# Both systems store Y/N since the July 2026 update; pre-update TSMIS data stored 1/0
+# and the same normalization still folds it, so only real changes flag either way.
 BOOLEAN_FIELDS = ("Lighting", "ML Mastarm", "ML Right Chan", "CS Mastarm", "CS Right Chan")
 # Numeric fields where the two systems differ only in zero-padding — Main Line Length
-# (TSMIS '58' vs TSN '058'), the intersecting-route number, and its postmile (TSMIS
-# '9.560' vs TSN '9.56'). Normalized to a canonical number so the padding doesn't flag.
-NUMERIC_FIELDS = ("Main Line Length", "Intrte Route", "Intrte Postmile")
+# (TSMIS '58' vs TSN '058'), the intersecting-route number, its postmile (TSMIS
+# '9.560' vs TSN '9.56'), and the crossing line length (X_CROSS_OVERRIDE).
+# Normalized to a canonical number so the padding doesn't flag.
+NUMERIC_FIELDS = ("Main Line Length", "Intrte Route", "Intrte Postmile", "Xing Line Lgth")
 # Control-type crosswalk (per the TSNR/MIRE reference "TSNR - Intersection Control
 # and Geometry Type"): TSN spreads the signalized category across the legacy signal
 # sub-types J–P (J/K/L/M/N/P), which TSNR/TSMIS collapses into the single code TSMIS
@@ -131,36 +137,44 @@ _TSN_COL = {
     "CS Mastarm": "CS_SM", "CS Left Chan": "CS_LC", "CS Right Chan": "CS_RC",
     "CS Traffic Flow": "CS_TF", "CS Num Lanes": "CS_NL", "Date of Record": "DATE_REC",
     # added columns — mapped BY REPORT POSITION (each report column compared to the same
-    # column in the other report; user decision 2026-06-24). So the FIRST mainline/cross
-    # eff-date (next to the attrs) maps to TSN's first date — the historical/geometry
-    # EFF_DATE_ML / CROSS_BEGIN_DATE — and the SECOND eff-date maps to TSN's recent
-    # MAIN_EFF_DATE / EFF_DATE. TSMIS stores a refresh date in the first slot, so these
-    # read as structural refresh-vs-original differences (like Date of Record), not a
-    # 1-day offset. INT/Control/Lighting are geometry-vs-geometry (the 1-day offset).
+    # column in the other report; user decision 2026-06-24). The mainline/cross eff-date
+    # (next to the attrs) maps to TSN's historical/geometry EFF_DATE_ML / CROSS_BEGIN_DATE
+    # and the Int St eff-date to TSN's EFF_DATE (both prints show those there). Since the
+    # July 2026 update Int St is the structural one — TSN stores a bulk refresh stamp
+    # ('2022-01-01') where TSMIS keeps the historical date.
     "INT Type Eff-Date": "EFF_DATE_INT", "Control Type Eff-Date": "EFF_DATE_CT",
     "Lighting Eff-Date": "EFF_DATE_LT", "ML Eff-Date": "EFF_DATE_ML",
     "CS Eff-Date": "CROSS_BEGIN_DATE", "Main Line Length": "MAIN_OVERRIDE",
-    "ML 2nd Eff-Date": "MAIN_EFF_DATE", "Int St Eff-Date": "EFF_DATE",
+    "Int St Eff-Date": "EFF_DATE",
     "Intrte Route": "CROSS_ROUTE_NAME", "Intrte PM Prefix": "CROSS_PM_PREFIX",
     "Intrte Postmile": "CROSS_POSTMILE", "Intrte PM Suffix": "CROSS_PM_SUFFIX",
+    "Xing Line Lgth": "X_CROSS_OVERRIDE",
 }
-# Consolidated-TSMIS VALUE position for each shared field (Route at 0; header is
-# column-shifted so position — not label — is authoritative; verified on route 1).
+# Consolidated-TSMIS VALUE position for each shared field (Route at 0; some header
+# labels are still shifted against their values — the eff-date sits under each block's
+# type label — so position, not label, stays authoritative; verified statewide against
+# the July 2026 export, 16,200 paired rows).
 _TSMIS_POS = {
     "PR": 1, "PM": 2, "HG": 6, "City Code": 7, "R/U": 8, "INT Type": 10,
     "Control Type": 12, "Lighting": 14, "ML Mastarm": 16, "ML Left Chan": 17,
-    "ML Right Chan": 18, "ML Traffic Flow": 19, "ML Num Lanes": 20, "Description": 22,
-    "CS Mastarm": 25, "CS Left Chan": 26, "CS Right Chan": 27, "CS Traffic Flow": 28,
-    "CS Num Lanes": 29, "Date of Record": 5,
-    # added columns — the consolidated VALUE position (header labels are shifted; the
-    # eff-date sits one column LEFT of its type value). Verified across 16k paired rows.
-    # NB the intersecting-route PM suffix is at pos 35 (the 'Xing Rte' label), not 31.
+    "ML Right Chan": 18, "ML Traffic Flow": 19, "ML Num Lanes": 20, "Description": 21,
+    "CS Mastarm": 24, "CS Left Chan": 25, "CS Right Chan": 26, "CS Traffic Flow": 27,
+    "CS Num Lanes": 28, "Date of Record": 5,
     "INT Type Eff-Date": 9, "Control Type Eff-Date": 11, "Lighting Eff-Date": 13,
-    "ML Eff-Date": 15, "ML 2nd Eff-Date": 21, "Main Line Length": 23, "CS Eff-Date": 24,
-    "Int St Eff-Date": 30, "Intrte Route": 32, "Intrte PM Prefix": 33,
-    "Intrte Postmile": 34, "Intrte PM Suffix": 35,
+    "ML Eff-Date": 15, "Main Line Length": 22, "CS Eff-Date": 23,
+    "Int St Eff-Date": 29, "Intrte Route": 31, "Intrte PM Prefix": 32,
+    "Intrte Postmile": 33, "Intrte PM Suffix": 34, "Xing Line Lgth": 35,
 }
 _TSMIS_ROUTE_POS = 4                       # consolidated "Location" column ("12 ORA 001")
+# The July-2026 consolidated shape: Route + the 35 current source columns, ending in
+# the new 'Xing Line Lgth'. A pre-update workbook (37 columns, the duplicated second
+# 'ML Eff-Date') fails this and is REFUSED — reading it by the positions above would
+# silently mis-map every column from Description on.
+_HEADER_LEN = 36
+
+
+def _header_ok(header):
+    return len(header) == _HEADER_LEN and header[-1] == "Xing Line Lgth"
 
 
 # --------------------------------------------------------------------------- #
@@ -326,8 +340,13 @@ def _load_tsmis(path):
     return load_consolidated_rows(
         path, TSMIS_SHEET,
         missing_sheet_hint="pick the consolidated TSMIS Intersection Detail workbook.",
-        bad_header_msg="isn't a CONSOLIDATED Intersection Detail workbook "
-                       "(expected a leading 'Route' column) — consolidate first.",
+        bad_header_msg="isn't a CONSOLIDATED Intersection Detail workbook in the "
+                       "current (July 2026) site format — a leading 'Route' column "
+                       "and the 'Xing Line Lgth' tail column are expected. "
+                       "Consolidate a fresh post-update export; pre-update exports "
+                       "used the old 36-column layout, which this version doesn't "
+                       "compare.",
+        header_ok=_header_ok,
         row_transform=_tsmis_row)
 
 
@@ -368,9 +387,11 @@ def _write_notes_sheet(wb):
     ws.column_dimensions["A"].width = 110
     ws.append([cell("Intersection Detail — TSMIS vs TSN: comparison notes", title, fill)])
     note("This is a MECHANICAL field-by-field diff. EVERY column present in both systems "
-         "is compared and counted — nothing is hidden. Some columns differ on nearly every "
-         "row by their nature; they are still flagged, and the reasons are noted below "
-         "(commentary belongs to the reader, not to suppressing a column).")
+         "is compared and counted — nothing is hidden. A few columns differ structurally "
+         "(noted below); they are still flagged, and the reasons are noted here "
+         "(commentary belongs to the reader, not to suppressing a column). The TSMIS side "
+         "must be a JULY-2026-or-later export: the site update of 2026-07 reshaped the "
+         "report (35 columns), and pre-update workbooks are refused rather than mis-read.")
 
     section("NORMALIZATIONS APPLIED  (these can make raw-different values compare EQUAL — "
             "a match means 'equal after the normalization named here', not that the source "
@@ -385,52 +406,59 @@ def _write_notes_sheet(wb):
          "(A/B/C/D/E/F/G/H/I/R/Z) is shared and compared unchanged. INT Type needs no "
          "crosswalk — both systems share the F/M/S/T/Y/Z/R codes.")
     note("• Boolean encoding — Lighting, ML Mastarm, ML Right Chan, CS Mastarm, CS Right "
-         "Chan are stored Y/N on TSN but 1/0 on TSMIS. Normalized as Y≡1 / N≡0, so only a "
-         "genuine change flags (not the encoding). HOW TO SEE IT: a cell shown as 'Y' on the "
-         "TSMIS side was stored '1' (and 'N' was '0').")
+         "Chan are Y/N on BOTH sides since the July 2026 update. Pre-update TSMIS data "
+         "stored 1/0; the Y≡1 / N≡0 normalization still folds any legacy-encoded value, so "
+         "only a genuine change flags (not the encoding).")
     note("• Postmile (PM) — leading zeros and spaces are stripped so the same postmile pairs "
-         "across formatting (TSN ' 004.901' ≡ TSMIS '4.901'). PM is the row key.")
-    note("• Route suffix — a California route name can carry an alpha suffix (e.g. S/U — the "
-         "printed report's 'S' column) that TSN keeps but TSMIS often omits (TSN '210U' vs TSMIS "
-         "'210'). Rows are matched on the BASE route number so the same intersection still pairs; "
-         "the suffix is compared in the 'Route Suffix' column (TSN 'U' vs TSMIS blank flags there) "
-         "rather than dropping the row.")
+         "across formatting (TSN ' 004.901' ≡ TSMIS '004.901' ≡ an older '4.901'). PM is "
+         "the row key.")
+    note("• Route suffix — a California route name can carry an alpha suffix (e.g. S/U). "
+         "Rows are matched on the BASE route number so the same intersection pairs either "
+         "way; the suffix is compared in the 'Route Suffix' column. Since July 2026 the "
+         "TSMIS Location carries the suffix too ('11 IMP 008U'), so this column now flags "
+         "only genuine suffix disagreements, not the old TSMIS-blank gap.")
+    note("• Numeric zero-padding — Main Line Length ('58' ≡ '058'), the intersecting-route "
+         "number and postmile ('9.560' ≡ '9.56'), and Xing Line Lgth (TSN's "
+         "X_CROSS_OVERRIDE) canonicalize before comparing.")
 
-    section("COLUMNS THAT DIFFER WHOLESALE  (compared and counted like any other — the "
-            "difference is structural, explained here, NOT a per-intersection data error)")
-    note("• Date of Record — TSMIS stores a data-REFRESH date (typically 2019–2023) while TSN "
-         "stores the historical RECORD date (often 1964/1970/1977). The two therefore differ on "
-         "almost every matched row. The column is compared and counted; treat the count as 'the "
-         "field means different things in the two systems', not as thousands of corrections.")
-    note("• Cross-street attributes (CS Mastarm / Left Chan / Right Chan / Traffic Flow / Num "
-         "Lanes) — TSMIS leaves cross-street detail blank for ~37% of intersections while TSN "
-         "defaults it, so this group shows many blank-vs-value differences. They are compared "
-         "and counted; most differences here are a TSMIS completeness gap rather than a "
-         "value conflict.")
-    note("• Effective-date columns — all COMPARED BY REPORT POSITION (each report column to the "
-         "same column in the other report, user decision 2026-06-24). They split two ways. "
-         "(a) STRUCTURAL refresh-vs-original — Date of Record and the mainline / cross-street "
-         "eff-dates (first AND second): TSMIS stores a recent refresh date or a uniform '2024' "
-         "bulk stamp where TSN keeps the original/recent geometry date (e.g. '2021-12-31' vs "
-         "'1964-01-01', or '2024' vs '2022-01-01'), so they differ on nearly every matched row. "
-         "(b) The INT Type / Control / Lighting eff-dates are geometry-vs-geometry and sit a "
-         "SYSTEMATIC ~1 day apart ('1973-10-18' vs '1973-10-19') — an encoding convention. Read "
-         "the counts as the convention/structure, not as per-intersection edits.")
+    section("COLUMNS THAT STILL DIFFER STRUCTURALLY  (compared and counted like any other — "
+            "the difference is systematic, explained here, NOT a per-intersection data error)")
+    note("• Int St Eff-Date — TSN stores a BULK refresh stamp ('2022-01-01' on ~99% of rows) "
+         "where TSMIS keeps the historical date, so this column differs on nearly every "
+         "matched row — the one wholesale-structural column left. Read the count as the "
+         "convention, not as thousands of corrections.")
+    note("• ML Eff-Date (~12% of rows) and CS Eff-Date (~3%) — TSN tracks the most recent "
+         "mainline/cross-street resurvey date where TSMIS keeps the original geometry date "
+         "(e.g. TSMIS '1964-01-01' vs TSN '1998-08-28'). Systematic direction, moderate "
+         "volume; red on the Report View but kept out of its Major count.")
+    note("• ML / CS attributes — a small completeness gap remains (~1% of rows): TSMIS "
+         "leaves an attribute blank where TSN carries a value. Compared and counted; the "
+         "old ~37% cross-street gap was closed by the July 2026 update.")
+    note("• WHAT THE JULY 2026 UPDATE FIXED (expect these counts to be near zero now): "
+         "Date of Record and the INT Type / Control / Lighting eff-dates now match TSN on "
+         "≥99.9% of rows — the old wholesale refresh-vs-record difference AND the old "
+         "systematic ~1-day offset are both gone; the remaining flags in those columns are "
+         "GENUINE conflicts. 'Xing Line Lgth' (TSN X_CROSS_OVERRIDE) is newly exported by "
+         "TSMIS and newly compared.")
     note("• Intersecting-route block (Intrte Route / PM Prefix / Postmile / PM Suffix) + Main "
-         "Line Length — also compared. The intersecting route is mostly blank on both (only ~10 "
-         "intersections cross another state route); differences are genuine where present.")
+         "Line Length — also compared. The intersecting route is mostly blank on both (only a "
+         "few hundred intersections cross another state route); differences are genuine "
+         "where present.")
     note("• Nothing is greyed-out or shown-but-not-counted — under position alignment every shared "
-         "column is compared and counted. (TSMIS's blank route-suffix 'S' / second 'Xing' route stubs "
-         "are omitted; TSN's ADT columns MAIN_ADT / CROSS_ADT have no TSMIS counterpart and aren't "
-         "compared — they appear, for reference, only on the Report View.)")
+         "column is compared and counted. (TSMIS's blank route-suffix 'S' / 'Intrte S' stubs are "
+         "omitted; TSN's MAIN_EFF_DATE — the second ML eff-date TSMIS no longer exports — and its "
+         "ADT columns MAIN_ADT / CROSS_ADT have no TSMIS counterpart and aren't compared — they "
+         "appear, for reference, only on the Report View.)")
 
     section("REPORT VIEW  (a second sheet — the printed two-line record, for visual inspection)")
     note("• The 'Report View' tab replicates the printed Intersection Detail record (two physical "
-         "lines per intersection) and renders EVERY difference in red — the structural date offsets "
-         "included — so the page can be eyeballed straight against the source PDF. Per record it "
-         "shows two counts: 'Major' = genuine NON-date attribute conflicts (the date offsets are "
-         "excluded so they don't drown out the real conflicts); 'Diffs' = every difference. TSN-only "
-         "geometry/ADT columns appear there in blue for reference.")
+         "lines per intersection) and renders EVERY difference in red — the structural date "
+         "columns included — so the page can be eyeballed straight against the source PDF. Per "
+         "record it shows two counts: 'Major' = genuine conflicts (the three structural date "
+         "columns — Int St / ML / CS Eff-Date — and the route suffix are excluded so they don't "
+         "drown out the real conflicts; Date of Record and the INT/Control/Lighting eff-dates "
+         "COUNT now that they match structurally); 'Diffs' = every difference. TSN-only "
+         "reference columns (ML 2nd Eff-Date, the ADT pair) appear there in blue.")
     note("Rows are keyed on Route + Postmile (PM).")
     return ws
 
@@ -462,21 +490,23 @@ _SCHEMA = CompareSchema(
 # like the report. Mainline and intersecting blocks are PARALLEL (same attributes)
 # so they share the middle columns; line-1-only fields sit on the mainline row,
 # line-2-only on the cross row. Colour: RED = any difference — a genuine ("Major")
-# discrepancy AND a structural date offset (Date of Record / the position-aligned
-# eff-dates) both read red (user request 2026-06-24: all date discrepancies are red);
-# BLUE = TSN-only column; AMBER = TSMIS-only column. Two per-record counts head each
-# record: Major = genuine NON-date conflicts (so the reader can filter to the real
-# attribute differences past the ubiquitous date offsets), Diffs = every difference
-# (the dates included). Identity is repeated on both physical rows so a filter keeps
-# the 2-row records together — the streaming workbook can't vertically merge cells.
-_RV_ONE = {"LOC": "LOCATION", "XOVR": "X_CROSS_OVERRIDE",
+# discrepancy AND a structural date difference both read red (user request
+# 2026-06-24: all date discrepancies are red); BLUE = TSN-only column; AMBER =
+# TSMIS-only column. Two per-record counts head each record: Major = genuine
+# conflicts (the structural columns below are excluded so they don't drown out the
+# real differences), Diffs = every difference. Identity is repeated on both
+# physical rows so a filter keeps the 2-row records together — the streaming
+# workbook can't vertically merge cells.
+_RV_ONE = {"LOC": "LOCATION", "ML2": "MAIN_EFF_DATE",
            "ADT": "MAIN_ADT", "CADT": "CROSS_ADT"}
-_RV_DATEONE = ()         # no date-valued TSN-only columns (geometry dates are compared)
-# Structural date columns (refresh-vs-original or ADT-year) -> always yellow. The
-# geometry-vs-geometry INT/Control/Lighting eff-dates -> yellow only within the 1-day offset.
-_RV_SOFT_ALWAYS = ("Date of Record", "ML Eff-Date", "CS Eff-Date",
-                   "ML 2nd Eff-Date", "Int St Eff-Date")
-_RV_EFFDATES = ("INT Type Eff-Date", "Control Type Eff-Date", "Lighting Eff-Date")
+_RV_DATEONE = ("ML2",)   # MAIN_EFF_DATE (the 2nd ML eff-date TSMIS no longer exports)
+# The structural columns (user decision 2026-07-08, the data-driven soft set): Int St
+# Eff-Date (TSN's bulk '2022-01-01' stamp vs TSMIS's historical date, ~99% differ),
+# ML / CS Eff-Date (TSN tracks a later resurvey date, ~12% / ~3%). Date of Record and
+# the INT/Control/Lighting eff-dates now match TSN structurally (the July 2026 export
+# update; the old ~1-day offset is gone), so their differences are GENUINE and count
+# as Major like any attribute conflict.
+_RV_SOFT_ALWAYS = ("ML Eff-Date", "CS Eff-Date", "Int St Eff-Date")
 _RV_AUX = ("Major", "Diffs", "Route")       # frozen-left aux columns
 # Report grid — column SHARING matches the printed report: DESCRIPTION spans under
 # LOCATION, LINE LGTH under R/U, the INTERSECTING block under INT/CONTROL/LIGHTING,
@@ -506,10 +536,9 @@ _RV_GRID = [
     ("* MAINLINE *", "S/M", ("cmp", "ML Mastarm"), "*INT ROUTE*", "RTE NO", ("cmp", "Intrte Route")),
     ("* MAINLINE *", "L/C", ("cmp", "ML Left Chan"), "*INT ROUTE*", "P", ("cmp", "Intrte PM Prefix")),
     ("* MAINLINE *", "R/C", ("cmp", "ML Right Chan"), "*INT ROUTE*", "POST MI", ("cmp", "Intrte Postmile")),
-    ("* MAINLINE *", "T/F", ("cmp", "ML Traffic Flow"), "*XING*", "RTE", ("cmp", "Intrte PM Suffix")),
-    ("* MAINLINE *", "N/L", ("cmp", "ML Num Lanes"), "*XING*", "S", ("blank", None)),
-    ("* MAINLINE *", "EFF-DATE", ("cmp", "ML 2nd Eff-Date"), "", "", ("blank", None)),
-    ("TSN only", "X-Ovr", ("tn", "XOVR"), "TSN only", "", ("blank", None)),
+    ("* MAINLINE *", "T/F", ("cmp", "ML Traffic Flow"), "*XING*", "P/S", ("cmp", "Intrte PM Suffix")),
+    ("* MAINLINE *", "N/L", ("cmp", "ML Num Lanes"), "*XING*", "LINE LGTH", ("cmp", "Xing Line Lgth")),
+    ("TSN only", "ML 2nd EFF", ("tn", "ML2"), "TSN only", "", ("blank", None)),
     ("TSN only", "ML ADT", ("tn", "ADT"), "TSN only", "CS ADT", ("tn", "CADT")),
 ]
 # (normal, ALT) fill hex pairs — whole-record alternation across every cell type. A record's
@@ -526,56 +555,51 @@ _RV_FONTCOL = {"hard": "9C0006", "soft": "9C0006", "tn": "163A63", "tm": "7A431A
 _RV_COMMENTS = {
     "Control Type": "NORMALIZED: TSN's signal sub-types J-P and TSMIS's 'S' all fold to 'S' "
                     "(signalized) per the TSNR crosswalk, so the sub-type split doesn't flag.",
-    "Lighting": "NORMALIZED: boolean 1/0 (TSMIS) compared as 1=Y, 0=N (TSN).",
-    "ML Mastarm": "NORMALIZED: boolean 1/0 (TSMIS) = Y/N (TSN).",
-    "ML Right Chan": "NORMALIZED: boolean 1/0 (TSMIS) = Y/N (TSN).",
-    "CS Mastarm": "NORMALIZED: boolean 1/0 (TSMIS) = Y/N (TSN).",
-    "CS Right Chan": "NORMALIZED: boolean 1/0 (TSMIS) = Y/N (TSN).",
+    "Lighting": "NORMALIZED: both sides store Y/N; a legacy TSMIS 1/0 folds to Y/N.",
+    "ML Mastarm": "NORMALIZED: Y/N both sides; legacy 1/0 folds to Y/N.",
+    "ML Right Chan": "NORMALIZED: Y/N both sides; legacy 1/0 folds to Y/N.",
+    "CS Mastarm": "NORMALIZED: Y/N both sides; legacy 1/0 folds to Y/N.",
+    "CS Right Chan": "NORMALIZED: Y/N both sides; legacy 1/0 folds to Y/N.",
     "Main Line Length": "NORMALIZED: zero-padding ignored (TSMIS '58' = TSN '058').",
     "Intrte Postmile": "NORMALIZED: trailing zeros ignored (TSMIS '9.560' = TSN '9.56').",
-    "Date of Record": "TSMIS stores a data-REFRESH date; TSN the historical RECORD date - a "
-                      "structural difference. Shown RED, but kept OUT of the Major count "
-                      "(it isn't a per-row data error).",
-    "ML Eff-Date": "Compared BY REPORT POSITION: TSMIS shows its refresh date, TSN the "
-                   "original/geometry date - structural. Shown RED, not counted as Major.",
-    "CS Eff-Date": "Compared BY REPORT POSITION: TSMIS shows its refresh date, TSN the "
-                   "original/geometry date - structural. Shown RED, not counted as Major.",
+    "Xing Line Lgth": "NORMALIZED: zero-padding ignored. TSN's X_CROSS_OVERRIDE - newly "
+                      "exported by TSMIS (July 2026) and compared.",
+    "Date of Record": "Both sides store the historical record date since the July 2026 "
+                      "export update - a difference here is a GENUINE conflict and "
+                      "counts as Major.",
+    "ML Eff-Date": "TSN tracks the most recent mainline resurvey date; TSMIS keeps the "
+                   "original on ~12% of rows - structural. Shown RED, not counted as Major.",
+    "CS Eff-Date": "TSN tracks the most recent cross-street resurvey date; TSMIS keeps the "
+                   "original on ~3% of rows - structural. Shown RED, not counted as Major.",
+    "Int St Eff-Date": "TSN stores a bulk refresh stamp ('2022-01-01' on ~99% of rows); "
+                       "TSMIS the historical date - structural. Shown RED, not counted "
+                       "as Major.",
 }
 
 
-def _rv_pdate(s):
-    m = re.match(r"(\d{4})-(\d{2})-(\d{2})$", "" if s is None else str(s))
-    try:
-        return date(int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
-    except (ValueError, AttributeError):  # silent-ok: a value normalizer; malformed dates read as blank
-        return None
-
-
 def _rv_classify(field, tm, tn):
-    """Classify a DIFFERING cell. 'soft' = a structural DATE difference (Date of Record,
-    a position-aligned eff-date, or an INT/Control/Lighting geometry date within the
-    systematic 1-day offset): it renders RED like a genuine conflict but is kept OUT of
-    the per-record Major count. 'hard' = a genuine 'Major' discrepancy. Everything that
-    isn't one of those date cases (or the route suffix, below) is hard. (Both soft and
-    hard count toward Diffs.)"""
+    """Classify a DIFFERING cell. 'soft' = a structural difference (Int St / ML / CS
+    Eff-Date — see _RV_SOFT_ALWAYS — or the route suffix): it renders RED like a
+    genuine conflict but is kept OUT of the per-record Major count. 'hard' = a genuine
+    'Major' discrepancy — since the July 2026 export update that includes Date of
+    Record and the INT/Control/Lighting eff-dates (they match TSN structurally now;
+    the old ~1-day-offset tolerance is retired). Both soft and hard count toward
+    Diffs. (`tm`/`tn` stay in the signature for parity with the grid's cmp cells.)"""
+    del tm, tn
     if field == "Route Suffix":
-        # TSMIS systematically leaves the alpha route suffix blank where TSN carries U/S —
-        # a structural/completeness gap, not a geometry conflict: red, but not Major.
+        # Matched on the base route; a suffix disagreement is a labeling gap, not a
+        # geometry conflict: red, but not Major.
         return "soft"
     if field in _RV_SOFT_ALWAYS:
         return "soft"
-    if field in _RV_EFFDATES:
-        da, db = _rv_pdate(tm), _rv_pdate(tn)
-        if da and db and abs((da - db).days) <= 1:
-            return "soft"
     return "hard"
 
 
 def _tsn_onesided(path):
-    """Raw TSN one-sided columns (geometry eff-dates, ADT counts, X-cross override) +
-    Location, aligned to the rows `tsn_rows_from_raw` yields. Returns None for a
-    normalized-library workbook (those columns aren't stored there) — the replica then
-    shows the TSN-only cells blank."""
+    """Raw TSN one-sided columns (the second ML eff-date TSMIS no longer exports +
+    the ADT counts) + Location, aligned to the rows `tsn_rows_from_raw` yields.
+    Returns None for a normalized-library workbook (those columns aren't stored
+    there) — the replica then shows the TSN-only cells blank."""
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
     except Exception as e:
@@ -857,13 +881,13 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
     for h, ht in {1: 13, 2: 22, 3: 13, 4: 14}.items():
         ws.row_dimensions[h].height = ht
     WG = {"SFX": 5, "P": 3.5, "POST MILE": 8, "S": 3, "LOCATION": 13, "DATE OF REC": 9.5,
-          "H/G": 4, "CITY": 6, "R/U": 5}
+          "H/G": 4, "CITY": 6, "R/U": 5, "N/L": 6}
     for ci, w in {1: 5.5, 2: 5.5, 3: 8}.items():
         ws.column_dimensions[get_column_letter(ci)].width = w
     for gi, col in enumerate(_RV_GRID):
         lab = col[1]
-        w = (10.5 if lab == "EFF-DATE" else WG[lab] if lab in WG
-             else 9 if lab in ("X-Ovr", "ML ADT") else 4.2)
+        w = (10.5 if lab in ("EFF-DATE", "ML 2nd EFF") else WG[lab] if lab in WG
+             else 9 if lab == "ML ADT" else 4.2)
         ws.column_dimensions[get_column_letter(NA + gi + 1)].width = w
     return ws
 

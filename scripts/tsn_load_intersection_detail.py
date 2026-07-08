@@ -12,7 +12,7 @@ find-raw/write/save skeleton to tsn_library.build_normalized (S04).
 Console-free; openpyxl only.
 """
 try:
-    from openpyxl import Workbook  # noqa: F401  (deps probe; tsn_library writes the workbook)
+    from openpyxl import Workbook, load_workbook  # noqa: F401  (deps probe; tsn_library writes the workbook)
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
@@ -23,11 +23,54 @@ from events import ConsolidateResult
 
 RAW_GLOB = "*.xlsx"
 
+# Sidecar columns APPENDED after the shared header (normalization_version 3):
+# each row's TSN district + county, split out of its LOCATION ("12 ORA 001").
+# The comparison's loader slices them off (compare_intersection_detail_tsn's
+# _normalized_row reads exactly the shared width); the visual-evidence generator
+# reads them to find a row in the TSN statewide print.
+SIDECAR_HEADER = ["TSN District", "TSN County"]
+
+
+def _dist_cnty(loc):
+    """LOCATION '12 ORA 001' / '04 CC. 004' -> ('12', 'ORA'/'CC')."""
+    parts = ("" if loc is None else str(loc)).strip().upper().split()
+    dist = parts[0] if parts else ""
+    cnty = parts[1].rstrip(".") if len(parts) >= 2 else ""
+    return dist, cnty
+
+
+def tsn_rows_with_dcr(path):
+    """The raw statewide projection (idt.tsn_rows_from_raw's rows, same order)
+    PLUS each row's (district, county) — a separate loop so the comparator's
+    regression-locked loader stays untouched."""
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        sn = idt.TSN_SHEET if idt.TSN_SHEET in wb.sheetnames else wb.sheetnames[0]
+        it = wb[sn].iter_rows(values_only=True)
+        header = list(next(it, []) or [])
+        h = {str(n).strip(): i for i, n in enumerate(header) if n is not None}
+        if "LOCATION" not in h or "POST_MILE" not in h:
+            raise ValueError("the TSN Intersection Detail workbook is missing "
+                             "LOCATION/POST_MILE — pick the raw 'TSAR - INTERSECTION "
+                             "DETAIL' export.")
+        li = h["LOCATION"]
+        rows, dcr = [], []
+        for raw in it:
+            r = list(raw)
+            if not any(c not in (None, "") for c in r):
+                continue
+            rows.append(idt._tsn_row(r, h))
+            dcr.append(_dist_cnty(r[li] if li < len(r) else None))
+        return rows, dcr
+    finally:
+        wb.close()
+
 
 def _project(raw_path):
-    """Read the statewide workbook into the consolidated [Route]+SHARED_HEADER rows
-    and build the success result (rows count + distinct routes)."""
-    rows = idt.tsn_rows_from_raw(raw_path)
+    """Read the statewide workbook into the consolidated [Route]+SHARED_HEADER
+    (+ sidecar) rows and build the success result (rows count + distinct routes)."""
+    base, dcr = tsn_rows_with_dcr(raw_path)
+    rows = [row + list(dc) for row, dc in zip(base, dcr)]
     n_routes = len({r[0] for r in rows})
 
     def make_result(out_name):
@@ -43,7 +86,7 @@ def _project(raw_path):
 def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
     """Project the raw TSN Intersection Detail statewide workbook in `raw_dir` into
     the normalized workbook at `out_path` (sheet idt.NORMALIZED_SHEET, header
-    ['Route'] + idt.SHARED_HEADER). Returns a ConsolidateResult."""
+    ['Route'] + idt.SHARED_HEADER + SIDECAR_HEADER). Returns a ConsolidateResult."""
     return tsn_library.build_normalized(
         raw_dir, out_path, events=events, confirm_overwrite=confirm_overwrite,
         glob=RAW_GLOB, deps_ok=_DEPS_OK,
@@ -52,6 +95,6 @@ def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
         no_raw_hint="Import the statewide 'TSAR - INTERSECTION DETAIL' TSN export first.",
         log_label="TSN Intersection Detail",
         sheet=idt.NORMALIZED_SHEET,
-        header=["Route"] + idt.SHARED_HEADER,
+        header=["Route"] + idt.SHARED_HEADER + SIDECAR_HEADER,
         header_align={"horizontal": "center", "vertical": "center", "wrap_text": True},
         project=_project)

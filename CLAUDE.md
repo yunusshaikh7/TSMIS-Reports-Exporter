@@ -48,7 +48,10 @@ for the per-report schema + locked canaries; Highway Detail's schema was verifie
 the full statewide bundle — 252 routes vs the 60k-row TSN extract — and its comparison
 carries an Intersection-Detail-style **Report View** replica). Report **8 (Highway
 Summary)** is **export-only** (export-enabled app-side but still site-greyed); its
-integration waits for a verifiable schema. Where the live site still greys a report,
+integration waits for a verifiable schema. **Intersection Detail follows the site's
+July-2026 report overhaul since v0.22.0** (35-column export, re-verified statewide on the
+7.8 bundle; pre-update workbooks/PDFs are refused with re-export hints; canary
+163,310 → 21,675). Where the live site still greys a report,
 `select_report` fails fast rather than stalling.
 **Selecting both editions of one report (Excel + PDF, same `data_value`) coalesces** — the route
 is generated **once** and both files saved off it (`run_export_combined`, v0.19.2; standard path
@@ -57,11 +60,12 @@ Highway Log district PDFs (dropped into `input/tsn_highway_log/`) and the app's 
 **Highway Log (PDF)**, **Intersection Detail (PDF)** and **Highway Detail (PDF)**
 exports. The **Compare** tab diffs every report **TSMIS-vs-TSN** (the PDF-sourced
 editions among them, each also offering a **PDF-vs-Excel** self-check) and runs
-cross-environment comparisons. **Visual evidence (v0.21.0):** Highway Detail vs-TSN
-comparisons can also render sampled diffs as highlighted snippets from BOTH PDFs
-(parse-back-verified; `… (evidence).xlsx` + a two-layout image folder beside the
-comparison) — one shared toggle+count on both matrix pages, enabled once the TSN
-district PDFs sit in `tsn_library/highway_detail/pdf/`. See
+cross-environment comparisons. **Visual evidence (v0.21.0; + Intersection Detail in
+v0.22.0):** Highway Detail and Intersection Detail vs-TSN comparisons can also render
+sampled diffs as highlighted snippets from BOTH PDFs (parse-back-verified;
+`… (evidence).xlsx` + a two-layout image folder beside the comparison) — one shared
+toggle+count on both matrix pages, enabled per report once its TSN prints sit in
+`tsn_library/<report>/pdf/` (HD: the district PDFs; ID: the one statewide print). See
 [docs/comparison-engine.md](docs/comparison-engine.md) §13.
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
@@ -188,7 +192,7 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   compare_core.py            the regression-locked comparison-workbook engine
   compare_tsn_common.py      the shared FILE-comparator substrate (P5b; every comparator rides it since v0.19.0)
   compare_env.py compare_highway_log*.py compare_*_tsn.py   the comparison families over compare_core
-  visual_evidence.py evidence_highway_detail.py   the evidence-images engine + HD adapter (v0.21.0)
+  visual_evidence.py evidence_highway_detail.py evidence_intersection_detail.py   the evidence-images engine + per-report adapters
   pdf_table_lib.py           the shared PDF-table machinery (clusterer/columns/writer/convert loop, R2)
   matrix.py                  the matrix FACADE (patch matrix.<name>) over matrix_state.py + matrix_build.py
   matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary

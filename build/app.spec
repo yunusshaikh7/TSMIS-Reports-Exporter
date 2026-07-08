@@ -111,9 +111,9 @@ APP_MODULES = [
     "compare_intersection_detail_tsn", "compare_intersection_detail_pdf",
     "compare_highway_sequence_tsn",
     "compare_highway_detail_tsn", "compare_highway_detail_pdf",
-    # v0.21.0 visual evidence: the report-agnostic engine + the Highway Detail
-    # adapter (lazy-imported by matrix_build/gui_api, so they MUST be declared).
-    "visual_evidence", "evidence_highway_detail",
+    # v0.21.0 visual evidence: the report-agnostic engine + the per-report
+    # adapters (lazy-imported by matrix_build/gui_api, so they MUST be declared).
+    "visual_evidence", "evidence_highway_detail", "evidence_intersection_detail",
     "gui_main", "gui_api", "gui_worker", "gui_win32", "gui_endpoint", "gui_matrix",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are

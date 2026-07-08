@@ -1,14 +1,18 @@
 """Golden check for the TSMIS-vs-TSN Intersection Detail comparator
-(scripts/compare_intersection_detail_tsn.py) — the FLAT recipe (route+PM).
+(scripts/compare_intersection_detail_tsn.py) — the FLAT recipe (route+PM),
+July-2026 export format.
 
 Locks: the CompareSchema wiring (PM key; NO context fields — every shared column is
-compared and counted; boolean fields; the Notes legend_writer), the Y/N<->1/0
-boolean normalization, the control-type crosswalk, route-from-LOCATION + PM/date
-normalization, the position-based TSMIS-consolidated loader, and end-to-end that a
-normalization still produces a MATCH (a Y/1 boolean and a crosswalked S/P compare
-EQUAL) while everything present in both systems IS counted — a non-signalized
-control change, the cross-street blank-vs-value gap, and the Date-of-Record
-refresh-vs-record column all flag as genuine diffs. No Excel; CI-safe.
+compared and counted; boolean fields; the Notes legend_writer), the July-2026 shape
+(33 shared fields ending in 'Xing Line Lgth'; the second ML eff-date gone — TSN's
+MAIN_EFF_DATE is Report-View-only now), the old-format refusal (a pre-update
+consolidated workbook errors with a re-export hint instead of being mis-read by
+position), the Y/N<->legacy-1/0 boolean normalization, the control-type crosswalk,
+route-from-LOCATION + PM/date/zero-pad normalization, the position-based TSMIS
+loader, the Report View classification (Date of Record + INT/Ctrl/Light eff-dates
+count as Major now; Int St / ML / CS Eff-Date + Route Suffix stay soft — user
+decision 2026-07-08), and end-to-end that a normalization still produces a MATCH
+while everything present in both systems IS counted. No Excel; CI-safe.
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_compare_intersection_detail_tsn.py
@@ -34,29 +38,40 @@ def check(name, cond):
         _fail.append(name)
 
 
-def _write_tsmis(path, rows):
-    """Synthetic CONSOLIDATED Intersection Detail: header[0]='Route'; the loader
-    reads by POSITION, so only the column positions matter (labels are placeholders)."""
+def _write_tsmis(path, rows, old_format=False):
+    """Synthetic CONSOLIDATED Intersection Detail: header[0]='Route' + the 35
+    July-2026 source columns (the loader reads by POSITION, but its header gate
+    demands the trailing 'Xing Line Lgth'). `old_format` writes the pre-update
+    37-column shape instead — the refusal fixture."""
     wb = Workbook()
     ws = wb.active
     ws.title = idt.TSMIS_SHEET
-    ws.append(["Route"] + [f"c{i}" for i in range(1, 37)])
+    if old_format:
+        ws.append(["Route"] + [f"c{i}" for i in range(1, 36)] + ["Xing S"])
+    else:
+        ws.append(["Route"] + [f"c{i}" for i in range(1, 35)] + ["Xing Line Lgth"])
     for r in rows:
-        ws.append(r + [None] * (37 - len(r)))
+        ws.append(r + [None] * (36 - len(r)))
     wb.save(path)
     wb.close()
 
 
 def _tsmis_row(route, pr, pm, dor, hg, city, ru, int_t, ctrl_t, light, ml_sm, ml_lc,
-               ml_rc, ml_tf, ml_nl, desc, cs_sm=None, cs_lc=None):
-    """Place values at the consolidated VALUE positions the loader reads."""
-    r = [None] * 37
-    r[0], r[1], r[2], r[4], r[5] = route, pr, pm, "12 ORA " + route, dor
+               ml_rc, ml_tf, ml_nl, desc, cs_sm=None, cs_lc=None, geo_date=None,
+               int_st=None, xll=None, mll=None, location=None):
+    """Place values at the July-2026 consolidated VALUE positions the loader
+    reads. `geo_date` fills every geometry eff-date slot (INT/Ctrl/Light/ML/CS)."""
+    r = [None] * 36
+    r[0], r[1], r[2], r[4], r[5] = route, pr, pm, location or ("12 ORA " + route), dor
     r[6], r[7], r[8] = hg, city, ru
+    d = geo_date or dor
+    r[9], r[11], r[13], r[15], r[23] = d, d, d, d, d      # the five eff-dates
     r[10], r[12], r[14] = int_t, ctrl_t, light
     r[16], r[17], r[18], r[19], r[20] = ml_sm, ml_lc, ml_rc, ml_tf, ml_nl
-    r[22] = desc
-    r[25], r[26] = cs_sm, cs_lc            # cross-street (context)
+    r[21], r[22] = desc, mll               # Description, Main Line Length
+    r[24], r[25] = cs_sm, cs_lc            # cross-street attributes
+    r[29] = int_st or d                    # Int St Eff-Date
+    r[35] = xll                            # Xing Line Lgth (July 2026)
     return r
 
 
@@ -67,10 +82,9 @@ def _write_tsn(path, rows):
     cols = ["PP", "POST_MILE", "LOCATION", "DATE_REC", "HG", "CITY_CODE", "RU",
             "TY_INT", "TY_CT", "LT_TY", "MAIN_SM", "MAIN_LC", "MAIN_RC", "MAIN_TF",
             "MAIN_NL", "DESCRIPTION", "CS_SM", "CS_LC", "CS_RC", "CS_TF", "CS_NL",
-            # added columns the comparison now reads
             "EFF_DATE_INT", "EFF_DATE_CT", "EFF_DATE_LT", "EFF_DATE_ML", "MAIN_EFF_DATE",
             "MAIN_OVERRIDE", "CROSS_BEGIN_DATE", "EFF_DATE", "CROSS_ROUTE_NAME",
-            "CROSS_PM_PREFIX", "CROSS_POSTMILE", "CROSS_PM_SUFFIX"]
+            "CROSS_PM_PREFIX", "CROSS_POSTMILE", "CROSS_PM_SUFFIX", "X_CROSS_OVERRIDE"]
     ws.append(cols)
     for r in rows:
         ws.append([r.get(c) for c in cols])
@@ -92,31 +106,43 @@ def _comparison(path):
 
 
 def test_schema():
-    print("schema + normalizers:")
+    print("schema + normalizers (July-2026 shape):")
     sc = idt._SCHEMA
     check("key is PM", sc.header[sc.key_field] == "PM")
     check("side names TSMIS / TSN", sc.side_a == "TSMIS" and sc.side_b == "TSN")
     check("position-aligned: NO context fields (nothing suppressed or greyed)",
           tuple(sc.context_fields) == ())
-    check("all 8 date cols + Main Line Length + intersecting route ARE compared "
-          "(incl. the former context columns ML 2nd / Int St Eff-Date)",
+    check("33 shared fields, ending in the new 'Xing Line Lgth'",
+          len(sc.header) == 33 and sc.header[-1] == "Xing Line Lgth")
+    check("the second ML eff-date left the shared header (TSN MAIN_EFF_DATE is "
+          "Report-View-only now)", "ML 2nd Eff-Date" not in sc.header)
+    check("all 7 date cols + Main Line Length + intersecting route + Xing Line "
+          "Lgth ARE compared",
           all(f in sc.header and f not in sc.context_fields for f in (
               "Date of Record", "INT Type Eff-Date", "Control Type Eff-Date",
-              "Lighting Eff-Date", "ML Eff-Date", "ML 2nd Eff-Date", "CS Eff-Date",
+              "Lighting Eff-Date", "ML Eff-Date", "CS Eff-Date",
               "Int St Eff-Date", "Main Line Length", "Intrte Route",
-              "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix")))
-    check("position-aligned eff-dates: ML/CS Eff-Date -> geometry EFF_DATE_ML/CROSS_BEGIN_DATE; "
-          "ML 2nd/Int St Eff-Date -> recent MAIN_EFF_DATE/EFF_DATE",
+              "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix",
+              "Xing Line Lgth")))
+    check("position-aligned eff-dates: ML/CS -> geometry EFF_DATE_ML/CROSS_BEGIN_DATE; "
+          "Int St -> TSN's EFF_DATE (its bulk stamp); XLL -> X_CROSS_OVERRIDE",
           idt._TSN_COL["ML Eff-Date"] == "EFF_DATE_ML"
           and idt._TSN_COL["CS Eff-Date"] == "CROSS_BEGIN_DATE"
-          and idt._TSN_COL["ML 2nd Eff-Date"] == "MAIN_EFF_DATE"
-          and idt._TSN_COL["Int St Eff-Date"] == "EFF_DATE")
-    check("intersecting-route PM suffix reads from pos 35 (not the blank pos 31)",
-          idt._TSMIS_POS["Intrte PM Suffix"] == 35)
+          and idt._TSN_COL["Int St Eff-Date"] == "EFF_DATE"
+          and idt._TSN_COL["Xing Line Lgth"] == "X_CROSS_OVERRIDE"
+          and "ML 2nd Eff-Date" not in idt._TSN_COL)
+    check("July-2026 positions: Description 21, Int St 29, PM suffix 34, XLL 35",
+          idt._TSMIS_POS["Description"] == 21 and idt._TSMIS_POS["Int St Eff-Date"] == 29
+          and idt._TSMIS_POS["Intrte PM Suffix"] == 34
+          and idt._TSMIS_POS["Xing Line Lgth"] == 35)
+    check("header gate: Route + 35 cols ending 'Xing Line Lgth'",
+          idt._header_ok(["Route"] + ["x"] * 34 + ["Xing Line Lgth"])
+          and not idt._header_ok(["Route"] + ["x"] * 36)          # the old 37-col shape
+          and not idt._header_ok(["Route"] + ["x"] * 35))
     check("Notes legend_writer set (documents the normalizations)", sc.legend_writer is not None)
     check("Report View extra_sheet_writer set (the printed two-line replica)",
           sc.extra_sheet_writer is None)   # base schema is clean; the closure is added per-call in compare()
-    check("boolean normalize Y/1->Y, N/0->N",
+    check("boolean normalize Y/1->Y, N/0->N (legacy 1/0 still folds)",
           idt._norm_bool("Y") == "Y" and idt._norm_bool("1") == "Y"
           and idt._norm_bool("N") == "N" and idt._norm_bool("0") == "N")
     check("control-type crosswalk: TSN J-P + TSMIS S -> 'S' (signalized); others unchanged",
@@ -125,31 +151,40 @@ def test_schema():
     check("route token: numeric 0 keys as '000', never blank (falsy-zero D1 — "
           "_split_route feeds the alignment key)",
           idt._split_route(0) == ("000", ""))
-    # Report View (v0.17.8): every date difference renders RED like a genuine conflict but is
-    # kept OUT of the per-record Major count; the lighter alternating band is WHITE (user, 2026-06-24).
-    check("Report View: date 'soft' diffs share the hard RED palette (all dates red)",
+    # Report View classification (user decision 2026-07-08, the data-driven soft set).
+    check("Report View: 'soft' shares the hard RED palette (all diffs red)",
           idt._RV_FILLS["soft"] == idt._RV_FILLS["hard"])
     check("Report View: the normal (lighter) alternating band is WHITE",
           idt._RV_FILLS["eq"][0] == "FFFFFF" and idt._RV_FILLS["id"][0] == "FFFFFF")
-    check("Report View: a date diff classifies 'soft' (red, excluded from Major)",
-          idt._rv_classify("Date of Record", "2021-12-31", "1973-10-19") == "soft")
+    check("Report View: a Date of Record diff counts as Major now (the July-2026 "
+          "export matches TSN structurally)",
+          idt._rv_classify("Date of Record", "1999-12-30", "1970-01-01") == "hard")
+    check("Report View: INT/Ctrl/Light eff-date diffs are Major (the ~1-day-offset "
+          "tolerance is retired)",
+          idt._rv_classify("Lighting Eff-Date", "1973-10-18", "1973-10-19") == "hard")
+    check("Report View: Int St / ML / CS Eff-Date stay soft (structural)",
+          all(idt._rv_classify(f, "1964-01-01", "2022-01-01") == "soft"
+              for f in ("Int St Eff-Date", "ML Eff-Date", "CS Eff-Date")))
     check("Report View: a non-date attribute diff classifies 'hard' (counts as Major)",
           idt._rv_classify("Control Type", "S", "A") == "hard")
-    # Route Suffix is surfaced in the Report View too (next to Route), compared like any
-    # cell but 'soft' (red, not Major) since TSMIS is systematically blank vs TSN's U/S.
     check("Report View: Route Suffix is a compared grid column (next to Route)",
           any(c[2] == ("cmp", "Route Suffix") for c in idt._RV_GRID))
     check("Report View: a route-suffix diff classifies 'soft' (red, excluded from Major)",
           idt._rv_classify("Route Suffix", "", "U") == "soft")
+    check("Report View grid: Xing Line Lgth is a compared cell; the 2nd ML eff-date "
+          "is a TSN-only (blue) reference cell",
+          any(spec == ("cmp", "Xing Line Lgth") for c in idt._RV_GRID for spec in (c[2], c[5]))
+          and any(spec == ("tn", "ML2") for c in idt._RV_GRID for spec in (c[2], c[5]))
+          and not any(spec == ("cmp", "ML 2nd Eff-Date") for c in idt._RV_GRID
+                      for spec in (c[2], c[5])))
+    check("Report View: the TSN-only 2nd ML eff-date renders as a DATE",
+          "ML2" in idt._RV_DATEONE and idt._RV_ONE["ML2"] == "MAIN_EFF_DATE")
     check("route from LOCATION '12 ORA 001' -> '001'", idt._norm_route("12 ORA 001") == "001")
     check("route-suffix split '12 ORA 210U' -> ('210','U')", idt._split_route("12 ORA 210U") == ("210", "U"))
     check("route-suffix split '12 ORA. 210' -> ('210','')", idt._split_route("12 ORA. 210") == ("210", ""))
     check("Route Suffix is a COMPARED column (not context)",
           "Route Suffix" in sc.header and "Route Suffix" not in sc.context_fields)
     check("PM ' 000.204' -> '0.204'", idt._norm_pm(" 000.204") == "0.204")
-    # Numeric 0 must canonicalize to '0', not blank: TSN stores a numeric-0 intersecting-route
-    # postmile where TSMIS stores text '0.000'; the old `str(v or "")` blanked the 0 and flagged
-    # a phantom 0-vs-blank diff. None/'' stay blank so a real value-vs-missing still flags.
     check("numeric 0 -> '0' (preserved; matches text '0.000')",
           idt._norm_num(0) == "0" and idt._norm_num(0.0) == "0" and idt._norm_num("0.000") == "0")
     check("blank stays blank (None/'' -> '')",
@@ -163,25 +198,34 @@ def test_end_to_end():
     print("end-to-end (normalizations still match; every shared column counted):")
     root = Path(tempfile.mkdtemp(prefix="tsmis_id_tsn_"))
     tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
-    # PM 0.204: signalized sub-type split (TSMIS S vs TSN P) — CROSSWALKED to equal,
-    #   raw codes kept in context; booleans equal across encodings; CS present on TSN,
-    #   blank on TSMIS (context). PM 1.000: a NON-signalized control diff (A vs B, NOT
-    #   crosswalked) + a real ML Num Lanes diff.
+    # PM 000.204: signalized sub-type split (TSMIS S vs TSN P) — CROSSWALKED to
+    #   equal; native Y/N booleans equal; Xing Line Lgth '250' vs TSN '0250' —
+    #   zero-pad-normalized to EQUAL; the CS attributes blank on TSMIS vs valued
+    #   on TSN (5 counted diffs); Int St Eff-Date historical vs TSN's bulk stamp
+    #   (1 structural counted diff). PM 001.000: a NON-signalized control diff
+    #   (A vs B, NOT crosswalked) + a real ML Num Lanes diff.
     _write_tsmis(tsmis, [
-        _tsmis_row("001", "R", "0.204", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
-                   "1", "N", "0", "P", "3", "JCT 5"),
-        _tsmis_row("001", "R", "1.000", "21-12-31", "D", "DAPT", "U", "T", "A", "1",
-                   "1", "N", "0", "P", "4", "JCT 6"),
+        _tsmis_row("001", "R", "000.204", "73-10-19", "D", "DAPT", "U", "T", "S", "Y",
+                   "Y", "N", "N", "P", "3", "JCT 5", int_st="73-10-19", xll="250",
+                   mll="100"),
+        _tsmis_row("001", "R", "001.000", "73-10-19", "D", "DAPT", "U", "T", "A", "Y",
+                   "Y", "N", "N", "P", "4", "JCT 6", int_st="73-10-19"),
     ])
     _write_tsn(tsn, [
         {"PP": "R", "POST_MILE": " 000.204", "LOCATION": "12 ORA 001", "DATE_REC": "73-10-19",
          "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "P", "LT_TY": "Y",
          "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
-         "DESCRIPTION": "JCT 5", "CS_SM": "N", "CS_LC": "N", "CS_RC": "N", "CS_TF": "P", "CS_NL": 2},
+         "DESCRIPTION": "JCT 5", "CS_SM": "N", "CS_LC": "N", "CS_RC": "N", "CS_TF": "P",
+         "CS_NL": 2, "EFF_DATE_INT": "73-10-19", "EFF_DATE_CT": "73-10-19",
+         "EFF_DATE_LT": "73-10-19", "EFF_DATE_ML": "73-10-19",
+         "CROSS_BEGIN_DATE": "73-10-19", "MAIN_OVERRIDE": None,
+         "EFF_DATE": "22-01-01", "X_CROSS_OVERRIDE": "0250"},
         {"PP": "R", "POST_MILE": " 001.000", "LOCATION": "12 ORA 001", "DATE_REC": "73-10-19",
          "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "B", "LT_TY": "Y",
          "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
-         "DESCRIPTION": "JCT 6"},
+         "DESCRIPTION": "JCT 6", "EFF_DATE_INT": "73-10-19", "EFF_DATE_CT": "73-10-19",
+         "EFF_DATE_LT": "73-10-19", "EFF_DATE_ML": "73-10-19",
+         "CROSS_BEGIN_DATE": "73-10-19", "EFF_DATE": "73-10-19"},
     ])
     res = idt.compare(tsmis, tsn, out, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
     check("compare ok", res.status == "ok")
@@ -192,60 +236,86 @@ def test_end_to_end():
     by = {r[pm]: r for r in rows}
 
     light = header.index("Lighting")
-    mast = header.index("ML Mastarm")
-    rc = header.index("ML Right Chan")
     ctrl = header.index("Control Type")
     nl = header.index("ML Num Lanes")
     dor = header.index("Date of Record")
     cs_sm = header.index("CS Mastarm")
+    int_st = header.index("Int St Eff-Date")
+    xll = header.index("Xing Line Lgth")
+    mll = header.index("Main Line Length")
     diffs_col = header.index("Diffs")
     # Normalizations still produce a MATCH (the point of "make normalization clear,
     # even though it leads to a match").
-    check("Lighting Y(TSN)/1(TSMIS) normalized equal — no diff", DIFF not in by["0.204"][light])
-    check("ML Mastarm Y/1 normalized equal — no diff", DIFF not in by["0.204"][mast])
-    check("ML Right Chan N/0 normalized equal — no diff", DIFF not in by["0.204"][rc])
+    check("Lighting Y/Y equal — no diff", DIFF not in by["0.204"][light])
     check("Control Type S(TSMIS)/P(TSN) crosswalk to 'S' — no diff",
           DIFF not in by["0.204"][ctrl] and by["0.204"][ctrl] == "S")
-    # Everything present in both systems is now COUNTED (no suppression):
-    # the cross-street blank-vs-value gap and the Date-of-Record refresh-vs-record
-    # column flag like any other diff.
-    check("CS Mastarm blank(TSMIS) vs N(TSN) is now a COUNTED diff (no coalescing)",
+    check("Xing Line Lgth '250' vs TSN '0250' zero-pad-normalized — no diff",
+          DIFF not in by["0.204"][xll] and by["0.204"][xll] == "250")
+    check("Date of Record MATCHES now (the July-2026 fix — no wholesale diff)",
+          DIFF not in by["0.204"][dor])
+    check("Main Line Length '100'(TSMIS) vs blank(TSN) is a counted diff",
+          DIFF in by["0.204"][mll])
+    # Everything present in both systems is COUNTED (no suppression):
+    check("CS Mastarm blank(TSMIS) vs N(TSN) is a COUNTED diff (no coalescing)",
           DIFF in by["0.204"][cs_sm])
-    check("Date of Record refresh(2021)/record(1973) is now a COUNTED diff",
-          DIFF in by["0.204"][dor])
-    check("PM 0.204 counts the 5 cross-street + 1 Date-of-Record diffs (6)",
-          by["0.204"][diffs_col] in ("6", "6.0"))
+    check("Int St Eff-Date historical(1973) vs TSN bulk stamp(2022) is a COUNTED diff",
+          DIFF in by["0.204"][int_st])
+    check("PM 0.204 counts 5 cross-street + Int St + Main Line Length (7)",
+          by["0.204"][diffs_col] in ("7", "7.0"))
     # A NON-signalized control change (A vs B) is NOT crosswalked -> still a genuine diff.
     check("Control Type A(TSMIS) vs B(TSN) — non-signalized, still a genuine diff",
           DIFF in by["1.000"][ctrl])
     check("ML Num Lanes 4 vs 3 is a genuine diff", DIFF in by["1.000"][nl])
-    check("PM 1.000 counts Control + ML Num Lanes + Date of Record (3)",
-          by["1.000"][diffs_col] in ("3", "3.0"))
+    check("PM 1.000 counts Control + ML Num Lanes (2)",
+          by["1.000"][diffs_col] in ("2", "2.0"))
     total = sum(1 for r in rows for c in r if DIFF in c)
     check("total counted diff cells across both rows == 9", total == 9)
     print(f"      (rows={len(rows)}, total diff cells={total})")
 
 
+def test_old_format_refused():
+    """A PRE-update consolidated workbook (the 37-column layout) must be REFUSED
+    with the re-export hint — reading it by the new positions would silently
+    mis-map every column from Description on."""
+    print("pre-July-2026 workbook refusal:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_id_old_"))
+    tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
+    _write_tsmis(tsmis, [
+        _tsmis_row("001", "R", "0.204", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
+                   "1", "N", "0", "P", "3", "JCT 5") + [None],
+    ], old_format=True)
+    _write_tsn(tsn, [
+        {"PP": "R", "POST_MILE": " 000.204", "LOCATION": "12 ORA 001",
+         "DATE_REC": "73-10-19", "HG": "D", "RU": "U"},
+    ])
+    res = idt.compare(tsmis, tsn, out, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
+    check("old-format compare errors (not silently mis-read)", res.status == "error")
+    check("the error names the July-2026 format and says to re-export",
+          "July 2026" in (res.message or "") and "re" in (res.message or "").lower())
+    check("no comparison workbook was written", not out.exists())
+
+
 def test_route_suffix_match():
     """A TSN route carrying a route suffix (210U) must MATCH the suffix-less
     TSMIS route (210) on base route + PM — not drop to one-sided — and the suffix
-    difference must be FLAGGED in the 'Route Suffix' column (the indicator)."""
+    difference must be FLAGGED in the 'Route Suffix' column (the indicator).
+    (Since July 2026 the TSMIS Location usually carries the suffix too — then
+    both sides read 'U' and the column simply matches.)"""
     print("route-suffix matching + indicator:")
     root = Path(tempfile.mkdtemp(prefix="tsmis_id_rb_"))
     tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
     # TSMIS lists the route WITHOUT a suffix ("210"); everything else identical.
     _write_tsmis(tsmis, [
-        _tsmis_row("210", "R", "5.000", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
-                   "1", "N", "0", "P", "3", "JCT 99"),
+        _tsmis_row("210", "R", "005.000", "73-10-19", "D", "DAPT", "U", "T", "S", "Y",
+                   "Y", "N", "N", "P", "3", "JCT 99", int_st="73-10-19"),
     ])
-    # TSN lists the SAME intersection under "210U" (route suffix 'U'). Every other
-    # column (incl. Date of Record, now compared) is identical, so the suffix is the
-    # ONLY difference.
     _write_tsn(tsn, [
-        {"PP": "R", "POST_MILE": " 005.000", "LOCATION": "12 ORA 210U", "DATE_REC": "21-12-31",
+        {"PP": "R", "POST_MILE": " 005.000", "LOCATION": "12 ORA 210U", "DATE_REC": "73-10-19",
          "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "S", "LT_TY": "Y",
          "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
-         "DESCRIPTION": "JCT 99"},
+         "DESCRIPTION": "JCT 99", "EFF_DATE_INT": "73-10-19", "EFF_DATE_CT": "73-10-19",
+         "EFF_DATE_LT": "73-10-19", "EFF_DATE_ML": "73-10-19",
+         "CROSS_BEGIN_DATE": "73-10-19", "EFF_DATE": "73-10-19"},
     ])
     res = idt.compare(tsmis, tsn, out, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
     check("compare ok", res.status == "ok")
@@ -262,18 +332,19 @@ def test_normalized_path_crosswalk():
     """A normalized TSN-library workbook carrying RAW control codes (a library built
     before the crosswalk existed — 'stale') must STILL get the crosswalk applied when
     read: _load_tsn re-projects the normalized sheet at compare time. Regression lock
-    for the 'Signalized ≠ P' bug (the crosswalk used to be skipped on this path)."""
-    print("normalized-library path re-applies the crosswalk (stale-library repair):")
+    for the 'Signalized ≠ P' bug. ALSO: a v3 library carrying the District/County
+    sidecar columns must load with them SLICED OFF (the comparison never sees them)."""
+    print("normalized-library path: crosswalk re-applied + sidecar sliced:")
     root = Path(tempfile.mkdtemp(prefix="tsmis_id_norm_"))
     norm = root / "tsn_norm.xlsx"
     wb = Workbook()
     ws = wb.active
     ws.title = idt.NORMALIZED_SHEET
-    ws.append(["Route"] + idt.SHARED_HEADER)
+    ws.append(["Route"] + idt.SHARED_HEADER + ["TSN District", "TSN County"])
 
-    def nrow(route, pm, ctrl, light="Y"):
+    def nrow(route, pm, ctrl, light="Y", sidecar=("12", "ORA")):
         d = {"PM": pm, "Control Type": ctrl, "Lighting": light}
-        return [route] + [d.get(f, "") for f in idt.SHARED_HEADER]
+        return [route] + [d.get(f, "") for f in idt.SHARED_HEADER] + list(sidecar)
 
     ws.append(nrow("001", "1.000", "P"))     # stale RAW signal sub-type
     ws.append(nrow("001", "2.000", "J"))     # another stale RAW signal sub-type
@@ -281,6 +352,8 @@ def test_normalized_path_crosswalk():
     wb.save(norm)
     wb.close()
     rows, _ = idt._load_tsn(norm)
+    check("sidecar columns are SLICED OFF (rows are the shared width)",
+          all(len(r) == 1 + len(idt.SHARED_HEADER) for r in rows))
     pm_i = 1 + idt.SHARED_HEADER.index("PM")
     ct_i = 1 + idt.SHARED_HEADER.index("Control Type")
     by_pm = {r[pm_i]: r[ct_i] for r in rows}
@@ -291,40 +364,45 @@ def test_normalized_path_crosswalk():
 
 
 def test_added_columns():
-    """The previously-omitted columns are now compared (v0.17.7): an effective-date
-    difference flags, and the intersecting-route block + Main Line Length compare
-    (matching where equal). Lock against silently dropping them again."""
-    print("added columns (eff-dates, intersecting route, main line length):")
+    """The July-2026 columns hold their mappings: an intersecting-route block
+    value compares (matching where equal), Xing Line Lgth flags a GENUINE length
+    difference (not just padding), and a geometry eff-date conflict flags."""
+    print("July-2026 columns (intersecting route, Xing Line Lgth, eff-dates):")
     root = Path(tempfile.mkdtemp(prefix="tsmis_id_add_"))
     tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
-    r = _tsmis_row("001", "R", "0.204", "21-12-31", "D", "DAPT", "U", "T", "S", "1",
-                   "1", "N", "0", "P", "3", "JCT 5")
-    r[9] = "73-10-18"      # INT Type Eff-Date — 1 day before TSN (systematic offset)
-    r[23] = "100"          # Main Line Length — matches TSN
-    r[32] = "005"          # Intrte Route — matches TSN
+    r = _tsmis_row("001", "R", "000.204", "73-10-19", "D", "DAPT", "U", "T", "S", "Y",
+                   "Y", "N", "N", "P", "3", "JCT 5", int_st="73-10-19", xll="165")
+    r[9] = "70-01-01"      # INT Type Eff-Date — a GENUINE conflict vs TSN's 73-10-19
+    r[22] = "100"          # Main Line Length — matches TSN
+    r[31] = "005"          # Intrte Route — matches TSN
     _write_tsmis(tsmis, [r])
     _write_tsn(tsn, [{
-        "PP": "R", "POST_MILE": " 000.204", "LOCATION": "12 ORA 001", "DATE_REC": "21-12-31",
+        "PP": "R", "POST_MILE": " 000.204", "LOCATION": "12 ORA 001", "DATE_REC": "73-10-19",
         "HG": "D", "CITY_CODE": "DAPT", "RU": "U", "TY_INT": "T", "TY_CT": "S", "LT_TY": "Y",
         "MAIN_SM": "Y", "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
-        "DESCRIPTION": "JCT 5", "EFF_DATE_INT": "73-10-19", "MAIN_OVERRIDE": "100",
-        "CROSS_ROUTE_NAME": "005",
+        "DESCRIPTION": "JCT 5", "EFF_DATE_INT": "73-10-19", "EFF_DATE_CT": "73-10-19",
+        "EFF_DATE_LT": "73-10-19", "EFF_DATE_ML": "73-10-19", "CROSS_BEGIN_DATE": "73-10-19",
+        "EFF_DATE": "73-10-19", "MAIN_OVERRIDE": "100", "CROSS_ROUTE_NAME": "005",
+        "X_CROSS_OVERRIDE": "250",
     }])
     res = idt.compare(tsmis, tsn, out, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
     check("compare ok", res.status == "ok")
     header, rows, _ = _comparison(out)
     row = {r[header.index("PM")]: r for r in rows}["0.204"]
-    check("INT Type Eff-Date is COMPARED and flags (1973-10-18 vs 1973-10-19)",
+    check("INT Type Eff-Date is COMPARED and flags (1970 vs 1973 — genuine)",
           DIFF in row[header.index("INT Type Eff-Date")])
     check("Main Line Length is COMPARED and matches (100=100)",
           DIFF not in row[header.index("Main Line Length")])
     check("Intrte Route is COMPARED and matches (005=005)",
           DIFF not in row[header.index("Intrte Route")])
+    check("Xing Line Lgth flags a GENUINE difference (165 vs 250)",
+          DIFF in row[header.index("Xing Line Lgth")])
 
 
 def main():
     test_schema()
     test_end_to_end()
+    test_old_format_refused()
     test_route_suffix_match()
     test_normalized_path_crosswalk()
     test_added_columns()
