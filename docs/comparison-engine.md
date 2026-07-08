@@ -839,11 +839,12 @@ Two reports so far, each via its own adapter over the shared engine:
 the ID differences are called out inline.
 
 - **What it produces**, next to the comparison workbook (the `(formulas).xlsx` sibling family):
-  `<comparison> (evidence).xlsx` (a Summary sheet + every stacked image embedded) and
-  `<comparison> (evidence images)/` with each example in BOTH layouts (`*_stacked.png` for
-  reading, `*_pair.png` side-by-side for pasting into docs). Keep-last-good: the images render
-  into a temp folder and swap in only after the workbook wrote; a locked-open previous set
-  diverts to `.new` with a note instead of failing.
+  `<comparison> (evidence).xlsx` (a Summary sheet + BOTH image layouts embedded, each on its
+  own tab — "Evidence (stacked)" for reading, "Evidence (side-by-side)" for pasting; v0.22.1,
+  previously stacked-only) and `<comparison> (evidence images)/` with the same examples as
+  loose files in both layouts (`*_stacked.png`, `*_pair.png`). Keep-last-good: the images
+  render into a temp folder and swap in only after the workbook wrote; a locked-open previous
+  set diverts to `.new` with a note instead of failing.
 - **Sampling:** for every differing column, up to N (user setting, 1–10, default 2) random
   example rows across random routes, keys restricted to UNIQUE-per-route on both sides so a
   highlight is THE row. Each run logs its sample seed.
