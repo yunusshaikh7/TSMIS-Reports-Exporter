@@ -78,10 +78,15 @@ CompareEntry = namedtuple("CompareEntry", "key label adapter kind group")
 # behavior. The library stores ALREADY-NORMALIZED values, so an old build must
 # read as stale and auto-rebuild from raw (D2) — a silent mismatch shipped wrong
 # comparison numbers twice (v0.17.6, v0.18.3).
+# evidence_pdfs: the report ALSO keeps an OPTIONAL pdf/ drop folder of TSN
+# district prints, read only by the visual-evidence generator (v0.21.x) —
+# tsn_library.ensure_layout creates + hints it so the user has somewhere to
+# drop the files (the toggle stays greyed until they do).
 TsnEntry = namedtuple(
     "TsnEntry",
-    "subdir label raw_glob raw_kind consolidated_name builder normalization_version",
-    defaults=(1,))
+    "subdir label raw_glob raw_kind consolidated_name builder "
+    "normalization_version evidence_pdfs",
+    defaults=(1, False))
 
 # ----------------------------------------------------------------------------- #
 # The authoritative, ORDERED report metadata. Order == display order (the GUI
@@ -295,7 +300,7 @@ TSN = (
     # comparison loader slices to the shared width and never sees them.
     TsnEntry("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
              "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into",
-             normalization_version=2),
+             normalization_version=2, evidence_pdfs=True),
 )
 
 

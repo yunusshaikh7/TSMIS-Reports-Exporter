@@ -840,11 +840,15 @@ status/completion/counts, and any evidence failure only logs + adds a summary no
 - **Sources:** TSMIS side = the per-route **Highway Detail (PDF)** export (the Everything matrix
   resolves the row's cell store, the by-day matrix that day's `highway_detail_pdf/` run folder);
   TSN side = the district prints in `tsn_library/highway_detail/pdf/` (any filenames — the
-  district is read from each file's own DIST-CNTY-ROUTE header). The **v2 normalized TSN library
-  appends TSN District/County sidecar columns** (`tsn_load_highway_detail.SIDECAR_HEADER`) so
-  evidence can find a row's print; `_normalized_row` slices to the shared width, so the
-  comparison itself never sees them (a pre-v2 library is refused with a rebuild hint, and the D2
-  version bump rebuilds it automatically).
+  district is read from each file's own DIST-CNTY-ROUTE header). The pdf/ folder is **created +
+  hinted by `tsn_library.ensure_layout`** (v0.21.1 — driven by the catalog's
+  `TsnEntry.evidence_pdfs` flag; v0.21.0 never created it, so an updated install had nowhere to
+  drop the prints), and re-entering a matrix tab re-pushes the state so the toggle re-probes and
+  un-greys without a restart. The **v2 normalized TSN library appends TSN District/County
+  sidecar columns** (`tsn_load_highway_detail.SIDECAR_HEADER`) so evidence can find a row's
+  print; `_normalized_row` slices to the shared width, so the comparison itself never sees them
+  (a pre-v2 library is refused with a rebuild hint, and the D2 version bump rebuilds it
+  automatically).
 - **Locators:** the TSMIS locator mirrors `consolidate_tsmis_highway_detail_pdf.parse_pdf` step
   for step (per-page windows, row groups, the postmile test, the date-token guard, cross-page
   carry) while capturing positions — **keep them in LOCKSTEP**; records on a fallback-grid page

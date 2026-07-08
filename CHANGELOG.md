@@ -3,6 +3,20 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.21.1 — 2026-07-08
+
+Hotfix: the folder v0.21.0's release notes told you to drop the TSN district PDFs into now
+actually appears.
+
+- **The `highway_detail/pdf/` drop folder is created by the app.** v0.21.0 looked for the TSN
+  district prints there but never created the folder, so an updated install had nowhere to drop
+  them. The TSN library now creates it on startup (and from Settings ▸ "Open TSN library folder"),
+  with a hint file inside explaining what goes there — and the library's README refreshes on
+  update instead of staying frozen at the version that first wrote it.
+- **The evidence toggle wakes up when you come back.** After dropping the PDFs, re-entering the
+  Everything matrix or the by-day matrix re-checks for them — no restart needed to un-grey the
+  "Evidence images" option.
+
 ## v0.21.0 — 2026-07-08
 
 **Evidence images** — the manual "screenshot both PDFs and circle the cell" workflow, automated.

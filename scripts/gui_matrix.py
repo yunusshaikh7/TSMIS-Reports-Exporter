@@ -58,8 +58,14 @@ class GuiMatrixMixin:
         """The comparison-matrix snapshot for the Everything tab — a pure
         filesystem read (per-cell export + comparison freshness, cached verdict +
         discrepancy counts). `baseline` overrides the persisted one for a one-off
-        view; otherwise the saved baseline (default ssor-prod) is used."""
+        view; otherwise the saved baseline (default ssor-prod) is used.
+
+        Also re-pushes the state: the JS calls this on every entry to the tab,
+        and the state carries the evidence-availability probe — so dropping the
+        TSN district PDFs and returning to the tab un-greys the evidence toggle
+        without a restart (v0.21.1)."""
         base = self._valid_baseline(baseline) or self._current_baseline()
+        self._push_state()
         return self._matrix_snapshot(base)
 
     @_api_method
@@ -867,9 +873,12 @@ class GuiMatrixMixin:
     @_api_method
     def day_matrix_info(self):
         """The by-day matrix snapshot for the Compare tab — a pure filesystem read
-        plus the add-day picker's available days for the current source."""
+        plus the add-day picker's available days for the current source. Also
+        re-pushes the state so the evidence toggle re-probes on tab entry (see
+        matrix_info)."""
         snap = self._day_matrix_snapshot()
         snap["available_days"] = day_matrix.available_days(snap["source"])
+        self._push_state()
         return snap
 
     @_api_method
