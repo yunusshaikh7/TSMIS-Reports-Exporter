@@ -63,9 +63,11 @@ editions among them, each also offering a **PDF-vs-Excel** self-check) and runs
 cross-environment comparisons. **Visual evidence (v0.21.0; + Intersection Detail in
 v0.22.0):** Highway Detail and Intersection Detail vs-TSN comparisons can also render
 sampled diffs as highlighted snippets from BOTH PDFs (parse-back-verified;
-`… (evidence).xlsx` + a two-layout image folder beside the comparison) — one shared
-toggle+count on both matrix pages, enabled per report once its TSN prints sit in
-`tsn_library/<report>/pdf/` (HD: the district PDFs; ID: the one statewide print). See
+`… (evidence).xlsx` with stacked + side-by-side image tabs, plus the loose image folder,
+beside the comparison) — one shared toggle+count on both matrix pages, enabled per report
+once its TSN prints sit in `tsn_library/<report>/pdf/` (HD: the district PDFs; ID: the
+one statewide print), and since v0.23.0 a per-cell **camera action** regenerates a BUILT
+comparison's evidence on demand (no re-compare; freshness-gated). See
 [docs/comparison-engine.md](docs/comparison-engine.md) §13.
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:

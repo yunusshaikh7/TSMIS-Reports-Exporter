@@ -142,13 +142,17 @@ v0.18.1 is accepted when the returned evidence confirms each item. Disposable de
 - [ ] **Evidence-driven PDF/parser fixes** — the P12 row-count oracle + the ramp-summary
       misattribution / duplicate-pop items, run against the **returned real source PDFs**; any fix
       landed + locked.
-- [ ] **Intersection Detail (PDF) live acceptance (CR-002)** — the forward-ported report's live
-      **export → consolidate → PDF-vs-TSN / PDF-vs-Excel / cross-env**, re-confirming the handoff's
-      218/218-route, 0-content-diff reconciliation, **and** the v0.17.8 vs-TSN behavior (the
-      position-aligned dates, the `S` control crosswalk, the Report View) against the returned real
-      PDFs/Excel/TSN. The offline canary shifted with the v0.18.3 numeric-0 fix — Excel is now **≈163,310**
-      (was 163,353; the PDF edition shifts by the same fix), locked in `check_compare_intersection_detail_tsn`;
-      this confirms it on real data.
+- [ ] **Intersection Detail (PDF) live acceptance (CR-002; re-scoped by the July-2026 site
+      update, v0.22.0)** — the report's live **export → consolidate → PDF-vs-TSN /
+      PDF-vs-Excel / cross-env** on the work PC, now against the **July-2026 35-column
+      format**: the offline reconciliation to re-confirm is the 7.8 bundle's (217/217 routes,
+      16,459/16,459 rows, 0 non-whitespace PDF↔Excel diffs) and the vs-TSN canary is
+      **21,675 diff cells / 16,199 matched / 260+427 one-sided** (the pre-update ≈163,310
+      belonged to the retired format — pre-update workbooks/PDFs are now REFUSED with a
+      re-export hint, which the live run should also confirm fires on any stale store).
+      Locked offline in `check_compare_intersection_detail_tsn`; this confirms it on real
+      data, plus the **evidence images** flow (drop the statewide TSN print, toggle or the
+      per-cell camera) end-to-end on the work PC.
 - [ ] **No regressions** — the full offline `build/check_*.py` suite still green; every v0.18.1
       code fix is itself offline-RED-proven first.
 

@@ -253,6 +253,37 @@ boundary — so encode the boundary's rule where it runs (ASCII in `.ps1`, an as
 the generator) instead of relying on memory. → [build-and-release.md](build-and-release.md),
 `tools/screenshots.py`.
 
+## 13. Upstream reshaped a report: census first, then refuse the old format
+
+The July-2026 site update reshaped Intersection Detail (v0.22.0) — the first time an
+already-integrated report changed format underneath the app. Two rules made the
+re-baseline fast and safe:
+
+- **Measure before rewriting.** Before touching the comparator, a statewide *census*
+  diffed the new exports against TSN field-by-field (per-column diff rates + date-delta
+  distributions). That one table decided everything downstream with evidence instead of
+  judgment: which normalizations were dead (the ~1-day offset: zero occurrences left),
+  which Notes were stale (Date of Record now 99.94% matched), the new soft/hard Major
+  classification, and roughly where the new canary would land (~21.7k). The same method
+  proved the new PDF parser *before it was written* — a scratch mapping run cell-for-cell
+  against the same-run Excels (576k cells, 0 real diffs). Never re-baseline a
+  regression-locked comparison on reasoning alone when the ground truth can be measured
+  in minutes.
+- **Refuse retired formats loudly; don't dual-support.** Reading a pre-update workbook by
+  the new positions would silently mis-map every column from Description on — the worst
+  failure class this project has (plausible wrong numbers). So the comparator gained a
+  cheap header gate and the PDF parser a shape discriminator (padded vs unpadded
+  postmiles), each erroring with a "re-export" hint. Dual-format support was considered
+  and rejected: the old format can never be exported again, so its only future is a stale
+  store the user should refresh — an actionable refusal beats a silently wrong
+  comparison, and costs ~10 lines instead of a parallel position map. The v0.23.0
+  on-demand evidence action applies the same principle as a *freshness gate*: when a
+  derived artifact can't be proven to belong to its inputs, decline and say why.
+
+→ [tsn-parsers.md](tsn-parsers.md) (the Intersection Detail update block),
+[comparison-engine.md](comparison-engine.md) §9f + §13. The census scripts + expected
+numbers are preserved (local-only) in the 7.8 bundle's `_verification-scripts/`.
+
 ---
 
 ### Quick index of the lessons
@@ -271,3 +302,4 @@ the generator) instead of relying on memory. → [build-and-release.md](build-an
 | 10 | A hidden input with no positioned parent escapes its clip | gui |
 | 11 | Read a form's state by its stable id, never its visible label | engine-and-reliability |
 | 12 | Invisible bytes break real gates — keep the toolchain ASCII-safe | build-and-release + tools/screenshots.py |
+| 13 | Upstream format change: census first, then refuse the old format | tsn-parsers + comparison-engine §9f/§13 |

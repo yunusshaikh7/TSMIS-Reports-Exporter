@@ -126,7 +126,7 @@ Highway Log consolidators are TSMIS-before-TSN with source-explicit labels:
 | `Highway Sequence Listing` | `consolidate_highway_sequence` | |
 | `Intersection Summary` | `consolidate_intersection_summary` | TSMIS "Intersection Summary" Excel export (day-aware). |
 | `Intersection Detail` | `consolidate_intersection_detail` | TSMIS "Intersection Detail" Excel export (day-aware). |
-| `TSMIS Intersection Detail (PDF)` | `consolidate_tsmis_intersection_detail_pdf` | this app's own "Intersection Detail (PDF)" export, parsed into the same 36-column format (the print-layout substitute for the Excel export). |
+| `TSMIS Intersection Detail (PDF)` | `consolidate_tsmis_intersection_detail_pdf` | this app's own "Intersection Detail (PDF)" export, parsed into the same 35-column July-2026 format as the Excel export (pre-update prints are refused with a re-export hint). |
 | `TSMIS Highway Log (Excel)` | `consolidate_highway_log` | TSMIS "Highway Log" Excel export, `output/<run>/highway_log/` (day-aware). |
 | `TSMIS Highway Log (PDF)` | `consolidate_tsmis_highway_log_pdf` | TSMIS "Highway Log (PDF)" export, `output/<run>/highway_log_pdf/` (day-aware, this app's own export). |
 | `TSN Highway Log (PDF)` | `consolidate_tsn_highway_log` | TSN district PDFs dropped in `input/tsn_highway_log/` (from outside the app, so this one keeps an input folder + `day` ignored). |
