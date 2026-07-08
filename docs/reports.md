@@ -1,6 +1,6 @@
 ﻿# Reports
 
-What this doc covers: the full TSMIS report catalog (the **eight** exportable types, incl. the Highway Log (PDF) and Intersection Detail (PDF) print editions), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
+What this doc covers: the full TSMIS report catalog (the **eleven** exportable types, incl. the Highway Log / Intersection Detail / Highway Detail print editions), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
 
 Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- the corrected 31-column labels in [highway_log/columns.md](highway_log/columns.md), PDF/TSN parsing in [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md), and the PDF-vs-Excel/TSN study in [highway_log/comparison-study.md](highway_log/comparison-study.md). The comparison workbook engine is owned by [comparison-engine.md](comparison-engine.md).
 
@@ -16,6 +16,9 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 | 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
+| 7 | Highway Detail | XLSX | `output/<run>/highway_detail/` |
+| 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
+| 8 | Highway Summary | XLSX (export-only) | `output/<run>/highway_summary/` |
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
 
