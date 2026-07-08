@@ -506,17 +506,30 @@ or accept as someday.**
   parallel engine to save both editions per route, and share `_coalesce_groups` (move it off
   `gui_worker_export` to a neutral module) so the CLI can group too.
 - [x] **Visual evidence — SHIPPED (v0.21.0)** for Highway Detail vs-TSN (both matrix toggles; see
-  [comparison-engine.md](comparison-engine.md) §13). **Follow-ups, none started:**
-  - [ ] **Highway Log evidence adapter** [M] — the natural second report: its TSN district PDFs
+  [comparison-engine.md](comparison-engine.md) §13). **v0.22.0 added Intersection Detail** —
+  `evidence_intersection_detail` locates the TSN side on the STATEWIDE print's fixed monospace
+  template (indexed once per file, cached on size+mtime — the ID half of the parse-cache
+  follow-up), and `availability()` went per-report so the toggle hint names which report still
+  needs its prints. **Follow-ups, none started:**
+  - [ ] **Highway Log evidence adapter** [M] — the natural third report: its TSN district PDFs
     already live in the library and its TSMIS (PDF) export exists; needs an HL locator pair on the
     `evidence_highway_detail` pattern (mind the `+`/`++` ditto domain — HL is where it comes from).
-  - [ ] **TSN district-parse cache** [S] — a statewide evidence run spends ~10–20 min re-extracting
-    words from ~4,300 print pages; cache per-district locate indexes keyed on file mtime.
+  - [ ] **TSN district-parse cache for HIGHWAY DETAIL** [S] — an HD statewide evidence run still
+    spends ~10–20 min re-extracting words from ~4,300 district-print pages every run; give the HD
+    adapter the same mtime-keyed index cache the ID adapter shipped with in v0.22.0.
   - [ ] **PDF-vs-Excel self-check evidence** [M] — needs a synthetic render of the Excel side (no
     second PDF exists); park until someone actually asks for it.
   - [ ] **Evidence on the Compare tab's direct file-pair flow** [S] — the matrix surfaces were the
     ask; the manual pick-two-files compare has no toggle (its TSMIS-PDF folder can't be inferred
     from the picked files — needs a picker or the standard-location assumption).
+- [x] **Intersection Detail July-2026 format — SHIPPED (v0.22.0).** The site reshaped the report
+  (35 columns; see [reports.md](reports.md) Reports 5–6 + 6b and
+  [tsn-parsers.md](tsn-parsers.md) Intersection Detail): consolidators/comparators updated with a
+  pre-update-workbook refusal, the comparison re-baselined (canary 163,310 → **21,675**), the TSN
+  library moved to normalization v3 (new shape + District/County sidecar), evidence enabled.
+  **Note:** Intersection SUMMARY was NOT in the 7.8 bundle — if the site's July update also touched
+  its export, `consolidate_intersection_summary`/its comparator may need the same treatment when
+  the next export shows it.
 
 ---
 
@@ -577,7 +590,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.21.0, shipped)
+### Version buckets — reconciled to reality (current: v0.22.0, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -601,6 +614,8 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.19.3** ✅ | Jul 7 | **Hotfix** (field-driven) — the per-route stale-form guard (`_ensure_report_armed`) false-"drifted" on **every** route for a grouped-menu report: it compared the visible `.cs-value` (the short leaf label "Detail") to the full `spec.label` ("Highway Detail") and re-selected each route (correct exports, but log spam + wasted work). Fix = key on the hidden `#reportSelect`'s stable `data-value` (`current_report_value`), text read only as fallback. Affects both Highway Detail editions. Regression-covered in `check_export_engine` + `check_fake_site` (new `test_current_report_value`); `compare_core` untouched. |
 | **v0.20.0** ✅ | Jul 7 | **Highway Detail full integration** — consolidators (Excel `consolidate_highway_detail` + PDF-sourced `consolidate_tsmis_highway_detail_pdf` on `pdf_table_lib`), the **vs-TSN comparator** (`compare_highway_detail_tsn`: new opt-in `CompareSchema`, canonical roadbed-aware PM key, PS column, NA/zero-pad/length/WDA normalizations, ID-style **Report View** + **Notes**), the PDF flavors (PDF↔TSN + PDF↔Excel), a `tsn_library` statewide-xlsx entry, both matrices + by-day rows, catalog/`.bat`/mock parity. Schema verified against the full statewide bundle (252 routes / 51,243 rows vs the 60,083-row TSN extract; TSN PDFs cross-checked ≥99.9% vs the extract → the Excel is the library source). `compare_core` untouched (byte-identical; new behavior rides the new schema). Highway Summary stays export-only. |
 | **v0.21.0** ✅ | Jul 8 | **Visual evidence** — the manual "screenshot both PDFs and circle the cell" workflow automated as a decoration of the Highway Detail vs-TSN comparisons: per differing column, N (1–10) random verified example rows rendered as highlighted snippets from BOTH PDFs (the app's (PDF) export + the TSN district prints in `tsn_library/highway_detail/pdf/`), each example parse-back-verified against the compared values before it's shown; `… (evidence).xlsx` + a two-layout image folder beside each comparison (keep-last-good). One shared toggle+count on both matrix pages (`evidence_images`/`evidence_examples`), ONE hook in `consolidate_and_compare_tsn`. TSN library v2 appends the District/County sidecar (D2 auto-rebuild). Pillow + pypdfium2 now SHIP (~20 MB; the frozen self-test proves the render path). Locked by `check_visual_evidence`. |
+| **v0.21.1** ✅ | Jul 8 | **Hotfix** (field-driven) — the `tsn_library/highway_detail/pdf/` drop folder v0.21.0 pointed at but never created: `TsnEntry.evidence_pdfs` drives `ensure_layout` (folder + hint file; README refreshes when its generated text changes), and `matrix_info`/`day_matrix_info` re-push state so dropping the PDFs + re-entering a tab un-greys the evidence toggle without a restart. |
+| **v0.22.0** ✅ | Jul 8 | **Intersection Detail July-2026 format + evidence** — the site's report overhaul absorbed end-to-end: 35-column SoT, the PDF parser rewritten for the reshaped print (cover pages, rowB bands + print-only intersection numbers, padded postmiles; pre-update workbooks/PDFs refused with re-export hints), the vs-TSN comparison re-baselined against the same-run 7.8 statewide bundle (parity 217/217 routes / 576k cells / 0 real diffs; canary 163,310 → **21,675**; Notes + Report-View Major classification rewritten to the data — soft = Int St/ML/CS Eff-Date + Route Suffix), `Xing Line Lgth`↔`X_CROSS_OVERRIDE` newly compared, TSN library **v3** (new shape + District/County sidecar), and **evidence images for both ID rows** via `evidence_intersection_detail` (the statewide TASAS print on a fixed monospace template, indexed once + cached; 16,584/16,584 records, 30/32 fields 100.00% parse-back). `availability()` went per-report; `compare_core` untouched. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

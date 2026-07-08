@@ -515,13 +515,25 @@ the BASE route so the same intersection still pairs, with the suffix surfaced as
 Suffix` column (renamed from the v0.18.0 misnomer "Roadbed" in v0.18.1; figures unchanged). The TSN
 side is **re-normalized at compare time** (so a library cached before a normalization change can't mask
 it), and a **"Report View" replica sheet** — wired through the opt-in `extra_sheet_writer` — renders
-the printed two-line record, classifying date differences as "soft" (rendered red but excluded from the
-Major count) vs hard attribute diffs. Because every column now counts, the statewide diff total rises
-sharply: the real-data canary is **≈163,310 diff cells (Excel)** (v0.18.3, after the numeric-0
-intersecting-route-postmile fix dropped 43 phantom 0-vs-blank cells; was 163,353 at v0.18.1 — the PDF
-edition shifts by the same fix). The offline lock is `check_compare_intersection_detail_tsn.py`'s synthetic
-behavior fixture (the S-crosswalk, the Y/N↔1/0 norm, Date-of-Record counted, the numeric-0→'0' canon, the
-Report View soft/hard split + one-sided "Only in TSMIS/TSN" rows). Live in both matrices.
+the printed two-line record with a soft/hard (red-but-not-Major vs Major) classification.
+
+**July 2026 site update (v0.22.0):** the export reshaped to **35 columns** (the duplicated second
+`ML Eff-Date` gone; `Xing P/S` + `Xing Line Lgth` at the tail) and fixed most of the old structural
+classes — Date of Record + INT/Ctrl/Light eff-dates now match TSN ≥99.9% (the ~1-day offset is dead),
+booleans are natively Y/N, Location carries the route suffix, the CS gap fell ~37%→~1%. The shared
+header is now **33 fields ending `Xing Line Lgth`** (↔ TSN `X_CROSS_OVERRIDE`, newly compared); TSN's
+`MAIN_EFF_DATE` became Report-View-only (blue, with the ADT pair). The loader's **header gate refuses
+pre-update workbooks** (the old 37-col consolidated shape) with a re-export hint — reading them by the
+new positions would mis-map everything from Description on. Soft (red, excluded from Major) is now the
+data-driven set (user 2026-07-08): **Int St Eff-Date** (TSN's 2022 bulk stamp vs TSMIS's historical
+date — ~99% differ, the one wholesale column left), **ML/CS Eff-Date** (TSN carries the later resurvey
+date; ~12%/~3%), and **Route Suffix**; Date of Record + INT/Ctrl/Light differences count as Major.
+The statewide real-data canary is **21,675 diff cells / 16,199 matched / 260+427 one-sided** (the 7.8
+ground-truth bundle; was ≈163,310/677 pre-update). The offline lock is
+`check_compare_intersection_detail_tsn.py`'s synthetic behavior fixture (the S-crosswalk, the boolean
+norm, the header-gate refusal, Xing Line Lgth zero-pad matching + genuine-diff flagging, the new
+soft/hard split, the numeric-0→'0' canon, the sidecar slice + one-sided "Only in TSMIS/TSN" rows).
+Live in both matrices.
 
 ### 9f-2. TSMIS vs TSN Highway Detail — `compare_highway_detail_tsn.py` (FLAT, route + canonical PM; v0.20.0)
 
@@ -816,11 +828,15 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
   cells, scoped rebuild list, build guards, and the gui_api bridge incl. the shared queue). **Owed on
   the work PC:** building two real days vs TSN end-to-end.
 
-## 13. Visual evidence (`scripts/visual_evidence.py` + `evidence_highway_detail.py`, v0.21.0)
+## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0)
 
 The manual "screenshot the cell in both PDFs and circle it" workflow, automated, as a
 **decoration of a finished vs-TSN comparison** — it never changes the comparison's
 status/completion/counts, and any evidence failure only logs + adds a summary note.
+Two reports so far, each via its own adapter over the shared engine:
+`evidence_highway_detail` (district TSN prints) and `evidence_intersection_detail`
+(the statewide TSN print). The HD-specific bullets below apply to ID analogously;
+the ID differences are called out inline.
 
 - **What it produces**, next to the comparison workbook (the `(formulas).xlsx` sibling family):
   `<comparison> (evidence).xlsx` (a Summary sheet + every stacked image embedded) and
@@ -837,34 +853,48 @@ status/completion/counts, and any evidence failure only logs + adds a summary no
   doubles as an end-to-end spot-check of the comparison at that cell. Failed candidates are
   skipped with a per-column reason (recorded in the workbook), e.g. the TSMIS PDF/Excel
   site-build skew or a TSN reference-date skew.
-- **Sources:** TSMIS side = the per-route **Highway Detail (PDF)** export (the Everything matrix
-  resolves the row's cell store, the by-day matrix that day's `highway_detail_pdf/` run folder);
-  TSN side = the district prints in `tsn_library/highway_detail/pdf/` (any filenames — the
-  district is read from each file's own DIST-CNTY-ROUTE header). The pdf/ folder is **created +
-  hinted by `tsn_library.ensure_layout`** (v0.21.1 — driven by the catalog's
-  `TsnEntry.evidence_pdfs` flag; v0.21.0 never created it, so an updated install had nowhere to
-  drop the prints), and re-entering a matrix tab re-pushes the state so the toggle re-probes and
-  un-greys without a restart. The **v2 normalized TSN library appends TSN District/County
-  sidecar columns** (`tsn_load_highway_detail.SIDECAR_HEADER`) so evidence can find a row's
-  print; `_normalized_row` slices to the shared width, so the comparison itself never sees them
-  (a pre-v2 library is refused with a rebuild hint, and the D2 version bump rebuilds it
+- **Sources:** TSMIS side = the per-route **(PDF)-edition** export of the report (the Everything
+  matrix resolves the row's cell store, the by-day matrix that day's `*_pdf/` run folder);
+  TSN side = the prints in the report's `tsn_library/<report>/pdf/` folder — Highway Detail
+  takes the 12 **district prints** (the district is read from each file's own DIST-CNTY-ROUTE
+  header), Intersection Detail the ONE **statewide print** (district/county read per record
+  from `LOCATION`); filenames never matter. The pdf/ folders are **created + hinted by
+  `tsn_library.ensure_layout`** (v0.21.1 — driven by the catalog's `TsnEntry.evidence_pdfs`
+  flag; v0.21.0 never created it, so an updated install had nowhere to drop the prints), and
+  re-entering a matrix tab re-pushes the state so the toggle re-probes and un-greys without a
+  restart. The **normalized TSN library appends TSN District/County sidecar columns** (HD since
+  its v2, ID since its v3 — `tsn_load_*.SIDECAR_HEADER`) so evidence can find a row's print;
+  `_normalized_row` slices to the shared width, so the comparison itself never sees them (a
+  pre-sidecar library is refused with a rebuild hint, and the D2 version bump rebuilds it
   automatically).
-- **Locators:** the TSMIS locator mirrors `consolidate_tsmis_highway_detail_pdf.parse_pdf` step
-  for step (per-page windows, row groups, the postmile test, the date-token guard, cross-page
-  carry) while capturing positions — **keep them in LOCKSTEP**; records on a fallback-grid page
-  or split across pages are rejected as not evidence-grade. The TSN locator parses the TASAS
-  print line-anchored with word positions (the two-line regexes cross-checked ≥99.9% against the
-  statewide extract), boxing an optional group that didn't print as the gap between its
-  neighbors.
+- **Locators:** each TSMIS locator mirrors its PDF consolidator's parse step for step while
+  capturing positions — **keep them in LOCKSTEP** (HD: per-page windows, row groups, the
+  postmile test, the date-token guard, cross-page carry, fallback-grid/straddling records
+  rejected; ID: the document grids from both band shapes, the padded-postmile rowA test, the
+  integer-column-1 rowB pairing, page-straddling records rejected). The TSN locators differ by
+  print style: HD parses the TASAS district print line-anchored with the two-line REGEXES
+  (word positions kept; an optional group that didn't print boxes the gap between neighbors;
+  cross-checked ≥99.9% against the statewide extract); ID rides the statewide print's FIXED
+  monospace column template — per-field x-windows with MAX-OVERLAP word assignment (a
+  `Y`-flagged date leaning into its neighbor stays in its date window; the flag is stripped
+  from the value), LOCATION as one token-split window, and a BLANK cell boxes its template
+  window. The ID print is indexed ONCE per file (cached on size+mtime) inside
+  `district_index`, so the engine's per-district `locate_tsn` calls are dictionary lookups —
+  the engine stayed untouched. Validated statewide: 16,584/16,584 records, 30/32 fields 100.00%
+  parse-back vs the raw extract (the rest are print truncations the verifier skips).
 - **Wiring:** ONE hook in `matrix.consolidate_and_compare_tsn(evidence_opts=)` covers both
   matrices; callers resolve their own store layout through `matrix.evidence_opts_for` (the shared
   gate — toggle on + `visual_evidence.capable(row_key)`). The user toggle is ONE persisted pair
   (`evidence_images` + `evidence_examples`, endpoints `set_evidence_images` /
   `set_evidence_examples`) surfaced under *Comparison output* on BOTH matrix pages, greyed with a
-  drop-hint until the TSN prints are in place (`visual_evidence.availability()` rides the state
-  push). The render stack (Pillow + pypdfium2) SHIPS since v0.21.0 — see
-  [build-and-release.md](build-and-release.md).
-- **Locked by** `build/check_visual_evidence.py` (registry/sources/clamp, the caller gate, the
-  LOCKSTEP pins, the TSN print regexes, span→box math, verification projections, unique-key diff
-  enumeration, and the TSN loader sidecar contract — `tsn_rows_with_dcr` row-identical to the
-  locked raw loader); the frozen self-test proves the render stack itself.
+  drop-hint until at least one report's TSN prints are in place —
+  `visual_evidence.availability()` rides the state push and reports **per-report** folders
+  (`reports: [{key,label,tsn_pdfs,dir}]`), so the hint names exactly which report still needs
+  its prints while the other keeps working. The render stack (Pillow + pypdfium2) SHIPS since
+  v0.21.0 — see [build-and-release.md](build-and-release.md).
+- **Locked by** `build/check_visual_evidence.py` (registry/sources/clamp for BOTH reports, the
+  caller gate, the LOCKSTEP pins, the HD TSN print regexes + the ID fixed-window/max-overlap/
+  flag-strip/LOC-tokenizer behavior, span→box math, verification projections, unique-key diff
+  enumeration — the ID one mirroring compare_core's cell trim so whitespace-only differences
+  never enumerate — and both TSN loaders' sidecar contracts (`tsn_rows_with_dcr` row-identical
+  to the locked raw loaders); the frozen self-test proves the render stack itself.

@@ -46,7 +46,6 @@ import tsn_load_intersection_detail as id_load     # noqa: E402
 import tsn_load_ramp_summary as rs_load            # noqa: E402
 import tsn_load_intersection_summary as is_load    # noqa: E402
 import compare_ramp_detail_tsn as rd               # noqa: E402
-import compare_intersection_detail_tsn as idt      # noqa: E402
 import compare_ramp_summary_tsn as rstsn           # noqa: E402
 import compare_intersection_summary_tsn as istsn   # noqa: E402
 
@@ -86,17 +85,20 @@ _RS_SHEET = "Ramp Summary (TSN)"
 _IS_SHEET = "Intersection Summary (TSN)"
 _RD_HEADER = ["Route", "PR", "PM", "Date of Record", "HG", "Area 4", "City Code", "R/U",
               "Description", "Ramp Name", "On/Off", "Ramp Type", "ADT"]
-# Re-blessed to the v0.17.8 position-aligned 33-column layout (CR-002 §9e): each
-# effective-date column sits next to its type, the mainline/cross blocks carry both
-# eff-dates, and the intersecting-route block is added. Hand-written (the golden
-# tripwire stays independent of idt.SHARED_HEADER), so a future header drift is caught.
+# Re-blessed to the v0.22.0 July-2026 layout: the second ML eff-date left the shared
+# header, 'Xing Line Lgth' joined at the tail, and the v3 normalized sheet appends the
+# TSN District/County sidecar (read by the visual-evidence generator; the comparison
+# loader slices it off). Hand-written (the golden tripwire stays independent of
+# idt.SHARED_HEADER), so a future header drift is caught.
+_ID_SIDECAR = ["TSN District", "TSN County"]
 _ID_HEADER = ["Route", "PR", "Route Suffix", "PM", "Date of Record", "HG", "City Code", "R/U",
               "INT Type Eff-Date", "INT Type", "Control Type Eff-Date", "Control Type",
               "Lighting Eff-Date", "Lighting", "ML Eff-Date", "ML Mastarm", "ML Left Chan",
-              "ML Right Chan", "ML Traffic Flow", "ML Num Lanes", "ML 2nd Eff-Date",
+              "ML Right Chan", "ML Traffic Flow", "ML Num Lanes",
               "Description", "Main Line Length", "CS Eff-Date", "CS Mastarm", "CS Left Chan",
               "CS Right Chan", "CS Traffic Flow", "CS Num Lanes", "Int St Eff-Date",
-              "Intrte Route", "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix"]
+              "Intrte Route", "Intrte PM Prefix", "Intrte Postmile", "Intrte PM Suffix",
+              "Xing Line Lgth"] + _ID_SIDECAR
 _SUM_HEADER = ["Category", "Count"]
 _DEPS_XLSX = "Required components are missing (openpyxl)."
 _DEPS_PDF = "Required components are missing (pdfplumber, openpyxl)."
@@ -129,18 +131,29 @@ def test_detail_signatures():
     print("detail loaders -- full frozen signature (result + log + sheet/header/rows + style):")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_tsnnorm_"))
     try:
-        for loader, cmp_mod, label, sheet, header in (
-                (rd_load, rd, "TSN Ramp Detail", _RD_SHEET, _RD_HEADER),
-                (id_load, idt, "TSN Intersection Detail", _ID_SHEET, _ID_HEADER)):
+        # Intersection Detail (v3) feeds through its OWN tsn_rows_with_dcr (the
+        # loader appends the district/county sidecar); Ramp Detail still rides the
+        # comparator's tsn_rows_from_raw. Each entry: the patch target/factory and
+        # how the written rows relate to the fed base rows.
+        for loader, label, sheet, header, base_w, target, make_patch, exp_rows_fn in (
+                (rd_load, "TSN Ramp Detail", _RD_SHEET, _RD_HEADER, len(_RD_HEADER),
+                 (rd, "tsn_rows_from_raw"),
+                 lambda syn: (lambda _p, s=syn: list(s)),
+                 lambda syn: syn),
+                (id_load, "TSN Intersection Detail", _ID_SHEET, _ID_HEADER,
+                 len(_ID_HEADER) - len(_ID_SIDECAR),
+                 (id_load, "tsn_rows_with_dcr"),
+                 lambda syn: (lambda _p, s=syn: (list(s), [("12", "ORA")] * len(s))),
+                 lambda syn: [r + ["12", "ORA"] for r in syn])):
             raw = tmp / sheet
             raw.mkdir()
             (raw / "s.xlsx").write_bytes(b"x")
-            syn = [["1"] + ["a"] * (len(header) - 1),
-                   ["1"] + ["b"] * (len(header) - 1),
-                   ["2"] + ["c"] * (len(header) - 1)]     # 3 rows, 2 distinct routes
+            syn = [["1"] + ["a"] * (base_w - 1),
+                   ["1"] + ["b"] * (base_w - 1),
+                   ["2"] + ["c"] * (base_w - 1)]          # 3 rows, 2 distinct routes
             out = tmp / f"{sheet}.xlsx"
             ev, logs = _events()
-            with _patch(cmp_mod, "tsn_rows_from_raw", lambda _p, s=syn: list(s)):
+            with _patch(target[0], target[1], make_patch(syn)):
                 r = loader.build_into(raw, out, events=ev)
             exp_msg = f"Normalized 3 {label} rows (2 routes)."
             exp_sum = [f"{label}: 3 rows, 2 routes -> {out.name}"]
@@ -150,7 +163,7 @@ def test_detail_signatures():
             check(f"{label}: event log == one Normalizing line", logs == [f"Normalizing {label}: s.xlsx"])
             title, rows, head = _sig(out)
             check(f"{label}: sheet + header + data rows exact",
-                  (title, rows[0], rows[1:]) == (sheet, header, syn))
+                  (title, rows[0], rows[1:]) == (sheet, header, exp_rows_fn(syn)))
             check(f"{label}: every header cell align/font/fill == frozen wrap+blue",
                   all(s == (_AL_WRAP, _FONT, _FILL) for s in head))
     finally:

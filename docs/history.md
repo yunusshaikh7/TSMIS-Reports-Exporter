@@ -57,6 +57,8 @@ that rewrote the design.
 | `v0.19.3` | Jul 7 | **Hotfix** — Highway Detail stopped re-selecting the report on every route (the site's grouped menu shows the short label "Detail"; the per-route stale-form check now confirms the report by its stable id, not the on-screen text) |
 | `v0.20.0` | Jul 7 | **Highway Detail fully integrated** — consolidators (Excel + PDF-sourced), the vs-TSN comparison (canonical roadbed-aware key, Report View replica, Notes), the PDF↔Excel export self-check, the TSN library entry, both matrices; schema verified against the full statewide bundle + the 60k-row TSN extract (the TSN PDFs cross-checked ≥99.9% against it) |
 | `v0.21.0` | Jul 8 | **Visual evidence** — the manual screenshot-and-circle workflow automated: per differing column, random verified example rows rendered as highlighted snippets from BOTH PDFs, written beside the comparison in two layouts; one shared toggle on both matrix pages; Pillow + pypdfium2 join the bundle |
+| `v0.21.1` | Jul 8 | **Hotfix** — the TSN-print drop folder v0.21.0 told users about now actually appears (created + hinted by the library layout; the evidence toggle un-greys on tab re-entry) |
+| `v0.22.0` | Jul 8 | **Intersection Detail's July-2026 overhaul absorbed** — the site fixed most of what the comparison used to flag structurally (dates, booleans, suffixes; the statewide baseline fell 163k → 21.7k diff cells) and reshaped the export to 35 columns; parser + comparators updated with pre-update refusals, `Xing Line Lgth` newly compared, TSN library v3, and **evidence images for Intersection Detail** located on the statewide TASAS print's fixed template |
 
 ---
 

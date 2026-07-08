@@ -21,8 +21,9 @@ BOTH layouts (stacked for reading, side-by-side for pasting into docs). Both
 writes are keep-last-good: a failed/cancelled run leaves the previous set
 untouched; files locked open in Excel divert to a ".new" sibling with a note.
 
-Report-agnostic: everything report-specific comes from an adapter module (see
-evidence_highway_detail — currently Highway Detail Excel + PDF rows). Engine is
+Report-agnostic: everything report-specific comes from an adapter module
+(evidence_highway_detail — district TSN prints; evidence_intersection_detail —
+the statewide TSN print; each covers its report's Excel + PDF rows). Engine is
 console-free (Events sink, cancellation honored between steps) and never
 affects the comparison result it decorates.
 """
@@ -49,19 +50,31 @@ log = logging.getLogger("tsmis.evidence")
 
 DEPS_MSG = "Required components are missing (pdfplumber/Pillow/openpyxl)."
 
-# row_key -> adapter module name (lazy import; both Highway Detail rows share
-# one adapter — the Excel row's images render from the PDF-edition export, the
-# PDF row's from the same files it was compared from).
+# row_key -> adapter module name (lazy import; each report's Excel + PDF rows
+# share one adapter — the Excel row's images render from the PDF-edition export,
+# the PDF row's from the same files it was compared from).
 _ADAPTER_MODULES = {
     "highway_detail": "evidence_highway_detail",
     "highway_detail_pdf": "evidence_highway_detail",
+    "intersection_detail": "evidence_intersection_detail",
+    "intersection_detail_pdf": "evidence_intersection_detail",
 }
 # Where each row's TSMIS-side PDFs live (the per-route export subdir) and which
-# TSN library report's pdf/ folder holds the district prints.
+# TSN library report's pdf/ folder holds the TSN prints (per-district files for
+# Highway Detail; the single statewide TASAS print for Intersection Detail —
+# the adapters read district/county per record, so filenames never matter).
 TSMIS_PDF_SUBDIR = {"highway_detail": "highway_detail_pdf",
-                    "highway_detail_pdf": "highway_detail_pdf"}
+                    "highway_detail_pdf": "highway_detail_pdf",
+                    "intersection_detail": "intersection_detail_pdf",
+                    "intersection_detail_pdf": "intersection_detail_pdf"}
 TSN_PDF_REPORT = {"highway_detail": "highway_detail",
-                  "highway_detail_pdf": "highway_detail"}
+                  "highway_detail_pdf": "highway_detail",
+                  "intersection_detail": "intersection_detail",
+                  "intersection_detail_pdf": "intersection_detail"}
+# Report labels for the availability probe (static so the probe never has to
+# import an adapter — a state push must stay cheap).
+_TSN_PDF_LABELS = {"highway_detail": "Highway Detail",
+                   "intersection_detail": "Intersection Detail"}
 
 MIN_EXAMPLES, MAX_EXAMPLES, DEFAULT_EXAMPLES = 1, 10, 2
 _RES = 180                     # render DPI (points * _RES/72 = pixels)
@@ -104,16 +117,27 @@ def clamp_examples(n):
 
 
 def availability():
-    """Cheap probe for the GUI toggle: which rows support evidence and whether
-    the TSN district prints are in place (the TSMIS side varies per run/day and
-    is reported per cell instead)."""
-    d = tsn_pdf_dir("highway_detail")
-    try:
-        n = sum(1 for _ in Path(d).glob("*.pdf"))
-    except OSError:              # silent-ok: a pure probe; unreadable = not ready
-        n = 0
-    return {"rows": rows(), "tsn_pdfs": n, "ready": _DEPS_OK and n > 0,
-            "dir": str(d), "deps_ok": _DEPS_OK}
+    """Cheap probe for the GUI toggle: which rows support evidence and, PER
+    REPORT, whether that report's TSN prints are in place (the TSMIS side varies
+    per run/day and is reported per cell instead). `ready` = deps present and at
+    least one report has its prints — the toggle enables then, and a still-empty
+    report notes per cell where to drop its prints. The aggregate `tsn_pdfs`/`dir`
+    keys stay for the hint's simple cases."""
+    reports = []
+    total = 0
+    for key, label in sorted(_TSN_PDF_LABELS.items()):
+        d = paths.tsn_library_pdf_dir(key)
+        try:
+            n = sum(1 for _ in Path(d).glob("*.pdf"))
+        except OSError:          # silent-ok: a pure probe; unreadable = not ready
+            n = 0
+        total += n
+        reports.append({"key": key, "label": label, "tsn_pdfs": n, "dir": str(d)})
+    return {"rows": rows(), "tsn_pdfs": total,
+            "ready": _DEPS_OK and any(r["tsn_pdfs"] for r in reports),
+            "dir": next((r["dir"] for r in reports if not r["tsn_pdfs"]),
+                        reports[0]["dir"] if reports else ""),
+            "reports": reports, "deps_ok": _DEPS_OK}
 
 
 def sibling_paths(comparison_path):
@@ -148,7 +172,7 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                          f"{tsmis_pdf_dir} — run that export first")
     n_tsn = sum(1 for _ in Path(tsn_dir).glob("*.pdf")) if Path(tsn_dir).is_dir() else 0
     if not n_tsn:
-        raise ValueError(f"no TSN district PDFs in {tsn_dir}")
+        raise ValueError(f"no TSN {adapter.REPORT_LABEL} PDFs in {tsn_dir}")
 
     seed = int.from_bytes(os.urandom(4), "big")
     rng = random.Random(seed)

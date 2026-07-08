@@ -126,11 +126,12 @@ def test_pdf_flavors():
           and resm.message.startswith("The TSMIS (PDF) file doesn't exist:"),
           resm.message)
 
-    # Intersection Detail flavors: consolidated 36-col TSMIS both sides (vs-Excel)
+    # Intersection Detail flavors: consolidated TSMIS both sides (vs-Excel), the
+    # July-2026 35-column shape (the loader's header gate demands its tail column).
     def id_row(route, pm, desc):
-        r = [None] * 37
-        r[0], r[1], r[2], r[4], r[5] = route, "R", pm, f"12 ORA {route}", "01/02/2020"
-        r[22] = desc
+        r = [None] * 36
+        r[0], r[1], r[2], r[4], r[5] = route, "R", pm, f"12 ORA {route}", "73-10-19"
+        r[21] = desc
         return r
 
     ia, ib = tmp / "id_pdf.xlsx", tmp / "id_xls.xlsx"
@@ -138,7 +139,7 @@ def test_pdf_flavors():
         wb = Workbook()
         ws = wb.active
         ws.title = idt.TSMIS_SHEET
-        ws.append(["Route"] + [f"c{i}" for i in range(1, 37)])
+        ws.append(["Route"] + [f"c{i}" for i in range(1, 35)] + ["Xing Line Lgth"])
         ws.append(id_row("001", "1.000", d))
         wb.save(p)
         wb.close()

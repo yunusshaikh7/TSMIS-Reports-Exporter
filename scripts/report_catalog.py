@@ -286,8 +286,15 @@ TSN = (
              "tsn_ramp_summary_normalized.xlsx", "tsn_load_ramp_summary:build_into", normalization_version=2),
     TsnEntry("intersection_summary", "TSN Intersection Summary", "*.pdf", "statewide_pdf",
              "tsn_intersection_summary_normalized.xlsx", "tsn_load_intersection_summary:build_into", normalization_version=2),
+    # Intersection Detail v3 (v0.22.0, the July-2026 site update): the normalized
+    # shape follows the reshaped comparison header (the second ML eff-date left it,
+    # 'Xing Line Lgth'/X_CROSS_OVERRIDE joined) AND appends the TSN District/County
+    # sidecar columns (split from LOCATION) — evidence locates a row in the TSN
+    # statewide print with them; the comparison loader slices to the shared width
+    # and never sees them. The bump re-projects any stored library on next use (D2).
     TsnEntry("intersection_detail", "TSN Intersection Detail", "*.xlsx", "statewide_xlsx",
-             "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into", normalization_version=2),
+             "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into",
+             normalization_version=3, evidence_pdfs=True),
     TsnEntry("highway_sequence", "TSN Highway Sequence", "*.pdf", "district_pdfs",
              "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into", normalization_version=2),
     # Highway Detail (v0.20.0): the statewide 56-column "TSAR - HIGHWAY DETAIL"

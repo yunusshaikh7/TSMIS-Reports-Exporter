@@ -48,15 +48,21 @@ def check(name, cond):
 
 # --------------------------------------------------------------------------- #
 print("registry + sources + clamp")
-check("rows: both Highway Detail rows, nothing else",
-      ve.rows() == ["highway_detail", "highway_detail_pdf"])
+check("rows: the Highway Detail + Intersection Detail pairs, nothing else",
+      ve.rows() == ["highway_detail", "highway_detail_pdf",
+                    "intersection_detail", "intersection_detail_pdf"])
 check("capable() matches rows()",
       all(ve.capable(r) for r in ve.rows()) and not ve.capable("highway_log"))
-check("TSMIS visuals come from the (PDF)-edition export subdir",
-      all(ve.pdf_subdir_for(r) == "highway_detail_pdf" for r in ve.rows()))
-check("TSN prints live in the library's highway_detail/pdf folder",
+check("TSMIS visuals come from each report's (PDF)-edition export subdir",
+      ve.pdf_subdir_for("highway_detail") == "highway_detail_pdf"
+      and ve.pdf_subdir_for("highway_detail_pdf") == "highway_detail_pdf"
+      and ve.pdf_subdir_for("intersection_detail") == "intersection_detail_pdf"
+      and ve.pdf_subdir_for("intersection_detail_pdf") == "intersection_detail_pdf")
+check("TSN prints live in each report's library pdf folder",
       str(ve.tsn_pdf_dir("highway_detail")).replace("\\", "/")
-      .endswith("tsn_library/highway_detail/pdf"))
+      .endswith("tsn_library/highway_detail/pdf")
+      and str(ve.tsn_pdf_dir("intersection_detail")).replace("\\", "/")
+      .endswith("tsn_library/intersection_detail/pdf"))
 check("clamp: default/garbage/low/high",
       (ve.clamp_examples(None), ve.clamp_examples("x"), ve.clamp_examples(0),
        ve.clamp_examples(99), ve.clamp_examples("7"))
@@ -66,8 +72,11 @@ check("sibling naming: '(evidence).xlsx' + '(evidence images)' folder",
       wbp.name == "hd vs tsn (evidence).xlsx"
       and imgp.name == "hd vs tsn (evidence images)")
 avail = ve.availability()
-check("availability shape (rows/tsn_pdfs/ready/dir/deps_ok)",
-      set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "deps_ok"})
+check("availability shape (rows/tsn_pdfs/ready/dir/reports/deps_ok)",
+      set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "reports", "deps_ok"})
+check("availability reports BOTH evidence reports, per-dir",
+      [r["key"] for r in avail["reports"]] == ["highway_detail", "intersection_detail"]
+      and all(set(r) >= {"key", "label", "tsn_pdfs", "dir"} for r in avail["reports"]))
 
 print("caller-side gate (matrix_build.evidence_opts_for)")
 check("toggle off -> None",
@@ -260,6 +269,172 @@ finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #
+print("Intersection Detail adapter (v0.22.0): maps + windows + LOCKSTEP")
+import compare_intersection_detail_tsn as idt                # noqa: E402
+import consolidate_tsmis_intersection_detail_pdf as idpdf    # noqa: E402
+import evidence_intersection_detail as eid                   # noqa: E402
+import tsn_load_intersection_detail as tli                   # noqa: E402
+
+check("ID FIELDS = every shared column except the key (32, Route Suffix included)",
+      eid.FIELDS == [f for f in idt.SHARED_HEADER if f != idt.KEY]
+      and "Route Suffix" in eid.FIELDS and len(eid.FIELDS) == 32)
+check("ID TSMIS cell map covers exactly FIELDS",
+      set(eid._TSMIS_CELL) == set(eid.FIELDS))
+check("ID TSN cell map covers exactly FIELDS",
+      set(eid.TSN_CELL) == set(eid.FIELDS))
+_l1n = {n for n, _lo, _hi in eid._L1_WIN}
+_l2n = {n for n, _lo, _hi in eid._L2_WIN}
+check("every TSN cell target has a fixed window on its line",
+      all((n in _l1n if ln == 1 else n in _l2n)
+          for ln, n in eid.TSN_CELL.values()))
+check("ID TSMIS value positions mirror the comparator's (consolidated - Route)",
+      eid._TSMIS_SRC == {f: p - 1 for f, p in idt._TSMIS_POS.items()})
+check("Xing Line Lgth: TSMIS boxes rowB window 17, TSN boxes LINE 1's X-OVR "
+      "(each side its own print position)",
+      eid._TSMIS_CELL["Xing Line Lgth"] == (2, 17)
+      and eid.TSN_CELL["Xing Line Lgth"] == (1, "X_CROSS_OVERRIDE"))
+check("the Intrte swap mirrored: TSMIS boxes Route at rowB window 12",
+      eid._TSMIS_CELL["Intrte Route"] == (2, 12)
+      and eid._TSMIS_CELL["Intrte PM Suffix"] == (2, 16))
+check("Route Suffix boxes the Location cell on both sides",
+      eid._TSMIS_CELL["Route Suffix"] == (1, 3)
+      and eid.TSN_CELL["Route Suffix"] == (1, "LOC"))
+check("LOCKSTEP handles the consolidator's own pieces (rowA/rowB discriminators)",
+      idpdf._is_rowA(["", "000.204", "", "12 ORA 001"] + [""] * 17)
+      and bool(idpdf.INT_ROWB_RE.match("11050"))
+      and bool(idpdf.OLD_PM_RE.match("0.204")))
+
+print("ID TSN print: fixed windows, max-overlap, flag strip, LOC tokens")
+check("LOC tokenizer: 3-char / dotted / 2-char counties + a route suffix",
+      bool(eid._LOC_RE.match("12 ORA 001")) and bool(eid._LOC_RE.match("04 CC. 004"))
+      and bool(eid._LOC_RE.match("07 LA 001")) and bool(eid._LOC_RE.match("07 LA 210U"))
+      and not eid._LOC_RE.match("NB ON FROM SB RTE 5"))
+_w1 = [{"t": "R", "x0": 14.0, "x1": 19.0}, {"t": "000.204", "x0": 25.0, "x1": 59.0},
+       {"t": "12", "x0": 72.0, "x1": 82.0}, {"t": "ORA", "x0": 86.0, "x1": 101.0},
+       {"t": "210U", "x0": 106.0, "x1": 125.0},
+       {"t": "Y91-08-24", "x0": 406.0, "x1": 454.0}]
+_a1 = eid._assign_win(_w1, eid._L1_WIN)
+check("LOCATION is ONE window (a 2-char county can't shift the route out of it)",
+      _a1["LOC"][0] == "12 ORA 210U")
+check("max-overlap: a signature-flagged date leaning left stays in its DATE window",
+      _a1["EFF_DATE_LT"][0] == "Y91-08-24" and _a1["TY_CT"][0] == "")
+_l1 = {"page": 3, "words": _w1, "top": 100.0, "bottom": 110.0}
+_w2 = [{"t": "JCT", "x0": 72.0, "x1": 86.0}, {"t": "5", "x0": 90.0, "x1": 95.0}]
+_l2 = {"page": 3, "words": _w2, "top": 111.0, "bottom": 121.0}
+_rec = {"l1": _l1, "a1": _a1, "l2": _l2, "a2": eid._assign_win(_w2, eid._L2_WIN),
+        "dist": "12"}
+check("the glued flag is stripped from the VALUE ('Y91-08-24' -> 1991-08-24)…",
+      eid._tsn_raw(_rec, "Lighting Eff-Date") == "91-08-24"
+      and eid.tsn_value(_rec, "Lighting Eff-Date") == "1991-08-24")
+_pg, _box, _yspan, _xspan = eid.tsn_box(_rec, "Lighting Eff-Date")
+check("…while the BOX keeps the printed token (flag included)",
+      _pg == 3 and _box[0] <= 406.0 and _box[2] >= 454.0)
+_pg2, _box2, _y2, _x2 = eid.tsn_box(_rec, "Int St Eff-Date")
+check("a BLANK cell boxes its fixed template window (the window IS the cell)",
+      _pg2 == 3 and 405 <= _box2[0] <= 415 and 440 <= _box2[2] <= 460
+      and _box2[1] < _box2[3])
+check("Route Suffix reads the LOC route token ('210U' -> 'U')",
+      eid.tsn_value(_rec, "Route Suffix") == "U")
+
+print("ID diff enumeration: unique keys, sidecar, the comparison's own trim")
+def _idrow(route, pm, **over):
+    r = [route] + [""] * len(idt.SHARED_HEADER)
+    r[1 + idt.KEY_FIELD] = pm
+    for f, v in over.items():
+        r[1 + idt.SHARED_HEADER.index(f)] = v
+    return r
+
+_ar = [_idrow("001", "0.204", HG="D", Description="A  B"),
+       _idrow("001", "1.000", HG="D"),      # dup key: excluded
+       _idrow("001", "1.000", HG="U")]
+_br = [_idrow("001", "0.204", HG="U", Description="A B"),
+       _idrow("001", "1.000", HG="D")]
+_sc = {("001", "0.204"): [("12", "ORA")]}
+_diffs = eid.enumerate_diffs(_ar, _br, _sc)
+check("only the unique-key HG diff is enumerated, with its district/county",
+      list(_diffs) == ["HG"] and len(_diffs["HG"]) == 1
+      and (_diffs["HG"][0]["dist"], _diffs["HG"][0]["cnty"]) == ("12", "ORA")
+      and (_diffs["HG"][0]["va"], _diffs["HG"][0]["vb"]) == ("D", "U"))
+check("a whitespace-run-only difference is NOT enumerated (compare_core's trim)",
+      "Description" not in _diffs)
+
+print("ID TSN loader sidecar contract")
+tmp2 = Path(tempfile.mkdtemp())
+try:
+    raw2 = tmp2 / "raw.xlsx"
+    wb2 = Workbook()
+    ws2 = wb2.active
+    ws2.title = idt.TSN_SHEET
+    cols2 = ["PP", "POST_MILE", "LOCATION", "DATE_REC", "HG", "CITY_CODE", "RU",
+             "TY_INT", "TY_CT", "LT_TY", "MAIN_SM", "MAIN_LC", "MAIN_RC", "MAIN_TF",
+             "MAIN_NL", "DESCRIPTION", "CS_SM", "CS_LC", "CS_RC", "CS_TF", "CS_NL",
+             "EFF_DATE_INT", "EFF_DATE_CT", "EFF_DATE_LT", "EFF_DATE_ML",
+             "MAIN_EFF_DATE", "MAIN_OVERRIDE", "CROSS_BEGIN_DATE", "EFF_DATE",
+             "CROSS_ROUTE_NAME", "CROSS_PM_PREFIX", "CROSS_POSTMILE",
+             "CROSS_PM_SUFFIX", "X_CROSS_OVERRIDE"]
+    ws2.append(cols2)
+    _b2 = {c: "" for c in cols2}
+    _b2.update(PP="R", POST_MILE=" 000.204", LOCATION="04 CC. 004",
+               DATE_REC="73-10-19", HG="D", RU="U", X_CROSS_OVERRIDE="0250")
+    ws2.append([_b2[c] for c in cols2])
+    wb2.save(raw2)
+    wb2.close()
+
+    rows_locked2 = idt.tsn_rows_from_raw(raw2)
+    rows_dcr2, dcr2 = tli.tsn_rows_with_dcr(raw2)
+    check("tsn_rows_with_dcr rows are IDENTICAL to the locked loader's",
+          rows_dcr2 == rows_locked2 and len(rows_dcr2) == 1)
+    check("…and the sidecar carries (district, county-dot-stripped)",
+          dcr2 == [("04", "CC")])
+
+    out2 = tmp2 / "norm.xlsx"
+    res2 = tli.build_into(tmp2, out2, events=None, confirm_overwrite=lambda p: True)
+    nwb2 = load_workbook(out2)
+    nws2 = nwb2[idt.NORMALIZED_SHEET]
+    hdr2 = [c.value for c in nws2[1]]
+    first2 = [c.value for c in nws2[2]]
+    nwb2.close()
+    check("normalized header = Route + shared + sidecar (v3 shape, XLL included)",
+          res2.status == "ok"
+          and hdr2 == ["Route"] + idt.SHARED_HEADER + tli.SIDECAR_HEADER
+          and "Xing Line Lgth" in hdr2 and "ML 2nd Eff-Date" not in hdr2)
+    check("normalized row carries the sidecar values at the tail",
+          first2[-2:] == ["04", "CC"] and first2[0] == "004")
+
+    a_cons2 = tmp2 / "cons.xlsx"
+    cw2 = Workbook()
+    cs2 = cw2.active
+    cs2.title = idt.TSMIS_SHEET
+    cs2.append(["Route"] + [f"c{i}" for i in range(1, 35)] + ["Xing Line Lgth"])
+    _r2 = [None] * 36
+    _r2[0], _r2[1], _r2[2], _r2[4] = "004", "R", "000.204", "04 CC. 004"
+    cs2.append(_r2)
+    cw2.save(a_cons2)
+    cw2.close()
+    ar2, br2, sc22, note2 = eid.load_sides(a_cons2, out2)
+    check("load_sides: rows in comparator shape, sidecar keyed by (route,key)",
+          note2 is None and len(ar2) == 1 and len(br2) == 1
+          and len(br2[0]) == 1 + len(idt.SHARED_HEADER)
+          and sc22.get(("004", br2[0][1 + idt.KEY_FIELD])) == [("04", "CC")])
+    check("both sides land on the same normalized PM key",
+          ar2[0][1 + idt.KEY_FIELD] == br2[0][1 + idt.KEY_FIELD] == "0.204")
+
+    old2 = tmp2 / "old.xlsx"
+    ow2 = Workbook()
+    os2 = ow2.active
+    os2.title = idt.NORMALIZED_SHEET
+    os2.append(["Route"] + idt.SHARED_HEADER)
+    os2.append(br2[0])
+    ow2.save(old2)
+    ow2.close()
+    _a2, _bx2, sc32, note32 = eid.load_sides(a_cons2, old2)
+    check("legacy library -> sidecar None + 'rebuild the TSN library' hint",
+          sc32 is None and note32 and "rebuild the TSN library" in note32)
+finally:
+    import shutil
+    shutil.rmtree(tmp2, ignore_errors=True)
+
+# --------------------------------------------------------------------------- #
 print("engine misc")
 check("reason summarizer dedupes and caps",
       ve._summarize_reasons(["a", "a", "b", "c", "d"]) == "a; b; c"
@@ -287,10 +462,17 @@ try:
           pdf.is_dir() and any(pdf.glob("_PUT TSN DISTRICT PDFS HERE.txt")))
     check("…and the pdf/ path == the engine's tsn_pdf_dir (one location)",
           pdf == ve.tsn_pdf_dir("highway_detail") == tsn_library.pdf_dir("highway_detail"))
+    ipdf = root / "intersection_detail" / "pdf"
+    check("ensure_layout creates intersection_detail/pdf/ + its hint (v0.22.0)",
+          ipdf.is_dir() and any(ipdf.glob("_PUT TSN DISTRICT PDFS HERE.txt")))
+    check("…and it too == the engine's tsn_pdf_dir",
+          ipdf == ve.tsn_pdf_dir("intersection_detail")
+          == tsn_library.pdf_dir("intersection_detail"))
     readme = root / tsn_library._README_NAME
-    check("the root README documents the pdf/ folder",
+    check("the root README documents BOTH pdf/ folders",
           readme.is_file()
-          and "highway_detail/pdf/" in readme.read_text(encoding="utf-8"))
+          and "highway_detail/pdf/" in readme.read_text(encoding="utf-8")
+          and "intersection_detail/pdf/" in readme.read_text(encoding="utf-8"))
     # an OUTDATED readme (an updated install) refreshes on the next launch
     readme.write_text("old text from a previous version\n", encoding="utf-8")
     tsn_library.ensure_layout()

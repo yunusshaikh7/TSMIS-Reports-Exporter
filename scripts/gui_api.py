@@ -348,7 +348,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         except Exception:                    # noqa: BLE001 — probe-only
             log.warning("evidence availability probe failed", exc_info=True)
             avail = {"rows": [], "tsn_pdfs": 0, "ready": False, "dir": "",
-                     "deps_ok": False}
+                     "reports": [], "deps_ok": False}
         return {"on": settings.get_evidence_images(),
                 "examples": settings.get_evidence_examples(), **avail}
 

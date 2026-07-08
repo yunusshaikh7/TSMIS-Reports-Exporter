@@ -197,7 +197,54 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   compare_core workbook + familiar sheet, all agree).
 
 ### Intersection Detail — TSN
-- **TSMIS side:** per-route XLSX ×218, **sheet `Intersection Detail`** (CONFIRMED), **36 columns** `[P, Post Mile, S, Location, Date of Record, H/G, City Code, R/U, INT Type, INT Eff-Date, Ctrl T, Ctrl Type, Light Eff-Date, Light T/Y, ML Eff-Date, ML S/M, …]`. Free-text **Description** column → formula-injection guard (handled by the shared `consolidate_xlsx` core). **Consolidator DONE (v0.17.0):** `consolidate_intersection_detail` (thin `consolidate_xlsx` wrapper) — verified 218 routes → 16,473 rows.
+
+> **⚠ July 2026 site update (v0.22.0)** — the site reshaped this report; the bullets
+> below this block describe the PRE-update history where they conflict. What changed:
+> - **TSMIS export is now 35 columns** (`intersection_detail_columns.HEADER` is the SoT):
+>   the duplicated second `ML Eff-Date` is GONE; the tail is `Xing P/S` (the crossing
+>   postmile's L/R marker) + **`Xing Line Lgth`** (TSN's `X_CROSS_OVERRIDE`, newly
+>   exported and newly COMPARED). Postmiles print **zero-padded** (`000.204`), booleans
+>   are **natively Y/N**, `Location` **carries the route suffix** (`11 IMP 008U`), and the
+>   historical dates replaced the refresh stamps. The label-over-value shift REMAINS —
+>   positions stay authoritative (`_TSMIS_POS`, re-verified statewide on 16,200 paired rows).
+> - **Pre-update workbooks/PDFs are REFUSED, not mis-read**: the comparator's header gate
+>   demands the `Xing Line Lgth` tail (36 consolidated cols) and errors with a re-export
+>   hint on the old 37-col shape; the PDF parser detects unpadded postmiles and skips the
+>   file as "pre-July-2026 print layout".
+> - **The (PDF) print reshaped too**: 3 cover pages; rowB now carries its own 18-cell
+>   rect bands AND a leading print-only DB **intersection number** (discarded — neither
+>   Excel nor TSN has it). rowA keeps 21 cells whose last is a vestigial empty column
+>   (warned about if it ever grows data back). Discrimination: rowA = zero-padded PM +
+>   Location; rowB = integer in column 1. Parity proof: **217/217 routes, 16,459/16,459
+>   rows, 0 orphans; 576,065 cells with 0 non-whitespace mismatches** vs the same-run Excel.
+> - **What the update fixed in the comparison**: Date of Record + INT/Ctrl/Light eff-dates
+>   now match TSN ≥99.9% (the old ~1-day offset is DEAD; the ~10 remaining per column are
+>   genuine conflicts); the CS completeness gap fell ~37% → ~1%; Route Suffix usually
+>   matches now. STILL structural: **Int St Eff-Date** (TSN's `EFF_DATE` is a 2022 bulk
+>   stamp vs TSMIS's historical date — ~99% differ, the one wholesale column left) and
+>   the smaller **ML/CS Eff-Date** resurvey gap (~12% / ~3%, TSN carries the LATER date).
+>   TSN's `MAIN_EFF_DATE` (the second ML eff-date TSMIS dropped) is Report-View-only now.
+>   Report View **Major** counts follow the data (user decision 2026-07-08): soft =
+>   Int St / ML / CS Eff-Date + Route Suffix; everything else hard.
+> - **New statewide canary (v0.22.0, the 7.8 ground-truth bundle): 21,675 diff cells /
+>   16,199 matched / 260 TSMIS-only / 427 TSN-only** (was 163,310 / 677 pre-update).
+> - **`normalization_version` 2 → 3**: the normalized library takes the new 33-field shape
+>   (no `ML 2nd Eff-Date`, + `Xing Line Lgth`) AND appends the `TSN District`/`TSN County`
+>   sidecar (from `LOCATION`) for the visual-evidence generator — mirror of Highway
+>   Detail's v2 sidecar; the comparison loader slices it off. D2 auto-rebuilds on update.
+> - **Evidence images (the second report after Highway Detail):** the TSN side is the
+>   **statewide TASAS print** dropped in `tsn_library/intersection_detail/pdf/` (ONE file,
+>   any name — district/county read per record from `LOCATION`). It is line-printer
+>   Courier on ONE fixed column template document-wide; `evidence_intersection_detail`
+>   parses it with fixed x-windows + MAX-OVERLAP word assignment (a `Y`-flagged date like
+>   `Y98-08-28` leans left into its neighbor window; overlap keeps it home, the flag is
+>   stripped from the value), LOCATION as one token-split window (2-char counties shift
+>   the route token). Validated statewide: **16,584/16,584 records; 30/32 fields parse
+>   back 100.00% identical** to the raw extract (Description 99.84% — print truncation
+>   the verifier correctly skips; 2 ML-Num-Lanes cases). The whole print is indexed ONCE
+>   per file (cached on size+mtime); per-district locates are lookups.
+
+- **TSMIS side (pre-July-2026 notes):** per-route XLSX ×218, **sheet `Intersection Detail`** (CONFIRMED), **36 columns** `[P, Post Mile, S, Location, Date of Record, H/G, City Code, R/U, INT Type, INT Eff-Date, Ctrl T, Ctrl Type, Light Eff-Date, Light T/Y, ML Eff-Date, ML S/M, …]`. Free-text **Description** column → formula-injection guard (handled by the shared `consolidate_xlsx` core). **Consolidator DONE (v0.17.0):** `consolidate_intersection_detail` (thin `consolidate_xlsx` wrapper) — verified 218 routes → 16,473 rows.
 - **TSN format:** **XLSX, statewide flat**, single sheet `Sheet 1`, **16626 rows × 36 columns**, **216 routes** (`TSAR - INTERSECTION DETAIL_TSN.xlsx`). Columns: `[PP, POST_MILE, LOCATION, DATE_REC, HG, CITY_CODE, RU, EFF_DATE_INT, TY_INT, EFF_DATE_CT, TY_CT, EFF_DATE_LT, LT_TY, EFF_DATE_ML, MAIN_SM, …]`. `LOCATION` = `12 ORA 001` (space-separated). `POST_MILE` zero-padded ` 000.204`; TSMIS `Post Mile` unpadded `0.204`.
 - **Compare shape:** **FLAT**, **key = route + PM** (route from `LOCATION` `12 ORA 001` → `001`). Reconciled by hand on PM 0.204 (route 1). **CORRECTED findings (the planning-phase guess was wrong):**
   - **NO value pair-order reversal.** BOTH sides store values in **(eff_date, type)** order. What looked like a reversal is the TSMIS **header being column-shifted** (its "INT Type" label sits over the eff-date value, etc. — like Ramp Detail's shifted header). ⇒ read TSMIS **by position**, not by label.

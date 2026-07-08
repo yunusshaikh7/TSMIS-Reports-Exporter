@@ -3,6 +3,48 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.22.0 — 2026-07-08
+
+Intersection Detail catches up with the site's July 2026 report overhaul — and gets evidence
+images, the second report after Highway Detail.
+
+- **The new Intersection Detail format is fully supported.** The site's July 2026 update reshaped
+  the report (35 columns: the duplicated second "ML Eff-Date" is gone; the tail is now
+  "Xing P/S" + "Xing Line Lgth"; postmiles print zero-padded; booleans are Y/N; the print gained
+  cover pages and per-record intersection numbers). The Excel consolidator, the PDF consolidator,
+  and all three comparison flavors (vs TSN, PDF vs TSN, PDF vs Excel) now read that format —
+  verified statewide against a same-run 217-route export pair (16,459 rows; PDF↔Excel
+  cell-identical apart from whitespace the comparison already normalizes).
+- **Pre-update workbooks and PDFs are refused, not mis-read.** The old 36-column layout can't be
+  read by the new positions without silently mis-mapping every column from Description on, so the
+  comparators and the PDF parser detect it and say to re-export instead. Consolidated workbooks
+  and comparison results produced before the update remain readable as they are.
+- **The comparison itself got dramatically cleaner** — the site fixed most of what used to differ
+  wholesale. Date of Record and the INT/Control/Lighting effective dates now match TSN on ≥99.9%
+  of rows (the old systematic ~1-day offset is gone), booleans match natively, the Location now
+  carries the route suffix, and the cross-street completeness gap shrank from ~37% to ~1%. The
+  one wholesale-structural column left is **Int St Eff-Date** (TSN stores a 2022 bulk refresh
+  stamp where TSMIS now keeps the historical date), plus a smaller ML/CS eff-date resurvey gap
+  (~12% / ~3%). "Xing Line Lgth" (TSN's X_CROSS_OVERRIDE) is newly exported and newly compared;
+  the second ML eff-date TSMIS no longer exports appears TSN-only (blue) on the Report View. The
+  statewide baseline drops from ~163k differing cells to **21,675** (16,199 matched
+  intersections), and the Notes sheet was rewritten to describe the new reality.
+- **Report View "Major" counts follow the data now.** Date of Record and INT/Control/Lighting
+  eff-date differences count as Major (they're genuine conflicts now); Int St / ML / CS Eff-Date
+  and the route suffix stay red-but-not-Major (structural). All differences still render red and
+  count in "Diffs".
+- **Evidence images for Intersection Detail.** The same verified screenshot-and-circle automation
+  Highway Detail got in v0.21.0 now covers both Intersection Detail rows. Drop the **statewide
+  TSN Intersection Detail print** (one PDF — any filename) into the TSN library's
+  `intersection_detail/pdf/` folder (the app creates it), keep the day's "Intersection Detail
+  (PDF)" export alongside the Excel one, and the shared "Evidence images" option covers this
+  report too. The TSN side of every example is located on the print's fixed column template —
+  validated statewide (16,584/16,584 records; 30 of 32 columns parse back 100.0% identical to
+  the TSN extract, the rest are print truncations the verifier correctly skips). The matrix
+  option's hint now reports each report's PDF folder separately.
+- Rebuild the TSN library once after updating (the app prompts): the stored Intersection Detail
+  projection moves to the new shape and records each row's district/county for evidence.
+
 ## v0.21.1 — 2026-07-08
 
 Hotfix: the folder v0.21.0's release notes told you to drop the TSN district PDFs into now

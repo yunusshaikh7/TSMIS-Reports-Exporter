@@ -95,10 +95,19 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
   report's `subdir`; `idx` is display-order metadata only), so a registry re-order never mis-resumes.
   Locked by `build/check_intersection_gate.py` (now registry-derived).
 - **Consolidate + compare:** `consolidate_intersection_summary` (category-count summer) and
-  `consolidate_intersection_detail` (a thin `consolidate_xlsx` wrapper, sheet "Intersection Detail",
-  36 cols) auto-consolidate on export finish (both in `_CONSOLIDATOR_BY_SUBDIR`); the vs-TSN +
-  cross-env comparators are wired per the registry (see [comparison-engine.md](comparison-engine.md)
-  §9e / §9f). The **PDF edition** of Intersection Detail has its own consolidator + comparators (Report 6b).
+  `consolidate_intersection_detail` (a thin `consolidate_xlsx` wrapper, sheet "Intersection Detail" —
+  header pass-through, so it consolidates whatever shape the run's exports carry) auto-consolidate on
+  export finish (both in `_CONSOLIDATOR_BY_SUBDIR`); the vs-TSN + cross-env comparators are wired per
+  the registry (see [comparison-engine.md](comparison-engine.md) §9e / §9f). The **PDF edition** of
+  Intersection Detail has its own consolidator + comparators (Report 6b).
+- **July 2026 format (v0.22.0):** the site reshaped the Intersection Detail export to **35 columns**
+  (the duplicated second `ML Eff-Date` dropped; the tail renamed to `Xing P/S` + the NEW
+  `Xing Line Lgth`; zero-padded postmiles; native Y/N booleans; historical dates; the Location now
+  carries the route suffix). `intersection_detail_columns.HEADER` is the 35-column SoT
+  (`DESC_IDX = 20`). The comparators **refuse pre-update consolidated workbooks** (header gate on the
+  `Xing Line Lgth` tail) with a re-export hint, and the PDF parser refuses pre-update prints
+  (unpadded postmiles) — mis-reading the old 36-column shape by the new positions would silently
+  corrupt every column from Description on. Export mechanics (`wait_js`/`is_empty`/save) unchanged.
 - Labels + formats verified against the live page source: **NO `"TSAR:"` prefix** (unlike the ramp pair), both Excel via the shared Export button.
 - **Intersection Summary**: `label="Intersection Summary"`, `subdir="intersection_summary"`, `filename=intersection_summary_route_<ROUTE>.xlsx`. The page never renders an empty notice -- it ALWAYS shows `Total Intersections = N` (including `= 0`) and always offers a working Export. `wait_js` = `EXPORT_READY_JS` or `.ints-total` present. `is_empty` matches the regex `total intersections\s*=\s*0\b` (a zero total; not `= 10`/`= 20`). No hang risk: a drifted marker just reverts to the old benign all-zeros-file behavior, never a stall.
 - **Intersection Detail**: `label="Intersection Detail"`, `subdir="intersection_detail"`, `filename=intersection_detail_route_<ROUTE>.xlsx`. The action bar (Export button) renders even for an empty route, plus an empty table row `<td class="hl-empty">No results found.</td>`. `wait_js` = `EXPORT_READY_JS` or `td.hl-empty` present. `is_empty` = `page.locator("td.hl-empty").count() > 0` (structural, robust to wording drift) OR `"no results found"` in body (text fallback). The engine's general no-download fast-fail (`save_via_export_button` -> `EmptyExport`) is the marker-independent backstop.
@@ -111,7 +120,7 @@ The exact parallel of Report 4b (Highway Log (PDF)), forward-ported in v0.18.0 (
 - **Appended LAST** in the export catalog so the seven existing export-op keys keep positions 0–6 — the manifest-v1 integer-index compatibility contract (CR-002-RM4; `batch_manifest._V017_EXPORT_ORDER` index 7 = `intersection_detail_pdf`).
 - `wait_js` / `is_empty` are identical to the Excel Intersection Detail (`td.hl-empty` / `"no results found"`); `is_empty` runs BEFORE save, so the PDF render only runs for routes with rows.
 - `save=save_intersection_detail_pdf` (in `exporter.py`) — the same print-capture mechanism as `save_highway_log_pdf`: the site's `intd_printAll()` builds the full multi-page layout, `window.print` is overridden to raise so the on-screen restore never runs, then `page.pdf()` captures it; it fails loudly with `ReportError` if the print fn or layout is missing.
-- **Consolidator:** `consolidate_tsmis_intersection_detail_pdf.py` parses the PDF route exports into the SAME 36-column format (`intersection_detail_columns.HEADER`, Description at index 21) as the Excel export — a two-row-per-record / zebra-shaded PDF parser. Like HL-PDF it is NOT auto-consolidated inline (it needs a scratch convert dir — the matrix handles it). **Comparators:** `compare_intersection_detail_pdf` — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, reusing the Excel Intersection Detail's vs-TSN schema/loaders.
+- **Consolidator:** `consolidate_tsmis_intersection_detail_pdf.py` parses the PDF route exports into the SAME 35-column July-2026 format (`intersection_detail_columns.HEADER`, Description at index 20) as the Excel export — a two-row-per-record / zebra-shaded PDF parser (both grids from the shaded records' own 21/18-cell bands; rowA = zero-padded postmile, rowB = the print-only integer intersection number, discarded; the vestigial 21st rowA column is warned about if it ever grows data back; pre-update prints are refused with a re-export hint). Statewide parity proof vs the same-run Excel: 217/217 routes, 16,459/16,459 rows, 0 orphans, 0 non-whitespace cell diffs. Like HL-PDF it is NOT auto-consolidated inline (it needs a scratch convert dir — the matrix handles it). **Comparators:** `compare_intersection_detail_pdf` — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, reusing the Excel Intersection Detail's vs-TSN schema/loaders.
 - Verified offline against the fake-site fixture (`build/check_intersection_detail_pdf.py`, `build/fake_site/intersection_detail_print.html`). **Live-export verification against TSMIS is owed in v0.18.1** (the dev PC can't reach the dev site).
 
 ## Report grouping & site-menu-safe selection (v0.18.1)
@@ -201,7 +210,7 @@ Then add the `__main__` -> `run_consolidate_cli`, wire `4. consolidate...bat` (t
 - `"TSMIS Highway Log (Excel)"` (`consolidate_highway_log`) -- reads the TSMIS "Highway Log" Excel export, day-aware.
 - `"TSMIS Highway Log (PDF)"` (`consolidate_tsmis_highway_log_pdf`) -- reads the app's own "Highway Log (PDF)" export, day-aware (NOT a dropped folder); parsed into the SAME 31-column format as the Excel export, the accurate substitute for the buggy vendor Excel.
 - `"TSN Highway Log (PDF)"` (`consolidate_tsn_highway_log`) -- TSN district PDFs the user drops into `input/tsn_highway_log/` (from OUTSIDE the app, so this one keeps an input folder + `day` ignored).
-- `"Intersection Detail"` (`consolidate_intersection_detail`, v0.17.0) -- a thin `consolidate_xlsx` wrapper (sheet "Intersection Detail", 36 cols), day-aware; also in `_CONSOLIDATOR_BY_SUBDIR` so it auto-consolidates on export finish and the matrix can build its vs-TSN cell. (Intersection Summary's consolidator — `consolidate_intersection_summary`, a category-count summer — is registered too.)
+- `"Intersection Detail"` (`consolidate_intersection_detail`, v0.17.0) -- a thin `consolidate_xlsx` wrapper (sheet "Intersection Detail"; 35 cols since the July-2026 site update — the wrapper passes the files' own header through), day-aware; also in `_CONSOLIDATOR_BY_SUBDIR` so it auto-consolidates on export finish and the matrix can build its vs-TSN cell. (Intersection Summary's consolidator — `consolidate_intersection_summary`, a category-count summer — is registered too.)
 
 See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for the Highway Log consolidator internals.
 

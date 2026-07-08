@@ -3,7 +3,7 @@
 The TSMIS "Intersection Detail (PDF)" export (report 6b — the site's Print layout
 saved via `page.pdf()`) renders the report as a real, BORDERED HTML table. Just
 like Highway Log, the PDF and the vendor Excel export can DISAGREE on data, so
-this consolidator parses those per-route PDFs into the SAME 36-column TSMIS
+this consolidator parses those per-route PDFs into the SAME 35-column TSMIS
 Intersection Detail format the Excel export and the TSN consolidator produce, so:
   * the combined workbook lines up column-for-column with the consolidated TSN
     Intersection Detail (for the TSMIS-PDF vs TSN comparison), and
@@ -19,27 +19,34 @@ to a per-route workbook (scratch, in output/tsmis_intersection_detail_pdf/) and
 writes one combined workbook to that run's consolidated/ folder.
 
 PARSING — derived-grid based, like the Highway Log PDF consolidator, but TWO
-physical table rows make ONE record. The site's `intd_renderRow` emits each
-intersection as
-  * rowA — the Post Mile, Location, Date of Record and the INT / CONTROL /
-    LIGHTING / MAINLINE attribute cells (21 grid columns); and
-  * rowB — a WIDE Description cell (it spans grid columns 3-6) then the Main Line /
-    Intersecting / Intersecting-Route / Xing cells (grid columns 7-20).
+physical table rows make ONE record. Since the July 2026 site update the print
+opens with THREE cover pages (report parameters + the policy text) and the site's
+`intd_renderRow` emits each intersection as
+  * rowA — the Post Mile (now zero-padded, '000.204'), Location, Date of Record
+    and the INT / CONTROL / LIGHTING / MAINLINE attribute cells on a 21-column
+    grid whose LAST column is a vestigial empty remnant of the dropped second
+    'ML Eff-Date'; and
+  * rowB — the record's DB intersection NUMBER (printed only here — neither the
+    Excel export nor TSN carries it, so it is NOT part of the output row), a WIDE
+    Description cell (it spans grid columns 3-6), then the Main Line /
+    Intersecting / Intersecting-Route / Xing cells on an 18-column grid.
 `intd_renderRow` ZEBRA-SHADES alternate records (`idx % 2 === 0`), and ONLY the
 shaded records carry cell rectangles — the un-shaded ones render as borderless
 text. So we can't band by rects (that would silently drop every other record).
-Instead we derive the table's 21 column x-windows ONCE from the shaded rowA bands
-(the print layout is a single table, so column widths are uniform across pages),
-then assign EVERY text line's characters to those windows (inserting a space where
-the x-gap opens a new token, so "04"+"SOL"+"780" -> "04 SOL 780"). A line whose
-Post Mile column holds a number is a rowA; the line after it is its rowB. The
-report is FLAT — each row's Location already carries "<district> <county>
-<route>", so there are NO centered county group headers (unlike Highway Log), and
-the print layout carries no route label, so the route comes from the FILENAME.
+Instead we derive BOTH grids' column x-windows ONCE from the shaded records'
+21-cell (rowA) and 18-cell (rowB) bands (the print layout is a single table, so
+column widths are uniform across pages), then assign EVERY text line's characters
+to those windows. A line whose Post Mile column holds a zero-padded postmile is a
+rowA; the next line whose column 1 holds the plain-integer intersection number is
+its rowB (page furniture between them — the repeated table header — is skipped).
+
+Pre-update PDFs (unpadded postmiles, no rowB intersection number) parse to ZERO
+rows by construction; they are refused per file with a re-export hint rather than
+mis-mapped — the old 36-column layout cannot be represented in the current shape.
 
 No value normalization happens here: the PDF already carries the native TSMIS
 formats, so values are written through verbatim. The comparison engine applies any
-normalization (e.g. Y/N<->1/0) at compare time, exactly as for the Excel side.
+normalization at compare time, exactly as for the Excel side.
 
 Console-free like the other consolidators: progress via events.on_log, overwrite
 confirmed through the callback, cancel honored between pages, ConsolidateResult
@@ -115,13 +122,21 @@ def out_path_for(day):
 # PDF layout
 # =============================================================================
 
-N_COLS = 21              # the 21-column grid (rowA's cells; rowB maps onto it too)
+N_COLS_A = 21            # rowA's grid (the last column is a vestigial empty cell)
+N_COLS_B = 18            # rowB's grid (its own rects since the July 2026 update)
 CELL_MIN_W = 3           # ignore hairline / spacer rects when finding shaded bands
 CELL_MIN_H = 3
 CELL_MAX_H = 40          # a data cell is one text line tall
 Y_TOLERANCE = 3          # chars within this y-distance form one logical line
 WORD_GAP = 1.5           # x-gap that opens a new token inside one column
 
+# A rowA's Post Mile is the site's zero-padded '000.204' form — the discriminator
+# against a rowB, whose column 1 holds the plain-integer intersection number.
+PM_ROWA_RE = re.compile(r"^\d{3}\.\d{3}$")
+INT_ROWB_RE = re.compile(r"^\d+$")
+# A PRE-update rowA printed the postmile unpadded ('0.204'); counting those lets a
+# refused old-layout PDF say WHY instead of a bare "no data found".
+OLD_PM_RE = re.compile(r"^\d{1,2}\.\d{3}$")
 # A data rowA's Location cell is "<district> <county> <route>", e.g. "04 SOL 780"
 # or the period-bearing county codes "04 CC. 004" / "10 SJ. 120". This guards the
 # rowA classification against any stray non-data line and is cheap to evaluate.
@@ -141,17 +156,17 @@ def _cluster_lines(page):
     return cluster_by_top((c for c in page.chars if c["text"].strip()), Y_TOLERANCE)
 
 
-def _shaded_column_windows(pdf):
-    """Derive the 21 contiguous column windows from the document's zebra-shaded
-    rowA cell rects.
+def _shaded_column_windows(pdf, n_cols):
+    """Derive `n_cols` contiguous column windows from the document's zebra-shaded
+    cell rects (rowA bands have 21 cells, rowB bands 18).
 
     Only the shaded (even-index) records carry rects, but the print layout is ONE
     table, so its column widths are uniform across every page and row — the median
-    cell edges of the shaded rowA bands therefore give the grid for EVERY line,
-    shaded or not. The windows are made CONTIGUOUS (each boundary is the midpoint
-    between adjacent cells; the ends extend to ±infinity) so no character can fall
-    between two columns and be dropped. Returns the 21 (lo, hi) windows, or None if
-    no full rowA band was found anywhere (an empty / unreadable PDF)."""
+    cell edges of the shaded bands therefore give the grid for EVERY line, shaded
+    or not. The windows are made CONTIGUOUS (each boundary is the midpoint between
+    adjacent cells; the ends extend to ±infinity) so no character can fall between
+    two columns and be dropped. Returns the (lo, hi) windows, or None if no full
+    band of that shape was found anywhere (an empty / unreadable PDF)."""
     bands = []
     for page in pdf.pages:
         by_top = defaultdict(list)
@@ -161,26 +176,27 @@ def _shaded_column_windows(pdf):
             if CELL_MIN_W < w < page.width - 10 and CELL_MIN_H < h < CELL_MAX_H:
                 by_top[round(r["top"])].append(r)
         for cells in by_top.values():
-            if len(cells) == N_COLS:
+            if len(cells) == n_cols:
                 bands.append(sorted(cells, key=lambda r: r["x0"]))
     if not bands:
         return None
 
-    lo = [median([b[i]["x0"] for b in bands]) for i in range(N_COLS)]
-    hi = [median([b[i]["x1"] for b in bands]) for i in range(N_COLS)]
+    lo = [median([b[i]["x0"] for b in bands]) for i in range(n_cols)]
+    hi = [median([b[i]["x1"] for b in bands]) for i in range(n_cols)]
     return contiguous_windows(lo, hi)
 
 
-def _rowb_windows(windows):
-    """rowB's 18 windows from the 21-column grid: columns 0,1,2 as-is, then ONE
-    merged Description window spanning grid columns 3-6, then columns 7..20 as-is.
-
-    The Description is a single wide cell in the table (it spans four grid columns),
-    so assigning it as one window lets WORD_GAP spacing flow continuously across it
-    — otherwise a word straddling a grid-column boundary ('ARCH' -> 'ARC' + 'H')
-    would be rejoined with a false space."""
-    desc = (windows[3][0], windows[6][1])
-    return windows[0:3] + [desc] + windows[7:21]
+def _doc_windows(pdf):
+    """(rowA windows, rowB windows) for the document, or (None, None) when no
+    shaded band of either shape exists (an empty / unreadable PDF). rowB's grid
+    comes from its OWN 18-cell bands — its merged Description cell (grid columns
+    3-6 of rowA) arrives as one window, so WORD_GAP spacing flows continuously
+    across it and a word straddling a rowA-column boundary isn't split."""
+    wa = _shaded_column_windows(pdf, N_COLS_A)
+    wb = _shaded_column_windows(pdf, N_COLS_B)
+    if wa is None or wb is None:
+        return None, None
+    return wa, wb
 
 
 def _assign_columns(chars, windows):
@@ -190,90 +206,104 @@ def _assign_columns(chars, windows):
 
 
 def _is_rowA(vals):
-    """A record's FIRST line (rowA) carries the Post Mile (column 1) — a number;
-    its second line (rowB) leaves columns 0-2 blank. So a numeric column 1 marks a
-    rowA. Header furniture ("POST MILE", "DATE OF RECORD", …) has no digit there."""
-    return any(ch.isdigit() for ch in vals[1])
+    """A record's FIRST line carries the zero-padded Post Mile in column 1 and a
+    real Location in column 3. Header furniture ("POST MILE", …) fails the PM
+    shape; a rowB fails it too (its column 1 is the integer intersection number)."""
+    return bool(PM_ROWA_RE.match(vals[1]) and LOCATION_RE.search(vals[3] or ""))
 
 
 def _make_row(a, b):
-    """Assemble the 36-column Intersection Detail row from rowA's 21 grid values
-    and rowB's 18 merged-window values (see _rowb_windows).
+    """Assemble the 35-column Intersection Detail row from rowA's 21 grid values
+    and rowB's 18 grid values.
 
-    rowA columns 0..20 map 1:1 to output columns 0..20 (P .. ML Eff-Date). rowB
-    carries the Description (its merged window 3) then the Main Line / Intersecting
-    fields (windows 4..17 -> grid columns 7..20). The Excel export emits the
-    intersecting-route pair as 'Intrte S' THEN 'Intrte Route' — the REVERSE of their
-    left-to-right order in the PDF — so rowB window 13 (Intrte S, grid col 16) -> col
-    30 and window 12 (Intrte Route, grid col 15) -> col 31, keeping the two sources
-    column-compatible."""
+    rowA columns 0..19 map 1:1 to output columns 0..19 (P .. ML N/L); rowA column
+    20 is the vestigial remnant of the dropped second 'ML Eff-Date' (checked empty
+    by the caller, never emitted). rowB window 1 is the print-only intersection
+    number (discarded — the Excel export has no such column); window 3 is the
+    merged Description; windows 4..11 the Main Line / Intersecting / Int-St cells.
+    The Excel export emits the intersecting-route pair as 'Intrte S' THEN 'Intrte
+    Route' — the REVERSE of their left-to-right order in the PDF — so rowB window
+    13 (Intrte S) -> col 29 and window 12 (Intrte Route) -> col 30, keeping the
+    two sources column-compatible. Windows 16/17 are the July-2026 'Xing P/S'
+    (the crossing postmile's L/R marker) and 'Xing Line Lgth' tail."""
     a = [v or None for v in a]
     b = [v or None for v in b]
     return [
-        *a[0:21],   # 0..20  P, Post Mile, S, Location, Date of Record, … ML Eff-Date
-        b[3],       # 21 Description    (rowB merged window, grid cols 3-6)
-        b[4],       # 22 Main Line Lgth
-        b[5],       # 23 Inter Eff-Date
-        b[6],       # 24 Inter S
-        b[7],       # 25 Inter L
-        b[8],       # 26 Inter R
-        b[9],       # 27 Inter T
-        b[10],      # 28 Inter N
-        b[11],      # 29 Int St Eff-Date
-        b[13],      # 30 Intrte S       (rowB window 13 = grid col 16; Excel lists S first)
-        b[12],      # 31 Intrte Route   (rowB window 12 = grid col 15)
-        b[14],      # 32 Intrte Post
-        b[15],      # 33 Intrte Mile
-        b[16],      # 34 Xing Rte
-        b[17],      # 35 Xing S
+        *a[0:20],   # 0..19  P, Post Mile, S, Location, Date of Record, … ML N/L
+        b[3],       # 20 Description    (rowB merged window, rowA grid cols 3-6)
+        b[4],       # 21 Main Line Lgth
+        b[5],       # 22 Inter Eff-Date
+        b[6],       # 23 Inter S
+        b[7],       # 24 Inter L
+        b[8],       # 25 Inter R
+        b[9],       # 26 Inter T
+        b[10],      # 27 Inter N
+        b[11],      # 28 Int St Eff-Date
+        b[13],      # 29 Intrte S       (rowB window 13; Excel lists S first)
+        b[12],      # 30 Intrte Route   (rowB window 12)
+        b[14],      # 31 Intrte Post
+        b[15],      # 32 Intrte Mile
+        b[16],      # 33 Xing P/S
+        b[17],      # 34 Xing Line Lgth
     ]
 
 
 def parse_pdf(path, events):
-    """Parse one TSMIS Intersection Detail PDF into 36-column TSMIS-format rows.
+    """Parse one TSMIS Intersection Detail PDF into 35-column TSMIS-format rows.
 
-    Returns (rows, stats): `rows` a list of 36-column row lists in document order,
-    `stats` a reconciliation dict (emitted, pages, orphans = a rowA that never got
-    its rowB — should be 0; `no_grid` when the column geometry couldn't be derived).
+    Returns (rows, stats): `rows` a list of 35-column row lists in document order,
+    `stats` a reconciliation dict (emitted, pages, orphans = a rowA whose rowB
+    never arrived — should be 0; `no_grid` when the column geometry couldn't be
+    derived; `old_layout` when the file matches the PRE-July-2026 print instead —
+    unpadded postmiles, no rowB intersection numbers; `vestigial` counts rowA
+    values in the dropped 21st column, a layout-drift canary that should be 0).
     Returns (None, None) if cancelled.
 
-    Only the zebra-shaded records carry cell rects, so the 21-column grid is derived
-    once from those shaded bands (the report is one table, so its widths are uniform)
-    and EVERY text line is then placed on that grid — the un-shaded records included.
-    A line whose Post Mile column holds a number is a rowA; the line right after it
-    is its rowB. The pairing is carried across page boundaries defensively, so a
-    future layout change that splits a record surfaces as an orphan, never a silent
-    drop."""
+    A line whose Post Mile column holds a zero-padded postmile is a rowA; its rowB
+    is the NEXT line whose column 1 holds the plain-integer intersection number —
+    page furniture between them (the table header repeated on every page, the
+    cover pages) matches neither shape and is skipped, so a record split across a
+    page boundary still pairs. A second rowA arriving before any rowB surfaces as
+    an orphan, never a silent drop."""
     rows = []
     pending_a = None            # a rowA (21 grid vals) awaiting its rowB
     orphans = 0
+    old_pm_hits = 0
+    vestigial = 0
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
-        windows = _shaded_column_windows(pdf)
-        if windows is None:
-            return [], {"emitted": 0, "pages": n_pages, "orphans": 0, "no_grid": True}
-        rowb_windows = _rowb_windows(windows)
+        win_a, win_b = _doc_windows(pdf)
+        if win_a is None:
+            return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
+                        "no_grid": True, "old_layout": False, "vestigial": 0}
         for page_no, page in enumerate(pdf.pages, 1):
             if events.is_cancelled():
                 return None, None
             if page_no % 25 == 0:
                 events.on_log(f"    …page {page_no}/{n_pages}")
             for _top, chars in _cluster_lines(page):
-                vals = _assign_columns(chars, windows)
+                vals = _assign_columns(chars, win_a)
                 if _is_rowA(vals):
-                    if not LOCATION_RE.search(vals[3] or ""):
-                        continue            # a non-data line (no real Location)
                     if pending_a is not None:
                         orphans += 1        # previous rowA never got its rowB
                     pending_a = vals
-                elif pending_a is not None:
-                    # rowB: re-read with the merged Description window so a word that
-                    # straddles a grid-column boundary isn't split by a false space.
-                    rows.append(_make_row(pending_a, _assign_columns(chars, rowb_windows)))
-                    pending_a = None
+                    if vals[20]:
+                        vestigial += 1      # the dropped column grew data back?!
+                    continue
+                if OLD_PM_RE.match(vals[1]) and LOCATION_RE.search(vals[3] or ""):
+                    old_pm_hits += 1        # a PRE-update rowA (unpadded postmile)
+                    continue
+                if pending_a is not None:
+                    vals_b = _assign_columns(chars, win_b)
+                    if INT_ROWB_RE.match(vals_b[1] or ""):
+                        rows.append(_make_row(pending_a, vals_b))
+                        pending_a = None
+                    # else: furniture between a rowA and its rowB — skip
     if pending_a is not None:
         orphans += 1
-    return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans}
+    return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
+                  "no_grid": False, "old_layout": not rows and old_pm_hits > 0,
+                  "vestigial": vestigial}
 
 
 # =============================================================================
@@ -282,7 +312,7 @@ def parse_pdf(path, events):
 
 def _write_route_workbook(rows, out_path):
     """Write one route's rows as a TSMIS-format Intersection Detail workbook (same
-    sheet name + 36 columns the Excel export uses)."""
+    sheet name + 35 columns the Excel export uses)."""
     write_route_workbook(rows, out_path, sheet_name=SHEET_NAME, header=INTD_HEADER)
 
 
@@ -300,8 +330,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     Console-free; honors events.is_cancelled() between pages. The convert-loop
     skeleton lives in pdf_table_lib.run_pdf_conversion; this module supplies the
     layout knowledge: the per-PDF step (route from the FILENAME — the print layout
-    carries no route label; orphan reconciliation) and the ⚠-note /
-    PARTIAL-escalation policy.
+    carries no route label; orphan reconciliation; the pre-update-layout refusal)
+    and the ⚠-note / PARTIAL-escalation policy.
     """
     day = day or latest_output_day()
     in_dir = Path(input_dir) if input_dir else input_dir_for(day)
@@ -323,6 +353,17 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             if pstats["orphans"]:
                 ev.on_log(f"  WARNING: {pstats['orphans']} unpaired row(s) in {p.name} "
                           "(a record's two lines didn't pair) — see the log.")
+            if pstats["vestigial"]:
+                ctx["vestigial"] = ctx.get("vestigial", 0) + pstats["vestigial"]
+                ev.on_log(f"  WARNING: {pstats['vestigial']} value(s) in the dropped "
+                          f"21st rowA column of {p.name} — the print layout may have "
+                          "changed again; verify before relying on this output.")
+            if pstats["old_layout"]:
+                ev.on_log(f"{prefix} uses the PRE-July-2026 print layout (unpadded "
+                          "postmiles) — this version parses the current layout only. "
+                          "Re-export the Intersection Detail (PDF) report; skipping")
+                ctx["failed"].append(p.name)
+                return ("skip",)
         if not rows:
             ev.on_log(f"{prefix} no intersection data found; skipping")
             ctx["failed"].append(p.name)
@@ -334,6 +375,9 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         notes = []
         if orphans:
             notes.append(f"⚠ {orphans} unpaired row line(s) — verify (see the log).")
+        if ctx.get("vestigial"):
+            notes.append(f"⚠ {ctx['vestigial']} value(s) in the dropped 21st rowA "
+                         "column — the print layout may have changed; verify.")
         result.summary_lines = notes + result.summary_lines
         # RR2-B1 / D18 parity with the HL-PDF consolidator: an unpaired record or
         # a failed PDF is invisible to the XLSX consolidator, so ESCALATE to a
