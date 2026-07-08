@@ -366,6 +366,13 @@ def _row_modes(row_key, subdir, adapter):
                  "tsn_subdir": "intersection_detail", "fmt": "pdf"},
                 {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
                  "env_subdir": "intersection_detail_pdf", "other_subdir": "intersection_detail"}]
+    if row_key == "highway_detail_pdf":        # the exact parallel of intersection_detail_pdf
+        return [env,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                 "env_subdir": "highway_detail_pdf",
+                 "tsn_subdir": "highway_detail", "fmt": "pdf"},
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                 "env_subdir": "highway_detail_pdf", "other_subdir": "highway_detail"}]
     return [env,
             {"id": "tsn", "label": "vs TSN", "kind": "tsn",
              "supported": tsn_supported(row_key),
@@ -408,6 +415,12 @@ def tsn_comparator_for(row_key):
     if row_key == "highway_sequence":
         import compare_highway_sequence_tsn as _m       # FLAT (county+PM key)
         return _m
+    if row_key == "highway_detail":
+        import compare_highway_detail_tsn as _m         # FLAT (route+canonical PM)
+        return _m
+    if row_key == "highway_detail_pdf":
+        import compare_highway_detail_pdf as _m
+        return _m.TSMIS_PDF_VS_TSN
     return None
 
 
@@ -421,6 +434,9 @@ def _pdf_self_comparator(pdf_subdir):
         return _m.TSMIS_PDF_VS_EXCEL
     if pdf_subdir == "intersection_detail_pdf":
         import compare_intersection_detail_pdf as _m
+        return _m.TSMIS_PDF_VS_EXCEL
+    if pdf_subdir == "highway_detail_pdf":
+        import compare_highway_detail_pdf as _m
         return _m.TSMIS_PDF_VS_EXCEL
     raise ValueError(f"no PDF-vs-Excel comparator for {pdf_subdir}")
 

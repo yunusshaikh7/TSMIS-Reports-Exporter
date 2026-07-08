@@ -67,6 +67,8 @@ import consolidate_tsn_highway_log as _con_tsn_hl
 import consolidate_intersection_summary as _con_int_summary
 import consolidate_intersection_detail as _con_int_detail
 import consolidate_tsmis_intersection_detail_pdf as _con_tsmis_int_detail_pdf
+import consolidate_highway_detail as _con_highway_detail
+import consolidate_tsmis_highway_detail_pdf as _con_tsmis_highway_detail_pdf
 import compare_env as _ce
 import compare_highway_log as _chl
 import compare_highway_log_pdf as _chlp
@@ -76,6 +78,8 @@ import compare_ramp_summary_tsn as _crs_tsn
 import compare_intersection_summary_tsn as _cis_tsn
 import compare_intersection_detail_tsn as _cid_tsn
 import compare_highway_sequence_tsn as _chs_tsn
+import compare_highway_detail_tsn as _chd_tsn
+import compare_highway_detail_pdf as _chdp
 
 _fail = []
 
@@ -114,6 +118,9 @@ _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:highway_log_excel", "TSMIS Highway Log (Excel)", _con_highway_log),
     ("cons:highway_log_pdf", "TSMIS Highway Log (PDF)", _con_tsmis_pdf),
     ("cons:tsn_highway_log", "TSN Highway Log (PDF)", _con_tsn_hl),
+    # v0.20.0: the Highway Detail pair (Excel + PDF-sourced), appended.
+    ("cons:highway_detail", "Highway Detail", _con_highway_detail),
+    ("cons:highway_detail_pdf", "TSMIS Highway Detail (PDF)", _con_tsmis_highway_detail_pdf),
 ]
 _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:ramp_summary:env", "TSAR: Ramp Summary — between environments", "folders", "env", _ce.RAMP_SUMMARY),
@@ -124,6 +131,9 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:intersection_detail:env", "TSAR: Intersection Detail — between environments", "folders", "env", _ce.INTERSECTION_DETAIL),
     ("cmp:highway_log_pdf:env", "Highway Log (PDF) — between environments", "folders", "env", _ce.HIGHWAY_LOG_PDF),
     ("cmp:intersection_detail_pdf:env", "Intersection Detail (PDF) — between environments", "folders", "env", _ce.INTERSECTION_DETAIL_PDF),
+    # v0.20.0: the Highway Detail env rows, appended after the existing env rows.
+    ("cmp:highway_detail:env", "Highway Detail — between environments", "folders", "env", _ce.HIGHWAY_DETAIL),
+    ("cmp:highway_detail_pdf:env", "Highway Detail (PDF) — between environments", "folders", "env", _ce.HIGHWAY_DETAIL_PDF),
     ("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN", "files", "tsn", _chl),
     ("cmp:highway_log:pdf_vs_tsn", "Highway Log — TSMIS (PDF) vs TSN (PDF)", "files", "tsn", _chlp.TSMIS_PDF_VS_TSN),
     ("cmp:highway_log:pdf_vs_excel", "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chlp.TSMIS_PDF_VS_EXCEL),
@@ -134,11 +144,16 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:intersection_detail:pdf_vs_tsn", "Intersection Detail — TSMIS (PDF) vs TSN", "files", "tsn", _cidp.TSMIS_PDF_VS_TSN),
     ("cmp:intersection_detail:pdf_vs_excel", "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _cidp.TSMIS_PDF_VS_EXCEL),
     ("cmp:highway_sequence:tsn", "Highway Sequence Listing — TSMIS vs TSN", "files", "tsn", _chs_tsn),
+    # v0.20.0: the Highway Detail file comparisons (vs-TSN + the two PDF flavors).
+    ("cmp:highway_detail:tsn", "Highway Detail — TSMIS vs TSN", "files", "tsn", _chd_tsn),
+    ("cmp:highway_detail:pdf_vs_tsn", "Highway Detail — TSMIS (PDF) vs TSN", "files", "tsn", _chdp.TSMIS_PDF_VS_TSN),
+    ("cmp:highway_detail:pdf_vs_excel", "Highway Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chdp.TSMIS_PDF_VS_EXCEL),
 ]
 _AUTO_CONS = {
     "ramp_summary": _con_ramp_summary, "ramp_detail": _con_ramp_detail,
     "highway_sequence": _con_highway_sequence, "highway_log": _con_highway_log,
     "intersection_summary": _con_int_summary, "intersection_detail": _con_int_detail,
+    "highway_detail": _con_highway_detail,
 }
 _TSN = [
     ("highway_log", "TSN Highway Log", "*.pdf", "district_pdfs",
@@ -153,6 +168,8 @@ _TSN = [
      "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into"),
     ("highway_sequence", "TSN Highway Sequence", "*.pdf", "district_pdfs",
      "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into"),
+    ("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
+     "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into"),
 ]
 
 

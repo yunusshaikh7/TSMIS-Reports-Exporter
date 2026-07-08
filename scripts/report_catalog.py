@@ -48,6 +48,8 @@ import consolidate_tsmis_highway_log_pdf as _c_tsmis_highway_log_pdf
 import consolidate_intersection_detail as _c_int_detail
 import consolidate_tsmis_intersection_detail_pdf as _c_tsmis_int_detail_pdf
 import consolidate_intersection_summary as _c_int_summary
+import consolidate_highway_detail as _c_highway_detail
+import consolidate_tsmis_highway_detail_pdf as _c_tsmis_highway_detail_pdf
 
 import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
@@ -58,6 +60,8 @@ import compare_ramp_summary_tsn as _cmp_ramp_summary_tsn
 import compare_intersection_summary_tsn as _cmp_int_summary_tsn
 import compare_intersection_detail_tsn as _cmp_int_detail_tsn
 import compare_highway_sequence_tsn as _cmp_highway_seq_tsn
+import compare_highway_detail_tsn as _cmp_highway_detail_tsn
+import compare_highway_detail_pdf as _cmp_highway_detail_pdf
 
 # Per-tier descriptors. `key` is the stable export/consolidation/comparison-op key
 # (P3 / §C.5); the rest is display + the module/adapter the op runs.
@@ -113,9 +117,10 @@ EXPORT = (
     # The "Highway" TSAR group (Highway Detail / Summary): reserved DISABLED
     # groundwork in v0.18.1 (cs-disabled on the dev site 2026-06-25), EXPORT
     # ENABLED in v0.19.1 as the site opens the pair. Appended LAST (stable-id
-    # append-only, batch positions 8/9 frozen). Still ABSENT from the matrices /
-    # consolidate / compare — that integration waits for the report's real
-    # schema (a later feature).
+    # append-only, batch positions 8/9 frozen). Highway DETAIL consolidates and
+    # compares (cross-env + vs-TSN + PDF-vs-Excel) as of v0.20.0, schema verified
+    # against the real statewide exports + the TSN extract; Highway SUMMARY stays
+    # export-only (still site-greyed) until its schema can be verified.
     ExportEntry("highway_detail", "Highway Detail", "Excel", _HIGHWAY_DETAIL_SPEC,
                 group="Highway", short_label="Detail"),
     ExportEntry("highway_summary", "Highway Summary", "Excel", _HIGHWAY_SUMMARY_SPEC,
@@ -123,7 +128,7 @@ EXPORT = (
     # Highway Detail (PDF), v0.19.2 — same "Highway Detail" dropdown option saved via
     # the site's Print layout (hd_printAll), the exact parallel of Highway Log (PDF).
     # Confirmed live on the 7.7 dev capture. Appended LAST (stable id 10, batch order
-    # frozen). Also consolidate/compare-ABSENT until the Highway integration lands.
+    # frozen). Consolidates + compares like Intersection Detail (PDF) as of v0.20.0.
     ExportEntry("highway_detail_pdf", "Highway Detail (PDF)", "PDF", _HIGHWAY_DETAIL_PDF_SPEC,
                 group="Highway", short_label="Detail (PDF)"),
 )
@@ -151,6 +156,13 @@ CONSOLIDATE = (
     #   Input = TSN district PDFs dropped into input/tsn_highway_log/ (from OUTSIDE
     #   the app, so this one keeps an input folder + day ignored).
     ConsolidateEntry("cons:tsn_highway_log", "TSN Highway Log (PDF)", _c_tsn_highway_log),
+    # Highway Detail (v0.20.0) — the Excel consolidator + its PDF-sourced sibling
+    # (input = this app's own "Highway Detail (PDF)" export, parsed into the SAME
+    # 34-column format), grouped like the Intersection Detail pair above. The TSN
+    # side is a statewide-XLSX library entry (TSN below), not a consolidator row.
+    ConsolidateEntry("cons:highway_detail", "Highway Detail", _c_highway_detail),
+    ConsolidateEntry("cons:highway_detail_pdf", "TSMIS Highway Detail (PDF)",
+                     _c_tsmis_highway_detail_pdf),
 )
 
 # Compare tab SUB-TABS (the FIRST is the default). "env" = cross-environment,
@@ -190,6 +202,14 @@ COMPARE = (
     # from the Excel one (the exact parallel of Highway Log (PDF) above).
     CompareEntry("cmp:intersection_detail_pdf:env", "Intersection Detail (PDF) — between environments",
                  _cmp_env.INTERSECTION_DETAIL_PDF, "folders", "env"),
+    # Highway Detail cross-env rows (v0.20.0), appended after the existing env rows
+    # so the matrix row order is unchanged; the PDF flavor keeps its own family
+    # `highway_detail_pdf` (its own matrix row), the exact parallel of the
+    # Intersection Detail pair above.
+    CompareEntry("cmp:highway_detail:env", "Highway Detail — between environments",
+                 _cmp_env.HIGHWAY_DETAIL, "folders", "env"),
+    CompareEntry("cmp:highway_detail_pdf:env", "Highway Detail (PDF) — between environments",
+                 _cmp_env.HIGHWAY_DETAIL_PDF, "folders", "env"),
     # vs TSN (file-based).
     CompareEntry("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN",
                  _cmp_highway_log, "files", "tsn"),
@@ -217,6 +237,15 @@ COMPARE = (
                  _cmp_int_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
     CompareEntry("cmp:highway_sequence:tsn", "Highway Sequence Listing — TSMIS vs TSN",
                  _cmp_highway_seq_tsn, "files", "tsn"),
+    # Highway Detail file comparisons (v0.20.0) — the FLAT vs-TSN comparator plus
+    # the two PDF-sourced flavors, the exact parallel of the Intersection Detail
+    # trio. PDF-vs-Excel is an internal one-system consistency check ("env").
+    CompareEntry("cmp:highway_detail:tsn", "Highway Detail — TSMIS vs TSN",
+                 _cmp_highway_detail_tsn, "files", "tsn"),
+    CompareEntry("cmp:highway_detail:pdf_vs_tsn", "Highway Detail — TSMIS (PDF) vs TSN",
+                 _cmp_highway_detail_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:highway_detail:pdf_vs_excel", "Highway Detail — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_highway_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
 )
 
 # B2 auto-consolidate: which consolidate module handles each EXPORTABLE report,
@@ -230,6 +259,7 @@ _AUTO_CONSOLIDATOR = (
     ("highway_log", _c_highway_log),
     ("intersection_summary", _c_int_summary),
     ("intersection_detail", _c_int_detail),
+    ("highway_detail", _c_highway_detail),
 )
 
 # Canonical TSN library descriptors — each report's TSN source format + the lazy
@@ -255,6 +285,13 @@ TSN = (
              "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into", normalization_version=2),
     TsnEntry("highway_sequence", "TSN Highway Sequence", "*.pdf", "district_pdfs",
              "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into", normalization_version=2),
+    # Highway Detail (v0.20.0): the statewide 56-column "TSAR - HIGHWAY DETAIL"
+    # Excel extract. Verified consistent with the TSN district PDFs (57,647
+    # records cross-checked, every shared field ≥99.9% identical), so the
+    # machine-readable Excel is the library source; the PDFs stay reference-only.
+    TsnEntry("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
+             "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into",
+             normalization_version=1),
 )
 
 

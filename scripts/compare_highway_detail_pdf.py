@@ -1,0 +1,82 @@
+"""PDF-sourced Highway Detail comparisons (mirrors compare_intersection_detail_pdf).
+
+Two "files"-kind comparison types over the regression-locked compare_core engine,
+both reusing compare_highway_detail_tsn's loaders + schema. The PDF-consolidated
+TSMIS workbook has the IDENTICAL 34-column layout the Excel export produces, so
+`_load_tsmis` reads it BY POSITION exactly the same way — no new loader is needed:
+
+  * TSMIS_PDF_VS_TSN   — TSMIS (PDF) vs TSN. The PDF replaces the Excel as the
+    TSMIS side (the PDF is parsed from this app's own "Highway Detail (PDF)"
+    export); the TSN side is unchanged.
+  * TSMIS_PDF_VS_EXCEL — TSMIS (PDF) vs TSMIS (Excel). Diffs the two TSMIS
+    renders of the SAME report to prove both exports carry the same data (and
+    to pinpoint exactly where they disagree when they don't).
+
+Each overrides ONLY the two side labels (and, for the PDF-vs-Excel pair, drops
+the TSN-specific Notes sheet — both sides are TSMIS, so the TSN normalization
+notes don't apply); the engine's formula/label text is untouched, so the
+compare_core regression lock stays intact. The GUI's Compare tab drives these
+through COMPARE_REPORTS ("files" input kind); `file_a_label`/`file_b_label`
+name the two file pickers.
+"""
+from dataclasses import replace
+
+import compare_highway_detail_tsn as _hd
+from compare_tsn_common import run_files_compare, suggest_route_name
+
+
+class _HighwayDetailFileCompare:
+    """One Highway-Detail file-vs-file comparison: compare(path_a, path_b, …) +
+    suggest_name(path_a), with the two side labels carried through to the
+    workbook and the GUI's file pickers. `load_b` is the loader for the SECOND
+    file (the TSN loader for vs-TSN, the consolidated-TSMIS loader for
+    vs-Excel); the first file is always the PDF-consolidated TSMIS workbook."""
+
+    def __init__(self, report_name, side_a, side_b, name_tag, load_b,
+                 one_sided_note_extra=None, drop_notes=False):
+        self.REPORT_NAME = report_name
+        self.file_a_label = side_a          # the GUI's first / second file-picker
+        self.file_b_label = side_b          # labels (also the workbook side names)
+        self._name_tag = name_tag
+        self._load_b = load_b
+        schema = replace(_hd._SCHEMA, side_a=side_a, side_b=side_b)
+        if one_sided_note_extra is not None:
+            schema = replace(schema, one_sided_note_extra=one_sided_note_extra)
+        if drop_notes:
+            # PDF-vs-Excel: both sides are TSMIS, so the TSN-specific Notes sheet
+            # (NA folding, BEG_DATE semantics, …) doesn't apply.
+            schema = replace(schema, legend_writer=None)
+        self._schema = schema
+
+    def suggest_name(self, path_a):
+        return suggest_route_name(path_a, "Highway_Detail", self._name_tag)
+
+    def _load_pair(self, path_a, path_b):
+        rows_a, _ = _hd._load_tsmis(path_a)   # PDF side: same 34-col consolidated layout
+        rows_b, _ = self._load_b(path_b)
+        return rows_a, rows_b, None
+
+    def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
+                mode="formulas"):
+        return run_files_compare(
+            self._schema, path_a, path_b, out_path,
+            banner=(f"Highway Detail Comparison — {self.file_a_label} vs "
+                    f"{self.file_b_label}"),
+            has_route=True, loader=self._load_pair, deps_ok=_hd._DEPS_OK,
+            side_a=self.file_a_label, side_b=self.file_b_label,
+            events=events, confirm_overwrite=confirm_overwrite, mode=mode)
+
+
+TSMIS_PDF_VS_TSN = _HighwayDetailFileCompare(
+    report_name="Highway Detail — TSMIS (PDF) vs TSN",
+    side_a="TSMIS (PDF)", side_b="TSN",
+    name_tag="TSMIS_PDF_vs_TSN_HighwayDetail",
+    load_b=_hd._load_tsn)
+
+TSMIS_PDF_VS_EXCEL = _HighwayDetailFileCompare(
+    report_name="Highway Detail — TSMIS PDF vs Excel",
+    side_a="TSMIS (PDF)", side_b="TSMIS (Excel)",
+    name_tag="TSMIS_PDF_vs_Excel_HighwayDetail",
+    load_b=_hd._load_tsmis,
+    one_sided_note_extra=" (locations one source lists at a postmile the other doesn't)",
+    drop_notes=True)

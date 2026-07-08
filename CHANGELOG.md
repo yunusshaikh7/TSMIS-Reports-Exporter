@@ -3,6 +3,43 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.20.0 — 2026-07-07
+
+Highway Detail is now a fully integrated report: consolidate it, compare it against TSN, check its
+two exports against each other, and see it in both matrices — the same treatment every other report
+gets. The schema and every comparison rule were verified against a full statewide export set (252
+routes / 51,243 rows), the statewide TSN "TSAR - HIGHWAY DETAIL" extract (60,083 rows), and all 12
+TSN district PDFs.
+
+- **Consolidate Highway Detail.** Two new consolidators, exactly like the Highway Log /
+  Intersection Detail pairs: **Highway Detail** combines the per-route Excel exports (with a hover
+  legend explaining every column), and **TSMIS Highway Detail (PDF)** parses the app's own PDF
+  export into the identical 34-column format.
+- **Compare Highway Detail against TSN.** A new TSMIS-vs-TSN comparison with the full discrepancy
+  workbook — Summary / Spot Check / Comparison / Routes / Only-in tabs — plus a **Report View**
+  sheet that replicates the printed two-line TASAS record with every difference in red (the
+  Intersection Detail treatment), and a **Notes** sheet documenting every normalization applied.
+  The TSN side lives in the TSN library (Settings ▸ TSN reports): import the statewide
+  "TSAR - HIGHWAY DETAIL" Excel extract once and every comparison reuses it. (The TSN district
+  PDFs were cross-checked against that extract — 57,647 records, every shared field ≥99.9%
+  identical — so the machine-readable Excel is the library source.)
+- **Rows pair correctly across the two systems' different conventions.** TSMIS tags an
+  independent-alignment roadbed by gluing R/L onto the postmile ("000.080R") where TSN prints a
+  bare postmile and says R/L in the Highway Group column — the comparison unifies the two, so
+  routes like 282 and 880S match row-for-row instead of showing as all-missing. The equation
+  marker "E", which the two systems attach to different rows, is compared as its own "PS" column
+  instead of splitting rows apart. TSN's explicit "A" (add mileage) matches TSMIS's blank, its
+  unpadded numbers match TSMIS's zero-padded ones ("2" = "02"), and its raw-precision lengths
+  match the printed 3-decimal miles.
+- **Check the PDF export against the Excel export.** "Highway Detail — TSMIS (PDF) vs TSMIS
+  (Excel)" diffs the two renders of the same report so you can prove both exports carry the same
+  data; "TSMIS (PDF) vs TSN" covers the PDF side against TSN. Both mirror the existing Highway
+  Log / Intersection Detail checks.
+- **In both matrices.** Highway Detail and Highway Detail (PDF) are rows in the Everything matrix
+  (cross-environment) and the vs-TSN by-day matrix, with the same auto-consolidate and freshness
+  behavior as every other report. Highway Summary remains export-only until its schema can be
+  verified the same way.
+
 ## v0.19.3 — 2026-07-07
 
 A field fix for the new Highway Detail export.

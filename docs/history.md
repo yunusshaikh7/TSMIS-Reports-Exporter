@@ -55,6 +55,7 @@ that rewrote the design.
 | `v0.19.1` | Jul 7 | **Highway Detail/Summary export goes live** (the v0.18.1 reserved pair, export-only for now) + a validation phantom-env fix (the store's TSN drop folder was miscounted as an export environment) |
 | `v0.19.2` | Jul 7 | **Highway Detail (PDF)** print edition (the vendor shipped the report on the dev site) + **dual-edition coalescing** — selecting both editions of a report generates it once and saves both instead of twice |
 | `v0.19.3` | Jul 7 | **Hotfix** — Highway Detail stopped re-selecting the report on every route (the site's grouped menu shows the short label "Detail"; the per-route stale-form check now confirms the report by its stable id, not the on-screen text) |
+| `v0.20.0` | Jul 7 | **Highway Detail fully integrated** — consolidators (Excel + PDF-sourced), the vs-TSN comparison (canonical roadbed-aware key, Report View replica, Notes), the PDF↔Excel export self-check, the TSN library entry, both matrices; schema verified against the full statewide bundle + the 60k-row TSN extract (the TSN PDFs cross-checked ≥99.9% against it) |
 
 ---
 
@@ -411,6 +412,28 @@ the hidden `#reportSelect`'s `data-value` and only falls back to the visible lab
 id — so it stays silent on the happy path while still catching a genuinely reset form. A one-line
 class of bug (visible text ≠ stable identity) that only surfaces once a report moves into the
 grouped menu, which is exactly where the whole report catalog is headed.
+
+**`v0.20.0` — Highway Detail joins the family.** The user delivered the promised resource drop —
+a complete statewide dev bundle: all 252 TSMIS Highway Detail routes in BOTH editions, the
+statewide 56-column TSN `TSAR - HIGHWAY DETAIL` extract, all 12 TSN district PDFs, and the
+annotated TASAS legend. The integration was built the way the prep file demanded: *evidence
+first*. A statewide reconciliation study (46,847 matched rows) decoded every convention before a
+line of product code was written — TSN prints an explicit `A` where TSMIS leaves Non-Add blank
+(98.7% of rows); TSMIS zero-pads what TSN doesn't; TSMIS puts the Rural/Urban layer date in the
+printed slot where the legacy report (and TSN) put the ADT begin year, so that column differs on
+~99% of rows *by construction*; and — the find that mattered most — TSMIS glues an `R`/`L` onto
+the postmile for independent-alignment roadbed rows where TSN prints a bare postmile and says R/L
+in Highway Group, which had four routes (282, 880S, 011, 260) matching ZERO rows until the
+canonical roadbed-aware key unified the encodings. The equation marker turned out to be attached
+to *different rows* by the two systems, so it moved out of the key into its own compared `PS`
+column — a marker disagreement now flags as a one-cell diff instead of tearing the row into a
+false one-sided pair. The TSN district PDFs were cross-checked against the Excel extract
+(57,647 records, every shared field ≥99.9% identical) before the machine-readable Excel was
+blessed as the library source. The comparison itself ships in the Intersection Detail mold —
+compare-everything, nothing suppressed, a Notes sheet that names every normalization, and the
+printed two-line TASAS Report View with red diffs and a Major count that ignores the structural
+date columns. `compare_core` was never touched: the whole family rides a new opt-in
+`CompareSchema`, and the locked canaries proved it byte-identical.
 
 ---
 

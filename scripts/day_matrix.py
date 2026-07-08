@@ -69,7 +69,8 @@ def _day_rows():
         tsn_subdir = matrix.tsn_subdir_for(row_key, subdir, adapter)
         if row_key == "highway_log":
             out.append((row_key, label, subdir, "excel", True, tsn_subdir))
-        elif row_key in ("highway_log_pdf", "intersection_detail_pdf"):
+        elif row_key in ("highway_log_pdf", "intersection_detail_pdf",
+                         "highway_detail_pdf"):
             out.append((row_key, label, subdir, "pdf", True, tsn_subdir))
         else:
             # Any report with a coded vs-TSN comparator is live (all of them as of

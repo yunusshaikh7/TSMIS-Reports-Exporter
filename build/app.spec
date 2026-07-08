@@ -80,6 +80,7 @@ APP_MODULES = [
     "export_highway_detail_pdf",                          # Highway Detail (PDF), v0.19.2
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
+    "highway_detail_columns",                                # Highway Detail labels + legend (v0.20.0)
     "pdf_row_oracle",
     "pdf_table_lib",
     "gui_update",
@@ -99,12 +100,17 @@ APP_MODULES = [
     "consolidate_tsmis_intersection_detail_pdf",   # CR-002: Int-Detail-PDF parser (HL-PDF parallel)
     "consolidate_tsn_highway_sequence",
     "consolidate_intersection_detail", "consolidate_intersection_summary",
+    # Highway Detail family (v0.20.0): the Excel + PDF-sourced consolidators,
+    # the TSN-library loader, and the vs-TSN / PDF-flavor comparators.
+    "consolidate_highway_detail", "consolidate_tsmis_highway_detail_pdf",
+    "tsn_load_highway_detail",
     "tsn_library", "tsn_load_ramp_detail", "tsn_load_ramp_summary",
     "tsn_load_intersection_summary", "tsn_load_intersection_detail", "summary_layout",
     "compare_core", "compare_tsn_common", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
     "compare_ramp_detail_tsn", "compare_ramp_summary_tsn", "compare_intersection_summary_tsn",
     "compare_intersection_detail_tsn", "compare_intersection_detail_pdf",
     "compare_highway_sequence_tsn",
+    "compare_highway_detail_tsn", "compare_highway_detail_pdf",
     "gui_main", "gui_api", "gui_worker", "gui_win32", "gui_endpoint", "gui_matrix",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are

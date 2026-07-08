@@ -23,8 +23,10 @@ log = logging.getLogger("tsmis.gui")
 # is left alone — only content this app generates is ever deleted.
 _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_detail", "highway_sequence",
                        "highway_log", "highway_log_pdf", "intersection_detail_pdf",
+                       "highway_detail", "highway_detail_pdf",
                        "consolidated", "tsn_highway_log", "tsmis_highway_log_pdf",
-                       "tsmis_intersection_detail_pdf", "run_reports", "comparisons")
+                       "tsmis_intersection_detail_pdf", "tsmis_highway_detail_pdf",
+                       "run_reports", "comparisons")
 
 
 def reset_targets(include_input=False, warnings=None):
@@ -46,7 +48,9 @@ def reset_targets(include_input=False, warnings=None):
                        ("tsmis_highway_log_pdf_consolidated.xlsx",
                         "TSMIS Highway Log (PDF) consolidated workbook"),
                        ("tsmis_intersection_detail_pdf_consolidated.xlsx",
-                        "TSMIS Intersection Detail (PDF) consolidated workbook")):
+                        "TSMIS Intersection Detail (PDF) consolidated workbook"),
+                       ("tsmis_highway_detail_pdf_consolidated.xlsx",
+                        "TSMIS Highway Detail (PDF) consolidated workbook")):
         p = OUTPUT_ROOT / fname
         if p.is_file():
             targets.append((lbl, p))

@@ -63,9 +63,17 @@ def test_reserved_groundwork():
     check("their site dropdown ids are intact",
           cat.EXPORT[8].spec.data_value == "highway_detail"
           and cat.EXPORT[9].spec.data_value == "highway_summary")
-    check("absent from consolidate/compare until the feature lands",
-          not any("highway_detail" in e.key or "highway_summary" in e.key
-                  for e in cat.CONSOLIDATE + cat.COMPARE))
+    # v0.20.0: the Highway DETAIL family landed — the recipe this check dry-ran is
+    # now the REAL registration (consolidate + compare + TSN library). Highway
+    # SUMMARY stays export-only until its schema can be verified.
+    check("Highway Detail is REGISTERED in consolidate/compare (the feature landed)",
+          any(e.key == "cons:highway_detail" for e in cat.CONSOLIDATE)
+          and any(e.key == "cmp:highway_detail:tsn" for e in cat.COMPARE))
+    check("...with its TSN library entry (statewide xlsx)",
+          any(t.subdir == "highway_detail" and t.raw_kind == "statewide_xlsx"
+              for t in cat.TSN))
+    check("Highway Summary stays consolidate/compare-ABSENT (export-only)",
+          not any("highway_summary" in e.key for e in cat.CONSOLIDATE + cat.COMPARE))
 
 
 class _Patch:

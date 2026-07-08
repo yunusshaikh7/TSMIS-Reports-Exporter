@@ -72,11 +72,13 @@ def main():
 
         print("matrix_info + snapshot key:")
         info = a.matrix_info()
-        check("rows are all eight comparable reports (both HL + both Intersection formats, cross-env)",
+        check("rows are all ten comparable reports (both HL + both Intersection + "
+              "both Highway Detail formats, cross-env)",
               info["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence",
                                "highway_log", "intersection_summary",
                                "intersection_detail", "highway_log_pdf",
-                               "intersection_detail_pdf"])
+                               "intersection_detail_pdf", "highway_detail",
+                               "highway_detail_pdf"])
         check("baseline defaults to ssor-prod", info["baseline"] == "ssor-prod")
 
         print("set_matrix_report (show/hide rows):")
@@ -87,14 +89,16 @@ def main():
         check("show puts it back",
               a.set_matrix_report("highway_log", True).get("ok")
               and "highway_log" in a.matrix_info()["rows"])
-        # can't hide them all (8 rows: hide 7, the 8th hide is rejected)
+        # can't hide them all (10 rows: hide 9, the 10th hide is rejected)
         for k in ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
-                  "intersection_summary", "intersection_detail", "highway_log_pdf"):
+                  "intersection_summary", "intersection_detail", "highway_log_pdf",
+                  "intersection_detail_pdf", "highway_detail"):
             a.set_matrix_report(k, False)
-        last = a.set_matrix_report("intersection_detail_pdf", False)
+        last = a.set_matrix_report("highway_detail_pdf", False)
         check("can't hide the last remaining row", bool(last.get("error")))
         for k in ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
-                  "intersection_summary", "intersection_detail", "highway_log_pdf"):
+                  "intersection_summary", "intersection_detail", "highway_log_pdf",
+                  "intersection_detail_pdf", "highway_detail"):
             a.set_matrix_report(k, True)
         snap0 = a._state_snapshot()
         check("snapshot carries the 'matrix' key (None idle)",

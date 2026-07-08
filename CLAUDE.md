@@ -38,24 +38,25 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
 Reports 5–6 (Intersection): export is **enabled** but the report lives on the
 **development** TSMIS site — switch via Settings ▸ "Use development site"
-(`tsmis-dev.dot.ca.gov`). Highway Log and Intersection Detail each ship in **two
-editions** — the Excel export and a print-layout **PDF** edition (4b / 6b; 6b was
-forward-ported in v0.18.0 as an exact parallel of 4b; **7b** is Highway Detail's, v0.19.2).
-v0.17.0 brought reports 1–6b to parity: the **8 fully-integrated export types consolidate AND
-compare vs TSN** — each has a vs-TSN comparator and lives in both the Everything and by-day
+(`tsmis-dev.dot.ca.gov`). Highway Log, Intersection Detail and Highway Detail each
+ship in **two editions** — the Excel export and a print-layout **PDF** edition
+(4b / 6b / 7b). v0.17.0 brought reports 1–6b to parity, and **v0.20.0 added Highway
+Detail (7/7b)**: the **10 fully-integrated export types consolidate AND compare vs
+TSN** — each has a vs-TSN comparator and lives in both the Everything and by-day
 matrices (see [docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md)
-for the per-report schema + locked canaries). Reports **7 / 7b / 8 (Highway Detail + its PDF /
-Highway Summary)** are **export-only** — the site's newest TSAR report (Detail export v0.19.1,
-its PDF v0.19.2; Summary export-enabled app-side but still site-greyed); consolidator/comparison/
-matrix integration is a later feature, so they're absent from Consolidate/Compare/the matrices.
-Where the live site still greys a report, `select_report` fails fast rather than stalling.
+for the per-report schema + locked canaries; Highway Detail's schema was verified against
+the full statewide bundle — 252 routes vs the 60k-row TSN extract — and its comparison
+carries an Intersection-Detail-style **Report View** replica). Report **8 (Highway
+Summary)** is **export-only** (export-enabled app-side but still site-greyed); its
+integration waits for a verifiable schema. Where the live site still greys a report,
+`select_report` fails fast rather than stalling.
 **Selecting both editions of one report (Excel + PDF, same `data_value`) coalesces** — the route
 is generated **once** and both files saved off it (`run_export_combined`, v0.19.2; standard path
 only, not fast mode). Consolidate-only sources exist too — **TSN**
 Highway Log district PDFs (dropped into `input/tsn_highway_log/`) and the app's own
-**Highway Log (PDF)** and **Intersection Detail (PDF)** exports. The **Compare** tab
-diffs every report **TSMIS-vs-TSN** (the PDF-sourced Highway Log and Intersection
-Detail among them, each also offering a **PDF-vs-Excel** self-check) and runs
+**Highway Log (PDF)**, **Intersection Detail (PDF)** and **Highway Detail (PDF)**
+exports. The **Compare** tab diffs every report **TSMIS-vs-TSN** (the PDF-sourced
+editions among them, each also offering a **PDF-vs-Excel** self-check) and runs
 cross-environment comparisons.
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
@@ -186,7 +187,7 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   matrix.py                  the matrix FACADE (patch matrix.<name>) over matrix_state.py + matrix_build.py
   matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary
   tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
-  highway_log_columns.py intersection_detail_columns.py   the corrected per-report column labels
+  highway_log_columns.py intersection_detail_columns.py highway_detail_columns.py   the per-report column labels
   gui_main.py gui_api.py     GUI entry / the bridge core (state, pump, gate)
   gui_export_api.py gui_auth_api.py gui_compare_api.py gui_settings_api.py gui_update.py   the endpoint mixins (S1)
   gui_worker.py              re-export SHIM over gui_worker_export/_env/_maint/_matrix.py (S2)

@@ -115,8 +115,9 @@ criteria: [work-pc-validation.md](work-pc-validation.md) §3.
   height-fill / config-uncap rules live in `@media (min-width:980px)`, so a small/high-DPI laptop shows stray
   idle cards + a cramped Matrix-options panel on the matrix sub-tabs. *(v0.17.1 follow-up.)*
 
-**Site-gated (not on our schedule):** **Highway Detail / Highway Summary enablement** — groundwork shipped
-in v0.18.1; flip on when TSMIS turns them on (see *Feature backlog*).
+**Site-gated (not on our schedule):** **Highway Summary enablement** — export shipped app-side (v0.19.1)
+but the report is still `cs-disabled` on the site; consolidate/compare integration follows the Highway
+Detail recipe once a real export exists (see *Feature backlog*). Highway Detail itself is DONE (v0.20.0).
 
 **Parked — pull in only by a separate decision:** code-signing (SignPath cert), DPAPI at-rest auth,
 `compare_core` min-cost-pairs, the A3 / C1 / D1 / F1 feature backlog, the dormant Med Wid watch, and the two
@@ -492,13 +493,12 @@ or accept as someday.**
   district→routes / county→routes mapping, likely sourced live from how the site repopulates the
   route dropdown after a district/county pick. **Most research-heavy — do a small site-behavior
   spike before committing to a UX.**
-- [~] **Highway Detail / Highway Summary — EXPORT shipped; consolidate/compare still owed** [M] —
-  **v0.18.1** reserved-DISABLED groundwork; **v0.19.1** enabled the Excel EXPORT; **v0.19.2** added the
-  **Highway Detail (PDF)** print edition (`hd_printAll`, confirmed on the 7.7 dev capture). Where the live
-  site still greys a report (Highway Summary is still `cs-disabled`), `select_report` fails fast rather than
-  stalling. **Still owed (the next feature):** their consolidators + vs-TSN / cross-env comparators +
-  `tsn_library` entries + matrix rows — build via the proven recipe in `build/check_report_recipe.py`.
-  Live-export verification against the site is owed (the dev PC can't reach it).
+- [x] **Highway Detail — FULLY INTEGRATED (v0.20.0)**: export (v0.19.1/2) + consolidators + vs-TSN /
+  cross-env / PDF↔Excel comparators + `tsn_library` entry + both matrices, schema verified against the
+  full statewide bundle. **Still owed:** **Highway Summary** consolidate/compare [S] — export shipped
+  (v0.19.1) but the report is still `cs-disabled` on the site (no real export to verify a schema
+  against); integrate via the same recipe when the site turns it on and a statewide sample exists.
+  Live-export verification of the Highway reports against the site is owed (the dev PC can't reach it).
 - [ ] **Coalescing — extend to fast mode + the console CLI** [S] — v0.19.2 coalesces dual-edition exports
   (Excel + PDF of one report → generated once, both saved) in the **standard sequential** GUI path
   (`run_export_combined`). **Fast mode** still runs each edition as its own parallel pass (route-parallel
@@ -565,7 +565,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.19.3, shipped)
+### Version buckets — reconciled to reality (current: v0.20.0, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -587,6 +587,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.19.1** ✅ | Jul 7 | **Highway Detail/Summary EXPORT enabled** (the v0.18.1 reserved pair; export-only — consolidate/compare still owed) + **validation phantom-env fix** (`_envs_with_data` walked the store's `_tsn_input` TSN-drop folder as an environment → the Validate run now reads 18/18). |
 | **v0.19.2** ✅ | Jul 7 | **Highway Detail (PDF)** print edition (stable id 10, `hd_printAll` — confirmed on the 7.7 dev capture) + **dual-edition coalescing** (selecting both editions of one report generates it once and saves both; `run_export_combined`, standard path — fast mode + CLI are follow-ups). Locked by `check_coalesce_editions`. |
 | **v0.19.3** ✅ | Jul 7 | **Hotfix** (field-driven) — the per-route stale-form guard (`_ensure_report_armed`) false-"drifted" on **every** route for a grouped-menu report: it compared the visible `.cs-value` (the short leaf label "Detail") to the full `spec.label` ("Highway Detail") and re-selected each route (correct exports, but log spam + wasted work). Fix = key on the hidden `#reportSelect`'s stable `data-value` (`current_report_value`), text read only as fallback. Affects both Highway Detail editions. Regression-covered in `check_export_engine` + `check_fake_site` (new `test_current_report_value`); `compare_core` untouched. |
+| **v0.20.0** ✅ | Jul 7 | **Highway Detail full integration** — consolidators (Excel `consolidate_highway_detail` + PDF-sourced `consolidate_tsmis_highway_detail_pdf` on `pdf_table_lib`), the **vs-TSN comparator** (`compare_highway_detail_tsn`: new opt-in `CompareSchema`, canonical roadbed-aware PM key, PS column, NA/zero-pad/length/WDA normalizations, ID-style **Report View** + **Notes**), the PDF flavors (PDF↔TSN + PDF↔Excel), a `tsn_library` statewide-xlsx entry, both matrices + by-day rows, catalog/`.bat`/mock parity. Schema verified against the full statewide bundle (252 routes / 51,243 rows vs the 60,083-row TSN extract; TSN PDFs cross-checked ≥99.9% vs the extract → the Excel is the library source). `compare_core` untouched (byte-identical; new behavior rides the new schema). Highway Summary stays export-only. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

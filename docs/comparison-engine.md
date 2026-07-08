@@ -523,6 +523,38 @@ edition shifts by the same fix). The offline lock is `check_compare_intersection
 behavior fixture (the S-crosswalk, the Y/N↔1/0 norm, Date-of-Record counted, the numeric-0→'0' canon, the
 Report View soft/hard split + one-sided "Only in TSMIS/TSN" rows). Live in both matrices.
 
+### 9f-2. TSMIS vs TSN Highway Detail — `compare_highway_detail_tsn.py` (FLAT, route + canonical PM; v0.20.0)
+
+The Intersection Detail FLAT recipe applied to Highway Detail, reconciled against the full statewide
+dev bundle (252 TSMIS routes / 51,243 rows vs the 60,083-row `TSAR - HIGHWAY DETAIL` extract; 46,847
+rows matched in the reconciliation study). TSMIS side = the consolidated workbook read **by position**
+(`Route` + the 34 export columns — labels correct as-is, per `highway_detail_columns`); TSN side = the
+raw statewide `Sheet 1` (56 named DB columns) or the normalized library sheet `Highway Detail (TSN)`,
+**re-normalized at compare time** (stale-library repair, like §9f). The shared header is **35 columns**:
+the canonical **Post Mile** key + the derived **PS** column + the remaining 33 export columns;
+`CONTEXT_FIELDS = ()` — everything shared is compared and counted. The locked reconciliations:
+**(1) the canonical roadbed-aware key** — TSMIS glues `R`/`L` onto the postmile for an
+independent-alignment roadbed row (`'000.080R'`) where TSN prints the bare PM and says R/L in `HG`;
+the key = prefix + zero-padded mile + roadbed (from the trailing letter, else `HG∈{R,L}` on BOTH
+sides), which took routes like 282/880S from 0 matched rows to row-for-row pairing; **(2) the equation
+marker `E` is NOT keyed** — the systems disagree on where they print it (TSMIS `'C043.925R'` ≡ TSN
+`'C 043.925 E'`+HG=R), so it is compared as the separate `PS` column (a marker difference flags there
+instead of splitting the row one-sided); **(3)** TSN prints an explicit **`NON_ADD='A'`** on ordinary
+add-mileage rows where TSMIS leaves `NA` blank (98.7% of matched rows) — `'A'` folds to blank;
+**(4)** zero-padding (`'02'`≡`'2'`) on the 12 lane/shoulder/width columns; **(5)** Length normalizes
+to the printed 3-decimal mile (TSN stores raw DB precision, 0.01098 → `'000.011'`); **(6)** TSN's
+separate `M_WID`+`M_VA` glue to the TSMIS `Med V/WDA` code (`'14Z'`; `medwid_fields` forgives
+zero-padding inside it); **(7) `RU Eff` is compared BY POSITION against TSN's `BEG_DATE`** — the
+legacy TASAS report prints the ADT profile BEGIN date (a Jan-1 count year) in that slot where TSMIS
+prints the Rural/Urban layer date, so the column differs on ~99% of rows (structural; documented in
+the **Notes** sheet, "soft" in the Report View — red but out of the Major count, like §9f's dates).
+The TSN-only **ADT INFORMATION block** (LK-AHD/P/LK-BACK/CHANGE-MILE/DVM — TSMIS omits it by design)
+and TSN's `*`/`Y` change flags are not compared; the ADT block + the TSN district-county-route show
+in blue on the **"Report View"** replica (the printed two-line TASAS record, via the opt-in
+`extra_sheet_writer`, exactly the §9f treatment). `compare_highway_detail_pdf` adds
+`TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL` (the exact §9b/§9f-PDF parallel). Offline lock:
+`check_compare_highway_detail_tsn.py` + `check_highway_detail_pdf.py`. Live in both matrices.
+
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 
 The FLAT recipe with a **county-relative key** — the direct analog of the Highway Log comparison (a
@@ -741,11 +773,11 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
-cross-environment, no live re-export** (it compares specific historical exports). **ALL 8
+cross-environment, no live re-export** (it compares specific historical exports). **ALL 10
 comparison-integrated reports are live** — HL Excel/PDF + Ramp Detail + Ramp Summary + Intersection
-Summary + Intersection Detail (Excel + PDF) + Highway Sequence; nothing greyed (v0.17.0/v0.18.0
-complete). (The v0.19.1 Highway Detail/Summary pair is export-only — no comparator yet, so it isn't
-a matrix row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orchestrates.
+Summary + Intersection Detail (Excel + PDF) + Highway Sequence + Highway Detail (Excel + PDF,
+v0.20.0); nothing greyed. (Highway Summary is export-only — no comparator yet, so it isn't a matrix
+row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orchestrates.
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
   (the same path `build_comparison`'s tsn branch uses, now keyed on `(row_key, subdir)`) over the

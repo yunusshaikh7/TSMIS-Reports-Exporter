@@ -54,6 +54,8 @@ function makeMockApi() {
     { key: "cons:highway_log_excel", label: "TSMIS Highway Log (Excel)" },
     { key: "cons:highway_log_pdf", label: "TSMIS Highway Log (PDF)" },
     { key: "cons:tsn_highway_log", label: "TSN Highway Log (PDF)" },
+    { key: "cons:highway_detail", label: "Highway Detail" },
+    { key: "cons:highway_detail_pdf", label: "TSMIS Highway Detail (PDF)" },
   ];
   // Mock selection travels by KEY too (P3), so the preview exercises the same
   // bridge contract as production. These map a key back to its mock row.
@@ -167,7 +169,7 @@ function makeMockApi() {
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
       meta: {
-        version: "0.19.3 (preview)", build: "portable app",
+        version: "0.20.0 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
@@ -600,7 +602,7 @@ function makeMockApi() {
       // P9: mirror the backend's bridge-enum surface (gui_api.get_initial_state ->
       // contract.initial_state_enums) so the preview's init payload matches production.
       contract: window.CONTRACT,
-      app_name: "TSMIS Exporter", version: "0.19.3 (preview)",
+      app_name: "TSMIS Exporter", version: "0.20.0 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       // Mirror the real gate: Intersection is enabled (dev site); the reserved Highway
@@ -618,6 +620,8 @@ function makeMockApi() {
         { key: "cons:intersection_summary", label: "Intersection Summary", group: "Intersection", short: "Summary", fmt: "Excel" },
         { key: "cons:intersection_detail", label: "Intersection Detail", group: "Intersection", short: "Detail", fmt: "Excel" },
         { key: "cons:intersection_detail_pdf", label: "TSMIS Intersection Detail (PDF)", group: "Intersection", short: "Detail (PDF)", fmt: "PDF" },
+        { key: "cons:highway_detail", label: "Highway Detail", group: "Highway", short: "Detail", fmt: "Excel" },
+        { key: "cons:highway_detail_pdf", label: "TSMIS Highway Detail (PDF)", group: "Highway", short: "Detail (PDF)", fmt: "PDF" },
       ],
       compare_groups: [
         { id: "env", label: "Cross-environment" },
@@ -647,6 +651,11 @@ function makeMockApi() {
         { key: "cmp:intersection_detail:pdf_vs_tsn", label: "Intersection Detail — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Intersection", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN" },
         { key: "cmp:intersection_detail:pdf_vs_excel", label: "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env", family_group: "Intersection", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
         { key: "cmp:intersection_detail_pdf:env", label: "Intersection Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Intersection", subdir: "intersection_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_detail:env", label: "Highway Detail — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_detail", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_detail:tsn", label: "Highway Detail — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Highway", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_detail:pdf_vs_tsn", label: "Highway Detail — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Highway", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN" },
+        { key: "cmp:highway_detail:pdf_vs_excel", label: "Highway Detail — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env", family_group: "Highway", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
+        { key: "cmp:highway_detail_pdf:env", label: "Highway Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
       ],
       batch_resume: null,
       batch_dest: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
@@ -1348,7 +1357,7 @@ function makeMockApi() {
         push({ t: "log", text: "An update is already downloaded — click ‘Restart to update’ in the title bar to install it." });
       } else {
         push({ t: "log", text: "Checking for updates…" });
-        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.19.3 preview)." }), 600);
+        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.20.0 preview)." }), 600);
       }
       return { ok: true };
     },

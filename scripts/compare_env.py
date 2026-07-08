@@ -359,6 +359,38 @@ def _load_highway_log_pdf_side(folder, label, events):
         shutil.rmtree(combined_dir, ignore_errors=True)
 
 
+def _load_highway_detail_pdf_side(folder, label, events):
+    """Parse one side's Highway Detail PDFs (folder/highway_detail_pdf/*.pdf)
+    into consolidated-shape 34-column rows: convert them to per-route XLSX with
+    the HD-PDF consolidator's own parser in a temp dir, then read those flat like
+    any XLSX side. Returns (rows, header, skipped). The exact parallel of
+    _load_intersection_detail_pdf_side below."""
+    import consolidate_tsmis_highway_detail_pdf as _hdpdf
+    import highway_detail_columns as hdc
+    in_dir, pdfs = _find_input_dir(folder, _hdpdf.SUBDIR, "*.pdf")
+    if not pdfs:
+        raise ValueError(
+            f"No Highway Detail (PDF) files were found for the {label} side:\n{in_dir}"
+            "\n\nExport the Highway Detail (PDF) report on that environment first.")
+    conv = Path(tempfile.mkdtemp(prefix="hdpdf_env_conv_"))
+    combined_dir = Path(tempfile.mkdtemp(prefix="hdpdf_env_out_"))
+    try:
+        res = _hdpdf.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                 input_dir=in_dir, out_path=combined_dir / "_combined.xlsx",
+                                 converted_dir=conv)
+        if res.status == "cancelled":
+            raise ValueError("Cancelled by user.")
+        if res.status != "ok":
+            raise ValueError(res.message or "Could not parse the Highway Detail PDFs.")
+        # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
+        # excluded). Read them flat with the 34-column Highway Detail header pinned.
+        return _load_xlsx_side(conv, label, "_perroute_", _hdpdf.SHEET_NAME,
+                               "Highway Detail (PDF)", events, expected_header=hdc.HEADER)
+    finally:
+        shutil.rmtree(conv, ignore_errors=True)
+        shutil.rmtree(combined_dir, ignore_errors=True)
+
+
 def _load_intersection_detail_pdf_side(folder, label, events):
     """Parse one side's Intersection Detail PDFs (folder/intersection_detail_pdf/*.pdf)
     into consolidated-shape 36-column rows: convert them to per-route XLSX with the
@@ -630,6 +662,25 @@ INTERSECTION_DETAIL_PDF = EnvCompare(
         report_name="Intersection Detail (PDF)", header=["Post Mile"],
         id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"),
     flat_pdf_loader=_load_intersection_detail_pdf_side)
+# Highway Detail: a flat per-route XLSX (sheet "Highway Detail", 34 correct labels),
+# keyed on the glued Post Mile — both env sides share the identical TSMIS encoding
+# (prefix/roadbed/equation glued the same way), so the standard flat path applies and
+# no roadbed canonicalization is needed (that is a TSMIS-vs-TSN tool).
+HIGHWAY_DETAIL = EnvCompare(
+    "highway_detail", "Highway Detail", "highway_detail",
+    sheet_name="Highway Detail", key_col="Post Mile",
+    base_schema=CompareSchema(
+        report_name="Highway Detail", header=["Post Mile"],
+        id_noun="location", id_noun_plural="locations", pair_noun="postmile"))
+# Highway Detail (PDF) cross-env: the same flat shape, but BOTH sides are parsed from
+# the app's own PDF export — the exact parallel of INTERSECTION_DETAIL_PDF.
+HIGHWAY_DETAIL_PDF = EnvCompare(
+    "highway_detail_pdf", "Highway Detail (PDF)", "highway_detail_pdf",
+    sheet_name="Highway Detail", key_col="Post Mile",
+    base_schema=CompareSchema(
+        report_name="Highway Detail (PDF)", header=["Post Mile"],
+        id_noun="location", id_noun_plural="locations", pair_noun="postmile"),
+    flat_pdf_loader=_load_highway_detail_pdf_side)
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).
