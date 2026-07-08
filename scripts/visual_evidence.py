@@ -139,7 +139,8 @@ def availability():
             "ready": _DEPS_OK and any(r["tsn_pdfs"] for r in reports),
             "dir": next((r["dir"] for r in reports if not r["tsn_pdfs"]),
                         reports[0]["dir"] if reports else ""),
-            "reports": reports, "deps_ok": _DEPS_OK}
+            "reports": reports, "row_reports": dict(TSN_PDF_REPORT),
+            "deps_ok": _DEPS_OK}
 
 
 def sibling_paths(comparison_path):

@@ -890,11 +890,25 @@ the ID differences are called out inline.
   `set_evidence_examples`) surfaced under *Comparison output* on BOTH matrix pages, greyed with a
   drop-hint until at least one report's TSN prints are in place —
   `visual_evidence.availability()` rides the state push and reports **per-report** folders
-  (`reports: [{key,label,tsn_pdfs,dir}]`), so the hint names exactly which report still needs
-  its prints while the other keeps working. The render stack (Pillow + pypdfium2) SHIPS since
-  v0.21.0 — see [build-and-release.md](build-and-release.md).
+  (`reports: [{key,label,tsn_pdfs,dir}]` + the `row_reports` row→report map), so the hint names
+  exactly which report still needs its prints while the other keeps working. The render stack
+  (Pillow + pypdfium2) SHIPS since v0.21.0 — see [build-and-release.md](build-and-release.md).
+- **On-demand per-cell evidence (v0.23.0):** a camera action on every BUILT, FRESH vs-TSN cell
+  of an evidence-capable row (both matrices) runs `matrix.run_evidence_only` — images for the
+  EXISTING comparison, no consolidation, no compare, toggle-independent (endpoints
+  `matrix_evidence_cell` / `day_matrix_evidence_cell` → an `evidence` queue job →
+  `MatrixEvidenceWorker`; resolvers `matrix.evidence_for_cell` /
+  `day_matrix.evidence_for_day_cell` mirror the build paths' path resolution but do NOT heal
+  the TSN library — a heal would rebuild it newer than the comparison and the gate below would
+  then rightly refuse). The **freshness gate** is what keeps it honest: the generator
+  re-enumerates diffs from the CURRENT consolidated + TSN artifacts, so the action REFUSES
+  (with a "refresh the comparison" hint) when the store changed under the consolidated
+  workbook or the consolidated/TSN workbook is newer than the comparison — images can never
+  illustrate a diff set the workbook doesn't carry. The JS side hides the camera on stale
+  cells and on rows whose report has no TSN prints (`evidenceActionInfo`).
 - **Locked by** `build/check_visual_evidence.py` (registry/sources/clamp for BOTH reports, the
-  caller gate, the LOCKSTEP pins, the HD TSN print regexes + the ID fixed-window/max-overlap/
+  caller gate + the on-demand freshness gate (every refusal message + the pass-through),
+  the LOCKSTEP pins, the HD TSN print regexes + the ID fixed-window/max-overlap/
   flag-strip/LOC-tokenizer behavior, span→box math, verification projections, unique-key diff
   enumeration — the ID one mirroring compare_core's cell trim so whitespace-only differences
   never enumerate — and both TSN loaders' sidecar contracts (`tsn_rows_with_dcr` row-identical

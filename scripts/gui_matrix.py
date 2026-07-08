@@ -19,7 +19,7 @@ from exporter_parallel import MAX_WORKERS, default_worker_count
 from gui_endpoint import _api_method, pick_path, pick_paths
 from gui_worker import (ConsolidateWorker, DayMatrixCompareWorker,
                         MatrixBatchExportWorker, MatrixCompareWorker,
-                        MatrixTsnConsolidateWorker)
+                        MatrixEvidenceWorker, MatrixTsnConsolidateWorker)
 from paths import TSN_LIBRARY_ROOT
 from reports import EXPORT_REPORTS, matrix_rows
 
@@ -140,6 +140,9 @@ class GuiMatrixMixin:
         """Human label for the queue panel / log from a job's shape."""
         if kind == "tsn_consolidate":
             return "Consolidate TSN Highway Log PDFs"
+        if kind == "evidence":
+            return (f"Evidence images {self._matrix_row_label(row)} — "
+                    f"{matrix.default_env_label(env)}")
         verb = "Re-export" if kind == "export" else "Rebuild"
         rl = self._matrix_row_label(row) if row else None
         el = matrix.default_env_label(env) if env else None
@@ -218,6 +221,8 @@ class GuiMatrixMixin:
             return self._dispatch_compare_job(job)
         if kind == "export":
             return self._dispatch_export_job(job)
+        if kind == "evidence":
+            return self._dispatch_evidence_job(job)
         if kind == "tsn_consolidate":
             return self._dispatch_tsn_consolidate_job(job)
         return False
@@ -302,6 +307,36 @@ class GuiMatrixMixin:
         evidence support; the count is engine-clamped downstream."""
         return {"enabled": settings.get_evidence_images(),
                 "examples": settings.get_evidence_examples()}
+
+    def _dispatch_evidence_job(self, job):
+        """Start the on-demand evidence worker for ONE cell's EXISTING vs-TSN
+        comparison (either matrix). Runs regardless of the evidence toggle —
+        that's the point of the action; the matrix/day resolvers gate on
+        comparison freshness and raise actionable errors."""
+        dest = settings.get_batch_dest()
+        tsn_files = settings.get_matrix_tsn_files()
+        examples = settings.get_evidence_examples()
+        row, cell = job["row"], job["env"]
+        if job.get("which") == "day":
+            source = settings.get_day_matrix_source()
+            run_fn = (lambda events: day_matrix.evidence_for_day_cell(
+                source, cell, row, dest, events, tsn_files=tsn_files,
+                examples=examples))
+        else:
+            base = self._current_baseline()
+            run_fn = (lambda events: matrix.evidence_for_cell(
+                dest, row, cell, base, events, tsn_files=tsn_files,
+                examples=examples))
+        with self._lock:
+            self._matrix = {"phase": "comparing", "row": row, "cell": cell,
+                            "done": 0, "total": 1}
+        self._emit_log(f"{job['label']} — generating from the existing comparison…")
+        self._set_dot("busy", "Evidence images…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Evidence images…", "workers": 1})
+        MatrixEvidenceWorker(run_fn, row, cell, self._gated_queue(),
+                             self.cancel_event).start()
+        return True
 
     def _matrix_worker_count(self):
         """Fast-mode browser count for matrix re-exports (the shared fast_workers
@@ -489,6 +524,24 @@ class GuiMatrixMixin:
             return {"error": "The baseline column has nothing to compare against."}
         job = self._make_job("compare", "cell",
                              self._job_label("compare", "cell", row_key, env_key),
+                             row=row_key, env=env_key)
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def matrix_evidence_cell(self, row_key, env_key):
+        """Queue an ON-DEMAND evidence run for ONE cell's EXISTING vs-TSN
+        comparison — images only, no re-compare (runs even with the Evidence
+        images toggle off). The worker refuses stale/missing comparisons with
+        an actionable message."""
+        if row_key not in {r[0] for r in matrix_rows()}:
+            return {"error": "Unknown report for the matrix."}
+        if not self._parse_env_keys([env_key]):
+            return {"error": "Unknown environment."}
+        import visual_evidence                       # lazy: pulls PIL/pdfium
+        if not visual_evidence.capable(row_key):
+            return {"error": "This report doesn't support evidence images."}
+        job = self._make_job("evidence", "cell",
+                             self._job_label("evidence", "cell", row_key, env_key),
                              row=row_key, env=env_key)
         return self._enqueue_matrix_job(job)
 
@@ -1011,6 +1064,27 @@ class GuiMatrixMixin:
         job = self._make_job("compare", "cell",
                              self._day_job_label("cell", row_key, date),
                              row=row_key, env=date, which="day")
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def day_matrix_evidence_cell(self, row_key, date):
+        """Queue an ON-DEMAND evidence run for ONE by-day cell's EXISTING vs-TSN
+        comparison — images only, no re-compare (runs even with the Evidence
+        images toggle off)."""
+        snap = self._day_matrix_snapshot()
+        if row_key not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report for the matrix."}
+        if not snap.get("row_supported", {}).get(row_key):
+            return {"error": "That comparison isn't available yet for this report."}
+        if date not in snap["days"]:
+            return {"error": "Add that day first."}
+        import visual_evidence                       # lazy: pulls PIL/pdfium
+        if not visual_evidence.capable(row_key):
+            return {"error": "This report doesn't support evidence images."}
+        job = self._make_job(
+            "evidence", "cell",
+            f"Evidence images {self._matrix_row_label(row_key)} — {date}",
+            row=row_key, env=date, which="day")
         return self._enqueue_matrix_job(job)
 
     @_api_method

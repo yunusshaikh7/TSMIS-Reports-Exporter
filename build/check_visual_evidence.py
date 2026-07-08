@@ -72,11 +72,15 @@ check("sibling naming: '(evidence).xlsx' + '(evidence images)' folder",
       wbp.name == "hd vs tsn (evidence).xlsx"
       and imgp.name == "hd vs tsn (evidence images)")
 avail = ve.availability()
-check("availability shape (rows/tsn_pdfs/ready/dir/reports/deps_ok)",
-      set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "reports", "deps_ok"})
+check("availability shape (rows/tsn_pdfs/ready/dir/reports/row_reports/deps_ok)",
+      set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "reports", "row_reports",
+                     "deps_ok"})
 check("availability reports BOTH evidence reports, per-dir",
       [r["key"] for r in avail["reports"]] == ["highway_detail", "intersection_detail"]
       and all(set(r) >= {"key", "label", "tsn_pdfs", "dir"} for r in avail["reports"]))
+check("row_reports maps every capable row to its report (the per-cell action's gate)",
+      avail["row_reports"] == ve.TSN_PDF_REPORT
+      and set(avail["row_reports"]) == set(ve.rows()))
 
 print("caller-side gate (matrix_build.evidence_opts_for)")
 check("toggle off -> None",
@@ -433,6 +437,99 @@ try:
 finally:
     import shutil
     shutil.rmtree(tmp2, ignore_errors=True)
+
+# --------------------------------------------------------------------------- #
+print("on-demand per-cell evidence (v0.23.0): the freshness gate")
+import time                                                # noqa: E402
+import matrix                                              # noqa: E402
+
+tmp3 = Path(tempfile.mkdtemp())
+try:
+    store = tmp3 / "cell" / "highway_detail_pdf"
+    store.mkdir(parents=True)
+    consolidated = matrix.consolidated_store_path(store, "highway_detail_pdf")
+    tsn = tmp3 / "tsn.xlsx"
+    cmpwb = tmp3 / "cmp.xlsx"
+    pdfdir = tmp3 / "pdfs"
+
+    def _touch(p, when):
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"x")
+        os.utime(p, (when, when))
+
+    def _gate_error(**over):
+        try:
+            matrix.run_evidence_only("highway_detail_pdf", store,
+                                     "highway_detail_pdf", tsn, cmpwb, pdfdir,
+                                     events=None, examples=2)
+        except ValueError as e:
+            return str(e)
+        return None
+
+    try:
+        matrix.run_evidence_only("ramp_detail", store, "ramp_detail", tsn, cmpwb,
+                                 pdfdir, events=None)
+        _cap_err = None
+    except ValueError as e:
+        _cap_err = str(e)
+    check("an evidence-incapable row is refused with the reason",
+          _cap_err and "doesn't support evidence images" in _cap_err)
+
+    err = _gate_error()
+    check("missing comparison -> 'run the comparison first'",
+          err and "run the comparison first" in err)
+
+    now = time.time()
+    _touch(cmpwb, now - 50)
+    err = _gate_error()
+    check("missing consolidated -> 'run the comparison first'",
+          err and "no consolidated" in err and "run the comparison first" in err)
+
+    # a store file NEWER than the consolidated -> the store-changed refusal
+    _touch(consolidated, now - 100)
+    _touch(store / "highway_detail_route_001.pdf", now - 20)
+    err = _gate_error()
+    check("store changed since the consolidation -> refuse with the refresh hint",
+          err and "exports changed" in err and "refresh the comparison" in err)
+
+    # consolidated fresh vs store, but NEWER than the comparison -> refuse.
+    # (No fingerprint sidecar exists for this synthetic store; stub the staleness
+    # probe so the mtime gates are what's under test.)
+    _real_stale = matrix._consolidated_stale
+    matrix._consolidated_stale = lambda *_a, **_k: False
+    try:
+        _touch(consolidated, now - 10)
+        err = _gate_error()
+        check("consolidated newer than the comparison -> refuse with the hint",
+              err and "newer than" in err and "refresh the comparison" in err)
+
+        _touch(consolidated, now - 100)
+        _touch(tsn, now - 5)
+        err = _gate_error()
+        check("TSN workbook newer than the comparison -> refuse with the hint",
+              err and "TSN workbook is newer" in err)
+
+        # everything consistent -> the gate passes through to the generator; a
+        # stubbed generate proves the call shape + the ok result + note.
+        _touch(tsn, now - 200)
+        import visual_evidence as _ve2
+        _real_gen = _ve2.generate
+        _ve2.generate = (lambda *_a, **_k:
+                         {"note": "evidence: 2 example(s) across 1/1 …"})
+        try:
+            res = matrix.run_evidence_only(
+                "highway_detail_pdf", store, "highway_detail_pdf", tsn, cmpwb,
+                pdfdir, events=None, examples=2)
+        finally:
+            _ve2.generate = _real_gen
+        check("fresh inputs -> ok result carrying the generator's note",
+              res.status == "ok" and "example(s)" in (res.message or "")
+              and res.summary_lines == [res.message])
+    finally:
+        matrix._consolidated_stale = _real_stale
+finally:
+    import shutil
+    shutil.rmtree(tmp3, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #
 print("engine misc")

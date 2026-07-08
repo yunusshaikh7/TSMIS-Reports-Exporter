@@ -3,6 +3,19 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.23.0 — 2026-07-08
+
+- **Evidence images on demand — no re-compare.** Every built, up-to-date vs-TSN cell of an
+  evidence-capable report (Highway Detail, Intersection Detail) now has a camera action on both
+  matrix pages: it generates — or refreshes — the "… (evidence).xlsx" and image folder for that
+  cell's EXISTING comparison, without re-running the comparison and regardless of the "Evidence
+  images" toggle. Use it when you compared with the toggle off, want a different example count,
+  or just dropped the TSN prints in.
+- **It refuses to lie.** If the exports, the consolidated workbook, or the TSN workbook changed
+  since the comparison was built, the action declines with a "refresh the comparison" message
+  instead of rendering images for a diff set the workbook doesn't carry. The camera only appears
+  on fresh cells of reports whose TSN prints are in place.
+
 ## v0.22.1 — 2026-07-08
 
 - **Both image layouts in the evidence workbook.** "… (evidence).xlsx" now carries two image

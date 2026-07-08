@@ -4,8 +4,9 @@ endpoints share one claim->dialog->launch tail.
 
 Two halves:
   * SURFACE IDENTITY (RM08) — GuiApi's public method set (the methods pywebview exposes
-    to JS) equals a FROZEN list of 100 names (U3 deleted the dead set_batch_dest;
-    v0.21.0 added the two evidence-toggle endpoints). A moved/renamed/dropped/added endpoint fails
+    to JS) equals a FROZEN list of 102 names (U3 deleted the dead set_batch_dest;
+    v0.21.0 added the two evidence-toggle endpoints; v0.23.0 the two on-demand
+    per-cell evidence endpoints). A moved/renamed/dropped/added endpoint fails
     here; this is the invariant the mechanical move must preserve. The two touched
     endpoints (start_compare / start_compare_env) additionally have their exact source
     `def` signature asserted (the @_api_method wrapper hides arity from inspect, so the
@@ -52,7 +53,9 @@ FROZEN_API = {
     "consolidate_info", "consolidate_matrix_tsn", "day_matrix_info", "decline_overwrite",
     "delete_chromium", "discard_batch", "download_chromium", "export_day_cell",
     "export_day_column", "export_day_row", "finish_login", "get_compare_folders",
-    "get_initial_state", "get_settings", "import_tsn_raw", "log_js_error", "matrix_info",
+    "day_matrix_evidence_cell",
+    "get_initial_state", "get_settings", "import_tsn_raw", "log_js_error", "matrix_evidence_cell",
+    "matrix_info",
     "matrix_queue_clear", "matrix_queue_move", "matrix_queue_remove", "matrix_stop_all",
     "open_cell_comparison", "open_comparisons_folder", "open_consolidate_input",
     "open_consolidated_folder", "open_day_cell_comparison", "open_day_comparisons_folder",

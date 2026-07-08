@@ -157,7 +157,9 @@ refresh**; each **column header** has a **per-column refresh**. Refreshes are po
 light-surface `select-light` (not the dark title-bar skin). Each cell renders the unified `cmp` state — **discrepancy count,
 colour-coded** (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing`/`.mx-na`)
 plus greyed / needs-export / needs-TSN / "consolidate N PDFs" / stale states — with
-compact **icon** actions (`↻ export` / `↻ compare` / `↗ open`, gated on support+built).
+compact **icon** actions (`↻ export` / `↻ compare` / `↗ open`, gated on support+built; since
+v0.23.0 a **camera** on built, FRESH vs-TSN cells of evidence-capable rows — the on-demand
+evidence run for the existing comparison, hidden while the report's TSN prints are missing).
 The **config zone** (`#matrixConfig`, a card under the slim activity log, shown via
 `body.matrix-wide:not(.mw-day)`) holds the report + **environment-column** show/hide toggles,
 the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the **evidence-images

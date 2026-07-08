@@ -17,7 +17,8 @@ import outcome
 import reports
 
 import artifact_store
-from matrix_state import (_cell_input_fingerprint, _mode_by_id,
+from events import ConsolidateResult
+from matrix_state import (_MTIME_TOL_S, _cell_input_fingerprint, _mode_by_id,
                           _pdf_self_comparator, _row_defs, _row_modes,
                           _safe_mtime, comparison_path, mode_out_path,
                           record_result, record_tsn_result, tsn_input_root,
@@ -377,6 +378,81 @@ def evidence_opts_for(evidence, row_key, dir_for_subdir):
         return None
     return {"tsmis_pdf_dir": dir_for_subdir(visual_evidence.pdf_subdir_for(row_key)),
             "examples": visual_evidence.clamp_examples(evidence.get("examples"))}
+
+
+def run_evidence_only(row_key, store_dir, subdir, tsn_path, comparison_path,
+                      tsmis_pdf_dir, events, examples=None):
+    """Generate/refresh the evidence set for an EXISTING vs-TSN comparison — the
+    on-demand per-cell action (the toggle-driven decoration runs inside
+    consolidate_and_compare_tsn as the comparison is built). Runs regardless of
+    the evidence toggle; `examples` is engine-clamped.
+
+    The FRESHNESS GATE is what keeps the on-demand path honest: the generator
+    re-enumerates the differences from the CURRENT consolidated + TSN artifacts,
+    so if either moved on since the comparison was built, the images could
+    illustrate a diff set the workbook doesn't carry. It therefore REFUSES —
+    with a "refresh the comparison" hint — when the store changed under the
+    consolidated workbook, or when the consolidated/TSN workbook is newer than
+    the comparison. Returns a ConsolidateResult; raises ValueError with the
+    actionable reason for every not-runnable case."""
+    import visual_evidence                               # lazy: pulls PIL/pdfium
+    if not visual_evidence.capable(row_key):
+        raise ValueError("this report doesn't support evidence images")
+    comparison_path = Path(comparison_path)
+    tsn_path = Path(tsn_path)
+    consolidated = consolidated_store_path(store_dir, subdir)
+    if not comparison_path.exists():
+        raise ValueError("no comparison workbook for this cell yet — run the "
+                         "comparison first")
+    if not consolidated.exists():
+        raise ValueError(f"no consolidated {subdir} workbook for this cell — "
+                         "run the comparison first")
+    refresh_hint = ("— refresh the comparison instead (it regenerates the "
+                    "evidence set when the Evidence images option is on, or "
+                    "run this action again after)")
+    if _m._consolidated_stale(consolidated, store_dir):
+        raise ValueError(f"the {subdir} exports changed since the comparison "
+                         f"was built {refresh_hint}")
+    cmp_mtime = _safe_mtime(comparison_path) or 0
+    if (_safe_mtime(consolidated) or 0) > cmp_mtime + _MTIME_TOL_S:
+        raise ValueError(f"the consolidated {subdir} workbook is newer than "
+                         f"this comparison {refresh_hint}")
+    if (_safe_mtime(tsn_path) or 0) > cmp_mtime + _MTIME_TOL_S:
+        raise ValueError(f"the TSN workbook is newer than this comparison "
+                         f"{refresh_hint}")
+    ev = visual_evidence.generate(
+        row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir, events,
+        examples=visual_evidence.clamp_examples(examples))
+    note = ev.get("note") or "evidence run finished"
+    return ConsolidateResult(status="ok", message=note, summary_lines=[note])
+
+
+def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
+                      tsn_files=None, examples=None):
+    """On-demand evidence for one Everything-matrix cell's EXISTING vs-TSN
+    comparison. Resolves the same paths build_comparison's tsn branch uses —
+    but consolidates nothing, compares nothing, and does NOT heal the TSN
+    library (a heal would rebuild it newer than the comparison and the
+    freshness gate would then rightly refuse; a version-stale library needs a
+    comparison refresh anyway)."""
+    rows = _row_defs()
+    if row_key not in rows:
+        raise ValueError(f"unknown matrix row: {row_key}")
+    _label, subdir, _idx, adapter, _hr = rows[row_key]
+    mode = _mode_by_id(_row_modes(row_key, subdir, adapter), "tsn")
+    if not mode["supported"]:
+        raise ValueError(f"no TSN comparison for {row_key}")
+    dest = Path(dest)
+    tsn_files = tsn_files or {}
+    src = tsn_source(dest, mode["tsn_subdir"], tsn_files.get(mode["tsn_subdir"]))
+    if src.get("kind") not in ("file", "consolidated"):
+        raise ValueError("no consolidated TSN workbook available")
+    import visual_evidence                               # lazy: pulls PIL/pdfium
+    return run_evidence_only(
+        row_key, dest / cell_key / mode["env_subdir"], mode["env_subdir"],
+        src["path"], mode_out_path(dest, baseline_key, row_key, cell_key, mode),
+        dest / cell_key / visual_evidence.pdf_subdir_for(row_key),
+        events, examples=examples)
 
 
 # Producer-completion persistence for the persistent consolidated workbook lives in
