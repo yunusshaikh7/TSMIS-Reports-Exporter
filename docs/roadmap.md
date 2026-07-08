@@ -590,7 +590,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.22.0, shipped)
+### Version buckets — reconciled to reality (current: v0.22.1, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -616,6 +616,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.21.0** ✅ | Jul 8 | **Visual evidence** — the manual "screenshot both PDFs and circle the cell" workflow automated as a decoration of the Highway Detail vs-TSN comparisons: per differing column, N (1–10) random verified example rows rendered as highlighted snippets from BOTH PDFs (the app's (PDF) export + the TSN district prints in `tsn_library/highway_detail/pdf/`), each example parse-back-verified against the compared values before it's shown; `… (evidence).xlsx` + a two-layout image folder beside each comparison (keep-last-good). One shared toggle+count on both matrix pages (`evidence_images`/`evidence_examples`), ONE hook in `consolidate_and_compare_tsn`. TSN library v2 appends the District/County sidecar (D2 auto-rebuild). Pillow + pypdfium2 now SHIP (~20 MB; the frozen self-test proves the render path). Locked by `check_visual_evidence`. |
 | **v0.21.1** ✅ | Jul 8 | **Hotfix** (field-driven) — the `tsn_library/highway_detail/pdf/` drop folder v0.21.0 pointed at but never created: `TsnEntry.evidence_pdfs` drives `ensure_layout` (folder + hint file; README refreshes when its generated text changes), and `matrix_info`/`day_matrix_info` re-push state so dropping the PDFs + re-entering a tab un-greys the evidence toggle without a restart. |
 | **v0.22.0** ✅ | Jul 8 | **Intersection Detail July-2026 format + evidence** — the site's report overhaul absorbed end-to-end: 35-column SoT, the PDF parser rewritten for the reshaped print (cover pages, rowB bands + print-only intersection numbers, padded postmiles; pre-update workbooks/PDFs refused with re-export hints), the vs-TSN comparison re-baselined against the same-run 7.8 statewide bundle (parity 217/217 routes / 576k cells / 0 real diffs; canary 163,310 → **21,675**; Notes + Report-View Major classification rewritten to the data — soft = Int St/ML/CS Eff-Date + Route Suffix), `Xing Line Lgth`↔`X_CROSS_OVERRIDE` newly compared, TSN library **v3** (new shape + District/County sidecar), and **evidence images for both ID rows** via `evidence_intersection_detail` (the statewide TASAS print on a fixed monospace template, indexed once + cached; 16,584/16,584 records, 30/32 fields 100.00% parse-back). `availability()` went per-report; `compare_core` untouched. |
+| **v0.22.1** ✅ | Jul 8 | **Evidence workbook: both layouts** — "… (evidence).xlsx" gains a second image tab: **Evidence (stacked)** + **Evidence (side-by-side)** (previously stacked-only; the pair files lived only in the images folder). Engine-level (`_image_sheet`), so HD + ID both get it. |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

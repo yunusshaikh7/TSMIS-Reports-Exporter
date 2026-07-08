@@ -3,6 +3,14 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.22.1 — 2026-07-08
+
+- **Both image layouts in the evidence workbook.** "… (evidence).xlsx" now carries two image
+  tabs — **Evidence (stacked)** for reading top-to-bottom and **Evidence (side-by-side)** for
+  copying straight into a report — instead of stacked-only (the side-by-side files previously
+  lived only in the images folder). Applies to both Highway Detail and Intersection Detail
+  evidence sets; the workbook grows accordingly (both layouts embedded).
+
 ## v0.22.0 — 2026-07-08
 
 Intersection Detail catches up with the site's July 2026 report overhaul — and gets evidence

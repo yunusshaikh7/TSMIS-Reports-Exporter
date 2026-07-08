@@ -15,11 +15,12 @@ disagreeing at that cell, a TSN reference-date skew, a duplicated key) are
 skipped with a recorded reason, never shown.
 
 Outputs, next to the comparison workbook (the "(formulas).xlsx" sibling
-convention): `<comparison> (evidence).xlsx` — a Summary sheet + every stacked
-image embedded — and `<comparison> (evidence images)/` holding each example in
-BOTH layouts (stacked for reading, side-by-side for pasting into docs). Both
-writes are keep-last-good: a failed/cancelled run leaves the previous set
-untouched; files locked open in Excel divert to a ".new" sibling with a note.
+convention): `<comparison> (evidence).xlsx` — a Summary sheet + BOTH image
+layouts embedded, each on its own tab — and `<comparison> (evidence images)/`
+holding the same examples as loose files in both layouts (stacked for reading,
+side-by-side for pasting into docs). Both writes are keep-last-good: a
+failed/cancelled run leaves the previous set untouched; files locked open in
+Excel divert to a ".new" sibling with a note.
 
 Report-agnostic: everything report-specific comes from an adapter module
 (evidence_highway_detail — district TSN prints; evidence_intersection_detail —
@@ -83,7 +84,8 @@ _STACK_W = 1900                # stacked strip width (px)
 _PAIR_SIDE_W = 1300            # side-by-side per-side width (px)
 _CTX_PT = 27                   # vertical context around the record (points)
 _PAGE_CACHE_MAX = 16
-_EMBED_W = 1500                # embedded image display width in the workbook
+_EMBED_W = 1500                # embedded stacked-image display width in the workbook
+_EMBED_W_PAIR = 2000           # side-by-side embeds are twice as wide — give them more
 _PX_PER_ROW = 20               # Excel's default row height in pixels
 
 
@@ -476,9 +478,32 @@ def _compose_pair(title, sub, l_label, l_img, r_label, r_img, out):
 # --------------------------------------------------------------------------- #
 # outputs (keep-last-good)
 # --------------------------------------------------------------------------- #
+def _image_sheet(wb, sheet_title, entries, img_dir, img_key, embed_w, fonts):
+    """One image tab: the caption line + every example's `img_key` layout
+    embedded, scaled to `embed_w` display pixels."""
+    bold, small = fonts
+    ev = wb.create_sheet(sheet_title)
+    ev.sheet_properties.tabColor = "C00000"
+    ev.append(["Red box = the compared cell in each source PDF; gray box = the "
+               "record (its printed lines). Values shown are the compared "
+               "(normalized) forms."])
+    ev["A1"].font = small
+    r = 3
+    for e in entries:
+        ev.cell(row=r, column=1, value=(
+            f"{e['field']}   —   route {e['route']} @ {e['key']}   —   "
+            f"TSMIS '{e['va']}' vs TSN '{e['vb']}'")).font = bold
+        img = XLImage(str(img_dir / e[img_key]))
+        scale = min(1.0, embed_w / img.width)
+        img.width, img.height = int(img.width * scale), int(img.height * scale)
+        ev.add_image(img, f"A{r + 1}")
+        r += 1 + max(1, round(img.height / _PX_PER_ROW)) + 2
+
+
 def _write_workbook(wb_path, img_dir, entries, misses, info):
-    """Write '<comparison> (evidence).xlsx' — Summary sheet + every stacked
-    image embedded — via a temp file + os.replace. Returns a short note when
+    """Write '<comparison> (evidence).xlsx' — a Summary sheet + BOTH image
+    layouts embedded, each on its own tab (stacked for reading, side-by-side
+    for pasting) — via a temp file + os.replace. Returns a short note when
     the previous workbook was locked open and the new one diverted to .new."""
     wb = Workbook()
     ws = wb.active
@@ -513,22 +538,10 @@ def _write_workbook(wb_path, img_dir, entries, misses, info):
     for col, width in (("A", 14), ("B", 24), ("C", 26), ("D", 26), ("E", 46)):
         ws.column_dimensions[col].width = width
 
-    ev = wb.create_sheet("Evidence")
-    ev.sheet_properties.tabColor = "C00000"
-    ev.append(["Red box = the compared cell in each source PDF; gray box = the "
-               "record (its printed lines). Values shown are the compared "
-               "(normalized) forms."])
-    ev["A1"].font = small
-    r = 3
-    for e in entries:
-        ev.cell(row=r, column=1, value=(
-            f"{e['field']}   —   route {e['route']} @ {e['key']}   —   "
-            f"TSMIS '{e['va']}' vs TSN '{e['vb']}'")).font = bold
-        img = XLImage(str(img_dir / e["stacked"]))
-        scale = min(1.0, _EMBED_W / img.width)
-        img.width, img.height = int(img.width * scale), int(img.height * scale)
-        ev.add_image(img, f"A{r + 1}")
-        r += 1 + max(1, round(img.height / _PX_PER_ROW)) + 2
+    _image_sheet(wb, "Evidence (stacked)", entries, img_dir, "stacked",
+                 _EMBED_W, (bold, small))
+    _image_sheet(wb, "Evidence (side-by-side)", entries, img_dir, "pair",
+                 _EMBED_W_PAIR, (bold, small))
 
     tmp = wb_path.with_name(wb_path.name + ".tmp")
     wb.save(tmp)
