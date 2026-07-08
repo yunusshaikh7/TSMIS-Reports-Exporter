@@ -163,8 +163,10 @@ The **config zone** (`#matrixConfig`, a card under the slim activity log, shown 
 the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the **evidence-images
 toggle + per-column count** (`#matrixEvidence` / `#matrixEvidenceCount` — ONE shared persisted
 pair `evidence_images`/`evidence_examples` mirrored on the by-day corner, synced by
-`syncMatrixEvidence` off the state's `evidence` block; greyed with a drop-hint until the TSN
-district prints are in place — [comparison-engine.md](comparison-engine.md) §13), the live
+`syncMatrixEvidence` off the state's `evidence` block; greyed with a drop-hint until at least
+one report's TSN prints are in place, and since v0.22.0 the hint reads the block's PER-REPORT
+`reports` list to name exactly which report still lacks its prints —
+[comparison-engine.md](comparison-engine.md) §13), the live
 queue, and the **fast-mode browser-count spinner** (`#matrixWorkers`, the `.mc-workers` row): it writes the
 shared `fast_workers` setting via `set_setting`, so the matrix corner, the Export pane
 (`#fastWorkers`) and the Settings tab (`#setFastWorkers`) stay on one value; `syncMatrixFast`
