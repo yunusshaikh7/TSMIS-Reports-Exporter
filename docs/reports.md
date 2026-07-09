@@ -1,6 +1,6 @@
 ﻿# Reports
 
-What this doc covers: the full TSMIS report catalog (the **eleven** exportable types, incl. the Highway Log / Intersection Detail / Highway Detail print editions), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
+What this doc covers: the full TSMIS report catalog (the **thirteen** exportable types, incl. the five print editions — Ramp Detail / Highway Sequence / Highway Log / Intersection Detail / Highway Detail), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
 
 Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- the corrected 31-column labels in [highway_log/columns.md](highway_log/columns.md), PDF/TSN parsing in [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md), and the PDF-vs-Excel/TSN study in [highway_log/comparison-study.md](highway_log/comparison-study.md). The comparison workbook engine is owned by [comparison-engine.md](comparison-engine.md).
 
