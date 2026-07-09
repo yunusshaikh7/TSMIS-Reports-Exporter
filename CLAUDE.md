@@ -25,7 +25,9 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 |---|---|---|---|
 | 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<run>/ramp_summary/` |
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
+| 2b | TSAR: Ramp Detail (PDF) | PDF (Letter, landscape) | `output/<run>/ramp_detail_pdf/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
+| 3b | Highway Sequence Listing (PDF) | PDF (Letter, portrait) | `output/<run>/highway_sequence_pdf/` |
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
@@ -38,12 +40,15 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
 Reports 5–6 (Intersection): export is **enabled** but the report lives on the
 **development** TSMIS site — switch via Settings ▸ "Use development site"
-(`tsmis-dev.dot.ca.gov`). Highway Log, Intersection Detail and Highway Detail each
-ship in **two editions** — the Excel export and a print-layout **PDF** edition
-(4b / 6b / 7b). v0.17.0 brought reports 1–6b to parity, and **v0.20.0 added Highway
-Detail (7/7b)**: the **10 fully-integrated export types consolidate AND compare vs
-TSN** — each has a vs-TSN comparator and lives in both the Everything and by-day
-matrices (see [docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md)
+(`tsmis-dev.dot.ca.gov`). Ramp Detail, Highway Sequence, Highway Log, Intersection
+Detail and Highway Detail each ship in **two editions** — the Excel export and a
+print-layout **PDF** edition (2b / 3b / 4b / 6b / 7b; 2b + 3b are **v0.24.0,
+export-only** — their print parsers/consolidations/comparisons follow once real
+work-PC PDFs verify the layout, the same staged path 7b took). v0.17.0 brought
+reports 1–6b to parity, and **v0.20.0 added Highway Detail (7/7b)**: the **10
+fully-integrated export types consolidate AND compare vs TSN** — each has a vs-TSN
+comparator and lives in both the Everything and by-day matrices (see
+[docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md)
 for the per-report schema + locked canaries; Highway Detail's schema was verified against
 the full statewide bundle — 252 routes vs the 60k-row TSN extract — and its comparison
 carries an Intersection-Detail-style **Report View** replica). Report **8 (Highway
@@ -51,7 +56,9 @@ Summary)** is **export-only** (export-enabled app-side but still site-greyed); i
 integration waits for a verifiable schema. **Intersection Detail follows the site's
 July-2026 report overhaul since v0.22.0** (35-column export, re-verified statewide on the
 7.8 bundle; pre-update workbooks/PDFs are refused with re-export hints; canary
-163,310 → 21,675). Where the live site still greys a report,
+163,310 → 21,675). **The Highway Sequence comparison was re-verified statewide on the
+fresh 7.8 bundle in v0.24.0** (library rebuild byte-identical; counts within ~54 rows of
+the 6.19 canary — the TSMIS drift since June). Where the live site still greys a report,
 `select_report` fails fast rather than stalling.
 **Selecting both editions of one report (Excel + PDF, same `data_value`) coalesces** — the route
 is generated **once** and both files saved off it (`run_export_combined`, v0.19.2; standard path
@@ -61,13 +68,18 @@ Highway Log district PDFs (dropped into `input/tsn_highway_log/`) and the app's 
 exports. The **Compare** tab diffs every report **TSMIS-vs-TSN** (the PDF-sourced
 editions among them, each also offering a **PDF-vs-Excel** self-check) and runs
 cross-environment comparisons. **Visual evidence (v0.21.0; + Intersection Detail in
-v0.22.0):** Highway Detail and Intersection Detail vs-TSN comparisons can also render
-sampled diffs as highlighted snippets from BOTH PDFs (parse-back-verified;
-`… (evidence).xlsx` with stacked + side-by-side image tabs, plus the loose image folder,
-beside the comparison) — one shared toggle+count on both matrix pages, enabled per report
-once its TSN prints sit in `tsn_library/<report>/pdf/` (HD: the district PDFs; ID: the
-one statewide print), and since v0.23.0 a per-cell **camera action** regenerates a BUILT
-comparison's evidence on demand (no re-compare; freshness-gated). See
+v0.22.0; + Highway Log in v0.24.0):** Highway Detail, Intersection Detail and Highway
+Log vs-TSN comparisons can also render sampled diffs as highlighted snippets from BOTH
+PDFs (parse-back-verified; ditto-aware for HL; `… (evidence).xlsx` with stacked +
+side-by-side image tabs, plus the loose image folder, beside the comparison) — one
+shared toggle+count on both matrix pages, enabled per report once its TSN prints are in
+place (HD: district PDFs in `tsn_library/highway_detail/pdf/`; ID: the one statewide
+print in `…/intersection_detail/pdf/`; **HL: the SAME district prints its TSN library
+builds from, read from `…/highway_log/raw/` — no duplicate drop**), and since v0.23.0 a
+per-cell **camera action** regenerates a BUILT comparison's evidence on demand (no
+re-compare; freshness-gated). **Since v0.24.0 the toggle spells itself out per report**
+(✓ will generate / ○ needs prints → folder / a named no-support list) and supported
+matrix rows carry a camera badge. See
 [docs/comparison-engine.md](docs/comparison-engine.md) §13.
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:

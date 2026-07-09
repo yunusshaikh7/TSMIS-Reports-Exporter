@@ -156,6 +156,14 @@ function syncCompareButton() {
        && $("cmpDirA").value !== $("cmpDirB").value)
     : (CMP.tsmis && CMP.tsn);
   $("btnStartCompare").disabled = locked || !ready || !anyOut;
+  // A disabled primary button always says WHY (hover) — never a mystery grey.
+  $("btnStartCompare").title = locked
+    ? "Another task is running — it finishes (or you cancel it) first."
+    : !anyOut ? "Tick at least one output format above first."
+    : !ready ? (compareKind() === "folders"
+        ? "Pick two different run folders above first."
+        : "Pick both input files above first.")
+    : "";
   $("cmpOutHint").textContent = anyOut
     ? "Pick one or both. With both, the values copy is saved next to the other as “… (values).xlsx”."
     : "Tick at least one output to enable the comparison.";

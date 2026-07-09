@@ -61,6 +61,7 @@ that rewrote the design.
 | `v0.22.0` | Jul 8 | **Intersection Detail's July-2026 overhaul absorbed** — the site fixed most of what the comparison used to flag structurally (dates, booleans, suffixes; the statewide baseline fell 163k → 21.7k diff cells) and reshaped the export to 35 columns; parser + comparators updated with pre-update refusals, `Xing Line Lgth` newly compared, TSN library v3, and **evidence images for Intersection Detail** located on the statewide TASAS print's fixed template |
 | `v0.22.1` | Jul 8 | The evidence workbook embeds **both** image layouts — a stacked tab and a side-by-side tab (the side-by-side files previously lived only in the images folder) |
 | `v0.23.0` | Jul 8 | **Evidence on demand** — a camera action on built vs-TSN matrix cells renders/refreshes the evidence images for the existing comparison without re-comparing; a freshness gate refuses when the inputs moved past the comparison |
+| `v0.24.0` | Jul 9 | **Highway Log evidence + print editions + the standards audit** — HL joins the evidence reports (ditto-aware, per-print routing, its TSN prints read straight from the library raw/); Highway Sequence (PDF) + Ramp Detail (PDF) export-only print editions (stable ids 11/12); the HSL comparison re-verified statewide on the fresh 7.8 bundle (library rebuild byte-identical, canary held within the TSMIS drift); Ramp Detail/Summary comparison hardening; the evidence toggle now spells out per report what it will generate (+ row-header camera badges) |
 
 ---
 

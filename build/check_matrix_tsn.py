@@ -145,6 +145,12 @@ def test_source_detection():
 def test_snapshot_modes():
     print("snapshot per-row mode + greyed cells + scoped rebuild:")
     dest = Path(tempfile.mkdtemp(prefix="tsmis_tsnsnap_"))
+    # HERMETIC: tsn_source consults the CANONICAL library too — on a dev PC whose
+    # real tsn_library/<report>/raw is stocked (e.g. the Highway Log district
+    # prints, which double as its evidence source), the un-sandboxed snapshot
+    # would see "pdfs" where this fixture stages a legacy-drop "consolidated".
+    saved_lib = paths.TSN_LIBRARY_ROOT
+    paths.TSN_LIBRARY_ROOT = dest / "_lib"
     try:
         # HL-excel in vs-TSN mode with both sides present.
         _touch(dest / "ars-prod" / "highway_log" / "r1.xlsx")
@@ -181,12 +187,17 @@ def test_snapshot_modes():
               all(rk == "highway_log"
                   for rk, _e, _m in matrix.cells_to_rebuild(snap, "all", row="highway_log")))
     finally:
+        paths.TSN_LIBRARY_ROOT = saved_lib
         shutil.rmtree(dest, ignore_errors=True)
 
 
 def test_build_guards():
     print("build_comparison guard paths:")
     dest = Path(tempfile.mkdtemp(prefix="tsmis_tsnbuild_"))
+    # HERMETIC like test_snapshot_modes: the no-TSN-source guard must not see a
+    # stocked real library.
+    saved_lib = paths.TSN_LIBRARY_ROOT
+    paths.TSN_LIBRARY_ROOT = dest / "_lib"
     try:
         def raises(fn):
             try:
@@ -210,6 +221,7 @@ def test_build_guards():
               raises(lambda: matrix.build_comparison(dest, "highway_log", "ars-prod", "tsn",
                                                      "ssor-prod", events=None)))
     finally:
+        paths.TSN_LIBRARY_ROOT = saved_lib
         shutil.rmtree(dest, ignore_errors=True)
 
 

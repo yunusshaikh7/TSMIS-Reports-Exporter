@@ -53,7 +53,7 @@ from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_DISPLAY, COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPORTS,
                      CONSOLIDATE_DISPLAY, CONSOLIDATE_KEYS,
                      CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_REPORTS, PICKER_ORDER,
-                     consolidate_index_for_key, export_reports_status)
+                     consolidate_index_for_key, export_reports_status, matrix_rows)
 import outcome
 from gui_endpoint import _api_method, pick_path   # the shared js_api decorator + dialog unwrap
 import contract
@@ -340,15 +340,26 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
 
     def _evidence_view(self):
         """The visual-evidence block for the UI: the persisted toggle+count
-        plus whether the TSN district prints are in place. The probe can never
-        break a state push (it only greys the toggle)."""
+        plus whether the TSN district prints are in place, AND the vs-TSN
+        matrix rows that have NO evidence support at all (named, one entry per
+        report family) — so both matrix pages can spell out exactly which
+        reports the toggle will and won't generate images for. The probe can
+        never break a state push (it only greys the toggle)."""
         try:
             import visual_evidence           # lazy: first call pays the import
             avail = visual_evidence.availability()
+            seen, unsupported = set(), []
+            for _rk, label, sub, _i, _a in matrix_rows():
+                fam = sub[:-4] if sub.endswith("_pdf") else sub
+                if visual_evidence.capable(sub) or fam in seen:
+                    continue
+                seen.add(fam)
+                unsupported.append(label)
+            avail["unsupported"] = unsupported
         except Exception:                    # noqa: BLE001 — probe-only
             log.warning("evidence availability probe failed", exc_info=True)
             avail = {"rows": [], "tsn_pdfs": 0, "ready": False, "dir": "",
-                     "reports": [], "deps_ok": False}
+                     "reports": [], "deps_ok": False, "unsupported": []}
         return {"on": settings.get_evidence_images(),
                 "examples": settings.get_evidence_examples(), **avail}
 

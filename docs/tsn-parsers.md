@@ -149,6 +149,21 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   **FT 699**, **Description 4,839**; **County/City/HG/Distance = 0** (key/context — never count). Verified 3
   ways: golden check + full compare-suite + live independent recompute (which confirmed the engine's
   similarity pairing reduces FT 1,504→699 false order-pairs).
+- **Re-verified on the fresh 7.8 statewide bundle (v0.24.0 audit; the July-2026 site update did NOT
+  reshape HSL):** the per-route export format is UNCHANGED (positional map still exact, `SD.`
+  trailing periods and `<route>/` description prefixes still present); rebuilding the library
+  from the bundle's 12 district PDFs reproduces the user's installed library **byte-for-byte**
+  (69,758 rows — the same 15-SEP-25 TSN snapshot); the fresh comparison (TSMIS **60,493** rows,
+  2026-07-08 ssor-prod) lands within a hair of the canary — both **57,071**, only **3,422/12,687**,
+  **diff cells 5,521** (FT **698** + Description **4,823**), identical **52,244**, routes
+  **242/10/21** — the deltas are exactly the ~54 locations TSMIS added since June. Census of the
+  diff classes: **681 of the 698 FT diffs are the by-design equate pairings** (TSN's synthetic
+  "EQUATES TO" row carries no flag → `H ≠ (blank)`), 17 genuine (H↔I, R↔H); Description splits
+  into TSMIS-labeled-vs-TSN-blank breaks (2,024), TSMIS comma-extended multi-item descriptions
+  (1,487), the equate pairings (681), genuine wording drift (522 — incl. real renames like
+  "OLD OREGON TRAIL"→"MTN GATE": the TSN snapshot is 10 months older), TSN-labeled (108). No new
+  artifact classes; the comparator's Notes sheet now spells out the equate-pairing FT behavior.
+  Bundle + scripts: `ground-truth/HSL Bundle 7.8/` (local).
 
 ### Intersection Summary — TSN  *(BUILT + verified — v0.17.0 Phase 3b/3c)*
 - **TSMIS side:** per-route XLSX ×218, **sheet `Intersection Summary`** (CONFIRMED), 3-col sheet

@@ -146,7 +146,10 @@ The grid (`renderMatrix`) is fed by `gui_api.matrix_info` (a pure-filesystem
 snapshot). **7 rows** (every report — Ramp Summary/Detail, Highway Sequence, both
 Highway Log formats, Intersection Summary/Detail — all with cross-env AND vs-TSN as of
 v0.17.0); each **row header** carries the
-report name, a per-row **comparison-mode select** (compact + content-sized in a
+report name (evidence-supported rows append a small **camera badge**, v0.24.0 —
+`evidenceRowBadge`: lit `--success` when the report's TSN prints are in place, dimmed
+with the drop-folder tooltip when not; unsupported rows get no badge, the toggle's
+status lines name them), a per-row **comparison-mode select** (compact + content-sized in a
 `.mx-fluent-select` chevron wrapper; the "(soon)" greying is now defensive — every
 mode is coded), a vs-TSN
 **file picker** when in a TSN mode — a **status-dot chip** (`.mxtp-file`) that surfaces
@@ -165,9 +168,12 @@ The **config zone** (`#matrixConfig`, a card under the slim activity log, shown 
 the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the **evidence-images
 toggle + per-column count** (`#matrixEvidence` / `#matrixEvidenceCount` — ONE shared persisted
 pair `evidence_images`/`evidence_examples` mirrored on the by-day corner, synced by
-`syncMatrixEvidence` off the state's `evidence` block; greyed with a drop-hint until at least
-one report's TSN prints are in place, and since v0.22.0 the hint reads the block's PER-REPORT
-`reports` list to name exactly which report still lacks its prints —
+`syncMatrixEvidence` off the state's `evidence` block; greyed only when NO report is ready.
+Since v0.24.0 the hint is an always-visible PER-REPORT **status block** (`.ev-status-line`):
+a ✓ "will generate (N TSN prints)" line per ready report, a ○ "needs its TSN PDFs in <dir>"
+line per supported-but-empty one, and one "No evidence support yet: …" line naming the rest
+(the state's `evidence.unsupported`, derived server-side from `matrix_rows()` ×
+`visual_evidence.capable`) — so the toggle is never a mystery switch —
 [comparison-engine.md](comparison-engine.md) §13), the live
 queue, and the **fast-mode browser-count spinner** (`#matrixWorkers`, the `.mc-workers` row): it writes the
 shared `fast_workers` setting via `set_setting`, so the matrix corner, the Export pane

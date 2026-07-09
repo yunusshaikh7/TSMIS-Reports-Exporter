@@ -51,10 +51,11 @@ HTML = """
 # half of build/check_app_modules.py's offline packaging contract: if the bundle
 # ever drops one, the exact shipped exe fails its own gate with a precise error.
 # v0.21.0 adds the lazily-imported visual-evidence modules to the contract
-# (v0.22.0: the Intersection Detail adapter joins).
+# (v0.22.0: the Intersection Detail adapter joins; v0.24.0: Highway Log).
 _DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "report_library",
                            "visual_evidence", "evidence_highway_detail",
-                           "evidence_intersection_detail")
+                           "evidence_intersection_detail",
+                           "evidence_highway_log")
 
 
 def run(emit=None):

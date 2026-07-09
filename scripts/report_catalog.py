@@ -28,7 +28,9 @@ from collections import namedtuple
 
 from export_ramp_summary import SPEC as _RAMP_SUMMARY_SPEC
 from export_ramp_detail import SPEC as _RAMP_DETAIL_SPEC
+from export_ramp_detail_pdf import SPEC as _RAMP_DETAIL_PDF_SPEC
 from export_highway_sequence import SPEC as _HIGHWAY_SEQ_SPEC
+from export_highway_sequence_pdf import SPEC as _HIGHWAY_SEQ_PDF_SPEC
 from export_highway_log import SPEC as _HIGHWAY_LOG_SPEC
 from export_highway_log_pdf import SPEC as _HIGHWAY_LOG_PDF_SPEC
 from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
@@ -136,6 +138,17 @@ EXPORT = (
     # frozen). Consolidates + compares like Intersection Detail (PDF) as of v0.20.0.
     ExportEntry("highway_detail_pdf", "Highway Detail (PDF)", "PDF", _HIGHWAY_DETAIL_PDF_SPEC,
                 group="Highway", short_label="Detail (PDF)"),
+    # Highway Sequence (PDF) + Ramp Detail (PDF), v0.24.0 — the same dropdown
+    # options saved via the site's Print layouts (hsl_printAll; the shared
+    # printAll() dispatcher body for Ramp Detail). Confirmed on BOTH site
+    # captures (main + dev 7.7). Appended LAST (stable ids 11/12, batch order
+    # frozen). EXPORT-ONLY for now: their print-layout consolidators/comparisons
+    # (and the evidence adapters that ride them) land once real work-PC PDFs
+    # verify the parse (the Highway Detail v0.19.2 -> v0.20.0 sequence).
+    ExportEntry("highway_sequence_pdf", "Highway Sequence Listing (PDF)", "PDF",
+                _HIGHWAY_SEQ_PDF_SPEC),
+    ExportEntry("ramp_detail_pdf", "TSAR: Ramp Detail (PDF)", "PDF", _RAMP_DETAIL_PDF_SPEC,
+                group="Ramp", short_label="Detail (PDF)"),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -342,8 +355,8 @@ def export_display():
 # order. DISTINCT from the registry/matrix order (the matrix keeps the PDF rows last);
 # every EXPORT key appears exactly once (asserted at import).
 _PICKER_ORDER = (
-    "highway_log", "highway_log_pdf", "highway_sequence",
-    "ramp_summary", "ramp_detail",
+    "highway_log", "highway_log_pdf", "highway_sequence", "highway_sequence_pdf",
+    "ramp_summary", "ramp_detail", "ramp_detail_pdf",
     "intersection_summary", "intersection_detail", "intersection_detail_pdf",
     # The newest Highway group renders last; the PDF variant sits next to its Excel
     # sibling (like Intersection Detail + its PDF). Detail export enabled v0.19.1,

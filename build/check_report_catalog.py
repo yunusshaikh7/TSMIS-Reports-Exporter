@@ -49,7 +49,9 @@ import tsn_library
 # --- INDEPENDENT identity oracle: import the expected objects ourselves.
 from export_ramp_summary import SPEC as _S_ramp_summary
 from export_ramp_detail import SPEC as _S_ramp_detail
+from export_ramp_detail_pdf import SPEC as _S_ramp_detail_pdf
 from export_highway_sequence import SPEC as _S_highway_sequence
+from export_highway_sequence_pdf import SPEC as _S_highway_sequence_pdf
 from export_highway_log import SPEC as _S_highway_log
 from export_highway_log_pdf import SPEC as _S_highway_log_pdf
 from export_intersection_summary import SPEC as _S_intersection_summary
@@ -107,6 +109,10 @@ _EXPORT = [  # (key, label, fmt, expected ReportSpec)
     ("highway_detail", "Highway Detail", "Excel", _S_highway_detail),
     ("highway_summary", "Highway Summary", "Excel", _S_highway_summary),
     ("highway_detail_pdf", "Highway Detail (PDF)", "PDF", _S_highway_detail_pdf),
+    # v0.24.0: the Highway Sequence + Ramp Detail PDF editions at ids 11/12
+    # (append-only; export-only until their print parsers are verified).
+    ("highway_sequence_pdf", "Highway Sequence Listing (PDF)", "PDF", _S_highway_sequence_pdf),
+    ("ramp_detail_pdf", "TSAR: Ramp Detail (PDF)", "PDF", _S_ramp_detail_pdf),
 ]
 _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:ramp_summary", "TSAR: Ramp Summary", _con_ramp_summary),

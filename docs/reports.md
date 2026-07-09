@@ -10,7 +10,9 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 |---|---|---|---|
 | 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<run>/ramp_summary/` |
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
+| 2b | TSAR: Ramp Detail (PDF) | PDF (Letter, landscape; export-only) | `output/<run>/ramp_detail_pdf/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
+| 3b | Highway Sequence Listing (PDF) | PDF (Letter, portrait; export-only) | `output/<run>/highway_sequence_pdf/` |
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
@@ -135,7 +137,7 @@ The `#customReport` dropdown is moving from flat `li.cs-option` rows (whose visi
 
 ### The picker is grouped like the website
 
-The GUI report picker mirrors the site's own grouping: **flat** Highway Log, Highway Log (PDF), and Highway Sequence at the top (the site's order), then the **Ramp** and **Intersection** families under their own headings. Order + grouping are catalog-driven, not UI-hardcoded: each `ExportEntry` carries an optional `group` + `short_label`, and `report_catalog._PICKER_ORDER` (exposed as `picker_order()`, import-asserted to cover every export key) fixes the display sequence. `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload by `PICKER_ORDER` and sets each entry's `idx` = its **display position** (no app code reads `idx` — it's parity-check metadata only), plus `group` and `short` (the short leaf label, e.g. "Detail"). `ui/app.js` emits an `.option-group` header on each group change and shows `short || label` (indented under its group). Both the Export picker and Export-Everything use the one `fillReportList()`.
+The GUI report picker mirrors the site's own grouping: **flat** Highway Log, Highway Log (PDF), Highway Sequence and Highway Sequence (PDF) at the top (the site's order), then the **Ramp** and **Intersection** families under their own headings. Order + grouping are catalog-driven, not UI-hardcoded: each `ExportEntry` carries an optional `group` + `short_label`, and `report_catalog._PICKER_ORDER` (exposed as `picker_order()`, import-asserted to cover every export key) fixes the display sequence. `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload by `PICKER_ORDER` and sets each entry's `idx` = its **display position** (no app code reads `idx` — it's parity-check metadata only), plus `group` and `short` (the short leaf label, e.g. "Detail"). `ui/app.js` emits an `.option-group` header on each group change and shows `short || label` (indented under its group). Both the Export picker and Export-Everything use the one `fillReportList()`.
 
 ### Highway Detail / Highway Summary — Detail FULLY INTEGRATED (v0.20.0); Summary export-only
 
@@ -161,9 +163,37 @@ Built on the Intersection Detail recipe, verified against the full statewide dev
 - **`visual_evidence.py` + `evidence_highway_detail.py`** (v0.21.0) — the OPTIONAL **evidence images** decoration of the vs-TSN comparisons: for every differing column, sampled random rows rendered as highlighted snippets from BOTH PDFs (the app's (PDF) export + the TSN district prints), each example verified by parse-back before it's shown; `… (evidence).xlsx` + a two-layout image folder beside the comparison. Toggle + per-column count (1–10) on both matrix pages. → [comparison-engine.md](comparison-engine.md) §13.
 - Locked by `check_compare_highway_detail_tsn` + `check_highway_detail_pdf` + `check_visual_evidence` (+ the registry/matrix/mock parity checks).
 
+### Highway Sequence (PDF) + Ramp Detail (PDF) — export-only print editions (v0.24.0)
+
+Two more print editions, cloned from the Highway Detail (PDF) recipe and confirmed on BOTH
+site captures (main `website-source` + `TSMIS Dev Site 7.7`):
+
+- **`export_highway_sequence_pdf.py`** — `subdir="highway_sequence_pdf"`,
+  `data_value="highway_sequence"` (same dropdown option as the Excel sibling),
+  `save=save_highway_sequence_pdf`. The site's `hsl_printAll()` builds a cover page + legend
+  page + per-district `.hsl-print-table` sections (9 columns); the save overrides
+  `window.print` to raise, calls it, counts non-colspan tbody rows as the empty backstop,
+  and captures **PORTRAIT** Letter — matching the TSN district prints (612×792).
+- **`export_ramp_detail_pdf.py`** — `subdir="ramp_detail_pdf"`, `data_value="Ramp_Detail"`,
+  `save=save_ramp_detail_pdf`. Ramp Detail has **no `rd_printAll`**: its print body IS the
+  site's shared async `printAll()` dispatcher, which first `await`s a
+  `showPrompt('Enter report title:')` modal. The save overrides BOTH globals —
+  `window.print` raises, `showPrompt` resolves immediately with a route-derived title (no
+  modal ever opens) — and awaits the dispatcher under a `Promise.race` bound
+  (`_RAMP_DETAIL_PRINT_BUILD_MS`) so a future unanswered await fails the route loudly
+  instead of hanging it. Captures **LANDSCAPE** Letter (the TSN statewide Ramp Detail print
+  is 792×612). Marker `.rd-print-table` (11 columns).
+- **Stable ids 11/12** (append-only; `batch_manifest._V017_EXPORT_ORDER == EXPORT_KEYS`
+  still holds); `_PICKER_ORDER` seats each next to its Excel sibling; both coalesce with
+  their siblings automatically (shared `data_value`, and both saves joined
+  `_PAGE_REBUILDING_SAVES` so the Export-button save always runs first).
+- **EXPORT-ONLY for now** — no consolidator/comparison/evidence until real work-PC PDFs
+  verify the print parse (Lesson 13 discipline: never bless a parser on synthetic renders).
+  The picker rows explain what a print edition is on hover; the roadmap tracks the follow-up.
+
 ### Coalescing both editions of a report (v0.19.2)
 
-When the user selects **both editions of one on-site report** — the Excel export and the print-layout PDF, which share a `data_value` (Highway Log, Intersection Detail, Highway Detail) — the standard (sequential) export path generates the report **once per route** and saves both files off that single render, instead of generating it twice. `ExportWorker._run_specs` groups the selected specs by `data_value` (`_coalesce_groups`) and runs a pair through `exporter.run_export_combined`; the **Export-button save runs first** and the **DOM-rebuilding PDF Print save last** (`_PAGE_REBUILDING_SAVES` / `_save_rebuilds_page`), because `hl_printAll`/`intd_printAll`/`hd_printAll` replace `#rampResults` and would remove the Export button. Each edition keeps its own `RunResult`, staging/swap, run report, and auto-consolidation (`_prep_edition` / `_finish_edition`). **Scope:** the single-report `run_export` and the parallel engine are untouched; **fast mode** keeps each edition its own parallel pass (coalescing the parallel engine, and the console `run_cli_multi`, are follow-ups). Locked by `build/check_coalesce_editions.py`.
+When the user selects **both editions of one on-site report** — the Excel export and the print-layout PDF, which share a `data_value` (Highway Log, Intersection Detail, Highway Detail; Highway Sequence + Ramp Detail joined in v0.24.0) — the standard (sequential) export path generates the report **once per route** and saves both files off that single render, instead of generating it twice. `ExportWorker._run_specs` groups the selected specs by `data_value` (`_coalesce_groups`) and runs a pair through `exporter.run_export_combined`; the **Export-button save runs first** and the **DOM-rebuilding PDF Print save last** (`_PAGE_REBUILDING_SAVES` / `_save_rebuilds_page`), because `hl_printAll`/`intd_printAll`/`hd_printAll` replace `#rampResults` and would remove the Export button. Each edition keeps its own `RunResult`, staging/swap, run report, and auto-consolidation (`_prep_edition` / `_finish_edition`). **Scope:** the single-report `run_export` and the parallel engine are untouched; **fast mode** keeps each edition its own parallel pass (coalescing the parallel engine, and the console `run_cli_multi`, are follow-ups). Locked by `build/check_coalesce_editions.py`.
 
 ## `cs-disabled` -- the site can temporarily disable a report (EXPECTED)
 
