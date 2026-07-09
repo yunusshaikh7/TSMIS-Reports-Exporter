@@ -51,6 +51,7 @@ function makeMockApi() {
     { key: "cons:ramp_summary", label: "TSAR: Ramp Summary" },
     { key: "cons:ramp_detail", label: "TSAR: Ramp Detail" },
     { key: "cons:highway_sequence", label: "Highway Sequence Listing" },
+    { key: "cons:highway_sequence_pdf", label: "TSMIS Highway Sequence (PDF)" },
     { key: "cons:intersection_summary", label: "Intersection Summary" },
     { key: "cons:intersection_detail", label: "Intersection Detail" },
     { key: "cons:intersection_detail_pdf", label: "TSMIS Intersection Detail (PDF)" },
@@ -120,10 +121,12 @@ function makeMockApi() {
     day_matrix_row_order: [],    // drag-to-reorder row preference (by-day)
     day_matrix_formulas: false,
     evidence: {                  // v0.21.0 visual-evidence toggle (shared); v0.22.0 per-report;
-      // v0.24.0 Highway Log (raw-sourced prints) + the named unsupported rows
-      on: false, examples: 2, ready: true, deps_ok: true, tsn_pdfs: 25,
+      // v0.24.0 Highway Log (raw-sourced prints) + the named unsupported rows;
+      // v0.25.0 Highway Sequence (raw-sourced like Highway Log)
+      on: false, examples: 2, ready: true, deps_ok: true, tsn_pdfs: 37,
       rows: ["highway_detail", "highway_detail_pdf",
              "highway_log", "highway_log_pdf",
+             "highway_sequence", "highway_sequence_pdf",
              "intersection_detail", "intersection_detail_pdf"],
       dir: "C:\\demo\\tsn_library\\highway_detail\\pdf",
       reports: [
@@ -131,17 +134,21 @@ function makeMockApi() {
           dir: "C:\\demo\\tsn_library\\highway_detail\\pdf", source: "pdf" },
         { key: "highway_log", label: "Highway Log", tsn_pdfs: 12,
           dir: "C:\\demo\\tsn_library\\highway_log\\raw", source: "raw" },
+        { key: "highway_sequence", label: "Highway Sequence", tsn_pdfs: 12,
+          dir: "C:\\demo\\tsn_library\\highway_sequence\\raw", source: "raw" },
         { key: "intersection_detail", label: "Intersection Detail", tsn_pdfs: 1,
           dir: "C:\\demo\\tsn_library\\intersection_detail\\pdf", source: "pdf" },
       ],
       row_reports: {
         highway_detail: "highway_detail", highway_detail_pdf: "highway_detail",
         highway_log: "highway_log", highway_log_pdf: "highway_log",
+        highway_sequence: "highway_sequence",
+        highway_sequence_pdf: "highway_sequence",
         intersection_detail: "intersection_detail",
         intersection_detail_pdf: "intersection_detail",
       },
       unsupported: ["TSAR: Ramp Summary", "TSAR: Ramp Detail",
-                    "Highway Sequence Listing", "Intersection Summary"],
+                    "Intersection Summary"],
     },
   };
   const mockSettings = {
@@ -196,7 +203,7 @@ function makeMockApi() {
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
       meta: {
-        version: "0.24.0 (preview)", build: "portable app",
+        version: "0.25.0 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
@@ -222,6 +229,10 @@ function makeMockApi() {
       { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
       { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
     if (rk === "intersection_detail_pdf") return [   // CR-002: the exact HL-PDF parallel
+      { id: "env", label: "Cross-environment", kind: "env", supported: true },
+      { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
+      { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
+    if (rk === "highway_sequence_pdf") return [      // v0.25.0: the HD/HL-PDF parallel
       { id: "env", label: "Cross-environment", kind: "env", supported: true },
       { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
       { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
@@ -261,6 +272,7 @@ function makeMockApi() {
       { key: "intersection_detail", label: "Intersection Detail", tsn_capable: true },
       { key: "highway_log_pdf", label: "Highway Log (PDF)", tsn_capable: true },
       { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", tsn_capable: true },
+      { key: "highway_sequence_pdf", label: "Highway Sequence Listing (PDF)", tsn_capable: true },
     ];
     const rowLabels = {}; allRows.forEach((r) => { rowLabels[r.key] = r.label; });
     const hidden = st.matrix_hidden || [];
@@ -279,6 +291,7 @@ function makeMockApi() {
       intersection_detail: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "stale" },
       highway_log_pdf: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
       intersection_detail_pdf: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "stale" },
+      highway_sequence_pdf: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
     };
     const cells = {}, modes = {}, rowModes = {}, tsnMeta = {};
     rows.forEach((rk) => {
@@ -288,16 +301,19 @@ function makeMockApi() {
       const mode = avail.find((m) => m.id === selId) || avail[0];
       modes[rk] = mode.id; rowModes[rk] = avail;
       // Per-row TSN dataset: each PDF report SHARES its Excel sibling's TSN dataset
-      // (highway_log_pdf→highway_log, intersection_detail_pdf→intersection_detail);
-      // every other report has its OWN (mirrors the real matrix + the by-day mock).
+      // (highway_log_pdf→highway_log, intersection_detail_pdf→intersection_detail,
+      // highway_sequence_pdf→highway_sequence); every other report has its OWN
+      // (mirrors the real matrix + the by-day mock).
       const tsnSub = (rk === "highway_log_pdf") ? "highway_log"
-        : (rk === "intersection_detail_pdf") ? "intersection_detail" : rk;
+        : (rk === "intersection_detail_pdf") ? "intersection_detail"
+        : (rk === "highway_sequence_pdf") ? "highway_sequence" : rk;
       const isPdfs = (tsnSub === "highway_log" || tsnSub === "highway_sequence");
       const tsnFile = (st.matrix_tsn_files || {})[tsnSub];
       const srcKind = tsnFile ? "file" : (isPdfs && st.mock_tsn_pdfs) ? "pdfs" : "consolidated";
       if (mode.kind === "tsn") {
         tsnMeta[rk] = { supported: mode.supported,
-          fmt: (rk === "highway_log_pdf" || rk === "intersection_detail_pdf") ? "pdf" : "excel",
+          fmt: (rk === "highway_log_pdf" || rk === "intersection_detail_pdf"
+                || rk === "highway_sequence_pdf") ? "pdf" : "excel",
           source_kind: srcKind, pdf_count: srcKind === "pdfs" ? 12 : undefined,
           source_path: tsnFile || (srcKind === "consolidated"
             ? `…\\_tsn_input\\${tsnSub}\\tsn_${tsnSub}_consolidated.xlsx` : undefined),
@@ -345,6 +361,7 @@ function makeMockApi() {
       { key: "ramp_summary", label: "TSAR: Ramp Summary", supported: true },
       { key: "ramp_detail", label: "TSAR: Ramp Detail", supported: true },
       { key: "highway_sequence", label: "Highway Sequence Listing", supported: true },
+      { key: "highway_sequence_pdf", label: "Highway Sequence Listing (PDF)", supported: true },
       { key: "intersection_summary", label: "Intersection Summary", supported: true },
       { key: "intersection_detail", label: "Intersection Detail", supported: true },
       { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", supported: true },
@@ -364,11 +381,13 @@ function makeMockApi() {
     shown.forEach((r) => {
       const sub = r.key;
       // Each PDF row shares its Excel sibling's TSN dataset (highway_log_pdf→
-      // highway_log, intersection_detail_pdf→intersection_detail) — mirror the real
-      // engine (and the Everything mock) so the picker reads/writes matrix_tsn_files
-      // under the right key.
+      // highway_log, intersection_detail_pdf→intersection_detail,
+      // highway_sequence_pdf→highway_sequence) — mirror the real engine (and the
+      // Everything mock) so the picker reads/writes matrix_tsn_files under the
+      // right key.
       const tsnSub = (sub === "highway_log_pdf") ? "highway_log"
-        : (sub === "intersection_detail_pdf") ? "intersection_detail" : sub;
+        : (sub === "intersection_detail_pdf") ? "intersection_detail"
+        : (sub === "highway_sequence_pdf") ? "highway_sequence" : sub;
       const isPdfs = (tsnSub === "highway_log" || tsnSub === "highway_sequence");
       const file = (st.matrix_tsn_files || {})[tsnSub];
       const kind = file ? "file" : (isPdfs && st.mock_tsn_pdfs) ? "pdfs" : "consolidated";
@@ -629,7 +648,7 @@ function makeMockApi() {
       // P9: mirror the backend's bridge-enum surface (gui_api.get_initial_state ->
       // contract.initial_state_enums) so the preview's init payload matches production.
       contract: window.CONTRACT,
-      app_name: "TSMIS Exporter", version: "0.24.0 (preview)",
+      app_name: "TSMIS Exporter", version: "0.25.0 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       // Mirror the real gate: Intersection is enabled (dev site); the reserved Highway
@@ -642,6 +661,7 @@ function makeMockApi() {
         { key: "cons:highway_log_pdf", label: "TSMIS Highway Log (PDF)", group: null, short: null, fmt: "PDF" },
         { key: "cons:tsn_highway_log", label: "TSN Highway Log (PDF)", group: null, short: null, fmt: "PDF" },
         { key: "cons:highway_sequence", label: "Highway Sequence Listing", group: null, short: null, fmt: "Excel" },
+        { key: "cons:highway_sequence_pdf", label: "TSMIS Highway Sequence (PDF)", group: null, short: null, fmt: "PDF" },
         { key: "cons:ramp_summary", label: "TSAR: Ramp Summary", group: "Ramp", short: "Summary", fmt: "PDF" },
         { key: "cons:ramp_detail", label: "TSAR: Ramp Detail", group: "Ramp", short: "Detail", fmt: "Excel" },
         { key: "cons:intersection_summary", label: "Intersection Summary", group: "Intersection", short: "Summary", fmt: "Excel" },
@@ -654,9 +674,9 @@ function makeMockApi() {
         { id: "env", label: "Cross-environment" },
         { id: "tsn", label: "vs TSN" },
       ],
-      // Mirrors the real reports.COMPARE_REPORTS (18 rows as of CR-002: every report
-      // has a cross-env ("— between environments") AND a vs-TSN comparator, plus both
-      // PDF reports' PDF↔Excel + PDF↔TSN self/vs-TSN checks). Each row carries its
+      // Mirrors the real reports.COMPARE_REPORTS (26 rows as of v0.25.0: every report
+      // has a cross-env ("— between environments") AND a vs-TSN comparator, plus each
+      // PDF edition's PDF↔Excel + PDF↔TSN self/vs-TSN checks). Each row carries its
       // stable `cmp:*` key (P3), so selection/routing resolves by key — the order just
       // mirrors the registry for display parity.
       compare_reports: [
@@ -667,6 +687,9 @@ function makeMockApi() {
         { key: "cmp:highway_log:pdf_vs_excel", label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
         { key: "cmp:highway_sequence:env", label: "Highway Sequence Listing — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_sequence", file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:highway_sequence:tsn", label: "Highway Sequence Listing — TSMIS vs TSN", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_sequence:pdf_vs_tsn", label: "Highway Sequence Listing — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN" },
+        { key: "cmp:highway_sequence:pdf_vs_excel", label: "Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "env", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)" },
+        { key: "cmp:highway_sequence_pdf:env", label: "Highway Sequence Listing (PDF) — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_sequence_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:ramp_summary:env", label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_summary", file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:ramp_summary:tsn", label: "TSAR: Ramp Summary — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Ramp", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN" },
         { key: "cmp:ramp_detail:env", label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_detail", file_a_label: "TSMIS", file_b_label: "TSN" },
@@ -1402,7 +1425,7 @@ function makeMockApi() {
         push({ t: "log", text: "An update is already downloaded — click ‘Restart to update’ in the title bar to install it." });
       } else {
         push({ t: "log", text: "Checking for updates…" });
-        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.24.0 preview)." }), 600);
+        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.25.0 preview)." }), 600);
       }
       return { ok: true };
     },

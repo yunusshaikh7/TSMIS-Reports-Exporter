@@ -61,6 +61,8 @@ _ADAPTER_MODULES = {
     "intersection_detail_pdf": "evidence_intersection_detail",
     "highway_log": "evidence_highway_log",
     "highway_log_pdf": "evidence_highway_log",
+    "highway_sequence": "evidence_highway_sequence",
+    "highway_sequence_pdf": "evidence_highway_sequence",
 }
 # Where each row's TSMIS-side PDFs live (the per-route export subdir) and which
 # TSN library report holds the TSN prints (per-district files for Highway
@@ -71,24 +73,30 @@ TSMIS_PDF_SUBDIR = {"highway_detail": "highway_detail_pdf",
                     "intersection_detail": "intersection_detail_pdf",
                     "intersection_detail_pdf": "intersection_detail_pdf",
                     "highway_log": "highway_log_pdf",
-                    "highway_log_pdf": "highway_log_pdf"}
+                    "highway_log_pdf": "highway_log_pdf",
+                    "highway_sequence": "highway_sequence_pdf",
+                    "highway_sequence_pdf": "highway_sequence_pdf"}
 TSN_PDF_REPORT = {"highway_detail": "highway_detail",
                   "highway_detail_pdf": "highway_detail",
                   "intersection_detail": "intersection_detail",
                   "intersection_detail_pdf": "intersection_detail",
                   "highway_log": "highway_log",
-                  "highway_log_pdf": "highway_log"}
+                  "highway_log_pdf": "highway_log",
+                  "highway_sequence": "highway_sequence",
+                  "highway_sequence_pdf": "highway_sequence"}
 # Report labels for the availability probe (static so the probe never has to
 # import an adapter — a state push must stay cheap; check_visual_evidence pins
 # these maps against report_catalog so they can't drift).
 _TSN_PDF_LABELS = {"highway_detail": "Highway Detail",
                    "intersection_detail": "Intersection Detail",
-                   "highway_log": "Highway Log"}
+                   "highway_log": "Highway Log",
+                   "highway_sequence": "Highway Sequence"}
 # Reports whose TSN prints ARE the library's raw inputs (district-PDF-sourced
-# TSN libraries — Highway Log): evidence reads the SAME files from raw/, so a
-# user with a working vs-TSN comparison already has the prints in place. The
-# statewide-XLSX-sourced reports keep the separate OPTIONAL pdf/ drop folder.
-_TSN_PDFS_IN_RAW = frozenset({"highway_log"})
+# TSN libraries — Highway Log and Highway Sequence): evidence reads the SAME
+# files from raw/, so a user with a working vs-TSN comparison already has the
+# prints in place. The statewide-XLSX-sourced reports keep the separate
+# OPTIONAL pdf/ drop folder.
+_TSN_PDFS_IN_RAW = frozenset({"highway_log", "highway_sequence"})
 
 MIN_EXAMPLES, MAX_EXAMPLES, DEFAULT_EXAMPLES = 1, 10, 2
 _RES = 180                     # render DPI (points * _RES/72 = pixels)

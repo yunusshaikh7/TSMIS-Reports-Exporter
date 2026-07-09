@@ -587,6 +587,14 @@ granularity artifact, not a disagreement) — shown, never counted; **FT + Descr
 **Notes sheet** (`legend_writer`) indicating all of this. Canary in [tsn-parsers.md](tsn-parsers.md):
 **57,070 both / 3,369 only-TSMIS / 12,688 only-TSN; 5,538 counted diffs (FT 699 + Description 4,839; 0 in
 context); 60,439 vs 69,758 rows; 242 routes both**. Live in both matrices — completing all 6 reports + HL-PDF.
+`compare_highway_sequence_pdf` (v0.25.0) adds `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL` (the exact
+§9f-PDF parallel, riding this module's loaders + schema) — each flavor carries its OWN Notes sheet
+because the print represents EQUATES the TSN way (annotation row + `E` on the equated postmile), so
+PDF-vs-TSN pairs BETTER than Excel-vs-TSN (7.8/7.9 canary: both **57,505** / diffs **4,930** vs
+57,071 / 5,521) while PDF-vs-Excel surfaces the two renders' representation classes by design
+(both **59,946** / one-sided **547/547** / identical **59,082**; residual = 4 Excel `_x000D_`
+escapes + the route-037 Description the Excel export drops). Parser + canaries:
+`ground-truth/HSL PDF + IS Bundle 7.9/_verification-scripts/`.
 
 ### 9c. Cross-environment — `compare_env.py` (the `"folders"` family)
 
@@ -614,10 +622,15 @@ limit and falls back to "Side A"/"Side B" on collision).
 | `INTERSECTION_DETAIL` | Intersection Detail | `intersection_detail` / "Intersection Detail" | `Post Mile` | **flat** (v0.17.0): a normal per-route XLSX, consolidated shape, route+PM key (the export header is offset within each type/eff-date pair, but both env sides share the layout so the position-wise compare is valid) |
 | `HIGHWAY_LOG_PDF` | Highway Log (PDF) | `highway_log_pdf` / "Highway Log" | Location | **flat, PDF-sourced** (v0.17.0): a `flat_pdf_loader` (`_load_highway_log_pdf_side`) converts each side's PDFs to per-route XLSX (the HL-PDF consolidator's parser) then reads them flat; reuses the Highway Log schema (`_HL_BASE`, `force_header`, Med Wid, ditto/roadbed). The PDF is the accurate HL source, so this is the preferred cross-env Highway Log |
 | `INTERSECTION_DETAIL_PDF` | Intersection Detail (PDF) | `intersection_detail_pdf` / "Intersection Detail" | `Post Mile` | **flat, PDF-sourced** (v0.18.0): the exact parallel of `HIGHWAY_LOG_PDF` — a `flat_pdf_loader` (`_load_intersection_detail_pdf_side`) parses each side's PDFs to per-route XLSX (the Int-Detail-PDF consolidator's parser) then reads them flat; reuses the Intersection Detail layout |
+| `HIGHWAY_DETAIL` | Highway Detail | `highway_detail` / "Highway Detail" | `Post Mile` | **flat** (v0.20.0): per-route XLSX, consolidated shape, route + glued-PM key (both env sides share the TSMIS encoding, so no roadbed canonicalization — that's a vs-TSN tool) |
+| `HIGHWAY_DETAIL_PDF` | Highway Detail (PDF) | `highway_detail_pdf` / "Highway Detail" | `Post Mile` | **flat, PDF-sourced** (v0.20.0): `_load_highway_detail_pdf_side`, the `INTERSECTION_DETAIL_PDF` parallel |
+| `HIGHWAY_SEQUENCE_PDF` | Highway Sequence (PDF) | `highway_sequence_pdf` / "Highway Locations" | `PM` | **flat, PDF-sourced** (v0.25.0): `_load_highway_sequence_pdf_side` parses each side's prints with the HSL-PDF consolidator, then reads them flat exactly like the Excel `HIGHWAY_SEQUENCE` row (no header pin — the converted files carry the export's own header, unnamed columns included) |
 
 `EnvCompare` has three shapes: the **flat** path (Ramp Detail / Highway Sequence / Highway Log /
-Intersection Detail — read the per-route sheet rows in consolidated shape); a **flat, PDF-sourced**
-variant (`flat_pdf_loader` — Highway Log (PDF) **and Intersection Detail (PDF)**, which parse each
+Intersection Detail / Highway Detail — read the per-route sheet rows in consolidated shape); a
+**flat, PDF-sourced**
+variant (`flat_pdf_loader` — Highway Log (PDF), Intersection Detail (PDF), Highway Detail (PDF)
+**and Highway Sequence (PDF)**, which parse each
 side's PDFs to per-route XLSX first); and the **aggregate-per-route** path (a `side_loader` yielding
 one row per route — Ramp Summary's PDFs, Intersection Summary's category sheets). Ramp Detail /
 Highway Sequence / Intersection Detail lock their
@@ -828,16 +841,16 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
   cells, scoped rebuild list, build guards, and the gui_api bridge incl. the shared queue). **Owed on
   the work PC:** building two real days vs TSN end-to-end.
 
-## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0)
+## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0, Highway Sequence in v0.25.0)
 
 The manual "screenshot the cell in both PDFs and circle it" workflow, automated, as a
 **decoration of a finished vs-TSN comparison** — it never changes the comparison's
 status/completion/counts, and any evidence failure only logs + adds a summary note.
-Three reports so far, each via its own adapter over the shared engine:
+Four reports so far, each via its own adapter over the shared engine:
 `evidence_highway_detail` (district TSN prints), `evidence_intersection_detail`
-(the statewide TSN print) and `evidence_highway_log` (district TSN prints, with its
-own routing — below). The HD-specific bullets below apply to the others analogously;
-the ID/HL differences are called out inline.
+(the statewide TSN print), `evidence_highway_log` and `evidence_highway_sequence`
+(district TSN prints, with the per-print routing — below). The HD-specific bullets
+below apply to the others analogously; the ID/HL/HSL differences are called out inline.
 
 - **What it produces**, next to the comparison workbook (the `(formulas).xlsx` sibling family):
   `<comparison> (evidence).xlsx` (a Summary sheet + BOTH image layouts embedded, each on its
@@ -860,11 +873,12 @@ the ID/HL differences are called out inline.
   TSN side = the prints in the report's `tsn_library/<report>/pdf/` folder — Highway Detail
   takes the 12 **district prints** (the district is read from each file's own DIST-CNTY-ROUTE
   header), Intersection Detail the ONE **statewide print** (district/county read per record
-  from `LOCATION`); filenames never matter. **Highway Log is the raw-sourced exception
-  (v0.24.0):** its TSN library is BUILT from the district prints, so evidence reads the SAME
-  files from `tsn_library/highway_log/raw/` (`visual_evidence._TSN_PDFS_IN_RAW`; availability
-  reports `source: "raw"`) — no duplicate pdf/ drop, and a user with a working HL vs-TSN
-  comparison already has evidence ready. The pdf/ folders are **created + hinted by
+  from `LOCATION`); filenames never matter. **Highway Log and Highway Sequence are the
+  raw-sourced exceptions (v0.24.0 / v0.25.0):** their TSN libraries are BUILT from the
+  district prints, so evidence reads the SAME files from `tsn_library/highway_log/raw/` /
+  `…/highway_sequence/raw/` (`visual_evidence._TSN_PDFS_IN_RAW`; availability
+  reports `source: "raw"`) — no duplicate pdf/ drop, and a user with a working vs-TSN
+  comparison for those reports already has evidence ready. The pdf/ folders are **created + hinted by
   `tsn_library.ensure_layout`** (v0.21.1 — driven by the catalog's `TsnEntry.evidence_pdfs`
   flag; v0.21.0 never created it, so an updated install had nowhere to drop the prints), and
   re-entering a matrix tab re-pushes the state so the toggle re-probes and un-greys without a
@@ -880,7 +894,11 @@ the ID/HL differences are called out inline.
   integer-column-1 rowB pairing, page-straddling records rejected; HL: the zebra-rect per-page
   windows with carry-forward — carried-geometry records rejected as approximate — the
   header-bottom cutoff, the col0-right data test, and Description captured from its own
-  follow-on lines, page-split descriptions rejected). The TSN locators differ by
+  follow-on lines, page-split descriptions rejected; HSL: the header-anchored per-page
+  boundaries, the trailer hard-stop, the PM / PM-less data tests, and wrapped-Description
+  fragments attached + hyphen-aware-joined exactly like its consolidator — the evidence
+  classifier is the word-object-keeping TWIN of `chslp._classify_words`, pinned identical
+  in `check_visual_evidence`). The TSN locators differ by
   print style: HD parses the TASAS district print line-anchored with the two-line REGEXES
   (word positions kept; an optional group that didn't print boxes the gap between neighbors;
   cross-checked ≥99.9% against the statewide extract); ID rides the statewide print's FIXED
@@ -894,18 +912,22 @@ the ID/HL differences are called out inline.
   locator rides the OTM52010 print's fixed document-wide column windows
   (`consolidate_tsn_highway_log.COLUMN_WINDOWS`), LOCKSTEP with that parser's walk (district/
   group headers, totals close, the description x-band + totals-pattern guards, `', '` joins).
-- **Highway Log's per-print routing (v0.24.0):** the HL comparison's 31 columns carry NO
+- **Per-print routing (Highway Log v0.24.0; Highway Sequence v0.25.0):** those comparisons'
+  columns carry NO
   county/district, so a diff row can't be mapped to one district print up front (HD's sidecar
   trick doesn't apply, and the comparator/library shapes stay untouched). The adapter owns the
   fan-out instead: every example carries the SENTINEL district `""`, `district_index` returns
   one `{"": <folder>}` entry, and `locate_tsn` receives the FOLDER — scanning every district
   print route-filtered, tagging each record with its source path + the district/county it was
-  printed under. `_try_example` prefers a record's own `src`/`dist`/`cnty` over the district
+  printed under (HL: the print's district/group headers; HSL: the "DIST NN RTE NNN" group
+  headers + the county carried from the data lines). `_try_example` prefers a record's own
+  `src`/`dist`/`cnty` over the district
   index (additive; HD/ID records don't carry them and behave exactly as before), and the
   engine's own uniqueness gate turns any cross-print key collision into a skipped example —
   ambiguity can only cost an example, never mislabel one. Diffs are judged by
   `compare_core.compared_cell` itself, so the `+`-run **ditto** cells (non-asserting by
-  schema) and the Med Wid normalization can never enumerate as examples. Costs a full
+  schema, HL), the **context fields** (HG/City/Distance, HSL) and the Med Wid normalization
+  can never enumerate as examples. Costs a full
   route-filtered scan of the district prints per run (minutes, like the TSN consolidation) —
   the district-parse cache stays on the roadmap alongside HD's.
 - **Evidence UX (v0.24.0):** the toggle on both matrix pages lists per report what it will

@@ -100,6 +100,7 @@ APP_MODULES = [
     "consolidate_tsn_highway_log", "consolidate_tsmis_highway_log_pdf",
     "consolidate_tsmis_intersection_detail_pdf",   # CR-002: Int-Detail-PDF parser (HL-PDF parallel)
     "consolidate_tsn_highway_sequence",
+    "consolidate_tsmis_highway_sequence_pdf",   # v0.25.0: HSL-PDF parser (HD-PDF parallel)
     "consolidate_intersection_detail", "consolidate_intersection_summary",
     # Highway Detail family (v0.20.0): the Excel + PDF-sourced consolidators,
     # the TSN-library loader, and the vs-TSN / PDF-flavor comparators.
@@ -110,12 +111,12 @@ APP_MODULES = [
     "compare_core", "compare_tsn_common", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
     "compare_ramp_detail_tsn", "compare_ramp_summary_tsn", "compare_intersection_summary_tsn",
     "compare_intersection_detail_tsn", "compare_intersection_detail_pdf",
-    "compare_highway_sequence_tsn",
+    "compare_highway_sequence_tsn", "compare_highway_sequence_pdf",
     "compare_highway_detail_tsn", "compare_highway_detail_pdf",
     # v0.21.0 visual evidence: the report-agnostic engine + the per-report
     # adapters (lazy-imported by matrix_build/gui_api, so they MUST be declared).
     "visual_evidence", "evidence_highway_detail", "evidence_intersection_detail",
-    "evidence_highway_log",
+    "evidence_highway_log", "evidence_highway_sequence",
     "gui_main", "gui_api", "gui_worker", "gui_win32", "gui_endpoint", "gui_matrix",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are

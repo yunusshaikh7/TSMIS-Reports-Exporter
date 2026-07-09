@@ -12,7 +12,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
 | 2b | TSAR: Ramp Detail (PDF) | PDF (Letter, landscape; export-only) | `output/<run>/ramp_detail_pdf/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
-| 3b | Highway Sequence Listing (PDF) | PDF (Letter, portrait; export-only) | `output/<run>/highway_sequence_pdf/` |
+| 3b | Highway Sequence Listing (PDF) | PDF (Letter, portrait) | `output/<run>/highway_sequence_pdf/` |
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
@@ -163,10 +163,13 @@ Built on the Intersection Detail recipe, verified against the full statewide dev
 - **`visual_evidence.py` + `evidence_highway_detail.py`** (v0.21.0) — the OPTIONAL **evidence images** decoration of the vs-TSN comparisons: for every differing column, sampled random rows rendered as highlighted snippets from BOTH PDFs (the app's (PDF) export + the TSN district prints), each example verified by parse-back before it's shown; `… (evidence).xlsx` + a two-layout image folder beside the comparison. Toggle + per-column count (1–10) on both matrix pages. → [comparison-engine.md](comparison-engine.md) §13.
 - Locked by `check_compare_highway_detail_tsn` + `check_highway_detail_pdf` + `check_visual_evidence` (+ the registry/matrix/mock parity checks).
 
-### Highway Sequence (PDF) + Ramp Detail (PDF) — export-only print editions (v0.24.0)
+### Highway Sequence (PDF) — the fully-integrated print edition (export v0.24.0, the rest v0.25.0)
 
-Two more print editions, cloned from the Highway Detail (PDF) recipe and confirmed on BOTH
-site captures (main `website-source` + `TSMIS Dev Site 7.7`):
+Cloned from the Highway Detail (PDF) recipe; the export was confirmed on BOTH site
+captures (main `website-source` + `TSMIS Dev Site 7.7`), and the parser/comparisons/
+evidence were **censused-first and blessed on the first real work-PC print set**
+(`ground-truth/HSL PDF + IS Bundle 7.9`, 252 routes — parse-back 60,493/60,493 rows vs
+the 7.8 Excel exports; every residual class explained):
 
 - **`export_highway_sequence_pdf.py`** — `subdir="highway_sequence_pdf"`,
   `data_value="highway_sequence"` (same dropdown option as the Excel sibling),
@@ -174,6 +177,38 @@ site captures (main `website-source` + `TSMIS Dev Site 7.7`):
   page + per-district `.hsl-print-table` sections (9 columns); the save overrides
   `window.print` to raise, calls it, counts non-colspan tbody rows as the empty backstop,
   and captures **PORTRAIT** Letter — matching the TSN district prints (612×792).
+- **`consolidate_tsmis_highway_sequence_pdf.py`** — parses the per-route prints into the
+  SAME 9-column TSMIS format the Excel export produces (header-anchored per-page windows;
+  the postmile prefix/suffix in their two unnamed columns). The censused conventions:
+  wrapped Descriptions cluster as fragment lines around a vertically-centered data line
+  (top-order, HYPHEN-AWARE rejoin — `join_desc_parts`); a few rows carry NO postmile
+  ("END OF ROUTE …", "CITY END: …" — matched by their single-letter HG+FT windows);
+  EQUATES print the TSN way (annotation row "EQUATES TO <label>" with HG/FT/Distance
+  blank + the `E` suffix on the equated plain postmile — the Excel export seats them
+  differently BY DESIGN); the last page ends with an "Unresolved Intersections"
+  site-diagnostics trailer (hard stop). Values written verbatim; unparsed lines escalate
+  to a producer-owned PARTIAL.
+- **`compare_highway_sequence_pdf.py`** — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, the
+  `compare_highway_detail_pdf` parallel riding `compare_highway_sequence_tsn`'s loaders +
+  schema, each flavor with its OWN Notes sheet (the print's TSN-style equates make
+  PDF-vs-TSN pair BETTER than Excel-vs-TSN — both 57,505 vs 57,071, diff cells 4,930 vs
+  5,521 on the 7.8/7.9 sets — while PDF-vs-Excel documents the equate-representation
+  classes; identical 59,082 of 59,946 both, one-sided 547/547). The self-check caught the
+  Excel export DROPPING a Description the print carries (route 037 PM 003.809).
+- **`evidence_highway_sequence.py`** (v0.25.0) — evidence images for BOTH Highway
+  Sequence rows: the highway-log pattern (per-print SENTINEL routing — HSL rows carry no
+  district; records carry their own src/dist/cnty from the prints' "DIST NN RTE NNN"
+  group headers), diffs judged via `compare_core.compared_cell` so the CONTEXT columns
+  (HG/City/Distance) can never enumerate. TSN prints read from
+  `tsn_library/highway_sequence/raw/` — the SAME files the TSN library builds from (the
+  `_TSN_PDFS_IN_RAW` pattern; no duplicate drop).
+- Matrix rows in BOTH matrices (env + vs TSN + vs TSMIS Excel modes; shares the
+  `highway_sequence` TSN dataset with its Excel sibling); `cons:highway_sequence_pdf` on
+  the Consolidate tab + the console menu. Locked by `check_report_catalog`,
+  `check_matrix_tsn`, `check_visual_evidence` (+ the mock parity checks).
+
+### Ramp Detail (PDF) — export-only print edition (v0.24.0)
+
 - **`export_ramp_detail_pdf.py`** — `subdir="ramp_detail_pdf"`, `data_value="Ramp_Detail"`,
   `save=save_ramp_detail_pdf`. Ramp Detail has **no `rd_printAll`**: its print body IS the
   site's shared async `printAll()` dispatcher, which first `await`s a
@@ -183,13 +218,15 @@ site captures (main `website-source` + `TSMIS Dev Site 7.7`):
   (`_RAMP_DETAIL_PRINT_BUILD_MS`) so a future unanswered await fails the route loudly
   instead of hanging it. Captures **LANDSCAPE** Letter (the TSN statewide Ramp Detail print
   is 792×612). Marker `.rd-print-table` (11 columns).
-- **Stable ids 11/12** (append-only; `batch_manifest._V017_EXPORT_ORDER == EXPORT_KEYS`
+- **Stable ids 11/12** (with Highway Sequence (PDF); append-only;
+  `batch_manifest._V017_EXPORT_ORDER == EXPORT_KEYS`
   still holds); `_PICKER_ORDER` seats each next to its Excel sibling; both coalesce with
   their siblings automatically (shared `data_value`, and both saves joined
   `_PAGE_REBUILDING_SAVES` so the Export-button save always runs first).
 - **EXPORT-ONLY for now** — no consolidator/comparison/evidence until real work-PC PDFs
-  verify the print parse (Lesson 13 discipline: never bless a parser on synthetic renders).
-  The picker rows explain what a print edition is on hover; the roadmap tracks the follow-up.
+  verify the print parse (Lesson 13 discipline: never bless a parser on synthetic
+  renders; Highway Sequence (PDF) graduated exactly this way in v0.25.0). The picker row
+  explains what a print edition is on hover; the roadmap tracks the follow-up.
 
 ### Coalescing both editions of a report (v0.19.2)
 

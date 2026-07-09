@@ -30,10 +30,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import compare_highway_detail_tsn as cht
 import compare_highway_log as chl_cmp
+import compare_highway_sequence_tsn as chsl_cmp
 import consolidate_tsmis_highway_detail_pdf as chd
+import consolidate_tsmis_highway_sequence_pdf as chslp
 import consolidate_tsn_highway_log as ctnl
+import consolidate_tsn_highway_sequence as ctnsl
 import evidence_highway_detail as ehd
 import evidence_highway_log as ehl
+import evidence_highway_sequence as ehsl
 import highway_detail_columns as hdc
 import highway_log_columns as hlc
 import matrix_build
@@ -52,9 +56,11 @@ def check(name, cond):
 
 # --------------------------------------------------------------------------- #
 print("registry + sources + clamp")
-check("rows: the Highway Detail + Highway Log + Intersection Detail pairs, nothing else",
+check("rows: the Highway Detail + Highway Log + Highway Sequence + Intersection "
+      "Detail pairs, nothing else",
       ve.rows() == ["highway_detail", "highway_detail_pdf",
                     "highway_log", "highway_log_pdf",
+                    "highway_sequence", "highway_sequence_pdf",
                     "intersection_detail", "intersection_detail_pdf"])
 check("capable() matches rows()",
       all(ve.capable(r) for r in ve.rows()) and not ve.capable("ramp_detail"))
@@ -64,9 +70,12 @@ check("TSMIS visuals come from each report's (PDF)-edition export subdir",
       and ve.pdf_subdir_for("intersection_detail") == "intersection_detail_pdf"
       and ve.pdf_subdir_for("intersection_detail_pdf") == "intersection_detail_pdf"
       and ve.pdf_subdir_for("highway_log") == "highway_log_pdf"
-      and ve.pdf_subdir_for("highway_log_pdf") == "highway_log_pdf")
+      and ve.pdf_subdir_for("highway_log_pdf") == "highway_log_pdf"
+      and ve.pdf_subdir_for("highway_sequence") == "highway_sequence_pdf"
+      and ve.pdf_subdir_for("highway_sequence_pdf") == "highway_sequence_pdf")
 check("TSN prints live in each report's library pdf folder — except the Highway "
-      "Log, whose district prints ARE the library's raw inputs (no duplicate drop)",
+      "Log and Highway Sequence, whose district prints ARE the library's raw "
+      "inputs (no duplicate drop)",
       str(ve.tsn_pdf_dir("highway_detail")).replace("\\", "/")
       .endswith("tsn_library/highway_detail/pdf")
       and str(ve.tsn_pdf_dir("intersection_detail")).replace("\\", "/")
@@ -74,7 +83,11 @@ check("TSN prints live in each report's library pdf folder — except the Highwa
       and str(ve.tsn_pdf_dir("highway_log")).replace("\\", "/")
       .endswith("tsn_library/highway_log/raw")
       and str(ve.tsn_pdf_dir("highway_log_pdf")).replace("\\", "/")
-      .endswith("tsn_library/highway_log/raw"))
+      .endswith("tsn_library/highway_log/raw")
+      and str(ve.tsn_pdf_dir("highway_sequence")).replace("\\", "/")
+      .endswith("tsn_library/highway_sequence/raw")
+      and str(ve.tsn_pdf_dir("highway_sequence_pdf")).replace("\\", "/")
+      .endswith("tsn_library/highway_sequence/raw"))
 check("clamp: default/garbage/low/high",
       (ve.clamp_examples(None), ve.clamp_examples("x"), ve.clamp_examples(0),
        ve.clamp_examples(99), ve.clamp_examples("7"))
@@ -89,12 +102,13 @@ check("availability shape (rows/tsn_pdfs/ready/dir/reports/row_reports/deps_ok)"
                      "deps_ok"})
 check("availability reports every evidence report, per-dir + source kind",
       [r["key"] for r in avail["reports"]]
-      == ["highway_detail", "highway_log", "intersection_detail"]
+      == ["highway_detail", "highway_log", "highway_sequence",
+          "intersection_detail"]
       and all(set(r) >= {"key", "label", "tsn_pdfs", "dir", "source"}
               for r in avail["reports"])
       and {r["key"]: r["source"] for r in avail["reports"]}
       == {"highway_detail": "pdf", "highway_log": "raw",
-          "intersection_detail": "pdf"})
+          "highway_sequence": "raw", "intersection_detail": "pdf"})
 check("row_reports maps every capable row to its report (the per-cell action's gate)",
       avail["row_reports"] == ve.TSN_PDF_REPORT
       and set(avail["row_reports"]) == set(ve.rows()))
@@ -607,6 +621,110 @@ check("load_sides accepts consolidated workbooks (truthy routing sidecar, no not
       and len(_r_t) == 1 and _r_t[0][0] == "001")
 import shutil as _sh
 _sh.rmtree(_hl_tmp, ignore_errors=True)
+
+# --------------------------------------------------------------------------- #
+print("Highway Sequence adapter (v0.25.0): fields, maps, routing, context discipline")
+check("FIELDS = every shared column except the PM key",
+      ehsl.FIELDS == [f for f in chsl_cmp.SHARED_HEADER if f != "PM"]
+      and len(ehsl.FIELDS) == 6)
+check("field -> TSMIS print column / TSN print window maps are complete",
+      all(f in ehsl._TSMIS_COL for f in ehsl.FIELDS)
+      and all(f == "Description" or f in ehsl._TSN_WIN for f in ehsl.FIELDS))
+check("verification projection == the comparator's per-field normalization + TRIM "
+      "(route-prefix strip + whitespace collapse on Description; county period)",
+      ehsl.project("Description", "001/NB  OFF TO X ") == "NB OFF TO X"
+      and ehsl.project("County", "LA.") == "LA"
+      and ehsl.project("FT", " H\t") == "H")
+check("canonical key: 'COUNTY GLUED-POSTMILE', county normalized",
+      ehsl._canon("LA.", "R000.129") == "LA R000.129"
+      and ehsl._canon("ORA", "018.530E") == "ORA 018.530E")
+check("district_index is the sentinel single-folder entry (per-print routing)",
+      ehsl.district_index(Path("C:/anywhere")) == {"": Path("C:/anywhere")})
+# Context discipline: HG / City / Distance are CONTEXT fields (never counted by
+# the comparison), so enumerate_diffs must never sample them — while FT and
+# Description diffs in the same row still enumerate.
+_hs_a = ["001", "ORA", "R000.129", "LGNB", "D", "H", "000.100", "JCT 5"]
+_hs_b = ["001", "ORA", "R000.129", "",     "U", "I", "000.900", "JCT 5 UC"]
+_hs_diffs = ehsl.enumerate_diffs([_hs_a], [_hs_b], {"routing": "per-print"})
+check("enumerate_diffs skips context fields but keeps FT + Description diffs",
+      set(_hs_diffs) == {"FT", "Description"}
+      and [e["key"] for e in _hs_diffs["FT"]] == ["ORA R000.129"]
+      and _hs_diffs["FT"][0]["dist"] == "" and _hs_diffs["FT"][0]["cnty"] == "")
+check("enumerate_diffs judges through the LIVE schema (context fields set)",
+      set(chsl_cmp._SCHEMA.context_fields)
+      == {"HG", "City", "Distance To Next Point"})
+# LOCKSTEP pins vs the PDF consolidator: the wrap join, the PM-less data test,
+# the trailer heading, and the evidence twin of the word classifier.
+check("join_desc_parts: bare after a hyphen, one space otherwise, empties skipped",
+      chslp.join_desc_parts(["UC 55-", "1107"]) == "UC 55-1107"
+      and chslp.join_desc_parts(["A", "", "B"]) == "A B"
+      and chslp.join_desc_parts(["", "X"]) == "X")
+check("PM-less data rows accepted (END OF ROUTE / CITY END), furniture rejected",
+      chslp._is_pmless_data({"pm": "", "prefix": "", "suffix": "",
+                             "desc": "END OF ROUTE 043", "hg": "D", "ft": "H",
+                             "county": "", "city": "", "dist": "000.000"})
+      and not chslp._is_pmless_data({"pm": "", "prefix": "", "suffix": "Direction:",
+                                     "desc": "S - N", "hg": "", "ft": "",
+                                     "county": "", "city": "", "dist": ""})
+      and not chslp._is_pmless_data({"pm": "", "prefix": "", "suffix": "",
+                                     "desc": "", "hg": "D", "ft": "H",
+                                     "county": "", "city": "", "dist": ""}))
+check("the trailer heading pin (parsing hard-stops there)",
+      chslp.TRAILER_HEADING == "Unresolved Intersections")
+# The evidence classifier is the word-object-keeping TWIN of the consolidator's:
+# the same synthetic line must classify identically through both.
+_hd7 = {"COUNTY": {"x0": 31, "x1": 68}, "CITY": {"x0": 84, "x1": 103},
+        "PM": {"x0": 149, "x1": 163}, "HG": {"x0": 201, "x1": 214},
+        "FT": {"x0": 225, "x1": 235}, "NEXT": {"x0": 251, "x1": 274},
+        "DESCRIPTION": {"x0": 317, "x1": 376}}
+_bounds = chslp._boundaries(_hd7)
+_line = [{"text": "ORA", "x0": 40, "x1": 59}, {"text": "LGNB", "x0": 82, "x1": 105},
+         {"text": "R", "x0": 127, "x1": 133}, {"text": "000.129", "x0": 140, "x1": 173},
+         {"text": "E", "x0": 184, "x1": 189}, {"text": "D", "x0": 204, "x1": 211},
+         {"text": "H", "x0": 233, "x1": 239}, {"text": "000.124", "x0": 262, "x1": 294},
+         {"text": "COUNTY", "x0": 317, "x1": 353}, {"text": "BEGIN:", "x0": 356, "x1": 384}]
+_vals = chslp._classify_words(_line, _bounds)
+_cols = ehsl._classify_line_words(_line, _bounds)
+check("consolidator + evidence classify one line identically (LOCKSTEP twin)",
+      _vals == {k: " ".join(w["text"] for w in ws) for k, ws in _cols.items()}
+      and _vals["county"] == "ORA" and _vals["prefix"] == "R"
+      and _vals["pm"] == "000.129" and _vals["suffix"] == "E"
+      and _vals["hg"] == "D" and _vals["ft"] == "H"
+      and _vals["dist"] == "000.124" and _vals["desc"] == "COUNTY BEGIN:")
+# load_sides refuses a NON-consolidated TSMIS workbook (no Route column) with the
+# comparator's own hint, and accepts the consolidated + normalized-TSN pair.
+_hs_tmp = Path(tempfile.mkdtemp(prefix="tsmis_ev_hsl_"))
+_wbp = Workbook()
+_wsp = _wbp.active
+_wsp.title = chsl_cmp.TSMIS_SHEET
+_wsp.append(["County", "City", None, "PM", None, "HG", "FT",
+             "Distance To Next Point", "Description"])   # per-route: NO Route col
+_wsp.append(["ORA", None, "R", "000.129", None, "D", "H", "000.124", "X"])
+_wbp.save(_hs_tmp / "per_route.xlsx")
+_wbn = Workbook()
+_wsn = _wbn.active
+_wsn.title = ctnsl.NORMALIZED_SHEET
+_wsn.append(ctnsl.NORMALIZED_HEADER)
+_wsn.append(["001", "ORA", "R000.129", None, "D", "H", "000.102", "X"])
+_wbn.save(_hs_tmp / "tsn.xlsx")
+_r_t, _r_n, _sc3, _note3 = ehsl.load_sides(str(_hs_tmp / "per_route.xlsx"),
+                                           str(_hs_tmp / "tsn.xlsx"))
+check("load_sides refuses per-route (route-less) workbooks with a clear note",
+      _sc3 is None and "consolidate first" in (_note3 or ""))
+_wbc = Workbook()
+_wsc = _wbc.active
+_wsc.title = chsl_cmp.TSMIS_SHEET
+_wsc.append(["Route", "County", "City", None, "PM", None, "HG", "FT",
+             "Distance To Next Point", "Description"])    # consolidated shape
+_wsc.append(["001", "ORA", None, "R", "000.129", None, "D", "H", "000.124", "X"])
+_wbc.save(_hs_tmp / "consolidated.xlsx")
+_r_t, _r_n, _sc4, _note4 = ehsl.load_sides(str(_hs_tmp / "consolidated.xlsx"),
+                                           str(_hs_tmp / "tsn.xlsx"))
+check("load_sides accepts the consolidated + normalized-TSN pair (glued key both sides)",
+      _sc4 == {"routing": "per-print"} and _note4 is None
+      and len(_r_t) == 1 and _r_t[0][0] == "001" and _r_t[0][2] == "R000.129"
+      and len(_r_n) == 1 and _r_n[0][2] == "R000.129")
+_sh.rmtree(_hs_tmp, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #
 print("engine misc")

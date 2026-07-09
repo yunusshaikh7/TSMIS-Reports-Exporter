@@ -164,6 +164,24 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   "OLD OREGON TRAIL"→"MTN GATE": the TSN snapshot is 10 months older), TSN-labeled (108). No new
   artifact classes; the comparator's Notes sheet now spells out the equate-pairing FT behavior.
   Bundle + scripts: `ground-truth/HSL Bundle 7.8/` (local).
+- **The PDF edition (v0.25.0 — parser blessed on the first real work-PC print set,
+  `ground-truth/HSL PDF + IS Bundle 7.9/`, 252 routes):**
+  `consolidate_tsmis_highway_sequence_pdf` parses the print into the SAME 9-column TSMIS shape
+  (header-anchored per-page windows; prefix/PM/suffix in their own narrow windows; wrapped
+  Descriptions rejoined top-to-bottom HYPHEN-AWARE; PM-less "END OF ROUTE"/"CITY END" rows
+  matched by single-letter HG+FT; the last page's "Unresolved Intersections" diagnostics
+  trailer hard-stops the parse). Parse-back vs the 7.8 Excel exports: **60,493/60,493 rows,
+  59,082 fully equal**; residual = the EQUATE-representation classes (the print writes the
+  TSN convention — annotation "EQUATES TO <label>" with HG/FT/Distance blank + `E` on the
+  equated plain postmile — where Excel writes the label alone and seats `E` differently:
+  blanked-FT 1,129 / blanked-HG 910 / anno-desc 716 / suffix-moved 549 / "PM EQUATION" 413)
+  plus 4 Excel `_x000D_` literal escapes and ONE genuine Excel defect (route 037 PM 003.809 —
+  the Excel export drops a Description the print carries). Flavor canaries (7.9 PDFs vs the
+  7.8 TSN/Excel): **PDF-vs-TSN both 57,505 / only 2,988+12,253 / diffs 4,930 / identical
+  52,659 / routes 242/10/21** (pairs BETTER than Excel-vs-TSN — the equates key-match);
+  **PDF-vs-Excel both 59,946 / one-sided 547/547 / diffs 1,722 on 864 rows / identical
+  59,082** (== the independent positional verify, exactly). Scripts + expected numbers:
+  `ground-truth/HSL PDF + IS Bundle 7.9/_verification-scripts/`.
 
 ### Intersection Summary — TSN  *(BUILT + verified — v0.17.0 Phase 3b/3c)*
 - **TSMIS side:** per-route XLSX ×218, **sheet `Intersection Summary`** (CONFIRMED), 3-col sheet
@@ -197,6 +215,18 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   the Ramp Summary AGGREGATE machinery + `extra_sheet_writer`.
 - **Normalization:** key on block+code-letter (label text ignored); rural/urban + lanes special-cased.
   **No ditto/roadbed.**
+- **July-2026 site rename (v0.25.0):** the per-route export renamed ONE block header,
+  `MAINLINE MASTARM` → `MAINLINE MASTERARM` (the 7.9 statewide export's skeleton is otherwise
+  IDENTICAL to 6.19 — verified route-by-route). The spec's Section now carries a parse-only
+  `aliases=("MAINLINE MASTERARM",)` (all slugs/keys/labels stay derived from the original name, so
+  no workbook text changed and no re-bless was needed; the TSN print keeps MASTARM). Because the
+  pre-fix failure was SILENT (the block zeroed and its `+` count leaked into Lanes), the
+  consolidator gained a **layout-drift tripwire**: every section's category counts must sum to the
+  route's `Total Intersections` — true statewide in BOTH eras for every block EXCEPT `HIGHWAY
+  GROUP` (the site itself under-counts it: 121/218 routes on 6.19, 6/217 on 7.9 — exempted) — so a
+  future renamed header or unknown new code fails the route LOUDLY (named block, re-export hint,
+  producer-owned PARTIAL) instead of writing wrong numbers. Fresh-export canary (7.9, 217 routes —
+  route 170 missing vs 6.19's 218, flagged): all parse, statewide Total Intersections **16,459**.
 - **Drop folder / consolidator / comparator / golden check:** `tsn_library/intersection_summary/`
   (raw statewide PDF → normalized `Category|Count` via `tsn_load_intersection_summary.build_into`) ·
   `consolidate_intersection_summary` (block-walk category summer; per-route sheet + familiar Combined) ·

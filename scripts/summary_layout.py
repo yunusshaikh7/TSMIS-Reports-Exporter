@@ -56,6 +56,11 @@ class Cat:
 class Section:
     name: str
     cats: tuple
+    # Alternate header spellings that switch to this block when block-walked.
+    # PARSING-only: slugs/keys/labels stay derived from `name`, so accepting a
+    # renamed source header never changes any workbook text. (The July-2026 site
+    # update renamed MASTARM -> MASTERARM; TSN prints keep the old spelling.)
+    aliases: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -220,8 +225,9 @@ def _icat(block, code, label):
                code=code, sides=sides)
 
 
-def _isec(block, *cat_specs):
-    return Section(block, tuple(_icat(block, c, l) for c, l in cat_specs))
+def _isec(block, *cat_specs, aliases=()):
+    return Section(block, tuple(_icat(block, c, l) for c, l in cat_specs),
+                   aliases=aliases)
 
 
 _IS_RURAL_URBAN = "RURAL/URBAN/SUBURBAN"
@@ -265,8 +271,12 @@ INTERSECTION_SUMMARY_SPEC = SummarySpec(
         _isec("MAINLINE NUM OF LANES",
               ("1", ""), ("2", ""), ("3", ""), ("4", ""), ("5", ""),
               ("6", ""), ("7", ""), ("8", ""), ("+", "NO DATA GIVEN")),
+        # The July-2026 site update renamed this block's header MASTARM ->
+        # MASTERARM in the per-route export; the TSN statewide print keeps
+        # MASTARM. Alias accepts both; all output text stays "MASTARM".
         _isec("MAINLINE MASTARM",
-              ("Y", "YES"), ("N", "NO"), ("+", "NO DATA GIVEN")),
+              ("Y", "YES"), ("N", "NO"), ("+", "NO DATA GIVEN"),
+              aliases=("MAINLINE MASTERARM",)),
         _isec("MAINLINE LEFT CHANNELIZATION",
               ("C", "CURBED MEDIAN LEFT TURN CHAN"), ("N", "NO LEFT TURN CHANNELIZATION"),
               ("P", "PAINTED LEFT TURN CHAN"), ("R", "RAISED BARS LEFT TURN CHAN"),
@@ -324,6 +334,9 @@ def counts_from_rows(spec, rows):
     block; data rows (numeric count) map by within-block code. The Rural/Urban
     block's two '-O OUTSIDE CITY' rows are bound to their R-RURAL / U-URBAN parent."""
     headers = {_norm_header(s.name): s for s in spec.sections}
+    for s in spec.sections:                      # renamed-header aliases (parse-only)
+        for alias in s.aliases:
+            headers[_norm_header(alias)] = s
     by_block = {s.name: {c.code: c for c in s.cats} for s in spec.sections}
     out, cur, ru_parent = {}, None, None
     for count, text in rows:

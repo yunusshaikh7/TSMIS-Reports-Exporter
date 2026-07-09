@@ -21,11 +21,13 @@ from paths import (DOWNLOADED_BROWSERS_DIR, FAILURES_DIR, INPUT_ROOT,
 log = logging.getLogger("tsmis.gui")
 
 # is left alone — only content this app generates is ever deleted.
-_LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_detail", "highway_sequence",
+_LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_detail", "ramp_detail_pdf",
+                       "highway_sequence", "highway_sequence_pdf",
                        "highway_log", "highway_log_pdf", "intersection_detail_pdf",
                        "highway_detail", "highway_detail_pdf",
                        "consolidated", "tsn_highway_log", "tsmis_highway_log_pdf",
                        "tsmis_intersection_detail_pdf", "tsmis_highway_detail_pdf",
+                       "tsmis_highway_sequence_pdf",
                        "run_reports", "comparisons")
 
 
@@ -50,7 +52,9 @@ def reset_targets(include_input=False, warnings=None):
                        ("tsmis_intersection_detail_pdf_consolidated.xlsx",
                         "TSMIS Intersection Detail (PDF) consolidated workbook"),
                        ("tsmis_highway_detail_pdf_consolidated.xlsx",
-                        "TSMIS Highway Detail (PDF) consolidated workbook")):
+                        "TSMIS Highway Detail (PDF) consolidated workbook"),
+                       ("tsmis_highway_sequence_pdf_consolidated.xlsx",
+                        "TSMIS Highway Sequence (PDF) consolidated workbook")):
         p = OUTPUT_ROOT / fname
         if p.is_file():
             targets.append((lbl, p))

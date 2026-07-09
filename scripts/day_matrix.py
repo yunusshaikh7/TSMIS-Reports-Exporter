@@ -70,7 +70,7 @@ def _day_rows():
         if row_key == "highway_log":
             out.append((row_key, label, subdir, "excel", True, tsn_subdir))
         elif row_key in ("highway_log_pdf", "intersection_detail_pdf",
-                         "highway_detail_pdf"):
+                         "highway_detail_pdf", "highway_sequence_pdf"):
             out.append((row_key, label, subdir, "pdf", True, tsn_subdir))
         else:
             # Any report with a coded vs-TSN comparator is live (all of them as of
