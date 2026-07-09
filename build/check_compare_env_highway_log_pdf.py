@@ -57,9 +57,10 @@ def test_wiring():
     check("highway_log_pdf is a matrix row (membership; CR-002 appended a row after it)",
           "highway_log_pdf" in _mrows)
     check("existing matrix order unchanged — intersection_detail_pdf right after HL-PDF; "
-          "the v0.20.0 Highway Detail rows appended after it",
+          "the v0.20.0 Highway Detail rows, then the v0.25.0 HSL-PDF row, appended after it",
           _mrows[_mrows.index("highway_log_pdf") + 1] == "intersection_detail_pdf"
-          and _mrows[-2:] == ["highway_detail", "highway_detail_pdf"])
+          and _mrows[-3:] == ["highway_detail", "highway_detail_pdf",
+                              "highway_sequence_pdf"])
     defs = matrix._row_defs()
     hp = {m["id"]: m for m in matrix._row_modes("highway_log_pdf", "highway_log_pdf",
                                                 defs["highway_log_pdf"][3])}

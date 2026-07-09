@@ -424,6 +424,39 @@ def _load_intersection_detail_pdf_side(folder, label, events):
         shutil.rmtree(combined_dir, ignore_errors=True)
 
 
+def _load_highway_sequence_pdf_side(folder, label, events):
+    """Parse one side's Highway Sequence PDFs (folder/highway_sequence_pdf/*.pdf)
+    into consolidated-shape 9-column rows: convert them to per-route XLSX with the
+    HSL-PDF consolidator's own parser in a temp dir, then read those flat like any
+    XLSX side. Returns (rows, header, skipped). The exact parallel of
+    _load_highway_detail_pdf_side; no expected_header pin — the converted files
+    carry the Excel export's own header (with its two unnamed columns), exactly
+    like the Excel side the HIGHWAY_SEQUENCE row reads."""
+    import consolidate_tsmis_highway_sequence_pdf as _hslpdf
+    in_dir, pdfs = _find_input_dir(folder, _hslpdf.SUBDIR, "*.pdf")
+    if not pdfs:
+        raise ValueError(
+            f"No Highway Sequence (PDF) files were found for the {label} side:\n{in_dir}"
+            "\n\nExport the Highway Sequence Listing (PDF) report on that environment first.")
+    conv = Path(tempfile.mkdtemp(prefix="hslpdf_env_conv_"))
+    combined_dir = Path(tempfile.mkdtemp(prefix="hslpdf_env_out_"))
+    try:
+        res = _hslpdf.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                  input_dir=in_dir, out_path=combined_dir / "_combined.xlsx",
+                                  converted_dir=conv)
+        if res.status == "cancelled":
+            raise ValueError("Cancelled by user.")
+        if res.status != "ok":
+            raise ValueError(res.message or "Could not parse the Highway Sequence PDFs.")
+        # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
+        # excluded). Read them flat like the Excel per-route files.
+        return _load_xlsx_side(conv, label, "_perroute_", _hslpdf.SHEET_NAME,
+                               "Highway Sequence (PDF)", events)
+    finally:
+        shutil.rmtree(conv, ignore_errors=True)
+        shutil.rmtree(combined_dir, ignore_errors=True)
+
+
 # ---------------------------------------------------------------------------
 # Per-report adapters
 # ---------------------------------------------------------------------------
@@ -681,6 +714,14 @@ HIGHWAY_DETAIL_PDF = EnvCompare(
         report_name="Highway Detail (PDF)", header=["Post Mile"],
         id_noun="location", id_noun_plural="locations", pair_noun="postmile"),
     flat_pdf_loader=_load_highway_detail_pdf_side)
+# Highway Sequence (PDF) cross-env: the same flat per-route shape as the Excel
+# HIGHWAY_SEQUENCE row (sheet "Highway Locations", keyed on PM), but BOTH sides
+# are parsed from the app's own PDF export — the exact parallel of
+# HIGHWAY_DETAIL_PDF above.
+HIGHWAY_SEQUENCE_PDF = EnvCompare(
+    "highway_sequence_pdf", "Highway Sequence (PDF)", "highway_sequence_pdf",
+    sheet_name="Highway Locations", key_col="PM",
+    flat_pdf_loader=_load_highway_sequence_pdf_side)
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).

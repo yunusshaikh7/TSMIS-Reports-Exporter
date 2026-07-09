@@ -513,25 +513,38 @@ or accept as someday.**
   needs its prints. **Follow-ups, none started:**
   - [x] **Highway Log evidence adapter — SHIPPED (v0.24.0)** (`evidence_highway_log`: ditto-aware
     via `compared_cell`, per-print sentinel routing, TSN prints read from the library raw/).
-  - [ ] **TSN district-parse cache for HIGHWAY DETAIL + HIGHWAY LOG** [S] — an HD statewide
+  - [x] **Highway Sequence evidence adapter — SHIPPED (v0.25.0)** (`evidence_highway_sequence`:
+    context-field-aware via `compared_cell`, the HL per-print sentinel routing, TSN prints read
+    from the library raw/).
+  - [ ] **TSN district-parse cache for HIGHWAY DETAIL + HIGHWAY LOG + HIGHWAY SEQUENCE** [S] — an
+    HD statewide
     evidence run still spends ~10–20 min re-extracting words from ~4,300 district-print pages
-    every run, and the v0.24.0 HL adapter's per-print routing full-scans its 12 district prints
-    likewise; give both the mtime-keyed index cache the ID adapter shipped with in v0.22.0.
+    every run, and the HL (v0.24.0) + HSL (v0.25.0) adapters' per-print routing full-scans their
+    12 district prints
+    likewise; give all three the mtime-keyed index cache the ID adapter shipped with in v0.22.0.
   - [ ] **PDF-vs-Excel self-check evidence** [M] — needs a synthetic render of the Excel side (no
-    second PDF exists); park until someone actually asks for it. (The HL row's `vs_pdf`/`vs_excel`
+    second PDF exists); park until someone actually asks for it. (The HL/HSL rows'
+    `vs_pdf`/`vs_excel`
     self-check modes deliberately show no camera for the same reason.)
   - [ ] **Evidence on the Compare tab's direct file-pair flow** [S] — the matrix surfaces were the
     ask; the manual pick-two-files compare has no toggle (its TSMIS-PDF folder can't be inferred
     from the picked files — needs a picker or the standard-location assumption). The v0.24.0
     "What you'll get" text points users at the matrix pages meanwhile.
-  - [ ] **HSL + Ramp Detail evidence adapters** [M] — blocked on the same work-PC PDFs as their
-    print parsers (below). TSN sides are already in hand: HSL's district prints (the library raw/,
-    like HL) and the Ramp Detail statewide TSN print (`tsn_library/ramp_detail/pdf/` once flagged).
-- [ ] **Highway Sequence (PDF) + Ramp Detail (PDF) integration** [L] — the v0.24.0 editions are
-  EXPORT-ONLY. Once the user runs them on the work PC and returns samples (ideally a coalesced
-  same-run pair per report): the two print parsers (census-first, Lesson 13), consolidators,
-  PDF↔Excel + PDF↔TSN flavors, matrix rows (mirror EVERY special-case), and the evidence adapters
-  above. Ask for a fresh site capture with them if the print JS drifted.
+  - [ ] **Ramp Detail evidence adapter** [M] — blocked on the same work-PC PDFs as its print
+    parser (below). The TSN side is already in hand: the Ramp Detail statewide TSN print
+    (`ground-truth/Ramp Detail TSN print 9.15/` → `tsn_library/ramp_detail/pdf/` once flagged).
+- [x] **Highway Sequence (PDF) integration — SHIPPED (v0.25.0)** off the first real work-PC print
+  set (`ground-truth/HSL PDF + IS Bundle 7.9`, 252 routes): census-first parser
+  (`consolidate_tsmis_highway_sequence_pdf` — wrapped-desc hyphen-aware rejoin, PM-less rows, the
+  diagnostics-trailer hard stop; 60,493/60,493 parse-back), `compare_highway_sequence_pdf`
+  (PDF↔TSN pairs BETTER than Excel↔TSN — the print shares TSN's equate convention; PDF↔Excel
+  caught the route-037 Excel-dropped Description), both matrix rows + all special-case mirrors,
+  and the evidence adapter above.
+- [ ] **Ramp Detail (PDF) integration** [L] — the v0.24.0 edition is EXPORT-ONLY. Once the user
+  runs it on the work PC and returns samples (ideally a coalesced same-run pair): the print
+  parser (census-first, Lesson 13), consolidator, PDF↔Excel + PDF↔TSN flavors, matrix row (mirror
+  EVERY special-case), and the evidence adapter above. Ask for a fresh site capture with it if
+  the print JS drifted.
   - [ ] **Shared whitespace-collapse helper** [XS] — `compare_highway_log._hl_normalize` and
     `compare_highway_sequence_tsn._v` carry the same tab/newline collapse; homing one helper in
     `compare_tsn_common` needs a locked-comparator re-bless, so it waits for a release that
@@ -541,9 +554,11 @@ or accept as someday.**
   [tsn-parsers.md](tsn-parsers.md) Intersection Detail): consolidators/comparators updated with a
   pre-update-workbook refusal, the comparison re-baselined (canary 163,310 → **21,675**), the TSN
   library moved to normalization v3 (new shape + District/County sidecar), evidence enabled.
-  **Note:** Intersection SUMMARY was NOT in the 7.8 bundle — if the site's July update also touched
-  its export, `consolidate_intersection_summary`/its comparator may need the same treatment when
-  the next export shows it.
+- [x] **Intersection Summary July-2026 watch — CLOSED (v0.25.0).** The fresh 7.9 export showed the
+  July update touched IS too, but only ONE header (`MAINLINE MASTARM` → `MASTERARM`): fixed with a
+  parse-only Section alias + a section-partition layout-drift tripwire (see
+  [tsn-parsers.md](tsn-parsers.md) Intersection Summary). Open thread: **route 170 was missing**
+  from the 7.9 export (218 → 217 routes) — asked the user for a re-export or confirmation.
 
 ---
 
@@ -604,7 +619,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.24.0, shipped)
+### Version buckets — reconciled to reality (current: v0.25.0, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -633,6 +648,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.22.1** ✅ | Jul 8 | **Evidence workbook: both layouts** — "… (evidence).xlsx" gains a second image tab: **Evidence (stacked)** + **Evidence (side-by-side)** (previously stacked-only; the pair files lived only in the images folder). Engine-level (`_image_sheet`), so HD + ID both get it. |
 | **v0.23.0** ✅ | Jul 8 | **On-demand per-cell evidence** — a camera action on built, fresh vs-TSN cells (both matrices) generates/refreshes the evidence set for the EXISTING comparison: no re-compare, toggle-independent (`matrix.run_evidence_only` + `evidence_for_cell`/`evidence_for_day_cell`, an `evidence` queue job, endpoints `matrix_evidence_cell`/`day_matrix_evidence_cell`). The freshness gate refuses when the store/consolidated/TSN moved past the comparison ("refresh the comparison" hint) so images can't illustrate a diff set the workbook doesn't carry; `availability()` gains the `row_reports` map the JS gate reads. Verified e2e on the 7.8 mini-store (real compare → on-demand run → warm-cache re-run → staleness refusal). |
 | **v0.24.0** ✅ | Jul 9 | **Highway Log evidence + two print editions + the comparison standards audit + evidence-toggle clarity** — (1) `evidence_highway_log`: both HL rows render evidence images (compared_cell-judged so dittos/Med-Wid never enumerate; per-print sentinel routing since HL's 31 columns carry no district — records carry their own `src`/dist/cnty, the engine prefers them, cross-print collisions skip via the uniqueness gate; TSN side reads the SAME district prints from `tsn_library/highway_log/raw/`, no duplicate drop). (2) **Highway Sequence (PDF)** + **Ramp Detail (PDF)** export-only print editions (stable ids 11/12; `hsl_printAll` portrait / the shared async `printAll()` dispatcher with a `showPrompt` auto-answer + `Promise.race` bound, landscape; coalescing automatic). (3) The audit: HSL re-verified statewide on the fresh 7.8 bundle (library rebuild byte-identical, counts within ~54 rows of the canary, FT-diff census: 681/698 = the by-design equate pairings — Notes updated); Ramp Detail gained a Notes sheet + stale-library re-normalization (idempotence proven on 15,410 real rows) + a width gate; Ramp Summary gained spec notes. (4) The evidence toggle spells itself out per report (✓/○/no-support lines + row-header camera badges); disabled Create-comparison explains why; (PDF) picker rows explain print editions. `check_day_matrix`/`check_matrix_tsn` made HERMETIC (sandbox `TSN_LIBRARY_ROOT` — a stocked dev library flipped their staged fixtures). |
+| **v0.25.0** ✅ | Jul 9 | **Highway Sequence (PDF) fully integrated + the Intersection Summary July fix** — off the first real work-PC print set (`ground-truth/HSL PDF + IS Bundle 7.9`, delivered same day): (1) the census-first print parser (`consolidate_tsmis_highway_sequence_pdf` — header-anchored per-page windows, wrapped-desc HYPHEN-AWARE rejoin, PM-less END-OF-ROUTE/CITY-END rows, the "Unresolved Intersections" trailer hard-stop; parse-back **60,493/60,493 rows / 59,082 fully equal** vs the 7.8 Excel — residual = the equate-representation classes + 4 `_x000D_` + the route-037 Description the Excel export DROPS). (2) `compare_highway_sequence_pdf` (PDF↔TSN pairs BETTER than Excel↔TSN — both 57,505 vs 57,071, the print shares TSN's equate convention; PDF↔Excel both 59,946 / identical 59,082; per-flavor Notes sheets) + the `HIGHWAY_SEQUENCE_PDF` env adapter + BOTH matrix rows (env/tsn/vs_excel modes; every special-case mirrored: `matrix_state`, `matrix_build`, `day_matrix`, `gui_worker_maint`, the console menu, the mock). (3) `evidence_highway_sequence` — the HL per-print sentinel routing, context-fields never enumerate (`compared_cell`), TSN prints from `tsn_library/highway_sequence/raw/` (`_TSN_PDFS_IN_RAW`). (4) **Intersection Summary**: the July `MASTARM`→`MASTERARM` rename absorbed via a parse-only Section alias + the section-partition layout-drift tripwire (every block but the site-under-counted Highway Group must sum to the route total); verified on the fresh 217-route export (route 170 missing — flagged). |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

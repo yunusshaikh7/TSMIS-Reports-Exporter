@@ -102,6 +102,31 @@ def record_has_data(rec):
     return bool(rec.get("counts")) and sum(rec["counts"].values()) > 0
 
 
+# HIGHWAY GROUP genuinely under-counts the route total on many routes (site-side
+# tabulation — 121/218 routes on the 6.19 exports). Every OTHER block partitions
+# the route total EXACTLY (verified statewide on the 6.19 and 7.9 exports), so a
+# mismatch there means block rows were silently dropped or misfiled: a renamed
+# header or an unknown new code (the July-2026 MASTARM->MASTERARM rename failed
+# exactly this way — the block vanished and its '+' count leaked into Lanes).
+_PARTITION_EXEMPT = frozenset({"HIGHWAY GROUP"})
+
+
+def _layout_drift(counts, total):
+    """Name the first section whose category sum breaks the route-total partition
+    (layout drift), or None when the parse looks structurally sound."""
+    if not total:
+        return None
+    for sec in _SPEC.sections:
+        if sec.name in _PARTITION_EXEMPT:
+            continue
+        ssum = sum(counts.get(c.slug, 0) for c in sec.cats)
+        if ssum != total:
+            return (f"the '{sec.name}' block sums {ssum} of {total} intersections — "
+                    "the export layout may have changed (renamed header or a new "
+                    "code); if this export is fresh, the app needs an update for it")
+    return None
+
+
 # --------------------------------------------------------------------------- #
 # records -> workbook
 # --------------------------------------------------------------------------- #
@@ -236,7 +261,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             failed.append(p.name)
             continue
         rec = {"route": route, "counts": counts, "total": total}
-        if record_has_data(rec):
+        drift = _layout_drift(counts, total)
+        if drift:
+            events.on_log(f"{prefix} FAILED (layout drift): {drift}")
+            failed.append(p.name)
+        elif record_has_data(rec):
             records.append(rec)
             events.on_log(f"{prefix} parsed (route {route}, total {total})")
         else:

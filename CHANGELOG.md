@@ -3,6 +3,46 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.25.0 — 2026-07-09
+
+The Highway Sequence Listing (PDF) edition grows up — parser, comparisons, matrix row,
+and evidence images, all verified against the first real statewide print set — and the
+Intersection Summary consolidator absorbs the site's July rename before it could
+mis-count anything in the field.
+
+- **Highway Sequence (PDF) is fully integrated.** The print edition added in v0.24.0
+  now consolidates ("TSMIS Highway Sequence (PDF)" on the Consolidate tab and in the
+  console menu), compares, and appears as its own row in BOTH matrices with the full
+  three modes: cross-environment, vs TSN, and vs TSMIS Excel. The parser was
+  censused-first against the entire 252-route statewide set from a real work PC and
+  parses back against the Excel edition at 60,493/60,493 rows — every residual
+  difference class is explained and documented in the comparison's Notes sheets.
+- **The print catches what the Excel export drops.** The statewide census found a
+  location whose Description the Excel export silently omits while the print carries it
+  (route 037 at postmile 003.809) — exactly the defect class the PDF↔Excel self-check
+  exists to surface, and the same reason the Highway Log's PDF edition was born.
+- **The PDF edition actually pairs BETTER against TSN.** The site's print renders
+  equate points the same way TSN's own prints do (an "EQUATES TO …" annotation row plus
+  the "E" suffix on the equated postmile), so the Excel edition's by-design "H ≠ blank"
+  feature-type class largely disappears: statewide, 434 more locations match and ~600
+  fewer cells differ than the Excel-vs-TSN comparison. Each flavor's Notes sheet
+  explains its own by-design classes.
+- **Evidence images for the Highway Sequence.** Both Highway Sequence rows can now
+  render sampled vs-TSN differences as highlighted snippets from both PDFs — the same
+  parse-back-verified workflow as Highway Detail, Intersection Detail and Highway Log.
+  No new drop folder: the TSN side reads the SAME district prints your TSN Highway
+  Sequence library is already built from (`tsn_library/highway_sequence/raw`), so if
+  your vs-TSN comparison works, evidence is ready today.
+- **Intersection Summary survives the July site update.** The site renamed one block
+  header ("MAINLINE MASTARM" → "MAINLINE MASTERARM"), which silently emptied that block
+  and mis-filed its "no data" count under Lanes when consolidating a fresh export. The
+  parser now accepts both spellings (all workbook text keeps the original), verified on
+  a fresh 217-route statewide export. And because that failure was silent, the
+  consolidator gained a tripwire: every category block must sum to the route's total
+  intersections (they all do, statewide, in both eras — except Highway Group, which the
+  site itself under-counts and is exempt), so a future renamed header or brand-new code
+  fails loudly with the block named instead of writing wrong numbers.
+
 ## v0.24.0 — 2026-07-09
 
 Highway Log joins the evidence-images club, two new PDF print editions arrive, every
