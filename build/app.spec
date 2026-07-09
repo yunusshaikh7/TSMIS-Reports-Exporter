@@ -78,6 +78,7 @@ APP_MODULES = [
     "export_intersection_detail", "export_intersection_detail_pdf",
     "export_highway_detail", "export_highway_summary",   # export enabled v0.19.1
     "export_highway_detail_pdf",                          # Highway Detail (PDF), v0.19.2
+    "export_highway_sequence_pdf", "export_ramp_detail_pdf",   # PDF editions, v0.24.0
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
     "highway_detail_columns",                                # Highway Detail labels + legend (v0.20.0)
@@ -114,6 +115,7 @@ APP_MODULES = [
     # v0.21.0 visual evidence: the report-agnostic engine + the per-report
     # adapters (lazy-imported by matrix_build/gui_api, so they MUST be declared).
     "visual_evidence", "evidence_highway_detail", "evidence_intersection_detail",
+    "evidence_highway_log",
     "gui_main", "gui_api", "gui_worker", "gui_win32", "gui_endpoint", "gui_matrix",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are

@@ -195,6 +195,12 @@ _write_notes_sheet = ctc.make_notes_writer(
         "One-sided rows are expected and honest: TSN lists every segment break (including "
         "unnamed ones) and prints equate points as \"EQUATES TO\" annotations, while TSMIS "
         "omits most unnamed breaks and records the equate as an \"END R REALIGNMENT\" row.",
+        "Equate points that BOTH systems mark pair up by design and then differ on "
+        "purpose: TSN's bare \"EQUATES TO\" annotation carries no feature type, so the "
+        "pair surfaces as a Description difference (TSMIS's realignment/route-break "
+        "label vs \"EQUATES TO\") and usually an FT difference (TSMIS \"H\" vs TSN "
+        "blank). Nearly all FT differences statewide are this class; the few remaining "
+        "are genuine feature-type disagreements (H vs I, R vs H).",
         "CONTEXT columns (shown for reference, never counted as a difference): HG (TSMIS "
         "leaves the highway-group blank for whole counties while TSN always fills it); City "
         "(TSN assigns a city code far more aggressively than TSMIS); and Distance To Next "

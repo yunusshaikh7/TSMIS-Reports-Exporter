@@ -381,6 +381,15 @@ Before diagnosing any "couldn't update" / "it failed" report:
   (NOT importing the engine) + Excel COM self-check/parity recalc + v0.11.0
   regeneration + an adversarial refutation agent + the workbooks' own literals —
   all agreed.
+- **Checks must be HERMETIC — sandbox every canonical root a fixture touches.**
+  `tsn_source`/the matrix snapshots consult the CANONICAL TSN library as well as
+  the staged dest; two checks (`check_day_matrix`, `check_matrix_tsn`) overrode
+  `OUTPUT_ROOT` but not `paths.TSN_LIBRARY_ROOT`, so they passed on CI (empty
+  library) and on any dev PC — until v0.24.0 staged the Highway Log district
+  prints into the real `tsn_library/highway_log/raw/` (they're the HL evidence
+  source) and both checks' staged "consolidated" fixtures started reading as
+  "pdfs". A check that reads ANY live app root is machine-state-dependent; fix
+  the CHECK (sandbox + restore in `finally`), don't unstage the data.
 
 ## Release-branch / tag pitfall
 

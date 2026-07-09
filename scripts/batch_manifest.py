@@ -41,6 +41,8 @@ _V017_EXPORT_ORDER = (
     # at 8/9; highway_detail_pdf (v0.19.2) at 10. A v1 manifest could never carry
     # these indices (they postdate the int-index era).
     "highway_detail", "highway_summary", "highway_detail_pdf",
+    # v0.24.0 PDF editions — appended at 11/12 (same rule: never insert/reorder).
+    "highway_sequence_pdf", "ramp_detail_pdf",
 )
 
 # Poison sentinel for a structurally-invalid saved entry. It is never a real export

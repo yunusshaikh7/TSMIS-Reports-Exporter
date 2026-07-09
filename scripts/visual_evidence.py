@@ -59,23 +59,36 @@ _ADAPTER_MODULES = {
     "highway_detail_pdf": "evidence_highway_detail",
     "intersection_detail": "evidence_intersection_detail",
     "intersection_detail_pdf": "evidence_intersection_detail",
+    "highway_log": "evidence_highway_log",
+    "highway_log_pdf": "evidence_highway_log",
 }
 # Where each row's TSMIS-side PDFs live (the per-route export subdir) and which
-# TSN library report's pdf/ folder holds the TSN prints (per-district files for
-# Highway Detail; the single statewide TASAS print for Intersection Detail —
-# the adapters read district/county per record, so filenames never matter).
+# TSN library report holds the TSN prints (per-district files for Highway
+# Detail/Log; the single statewide TASAS print for Intersection Detail — the
+# adapters read district/county per record, so filenames never matter).
 TSMIS_PDF_SUBDIR = {"highway_detail": "highway_detail_pdf",
                     "highway_detail_pdf": "highway_detail_pdf",
                     "intersection_detail": "intersection_detail_pdf",
-                    "intersection_detail_pdf": "intersection_detail_pdf"}
+                    "intersection_detail_pdf": "intersection_detail_pdf",
+                    "highway_log": "highway_log_pdf",
+                    "highway_log_pdf": "highway_log_pdf"}
 TSN_PDF_REPORT = {"highway_detail": "highway_detail",
                   "highway_detail_pdf": "highway_detail",
                   "intersection_detail": "intersection_detail",
-                  "intersection_detail_pdf": "intersection_detail"}
+                  "intersection_detail_pdf": "intersection_detail",
+                  "highway_log": "highway_log",
+                  "highway_log_pdf": "highway_log"}
 # Report labels for the availability probe (static so the probe never has to
-# import an adapter — a state push must stay cheap).
+# import an adapter — a state push must stay cheap; check_visual_evidence pins
+# these maps against report_catalog so they can't drift).
 _TSN_PDF_LABELS = {"highway_detail": "Highway Detail",
-                   "intersection_detail": "Intersection Detail"}
+                   "intersection_detail": "Intersection Detail",
+                   "highway_log": "Highway Log"}
+# Reports whose TSN prints ARE the library's raw inputs (district-PDF-sourced
+# TSN libraries — Highway Log): evidence reads the SAME files from raw/, so a
+# user with a working vs-TSN comparison already has the prints in place. The
+# statewide-XLSX-sourced reports keep the separate OPTIONAL pdf/ drop folder.
+_TSN_PDFS_IN_RAW = frozenset({"highway_log"})
 
 MIN_EXAMPLES, MAX_EXAMPLES, DEFAULT_EXAMPLES = 1, 10, 2
 _RES = 180                     # render DPI (points * _RES/72 = pixels)
@@ -108,7 +121,10 @@ def pdf_subdir_for(row_key):
 
 
 def tsn_pdf_dir(row_key):
-    return paths.tsn_library_pdf_dir(TSN_PDF_REPORT[row_key])
+    report = TSN_PDF_REPORT[row_key]
+    if report in _TSN_PDFS_IN_RAW:
+        return paths.tsn_library_raw_dir(report)
+    return paths.tsn_library_pdf_dir(report)
 
 
 def clamp_examples(n):
@@ -128,13 +144,15 @@ def availability():
     reports = []
     total = 0
     for key, label in sorted(_TSN_PDF_LABELS.items()):
-        d = paths.tsn_library_pdf_dir(key)
+        d = (paths.tsn_library_raw_dir(key) if key in _TSN_PDFS_IN_RAW
+             else paths.tsn_library_pdf_dir(key))
         try:
             n = sum(1 for _ in Path(d).glob("*.pdf"))
         except OSError:          # silent-ok: a pure probe; unreadable = not ready
             n = 0
         total += n
-        reports.append({"key": key, "label": label, "tsn_pdfs": n, "dir": str(d)})
+        reports.append({"key": key, "label": label, "tsn_pdfs": n, "dir": str(d),
+                        "source": "raw" if key in _TSN_PDFS_IN_RAW else "pdf"})
     return {"rows": rows(), "tsn_pdfs": total,
             "ready": _DEPS_OK and any(r["tsn_pdfs"] for r in reports),
             "dir": next((r["dir"] for r in reports if not r["tsn_pdfs"]),
@@ -353,21 +371,29 @@ def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
     nv = adapter.tsn_value(nrec, field)
     if nv != ex["vb"]:
         return None, "the TSN print differs from the TSN workbook at this cell"
-    npage, nbox, nyspan, nxspan = adapter.tsn_box(nrec, field)
+    nb = adapter.tsn_box(nrec, field)
+    if nb is None:
+        return None, "the TSN record's geometry isn't evidence-grade here"
+    npage, nbox, nyspan, nxspan = nb
     tpage, tbox, tyspan, txspan = tb
 
     t_pdf = adapter.tsmis_pdf_path(tsmis_pdf_dir, ex["route"])
-    n_pdf = dist_index[ex["dist"]]
+    # A record that names its own source print (the Highway Log's per-print
+    # routing) wins over the district index; likewise its district/county
+    # provenance (learned from the print's own headers) enriches the captions.
+    n_pdf = Path(nrec.get("src") or dist_index[ex["dist"]])
+    dist = nrec.get("dist") or ex["dist"]
+    cnty = nrec.get("cnty") or ex["cnty"]
     t_img = _strip(t_pdf, tpage, tbox, tyspan, txspan, page_cache)
     n_img = _strip(n_pdf, npage, nbox, nyspan, nxspan, page_cache)
     title = (f"{field} — TSMIS '{ex['va'] or '(blank)'}'  vs  "
              f"TSN '{ex['vb'] or '(blank)'}'")
+    where = f" — TSN district D{dist} ({cnty})" if dist or cnty else ""
     sub = (f"Route {ex['route']} @ {ex['key']} — both PDFs re-parsed and "
-           f"verified against the compared values — TSN district "
-           f"D{ex['dist']} ({ex['cnty']})")
+           f"verified against the compared values{where}")
     t_label = f"TSMIS (PDF)  —  {t_pdf.name} · page {tpage}"
     n_label = (f"TSN  —  {n_pdf.name} · page {npage} · "
-               f"{ex['cnty']}-{ex['route']}")
+               f"{(cnty + '-') if cnty else ''}{ex['route']}")
     safe = re.sub(r"[^A-Za-z0-9]+", "_", field).strip("_")
     stacked = out_dir / f"{safe}_{k}_stacked.png"
     pair = out_dir / f"{safe}_{k}_pair.png"

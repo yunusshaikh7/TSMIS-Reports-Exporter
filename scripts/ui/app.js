@@ -64,6 +64,16 @@ function makeReportRow(rep, checked, off, onChange) {
   chip.className = "chip " + (rep.fmt === "PDF" ? "chip-pdf" : "chip-excel");
   chip.textContent = rep.fmt;
   row.append(cb, box, name, chip);
+  // Print editions (the *_pdf keys) explain themselves on hover; the
+  // env-availability sync APPENDS its warning to this base title (never
+  // replaces it). Ramp Summary is fmt PDF but not a print edition.
+  if (/_pdf$/.test(rep.key)) {
+    row.dataset.baseTitle =
+      "The same on-site report as its Excel sibling, saved via the site's own "
+      + "Print layout (print-accurate). Ticking both editions generates the "
+      + "report once per route and saves both files.";
+    row.title = row.dataset.baseTitle;
+  }
   cb.addEventListener("change", () => {
     row.classList.toggle("checked", cb.checked);
     onChange();
@@ -609,10 +619,13 @@ function renderEnvAccess() {
     const state = label && reps[label];
     const off = state && state !== "ok";
     row.classList.toggle("report-off", !!off);
-    row.title = off
+    const warn = off
       ? `The last environment check found this report ${state === "greyed"
           ? "greyed out" : "missing"} on ${active.label} — the export may fail.`
       : "";
+    // Compose with the row's static base title (the *_pdf print-edition
+    // explainer) rather than clobbering it.
+    row.title = [row.dataset.baseTitle, warn].filter(Boolean).join("\n\n");
   });
   renderBatchAccess();
 }
@@ -654,10 +667,11 @@ function renderBatchAccess() {
       }
     });
     row.classList.toggle("report-off", hits.length > 0);
-    row.title = hits.length
+    const warn = hits.length
       ? "The last environment check found this report unavailable on:\n"
         + hits.join("\n") + "\nThe export may fail there."
       : "";
+    row.title = [row.dataset.baseTitle, warn].filter(Boolean).join("\n\n");
   });
 }
 

@@ -11,6 +11,7 @@ raises AuthError on session problems, so the same code backs both the console
 shim (cli.py) and the future GUI.
 """
 import logging
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -390,12 +391,142 @@ def save_highway_detail_pdf(page, out_path, timeout_ms=None):
     _verify_saved_file(out_path)
 
 
+def save_highway_sequence_pdf(page, out_path, timeout_ms=None):
+    """Render the FULL Highway Sequence Listing to a Portrait PDF, the way the
+    site's Print button lays it out.
+
+    Mirrors save_highway_log_pdf. The on-screen listing is PAGINATED, so a bare
+    `page.pdf()` would capture one page. The site's global `hsl_printAll()`
+    builds a cover page + legend page + every district section (`.hsl-print-table`)
+    into #rampResults, then calls `window.print()` and SYNCHRONOUSLY restores the
+    on-screen view. We override `window.print` to raise FIRST, so that restore
+    never runs and the complete layout stays in the DOM for `page.pdf()` (which
+    emulates print media; the site's `@media print` shows only #rampResults).
+    9 narrow columns + a 52%-width Description -> Portrait, matching the TSN
+    district prints (612x792) for side-by-side reading.
+
+    is_empty ran first, so this is never an empty route; the layout is built
+    client-side, so timeout_ms is unused (kept for the uniform save signature).
+    Recognised by the `.hsl-print-table` marker; the row-count empty backstop
+    counts its tbody rows (the cover/legend pages use their own hsl-legend-*
+    tables, never `.hsl-print-table`). Fails loudly with ReportError if the
+    site's Print function is gone/renamed."""
+    built = page.evaluate(
+        """() => {
+            if (typeof hsl_printAll !== 'function') return {status: 'no-print-fn', rows: 0};
+            window.print = () => { throw new Error('skip-print'); };
+            try { hsl_printAll(); } catch (e) { /* the throw skips hsl_printAll's restore */ }
+            const box = document.getElementById('rampResults');
+            if (!box || !box.querySelector('.hsl-print-table'))
+                return {status: 'no-layout', rows: 0};
+            // Data rows: every `.hsl-print-table` tbody row (one per location);
+            // a spanning (colspan) placeholder never counts, so the empty
+            // backstop fires even if the empty-text wording drifts.
+            let rows = 0;
+            for (const tr of box.querySelectorAll('.hsl-print-table tbody tr')) {
+                const tds = tr.querySelectorAll('td');
+                if (!tds.length) continue;
+                if ([...tds].some(td => td.hasAttribute('colspan'))) continue;
+                rows++;
+            }
+            return {status: 'ok', rows: rows};
+        }""")
+    status = built.get("status") if isinstance(built, dict) else built
+    if status != "ok":
+        raise ReportError(
+            "Couldn't build the Highway Sequence print layout for the PDF "
+            f"(the site's Print control changed: {status}).")
+    if not (built.get("rows") if isinstance(built, dict) else 0):
+        log.info("highway_sequence PDF: print layout has no data rows for %s; "
+                 "treating as empty", out_path.name)
+        raise EmptyExport()
+    page.pdf(
+        path=str(out_path),
+        format="Letter",
+        print_background=True,
+        margin={"top": "0.4in", "bottom": "0.4in", "left": "0.4in", "right": "0.4in"},
+    )
+    _verify_saved_file(out_path)
+
+
+# The Ramp Detail print prompts for a free-text report title (the site's
+# showPrompt modal); the save auto-answers it with the route so the capture
+# never waits on a dialog. Bound the print-layout build so a future site change
+# that re-introduces an unanswered await fails the route loudly instead of
+# hanging it to the full per-route timeout.
+_RAMP_DETAIL_PRINT_BUILD_MS = 15_000
+
+
+def save_ramp_detail_pdf(page, out_path, timeout_ms=None):
+    """Render the FULL Ramp Detail to a Landscape PDF, the way the site's Print
+    button lays it out.
+
+    Mirrors save_highway_log_pdf with two Ramp Detail wrinkles. The print body
+    lives in the site's ASYNC global `printAll()` dispatcher itself (there is no
+    rd_printAll): on the Ramp Detail report it awaits `showPrompt('Enter report
+    title:')`, builds a cover page + one `.rd-print-table` (11 columns) into
+    #rampResults, then calls `window.print()` and restores the on-screen view in
+    an afterprint listener. So this save overrides BOTH globals first --
+    `window.print` raises (the restore never runs, the layout stays for
+    `page.pdf()`), and `showPrompt` resolves immediately with the route title
+    (no modal ever opens). The dispatcher is awaited under a bound (`Promise.race`)
+    so a site change that re-introduces an unanswered await returns 'no-layout'
+    loudly instead of hanging the route. Landscape, matching the TSN statewide
+    Ramp Detail print (792x612).
+
+    is_empty ran first, so this is never an empty route; timeout_ms is unused
+    (kept for the uniform save signature). Fails loudly with ReportError if the
+    site's Print function is gone/renamed."""
+    m = re.search(r"route_(\w+)", out_path.name)
+    title = f"Route {m.group(1)}" if m else "TSMIS bulk export"
+    built = page.evaluate(
+        """async (title) => {
+            if (typeof printAll !== 'function') return {status: 'no-print-fn', rows: 0};
+            window.print = () => { throw new Error('skip-print'); };
+            window.showPrompt = () => Promise.resolve(title);
+            const bound = new Promise(r => setTimeout(() => r('build-timeout'), %d));
+            try { await Promise.race([printAll(), bound]); }
+            catch (e) { /* the print throw skips the dispatcher's restore */ }
+            const box = document.getElementById('rampResults');
+            if (!box || !box.querySelector('.rd-print-table'))
+                return {status: 'no-layout', rows: 0};
+            // Data rows: `.rd-print-table` tbody rows (the route/header rows live
+            // in thead); a spanning (colspan) placeholder never counts.
+            let rows = 0;
+            for (const tr of box.querySelectorAll('.rd-print-table tbody tr')) {
+                const tds = tr.querySelectorAll('td');
+                if (!tds.length) continue;
+                if ([...tds].some(td => td.hasAttribute('colspan'))) continue;
+                rows++;
+            }
+            return {status: 'ok', rows: rows};
+        }""" % _RAMP_DETAIL_PRINT_BUILD_MS, title)
+    status = built.get("status") if isinstance(built, dict) else built
+    if status != "ok":
+        raise ReportError(
+            "Couldn't build the Ramp Detail print layout for the PDF "
+            f"(the site's Print control changed: {status}).")
+    if not (built.get("rows") if isinstance(built, dict) else 0):
+        log.info("ramp_detail PDF: print layout has no data rows for %s; "
+                 "treating as empty", out_path.name)
+        raise EmptyExport()
+    page.pdf(
+        path=str(out_path),
+        format="Letter",
+        landscape=True,
+        print_background=True,
+        margin={"top": "0.4in", "bottom": "0.4in", "left": "0.4in", "right": "0.4in"},
+    )
+    _verify_saved_file(out_path)
+
+
 # Saves that REBUILD the page DOM: the site's Print layout replaces #rampResults
 # (the on-screen restore is what the PDF capture deliberately skips). In a combined
 # dual-edition run these must save LAST -- after the Export-button save, which needs
 # the normal action bar + Export button still in the DOM.
 _PAGE_REBUILDING_SAVES = frozenset({
     save_highway_log_pdf, save_intersection_detail_pdf, save_highway_detail_pdf,
+    save_highway_sequence_pdf, save_ramp_detail_pdf,
 })
 
 

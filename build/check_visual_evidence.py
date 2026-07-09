@@ -29,9 +29,13 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import compare_highway_detail_tsn as cht
+import compare_highway_log as chl_cmp
 import consolidate_tsmis_highway_detail_pdf as chd
+import consolidate_tsn_highway_log as ctnl
 import evidence_highway_detail as ehd
+import evidence_highway_log as ehl
 import highway_detail_columns as hdc
+import highway_log_columns as hlc
 import matrix_build
 import tsn_load_highway_detail as tlh
 import visual_evidence as ve
@@ -48,21 +52,29 @@ def check(name, cond):
 
 # --------------------------------------------------------------------------- #
 print("registry + sources + clamp")
-check("rows: the Highway Detail + Intersection Detail pairs, nothing else",
+check("rows: the Highway Detail + Highway Log + Intersection Detail pairs, nothing else",
       ve.rows() == ["highway_detail", "highway_detail_pdf",
+                    "highway_log", "highway_log_pdf",
                     "intersection_detail", "intersection_detail_pdf"])
 check("capable() matches rows()",
-      all(ve.capable(r) for r in ve.rows()) and not ve.capable("highway_log"))
+      all(ve.capable(r) for r in ve.rows()) and not ve.capable("ramp_detail"))
 check("TSMIS visuals come from each report's (PDF)-edition export subdir",
       ve.pdf_subdir_for("highway_detail") == "highway_detail_pdf"
       and ve.pdf_subdir_for("highway_detail_pdf") == "highway_detail_pdf"
       and ve.pdf_subdir_for("intersection_detail") == "intersection_detail_pdf"
-      and ve.pdf_subdir_for("intersection_detail_pdf") == "intersection_detail_pdf")
-check("TSN prints live in each report's library pdf folder",
+      and ve.pdf_subdir_for("intersection_detail_pdf") == "intersection_detail_pdf"
+      and ve.pdf_subdir_for("highway_log") == "highway_log_pdf"
+      and ve.pdf_subdir_for("highway_log_pdf") == "highway_log_pdf")
+check("TSN prints live in each report's library pdf folder — except the Highway "
+      "Log, whose district prints ARE the library's raw inputs (no duplicate drop)",
       str(ve.tsn_pdf_dir("highway_detail")).replace("\\", "/")
       .endswith("tsn_library/highway_detail/pdf")
       and str(ve.tsn_pdf_dir("intersection_detail")).replace("\\", "/")
-      .endswith("tsn_library/intersection_detail/pdf"))
+      .endswith("tsn_library/intersection_detail/pdf")
+      and str(ve.tsn_pdf_dir("highway_log")).replace("\\", "/")
+      .endswith("tsn_library/highway_log/raw")
+      and str(ve.tsn_pdf_dir("highway_log_pdf")).replace("\\", "/")
+      .endswith("tsn_library/highway_log/raw"))
 check("clamp: default/garbage/low/high",
       (ve.clamp_examples(None), ve.clamp_examples("x"), ve.clamp_examples(0),
        ve.clamp_examples(99), ve.clamp_examples("7"))
@@ -75,9 +87,14 @@ avail = ve.availability()
 check("availability shape (rows/tsn_pdfs/ready/dir/reports/row_reports/deps_ok)",
       set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "reports", "row_reports",
                      "deps_ok"})
-check("availability reports BOTH evidence reports, per-dir",
-      [r["key"] for r in avail["reports"]] == ["highway_detail", "intersection_detail"]
-      and all(set(r) >= {"key", "label", "tsn_pdfs", "dir"} for r in avail["reports"]))
+check("availability reports every evidence report, per-dir + source kind",
+      [r["key"] for r in avail["reports"]]
+      == ["highway_detail", "highway_log", "intersection_detail"]
+      and all(set(r) >= {"key", "label", "tsn_pdfs", "dir", "source"}
+              for r in avail["reports"])
+      and {r["key"]: r["source"] for r in avail["reports"]}
+      == {"highway_detail": "pdf", "highway_log": "raw",
+          "intersection_detail": "pdf"})
 check("row_reports maps every capable row to its report (the per-cell action's gate)",
       avail["row_reports"] == ve.TSN_PDF_REPORT
       and set(avail["row_reports"]) == set(ve.rows()))
@@ -88,7 +105,7 @@ check("toggle off -> None",
       and matrix_build.evidence_opts_for({"enabled": False, "examples": 5},
                                          "highway_detail", lambda s: s) is None)
 check("unsupported row -> None",
-      matrix_build.evidence_opts_for({"enabled": True}, "highway_log",
+      matrix_build.evidence_opts_for({"enabled": True}, "ramp_detail",
                                      lambda s: s) is None)
 opts = matrix_build.evidence_opts_for({"enabled": True, "examples": 99},
                                       "highway_detail",
@@ -532,6 +549,66 @@ finally:
     shutil.rmtree(tmp3, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #
+print("Highway Log adapter (v0.24.0): fields, window map, routing, ditto discipline")
+check("FIELDS = every Highway Log column except the Location key",
+      ehl.FIELDS == [f for f in hlc.HEADER if f != hlc.HEADER[0]]
+      and len(ehl.FIELDS) == 30)
+check("field -> TSN window map is positional over ROW_KEYS and complete "
+      "(Description alone has no window — its own follow-on lines)",
+      ehl._TSN_WIN_KEY == dict(zip(hlc.HEADER, ctnl.ROW_KEYS))
+      and all(f == "Description" or ehl._TSN_WIN_KEY[f] in ehl._TSN_WINDOWS
+              for f in ehl.FIELDS))
+check("verification projection == the comparator's load normalization + Excel TRIM "
+      "(tab-padded values compare clean, numerics match the trim)",
+      ehl.project("HG", "D\t\t") == "D"
+      and ehl.project("Length (MI) [MI]", " 000.075 ") == "000.075")
+check("canonical key: the comparator's roadbed_canonical_location (suffix "
+      "authoritative; a dittoed LEFT block tags the row R)",
+      ehl._canon(["012.887R"] + [None] * 30) == "012.887R"
+      and ehl._canon(["012.887"] + [None] * 9 + ["+"] * 8 + [None] * 13) == "012.887R")
+check("district_index is the sentinel single-folder entry (per-print routing)",
+      ehl.district_index(Path("C:/anywhere")) == {"": Path("C:/anywhere")})
+# Ditto discipline: a `+`-run cell on either side is NON-ASSERTING in the
+# comparison, so enumerate_diffs must never sample it — while a genuine text
+# diff in the same row still enumerates.
+_hl_a = ["001"] + ["012.887"] + ["a"] * 30
+_hl_b = ["001"] + ["012.887"] + ["a"] * 30
+_hl_a[2], _hl_b[2] = "X", "+"                       # ditto side -> non-asserting
+_hl_a[3], _hl_b[3] = "Y", "Z"                       # a real diff
+_diffs = ehl.enumerate_diffs([_hl_a], [_hl_b], {"routing": "per-print"})
+check("enumerate_diffs skips ditto cells but keeps real diffs (compared_cell semantics)",
+      hlc.HEADER[1] not in _diffs and [e["key"] for e in _diffs[hlc.HEADER[2]]] == ["012.887"]
+      and _diffs[hlc.HEADER[2]][0]["dist"] == "" and _diffs[hlc.HEADER[2]][0]["cnty"] == "")
+check("enumerate_diffs judges through the LIVE schema (ditto_nonasserting set)",
+      chl_cmp._SCHEMA.ditto_nonasserting is True)
+# load_sides refuses per-route (route-less) workbooks: evidence groups by the
+# leading Route column, which a per-route export doesn't carry.
+_hl_tmp = Path(tempfile.mkdtemp(prefix="tsmis_ev_hl_"))
+_wb = Workbook()
+_ws = _wb.active
+_ws.title = chl_cmp.SHEET_NAME
+_ws.append(hlc.HEADER)                              # per-route: NO Route column
+_ws.append(["012.887"] + ["a"] * 30)
+_wb.save(_hl_tmp / "per_route.xlsx")
+_r_t, _r_n, _sc, _note = ehl.load_sides(str(_hl_tmp / "per_route.xlsx"),
+                                        str(_hl_tmp / "per_route.xlsx"))
+check("load_sides refuses per-route (route-less) workbooks with a clear note",
+      _sc is None and "Route column" in (_note or ""))
+_wb2 = Workbook()
+_ws2 = _wb2.active
+_ws2.title = chl_cmp.SHEET_NAME
+_ws2.append([hlc.ROUTE_COL] + hlc.HEADER)           # consolidated shape
+_ws2.append(["001", "012.887"] + ["a"] * 30)
+_wb2.save(_hl_tmp / "consolidated.xlsx")
+_r_t, _r_n, _sc2, _note2 = ehl.load_sides(str(_hl_tmp / "consolidated.xlsx"),
+                                          str(_hl_tmp / "consolidated.xlsx"))
+check("load_sides accepts consolidated workbooks (truthy routing sidecar, no note)",
+      _sc2 == {"routing": "per-print"} and _note2 is None
+      and len(_r_t) == 1 and _r_t[0][0] == "001")
+import shutil as _sh
+_sh.rmtree(_hl_tmp, ignore_errors=True)
+
+# --------------------------------------------------------------------------- #
 print("engine misc")
 check("reason summarizer dedupes and caps",
       ve._summarize_reasons(["a", "a", "b", "c", "d"]) == "a; b; c"
@@ -544,11 +621,20 @@ print("the pdf/ drop folder exists for the user (v0.21.1 — the update-day gap)
 import paths                                              # noqa: E402
 import report_catalog                                     # noqa: E402
 import tsn_library                                        # noqa: E402
-check("every engine TSN-PDF source is catalog-flagged evidence_pdfs (and only those)",
+_pdf_drop_reports = set(ve.TSN_PDF_REPORT.values()) - ve._TSN_PDFS_IN_RAW
+check("every pdf/-drop TSN source is catalog-flagged evidence_pdfs (and only those)",
       {report_catalog.TSN[[e.subdir for e in report_catalog.TSN].index(r)].evidence_pdfs
-       for r in set(ve.TSN_PDF_REPORT.values())} == {True}
+       for r in _pdf_drop_reports} == {True}
       and {e.subdir for e in report_catalog.TSN if e.evidence_pdfs}
-      == set(ve.TSN_PDF_REPORT.values()))
+      == _pdf_drop_reports)
+check("every raw-sourced evidence report is a district_pdfs TSN library (its "
+      "prints ARE the raw inputs, so no pdf/ drop folder is flagged)",
+      all(report_catalog.TSN[[e.subdir for e in report_catalog.TSN].index(r)].raw_kind
+          == "district_pdfs"
+          and not report_catalog.TSN[[e.subdir for e in report_catalog.TSN]
+                                     .index(r)].evidence_pdfs
+          for r in ve._TSN_PDFS_IN_RAW)
+      and ve._TSN_PDFS_IN_RAW <= set(ve.TSN_PDF_REPORT.values()))
 _tmp = Path(tempfile.mkdtemp())
 _old_root = paths.TSN_LIBRARY_ROOT
 try:

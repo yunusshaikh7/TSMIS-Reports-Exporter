@@ -170,10 +170,12 @@ function syncDayMatrixFormulas() {
 }
 
 // Reflect the SHARED evidence-images option (one persisted setting surfaced on
-// both matrix pages). Ready = at least one report's TSN PDFs sit in its library
-// pdf folder; until then the toggle greys out and the hint says where to drop
-// them. A partially-ready state (one report stocked, another empty) keeps the
-// toggle live and the hint names what's still missing.
+// both matrix pages) and spell out PER REPORT what the toggle will actually
+// generate: a ✓ line for each report whose TSN prints are in place (images WILL
+// render for its vs-TSN cells), a ○ line naming the drop folder for one that
+// isn't, and one line naming the reports with no evidence support at all — so
+// the toggle is never a mystery switch. The toggle greys out only when NO
+// report is ready.
 function syncEvidenceControls(cbId, countRowId, countId, hintId) {
   const ev = (S.st && S.st.evidence) || {};
   const cb = $(cbId);
@@ -186,24 +188,42 @@ function syncEvidenceControls(cbId, countRowId, countId, hintId) {
   const count = $(countId);
   if (count && document.activeElement !== count) count.value = ev.examples || 2;
   const hint = $(hintId);
-  if (hint) {
-    const missing = (ev.reports || []).filter((r) => !r.tsn_pdfs);
-    if (!ev.deps_ok) {
-      hint.hidden = false;
-      hint.textContent = "Evidence images aren't available in this build.";
-    } else if (!ev.ready) {
-      hint.hidden = false;
-      hint.textContent = missing.length
-        ? missing.map((r) => `To enable ${r.label}, drop its TSN PDFs in ${r.dir}.`).join(" ")
-        : `To enable, drop the TSN PDFs in ${ev.dir || "the TSN library's pdf folders"}.`;
-    } else if (missing.length) {
-      hint.hidden = false;
-      hint.textContent = missing.map((r) =>
-        `${r.label} has no TSN PDFs yet (drop them in ${r.dir}).`).join(" ");
+  if (!hint) return;
+  hint.hidden = false;
+  if (!ev.deps_ok) {
+    hint.textContent = "Evidence images aren't available in this build.";
+    return;
+  }
+  const line = (mark, text, title) => {
+    const div = document.createElement("div");
+    div.className = "ev-status-line";
+    const m = document.createElement("span");
+    m.className = `ev-mark ev-mark-${mark}`;
+    m.textContent = mark === "ok" ? "✓" : mark === "todo" ? "○" : "—";
+    div.appendChild(m);
+    div.appendChild(document.createTextNode(" " + text));
+    if (title) div.title = title;
+    return div;
+  };
+  const lines = [];
+  for (const r of ev.reports || []) {
+    if (r.tsn_pdfs) {
+      lines.push(line("ok",
+        `${r.label} — will generate (${r.tsn_pdfs} TSN print${r.tsn_pdfs === 1 ? "" : "s"})`,
+        `TSN prints read from ${r.dir}. Cells whose run lacks the ${r.label} (PDF) ` +
+        "export skip with a note (that export is the TSMIS-side image source)."));
     } else {
-      hint.hidden = true;
+      lines.push(line("todo",
+        `${r.label} — needs its TSN PDFs in ${r.dir}`,
+        "Evidence is supported for this report, but its TSN prints aren't there yet."));
     }
   }
+  if ((ev.unsupported || []).length) {
+    lines.push(line("na", `No evidence support yet: ${ev.unsupported.join(", ")}.`,
+      "Evidence images need both sides as PDFs; these reports don't have " +
+      "verified PDF sources yet."));
+  }
+  hint.replaceChildren(...lines);
 }
 function syncMatrixEvidence() {
   syncEvidenceControls("matrixEvidence", "matrixEvidenceCountRow",
@@ -224,6 +244,25 @@ function evidenceActionInfo(rowKey) {
   const repKey = (ev.row_reports || {})[rowKey];
   const rep = (ev.reports || []).find((r) => r.key === repKey);
   return rep && rep.tsn_pdfs ? rep : null;
+}
+
+// A small camera badge on an evidence-SUPPORTED row's header (both matrices):
+// lit when its TSN prints are in place (images will render for its vs-TSN
+// comparisons), dimmed with the drop-folder in the tooltip when not. Rows with
+// no evidence support get no badge — the toggle's status lines name them.
+function evidenceRowBadge(rowKey) {
+  const ev = (S.st && S.st.evidence) || {};
+  if (!ev.deps_ok || !(ev.rows || []).includes(rowKey)) return null;
+  const repKey = (ev.row_reports || {})[rowKey];
+  const rep = (ev.reports || []).find((r) => r.key === repKey);
+  if (!rep) return null;
+  const b = document.createElement("span");
+  b.className = "mxrh-evbadge" + (rep.tsn_pdfs ? "" : " mxrh-evbadge-off");
+  b.appendChild(icon("i-camera", "ic"));
+  b.title = rep.tsn_pdfs
+    ? `Evidence images supported — the toggle (or a cell's camera) renders ${rep.label} diffs as highlighted PDF snippets.`
+    : `Evidence images supported once ${rep.label}'s TSN PDFs are in ${rep.dir}.`;
+  return b;
 }
 
 function mxCellContent(cmp, tsnMeta) {
@@ -619,6 +658,8 @@ async function renderMatrix() {
     const rlabel = snap.row_labels[rk] || rk;
     rh.dataset.rk = rk; rh.dataset.label = rlabel;   // env-access flag target
     lbl.textContent = rlabel; lbl.title = rlabel;
+    const evb = evidenceRowBadge(rk);
+    if (evb) lbl.appendChild(evb);
     top.append(lbl, mxHeaderBtns(rlabel,
       async () => {
         if (!await confirmBulkReexport(`${rlabel} across every environment`)) return;
@@ -918,6 +959,8 @@ async function renderDayMatrix() {
     const top = document.createElement("div"); top.className = "mxrh-top";
     const lbl = document.createElement("span"); lbl.className = "mxrh-label";
     lbl.textContent = rlabel + (supported ? "" : " (soon)");
+    const evb = supported ? evidenceRowBadge(rk) : null;
+    if (evb) lbl.appendChild(evb);
     top.appendChild(lbl);
     if (supported) {
       top.appendChild(mxHeadBtn("i-refresh", `Export ${rlabel} for today + compare vs TSN`,

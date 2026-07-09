@@ -155,6 +155,12 @@ RAMP_SUMMARY_SPEC = SummarySpec(
         _c("ramp_points_no_linework", "Ramp Points w/out linework",
            "Ramp Points w/out linework"),
     ),
+    notes=(
+        "Ramp Types P (Dummy Paired) and V (Dummy, Volume only) are TSN bookkeeping "
+        "classes the TSMIS summary doesn't tabulate — they stay one-sided by design. "
+        "'Ramp Points w/out linework' is the reverse: a TSMIS-only footnote count "
+        "with no TSN category, shown below the table and never compared.",
+    ),
 )
 
 

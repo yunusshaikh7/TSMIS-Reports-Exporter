@@ -3,6 +3,51 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.24.0 — 2026-07-09
+
+Highway Log joins the evidence-images club, two new PDF print editions arrive, every
+vs-TSN comparison got a standards audit against fresh statewide data, and the evidence
+toggle now explains itself report by report.
+
+- **Evidence images for the Highway Log.** Both Highway Log rows (Excel and PDF-sourced)
+  can now render sampled vs-TSN differences as highlighted snippets from both PDFs —
+  the same parse-back-verified workflow as Highway Detail and Intersection Detail,
+  ditto-aware (a `+`-run "see paired roadbed" cell is never sampled, exactly as the
+  comparison never counts it). No new drop folder: the TSN side reads the SAME district
+  prints your TSN Highway Log library is already built from (`tsn_library/highway_log/raw`),
+  so if your vs-TSN comparison works, evidence is ready today. The TSMIS side illustrates
+  from the Highway Log (PDF) export, like the other reports.
+- **Two new print editions: Highway Sequence Listing (PDF) and TSAR: Ramp Detail (PDF).**
+  The same on-site reports as their Excel siblings, saved via the site's own Print layout
+  (portrait for the Sequence Listing, landscape for Ramp Detail — matching their TSN
+  prints). Ticking an Excel + PDF pair still generates each route once and saves both
+  files. Export-only for now: their print-layout consolidators, comparisons, and evidence
+  come once real work-PC PDFs verify the parse (the same staged path Highway Detail took).
+- **The evidence toggle is no longer a mystery switch.** Both matrix pages now list, under
+  the toggle, exactly what it will do: a ✓ line per report whose TSN prints are in place
+  ("will generate"), a ○ line naming the exact drop folder for one that isn't, and one
+  line naming the reports with no evidence support at all. Supported rows also carry a
+  small camera badge on their row header (lit = ready, dimmed = tooltip names the folder),
+  so you can tell at a glance — before running anything — which comparisons get images.
+- **Comparison audit against fresh statewide data.** The Highway Sequence Listing
+  comparison was re-verified end-to-end on a fresh 2026-07-08 statewide export (252
+  routes): the TSN district-print parser reproduces the installed library byte-for-byte,
+  and every count lands within a hair of the blessed baseline (the deltas are exactly the
+  ~54 locations TSMIS added since June). A census of its differing cells confirmed the
+  known classes — no new artifacts. Its Notes sheet now also explains why nearly all FT
+  differences are the by-design "EQUATES TO" pairings.
+- **Ramp Detail comparison hardening.** Its notes are now a proper Notes sheet in the
+  workbook (key, normalizations, why the four TSN-only columns are context-only); a
+  stale TSN library can no longer feed unnormalized postmiles/dates through the
+  comparison (they re-normalize at compare time, proven a no-op on a fresh library across
+  15,410 real rows); and the consolidated-workbook gate also checks width, not just the
+  PM label. Ramp Summary's familiar sheet gained its own notes (the P/V dummy classes and
+  the TSMIS-only footnote). No comparison numbers change.
+- **Small clarity fixes everywhere.** A disabled "Create comparison…" button now says why
+  on hover; the (PDF) editions in the report picker explain what a print edition is; and
+  the Compare tab's "What you'll get" mentions the evidence-image workflow and where it
+  lives.
+
 ## v0.23.0 — 2026-07-08
 
 - **Evidence images on demand — no re-compare.** Every built, up-to-date vs-TSN cell of an

@@ -828,15 +828,16 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
   cells, scoped rebuild list, build guards, and the gui_api bridge incl. the shared queue). **Owed on
   the work PC:** building two real days vs TSN end-to-end.
 
-## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0)
+## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0)
 
 The manual "screenshot the cell in both PDFs and circle it" workflow, automated, as a
 **decoration of a finished vs-TSN comparison** — it never changes the comparison's
 status/completion/counts, and any evidence failure only logs + adds a summary note.
-Two reports so far, each via its own adapter over the shared engine:
-`evidence_highway_detail` (district TSN prints) and `evidence_intersection_detail`
-(the statewide TSN print). The HD-specific bullets below apply to ID analogously;
-the ID differences are called out inline.
+Three reports so far, each via its own adapter over the shared engine:
+`evidence_highway_detail` (district TSN prints), `evidence_intersection_detail`
+(the statewide TSN print) and `evidence_highway_log` (district TSN prints, with its
+own routing — below). The HD-specific bullets below apply to the others analogously;
+the ID/HL differences are called out inline.
 
 - **What it produces**, next to the comparison workbook (the `(formulas).xlsx` sibling family):
   `<comparison> (evidence).xlsx` (a Summary sheet + BOTH image layouts embedded, each on its
@@ -859,7 +860,11 @@ the ID differences are called out inline.
   TSN side = the prints in the report's `tsn_library/<report>/pdf/` folder — Highway Detail
   takes the 12 **district prints** (the district is read from each file's own DIST-CNTY-ROUTE
   header), Intersection Detail the ONE **statewide print** (district/county read per record
-  from `LOCATION`); filenames never matter. The pdf/ folders are **created + hinted by
+  from `LOCATION`); filenames never matter. **Highway Log is the raw-sourced exception
+  (v0.24.0):** its TSN library is BUILT from the district prints, so evidence reads the SAME
+  files from `tsn_library/highway_log/raw/` (`visual_evidence._TSN_PDFS_IN_RAW`; availability
+  reports `source: "raw"`) — no duplicate pdf/ drop, and a user with a working HL vs-TSN
+  comparison already has evidence ready. The pdf/ folders are **created + hinted by
   `tsn_library.ensure_layout`** (v0.21.1 — driven by the catalog's `TsnEntry.evidence_pdfs`
   flag; v0.21.0 never created it, so an updated install had nowhere to drop the prints), and
   re-entering a matrix tab re-pushes the state so the toggle re-probes and un-greys without a
@@ -872,7 +877,10 @@ the ID differences are called out inline.
   capturing positions — **keep them in LOCKSTEP** (HD: per-page windows, row groups, the
   postmile test, the date-token guard, cross-page carry, fallback-grid/straddling records
   rejected; ID: the document grids from both band shapes, the padded-postmile rowA test, the
-  integer-column-1 rowB pairing, page-straddling records rejected). The TSN locators differ by
+  integer-column-1 rowB pairing, page-straddling records rejected; HL: the zebra-rect per-page
+  windows with carry-forward — carried-geometry records rejected as approximate — the
+  header-bottom cutoff, the col0-right data test, and Description captured from its own
+  follow-on lines, page-split descriptions rejected). The TSN locators differ by
   print style: HD parses the TASAS district print line-anchored with the two-line REGEXES
   (word positions kept; an optional group that didn't print boxes the gap between neighbors;
   cross-checked ≥99.9% against the statewide extract); ID rides the statewide print's FIXED
@@ -882,7 +890,30 @@ the ID differences are called out inline.
   window. The ID print is indexed ONCE per file (cached on size+mtime) inside
   `district_index`, so the engine's per-district `locate_tsn` calls are dictionary lookups —
   the engine stayed untouched. Validated statewide: 16,584/16,584 records, 30/32 fields 100.00%
-  parse-back vs the raw extract (the rest are print truncations the verifier skips).
+  parse-back vs the raw extract (the rest are print truncations the verifier skips). HL's TSN
+  locator rides the OTM52010 print's fixed document-wide column windows
+  (`consolidate_tsn_highway_log.COLUMN_WINDOWS`), LOCKSTEP with that parser's walk (district/
+  group headers, totals close, the description x-band + totals-pattern guards, `', '` joins).
+- **Highway Log's per-print routing (v0.24.0):** the HL comparison's 31 columns carry NO
+  county/district, so a diff row can't be mapped to one district print up front (HD's sidecar
+  trick doesn't apply, and the comparator/library shapes stay untouched). The adapter owns the
+  fan-out instead: every example carries the SENTINEL district `""`, `district_index` returns
+  one `{"": <folder>}` entry, and `locate_tsn` receives the FOLDER — scanning every district
+  print route-filtered, tagging each record with its source path + the district/county it was
+  printed under. `_try_example` prefers a record's own `src`/`dist`/`cnty` over the district
+  index (additive; HD/ID records don't carry them and behave exactly as before), and the
+  engine's own uniqueness gate turns any cross-print key collision into a skipped example —
+  ambiguity can only cost an example, never mislabel one. Diffs are judged by
+  `compare_core.compared_cell` itself, so the `+`-run **ditto** cells (non-asserting by
+  schema) and the Med Wid normalization can never enumerate as examples. Costs a full
+  route-filtered scan of the district prints per run (minutes, like the TSN consolidation) —
+  the district-parse cache stays on the roadmap alongside HD's.
+- **Evidence UX (v0.24.0):** the toggle on both matrix pages lists per report what it will
+  do — a ✓ "will generate (N TSN prints)" line, a ○ "needs its TSN PDFs in <dir>" line, and
+  one line naming the rows with **no evidence support** (`_evidence_view` derives them from
+  `reports.matrix_rows()` × `visual_evidence.capable`, one entry per report family, pushed as
+  `evidence.unsupported`). Supported rows also carry a small camera badge on their row header
+  in both matrices (lit = prints in place, dimmed = tooltip names the drop folder).
 - **Wiring:** ONE hook in `matrix.consolidate_and_compare_tsn(evidence_opts=)` covers both
   matrices; callers resolve their own store layout through `matrix.evidence_opts_for` (the shared
   gate — toggle on + `visual_evidence.capable(row_key)`). The user toggle is ONE persisted pair

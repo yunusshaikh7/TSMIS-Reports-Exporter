@@ -90,11 +90,17 @@ def main():
     dest = Path(tempfile.mkdtemp(prefix="tsmis_day_dest_"))
     cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_day_cfg_"))
     # The matrix workers now live in gui_matrix (P7c) — patch them where the mixin
-    # dispatch resolves them.
+    # dispatch resolves them. TSN_LIBRARY_ROOT is sandboxed too (HERMETIC): the
+    # per-row TSN resolution consults the canonical library, and a dev PC whose
+    # real tsn_library/<report>/raw is stocked (the Highway Log district prints
+    # double as its evidence source) would otherwise flip these fixtures' staged
+    # legacy-drop "consolidated" source to "pdfs".
     saved = (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, gui_matrix.DayMatrixCompareWorker,
-             gui_matrix.MatrixCompareWorker, settings.get_batch_dest, settings.CONFIG_FILE)
+             gui_matrix.MatrixCompareWorker, settings.get_batch_dest, settings.CONFIG_FILE,
+             paths.TSN_LIBRARY_ROOT)
     paths.OUTPUT_ROOT = out
     day_matrix.OUTPUT_ROOT = out
+    paths.TSN_LIBRARY_ROOT = out / "_lib"
     gui_matrix.DayMatrixCompareWorker = _FakeWorker
     gui_matrix.MatrixCompareWorker = _FakeWorker
     settings.get_batch_dest = lambda: str(dest)
@@ -289,7 +295,8 @@ def main():
               and opened[-1] == day_matrix.byday_root())
     finally:
         (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, gui_matrix.DayMatrixCompareWorker,
-         gui_matrix.MatrixCompareWorker, settings.get_batch_dest, settings.CONFIG_FILE) = saved
+         gui_matrix.MatrixCompareWorker, settings.get_batch_dest, settings.CONFIG_FILE,
+         paths.TSN_LIBRARY_ROOT) = saved
         settings._cache = settings._cache_mtime = None
         for d in (out, dest, cfgdir):
             shutil.rmtree(d, ignore_errors=True)

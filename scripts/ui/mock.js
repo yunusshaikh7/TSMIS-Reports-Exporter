@@ -28,8 +28,11 @@ function makeMockApi() {
     { key: "highway_log", label: "Highway Log", fmt: "Excel" },
     { key: "highway_log_pdf", label: "Highway Log (PDF)", fmt: "PDF" },
     { key: "highway_sequence", label: "Highway Sequence Listing", fmt: "Excel" },
+    // v0.24.0 PDF editions (ids 11/12), next to their Excel siblings in the picker.
+    { key: "highway_sequence_pdf", label: "Highway Sequence Listing (PDF)", fmt: "PDF" },
     { key: "ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF", group: "Ramp", short: "Summary" },
     { key: "ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel", group: "Ramp", short: "Detail" },
+    { key: "ramp_detail_pdf", label: "TSAR: Ramp Detail (PDF)", fmt: "PDF", group: "Ramp", short: "Detail (PDF)" },
     { key: "intersection_summary", label: "Intersection Summary", fmt: "Excel", group: "Intersection", short: "Summary" },
     { key: "intersection_detail", label: "Intersection Detail", fmt: "Excel", group: "Intersection", short: "Detail" },
     { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", fmt: "PDF", group: "Intersection", short: "Detail (PDF)" },
@@ -116,22 +119,29 @@ function makeMockApi() {
     day_matrix_hidden: [],
     day_matrix_row_order: [],    // drag-to-reorder row preference (by-day)
     day_matrix_formulas: false,
-    evidence: {                  // v0.21.0 visual-evidence toggle (shared); v0.22.0 per-report
-      on: false, examples: 2, ready: true, deps_ok: true, tsn_pdfs: 13,
+    evidence: {                  // v0.21.0 visual-evidence toggle (shared); v0.22.0 per-report;
+      // v0.24.0 Highway Log (raw-sourced prints) + the named unsupported rows
+      on: false, examples: 2, ready: true, deps_ok: true, tsn_pdfs: 25,
       rows: ["highway_detail", "highway_detail_pdf",
+             "highway_log", "highway_log_pdf",
              "intersection_detail", "intersection_detail_pdf"],
       dir: "C:\\demo\\tsn_library\\highway_detail\\pdf",
       reports: [
         { key: "highway_detail", label: "Highway Detail", tsn_pdfs: 12,
-          dir: "C:\\demo\\tsn_library\\highway_detail\\pdf" },
+          dir: "C:\\demo\\tsn_library\\highway_detail\\pdf", source: "pdf" },
+        { key: "highway_log", label: "Highway Log", tsn_pdfs: 12,
+          dir: "C:\\demo\\tsn_library\\highway_log\\raw", source: "raw" },
         { key: "intersection_detail", label: "Intersection Detail", tsn_pdfs: 1,
-          dir: "C:\\demo\\tsn_library\\intersection_detail\\pdf" },
+          dir: "C:\\demo\\tsn_library\\intersection_detail\\pdf", source: "pdf" },
       ],
       row_reports: {
         highway_detail: "highway_detail", highway_detail_pdf: "highway_detail",
+        highway_log: "highway_log", highway_log_pdf: "highway_log",
         intersection_detail: "intersection_detail",
         intersection_detail_pdf: "intersection_detail",
       },
+      unsupported: ["TSAR: Ramp Summary", "TSAR: Ramp Detail",
+                    "Highway Sequence Listing", "Intersection Summary"],
     },
   };
   const mockSettings = {
@@ -186,7 +196,7 @@ function makeMockApi() {
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
       meta: {
-        version: "0.23.0 (preview)", build: "portable app",
+        version: "0.24.0 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
@@ -619,7 +629,7 @@ function makeMockApi() {
       // P9: mirror the backend's bridge-enum surface (gui_api.get_initial_state ->
       // contract.initial_state_enums) so the preview's init payload matches production.
       contract: window.CONTRACT,
-      app_name: "TSMIS Exporter", version: "0.23.0 (preview)",
+      app_name: "TSMIS Exporter", version: "0.24.0 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       // Mirror the real gate: Intersection is enabled (dev site); the reserved Highway
@@ -1392,7 +1402,7 @@ function makeMockApi() {
         push({ t: "log", text: "An update is already downloaded — click ‘Restart to update’ in the title bar to install it." });
       } else {
         push({ t: "log", text: "Checking for updates…" });
-        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.23.0 preview)." }), 600);
+        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.24.0 preview)." }), 600);
       }
       return { ok: true };
     },

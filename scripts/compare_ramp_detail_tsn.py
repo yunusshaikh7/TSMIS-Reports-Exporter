@@ -50,6 +50,24 @@ CONTEXT_FIELDS = ("Ramp Name", "On/Off", "Ramp Type", "ADT")   # TSN-only -> non
 DATE_FIELDS = ("Date of Record",)
 NORMALIZED_SHEET = "Ramp Detail (TSN)"    # the library's normalized TSN workbook sheet
 
+# Notes sheet — the user-facing INDICATOR for the key/normalization/context
+# choices (the same make_notes_writer legend the other vs-TSN comparators carry).
+_write_notes_sheet = ctc.make_notes_writer(
+    "Ramp Detail — TSMIS vs TSN: comparison notes",
+    (
+        "Rows are keyed on Route + PM (postmile), normalized to the TSN zero-padded "
+        "form ('9.6' and '009.600' are the same ramp).",
+        "Date of Record is compared as an ISO date — display-format differences "
+        "(6/1/2024 vs 2024-06-01) never count.",
+        "Description is compared after stripping the TSMIS leading \"<route>/\" "
+        "prefix (\"001/NB OFF …\" vs TSN \"NB OFF …\").",
+        "CONTEXT columns (shown for reference, never counted as a difference): "
+        "Ramp Name, On/Off, Ramp Type and ADT are TSN database columns with no "
+        "TSMIS counterpart — counting them would flood the workbook with one-sided "
+        "cells that say nothing about agreement.",
+        "One-sided rows are ramps one system lists at a postmile the other doesn't.",
+    ))
+
 _SCHEMA = CompareSchema(
     report_name="Ramp Detail",
     header=SHARED_HEADER,
@@ -65,6 +83,7 @@ _SCHEMA = CompareSchema(
     one_sided_note_extra=" (ramps one system lists at a postmile the other doesn't)",
     key_field=KEY_FIELD,
     context_fields=CONTEXT_FIELDS,
+    legend_writer=_write_notes_sheet,
 )
 
 _ROUTE_FROM_LOCATION = re.compile(r"^\s*\d{2}-[A-Za-z]{2,3}-(\w+)\s*$")  # "01-DN-101" -> "101"
@@ -132,6 +151,27 @@ def tsn_rows_from_raw(path):
         wb.close()
 
 
+def _normalized_row(r):
+    """Re-project one row from the normalized TSN-library sheet onto the shared
+    shape, RE-APPLYING the FORMAT normalizations (PM zero-pad, ISO date) so a
+    STALE library — one built before a PM/date normalization change — can't feed
+    raw values through `_v` and flag phantom format diffs (the Intersection
+    Detail `_normalized_row` defense). Both re-projections are idempotent on
+    already-normalized values, so this is a no-op for a fresh library.
+    Description deliberately is NOT re-stripped: `_strip_desc_prefix` is not
+    idempotent (a stripped description that itself starts "N/…" would lose
+    another segment), and semantic normalizer changes are owned by the D2
+    `normalization_version` rebuild, not compare-time repair."""
+    vals = list(r)[:len(SHARED_HEADER) + 1]
+    vals += [None] * (len(SHARED_HEADER) + 1 - len(vals))
+    pm_i = 1 + SHARED_HEADER.index("PM")
+    date_i = 1 + SHARED_HEADER.index("Date of Record")
+    out = [_v(c) for c in vals]
+    out[pm_i] = _norm_pm(vals[pm_i])
+    out[date_i] = _iso_date(vals[date_i])
+    return out
+
+
 def _load_tsn(path):
     """TSN side -> (rows, has_route=True). Reads the raw statewide Sheet-1, or the
     library's already-normalized workbook (header 'Route' + SHARED_HEADER)."""
@@ -145,7 +185,7 @@ def _load_tsn(path):
         if NORMALIZED_SHEET in sheets:                       # normalized library copy
             it = wb[NORMALIZED_SHEET].iter_rows(values_only=True)
             next(it, None)                                   # header row
-            rows = [[_v(c) for c in list(r)[:len(SHARED_HEADER) + 1]]
+            rows = [_normalized_row(r)
                     for r in it if r and any(c not in (None, "") for c in r)]
             return rows, True
     finally:
@@ -179,7 +219,9 @@ def _load_tsmis(path):
         bad_header_msg="isn't a CONSOLIDATED Ramp Detail workbook "
                        "(expected a leading 'Route' column) — consolidate the "
                        "per-route exports first.",
-        header_ok=lambda h: "PM" in h[:5],
+        # The export's header labels are column-shifted (read BY POSITION above),
+        # so the gate checks shape, not exact labels: PM early + the full width.
+        header_ok=lambda h: "PM" in h[:5] and len(h) >= 11,
         row_transform=_tsmis_row)
 
 
