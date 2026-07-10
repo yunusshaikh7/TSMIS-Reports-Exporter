@@ -61,9 +61,9 @@ except ImportError:
 
 import highway_log_columns as hlc               # the corrected column labels
 import outcome
-from pdf_table_lib import (assign_columns, char_lines, contiguous_windows,
-                           median, norm_route, run_pdf_conversion,
-                           write_route_workbook)
+from pdf_table_lib import (assign_columns, carried_line_crossings, char_lines,
+                           contiguous_windows, median, norm_route,
+                           run_pdf_conversion, write_route_workbook)
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
 
@@ -229,6 +229,21 @@ def _make_row(vals, description):
     return vals[0:_DESC_IDX] + [description] + vals[_DESC_IDX:N_PDF_COLS]
 
 
+def _carried_line_misfits(line_chars, windows, row):
+    """Misfit score for one data line parsed under CARRIED-FORWARD windows —
+    0 certifies the carry for this line, >0 is the genuinely-risky carry:
+      * intra-token window splits (`carried_line_crossings` — a drifted or
+        foreign-table layout cuts printed tokens across column boundaries), and
+      * a malformed Location cell (a boundary-0 shift moves whole tokens
+        without cutting any — pulling MI into col0 or pushing the postmile
+        out — so the emitted row's own key cell is re-checked against
+        LOCATION_RE, which every correctly-placed data row satisfies)."""
+    n = carried_line_crossings(line_chars, windows, WORD_GAP)
+    if not (row[0] and LOCATION_RE.match(row[0])):
+        n += 1
+    return n
+
+
 def parse_pdf(path, events, pdf_name=""):
     """Parse one TSMIS Highway Log PDF into TSMIS-format rows.
 
@@ -236,20 +251,26 @@ def parse_pdf(path, events, pdf_name=""):
     against the filename by the caller), `rows` a list of 31-column row lists in
     document order (all counties concatenated — county is a section marker, not a
     column), and `stats` a row-drop reconciliation dict (emitted, pages,
-    skipped_no_geometry, stale_geometry_pages). Returns (route, None, None) if
-    cancelled mid-PDF.
+    skipped_no_geometry, stale_geometry_pages, carried_validated_pages).
+    Returns (route, None, None) if cancelled mid-PDF.
 
     The reconciliation is REPORTING ONLY — the row-emit logic is unchanged, so
-    the per-route output (and every PDF comparison) is byte-identical. It just
-    makes two previously-silent conditions visible: data-looking lines dropped
-    on a page with no column geometry, and pages whose data is parsed with the
-    previous page's carried-forward geometry.
+    the per-route output (and every PDF comparison) is byte-identical. A page
+    with data rows but no 30-cell band of its own is parsed with the previous
+    page's carried-forward geometry, then VALIDATED read-only
+    (`_carried_line_misfits` == 0: no printed token split across windows AND
+    the emitted Location still a clean postmile token). Validated pages count
+    as `carried_validated_pages` and are ordinary; a page whose text does NOT
+    fit the carried windows counts as `stale_geometry_pages` — the
+    genuinely-risky case (a new table layout starting on a band-less page) —
+    and escalates.
     """
     route = None
     rows = []
     last_row = None                   # description lines attach to this row
     skipped_no_geometry = 0           # data-looking lines dropped: no column band yet
-    stale_geometry_pages = 0          # pages whose data used carried-forward geometry
+    stale_geometry_pages = 0          # carried-geometry pages whose text did NOT fit
+    carried_validated_pages = 0       # carried-geometry pages proven aligned
 
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
@@ -263,7 +284,8 @@ def parse_pdf(path, events, pdf_name=""):
             if derived is not None:
                 page_windows, col0_right = derived
             page_has_own_geometry = derived is not None
-            page_stale_logged = False    # log the carried-forward warning once per page
+            page_carried_lines = 0    # data lines parsed on a band-less page
+            page_carried_splits = 0   # intra-token window splits among them
 
             lines = _cluster_lines(page)
             hdr_bottom = _header_bottom(lines)
@@ -326,18 +348,18 @@ def parse_pdf(path, events, pdf_name=""):
                     or (len(texts) >= 2 and len(texts[0]) == 1 and texts[0].isalpha()
                         and LOCATION_RE.match(texts[1]) and first_x0 < col0_right))
                 if is_data:
-                    if not page_has_own_geometry and not page_stale_logged:
-                        # Data on a page with no column band of its own: parsed with
-                        # the previous page's geometry. Benign for the normal export
-                        # (the band repeats), but flag it once so a drifted layout
-                        # can't corrupt values silently.
-                        stale_geometry_pages += 1
-                        page_stale_logged = True
-                        events.on_log(f"    NOTE: page {page_no} has data rows but no column "
-                                      "band of its own; parsing with the previous page's "
-                                      "geometry (verify alignment).")
                     vals = _assign_columns(line_chars, page_windows)
                     row = _make_row(vals, None)
+                    if not page_has_own_geometry:
+                        # Data on a page with no column band of its own is parsed
+                        # with the previous page's geometry — VALIDATE it instead
+                        # of blanket-flagging: score the line's misfits (token
+                        # splits + a malformed Location cell; 0 = the page shares
+                        # the carried layout, the routine zebra-parity case).
+                        # Classified once the page's lines are done.
+                        page_carried_lines += 1
+                        page_carried_splits += _carried_line_misfits(
+                            line_chars, page_windows, row)
                     rows.append(row)
                     last_row = row
                     continue
@@ -355,9 +377,25 @@ def parse_pdf(path, events, pdf_name=""):
                     else:
                         last_row[_DESC_IDX] = text
 
+            # Classify the band-less page now that all its data lines are in:
+            # a clean fit is an ordinary page (counted, one quiet per-file log
+            # line from the caller); any token split across windows is the
+            # genuinely-risky carry — name the page loudly, it escalates.
+            if page_carried_lines:
+                if page_carried_splits:
+                    stale_geometry_pages += 1
+                    events.on_log(f"    WARNING: page {page_no} has data rows but no "
+                                  f"column band of its own, and its text does NOT fit "
+                                  f"the carried geometry ({page_carried_splits} "
+                                  f"misfit(s): tokens split across columns or a "
+                                  f"malformed Location) — verify this page.")
+                else:
+                    carried_validated_pages += 1
+
     stats = {"emitted": len(rows), "pages": n_pages,
              "skipped_no_geometry": skipped_no_geometry,
-             "stale_geometry_pages": stale_geometry_pages}
+             "stale_geometry_pages": stale_geometry_pages,
+             "carried_validated_pages": carried_validated_pages}
     return route, rows, stats
 
 
@@ -412,6 +450,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             ctx["skipped"] = ctx.get("skipped", 0) + pstats["skipped_no_geometry"]
             ctx["stale_pages"] = (ctx.get("stale_pages", 0)
                                   + pstats["stale_geometry_pages"])
+            ctx["carried_ok"] = (ctx.get("carried_ok", 0)
+                                 + pstats["carried_validated_pages"])
+            if pstats["carried_validated_pages"]:
+                ev.on_log(f"    {pstats['carried_validated_pages']} band-less page(s) "
+                          "validated against carried geometry.")
         route = name_route or pdf_route
         if not route:
             ev.on_log(f"{prefix} no route could be determined; skipping")
@@ -429,18 +472,24 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     def finalize(result, ctx):
         skipped = ctx.get("skipped", 0)
         stale_pages = ctx.get("stale_pages", 0)
+        carried_ok = ctx.get("carried_ok", 0)
         notes = []
         if skipped:
             notes.append(f"⚠ INCOMPLETE: {skipped} data line(s) dropped (no column "
                          "geometry) — see the log.")
         if stale_pages:
-            notes.append(f"⚠ {stale_pages} page(s) parsed with carried-forward geometry "
-                         "— verify alignment (see the log).")
+            notes.append(f"⚠ {stale_pages} page(s) whose text does NOT fit the "
+                         "carried-forward geometry — verify those pages (see the log).")
+        if carried_ok:
+            notes.append(f"{carried_ok} band-less page(s) parsed with carried geometry "
+                         "— every token fit its column (validated).")
         result.summary_lines = notes + result.summary_lines
         # RR2-B1 / D18: parse losses are invisible to the XLSX consolidator, so
         # ESCALATE to a producer-owned partial — a lossy output must not be
-        # promoted / cached / compared as complete. (Down-payment; eliminating the
-        # stale-geometry EMIT stays deferred — docs/roadmap.md.)
+        # promoted / cached / compared as complete. Carried-geometry pages that
+        # VALIDATE (every token intact under the carried windows — the normal
+        # zebra-parity case) are ordinary output and do NOT escalate; only a
+        # carry the page's own text contradicts does.
         if skipped or stale_pages or ctx["failed"]:
             result.completion = outcome.PARTIAL
             result.skipped_inputs = max(result.skipped_inputs, skipped)

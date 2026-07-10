@@ -315,7 +315,8 @@ def converter_late_save():
         saved = M.parse_pdf
         M.parse_pdf = lambda _p, _e, pdf_name="": (
             "001", [["000.001"] + ["x"] * 30],
-            {"emitted": 1, "pages": 1, "skipped_no_geometry": 0, "stale_geometry_pages": 0})
+            {"emitted": 1, "pages": 1, "skipped_no_geometry": 0,
+             "stale_geometry_pages": 0, "carried_validated_pages": 0})
         try:
             res = _run_with_late_save_appearance(out_path, lambda: M.consolidate(
                 events=Events(), confirm_overwrite=lambda _p: calls.append(_p) or False,

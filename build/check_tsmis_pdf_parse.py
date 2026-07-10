@@ -108,6 +108,40 @@ def check_assign_columns_conserves():
     assert want == got, (want, got)
 
 
+def check_carried_line_crossings():
+    """The carried-geometry validator (v0.26.2): intra-token window splits.
+    0 = the page shares the carried layout (every printed token's chars land in
+    one window — the same char-center test assign_columns places by); >0 = a
+    drifted/foreign layout is cutting through tokens, the genuinely-risky carry."""
+    from pdf_table_lib import carried_line_crossings
+    windows = [(float("-inf"), 80.0), (80.0, 120.0), (120.0, float("inf"))]
+    aligned = (
+        [_char(c, 40 + 4 * i, 44 + 4 * i) for i, c in enumerate("043.925")]   # col0
+        + [_char("6", 90, 96), _char("5", 96, 102)]                           # col1
+        + [_char(c, 130 + 3 * i, 133 + 3 * i) for i, c in enumerate("AB")])   # col2
+    assert carried_line_crossings(aligned, windows, M.WORD_GAP) == 0
+    # Two tokens split by a REAL gap across a boundary are two cells, not a split.
+    two_cells = [_char("1", 70, 76), _char("2", 90, 96)]
+    assert carried_line_crossings(two_cells, windows, M.WORD_GAP) == 0
+    # A drifted carry cuts through the col0 token: chars of ONE token (abutting)
+    # straddle the 80.0 boundary -> counted.
+    straddle = [_char(c, 70 + 4 * i, 74 + 4 * i) for i, c in enumerate("043.925")]
+    assert carried_line_crossings(straddle, windows, M.WORD_GAP) >= 1
+    # The foreign-table failure mode: the SAME aligned line scored against a
+    # shifted layout whose boundary now falls mid-token fires immediately.
+    shifted = [(lo - 30, hi - 30) for lo, hi in windows]      # boundary 80 -> 50
+    assert carried_line_crossings(aligned, shifted, M.WORD_GAP) >= 1
+    # The full misfit score adds the Location-cell re-check: a boundary-0 shift
+    # can move WHOLE tokens without cutting any (crossings blind spot) — but it
+    # glues MI into col0 / empties col0, which LOCATION_RE catches.
+    ok_row = M._make_row(["C 043.925E"] + ["x"] * 29, None)
+    assert M._carried_line_misfits(aligned, windows, ok_row) == 0
+    glued = M._make_row(["043.925 000.045"] + ["x"] * 29, None)   # MI pulled in
+    assert M._carried_line_misfits(aligned, windows, glued) >= 1
+    empty0 = M._make_row([""] + ["x"] * 29, None)                 # postmile pushed out
+    assert M._carried_line_misfits(aligned, windows, empty0) >= 1
+
+
 def check_header_bottom():
     def line(y, text):
         return (y, [{"text": t} for t in text.split()], [])
@@ -132,10 +166,12 @@ def main():
     check_normalize_location()
     check_make_row()
     check_assign_columns_conserves()
+    check_carried_line_crossings()
     check_header_bottom()
     print("OK  TSMIS Highway Log (PDF) parse: 30->31 column mapping, conserving "
-          "character assignment, Location normalization, route padding, and "
-          "content-based header detection all locked.")
+          "character assignment, Location normalization, route padding, "
+          "carried-geometry validation, and content-based header detection all "
+          "locked.")
 
 
 if __name__ == "__main__":

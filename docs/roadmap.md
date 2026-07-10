@@ -158,7 +158,14 @@ checkboxes in the *Next patch* section below — that list is the historical wor
 **v0.18.1 evidence-driven** (offline harness shipped; **real-PDF / work-PC acceptance owed** — RM04):
 - `ramp-summary-parse-failure-misattributed-to-source`, `ramp-summary-duplicate-pop-pattern-misassignment`,
   `pdf-consolidator-no-row-count-verification` (the P12 row oracle), and the stale-geometry **emit**
-  elimination — closed only when a committed fixture reproduces the exact failure, else real-PDF acceptance.
+  elimination — **RESOLVED in v0.26.2**: a carried-geometry page is now VALIDATED read-only
+  (`pdf_table_lib.carried_line_crossings` — every printed token's chars must land in ONE window, the
+  same char-center test `assign_columns` places by, so a 0 score certifies the assignment); a
+  committed fixture reproduces the exact failure mode (a foreign/drifted layout splits tokens), and
+  only a page whose text does NOT fit the carry keeps the ⚠ + PARTIAL. The blanket flag had marked
+  every HL (PDF) day "inputs incomplete" (~280 normal zebra-parity band-less pages per statewide
+  set — the work-PC field report of 2026-07-10); statewide census + re-verify in
+  `ground-truth/All Reports 7.9/_verification-scripts/`.
 - The carried live-verify set (P1 partial-keeps-last-good, P2 stage-and-swap, P3 resume-across-restart, the
   P8c live paths, the P10 v0.17→v0.18 self-update, **and the Intersection Detail (PDF) live reconciliation**).
   Full checklist: [work-pc-validation.md](work-pc-validation.md) §3.

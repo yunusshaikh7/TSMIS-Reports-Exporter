@@ -134,6 +134,33 @@ def contiguous_windows(edges_lo, edges_hi):
     return windows
 
 
+def carried_line_crossings(chars, windows, word_gap):
+    """How badly a data line disagrees with CARRIED-FORWARD column windows:
+    the number of intra-token window splits — consecutive characters closer
+    than `word_gap` (one printed token) whose centers fall in different
+    windows. A page that shares the carried table's layout scores 0 (a
+    printed cell never straddles a column boundary); a drifted or
+    foreign-table geometry cuts through tokens and scores immediately.
+    Read-only, and it applies the same char-center window test as
+    `assign_columns` — so a 0 score certifies that assignment placed every
+    token of the line intact."""
+    n = 0
+    prev_win = None
+    prev_x1 = None
+    for c in chars:                   # x-sorted by the clusterer
+        center = (c["x0"] + c["x1"]) / 2
+        win = None
+        for i, (lo, hi) in enumerate(windows):
+            if lo <= center < hi:
+                win = i
+                break
+        if (prev_win is not None and prev_x1 is not None
+                and (c["x0"] - prev_x1) < word_gap and win != prev_win):
+            n += 1
+        prev_win, prev_x1 = win, c["x1"]
+    return n
+
+
 # --------------------------------------------------------------------------- #
 # TSMIS-format per-route workbooks
 # --------------------------------------------------------------------------- #

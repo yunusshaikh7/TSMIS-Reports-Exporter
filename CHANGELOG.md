@@ -3,6 +3,28 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.26.2 — 2026-07-10
+
+### Fixed
+- **Highway Log (PDF) days no longer read "inputs incomplete" for a routine
+  print artifact.** A Highway Log print page whose only data rows are unshaded
+  carries no cell-rectangle band of its own (plain zebra-row parity, ~280 pages
+  per statewide export), so the parser reads it with the previous page's column
+  geometry — and since v0.19.0 ANY such page conservatively marked the whole
+  consolidation partial, which turned every Highway Log (PDF) matrix cell amber
+  ("inputs incomplete") even though nothing was missing. The carry is now
+  VALIDATED per page instead of blanket-flagged: every printed token's
+  characters must land inside one column window (the same char-center test the
+  parser assigns by) and the row's Location cell must still be a clean postmile
+  token. A validated page is ordinary output (an info line reports the count);
+  only a page whose text genuinely does not fit the carried geometry — a
+  changed table layout — keeps the ⚠ warning and the partial flag. Verified
+  statewide on two full export sets (551 carried pages, all validated; emitted
+  rows byte-identical to the previous parser on every affected route; both
+  end-to-end consolidations complete). After updating, force one re-consolidate
+  per amber day column (the day header's consolidate badge) — the cell then
+  clears to its real green/red.
+
 ## v0.26.1 — 2026-07-10
 
 ### Fixed
