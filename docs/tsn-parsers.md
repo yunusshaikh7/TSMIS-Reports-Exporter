@@ -299,6 +299,18 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
 >   back 100.00% identical** to the raw extract (Description 99.84% — print truncation
 >   the verifier correctly skips; 2 ML-Num-Lanes cases). The whole print is indexed ONCE
 >   per file (cached on size+mtime); per-district locates are lookups.
+> - **Quote convention (censused 2026-07-10, a field report off the evidence images):**
+>   both systems use THREE quote styles, character-identically — **doubled apostrophes**
+>   for quoted letters (`''F'' ST`; TSN 62 rows / TSMIS 61, matching contexts incl.
+>   `''13 DIPS'' RD`), single-quoted letters (route 238's `'G' ST. (LT)` family), and
+>   plain possessive apostrophes (`O'BRIEN`, `DEVIL'S`; 60/59 rows, same rows). Exactly
+>   ONE cell disagrees statewide — **KER 046 @ 50.904**: TSMIS `''F'' ST` vs TSN `"F" ST`
+>   — and that `"` is the ONLY quotation-mark character (U+0022) in the ENTIRE 09/2025
+>   TSN extract (TSMIS Descriptions contain zero). A genuine data edit on one side, NOT
+>   normalized (folding `''`≡`"` would hide it and mangle possessive-style text for zero
+>   count benefit; comparison-engine.md §13 has the census). Because the two forms print
+>   near-identically, the evidence header now carries a dark-red `_quote_note` line naming
+>   both sides' characters, and the ID Notes sheet documents that quotes compare literally.
 
 - **TSMIS side (pre-July-2026 notes):** per-route XLSX ×218, **sheet `Intersection Detail`** (CONFIRMED), **36 columns** `[P, Post Mile, S, Location, Date of Record, H/G, City Code, R/U, INT Type, INT Eff-Date, Ctrl T, Ctrl Type, Light Eff-Date, Light T/Y, ML Eff-Date, ML S/M, …]`. Free-text **Description** column → formula-injection guard (handled by the shared `consolidate_xlsx` core). **Consolidator DONE (v0.17.0):** `consolidate_intersection_detail` (thin `consolidate_xlsx` wrapper) — verified 218 routes → 16,473 rows.
 - **TSN format:** **XLSX, statewide flat**, single sheet `Sheet 1`, **16626 rows × 36 columns**, **216 routes** (`TSAR - INTERSECTION DETAIL_TSN.xlsx`). Columns: `[PP, POST_MILE, LOCATION, DATE_REC, HG, CITY_CODE, RU, EFF_DATE_INT, TY_INT, EFF_DATE_CT, TY_CT, EFF_DATE_LT, LT_TY, EFF_DATE_ML, MAIN_SM, …]`. `LOCATION` = `12 ORA 001` (space-separated). `POST_MILE` zero-padded ` 000.204`; TSMIS `Post Mile` unpadded `0.204`.
