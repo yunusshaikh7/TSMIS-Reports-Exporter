@@ -549,6 +549,13 @@ or accept as someday.**
     `compare_highway_sequence_tsn._v` carry the same tab/newline collapse; homing one helper in
     `compare_tsn_common` needs a locked-comparator re-bless, so it waits for a release that
     re-blesses HL anyway (audit finding, 2026-07-08 — cosmetic, no behavior drift).
+- [x] **Ramp Summary (Excel) edition — SHIPPED (v0.25.1**, same day it was backlogged**).** The
+  site's `rs_exportToExcel` wired as `ramp_summary_excel` (stable id 13) — the INVERSE of the
+  print editions. Shipped alongside **Intersection Summary (PDF)** (`ints_printAll`, id 14) and
+  the greyed **Route History** placeholder (id 15), so every enabled on-site report exports in
+  both formats the site offers (see the capability matrix in [reports.md](reports.md)). All
+  three export-only; the consolidate side (RS-Excel consolidator, IS-PDF print parser) waits for
+  real work-PC files, Lesson-13 style.
 - [x] **Intersection Detail July-2026 format — SHIPPED (v0.22.0).** The site reshaped the report
   (35 columns; see [reports.md](reports.md) Reports 5–6 + 6b and
   [tsn-parsers.md](tsn-parsers.md) Intersection Detail): consolidators/comparators updated with a
@@ -587,8 +594,15 @@ or accept as someday.**
   sign-off** in [Next version](#next-version-v0182--whats-actually-owed) above.)*
 
 ### Upstream / external (report to the TSMIS team)
-- [ ] Site hardcodes `highway_sequence_listing.xlsx` as *Ramp Detail*'s export filename (cosmetic
-  for us — we rename via `save_as`).
+- [ ] **DEV-SITE SSOR REGRESSION (2026-07-09, build 14:41)** — the Route History "restore" line in
+  `main.js`'s report-change handler re-hides the Query Method box for SSOR on every report pick
+  (clobbers the `checkTsmisHiGroup()` un-hide), so NO SSOR user can export on dev; prod fine. Fix
+  = restore `'block'` unconditionally. Relayed to the user with the one-line fix (see
+  `site-captures/TSMIS Dev Site 7.9` in the local index); blocks route-170 IS, the HD coalesced
+  pair, and all ID/IS/HD dev exports.
+- [x] Site hardcodes `highway_sequence_listing.xlsx` as *Ramp Detail*'s export filename (cosmetic
+  for us — we rename via `save_as`). **Fixed by the vendor in the dev 7.9 build**
+  (`ramp_detail_<route>.xlsx`); prod follows whenever that build promotes.
 - [ ] Ramp Summary **source-data** inconsistency on 9 routes (see the Shipped record — not our bug).
 
 ### Restructure leftovers (opportunistic — low priority, none release-blocking)
@@ -619,7 +633,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.25.0, shipped)
+### Version buckets — reconciled to reality (current: v0.25.1, shipped)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -649,6 +663,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.23.0** ✅ | Jul 8 | **On-demand per-cell evidence** — a camera action on built, fresh vs-TSN cells (both matrices) generates/refreshes the evidence set for the EXISTING comparison: no re-compare, toggle-independent (`matrix.run_evidence_only` + `evidence_for_cell`/`evidence_for_day_cell`, an `evidence` queue job, endpoints `matrix_evidence_cell`/`day_matrix_evidence_cell`). The freshness gate refuses when the store/consolidated/TSN moved past the comparison ("refresh the comparison" hint) so images can't illustrate a diff set the workbook doesn't carry; `availability()` gains the `row_reports` map the JS gate reads. Verified e2e on the 7.8 mini-store (real compare → on-demand run → warm-cache re-run → staleness refusal). |
 | **v0.24.0** ✅ | Jul 9 | **Highway Log evidence + two print editions + the comparison standards audit + evidence-toggle clarity** — (1) `evidence_highway_log`: both HL rows render evidence images (compared_cell-judged so dittos/Med-Wid never enumerate; per-print sentinel routing since HL's 31 columns carry no district — records carry their own `src`/dist/cnty, the engine prefers them, cross-print collisions skip via the uniqueness gate; TSN side reads the SAME district prints from `tsn_library/highway_log/raw/`, no duplicate drop). (2) **Highway Sequence (PDF)** + **Ramp Detail (PDF)** export-only print editions (stable ids 11/12; `hsl_printAll` portrait / the shared async `printAll()` dispatcher with a `showPrompt` auto-answer + `Promise.race` bound, landscape; coalescing automatic). (3) The audit: HSL re-verified statewide on the fresh 7.8 bundle (library rebuild byte-identical, counts within ~54 rows of the canary, FT-diff census: 681/698 = the by-design equate pairings — Notes updated); Ramp Detail gained a Notes sheet + stale-library re-normalization (idempotence proven on 15,410 real rows) + a width gate; Ramp Summary gained spec notes. (4) The evidence toggle spells itself out per report (✓/○/no-support lines + row-header camera badges); disabled Create-comparison explains why; (PDF) picker rows explain print editions. `check_day_matrix`/`check_matrix_tsn` made HERMETIC (sandbox `TSN_LIBRARY_ROOT` — a stocked dev library flipped their staged fixtures). |
 | **v0.25.0** ✅ | Jul 9 | **Highway Sequence (PDF) fully integrated + the Intersection Summary July fix** — off the first real work-PC print set (`ground-truth/HSL PDF + IS Bundle 7.9`, delivered same day): (1) the census-first print parser (`consolidate_tsmis_highway_sequence_pdf` — header-anchored per-page windows, wrapped-desc HYPHEN-AWARE rejoin, PM-less END-OF-ROUTE/CITY-END rows, the "Unresolved Intersections" trailer hard-stop; parse-back **60,493/60,493 rows / 59,082 fully equal** vs the 7.8 Excel — residual = the equate-representation classes + 4 `_x000D_` + the route-037 Description the Excel export DROPS). (2) `compare_highway_sequence_pdf` (PDF↔TSN pairs BETTER than Excel↔TSN — both 57,505 vs 57,071, the print shares TSN's equate convention; PDF↔Excel both 59,946 / identical 59,082; per-flavor Notes sheets) + the `HIGHWAY_SEQUENCE_PDF` env adapter + BOTH matrix rows (env/tsn/vs_excel modes; every special-case mirrored: `matrix_state`, `matrix_build`, `day_matrix`, `gui_worker_maint`, the console menu, the mock). (3) `evidence_highway_sequence` — the HL per-print sentinel routing, context-fields never enumerate (`compared_cell`), TSN prints from `tsn_library/highway_sequence/raw/` (`_TSN_PDFS_IN_RAW`). (4) **Intersection Summary**: the July `MASTARM`→`MASTERARM` rename absorbed via a parse-only Section alias + the section-partition layout-drift tripwire (every block but the site-under-counted Highway Group must sum to the route total); verified on the fresh 217-route export (route 170 missing — flagged). |
+| **v0.25.1** ✅ | Jul 9 | **Every edition, everywhere** — (1) **TSAR: Ramp Summary (Excel)** (stable id 13, `rs_exportToExcel` via the shared Export-button save — the site button the app never wired; the INVERSE of the print editions); (2) **Intersection Summary (PDF)** (id 14, `save_intersection_summary_pdf`: `ints_printAll` PREPENDS a cover to the inline count tables — no pagination — `window.print` overridden, `.rs-cover`+`.ints-total` verified, total re-read as the empty backstop, portrait; in `_PAGE_REBUILDING_SAVES`); both coalesce with their siblings (shared `data_value`). (3) **Route History Table** (id 15) wired as reserved-DISABLED groundwork (`DISABLED_EXPORT_SUBDIRS={"route_history"}`, greyed in the picker — the dev site's embedded-SSRS report has no export flow; the v0.18.1 Highway-pair pattern). Export-only; consolidate/compare/matrix untouched. Gate checks re-pointed (`check_intersection_gate._RESERVED`, stable-ids 13–15, catalog baseline + mock parity). |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

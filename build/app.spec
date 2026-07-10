@@ -79,6 +79,8 @@ APP_MODULES = [
     "export_highway_detail", "export_highway_summary",   # export enabled v0.19.1
     "export_highway_detail_pdf",                          # Highway Detail (PDF), v0.19.2
     "export_highway_sequence_pdf", "export_ramp_detail_pdf",   # PDF editions, v0.24.0
+    "export_ramp_summary_excel", "export_intersection_summary_pdf",  # the last editions, v0.25.1
+    "export_route_history",              # reserved-DISABLED SSRS placeholder, v0.25.1
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
     "highway_detail_columns",                                # Highway Detail labels + legend (v0.20.0)

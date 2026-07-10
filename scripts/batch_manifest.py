@@ -43,6 +43,10 @@ _V017_EXPORT_ORDER = (
     "highway_detail", "highway_summary", "highway_detail_pdf",
     # v0.24.0 PDF editions — appended at 11/12 (same rule: never insert/reorder).
     "highway_sequence_pdf", "ramp_detail_pdf",
+    # v0.25.1 — the last missing editions at 13/14 (Ramp Summary's Excel sibling,
+    # Intersection Summary's print edition) + the reserved-DISABLED Route History
+    # placeholder at 15 (same rule: never insert/reorder).
+    "ramp_summary_excel", "intersection_summary_pdf", "route_history",
 )
 
 # Poison sentinel for a structurally-invalid saved entry. It is never a real export
