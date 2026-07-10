@@ -121,6 +121,23 @@ check("a cell box taller than the record stretches the band over it",
 check("the band clamps to the page edges",
       ve._crop_window(2000, 300, (0, 0, 10, 10), (0, 4))[1] == 0
       and ve._crop_window(2000, 300, (0, 100, 10, 110), (110, 118))[3] == 300)
+# The quote-characters clarifier: a diff whose values differ ONLY in quote
+# characters ('' vs " vs ') prints near-identically, so the evidence header
+# must SAY the difference is real and name both sides' characters (the
+# censused case: Intersection Detail KER 046 @ 50.904).
+_qn = ve._quote_note("''F'' ST", '"F" ST')
+check("quote-only diff -> note names both sides' quote characters",
+      "quote characters only" in _qn and "two apostrophes" in _qn
+      and "a quotation mark" in _qn)
+check("quote-only detection is direction- and kind-aware",
+      "one apostrophe" in ve._quote_note("'F' ST", '"F" ST')
+      and "TSMIS prints \" (a quotation mark)" in ve._quote_note('"F" ST', "''F'' ST"))
+check("genuinely different values -> no note",
+      ve._quote_note("MYRTLE ST", "SANFORD AVE") == ""
+      and ve._quote_note("''F'' ST", '"F" AVE') == "")
+check("identical values (incl. both blank) -> no note",
+      ve._quote_note("''E'' ST", "''E'' ST") == ""
+      and ve._quote_note(None, "") == "")
 avail = ve.availability()
 check("availability shape (rows/tsn_pdfs/ready/dir/reports/row_reports/deps_ok)",
       set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "reports", "row_reports",

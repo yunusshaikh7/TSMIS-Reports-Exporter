@@ -3,6 +3,21 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.26.1 — 2026-07-10
+
+### Fixed
+- **Evidence images: invisible quote-character differences are now labeled.** A
+  difference whose two values differ only in quote characters — a doubled apostrophe
+  (`''F'' ST`) on one side vs a real quotation mark (`"F" ST`) on the other — prints
+  near-identically, so the evidence header looked like it flagged two equal values
+  (field report: the Intersection Detail Description at KER 046 @ 50.904, the single
+  such row statewide). The difference is real — the systems genuinely store different
+  characters — and the image header now says so on a dark-red third line naming both
+  sides' characters in words; the evidence workbook captions carry the same note. The
+  Intersection Detail comparison's Notes sheet documents that quote characters compare
+  literally (both systems share the `''X''` convention on every other quoted-letter row,
+  so no normalization is applied — folding would hide a genuine data edit).
+
 ## v0.26.0 — 2026-07-10
 
 Ramp Detail (PDF) — the last export-only print edition — is now fully integrated:

@@ -925,6 +925,16 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   fell outside the image. The gray record box still uses `xspan`; only the crop widened.
   Pinned in `check_visual_evidence`; re-verified on 99 regenerated examples (HSL Excel/PDF +
   RD Excel/PDF — both page orientations, district + statewide TSN prints).
+- **Quote-characters clarifier** (`_quote_note`, v0.26.1): when a sampled pair's two values differ
+  ONLY in quote characters (`''` doubled apostrophes vs `"` a quotation mark vs `'`), they
+  print near-identically and the pair header reads as a false positive. The header gains a
+  third, dark-red line naming both sides' characters in words ("TSMIS prints '' (two
+  apostrophes) where TSN prints \" (a quotation mark)"), and the workbook caption carries the
+  same note — the difference is REAL (the systems store different characters); the tool now
+  says so instead of looking broken. Censused trigger: Intersection Detail KER 046 @ 50.904,
+  the single statewide instance (both systems otherwise share the `''X''` convention — TSN 62
+  rows / TSMIS 61, near-identical contexts). Every other pair renders without the line. Pinned
+  in `check_visual_evidence`; the ID Notes sheet documents that quotes compare literally.
 - **Sampling:** for every differing column, up to N (user setting, 1–10, default 2) random
   example rows across random routes, keys restricted to UNIQUE-per-route on both sides so a
   highlight is THE row. Each run logs its sample seed.

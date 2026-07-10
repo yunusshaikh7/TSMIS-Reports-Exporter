@@ -222,7 +222,7 @@ function makeMockApi() {
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
       meta: {
-        version: "0.26.0 (preview)", build: "portable app",
+        version: "0.26.1 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
@@ -748,7 +748,7 @@ function makeMockApi() {
       // P9: mirror the backend's bridge-enum surface (gui_api.get_initial_state ->
       // contract.initial_state_enums) so the preview's init payload matches production.
       contract: window.CONTRACT,
-      app_name: "TSMIS Exporter", version: "0.26.0 (preview)",
+      app_name: "TSMIS Exporter", version: "0.26.1 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       // Mirror the real gate: Intersection is enabled (dev site); the reserved Highway

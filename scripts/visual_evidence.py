@@ -363,6 +363,30 @@ def _summarize_reasons(reasons):
     return "; ".join(uniq[:3])
 
 
+_QUOTE_TOKEN_RE = re.compile(r"''|[\"']")
+_QUOTE_NAMES = {"''": "'' (two apostrophes)", '"': '" (a quotation mark)',
+                "'": "' (one apostrophe)"}
+
+
+def _quote_note(va, vb):
+    """The one invisible diff class: two values that differ ONLY in quote
+    characters ('' vs " vs ') print near-identically, so a verified-real
+    difference reads as a false positive (the censused case: Intersection
+    Detail KER 046 @ 50.904 — TSMIS ''F'' ST vs TSN "F" ST, the single
+    statewide instance). Returns the header line naming both sides'
+    characters, or "" for every other pair."""
+    a, b = str(va or ""), str(vb or "")
+    if a == b or _QUOTE_TOKEN_RE.sub("'", a) != _QUOTE_TOKEN_RE.sub("'", b):
+        return ""
+    pair = next(((x, y) for x, y in zip(_QUOTE_TOKEN_RE.findall(a),
+                                        _QUOTE_TOKEN_RE.findall(b)) if x != y),
+                None)
+    if pair is None:                    # unreachable when a != b; kept safe
+        return ""
+    return ("REAL difference, in the quote characters only: TSMIS prints "
+            f"{_QUOTE_NAMES[pair[0]]} where TSN prints {_QUOTE_NAMES[pair[1]]}")
+
+
 def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
                  tsmis_pdf_dir, out_dir, k, page_cache):
     """Verify one candidate end-to-end and render both layouts. Returns
@@ -403,6 +427,7 @@ def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
     n_img = _strip(n_pdf, npage, nbox, nyspan, nxspan, page_cache)
     title = (f"{field} — TSMIS '{ex['va'] or '(blank)'}'  vs  "
              f"TSN '{ex['vb'] or '(blank)'}'")
+    note = _quote_note(ex["va"], ex["vb"])
     where = f" — TSN district D{dist} ({cnty})" if dist or cnty else ""
     sub = (f"Route {ex['route']} @ {ex['key']} — both PDFs re-parsed and "
            f"verified against the compared values{where}")
@@ -412,11 +437,11 @@ def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
     safe = re.sub(r"[^A-Za-z0-9]+", "_", field).strip("_")
     stacked = out_dir / f"{safe}_{k}_stacked.png"
     pair = out_dir / f"{safe}_{k}_pair.png"
-    _compose_stacked(title, sub, t_label, t_img, n_label, n_img, stacked)
-    _compose_pair(title, sub, t_label, t_img, n_label, n_img, pair)
+    _compose_stacked(title, sub, t_label, t_img, n_label, n_img, stacked, note=note)
+    _compose_pair(title, sub, t_label, t_img, n_label, n_img, pair, note=note)
     return {"field": field, "route": ex["route"], "key": ex["key"],
-            "va": ex["va"], "vb": ex["vb"], "stacked": stacked.name,
-            "pair": pair.name}, None
+            "va": ex["va"], "vb": ex["vb"], "note": note,
+            "stacked": stacked.name, "pair": pair.name}, None
 
 
 # --------------------------------------------------------------------------- #
@@ -483,20 +508,30 @@ def _scaled(im, width):
     return im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
 
 
-def _header(canvas, w, title, sub):
+_NOTE_H = 30            # extra header height when the quote-characters note line shows
+
+
+def _header(canvas, w, title, sub, note=""):
+    """The title block; returns the y where content starts. `note` (the
+    _quote_note line) renders dark red under the subtitle — it flags a REAL
+    difference the printed values themselves don't show."""
     d = ImageDraw.Draw(canvas)
     d.text((16, 12), title, font=_font(26, True), fill=(20, 20, 20))
     d.text((16, 50), sub, font=_font(17), fill=(90, 90, 90))
-    return 84
+    if note:
+        d.text((16, 80), note, font=_font(17, True), fill=(165, 20, 20))
+    return 84 + (_NOTE_H if note else 0)
 
 
-def _compose_stacked(title, sub, top_label, top_img, bot_label, bot_img, out):
+def _compose_stacked(title, sub, top_label, top_img, bot_label, bot_img, out,
+                     note=""):
     top_img, bot_img = _scaled(top_img, _STACK_W), _scaled(bot_img, _STACK_W)
     w = max(top_img.width, bot_img.width) + 32
     lab = 30
-    h = 84 + lab + top_img.height + 14 + lab + bot_img.height + 16
+    hd = 84 + (_NOTE_H if note else 0)
+    h = hd + lab + top_img.height + 14 + lab + bot_img.height + 16
     canvas = Image.new("RGB", (w, h), (255, 255, 255))
-    y = _header(canvas, w, title, sub)
+    y = _header(canvas, w, title, sub, note)
     d = ImageDraw.Draw(canvas)
     for label, im in ((top_label, top_img), (bot_label, bot_img)):
         d.text((16, y + 4), label, font=_font(16, True), fill=(31, 56, 100))
@@ -508,14 +543,14 @@ def _compose_stacked(title, sub, top_label, top_img, bot_label, bot_img, out):
     canvas.save(out)
 
 
-def _compose_pair(title, sub, l_label, l_img, r_label, r_img, out):
+def _compose_pair(title, sub, l_label, l_img, r_label, r_img, out, note=""):
     l_img, r_img = _scaled(l_img, _PAIR_SIDE_W), _scaled(r_img, _PAIR_SIDE_W)
     lab = 30
     col_h = max(l_img.height, r_img.height)
     w = l_img.width + r_img.width + 48
-    h = 84 + lab + col_h + 16
+    h = 84 + (_NOTE_H if note else 0) + lab + col_h + 16
     canvas = Image.new("RGB", (w, h), (255, 255, 255))
-    y0 = _header(canvas, w, title, sub)
+    y0 = _header(canvas, w, title, sub, note)
     d = ImageDraw.Draw(canvas)
     x = 16
     for label, im in ((l_label, l_img), (r_label, r_img)):
@@ -542,9 +577,11 @@ def _image_sheet(wb, sheet_title, entries, img_dir, img_key, embed_w, fonts):
     ev["A1"].font = small
     r = 3
     for e in entries:
+        note = e.get("note") or ""
         ev.cell(row=r, column=1, value=(
             f"{e['field']}   —   route {e['route']} @ {e['key']}   —   "
-            f"TSMIS '{e['va']}' vs TSN '{e['vb']}'")).font = bold
+            f"TSMIS '{e['va']}' vs TSN '{e['vb']}'"
+            + (f"   —   {note}" if note else ""))).font = bold
         img = XLImage(str(img_dir / e[img_key]))
         scale = min(1.0, embed_w / img.width)
         img.width, img.height = int(img.width * scale), int(img.height * scale)

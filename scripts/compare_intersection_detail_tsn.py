@@ -420,6 +420,12 @@ def _write_notes_sheet(wb):
     note("• Numeric zero-padding — Main Line Length ('58' ≡ '058'), the intersecting-route "
          "number and postmile ('9.560' ≡ '9.56'), and Xing Line Lgth (TSN's "
          "X_CROSS_OVERRIDE) canonicalize before comparing.")
+    note("• Quote characters are NOT normalized — they compare literally. Both systems "
+         "write quoted street letters as a doubled apostrophe (''F'' ST) on almost every "
+         "such row; where one side instead stores a real quotation mark (\"F\" ST) the "
+         "Description flags. The two forms print near-identically, so the evidence images "
+         "label such a difference explicitly — but the sides genuinely store different "
+         "characters (statewide census 2026-07: exactly one such row, KER 046 @ 50.904).")
 
     section("COLUMNS THAT STILL DIFFER STRUCTURALLY  (compared and counted like any other — "
             "the difference is systematic, explained here, NOT a per-intersection data error)")
