@@ -1,15 +1,16 @@
 """The matrix GUI workers (S2 / ARC-02, split from gui_worker.py).
 
-_run_matrix_export_step (one manifest-free report+env export) and the four
-matrix job workers: MatrixBatchExportWorker, MatrixCompareWorker,
-DayMatrixCompareWorker, MatrixTsnConsolidateWorker. Verbatim moves;
-gui_worker re-exports.
+_run_matrix_export_step (one manifest-free report+env export) and the matrix
+job workers: MatrixBatchExportWorker, MatrixCompareWorker,
+DayMatrixCompareWorker, BaselineMatrixCompareWorker,
+MatrixTsnConsolidateWorker. Verbatim moves; gui_worker re-exports.
 """
 import logging
 import threading
 from pathlib import Path
 
 import owned_dir
+import baseline_matrix
 import day_matrix
 import matrix
 import outcome
@@ -246,6 +247,68 @@ class DayMatrixCompareWorker(threading.Thread):
                         self.q.put(("log", f"  {date} {row_key}: {res.message}"))
                 except Exception as e:                   # noqa: BLE001
                     log.exception("day matrix compare %s/%s crashed", date, row_key)
+                    status, errors = "error", errors + 1
+                    self.q.put(("log", f"  {date} {row_key}: "
+                                       f"{type(e).__name__}: {e}"))
+                done += 1
+                self.q.put(("matrix_cell", {"row": row_key, "cell": date,
+                                            "status": status,
+                                            "done": done, "total": total}))
+        finally:
+            self.q.put(("matrix_done", {"done": done, "total": total,
+                                        "errors": errors,
+                                        "cancelled": self.cancel.is_set()}))
+
+
+class BaselineMatrixCompareWorker(threading.Thread):
+    """(Re)build Compare-tab "vs Baseline" cells — each a (day, report) vs the
+    picked baseline (an earlier run folder, or the Everything store).
+
+    `cells` is a list of (date, row_key). No browser, no consolidation, no TSN
+    dataset — pure orchestration via baseline_matrix.build_baseline_cell (the
+    row's own compare_env adapter reads the per-route files straight from both
+    folders). Honors cancel BETWEEN cells (each finished cell is saved). Posts
+    the same ('matrix_cell', …) / ('matrix_done', …) events as the other
+    compare workers so the bridge lifecycle is identical."""
+
+    def __init__(self, source, cells, baseline_id, dest, queue, cancel_event,
+                 also_formulas=False):
+        super().__init__(daemon=True, name="baseline-matrix-compare")
+        self.source = source
+        self.cells = [(c[0], c[1]) for c in cells]   # (date, row_key)
+        self.baseline_id = baseline_id
+        self.dest = dest
+        self.q = queue
+        self.cancel = cancel_event
+        self.also_formulas = also_formulas
+
+    def run(self):
+        events = Events(is_cancelled=self.cancel.is_set,
+                        on_log=lambda m: self.q.put(("log", m)))
+        # The comparisons/baseline-by-day tree lives under output/ — app-created,
+        # so stamp it owned (M03), like the by-day tree.
+        owned_dir.ensure_owned_dir(baseline_matrix.byday_root().parent,
+                                   kind="comparisons")
+        total = len(self.cells)
+        done = errors = 0
+        try:
+            for date, row_key in self.cells:
+                if self.cancel.is_set():
+                    break
+                self.q.put(("matrix_cell", {"row": row_key, "cell": date,
+                                            "status": "running",
+                                            "done": done, "total": total}))
+                try:
+                    res = baseline_matrix.build_baseline_cell(
+                        self.source, date, row_key, self.baseline_id, self.dest,
+                        events, also_formulas=self.also_formulas)
+                    status = res.status
+                    if status != "ok":
+                        errors += 1
+                        self.q.put(("log", f"  {date} {row_key}: {res.message}"))
+                except Exception as e:                   # noqa: BLE001
+                    log.exception("baseline matrix compare %s/%s crashed",
+                                  date, row_key)
                     status, errors = "error", errors + 1
                     self.q.put(("log", f"  {date} {row_key}: "
                                        f"{type(e).__name__}: {e}"))

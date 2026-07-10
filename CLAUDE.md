@@ -40,20 +40,23 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 8 | Highway Summary | XLSX | `output/<run>/highway_summary/` |
 
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
-Reports 5–6 (Intersection): export is **enabled** but the report lives on the
-**development** TSMIS site — switch via Settings ▸ "Use development site"
-(`tsmis-dev.dot.ca.gov`). **Since v0.25.1 every enabled on-site report exports in BOTH
-formats the site offers**: the five Excel reports each have a print-layout **PDF**
-edition (2b / 4b / 5b / 6b / 7b — **3b graduated in v0.25.0** off the first real
-work-PC print set — parser/consolidator/comparisons/matrix row; **5b joined in
+**Every enabled report exports from the production site since the 2026-07-09 prod
+rollout** (it un-greyed Intersection Summary/Detail + Highway Detail — verified on
+both data sources; the dev site, Settings ▸ "Use development site", is only needed
+for Route History testing now). **Since v0.25.1 every enabled on-site report exports
+in BOTH formats the site offers**: the five Excel reports each have a print-layout
+**PDF** edition (2b / 4b / 5b / 6b / 7b — **3b graduated in v0.25.0**, **2b in
+v0.26.0**, each off its first real work-PC print set —
+parser/consolidator/comparisons/matrix row; **5b joined in
 v0.25.1** via `ints_printAll`), and the natively-PDF Ramp Summary gained its **Excel**
-sibling (**1b**, v0.25.1 — the site's `rs_exportToExcel`, previously unwired). 1b/2b/5b
-are **export-only** (2b's parser next — its work-PC PDFs exist, awaiting drop; the
-staged path 3b/7b took). The dev site's new **Route History Table** (an embedded SSRS
+sibling (**1b**, v0.25.1 — the site's `rs_exportToExcel`, previously unwired). 1b/5b
+stay **export-only** by design (their siblings already consolidate + compare). The dev
+site's new **Route History Table** (an embedded SSRS
 report, no export flow) is wired as a **greyed reserved placeholder** (stable id 15,
 the v0.18.1 Highway-pair pattern). v0.17.0 brought
-reports 1–6b to parity, **v0.20.0 added Highway Detail (7/7b)**, and **v0.25.0 added
-Highway Sequence (PDF) (3b)**: the **11 fully-integrated export types consolidate AND
+reports 1–6b to parity, **v0.20.0 added Highway Detail (7/7b)**, **v0.25.0 added
+Highway Sequence (PDF) (3b)**, and **v0.26.0 added Ramp Detail (PDF) (2b)**: the
+**12 fully-integrated export types consolidate AND
 compare vs TSN** — each has a vs-TSN comparator and lives in both the Everything and
 by-day matrices (see
 [docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md)
@@ -72,26 +75,38 @@ statewide on the fresh 7.8 bundle in v0.24.0** (library rebuild byte-identical; 
 within ~54 rows of the 6.19 canary — the TSMIS drift since June); **its PDF edition was
 parser-blessed on the 7.9 print set** (60,493/60,493 rows parse back vs Excel; the print
 shares TSN's equate convention, so PDF-vs-TSN pairs 434 rows MORE than Excel-vs-TSN; the
-self-check exposes an Excel-dropped Description on route 037). Where the live site still
-greys a report, `select_report` fails fast rather than stalling.
+self-check exposes an Excel-dropped Description on route 037). **Ramp Detail (PDF) was
+blessed the same way in v0.26.0 on the `All Reports 7.9` pair** (15,216/15,216 rows parse
+back vs the same-day Excel; PDF↔Excel identical 15,212/15,216 — the 4 residuals are the
+Excel's `_x000d_` escapes the print omits; the print carries the On/Off + Ramp Type
+columns the Excel export DROPS, so the PDF-vs-TSN flavor compares two MORE columns than
+Excel-vs-TSN can — +151 diff cells of new coverage statewide). Where the live site
+still greys a report, `select_report` fails fast rather than stalling.
 **Selecting both editions of one report (Excel + PDF, same `data_value`) coalesces** — the route
 is generated **once** and both files saved off it (`run_export_combined`, v0.19.2; standard path
 only, not fast mode). Consolidate-only sources exist too — **TSN**
 Highway Log district PDFs (dropped into `input/tsn_highway_log/`) and the app's own
-**Highway Log (PDF)**, **Intersection Detail (PDF)**, **Highway Detail (PDF)** and
-**Highway Sequence (PDF)** exports. The **Compare** tab diffs every report
+**Highway Log (PDF)**, **Intersection Detail (PDF)**, **Highway Detail (PDF)**,
+**Highway Sequence (PDF)** and **Ramp Detail (PDF)** exports. The **Compare** tab diffs every report
 **TSMIS-vs-TSN** (the PDF-sourced
-editions among them, each also offering a **PDF-vs-Excel** self-check) and runs
-cross-environment comparisons. **Visual evidence (v0.21.0; + Intersection Detail in
-v0.22.0; + Highway Log in v0.24.0; + Highway Sequence in v0.25.0):** Highway Detail,
-Intersection Detail, Highway Log and Highway Sequence vs-TSN comparisons can also render
-sampled diffs as highlighted snippets from BOTH
+editions among them, each also offering a **PDF-vs-Excel** self-check), runs
+cross-environment comparisons, and (v0.26.0) hosts the **vs Baseline Matrix** — any
+exported day of a report diffed against an EARLIER pull of the same report (a prior
+day's run folder or the Everything store; same format on both sides by construction;
+`baseline_matrix.py` over `compare_env`, see
+[docs/comparison-engine.md](docs/comparison-engine.md) §12c). **Visual evidence (v0.21.0; + Intersection Detail in
+v0.22.0; + Highway Log in v0.24.0; + Highway Sequence in v0.25.0; + Ramp Detail in
+v0.26.0):** Highway Detail,
+Intersection Detail, Highway Log, Highway Sequence and Ramp Detail vs-TSN comparisons
+can also render sampled diffs as highlighted snippets from BOTH
 PDFs (parse-back-verified; ditto-aware for HL; context-field-aware for HSL;
-`… (evidence).xlsx` with stacked +
+dual-row-aware for RD — its PDF row compares two print-only columns the Excel row
+can't; `… (evidence).xlsx` with stacked +
 side-by-side image tabs, plus the loose image folder, beside the comparison) — one
 shared toggle+count on both matrix pages, enabled per report once its TSN prints are in
-place (HD: district PDFs in `tsn_library/highway_detail/pdf/`; ID: the one statewide
-print in `…/intersection_detail/pdf/`; **HL + HSL: the SAME district prints their TSN
+place (HD: district PDFs in `tsn_library/highway_detail/pdf/`; ID + RD: each one
+statewide print in `…/intersection_detail/pdf/` / `…/ramp_detail/pdf/`; **HL + HSL: the
+SAME district prints their TSN
 libraries build from, read from `…/highway_log/raw/` and `…/highway_sequence/raw/` — no
 duplicate drop**), and since v0.23.0 a
 per-cell **camera action** regenerates a BUILT comparison's evidence on demand (no
@@ -236,6 +251,8 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   task_coordinator.py contract.py        GUI task-state owner / Python⇄JS bridge enum SSOT
   gui_endpoint.py gui_matrix.py gui_win32.py   the endpoint envelope (+_task_endpoint/pick_path) / matrix mixin / Win32
   validation.py              the one-click Settings validation (W1)
+  site_capture.py            the Settings website-source capture (v0.26.0, local-only)
+  baseline_matrix.py         the Compare-tab "vs Baseline" day-vs-baseline matrix (v0.26.0)
   ui/                        index.html app.css app.js + ui-export/-batch/-compare/-matrix/-settings/-dom.js + mock.js + contract.js
   self_test.py evidence.py pdf_row_oracle.py owned_dir.py safe_delete.py   self-test / evidence / safety
   updater.py login.py logging_setup.py batch_manifest.py report_library.py

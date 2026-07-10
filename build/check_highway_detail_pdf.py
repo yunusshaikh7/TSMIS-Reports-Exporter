@@ -79,6 +79,63 @@ def test_line1_classifier():
           "merges 'PM LEN' into window 0)",
           hdpdf._is_line1(["000.000L 000.000 19-10-14"])
           and not hdpdf._is_line1(["04 ALA 880S"]))
+    # v0.26.0 (the 7.9/ARS census): an OUTDENTED equate description also opens
+    # with a PM-shaped token — but its text runs on as WORDS (not the Length
+    # cell), and on the ordinary grid it spills into window 1 too. Treating it
+    # as a line 1 orphaned the real record AND minted a phantom one.
+    check("rejects an outdented equate DESCRIPTION that starts PM-shaped",
+          not hdpdf._is_line1(["R42.401 LT EQ 43.185 , PM R42401BK=43185E AH"])
+          and not hdpdf._is_line1(["R42.401 LT EQ 43.1", "85 , PM"]))
+    check("a merged 'PM LEN' with window-1 spill is NOT a line 1 (desc overflow)",
+          not hdpdf._is_line1(["000.000L 000.000", "overflow text"]))
+
+
+def test_line2_furniture():
+    """The line-2 acceptance's furniture tests (v0.26.0) — matched on the
+    SPACELESS raw text. Every string below is a censused 7.9/ARS group; a
+    furniture false-NEGATIVE would corrupt silently (a THEAD swallowed as
+    data), so these pin the vocabulary."""
+    print("line-2 furniture tests (raw-text censused shapes):")
+    thead = ("POSTMILELENGTHRECORDGCEFF-DATECODEUEFF-DATE",
+             "DATEOFHAACC-CONTCITYR",
+             "S#SOTOTT-WININVS#SININT-WOTOT",
+             "EFF-S#SOTOTT-WININEFF-VEFF-S#SININT-WOTOT",
+             "DATETLNFTOTRWIDTOTRDATETCBWDADATETLNFTOTRWIDTOTR",
+             "ACC-")
+    check("every censused THEAD line matches THEAD_RE",
+          all(hdpdf.THEAD_RE.search(t) for t in thead))
+    sparse = ("Z07Z", "Z1010050207Z", "SMAINSTOCBR8-112Z07Z", "B080807Z",
+              "NZ080807Z", "07", "OLDUS101UC4-21607", "N.W.P.R.R.07",
+              "ACIDCANALZ07Z")
+    check("no censused SPARSE line 2 matches THEAD_RE (they must parse)",
+          not any(hdpdf.THEAD_RE.search(s) for s in sparse))
+    check("DCR rows / page furniture matched on raw text",
+          hdpdf.DCR_ROW_RE.match("02TEH005") and hdpdf.DCR_ROW_RE.match("11IMP007")
+          and hdpdf.PAGE_FURNITURE_RE.search("RefDate:2026-07-10Route101Page101")
+          and hdpdf.PAGE_FURNITURE_RE.search("Page176"))
+    check("no sparse line 2 reads as DCR / page furniture",
+          not any(hdpdf.DCR_ROW_RE.match(s) or hdpdf.PAGE_FURNITURE_RE.search(s)
+                  for s in sparse))
+    # The date FAST-accept works on RAW text (a mis-aligned window grid can
+    # split '15-10-29' across columns, so the merged values can't carry it).
+    # In spaceless raw a description ending in DIGITS glues onto the date
+    # ('…LNS 395' + '15-10-29' → '39515-10-29') and the lookbehind rightly
+    # rejects it — those line 2s are accepted by the furniture FALLTHROUGH
+    # instead, so the contract is: desc-less dated line 2s fast-accept, glued
+    # ones at least never read as furniture, and the header date never matches.
+    check("raw-text date accept: desc-less dated line 2 matches",
+          hdpdf.DATE_TOKEN_RE.search("65-12-21C03Z101036050207Z"))
+    glued = "JCT14/395ENDRTE14,RTLNS14OVERLTLNS39515-10-29H02Z101024050515-10-29"
+    check("digit-glued dated line 2 falls through to acceptance (not furniture)",
+          not hdpdf.THEAD_RE.search(glued) and not hdpdf.DCR_ROW_RE.match(glued)
+          and not hdpdf.PAGE_FURNITURE_RE.search(glued))
+    check("the page header's digit-adjacent date never matches",
+          not hdpdf.DATE_TOKEN_RE.search("RefDate:2026-07-10Route101Page101"))
+    # A record whose print carries NO second line is emitted with a blank
+    # attribute tail (the single-line flush), not dropped.
+    check("single-line flush shape: line 1 + a blank 25-cell tail",
+          hdpdf._make_row([f"a{i}" for i in range(10)], [""] * hdpdf.N_COLS_L2)
+          == [f"a{i}" for i in range(9)] + [None] * 25)
 
 
 def test_wrap_machinery():
@@ -157,6 +214,7 @@ def main():
     test_header()
     test_make_row_mapping()
     test_line1_classifier()
+    test_line2_furniture()
     test_wrap_machinery()
     test_adapters_and_matrix()
     print()

@@ -280,6 +280,16 @@ The same audit explicitly cleared these as sound — re-auditing them is wasted 
   `manifest.txt`. Its own docstring + the user-facing message say it carries "this
   PC's name in paths" so it's "safe to send to the TSMIS maintainer, not safe to post
   publicly" — and **never** the saved login, profiles, or `FAILURES_DIR` dumps.
+- **The website-source capture is local-only diagnostic data** (v0.26.0,
+  Settings ▸ "Capture website source" → `site_capture.py`). It saves the current
+  site's report page + its SAME-ORIGIN scripts/styles into
+  `output/site-capture/<date src-env HHMMSS>/` with a manifest — the maintainer's
+  manual devtools ▸ Sources walk, automated. The TSMIS source is
+  **Caltrans-internal**: the capture stays on disk (the manifest says so in-band),
+  is never added to the support bundle or uploaded, and third-party URLs are never
+  fetched. Filenames are flattened + sanitized (`_safe_name` — traversal-proof;
+  locked by `check_site_capture.py`). Runs on whatever sign-in the exports use; no
+  new permissions, no endpoints beyond the TSMIS page itself.
 - **Settings writes are atomic.** `config.json` (and the batch manifest,
   `batch_manifest.save` → temp file + `os.replace`) are written atomically, so a
   crash mid-write can't corrupt them.

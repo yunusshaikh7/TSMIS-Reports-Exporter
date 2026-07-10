@@ -63,6 +63,8 @@ _ADAPTER_MODULES = {
     "highway_log_pdf": "evidence_highway_log",
     "highway_sequence": "evidence_highway_sequence",
     "highway_sequence_pdf": "evidence_highway_sequence",
+    "ramp_detail": "evidence_ramp_detail",
+    "ramp_detail_pdf": "evidence_ramp_detail",
 }
 # Where each row's TSMIS-side PDFs live (the per-route export subdir) and which
 # TSN library report holds the TSN prints (per-district files for Highway
@@ -75,7 +77,9 @@ TSMIS_PDF_SUBDIR = {"highway_detail": "highway_detail_pdf",
                     "highway_log": "highway_log_pdf",
                     "highway_log_pdf": "highway_log_pdf",
                     "highway_sequence": "highway_sequence_pdf",
-                    "highway_sequence_pdf": "highway_sequence_pdf"}
+                    "highway_sequence_pdf": "highway_sequence_pdf",
+                    "ramp_detail": "ramp_detail_pdf",
+                    "ramp_detail_pdf": "ramp_detail_pdf"}
 TSN_PDF_REPORT = {"highway_detail": "highway_detail",
                   "highway_detail_pdf": "highway_detail",
                   "intersection_detail": "intersection_detail",
@@ -83,14 +87,17 @@ TSN_PDF_REPORT = {"highway_detail": "highway_detail",
                   "highway_log": "highway_log",
                   "highway_log_pdf": "highway_log",
                   "highway_sequence": "highway_sequence",
-                  "highway_sequence_pdf": "highway_sequence"}
+                  "highway_sequence_pdf": "highway_sequence",
+                  "ramp_detail": "ramp_detail",
+                  "ramp_detail_pdf": "ramp_detail"}
 # Report labels for the availability probe (static so the probe never has to
 # import an adapter — a state push must stay cheap; check_visual_evidence pins
 # these maps against report_catalog so they can't drift).
 _TSN_PDF_LABELS = {"highway_detail": "Highway Detail",
                    "intersection_detail": "Intersection Detail",
                    "highway_log": "Highway Log",
-                   "highway_sequence": "Highway Sequence"}
+                   "highway_sequence": "Highway Sequence",
+                   "ramp_detail": "Ramp Detail"}
 # Reports whose TSN prints ARE the library's raw inputs (district-PDF-sourced
 # TSN libraries — Highway Log and Highway Sequence): evidence reads the SAME
 # files from raw/, so a user with a working vs-TSN comparison already has the
@@ -426,9 +433,22 @@ def _render_page(path, page_no, cache):
     return cache[key]
 
 
+def _crop_window(img_w, img_h, cell_box, record_yspan):
+    """The strip's crop box (pixels): a FULL-WIDTH page band around the record.
+    The adapters' xspan covers only the record's own words, so cropping to it
+    clipped whatever printed beyond them — a blank cell's red box (drawn where
+    the value WOULD print) and the neighbors' longer text both fell outside.
+    The band must span the page and stretch vertically over the cell box."""
+    _x0, y0, _x1, y1 = cell_box
+    ry0, ry1 = record_yspan
+    top = min(ry0 - _CTX_PT, y0 - 4)
+    bottom = max(ry1 + _CTX_PT + 2, y1 + 4)
+    return (0, int(max(0, top * _SC)), img_w, int(min(img_h, bottom * _SC)))
+
+
 def _strip(path, page_no, cell_box, record_yspan, xspan, cache):
     """A context crop around the record: gray box = the record's printed
-    line(s), red box = the compared cell."""
+    line(s) (its word extent, `xspan`), red box = the compared cell."""
     img = _render_page(path, page_no, cache).copy()
     d = ImageDraw.Draw(img)
     rx0, rx1 = xspan
@@ -438,10 +458,7 @@ def _strip(path, page_no, cell_box, record_yspan, xspan, cache):
     x0, y0, x1, y1 = cell_box
     d.rectangle([x0 * _SC, y0 * _SC, x1 * _SC, y1 * _SC],
                 outline=(220, 20, 20), width=4)
-    return img.crop((int(max(0, (rx0 - 8) * _SC)),
-                     int(max(0, (ry0 - _CTX_PT) * _SC)),
-                     int(min(img.width, (rx1 + 8) * _SC)),
-                     int(min(img.height, (ry1 + _CTX_PT + 2) * _SC))))
+    return img.crop(_crop_window(img.width, img.height, cell_box, record_yspan))
 
 
 _FONT_WARNED = False

@@ -11,7 +11,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<run>/ramp_summary/` |
 | 1b | TSAR: Ramp Summary (Excel) | XLSX (export-only) | `output/<run>/ramp_summary_excel/` |
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
-| 2b | TSAR: Ramp Detail (PDF) | PDF (Letter, landscape; export-only) | `output/<run>/ramp_detail_pdf/` |
+| 2b | TSAR: Ramp Detail (PDF) | PDF (Letter, landscape) | `output/<run>/ramp_detail_pdf/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
 | 3b | Highway Sequence Listing (PDF) | PDF (Letter, portrait) | `output/<run>/highway_sequence_pdf/` |
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
@@ -32,7 +32,7 @@ The catalog (`scripts/report_catalog.py`) is the single source of truth for repo
 ## Capability matrix — what the app can do with each report
 
 The at-a-glance status of every export type across the app's capability tiers, as of
-**v0.25.1**. Derived from `report_catalog.py` (EXPORT / CONSOLIDATE / COMPARE / TSN) +
+**v0.26.0**. Derived from `report_catalog.py` (EXPORT / CONSOLIDATE / COMPARE / TSN) +
 `visual_evidence._ADAPTER_MODULES` — when a tier lands or a report is added, update this
 table in the same change.
 
@@ -40,8 +40,8 @@ table in the same change.
 |---|---|---|---|---|---|---|---|---|
 | 1 | TSAR: Ramp Summary (`ramp_summary`) | PDF | ✓ (parses its own PDFs) | ✓ aggregate | n/a | ✓ | ✓ | — (aggregate ⁵) |
 | 1b | TSAR: Ramp Summary (Excel) (`ramp_summary_excel`) | XLSX | — ¹ | — ¹ | — ¹ | — ¹ | — ¹ | — |
-| 2 | TSAR: Ramp Detail (`ramp_detail`) | XLSX | ✓ | ✓ flat | n/a | ✓ | ✓ | — (waits for 2b ²) |
-| 2b | TSAR: Ramp Detail (PDF) (`ramp_detail_pdf`) | PDF | — ² | — ² | — ² | — ² | — ² | — ² |
+| 2 | TSAR: Ramp Detail (`ramp_detail`) | XLSX | ✓ | ✓ flat | n/a | ✓ | ✓ | ✓ |
+| 2b | TSAR: Ramp Detail (PDF) (`ramp_detail_pdf`) | PDF | ✓ | ✓ (+ the print-only On/Off + Ramp Type ²) | ✓ | ✓ | ✓ | ✓ |
 | 3 | Highway Sequence Listing (`highway_sequence`) | XLSX | ✓ | ✓ flat, county+PM key | n/a | ✓ | ✓ | ✓ |
 | 3b | Highway Sequence Listing (PDF) (`highway_sequence_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 4 | Highway Log (`highway_log`) | XLSX | ✓ | ✓ flat, roadbed/ditto-aware | n/a | ✓ | ✓ | ✓ |
@@ -68,20 +68,23 @@ Plus one **consolidate-only source** (not an export type): **TSN Highway Log (PD
    work-PC files to verify against (Lesson 13), and is low-value until someone needs
    it — both reports' counts already consolidate + compare through their sibling
    editions.
-2. **Ramp Detail (PDF) is the export-only print edition whose integration is queued
-   NEXT** (stable id 12, v0.24.0). Its consolidator/comparisons/evidence follow the
-   Highway Sequence (PDF) graduation path (v0.24.0 export-only → v0.25.0 full); the
-   verification set (the 2026-07-09 work-PC pair) and the statewide TSN Ramp Detail
-   print are both in hand. Ramp Detail's evidence adapter (row 2) rides the same
-   unlock: evidence needs the TSMIS side as PDFs.
+2. **Ramp Detail (PDF) graduated to fully integrated in v0.26.0** (the Highway
+   Sequence (PDF) path: export v0.24.0 → the rest off the first real work-PC print
+   set, `ground-truth/All Reports 7.9`). The print carries TWO columns the Excel
+   export DROPS — the On/Off indicator and the Ramp Type letter — which TSN's
+   database also carries, so the PDF-vs-TSN flavor COMPARES them (they stay context
+   in the Excel flavor and the PDF↔Excel self-check). See
+   [Ramp Detail (PDF)](#ramp-detail-pdf--the-fully-integrated-print-edition-export-v0240-the-rest-v0260)
+   for the censused conventions + canaries.
 3. **Highway Summary is export-wired but site-greyed** (`cs-disabled` on every capture
    through Dev 7.9) — `select_report` fails fast with "currently unavailable" until
    the vendor turns it on; consolidate/compare integration then waits for a real
    statewide export to verify a schema against (the standard Lesson-13 sequence).
-4. **Where each report lives (site-side, as of 2026-07-09):** ramps, Highway Log and
-   Highway Sequence export from the **production** site; Intersection Summary/Detail
-   and Highway Detail live on the **development** site (Settings ▸ "Use development
-   site"); Highway Summary is greyed everywhere; Route History exists on dev only.
+4. **Where each report lives (site-side, as of 2026-07-10):** EVERY enabled report
+   now exports from the **production** site — the late-2026-07-09 prod rollout
+   un-greyed Intersection Summary/Detail and Highway Detail (verified on both data
+   sources in `ground-truth/All Reports 7.9`), ending the dev-site dependency.
+   Highway Summary is still greyed everywhere; Route History exists on dev only.
 5. **Evidence images require a row-level comparison and a TSMIS PDF edition** — the
    generator renders the exact differing CELL from both systems' prints. The two
    aggregate comparisons (Ramp Summary, Intersection Summary) compare statewide
@@ -261,7 +264,7 @@ Built on the Intersection Detail recipe, verified against the full statewide dev
 
 - **`highway_detail_columns.py`** — the 34-column labels SoT (the export's own labels are CORRECT, unlike Highway Log's) + legend meanings, hover tooltips, a Legend sheet, and `recognize()`.
 - **`consolidate_highway_detail.py`** — a thin `consolidate_xlsx` wrapper (sheet `"Highway Detail"`, Route column prepended, tooltips + Legend). Auto-consolidates on export finish (`_AUTO_CONSOLIDATOR`).
-- **`consolidate_tsmis_highway_detail_pdf.py`** — parses the app's own **Highway Detail (PDF)** export into the SAME 34-column format via `pdf_table_lib`. The print layout is TWO physical lines per record with DIFFERENT geometry (line 1 = 10 cells, line 2 = 25 cells), so TWO window sets are derived from the zebra-shaded bands; DCR group rows (`11 IMP 007`) and page furniture never match the line-1 postmile test. Orphan reconciliation escalates to a producer-owned PARTIAL.
+- **`consolidate_tsmis_highway_detail_pdf.py`** — parses the app's own **Highway Detail (PDF)** export into the SAME 34-column format via `pdf_table_lib`. The print layout is TWO physical lines per record with DIFFERENT geometry (line 1 = 10 cells, line 2 = 25 cells), so TWO window sets are derived from the zebra-shaded bands; DCR group rows (`11 IMP 007`) and page furniture never match the line-1 postmile test. Orphan reconciliation escalates to a producer-owned PARTIAL. **v0.26.0 (the July-print census, off the first real prod set):** line 2 is now "whatever follows the line 1 except the censused furniture" — the old "always carries a TASAS date" rule dropped real records whose roadbed blocks print codes without effective dates, and pages whose grid splits a date across windows; `_is_line1` requires the postmile ALONE (or PM+Length on the fallback grid), so an outdented equate DESCRIPTION starting with a PM-shaped token no longer minted phantom records; a record whose print carries NO second line is kept with a blank attribute tail (`single_line` in stats, an FYI note — not PARTIAL).
 - **`tsn_load_highway_detail.py` + the `TsnEntry`** — normalizes the statewide 56-column `TSAR - HIGHWAY DETAIL` Excel extract (`statewide_xlsx`, `normalization_version=2`) into `Highway Detail (TSN)` = `["Route"] + SHARED_HEADER + SIDECAR_HEADER` (v2 appends the TSN District/County sidecar the visual-evidence generator reads; the comparison loader slices to the shared width). The TSN **district PDFs** were verified consistent with the extract and stay reference-only for the comparison — dropped into `tsn_library/highway_detail/pdf/` they feed the evidence images.
 - **`compare_highway_detail_tsn.py`** — the FLAT vs-TSN comparator (route + **canonical Post Mile** key). The key unifies the two systems' roadbed encodings (TSMIS glues R/L onto the PM, `'000.080R'`; TSN prints a bare PM with `HG∈{R,L}`) and EXCLUDES the equation marker (the systems disagree on where they print `E` — it is compared as the separate **PS** column instead). Normalizations (each documented in the workbook's **Notes** sheet): TSN `NON_ADD 'A'` ≡ blank, zero-padding (`'02'`≡`'2'`), Length to the printed 3 decimals, `M_WID`+`M_VA` glued to `'14Z'`, whitespace collapse. `RU Eff` is compared BY POSITION against TSN's `BEG_DATE` (the legacy report's ADT begin-date slot — different semantics, differs on ~99% of rows, documented, soft in the Report View). The TSN-only ADT block + `*`/`Y` change flags are not compared (ADT shows in blue on the **Report View**, the printed two-line TASAS replica with Major/Diffs counts).
 - **`compare_highway_detail_pdf.py`** — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL` (the export-correctness self-check), the exact `compare_intersection_detail_pdf` parallel.
@@ -312,7 +315,13 @@ the 7.8 Excel exports; every residual class explained):
   the Consolidate tab + the console menu. Locked by `check_report_catalog`,
   `check_matrix_tsn`, `check_visual_evidence` (+ the mock parity checks).
 
-### Ramp Detail (PDF) — export-only print edition (v0.24.0)
+### Ramp Detail (PDF) — the fully-integrated print edition (export v0.24.0, the rest v0.26.0)
+
+The last export-only print edition graduated exactly the Highway Sequence (PDF) way:
+censused-first and blessed on the first real work-PC print set
+(`ground-truth/All Reports 7.9`, 126 routes — parse-back **15,216/15,216 rows**
+route-for-row against the SAME-DAY Excel exports; zero unclassified lines, zero stray
+fragments, every residual cell class explained):
 
 - **`export_ramp_detail_pdf.py`** — `subdir="ramp_detail_pdf"`, `data_value="Ramp_Detail"`,
   `save=save_ramp_detail_pdf`. Ramp Detail has **no `rd_printAll`**: its print body IS the
@@ -322,16 +331,50 @@ the 7.8 Excel exports; every residual class explained):
   modal ever opens) — and awaits the dispatcher under a `Promise.race` bound
   (`_RAMP_DETAIL_PRINT_BUILD_MS`) so a future unanswered await fails the route loudly
   instead of hanging it. Captures **LANDSCAPE** Letter (the TSN statewide Ramp Detail print
-  is 792×612). Marker `.rd-print-table` (11 columns).
-- **Stable ids 11/12** (with Highway Sequence (PDF); append-only;
-  `batch_manifest._V017_EXPORT_ORDER == EXPORT_KEYS`
-  still holds); `_PICKER_ORDER` seats each next to its Excel sibling; both coalesce with
-  their siblings automatically (shared `data_value`, and both saves joined
-  `_PAGE_REBUILDING_SAVES` so the Export-button save always runs first).
-- **EXPORT-ONLY for now** — no consolidator/comparison/evidence until real work-PC PDFs
-  verify the print parse (Lesson 13 discipline: never bless a parser on synthetic
-  renders; Highway Sequence (PDF) graduated exactly this way in v0.25.0). The picker row
-  explains what a print edition is on hover; the roadmap tracks the follow-up.
+  is 792×612). Marker `.rd-print-table` (11 columns). Stable ids 11/12 (with Highway
+  Sequence (PDF)); coalesces with its Excel sibling (shared `data_value`).
+- **`consolidate_tsmis_ramp_detail_pdf.py`** — parses the per-route prints into the Excel
+  export's EXACT layout (its column-shifted header included, so the combined workbook is
+  position-compatible with the Excel-consolidated one) **plus the two PRINT-ONLY columns
+  the Excel export drops** — the On/Off indicator (N/F/Z) and the Ramp Type letter —
+  appended after it with real labels. Header-anchored per-page word windows (the three
+  single-letter header columns located BETWEEN the multi-letter anchors, never by bare
+  text); Descriptions never wrapped statewide (the fragment machinery is kept as a loud
+  safety net); the print renders EMPTY fields visibly ("-" in Area 4 / On/Off, the
+  Description message "NO RAMP LINEAR EVENT" — 59 statewide rows, the ramp points
+  without linework Ramp Summary counts). Values written verbatim; unparsed lines escalate
+  to a producer-owned PARTIAL.
+- **`compare_ramp_detail_pdf.py`** — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, riding
+  `compare_ramp_detail_tsn`'s locked schema via `dataclasses.replace`, each flavor with
+  its OWN Notes sheet. The PDF flavors project the censused render artifacts at compare
+  time (the workbook stays verbatim): Description whitespace runs collapse on BOTH sides
+  (the database — so the Excel export AND the TSN extract — carries literal double
+  spaces the HTML print collapses), the null-render tokens project to blank, and the
+  print's On/Off letters (N/F/Z) project to TSN's (O/F/Z). **On/Off + Ramp Type GRADUATE
+  from context to compared in the PDF-vs-TSN flavor** — the print carries data the Excel
+  export doesn't, so the PDF side verifies two more columns against TSN (Ramp Name/ADT
+  stay context; the Excel flavor and the PDF↔Excel check keep all four context).
+  PDF↔Excel on the same-day statewide pair: **both 15,216, one-sided 0/0, 15,212 fully
+  identical** — the only 4 differing cells are the Excel's literal `_x000d_` line-break
+  escapes (route 010's rest-area ramps) the print omits, the same honest class HSL's
+  self-check carries.
+- **`evidence_ramp_detail.py`** — evidence images for BOTH Ramp Detail rows: the
+  Intersection Detail pattern on the TSN side (ONE statewide TASAS print, fixed column
+  template — header anchors pixel-identical across its 500 pages, censused 400/400
+  records against the raw extract — indexed once per file and cached) + the
+  consolidator-LOCKSTEP word-window locator on the TSMIS side. The adapter serves the
+  two rows' DIFFERENT compared sets (the consolidated workbook names its source — the
+  PDF-consolidated carries the "On/Off" header — so the Excel row never enumerates the
+  print-only columns). The RD TSN library gained the District/County sidecar
+  (`tsn_load_ramp_detail`, normalization **v3**, split from LOCATION "01-DN-101"; D2
+  auto-rebuild); the TSN print lives in `tsn_library/ramp_detail/pdf/` (the
+  statewide-XLSX-sourced pattern, like Intersection Detail). Known skip-classes recorded
+  honestly: the TSN print TRUNCATES long Descriptions; on the Excel row the compared
+  Description keeps the database's double spaces the print collapses.
+- Matrix rows in BOTH matrices (env + vs TSN + vs TSMIS Excel modes; shares the
+  `ramp_detail` TSN dataset with its Excel sibling); `cons:ramp_detail_pdf` on the
+  Consolidate tab + the console menu. Locked by `check_report_catalog`,
+  `check_matrix_tsn`, `check_visual_evidence` (+ the mock parity checks).
 
 ### Route History Table — reserved, app-wide DISABLED (v0.25.1)
 

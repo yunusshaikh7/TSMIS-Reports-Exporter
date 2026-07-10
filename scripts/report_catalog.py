@@ -46,6 +46,7 @@ from export_route_history import SPEC as _ROUTE_HISTORY_SPEC
 
 import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
+import consolidate_tsmis_ramp_detail_pdf as _c_tsmis_ramp_detail_pdf
 import consolidate_highway_sequence as _c_highway_seq
 import consolidate_tsmis_highway_sequence_pdf as _c_tsmis_highway_seq_pdf
 import consolidate_highway_log as _c_highway_log
@@ -62,6 +63,7 @@ import compare_highway_log as _cmp_highway_log
 import compare_highway_log_pdf as _cmp_highway_log_pdf
 import compare_intersection_detail_pdf as _cmp_int_detail_pdf
 import compare_ramp_detail_tsn as _cmp_ramp_detail_tsn
+import compare_ramp_detail_pdf as _cmp_ramp_detail_pdf
 import compare_ramp_summary_tsn as _cmp_ramp_summary_tsn
 import compare_intersection_summary_tsn as _cmp_int_summary_tsn
 import compare_intersection_detail_tsn as _cmp_int_detail_tsn
@@ -178,6 +180,12 @@ EXPORT = (
 CONSOLIDATE = (
     ConsolidateEntry("cons:ramp_summary", "TSAR: Ramp Summary", _c_ramp_summary),
     ConsolidateEntry("cons:ramp_detail", "TSAR: Ramp Detail", _c_ramp_detail),
+    #   Input = this app's own "TSAR: Ramp Detail (PDF)" export, parsed into the
+    #   SAME column layout plus the two print-only columns the Excel export drops
+    #   (On/Off, Ramp Type). Grouped next to its Excel sibling, like the Highway
+    #   Sequence pair below.
+    ConsolidateEntry("cons:ramp_detail_pdf", "TSMIS Ramp Detail (PDF)",
+                     _c_tsmis_ramp_detail_pdf),
     ConsolidateEntry("cons:highway_sequence", "Highway Sequence Listing", _c_highway_seq),
     #   Input = this app's own "Highway Sequence Listing (PDF)" export, parsed into
     #   the SAME 9-column format (the print-layout substitute for the Excel export).
@@ -259,6 +267,12 @@ COMPARE = (
     # exact parallel of the Highway Detail pair above.
     CompareEntry("cmp:highway_sequence_pdf:env", "Highway Sequence Listing (PDF) — between environments",
                  _cmp_env.HIGHWAY_SEQUENCE_PDF, "folders", "env"),
+    # Ramp Detail (PDF) cross-env (v0.26.0), appended after the existing env rows
+    # so the matrix row order is unchanged; its distinct family `ramp_detail_pdf`
+    # keeps it a separate row from the Excel one — the exact parallel of the
+    # Highway Sequence pair above.
+    CompareEntry("cmp:ramp_detail_pdf:env", "TSAR: Ramp Detail (PDF) — between environments",
+                 _cmp_env.RAMP_DETAIL_PDF, "folders", "env"),
     # vs TSN (file-based).
     CompareEntry("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN",
                  _cmp_highway_log, "files", "tsn"),
@@ -302,6 +316,14 @@ COMPARE = (
                  _cmp_highway_seq_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
     CompareEntry("cmp:highway_sequence:pdf_vs_excel", "Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel)",
                  _cmp_highway_seq_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
+    # Ramp Detail PDF-sourced file comparisons (v0.26.0) — the exact parallel of
+    # the Highway Sequence pair above. The PDF side carries the print-only
+    # On/Off + Ramp Type columns (COMPARED vs TSN, context vs Excel).
+    # PDF-vs-Excel is an internal one-system consistency check ("env").
+    CompareEntry("cmp:ramp_detail:pdf_vs_tsn", "TSAR: Ramp Detail — TSMIS (PDF) vs TSN",
+                 _cmp_ramp_detail_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:ramp_detail:pdf_vs_excel", "TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_ramp_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
 )
 
 # B2 auto-consolidate: which consolidate module handles each EXPORTABLE report,
@@ -331,8 +353,14 @@ TSN = (
     # re-keys any stored library on its next use (D2 auto-rebuild).
     TsnEntry("highway_log", "TSN Highway Log", "*.pdf", "district_pdfs",
              "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into", normalization_version=3),
+    # Ramp Detail v3 (v0.26.0): the normalized shape appends the TSN District/
+    # County sidecar columns (split from LOCATION "01-DN-101") — evidence locates
+    # a row in the TSN statewide print with them; the comparison loader slices to
+    # the shared width and never sees them. The bump re-projects any stored
+    # library on next use (D2 auto-rebuild).
     TsnEntry("ramp_detail", "TSN Ramp Detail", "*.xlsx", "statewide_xlsx",
-             "tsn_ramp_detail_normalized.xlsx", "tsn_load_ramp_detail:build_into", normalization_version=2),
+             "tsn_ramp_detail_normalized.xlsx", "tsn_load_ramp_detail:build_into",
+             normalization_version=3, evidence_pdfs=True),
     TsnEntry("ramp_summary", "TSN Ramp Summary", "*.pdf", "statewide_pdf",
              "tsn_ramp_summary_normalized.xlsx", "tsn_load_ramp_summary:build_into", normalization_version=2),
     TsnEntry("intersection_summary", "TSN Intersection Summary", "*.pdf", "statewide_pdf",

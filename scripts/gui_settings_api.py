@@ -18,8 +18,8 @@ from common import (BROWSER_CHANNELS, CHANNEL_LABELS, DATA_SOURCES,
                     has_valid_auth)
 from exporter_parallel import MAX_WORKERS
 from gui_endpoint import _api_method, _task_endpoint, pick_path
-from gui_worker import (ChromiumWorker, ResetWorker, ValidationWorker,
-                        measure_targets, reset_targets)
+from gui_worker import (ChromiumWorker, ConsolidateWorker, ResetWorker,
+                        ValidationWorker, measure_targets, reset_targets)
 from logging_setup import active_log_file, set_debug_logging
 from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
                    FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, TSN_LIBRARY_ROOT,
@@ -376,6 +376,45 @@ class GuiSettingsMixin:
                              payload.get("message", "See the log for details."))
         self._set_dot("ok" if self._authed else "bad", "Done")
         self._end_task()
+
+    @_api_method
+    def capture_site_source(self):
+        """Capture the ACTIVE site's report-page source into a dated folder
+        under output/site-capture/ — the rendered DOM, the raw page HTML, and
+        every same-origin script/stylesheet (the maintainer's manual
+        devtools ▸ Sources walk, one click). Signs in with the saved session
+        (or device sign-in) and runs on the shared single-task slot so
+        progress shows in the activity log like any other run."""
+        err = self._claim_task_error("consolidate")
+        if err:
+            return err
+        self.cancel_event.clear()
+        src, env = get_site()
+        self._emit_log(f"Capturing the website source ({src.upper()}-{env.upper()})…")
+        self._set_dot("busy", "Capturing site source…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": "Capturing site source…"})
+        self._push_state()
+
+        def _run(events=None, confirm_overwrite=None, day=None):   # noqa: ARG001
+            import site_capture                    # lazy: pulls playwright
+            return site_capture.capture(events=events)
+
+        ConsolidateWorker(_run, self._gated_queue(), self.cancel_event,
+                          lambda _p: True).start()
+        return {"ok": True}
+
+    @_api_method
+    def open_site_captures_folder(self):
+        """Open the site-capture output root (created on first use)."""
+        import site_capture                        # lazy (light, but keep parity)
+        root = site_capture.capture_root()
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+        except OSError:  # silent-ok: creation is a courtesy; the open below falls back to output/
+            pass
+        self._open_folder(root if root.is_dir() else OUTPUT_ROOT)
+        return {"ok": True}
 
     @_api_method
     def save_support_bundle(self):

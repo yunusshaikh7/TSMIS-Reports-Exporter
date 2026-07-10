@@ -540,15 +540,43 @@ or accept as someday.**
   (PDF↔TSN pairs BETTER than Excel↔TSN — the print shares TSN's equate convention; PDF↔Excel
   caught the route-037 Excel-dropped Description), both matrix rows + all special-case mirrors,
   and the evidence adapter above.
-- [ ] **Ramp Detail (PDF) integration** [L] — the v0.24.0 edition is EXPORT-ONLY. Once the user
-  runs it on the work PC and returns samples (ideally a coalesced same-run pair): the print
-  parser (census-first, Lesson 13), consolidator, PDF↔Excel + PDF↔TSN flavors, matrix row (mirror
-  EVERY special-case), and the evidence adapter above. Ask for a fresh site capture with it if
-  the print JS drifted.
-  - [ ] **Shared whitespace-collapse helper** [XS] — `compare_highway_log._hl_normalize` and
-    `compare_highway_sequence_tsn._v` carry the same tab/newline collapse; homing one helper in
-    `compare_tsn_common` needs a locked-comparator re-bless, so it waits for a release that
-    re-blesses HL anyway (audit finding, 2026-07-08 — cosmetic, no behavior drift).
+- [x] **Ramp Detail (PDF) integration — DONE (v0.26.0, unreleased).** Off the first real work-PC
+  pair (`ground-truth/All Reports 7.9`, 126 routes): the census-first print parser
+  (15,216/15,216 parse-back, 0 unclassified/strays), `consolidate_tsmis_ramp_detail_pdf` (the
+  Excel layout + the two PRINT-ONLY columns the Excel export drops — On/Off + Ramp Type),
+  `compare_ramp_detail_pdf` (PDF↔TSN GRADUATES those two columns to compared — +151 verified
+  cells statewide; PDF↔Excel 15,212/15,216 identical, the 4 = `_x000d_` Excel escapes), both
+  matrix rows + every special-case mirror, `evidence_ramp_detail` (the ID statewide-print
+  pattern; TSN library v3 sidecar; e2e 16/8-of-8 + 12/6-of-6). See
+  [reports.md](reports.md) / [tsn-parsers.md](tsn-parsers.md).
+- [x] **Highway Detail 7.9/ARS print parse gap — CENSUSED + FIXED (v0.26.0).** The 254 unpaired
+  lines decomposed into THREE uncensused record shapes (the 7.9 drop has NO ssor-prod HD prints,
+  so the ars pair is the only same-build set): (1) sparse rows whose roadbed blocks print codes
+  but **no effective dates** (the old "a line 2 always carries a TASAS date" guard dropped them),
+  (2) line 2s whose date lands across a shifted window grid (the per-window date test missed it —
+  now tested on raw text as the fast accept, with censused furniture tests carrying the date-less
+  path), and (3) **outdented equate descriptions starting with a PM-shaped token** that `_is_line1`
+  misread as new records (orphaning the real record AND minting a phantom — route 101's 190).
+  Re-verified statewide: consolidation **COMPLETE, 0 orphans, 0 single-line records**; PDF↔Excel
+  50,171/50,730 matched identical; one-sided fell 1,273 → **1,019 (476 PDF / 543 Excel)** — near-all
+  the newly-parsed sparse attribute-only rows at REPEATED postmiles whose duplicate-row pairing
+  tie-breaks differ between renders (enumerated on the Only-in sheets; 9 Excel-only carry real
+  descriptions). Scripts + expected numbers → `All Reports 7.9/_verification-scripts/`. Follow-up
+  [S]: census the duplicate-PM pairing classes if the vendor conversation needs them attributed.
+- [x] **Day-vs-baseline comparisons — the "vs Baseline Matrix" — SHIPPED (v0.26.0, unreleased).**
+  Same report + format + source, one exported day diffed against an EARLIER pull (a run-folder
+  day or the Export-Everything store) — `scripts/baseline_matrix.py` orchestrating the untouched
+  `compare_env.compare_folders` per row (an additive `labels=` override names the sides), a third
+  Compare sub-tab with its own config corner, all 12 rows, per-baseline artifact store under
+  `output/comparisons/baseline-by-day/`, two-folder fingerprint freshness, the shared job queue.
+  Locked by `build/check_baseline_matrix.py` (incl. one REAL build per baseline kind); the
+  UI verified on the `#mock`. See [comparison-engine.md](comparison-engine.md) §12c. **Owed on
+  the work PC:** a real two-day baseline run (the dev PC has no run-folder history).
+- [ ] **Shared whitespace-collapse helper** [XS] — `compare_highway_log._hl_normalize` and
+  `compare_highway_sequence_tsn._v` carry the same tab/newline collapse
+  (`compare_ramp_detail_pdf._collapse` joined the family in v0.26.0, flavor-local by design);
+  homing one helper in `compare_tsn_common` needs a locked-comparator re-bless, so it waits for
+  a release that re-blesses HL anyway (audit finding, 2026-07-08 — cosmetic, no behavior drift).
 - [x] **Ramp Summary (Excel) edition — SHIPPED (v0.25.1**, same day it was backlogged**).** The
   site's `rs_exportToExcel` wired as `ramp_summary_excel` (stable id 13) — the INVERSE of the
   print editions. Shipped alongside **Intersection Summary (PDF)** (`ints_printAll`, id 14) and
@@ -564,8 +592,9 @@ or accept as someday.**
 - [x] **Intersection Summary July-2026 watch — CLOSED (v0.25.0).** The fresh 7.9 export showed the
   July update touched IS too, but only ONE header (`MAINLINE MASTARM` → `MASTERARM`): fixed with a
   parse-only Section alias + a section-partition layout-drift tripwire (see
-  [tsn-parsers.md](tsn-parsers.md) Intersection Summary). Open thread: **route 170 was missing**
-  from the 7.9 export (218 → 217 routes) — asked the user for a re-export or confirmation.
+  [tsn-parsers.md](tsn-parsers.md) Intersection Summary). The route-170 thread CLOSED with the
+  `All Reports 7.9` drop: absent from all four intersection exports across BOTH data sources
+  (matching dev) — a data-side removal, not an export glitch.
 
 ---
 
@@ -633,7 +662,7 @@ or accept as someday.**
 
 What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 
-### Version buckets — reconciled to reality (current: v0.25.2, shipped)
+### Version buckets — reconciled to reality (current: v0.26.0, IN PROGRESS — unreleased)
 
 | Version | Date | What actually shipped |
 |---|---|---|
@@ -665,6 +694,7 @@ What landed, so the open list stays honest. Full changelog: `CHANGELOG.md`.
 | **v0.25.0** ✅ | Jul 9 | **Highway Sequence (PDF) fully integrated + the Intersection Summary July fix** — off the first real work-PC print set (`ground-truth/HSL PDF + IS Bundle 7.9`, delivered same day): (1) the census-first print parser (`consolidate_tsmis_highway_sequence_pdf` — header-anchored per-page windows, wrapped-desc HYPHEN-AWARE rejoin, PM-less END-OF-ROUTE/CITY-END rows, the "Unresolved Intersections" trailer hard-stop; parse-back **60,493/60,493 rows / 59,082 fully equal** vs the 7.8 Excel — residual = the equate-representation classes + 4 `_x000D_` + the route-037 Description the Excel export DROPS). (2) `compare_highway_sequence_pdf` (PDF↔TSN pairs BETTER than Excel↔TSN — both 57,505 vs 57,071, the print shares TSN's equate convention; PDF↔Excel both 59,946 / identical 59,082; per-flavor Notes sheets) + the `HIGHWAY_SEQUENCE_PDF` env adapter + BOTH matrix rows (env/tsn/vs_excel modes; every special-case mirrored: `matrix_state`, `matrix_build`, `day_matrix`, `gui_worker_maint`, the console menu, the mock). (3) `evidence_highway_sequence` — the HL per-print sentinel routing, context-fields never enumerate (`compared_cell`), TSN prints from `tsn_library/highway_sequence/raw/` (`_TSN_PDFS_IN_RAW`). (4) **Intersection Summary**: the July `MASTARM`→`MASTERARM` rename absorbed via a parse-only Section alias + the section-partition layout-drift tripwire (every block but the site-under-counted Highway Group must sum to the route total); verified on the fresh 217-route export (route 170 missing — flagged). |
 | **v0.25.1** ✅ | Jul 9 | **Every edition, everywhere** — (1) **TSAR: Ramp Summary (Excel)** (stable id 13, `rs_exportToExcel` via the shared Export-button save — the site button the app never wired; the INVERSE of the print editions); (2) **Intersection Summary (PDF)** (id 14, `save_intersection_summary_pdf`: `ints_printAll` PREPENDS a cover to the inline count tables — no pagination — `window.print` overridden, `.rs-cover`+`.ints-total` verified, total re-read as the empty backstop, portrait; in `_PAGE_REBUILDING_SAVES`); both coalesce with their siblings (shared `data_value`). (3) **Route History Table** (id 15) wired as reserved-DISABLED groundwork (`DISABLED_EXPORT_SUBDIRS={"route_history"}`, greyed in the picker — the dev site's embedded-SSRS report has no export flow; the v0.18.1 Highway-pair pattern). Export-only; consolidate/compare/matrix untouched. Gate checks re-pointed (`check_intersection_gate._RESERVED`, stable-ids 13–15, catalog baseline + mock parity). |
 | **v0.25.2** ✅ | Jul 9 | **Hotfix** (field-driven, same evening) — a plain (non-fast, non-store) export of a coalesced Excel+PDF pair crashed instantly: `run_export_combined` did `Path(out_dirs[i])` on the truthy `[None, None]` list `_prep_edition` passes when there is no store base → `TypeError … not NoneType` before the browser launched. Latent since v0.19.2 (fast mode never coalesces; the Everything store always passes real staging dirs) — the user's first standard-mode pair run (2026-07-09 18:30, three attempts) was the first field exercise. Fix = `_combined_output_dirs`: a None ENTRY falls back to that spec's dated run folder (run_export's `out_dir=None` semantics, per edition). Regression-locked in `check_coalesce_editions.test_combined_output_dirs`. |
+| **v0.26.0** 🚧 | Jul 10 (in progress) | **Ramp Detail (PDF) fully integrated** — the LAST export-only print edition graduated off the first real work-PC pair (`All Reports 7.9`): the census-first parser (parse-back **15,216/15,216 rows**, 0 unclassified), the consolidator carrying the Excel layout **plus the two print-only columns the Excel export DROPS** (On/Off, Ramp Type), `compare_ramp_detail_pdf` (PDF↔TSN **graduates On/Off + Ramp Type to compared** — +151 verified cells statewide vs the Excel baseline; PDF↔Excel **15,212/15,216 identical, 0 one-sided** — the 4 = the Excel's `_x000d_` escapes), the `RAMP_DETAIL_PDF` env adapter + BOTH matrix rows (every special-case mirrored), `evidence_ramp_detail` (the ID statewide-print pattern — fixed template censused 400/400 vs the raw extract; TSN library **v3** District/County sidecar; e2e 16 examples across 8/8 PDF-row columns + 12 across 6/6 Excel-row columns; dual-row discipline: the Excel row never enumerates the print-only columns). **+ the "vs Baseline Matrix"** — day-vs-baseline comparisons for all 12 reports (an earlier day or the Everything store as the baseline; `baseline_matrix.py` over the untouched `compare_env.compare_folders` with an additive `labels=` override; a third Compare sub-tab + config corner; per-baseline artifacts under `comparisons/baseline-by-day/`; locked by `check_baseline_matrix`) **+ the evidence full-width-band crop fix** (`_crop_window`: a blank cell's red box / neighbor text no longer clips — the HSL complaint; verified on 99 regenerated examples) **+ the HD-PDF July-print parser fix** (the 254-orphan census: date-less sparse roadbed rows, window-split dates, outdented PM-shaped equate descriptions — all parse; single-line records kept with a blank attribute tail) **+ one-click website-source capture** (Settings; `site_capture.py`, local-only — see [it-and-security.md](it-and-security.md)) **+ mock parity fixes** (the by-day mock gained the two HD rows + the HSL/HD-PDF fmt flags it had drifted on). |
 
 > **The planned "A3 / D1" buckets never shipped** — v0.13 became a UI/UX release and v0.14 became
 > Highway Log accuracy, displacing A3 (results tab) and D1 (adaptive fast mode) each time. They're

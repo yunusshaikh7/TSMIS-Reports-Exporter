@@ -45,7 +45,6 @@ import tsn_load_ramp_detail as rd_load             # noqa: E402
 import tsn_load_intersection_detail as id_load     # noqa: E402
 import tsn_load_ramp_summary as rs_load            # noqa: E402
 import tsn_load_intersection_summary as is_load    # noqa: E402
-import compare_ramp_detail_tsn as rd               # noqa: E402
 import compare_ramp_summary_tsn as rstsn           # noqa: E402
 import compare_intersection_summary_tsn as istsn   # noqa: E402
 
@@ -83,8 +82,13 @@ _RD_SHEET = "Ramp Detail (TSN)"
 _ID_SHEET = "Intersection Detail (TSN)"
 _RS_SHEET = "Ramp Summary (TSN)"
 _IS_SHEET = "Intersection Summary (TSN)"
+# Re-blessed to the v0.26.0 v3 layout: the normalized sheet appends the TSN
+# District/County sidecar (read by the visual-evidence generator; the comparison
+# loader slices it off). Hand-written (the golden tripwire stays independent of
+# rd.SHARED_HEADER), so a future header drift is caught.
+_RD_SIDECAR = ["TSN District", "TSN County"]
 _RD_HEADER = ["Route", "PR", "PM", "Date of Record", "HG", "Area 4", "City Code", "R/U",
-              "Description", "Ramp Name", "On/Off", "Ramp Type", "ADT"]
+              "Description", "Ramp Name", "On/Off", "Ramp Type", "ADT"] + _RD_SIDECAR
 # Re-blessed to the v0.22.0 July-2026 layout: the second ML eff-date left the shared
 # header, 'Xing Line Lgth' joined at the tail, and the v3 normalized sheet appends the
 # TSN District/County sidecar (read by the visual-evidence generator; the comparison
@@ -131,15 +135,16 @@ def test_detail_signatures():
     print("detail loaders -- full frozen signature (result + log + sheet/header/rows + style):")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_tsnnorm_"))
     try:
-        # Intersection Detail (v3) feeds through its OWN tsn_rows_with_dcr (the
-        # loader appends the district/county sidecar); Ramp Detail still rides the
-        # comparator's tsn_rows_from_raw. Each entry: the patch target/factory and
-        # how the written rows relate to the fed base rows.
+        # BOTH detail loaders (v3) feed through their OWN tsn_rows_with_dcr (the
+        # loader appends the district/county sidecar — Ramp Detail joined in
+        # v0.26.0). Each entry: the patch target/factory and how the written rows
+        # relate to the fed base rows.
         for loader, label, sheet, header, base_w, target, make_patch, exp_rows_fn in (
-                (rd_load, "TSN Ramp Detail", _RD_SHEET, _RD_HEADER, len(_RD_HEADER),
-                 (rd, "tsn_rows_from_raw"),
-                 lambda syn: (lambda _p, s=syn: list(s)),
-                 lambda syn: syn),
+                (rd_load, "TSN Ramp Detail", _RD_SHEET, _RD_HEADER,
+                 len(_RD_HEADER) - len(_RD_SIDECAR),
+                 (rd_load, "tsn_rows_with_dcr"),
+                 lambda syn: (lambda _p, s=syn: (list(s), [("01", "DN")] * len(s))),
+                 lambda syn: [r + ["01", "DN"] for r in syn]),
                 (id_load, "TSN Intersection Detail", _ID_SHEET, _ID_HEADER,
                  len(_ID_HEADER) - len(_ID_SIDECAR),
                  (id_load, "tsn_rows_with_dcr"),
@@ -232,7 +237,7 @@ def test_shared_skeleton():
     print("the shared factory skeleton -- exact strings + branches:")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_tsnnorm_"))
     try:
-        rows = [["1"] + ["a"] * (len(_RD_HEADER) - 1)]
+        rows = [["1"] + ["a"] * (len(_RD_HEADER) - len(_RD_SIDECAR) - 1)]
         raw = tmp / "rd"
         raw.mkdir()
         # deps gate -> exact friendly deps message
@@ -250,12 +255,14 @@ def test_shared_skeleton():
         (raw / "s.xlsx").write_bytes(b"x")
         out = tmp / "out.xlsx"
         out.write_bytes(b"existing")
-        with _patch(rd, "tsn_rows_from_raw", lambda _p: list(rows)):
+        with _patch(rd_load, "tsn_rows_with_dcr",
+                    lambda _p: (list(rows), [("01", "DN")] * len(rows))):
             r = rd_load.build_into(raw, out, events=_events()[0], confirm_overwrite=lambda _p: False)
         check("existing out + confirm False -> exact cancelled string, prior bytes kept",
               r.status == "cancelled" and r.message == _CANCELLED and out.read_bytes() == b"existing")
         # parse error -> exact 'Could not read ...' wrap
-        with _patch(rd, "tsn_rows_from_raw", lambda _p: (_ for _ in ()).throw(ValueError("bad parse"))):
+        with _patch(rd_load, "tsn_rows_with_dcr",
+                    lambda _p: (_ for _ in ()).throw(ValueError("bad parse"))):
             r = rd_load.build_into(raw, tmp / "y.xlsx", events=_events()[0])
         check("projection raises -> exact 'Could not read s.xlsx: ValueError: bad parse'",
               r.status == "error" and r.message == "Could not read s.xlsx: ValueError: bad parse")
@@ -264,7 +271,7 @@ def test_shared_skeleton():
         # every comparison row into "Only in TSMIS").
         prev = tmp / "prev.xlsx"
         prev.write_bytes(b"prior-normalized")
-        with _patch(rd, "tsn_rows_from_raw", lambda _p: []):
+        with _patch(rd_load, "tsn_rows_with_dcr", lambda _p: ([], [])):
             r = rd_load.build_into(raw, prev, events=_events()[0],
                                    confirm_overwrite=lambda _p: True)
         check("zero-row projection -> error suggesting a layout change",
@@ -285,7 +292,8 @@ def test_shared_skeleton():
 
         def _boom_replace(*a, **k):
             raise PermissionError(13, "destination open in Excel")
-        with _patch(rd, "tsn_rows_from_raw", lambda _p: list(rows)), \
+        with _patch(rd_load, "tsn_rows_with_dcr",
+                    lambda _p: (list(rows), [("01", "DN")] * len(rows))), \
              _patch(artifact_store.os, "replace", _boom_replace):
             r = rd_load.build_into(raw, out, events=_events()[0])
         check("atomic-save PermissionError (real os.replace) -> exact 'probably open in Excel' message",
@@ -294,7 +302,8 @@ def test_shared_skeleton():
         check("...prior output bytes retained + atomic_save left no .tmp-* sibling in the output dir",
               out.read_bytes() == b"prior" and sorted(p.name for p in od.iterdir()) == ["keep.xlsx"])
         # P5-A01: a partial openpyxl (workbook symbol missing) -> friendly deps result, not a crash
-        with _patch(rd, "tsn_rows_from_raw", lambda _p: list(rows)), \
+        with _patch(rd_load, "tsn_rows_with_dcr",
+                    lambda _p: (list(rows), [("01", "DN")] * len(rows))), \
              _patch(tsn_library, "_write_normalized_workbook",
                     lambda *a, **k: (_ for _ in ()).throw(ImportError("no WriteOnlyCell"))):
             r = rd_load.build_into(raw, tmp / "z.xlsx", events=_events()[0])
@@ -311,8 +320,8 @@ def test_shared_skeleton():
 
         def _capture(p):
             seen["path"] = p
-            return list(rows)
-        with _patch(rd, "tsn_rows_from_raw", _capture):
+            return list(rows), [("01", "DN")] * len(rows)
+        with _patch(rd_load, "tsn_rows_with_dcr", _capture):
             rd_load.build_into(raw2, tmp / "z2.xlsx", events=_events()[0])
         check("newest raw by MTIME parsed (not by name); ~$ lock skipped",
               Path(seen.get("path", "")).name == "a.xlsx")

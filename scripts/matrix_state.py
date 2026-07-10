@@ -353,7 +353,7 @@ def _row_modes(row_key, subdir, adapter):
                  "env_subdir": "highway_log", "tsn_subdir": "highway_log", "fmt": "excel"},
                 {"id": "vs_pdf", "label": "vs TSMIS PDF", "kind": "self", "supported": True,
                  "env_subdir": "highway_log", "other_subdir": "highway_log_pdf"}]
-    if row_key == "highway_log_pdf":        # TSMIS PDF (cross-env not coded -> greyed)
+    if row_key == "highway_log_pdf":        # TSMIS PDF
         return [env,
                 {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
                  "env_subdir": "highway_log_pdf", "tsn_subdir": "highway_log", "fmt": "pdf"},
@@ -380,6 +380,13 @@ def _row_modes(row_key, subdir, adapter):
                  "tsn_subdir": "highway_sequence", "fmt": "pdf"},
                 {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
                  "env_subdir": "highway_sequence_pdf", "other_subdir": "highway_sequence"}]
+    if row_key == "ramp_detail_pdf":           # the exact parallel of highway_sequence_pdf
+        return [env,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                 "env_subdir": "ramp_detail_pdf",
+                 "tsn_subdir": "ramp_detail", "fmt": "pdf"},
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                 "env_subdir": "ramp_detail_pdf", "other_subdir": "ramp_detail"}]
     return [env,
             {"id": "tsn", "label": "vs TSN", "kind": "tsn",
              "supported": tsn_supported(row_key),
@@ -431,6 +438,9 @@ def tsn_comparator_for(row_key):
     if row_key == "highway_sequence_pdf":
         import compare_highway_sequence_pdf as _m
         return _m.TSMIS_PDF_VS_TSN
+    if row_key == "ramp_detail_pdf":
+        import compare_ramp_detail_pdf as _m
+        return _m.TSMIS_PDF_VS_TSN
     return None
 
 
@@ -450,6 +460,9 @@ def _pdf_self_comparator(pdf_subdir):
         return _m.TSMIS_PDF_VS_EXCEL
     if pdf_subdir == "highway_sequence_pdf":
         import compare_highway_sequence_pdf as _m
+        return _m.TSMIS_PDF_VS_EXCEL
+    if pdf_subdir == "ramp_detail_pdf":
+        import compare_ramp_detail_pdf as _m
         return _m.TSMIS_PDF_VS_EXCEL
     raise ValueError(f"no PDF-vs-Excel comparator for {pdf_subdir}")
 

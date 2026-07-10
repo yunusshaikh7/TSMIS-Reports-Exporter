@@ -195,14 +195,20 @@ function buildStatic() {
     b.addEventListener("click", () => selectCompareGroup(g.id));
     subStrip.appendChild(b);
   });
-  // The "TSN by day" matrix is a manual day-picking sub-tab (not a registry
-  // comparison group), appended after the generated ones.
+  // The "TSN by day" + "vs Baseline" matrices are manual day-picking sub-tabs
+  // (not registry comparison groups), appended after the generated ones.
   const dayTab = document.createElement("button");
   dayTab.className = "subtab"; dayTab.dataset.group = DAY_MATRIX_GROUP;
   dayTab.setAttribute("role", "tab"); dayTab.setAttribute("aria-selected", "false");
   dayTab.textContent = "vs TSN Matrix";
   dayTab.addEventListener("click", () => selectCompareGroup(DAY_MATRIX_GROUP));
   subStrip.appendChild(dayTab);
+  const blTab = document.createElement("button");
+  blTab.className = "subtab"; blTab.dataset.group = BASELINE_MATRIX_GROUP;
+  blTab.setAttribute("role", "tab"); blTab.setAttribute("aria-selected", "false");
+  blTab.textContent = "vs Baseline Matrix";
+  blTab.addEventListener("click", () => selectCompareGroup(BASELINE_MATRIX_GROUP));
+  subStrip.appendChild(blTab);
 
   const cl2 = $("compareList");
   // W2: family headers inside each comparison-type sub-tab; tracked PER SUB-TAB
@@ -975,6 +981,7 @@ function dispatch(events) {
       switch (ev.t) {
         case "state":
           S.st = ev.s; renderState(); updateMatrixProgress(); updateDayMatrixProgress();
+          updateBaselineMatrixProgress();
           // env_access can change on a push (background active-env check / scan) —
           // re-overlay the matrix warnings without a full rebuild when one is visible.
           if ((S.tab === "everything" && S.everySub === "matrix")
@@ -999,10 +1006,12 @@ function dispatch(events) {
           endRunUi();
           if (S.tab === "everything") { renderBatchLibrary(); if (S.everySub === "matrix") renderMatrix(); }
           if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
+          if (S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP) renderBaselineMatrix();
           break;
         case "matrix_refresh":
           if (S.tab === "everything" && S.everySub === "matrix") renderMatrix();
           if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
+          if (S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP) renderBaselineMatrix();
           break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default:
@@ -1073,9 +1082,10 @@ function bindEvents() {
       renderBatchLibrary();
       setEverySub(S.everySub || "export");   // re-applies matrix-wide if on the matrix sub-tab
     } else {
-      // Compare re-enters its last sub-tab; the by-day one re-applies full-width.
+      // Compare re-enters its last sub-tab; a matrix one re-applies full-width.
       if (tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
-      applyMatrixWide();   // clears matrix-wide unless the by-day matrix is active
+      if (tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP) renderBaselineMatrix();
+      applyMatrixWide();   // clears matrix-wide unless a day matrix is active
     }
     updateActivityCards();
   };
@@ -1112,6 +1122,11 @@ function bindEvents() {
     const r = await api.set_day_matrix_formulas(e.target.checked);
     if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
     syncDayMatrixFormulas();
+  });
+  $("baselineMatrixFormulas")?.addEventListener("change", async (e) => {
+    const r = await api.set_baseline_matrix_formulas(e.target.checked);
+    if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
+    syncBaselineMatrixFormulas();
   });
   // Evidence images — ONE shared persisted setting, surfaced on both matrix
   // pages (the checkboxes/counts are mirrors, resynced from each state push).
@@ -1150,9 +1165,11 @@ function bindEvents() {
   });
   $("btnQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
   $("btnQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
-  // The by-day matrix shares the same queue (Clear / Stop-all act on it too).
+  // The day matrices share the same queue (Clear / Stop-all act on it too).
   $("btnDayQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
   $("btnDayQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
+  $("btnBaselineQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
+  $("btnBaselineQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
 
   renderThemeButton();
   $("btnTheme").onclick = () => {
@@ -1253,6 +1270,11 @@ function bindEvents() {
     const res = await api.save_support_bundle();
     if (res && res.error) showMessage("error", "Could not save the bundle", res.error);
   };
+  $("btnSiteCapture")?.addEventListener("click", async () => {
+    const res = await api.capture_site_source();
+    if (res && res.error) showMessage("error", "Can't capture right now", res.error);
+    // Progress + the saved-folder summary arrive via run_started/log events.
+  });
   $("btnOpenFailures").onclick = () => api.open_failures_folder();
   $("btnCheckUpdates2").onclick = () => api.check_updates();
   $("btnRevert").onclick = async () => {

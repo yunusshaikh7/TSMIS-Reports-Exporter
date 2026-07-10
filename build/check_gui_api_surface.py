@@ -48,8 +48,15 @@ def _src(mod):
 # the one public non-endpoint). Captured at the P7b baseline (8eb9cc8). A mechanical
 # extraction must NOT change this set — adding/removing/renaming an endpoint fails here.
 FROZEN_API = {
+    "add_baseline_matrix_day", "baseline_matrix_info", "build_baseline_matrix_cell",
+    "open_baseline_cell_comparison", "open_baseline_comparisons_folder",
+    "rebuild_baseline_matrix", "remove_baseline_matrix_day",
+    "set_baseline_matrix_baseline", "set_baseline_matrix_formulas",
+    "set_baseline_matrix_report", "set_baseline_matrix_row_order",
+    "set_baseline_matrix_source",
     "add_day_matrix_day", "apply_site_preset", "attach", "build_day_cell", "cancel_login",
-    "cancel_run", "check_environments", "check_updates", "clear_saved_login",
+    "cancel_run", "capture_site_source", "check_environments", "check_updates",
+    "clear_saved_login", "open_site_captures_folder",
     "consolidate_info", "consolidate_matrix_tsn", "day_matrix_info", "decline_overwrite",
     "delete_chromium", "discard_batch", "download_chromium", "export_day_cell",
     "export_day_column", "export_day_row", "finish_login", "get_compare_folders",

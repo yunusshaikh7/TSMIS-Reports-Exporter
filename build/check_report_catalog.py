@@ -75,11 +75,13 @@ import consolidate_tsmis_intersection_detail_pdf as _con_tsmis_int_detail_pdf
 import consolidate_highway_detail as _con_highway_detail
 import consolidate_tsmis_highway_detail_pdf as _con_tsmis_highway_detail_pdf
 import consolidate_tsmis_highway_sequence_pdf as _con_tsmis_hsl_pdf
+import consolidate_tsmis_ramp_detail_pdf as _con_tsmis_rd_pdf
 import compare_env as _ce
 import compare_highway_log as _chl
 import compare_highway_log_pdf as _chlp
 import compare_intersection_detail_pdf as _cidp
 import compare_ramp_detail_tsn as _crd_tsn
+import compare_ramp_detail_pdf as _crdp
 import compare_ramp_summary_tsn as _crs_tsn
 import compare_intersection_summary_tsn as _cis_tsn
 import compare_intersection_detail_tsn as _cid_tsn
@@ -128,6 +130,8 @@ _EXPORT = [  # (key, label, fmt, expected ReportSpec)
 _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:ramp_summary", "TSAR: Ramp Summary", _con_ramp_summary),
     ("cons:ramp_detail", "TSAR: Ramp Detail", _con_ramp_detail),
+    # v0.26.0: the RD PDF-sourced consolidator, grouped next to its Excel sibling.
+    ("cons:ramp_detail_pdf", "TSMIS Ramp Detail (PDF)", _con_tsmis_rd_pdf),
     ("cons:highway_sequence", "Highway Sequence Listing", _con_highway_sequence),
     # v0.25.0: the HSL PDF-sourced consolidator, grouped next to its Excel sibling.
     ("cons:highway_sequence_pdf", "TSMIS Highway Sequence (PDF)", _con_tsmis_hsl_pdf),
@@ -155,6 +159,8 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:highway_detail_pdf:env", "Highway Detail (PDF) — between environments", "folders", "env", _ce.HIGHWAY_DETAIL_PDF),
     # v0.25.0: the Highway Sequence (PDF) env row, appended likewise.
     ("cmp:highway_sequence_pdf:env", "Highway Sequence Listing (PDF) — between environments", "folders", "env", _ce.HIGHWAY_SEQUENCE_PDF),
+    # v0.26.0: the Ramp Detail (PDF) env row, appended likewise.
+    ("cmp:ramp_detail_pdf:env", "TSAR: Ramp Detail (PDF) — between environments", "folders", "env", _ce.RAMP_DETAIL_PDF),
     ("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN", "files", "tsn", _chl),
     ("cmp:highway_log:pdf_vs_tsn", "Highway Log — TSMIS (PDF) vs TSN (PDF)", "files", "tsn", _chlp.TSMIS_PDF_VS_TSN),
     ("cmp:highway_log:pdf_vs_excel", "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chlp.TSMIS_PDF_VS_EXCEL),
@@ -172,6 +178,9 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     # v0.25.0: the Highway Sequence PDF file comparisons, the HD parallel.
     ("cmp:highway_sequence:pdf_vs_tsn", "Highway Sequence Listing — TSMIS (PDF) vs TSN", "files", "tsn", _chslp.TSMIS_PDF_VS_TSN),
     ("cmp:highway_sequence:pdf_vs_excel", "Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chslp.TSMIS_PDF_VS_EXCEL),
+    # v0.26.0: the Ramp Detail PDF file comparisons, the HSL parallel.
+    ("cmp:ramp_detail:pdf_vs_tsn", "TSAR: Ramp Detail — TSMIS (PDF) vs TSN", "files", "tsn", _crdp.TSMIS_PDF_VS_TSN),
+    ("cmp:ramp_detail:pdf_vs_excel", "TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _crdp.TSMIS_PDF_VS_EXCEL),
 ]
 _AUTO_CONS = {
     "ramp_summary": _con_ramp_summary, "ramp_detail": _con_ramp_detail,

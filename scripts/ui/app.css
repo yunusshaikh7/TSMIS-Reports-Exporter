@@ -958,14 +958,16 @@ button, input, select { font-family: inherit; }
 }
 
 /* Config zone (bottom-right, under the activity log) — only on a matrix tab.
-   Two cards share the look (.matrix-config); the body context class picks which
-   one shows: the Everything corner by default, the by-day corner under .mw-day. */
+   Three cards share the look (.matrix-config); the body context class picks which
+   one shows: the Everything corner by default, the by-day corner under .mw-day,
+   the vs-Baseline corner under .mw-bl. */
 .matrix-config {
   display: none; flex-direction: column; gap: 12px; flex-shrink: 0;
   padding: 12px 14px; max-height: 46%; overflow-y: auto;
 }
-body.matrix-wide:not(.mw-day) #matrixConfig { display: flex; }
+body.matrix-wide:not(.mw-day):not(.mw-bl) #matrixConfig { display: flex; }
 body.matrix-wide.mw-day #dayMatrixConfig { display: flex; }
+body.matrix-wide.mw-bl #baselineMatrixConfig { display: flex; }
 .matrix-config .mc-head {
   display: flex; align-items: center; gap: 7px;
   font-size: 12px; font-weight: 600; color: var(--muted-foreground);

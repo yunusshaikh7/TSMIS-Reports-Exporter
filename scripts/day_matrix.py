@@ -70,16 +70,17 @@ def _day_rows():
         if row_key == "highway_log":
             out.append((row_key, label, subdir, "excel", True, tsn_subdir))
         elif row_key in ("highway_log_pdf", "intersection_detail_pdf",
-                         "highway_detail_pdf", "highway_sequence_pdf"):
+                         "highway_detail_pdf", "highway_sequence_pdf",
+                         "ramp_detail_pdf"):
             out.append((row_key, label, subdir, "pdf", True, tsn_subdir))
         else:
             # Any report with a coded vs-TSN comparator is live (all of them as of
             # v0.17.0); `supported` derives from the single tsn_supported registry.
             out.append((row_key, label, subdir, None,
                         matrix.tsn_supported(row_key), tsn_subdir))
-    # Intersection Summary/Detail have no cross-env adapter (absent from
-    # matrix_rows), so add them here — they're live too (supported from the same
-    # tsn_supported registry, not hard-coded).
+    # Reports with no cross-env adapter (absent from matrix_rows) still get a
+    # by-day vs-TSN row here. EMPTY today — every report has an env adapter —
+    # kept as the documented extension point for a future export-only report.
     for row_key, label, subdir in reports.tsn_matrix_extra_rows():
         out.append((row_key, label, subdir, None,
                     matrix.tsn_supported(row_key),
