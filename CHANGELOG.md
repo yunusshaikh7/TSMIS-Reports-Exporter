@@ -3,6 +3,20 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.25.2 — 2026-07-09
+
+Hotfix for a field crash: exporting both editions of a report together (outside fast
+mode) crashed immediately with "TypeError: expected str, bytes or os.PathLike object,
+not NoneType" — before the browser even opened.
+
+- **Coalesced exports work from the plain Export tab again.** Selecting an
+  Excel + PDF pair of one report in a normal (sequential) export crashed while
+  working out the output folders; the bug had been latent since coalescing shipped in
+  v0.19.2 because fast mode runs editions separately and Export Everything supplies
+  its own folders — a plain paired export was the one path that tripped it. Each
+  edition now falls back to its dated run folder exactly like a single-report export.
+  Locked by a new regression test.
+
 ## v0.25.1 — 2026-07-09
 
 Every enabled report now exports in BOTH formats the site offers, and the site's

@@ -190,6 +190,34 @@ def test_guards():
             _raises(lambda: exporter.run_export_combined([excel, mixed])))
 
 
+def test_combined_output_dirs():
+    print("_combined_output_dirs: a None ENTRY falls back to the dated run folder "
+          "(the 2026-07-09 field crash):")
+    excel = _spec("highway_log", save_via_export_button)
+    pdf = _spec("highway_log_pdf", save_highway_log_pdf)
+    with temp_dir("tsmis_coal3_") as tmp:
+        run_root = Path(tmp) / "2026-07-09 ssor-prod"
+        with patch(exporter, "output_run_dir", lambda s, e: run_root):
+            # THE crash: every normal (non-store) coalesced export passes
+            # out_dirs=[None, None] (run_dirs from _prep_edition with no store
+            # base). Each None must resolve to that spec's dated run folder —
+            # the old code did Path(out_dirs[i]) on the truthy list -> Path(None)
+            # -> TypeError before the browser even launched.
+            dirs = exporter._combined_output_dirs(
+                [excel, pdf], [None, None], "ssor", "prod")
+            c.check("[None, None] resolves BOTH editions to dated run folders",
+                    dirs == [run_root / "highway_log", run_root / "highway_log_pdf"],
+                    f"dirs={dirs}")
+            c.check("out_dirs=None (no override list) resolves the same way",
+                    exporter._combined_output_dirs(
+                        [excel, pdf], None, "ssor", "prod") == dirs)
+            store = Path(tmp) / "store" / "highway_log.staging"
+            c.check("a real override is honored per entry; a None entry still falls back",
+                    exporter._combined_output_dirs(
+                        [excel, pdf], [store, None], "ssor", "prod")
+                    == [store, run_root / "highway_log_pdf"])
+
+
 def _raises(fn):
     try:
         fn()
@@ -207,4 +235,5 @@ if __name__ == "__main__":
     test_one_generation_saves_both()
     test_empty_and_error()
     test_guards()
+    test_combined_output_dirs()
     raise SystemExit(c.summary())

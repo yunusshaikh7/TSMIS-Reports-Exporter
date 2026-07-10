@@ -1212,13 +1212,35 @@ def _retry_failed_combined(page, base_spec, targets_for, results, events, timeou
             break
 
 
+def _combined_output_dirs(specs, out_dirs, src, env):
+    """One output dir per edition of a combined run: the caller's PER-ENTRY
+    override when given, else that spec's dated run folder — exactly
+    run_export's `out_dir=None` fallback, applied per edition.
+
+    A None ENTRY means "no override for this edition": every normal
+    (non-store) coalesced export passes run_dirs of None from
+    `_prep_edition` (only the Everything store passes real staging dirs), so
+    treating the LIST as the override — `Path(out_dirs[i])` — crashed the
+    whole run with `TypeError: ... not NoneType` before the browser even
+    launched (field crash, 2026-07-09; latent since v0.19.2 because fast
+    mode never coalesces and the store path always overrides)."""
+    resolved = []
+    for i, spec in enumerate(specs):
+        override = out_dirs[i] if out_dirs else None
+        resolved.append(Path(override) if override is not None
+                        else output_run_dir(src, env) / spec.subdir)
+    return resolved
+
+
 def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
                         retry_timeout_ms=None, out_dirs=None):
     """Export several EDITIONS of the SAME on-site report in ONE pass: the report is
     generated once per route and every edition is saved off that single render (e.g.
     Highway Log Excel + Highway Log PDF). Returns a RunResult per spec, in the SAME
     order as `specs`. `out_dirs`, when given, overrides each spec's dated run folder
-    (parallel to `specs` -- the always-current store passes its staging dirs).
+    (parallel to `specs` -- the always-current store passes its staging dirs; a None
+    ENTRY keeps that spec's dated run folder, which is what every normal export
+    passes).
 
     Console-free; mirrors run_export's lifecycle (sign-in, preflight, per-route
     resume-skip, retry-once, end-of-run slow retry, per-edition run reports) but
@@ -1242,8 +1264,7 @@ def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
     # Save order puts page-rebuilding (PDF) saves last; results stay in `specs` order.
     save_order = sorted(range(len(specs)), key=lambda i: _save_rebuilds_page(specs[i]))
     dirs, results = [], []
-    for i, spec in enumerate(specs):
-        d = Path(out_dirs[i]) if out_dirs else output_run_dir(src, env) / spec.subdir
+    for d in _combined_output_dirs(specs, out_dirs, src, env):
         d.mkdir(parents=True, exist_ok=True)
         dirs.append(d)
         results.append(RunResult(output_dir=str(d)))
