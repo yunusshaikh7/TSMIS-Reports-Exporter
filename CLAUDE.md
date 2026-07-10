@@ -24,6 +24,7 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | # | Report | Output | Folder |
 |---|---|---|---|
 | 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<run>/ramp_summary/` |
+| 1b | TSAR: Ramp Summary (Excel) | XLSX | `output/<run>/ramp_summary_excel/` |
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
 | 2b | TSAR: Ramp Detail (PDF) | PDF (Letter, landscape) | `output/<run>/ramp_detail_pdf/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
@@ -31,6 +32,7 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
+| 5b | Intersection Summary (PDF) | PDF (Letter, portrait) | `output/<run>/intersection_summary_pdf/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 | 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 | 7 | Highway Detail | XLSX | `output/<run>/highway_detail/` |
@@ -40,11 +42,16 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
 Reports 5–6 (Intersection): export is **enabled** but the report lives on the
 **development** TSMIS site — switch via Settings ▸ "Use development site"
-(`tsmis-dev.dot.ca.gov`). Ramp Detail, Highway Sequence, Highway Log, Intersection
-Detail and Highway Detail each ship in **two editions** — the Excel export and a
-print-layout **PDF** edition (2b / 3b / 4b / 6b / 7b; **3b graduated in v0.25.0** off
-the first real work-PC print set — parser/consolidator/comparisons/matrix row; 2b stays
-**export-only** until its PDFs arrive, the same staged path 3b/7b took). v0.17.0 brought
+(`tsmis-dev.dot.ca.gov`). **Since v0.25.1 every enabled on-site report exports in BOTH
+formats the site offers**: the five Excel reports each have a print-layout **PDF**
+edition (2b / 4b / 5b / 6b / 7b — **3b graduated in v0.25.0** off the first real
+work-PC print set — parser/consolidator/comparisons/matrix row; **5b joined in
+v0.25.1** via `ints_printAll`), and the natively-PDF Ramp Summary gained its **Excel**
+sibling (**1b**, v0.25.1 — the site's `rs_exportToExcel`, previously unwired). 1b/2b/5b
+are **export-only** (2b's parser next — its work-PC PDFs exist, awaiting drop; the
+staged path 3b/7b took). The dev site's new **Route History Table** (an embedded SSRS
+report, no export flow) is wired as a **greyed reserved placeholder** (stable id 15,
+the v0.18.1 Highway-pair pattern). v0.17.0 brought
 reports 1–6b to parity, **v0.20.0 added Highway Detail (7/7b)**, and **v0.25.0 added
 Highway Sequence (PDF) (3b)**: the **11 fully-integrated export types consolidate AND
 compare vs TSN** — each has a vs-TSN comparator and lives in both the Everything and

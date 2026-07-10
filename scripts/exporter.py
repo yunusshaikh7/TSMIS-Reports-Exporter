@@ -449,6 +449,58 @@ def save_highway_sequence_pdf(page, out_path, timeout_ms=None):
     _verify_saved_file(out_path)
 
 
+def save_intersection_summary_pdf(page, out_path, timeout_ms=None):
+    """Render the Intersection Summary to a Portrait PDF, the way the site's
+    Print button lays it out.
+
+    The Intersection Summary renders fully INLINE (count tables, like Ramp
+    Summary — no pagination), so unlike the other print editions there is no
+    multi-page layout to build: the site's global `ints_printAll()` simply
+    PREPENDS a cover page to the on-screen report, calls `window.print()`, and
+    restores in an `afterprint` listener. We override `window.print` to raise
+    FIRST, so no print dialog ever opens, the afterprint restore never fires,
+    and the cover + report stay in the DOM for `page.pdf()` (which emulates
+    print media; the site's `@media print` shows only #rampResults). Narrow
+    count tables -> Portrait, like the native Ramp Summary PDF.
+
+    is_empty (`Total Intersections = 0`) ran first, so this is never an empty
+    route; timeout_ms is unused (kept for the uniform save signature). The
+    cover (`.rs-cover`, print-only for this report) proves the Print function
+    ran; the total is re-read from `.ints-total` as the marker-INDEPENDENT
+    empty backstop. Fails loudly with ReportError if the site's Print function
+    is gone/renamed."""
+    built = page.evaluate(
+        """() => {
+            if (typeof ints_printAll !== 'function') return {status: 'no-print-fn', total: 0};
+            window.print = () => { throw new Error('skip-print'); };
+            try { ints_printAll(); } catch (e) { /* the throw skips the afterprint restore */ }
+            const box = document.getElementById('rampResults');
+            if (!box || !box.querySelector('.rs-cover') || !box.querySelector('.ints-total'))
+                return {status: 'no-layout', total: 0};
+            const m = (box.querySelector('.ints-total').textContent || '').match(/=\\s*(\\d+)/);
+            return {status: 'ok', total: m ? +m[1] : 0};
+        }""")
+    status = built.get("status") if isinstance(built, dict) else built
+    if status != "ok":
+        raise ReportError(
+            "Couldn't build the Intersection Summary print layout for the PDF "
+            f"(the site's Print control changed: {status}).")
+    if not (built.get("total") if isinstance(built, dict) else 0):
+        # The layout built but the report totals zero intersections. Marker-
+        # INDEPENDENT empty backstop: record the route `empty` (retried once)
+        # instead of saving an all-zeros PDF, even if the empty-text marker drifted.
+        log.info("intersection_summary PDF: zero total for %s; treating as empty",
+                 out_path.name)
+        raise EmptyExport()
+    page.pdf(
+        path=str(out_path),
+        format="Letter",
+        print_background=True,
+        margin={"top": "0.4in", "bottom": "0.4in", "left": "0.4in", "right": "0.4in"},
+    )
+    _verify_saved_file(out_path)
+
+
 # The Ramp Detail print prompts for a free-text report title (the site's
 # showPrompt modal); the save auto-answers it with the route so the capture
 # never waits on a dialog. Bound the print-layout build so a future site change
@@ -527,6 +579,10 @@ def save_ramp_detail_pdf(page, out_path, timeout_ms=None):
 _PAGE_REBUILDING_SAVES = frozenset({
     save_highway_log_pdf, save_intersection_detail_pdf, save_highway_detail_pdf,
     save_highway_sequence_pdf, save_ramp_detail_pdf,
+    # ints_printAll only PREPENDS a cover, but it reassigns #rampResults's
+    # innerHTML (the Export button element is re-created) — order it after the
+    # DOM-preserving Export-button save all the same.
+    save_intersection_summary_pdf,
 })
 
 

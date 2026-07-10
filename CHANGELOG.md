@@ -3,6 +3,29 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.25.1 — 2026-07-09
+
+Every enabled report now exports in BOTH formats the site offers, and the site's
+brand-new Route History Table shows up in the picker (greyed) so you know it exists.
+
+- **TSAR: Ramp Summary (Excel).** Ramp Summary was the one report the app could only
+  save as a PDF — yet the site's action bar has always had an Export button for it.
+  It's now wired: a new "Summary (Excel)" edition under the Ramp group saves the same
+  count tables as a per-route workbook. Selecting both Ramp Summary editions generates
+  each route once and saves both files off it, like every other edition pair.
+- **Intersection Summary (PDF).** The last report without a print edition gets one: a
+  new "Summary (PDF)" edition under the Intersection group captures the site's own
+  Print layout (cover page + the count tables) as a portrait Letter PDF, matching how
+  the other five print editions mirror their Excel siblings. Coalesces with the Excel
+  edition too.
+- **Route History Table appears — greyed.** The TSMIS dev site added a "Route History
+  Table" report on 2026-07-09. It isn't exportable (on the site it's an embedded
+  report-server page with no export control), so the app lists it greyed in the picker
+  — you can see the site gained it, and the moment the site gives it an export path a
+  future update can turn it on without re-plumbing anything.
+- Both new editions are export-only for now (their siblings already consolidate and
+  compare the same data); they appear in Export Everything automatically.
+
 ## v0.25.0 — 2026-07-09
 
 The Highway Sequence Listing (PDF) edition grows up — parser, comparisons, matrix row,

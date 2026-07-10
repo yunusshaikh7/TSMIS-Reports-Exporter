@@ -48,6 +48,7 @@ import tsn_library
 
 # --- INDEPENDENT identity oracle: import the expected objects ourselves.
 from export_ramp_summary import SPEC as _S_ramp_summary
+from export_ramp_summary_excel import SPEC as _S_ramp_summary_excel
 from export_ramp_detail import SPEC as _S_ramp_detail
 from export_ramp_detail_pdf import SPEC as _S_ramp_detail_pdf
 from export_highway_sequence import SPEC as _S_highway_sequence
@@ -55,11 +56,13 @@ from export_highway_sequence_pdf import SPEC as _S_highway_sequence_pdf
 from export_highway_log import SPEC as _S_highway_log
 from export_highway_log_pdf import SPEC as _S_highway_log_pdf
 from export_intersection_summary import SPEC as _S_intersection_summary
+from export_intersection_summary_pdf import SPEC as _S_intersection_summary_pdf
 from export_intersection_detail import SPEC as _S_intersection_detail
 from export_intersection_detail_pdf import SPEC as _S_intersection_detail_pdf
 from export_highway_detail import SPEC as _S_highway_detail
 from export_highway_summary import SPEC as _S_highway_summary
 from export_highway_detail_pdf import SPEC as _S_highway_detail_pdf
+from export_route_history import SPEC as _S_route_history
 import consolidate_ramp_summary as _con_ramp_summary
 import consolidate_ramp_detail as _con_ramp_detail
 import consolidate_highway_sequence as _con_highway_sequence
@@ -115,6 +118,12 @@ _EXPORT = [  # (key, label, fmt, expected ReportSpec)
     # (append-only; export-only until their print parsers are verified).
     ("highway_sequence_pdf", "Highway Sequence Listing (PDF)", "PDF", _S_highway_sequence_pdf),
     ("ramp_detail_pdf", "TSAR: Ramp Detail (PDF)", "PDF", _S_ramp_detail_pdf),
+    # v0.25.1: the last missing editions at ids 13/14 (Ramp Summary's Excel
+    # sibling + Intersection Summary's print edition) and the reserved-DISABLED
+    # Route History placeholder at id 15 (append-only).
+    ("ramp_summary_excel", "TSAR: Ramp Summary (Excel)", "Excel", _S_ramp_summary_excel),
+    ("intersection_summary_pdf", "Intersection Summary (PDF)", "PDF", _S_intersection_summary_pdf),
+    ("route_history", "Route History Table", "SSRS", _S_route_history),
 ]
 _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:ramp_summary", "TSAR: Ramp Summary", _con_ramp_summary),

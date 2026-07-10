@@ -30,10 +30,12 @@ import gui_api
 _fail = []
 
 # DERIVED counts — adding a report flows through here without a literal edit.
-# The gate is EMPTY again as of v0.19.1 (the v0.18.1 reserved Highway pair's
-# export is now enabled); a future re-disable goes back into _RESERVED.
+# The gate held ONLY the v0.18.1 reserved Highway pair until v0.19.1 enabled it;
+# as of v0.25.1 it holds the reserved Route History placeholder (the dev site's
+# embedded-SSRS report — no export flow yet, shown greyed).
 N_REPORTS = len(reports.EXPORT_REPORTS)
-_RESERVED = set()
+_RESERVED = {"route_history"}
+_RESERVED_LABELS = {"Route History Table"}
 N_ENABLED = N_REPORTS - len(_RESERVED)
 
 
@@ -44,34 +46,40 @@ def check(name, cond):
 
 
 def test_default_all_enabled():
-    print(f"default gate = empty; all {N_ENABLED} reports enabled:")
-    check("DISABLED_EXPORT_SUBDIRS is empty (every report enabled)",
+    print(f"default gate = the reserved placeholder; {N_ENABLED} reports enabled:")
+    check("DISABLED_EXPORT_SUBDIRS holds exactly the reserved Route History (v0.25.1)",
           reports.DISABLED_EXPORT_SUBDIRS == _RESERVED)
     enabled = reports.enabled_export_reports()
-    check(f"{N_ENABLED} export reports enabled (all of them)",
+    check(f"{N_ENABLED} export reports enabled (all but the placeholder)",
           len(enabled) == N_ENABLED)
     subdirs = {spec.subdir for _i, _l, _f, spec in enabled}
-    check("Intersection Summary + Detail (+ the PDF variant) are enabled",
-          {"intersection_summary", "intersection_detail", "intersection_detail_pdf"} <= subdirs)
+    check("Intersection Summary + Detail (+ the PDF variants) are enabled",
+          {"intersection_summary", "intersection_summary_pdf",
+           "intersection_detail", "intersection_detail_pdf"} <= subdirs)
     check("the Highway Detail/Summary pair is enabled (v0.19.1)",
           {"highway_detail", "highway_summary"} <= subdirs)
+    check("the v0.25.1 editions are enabled (RS Excel + IS PDF)",
+          {"ramp_summary_excel", "intersection_summary_pdf"} <= subdirs)
     status = reports.export_reports_status()
     disabled = {label for _i, label, _f, _s, d in status if d}
-    check(f"all {N_REPORTS} present; none flagged disabled",
-          len(status) == N_REPORTS and disabled == set())
+    check(f"all {N_REPORTS} present; only the placeholder flagged disabled",
+          len(status) == N_REPORTS and disabled == _RESERVED_LABELS)
     check("each report's row maps back to its own EXPORT_REPORTS entry",
           all(reports.EXPORT_REPORTS[i] == (label, fmt, spec)
               for i, label, fmt, spec, _d in status))
 
 
 def test_gui_initial_state_all_enabled():
-    print(f"gui_api.get_initial_state (all {N_REPORTS} offered; none greyed):")
+    print(f"gui_api.get_initial_state (all {N_REPORTS} offered; only the placeholder greyed):")
     a = gui_api.GuiApi()
     a._started = True            # skip the one-time check/update worker launch
     init = a.get_initial_state()
     check(f"{N_REPORTS} reports offered", len(init["reports"]) == N_REPORTS)
-    check("no report greyed (the Highway pair enabled in v0.19.1)",
-          {r["label"] for r in init["reports"] if r["disabled"]} == set())
+    check("exactly the Route History placeholder greyed (v0.25.1)",
+          {r["label"] for r in init["reports"] if r["disabled"]} == _RESERVED_LABELS)
+    check("Route History is SHOWN greyed (visible, not hidden)",
+          any(r["label"] == "Route History Table" and r["disabled"]
+              for r in init["reports"]))
     check("Highway Detail/Summary shown AND pickable",
           all(any(r["label"] == lbl and not r["disabled"] for r in init["reports"])
               for lbl in ("Highway Detail", "Highway Summary")))
@@ -124,7 +132,7 @@ def test_gate_mechanism_still_works():
               and len(init["reports"]) == N_REPORTS)
     finally:
         reports.DISABLED_EXPORT_SUBDIRS = saved
-    check("restored to the default gate (empty — every report enabled)",
+    check("restored to the default gate (only the reserved placeholder disabled)",
           len(reports.enabled_export_reports()) == N_ENABLED)
 
 

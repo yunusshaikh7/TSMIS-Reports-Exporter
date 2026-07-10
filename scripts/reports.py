@@ -104,7 +104,10 @@ def consolidator_for_subdir(subdir):
 # fast per run — no per-route stall. They stay consolidate/compare/matrix-ABSENT
 # until that later feature lands. The set stays as the app-wide kill switch: to
 # disable a report app-wide again, add its subdir back.
-DISABLED_EXPORT_SUBDIRS = set()
+# (v0.25.1) Route History Table is RESERVED groundwork (the same v0.18.1 path):
+# the dev site's new report is an embedded SSRS page with NO export flow, so it
+# shows greyed in the picker until the site gives it one.
+DISABLED_EXPORT_SUBDIRS = {"route_history"}
 
 
 def is_export_disabled(spec):

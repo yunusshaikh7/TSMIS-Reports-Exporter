@@ -27,6 +27,7 @@ catalog doesn't ALSO import the `tsn_load_*` normalizers eagerly.
 from collections import namedtuple
 
 from export_ramp_summary import SPEC as _RAMP_SUMMARY_SPEC
+from export_ramp_summary_excel import SPEC as _RAMP_SUMMARY_EXCEL_SPEC
 from export_ramp_detail import SPEC as _RAMP_DETAIL_SPEC
 from export_ramp_detail_pdf import SPEC as _RAMP_DETAIL_PDF_SPEC
 from export_highway_sequence import SPEC as _HIGHWAY_SEQ_SPEC
@@ -34,12 +35,14 @@ from export_highway_sequence_pdf import SPEC as _HIGHWAY_SEQ_PDF_SPEC
 from export_highway_log import SPEC as _HIGHWAY_LOG_SPEC
 from export_highway_log_pdf import SPEC as _HIGHWAY_LOG_PDF_SPEC
 from export_intersection_summary import SPEC as _INT_SUMMARY_SPEC
+from export_intersection_summary_pdf import SPEC as _INT_SUMMARY_PDF_SPEC
 from export_intersection_detail import SPEC as _INT_DETAIL_SPEC
 from export_intersection_detail_pdf import SPEC as _INT_DETAIL_PDF_SPEC
 # The "Highway" TSAR group — see the ExportEntry block below.
 from export_highway_detail import SPEC as _HIGHWAY_DETAIL_SPEC
 from export_highway_summary import SPEC as _HIGHWAY_SUMMARY_SPEC
 from export_highway_detail_pdf import SPEC as _HIGHWAY_DETAIL_PDF_SPEC
+from export_route_history import SPEC as _ROUTE_HISTORY_SPEC
 
 import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
@@ -151,6 +154,21 @@ EXPORT = (
                 _HIGHWAY_SEQ_PDF_SPEC),
     ExportEntry("ramp_detail_pdf", "TSAR: Ramp Detail (PDF)", "PDF", _RAMP_DETAIL_PDF_SPEC,
                 group="Ramp", short_label="Detail (PDF)"),
+    # v0.25.1 — every on-site report now has BOTH editions where the site offers
+    # them: Ramp Summary gains its Excel sibling (the site's `rs_exportToExcel`
+    # was never wired — the INVERSE of the print editions) and Intersection
+    # Summary gains its print edition (`ints_printAll`). Appended LAST (stable
+    # ids 13/14, batch order frozen). Both coalesce with their siblings
+    # automatically (shared data_value).
+    ExportEntry("ramp_summary_excel", "TSAR: Ramp Summary (Excel)", "Excel",
+                _RAMP_SUMMARY_EXCEL_SPEC, group="Ramp", short_label="Summary (Excel)"),
+    ExportEntry("intersection_summary_pdf", "Intersection Summary (PDF)", "PDF",
+                _INT_SUMMARY_PDF_SPEC, group="Intersection", short_label="Summary (PDF)"),
+    # Route History Table (dev site, 2026-07-09) — RESERVED groundwork at stable
+    # id 15, app-wide DISABLED (`reports.DISABLED_EXPORT_SUBDIRS`): the site's
+    # report is an embedded SSRS page with no export flow, so the picker shows
+    # it greyed until the site gives it one (the v0.18.1 Highway-pair path).
+    ExportEntry("route_history", "Route History Table", "SSRS", _ROUTE_HISTORY_SPEC),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -376,8 +394,12 @@ def export_display():
 # every EXPORT key appears exactly once (asserted at import).
 _PICKER_ORDER = (
     "highway_log", "highway_log_pdf", "highway_sequence", "highway_sequence_pdf",
-    "ramp_summary", "ramp_detail", "ramp_detail_pdf",
-    "intersection_summary", "intersection_detail", "intersection_detail_pdf",
+    # Route History sits third among the site's flat options (after Highway
+    # Sequence) — mirrored here, greyed until the site gives it an export flow.
+    "route_history",
+    "ramp_summary", "ramp_summary_excel", "ramp_detail", "ramp_detail_pdf",
+    "intersection_summary", "intersection_summary_pdf",
+    "intersection_detail", "intersection_detail_pdf",
     # The newest Highway group renders last; the PDF variant sits next to its Excel
     # sibling (like Intersection Detail + its PDF). Detail export enabled v0.19.1,
     # the PDF v0.19.2; Summary export-enabled but still site-greyed.

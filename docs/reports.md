@@ -1,6 +1,6 @@
 ﻿# Reports
 
-What this doc covers: the full TSMIS report catalog (the **thirteen** exportable types, incl. the five print editions — Ramp Detail / Highway Sequence / Highway Log / Intersection Detail / Highway Detail), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), and the three "add a new X" recipes (report type, consolidator, comparison).
+What this doc covers: the full TSMIS report catalog (**fifteen** exportable types — incl. the six print editions (Ramp Detail / Highway Sequence / Highway Log / Intersection Summary / Intersection Detail / Highway Detail) and Ramp Summary's Excel sibling — plus the greyed **Route History** placeholder), the **[capability matrix](#capability-matrix--what-the-app-can-do-with-each-report)** (what the app can do with each report today), each report's per-export behavior (`ReportSpec`, save strategy, empty/ready detection), why the site greys reports out (`cs-disabled`), the **[integration ladder](#the-integration-ladder--every-touchpoint-when-a-report-levels-up)** (every touchpoint when a report gains a tier), and the three "add a new X" recipes (report type, consolidator, comparison).
 
 Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- the corrected 31-column labels in [highway_log/columns.md](highway_log/columns.md), PDF/TSN parsing in [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md), and the PDF-vs-Excel/TSN study in [highway_log/comparison-study.md](highway_log/comparison-study.md). The comparison workbook engine is owned by [comparison-engine.md](comparison-engine.md).
 
@@ -9,6 +9,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | # | Report | Output | Folder |
 |---|---|---|---|
 | 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<run>/ramp_summary/` |
+| 1b | TSAR: Ramp Summary (Excel) | XLSX (export-only) | `output/<run>/ramp_summary_excel/` |
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
 | 2b | TSAR: Ramp Detail (PDF) | PDF (Letter, landscape; export-only) | `output/<run>/ramp_detail_pdf/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
@@ -16,15 +17,107 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
+| 5b | Intersection Summary (PDF) | PDF (Letter, portrait; export-only) | `output/<run>/intersection_summary_pdf/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 | 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 | 7 | Highway Detail | XLSX | `output/<run>/highway_detail/` |
 | 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
 | 8 | Highway Summary | XLSX (export-only) | `output/<run>/highway_summary/` |
+| — | Route History Table | *(none — greyed reserved placeholder, v0.25.1)* | — |
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
 
 The catalog (`scripts/report_catalog.py`) is the single source of truth for report metadata (P4); `reports.py` derives `EXPORT_REPORTS` from it, feeding the GUI checkboxes and `export_multi.py`, so the list can't drift. The `.bat` menus keep their own text, with a registry-parity check for the consolidate menu (`build/check_report_catalog.py`). Each row is `(menu label, format hint, ReportSpec)`. **Console** numbering follows `EXPORT_REPORTS` order; the **GUI picker** is grouped to mirror the website — its order comes from the catalog's `_PICKER_ORDER` / `picker_order()` and each entry's optional `group` + `short_label` (v0.18.1; see [Report grouping & site-menu-safe selection](#report-grouping--site-menu-safe-selection-v0181) below).
+
+## Capability matrix — what the app can do with each report
+
+The at-a-glance status of every export type across the app's capability tiers, as of
+**v0.25.1**. Derived from `report_catalog.py` (EXPORT / CONSOLIDATE / COMPARE / TSN) +
+`visual_evidence._ADAPTER_MODULES` — when a tier lands or a report is added, update this
+table in the same change.
+
+| # | Export type (stable key) | Saves as | Consolidate | vs TSN | PDF↔Excel self-check | Cross-env | Matrix rows | Evidence images |
+|---|---|---|---|---|---|---|---|---|
+| 1 | TSAR: Ramp Summary (`ramp_summary`) | PDF | ✓ (parses its own PDFs) | ✓ aggregate | n/a | ✓ | ✓ | — (aggregate ⁵) |
+| 1b | TSAR: Ramp Summary (Excel) (`ramp_summary_excel`) | XLSX | — ¹ | — ¹ | — ¹ | — ¹ | — ¹ | — |
+| 2 | TSAR: Ramp Detail (`ramp_detail`) | XLSX | ✓ | ✓ flat | n/a | ✓ | ✓ | — (waits for 2b ²) |
+| 2b | TSAR: Ramp Detail (PDF) (`ramp_detail_pdf`) | PDF | — ² | — ² | — ² | — ² | — ² | — ² |
+| 3 | Highway Sequence Listing (`highway_sequence`) | XLSX | ✓ | ✓ flat, county+PM key | n/a | ✓ | ✓ | ✓ |
+| 3b | Highway Sequence Listing (PDF) (`highway_sequence_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 4 | Highway Log (`highway_log`) | XLSX | ✓ | ✓ flat, roadbed/ditto-aware | n/a | ✓ | ✓ | ✓ |
+| 4b | Highway Log (PDF) (`highway_log_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 5 | Intersection Summary (`intersection_summary`) | XLSX | ✓ (category counts) | ✓ aggregate | n/a | ✓ | ✓ | — (aggregate ⁵) |
+| 5b | Intersection Summary (PDF) (`intersection_summary_pdf`) | PDF | — ¹ | — ¹ | — ¹ | — ¹ | — ¹ | — (aggregate ⁵) |
+| 6 | Intersection Detail (`intersection_detail`) | XLSX | ✓ | ✓ flat | n/a | ✓ | ✓ | ✓ |
+| 6b | Intersection Detail (PDF) (`intersection_detail_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 7 | Highway Detail (`highway_detail`) | XLSX | ✓ | ✓ flat, canonical roadbed key | n/a | ✓ | ✓ | ✓ |
+| 7b | Highway Detail (PDF) (`highway_detail_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 8 | Highway Summary (`highway_summary`) | XLSX ³ | — ³ | — ³ | — | — ³ | — ³ | — ³ |
+| — | Route History Table (`route_history`) | — ⁶ | — | — | — | — | — | — |
+
+Plus one **consolidate-only source** (not an export type): **TSN Highway Log (PDF)**
+(`cons:tsn_highway_log`) — TSN district prints the user drops into
+`input/tsn_highway_log/` (the only consolidator with an input drop folder).
+
+**Footnotes — the current gaps, each with its unlock:**
+
+1. **The v0.25.1 editions are export-only for now.** Ramp Summary (Excel) (id 13, the
+   site's `rs_exportToExcel` — an AOA workbook of the same count tables the PDF
+   consolidator already extracts) and Intersection Summary (PDF) (id 14,
+   `ints_printAll`) ship as exports; consolidate-side integration waits for real
+   work-PC files to verify against (Lesson 13), and is low-value until someone needs
+   it — both reports' counts already consolidate + compare through their sibling
+   editions.
+2. **Ramp Detail (PDF) is the export-only print edition whose integration is queued
+   NEXT** (stable id 12, v0.24.0). Its consolidator/comparisons/evidence follow the
+   Highway Sequence (PDF) graduation path (v0.24.0 export-only → v0.25.0 full); the
+   verification set (the 2026-07-09 work-PC pair) and the statewide TSN Ramp Detail
+   print are both in hand. Ramp Detail's evidence adapter (row 2) rides the same
+   unlock: evidence needs the TSMIS side as PDFs.
+3. **Highway Summary is export-wired but site-greyed** (`cs-disabled` on every capture
+   through Dev 7.9) — `select_report` fails fast with "currently unavailable" until
+   the vendor turns it on; consolidate/compare integration then waits for a real
+   statewide export to verify a schema against (the standard Lesson-13 sequence).
+4. **Where each report lives (site-side, as of 2026-07-09):** ramps, Highway Log and
+   Highway Sequence export from the **production** site; Intersection Summary/Detail
+   and Highway Detail live on the **development** site (Settings ▸ "Use development
+   site"); Highway Summary is greyed everywhere; Route History exists on dev only.
+5. **Evidence images require a row-level comparison and a TSMIS PDF edition** — the
+   generator renders the exact differing CELL from both systems' prints. The two
+   aggregate comparisons (Ramp Summary, Intersection Summary) compare statewide
+   category COUNTS, so there is no per-row cell to render; they are named in the
+   toggle's no-support line by design.
+6. **Route History Table is a wired-but-DISABLED placeholder** (stable id 15,
+   v0.25.1 — the v0.18.1 reserved-groundwork pattern): the dev site's new report is
+   an embedded SSRS page (`route_history.js` iframes the TSN report server; users
+   pick parameters in the SSRS panel) with NO export control, so there is nothing
+   for the engine to drive. It shows greyed in the picker
+   (`reports.DISABLED_EXPORT_SUBDIRS`); if the site later gives it an export flow,
+   enabling it = write the real save + empty the gate.
+
+**Cross-cutting engine capabilities** (all reports, unless noted): resume + retry +
+skip/cancel + fast-fail per route; **fast mode** (6 parallel browsers; no coalescing);
+**coalescing** (standard path: selecting both editions of one report generates each
+route once — HL, ID, HD, HSL, RD pairs); **auto-consolidate on export finish** (the
+seven `_AUTO_CONSOLIDATOR` families — the PDF editions consolidate via the matrix
+instead, needing a scratch convert dir); the **Everything matrix** + **Compare by-day
+matrix** (one row per comparison-integrated family; env / vs-TSN / vs-Excel modes per
+row); **on-demand per-cell evidence cameras** on built, fresh vs-TSN cells (the
+evidence-capable rows above).
+
+TSN-side datasets backing the vs-TSN column (`report_catalog.TSN`; the library
+normalizes each raw source once and caches it — see
+[tsn-parsers.md](tsn-parsers.md)):
+
+| TSN dataset | Raw source | Norm ver | Evidence prints |
+|---|---|---|---|
+| `highway_log` | 12 district PDFs | 3 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
+| `ramp_detail` | statewide XLSX | 2 | — |
+| `ramp_summary` | statewide PDF | 2 | — |
+| `intersection_summary` | statewide PDF | 2 | — |
+| `intersection_detail` | statewide XLSX | 3 | `pdf/` drop: the ONE statewide TASAS print |
+| `highway_sequence` | 12 district PDFs | 2 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
+| `highway_detail` | statewide XLSX | 2 | `pdf/` drop: the 12 district prints |
 
 ## `ReportSpec` -- what makes one report differ from another
 
@@ -60,6 +153,12 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 - Renders **inline**: `wait_js` ready when `Route <route>` appears or `No ramps found`. `is_empty` = `"No ramps found"` in body.
 - `save=save_pdf_letter` (inline page -> `page.pdf()` Letter, no Export button click).
 - **Source-data caveat (in the consolidator, not the parser).** On **9 routes** (005, 008, 010, 094, 110, 134, 210, 280, 605) the source PDF's own *Ramp Types* breakdown sums short of its stated *Total* by 1-9 ramps, **identically across all three environments**. `consolidate_ramp_summary.parse_pdf` is **correct** -- cross-checked against an independent geometric word-position extraction over all 378 PDFs x 14 ramp types (0 mismatches) and the raw page-2 text. The consolidator's `_audit_ok` cell flags these routes **RED on purpose** (`⚠ Source ≠ total: <section>`). **Do NOT "fix" the parser to force them green** -- that would hide a real TSMIS source-data issue (the cell exists to catch exactly this). The identical gap cancels on both sides of a cross-env comparison. -> [lessons.md](lessons.md) §5.
+
+### Report 1b -- TSAR: Ramp Summary (Excel) (v0.25.1)
+- **Same dropdown option as #1** -- `label="TSAR: Ramp Summary"` -- saved as an Excel workbook via the site's Export button instead of capturing the inline page as a PDF. The INVERSE of the print editions: the Excel sibling of a natively-PDF report. Module `export_ramp_summary_excel.py`; `subdir="ramp_summary_excel"`, `filename=tsar_ramp_summary_route_<ROUTE>.xlsx`. The registry's **menu label** is `"TSAR: Ramp Summary (Excel)"` (display only).
+- `wait_js` / `is_empty` are identical to the PDF Ramp Summary (inline render; `Route <route>` or `No ramps found`).
+- `save=save_via_export_button` -- the action bar's Export button calls the shared `exportToExcel()` dispatcher, which routes `Ramp_Summary` to `rs_exportToExcel()` (an `XLSX.writeFile` download of the count tables). The engine's no-download fast-fail is the empty backstop (`rs_exportToExcel` no-ops without a summary).
+- **Export-only** -- no consolidator yet (the PDF edition's consolidator already extracts the same counts); coalesces with #1 automatically (shared `data_value`).
 
 ### Report 2 -- TSAR: Ramp Detail (XLSX)
 - `label="TSAR: Ramp Detail"`, `subdir="ramp_detail"`, `filename=tsar_ramp_detail_route_<ROUTE>.xlsx`.
@@ -115,6 +214,12 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 - **Intersection Detail**: `label="Intersection Detail"`, `subdir="intersection_detail"`, `filename=intersection_detail_route_<ROUTE>.xlsx`. The action bar (Export button) renders even for an empty route, plus an empty table row `<td class="hl-empty">No results found.</td>`. `wait_js` = `EXPORT_READY_JS` or `td.hl-empty` present. `is_empty` = `page.locator("td.hl-empty").count() > 0` (structural, robust to wording drift) OR `"no results found"` in body (text fallback). The engine's general no-download fast-fail (`save_via_export_button` -> `EmptyExport`) is the marker-independent backstop.
 - **Caveat:** the site's Intersection feature is still under active development -- its empty strings / DOM are a MOVING TARGET. The fixes key on the robust structural signals (`td.hl-empty`, `Total Intersections = 0`) plus the general empty/no-download fast-fail, and must be re-verified once the feature is finalized. Do not hard-lock to `"No results found."`.
 
+### Report 5b -- Intersection Summary (PDF) (v0.25.1)
+- **Same dropdown option as #5** -- `label="Intersection Summary"` -- saved as a PDF via the page's own Print layout. Module `export_intersection_summary_pdf.py`; `subdir="intersection_summary_pdf"`; Letter, **portrait** (count tables, like the native Ramp Summary PDF). The registry's **menu label** is `"Intersection Summary (PDF)"` (display only).
+- `wait_js` / `is_empty` are identical to the Excel Intersection Summary (`.ints-total` / `Total Intersections = 0`); `is_empty` runs BEFORE save.
+- `save=save_intersection_summary_pdf` (in `exporter.py`). UNLIKE the paginated row reports, the Intersection Summary renders fully INLINE, so the site's `ints_printAll()` merely **prepends a cover page** (`.rs-cover`) to the on-screen report, calls `window.print()`, and restores in an `afterprint` listener. The save overrides `window.print` to raise (no dialog; the afterprint restore never fires), verifies the cover + `.ints-total`, re-reads the total as the marker-independent empty backstop, then `page.pdf()` captures cover + report. In `_PAGE_REBUILDING_SAVES` (the innerHTML reassignment re-creates the Export button), so a coalesced run saves the Excel edition first.
+- **Export-only** -- no consolidator/comparisons yet (the Excel edition's aggregate comparison covers the counts); coalesces with #5 automatically (shared `data_value`).
+
 ### Report 6b -- Intersection Detail (PDF)
 
 The exact parallel of Report 4b (Highway Log (PDF)), forward-ported in v0.18.0 (CR-002).
@@ -137,7 +242,7 @@ The `#customReport` dropdown is moving from flat `li.cs-option` rows (whose visi
 
 ### The picker is grouped like the website
 
-The GUI report picker mirrors the site's own grouping: **flat** Highway Log, Highway Log (PDF), Highway Sequence and Highway Sequence (PDF) at the top (the site's order), then the **Ramp** and **Intersection** families under their own headings. Order + grouping are catalog-driven, not UI-hardcoded: each `ExportEntry` carries an optional `group` + `short_label`, and `report_catalog._PICKER_ORDER` (exposed as `picker_order()`, import-asserted to cover every export key) fixes the display sequence. `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload by `PICKER_ORDER` and sets each entry's `idx` = its **display position** (no app code reads `idx` — it's parity-check metadata only), plus `group` and `short` (the short leaf label, e.g. "Detail"). `ui/app.js` emits an `.option-group` header on each group change and shows `short || label` (indented under its group). Both the Export picker and Export-Everything use the one `fillReportList()`.
+The GUI report picker mirrors the site's own grouping: **flat** Highway Log, Highway Log (PDF), Highway Sequence, Highway Sequence (PDF) and the greyed Route History Table at the top (the site's order), then the **Ramp** and **Intersection** families under their own headings. Order + grouping are catalog-driven, not UI-hardcoded: each `ExportEntry` carries an optional `group` + `short_label`, and `report_catalog._PICKER_ORDER` (exposed as `picker_order()`, import-asserted to cover every export key) fixes the display sequence. `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload by `PICKER_ORDER` and sets each entry's `idx` = its **display position** (no app code reads `idx` — it's parity-check metadata only), plus `group` and `short` (the short leaf label, e.g. "Detail"). `ui/app.js` emits an `.option-group` header on each group change and shows `short || label` (indented under its group). Both the Export picker and Export-Everything use the one `fillReportList()`.
 
 ### Highway Detail / Highway Summary — Detail FULLY INTEGRATED (v0.20.0); Summary export-only
 
@@ -228,9 +333,13 @@ the 7.8 Excel exports; every residual class explained):
   renders; Highway Sequence (PDF) graduated exactly this way in v0.25.0). The picker row
   explains what a print edition is on hover; the roadmap tracks the follow-up.
 
+### Route History Table — reserved, app-wide DISABLED (v0.25.1)
+
+The dev site added a **"Route History Table"** report on 2026-07-09 (`data_value="route_history"`, a flat top-level option). It is NOT a query report: selecting it drops into an **embedded SSRS report** (`route_history.js` iframes the TSN report server; District/County/Route/Date are picked in the SSRS parameter panel), with **no export control** — nothing for the engine to drive. The app wires it as **reserved-DISABLED groundwork** (the exact v0.18.1 Highway-pair path): `export_route_history.py` holds a minimal placeholder spec (its `save` raises loudly if ever reached), stable id **15** is reserved (`batch_manifest` appended), and `reports.DISABLED_EXPORT_SUBDIRS = {"route_history"}` shows it **greyed** in the picker while the start guards reject its key server-side. If the site later gives Route History an export flow: write the real save, empty the gate, and update `check_intersection_gate`'s `_RESERVED`.
+
 ### Coalescing both editions of a report (v0.19.2)
 
-When the user selects **both editions of one on-site report** — the Excel export and the print-layout PDF, which share a `data_value` (Highway Log, Intersection Detail, Highway Detail; Highway Sequence + Ramp Detail joined in v0.24.0) — the standard (sequential) export path generates the report **once per route** and saves both files off that single render, instead of generating it twice. `ExportWorker._run_specs` groups the selected specs by `data_value` (`_coalesce_groups`) and runs a pair through `exporter.run_export_combined`; the **Export-button save runs first** and the **DOM-rebuilding PDF Print save last** (`_PAGE_REBUILDING_SAVES` / `_save_rebuilds_page`), because `hl_printAll`/`intd_printAll`/`hd_printAll` replace `#rampResults` and would remove the Export button. Each edition keeps its own `RunResult`, staging/swap, run report, and auto-consolidation (`_prep_edition` / `_finish_edition`). **Scope:** the single-report `run_export` and the parallel engine are untouched; **fast mode** keeps each edition its own parallel pass (coalescing the parallel engine, and the console `run_cli_multi`, are follow-ups). Locked by `build/check_coalesce_editions.py`.
+When the user selects **both editions of one on-site report** — the two formats share a `data_value` (Highway Log, Intersection Detail, Highway Detail; Highway Sequence + Ramp Detail joined in v0.24.0; Ramp Summary + Intersection Summary in v0.25.1) — the standard (sequential) export path generates the report **once per route** and saves both files off that single render, instead of generating it twice. `ExportWorker._run_specs` groups the selected specs by `data_value` (`_coalesce_groups`) and runs a pair through `exporter.run_export_combined`; the **Export-button save runs first** and the **DOM-rebuilding PDF Print save last** (`_PAGE_REBUILDING_SAVES` / `_save_rebuilds_page`), because `hl_printAll`/`intd_printAll`/`hd_printAll` replace `#rampResults` and would remove the Export button. Each edition keeps its own `RunResult`, staging/swap, run report, and auto-consolidation (`_prep_edition` / `_finish_edition`). **Scope:** the single-report `run_export` and the parallel engine are untouched; **fast mode** keeps each edition its own parallel pass (coalescing the parallel engine, and the console `run_cli_multi`, are follow-ups). Locked by `build/check_coalesce_editions.py`.
 
 ## `cs-disabled` -- the site can temporarily disable a report (EXPECTED)
 
@@ -251,6 +360,93 @@ TSMIS can temporarily disable individual reports from exporting, **by design (se
 For timeouts (`REPORT_TIMEOUT_MS`, `DOWNLOAD_START_TIMEOUT_MS`, etc.) and the fast-fail classes (`EmptyExport`, `ReportError`, `ReportUnavailableError`), see [engine-and-reliability.md](engine-and-reliability.md).
 
 ---
+
+## The integration ladder — every touchpoint when a report levels up
+
+A report climbs four tiers: **export → consolidate → compare (vs TSN / env / self) →
+evidence**. Each tier below lists EVERY file/registry a change touches — the recipes
+that follow hold the per-file detail; this is the completeness checklist (the v0.17.3
+lesson: a missed special-case in one of these shipped a field crash). The proven
+sequence for a print edition is Highway Detail (v0.19.2 export → v0.20.0 full) and
+Highway Sequence (v0.24.0 export → v0.25.0 full): **ship the export first, then
+census real work-PC output before blessing any parser (Lesson 13)** — never integrate
+off synthetic renders.
+
+**Tier 0 — Export** ([recipe](#recipe-add-a-new-report-type)):
+- [ ] `scripts/export_<name>.py` (`ReportSpec`: `label`, **`data_value`** from the site
+      capture, `subdir`, `filename`, `wait_js`, `is_empty`, `save`) + `run_cli`.
+- [ ] For a **print edition**: the site's print-function name from the capture
+      (`*_printAll` or the shared `printAll()` dispatcher), a `save_*_pdf` in
+      `exporter.py` (override `window.print` to raise; fail loudly on missing
+      fn/layout), portrait/landscape matched to the TSN print, membership in
+      `_PAGE_REBUILDING_SAVES` (coalescing order), an empty-backstop row count.
+- [ ] `report_catalog.EXPORT` — **append LAST** (stable ids are append-only;
+      `batch_manifest._V017_EXPORT_ORDER == EXPORT_KEYS` must keep holding), plus
+      `_PICKER_ORDER` + optional `group`/`short_label`.
+- [ ] `3. run export...bat` + `5. fast export...bat` branches; `build/app.spec`
+      `APP_MODULES`; `scripts/ui/mock.js` report list; `output/<subdir>/.gitkeep` +
+      `.gitignore`; `build/check_report_catalog.py` frozen baseline (+
+      `check_stable_ids`).
+- [ ] Docs: the catalog table here + CLAUDE.md's table + CHANGELOG.
+
+**Tier 1 — Consolidate** ([recipe](#recipe-add-a-new-consolidator)):
+- [ ] `scripts/consolidate_<name>.py` — console-free, day-aware
+      (`consolidate(events, confirm_overwrite, day=None)` + `input_dir_for` /
+      `out_path_for`), transactional write (temp + `os.replace`, keep-last-good),
+      producer-owned completion (`outcome.py` from structured counts) + the
+      `consolidation_meta` sidecar. XLSX report → wrap `consolidate_xlsx`; PDF/print
+      → a standalone parser censused on real exports first.
+- [ ] `report_catalog.CONSOLIDATE` entry; `_AUTO_CONSOLIDATOR` **only for Excel-input
+      families** (PDF-sourced consolidators need a scratch convert dir — the matrix
+      runs them via `matrix_build._pdf_store_consolidator` instead).
+- [ ] `4. consolidate...bat` menu entry + renumber (registry-parity-checked);
+      `APP_MODULES`; mock.js `CONS_REPORTS` + consolidate radios; baselines.
+
+**Tier 2 — Compare** ([recipe](#recipe-add-a-new-comparison-type); comparisons ride
+`compare_tsn_common` over the regression-locked `compare_core` — never hand-roll):
+- [ ] **Hand-reconcile the two raw files FIRST** and lock the approved counts as
+      canaries in [tsn-parsers.md](tsn-parsers.md).
+- [ ] `report_catalog.TSN` `TsnEntry` (raw kind + lazy builder +
+      `normalization_version` — bump it on EVERY normalizer behavior change, or the
+      cached library silently bypasses the change) + the `tsn_load_*`/builder module.
+- [ ] `scripts/compare_<name>_tsn.py` (flat / aggregate / composite-key per the
+      references) and, for a PDF edition, `compare_<name>_pdf.py` with
+      `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL` flavors riding the Excel module's
+      loaders/schema.
+- [ ] `report_catalog.COMPARE` rows (`tsn` + `env`; PDF↔Excel lives under `env`);
+      `compare_env.EnvCompare` (+ `flat_pdf_loader` for a PDF edition).
+- [ ] **Matrix wiring — mirror EVERY special-case, not just labels:**
+      `matrix_state._row_modes` + `tsn_comparator_for` + `_pdf_self_comparator`;
+      `matrix_build._pdf_store_consolidator`; `day_matrix`'s pdf-format tuple;
+      `gui_worker_maint` delete lists (legacy output dirs + consolidated filenames).
+- [ ] Golden check `build/check_compare_<name>_tsn.py` wired into
+      `.github/workflows/checks.yml`; row-count pins in `check_matrix` /
+      `check_matrix_tsn` / `check_matrix_bridge` / `check_compare_env_*`; mock.js
+      matrix rows + `mockMatrixModes` + compare radios (picker-family order).
+- [ ] Docs: [comparison-engine.md](comparison-engine.md) §9 tables +
+      [tsn-parsers.md](tsn-parsers.md) schema/canaries.
+
+**Tier 3 — Evidence images** (needs a ROW-LEVEL vs-TSN comparison + a TSMIS PDF
+edition + TSN prints; → [comparison-engine.md](comparison-engine.md) §13):
+- [ ] `scripts/evidence_<name>.py` — the TSMIS locator as the word-object-keeping
+      TWIN of the consolidator's classifier (pin them identical in
+      `check_visual_evidence`), projections through the comparator's own normalizers,
+      diffs judged via `compare_core.compared_cell` (context/ditto cells can never
+      enumerate), district routing (sidecar columns, or the HL/HSL per-print SENTINEL
+      when the report carries no district).
+- [ ] `visual_evidence.py` registration: `_ADAPTER_MODULES` (BOTH rows of the family),
+      `TSMIS_PDF_SUBDIR`, `TSN_PDF_REPORT`, `_TSN_PDF_LABELS`, and `_TSN_PDFS_IN_RAW`
+      if the TSN prints ARE the library's raw inputs; else set
+      `TsnEntry.evidence_pdfs=True` so `ensure_layout` creates + hints the `pdf/`
+      drop folder.
+- [ ] `self_test._DYNAMIC_REPORT_MODULES` + `APP_MODULES` (the adapter loads
+      dynamically); `check_visual_evidence` pins (fields/maps/projection/classifier
+      fixtures); mock.js evidence block (rows, reports, `row_reports`, unsupported
+      list); e2e on real data before shipping (examples must parse-back-verify).
+
+**Every tier:** run the FULL release gate (`build/run_checks.py -j 4 -k` + byte-compile
++ ruff + `build.ps1 -SelfTest`) — a subset once shipped a field crash — and update the
+[capability matrix](#capability-matrix--what-the-app-can-do-with-each-report) above.
 
 ## Recipe: add a new report type
 

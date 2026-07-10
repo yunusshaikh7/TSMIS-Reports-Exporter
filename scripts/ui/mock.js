@@ -30,10 +30,17 @@ function makeMockApi() {
     { key: "highway_sequence", label: "Highway Sequence Listing", fmt: "Excel" },
     // v0.24.0 PDF editions (ids 11/12), next to their Excel siblings in the picker.
     { key: "highway_sequence_pdf", label: "Highway Sequence Listing (PDF)", fmt: "PDF" },
+    // v0.25.1: the dev site's embedded-SSRS Route History — reserved, app-DISABLED
+    // (shown greyed); third among the site's flat options.
+    { key: "route_history", label: "Route History Table", fmt: "SSRS", disabled: true },
     { key: "ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF", group: "Ramp", short: "Summary" },
+    // v0.25.1: Ramp Summary's Excel sibling (the site's rs_exportToExcel, id 13).
+    { key: "ramp_summary_excel", label: "TSAR: Ramp Summary (Excel)", fmt: "Excel", group: "Ramp", short: "Summary (Excel)" },
     { key: "ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel", group: "Ramp", short: "Detail" },
     { key: "ramp_detail_pdf", label: "TSAR: Ramp Detail (PDF)", fmt: "PDF", group: "Ramp", short: "Detail (PDF)" },
     { key: "intersection_summary", label: "Intersection Summary", fmt: "Excel", group: "Intersection", short: "Summary" },
+    // v0.25.1: Intersection Summary's print edition (ints_printAll, id 14).
+    { key: "intersection_summary_pdf", label: "Intersection Summary (PDF)", fmt: "PDF", group: "Intersection", short: "Summary (PDF)" },
     { key: "intersection_detail", label: "Intersection Detail", fmt: "Excel", group: "Intersection", short: "Detail" },
     { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", fmt: "PDF", group: "Intersection", short: "Detail (PDF)" },
     // The "Highway" TSAR group — export enabled v0.19.1 (Detail/Summary) + the Highway
@@ -203,7 +210,7 @@ function makeMockApi() {
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
       meta: {
-        version: "0.25.0 (preview)", build: "portable app",
+        version: "0.25.1 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
         data_root: "C:\\Tools\\TSMIS Exporter",
         output_root: "C:\\Tools\\TSMIS Exporter\\output",
@@ -648,7 +655,7 @@ function makeMockApi() {
       // P9: mirror the backend's bridge-enum surface (gui_api.get_initial_state ->
       // contract.initial_state_enums) so the preview's init payload matches production.
       contract: window.CONTRACT,
-      app_name: "TSMIS Exporter", version: "0.25.0 (preview)",
+      app_name: "TSMIS Exporter", version: "0.25.1 (preview)",
       output_root: "C:\\Tools\\TSMIS Exporter\\output",
       log_dir: "C:\\Tools\\TSMIS Exporter\\data\\logs",
       // Mirror the real gate: Intersection is enabled (dev site); the reserved Highway
@@ -1425,7 +1432,7 @@ function makeMockApi() {
         push({ t: "log", text: "An update is already downloaded — click ‘Restart to update’ in the title bar to install it." });
       } else {
         push({ t: "log", text: "Checking for updates…" });
-        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.25.0 preview)." }), 600);
+        setTimeout(() => push({ t: "log", text: "You're on the latest version (v0.25.1 preview)." }), 600);
       }
       return { ok: true };
     },

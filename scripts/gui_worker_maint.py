@@ -21,9 +21,11 @@ from paths import (DOWNLOADED_BROWSERS_DIR, FAILURES_DIR, INPUT_ROOT,
 log = logging.getLogger("tsmis.gui")
 
 # is left alone — only content this app generates is ever deleted.
-_LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_detail", "ramp_detail_pdf",
+_LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_summary_excel",
+                       "ramp_detail", "ramp_detail_pdf",
                        "highway_sequence", "highway_sequence_pdf",
                        "highway_log", "highway_log_pdf", "intersection_detail_pdf",
+                       "intersection_summary_pdf",
                        "highway_detail", "highway_detail_pdf",
                        "consolidated", "tsn_highway_log", "tsmis_highway_log_pdf",
                        "tsmis_intersection_detail_pdf", "tsmis_highway_detail_pdf",
