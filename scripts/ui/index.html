@@ -58,6 +58,7 @@
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
   <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
 </svg>
 
 <div class="app">
@@ -437,8 +438,9 @@
       <!-- Compare pane. Sub-tabs generated from compare_groups — "Cross-environment"
            (every report's between-environments compare) and "vs TSN" (the file-based
            TSMIS-vs-TSN compares, all reports as of v0.17.0) — plus the appended
-           "vs TSN Matrix" (the manual day-picking matrix). The classic picker lives
-           in #compareClassic, the matrix in #dayMatrixSection. -->
+           "vs TSN Matrix" (the manual day-picking matrix) and "vs Baseline Matrix"
+           (day-vs-baseline, v0.26.0). The classic picker lives in #compareClassic,
+           the matrices in #dayMatrixSection / #baselineMatrixSection. -->
       <div class="card pane hidden mx-host" id="paneCompare">
         <div class="subtabs" id="compareSubtabs" role="tablist"></div>
         <div id="compareClassic">
@@ -598,6 +600,53 @@
               <svg class="ic"><use href="#i-x"/></svg>Cancel
             </button>
           </div>
+        </div><!-- /dayMatrixSection -->
+
+        <!-- vs Baseline Matrix: a manual day-picking matrix (rows = reports,
+             columns = exported days; each cell = that day's export vs a BASELINE
+             copy of the SAME report — an earlier day's run folder, or the
+             Export-Everything store, same source). Shown only on the
+             "vs Baseline Matrix" sub-tab. Same format on both sides by
+             construction; no TSN dataset, no consolidation, no live re-export. -->
+        <div id="baselineMatrixSection" class="hidden mx-pane">
+          <div class="card-section mx-gridsection">
+            <div class="section-head">
+              <span class="section-label">Reports vs a baseline — by export day</span>
+              <span class="section-meta">
+                Source
+                <span class="tb-select select-light"><select id="baselineMatrixSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+                Baseline
+                <span class="tb-select select-light"><select id="baselineMatrixBaseline"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+                <span class="hint" id="baselineMatrixProgress" hidden></span>
+              </span>
+            </div>
+            <div class="matrix-legend">
+              <span class="mx-key mx-match">identical</span>
+              <span class="mx-key mx-diff-lo">few diffs</span>
+              <span class="mx-key mx-diff-hi">many diffs</span>
+              <span class="mx-key mx-partial">partial inputs</span>
+              <span class="mx-key mx-stale">stale</span>
+              <span class="mx-key mx-missing">needs export</span>
+              <span class="mx-key mx-na">not available</span>
+            </div>
+            <div class="matrix-wrap"><div class="matrix-grid" id="baselineMatrixGrid"></div></div>
+          </div>
+
+          <div class="card-section actions-row">
+            <button class="btn btn-subtle btn-small" id="btnBaselineBuildAll">
+              <svg class="ic"><use href="#i-layers"/></svg>Build all
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnBaselineRebuildAll">
+              <svg class="ic"><use href="#i-refresh"/></svg>Rebuild stale
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnOpenBaselineComparisons">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open comparisons folder
+            </button>
+            <span class="spacer"></span>
+            <button class="btn btn-subtle btn-small hidden" id="btnBaselineCancel">
+              <svg class="ic"><use href="#i-x"/></svg>Cancel
+            </button>
+          </div>
         </div>
       </div>
 
@@ -655,6 +704,10 @@
             </button>
             <button class="btn btn-standard" id="btnSupportBundle" data-lock-when-busy>
               <svg class="ic"><use href="#i-package"/></svg>Save support bundle…
+            </button>
+            <button class="btn btn-standard" id="btnSiteCapture" data-lock-when-busy
+                    title="Sign in and save the current site's report page + its scripts/styles into a dated folder — the source snapshot a maintainer asks for after a site change">
+              <svg class="ic"><use href="#i-globe"/></svg>Capture website source
             </button>
             <button class="btn btn-standard" id="btnOpenFailures">
               <svg class="ic"><use href="#i-folder-open"/></svg>Failure screenshots
@@ -1032,6 +1085,57 @@
         <div class="mc-group">
           <div class="mc-label">Reports</div>
           <div class="mx-toggles" id="dayMatrixReportToggles"></div>
+        </div>
+      </div>
+
+      <!-- vs-Baseline matrix config zone: same corner pattern, shown on the
+           "vs Baseline Matrix" sub-tab (body.matrix-wide.mw-bl). Compare-only,
+           so no export-speed / TSN / evidence groups — just the shared job
+           queue, day columns, the live-formulas option (its OWN setting), and
+           the report show/hide toggles. -->
+      <div class="card matrix-config" id="baselineMatrixConfig">
+        <div class="mc-head"><svg class="ic"><use href="#i-grid"/></svg>Matrix options</div>
+
+        <div class="mc-group mx-queue-group" id="baselineQueueGroup" hidden>
+          <div class="mc-label">Queue <span class="mx-queue-count" id="baselineQueueCount"></span></div>
+          <div class="mx-queue" id="baselineQueue"></div>
+          <div class="mx-queue-actions">
+            <button class="btn btn-subtle btn-small" id="btnBaselineQueueClear">
+              <svg class="ic"><use href="#i-trash"/></svg>Clear queued
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnBaselineQueueStopAll">
+              <svg class="ic"><use href="#i-x"/></svg>Stop all
+            </button>
+          </div>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Day columns</div>
+          <div class="dm-toolbar">
+            <span class="tb-select select-light"><select id="baselineMatrixAddDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+            <button class="btn btn-standard btn-small" id="btnBaselineAddDay">
+              <svg class="ic"><use href="#i-check"/></svg>Add day
+            </button>
+          </div>
+          <p class="hint" style="margin:6px 0 0">Add exported days as columns, then pick
+            the <b>Baseline</b> above — an earlier day, or the All&nbsp;Reports store.
+            Each cell diffs that day's export against the baseline's copy of the
+            same report (Excel vs Excel, PDF vs PDF).</p>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Comparison output</div>
+          <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
+            <input type="checkbox" id="baselineMatrixFormulas">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-file-text"/></svg>
+            <span>Also write a live-formulas copy</span>
+          </label>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Reports</div>
+          <div class="mx-toggles" id="baselineMatrixReportToggles"></div>
         </div>
       </div>
     </section>

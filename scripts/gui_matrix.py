@@ -12,14 +12,16 @@ import collections
 import logging
 import webview
 
+import baseline_matrix
 import day_matrix
 import matrix
 import settings
 from exporter_parallel import MAX_WORKERS, default_worker_count
 from gui_endpoint import _api_method, pick_path, pick_paths
-from gui_worker import (ConsolidateWorker, DayMatrixCompareWorker,
-                        MatrixBatchExportWorker, MatrixCompareWorker,
-                        MatrixEvidenceWorker, MatrixTsnConsolidateWorker)
+from gui_worker import (BaselineMatrixCompareWorker, ConsolidateWorker,
+                        DayMatrixCompareWorker, MatrixBatchExportWorker,
+                        MatrixCompareWorker, MatrixEvidenceWorker,
+                        MatrixTsnConsolidateWorker)
 from paths import TSN_LIBRARY_ROOT
 from reports import EXPORT_REPORTS, matrix_rows
 
@@ -257,9 +259,49 @@ class GuiMatrixMixin:
         return day_matrix.cells_to_rebuild(snap, scope=rebuild_scope,
                                            row=job.get("row"), date=job.get("env"))
 
+    def _resolve_baseline_cells(self, job):
+        """[(date, row)] for a vs-Baseline compare job. 'cell' = the one explicit
+        cell; row/column/all/stale defer to baseline_matrix's staleness-aware list."""
+        snap = self._baseline_matrix_snapshot()
+        scope = job["scope"]
+        if scope == "cell":
+            row, date = job["row"], job["env"]
+            if not snap.get("row_supported", {}).get(row) or date not in snap["days"]:
+                return []
+            return [(date, row)]
+        rebuild_scope = "stale" if scope == "stale" else "all"
+        return baseline_matrix.cells_to_rebuild(snap, scope=rebuild_scope,
+                                                row=job.get("row"), date=job.get("env"))
+
+    def _dispatch_baseline_compare_job(self, job):
+        source = settings.get_baseline_matrix_source()
+        baseline_id = settings.get_baseline_matrix_baseline()
+        if not baseline_matrix.parse_baseline(baseline_id):
+            self._emit_log("Pick a baseline first — the vs-Baseline matrix has "
+                           "nothing to compare against.")
+            return False
+        cells = self._resolve_baseline_cells(job)
+        if not cells:
+            return False
+        with self._lock:
+            self._matrix = {"phase": "comparing", "row": job.get("row"),
+                            "cell": job.get("env"), "done": 0, "total": len(cells)}
+        self._emit_log(f"{job['label']} — {len(cells)} comparison(s) vs "
+                       f"{baseline_matrix.baseline_label(source, baseline_id)}…")
+        self._set_dot("busy", "Comparing…")
+        self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
+                    "workers": 1})
+        BaselineMatrixCompareWorker(
+            source, cells, baseline_id, settings.get_batch_dest(),
+            self._gated_queue(), self.cancel_event,
+            also_formulas=settings.get_baseline_matrix_formulas()).start()
+        return True
+
     def _dispatch_compare_job(self, job):
         if job.get("which") == "day":
             return self._dispatch_day_compare_job(job)
+        if job.get("which") == "baseline":
+            return self._dispatch_baseline_compare_job(job)
         base = self._current_baseline()
         dest = settings.get_batch_dest()
         cells = self._resolve_compare_cells(job, base)
@@ -1136,6 +1178,196 @@ class GuiMatrixMixin:
         import tsn_library                              # lazy import (tsn_library pulls pdfplumber via report_catalog)
         root = tsn_library.ensure_layout()
         self._open_folder(root)
+        return {"ok": True}
+
+    # ----- Compare-tab "vs Baseline" matrix -----------------------------------
+    def _baseline_matrix_snapshot(self):
+        """The vs-Baseline snapshot with the user's source / day columns /
+        baseline / hidden rows applied (dest = the Everything matrix's
+        batch_dest — the "store" baseline lives under it)."""
+        return baseline_matrix.baseline_matrix_snapshot(
+            settings.get_baseline_matrix_source(),
+            settings.get_baseline_matrix_days(),
+            settings.get_baseline_matrix_baseline() or None,
+            hidden=settings.get_baseline_matrix_hidden(),
+            dest=settings.get_batch_dest(),
+            row_order=settings.get_baseline_matrix_row_order())
+
+    def _baseline_job_label(self, scope, row=None, date=None):
+        rl = self._matrix_row_label(row) if row else None
+        if scope == "cell":
+            return f"Rebuild {rl} — {date} vs baseline"
+        if scope == "row":
+            return f"Rebuild {rl} — all days vs baseline"
+        if scope == "column":
+            return f"Rebuild all reports — {date} vs baseline"
+        if scope == "stale":
+            return "Refresh stale vs-baseline comparisons"
+        return "Rebuild all vs-baseline comparisons"
+
+    @_api_method
+    def baseline_matrix_info(self):
+        """The vs-Baseline matrix snapshot for the Compare tab — a pure
+        filesystem read plus the add-day picker's available days and the
+        baseline picker's options (store + exported days, each with how many
+        reports it covers)."""
+        snap = self._baseline_matrix_snapshot()
+        snap["available_days"] = baseline_matrix.available_days(snap["source"])
+        snap["baseline_options"] = baseline_matrix.baseline_options(
+            snap["source"], settings.get_batch_dest())
+        self._push_state()
+        return snap
+
+    @_api_method
+    def set_baseline_matrix_source(self, source):
+        """Set the vs-Baseline matrix data source (both sides live within it)."""
+        if source not in baseline_matrix.sources():
+            return {"error": "Unknown data source."}
+        settings.set_baseline_matrix_source(source)
+        self._emit_log("vs-Baseline matrix source set to "
+                       f"{matrix.default_env_label(source)}.")
+        self._push_state()
+        return {"ok": True, "source": source}
+
+    @_api_method
+    def set_baseline_matrix_baseline(self, baseline_id):
+        """Persist the picked baseline ("store" / "day:<date>"; empty clears).
+        Validated against the current picker options so a stale/typo id can't
+        aim a comparison at a non-existent folder."""
+        baseline_id = (baseline_id or "").strip()
+        if baseline_id:
+            source = settings.get_baseline_matrix_source()
+            valid = {o["id"] for o in baseline_matrix.baseline_options(
+                source, settings.get_batch_dest())}
+            if baseline_id not in valid:
+                return {"error": "That baseline has no exports for this source."}
+        settings.set_baseline_matrix_baseline(baseline_id)
+        if baseline_id:
+            self._emit_log("vs-Baseline matrix baseline set to "
+                           f"{baseline_matrix.baseline_label(settings.get_baseline_matrix_source(), baseline_id)}.")
+        self._push_state()
+        return {"ok": True, "baseline": baseline_id}
+
+    @_api_method
+    def add_baseline_matrix_day(self, date):
+        """Add a day COLUMN: a date with an export for the source."""
+        if date not in baseline_matrix.available_days(
+                settings.get_baseline_matrix_source()):
+            return {"error": "That day has no export for this source (only "
+                             "exported days can be added)."}
+        days = settings.get_baseline_matrix_days()
+        if date not in days:
+            settings.set_baseline_matrix_days(days + [date])
+        self._push_state()
+        return {"ok": True, "days": settings.get_baseline_matrix_days()}
+
+    @_api_method
+    def remove_baseline_matrix_day(self, date):
+        """Remove a day column."""
+        settings.set_baseline_matrix_days(
+            [d for d in settings.get_baseline_matrix_days() if d != date])
+        self._push_state()
+        return {"ok": True, "days": settings.get_baseline_matrix_days()}
+
+    @_api_method
+    def set_baseline_matrix_report(self, row_key, visible):
+        """Show/hide a report ROW on the vs-Baseline matrix. At least one stays on."""
+        keys = {r["key"] for r in self._baseline_matrix_snapshot()["all_rows"]}
+        if row_key not in keys:
+            return {"error": "Unknown report for the matrix."}
+        hidden = set(settings.get_baseline_matrix_hidden())
+        if visible:
+            hidden.discard(row_key)
+        else:
+            hidden.add(row_key)
+        if len(hidden & keys) >= len(keys):
+            return {"error": "Keep at least one report on the matrix."}
+        settings.set_baseline_matrix_hidden(sorted(hidden))
+        self._push_state()
+        return {"ok": True, "hidden": sorted(hidden)}
+
+    @_api_method
+    def set_baseline_matrix_row_order(self, keys):
+        """Persist the drag-to-reorder ROW order for the vs-Baseline matrix."""
+        valid = {r["key"] for r in self._baseline_matrix_snapshot()["all_rows"]}
+        clean = [k for k in (keys or []) if isinstance(k, str) and k in valid]
+        settings.set_baseline_matrix_row_order(clean)
+        self._push_state()
+        return {"ok": True, "order": clean}
+
+    @_api_method
+    def set_baseline_matrix_formulas(self, on):
+        """Toggle the vs-Baseline matrix's OWN live-formulas option (persisted,
+        independent of the other matrices')."""
+        val = settings.set_baseline_matrix_formulas(bool(on))
+        self._emit_log("vs-Baseline live-formulas workbook " + ("on" if val else "off")
+                       + (" — each comparison also writes a '… (formulas).xlsx'."
+                          if val else "."))
+        self._push_state()
+        return {"ok": True, "on": val}
+
+    @_api_method
+    def build_baseline_matrix_cell(self, row_key, date):
+        """Queue a (re)build of ONE (report, day) vs-baseline comparison."""
+        snap = self._baseline_matrix_snapshot()
+        if row_key not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report for the matrix."}
+        if not snap.get("row_supported", {}).get(row_key):
+            return {"error": "That comparison isn't available yet for this report."}
+        if date not in snap["days"]:
+            return {"error": "Add that day first."}
+        if not snap["baseline"]["id"]:
+            return {"error": "Pick a baseline first."}
+        if snap["baseline"]["date"] == date:
+            return {"error": "That day IS the baseline — nothing to compare."}
+        job = self._make_job("compare", "cell",
+                             self._baseline_job_label("cell", row_key, date),
+                             row=row_key, env=date, which="baseline")
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def rebuild_baseline_matrix(self, scope="stale", row=None, date=None):
+        """Queue a vs-Baseline comparison rebuild in scope ('stale'/'all'),
+        optionally scoped to one report row or one day column. {nothing:True}
+        only when idle and there's nothing to do."""
+        snap = self._baseline_matrix_snapshot()
+        if not snap["baseline"]["id"]:
+            return {"error": "Pick a baseline first."}
+        scope = scope if scope in ("stale", "all") else "stale"
+        row = row if (row and row in {r["key"] for r in snap["all_rows"]}) else None
+        date = date if (date and date in snap["days"]) else None
+        job_scope = "row" if row else "column" if date else scope
+        with self._lock:
+            idle = not self._task and not self._queue
+        if idle:
+            cells = baseline_matrix.cells_to_rebuild(snap, scope=scope,
+                                                     row=row, date=date)
+            if not cells:
+                return {"ok": True, "nothing": True}
+        job = self._make_job("compare", job_scope,
+                             self._baseline_job_label(job_scope, row, date),
+                             row=row, env=date, which="baseline")
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def open_baseline_cell_comparison(self, row_key, date):
+        """Open ONE vs-Baseline comparison VALUES workbook."""
+        snap = self._baseline_matrix_snapshot()
+        if date not in snap["days"] or row_key not in snap["rows"]:
+            return {"error": "Unknown cell."}
+        baseline_id = snap["baseline"]["id"]
+        if not baseline_id:
+            return {"error": "Pick a baseline first."}
+        path = baseline_matrix.out_path(date, snap["source"], row_key, baseline_id)
+        if not path.exists():
+            return {"error": "No comparison built yet — use “⟳ rebuild” first."}
+        self._open_file(path)
+        return {"ok": True}
+
+    @_api_method
+    def open_baseline_comparisons_folder(self):
+        """Open the vs-Baseline comparison store (output/comparisons/baseline-by-day/)."""
+        self._open_folder(baseline_matrix.byday_root())
         return {"ok": True}
 
     def _on_matrix_cell(self, payload):

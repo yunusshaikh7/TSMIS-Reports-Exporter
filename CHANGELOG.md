@@ -3,6 +3,80 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.26.0 — 2026-07-10
+
+Ramp Detail (PDF) — the last export-only print edition — is now fully integrated:
+it consolidates, compares against TSN and against its own Excel edition, lives in
+both matrices, and renders evidence images. Blessed on the first real work-PC print
+set (`All Reports 7.9`, 126 routes): every one of its 15,216 rows parses back
+row-for-row against the same-day Excel exports. This release also adds a third
+comparison matrix — **vs Baseline** — that diffs any exported day of a report
+against an earlier pull of the same report, and fixes the evidence images'
+cropped snippets.
+
+- **New: the "vs Baseline Matrix"** (Compare tab, beside the vs TSN Matrix). Rows =
+  all 12 comparison-integrated reports, columns = exported days you add, each cell =
+  that day's export compared against a **baseline** you pick — an earlier day's run
+  folder, or the Export-Everything store — for the same source. Same format on both
+  sides by construction (Excel vs Excel, PDF vs PDF: each row reads its own report
+  subdir on both sides). The baseline picker shows how many reports each candidate
+  day holds ("2026-06-11 · 9/12 reports"), missing copies render per cell, and the
+  baseline's own column is marked. No consolidation and no TSN dataset needed — the
+  per-route files are read straight from both folders, exactly like the classic
+  cross-environment compare, and each cell writes the same discrepancy workbook
+  (optionally with a live-formulas copy) into
+  `output/comparisons/baseline-by-day/`. Switching baselines never clobbers another
+  baseline's comparisons — each is its own artifact.
+- **Evidence images no longer crop the interesting part.** Each snippet is now a
+  full-width band of the page instead of a crop hugged to the record's own text —
+  previously a difference on a BLANK cell could have its red box clipped off the
+  image's edge (Highway Sequence showed it most), and neighbor rows' longer text
+  was cut mid-word. Verified on 99 regenerated examples across Highway Sequence and
+  Ramp Detail, both layouts; all five evidence reports inherit the fix.
+- **New: one-click website source capture** (Settings ▸ "Capture website source").
+  Signs in with the saved session, opens the current site's report page, and saves
+  the rendered page, the raw HTML, and every same-origin script/stylesheet into a
+  dated folder under `output/site-capture/` with a manifest — the manual
+  devtools ▸ Sources download walk, automated. The capture is local diagnostic
+  data for the maintainer; the app never bundles or uploads it.
+- **Highway Detail (PDF) parses the July-2026 prints completely.** On the first
+  real prod print set, three record shapes the parser had never seen dropped 254
+  records as "unpaired lines" (the consolidation went partial): rows whose roadbed
+  blocks carry codes but no effective dates, rows whose printed date lands across
+  a shifted column grid, and outdented equate descriptions that START with a
+  postmile-shaped token (each previously orphaned the real record and minted a
+  phantom one). All three parse now and a record that genuinely prints no
+  attribute line would be kept with blank attribute columns instead of dropped.
+  Re-verified statewide on the same 252-print set: the consolidation completes
+  cleanly (0 unpaired lines, was 254 + partial), 50,171 of 50,730 matched rows
+  fully identical to the same-day Excel export, and the leftover one-sided rows
+  fell from an unattributable 1,273 to 1,019 — nearly all the new sparse
+  attribute-only rows at repeated postmiles, where the two renders' duplicate-row
+  pairing differs; each is listed on the workbook's "Only in …" sheets.
+
+- **TSMIS Ramp Detail (PDF) consolidator.** Parses the per-route prints into the
+  Excel export's exact column layout — plus the two columns the print carries that
+  the **Excel export drops**: the On/Off indicator and the Ramp Type letter. The
+  print also renders empty fields visibly ("-" marks and a "NO RAMP LINEAR EVENT"
+  message on the 59 statewide ramp points without linework) where the Excel leaves
+  blanks; values are kept verbatim in the workbook and projected at compare time.
+- **Two new comparison flavors.** TSMIS (PDF) vs TSN — where On/Off and Ramp Type
+  are actually COMPARED against TSN's database (the Excel edition has nothing to
+  compare there; ~151 more verified cells statewide) — and TSMIS (PDF) vs TSMIS
+  (Excel), the internal consistency check: on the same-day statewide pair,
+  **15,212 of 15,216 ramps fully identical, zero one-sided** — the only 4
+  differing cells are literal "_x000d_" line-break escapes the Excel carries and
+  the print omits.
+- **Evidence images for both Ramp Detail rows.** The statewide TSN Ramp Detail
+  print (500 pages) is indexed once and each differing cell renders as highlighted
+  snippets from both prints, parse-back-verified (the TSN template censused
+  400/400 records against the raw extract). The TSN Ramp Detail library gains
+  District/County evidence columns (normalization v3 — rebuilds itself on next
+  use).
+- Matrix rows in BOTH matrices (cross-env / vs TSN / vs TSMIS Excel), the
+  Consolidate-tab + console-menu entries, and the picker/coalescing behavior
+  carried over unchanged.
+
 ## v0.25.2 — 2026-07-09
 
 Hotfix for a field crash: exporting both editions of a report together (outside fast

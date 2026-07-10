@@ -135,10 +135,12 @@ See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for
 PDF parsers.
 
 **`COMPARE_GROUPS`** — the Compare-pane sub-tabs, in order (first = default). As of
-v0.16.1: `("env", "Cross-environment")` and `("tsn", "vs TSN")` (the GUI appends a
-third, the "vs TSN Matrix"). Cross-env compares sit in `env`; the file-based
-TSMIS-vs-TSN compares sit in `tsn`; the two PDF-vs-Excel self-checks (one system, one
-environment) sit in `env`, not `tsn`. Every report is wired as of v0.17.0/v0.18.0.
+v0.16.1: `("env", "Cross-environment")` and `("tsn", "vs TSN")` (the GUI appends two
+more — the "vs TSN Matrix", and since v0.26.0 the "vs Baseline Matrix", the day-vs-
+baseline matrix over `baseline_matrix.py`). Cross-env compares sit in `env`; the
+file-based TSMIS-vs-TSN compares sit in `tsn`; the two PDF-vs-Excel self-checks (one
+system, one environment) sit in `env`, not `tsn`. Every report is wired as of
+v0.17.0/v0.18.0.
 
 **`COMPARE_REPORTS`** — `(menu label, module/adapter, input kind, group)`. `kind` is
 `"files"` (two workbooks) or `"folders"` (two export run folders); `group` is one of

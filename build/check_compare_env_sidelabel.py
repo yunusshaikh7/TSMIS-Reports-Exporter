@@ -70,9 +70,37 @@ def test_side_labels_integration():
         check(f"'{lbl}' fits the sheet-name cap", len(lbl) <= limit)
 
 
+def test_labels_override():
+    print("compare_folders labels override (v0.26.0, the baseline matrix):")
+    # Functional: the override must reach the side machinery (labels=None keeps
+    # the derived behavior the tests above lock). Two EMPTY folders make the
+    # loader fail fast with a message that NAMES the side label — proving the
+    # explicit labels (and the identical-override (A)/(B) fallback) apply.
+    import shutil
+    import tempfile
+    a = Path(tempfile.mkdtemp(prefix="tsmis_lbl_a_"))
+    b = Path(tempfile.mkdtemp(prefix="tsmis_lbl_b_"))
+    try:
+        res = compare_env.RAMP_DETAIL.compare_folders(
+            a, b, a / "out.xlsx", labels=("MY DAY LABEL", "MY BASELINE"))
+        check("explicit labels reach the side loader (error names them)",
+              res.status == "error" and "MY DAY LABEL" in (res.message or ""))
+        res2 = compare_env.RAMP_DETAIL.compare_folders(
+            a, b, a / "out.xlsx", labels=("SAME", "SAME"))
+        check("identical overrides degrade to (A)/(B)",
+              res2.status == "error" and "SAME (A)" in (res2.message or ""))
+        res3 = compare_env.RAMP_DETAIL.compare_folders(a, b, a / "out.xlsx")
+        check("default (no labels) keeps the derived side names",
+              res3.status == "error" and "MY DAY LABEL" not in (res3.message or ""))
+    finally:
+        shutil.rmtree(a, ignore_errors=True)
+        shutil.rmtree(b, ignore_errors=True)
+
+
 def main():
     test_cap_label()
     test_side_labels_integration()
+    test_labels_override()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

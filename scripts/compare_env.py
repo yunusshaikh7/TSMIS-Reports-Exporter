@@ -457,6 +457,39 @@ def _load_highway_sequence_pdf_side(folder, label, events):
         shutil.rmtree(combined_dir, ignore_errors=True)
 
 
+def _load_ramp_detail_pdf_side(folder, label, events):
+    """Parse one side's Ramp Detail PDFs (folder/ramp_detail_pdf/*.pdf) into
+    consolidated-shape rows: convert them to per-route XLSX with the RD-PDF
+    consolidator's own parser in a temp dir, then read those flat like any XLSX
+    side. Returns (rows, header, skipped). The exact parallel of
+    _load_highway_sequence_pdf_side above; no expected_header pin — the
+    converted files carry the Excel export's own (column-shifted) header plus
+    the two print-only columns, identical on BOTH sides of a PDF-vs-PDF pair."""
+    import consolidate_tsmis_ramp_detail_pdf as _rdpdf
+    in_dir, pdfs = _find_input_dir(folder, _rdpdf.SUBDIR, "*.pdf")
+    if not pdfs:
+        raise ValueError(
+            f"No Ramp Detail (PDF) files were found for the {label} side:\n{in_dir}"
+            "\n\nExport the TSAR: Ramp Detail (PDF) report on that environment first.")
+    conv = Path(tempfile.mkdtemp(prefix="rdpdf_env_conv_"))
+    combined_dir = Path(tempfile.mkdtemp(prefix="rdpdf_env_out_"))
+    try:
+        res = _rdpdf.consolidate(events=events, confirm_overwrite=lambda _p: True,
+                                 input_dir=in_dir, out_path=combined_dir / "_combined.xlsx",
+                                 converted_dir=conv)
+        if res.status == "cancelled":
+            raise ValueError("Cancelled by user.")
+        if res.status != "ok":
+            raise ValueError(res.message or "Could not parse the Ramp Detail PDFs.")
+        # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
+        # excluded). Read them flat like the Excel per-route files.
+        return _load_xlsx_side(conv, label, "_perroute_", _rdpdf.SHEET_NAME,
+                               "Ramp Detail (PDF)", events)
+    finally:
+        shutil.rmtree(conv, ignore_errors=True)
+        shutil.rmtree(combined_dir, ignore_errors=True)
+
+
 # ---------------------------------------------------------------------------
 # Per-report adapters
 # ---------------------------------------------------------------------------
@@ -544,10 +577,14 @@ class EnvCompare:
                        one_sided_note_extra="", trim_note_extra="")
 
     def compare_folders(self, dir_a, dir_b, out_path, events=None,
-                        confirm_overwrite=None, mode="formulas"):
+                        confirm_overwrite=None, mode="formulas", labels=None):
         """Compare the report's per-route files in run folder `dir_a` against
         `dir_b` and write the discrepancy workbook(s) to `out_path`. Returns
-        a ConsolidateResult (same contract as the consolidators)."""
+        a ConsolidateResult (same contract as the consolidators). `labels`
+        overrides the two derived side names (still capped + kept distinct) —
+        the baseline matrix passes explicit ones because the Everything store's
+        folder shape ("All Reports (current)/<src-env>") derives a side label
+        confusingly close to the run-folder one."""
         events = events or Events()
         if not _XLSX_OK:
             return ConsolidateResult(
@@ -569,7 +606,12 @@ class EnvCompare:
                 status="error",
                 message="Pick two DIFFERENT folders — both sides point at "
                         f"the same one:\n{dir_a}")
-        la, lb = _side_labels(dir_a, dir_b)
+        if labels is not None:
+            la, lb = _cap_label(str(labels[0])), _cap_label(str(labels[1]))
+            if la == lb:                     # sheet names must differ
+                la, lb = _cap_label(f"{la} (A)"), _cap_label(f"{lb} (B)")
+        else:
+            la, lb = _side_labels(dir_a, dir_b)
 
         events.on_log("=" * 60)
         events.on_log(f"{self.REPORT_NAME} Comparison — {la} vs {lb}")
@@ -722,6 +764,15 @@ HIGHWAY_SEQUENCE_PDF = EnvCompare(
     "highway_sequence_pdf", "Highway Sequence (PDF)", "highway_sequence_pdf",
     sheet_name="Highway Locations", key_col="PM",
     flat_pdf_loader=_load_highway_sequence_pdf_side)
+# Ramp Detail (PDF) cross-env: the same flat per-route shape as the Excel
+# RAMP_DETAIL row (sheet "TSAR - Ramp Detail", keyed on PM) plus the two
+# print-only columns (identical on both sides of a PDF-vs-PDF pair), but BOTH
+# sides are parsed from the app's own PDF export — the exact parallel of
+# HIGHWAY_SEQUENCE_PDF above.
+RAMP_DETAIL_PDF = EnvCompare(
+    "ramp_detail_pdf", "Ramp Detail (PDF)", "ramp_detail_pdf",
+    sheet_name="TSAR - Ramp Detail", key_col="PM",
+    flat_pdf_loader=_load_ramp_detail_pdf_side)
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).

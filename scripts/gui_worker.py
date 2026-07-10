@@ -67,7 +67,8 @@ from gui_worker_env import (ActiveEnvCheckWorker, EnvCheckWorker,              #
 from gui_worker_maint import (CheckWorker, ChromiumWorker, ResetWorker,        # noqa: F401
                               UpdateWorker, ValidationWorker,
                               measure_targets, reset_targets)
-from gui_worker_matrix import (DayMatrixCompareWorker, MatrixBatchExportWorker,  # noqa: F401
+from gui_worker_matrix import (BaselineMatrixCompareWorker,                    # noqa: F401
+                               DayMatrixCompareWorker, MatrixBatchExportWorker,
                                MatrixCompareWorker, MatrixEvidenceWorker,
                                MatrixTsnConsolidateWorker,
                                _run_matrix_export_step)
@@ -75,6 +76,7 @@ from gui_worker_matrix import (DayMatrixCompareWorker, MatrixBatchExportWorker, 
 # Collaborators historically reachable AS gui_worker attributes (the checks and
 # older callers read them here); the workers themselves use their own module's
 # bindings — patch the OWNING module to stub a worker's collaborator.
+import baseline_matrix  # noqa: F401
 import batch_manifest  # noqa: F401
 import day_matrix      # noqa: F401
 import matrix          # noqa: F401

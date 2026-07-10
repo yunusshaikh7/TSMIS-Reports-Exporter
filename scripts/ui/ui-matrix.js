@@ -1152,3 +1152,278 @@ function updateDayMatrixProgress() {
   syncDayMatrixEvidence();
   syncDayMatrixFast();
 }
+
+// ---- Compare-tab "vs Baseline" matrix --------------------------------------
+// A manual day-picking matrix: rows = report types, columns = exported days the
+// user adds, each cell = that day's export vs the picked BASELINE copy of the
+// same report (an earlier day's run folder, or the Everything store — same
+// source, same format). Reuses the matrix cell vocab (mxCellContent / mxActBtn
+// / mxHeadBtn) + the shared queue panel; compare-only — no TSN dataset, no
+// live re-export, no evidence.
+let _blRenderSeq = 0;
+
+function syncBaselineMatrixFormulas() {
+  syncFormulasToggle("baselineMatrixFormulas", "baseline_matrix_formulas");
+}
+
+async function renderBaselineMatrix() {
+  const grid = $("baselineMatrixGrid");
+  if (!grid) return;
+  const seq = ++_blRenderSeq;
+  let snap;
+  try { snap = await api.baseline_matrix_info(); } catch (e) { return; }
+  if (seq !== _blRenderSeq) return;       // a newer render started; drop this one
+  if (!snap) return;
+  const days = snap.days || [], locked = !!(S.st && S.st.task);
+  const bl = snap.baseline || {};
+
+  const srcSel = $("baselineMatrixSource");
+  if (srcSel) {
+    srcSel.textContent = "";
+    (snap.sources || []).forEach((s) => {
+      const o = document.createElement("option");
+      o.value = s.key; o.textContent = s.label;
+      if (s.key === snap.source) o.selected = true;
+      srcSel.appendChild(o);
+    });
+    srcSel.disabled = locked;
+    srcSel.onchange = async () => {
+      const r = await api.set_baseline_matrix_source(srcSel.value);
+      if (r && r.error) showMessage("error", "Can't set source", r.error);
+      await renderBaselineMatrix();
+    };
+  }
+
+  // The baseline picker: the Everything store + every exported day, each with
+  // how many of the matrix reports it covers — the "which days have an old
+  // copy" answer, per option; the grid's cells answer it per report.
+  const blSel = $("baselineMatrixBaseline");
+  if (blSel) {
+    blSel.textContent = "";
+    const opts = snap.baseline_options || [];
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = opts.length ? "— pick a baseline —" : "— no exported days yet —";
+    blSel.appendChild(none);
+    opts.forEach((o) => {
+      const el = document.createElement("option");
+      el.value = o.id;
+      el.textContent = `${o.label}  (${o.present}/${o.total} reports)`;
+      if (o.id === bl.id) el.selected = true;
+      blSel.appendChild(el);
+    });
+    blSel.disabled = locked || !opts.length;
+    blSel.onchange = async () => {
+      const r = await api.set_baseline_matrix_baseline(blSel.value);
+      if (r && r.error) showMessage("error", "Can't set baseline", r.error);
+      await renderBaselineMatrix();
+    };
+  }
+
+  const addSel = $("baselineMatrixAddDay"), addBtn = $("btnBaselineAddDay");
+  const avail = (snap.available_days || []).filter((d) => !days.includes(d));
+  if (addSel) {
+    addSel.textContent = "";
+    if (!avail.length) {
+      const o = document.createElement("option");
+      o.value = ""; o.textContent = days.length ? "— no more exported days —" : "— no exported days —";
+      addSel.appendChild(o);
+    } else {
+      avail.forEach((d) => {
+        const o = document.createElement("option"); o.value = d; o.textContent = d;
+        addSel.appendChild(o);
+      });
+    }
+    addSel.disabled = locked || !avail.length;
+  }
+  if (addBtn) {
+    addBtn.disabled = locked || !avail.length;
+    addBtn.onclick = async () => {
+      const d = $("baselineMatrixAddDay").value;
+      if (!d) return;
+      const r = await api.add_baseline_matrix_day(d);
+      if (r && r.error) showMessage("error", "Can't add day", r.error);
+      await renderBaselineMatrix();
+    };
+  }
+
+  const rtog = $("baselineMatrixReportToggles");
+  if (rtog) {
+    rtog.textContent = "";
+    const hidden = new Set(snap.hidden || []);
+    (snap.all_rows || []).forEach((r) => {
+      const isOn = !hidden.has(r.key);
+      const b = document.createElement("button");
+      b.className = "mx-toggle" + (isOn ? " on" : "");
+      b.textContent = r.label + (r.supported ? "" : " (soon)");
+      b.disabled = locked;
+      b.title = (isOn ? "Hide " : "Show ") + r.label;
+      b.onclick = async () => {
+        const res = await api.set_baseline_matrix_report(r.key, !isOn);
+        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
+        await renderBaselineMatrix();
+      };
+      rtog.appendChild(b);
+    });
+  }
+
+  grid.textContent = "";
+  if (!days.length) {
+    grid.style.gridTemplateColumns = ""; grid.style.gridTemplateRows = "";
+    const empty = document.createElement("div");
+    empty.className = "dm-empty";
+    empty.textContent = "Add an export day from Matrix options, then pick a "
+      + "baseline to compare it against.";
+    grid.appendChild(empty);
+    wireBaselineMatrixFooter();
+    updateBaselineMatrixProgress();
+    return;
+  }
+  grid.style.gridTemplateColumns = `minmax(190px,1.1fr) repeat(${days.length}, minmax(120px,1fr))`;
+  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(50px,1fr))`;
+
+  const corner = document.createElement("div");
+  corner.className = "mx-cell mx-corner mx-colhead";
+  corner.textContent = "Report \\ Day";
+  grid.appendChild(corner);
+  days.forEach((d) => {
+    const h = document.createElement("div");
+    h.className = "mx-cell mx-colhead" + (d === bl.date ? " mx-baseline-col" : "");
+    const lab = document.createElement("div");
+    lab.textContent = d + (d === bl.date ? " (baseline)" : "");
+    h.appendChild(lab);
+    const btns = document.createElement("span"); btns.className = "mxch-btns";
+    if (d !== bl.date) {
+      btns.appendChild(
+        mxHeadBtn("i-compare", `Rebuild every report for ${d} vs the baseline`,
+          "mxch-rebuild", async () => {
+            const r = await api.rebuild_baseline_matrix("all", null, d);
+            if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this day.");
+            else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+          }));
+    }
+    btns.appendChild(
+      mxHeadBtn("i-trash", `Remove the ${d} column`, "mxch-rm", async () => {
+        await api.remove_baseline_matrix_day(d); await renderBaselineMatrix();
+      }));
+    h.appendChild(btns);
+    grid.appendChild(h);
+  });
+
+  snap.rows.forEach((rk) => {
+    const supported = !!snap.row_supported[rk];
+    const rlabel = snap.row_labels[rk] || rk;
+    const rh = document.createElement("div"); rh.className = "mx-cell mx-rowhead";
+    rh.dataset.rk = rk; rh.dataset.label = rlabel;
+    const top = document.createElement("div"); top.className = "mxrh-top";
+    const lbl = document.createElement("span"); lbl.className = "mxrh-label";
+    lbl.textContent = rlabel + (supported ? "" : " (soon)");
+    top.appendChild(lbl);
+    if (supported && bl.id) {
+      top.appendChild(mxHeadBtn("i-compare", `Rebuild ${rlabel} for every day vs the baseline`,
+        "mxch-rebuild", async () => {
+          const r = await api.rebuild_baseline_matrix("all", rk, null);
+          if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this row.");
+          else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+        }));
+    }
+    rh.appendChild(top);
+    dndAttach(rh, top, rk, "bl-row", "y", () => snap.rows.slice(), async (order) => {
+      const r = await api.set_baseline_matrix_row_order(order);
+      if (r && r.error) showMessage("error", "Can't reorder", r.error);
+      else await renderBaselineMatrix();
+    });
+    grid.appendChild(rh);
+    days.forEach((d) => {
+      const c = snap.cells[rk][d], cmp = c.cmp;
+      const cell = document.createElement("div"); cell.className = "mx-cell";
+      const main = document.createElement("div"); main.className = "mx-num";
+      const sub = document.createElement("div"); sub.className = "mx-sub";
+      const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "not exported";
+      if (!bl.id) {                        // no baseline picked yet
+        cell.classList.add("mx-na"); main.textContent = "—"; sub.textContent = "pick a baseline";
+      } else if (cmp && cmp.is_baseline) {  // the baseline's own column
+        cell.classList.add("mx-baseline-col");
+        main.textContent = "baseline"; sub.textContent = expWhen;
+      } else {
+        const v = mxCellContent(cmp);
+        cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
+      }
+      cell.title = `${rlabel} — ${d} vs ${bl.label || "baseline"}\nExported: ${expWhen}`;
+      cell.append(main, sub);
+      if (supported && bl.id && cmp && !cmp.is_baseline) {
+        const acts = document.createElement("div"); acts.className = "mx-actions";
+        if (!cmp.missing_side) {
+          acts.appendChild(mxActBtn("i-compare", "Build / rebuild this comparison vs the baseline",
+            false, async () => {
+              const r = await api.build_baseline_matrix_cell(rk, d);
+              if (r && r.error) showMessage("error", "Can't build", r.error);
+            }));
+        }
+        if (cmp.built) {
+          const ob = mxActBtn("i-external", "Open this comparison workbook (values copy)",
+            false, async () => {
+              const r = await api.open_baseline_cell_comparison(rk, d);
+              if (r && r.error) showMessage("error", "Can't open", r.error);
+            });
+          ob.classList.add("mx-open"); acts.appendChild(ob);
+        }
+        cell.appendChild(acts);
+      }
+      grid.appendChild(cell);
+    });
+  });
+
+  wireBaselineMatrixFooter();
+  updateBaselineMatrixProgress();
+}
+
+function wireBaselineMatrixFooter() {
+  const ba = $("btnBaselineBuildAll");
+  if (ba) ba.onclick = async () => {
+    const r = await api.rebuild_baseline_matrix("all");
+    if (r && r.nothing) showMessage("info", "Nothing to build", "Add days and pick a baseline first.");
+    else if (r && r.error) showMessage("error", "Can't build", r.error);
+  };
+  const rb = $("btnBaselineRebuildAll");
+  if (rb) rb.onclick = async () => {
+    const r = await api.rebuild_baseline_matrix("stale");
+    if (r && r.nothing) showMessage("info", "Up to date", "Every vs-baseline comparison is current.");
+    else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+  };
+  const of = $("btnOpenBaselineComparisons");
+  if (of) of.onclick = async () => {
+    const r = await api.open_baseline_comparisons_folder();
+    if (r && r.error) showMessage("error", "Can't open", r.error);
+  };
+  const cb = $("btnBaselineCancel");
+  if (cb) cb.onclick = () => api.cancel_run();
+}
+
+function updateBaselineMatrixProgress() {
+  const el = $("baselineMatrixProgress");
+  if (el) {
+    const m = S.st && S.st.matrix;
+    if (m && m.total) { el.hidden = false; el.textContent = `Comparing ${m.done}/${m.total}…`; }
+    else el.hidden = true;
+  }
+  const locked = !!(S.st && S.st.task);
+  document.querySelectorAll(
+    "#baselineMatrixSource, #baselineMatrixBaseline, "
+    + "#baselineMatrixReportToggles .mx-toggle")
+    .forEach((c) => { c.disabled = locked; });
+  // Add-day controls: disable on lock OR when there are no days left to add
+  // (the latter is owned by renderBaselineMatrix — don't blindly re-enable).
+  const addSel = $("baselineMatrixAddDay"), addBtn = $("btnBaselineAddDay");
+  const noAvail = !addSel || !addSel.querySelector('option[value]:not([value=""])');
+  if (addSel) addSel.disabled = locked || noAvail;
+  if (addBtn) addBtn.disabled = locked || noAvail;
+  const cancel = $("btnBaselineCancel");
+  if (cancel) {
+    const running = !!(S.st && S.st.task === "matrix");
+    cancel.classList.toggle("hidden", !running);
+    cancel.disabled = !running;
+  }
+  renderQueuePanel("baselineQueueGroup", "baselineQueue", "baselineQueueCount");
+  syncBaselineMatrixFormulas();
+}

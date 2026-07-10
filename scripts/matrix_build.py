@@ -229,6 +229,9 @@ def _pdf_store_consolidator(subdir):
     if subdir == "highway_sequence_pdf":
         import consolidate_tsmis_highway_sequence_pdf as _m
         return _m
+    if subdir == "ramp_detail_pdf":
+        import consolidate_tsmis_ramp_detail_pdf as _m
+        return _m
     return None
 
 

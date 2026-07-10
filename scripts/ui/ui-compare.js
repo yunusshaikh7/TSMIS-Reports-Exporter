@@ -17,17 +17,20 @@ function compareKind() {
 // name, so seating a new pick natively drops the now-hidden previous one;
 // renderCompareKind then swaps in the matching files/folders inputs.
 const DAY_MATRIX_GROUP = "tsn_by_day";
+const BASELINE_MATRIX_GROUP = "baseline_by_day";
 
 // Full-width "matrix" layout is shared by the Everything comparison matrix and the
-// Compare-tab by-day matrix. Compute it from the active tab/sub-tab in ONE place so
+// Compare-tab day matrices. Compute it from the active tab/sub-tab in ONE place so
 // every entry point (tab switch, Everything sub-tab, compare-group switch) stays in
 // sync. body.matrix-wide drives the shared layout (grid fills the screen, activity
-// log shrinks); body.mw-day additionally picks the by-day config corner.
+// log shrinks); body.mw-day / body.mw-bl additionally pick that matrix's config corner.
 function applyMatrixWide() {
   const every = S.tab === "everything" && S.everySub === "matrix";
   const day = S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP;
-  document.body.classList.toggle("matrix-wide", every || day);
+  const bl = S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP;
+  document.body.classList.toggle("matrix-wide", every || day || bl);
   document.body.classList.toggle("mw-day", day);
+  document.body.classList.toggle("mw-bl", bl);
 }
 
 function selectCompareGroup(groupId) {
@@ -37,13 +40,16 @@ function selectCompareGroup(groupId) {
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", String(on));
   });
-  // The TSN-by-day matrix swaps the whole classic picker out for the grid and goes
+  // The day matrices swap the whole classic picker out for their grid and go
   // full-width (same treatment as the Everything matrix).
   const dayMode = groupId === DAY_MATRIX_GROUP;
-  $("compareClassic")?.classList.toggle("hidden", dayMode);
+  const blMode = groupId === BASELINE_MATRIX_GROUP;
+  $("compareClassic")?.classList.toggle("hidden", dayMode || blMode);
   $("dayMatrixSection")?.classList.toggle("hidden", !dayMode);
+  $("baselineMatrixSection")?.classList.toggle("hidden", !blMode);
   applyMatrixWide();
   if (dayMode) { renderDayMatrix(); return; }
+  if (blMode) { renderBaselineMatrix(); return; }
   // family headers (W2) filter with their sub-tab, like the rows
   $("compareList").querySelectorAll(".option-group").forEach((h) => {
     h.classList.toggle("hidden", h.dataset.group !== groupId);

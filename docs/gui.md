@@ -129,7 +129,8 @@ Golden checks (no login, fast) live under `build\.venv\Scripts\python.exe build\
 The Everything pane has **two sub-tabs** (`.subtabs` like Compare's): *Refresh & export*
 (`#everyExport`, the batch controls) and *Comparison matrix* (`#everyMatrix`). A single
 **`app.js applyMatrixWide()`** computes the full-width context from `S.tab`/`S.everySub`/
-`S.compareGroup` and toggles `body.matrix-wide` (+ `body.mw-day` for the by-day matrix);
+`S.compareGroup` and toggles `body.matrix-wide` (+ `body.mw-day` for the by-day matrix,
+`body.mw-bl` for the vs-Baseline matrix — each picks its own config corner);
 `setEverySub`, `setTab`, and `selectCompareGroup` all call it, so every entry point stays
 in sync and leaving always clears it. **Full-width layout:** `.main` is a flex row (not
 grid) so the two columns' `flex-grow` can animate — `body.matrix-wide` grows the config
@@ -234,6 +235,26 @@ matrix's `matrix_formulas`; the **evidence-images pair** (`#dayMatrixEvidence` +
 `#dayMatrixEvidenceCount`, `syncDayMatrixEvidence`) is by contrast the SAME shared setting as
 the Everything matrix's. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
 Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs TSN Matrix).
+
+### The Compare-tab "vs Baseline Matrix" (v0.26.0)
+
+A **third** matrix sub-tab under Compare (group id `baseline_by_day`, appended beside
+"vs TSN Matrix"): rows = the same 12 report types, columns = exported **days** you add,
+each cell = (report, day) **vs a picked baseline** — an earlier day, or the
+Export-Everything store, for the same source. Same-format on both sides by construction;
+**compare-only** (no export actions, no TSN pickers, no consolidated badges, no evidence
+cameras — `compare_folders` reads the per-route files straight from both folders).
+`selectCompareGroup("baseline_by_day")` swaps in `#baselineMatrixSection`, full-width via
+`body.matrix-wide.mw-bl`; `renderBaselineMatrix` is fed by `gui_api.baseline_matrix_info`.
+The **Source + Baseline selects** live in the section head — the baseline picker lists the
+store + every exported day with its report coverage ("2026-06-11 (9/12 reports)"), the
+per-report half renders as the cells' "baseline not exported" state, and the baseline's own
+day column renders "baseline" cells (highlighted `.mx-baseline-col`, not rebuildable). Its
+config corner (`#baselineMatrixConfig`) holds the shared queue panel, the add-day toolbar,
+its OWN live-formulas toggle (`baseline_matrix_formulas`, `syncBaselineMatrixFormulas`) and
+the report toggles. Jobs carry `which:"baseline"` → `BaselineMatrixCompareWorker` on the
+same queue. Engine + store: [comparison-engine.md](comparison-engine.md) §12c.
+Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs Baseline Matrix).
 
 ### One-stop EXPORT on the by-day matrix (v0.17.0)
 

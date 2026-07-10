@@ -29,7 +29,7 @@ _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_summary_excel",
                        "highway_detail", "highway_detail_pdf",
                        "consolidated", "tsn_highway_log", "tsmis_highway_log_pdf",
                        "tsmis_intersection_detail_pdf", "tsmis_highway_detail_pdf",
-                       "tsmis_highway_sequence_pdf",
+                       "tsmis_highway_sequence_pdf", "tsmis_ramp_detail_pdf",
                        "run_reports", "comparisons")
 
 
@@ -56,7 +56,9 @@ def reset_targets(include_input=False, warnings=None):
                        ("tsmis_highway_detail_pdf_consolidated.xlsx",
                         "TSMIS Highway Detail (PDF) consolidated workbook"),
                        ("tsmis_highway_sequence_pdf_consolidated.xlsx",
-                        "TSMIS Highway Sequence (PDF) consolidated workbook")):
+                        "TSMIS Highway Sequence (PDF) consolidated workbook"),
+                       ("tsmis_ramp_detail_pdf_consolidated.xlsx",
+                        "TSMIS Ramp Detail (PDF) consolidated workbook")):
         p = OUTPUT_ROOT / fname
         if p.is_file():
             targets.append((lbl, p))

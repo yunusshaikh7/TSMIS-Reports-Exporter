@@ -53,13 +53,14 @@ def test_paths_and_modes():
           matrix.tsn_capable("highway_sequence"))
 
     defs = matrix._row_defs()
-    check("eleven matrix rows — every report (both HL + both Intersection + both "
-          "Highway Detail + both Highway Sequence formats, v0.25.0)",
+    check("twelve matrix rows — every report (both HL + both Intersection + both "
+          "Highway Detail + both Highway Sequence + both Ramp Detail formats, "
+          "v0.26.0)",
           set(defs) == {"ramp_summary", "ramp_detail", "highway_sequence",
                         "highway_log", "highway_log_pdf", "intersection_summary",
                         "intersection_detail", "intersection_detail_pdf",
                         "highway_detail", "highway_detail_pdf",
-                        "highway_sequence_pdf"})
+                        "highway_sequence_pdf", "ramp_detail_pdf"})
 
     def modes(rk):
         _l, sub, _i, adapter, _hr = defs[rk]
@@ -98,6 +99,13 @@ def test_paths_and_modes():
           and hsp["tsn"]["supported"] and hsp["vs_excel"]["supported"])
     check("HSL PDF tsn shares the highway_sequence TSN dataset (its Excel sibling)",
           hsp["tsn"]["fmt"] == "pdf" and hsp["tsn"]["tsn_subdir"] == "highway_sequence")
+    rdpm = modes("ramp_detail_pdf")
+    check("RD PDF row modes: env + tsn + vs_excel, ALL supported (v0.26.0 — the HSL-PDF parallel)",
+          set(rdpm) == {"env", "tsn", "vs_excel"}
+          and rdpm["env"]["supported"]
+          and rdpm["tsn"]["supported"] and rdpm["vs_excel"]["supported"])
+    check("RD PDF tsn shares the ramp_detail TSN dataset (its Excel sibling)",
+          rdpm["tsn"]["fmt"] == "pdf" and rdpm["tsn"]["tsn_subdir"] == "ramp_detail")
 
     # mode_out_path: env stays under comparisons/<baseline>/, others under tsn/
     env_p = matrix.mode_out_path(d, "ssor-prod", "highway_log", "ars-prod", hl["env"])

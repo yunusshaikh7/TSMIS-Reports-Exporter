@@ -129,13 +129,30 @@ ROW_GAP = 7.5
 # '000.000E', 'R012.243R'). Header furniture, DCR group rows ('11 IMP 007') and
 # description lines never match it.
 PM_TOKEN_RE = re.compile(r"^[A-Z]{0,2}\d{1,3}\.\d{3}[A-Z]{0,2}$")
-# A genuine line 2 always leads its roadbed/median blocks with TASAS YY-MM-DD
-# effective dates; the page furniture never contains one (the page header's
-# '2026-07-07' is digit-adjacent, which the lookarounds reject). Guards the
-# line-2 consumption so the THEAD repeated at the top of a print CONTINUATION
-# page (a section taller than one physical page splits mid-record and the
-# browser reprints the table header) is never swallowed as a record's line 2.
+# Line 1's second cell (the record length), used by _is_line1 to tell the
+# fallback-grid "PM LEN" merge from an OUTDENTED equate description that also
+# STARTS with a PM-shaped token ('R42.401 LT EQ 43.185 …' — the 7.9/ARS census).
+LEN_TOKEN_RE = re.compile(r"^\d{3}\.\d{3}$")
+# A TASAS YY-MM-DD effective date. Tested on the group's RAW TEXT (not the
+# window-merged values — a page whose grid sits off the printed columns can
+# split '15-10-29' across windows) as the line-2 FAST accept; the page header's
+# '2026-07-07' is digit-adjacent, which the lookarounds reject.
 DATE_TOKEN_RE = re.compile(r"(?<!\d)\d{2}-\d{2}-\d{2}(?!\d)")
+# Furniture a date-less group can be, censused on the 7.9/ARS prints (the only
+# things that ever appear between a record's two lines): the reprinted THEAD's
+# lines (a continuation page), its one-letter N/A residue, the DCR group rows,
+# and the page header/footer. EVERYTHING else following a line 1 is that
+# record's line 2 — including the date-less SPARSE rows (roadbed blocks with
+# codes but no effective dates) the old always-has-a-date assumption dropped.
+# Vocabulary is matched on the SPACELESS raw text; words that also occur in
+# real descriptions (CITY, RECORD, LENGTH alone) are deliberately absent —
+# a false furniture match only orphans loudly, but a THEAD swallowed as data
+# would corrupt silently, so the distinctive multi-token strings below are
+# each unique to the header.
+THEAD_RE = re.compile(r"POSTMILE|DESCRIPTION|EFF-|ACC-|ROADBED|MEDIAN|DATEOF|"
+                      r"T-W|WDA|S#S")
+DCR_ROW_RE = re.compile(r"^\d{2}[A-Z]{2,4}\.?\d{1,3}[A-Z]?$")
+PAGE_FURNITURE_RE = re.compile(r"RefDate:|Page\d+$")
 # Route token out of "highway_detail_route_<ROUTE>.pdf".
 ROUTE_FROM_NAME = re.compile(r"route[_ -]*([0-9]+[A-Za-z]?)", re.IGNORECASE)
 
@@ -243,15 +260,35 @@ def _assign(chars, windows):
     return [v.strip() for v in assign_columns(chars, windows, WORD_GAP)]
 
 
+def _group_text(group):
+    """The group's SPACELESS raw text (each line's characters joined, lines
+    concatenated) — what the furniture regexes and the raw-text date accept
+    match on, independent of any window grid."""
+    return "".join("".join(c["text"] for c in chars).replace(" ", "")
+                   for _top, chars in group)
+
+
 def _is_line1(vals):
-    """A record's FIRST line carries the postmile token in its first window.
-    The whole window matching is the ordinary case; accepting a postmile as
-    the window's FIRST TOKEN covers the document-median FALLBACK grid on a
-    band-less page, whose window 0 can be wide enough to also swallow the
-    neighboring Length ('000.000L 000.000') — the token is still the leftmost
-    thing in the row, and no furniture line starts with one."""
-    v = vals[0] or ""
-    return bool(PM_TOKEN_RE.match(v) or PM_TOKEN_RE.match(v.split(" ", 1)[0]))
+    """A record's FIRST line carries the postmile token in its first window —
+    ALONE (the ordinary case), or merged with the Length on the document-median
+    FALLBACK grid of a band-less page ('000.000L 000.000', window 1 then
+    empty). A postmile-shaped first TOKEN is NOT enough on its own: an
+    OUTDENTED equate DESCRIPTION also starts with one ('R42.401 LT EQ 43.185 ,
+    PM R42401BK=43185E AH' — the 7.9/ARS census), but its text runs on where a
+    real line 1 has the Length; treating it as a line 1 orphaned the real
+    record AND made the description a phantom record."""
+    v = (vals[0] or "").strip()
+    if PM_TOKEN_RE.match(v):
+        return True
+    first, _, rest = v.partition(" ")
+    if not (PM_TOKEN_RE.match(first) and rest):
+        return False
+    # Window 0 carries extra text: genuine only when that text is the merged
+    # LENGTH column ('PM LEN …' on the over-wide fallback grid); an equate
+    # description's text runs on as WORDS, and on the ordinary grid it also
+    # spills into window 1, which a real merged line 1 leaves empty.
+    win1 = (vals[1] or "") if len(vals) > 1 else ""
+    return bool(LEN_TOKEN_RE.match(rest.split(" ", 1)[0]) and not win1.strip())
 
 
 def _make_row(a, b):
@@ -274,26 +311,47 @@ def parse_pdf(path, events):
     """Parse one TSMIS Highway Detail PDF into 34-column TSMIS-format rows.
 
     Returns (rows, stats): `rows` in document order, `stats` a reconciliation
-    dict (emitted, pages, orphans = a line 1 that never got its line 2 — should
-    be 0; `fallback_pages` = data pages parsed on the document-median fallback
-    grid; `no_grid` when no page yielded any geometry). Returns (None, None) if
-    cancelled.
+    dict (emitted, pages, orphans — always 0 now, kept for the reconciliation
+    contract; `single_line` = records whose print carried NO second line,
+    emitted with a blank attribute tail; `fallback_pages` = data pages parsed
+    on the document-median fallback grid; `no_grid` when no page yielded any
+    geometry). Returns (None, None) if cancelled.
 
     The two window sets are derived PER PAGE from that page's own shaded bands
     (each print page is its own auto-layout table — see _page_windows). The
     page's text lines are re-grouped into PHYSICAL rows first (_row_groups —
     a wrapped cell's fragments rejoin their row, see _group_values); a row
-    group whose first line-1 window holds a postmile is a line 1, and the next
-    row group carrying a TASAS date is its line 2, read on the line-2 grid.
-    A print section taller than one physical page splits MID-RECORD (the
-    browser repeats the table header on the continuation page), so a pending
-    line 1 carries across the page boundary; the DATE_TOKEN_RE guard keeps the
-    reprinted header from being swallowed as its line 2."""
+    group whose line-1 shape matches (_is_line1 — the postmile ALONE in window
+    0, or postmile+Length on the fallback grid) is a line 1, and the NEXT
+    non-furniture row group is its line 2, read on the line-2 grid. A print
+    section taller than one physical page splits MID-RECORD (the browser
+    repeats the table header on the continuation page), so a pending line 1
+    carries across the page boundary; the furniture tests (THEAD_RE /
+    DCR_ROW_RE / PAGE_FURNITURE_RE on the raw text) keep the reprinted header
+    from being swallowed as its line 2. The old rule — "a genuine line 2
+    always carries a TASAS date" — is now only the FAST accept: the 7.9/ARS
+    census found real records whose roadbed blocks print codes but no
+    effective dates at all, and pages whose window grid splits a date across
+    columns; both parse now."""
     rows = []
     orphans = 0
+    single_line = 0
     fallback_pages = []
     doc_win = {}                       # lazy document-median fallback per shape
     pending_1 = None                   # carries across pages (mid-record splits)
+
+    def _flush_pending():
+        # A line 1 whose record printed NO second line at all (description and
+        # every attribute cell empty — censused on the 7.9/ARS prints): emit it
+        # with a blank attribute line rather than dropping the record. Counted
+        # separately so the summary can say so; the PDF↔Excel check remains the
+        # arbiter of whether the blank tail matches the Excel export.
+        nonlocal pending_1, single_line
+        if pending_1 is not None:
+            rows.append(_make_row(pending_1, [""] * N_COLS_L2))
+            single_line += 1
+            pending_1 = None
+
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
         any_grid = False
@@ -320,32 +378,46 @@ def parse_pdf(path, events):
                 used_fallback = False
                 any_grid = True
             page_rows = 0
+            in_thead = False           # inside a (reprinted) table header run
             for group in _row_groups(page):
                 vals1 = _group_values(group, win1)
                 if _is_line1(vals1):
-                    if pending_1 is not None:
-                        orphans += 1    # previous line 1 never got its line 2
+                    _flush_pending()   # the previous record had no line 2
                     pending_1 = vals1
+                    in_thead = False
                 elif pending_1 is not None:
-                    # Furniture (page header / reprinted THEAD / DCR rows)
-                    # never carries a TASAS date; a record's line 2 always does.
-                    # Tested on the MERGED window values, because a wrapped date
-                    # ('00-01-' over '01') is only whole again after _group_values.
+                    # A record's line 2 is WHATEVER follows its line 1 except
+                    # the censused furniture: the reprinted THEAD (+ its bare
+                    # N/A residue line), DCR group rows, and the page
+                    # header/footer. A TASAS date anywhere in the RAW text is
+                    # the fast accept (a mis-aligned window grid can split a
+                    # date, so the merged values can't carry this test); a
+                    # date-LESS group is accepted too once the furniture tests
+                    # pass — the sparse rows (roadbed codes but no effective
+                    # dates) the old always-has-a-date assumption dropped.
+                    raw = _group_text(group)
+                    if not DATE_TOKEN_RE.search(raw):
+                        if THEAD_RE.search(raw):
+                            in_thead = True
+                            continue
+                        if in_thead and len(raw) <= 2 and raw.isalpha():
+                            continue   # the THEAD's own N/A column residue
+                        if (PAGE_FURNITURE_RE.search(raw)
+                                or DCR_ROW_RE.match(raw)):
+                            continue
+                    in_thead = False
                     vals2 = _group_values(group, win2)
-                    if not any(v and DATE_TOKEN_RE.search(v) for v in vals2):
-                        continue
                     rows.append(_make_row(pending_1, vals2))
                     pending_1 = None
                     page_rows += 1
             if used_fallback and page_rows:
                 fallback_pages.append(page_no)
-        if pending_1 is not None:
-            orphans += 1                # a line 1 dangling at the document end
+        _flush_pending()               # a line 1 dangling at the document end
         if not any_grid and not rows:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
-                        "fallback_pages": [], "no_grid": True}
+                        "single_line": 0, "fallback_pages": [], "no_grid": True}
     return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
-                  "fallback_pages": fallback_pages}
+                  "single_line": single_line, "fallback_pages": fallback_pages}
 
 
 # =============================================================================
@@ -393,9 +465,15 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             return ("cancelled",)
         if pstats:
             ctx["orphans"] = ctx.get("orphans", 0) + pstats["orphans"]
+            ctx["single_line"] = (ctx.get("single_line", 0)
+                                  + pstats.get("single_line", 0))
             if pstats["orphans"]:
                 ev.on_log(f"  WARNING: {pstats['orphans']} unpaired row(s) in {p.name} "
                           "(a record's two lines didn't pair) — see the log.")
+            if pstats.get("single_line"):
+                ev.on_log(f"  note: {pstats['single_line']} record(s) in {p.name} "
+                          "printed no attribute line — kept with blank attribute "
+                          "columns.")
             if pstats.get("fallback_pages"):
                 # A data page with no shaded band of its own parsed on the
                 # document-median grid — worth eyeballing in the PDF↔Excel check.
@@ -412,6 +490,12 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         notes = []
         if orphans:
             notes.append(f"⚠ {orphans} unpaired row line(s) — verify (see the log).")
+        if ctx.get("single_line"):
+            # An FYI, not an escalation: a record whose print carries no second
+            # line is emitted with a blank attribute tail; the PDF↔Excel check
+            # is the arbiter of whether that matches the Excel export.
+            notes.append(f"{ctx['single_line']} record(s) printed no attribute "
+                         "line (kept with blank attribute columns).")
         result.summary_lines = notes + result.summary_lines
         # An unpaired record or a failed PDF is invisible to the XLSX
         # consolidator, so ESCALATE to a producer-owned partial — the incomplete

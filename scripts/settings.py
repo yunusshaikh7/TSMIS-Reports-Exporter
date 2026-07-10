@@ -747,6 +747,105 @@ def set_day_matrix_hidden(keys):
     return _set_str_list("day_matrix_hidden", keys)
 
 
+# ---- Compare-tab "vs Baseline" matrix ---------------------------------------
+# Same shape as the by-day matrix: a source, picked day-columns, hidden rows, a
+# row order, and its own formulas toggle — plus the picked BASELINE id
+# ("store" or "day:<date>"). Validation (known source / real run-folder dates /
+# known baseline) lives in gui_api via baseline_matrix.
+
+_DEFAULT_BASELINE_MATRIX_SOURCE = "ssor-prod"
+
+
+def get_baseline_matrix_source():
+    raw = _read_file().get("baseline_matrix_source")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return _DEFAULT_BASELINE_MATRIX_SOURCE
+
+
+def set_baseline_matrix_source(key):
+    """Save (or, empty, reset) the vs-Baseline matrix source. Returns the new value."""
+    data = dict(_read_file())
+    key = (key or "").strip()
+    if key:
+        data["baseline_matrix_source"] = key
+    else:
+        data.pop("baseline_matrix_source", None)
+    _atomic_write(data)
+    log.info("settings: baseline_matrix_source -> %s", key or "(default)")
+    return get_baseline_matrix_source()
+
+
+def get_baseline_matrix_days():
+    """The ordered day-column date strings the user added (default: none)."""
+    raw = _read_file().get("baseline_matrix_days")
+    if isinstance(raw, list):
+        return [d for d in raw if isinstance(d, str) and d]
+    return []
+
+
+def set_baseline_matrix_days(days):
+    """Persist the ordered day-column list. Empty -> cleared. Returns the new list."""
+    data = dict(_read_file())
+    days = [d for d in (days or []) if isinstance(d, str) and d]
+    if days:
+        data["baseline_matrix_days"] = days
+    else:
+        data.pop("baseline_matrix_days", None)
+    _atomic_write(data)
+    log.info("settings: baseline_matrix_days -> %s", days or "(none)")
+    return get_baseline_matrix_days()
+
+
+def get_baseline_matrix_baseline():
+    """The picked baseline id ("store" / "day:<date>"), or "" when unset."""
+    raw = _read_file().get("baseline_matrix_baseline")
+    return raw.strip() if isinstance(raw, str) else ""
+
+
+def set_baseline_matrix_baseline(key):
+    """Persist (or, empty, clear) the vs-Baseline matrix baseline id."""
+    data = dict(_read_file())
+    key = (key or "").strip()
+    if key:
+        data["baseline_matrix_baseline"] = key
+    else:
+        data.pop("baseline_matrix_baseline", None)
+    _atomic_write(data)
+    log.info("settings: baseline_matrix_baseline -> %s", key or "(unset)")
+    return get_baseline_matrix_baseline()
+
+
+def get_baseline_matrix_hidden():
+    """Hidden report-row keys on the vs-Baseline matrix (default: none)."""
+    return _get_str_list("baseline_matrix_hidden")
+
+
+def set_baseline_matrix_hidden(keys):
+    """Persist the hidden vs-Baseline report rows. Empty -> cleared."""
+    return _set_str_list("baseline_matrix_hidden", keys)
+
+
+def get_baseline_matrix_row_order():
+    """Preferred row (report) order for the vs-Baseline matrix."""
+    return _get_order("baseline_matrix_row_order")
+
+
+def set_baseline_matrix_row_order(keys):
+    return _set_order("baseline_matrix_row_order", keys)
+
+
+def get_baseline_matrix_formulas():
+    """Whether the vs-Baseline matrix ALSO writes a live-formulas workbook (its
+    own toggle, independent of the other matrices'; default off)."""
+    return _get_flag("baseline_matrix_formulas")
+
+
+def set_baseline_matrix_formulas(on):
+    """Persist the vs-Baseline matrix formulas-workbook toggle (cleared when off)."""
+    return _set_flag("baseline_matrix_formulas", on)
+
+
 def reset():
     """Delete the settings file (back to all defaults). Returns True if a
     file was removed."""

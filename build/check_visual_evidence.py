@@ -31,13 +31,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import compare_highway_detail_tsn as cht
 import compare_highway_log as chl_cmp
 import compare_highway_sequence_tsn as chsl_cmp
+import compare_ramp_detail_pdf as crdp
+import compare_ramp_detail_tsn as crd_cmp
 import consolidate_tsmis_highway_detail_pdf as chd
 import consolidate_tsmis_highway_sequence_pdf as chslp
+import consolidate_tsmis_ramp_detail_pdf as crdpdf
 import consolidate_tsn_highway_log as ctnl
 import consolidate_tsn_highway_sequence as ctnsl
 import evidence_highway_detail as ehd
 import evidence_highway_log as ehl
 import evidence_highway_sequence as ehsl
+import evidence_ramp_detail as erd
 import highway_detail_columns as hdc
 import highway_log_columns as hlc
 import matrix_build
@@ -57,13 +61,14 @@ def check(name, cond):
 # --------------------------------------------------------------------------- #
 print("registry + sources + clamp")
 check("rows: the Highway Detail + Highway Log + Highway Sequence + Intersection "
-      "Detail pairs, nothing else",
+      "Detail + Ramp Detail pairs, nothing else",
       ve.rows() == ["highway_detail", "highway_detail_pdf",
                     "highway_log", "highway_log_pdf",
                     "highway_sequence", "highway_sequence_pdf",
-                    "intersection_detail", "intersection_detail_pdf"])
+                    "intersection_detail", "intersection_detail_pdf",
+                    "ramp_detail", "ramp_detail_pdf"])
 check("capable() matches rows()",
-      all(ve.capable(r) for r in ve.rows()) and not ve.capable("ramp_detail"))
+      all(ve.capable(r) for r in ve.rows()) and not ve.capable("ramp_summary"))
 check("TSMIS visuals come from each report's (PDF)-edition export subdir",
       ve.pdf_subdir_for("highway_detail") == "highway_detail_pdf"
       and ve.pdf_subdir_for("highway_detail_pdf") == "highway_detail_pdf"
@@ -72,7 +77,9 @@ check("TSMIS visuals come from each report's (PDF)-edition export subdir",
       and ve.pdf_subdir_for("highway_log") == "highway_log_pdf"
       and ve.pdf_subdir_for("highway_log_pdf") == "highway_log_pdf"
       and ve.pdf_subdir_for("highway_sequence") == "highway_sequence_pdf"
-      and ve.pdf_subdir_for("highway_sequence_pdf") == "highway_sequence_pdf")
+      and ve.pdf_subdir_for("highway_sequence_pdf") == "highway_sequence_pdf"
+      and ve.pdf_subdir_for("ramp_detail") == "ramp_detail_pdf"
+      and ve.pdf_subdir_for("ramp_detail_pdf") == "ramp_detail_pdf")
 check("TSN prints live in each report's library pdf folder — except the Highway "
       "Log and Highway Sequence, whose district prints ARE the library's raw "
       "inputs (no duplicate drop)",
@@ -80,6 +87,10 @@ check("TSN prints live in each report's library pdf folder — except the Highwa
       .endswith("tsn_library/highway_detail/pdf")
       and str(ve.tsn_pdf_dir("intersection_detail")).replace("\\", "/")
       .endswith("tsn_library/intersection_detail/pdf")
+      and str(ve.tsn_pdf_dir("ramp_detail")).replace("\\", "/")
+      .endswith("tsn_library/ramp_detail/pdf")
+      and str(ve.tsn_pdf_dir("ramp_detail_pdf")).replace("\\", "/")
+      .endswith("tsn_library/ramp_detail/pdf")
       and str(ve.tsn_pdf_dir("highway_log")).replace("\\", "/")
       .endswith("tsn_library/highway_log/raw")
       and str(ve.tsn_pdf_dir("highway_log_pdf")).replace("\\", "/")
@@ -96,6 +107,20 @@ wbp, imgp = ve.sibling_paths(Path(r"C:\x\comparisons\hd vs tsn.xlsx"))
 check("sibling naming: '(evidence).xlsx' + '(evidence images)' folder",
       wbp.name == "hd vs tsn (evidence).xlsx"
       and imgp.name == "hd vs tsn (evidence images)")
+# The strip crop is a FULL-WIDTH page band stretched over the cell box
+# (v0.26.0): the adapters' xspan covers only the record's own words, so a crop
+# keyed to it clipped a blank cell's red box (drawn where the value WOULD
+# print) and truncated the neighbors' longer text — the HSL clipped-box defect.
+_cw = ve._crop_window(2000, 3000, (500, 100, 700, 110), (100, 110))
+check("crop is full page width, record band ± the vertical context",
+      _cw == (0, int((100 - ve._CTX_PT) * ve._SC), 2000,
+              int((110 + ve._CTX_PT + 2) * ve._SC)))
+_cw2 = ve._crop_window(2000, 3000, (500, 60, 700, 180), (100, 110))
+check("a cell box taller than the record stretches the band over it",
+      _cw2[1] == int(56 * ve._SC) and _cw2[3] == int(184 * ve._SC))
+check("the band clamps to the page edges",
+      ve._crop_window(2000, 300, (0, 0, 10, 10), (0, 4))[1] == 0
+      and ve._crop_window(2000, 300, (0, 100, 10, 110), (110, 118))[3] == 300)
 avail = ve.availability()
 check("availability shape (rows/tsn_pdfs/ready/dir/reports/row_reports/deps_ok)",
       set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "reports", "row_reports",
@@ -103,12 +128,13 @@ check("availability shape (rows/tsn_pdfs/ready/dir/reports/row_reports/deps_ok)"
 check("availability reports every evidence report, per-dir + source kind",
       [r["key"] for r in avail["reports"]]
       == ["highway_detail", "highway_log", "highway_sequence",
-          "intersection_detail"]
+          "intersection_detail", "ramp_detail"]
       and all(set(r) >= {"key", "label", "tsn_pdfs", "dir", "source"}
               for r in avail["reports"])
       and {r["key"]: r["source"] for r in avail["reports"]}
       == {"highway_detail": "pdf", "highway_log": "raw",
-          "highway_sequence": "raw", "intersection_detail": "pdf"})
+          "highway_sequence": "raw", "intersection_detail": "pdf",
+          "ramp_detail": "pdf"})
 check("row_reports maps every capable row to its report (the per-cell action's gate)",
       avail["row_reports"] == ve.TSN_PDF_REPORT
       and set(avail["row_reports"]) == set(ve.rows()))
@@ -119,7 +145,7 @@ check("toggle off -> None",
       and matrix_build.evidence_opts_for({"enabled": False, "examples": 5},
                                          "highway_detail", lambda s: s) is None)
 check("unsupported row -> None",
-      matrix_build.evidence_opts_for({"enabled": True}, "ramp_detail",
+      matrix_build.evidence_opts_for({"enabled": True}, "ramp_summary",
                                      lambda s: s) is None)
 opts = matrix_build.evidence_opts_for({"enabled": True, "examples": 99},
                                       "highway_detail",
@@ -498,7 +524,7 @@ try:
         return None
 
     try:
-        matrix.run_evidence_only("ramp_detail", store, "ramp_detail", tsn, cmpwb,
+        matrix.run_evidence_only("ramp_summary", store, "ramp_summary", tsn, cmpwb,
                                  pdfdir, events=None)
         _cap_err = None
     except ValueError as e:
@@ -727,6 +753,97 @@ check("load_sides accepts the consolidated + normalized-TSN pair (glued key both
 _sh.rmtree(_hs_tmp, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #
+print("Ramp Detail adapter (v0.26.0): fields, maps, projections, dual-row discipline")
+check("FIELDS = the union of both flavors' compared columns (PM key + the two "
+      "always-context TSN columns excluded)",
+      erd.FIELDS == ["PR", "Date of Record", "HG", "Area 4", "City Code", "R/U",
+                     "Description", "On/Off", "Ramp Type"])
+check("field -> TSMIS print column / TSN print window maps are complete",
+      all(f in erd._TSMIS_COL for f in erd.FIELDS)
+      and all(f in erd.TSN_CELL for f in erd.FIELDS)
+      and set(erd._TSMIS_COL.values()) <= set(crdpdf._COL_ORDER)
+      and all(n in {w[0] for w in erd._L_WIN} for n in erd.TSN_CELL.values()))
+check("TSN windows are x-ordered and non-overlapping (the fixed template)",
+      all(erd._L_WIN[i][2] <= erd._L_WIN[i + 1][1]
+          for i in range(len(erd._L_WIN) - 1)))
+check("verification projection == the PDF flavor's per-field normalization + TRIM "
+      "(route-prefix strip + collapse + the null-render message on Description; "
+      "the '-' null marks; the print's N -> TSN's O)",
+      erd.project("Description", "001/NB  OFF TO X ") == "NB OFF TO X"
+      and erd.project("Description", "NO RAMP LINEAR EVENT") == ""
+      and erd.project("Area 4", "-") == ""
+      and erd.project("On/Off", "-") == ""
+      and erd.project("On/Off", "N") == "O"
+      and erd.project("On/Off", "F") == "F"
+      and erd.project("Date of Record", "02/25/1976") == "1976-02-25"
+      and erd.project("Ramp Type", " D ") == "D")
+# Dual-row discipline: the Excel row's comparison keeps On/Off + Ramp Type as
+# context (never enumerated); the PDF row's comparison COMPARES them. Ramp Name
+# and ADT never enumerate on either row.
+_rd_a = ["001", "R", "000.606", "1976-02-25", "D", "Y", "DAPT", "U",
+         "NB OFF X", "", "O", "D", ""]
+_rd_b = ["001", "M", "000.606", "1976-02-25", "L", "Y", "DAPT", "U",
+         "NB OFF Y", "RAMP NM", "F", "L", "070"]
+_dc = {("001", "000.606"): [("12", "ORA")]}
+_dx = erd.enumerate_diffs([_rd_a], [_rd_b], {"dc": _dc, "pdf": False})
+check("Excel-row enumerate_diffs skips the print-only + TSN-only columns",
+      set(_dx) == {"PR", "HG", "Description"}
+      and _dx["PR"][0]["dist"] == "12" and _dx["PR"][0]["cnty"] == "ORA")
+_dp = erd.enumerate_diffs([_rd_a], [_rd_b], {"dc": _dc, "pdf": True})
+check("PDF-row enumerate_diffs ALSO samples On/Off + Ramp Type (compared there)",
+      set(_dp) == {"PR", "HG", "Description", "On/Off", "Ramp Type"})
+check("enumerate_diffs judges through the LIVE schemas (context sets)",
+      set(crd_cmp._SCHEMA.context_fields)
+      == {"Ramp Name", "On/Off", "Ramp Type", "ADT"}
+      and set(crdp.TSMIS_PDF_VS_TSN._schema.context_fields)
+      == {"Ramp Name", "ADT"})
+# LOCKSTEP pins vs the PDF consolidator: the wrap join, the PM test, the prefix
+# legend, and the null-render tokens the projections must keep matching.
+check("join_desc_parts: bare after a hyphen, one space otherwise, empties skipped",
+      crdpdf.join_desc_parts(["UC 55-", "1107"]) == "UC 55-1107"
+      and crdpdf.join_desc_parts(["A", "", "B"]) == "A B")
+check("the PM row test + prefix legend pins",
+      crdpdf.PM_RE.fullmatch("000.606") and not crdpdf.PM_RE.fullmatch("0.606")
+      and crdpdf.PREFIX_SET == frozenset("CDGHLMNRST"))
+check("the null-render token pins (the comparison flavors project these)",
+      crdp._NULL_DESC == "NO RAMP LINEAR EVENT" and crdp._NULL_MARK == "-")
+# The consolidated-workbook source detector: the PDF-consolidated carries the
+# print-only "On/Off" header; the Excel-consolidated doesn't.
+_rd_tmp = Path(tempfile.mkdtemp(prefix="tsmis_ev_rd_"))
+_wbe = Workbook()
+_wse = _wbe.active
+_wse.title = crd_cmp.TSMIS_SHEET
+_wse.append(["Route", "Location", None, "PM", "Date of Record", None, "HG",
+             "Area 4", None, "City Code", "R/U", "Description"])
+_wse.append(["001", "12-ORA-001", "R", "000.606", "02/25/1976", None, "D", "Y",
+             "DAPT", "U", "001/NB OFF X", None])
+_wbe.save(_rd_tmp / "excel_cons.xlsx")
+_wbP = Workbook()
+_wsP = _wbP.active
+_wsP.title = crd_cmp.TSMIS_SHEET
+_wsP.append(["Route"] + list(crdpdf.HEADER))
+_wsP.append(["001", "12-ORA-001", "R", "000.606", "02/25/1976", None, "D", "Y",
+             "DAPT", "U", "001/NB OFF X", None, "N", "D"])
+_wbP.save(_rd_tmp / "pdf_cons.xlsx")
+check("_is_pdf_consolidated tells the two consolidated shapes apart",
+      erd._is_pdf_consolidated(str(_rd_tmp / "pdf_cons.xlsx"))
+      and not erd._is_pdf_consolidated(str(_rd_tmp / "excel_cons.xlsx")))
+# load_sides on a sidecar-less normalized TSN library returns the rebuild note
+# instead of guessing (the pre-v3 library case).
+_wbn = Workbook()
+_wsn = _wbn.active
+_wsn.title = crd_cmp.NORMALIZED_SHEET
+_wsn.append(["Route"] + crd_cmp.SHARED_HEADER)         # v2: NO sidecar columns
+_wsn.append(["001", "R", "000.606", "1976-02-25", "D", "Y", "DAPT", "U",
+             "NB OFF X", "", "O", "D", ""])
+_wbn.save(_rd_tmp / "tsn_v2.xlsx")
+_t_r, _t_n, _meta, _note = erd.load_sides(str(_rd_tmp / "pdf_cons.xlsx"),
+                                          str(_rd_tmp / "tsn_v2.xlsx"))
+check("load_sides refuses a sidecar-less (pre-v3) TSN library with the rebuild note",
+      _meta is None and "rebuild the TSN library" in (_note or ""))
+_sh.rmtree(_rd_tmp, ignore_errors=True)
+
+# --------------------------------------------------------------------------- #
 print("engine misc")
 check("reason summarizer dedupes and caps",
       ve._summarize_reasons(["a", "a", "b", "c", "d"]) == "a; b; c"
@@ -769,6 +886,12 @@ try:
     check("…and it too == the engine's tsn_pdf_dir",
           ipdf == ve.tsn_pdf_dir("intersection_detail")
           == tsn_library.pdf_dir("intersection_detail"))
+    rpdf = root / "ramp_detail" / "pdf"
+    check("ensure_layout creates ramp_detail/pdf/ + its hint (v0.26.0)",
+          rpdf.is_dir() and any(rpdf.glob("_PUT TSN DISTRICT PDFS HERE.txt")))
+    check("…and it too == the engine's tsn_pdf_dir",
+          rpdf == ve.tsn_pdf_dir("ramp_detail")
+          == tsn_library.pdf_dir("ramp_detail"))
     readme = root / tsn_library._README_NAME
     check("the root README documents BOTH pdf/ folders",
           readme.is_file()

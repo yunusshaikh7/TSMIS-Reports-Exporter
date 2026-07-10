@@ -103,6 +103,7 @@ APP_MODULES = [
     "consolidate_tsmis_intersection_detail_pdf",   # CR-002: Int-Detail-PDF parser (HL-PDF parallel)
     "consolidate_tsn_highway_sequence",
     "consolidate_tsmis_highway_sequence_pdf",   # v0.25.0: HSL-PDF parser (HD-PDF parallel)
+    "consolidate_tsmis_ramp_detail_pdf",        # v0.26.0: RD-PDF parser (HSL-PDF parallel)
     "consolidate_intersection_detail", "consolidate_intersection_summary",
     # Highway Detail family (v0.20.0): the Excel + PDF-sourced consolidators,
     # the TSN-library loader, and the vs-TSN / PDF-flavor comparators.
@@ -111,14 +112,15 @@ APP_MODULES = [
     "tsn_library", "tsn_load_ramp_detail", "tsn_load_ramp_summary",
     "tsn_load_intersection_summary", "tsn_load_intersection_detail", "summary_layout",
     "compare_core", "compare_tsn_common", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
-    "compare_ramp_detail_tsn", "compare_ramp_summary_tsn", "compare_intersection_summary_tsn",
+    "compare_ramp_detail_tsn", "compare_ramp_detail_pdf", "compare_ramp_summary_tsn",
+    "compare_intersection_summary_tsn",
     "compare_intersection_detail_tsn", "compare_intersection_detail_pdf",
     "compare_highway_sequence_tsn", "compare_highway_sequence_pdf",
     "compare_highway_detail_tsn", "compare_highway_detail_pdf",
     # v0.21.0 visual evidence: the report-agnostic engine + the per-report
     # adapters (lazy-imported by matrix_build/gui_api, so they MUST be declared).
     "visual_evidence", "evidence_highway_detail", "evidence_intersection_detail",
-    "evidence_highway_log", "evidence_highway_sequence",
+    "evidence_highway_log", "evidence_highway_sequence", "evidence_ramp_detail",
     "gui_main", "gui_api", "gui_worker", "gui_win32", "gui_endpoint", "gui_matrix",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are
@@ -126,10 +128,13 @@ APP_MODULES = [
     # module" packaging contract was broken; build/check_app_modules.py (offline)
     # and the frozen `--self-test` gate now enforce that every flat scripts/ module
     # is declared here.
-    "matrix", "day_matrix", "report_library",
+    "matrix", "day_matrix", "baseline_matrix", "report_library",
     # W1 (v0.19.0): the one-click Settings validation — processes the on-disk
     # samples through the real pipeline; its manifest ships in the evidence zip.
     "validation",
+    # v0.26.0: the Settings-tab website-source capture (lazy-imported by
+    # gui_settings_api, so it MUST be declared).
+    "site_capture",
     # Shared comprehensive self-test body, run by gui_main --self-test (the frozen
     # exact-artifact release gate) and build/full_smoke.py.
     "self_test",

@@ -841,16 +841,74 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
   cells, scoped rebuild list, build guards, and the gui_api bridge incl. the shared queue). **Owed on
   the work PC:** building two real days vs TSN end-to-end.
 
-## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0, Highway Sequence in v0.25.0)
+### 12c. The Compare-tab "vs Baseline Matrix" (`scripts/baseline_matrix.py`, v0.26.0)
+
+A **third** matrix, a sibling of the vs TSN Matrix with the same day-column mechanics but a
+different other side: **rows = the 12 report types, columns = exported days you add, each cell =
+(report, day) vs a picked BASELINE copy of the SAME report** — an earlier day's run folder, or the
+Export-Everything store (`<batch_dest>/<source>/`) for the same source. It answers "did this report
+change since an earlier pull?" — same source, same report, same FORMAT by construction (each row's
+`compare_env` adapter reads the report's own subdir on both sides: Excel rows read the Excel
+per-route files, PDF rows parse the PDF exports), so an Excel edition can never be diffed against a
+PDF baseline.
+
+- **Engine: `compare_folders`, matrix-ified.** No consolidation and NO TSN dataset — each cell is
+  `adapter.compare_folders(<day run folder>, <baseline dir>, …, mode="values",
+  labels=("<SRC-ENV> <date>", "<SRC-ENV> <bl-date>|(store)"))`, the classic Compare tab's "export
+  folders" path (per-route files read straight from both folders), committed atomically via
+  `artifact_store.commit_workbook` exactly like the Everything matrix's env cells. The additive
+  `labels=` override on `EnvCompare.compare_folders` (v0.26.0; default None = derived labels,
+  regression-locked by `check_compare_env_sidelabel`) exists because the store's folder shape
+  derives a side label confusingly close to the run-folder one.
+- **Baseline identity:** `"day:<date>"` or `"store"` (`parse_baseline`); the picker
+  (`baseline_options`) lists the store + every exported day **with how many of the 12 reports each
+  holds** — the "which days have an old copy" answer per option; the grid's per-cell
+  `missing_side: "baseline"` state answers it per report. The baseline's own day column renders
+  `is_baseline` (skipped by `cells_to_rebuild`; building it is rejected).
+- **Store:** `output/comparisons/baseline-by-day/<date src-env>/<row>_vs_<token>.xlsx` — the
+  baseline token (`store` / the baseline date) is PART of the name, so each baseline's comparisons
+  are distinct artifacts and switching baselines never clobbers the other's. Counts cached in that
+  tree's `_results.json` under `"<date src-env>|<row>|<baseline-id>"`. Freshness reuses
+  `matrix._cmp_state` with the **two-folder input fingerprint** (`fp_folders=(day, baseline)`) —
+  BOTH sides are multi-file folders, so a route deleted on either one reads the cell stale.
+- **One queue, all three matrices:** baseline compare Jobs carry `which:"baseline"` and route to
+  `BaselineMatrixCompareWorker` (compare-only mirror of `DayMatrixCompareWorker`). Bridge:
+  `baseline_matrix_info` / `set_baseline_matrix_source` / `set_baseline_matrix_baseline` /
+  `add_/remove_baseline_matrix_day` / `set_baseline_matrix_report` / `set_baseline_matrix_row_order` /
+  `set_baseline_matrix_formulas` / `build_baseline_matrix_cell` / `rebuild_baseline_matrix` /
+  `open_baseline_cell_comparison` / `open_baseline_comparisons_folder`. Settings:
+  `baseline_matrix_source/days/baseline/hidden/row_order/formulas` (all its OWN, incl. the
+  live-formulas toggle; the `set_baseline_matrix_baseline` endpoint validates the id against the
+  CURRENT picker options so a stale/hand-edited id can't aim at a non-existent folder).
+- **UI:** the "vs Baseline Matrix" sub-tab under Compare (appended beside "vs TSN Matrix");
+  full-width via `body.matrix-wide.mw-bl` with its own corner `#baselineMatrixConfig` (queue,
+  add-day, live-formulas, report toggles); Source + Baseline selects live in the section head.
+  Compare-only: no export actions, no TSN pickers, no consolidated badges, no evidence cameras.
+- **Boundary guards:** `build_baseline_cell` rejects a `date`/`source` that doesn't parse as a real
+  run folder AND a baseline id that doesn't parse / points at the cell's own day; the id's date
+  shape is regex-pinned so a hand-edited settings file can't traverse out of `output/`.
+- **Locked by** `build/check_baseline_matrix.py` (identity parsing, picker options, snapshot states
+  incl. `is_baseline` + the two-folder fingerprint staleness, scoped rebuilds, guard paths, **one
+  REAL `compare_folders` build per baseline kind** — side labels + counts verified off the produced
+  workbook — and the gui_api bridge incl. the shared queue). **Owed on the work PC:** two real days
+  vs a real baseline end-to-end.
+
+## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0, Highway Sequence in v0.25.0, Ramp Detail in v0.26.0)
 
 The manual "screenshot the cell in both PDFs and circle it" workflow, automated, as a
 **decoration of a finished vs-TSN comparison** — it never changes the comparison's
 status/completion/counts, and any evidence failure only logs + adds a summary note.
-Four reports so far, each via its own adapter over the shared engine:
-`evidence_highway_detail` (district TSN prints), `evidence_intersection_detail`
-(the statewide TSN print), `evidence_highway_log` and `evidence_highway_sequence`
-(district TSN prints, with the per-print routing — below). The HD-specific bullets
-below apply to the others analogously; the ID/HL/HSL differences are called out inline.
+Five reports so far, each via its own adapter over the shared engine:
+`evidence_highway_detail` (district TSN prints), `evidence_intersection_detail` and
+`evidence_ramp_detail` (each ONE statewide TSN print), `evidence_highway_log` and
+`evidence_highway_sequence` (district TSN prints, with the per-print routing — below).
+The HD-specific bullets below apply to the others analogously; the ID/HL/HSL/RD
+differences are called out inline. **Ramp Detail's wrinkle is DUAL-ROW discipline**
+(v0.26.0): its two rows ride DIFFERENT compared sets — the PDF row's comparison
+compares the print-only On/Off + Ramp Type columns the Excel export lacks — so
+`erd.load_sides` detects which consolidated workbook it was handed (the
+PDF-consolidated carries the "On/Off" header) and `enumerate_diffs` only samples the
+columns THAT row's comparison counts (pinned in `check_visual_evidence`).
 
 - **What it produces**, next to the comparison workbook (the `(formulas).xlsx` sibling family):
   `<comparison> (evidence).xlsx` (a Summary sheet + BOTH image layouts embedded, each on its
@@ -859,6 +917,14 @@ below apply to the others analogously; the ID/HL/HSL differences are called out 
   loose files in both layouts (`*_stacked.png`, `*_pair.png`). Keep-last-good: the images
   render into a temp folder and swap in only after the workbook wrote; a locked-open previous
   set diverts to `.new` with a note instead of failing.
+- **Each strip is a FULL-WIDTH page band** (`_crop_window`, v0.26.0): the engine crops the
+  record's band (± the vertical context, stretched over the red cell box) across the page's
+  whole width. It previously cropped to the adapter's `xspan` — the record's own word extent —
+  which CLIPPED whatever printed beyond it: a blank cell's red box (drawn where the value
+  WOULD print, e.g. an HSL blank-Description diff) and the neighbor rows' longer text both
+  fell outside the image. The gray record box still uses `xspan`; only the crop widened.
+  Pinned in `check_visual_evidence`; re-verified on 99 regenerated examples (HSL Excel/PDF +
+  RD Excel/PDF — both page orientations, district + statewide TSN prints).
 - **Sampling:** for every differing column, up to N (user setting, 1–10, default 2) random
   example rows across random routes, keys restricted to UNIQUE-per-route on both sides so a
   highlight is THE row. Each run logs its sample seed.
@@ -882,11 +948,13 @@ below apply to the others analogously; the ID/HL/HSL differences are called out 
   `tsn_library.ensure_layout`** (v0.21.1 — driven by the catalog's `TsnEntry.evidence_pdfs`
   flag; v0.21.0 never created it, so an updated install had nowhere to drop the prints), and
   re-entering a matrix tab re-pushes the state so the toggle re-probes and un-greys without a
-  restart. The **normalized TSN library appends TSN District/County sidecar columns** (HD since
-  its v2, ID since its v3 — `tsn_load_*.SIDECAR_HEADER`) so evidence can find a row's print;
-  `_normalized_row` slices to the shared width, so the comparison itself never sees them (a
-  pre-sidecar library is refused with a rebuild hint, and the D2 version bump rebuilds it
-  automatically).
+  restart. **Ramp Detail follows the ID statewide-print pattern** (v0.26.0): ONE TASAS print in
+  `tsn_library/ramp_detail/pdf/`, district/county read per record from LOCATION. The
+  **normalized TSN library appends TSN District/County sidecar columns** (HD since
+  its v2, ID since its v3, RD since its v3 — `tsn_load_*.SIDECAR_HEADER`) so evidence can find
+  a row's print; `_normalized_row` slices to the shared width, so the comparison itself never
+  sees them (a pre-sidecar library is refused with a rebuild hint, and the D2 version bump
+  rebuilds it automatically).
 - **Locators:** each TSMIS locator mirrors its PDF consolidator's parse step for step while
   capturing positions — **keep them in LOCKSTEP** (HD: per-page windows, row groups, the
   postmile test, the date-token guard, cross-page carry, fallback-grid/straddling records
@@ -898,7 +966,9 @@ below apply to the others analogously; the ID/HL/HSL differences are called out 
   boundaries, the trailer hard-stop, the PM / PM-less data tests, and wrapped-Description
   fragments attached + hyphen-aware-joined exactly like its consolidator — the evidence
   classifier is the word-object-keeping TWIN of `chslp._classify_words`, pinned identical
-  in `check_visual_evidence`). The TSN locators differ by
+  in `check_visual_evidence`; RD: the same header-anchored per-page boundaries as ITS
+  consolidator, re-using `rdpdf._page_header`/`_classify_words` directly with a
+  word-capturing window loop alongside). The TSN locators differ by
   print style: HD parses the TASAS district print line-anchored with the two-line REGEXES
   (word positions kept; an optional group that didn't print boxes the gap between neighbors;
   cross-checked ≥99.9% against the statewide extract); ID rides the statewide print's FIXED
@@ -908,7 +978,11 @@ below apply to the others analogously; the ID/HL/HSL differences are called out 
   window. The ID print is indexed ONCE per file (cached on size+mtime) inside
   `district_index`, so the engine's per-district `locate_tsn` calls are dictionary lookups —
   the engine stayed untouched. Validated statewide: 16,584/16,584 records, 30/32 fields 100.00%
-  parse-back vs the raw extract (the rest are print truncations the verifier skips). HL's TSN
+  parse-back vs the raw extract (the rest are print truncations the verifier skips). RD's TSN
+  locator is the same statewide-print pattern one size smaller: single-line records on a fixed
+  template (header anchors pixel-identical across the 500 pages; windows censused on 415
+  order-assignable full rows, 400/400 sampled records value-identical to the raw extract;
+  long Descriptions TRUNCATE — the known skip-class), indexed once per file. HL's TSN
   locator rides the OTM52010 print's fixed document-wide column windows
   (`consolidate_tsn_highway_log.COLUMN_WINDOWS`), LOCKSTEP with that parser's walk (district/
   group headers, totals close, the description x-band + totals-pattern guards, `', '` joins).
