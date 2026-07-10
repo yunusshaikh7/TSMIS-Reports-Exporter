@@ -117,7 +117,7 @@ is owned by [comparison-engine.md](comparison-engine.md).
 | `check_ramp_summary_partial.py` | ramp-summary failures-OK + short-PDF-blank |
 | `check_tsn_description_leak.py` | TSN Highway Log Description-leak guards (x0-gate / `*`-totals close / `_is_totals_line`) |
 | `check_tsmis_pdf_parse.py` | TSMIS Highway Log (PDF) cell-rect consolidator (char-conservation, 1:1 cell mapping) — see [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) |
-| `check_tsmis_pdf_reconcile.py` | TSMIS Highway Log (PDF) row-drop reconciliation surfaces ⚠ INCOMPLETE (dropped-no-geometry lines) + carried-forward-geometry NOTE in `summary_lines` (v0.17.0 Phase 1) |
+| `check_tsmis_pdf_reconcile.py` | TSMIS Highway Log (PDF) row-drop reconciliation: ⚠ INCOMPLETE (dropped-no-geometry lines) + the unfit-carry ⚠ escalate PARTIAL; VALIDATED carried-geometry pages get an info line and stay COMPLETE (v0.26.2) |
 | `check_highway_log_columns.py` | the corrected 31-column Highway Log labels (position → canonical label) — see [highway_log/columns.md](highway_log/columns.md) |
 | `check_highway_log_ditto.py` | the Highway Log ditto resolver (`is_ditto` / `fill_paired_roadbed` / `display_fills`) |
 | `check_highway_log_roadbed.py` | the roadbed-aware comparison key (`roadbed_tag` / `roadbed_canonical_location` / `keys_for` opt-in; strictly refines, never merges) |

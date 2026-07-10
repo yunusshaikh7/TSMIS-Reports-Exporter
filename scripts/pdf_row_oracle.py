@@ -125,4 +125,5 @@ def capture_evidence(pdf_path, parse_fn, page_lines_fn=None):
         "flagged": rec["flagged"],
         "parser_skipped_no_geometry": stats.get("skipped_no_geometry"),
         "parser_stale_geometry_pages": stats.get("stale_geometry_pages"),
+        "parser_carried_validated_pages": stats.get("carried_validated_pages"),
     }

@@ -248,6 +248,23 @@ follow-on lines, like TSN).
 - Returns `None` on a page with no full 30-cell data band (cover / legend page);
   the previous page's `page_windows` is carried forward.
 
+**Carried-geometry validation (v0.26.2).** A page can carry DATA rows yet no
+30-cell band of its own — the normal zebra-parity case (its only data rows are
+unshaded, ~280 pages per statewide set) — and is parsed with the carried
+windows. Each such data line is then validated READ-ONLY with
+`pdf_table_lib.carried_line_crossings`: the number of intra-token window splits
+(consecutive chars closer than `WORD_GAP` — one printed token — whose centers
+land in different windows). It applies the same char-center test
+`_assign_columns` places by, so a **0 score certifies every token of the line
+was assigned intact**; a drifted or foreign-table layout (the real risk: a NEW
+auto-layout table starting on a band-less page) cuts through tokens and scores
+immediately. A validated page is ordinary output (`carried_validated_pages`,
+one quiet per-file log line + an info summary line); a page whose text does
+NOT fit the carry logs a per-page WARNING, counts as `stale_geometry_pages`,
+and escalates the consolidation to **PARTIAL** ("inputs incomplete" on the
+matrices). Before v0.26.2 EVERY carried page escalated, which marked every
+HL (PDF) day partial.
+
 `_assign_columns(chars, windows)` — same center-in-window assignment + `WORD_GAP`
 token split as the TSN parser.
 
