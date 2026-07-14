@@ -38,12 +38,36 @@ ROOT = BUILD_DIR.parent
 _COMPILEALL = [sys.executable, "-m", "compileall", "-q",
                str(ROOT / "scripts"), str(ROOT / "build"), str(ROOT / "version.py")]
 
+# The comparison-perfection AUDIT INSTRUMENTS (Phase 3/4/6/8 oracles, family gates,
+# product witnesses) also live in build/ and are named check_phase*.py, so the glob
+# below would otherwise pull them into the blocking gate. They are not product
+# regression checks and cannot act as one: several read the LOCAL-ONLY Caltrans corpus
+# (absent in CI and on the work PC), and several refuse to overwrite an existing audit
+# artifact, so they are once-only by design and would red the gate forever. Run them
+# on demand instead:
+#     build\.venv\Scripts\python.exe build\check_phase8_<family>_comparison.py
+# check_ci_manifest.py pins this exclusion to exactly this prefix so it can never be
+# widened into a way of quietly dropping a real check.
+AUDIT_PREFIX = "check_phase"
+
+
+def is_audit_instrument(path):
+    """True for a comparison-perfection audit gate, not a product regression check."""
+    return path.stem.startswith(AUDIT_PREFIX)
+
 
 def _discover(skip_js):
     """The full ordered check list as (name, argv) pairs."""
     checks = [("compileall", _COMPILEALL)]
+    audit = 0
     for p in sorted(BUILD_DIR.glob("check_*.py")):
+        if is_audit_instrument(p):
+            audit += 1
+            continue
         checks.append((p.stem, [sys.executable, str(p)]))
+    if audit:
+        print(f"note: {audit} audit instrument(s) ({AUDIT_PREFIX}*) are not gate "
+              f"checks -- run them on demand")
     js = sorted(BUILD_DIR.glob("check_*.js"))
     if skip_js:
         print(f"note: skipping {len(js)} JS check(s) (--skip-js)")

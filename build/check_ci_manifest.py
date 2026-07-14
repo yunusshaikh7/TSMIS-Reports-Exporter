@@ -24,8 +24,14 @@ ROOT = BUILD_DIR.parent
 CHECKS_YML = ROOT / ".github" / "workflows" / "checks.yml"
 RELEASE_YML = ROOT / ".github" / "workflows" / "release.yml"
 
-# The suite is ~88 today; a discovery bug that quietly halves it must trip this.
+# The suite is ~120 gated checks today; a discovery bug that quietly halves it must
+# trip this.
 MIN_SUITE_SIZE = 80
+
+# The ONE sanctioned exclusion: comparison-perfection audit instruments. This guard
+# keeps its own copy of the expected prefix on purpose — it must fail if the runner's
+# value drifts, so the exclusion can never be widened into a silent gate shrink.
+AUDIT_PREFIX = "check_phase"
 
 _fail = []
 
@@ -57,8 +63,20 @@ def _runner_step_blocking(text, wf_name):
 def main():
     on_disk = ({p.stem for p in BUILD_DIR.glob("check_*.py")}
                | {p.stem for p in BUILD_DIR.glob("check_*.js")})
-    check(f"a suite-sized check set exists on disk ({len(on_disk)})",
-          len(on_disk) >= MIN_SUITE_SIZE)
+    audit = {s for s in on_disk if s.startswith(AUDIT_PREFIX)}
+    gated = on_disk - audit
+    check(f"a suite-sized GATED check set exists on disk ({len(gated)})",
+          len(gated) >= MIN_SUITE_SIZE)
+
+    # The runner deliberately excludes the comparison-perfection audit instruments
+    # (corpus-bound, once-only). That exclusion is legitimate, but it is also the one
+    # sanctioned way to shrink the gate — so pin it to EXACTLY that prefix. Anything
+    # else dropping out of the suite is the v0.17.3 failure mode all over again.
+    check(f"the runner excludes exactly the audit prefix ({AUDIT_PREFIX}*)",
+          f'AUDIT_PREFIX = "{AUDIT_PREFIX}"' in
+          (BUILD_DIR / "run_checks.py").read_text(encoding="utf-8"))
+    check(f"every excluded check is an audit instrument ({len(audit)} excluded)",
+          all(s.startswith(AUDIT_PREFIX) for s in audit))
 
     for wf in (CHECKS_YML, RELEASE_YML):
         check(f"{wf.name} exists", wf.is_file(), str(wf))

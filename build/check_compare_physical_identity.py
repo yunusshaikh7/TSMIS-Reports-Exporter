@@ -4,7 +4,14 @@ This check is deliberately small and hermetic.  Real TSN collision counts are bo
 ``docs/planning/comparison-perfection/comparison-phase4-red-fixture-index.md``; this file locks the engine and
 adapter mechanisms that must make those collisions impossible to mis-pair.
 
-CMP-AUD-045.  Capture this check red before changing loader semantics.
+CMP-AUD-045.  This file is BOTH a green contract and the finding's live red fixture.
+``TESTS`` are the typed identity core, which is green.  ``KNOWN_RED`` are the four
+family-projector contracts that still fail, because the projectors hand the engine
+plain route/PM strings instead of a ``PhysicalKey``.  Each known-red contract asserts
+that the defect is still present AND still has its recorded signature, so the check
+fails if the defect drifts or is fixed — it is never a gate you learn to ignore.
+Capture it red before changing loader semantics; promote KNOWN_RED into TESTS when the
+projector batch lands.
 """
 from pathlib import Path
 import sys
@@ -422,11 +429,28 @@ TESTS = (
      test_route_authority_and_uniform_typed_mode),
     ("canonical display and ordering are side-independent",
      test_canonical_display_is_side_order_independent),
-    ("Highway Sequence env uses county + glued PM", test_highway_sequence_env_county_and_glued_pm),
-    ("Ramp env uses county identity", test_ramp_env_county_identity),
-    ("Intersection env uses county identity", test_intersection_env_county_identity),
+)
+
+# CMP-AUD-045 red fixture.  The typed identity CORE is green (the TESTS above), but the
+# report-family projectors were never wired to it: they still hand the engine plain
+# route/PM strings.  These four contracts therefore FAIL today, by design.
+#
+# They are not left hard-red — a permanently red gate is a gate nobody reads.  Instead
+# each one asserts the *known* defect: it must still fail, and fail with exactly the
+# recorded signature.  So this fixture goes red the moment the defect DRIFTS, and goes
+# red again the moment it is FIXED (telling the implementer to promote it into TESTS).
+# Promote these into TESTS as part of the CMP-AUD-045 projector batch.
+KNOWN_RED = (
+    ("Highway Sequence env uses county + glued PM",
+     test_highway_sequence_env_county_and_glued_pm,
+     "environment projector did not supply PhysicalKey"),
+    ("Ramp env uses county identity", test_ramp_env_county_identity,
+     "environment projector did not supply PhysicalKey"),
+    ("Intersection env uses county identity", test_intersection_env_county_identity,
+     "environment projector did not supply PhysicalKey"),
     ("direct/PDF projectors retain structured identity",
-     test_direct_projectors_retain_physical_identity),
+     test_direct_projectors_retain_physical_identity,
+     "engine-consumed key cell is not PhysicalKey"),
 )
 
 
@@ -440,9 +464,30 @@ def main():
             print(f"FAIL {label}: {type(exc).__name__}: {exc}")
         else:
             print(f"OK   {label}")
+
+    for label, test, signature in KNOWN_RED:
+        try:
+            test()
+        except AssertionError as exc:
+            if signature in str(exc):
+                print(f"RED  {label}  (known: CMP-AUD-045)")
+            else:
+                failures.append((label, exc))
+                print(f"FAIL {label}: CMP-AUD-045 red fixture DRIFTED — expected "
+                      f"{signature!r}, got: {exc}")
+        except Exception as exc:
+            failures.append((label, exc))
+            print(f"FAIL {label}: CMP-AUD-045 red fixture raised an unexpected "
+                  f"{type(exc).__name__}: {exc}")
+        else:
+            failures.append((label, None))
+            print(f"FAIL {label}: CMP-AUD-045 looks FIXED here — move this contract "
+                  f"from KNOWN_RED into TESTS and re-run the owning family gate")
+
     if failures:
         raise SystemExit(f"{len(failures)} physical-identity contract(s) failed")
-    print("OK  PHASE4-L0A-PHYSICAL-IDENTITY")
+    print(f"OK  PHASE4-L0A-PHYSICAL-IDENTITY "
+          f"({len(TESTS)} green, {len(KNOWN_RED)} known-red under CMP-AUD-045)")
 
 
 if __name__ == "__main__":
