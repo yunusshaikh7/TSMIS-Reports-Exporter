@@ -58,10 +58,19 @@ comparison-project planning document and must retain its protected SHA-256
   reviewer must independently reconcile that set rather than treating the count as
   authority.
 
-The dirty takeover baseline for `scripts/` is 321 files / 7,423,809 bytes, canonical
+> **Superseded (2026-07-14, Batch 0).** The takeover baseline below is now HISTORY. The
+> worktree has been committed to branch `comparison-perfection`, and two authorized fixes
+> have since changed product source, so `df7bb8fc…` **no longer reproduces — by design**.
+> Do not treat that drift as tampering and do not restore the old digest. The current
+> boundary is the source-only manifest
+> `d87951b2e7cd6b7f9107741c51af8c372da6fb5ea0c12595285070d633271809`
+> (135 files / 2,890,535 bytes). Full execution record, including the gate baseline:
+> [reconciliation-report.md](reconciliation-report.md) §14.
+
+The dirty takeover baseline for `scripts/` was 321 files / 7,423,809 bytes, canonical
 manifest 34,351 bytes, SHA-256
 `df7bb8fc3d997d60d82ecb93344f821e858feb015eed62fffe859958c9151bea`.
-It identifies the frozen worktree state; it does not certify correctness or attribution.
+It identified the frozen worktree state; it did not certify correctness or attribution.
 Do not reset, rewrite, or clean the existing product changes merely to match Git HEAD.
 
 Return to the general [documentation index](../../INDEX.md).

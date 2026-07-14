@@ -5,6 +5,17 @@ Status: audit closeout complete; product remediation not started or authorized b
 
 ## Stop line and frozen product baseline
 
+> **Superseded (2026-07-14, Batch 0).** The takeover has happened. The dirty worktree is
+> committed to branch `comparison-perfection`; two authorized fixes (`APP_MODULES`, the 14
+> silent swallows) then changed product source, so **`df7bb8fc…` no longer reproduces, by
+> design**. The "any drift is a stop" rule below was written for the takeover — it has been
+> discharged. **Do not hard-stop on that drift and do not restore the old digest.** The
+> current boundary is the source-only manifest
+> `d87951b2e7cd6b7f9107741c51af8c372da6fb5ea0c12595285070d633271809`
+> (135 files / 2,890,535 bytes), and the gate is green at 121/121. No comparison semantics
+> were changed; the Stage-8 freeze on comparison behaviour still stands.
+> Execution record: [reconciliation-report.md](reconciliation-report.md) §14.
+
 No product comparison code was changed after the freeze to complete this bounded
 closeout. The complete `scripts/`
 tree was frozen at 321 files / 7,423,809 bytes with canonical manifest SHA-256
