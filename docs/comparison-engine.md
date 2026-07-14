@@ -28,27 +28,46 @@ too. A report-specific `CompareSchema` carries everything that varies (side name
 normalizer/date fields, label nouns, widths, note fragments); the engine's formula and label
 text are fixed.
 
-Inputs arrive as ROWS — the CALLER (each comparison module) owns file loading + shape
-validation. Two shapes:
+The CALLER (each comparison module) owns file loading and shape validation. Phase 2
+represents each loaded input as a typed `LoadedSide` carrying rows plus exact completion,
+skipped/failed counts, diagnostics, and identity slots. Compatibility adapters still pass
+the following two row shapes into `run_compare`, together with the reduced input coverage:
 
 - **per-route**: `[key, f1..fn]`, `has_route=False`.
 - **consolidated**: `[route, key, f1..fn]`, `has_route=True`.
 
 Entry point: `run_compare(sc, rows_t, rows_n, has_route, out_path, *, events, confirm_overwrite,
-mode, name_a, name_b, warnings)` → `ConsolidateResult` (the same contract the consolidators
-return, so GUI/console drive it identically).
+mode, name_a, name_b, warnings, commit_guard, input_completion, skipped_inputs,
+failed_inputs, failures, coverage_diagnostics)` → an additively extended
+`ConsolidateResult`. Its
+`comparison_outcome`, `artifact_generation`, and `attempt_state` fields are the machine
+contract; legacy `verdict`, completion fields, and `summary_lines` remain display/
+compatibility data. GUI/console can still drive comparisons and consolidators through the
+same outer result type.
+
+The two public adapter boundaries—`compare_tsn_common.run_files_compare` for file recipes and
+`compare_env.EnvCompare.compare_folders` for folder recipes—apply
+`comparison_contract.comparison_result_boundary` to every returned path. Dependency or missing-
+input failures, source/alias preflight rejection, malformed input shape, overwrite cancellation,
+`no_data`, and artifact-commit failure therefore return a fail-closed typed
+`ComparisonOutcome` plus terminal `AttemptState`; they are never inferred from `summary_lines`.
+When such a path committed no workbook, `artifact_generation` remains `None` and the attempt's
+`generation_id` remains empty. Only a transaction that actually commits comparison bytes may
+invent an `ArtifactGeneration`.
 
 The three comparison families (see [§9](#9-the-three-comparison-families)) are all `run_compare`
 callers with different schemas.
 
 ---
 
-## 2. The regression lock (DO NOT change formula/label text casually)
+## 2. The correctness lock
 
-`compare_core` is **regression-locked**: any change to its formula or label text must be proven
-**cell-for-cell identical** for the TSMIS-vs-TSN flavor before shipping.
+`compare_core` is **correctness-locked, not history-locked**. Formula/label/equality/
+identity/pairing changes require independent semantic evidence, both workbook flavors,
+installed Excel, and an exact explanation of every deliberate delta. Historical bytes remain a
+valuable regression input only when they are correct; they do not veto a confirmed shared defect.
 
-> **v0.18.0 held the lock.** The structural overhaul left `compare_core.py`
+> **Historical context.** v0.18.0's structural overhaul left `compare_core.py`
 > **byte-for-byte unmodified** (`git diff origin/main…HEAD -- scripts/compare_core.py` is
 > empty); the dormant `context_fill` opt-in that the `main` branch added in v0.17.8 was
 > **deliberately NOT forward-ported** (it had no live user — CR-002-RM3), so `git grep
@@ -61,8 +80,8 @@ extraction was only accepted because **756,892 cell positions** (values, formula
 number formats, widths, conditional-formatting rules, calc mode) matched exactly across 4
 workbooks (the real Route-1 + consolidated pairs, both flavors).
 
-**Approved Route-1 sample counts** (per-route TSMIS-vs-TSN, format locked to these — never
-regress them): **299 both / 18 (TSMIS-only) / 69 (TSN-only) / 221 diff rows / 969 diff cells**.
+**Historical Route-1 sample counts** were **299 both / 18 (TSMIS-only) / 69 (TSN-only) /
+221 diff rows / 969 diff cells**.
 The 969 was **971** before the v0.11.0 TSN totals-block fix dropped Route-1's 2 leak-caused
 Description false positives. (CLAUDE.md / older notes that still say 971 are stale — 969 is
 current.)
@@ -78,13 +97,14 @@ pre-change checkout if the folder is gone):
 | `test_env_compare.py` | planted-difference fixtures for `compare_env` (missing route / removed rows / edited cells must be reported exactly) |
 | `com_verify.ps1` | real Excel COM: F9 the formulas flavor, every SELF-CHECK row must read OK |
 
-**The opt-in rule that keeps the lock intact:** every Highway-Log-only or report-specific
+**The opt-in rule for genuinely report-specific behavior:** every Highway-Log-only
 behavior is a `CompareSchema` field that defaults to the no-op original. When the flag is OFF
 (every non-HL comparison), the equality formula, Spot Check verdict, Python mirrors, helper keys
-and MATCH lookups are **byte-identical** to the locked output. This is how the engine gained
+and MATCH lookups should remain semantically invariant. This is how the engine gained
 ditto/roadbed/legend behaviors without re-running approval on the other comparisons. The
 in-repo golden checks (`build/check_compare_*.py`) lock the engine on synthetic fixtures; see
-[verification-and-testing.md](verification-and-testing.md).
+[verification-and-testing.md](verification-and-testing.md). Shared defects are fixed globally,
+even when doing so changes the default workbook.
 
 **Verification flow** (the only "test suite" this no-tests repo has for the comparison): real
 input pairs live at `C:\Users\Yunus\Downloads\TSMIS\ground-truth\inputs` (per-route `tsmis_highway_log_route
@@ -124,6 +144,7 @@ types override the data-shape fields and side names.
 | `key_normalizer` | `None` | `callable(row, off, key_field)->str` canonical identity token IN PLACE OF the raw key (HL roadbed key) — [§6](#6-roadbed-aware-key-normalizer-tsmis-vs-tsn-only) |
 | `context_fields` | `()` | field NAMES shown but NON-ASSERTING — never count as a diff, never get the ≠ mark; the cell coalesces to whichever side has a value (v0.17.0; Ramp Detail's TSN-only DB columns) |
 | `extra_sheet_writer` | `None` | `callable(wb, ctx)` run after the sheets, before save — appends a custom sheet: the familiar-layout rollup (v0.17.0; the Summary reports) and the Intersection Detail **"Report View"** replica (v0.17.8 / §9f). `ctx = {rows_a, rows_b, has_route, sc, side_a, side_b}` |
+| `report_view_diff_check` | `()` | optional `(sheet, Diffs-column, physical-row-repeat)` aggregate Summary invariant for typed two-line Report Views; requires `extra_sheet_writer`. It detects total-count drift, not same-count value changes. |
 
 Both v0.17.0 fields keep the lock: default `()`/`None` → `is_context` is always False / no extra
 sheet, so every existing comparison (and the Route-1=969 HL canary) is byte-identical.
@@ -157,9 +178,11 @@ text.
   sheets, NEVER reading the Comparison's answer) and an `Agree?` OK/CHECK column. Opens pre-set to
   `first_diff_row` (the first matched row with differences). Stays LIVE in both flavors.
 - **Comparison** — one row per `(route,) key + occurrence` in document order. Matched cells show
-  the matched value; differing cells show `a ≠ b` in red (the `_DIFF_MARK = " ≠ "` is the ONLY
-  place that string appears — CF, COUNTIFs, the Diffs count all key on it). One-sided rows tinted
-  yellow (A-only) / blue (B-only) and show that side's own values.
+  the matched value; differing cells show `a ≠ b` in red. Hidden, versioned state-mask columns
+  carry one `E` / `D` / `N` / `U` code per field (equal, different, non-asserting, one-sided).
+  Conditional formatting, row `Diffs`, Summary field counts, and Spot Check read those codes;
+  `_DIFF_MARK = " ≠ "` is presentation only and literal source text containing it is ordinary
+  content. One-sided rows are tinted yellow (A-only) / blue (B-only) and show that side's values.
 - **Only in <A>** / **Only in <B>** — every one-sided union row in union order, full field data
   pulled live from that system's data sheet. Consolidated mode adds a "Missing from <other>"
   column ("entire route" — tinted — vs "this <noun> only"). NOTE: one-sided rows have ALWAYS been
@@ -168,23 +191,82 @@ text.
 - **Routes** (consolidated only) — per-route coverage: Both / A-only / B-only with live per-route
   row / matched / with-diffs / differing-cell counts.
 - **<A>** / **<B>** — the two inputs copied in, with a leading "Comparison row" back-link column
-  (A) and a live "Key (helper)" column at the end. Route/key columns stay in their input
-  position.
+  (A) and a literal opaque "Key (helper)" column at the end. Route/key columns stay in their input
+  position. A Med-Wid field appends five hidden, versioned TRIM/CORE/VALID/MASK/CANON helpers;
+  formula mode keeps them live and values mode writes their exact literal twin. Hidden freshness
+  chunks compare every current source/helper cell against the corresponding very-hidden
+  `__CMP_E2_SNAPSHOT_A/B` sheet, with a tail sentinel for appended rows.
+- **`__CMP_E2_SNAPSHOT_A/B`** — very-hidden immutable build snapshots containing every source cell,
+  opaque helper, and literal Med-Wid stage. They certify that row identity and duplicate assignment
+  still match the visible source sheets; they are not user-facing comparison tabs.
 
 ### Two flavors via `mode=` ("formulas" | "values" | "both")
 
 `run_compare(..., mode=...)` — the GUI Compare tab has two checkboxes (both ticked by default;
 ≥1 required). The mirror that powers the run summary (`count_diffs` / `_field_value`) ALSO
-produces the literal cells of the values workbook, so the two flavors **can never disagree**.
+produces the literal cells and literal state masks of the values workbook. Formula mode derives
+the same state codes with blank-safe, case-sensitive `EXACT` expressions. The Phase-3 E1 gates
+lock Python counts, values displays/masks, formula displays/masks, Summary, Spot Check, and
+conditional formatting to that one state model. Familiar secondary views remain separately
+tracked in Phase 7, but any post-build source/helper mutation now invalidates the workbook's
+certifying headline.
 
 | | formulas | values |
 |---|---|---|
-| cells | every number is a LIVE Excel formula (lookup keys, statuses, per-field diffs, summary counts); edit a data cell ⇒ report recalculates | the same sheets / CF / links, but the bulk is plain computed RESULTS |
+| cells | statuses, state masks, displays, per-field diffs, and summary counts are LIVE observations; any source/helper edit makes Summary say `REGENERATE REQUIRED` because build-time identity/pairing is stale | the same sheets / CF / links, but the bulk is plain computed RESULTS plus literal state masks; edits likewise invalidate certification |
 | consolidated calc | ~2M formula cells; ships in **manual calculation mode** (`calcMode="manual"`, `calcOnSave=False`, `fullCalcOnLoad=False`); opens instantly showing blank/0, user presses F9 once, then saves (per-route files stay automatic) | automatic calc, no F9 banner |
 | size | larger | ~⅓ the size; opens instantly |
 | live in values flavor | n/a | ONLY the Spot Check sheet + the SELF-CHECK rows stay live (they recount the literal sheets) |
 
 `mode="both"` writes the picked name (formulas) + `<name> (values).xlsx` next to it.
+The values workbook is the canonical transactional member and commits first; formulas is
+best-effort and a failure is reported truthfully without retracting committed values. A
+pre-existing derived values twin requires a single-use server token bound to that exact path;
+a decline, mismatch, replay, or late unapproved twin fails closed.
+
+Every public comparator owns one `artifact_store.commit_workbook` transaction. It binds the
+effective selected/discovered source identities, rejects every final/derived destination that
+canonically or physically aliases a source (including hardlinks and linked directories),
+exclusively reserves unpredictable regular-file temps, validates their identity and workbook
+shape, and rechecks before publication/cleanup. Everything-Matrix callers additionally pass a
+target-aware `commit_guard`; direct and baseline callers use the same transaction without a
+user-destination lease.
+
+After workbook promotion, the transaction attaches one UUID `ArtifactGeneration`, the exact
+requested/committed member set, and each member's SHA-256, size, and mtime. Central classic
+`mode="both"` publishes values plus the optional formulas workbook as peers in that one
+generation. `consolidation_meta.write_comparison_outcomes` first protects every member with a
+conservative sentinel. Schema v3 stores one canonical compressed `ComparisonOutcome` in shared,
+content-addressed sibling chunks and keeps a small identical manifest in each peer envelope;
+strict inline schema-v2 records remain read-compatible. The writer holds a permanent parent-scoped
+thread/process lease through sentinel creation, crash-safe no-replace chunk installation, every
+final, sentinel cleanup, and an exact-own-generation postcheck. Conflicting chunk names use one of
+eight deterministic exact-byte fallback slots and are never replaced. Readers validate every
+envelope, peer, sentinel, workbook digest, manifest, and generation binding before decoding the
+shared payload once. The decoded limit is 64 MiB in at most sixteen 4 MiB chunks with a 32:1
+pre-decompression expansion ceiling. Interrupted, missing, mixed-schema, mismatched-generation,
+replaced, over-limit, malformed, or digest-tampered generations remain untrusted. A successful
+result carries a matching succeeded `AttemptState`.
+
+This artifact identity is deliberately separate from the public terminal-result contract above.
+A returned failure/cancellation/`no_data` attempt is still typed even when it produced no reusable
+artifact, but it has no `ArtifactGeneration`, no member sidecar, and no generation ID to offer a
+consumer. Conversely, a failure while publishing metadata for already-committed bytes retains the
+real generation/attempt axes in their fail-closed publication state rather than fabricating or
+discarding identity.
+
+All production consumers call `consolidation_meta.require_published_comparison`: returned status,
+typed outcome, committed generation, succeeded attempt, trusted/current persisted sidecar, member
+digests, and generation IDs must agree exactly. A returned/persisted disagreement is not repaired
+or inferred from workbook prose. The compatibility bridge will eventually be replaced by the
+Phase-5 generation manifest.
+
+Current limitation: Matrix `also_formulas` builds values and formulas through two comparator calls,
+so those twins still receive different generation IDs. Unifying them, the last-complete versus
+unpromoted-partial policy, universal source/producers identity, and durable failed-attempt history
+remain Phase-5 work (CMP-AUD-075/082/084/089). Exact-generation evidence publication remains the
+separate Phase-7 transaction; the typed public terminal boundary does not claim either later-phase
+closure.
 
 ### Streaming write (`write_only`)
 
@@ -201,7 +283,8 @@ styled cells are `WriteOnlyCell`s.
 A row's key is `CompareSchema.key_field`, the column that IS its identity — **not necessarily
 `header[0]`** (v0.11.0). `keys_for(rows, has_route, key_field, key_normalizer)` builds
 `[(route, key, occurrence)]` in file order; repeats of the same `(route, key)` are numbered
-`1..`, exactly like the live helper column on the data sheets. The key sits at
+`1..`. After exact duplicate pairing, each final tuple receives a versioned opaque ordinal
+helper token used by every workbook `MATCH`; raw components are never delimiter-flattened. The key sits at
 `r[(1 if has_route else 0) + key_field]`; the column stays in its display position everywhere —
 only the alignment identity and the Comparison sheet's lead column change.
 
@@ -320,42 +403,49 @@ go through `normalize_value` directly), so TRIM then collapses them and both fla
 
 ### The verdict (v0.10.0)
 
-Every comparison LEADS with a one-line answer. `summary_lines[0]` is
+Every comparison LEADS with a one-line human answer. `summary_lines[0]` is
 `✓ EVERYTHING MATCHES …` / `✗ DIFFERENCES FOUND …` / `⚠ COULD NOT COMPARE EVERYTHING …`.
-`ConsolidateResult.verdict` is `"match"` / `"diff"` (consolidators leave it `None`); the GUI keys a
-green/amber result dialog on it. The workbook's Summary carries the same verdict as a big banner
-cell right under the title (B3, or B4 under the manual-calc F9 banner) — a LIVE formula in the
-formulas flavor (CF green/red keyed on the `✓`/`✗` first character), a literal in the values
-flavor. **Match ⟺ zero differing cells AND zero one-sided rows.**
+`ComparisonOutcome.verdict` is `"match"` / `"diff"`, backed by exact `ComparisonCounts`; the legacy
+outer verdict mirrors it. Classic UI, Matrix, and validation accept the verdict only from the
+trusted returned/persisted generation. `summary_lines` is never parsed as state. The workbook's
+Summary carries the same human verdict as a big banner cell right under the title (B3, or B4 under
+the manual-calc F9 banner) — a LIVE formula in the formulas flavor (CF green/red keyed on the
+`✓`/`✗` first character), a literal in the values flavor. For a complete comparison,
+**match ⟺ zero differing cells AND zero one-sided rows**.
 
 ### Incompleteness contract (v0.11.0)
 
-An unreadable input is NEVER silently dropped — `run_compare(warnings=…)` keeps `status="ok"` but
-forces `verdict="diff"` (a clean match can't be certified) and leads `summary_lines[0]` with the
+An unreadable input is NEVER silently dropped. Loaders reduce both sides into exact completion,
+skipped/failed counts, warnings/failures, and diagnostics before `run_compare` commits anything.
+An incomplete run may keep outer `status="ok"` because it produced a useful workbook, but its typed
+completion is `partial`, its verdict is forced to `diff`, and `summary_lines[0]` leads with the
 literal **`⚠ COULD NOT COMPARE EVERYTHING`**. The in-workbook Summary banner uses `✗` so the
-existing red CF still applies (no new CF rule ⇒ the no-warnings path stays byte-identical); the GUI
-result dialog keys on the `⚠` prefix to title it "Comparison incomplete". The skipped files are
-listed in the notes (first 20, then "…and N more"). The loaders feed `warnings` from skipped files
-(e.g. `compare_env._load_xlsx_side` / `_load_ramp_summary_side` return a `skipped` list of
-"<side> <file>: <reason>" strings). **Match ⟺ zero diff cells AND zero one-sided rows AND zero
-skipped inputs.**
+existing red CF still applies. Classic UI titles it "Comparison incomplete" from typed completion;
+Matrix renders it amber, never with a checkmark or `match`, and treats it as retryable stale. The
+skipped files are listed in the notes (first 20, then "…and N more"). A clean match therefore also
+requires `completion=complete` and zero skipped/failed inputs.
 
 ### Write-path safety (v0.11.0)
 
-- **Formula-injection guard.** Free text beginning `= + - @` (`_FORMULA_LEAD`) would be interpreted
-  by Excel as a formula (the classic CSV/XLSX injection vector — a Description like
-  `=cmd|'/C calc'!A1` runs on open). `_styled(..., guard=True)` + `is_formula_injection` force such
-  a value to a STRING cell (`data_type="s"`) so Excel shows it verbatim. The value is kept
+- **Formula-injection guard.** Free text beginning `= + - @` (`_FORMULA_LEAD`) or matching an
+  Excel/openpyxl error token would otherwise be interpreted as a formula/error cell rather than
+  source text. `set_safe_literal_cell` and the guarded writer paths force such values to STRING
+  cells (`data_type="s"`) so Excel shows them verbatim. The value is kept
   byte-for-byte (only the cell TYPE changes), so equal sides still compare equal and clean data is
   unchanged — the regression lock is unaffected. Applied to raw input cells on the data sheets, the
   key cells, the helper key, the Comparison/Only-in/Routes literal id cells — never to the engine's
-  own `=formula`/HYPERLINK cells. The same guard is in the openpyxl consolidators. Scope confirmed
+  own `=formula`/HYPERLINK cells. The same guard is in the openpyxl consolidators and visual-evidence
+  summaries/captions. Scope confirmed
   by source verification: the free-text Description columns (ramp detail / HSL / highway log /
   intersection detail) re-emitted raw.
 - **Load-time canonicalization.** `normalize_value` renders dates/datetimes/times to a fixed ISO
-  string at LOAD time, so the engine only ever sees text and the two flavors can't disagree (Excel's
-  TRIM of a live date is locale/number-format dependent and would diverge from Python's
-  `str(datetime)`). Callers (the loaders) apply it per cell.
+  string and actual Booleans to exact uppercase `TRUE` / `FALSE` text at LOAD time. Numeric 1/0
+  and integer subclasses remain numeric. This prevents locale-dependent dates and Python's
+  bool-is-an-int inheritance from splitting the two flavors. Callers apply it per cell; the
+  copied-source writer stores every finite numeric as its exact `_xl_trim` text so Excel cannot
+  rewrite Decimal scale, exponent notation, or precision. NaN/infinity fail before prompts or
+  workbook creation. The shared literal helper also retains its >15-significant-digit backstop
+  for non-source callers; engine-owned counts/occurrences remain numeric.
 - **Limit / collision guards.** `excel_limit_error` checks before writing: a workbook past
   `XL_MAX_ROWS=1,048,576` or `XL_MAX_COLS=16,384` fails cleanly (with guidance to compare a smaller
   scope) instead of openpyxl raising mid-write (losing the partial file) or silently dropping
@@ -363,17 +453,21 @@ skipped inputs.**
   side-name⇄fixed-sheet-name collision (a side literally named `Summary`/`Comparison`/`Routes`/
   `Only in …` would collide).
 
-### Med Wid flavor-parity (dormant gap)
+### Med Wid formula/value parity (Phase-3 E1)
 
-The two flavors normalize Med Wid differently: the **values** flavor uses
-`compare_core._medwid_norm` (a Python regex), while the **formulas** flavor relies on Excel's
-`VALUE()` (`_medwid_ref`). Excel `VALUE()` accepts MORE strings as numeric than the Python regex
-(internal space, leading sign, scientific notation, a bare/trailing decimal point), so an exotic
-Med Wid value *could* make the two flavors disagree. **DORMANT:** every real Med Wid value across
-the consolidated TSMIS/TSN files is a clean `<digits><letter>` code or `"+++"` (parity-proven over
-**554k+** COM-recalc'd cells), so the current deliverable is accurate. Decision (2026-06-16):
-leave dormant; revisit only if a Med Wid value ever contains those characters. Tracked in
-[roadmap.md](roadmap.md).
+Both flavors now implement one narrow, decimal-exact grammar:
+`ASCII-digits[.ASCII-digits][optional one printable-ASCII suffix]`. The suffix must be U+0021
+through U+007E and cannot itself be a digit or dot. Leading integer zeros and trailing fractional
+zeros are insignificant; suffix case is significant. Signs, leading decimals, exponents,
+multiple suffixes, Unicode digits/letters, and control-character suffixes remain raw text.
+
+Python canonicalizes with strings/`Decimal` semantics and never binary float. Formula mode uses
+five short hidden stages per Med-Wid source field (TRIM, CORE, VALID, MASK, CANON) and compares
+CANON with `EXACT`; it never calls `VALUE`, `NUMBERVALUE`, or another lossy/coercive numeric
+function. Values mode writes the same stages as literals. Spot Check owns an independent staged
+twin and preserves a true blank before `INDEX` can coerce it to numeric zero. Every generated
+formula is checked against Excel's 8,192-character ceiling and all hidden physical columns count
+toward the 16,384-column preflight.
 
 ---
 
@@ -433,35 +527,43 @@ actual sides (not hard-coded TSMIS/TSN).
 | `TSMIS_PDF_VS_TSN` | "TSMIS (PDF)" vs "TSN (PDF)" | accurate replacement for 9a — BOTH sides from PDFs, so the PDF-vs-PDF nature is explicit and the vendor Excel bug never enters |
 | `TSMIS_PDF_VS_EXCEL` | "TSMIS (PDF)" vs "TSMIS (Excel)" | diffs PDF-parsed data against the vendor Excel of the SAME report to pinpoint the export's errors |
 
-### 9c. TSMIS vs TSN Ramp Detail — `compare_ramp_detail_tsn.py` (`"files"`, group `tsn`)
+### 9c. TSMIS vs TSN Ramp Detail — `compare_ramp_detail_tsn.py` (`"files"`, group `tsn`; remediation pending)
 
-The **reference v0.17.0 vs-TSN comparator** (the recipe the other reports follow). Both sides are
-XLSX but in DIFFERENT shapes, so each side has its own loader projecting to ONE shared header keyed
-on **PM**: the TSMIS side reads the **consolidated** Ramp Detail workbook **by POSITION** (its
+The current **v0.17.0 product comparator** was the recipe later reports followed, but its
+source semantics are now superseded by the accepted Stage-8 oracle. Both sides are XLSX
+in different shapes, so each side has its own loader projecting to one shared header
+currently keyed on **PM**: the TSMIS side reads the **consolidated** Ramp Detail workbook
+**by POSITION** (its
 header row is column-shifted — the City Code / R/U / Description labels sit right of their values);
 the TSN side reads the statewide raw `Sheet 1` (18 DB columns) or the library's normalized workbook,
 taking the route from `LOCATION` ("01-DN-101"→"101"). Normalization: PM zero-pad → one canon,
 `Date of Record` → ISO, Description drops the TSMIS leading `"<route>/"` prefix; TSN `POP` maps to
 TSMIS `R/U`. `_SCHEMA` sets `key_field=PM`, `date_fields=("Date of Record",)`, and
 **`context_fields=("Ramp Name","On/Off","Ramp Type","ADT")`** — the TSN-only DB columns, shown for
-reference but never counted (see [§3](#3-compareschema-the-parameterization)). Reconciled + locked
-on the 6.19 statewide set (approved canary in [tsn-parsers.md](tsn-parsers.md): 15,211 both / 902
-diff cells / 0 context-column diffs; TSN normalized 15,410 rows == the Ramp Summary total). The TSN
-side is normalized once into the canonical TSN library via `tsn_load_ramp_detail.build_into`.
+reference but never counted (see [§3](#3-compareschema-the-parameterization)). The TSN side is
+normalized once into the canonical TSN library via `tsn_load_ramp_detail.build_into`; normalization
+v3 appends District/County sidecars, but this comparator currently slices them away.
 
-Project premise CONFIRMED on real data: Excel-vs-TSN has ~4,280 MORE diffs than PDF-vs-TSN — those
-extra diffs are the Excel's dropped-geometry artifacts leaking in (98.9% dropped-value blanks), so
-sourcing TSMIS from the PDF gives a CLEANER TSMIS-vs-TSN comparison. PDF-vs-Excel at full scale
-(self-built from raw, complete Excel) = **49,699/50,455 rows fully identical (98.5%), 5,370 diff
-cells / 756 rows, zero missing routes** — of which 90.5% (4,858) = Excel BLANKED roadbed/median
-geometry cells (the localized Excel bug). The Excel export drops rows + whole roadbed-column blocks
-(route 041: 72 rows + ~4,500 blanked cells; route 046: drops rows in dense postmile bands), EXPANDS
-`+`/`++` dittos into values, PADS Descriptions with trailing tabs, and SHIFTS/mis-attributes
-descriptions. 21 routes are TSN-only (not in the 252 TSMIS PDFs). LESSON: always consolidate the
-Excel side from raw yourself — a stale/partial pre-existing consolidated workbook (missing 25
-routes) inflated PDF-vs-Excel to 22,210 diffs.
+The accepted identity is **`(Route, County, norm_pm(PM))`**, not Route+PM. The exact TSN source has
+81 weak Route+PM keys spanning 163 county identities. County must stay visible and participate in
+identity; District is a separate asserted field. At `005/SD/72.366`, both TSMIS representations say
+District 12 and both TSN representations say 11, but the current product omits District and calls
+the row identical (CMP-AUD-185). Description normalization also deletes exactly 15 authoritative
+numeric prefixes (CMP-AUD-135), while raw `PM_SFX`, `ADT_EFF_YEAR`, and `EFF_DATE` claims remain
+outside the comparison/evidence projection (CMP-AUD-133).
 
-### 9d. TSMIS vs TSN Ramp Summary — `compare_ramp_summary_tsn.py` (`"files"`, group `tsn`, **AGGREGATE**)
+For the bound 2026-07-09 source pull, independent Excel-vs-TSN truth is **15,212 paired, 4/198
+one-sided, 14,471 identical, 741 differing rows, and 847 differing cells**. Independent
+PDF-vs-TSN truth is **15,212 paired, 4/198 one-sided, 14,438 identical, 774 differing rows, and 998
+differing cells**. PDF-vs-Excel pairs all 15,216 rows and differs in exactly four Description cells.
+Current production instead reports 861 and 1,012 vs-TSN cells: 15 false Description differences
+minus the one hidden District difference. Raw and normalized TSN product paths are semantically
+identical, so this is a comparator contract defect, not a stale-library discrepancy. The permanent
+source/business gate is `build/check_phase8_ramp_detail_comparison.py`; the legacy product fixture
+remains useful only to reproduce the red behavior. Exact bindings are in
+[comparison-canary-bindings.md](planning/comparison-perfection/comparison-canary-bindings.md).
+
+### 9d. TSMIS vs TSN Ramp Summary — `compare_ramp_summary_tsn.py` (`"files"`, group `tsn`, **AGGREGATE**; remediation pending)
 
 The first **AGGREGATE** vs-TSN comparator — the recipe for the two Summary reports. Unlike the
 FLAT comparators (per-PM rows), each side reduces to ONE statewide `{category: count}` table, so
@@ -471,33 +573,58 @@ Ramp Summary workbook's per-route sheet column-by-column (the same totals its li
 sheet shows); the TSN loader parses the **statewide PDF** directly (reusing
 `consolidate_ramp_summary`'s geometry helpers — see [tsn-parsers.md](tsn-parsers.md)) or reads the
 library's normalized `Category|Count` workbook (`tsn_load_ramp_summary.build_into`). The canonical
-category list (the **16-ramp-type superset** incl. the TSN-only **P/V** "Dummy" classes + the
-grand Total) lives in `summary_layout.RAMP_SUMMARY_SPEC`, shared with the familiar sheet. A
+category list (the **16-ramp-type superset** incl. the TSN **P/V** "Dummy" classes + the grand
+Total) lives in `summary_layout.RAMP_SUMMARY_SPEC`, shared with the familiar sheet. A
 **"Summary by Category"** familiar-layout sheet (TSN sections/labels/order; *Category | TSMIS |
 TSN | Δ*) is appended via `extra_sheet_writer=summary_layout.make_extra_sheet_writer(SPEC)`.
-P/V are TSN-only → TSMIS contributes 0 → they read as `0 ≠ 122` / `0 ≠ 81` (both-sided);
-`Ramp Points w/out linework` is a TSMIS-only diagnostic emitted on the TSMIS side only (lands in
-*Only in TSMIS* + the footer). Approved canary in [tsn-parsers.md](tsn-parsers.md): **31 categories
-both, 1 only-TSMIS, 27 diff cells, 4 identical; TSMIS 15215 vs TSN 15410**. Live in both matrices.
+
+The accepted Stage-8 contract does **not** treat missing TSMIS Summary classifications as zero:
+P/V are **Only in TSN**, while `Ramp Points w/out linework` is a display/provenance footer and is
+excluded from comparison membership and verdicts. For the bound 2026-07-09 source pull, the exact
+shape is **29 both, 0 only-TSMIS, 2 only-TSN, 24 differing shared, 5 identical shared; TSMIS 15,216
+vs TSN 15,410**. Same-pull Ramp Detail sources contain P=2 and V=20, independently proving that
+Summary absence is not factual zero. The current implementation remains product-red: it projects
+P/V as TSMIS zeroes and emits no-linework as Only-in-TSMIS, producing the superseded 31/1/0 shape.
+See [tsn-parsers.md](tsn-parsers.md) and the permanent
+`build/check_phase8_ramp_summary_comparison.py` gate. Live in both matrices.
 
 ### 9e. TSMIS vs TSN Intersection Summary — `compare_intersection_summary_tsn.py` (AGGREGATE, ONE-SIDED divergence)
 
-The AGGREGATE recipe applied to the intersection taxonomy. The category schema (`summary_layout.
-INTERSECTION_SUMMARY_SPEC`, 11 blocks, **66 categories** after the v0.17.8 signal fold) is the union
-of both systems' taxonomies; the spec-driven block-walk `summary_layout.counts_from_rows` maps a
-(count, code-text) stream to `{slug: count}` and is shared by BOTH sides (the TSMIS consolidator AND
-the TSN parser) so they can't drift. The TSN side is a **3-column statewide PDF** — split into
-left/middle/right x-bands, each block-walked independently. **The v0.17.8 §9b fold** brought CONTROL
-TYPES into line with the Detail: TSN's legacy signal sub-types **J–P fold into the single
-`S - SIGNALIZED` category**, so Signalized now compares on **both** sides and **no TSN-only categories
-remain** (`_IS_TSN_ONLY == ()`). The genuinely TSMIS-only codes stay one-sided — CONTROL **O/Q/R** and
-INTERSECTION TYPE **Roundabout/Circular/Midblock** — driven by `Cat.sides` ("both" | "tsmis" | "tsn")
-+ `SummarySpec.categories_for(side)`. Keyed on `(block, code-letter)` because TSMIS reworded labels.
-Note the distinction from §9f: the **Summary keeps the category LABEL "S - SIGNALIZED"**, while the
-Detail's per-cell control value renders as the code **`S`**. Canary in [tsn-parsers.md](tsn-parsers.md):
-**66 categories — 58 both / 8 only-TSMIS / 0 only-TSN; TSMIS 16473 vs TSN 16626**. Live in both matrices.
+The AGGREGATE recipe applied to the intersection taxonomy. The category schema
+(`summary_layout.INTERSECTION_SUMMARY_SPEC`) spans 11 blocks and 65 taxonomy rows; with
+`Total Intersections`, the comparison has **66 union rows**. The spec-driven production
+block-walk `summary_layout.counts_from_rows` maps a `(count, code-text)` stream to
+`{slug: count}` for both consolidation and TSN projection. That shared mapping keeps the
+two product paths aligned, but is not independent proof; the accepted Stage-8 oracle
+parses the TSMIS Excel, TSMIS PDF, raw TSN PDF, normalized workbook, and TSNR reference
+without importing the app parser.
 
-### 9f. TSMIS vs TSN Intersection Detail — `compare_intersection_detail_tsn.py` (FLAT, route+PM)
+The raw TSN side is a **three-column statewide PDF** split into left/middle/right x-bands.
+TSN's six legacy signal rows **J/K/L/M/N/P project into shared `S - SIGNALIZED`**. Their
+individual raw rows remain authoritative provenance and must not be mistaken for six
+TSN-only comparison rows. The eight genuinely TSMIS-only rows remain structurally absent
+(blank, not zero) on TSN: Intersection Type **R/C/P/+**, Control **R/O/Q**, and Left
+Channelization **Y**. `Cat.sides` and `SummarySpec.categories_for(side)` drive that
+one-sided membership. Keys are `(block, code-letter)` because many labels were reworded.
+The Summary keeps the label `S - SIGNALIZED`; the Detail renders the per-record control
+value as code `S`.
+
+The current accepted source binding is the 2026-07-09 ARS pull: 217 Excel files and 217
+PDF siblings, with the same ordered route universe, six suffix routes, and route 170
+absent. All **14,322/14,322** fixed-layout Excel/PDF values match. Independent comparison
+truth is **58 shared / 8 only-TSMIS / 0 only-TSN; 53 differing shared / 5 identical
+shared; TSMIS 16,459 vs TSN 16,626**. TSNR plus both same-pull TSMIS formats prove
+Control F means red on the mainline; the raw TSN Summary PDF erroneously prints Control
+G's “red on all” text for F as well.
+
+Current production reproduces all source-backed values, one-sided statuses/blanks,
+verdict semantics, formulas/values twins, and familiar-sheet numbers exactly. Acceptance
+does not excuse its open strict-count/duplicate/route-universe, raw-fold/correction-
+provenance, metadata, or familiar-note defects (CMP-AUD-020/021/022/023/076/144/145/
+146/183/184). See [tsn-parsers.md](tsn-parsers.md) and permanent gate
+`build/check_phase8_intersection_summary_comparison.py`. Live in both matrices.
+
+### 9f. TSMIS vs TSN Intersection Detail — `compare_intersection_detail_tsn.py` (FLAT; current product route+PM, approved physical key richer)
 
 The Ramp Detail FLAT recipe for Intersection Detail, forward-ported in v0.18.0 to its **v0.17.8**
 state (P15). TSMIS side = the consolidated workbook read **by position** (its header is column-shifted
@@ -535,11 +662,36 @@ norm, the header-gate refusal, Xing Line Lgth zero-pad matching + genuine-diff f
 soft/hard split, the numeric-0→'0' canon, the sidecar slice + one-sided "Only in TSMIS/TSN" rows).
 Live in both matrices.
 
+**Accepted current-source audit (`ID-79`, 2026-07-13):** the exact 7.9 ARS-prod
+217-route Excel/PDF pair and both raw TSN forms establish the physical identity as
+`(base Route, County, complete PP, numeric Post Mile)`, not the product's Route+PM.
+Raw TSN has 78 Route+numeric-PM cross-county keys / 156 county identities and six real
+within-county numeric-PM groups separated by complete PP. Under the strong key,
+Excel-vs-TSN is **16,199 paired / 260+427 one-sided / 16,053 differing rows / 21,676
+cells**; PDF-vs-TSN has the same row universe and **21,683 cells**. PDF↔Excel pairs all
+16,459 rows and differs in exactly **nine** cells—eight Excel trailing-tab Description
+values that PDF cannot render and one HG value where PDF plus raw/normalized TSN agree
+against Excel. Raw↔normalized TSN pairs all 16,626 rows with zero asserted differences.
+
+All five production legs in both workbook modes reproduce the current overlapping cells,
+one-sided inventories, visible source sheets, and hidden snapshots exactly. That is not
+semantic acceptance: Comparison omits County/District and keys Route+PM; it re-derives
+explicit member Route/`S` from Location; both PDF-vs-TSN legs omit Report View; and the
+normalized Report View blanks all 16,626 `MAIN_EFF_DATE`, `MAIN_ADT`, and `CROSS_ADT`
+claims that the raw leg maps. These are the exact CMP-AUD-045/068/070/133 red paths.
+The source result passes 24 audit invariants and the permanent gate passes 31 mutations;
+`production_overlapping_comparison_cells_exact=true` while
+`production_value_projection_exact=false` and
+`production_comparison_semantics_exact=false`. The older 7.8 21,675-cell count above
+remains version-pinned history; it does not override the current 7.9 count.
+
 ### 9f-2. TSMIS vs TSN Highway Detail — `compare_highway_detail_tsn.py` (FLAT, route + canonical PM; v0.20.0)
 
 The Intersection Detail FLAT recipe applied to Highway Detail, reconciled against the full statewide
-dev bundle (252 TSMIS routes / 51,243 rows vs the 60,083-row `TSAR - HIGHWAY DETAIL` extract; 46,847
-rows matched in the reconciliation study). TSMIS side = the consolidated workbook read **by position**
+dev bundle (252 TSMIS routes / 51,243 rows vs the 60,083-row `TSAR - HIGHWAY DETAIL` extract). An
+early weaker-key reconciliation study matched 46,847 rows; that is historical analysis, not the
+acceptance canary. The canonical roadbed-aware key below produces the approved **48,644 paired**
+rows. TSMIS side = the consolidated workbook read **by position**
 (`Route` + the 34 export columns — labels correct as-is, per `highway_detail_columns`); TSN side = the
 raw statewide `Sheet 1` (56 named DB columns) or the normalized library sheet `Highway Detail (TSN)`,
 **re-normalized at compare time** (stale-library repair, like §9f). The shared header is **35 columns**:
@@ -569,6 +721,17 @@ in blue on the **"Report View"** replica (the printed two-line TASAS record, via
 
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 
+> **Stage-8 current-source correction (2026-07-13; product remediation pending):**
+> the v0.24/v0.25 counts below bind the historical 7.8-Excel/first-7.9-PDF fixture,
+> not the freshest same-run pair. Current truth is 60,494 Excel / 60,493 PDF rows:
+> route 037 `003.809` is fixed, four paired PDF Description cells are blank, and one
+> described Excel row is absent from PDF. Installed Excel decodes the four lowercase
+> `_x000d_` strings to CRLF. For PDF↔Excel, identity must be Route + County + prefix +
+> base PM + occurrence and suffix must be asserted; the shipped glued-suffix behavior
+> cross-pairs route 152 and suppresses the 549 suffix-cell truth. Full printed PM remains
+> source-proven identity for vs-TSN. The historical canaries remain useful versioned
+> fixtures but must not be presented as current acceptance.
+
 The FLAT recipe with a **county-relative key** — the direct analog of the Highway Log comparison (a
 postmile-sequence listing with the same "TSN lists more segment breaks, TSMIS more realignment markers"
 one-sided behavior). TSMIS side = the consolidated `Highway Locations` workbook read **by position**
@@ -578,8 +741,8 @@ one-sided behavior). TSMIS side = the consolidated `Highway Locations` workbook 
 HG+FT; `EQUATES TO` annotation lines are emitted so they pair with TSMIS `END R REALIGNMENT` rows).
 **California postmiles are county-relative** (a route restarts at `000.000` per county), so the key is
 composited via `key_normalizer` → `"COUNTY POSTMILE"` (County stays its own visible column;
-`pair_occurrences_by_similarity` handles landmarks still sharing a county+PM). Reconciliations, all
-locked: **(1)** County trailing-period strip (`LA.`→`LA` etc. — else whole counties go one-sided);
+`pair_occurrences_by_similarity` handles landmarks still sharing a county+PM). Historical shipped
+reconciliations: **(1)** County trailing-period strip (`LA.`→`LA` etc. — else whole counties go one-sided);
 **(2)** Description strips the TSMIS `^\d{1,3}[A-Z]?/` route prefix + collapses whitespace; **(3)**
 `context_fields` = **HG** (TSMIS blanks it for whole counties), **City** (TSN tags it far more
 aggressively), **Distance To Next Point** (measured to each system's OWN next listed point — a listing-
@@ -660,15 +823,19 @@ contain the chosen report — see [gui.md](gui.md).
   occurrence component of duplicate keys WITHIN each `(route, key)` group present on BOTH sides so
   the most-alike rows (fewest differing fields, via the SAME `_xl_trim`/`_medwid_norm`/ditto rules as
   `count_diffs` — `_row_diff_count`) share an occurrence #; the larger side's leftovers get higher,
-  side-unique occurrence numbers (stay one-sided). `_min_cost_pairs` does an exact min-total-cost 1:1
-  assignment by permutation search with pruning up to `_PAIR_EXACT_PERMS=5040` (7!), greedy above;
-  groups whose product exceeds `_PAIR_GROUP_CAP=100,000` keep file order. The optimal assignment's
-  total ≤ any positional one, so it can ONLY REMOVE phantom diffs, never add one. Deterministic,
-  file-order tie-break (lexicographic search tries the positional assignment first). The KEY/identity
-  is unchanged — only the duplicate pairing — and the non-duplicate path is byte-identical (the
-  approved Route-1 969 is untouched). On real consolidated data it cleared ~3,600 phantom diff cells.
-  Occurrence is a build-time LITERAL every sheet MATCHes on, so the reassignment flows through both
-  flavors with no formula change. Locked by `build/check_compare_dupmatch.py`.
+  side-unique occurrence numbers (stay one-sided). At or below
+  `_PAIR_GROUP_CAP=100,000` matrix cells, `_min_cost_pairs` runs a genuinely rectangular Hungarian
+  solver and is exact for every group. It minimizes scalar differing-cell cost first, then the
+  lexicographically smallest smaller-side assignment vector; side A owns the tie when dimensions
+  are equal. Above the cap, only deterministic positional diagnostics are produced: pairing quality
+  is `capped`, completion is partial, and neither a match nor certified differences can be claimed.
+  Every duplicate group carries a strict typed trace of original indices, assignment vector,
+  selected pairs/costs, dimensions, algorithm, quality, and positional comparison. Cancellation is
+  polled through matrix construction, Hungarian scans, capped fallback, trace materialization, and
+  counting; cancellation returns unknown/empty truth and writes nothing. Workbook lookups use
+  injective opaque ordinal tokens rather than flattened route/key text. Locked by
+  `check_compare_dupmatch.py`, `check_compare_pairing_policy.py`, and
+  `check_compare_cancellation.py`.
 - **`count_diffs`** — the Python mirror: overall totals, per-field diff counts, per-route aggregates
   (consolidated), and the FIRST matched-with-differences row (Spot Check default). The same numbers
   back the run summary AND become the literal cells of the values workbook. Uses `_xl_trim` (Excel
@@ -684,8 +851,12 @@ contain the chosen report — see [gui.md](gui.md).
   broken when auditing a workbook programmatically.
 - **SELF-CHECK** — each Summary headline number recomputed a second independent way (status totals vs
   union count, MATCH-hit counts, Only-in tab row counts, per-field diff sums, Routes-sheet row sums);
-  every row must read OK after F9. A CHECK means formulas no longer point at the right rows. Stays
-  live in BOTH flavors.
+  every row must read OK after F9. Typed Detail schemas also check
+  `SUM(Report View!Diffs) = 2 × SUM(Comparison!Diffs)`. A CHECK means formulas no longer point at
+  the right rows or the Report View's aggregate count is stale. Report View itself remains a
+  build-time view until Phase 7; the E2 source/helper snapshots now ensure that even a same-count
+  value/field edit invalidates certification and forces `REGENERATE REQUIRED`. SELF-CHECK stays
+  live in both flavors.
 
 ---
 
@@ -693,13 +864,17 @@ contain the chosen report — see [gui.md](gui.md).
 
 | Symbol | Value / meaning |
 |---|---|
-| `_DIFF_MARK` | `" ≠ "` — the ONLY marker of a differing cell; CF / COUNTIFs / Diffs count all key on it |
+| `_DIFF_MARK` | `" ≠ "` — presentation separator only; never owns equality/count truth |
+| `_STATE_MASK_VERSION` | `"CMP_E1_STATE_V1"` — hidden `E`/`D`/`N`/`U` field-state chunks |
+| `_MEDWID_HELPER_VERSION` | `"CMP_E1_MW_V1"` — hidden TRIM/CORE/VALID/MASK/CANON formula twin |
+| `_EXCEL_FORMULA_LIMIT` | `8_192` — every generated helper/state/display formula is checked |
 | `_DITTO_FILL` | `"E4DFEC"` (lavender) — dittoed roadbed cell tint on data sheets |
 | `_FORMULA_LEAD` | `("=", "+", "-", "@")` — injection-guard lead chars |
-| `_PROGRESS_EVERY` | `10_000` — log + cancel-check cadence on big workbooks |
+| `_PROGRESS_EVERY` | `2_500` — progress and bounded cancellation cadence on large scans |
 | `XL_MAX_ROWS` / `XL_MAX_COLS` | `1_048_576` / `16_384` |
-| `_PAIR_GROUP_CAP` | `100_000` — `len_t*len_n` above which duplicate groups keep file order |
-| `_PAIR_EXACT_PERMS` | `5040` (7!) — exact assignment cap, greedy above |
+| `_PAIR_GROUP_CAP` | `100_000` — exact rectangular assignment through this product; above it is explicit partial/capped positional diagnosis |
+| `_HELPER_KEY_VERSION` | `CMP_E2_KEY_V1` — opaque injective workbook lookup identity |
+| `_BUILD_SNAPSHOT_VERSION` | `CMP_E2_SNAPSHOT_V1` — very-hidden source/helper certification snapshot |
 | `_DARK` | `"1F3864"` — header band / banner color |
 
 Extending: a new comparison is one `COMPARE_REPORTS` row + module; build a `CompareSchema` and call
@@ -717,16 +892,15 @@ orchestration layer over the cross-environment family
 Selecting it goes **full-width** (`body.matrix-wide`: the right activity column shrinks via animated
 `flex-grow` to a slim-but-present log + the matrix **config zone**, so the grid fills the screen). The
 full-width CSS is written once against shared classes (`.mx-host`/`.mx-pane`/`.mx-gridsection`) and the
-by-day matrix (§12b) carries the same classes, so both matrices get identical layout. It is
-strictly **ADDITIVE / orchestration-only**: `matrix.py` NEVER edits the manual comparison code
-(`compare_core`, `compare_env`, `compare_highway_log`, `compare_highway_log_pdf`) — it just CALLS those
-adapters. The foundation it sits on was audited cell-accurate over the full 6-env batch (2026-06-18; see
+by-day matrix (§12b) carries the same classes, so both matrices get identical layout. It remains
+**orchestration-only for comparison semantics**: `matrix.py` calls the same manual adapters and
+supplies their target-aware output lease; it does not maintain a forked equality model. The
+foundation it sits on was audited cell-accurate over the full 6-env batch (2026-06-18; see
 [roadmap.md](roadmap.md) closed findings).
 
-- **Rows** = `reports.matrix_rows()` — **all 8 reports**: Ramp Summary, Ramp Detail, Highway Sequence,
-  **Highway Log (Excel)**, **Intersection Summary**, **Intersection Detail**, **Highway Log (PDF)**, and
-  **Intersection Detail (PDF)** (the two reports with PDF editions are two rows each, keyed by subdir
-  `highway_log`/`highway_log_pdf` and `intersection_detail`/`intersection_detail_pdf`). **Every cell of
+- **Rows** = `reports.matrix_rows()` — **all 12 comparable report editions**: Ramp Summary; Ramp
+  Detail Excel/PDF; Highway Sequence Excel/PDF; Highway Log Excel/PDF; Intersection Summary;
+  Intersection Detail Excel/PDF; and Highway Detail Excel/PDF. **Every cell of
   the matrix is coded — nothing is greyed**: both Intersection reports gained a cross-env adapter
   (`compare_env.INTERSECTION_SUMMARY` AGGREGATE-per-route + `INTERSECTION_DETAIL` flat) in v0.17.0, the
   **HL-PDF** row's cross-env mode is `compare_env.HIGHWAY_LOG_PDF`, and v0.18.0 added the **Intersection
@@ -734,14 +908,13 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
   PDF export). `reports.tsn_matrix_extra_rows()` is empty (every report is a full row).
 - **Per-row comparison MODE** (`matrix._row_modes`, picked via a dropdown under each row's name,
   persisted in `settings.matrix_row_modes`):
-  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). **All 8 rows.**
+  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). **All 12 rows.**
   - `tsn` — vs TSN, for **every** report (`matrix.tsn_comparator_for(row_key)`): the FLAT/AGGREGATE
-    `compare_*_tsn` comparators for RS/RD/HSL/Int-Summary/Int-Detail, `compare_highway_log` for HL-Excel,
-    and the PDF-sourced `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` / `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN`
-    for the two PDF rows. Each PDF row **shares its Excel sibling's TSN subdir** (`highway_log_pdf`→`highway_log`,
-    `intersection_detail_pdf`→`intersection_detail`), so one TSN dataset serves both rows.
-  - `vs_excel` — the two **PDF-vs-Excel self-checks** (`compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` and
-    `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL`), available only on the two PDF-edition rows.
+    family-specific comparators for all seven TSN datasets and their PDF siblings. Each PDF row
+    **shares its Excel sibling's TSN subdir**, so one TSN dataset serves both editions.
+  - `vs_excel` — five PDF-to-Excel self-comparators (Highway Log, Intersection Detail, Highway
+    Detail, Highway Sequence, Ramp Detail), one on every PDF row. Highway Log Excel also exposes
+    the inverse `vs_pdf` placement. These six placements bring the Matrix total to 30.
   A global "set all comparisons to…" (env|tsn) lives in the config zone.
 - **build_comparison** dispatches by mode: env → `build_cell_comparison`; tsn/self → consolidate the env's
   store folder(s) on the fly (`consolidate_highway_log` / `consolidate_tsmis_highway_log_pdf` — the PDF
@@ -753,15 +926,24 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
   `<dest>/comparisons/tsn/<cell>_<row>_<mode>.xlsx` (cross-env stays
   `<dest>/comparisons/<baseline>/<cell>_<row>.xlsx`) — both **stable, dateless** names.
 - **Cells** carry a unified `cmp` state (env mode also keeps a `comparison` alias). Each shows the
-  **discrepancy count** (diff cells + one-sided), color-coded; plus greyed (mode not coded), needs-export,
-  needs-TSN / "consolidate N PDFs", and stale states. **Freshness** is pure-filesystem
-  (`report_library.cell_ages` mtimes vs the comparison mtime); counts come from the produced VALUES
-  workbook and are cached (`comparisons/<baseline>/_results.json` for env, `comparisons/tsn/_tsn_results.json`
-  for tsn/self), so `matrix_snapshot()` is a pure offline read.
+  **typed discrepancy count** (diff cells + one-sided), color-coded; plus greyed (mode not coded),
+  needs-export, needs-TSN / "consolidate N PDFs", and stale states. Verdict/counts/completion come
+  only from a trusted/current comparison sidecar. The cache additionally must have the expected
+  output identity, workbook mtime, matching generation ID, and current input fingerprint; absent,
+  malformed, foreign, partial, or mismatched records are stale/rebuildable. `matrix_snapshot()` is
+  offline and read-only, but strict validation deliberately re-hashes workbook members—it is not a
+  pure-stat trust check. Cache files remain `comparisons/<baseline>/_results.json` for env and
+  `comparisons/tsn/_tsn_results.json` for tsn/self.
 - **Toggles + refresh:** report and **environment-column** show/hide (`matrix_hidden_reports` /
   `matrix_hidden_envs`); refresh per-cell, **per-row**, **per-column**, or all (`cells_to_rebuild(scope,
   row=, env=)`); **cancel** between cells (`MatrixCompareWorker`) + idempotent resume (re-run stale).
   TSN actions: pick a file, or **consolidate dropped PDFs** (`MatrixTsnConsolidateWorker`).
+- **Output authority:** Everything comparison jobs acquire a create-only `comparisons` lease. TSN/self
+  cells additionally bind the already app-created environment `store` lease; cross-env cells read
+  stores without claiming them. Exact target-aware guards route comparison/cache/evidence writes to
+  the comparisons lease and persistent consolidation/PDF/outcome/fingerprint writes to the store
+  lease, rejecting any linked/replaced descendant. `_tsn_input` remains explicit user-managed input.
+  Day and baseline outputs are app-private and never claim the batch destination.
 - **Workers** (`gui_worker`): `MatrixCompareWorker` (loops `build_comparison` over `(row, cell, mode)`),
   `MatrixBatchExportWorker` (v0.16.0; loops `_run_matrix_export_step` over `[(spec, src, env)]` for a cell,
   row or column — manifest-free, `workers=N` ⇒ fast; replaced the single-cell `MatrixExportWorker`),
@@ -777,7 +959,8 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
   orchestration with a planted diff), `build/check_matrix_tsn.py` (mode registry, TSN source detection,
   greyed cells, scoped rebuilds, build guards) and `build/check_matrix_bridge.py` (every bridge method,
   the **queue** — enqueue/auto-advance/reorder/remove/clear/stop-all/no-work-drop/auth-clear/fast — and
-  the "a cell export leaves a paused batch intact" invariant). **Owed on the work PC:** a LIVE per-cell
+  the "a cell export leaves a paused batch intact" invariant), plus
+  `build/check_matrix_ownership.py` for dual-lease/link/replacement/evidence routing. **Owed on the work PC:** a LIVE per-cell
   export, queue auto-advance + fast mode under real exports, a full baseline recompute, and the live HL
   TSN / PDF-vs-Excel comparisons over a real store (the underlying compare adapters are already
   golden-locked; the consolidate→compare glue is what's owed).
@@ -791,29 +974,30 @@ adapters. The foundation it sits on was audited cell-accurate over the full 6-en
 > automatically (`_row_modes` + `day_matrix._day_rows` + `available_days` all gate on it).
 > `day_matrix.TSN_SUBDIR` is GONE → per-row `tsn_subdir`; `consolidate_and_compare_tsn` is
 > keyed on `(row_key, subdir)` and consolidates via `reports.consolidator_for_subdir`. **Live
-> today: ALL 8 reports — HL Excel/PDF + Ramp Detail + Intersection Detail (Excel + PDF) + Highway
-> Sequence (FLAT) + Ramp Summary & Intersection Summary (AGGREGATE)**. The Intersection Detail (PDF)
-> row was added in v0.18.0 (its `tsn_subdir` shares `intersection_detail`). Nothing greyed.
+> today: **all 12 comparable report editions**. Each PDF row shares its family's TSN dataset key
+> with its Excel sibling; nothing is greyed.
 
 A **second, manual** matrix under the **Compare** tab — a sibling of the Everything matrix but
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
-cross-environment, no live re-export** (it compares specific historical exports). **ALL 10
-comparison-integrated reports are live** — HL Excel/PDF + Ramp Detail + Ramp Summary + Intersection
-Summary + Intersection Detail (Excel + PDF) + Highway Sequence + Highway Detail (Excel + PDF,
-v0.20.0); nothing greyed. (Highway Summary is export-only — no comparator yet, so it isn't a matrix
+cross-environment, no live re-export** (it compares specific historical exports). **All 12
+comparable report editions are live**; nothing is greyed. (Highway Summary is export-only — no comparator yet, so it isn't a matrix
 row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orchestrates.
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
   (the same path `build_comparison`'s tsn branch uses, now keyed on `(row_key, subdir)`) over the
   day's run folder `output/<date src-env>/<subdir>/`. The TSN dataset resolves per row's `tsn_subdir`
-  via `matrix.tsn_source` → the **canonical TSN library** (`tsn_library.resolve`), with the legacy
-  `<batch_dest>/_tsn_input/<subdir>/` + `settings.matrix_tsn_files` pick as fallback/override. The
+  via `matrix.tsn_source` → `tsn_library.resolve`. Automatic mode uses the canonical library and
+  legacy `<batch_dest>/_tsn_input/<subdir>/` fallbacks. A `settings.matrix_tsn_files` pick is a
+  versioned explicit selection: a missing, replaced, or legacy path-only pick blocks the cell until
+  it is re-picked or cleared; it never silently falls through to another dataset. The
   by-day matrix shows a PER-ROW TSN picker (named by its report, like the Everything matrix);
   each cell resolves its own report's TSN.
 - **Store:** `output/comparisons/tsn-by-day/<date src-env>/<row>_vs_tsn.xlsx` (stable, dateless per
-  cell); counts cached in that tree's `_results.json`. Snapshot (`day_matrix_snapshot`) is a pure stat,
-  reusing `matrix._cmp_state`; `cells_to_rebuild(scope, row=, date=)` skips greyed rows + missing sides.
+  cell); typed truth is read from the strict generation and cached in that tree's `_results.json`
+  under output identity `tsn-by-day`, generation ID, mtime, and input fingerprint. Snapshot
+  (`day_matrix_snapshot`) is offline/read-only rather than pure-stat; missing or mismatched trust
+  data is stale. `cells_to_rebuild(scope, row=, date=)` skips greyed rows + missing sides.
 - **One queue, both matrices:** day compare Jobs carry `which:"day"` and route to
   `DayMatrixCompareWorker` (mirrors `MatrixCompareWorker`); they share the Everything matrix's queue,
   gate, Cancel and queue panel. Bridge: `day_matrix_info` / `set_day_matrix_source` /
@@ -855,8 +1039,8 @@ PDF baseline.
 - **Engine: `compare_folders`, matrix-ified.** No consolidation and NO TSN dataset — each cell is
   `adapter.compare_folders(<day run folder>, <baseline dir>, …, mode="values",
   labels=("<SRC-ENV> <date>", "<SRC-ENV> <bl-date>|(store)"))`, the classic Compare tab's "export
-  folders" path (per-route files read straight from both folders), committed atomically via
-  `artifact_store.commit_workbook` exactly like the Everything matrix's env cells. The additive
+  folders" path (per-route files read straight from both folders), committed atomically by that
+  public adapter's `artifact_store.commit_workbook` transaction. The additive
   `labels=` override on `EnvCompare.compare_folders` (v0.26.0; default None = derived labels,
   regression-locked by `check_compare_env_sidelabel`) exists because the store's folder shape
   derives a side label confusingly close to the run-folder one.
@@ -867,10 +1051,11 @@ PDF baseline.
   `is_baseline` (skipped by `cells_to_rebuild`; building it is rejected).
 - **Store:** `output/comparisons/baseline-by-day/<date src-env>/<row>_vs_<token>.xlsx` — the
   baseline token (`store` / the baseline date) is PART of the name, so each baseline's comparisons
-  are distinct artifacts and switching baselines never clobbers the other's. Counts cached in that
-  tree's `_results.json` under `"<date src-env>|<row>|<baseline-id>"`. Freshness reuses
-  `matrix._cmp_state` with the **two-folder input fingerprint** (`fp_folders=(day, baseline)`) —
-  BOTH sides are multi-file folders, so a route deleted on either one reads the cell stale.
+  are distinct artifacts and switching baselines never clobbers the other's. Strict typed truth is
+  cached in that tree's `_results.json` under `"<date src-env>|<row>|<baseline-id>"`, with output
+  identity `baseline-by-day`, generation ID, mtime, and the **two-folder input fingerprint**
+  (`fp_folders=(day, baseline)`). BOTH sides are multi-file folders, so a route deleted on either
+  one reads the cell stale; missing or untrusted generation/cache data is stale too.
 - **One queue, all three matrices:** baseline compare Jobs carry `which:"baseline"` and route to
   `BaselineMatrixCompareWorker` (compare-only mirror of `DayMatrixCompareWorker`). Bridge:
   `baseline_matrix_info` / `set_baseline_matrix_source` / `set_baseline_matrix_baseline` /
@@ -940,8 +1125,9 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   highlight is THE row. Each run logs its sample seed.
 - **The trust contract:** an example is only used when the value parsed back OUT of each PDF —
   normalized with the comparator's OWN projections — equals the value the comparison compared.
-  So an image can never illustrate something other than what was diffed, and each rendered pair
-  doubles as an end-to-end spot-check of the comparison at that cell. Failed candidates are
+  Under unchanged source files, each rendered pair therefore doubles as an end-to-end spot-check
+  of the comparison at that cell. CMP-AUD-112 remains open for Phase 7: parse-time records and the
+  later raster reopen are not yet bound to one immutable PDF generation. Failed candidates are
   skipped with a per-column reason (recorded in the workbook), e.g. the TSMIS PDF/Excel
   site-build skew or a TSN reference-date skew.
 - **Sources:** TSMIS side = the per-route **(PDF)-edition** export of the report (the Everything
@@ -1037,16 +1223,23 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   `MatrixEvidenceWorker`; resolvers `matrix.evidence_for_cell` /
   `day_matrix.evidence_for_day_cell` mirror the build paths' path resolution but do NOT heal
   the TSN library — a heal would rebuild it newer than the comparison and the gate below would
-  then rightly refuse). The **freshness gate** is what keeps it honest: the generator
-  re-enumerates diffs from the CURRENT consolidated + TSN artifacts, so the action REFUSES
-  (with a "refresh the comparison" hint) when the store changed under the consolidated
-  workbook or the consolidated/TSN workbook is newer than the comparison — images can never
-  illustrate a diff set the workbook doesn't carry. The JS side hides the camera on stale
-  cells and on rows whose report has no TSN prints (`evidenceActionInfo`).
-- **Locked by** `build/check_visual_evidence.py` (registry/sources/clamp for BOTH reports, the
+  then rightly refuse). Before rendering, the gate requires a trusted, complete published
+  comparison generation and current consolidated/TSN freshness. After rendering it re-reads the
+  comparison and requires the same generation ID, refusing success if it changed. This blocks
+  known-stale inputs and comparison replacement during the render, but it does not yet bind every
+  source/PDF byte or publish workbook+images+retirement as one immutable transaction
+  (CMP-AUD-106/109/112 remain Phase 7). The JS side hides the camera on stale cells and on rows
+  whose report has no TSN prints (`evidenceActionInfo`).
+- **Publication safety:** evidence source/caption cells use `set_safe_literal_cell`, including
+  formula leads and every Excel error token. Workbook/image sets use unpredictable identity-bound
+  temps, quarantines, and fallbacks; source aliases and target-aware Everything leases are checked
+  before writes, swaps, rollback, and cleanup. Uncertain replacements are retained, never removed.
+- **Locked by** `build/check_visual_evidence.py` (all five evidence families, source routing,
+  transaction/lease rollback, the
   caller gate + the on-demand freshness gate (every refusal message + the pass-through),
   the LOCKSTEP pins, the HD TSN print regexes + the ID fixed-window/max-overlap/
   flag-strip/LOC-tokenizer behavior, span→box math, verification projections, unique-key diff
   enumeration — the ID one mirroring compare_core's cell trim so whitespace-only differences
-  never enumerate — and both TSN loaders' sidecar contracts (`tsn_rows_with_dcr` row-identical
-  to the locked raw loaders); the frozen self-test proves the render stack itself.
+  never enumerate — and the TSN loaders' sidecar contracts (`tsn_rows_with_dcr` row-identical
+  to the locked raw loaders), `build/check_evidence_literal_cells.py`, and
+  `build/check_matrix_ownership.py`; the frozen self-test proves the render stack itself.

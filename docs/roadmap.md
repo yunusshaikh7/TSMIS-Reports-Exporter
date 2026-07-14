@@ -120,7 +120,7 @@ but the report is still `cs-disabled` on the site; consolidate/compare integrati
 Detail recipe once a real export exists (see *Feature backlog*). Highway Detail itself is DONE (v0.20.0).
 
 **Parked — pull in only by a separate decision:** code-signing (SignPath cert), DPAPI at-rest auth,
-`compare_core` min-cost-pairs, the A3 / C1 / D1 / F1 feature backlog, the dormant Med Wid watch, and the two
+`compare_core` min-cost-pairs, the A3 / C1 / D1 / F1 feature backlog, and the two
 upstream TSMIS-team reports (all in *Standing & cross-cutting* / *Feature backlog* below).
 
 ---
@@ -424,7 +424,9 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   the consolidated TSMIS workbook vs the statewide TSN PDF (key = category), with a "Summary by
   Category" familiar sheet via `extra_sheet_writer`. Registered in `tsn_library` (+
   `tsn_load_ramp_summary.build_into`), live in both matrices, golden `check_compare_ramp_summary_tsn.py`.
-  Canary: 31 both / 1 only-TSMIS / 27 diff / TSMIS 15215 vs TSN 15410. See [tsn-parsers.md](tsn-parsers.md).
+  Historical v0.17.0 canary (now superseded; implementation-history evidence only): 31 both /
+  1 only-TSMIS / 27 diff / TSMIS 15215 vs TSN 15410. The accepted Stage-8 contract is maintained in
+  [tsn-parsers.md](tsn-parsers.md) and the comparison-perfection dashboard.
 - [ ] **Intersection consolidate + compare-vs-TSN** [M] — **IN PROGRESS (v0.17.0).** Export enabled
   (dev site, via Settings ▸ "Use development site"). **Done:** `consolidate_intersection_detail`
   (thin `consolidate_xlsx` wrapper); **`consolidate_intersection_summary`** (block-walk category summer,
@@ -627,7 +629,7 @@ or accept as someday.**
   live site once intersections finalize (still site-side development; markers may drift).
 - *(The bulk of this — plus the carried §J2 live-verify set: the wrong-env backstop, the empty-routes UX,
   the staging retry, `report_error_text`/Highway-Sequence empty — is consolidated as the **work-PC field
-  sign-off** in [Next version](#next-version-v0182--whats-actually-owed) above.)*
+  sign-off** in [Next version](#next-version-v0185--whats-actually-owed) above.)*
 
 ### Upstream / external (report to the TSMIS team)
 - [ ] **DEV-SITE SSOR REGRESSION (2026-07-09, build 14:41)** — the Route History "restore" line in
@@ -656,12 +658,11 @@ or accept as someday.**
   first phase that touches a hot path. Measure then, not before.
 
 ### Dormant / watch (no action unless the data changes)
-- [ ] **Med Wid flavor-parity gap** (`compare_core._medwid_norm` vs `_medwid_ref`) — Excel `VALUE()`
-  accepts more strings as numeric than the Python regex, so an exotic Med Wid value could make the
-  values + formulas flavors disagree. **DORMANT:** every real Med Wid value is a clean
-  `<digits><letter>` or `"+++"` (parity-proven over 554k+ COM cells), so the current deliverable is
-  accurate. Revisit only if a value ever contains those characters. Detail in
-  [comparison-engine.md](comparison-engine.md) (Med Wid flavor-parity).
+- [x] **Med Wid flavor-parity gap — resolved in Phase-3 E1 (2026-07-12).** Python, values,
+  formula Comparison, and independent Spot Check now share the approved narrow ASCII grammar via
+  exact string canonicalization and hidden staged helpers; no Excel `VALUE()` coercion remains.
+  The adversarial grammar/fuzz, formula-length, physical-width, and installed-Excel gates own the
+  contract. Detail in [comparison-engine.md](comparison-engine.md) (Med Wid formula/value parity).
 
 ---
 

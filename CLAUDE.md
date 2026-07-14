@@ -70,12 +70,40 @@ July-2026 report overhaul since v0.22.0** (35-column export, re-verified statewi
 163,310 → 21,675). **Intersection Summary absorbed the July rename in v0.25.0**
 (`MAINLINE MASTARM` → `MASTERARM`: a parsing-only alias + a section-partition tripwire —
 every block but the site-under-counted Highway Group must sum to the route total, so the
-next silent reshape fails loudly). **The Highway Sequence comparison was re-verified
-statewide on the fresh 7.8 bundle in v0.24.0** (library rebuild byte-identical; counts
-within ~54 rows of the 6.19 canary — the TSMIS drift since June); **its PDF edition was
-parser-blessed on the 7.9 print set** (60,493/60,493 rows parse back vs Excel; the print
-shares TSN's equate convention, so PDF-vs-TSN pairs 434 rows MORE than Excel-vs-TSN; the
-self-check exposes an Excel-dropped Description on route 037). **Ramp Detail (PDF) was
+next silent reshape fails loudly). **The Highway Sequence historical 7.8-Excel/
+first-7.9-PDF fixture remains retained** (60,493/60,493 rows), but it is not current
+same-run truth. The current July-9 pair is 60,494 Excel / 60,493 PDF rows: route 037
+`003.809` is fixed in Excel, four paired PDF Descriptions are blank, and one described
+Excel row is absent from PDF. Installed Excel also proves the four lowercase `_x000d_`
+values are CRLF, not substantive differences. The Stage-8 audit further proves
+PDF↔Excel must pair on route/county/prefix/base PM with suffix asserted; the product
+still uses the older glued-suffix identity and remains red pending remediation. The
+vs-TSN product is also red: its symmetric Description rule mutates all 154 TSN numeric
+prefixes and 90 cross-route TSMIS prefixes per form, and its asserted-only duplicate
+objective changes hundreds of source occurrence assignments. Do not re-bless its current
+aggregate counts as source truth. The cache-backed residual classifier reproduces those
+persisted maps and aggregate arithmetic. Its original zero-unexplained claim was
+withdrawn after CMP-AUD-221 through 223 exposed unconditional attribution, post-resolve
+link checks, and an output/input alias hazard. The hardened classifier now proves every
+assignment objective, rejects an arbitrary swap and real Windows link/alias probes, and
+replays byte-identically; it is still cache-backed non-acceptance evidence. Direct-source
+acceptance must reproduce the same contracts before any product count is blessed.
+Stage-8 base-family audits are complete: **7/7**. Highway Log closed on exact 252-member
+Excel/PDF source witnesses, its accepted-red Stage-6 chain, an independent projection
+oracle, two clean seven-file product-leg universes, and two byte-identical final-gate
+result/acceptance pairs. The gate accepts only the base audit: product, full-physical,
+workbook-evidence, and end-to-end perfection remain false. CMP-AUD-045/047/048/049/050/
+066/067/157 remain open, and no product code changed during the bounded closeout. Exact
+counts and hashes live in
+[docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
+Implementation is frozen; resume only from
+[docs/planning/comparison-perfection/comparison-implementation-handoff.md](docs/planning/comparison-perfection/comparison-implementation-handoff.md)
+after explicit owner authorization.
+New reviewers start at
+[docs/planning/comparison-perfection/README.md](docs/planning/comparison-perfection/README.md)
+and use the linked reconciliation prompt before deciding whether to finish Stages 9–10
+or propose implementation.
+**Ramp Detail (PDF) was
 blessed the same way in v0.26.0 on the `All Reports 7.9` pair** (15,216/15,216 rows parse
 back vs the same-day Excel; PDF↔Excel identical 15,212/15,216 — the 4 residuals are the
 Excel's `_x000d_` escapes the print omits; the print carries the On/Off + Ramp Type
@@ -114,6 +142,17 @@ re-compare; freshness-gated). **Since v0.24.0 the toggle spells itself out per r
 (✓ will generate / ○ needs prints → folder / a named no-support list) and supported
 matrix rows carry a camera badge. See
 [docs/comparison-engine.md](docs/comparison-engine.md) §13.
+
+**Comparison-perfection audit warning (2026-07-14): Highway Sequence imagery is not
+yet an end-to-end comparison verifier.** The current evidence adapter recomputes through
+the product loaders instead of reading the published Comparison cells, excludes whole
+difference and one-sided classes before sampling, routes Excel comparisons through a
+companion TSMIS PDF, and has no source-faithful PDF-vs-Excel mode. Its Spot Check also
+trusts Comparison's status and source-row links, so an internally consistent wrong pair
+can still display `OK`. Do not use a clean sample image set or Spot Check alone to bless
+HSL. The live source-first status and exact findings are in
+[docs/planning/comparison-perfection/comparison-perfection-project.md](docs/planning/comparison-perfection/comparison-perfection-project.md)
+and [docs/planning/comparison-perfection/comparison-audit-findings.md](docs/planning/comparison-perfection/comparison-audit-findings.md).
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
 [docs/reports.md](docs/reports.md). Highway Log columns / PDF parsing / comparisons:
@@ -162,33 +201,94 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   Write as if the user authored it. (Project-specific reinforcement of the global rule.)
 - **Never commit** `scripts/tsmis_auth.json` (treat as a credential), generated
   `output/`, or build artifacts (`build/.venv`, `dist/`, `.claude/` state).
-- **`compare_core` is regression-locked.** Any change to its formula/label TEXT must
-  be proven **cell-for-cell identical** for the TSMIS-vs-TSN flavor before shipping;
-  new behavior is added through **opt-in** `CompareSchema` fields that default to the
-  no-op original (so non-HL comparisons stay byte-identical). See
-  [docs/comparison-engine.md](docs/comparison-engine.md).
-- **Completion is producer-owned; a partial never promotes.** `outcome.py` is the
-  vocabulary (completion ∈ complete/partial/no_data/cancelled/failed × artifact ∈
-  promoted/new_unpromoted/previous_preserved/none) — set it from structured counts,
-  **never** inferred from `summary_lines` text. Only a **complete** result may be
-  promoted to the live store, cached, or shown green. See
+- **`compare_core` semantics are correctness-locked, not history-locked.** Equality,
+  formula, normalization, identity, pairing, and count changes must follow the approved
+  domain contract and be proved cell-for-cell against the independent oracle plus both
+  workbook flavors. Preserve historical output only when it is correct; a confirmed defect
+  must be fixed globally when the contract is global, even if canary counts or bytes change.
+  Every deliberate delta needs exact input/output evidence and an explained re-bless. Opt-in
+  `CompareSchema` fields remain appropriate for truly report-specific behavior, but are not a
+  shield for a broken shared engine. The typed `ComparedCell` and hidden versioned
+  `E`/`D`/`N`/`U` state masks own discrepancy truth; the visible ` ≠ ` separator is content/
+  presentation only and must never be scanned for state. See
+  [docs/comparison-engine.md](docs/comparison-engine.md). Before Phase-3 equality/pairing
+  work, read and honor the approved policy/oracle gates in
+  [docs/planning/comparison-perfection/comparison-phase3-decision-gates.md](docs/planning/comparison-perfection/comparison-phase3-decision-gates.md).
+- **Comparison perfection is source-first and end to end.** Before changing any
+  comparison family, read
+  [docs/planning/comparison-perfection/comparison-perfection-project.md](docs/planning/comparison-perfection/comparison-perfection-project.md).
+  Its at-a-glance table is the owner-facing progress surface; update it whenever a
+  comparison stage changes, a blocker is added/removed, or the next promotion proof
+  changes. Keep detailed bugs/hashes in the linked finding/source/canary ledgers rather
+  than duplicating them into new planning files.
+  Raw TSN is the starting truth; rebuild normalized inputs in isolation, prove
+  raw-to-normalized record/field conservation, re-prove comparison cells independently,
+  and require all supported evidence to agree with both PDFs and the Comparison sheet.
+  Historical outputs/counts never override source facts, and a missing source fact is a
+  hard stop rather than permission to infer it.
+- **Duplicate identity is exact, typed, and auditable.** Within the 100,000-cell
+  product cap, use the rectangular Hungarian assignment and the approved
+  lexicographically-smallest smaller-side vector; never reintroduce greedy or file-order
+  certification. Above the cap, positional output is partial/capped diagnosis only and
+  can never be green or a match. Persist the complete typed duplicate trace and capped
+  diagnostics. Workbook lookups use versioned opaque ordinal tokens—never delimiter-
+  flattened route/key text. Cancellation during source validation, pairing, or count
+  construction returns unknown counts/quality with no trace or workbook mutation.
+- **A generated workbook certifies only its build-time identity.** The visible source
+  sheets, opaque helpers, Med-Wid stages, and row universe are bound to very-hidden
+  `CMP_E2_SNAPSHOT_V1` sheets and tail sentinels. Any post-build source/helper edit must
+  make Summary say `REGENERATE REQUIRED`; live observations under stale duplicate
+  assignment are diagnostic and cannot certify either match or differences.
+- **Completion is producer-owned; prose is never state.** `outcome.py` owns the
+  consolidator vocabulary (completion ∈ complete/partial/no_data/cancelled/failed ×
+  artifact ∈ promoted/new_unpromoted/previous_preserved/none), while
+  `comparison_contract.py` owns typed comparison truth. Canonical report/store
+  promotion still requires a complete result. A comparison's observed partial
+  generation may currently be committed and cached so it can be shown amber and
+  retried, but it may never be called fresh, green, or a match. The Phase-5
+  last-complete/unpromoted-partial policy remains open. See
   [docs/engine-and-reliability.md](docs/engine-and-reliability.md).
-- **Consolidated artifacts are transactional.** Write to a temp then `os.replace`;
-  a partial/failed/cancelled refresh **keeps last-good** (never clobbers it). Each
-  persistent workbook carries a producer-set `consolidation_meta` completion sidecar
-  whose read is **fail-safe** (corrupt/locked ⇒ conservative partial, never a false
-  green). `cache_envelope.py` versions the matrix/by-day caches.
-- **Read comparison counts by HEADER LABEL, not column position.** `read_counts`
-  locates Status/Diffs from the workbook header so flat vs grouped layouts both work
-  (the F4/O4 fix); never hard-code A1/column indices.
+- **Every returned public comparison terminal is typed, even without an artifact.**
+  `comparison_result_boundary` covers file and folder adapters, normalizing missing
+  input/dependency/preflight/shape errors, overwrite cancellation, `no_data`, and commit
+  failure into a fail-closed `ComparisonOutcome` plus terminal `AttemptState`. It never
+  parses `summary_lines`. If no workbook committed, `artifact_generation` MUST remain
+  `None` and `attempt_state.generation_id` MUST remain empty; only real committed bytes
+  receive a generation and member sidecars.
+- **Generated artifacts are transactional and ownership-bound.** Reject every selected/
+  derived output that aliases an effective input; under user destinations, write only
+  through a current purpose-bound `OwnershipLease`. Use exclusively reserved,
+  identity-bound temps then `os.replace`;
+  a partial/failed/cancelled refresh **keeps last-good** (never clobbers it). Ordinary
+  persistent workbooks carry producer-set `consolidation_meta` completion sidecars.
+  Comparison consumers use the stricter contract instead: returned
+  `ComparisonOutcome`, committed `ArtifactGeneration`, succeeded `AttemptState`, and
+  the trusted/current persisted member generation must agree exactly through
+  `consolidation_meta.require_published_comparison`. A sentinel, peer/digest mismatch,
+  malformed metadata, or returned/persisted disagreement is untrusted; missing/stale
+  metadata is stale. Comparison schema v3 uses one bounded canonical compressed payload
+  shared by small peer envelopes; inline schema v2 remains read-compatible. Publication
+  is parent-serialized across local threads/processes, installs chunks crash-safely
+  without replacement, and succeeds only when the persisted outcome/generation/member
+  exactly equals its own attempt. Peers are validated before the payload is decoded
+  once; over-limit or high-expansion payloads fail closed. No-artifact terminal results
+  are not sent through this committed-generation reducer. `cache_envelope.py` versions
+  the matrix/by-day caches. Matrix
+  formula-twin unification, durable attempt overlays/provenance, and exact-generation
+  evidence remain their assigned Phase-5/7 work.
+- **Workbook count scraping is diagnostic/migration-only.** `read_counts` locates
+  Status/Diffs by HEADER LABEL (never hard-coded position), but Matrix, classic UI,
+  and validation truth comes from the strict typed comparison generation. Workbook
+  scraping must never certify a green UI result.
 - **`report_catalog.py` is the report-metadata SoT**; `reports.py` is **derived** from
   it (EXPORT/CONSOLIDATE/COMPARE lists, matrix rows, stable-ID lookups, the picker
   `group`/`short_label` + `_PICKER_ORDER`). Stable IDs are immutable string keys;
   `batch_manifest._V017_EXPORT_ORDER` (== `EXPORT_KEYS`) is **append-only** — positions
   0–7 frozen; v0.18.1 appended Highway Detail/Summary at 8/9 as reserved-DISABLED
   groundwork, **v0.19.1 enabled their EXPORT** (`DISABLED_EXPORT_SUBDIRS` now empty;
-  real Excel-sibling specs). They stay **absent from matrix/compare/consolidate** until
-  that integration lands (a later feature). Add a report by editing the catalog;
+  real Excel-sibling specs). Highway Detail now consolidates and participates in the
+  Matrix, cross-environment, vs-TSN, and PDF-vs-Excel comparisons; Highway Summary
+  remains export-only until a real enabled-site schema can be verified. Add a report by editing the catalog;
   `check_report_catalog` proves the derivation. See [docs/reports.md](docs/reports.md).
 - **Select reports by stable `data_value`, not visible text** (v0.18.1). `select_report`
   and the env-scan probe match the `#customReport` option by its `data-value` (the site's
@@ -208,9 +308,14 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
 - **The updater TLS trusts the Windows cert store** (`ssl.create_default_context()`).
   Never switch it to `requests`/`certifi` — a bundled CA list breaks corporate
   TLS inspection on exactly the managed PCs that need it.
-- **Real test data + the live TSMIS website source are LOCAL ONLY** (under
-  `C:\Users\Yunus\Downloads\TSMIS\…`) — never commit, copy into the repo, or push;
-  the website source is Caltrans-internal. It is the ground truth for selectors/labels.
+- **Real test data + the live TSMIS website source are LOCAL ONLY** under
+  `C:\Users\Yunus\Downloads\TSMIS\…` — never commit, copy into the repo, or push;
+  the website source is Caltrans-internal. Read that corpus's `_INDEX.md` before
+  choosing fixtures: `ground-truth/` is the acceptance oracle, `report-samples/`
+  is for parser spot checks, `comparison-outputs/` is historical reference only,
+  and `_scratch/` is disposable and must never become an oracle. Bind and record
+  the exact canonical bundle/input identities used by each real-data canary in
+  [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
 - **Work-PC reality:** any feature that must run on the locked-down Caltrans work PC
   must work as a plain unsigned exe from a user-writable folder — no PowerShell, cmd,
   admin, temp scripts, or scheduled tasks. See [docs/it-and-security.md](docs/it-and-security.md).
@@ -231,15 +336,16 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   auth_nav.py report_nav.py session.py site_target.py routes.py errors.py timeouts.py
   browser_channels.py edge_device.py   the extracted engine leaves common.py re-exports
   exporter.py exporter_parallel.py export_multi.py run_report.py cli.py events.py settings.py paths.py
-  outcome.py cache_envelope.py consolidation_meta.py artifact_store.py   the outcome/transaction contracts
+  outcome.py comparison_contract.py cache_envelope.py consolidation_meta.py artifact_store.py owned_dir.py
+                              outcome/typed comparison/transaction/ownership
   report_catalog.py          the report-metadata source of truth (P4); reports.py derives from it
   reports.py                 the report/consolidate/compare registry view + stable-ID lookups
   export_*.py                one thin ReportSpec per report type (incl. *_pdf editions)
   consolidate_*.py           per-route exports → one workbook (+ TSN / TSMIS-PDF parsers)
-  compare_core.py            the regression-locked comparison-workbook engine
+  compare_core.py            the correctness-locked comparison-workbook engine
   compare_tsn_common.py      the shared FILE-comparator substrate (P5b; every comparator rides it since v0.19.0)
   compare_env.py compare_highway_log*.py compare_*_tsn.py compare_*_pdf.py   the comparison families over compare_core
-  visual_evidence.py evidence_*.py       the evidence-images engine + the per-report adapters (HD, ID, HL, HSL)
+  visual_evidence.py evidence_*.py       the evidence-images engine + adapters (HD, ID, HL, HSL, RD)
   pdf_table_lib.py           the shared PDF-table machinery (clusterer/columns/writer/convert loop, R2)
   matrix.py                  the matrix FACADE (patch matrix.<name>) over matrix_state.py + matrix_build.py
   matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary
@@ -250,7 +356,7 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   gui_worker.py              re-export SHIM over gui_worker_export/_env/_maint/_matrix.py (S2)
   task_coordinator.py contract.py        GUI task-state owner / Python⇄JS bridge enum SSOT
   gui_endpoint.py gui_matrix.py gui_win32.py   the endpoint envelope (+_task_endpoint/pick_path) / matrix mixin / Win32
-  validation.py              the one-click Settings validation (W1)
+  validation.py credential_safety.py     one-click validation + diagnostic credential guard
   site_capture.py            the Settings website-source capture (v0.26.0, local-only)
   baseline_matrix.py         the Compare-tab "vs Baseline" day-vs-baseline matrix (v0.26.0)
   ui/                        index.html app.css app.js + ui-export/-batch/-compare/-matrix/-settings/-dom.js + mock.js + contract.js

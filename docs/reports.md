@@ -114,12 +114,12 @@ normalizes each raw source once and caches it — see
 
 | TSN dataset | Raw source | Norm ver | Evidence prints |
 |---|---|---|---|
-| `highway_log` | 12 district PDFs | 3 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
+| `highway_log` | exactly one internally claimed D01–D12 PDF | 4 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
 | `ramp_detail` | statewide XLSX | 2 | — |
 | `ramp_summary` | statewide PDF | 2 | — |
 | `intersection_summary` | statewide PDF | 2 | — |
 | `intersection_detail` | statewide XLSX | 3 | `pdf/` drop: the ONE statewide TASAS print |
-| `highway_sequence` | 12 district PDFs | 2 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
+| `highway_sequence` | exactly one internally claimed D01–D12 PDF | 3 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
 | `highway_detail` | statewide XLSX | 2 | `pdf/` drop: the 12 district prints |
 
 ## `ReportSpec` -- what makes one report differ from another
@@ -142,8 +142,8 @@ Each thin `scripts/export_<name>.py` module is ~30 lines: a `SPEC = ReportSpec(.
 
 - **`save_pdf_letter(page, out_path, timeout_ms=None)`** -- `page.pdf(format="Letter", print_background=True, margin 0.4in)`. The report is already rendered inline, so `timeout_ms` is unused. Used by Ramp Summary.
 - **`save_via_export_button(page, out_path, timeout_ms=None)`** -- clicks `button.export-btn` (`has_text="Export"`, `.first`) and saves the download. Bounds the download wait at `min(download_start_timeout_ms(), ceiling)`; a rendered route whose Export produces no download (the site's no-op for "nothing to export") raises `EmptyExport` in seconds instead of hanging the full ceiling + 15-min retry. If `report_error_text(page)` is set it raises `ReportError` instead. Used by Ramp Detail, Highway Sequence, Highway Log, both Intersection reports.
-- **`save_highway_log_pdf(page, out_path, timeout_ms=None)`** -- see [Highway Log (PDF)](#report-4b--highway-log-pdf) below.
-- **`save_intersection_detail_pdf(page, out_path, timeout_ms=None)`** -- the Intersection Detail parallel (`intd_printAll`); see [Report 6b](#report-6b--intersection-detail-pdf) below.
+- **`save_highway_log_pdf(page, out_path, timeout_ms=None)`** -- see [Highway Log (PDF)](#report-4b----highway-log-pdf) below.
+- **`save_intersection_detail_pdf(page, out_path, timeout_ms=None)`** -- the Intersection Detail parallel (`intd_printAll`); see [Report 6b](#report-6b----intersection-detail-pdf) below.
 
 Every save calls `_verify_saved_file` (magic-byte integrity check: `.xlsx` must start `PK\x03\x04`, `.pdf` must start `%PDF`; a truncated/0-byte file is deleted and the route fails so resume re-pulls it). See [engine-and-reliability.md](engine-and-reliability.md) for the resume integrity gate.
 
@@ -230,8 +230,8 @@ The exact parallel of Report 4b (Highway Log (PDF)), forward-ported in v0.18.0 (
 - **Appended LAST** in the export catalog so the seven existing export-op keys keep positions 0–6 — the manifest-v1 integer-index compatibility contract (CR-002-RM4; `batch_manifest._V017_EXPORT_ORDER` index 7 = `intersection_detail_pdf`).
 - `wait_js` / `is_empty` are identical to the Excel Intersection Detail (`td.hl-empty` / `"no results found"`); `is_empty` runs BEFORE save, so the PDF render only runs for routes with rows.
 - `save=save_intersection_detail_pdf` (in `exporter.py`) — the same print-capture mechanism as `save_highway_log_pdf`: the site's `intd_printAll()` builds the full multi-page layout, `window.print` is overridden to raise so the on-screen restore never runs, then `page.pdf()` captures it; it fails loudly with `ReportError` if the print fn or layout is missing.
-- **Consolidator:** `consolidate_tsmis_intersection_detail_pdf.py` parses the PDF route exports into the SAME 35-column July-2026 format (`intersection_detail_columns.HEADER`, Description at index 20) as the Excel export — a two-row-per-record / zebra-shaded PDF parser (both grids from the shaded records' own 21/18-cell bands; rowA = zero-padded postmile, rowB = the print-only integer intersection number, discarded; the vestigial 21st rowA column is warned about if it ever grows data back; pre-update prints are refused with a re-export hint). Statewide parity proof vs the same-run Excel: 217/217 routes, 16,459/16,459 rows, 0 orphans, 0 non-whitespace cell diffs. Like HL-PDF it is NOT auto-consolidated inline (it needs a scratch convert dir — the matrix handles it). **Comparators:** `compare_intersection_detail_pdf` — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, reusing the Excel Intersection Detail's vs-TSN schema/loaders.
-- Verified offline against the fake-site fixture (`build/check_intersection_detail_pdf.py`, `build/fake_site/intersection_detail_print.html`). **Live-export verification against TSMIS is owed in v0.18.1** (the dev PC can't reach the dev site).
+- **Consolidator:** `consolidate_tsmis_intersection_detail_pdf.py` parses the PDF route exports into the SAME 35-column July-2026 format (`intersection_detail_columns.HEADER`, Description at index 20) as the Excel export — a two-row-per-record / zebra-shaded PDF parser (both grids from the shaded records' own 21/18-cell bands; rowA = zero-padded postmile, rowB = the print-only integer intersection number, discarded; the vestigial 21st rowA column is warned about if it ever grows data back; pre-update prints are refused with a re-export hint). Current 7.9 statewide parity proof vs the same-pull Excel: 217/217 routes, 16,459/16,459 rows, 0 orphans across 1,844 PDF pages, and exactly nine typed cell differences — eight Excel Description cells with trailing tabs the PDF cannot render plus one HG source conflict at `108/TUO/5.870` where PDF and both TSN forms agree against Excel. Every nonblank typed consolidation cell, explicit member Route, and physical `S` claim is exact. Like HL-PDF it is NOT auto-consolidated inline (it needs a scratch convert dir — the matrix handles it). **Comparators:** `compare_intersection_detail_pdf` — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, reusing the Excel Intersection Detail's vs-TSN schema/loaders.
+- Verified offline against the fake-site fixture (`build/check_intersection_detail_pdf.py`, `build/fake_site/intersection_detail_print.html`) and source-bound end to end against the current 217+217 `All Reports 7.9` ARS-prod pair. The accepted source oracle is `ID-79` in `docs/planning/comparison-perfection/comparison-canary-bindings.md`; product parser/identity/Report-View findings remain open and are not excused by source-projection acceptance.
 
 ## Report grouping & site-menu-safe selection (v0.18.1)
 

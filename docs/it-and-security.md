@@ -44,9 +44,12 @@ re-signed certificate and break the updater on exactly the managed PCs that need
 
 ## 2. Files it reads and writes
 
-Everything lives **next to the `.exe`** (or `%LOCALAPPDATA%\TSMIS Exporter` if that
-folder is read-only — see `scripts/paths.py`, `_resolve_data_root` → `DATA_ROOT`).
-It never writes to system locations, the registry, or other users' profiles.
+App-private data defaults **next to the `.exe`** (or `%LOCALAPPDATA%\TSMIS Exporter` if
+that folder is read-only — see `scripts/paths.py`, `_resolve_data_root` → `DATA_ROOT`).
+User-authorized exceptions may live elsewhere: the configured Export-Everything
+destination and its comparisons, an explicit TSN workbook selected for reading, and
+workbooks/ZIPs chosen in native Save dialogs. The app does not write to system
+locations, the registry, or other users' profiles.
 
 - `output\…` — the exported PDF/XLSX reports and run-report CSVs (`OUTPUT_ROOT`).
 - `input\tsn_highway_log\…` — TSN PDFs the user drops in (consolidate feature;
@@ -119,6 +122,8 @@ narrative: [lessons.md](lessons.md); the strip routine itself is
   staged file is ignored. User data (`output\`, `input\`, `data\`) is never in the update and is
   never touched. A failed swap rolls back to the previous version.
 - A read-only install can't self-update; it opens the release page instead.
+- Build-time dependencies are hash-pinned in `requirements-build.lock.txt` and
+  `build.ps1` installs them with `--require-hashes`; CI also runs `pip-audit`.
 
 ## 6. Known gaps (honest disclosure)
 
@@ -134,9 +139,6 @@ narrative: [lessons.md](lessons.md); the strip routine itself is
   own app folder. Windows DPAPI (`CryptProtectData`) at-rest encryption is the
   candidate hardening (the code comment at `common.save_auth_state` points back at
   this doc).
-- **Build-time dependencies are not yet hash-pinned** (`--require-hashes`). CI runs
-  `pip-audit` to flag known-vulnerable deps; a fully hash-locked build requirements
-  file is the planned next step.
 
 ## 7. Code-signing — the recommended path
 
@@ -255,31 +257,50 @@ should act on (all verified against code, not just asserted):
   EVERYTHING`, forced `verdict="diff"` on skipped inputs — is the intended fix; see
   [comparison-engine.md](comparison-engine.md).)
 
-### 8.3 Notable GOOD designs (don't waste time re-flagging)
+### 8.3 Current independently reverified controls
 
-The same audit explicitly cleared these as sound — re-auditing them is wasted effort:
+These controls have current executable checks; re-audit them when their boundaries change:
 
 - **GUI is injection-safe.** The Python→JS bridge dispatches via `json.dumps`
   (`window.__tsmis.dispatch()`); `app.js` uses **no `innerHTML` / no `eval`**, so
   report data and env strings can't become markup or code. (GUI internals:
   [gui.md](gui.md).)
-- **`reset_targets` (Delete-all-reports) is well-scoped.** Its docstring is explicit:
-  "logs, the saved login, the Edge sign-in profile and the app's settings are NEVER
-  in this list." It removes only run folders, legacy output folders, the
-  TSN/TSMIS-PDF consolidated workbooks, the Export-Everything store, `FAILURES_DIR`,
-  and (opt-in) the TSN input PDFs. **Phase-3 hardening (`reset-deletes-unvalidated-batch-dest`):**
-  the user-chosen Export-Everything destination is NOT rmtree'd wholesale — only its
-  known `<src-env>/` children (the exact `{ssor,ars}-{prod,test,dev}` folders the batch
-  writer creates) are deleted, so any foreign files the user keeps alongside the store
-  survive; and the confirm dialog now shows each target's **real `str(path)`** under its
-  label (`reset_preview` returns `paths`), not a label that hid the location. Locked by
-  `check_b3_batch.py` (`test_reset_scopes_batch_dest`).
+- **`reset_targets` (Delete-all-reports) is identity- and ownership-bound.** Logs,
+  the saved login, browser profiles, and settings are never candidates. A child of a
+  user-chosen Export-Everything destination is eligible only when its name/layout,
+  purpose-specific create-only ownership marker, direct-parent relationship, and stable
+  directory identity all agree; older markers, user-created folders, linked paths, and
+  ambiguous entries are retained with a preview warning. The preview captures the exact
+  entry/root identities and the GUI binds that immutable set to a single-use confirmation
+  token. Reset then atomically renames each approved entry to an unpredictable same-parent
+  quarantine, revalidates the identity/marker, and uses the reparse-safe deleter. A failed
+  deletion is restored or retained at the disclosed quarantine path; an object that later
+  appears under the original name is never inherited into the approved set. User-placed
+  TSN inputs remain an explicit opt-in exception: they have no app-ownership marker, but
+  the preview and quarantine still bind their exact identities. Locked by
+  `check_owned_dir.py`, `check_reset_safety.py`, `check_b3_batch.py`, and the GUI token tests.
+- **Generated writes stay under exact app-created leases.** External store roots are
+  create-only and purpose-marked; pre-existing/legacy folders are never adopted.
+  `OwnershipLease` rejects a replaced root or any linked descendant. Exclusive staging,
+  report saves, consolidation/PDF scratch, sidecars/caches/evidence, promotion journals,
+  recovery, and cleanup all receive target-aware guards and bind created-object identities.
+  `check_owned_dir.py`, `check_artifact_store.py`, and `check_matrix_ownership.py` execute
+  ordinary replacement plus real Windows junction cases.
 - **The support bundle excludes the auth file and browser profiles.**
   `gui_api.save_support_bundle` adds only the rotating logs (`tsmis.log*`,
   `crash.log`, `update_helper.log`), up to 50 recent run-report CSVs, and a
-  `manifest.txt`. Its own docstring + the user-facing message say it carries "this
+  `manifest.txt`; that manifest includes only the diagnostic settings explicitly
+  allowlisted by `settings.support_bundle_settings()`. Its own docstring + the
+  user-facing message say it carries "this
   PC's name in paths" so it's "safe to send to the TSMIS maintainer, not safe to post
   publicly" — and **never** the saved login, profiles, or `FAILURES_DIR` dumps.
+- **Validation evidence is credential-scanned at the final ZIP boundary.** Diagnostic
+  text is redacted through the shared credential grammar, then every final member is
+  scanned before publication — member names/comments/extra fields, UTF-8/UTF-16 and
+  binary streams, and nested Office/ZIP members included. An opaque or malformed Office
+  member that cannot be proved safe fails closed. Publication is atomic, so a rejected
+  build leaves the prior good evidence bundle byte-for-byte intact. Locked by
+  `check_evidence_bundle.py` and `check_validation.py`.
 - **The website-source capture is local-only diagnostic data** (v0.26.0,
   Settings ▸ "Capture website source" → `site_capture.py`). It saves the current
   site's report page + its SAME-ORIGIN scripts/styles into
@@ -293,17 +314,16 @@ The same audit explicitly cleared these as sound — re-auditing them is wasted 
 - **Settings writes are atomic.** `config.json` (and the batch manifest,
   `batch_manifest.save` → temp file + `os.replace`) are written atomically, so a
   crash mid-write can't corrupt them.
-- **The reset/extract paths can't be tricked into traversing outside their
-  targets** (verified empirically on Python 3.11 + Windows, 2026-06-16).
-  `shutil.rmtree` **refuses** a top-level directory junction (leaves the junction's
-  target untouched) and does **not** recurse into a nested junction (removes the
-  link only); `reset_targets` builds its delete list from path constants
-  (`OUTPUT_ROOT` run folders / fixed legacy names / `FAILURES_DIR` / `INPUT_ROOT`) plus,
-  for the user-chosen Export-Everything dest, ONLY its recognized `<src-env>/` children
-  (name-gated against `{ssor,ars}-{prod,test,dev}`) — never the dest root and never an
-  arbitrary user-supplied path. The updater's `zipfile.extractall` is likewise safe:
-  3.11 sanitizes `..`/absolute/drive members and the staged zip is SHA-256-verified
-  and self-produced. (Closed item; see [roadmap.md](roadmap.md).)
+- **Reset never recursively follows a junction/symlink.** `safe_delete.scoped_rmtree`
+  inspects entries without following them and unlinks a reparse entry itself; the
+  identity-bound quarantine above prevents a replacement at the previewed spelling from
+  transferring delete authority. This guarantee is enforced by real Windows junction
+  probes, rather than depending on undocumented `shutil.rmtree` behavior. The updater's
+  staged ZIP is separately SHA-256-verified and its extraction path checks reject
+  traversal/absolute/drive escapes. The unavoidable last-instruction pathname race of
+  ordinary Windows rename/delete APIs remains minimized by immediate identity rechecks
+  and fail-closed retention; native handle-relative filesystem calls would be required
+  to remove that final syscall-sized window entirely.
 
 ### 8.4 Open security gaps (the levers that remain)
 
@@ -314,8 +334,6 @@ In priority order:
 2. **Auth file at rest is plaintext `storage_state`** — protected only by NTFS perms.
    Consider Windows DPAPI (`CryptProtectData`) encryption (§6; see
    [auth-and-signin.md](auth-and-signin.md) for the auth lifecycle).
-3. **Build deps are not hash-pinned** — `pip-audit` flags known-vulnerable deps in
-   CI, but a `--require-hashes` build requirements file is not yet in place (§6).
 
 ---
 

@@ -148,7 +148,7 @@ v0.17.0/v0.18.0.
 `cmp:*` key (`COMPARE_KEYS`), so this order is only the UI-radio display order, not the
 contract `start_compare*` calls key on:
 
-The full set (18 rows; the env-folder rows first, since they drive the matrix, then
+The full set (29 rows; the env-folder rows first, since they drive the matrix, then
 the file-based vs-TSN / self rows — `cmp:*` key shown for the stable contract):
 
 | Label | Module / adapter | Kind | Group |
@@ -286,6 +286,11 @@ destination under `batch_dest` (`get/set_batch_dest`, default
 download, support bundle, Delete-all-reports, etc.) is described at a high level
 under the feature buckets below; its UI mechanics belong to [gui.md](gui.md).
 
+Explicit TSN picks are not stored as bare paths. `matrix_tsn_files` is read through
+`get_matrix_tsn_selections()` as versioned selection records carrying canonical path,
+content hash, size/mtime, and file identity. A legacy/path-only, missing, unreadable,
+or replaced selection is a durable blocked state until the user re-picks or clears it.
+
 ## High-level feature buckets (v0.12.0 / v0.13.0)
 
 These are the structural shape of recent features. Runtime details and the GUI
@@ -301,6 +306,18 @@ mechanics are owned by [engine-and-reliability.md](engine-and-reliability.md) an
 | **B1 Pause/Resume** | Holds BETWEEN routes (never inside a thread-affine Playwright wait), in both sequential and parallel engines — so it WORKS in fast mode (all workers park), unlike Skip. | `Events.is_paused` (8th callback) + shared `exporter._wait_while_paused`; `GuiApi.pause_or_resume` toggles `pause_event`, cleared on cancel and at end-of-task. Lock: `build/check_b1_pause.py`. |
 | **B2 auto-consolidate** | One Export-tab toggle; `ExportWorker` runs the matching consolidator INLINE after each spec's export (reuses the held task slot + same Events sink). The two PDF editions (Highway Log (PDF) + Intersection Detail (PDF)) have no inline auto-consolidator → skipped (they need a scratch convert dir, so the matrix / auto-consolidate handles them specially; every other report, incl. both Intersection **Excel** reports, consolidates inline as of v0.17.0); failures logged, never fatal. | `reports.consolidator_for_spec` maps export→consolidate by subdir. Lock: `build/check_b2_autoconsolidate.py`. |
 | **B3 Export Everything (always-current store)** | The **Everything** tab runs selected report types × selected environments SEQUENTIALLY into a configurable, UNDATED, overwritten-in-place destination (always holds the latest of every report), laid out `<dest>/<src-env>/<report>/` (+ `consolidated/`). Each report+env folder is refreshed via **STAGE-AND-SWAP** (`_swap_store_dir`): the export writes into a `.staging` sibling and replaces the live folder only on a clean finish (discarded on cancel/crash), so a failed refresh never destroys the last-good copy — the Phase-3 fix for `auto-consolidate-rmtree-out-dir-before-export`. Reuses B1 pause + B2 auto-consolidate. | `gui_worker.BatchWorker` (per-env, reusing `ExportWorker._run_specs`); per-env targeting via process-global `common.set_site` (NOT `set_thread_site` — a single sequential orchestrator under the single-task gate; original restored at end). Dest = `settings.get/set_batch_dest`. Saved-reports freshness library via `report_library.report_ages` + `GuiApi.report_library_info`. Progress persists to `batch_manifest` (`DATA_ROOT/batch_job.json`, atomic, untouched by Delete-all-reports) → resumes across restarts (startup Resume/Discard banner). Locks: `build/check_b3_batch.py` + `check_report_library.py`. |
+
+**Phase-1 destination ownership.** User-selected store children are create-only,
+purpose-marked `OwnershipLease` roots; existing unowned or legacy-marked folders are
+never adopted. `.staging` is exclusively created, plain, and identity-bound. Export
+saves, consolidation/PDF scratch, sidecars, promotion journals/recovery, Matrix caches,
+and evidence receive a target-aware guard that rejects a changed root or any reparse
+component. Everything comparisons use a comparisons lease plus a lazily acquired
+existing environment-store lease for TSN/self cells; Day/Baseline outputs are
+app-private and never claim the batch destination. Reset binds its preview to exact
+entry/root identities, quarantines the same entry under an unpredictable same-parent
+name, and retains/restores on drift. Portable pathname checks leave an irreducible
+syscall-sized Windows race; every surrounding boundary fails closed.
 
 A3 (results tab) was deferred. **The current GUI is a stopgap** — a full GUI
 overhaul is planned (the user designs it elsewhere and will hand it over). Fix bugs,
@@ -377,7 +394,7 @@ ONE job queue (a `which:env|day` Job discriminator routes to the right worker). 
 
 ### v0.17.0 — the canonical TSN library + per-row `tsn_subdir`
 
-The six TSN reports essentially never change, so v0.17.0 gives them **one fixed home**
+The seven canonical TSN datasets essentially never change, so v0.17.0 gives them **one fixed home**
 instead of scattering them across drop folders: `scripts/tsn_library.py` over
 `<DATA_ROOT>/tsn_library/<report>/` (`raw/` = the raw TSN file(s) as exported — district
 PDFs / a statewide PDF / a statewide XLSX, the format is the report's own; `consolidated/`
@@ -391,11 +408,14 @@ openpyxl/pdfplumber, so importing it is console-free but not dependency-light. I
 the matrices' single TSN entry point, returning the same `{kind: file|consolidated|pdfs|
 raw|none, …}` contract as before.
 
-`matrix.tsn_source` now **delegates to `tsn_library.resolve`**: an explicit user pick
-(`settings.matrix_tsn_files`, keyed by report) wins; else the library; else the legacy
-fallbacks (`<dest>/_tsn_input/<report>/`, then the global console-flow
+`matrix.tsn_source` now **delegates to `tsn_library.resolve`**. In automatic mode the
+canonical library wins, followed by the legacy fallbacks (`<dest>/_tsn_input/<report>/`,
+then the global console-flow
 `input/tsn_highway_log/` + `output/tsn_highway_log_consolidated.xlsx`) so existing installs
-keep working until imported. The report key IS the per-row **`tsn_subdir`**
+keep working until imported. An explicit user pick (`settings.matrix_tsn_files`, keyed
+by report) is a versioned, identity-bound selection: it wins while current, and a
+missing/replaced/legacy path-only selection blocks dependent comparisons until the user
+re-picks or clears it—it never silently falls through to another dataset. The report key IS the per-row **`tsn_subdir`**
 (`matrix.tsn_subdir_for`): **each PDF edition shares its Excel sibling's subdir** — both Highway Log
 rows share `highway_log` and `intersection_detail_pdf` shares `intersection_detail` — so one TSN
 dataset serves both rows of a report; every other report uses its own. This replaced
@@ -412,11 +432,11 @@ where it lives" map — each item owned by the doc named:
 | Area | What changed | Owner doc |
 |---|---|---|
 | **Outcome contract** | An orthogonal, producer-owned completion × artifact model (`outcome.py`): a partial/failed/cancelled run is never promoted, cached, or shown green; counts (not text) decide. | [engine-and-reliability.md](engine-and-reliability.md) |
-| **Transactional artifacts** | Consolidated workbooks write temp-then-`os.replace` and keep last-good on failure; a fail-safe producer sidecar (`consolidation_meta.py`) records completion; `cache_envelope.py` versions the matrix caches; `artifact_store.py` owns the staged store-promote. | [engine-and-reliability.md](engine-and-reliability.md) |
+| **Transactional artifacts** | Workbooks use exclusively reserved identity-bound temps, source/output-alias rejection, target-aware guards, validation, then `os.replace`; last-good survives failures. `consolidation_meta.py` records completion, `cache_envelope.py` versions Matrix caches, and `artifact_store.py` owns staged store promotion/recovery. | [engine-and-reliability.md](engine-and-reliability.md) |
 | **Engine leaf split** | `common.py` became a re-export **shim** over an acyclic set of engine leaves (`auth_nav`, `report_nav`, `session`, `site_target`, `routes`, `errors`, `timeouts`, `browser_channels`, `edge_device`); `from common import X` is unchanged. Import direction is guarded (`build/check_import_direction.py`). | [engine-and-reliability.md](engine-and-reliability.md) |
 | **GUI restructuring** | `task_coordinator.py` is the single owner of task/gate state (exactly-once terminal delivery); `contract.py` + `ui/contract.js` are the Python⇄JS bridge enum SSOT; endpoint groups split into `gui_endpoint` / `gui_matrix` / `gui_win32`. | [gui.md](gui.md) |
 | **Front-end split** | `scripts/ui/` is now `index.html` + `app.css` + `app.js` + `mock.js` (the `#mock` fixtures, a separate file) + `ui-dom.js` / `ui-matrix.js` / `ui-settings.js` + `contract.js`. | [gui.md](gui.md) |
-| **Comparator substrate** | The five non-HL vs-TSN file comparators share `compare_tsn_common`; `compare_core` stays **byte-for-byte unmodified** (the dormant `context_fill` hook on `main` was deliberately not ported). | [comparison-engine.md](comparison-engine.md) |
+| **Comparator substrate** | At the v0.18.0 overhaul the five non-HL vs-TSN file comparators shared `compare_tsn_common` while semantic `compare_core` output stayed byte-identical. Current Phase-1 changes add only shared literal-cell and target-aware write-safety seams; semantic equality remediation remains separately regression-gated. | [comparison-engine.md](comparison-engine.md) |
 | **New report (CR-002)** | Intersection Detail (PDF) forward-ported as an exact parallel of Highway Log (PDF) — see the registry tables above. | [reports.md](reports.md) |
 | **Packaging / updater** | Updater hardened (fail-closed checksum, staged re-hash before swap, zip-slip guard, bounded retry, revert pagination, log rotation, frozen-only cache clear); a hash-pinned reproducible build; `release.yml` per-variant `.sha256` enforcement; the exact **windowed** exe runs the self-test gate; a credential-safe work-PC **evidence kit** (`evidence.py`, `--collect-evidence`). | [build-and-release.md](build-and-release.md), [work-pc-validation.md](work-pc-validation.md) |
 
