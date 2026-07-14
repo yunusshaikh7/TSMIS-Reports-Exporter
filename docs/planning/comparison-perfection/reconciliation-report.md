@@ -656,29 +656,52 @@ and every family canary is untouched.
 Use the **source-only** digest as the boundary from here. The old full-tree digest was 58%
 bytecode and cannot survive an edit to any source file.
 
-## 14.4 Still open from Batch 0 — owner actions
+## 14.4 Batch 0 owner actions — all resolved (2026-07-14)
 
-1. **The two Highway Sequence final-gate replay roots are still ACL-locked** (§10, Q1).
-   Changing file access controls is outside what I may do; this one needs you, elevated:
-   ```
-   takeown /f "<...>\phase8_highway_sequence_final_family_gate_replay_r1" /r /d y
-   icacls  "<...>\phase8_highway_sequence_final_family_gate_replay_r1" /reset /t
-   ```
-   (same for `_r2`, and for `tmp\stage8-intersection-summary-r1\oracle-work\source-transaction-kba59jr0`).
-   Until then Stage 8 is **verifiably 6/7**, with Highway Sequence resting on a record no
-   one can open. Highway Log's equivalent artifacts verify byte-for-byte.
-   *Hypothesis, unproven:* those locks look like reserved transaction temps that were
-   never released — the audit harness runs on the product's own `owned_dir`/`artifact_store`
-   lease machinery, so the leak may be a defect in the code under audit. Worth a look;
-   not asserted.
-2. **The audit evidence base still lives in an agent-session sandbox**
-   (`~/.codex/visualizations/2026/07/10/<uuid>/`). It needs copying to durable storage and
-   re-hashing against the canary ledger. Say where and I will do it.
-3. **`uv.lock`** (root, untracked, a by-product of `tmp/uv-cache`): keep, ignore, or delete?
+1. **ACL unlock — DONE, and Stage 8 is now verifiably 7/7.** The owner ran `takeown` +
+   `icacls /grant` on the two Highway Sequence final-gate replay roots and the locked
+   `tmp\stage8-intersection-summary-r1\oracle-work\source-transaction-kba59jr0`. Both HSL
+   replays then hashed **byte-for-byte** to the recorded values — `result.json`
+   `f7f60e52…` (42,140 B) and `acceptance.json` `7e2e9ce4…` (1,510 B), each ×2 — and the
+   acceptance's own verdict (`stage8_family_accepted: false`,
+   `PASS_AUDIT_REPLAY_UNIT…NOT_FAMILY_PROMOTION`, 14 red findings preserved) matches the
+   docs. Combined with Highway Log's byte-verified pair, **all seven Stage-8 base
+   witnesses are now confirmed on disk. Stage 8 = 7/7 (audit layer).**
+   *Lease-leak hypothesis:* still open, now leaning **audit-harness artifact, not product
+   defect** — the `source-transaction-` directory name is generated only by
+   `build/phase8_intersection_summary_comparison.py` (an audit instrument), and the
+   product's `owned_dir`/`artifact_store` never restrict a directory or touch Windows
+   ACLs (the sole product `icacls`, in `auth_nav.py`, only *grants* the owner). Handed to
+   Codex for independent confirmation.
+2. **Evidence backup — DONE, and it turned out there were TWO locations.**
+   - `~/.codex/visualizations/2026/07/` → `…\comparison-audit-evidence\codex-visualizations-2026-07\`:
+     **19,017 files / 4.28 GB**, robocopy 0-failed, independently re-hashed 0-missing;
+     `MANIFEST.sha256` written; 67/115 ledger artifacts reproduced (the other 48 are
+     git-committed code, computed digests, the immutable corpus, or rejected/provisional
+     non-witnesses — see the backup's `README.md`).
+   - **repo `tmp/`** (found during this pass to be a *second* evidence location holding
+     ≥4 ledger-bound artifacts, incl. an `oracle-candidate.json` byte-identical to the
+     accepted Intersection Summary result `7e4aceba…`; git-ignored, so a `git clean -fdx`
+     would destroy it) → `…\comparison-audit-evidence\repo-tmp-stage8-working-trees\`:
+     **2,045 files / 2.31 GB**, robocopy 0-failed.
+   Durable location: `C:\Users\Yunus\Desktop\AI Workspace\Claude\comparison-audit-evidence\`.
+3. **`uv.lock` — DONE.** Removed (untracked, unreferenced by the app, a `uv`-cache
+   by-product). The app pins dependencies via `requirements*.txt` + `version.py`.
 
-## 14.5 Next
+## 14.5 Deferred housekeeping (safe, not yet done)
 
-Prerequisites 1–5 in §13 are now met except the ACL and the evidence backup, neither of
-which blocks **Batch 1 — CMP-AUD-024/025, Ramp Summary vs TSN**. Its oracle is accepted
-and replayed, it has no evidence family and no Report View, and the gate it will be proved
-against is now green and trustworthy.
+- **Do not clean repo `tmp/` yet.** Codex is mid-review in this working tree; `tmp/` is
+  now backed up, so it can be removed later, but not while another agent may be reading it.
+- **Push branch `comparison-perfection` to origin** — the 7 commits are local-only;
+  pushing is the biggest remaining durability win, but it is outward-facing and awaits an
+  explicit owner go-ahead.
+- **Refresh the `CLAUDE.md` project snapshot** (still says "implementation frozen") once
+  Batch 1 lands and the steady state settles — premature now.
+
+## 14.6 Next
+
+All §13 prerequisites are met. **Batch 1 — CMP-AUD-024/025, Ramp Summary vs TSN** — is
+clear to start: its oracle is accepted and byte-identical-replayed, it has no evidence
+family and no Report View, and the gate it will be proved against is green (121/121) and
+trustworthy. Recommended sequencing: let Codex's review of the engine diff land first so
+product `compare_*` files are not edited under review, then run Batch 1.
