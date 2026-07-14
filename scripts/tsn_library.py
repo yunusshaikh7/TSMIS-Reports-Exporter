@@ -175,7 +175,7 @@ def _finite_number(value):
         return False
     try:
         return math.isfinite(float(value))
-    except (OverflowError, TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):  # silent-ok: pure shape predicate, not an error path
         return False
 
 
@@ -216,7 +216,7 @@ def _open_bound_file(path):
     except Exception:
         try:
             os.close(descriptor)
-        except OSError:
+        except OSError:  # silent-ok: cleanup close; the bare re-raise below carries the real cause
             pass
         raise
     return path, descriptor, opened
@@ -232,7 +232,7 @@ def _finish_bound_file(path, descriptor, opened):
     finally:
         try:
             os.close(descriptor)
-        except OSError as exc:
+        except OSError as exc:  # silent-ok: not swallowed -- re-raised as ValueError just below
             close_error = exc
     if close_error is not None:
         raise ValueError("file descriptor could not be closed after reading") from close_error
@@ -267,7 +267,7 @@ def normalized_workbook_identity(path):
     except OSError as exc:
         try:
             os.close(descriptor)
-        except OSError:
+        except OSError:  # silent-ok: cleanup close; the ValueError below carries the real cause
             pass
         raise ValueError(
             f"normalized workbook could not be hashed ({type(exc).__name__}: {exc})") from exc
@@ -344,7 +344,7 @@ def _bound_sidecar_payload(path):
     except OSError as exc:
         try:
             os.close(descriptor)
-        except OSError:
+        except OSError:  # silent-ok: cleanup close; the ValueError below carries the real cause
             pass
         raise ValueError("TSN sidecar could not be read completely") from exc
     _finish_bound_file(path, descriptor, opened)
@@ -691,7 +691,12 @@ def status(report):
                        if metadata_current else None)
     try:
         stored_manifest = _raw_contract.validate_raw_manifest(stored_manifest)
-    except ValueError:
+    except ValueError as e:
+        # Absent is the ordinary "not built yet" state; PRESENT-but-invalid means a
+        # corrupt certificate is about to force a silent rebuild -- say so.
+        if stored_manifest is not None:
+            log.warning("tsn: stored raw manifest for %s is unusable (%s: %s)",
+                        report, type(e).__name__, e)
         stored_manifest = None
     raw_manifest_current = bool(
         raw_admissible and stored_manifest is not None
@@ -703,7 +708,10 @@ def status(report):
     try:
         stored_workbook_identity = validate_normalized_workbook_identity(
             stored_workbook_identity)
-    except ValueError:
+    except ValueError as e:
+        if stored_workbook_identity is not None:
+            log.warning("tsn: stored normalized-workbook identity for %s is unusable "
+                        "(%s: %s)", report, type(e).__name__, e)
         stored_workbook_identity = None
     current_workbook_identity = None
     workbook_identity_error = None
@@ -724,7 +732,11 @@ def status(report):
         try:
             expected_identity_token = canonical_normalized_identity_token(
                 report, current_manifest, current_workbook_identity)
-        except ValueError:
+        except ValueError as e:
+            # Everything else already looks current, so a token we cannot compute is
+            # abnormal: it silently demotes the library to stale.
+            log.warning("tsn: canonical identity token for %s could not be computed "
+                        "(%s: %s)", report, type(e).__name__, e)
             expected_identity_token = None
     identity_token_current = bool(
         isinstance(stored_identity_token, str)
@@ -1043,7 +1055,12 @@ def ensure_current(report, events=None, source=None):
             is_canonical = bool(
                 resolved_path
                 and Path(resolved_path).absolute() == consolidated_path(report).absolute())
-        except (OSError, RuntimeError, TypeError):
+        except (OSError, RuntimeError, TypeError) as e:
+            # Fail closed, but the refusal below only says "legacy or foreign"; the
+            # actual path fault has to reach the log.
+            log.warning("tsn: could not canonicalize the resolved consolidated path "
+                        "%r for %s (%s: %s)", resolved_path, report,
+                        type(e).__name__, e)
             is_canonical = False
         if source.get("legacy") or not is_canonical:
             return ConsolidateResult(

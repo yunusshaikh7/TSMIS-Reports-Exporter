@@ -109,7 +109,7 @@ APP_MODULES = [
     # the TSN-library loader, and the vs-TSN / PDF-flavor comparators.
     "consolidate_highway_detail", "consolidate_tsmis_highway_detail_pdf",
     "tsn_load_highway_detail",
-    "tsn_library", "tsn_load_ramp_detail", "tsn_load_ramp_summary",
+    "tsn_district_contract", "tsn_library", "tsn_load_ramp_detail", "tsn_load_ramp_summary",
     "tsn_load_intersection_summary", "tsn_load_intersection_detail", "summary_layout",
     "compare_core", "compare_tsn_common", "compare_highway_log", "compare_highway_log_pdf", "compare_env",
     "compare_ramp_detail_tsn", "compare_ramp_detail_pdf", "compare_ramp_summary_tsn",

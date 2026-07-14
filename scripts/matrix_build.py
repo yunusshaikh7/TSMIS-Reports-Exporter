@@ -133,7 +133,11 @@ def tsn_identity_check_for(tsn_key, source):
             try:
                 tsn_library.require_explicit_selection(selection)
                 return True
-            except (OSError, ValueError):
+            except (OSError, ValueError) as e:
+                # The caller turns False into a source-identity refusal, but the
+                # WHY only survives in the log ("one log upload answers it").
+                log.warning("matrix: selected TSN workbook is no longer current "
+                            "(%s: %s)", type(e).__name__, e)
                 return False
 
         _require_source_identity(_explicit_current, "using the selected TSN workbook")
@@ -261,7 +265,7 @@ def captured_tsn_workbook(source_path, expected_identity):
             if descriptor is not None:
                 try:
                     os.close(descriptor)
-                except OSError:
+                except OSError:  # silent-ok: cleanup close; the ValueError below carries the real cause
                     pass
             raise ValueError(
                 "the TSN workbook could not be captured through a stable pathname "
@@ -317,7 +321,7 @@ def captured_tsn_workbook(source_path, expected_identity):
                 else:
                     log.warning("matrix: retained replaced TSN capture sidecar %s",
                                 captured_sidecar)
-            except FileNotFoundError:
+            except FileNotFoundError:  # silent-ok: already gone is the desired end state
                 pass
             except OSError as e:
                 log.warning("matrix: could not clean TSN capture sidecar %s (%s: %s)",
@@ -328,7 +332,7 @@ def captured_tsn_workbook(source_path, expected_identity):
                     captured.unlink()
                 else:
                     log.warning("matrix: retained replaced TSN capture %s", captured)
-            except FileNotFoundError:
+            except FileNotFoundError:  # silent-ok: already gone is the desired end state
                 pass
             except OSError as e:
                 log.warning("matrix: could not clean TSN capture %s (%s: %s)",
@@ -339,7 +343,7 @@ def captured_tsn_workbook(source_path, expected_identity):
             else:
                 log.warning("matrix: retained replaced TSN capture directory %s",
                             temp_root)
-        except FileNotFoundError:
+        except FileNotFoundError:  # silent-ok: already gone is the desired end state
             pass
         except OSError as e:
             log.warning("matrix: retained non-empty/uncertain TSN capture directory "
