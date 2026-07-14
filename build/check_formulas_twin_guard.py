@@ -107,6 +107,19 @@ def main():
               len(calls2) == 1, f"calls: {calls2}")
         check("under the limit: the formulas sibling is committed",
               matrix._formulas_sibling(small).exists())
+
+        # S1: Matrix formulas are a derived destination, not the path the user
+        # selected.  If that sibling is one of the comparison inputs, the shared
+        # commit guard must stop before the comparator runs and preserve it.
+        formulas_source = matrix._formulas_sibling(small)
+        formulas_prior = formulas_source.read_bytes()
+        calls3 = []
+        matrix._try_formulas(_fake_compare_call_factory(calls3), small,
+                             events=events, source_paths=(formulas_source,))
+        check("a formulas sibling that aliases a source is rejected before compare",
+              calls3 == [], f"invoked with {calls3}")
+        check("the aliased formulas source is preserved byte-for-byte",
+              formulas_source.read_bytes() == formulas_prior)
     finally:
         matrix._FORMULAS_TWIN_MAX_ROWS = orig_limit
 

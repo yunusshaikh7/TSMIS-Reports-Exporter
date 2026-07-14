@@ -81,7 +81,15 @@ def main():
     res = run_compare(sc_pm, ROWS_A, ROWS_B, False, out, mode="formulas")
     assert res.status == "ok", res.status
     wb = load_workbook(out, data_only=False)
-    hdr = [c.value for c in next(wb["Comparison"].iter_rows(max_row=1))]
+    header_cells = list(next(wb["Comparison"].iter_rows(max_row=1)))
+    # E1 appends versioned hidden state-mask columns after every visible field;
+    # key-field geometry is the user-visible prefix, not those internal twins.
+    hdr = [c.value for c in header_cells
+           if not str(c.value).startswith("__CMP_E1_STATE_V1_")]
+    state_cells = [c for c in header_cells
+                   if str(c.value).startswith("__CMP_E1_STATE_V1_")]
+    assert state_cells and all(wb["Comparison"].column_dimensions[c.column_letter].hidden
+                               for c in state_cells), state_cells
     wb.close()
     # id columns: PM, #, AENV Row, BENV Row, Status, Diffs, then fields.
     assert hdr[0] == "PM", ("key column must lead the Comparison sheet", hdr)
@@ -93,7 +101,8 @@ def main():
     res = run_compare(sc_county, ROWS_A, ROWS_B, False, out, mode="formulas")
     assert res.status == "ok", res.status
     wb = load_workbook(out, data_only=False)
-    hdr = [c.value for c in next(wb["Comparison"].iter_rows(max_row=1))]
+    hdr = [c.value for c in next(wb["Comparison"].iter_rows(max_row=1))
+           if not str(c.value).startswith("__CMP_E1_STATE_V1_")]
     wb.close()
     assert hdr[0] == "County" and hdr[6:] == ["PM", "Desc"], \
         ("key_field=0 must keep the original layout", hdr)

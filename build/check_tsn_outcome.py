@@ -1,13 +1,14 @@
-"""CT (P1-B05) -- TSN producer-owned completion + library persistence + propagation.
+"""CT (P1-B05) -- TSN producer completion persistence and complete-only reuse.
 
 Proves the contract is complete on the TSN side:
   * every incomplete-capable TSN builder SETS a producer-owned completion + structured
     counts (not just an "INCOMPLETE" warning line) -- Ramp Summary / Intersection
     Summary (missing categories) and Highway Sequence (a failed district PDF);
   * tsn_library.build_consolidated PERSISTS that outcome beside the generated workbook
-    and tsn_library.resolve EXPOSES it (so a reused TSN workbook stays flagged);
-  * matrix.build_comparison AND day_matrix.build_day_cell REDUCE a partial TSN side into
-    the comparison result, so the cell reads partial (compared, but flagged).
+    and tsn_library.resolve EXPOSES it before reuse;
+  * comparison consumers never compare that PARTIAL ground truth: Everything and
+    by-day drive ensure_current, rebuild from admissible raw, and proceed only after
+    the persisted producer outcome is COMPLETE with zero skipped/failed inputs.
 
 Offline: the PDF parse functions are monkeypatched (no real PDFs / pdfplumber parse);
 openpyxl writes real workbooks. Run from the repo root:
@@ -23,12 +24,15 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import outcome as oc                  # noqa: E402
+import artifact_store                 # noqa: E402
 import consolidation_meta as cm       # noqa: E402
 import matrix                         # noqa: E402
 import day_matrix as dm               # noqa: E402
 import paths                          # noqa: E402
 import tsn_library                    # noqa: E402
 from events import ConsolidateResult, Events   # noqa: E402
+from comparison_contract import ComparisonCounts, ComparisonOutcome  # noqa: E402
+from openpyxl import Workbook         # noqa: E402
 
 _fail = []
 
@@ -37,6 +41,40 @@ def check(name, cond):
     print(f"  [{'OK ' if cond else 'FAIL'}] {name}")
     if not cond:
         _fail.append(name)
+
+
+def _partial_comparison(path):
+    typed = ComparisonOutcome(
+        status="ok", completion="partial", verdict="diff",
+        counts=ComparisonCounts(known=True, paired_rows=1),
+        warnings=("TSN source coverage was partial",), pairing_quality="exact")
+
+    def produce(tmp):
+        wb = Workbook(); wb.active.title = "Comparison"; wb.save(tmp)
+        return ConsolidateResult(
+            status="ok", output_path=str(tmp), verdict="diff",
+            completion="partial", skipped_inputs=1, failed_inputs=0,
+            comparison_outcome=typed)
+
+    return artifact_store.commit_workbook(
+        path, produce, expect_sheet="Comparison", requested_mode="values")
+
+
+def _complete_comparison(path):
+    typed = ComparisonOutcome(
+        status="ok", completion="complete", verdict="match",
+        counts=ComparisonCounts(known=True, paired_rows=1),
+        warnings=(), pairing_quality="exact")
+
+    def produce(tmp):
+        wb = Workbook(); wb.active.title = "Comparison"; wb.save(tmp)
+        return ConsolidateResult(
+            status="ok", output_path=str(tmp), verdict="match",
+            completion="complete", skipped_inputs=0, failed_inputs=0,
+            comparison_outcome=typed)
+
+    return artifact_store.commit_workbook(
+        path, produce, expect_sheet="Comparison", requested_mode="values")
 
 
 @contextlib.contextmanager
@@ -89,16 +127,17 @@ def test_producers():
         import consolidate_tsn_highway_sequence as hs
         hsraw = tmp / "hsraw"
         hsraw.mkdir()
-        (hsraw / "D01 HSL TSN.pdf").write_bytes(b"%PDF-1.4")
-        (hsraw / "D02 HSL TSN.pdf").write_bytes(b"%PDF-1.4")
+        for district in range(1, 13):
+            (hsraw / f"D{district:02d} HSL TSN.pdf").write_bytes(b"%PDF-1.4")
 
         def _parse_both_ok(path, events, pdf_name=None):
-            return {"1": [{"row": 1}]}                       # non-empty -> a route landed
+            district = Path(pdf_name).name[1:3]
+            return district, {district: [{"row": 1}]}       # non-empty -> a route landed
 
         def _parse_one_fails(path, events, pdf_name=None):
-            if "D02" in str(path):
+            if "D02" in str(pdf_name):
                 raise ValueError("unreadable district PDF")
-            return {"1": [{"row": 1}]}
+            return _parse_both_ok(path, events, pdf_name)
 
         # The workbook content is irrelevant here (only the completion is) — stub the
         # writer so the test doesn't depend on the row-dict schema. The writer now takes
@@ -117,8 +156,9 @@ def test_producers():
                   r.completion == oc.COMPLETE and r.failed_inputs == 0)
             with _patch(hs, "parse_pdf", _parse_one_fails):
                 r = hs.consolidate(input_dir=hsraw, out_path=tmp / "hs_part.xlsx", events=Events())
-            check("highway sequence, one district PDF fails -> partial + failed_inputs",
-                  r.completion == oc.PARTIAL and r.failed_inputs == 1)
+            check("highway sequence, one district PDF fails -> error / no partial truth",
+                  r.status == "error" and r.failed_inputs == 1
+                  and not (tmp / "hs_part.xlsx").exists())
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -158,42 +198,77 @@ def test_library_and_matrix_end_to_end():
             errres = tsn_library.build_consolidated("ramp_summary", events=Events(), force=True)
         check("build_consolidated returns an ERROR result when write_outcome reports failure",
               errres.status == "error")
+        # The monkeypatch above deliberately bypasses write_outcome's real
+        # fail-safe cleanup. Re-certify this unchanged fixture generation before
+        # testing downstream reuse; production never receives this test-only gap.
+        raw_manifest = tsn_library._raw_manifest("ramp_summary")
+        workbook_identity = tsn_library.normalized_workbook_identity(cons)
+        cm.write_outcome(
+            cons, br,
+            extra={"tsn_normalization_version":
+                   tsn_library.get("ramp_summary").normalization_version,
+                   "tsn_raw_manifest": raw_manifest,
+                   "tsn_normalized_workbook_identity": workbook_identity,
+                   "tsn_artifact_identity_token":
+                       tsn_library.canonical_normalized_identity_token(
+                           "ramp_summary", raw_manifest, workbook_identity)})
 
-        # Everything matrix: build_comparison reduces the partial TSN side into the cell.
-        # The TSMIS-side consolidate/compare is stubbed (ok/complete) so only the TSN-side
-        # reduction is under test; tsn_source -> the REAL library resolve above.
+        # Everything matrix: the identity-valid PARTIAL is not a comparison
+        # source.  The real ensure_current path must rebuild it to COMPLETE from
+        # the retained raw before the comparator is reached.
         dest = tmp / "store"
         (dest / "ars-prod" / "ramp_summary").mkdir(parents=True, exist_ok=True)
+        healed_counts = dict(full)
+        healed_counts[rstsn._CATEGORIES[0][1]] = 1
 
         def _ok_compare(tsmis_dir, tsn_path, out_path, *a, **k):
-            Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-            Path(out_path).write_text("x")
-            return ConsolidateResult(status="ok", verdict="diff", output_path=str(out_path))
+            return _complete_comparison(Path(out_path))
 
-        with _patch(matrix, "consolidate_and_compare_tsn", _ok_compare):
+        with _patch(rstsn, "parse_tsn_pdf", lambda _p: dict(healed_counts)), \
+             _patch(matrix, "consolidate_and_compare_tsn", _ok_compare):
             res = matrix.build_comparison(dest, "ramp_summary", "ars-prod", "tsn",
                                           "ssor-prod", events=None)
-        check("Everything matrix cell reduces the partial TSN side -> partial",
-              res.completion == oc.PARTIAL)
+        check("Everything matrix rebuilds PARTIAL TSN before comparison",
+              res.completion == oc.COMPLETE
+              and tsn_library.status("ramp_summary")["current"] is True
+              and tsn_library.resolve("ramp_summary").get("completion") == oc.COMPLETE)
 
-        # by-day matrix: build_day_cell reduces the partial TSN side too.
+        # Restore a valid PARTIAL certificate over the same current workbook so
+        # the independent by-day entry point must perform the same healing.
+        raw_manifest = tsn_library._raw_manifest("ramp_summary")
+        workbook_identity = tsn_library.normalized_workbook_identity(cons)
+        assert cm.write_outcome(
+            cons, br,
+            extra={"tsn_normalization_version":
+                   tsn_library.get("ramp_summary").normalization_version,
+                   "tsn_raw_manifest": raw_manifest,
+                   "tsn_normalized_workbook_identity": workbook_identity,
+                   "tsn_artifact_identity_token":
+                       tsn_library.canonical_normalized_identity_token(
+                           "ramp_summary", raw_manifest, workbook_identity)})
+        assert tsn_library.resolve("ramp_summary").get("completion") == oc.PARTIAL
+
+        # by-day matrix: it too heals before compare and records COMPLETE.
         captured = {}
 
         def _rec(date, source, row_key, verdict, diff_cells, one_sided, built_at,
-                 completion=oc.COMPLETE, input_fingerprint=None):
+                 completion=None, input_fingerprint=None,
+                 source_identities=None, generation_id=None,
+                 commit_guard=None):
             captured["completion"] = completion
 
         out_file = tmp / "byday_out.xlsx"
-        with _patch(matrix, "consolidate_and_compare_tsn",
-                    lambda *a, **k: (out_file.write_text("x"),
-                                     ConsolidateResult(status="ok", verdict="diff",
-                                                       output_path=str(out_file)))[1]), \
+        with _patch(rstsn, "parse_tsn_pdf", lambda _p: dict(healed_counts)), \
+             _patch(matrix, "consolidate_and_compare_tsn",
+                    lambda *a, **k: _complete_comparison(out_file)), \
              _patch(dm, "parse_run_folder", lambda _n: True), \
              _patch(dm, "day_out_path", lambda *a: out_file), \
              _patch(dm, "record_result", _rec):
             dres = dm.build_day_cell("ssor-prod", "2026-06-21", "ramp_summary", dest, events=None)
-        check("by-day cell reduces the partial TSN side -> partial",
-              dres.completion == oc.PARTIAL and captured.get("completion") == oc.PARTIAL)
+        check("by-day matrix rebuilds PARTIAL TSN before comparison",
+              dres.completion == oc.COMPLETE
+              and captured.get("completion") == oc.COMPLETE
+              and tsn_library.status("ramp_summary")["current"] is True)
     finally:
         paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT = saved
         shutil.rmtree(tmp, ignore_errors=True)

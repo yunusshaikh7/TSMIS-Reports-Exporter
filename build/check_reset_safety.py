@@ -101,8 +101,7 @@ def test_owned_marker_required():
     foreign = dest / "ssor-prod"                 # the user's own folder
     foreign.mkdir()
     owned = dest / "ars-dev"                     # an app-created store child
-    owned.mkdir()
-    owned_dir.mark_owned(owned)
+    owned_dir.ensure_owned_dir(owned, kind="store")
     saved = settings.get_batch_dest
     settings.get_batch_dest = lambda: str(dest)
     try:

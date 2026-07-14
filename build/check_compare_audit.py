@@ -5,8 +5,9 @@ but real invariant/robustness gaps):
   P1  the data-sheet HELPER-KEY cell and the Routes ROUTE-ID cell are guarded —
       a "="-leading key/route no longer becomes a live formula (which broke the
       Comparison MATCH lookups AND split the two flavors). [completes injection fix]
-  P2  the Summary per-field COUNTIF keys on the SPACED " ≠ " marker, like every
-      other diff detector (Diffs/CF/Spot Check/Python mirror).
+  P2  hidden, versioned state masks own discrepancy truth. Diffs, Summary,
+      conditional formatting, and Spot Check consume E/D/N/U state or an exact
+      state/display twin; the visible " ≠ " separator is presentation only.
   P3  Ramp Summary route keys are zero-pad-normalized (PDF title "1" == filename
       "001"); internal unnamed header columns get an identifiable placeholder.
   P4  normalize_value canonicalizes datetime.time too.
@@ -38,15 +39,20 @@ def test_p1_helper_key_and_route_id_guarded():
     sc = CompareSchema(report_name="K", header=["Loc", "V"], side_a="A", side_b="B",
                        id_noun="row", id_noun_plural="rows")
     out = os.path.join(tempfile.gettempdir(), "_audit_hk.xlsx")
-    # per-route: a "="-leading KEY. The data sheet "Key (helper)" cell ("=K1|1")
-    # must be TEXT, not a live formula (else its MATCH lookups break + flavors split).
+    # per-route: a "="-leading KEY. The data helper must be an opaque literal,
+    # never source-derived formula text (else MATCH lookups break + flavors split).
     run_compare(sc, [["=K1", "x"], ["b", "y"]], [["=K1", "x"], ["b", "y"]],
                 False, out, mode="formulas")
     wb = load_workbook(out, data_only=False)
     ws = wb["A"]
     hk_col = _col(ws, "Key (helper)")
     hk = ws.cell(row=2, column=hk_col)
-    assert hk.data_type == "s" and hk.value == "=K1|1", (hk.data_type, hk.value)
+    assert (hk.data_type == "s"
+            and str(hk.value).startswith("__CMP_E2_KEY_V1_")), \
+        (hk.data_type, hk.value)
+    raw_key = ws.cell(row=2, column=_col(ws, "Loc"))
+    assert raw_key.data_type == "s" and raw_key.value == "=K1", \
+        (raw_key.data_type, raw_key.value)
     wb.close(); os.remove(out)
 
     # consolidated: a "="-leading ROUTE id on the Routes sheet must be TEXT.
@@ -60,19 +66,52 @@ def test_p1_helper_key_and_route_id_guarded():
     wb.close(); os.remove(out)
 
 
-def test_p2_countif_spaced_marker():
+def test_p2_state_mask_is_truth():
     sc = CompareSchema(report_name="K", header=["Loc", "V"], side_a="A", side_b="B",
                        id_noun="row", id_noun_plural="rows")
     out = os.path.join(tempfile.gettempdir(), "_audit_cf.xlsx")
     run_compare(sc, [["1", "a"]], [["1", "b"]], False, out, mode="formulas")
     wb = load_workbook(out, data_only=False)
-    cfs = [str(c.value) for row in wb["Summary"].iter_rows() for c in row
-           if c.data_type == "f" and "COUNTIF" in str(c.value) and "Comparison!" in str(c.value)
-           and "≠" in str(c.value)]
-    wb.close(); os.remove(out)
-    assert cfs, "no per-field COUNTIF found"
-    for f in cfs:
-        assert '"* ≠ *"' in f, ("per-field COUNTIF must use the spaced marker", f)
+    try:
+        comparison = wb["Comparison"]
+        state_cells = [cell for cell in comparison[1]
+                       if str(cell.value).startswith("__CMP_E1_STATE_V1_")]
+        assert len(state_cells) == 1, [cell.value for cell in state_cells]
+        state_col = state_cells[0].column_letter
+        assert comparison.column_dimensions[state_col].hidden, state_col
+        state_formula = str(comparison[f"{state_col}2"].value)
+        assert '"E"' in state_formula and '"D"' in state_formula, state_formula
+
+        diffs = str(comparison.cell(2, _col(comparison, "Diffs")).value)
+        summary_formulas = [str(cell.value) for row in wb["Summary"].iter_rows()
+                            for cell in row if cell.data_type == "f"]
+        per_field = [formula for formula in summary_formulas
+                     if "MID(Comparison!" in formula and '="D"' in formula]
+        cf_formulas = [str(formula)
+                       for region in comparison.conditional_formatting
+                       for rule in comparison.conditional_formatting[region]
+                       for formula in (rule.formula or ())]
+        spot = wb["Spot Check"]
+        agreement = str(spot["G16"].value)
+
+        assert "SUBSTITUTE(" in diffs and '"D"' in diffs, diffs
+        assert per_field, summary_formulas
+        assert any("MID($" in formula and '="D"' in formula
+                   for formula in cf_formulas), cf_formulas
+        assert ("EXACT($K16,$M16)" in agreement
+                and "EXACT($L16,$F16)" in agreement), agreement
+        assert all(spot.column_dimensions[col].hidden for col in ("K", "L", "M"))
+
+        # The separator may appear in display formulas and prose, but no truth
+        # consumer may scan for it. This rejects the old forged-state path.
+        truth_formulas = [diffs, agreement, *per_field, *cf_formulas]
+        marker_scans = [formula for formula in truth_formulas
+                        if "≠" in formula
+                        and any(token in formula.upper()
+                                for token in ("SEARCH(", "FIND(", "COUNTIF("))]
+        assert not marker_scans, marker_scans
+    finally:
+        wb.close(); os.remove(out)
 
 
 def test_p3_route_key_normalize():
@@ -117,13 +156,13 @@ def test_p3_side_label_cap():
 
 def main():
     test_p1_helper_key_and_route_id_guarded()
-    test_p2_countif_spaced_marker()
+    test_p2_state_mask_is_truth()
     test_p3_route_key_normalize()
     test_p3_none_header_placeholder()
     test_p4_time_normalize()
     test_p3_side_label_cap()
-    print("OK  audit hardening: helper-key + route-id guarded; per-field COUNTIF "
-          "uses the spaced marker; route keys normalized; unnamed columns "
+    print("OK  audit hardening: helper-key + route-id guarded; hidden state masks "
+          "own diff truth with no marker scans; route keys normalized; unnamed columns "
           "labeled; time canonicalized; side labels capped to the 31-char limit.")
 
 

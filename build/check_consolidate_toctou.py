@@ -287,15 +287,18 @@ def tsn_highway_sequence_late_save():
         out_path = tmp / "seq.xlsx"
         calls = []
         saved = M.parse_pdf
+        saved_universe = M.tdc.require_exact_universe
         _row = {"county": "04", "pm": "0.000", "city": "", "hg": "", "ft": "",
                 "dist": "", "description": ""}
-        M.parse_pdf = lambda _p, _e, pdf_name="": {"001": [_row]}
+        M.parse_pdf = lambda _p, _e, pdf_name="": ("01", {"001": [_row]})
+        M.tdc.require_exact_universe = lambda claimed: tuple(claimed)
         try:
             res = _run_with_late_save_appearance(out_path, lambda: M.consolidate(
                 events=Events(), confirm_overwrite=lambda _p: calls.append(_p) or False,
                 input_dir=in_dir, out_path=out_path))
         finally:
             M.parse_pdf = saved
+            M.tdc.require_exact_universe = saved_universe
         _assert_late_save("tsn_highway_sequence", calls, res, out_path)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

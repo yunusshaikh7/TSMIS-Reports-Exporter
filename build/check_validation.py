@@ -16,6 +16,7 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [os.path.join(_ROOT, "scripts"), _ROOT]   # scripts + repo root (version.py)
@@ -47,6 +48,34 @@ class _Patch:
 
     def __exit__(self, *a):
         setattr(self.obj, self.name, self.old)
+
+
+def _published(completion="complete", diff_cells=0, one_sided=0,
+               skipped_inputs=0, failed_inputs=0):
+    counts = SimpleNamespace(
+        known=True,
+        paired_rows=10,
+        side_a_only_rows=one_sided,
+        side_b_only_rows=0,
+        differing_rows=min(diff_cells, 10),
+        differing_cells=diff_cells,
+        asserted_cells=20,
+        context_cells=0,
+    )
+    typed = SimpleNamespace(
+        completion=completion,
+        verdict=("match" if completion == "complete"
+                 and diff_cells == 0 and one_sided == 0 else "diff"),
+        counts=counts,
+    )
+    return SimpleNamespace(
+        trusted=True,
+        current=True,
+        comparison_outcome=typed,
+        artifact_generation=SimpleNamespace(generation_id="g-test"),
+        skipped_inputs=skipped_inputs,
+        failed_inputs=failed_inputs,
+    )
 
 
 def _store(root, rows_per_env):
@@ -84,7 +113,8 @@ def test_manifest_and_cancel():
     with _Patch(_settings, "get_batch_dest", lambda: str(dest)), \
          _Patch(_settings, "get_matrix_baseline", lambda: "ssor-prod"), \
          _Patch(_matrix, "build_comparison", fake_build), \
-         _Patch(_matrix, "read_counts", lambda p: (969, 0)), \
+         _Patch(validation.consolidation_meta, "require_published_comparison",
+                lambda p, r: _published(diff_cells=969)), \
          _Patch(_reports, "matrix_rows",
                 lambda: [("highway_log", "Highway Log", "highway_log", 0, object())]), \
          _Patch(_tsn, "is_registered", lambda r: True), \
@@ -121,7 +151,8 @@ def test_manifest_and_cancel():
     with _Patch(_settings, "get_batch_dest", lambda: str(dest)), \
          _Patch(_settings, "get_matrix_baseline", lambda: "ssor-prod"), \
          _Patch(_matrix, "build_comparison", fake_build), \
-         _Patch(_matrix, "read_counts", lambda p: (1, 0)), \
+         _Patch(validation.consolidation_meta, "require_published_comparison",
+                lambda p, r: _published(diff_cells=1)), \
          _Patch(_reports, "matrix_rows",
                 lambda: [("highway_log", "Highway Log", "highway_log", 0, object())]), \
          _Patch(_tsn, "is_registered", lambda r: True), \
@@ -182,6 +213,31 @@ def test_degrades_on_family_error():
     check("the harmless path in the same message is preserved (RM05: paths OK)",
           "r.xlsx" in blob)
 
+    # CMP-AUD-117: labels/schemes must consume the WHOLE credential value. The
+    # old regex redacted only the word "Bearer" in an Authorization header and
+    # ignored bare schemes/JWTs entirely, leaving the actual secret in the ZIP.
+    scrub_cases = [
+        ("Authorization: Bearer SECRET-ABC-123", ("SECRET-ABC-123",)),
+        ("Proxy-Authorization=Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==",
+         ("QWxhZGRpbjpvcGVuIHNlc2FtZQ==",)),
+        ("retry with Bearer BARE-TOKEN-456", ("BARE-TOKEN-456",)),
+        ("retry with Bearer abc", ("abc",)),
+        ("retry with Bearer AB$CD", ("AB$CD",)),
+        ("Authorization: Bearer\r\n FOLDED-SECRET-789",
+         ("FOLDED-SECRET-789",)),
+        ("Cookie: SID=cookie-secret; theme=dark", ("cookie-secret",)),
+        ("https://x.invalid/?access_token=QUERY-SECRET&mode=1", ("QUERY-SECRET",)),
+        ("jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0."
+         "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+         ("eyJhbGciOiJIUzI1NiJ9", "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")),
+    ]
+    for raw, secrets in scrub_cases:
+        cleaned = validation._scrub(raw)
+        check(f"credential form is fully scrubbed: {raw.split()[0]}",
+              all(secret not in cleaned for secret in secrets)
+              and "[redacted]" in cleaned,
+              f"scrubbed value still leaked: {cleaned!r}")
+
 
 def test_evidence_carries_manifest():
     print("evidence.collect ships validation.txt + validation.json:")
@@ -213,6 +269,8 @@ def test_evidence_carries_manifest():
               "app v0.19.0" in digest and "969" in digest and "route_001" not in digest)
         rt = json.loads(z.read("validation.json"))
         check("json round-trips the manifest", rt["totals"]["comparisons_ok"] == 1)
+        check("returned member count equals the actual ZIP member count",
+              res.get("files") == len(names))
 
 
 def test_trust_semantics():
@@ -220,6 +278,11 @@ def test_trust_semantics():
     library is HEALED (not errored); unreadable counts are flagged, not shown as
     a clean success. These are the trust properties the bundle exists to prove."""
     print("validation trust semantics — partial/heal/unreadable-counts:")
+    check("missing completion/counts/generation can never default to full OK",
+          not validation._is_full_ok({"status": "ok"})
+          and not validation._is_full_ok({
+              "status": "ok", "classification": "ok",
+              "completion": "complete", "counts_unreadable": True}))
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_valtrust_"))
     dest = tmp / "store"
     _store(dest, {"ssor-prod": ["highway_log", "intersection_detail"]})
@@ -243,11 +306,17 @@ def test_trust_semantics():
         healed["n"] += 1
         return ConsolidateResult(status="ok", message="rebuilt")
 
+    def require_published(path, _result):
+        if str(path).endswith("c.xlsx"):
+            raise ValueError("typed counts/generation are unreadable")
+        return _published(completion=outcome.PARTIAL, diff_cells=3,
+                          skipped_inputs=1)
+
     with _Patch(_settings, "get_batch_dest", lambda: str(dest)), \
          _Patch(_settings, "get_matrix_baseline", lambda: "ssor-prod"), \
          _Patch(_matrix, "build_comparison", build), \
-         _Patch(_matrix, "read_counts",
-                lambda p: (None, None) if p.endswith("c.xlsx") else (3, 0)), \
+         _Patch(validation.consolidation_meta, "require_published_comparison",
+                require_published), \
          _Patch(_reports, "matrix_rows",
                 lambda: [("highway_log", "Highway Log", "highway_log", 0, object()),
                          ("intersection_detail", "Int Detail", "intersection_detail", 1, object())]), \
@@ -260,14 +329,15 @@ def test_trust_semantics():
 
     t = man["totals"]
     check("a PARTIAL comparison is NOT a full OK (partial tallied separately)",
-          t["comparisons_ok"] == 1 and t["comparisons_partial"] == 1
+          t["comparisons_ok"] == 0 and t["comparisons_partial"] == 1
+          and t["comparisons_untrusted"] == 1
           and t["comparisons_run"] == 2, f"totals={t}")
     check("a present-but-raw TSN library is HEALED before comparing (not errored)",
           healed["n"] >= 1)
     dig = "\n".join(validation.summary_lines(man))
     check("digest flags the PARTIAL cell", "PARTIAL inputs" in dig)
-    check("digest flags unreadable counts (not a bare success)",
-          "counts could not be read" in dig)
+    check("digest flags unreadable typed metadata (not a bare success)",
+          "UNTRUSTED" in dig and "unreadable" in dig)
 
 
 def test_tsn_stage_heals_stale_library():
@@ -315,6 +385,73 @@ def test_tsn_stage_heals_stale_library():
           by["stale_lib"]["normalization_version"] == 2)
 
 
+def test_missing_explicit_tsn_is_not_substituted():
+    """CMP-AUD-105: validation honors shared TSN keys for every PDF row."""
+    print("validation fails closed on deleted explicit TSN selections (all PDF rows):")
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_valpick_"))
+    dest = tmp / "store"
+    _store(dest, {"ssor-prod": ["highway_log"]})
+    pdf_rows = [
+        ("highway_log_pdf", "Highway Log (PDF)", "highway_log_pdf", 0, object()),
+        ("intersection_detail_pdf", "Intersection Detail (PDF)",
+         "intersection_detail_pdf", 0, object()),
+        ("highway_detail_pdf", "Highway Detail (PDF)", "highway_detail_pdf", 0, object()),
+        ("highway_sequence_pdf", "Highway Sequence (PDF)",
+         "highway_sequence_pdf", 0, object()),
+        ("ramp_detail_pdf", "Ramp Detail (PDF)", "ramp_detail_pdf", 0, object()),
+    ]
+    bases = {
+        "highway_log_pdf": "highway_log",
+        "intersection_detail_pdf": "intersection_detail",
+        "highway_detail_pdf": "highway_detail",
+        "highway_sequence_pdf": "highway_sequence",
+        "ramp_detail_pdf": "ramp_detail",
+    }
+    selections = {
+        base: {"version": 1, "path": str(tmp / f"deleted-{base}.xlsx"),
+               "identity": {"sha256": "0" * 64, "size": 1,
+                            "mtime_ns": 1, "file_id": "1:1"}}
+        for base in set(bases.values())
+    }
+    built = []
+    resolved = []
+
+    import matrix as _matrix
+    import settings as _settings
+    import tsn_library as _tsn
+    import reports as _reports
+
+    def resolve(_report, selected_file=None):
+        resolved.append((_report, selected_file))
+        if selected_file:
+            return {"kind": "missing_explicit",
+                    "selected_path": selected_file["path"],
+                    "selection_reason": "missing"}
+        return {"kind": "consolidated", "path": str(tmp / "canonical.xlsx")}
+
+    with _Patch(_settings, "get_batch_dest", lambda: str(dest)), \
+         _Patch(_settings, "get_matrix_baseline", lambda: "ssor-prod"), \
+         _Patch(_settings, "get_matrix_tsn_selections", lambda: selections), \
+         _Patch(_matrix, "build_comparison", lambda *a, **k: built.append((a, k))), \
+         _Patch(_reports, "matrix_rows", lambda: pdf_rows), \
+         _Patch(_tsn, "is_registered", lambda r: True), \
+         _Patch(_tsn, "resolve", resolve), \
+         _Patch(_tsn, "reports", lambda: []):
+        man = validation.run_validation(events=Events())
+
+    cells = man["comparisons"]["cells"]
+    check("validation records all five shared selected files as blocked",
+          len(cells) == 5 and all(
+              "selected TSN" in cell.get("skipped", "")
+              and "re-pick" in cell.get("skipped", "").lower()
+              and "clear" in cell.get("skipped", "").lower()
+              for cell in cells))
+    check("validation resolves PDF rows through their five base TSN dataset keys",
+          {report for report, selected in resolved if selected}
+          == set(bases.values()))
+    check("validation never builds against the available fallback", not built)
+
+
 def test_worker_always_posts_terminal():
     """The ValidationWorker MUST post exactly one validate_done no matter what
     fails — an un-posted terminal wedges the single-task gate. Drive it with an
@@ -337,6 +474,30 @@ def test_worker_always_posts_terminal():
     check("a raising evidence.collect still posts exactly one validate_done",
           len(terminals) == 1, f"terminals={terminals} all={kinds}")
 
+    q2 = _queue.Queue()
+    totals = {
+        "comparisons_run": 4, "comparisons_ok": 1,
+        "comparisons_partial": 1, "comparisons_untrusted": 1,
+        "comparisons_failed": 1, "comparisons_cancelled": 0,
+        "comparisons_blocked": 2, "cancelled": False,
+    }
+    with _Patch(_val, "run_validation",
+                lambda events=None, should_cancel=None: {"totals": totals}), \
+         _Patch(_ev, "collect",
+                lambda **k: {"ok": False, "message": "disk full"}):
+        gui_worker.ValidationWorker(q2).run()
+    payloads = []
+    while not q2.empty():
+        kind, payload = q2.get_nowait()
+        if kind == "validate_done":
+            payloads.append(payload)
+    check("false collector result preserves its message and every outcome bucket",
+          len(payloads) == 1 and payloads[0].get("message") == "disk full"
+          and payloads[0].get("comparisons_partial") == 1
+          and payloads[0].get("comparisons_untrusted") == 1
+          and payloads[0].get("comparisons_failed") == 1
+          and payloads[0].get("comparisons_blocked") == 2)
+
 
 if __name__ == "__main__":
     print("W1 one-click validation:")
@@ -345,6 +506,7 @@ if __name__ == "__main__":
     test_evidence_carries_manifest()
     test_trust_semantics()
     test_tsn_stage_heals_stale_library()
+    test_missing_explicit_tsn_is_not_substituted()
     test_worker_always_posts_terminal()
     if _fail:
         print(f"\n{len(_fail)} check(s) FAILED")

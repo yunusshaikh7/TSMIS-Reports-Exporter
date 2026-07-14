@@ -11,6 +11,7 @@ exercised separately / on the work PC with real TSN data).
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_matrix_tsn.py
 """
+import os
 import shutil
 import sys
 import tempfile
@@ -21,6 +22,8 @@ sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import matrix
 import paths
+import tsn_library
+from openpyxl import Workbook
 
 _fail = []
 
@@ -34,6 +37,15 @@ def check(name, cond):
 def _touch(p, data=b"PK"):
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_bytes(data)
+
+
+def _workbook(p, value="TSN"):
+    p.parent.mkdir(parents=True, exist_ok=True)
+    wb = Workbook()
+    wb.active["A1"] = value
+    wb.save(p)
+    wb.close()
+    return p
 
 
 def test_paths_and_modes():
@@ -140,13 +152,56 @@ def test_source_detection():
         _touch(matrix.tsn_input_root(dest, sub) / "tsn_highway_log_consolidated.xlsx")
         check("consolidated .xlsx present -> consolidated",
               matrix.tsn_source(dest, sub)["kind"] == "consolidated")
-        picked = dest / "elsewhere" / "my_tsn.xlsx"
-        _touch(picked)
+        picked = _workbook(dest / "elsewhere" / "my_tsn.xlsx")
+        selection = tsn_library.create_explicit_selection(picked)
         check("explicit file selection wins",
-              matrix.tsn_source(dest, sub, selected_file=str(picked))["kind"] == "file")
-        check("a non-xlsx selection is ignored (falls back to scan)",
-              matrix.tsn_source(dest, sub, selected_file=str(dest / "nope.pdf"))["kind"]
-              == "consolidated")
+              matrix.tsn_source(dest, sub, selected_file=selection)["kind"] == "file")
+        legacy = matrix.tsn_source(dest, sub, selected_file=str(picked))
+        check("a legacy path-only selection requires an explicit re-pick",
+              legacy["kind"] == "missing_explicit"
+              and legacy.get("selection_reason") == "legacy_identity")
+
+        # Same path + restored mtime is the adversarial replacement that path/mtime
+        # persistence cannot see. The content digest/file ID must still reject it.
+        old_stat = picked.stat()
+        picked.unlink()
+        _workbook(picked, "DIFFERENT TSN DATA")
+        os.utime(picked, ns=(old_stat.st_atime_ns, old_stat.st_mtime_ns))
+        replaced = matrix.tsn_source(dest, sub, selected_file=selection)
+        check("same-path replacement with restored mtime fails closed",
+              replaced["kind"] == "missing_explicit"
+              and replaced.get("selection_reason") == "changed")
+
+        fake_xlsx = dest / "elsewhere" / "not-a-workbook.xlsx"
+        _touch(fake_xlsx, b"not an Excel workbook")
+        try:
+            tsn_library.create_explicit_selection(fake_xlsx)
+            fake_rejected = False
+        except ValueError:
+            fake_rejected = True
+        check("an existing non-workbook .xlsx is rejected at selection time",
+              fake_rejected)
+        forged_record = {
+            "version": 1, "path": str(fake_xlsx),
+            "identity": {"sha256": "0" * 64, "size": fake_xlsx.stat().st_size,
+                         "mtime_ns": fake_xlsx.stat().st_mtime_ns,
+                         "file_id": "0:0"},
+        }
+        fake_resolved = matrix.tsn_source(dest, sub, selected_file=forged_record)
+        check("a persisted non-workbook .xlsx is rejected again at resolution",
+              fake_resolved["kind"] == "missing_explicit"
+              and fake_resolved.get("selection_reason") == "not_workbook")
+        missing_pick = str(dest / "elsewhere" / "deleted.xlsx")
+        missing = matrix.tsn_source(dest, sub, selected_file=missing_pick)
+        check("a missing explicit selection fails closed instead of falling back",
+              missing["kind"] == "missing_explicit"
+              and missing.get("selected_path") == missing_pick
+              and not missing.get("path"))
+        invalid_pick = str(dest / "nope.pdf")
+        invalid = matrix.tsn_source(dest, sub, selected_file=invalid_pick)
+        check("an invalid explicit selection also fails closed",
+              invalid["kind"] == "missing_explicit"
+              and invalid.get("selected_path") == invalid_pick)
         # The canonical TSN library takes precedence over the legacy dest drop.
         lib_cons = paths.tsn_library_consolidated_path(sub, "tsn_highway_log_consolidated.xlsx")
         _touch(lib_cons)
@@ -155,6 +210,78 @@ def test_source_detection():
               r["kind"] == "consolidated" and Path(r["path"]) == lib_cons)
     finally:
         paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT = saved_roots
+        shutil.rmtree(dest, ignore_errors=True)
+
+
+def test_canonical_selection_keys():
+    print("canonical explicit-selection keys + all PDF siblings:")
+    aliases = {
+        "highway_log_pdf": "highway_log",
+        "intersection_detail_pdf": "intersection_detail",
+        "highway_detail_pdf": "highway_detail",
+        "highway_sequence_pdf": "highway_sequence",
+        "ramp_detail_pdf": "ramp_detail",
+    }
+    check("all five PDF export keys canonicalize to their shared TSN dataset",
+          all(tsn_library.canonical_dataset_key(alias) == base
+              for alias, base in aliases.items()))
+    sources = [
+        {"name": "cell", "present": True, "mtime": 1.0},
+        {"name": "tsn", "present": True, "mtime": 1.0,
+         "identity": {"sha256": "a" * 64}, "identity_required": True},
+    ]
+    legacy_state = matrix._staleness(
+        10.0, sources, {"built_at_mtime": 10.0, "verdict": "match"}, (), None)
+    matching_state = matrix._staleness(
+        10.0, sources,
+        {"built_at_mtime": 10.0, "verdict": "match",
+         "source_identities": {"tsn": {"sha256": "a" * 64}}}, (), None)
+    changed_state = matrix._staleness(
+        10.0, sources,
+        {"built_at_mtime": 10.0, "verdict": "match",
+         "source_identities": {"tsn": {"sha256": "b" * 64}}}, (), None)
+    check("explicit identity gates cached truth (legacy/different stale; matching fresh)",
+          legacy_state["stale"] and changed_state["stale"]
+          and not matching_state["stale"])
+
+    dest = Path(tempfile.mkdtemp(prefix="tsmis_tsnaliases_"))
+    saved_lib = paths.TSN_LIBRARY_ROOT
+    paths.TSN_LIBRARY_ROOT = dest / "_lib"
+    try:
+        selections = {}
+        picked_paths = {}
+        for alias, base in aliases.items():
+            picked = _workbook(dest / f"{base}.xlsx", base)
+            selections[base] = tsn_library.create_explicit_selection(picked)
+            picked_paths[base] = str(picked.resolve())
+            picked.unlink()
+
+        row_modes = {alias: "tsn" for alias in aliases}
+        snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod",
+                                      row_modes=row_modes, tsn_files=selections)
+        check("each PDF row exposes the shared deleted explicit selection",
+              all(snap["tsn_meta"][alias]["source_kind"] == "missing_explicit"
+                  and snap["tsn_meta"][alias]["selection_missing"] is True
+                  and snap["tsn_meta"][alias]["selected_path"] == picked_paths[base]
+                  for alias, base in aliases.items()))
+
+        # A legacy PDF-keyed setting must be migrated to the base key and block;
+        # it must never be ignored in favor of an available canonical fallback.
+        fallback = paths.tsn_library_consolidated_path(
+            "highway_log", "tsn_highway_log_consolidated.xlsx")
+        _touch(fallback)
+        legacy_path = str(dest / "legacy-deleted.xlsx")
+        legacy_snap = matrix.matrix_snapshot(
+            dest, baseline_key="ssor-prod",
+            row_modes={"highway_log_pdf": "tsn"},
+            tsn_files={"highway_log_pdf": legacy_path})
+        meta = legacy_snap["tsn_meta"]["highway_log_pdf"]
+        check("legacy PDF-keyed explicit selection cannot silently fall back",
+              meta["source_kind"] == "missing_explicit"
+              and meta["selected_path"] == legacy_path
+              and meta["selection_reason"] == "legacy_identity")
+    finally:
+        paths.TSN_LIBRARY_ROOT = saved_lib
         shutil.rmtree(dest, ignore_errors=True)
 
 
@@ -184,6 +311,23 @@ def test_snapshot_modes():
         check("tsn_meta carries the source summary",
               snap["tsn_meta"]["highway_log"]["source_kind"] == "consolidated"
               and snap["tsn_meta"]["highway_log"]["fmt"] == "excel")
+        # CMP-AUD-105: a persisted explicit pick is an instruction, not a hint.
+        # Even with the canonical/legacy TSN source above available, deleting the
+        # picked file must block this row and keep a clearable UI state.
+        missing_pick = str(dest / "deleted-explicit.xlsx")
+        missing_snap = matrix.matrix_snapshot(
+            dest, baseline_key="ssor-prod", row_modes={"highway_log": "tsn"},
+            tsn_files={"highway_log": missing_pick})
+        missing_meta = missing_snap["tsn_meta"]["highway_log"]
+        missing_cell = missing_snap["cells"]["highway_log"]["ars-prod"]["cmp"]
+        check("snapshot exposes a durable missing-explicit selection",
+              missing_meta["source_kind"] == "missing_explicit"
+              and missing_meta.get("selected_path") == missing_pick
+              and missing_meta.get("selection_missing") is True)
+        check("missing explicit selection blocks the TSN side and rebuild target",
+              missing_cell.get("missing_side") == "tsn"
+              and ("highway_log", "ars-prod", "tsn") not in
+              matrix.cells_to_rebuild(missing_snap, scope="all"))
         # HL-PDF env mode is now CODED (v0.17.0) — a real cross-env cell, not greyed
         hp = snap["cells"]["highway_log_pdf"]["ars-prod"]
         check("HL-PDF cross-env cell now supported (not greyed)",
@@ -236,6 +380,21 @@ def test_build_guards():
         check("HL tsn with no TSN source raises",
               raises(lambda: matrix.build_comparison(dest, "highway_log", "ars-prod", "tsn",
                                                      "ssor-prod", events=None)))
+        # Plant an automatic fallback, then point the persisted override at a
+        # deleted file. The build must name the explicit selection instead of
+        # silently comparing the fallback dataset.
+        _touch(matrix.tsn_input_root(dest, "highway_log") / "fallback.xlsx")
+        missing_pick = str(dest / "deleted-explicit.xlsx")
+        try:
+            matrix.build_comparison(
+                dest, "highway_log", "ars-prod", "tsn", "ssor-prod", events=None,
+                tsn_files={"highway_log": missing_pick})
+            missing_message = ""
+        except ValueError as e:
+            missing_message = str(e)
+        check("build names the missing explicit source with re-pick/clear guidance",
+              "selected TSN" in missing_message and "re-pick" in missing_message.lower()
+              and "clear" in missing_message.lower())
     finally:
         paths.TSN_LIBRARY_ROOT = saved_lib
         shutil.rmtree(dest, ignore_errors=True)
@@ -244,6 +403,7 @@ def test_build_guards():
 def main():
     test_paths_and_modes()
     test_source_detection()
+    test_canonical_selection_keys()
     test_snapshot_modes()
     test_build_guards()
     print()

@@ -15,12 +15,15 @@ Covers the v0.11 bridge fixes:
     (a bad index must not wedge the task gate)
 """
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import gui_api  # noqa: E402
+import gui_compare_api  # noqa: E402
+import gui_settings_api  # noqa: E402
 import paths  # noqa: E402
 
 _failures = []
@@ -102,6 +105,37 @@ def test_reset_token():
     check("replayed/stale token refused",
           a.start_reset(False, tok).get("error") is not None)
 
+    # A matching token authorizes exactly what that preview showed. The worker
+    # must not call reset_targets again and silently include a later directory.
+    captured = {}
+
+    class _FakeResetWorker:
+        def __init__(self, _queue, include_input=False, cancel_event=None,
+                     targets=None):
+            captured["targets"] = tuple(targets or ())
+
+        def start(self):
+            captured["started"] = True
+
+    old_targets = gui_settings_api.reset_targets
+    old_worker = gui_settings_api.ResetWorker
+    previewed = [("previewed target", Path("preview-A"))]
+    later = [("later target", Path("preview-B"))]
+    try:
+        gui_settings_api.reset_targets = lambda *_a, **_k: list(previewed)
+        gui_settings_api.ResetWorker = _FakeResetWorker
+        prev = a.reset_preview(False)
+        gui_settings_api.reset_targets = lambda *_a, **_k: list(later)
+        res = a.start_reset(False, prev["token"])
+        check("matching token starts Reset", res.get("ok") is True)
+        check("Reset receives the exact previewed set, not a fresh expanded set",
+              captured.get("started") is True
+              and captured.get("targets") == tuple(previewed))
+    finally:
+        gui_settings_api.reset_targets = old_targets
+        gui_settings_api.ResetWorker = old_worker
+        a._release_task()
+
 
 def test_consolidate_index_before_claim():
     print("start_consolidate validates the report KEY before claiming the slot:")
@@ -133,6 +167,198 @@ def test_compare_dialog_error_releases():
     check("error surfaced to the caller", isinstance(res, dict) and res.get("error"))
     check("task slot released after a dialog error", a._try_claim_task("x") is True)
     a._release_task()
+
+
+def test_compare_derived_overwrite_token():
+    print("classic both-mode derived-values overwrite confirmation:")
+    import reports
+
+    files_key = next((reports.COMPARE_KEYS[i]
+                      for i, r in enumerate(reports.COMPARE_REPORTS)
+                      if r[2] == "files"), None)
+    if files_key is None:
+        check("a files-kind comparison exists", False)
+        return
+
+    with tempfile.TemporaryDirectory(prefix="tsmis_compare_consent_") as td:
+        root = Path(td)
+        src_a = root / "source-a.xlsx"
+        src_b = root / "source-b.xlsx"
+        src_a.write_bytes(b"source-a")
+        src_b.write_bytes(b"source-b")
+        out = root / "chosen formulas.xlsx"
+        twin = root / "chosen formulas (values).xlsx"
+        twin.write_bytes(b"existing-values")
+
+        launched = []
+
+        def api_with_fake_launch():
+            a = gui_api.GuiApi()
+            a._save_dialog_for_compare = lambda *_a, **_k: out
+
+            def fake_launch(label, mode, selected_out, run_fn, source_paths=(),
+                            **kwargs):
+                launched.append({
+                    "label": label, "mode": mode, "out": Path(selected_out),
+                    "run_fn": run_fn, "source_paths": tuple(source_paths),
+                    **kwargs,
+                })
+                return {"ok": True}
+
+            a._launch_compare = fake_launch
+            return a
+
+        # Existing derived twin: preview names the exact full path and does not
+        # launch until the matching token is accepted.
+        a = api_with_fake_launch()
+        preview = a.start_compare(files_key, str(src_a), str(src_b), True, True)
+        check("existing values twin requires confirmation",
+              preview.get("confirm_required") is True and not launched)
+        check("confirmation names the exact derived path",
+              preview.get("path") == str(twin)
+              and str(twin) in preview.get("message", ""))
+        token = preview.get("confirm_token")
+        accepted = a.confirm_compare_overwrite(token, True)
+        check("accept launches the parked operation", accepted.get("ok") is True
+              and len(launched) == 1)
+        launch = launched[-1]
+        check("accept cannot retarget output, mode, or selected inputs",
+              launch["out"] == out and launch["mode"] == "both"
+              and launch["source_paths"] == (str(src_a), str(src_b))
+              and launch.get("confirmed_twin") == twin)
+        check("matching token is single-use (replay refused)",
+              a.confirm_compare_overwrite(token, True).get("error") is not None)
+        a._release_task()                 # fake launch has no terminal worker
+
+        # Decline consumes the token, preserves the twin, and releases the task.
+        launched.clear()
+        a = api_with_fake_launch()
+        preview = a.start_compare(files_key, str(src_a), str(src_b), True, True)
+        declined = a.confirm_compare_overwrite(preview["confirm_token"], False)
+        check("decline does not launch and keeps the existing twin",
+              declined.get("cancelled") is True and not launched
+              and twin.read_bytes() == b"existing-values")
+        free = a._try_claim_task("after-decline")
+        check("decline does not wedge the task slot", free is True)
+        if free:
+            a._release_task()
+
+        # A stale/mismatched token cannot consume or retarget the live operation;
+        # its real token can still decline and release the slot.
+        a = api_with_fake_launch()
+        preview = a.start_compare(files_key, str(src_a), str(src_b), True, True)
+        check("mismatched token refused without launch",
+              a.confirm_compare_overwrite("stale-token", True).get("error") is not None
+              and not launched)
+        declined = a.confirm_compare_overwrite(preview["confirm_token"], False)
+        check("valid decision still resolves after stale-token attempt",
+              declined.get("cancelled") is True)
+        free = a._try_claim_task("after-stale")
+        check("stale-token path leaves no task-slot wedge after resolution", free is True)
+        if free:
+            a._release_task()
+
+        # Source safety has higher precedence than consent: a selected source
+        # named as the derived sibling errors before issuing any overwrite token.
+        a = api_with_fake_launch()
+        alias = a.start_compare(files_key, str(twin), str(src_b), True, True)
+        check("source-alias precedence refuses before prompting",
+              alias.get("error") is not None
+              and not alias.get("confirm_required") and not launched)
+        free = a._try_claim_task("after-alias")
+        check("source-alias refusal releases the task slot", free is True)
+        if free:
+            a._release_task()
+
+        # The selected source object is identity-bound across human think-time.
+        a = api_with_fake_launch()
+        preview = a.start_compare(files_key, str(src_a), str(src_b), True, True)
+        original = root / "source-a-original.xlsx"
+        src_a.replace(original)
+        src_a.write_bytes(b"retargeted-source")
+        retargeted = a.confirm_compare_overwrite(preview["confirm_token"], True)
+        check("source replacement between prompt and launch is refused",
+              retargeted.get("error") is not None and not launched)
+        free = a._try_claim_task("after-retarget")
+        check("source-retarget refusal releases the task slot", free is True)
+        if free:
+            a._release_task()
+
+        # Exercise the callback passed directly into the transactional public
+        # comparator. Neither an
+        # absent values twin nor an absent picked formulas path may be silently
+        # overwritten if it appears after the native dialog/initial decision.
+        late_out = root / "late formulas.xlsx"
+        late_twin = root / "late formulas (values).xlsx"
+        captured = {}
+
+        class FakeWorker:
+            def __init__(self, committed, *_a, **_k):
+                captured["committed"] = committed
+
+            def start(self):
+                captured["worker_started"] = True
+
+        def fake_run(_final, events=None, confirm_overwrite=None, day=None):
+            captured["run_final"] = Path(_final)
+            captured["confirm"] = confirm_overwrite
+            return object()
+
+        old_worker = gui_compare_api.ConsolidateWorker
+        try:
+            gui_compare_api.ConsolidateWorker = FakeWorker
+            a = gui_api.GuiApi()
+            a._try_claim_task("compare")
+            a._launch_compare("late", "both", late_out,
+                              fake_run,
+                              source_paths=(original, src_b),
+                              captured_sources=gui_compare_api.artifact_store.capture_source_identities(
+                                  (original, src_b)),
+                              picked_was_existing=False)
+            captured["committed"]()
+            check("classic worker delegates the selected final to one transaction",
+                  captured.get("run_final") == late_out)
+            late_out.write_bytes(b"late-formulas-foreign")
+            late_twin.write_bytes(b"late-values-foreign")
+            check("values twin appearing late is denied",
+                  captured["confirm"](late_twin) is False)
+            check("picked formulas path appearing after native dialog is denied",
+                  captured["confirm"](late_out) is False)
+            approved = gui_compare_api._comparison_overwrite_authorizer(
+                late_out, "both", confirmed_twin=late_twin,
+                picked_was_existing=True)
+            check("explicit decisions authorize only their exact two paths",
+                  approved(late_out) is True and approved(late_twin) is True
+                  and approved(root / "other.xlsx") is False)
+
+            # No-confirmation path: replacement after launch but before the
+            # worker actually enters the comparator must still be rejected
+            # against the identity captured after the native dialog.
+            worker_src = root / "worker-source.xlsx"
+            worker_other = root / "worker-other.xlsx"
+            worker_src.write_bytes(b"worker-source-original")
+            worker_other.write_bytes(b"worker-other")
+            worker_capture = gui_compare_api.artifact_store.capture_source_identities(
+                (worker_src, worker_other))
+            captured.pop("run_final", None)
+            a._launch_compare(
+                "worker-preflight", "values", root / "worker-out.xlsx",
+                fake_run, source_paths=(worker_src, worker_other),
+                captured_sources=worker_capture, picked_was_existing=False)
+            moved_worker_src = root / "worker-source-moved.xlsx"
+            worker_src.replace(moved_worker_src)
+            worker_src.write_bytes(b"same-path-decoy")
+            try:
+                captured["committed"]()
+            except ValueError:
+                preflight_blocked = True
+            else:
+                preflight_blocked = False
+            check("worker-entry preflight rejects a selected-source replacement",
+                  preflight_blocked and "run_final" not in captured)
+        finally:
+            gui_compare_api.ConsolidateWorker = old_worker
+            a._release_task()
 
 
 def test_tsn_library_panel():
@@ -336,6 +562,7 @@ def main():
     test_reset_token()
     test_consolidate_index_before_claim()
     test_compare_dialog_error_releases()
+    test_compare_derived_overwrite_token()
     test_tsn_library_panel()
     test_export_browser()
     test_channel_order()

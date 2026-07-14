@@ -5,8 +5,9 @@ A free-text value that begins with = + - @ (e.g. a malicious Description like
 into a live FORMULA, so opening the workbook in Excel could execute it. The
 shared guard (compare_core.is_formula_injection + the per-writer data_type='s'
 forcing) keeps the value byte-for-byte but stores it as TEXT, so Excel shows it
-verbatim and never runs it. Clean data is unaffected (the regression lock holds
-— proven separately by the cell-dump diff).
+verbatim and never runs it. The same guard covers openpyxl's seven ERROR_CODES,
+which otherwise become live error cells. Clean data is unaffected (the
+regression lock holds — proven separately by the cell-dump diff).
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_compare_injection.py
@@ -21,14 +22,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from compare_core import CompareSchema, is_formula_injection, run_compare
 from consolidate_xlsx_base import consolidate_xlsx
 from openpyxl import Workbook, load_workbook
+from openpyxl.cell.cell import ERROR_CODES
 
 EVIL = '=HYPERLINK("http://x",1)'
 EVIL2 = "=cmd|'/C calc'!A1"
 SC = CompareSchema(report_name="Inj", header=["Loc", "Desc"], side_a="AENV",
                    side_b="BENV", id_noun="row", id_noun_plural="rows",
                    sides_noun="environments")
-ROWS_A = [["1.0", EVIL], ["2.0", "normal"], ["3.0", EVIL2]]  # 3.0 is A-only
-ROWS_B = [["1.0", EVIL], ["2.0", "normal"]]
+ERROR_ROWS = [[f"E{i}", value] for i, value in enumerate(ERROR_CODES, start=1)]
+ROWS_A = [["1.0", EVIL], ["2.0", "normal"], ["3.0", EVIL2]] + ERROR_ROWS
+ROWS_B = [["1.0", EVIL], ["2.0", "normal"]] + ERROR_ROWS
 
 
 def _col_of(ws, header_name):
@@ -48,9 +51,9 @@ def _cell_type(ws, header_name, want_value):
 
 
 def test_predicate():
-    for v in (EVIL, EVIL2, "+1", "-x", "@y"):
+    for v in (EVIL, EVIL2, "+1", "-x", "@y", *ERROR_CODES):
         assert is_formula_injection(v), v
-    for v in ("normal", "1.0", 5, None, "(blank)"):
+    for v in ("normal", "1.0", "#N/A with context", 5, None, "(blank)"):
         assert not is_formula_injection(v), v
 
 
@@ -64,6 +67,10 @@ def test_compare_values_flavor():
     assert _cell_type(wb["Comparison"], "Desc", EVIL) == "s", "Comparison Desc not guarded"
     # Only-in: the A-only evil row, guarded
     assert _cell_type(wb["Only in AENV"], "Desc", EVIL2) == "s", "Only-in Desc not guarded"
+    for value in ERROR_CODES:
+        assert _cell_type(wb["AENV"], "Desc", value) == "s", value
+        assert _cell_type(wb["BENV"], "Desc", value) == "s", value
+        assert _cell_type(wb["Comparison"], "Desc", value) == "s", value
     wb.close()
     os.remove(out)
 
@@ -74,6 +81,9 @@ def test_compare_formulas_flavor():
     wb = load_workbook(out, data_only=False)
     # data sheet still guarded; the field cell is our own =IF formula (type f).
     assert _cell_type(wb["AENV"], "Desc", EVIL) == "s", "data-sheet Desc not guarded"
+    for value in ERROR_CODES:
+        assert _cell_type(wb["AENV"], "Desc", value) == "s", value
+        assert _cell_type(wb["BENV"], "Desc", value) == "s", value
     g = _col_of(wb["Comparison"], "Desc")
     field = wb["Comparison"].cell(row=2, column=g)
     assert field.data_type == "f" and str(field.value).startswith("=IF"), \
@@ -119,10 +129,10 @@ def main():
     test_compare_values_flavor()
     test_compare_formulas_flavor()
     test_consolidate_streaming_and_normal()
-    print("OK  SHEET-FORMULA-INJECTION: leading =+-@ free text is stored as "
-          "TEXT (not a live formula) on every write path (data sheets, "
-          "Comparison + Only-in, consolidators, normal-mode); our own formulas "
-          "stay formulas.")
+    print("OK  SHEET-LITERAL-GUARD: leading =+-@ free text and all openpyxl "
+          "ERROR_CODES are stored as TEXT on source-data write paths (data "
+          "sheets, Comparison + Only-in, consolidators, normal-mode); our own "
+          "formulas stay formulas.")
 
 
 if __name__ == "__main__":

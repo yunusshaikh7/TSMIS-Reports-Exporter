@@ -19,8 +19,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import outcome as oc                         # noqa: E402
+import artifact_store                        # noqa: E402
 import consolidation_meta as cm              # noqa: E402
 import matrix                                # noqa: E402
+import tsn_library                           # noqa: E402
+from comparison_contract import ComparisonCounts, ComparisonOutcome  # noqa: E402
 from events import ConsolidateResult, Events   # noqa: E402
 from consolidate_xlsx_base import consolidate_xlsx   # noqa: E402
 from openpyxl import Workbook                # noqa: E402
@@ -63,6 +66,25 @@ def _xlsx(path, header, n_rows=2, sheet=None):
     for i in range(n_rows):
         ws.append([f"v{i}"] * len(header))
     wb.save(path)
+
+
+def _published_comparison(path, completion):
+    typed = ComparisonOutcome(
+        status="ok", completion=completion,
+        verdict="match" if completion == oc.COMPLETE else "diff",
+        counts=ComparisonCounts(known=True, paired_rows=1),
+        warnings=(() if completion == oc.COMPLETE else ("input partial",)),
+        pairing_quality="exact")
+
+    def produce(tmp):
+        _xlsx(tmp, ["A", "B"], n_rows=1, sheet="Comparison")
+        return ConsolidateResult(
+            status="ok", verdict=typed.verdict, completion=completion,
+            skipped_inputs=0 if completion == oc.COMPLETE else 1,
+            failed_inputs=0, output_path=str(tmp), comparison_outcome=typed)
+
+    return artifact_store.commit_workbook(
+        path, produce, expect_sheet="Comparison", requested_mode="values")
 
 
 def main():
@@ -135,17 +157,20 @@ def main():
 
         class _Cmp:
             def compare(self, consolidated, tsn_path, out_path, events=None,
-                        confirm_overwrite=None, mode="values"):
+                        confirm_overwrite=None, mode="values", commit_guard=None):
                 called["n"] += 1
-                Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-                _xlsx(out_path, ["A", "B"], n_rows=1, sheet="Comparison")  # valid comparison wb
-                return ConsolidateResult(status="ok", verdict="diff", output_path=str(out_path))
+                source = cm.read_outcome(consolidated)
+                completion = (source.completion if source is not None and source.trusted
+                              else oc.COMPLETE)
+                return _published_comparison(Path(out_path), completion)
 
         def _stub_consolidate(result, write=True):
-            def _f(subdir, store_dir, consolidated, events):
+            def _f(subdir, store_dir, consolidated, events, **_kwargs):
                 if write:
                     Path(consolidated).parent.mkdir(parents=True, exist_ok=True)
                     Path(consolidated).write_text("data")     # non-empty: passes the size check
+                    if getattr(result, "status", None) == "ok":
+                        cm.write_outcome(consolidated, result)
                 return result
             return _f
 
@@ -160,7 +185,9 @@ def main():
              _patch(matrix, "_consolidate_store_folder",
                     _stub_consolidate(ConsolidateResult(status="ok", completion=oc.PARTIAL, skipped_inputs=1))):
             r = matrix.consolidate_and_compare_tsn(store_dir, str(tsn), tmp / "out1.xlsx",
-                                                   "ramp_summary", "ramp_summary", events=None)
+                                                   "ramp_summary", "ramp_summary", events=None,
+                                                   source_identity_check=lambda: True,
+                                                   source_workbook_identity=tsn_library.normalized_workbook_identity(tsn))
         check("partial consolidation INVOKES the comparator", called["n"] == 1)
         check("...and the comparison result carries completion=partial (R01)",
               r.completion == oc.PARTIAL)
@@ -174,7 +201,9 @@ def main():
                                       write=False)):
             try:
                 matrix.consolidate_and_compare_tsn(store_dir, str(tsn), tmp / "out2.xlsx",
-                                                   "ramp_summary", "ramp_summary", events=None)
+                                                   "ramp_summary", "ramp_summary", events=None,
+                                                   source_identity_check=lambda: True,
+                                                   source_workbook_identity=tsn_library.normalized_workbook_identity(tsn))
                 raised = False
             except ValueError:
                 raised = True
@@ -193,7 +222,8 @@ def main():
                                   [{"name": "a", "present": True, "mtime": None}],
                                   {"verdict": "diff", "diff_cells": 4, "one_sided": 1,
                                    "built_at_mtime": matrix._safe_mtime(tmp / "out1.xlsx"),
-                                   "completion": oc.PARTIAL})
+                                   "completion": oc.PARTIAL,
+                                   "generation_id": r.artifact_generation.generation_id})
         check("_cmp_state surfaces the partial completion for the matrix to flag",
               state.get("completion") == oc.PARTIAL)
 
@@ -217,7 +247,7 @@ def main():
         tsn2 = tmp / "tsn2.xlsx"
         tsn2.write_text("tsn")
 
-        def _consolidate_partial(subdir, store_dir, consolidated, events):
+        def _consolidate_partial(subdir, store_dir, consolidated, events, **_kwargs):
             Path(consolidated).parent.mkdir(parents=True, exist_ok=True)
             Path(consolidated).write_text("data")
             cres = ConsolidateResult(status="ok", completion=oc.PARTIAL, skipped_inputs=1)
@@ -228,12 +258,16 @@ def main():
              _patch(matrix, "tsn_comparator_for", lambda rk: _Cmp()), \
              _patch(matrix, "_consolidate_store_folder", _consolidate_partial):
             r1 = matrix.consolidate_and_compare_tsn(store2, str(tsn2), tmp / "ro1.xlsx",
-                                                    "ramp_summary", "ramp_summary", events=None)
+                                                    "ramp_summary", "ramp_summary", events=None,
+                                                    source_identity_check=lambda: True,
+                                                    source_workbook_identity=tsn_library.normalized_workbook_identity(tsn2))
         check("first (fresh) build flags partial", r1.completion == oc.PARTIAL)
         with _patch(matrix, "_consolidated_stale", lambda *a: False), \
              _patch(matrix, "tsn_comparator_for", lambda rk: _Cmp()):
             r2 = matrix.consolidate_and_compare_tsn(store2, str(tsn2), tmp / "ro2.xlsx",
-                                                    "ramp_summary", "ramp_summary", events=None)
+                                                    "ramp_summary", "ramp_summary", events=None,
+                                                    source_identity_check=lambda: True,
+                                                    source_workbook_identity=tsn_library.normalized_workbook_identity(tsn2))
         check("REUSED build (no fresh result) STILL partial — recovered from sidecar",
               r2.completion == oc.PARTIAL)
 
@@ -242,15 +276,24 @@ def main():
 
         class _SelfCmp:
             def compare(self, pdf_c, excel_c, out_path, events=None,
-                        confirm_overwrite=None, mode="values"):
-                Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-                _xlsx(out_path, ["A", "B"], n_rows=1, sheet="Comparison")  # valid comparison wb
-                return ConsolidateResult(status="ok", verdict="diff", output_path=str(out_path))
+                        confirm_overwrite=None, mode="values", commit_guard=None):
+                records = (cm.read_outcome(pdf_c), cm.read_outcome(excel_c))
+                completion = (oc.PARTIAL if any(
+                    record is not None and record.completion == oc.PARTIAL
+                    for record in records) else oc.COMPLETE)
+                return _published_comparison(Path(out_path), completion)
 
-        def _sides(store_dir, subdir, events, force):
+        def _sides(store_dir, subdir, events, force, **_kwargs):
             # the PDF side is partial, the Excel side complete -> reduce to partial
-            return (matrix.consolidated_store_path(store_dir, subdir),
-                    oc.PARTIAL if subdir == "highway_log_pdf" else oc.COMPLETE)
+            path = matrix.consolidated_store_path(store_dir, subdir)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"data")
+            completion = (oc.PARTIAL if subdir == "highway_log_pdf" else oc.COMPLETE)
+            cm.write_outcome(path, ConsolidateResult(
+                status="ok", completion=completion,
+                skipped_inputs=1 if completion == oc.PARTIAL else 0,
+                failed_inputs=0))
+            return path, completion
 
         with _patch(matrix, "_ensure_consolidated", _sides), \
              _patch(_chp, "TSMIS_PDF_VS_EXCEL", _SelfCmp()):
@@ -270,10 +313,12 @@ def main():
         _l, _sub, _i, _adapter, _hr = defs["highway_log"]
         tsn_mode = {m["id"]: m for m in matrix._row_modes("highway_log", _sub, _adapter)}["tsn"]
         out_tsn = matrix.mode_out_path(snapdest, "ssor-prod", "highway_log", "ars-prod", tsn_mode)
-        out_tsn.parent.mkdir(parents=True, exist_ok=True)
-        out_tsn.write_bytes(b"PK")
+        snap_result = _published_comparison(out_tsn, oc.PARTIAL)
         matrix.record_tsn_result(snapdest, "highway_log|tsn", "ars-prod", "diff", 3, 1,
-                                 matrix._safe_mtime(out_tsn), completion=oc.PARTIAL)
+                                 matrix._safe_mtime(out_tsn), completion=oc.PARTIAL,
+                                 input_fingerprint=matrix._cell_input_fingerprint(
+                                     snapdest / "ars-prod" / "highway_log"),
+                                 generation_id=snap_result.artifact_generation.generation_id)
         snap = matrix.matrix_snapshot(snapdest, baseline_key="ssor-prod",
                                       row_modes={"highway_log": "tsn"})
         cmp_cell = snap["cells"]["highway_log"]["ars-prod"]["cmp"]
@@ -285,12 +330,44 @@ def main():
         import json as _json
         check("no sidecar -> None (a legacy workbook reads complete)",
               cm.read_completion(tmp / "nope" / "absent.xlsx") is None)
+        check("read_outcome also returns None for truly absent legacy metadata",
+              cm.read_outcome(tmp / "nope" / "absent.xlsx") is None)
+
+        structured = tmp / "structured" / "wb.xlsx"
+        structured.parent.mkdir(parents=True, exist_ok=True)
+        structured.write_bytes(b"PK")
+        cm.write_outcome(
+            structured,
+            ConsolidateResult(status="ok", completion=oc.PARTIAL,
+                              skipped_inputs=2, failed_inputs=3),
+        )
+        srec = cm.read_outcome(structured)
+        frozen = False
+        if isinstance(srec, cm.ConsolidationOutcome):
+            try:
+                srec.completion = oc.COMPLETE
+            except AttributeError:
+                frozen = True
+        check("read_outcome returns one immutable structured record", frozen)
+        check("...completion and exact non-negative counters share that record",
+              srec is not None and srec.completion == oc.PARTIAL
+              and srec.skipped_inputs == 2 and srec.failed_inputs == 3)
+        check("...a validated final record is trusted/current and identifies its source",
+              srec is not None and srec.trusted is True and srec.current is True
+              and srec.diagnostic is None and srec.source == "sidecar")
+
         wbp = tmp / "rob" / "wb.xlsx"
         wbp.parent.mkdir(parents=True, exist_ok=True)
         wbp.write_bytes(b"PK")
         cm.meta_path(wbp).write_text("{ not valid json", encoding="utf-8")
         check("corrupt JSON sidecar -> conservative partial (no raise)",
               cm.read_completion(wbp) == oc.PARTIAL)
+        badrec = cm.read_outcome(wbp)
+        check("...structured corrupt state is partial/untrusted/current with a diagnostic",
+              badrec is not None and badrec.completion == oc.PARTIAL
+              and badrec.skipped_inputs is None and badrec.failed_inputs is None
+              and badrec.trusted is False and badrec.current is True
+              and bool(badrec.diagnostic) and badrec.source == "sidecar")
         cm.meta_path(wbp).write_text(_json.dumps(
             {"schema_version": cm.SCHEMA_VERSION, "completion": "complete",
              "built_at_mtime": "not-a-number"}), encoding="utf-8")
@@ -301,6 +378,59 @@ def main():
              "built_at_mtime": 1.0}), encoding="utf-8")
         check("wrong schema_version -> conservative partial (never silently complete)",
               cm.read_completion(wbp) == oc.PARTIAL)
+
+        cm.meta_path(wbp).write_text(_json.dumps({
+            "schema_version": cm.SCHEMA_VERSION,
+            "completion": oc.COMPLETE,
+            "built_at_mtime": cm._safe_mtime(wbp),
+        }), encoding="utf-8")
+        missing_counts = cm.read_outcome(wbp)
+        check("current metadata missing counters -> partial/untrusted, never complete",
+              missing_counts is not None and missing_counts.completion == oc.PARTIAL
+              and missing_counts.trusted is False
+              and "missing input counters" in (missing_counts.diagnostic or ""))
+
+        # A current record may never certify completion with fabricated/invalid
+        # counters. bool is rejected even though it subclasses int in Python.
+        for label, skipped, failed in (
+                ("negative", -1, 0), ("boolean", True, 0), ("non-integer", 0, 1.5)):
+            cm.meta_path(wbp).write_text(_json.dumps({
+                "schema_version": cm.SCHEMA_VERSION,
+                "completion": oc.COMPLETE,
+                "skipped_inputs": skipped,
+                "failed_inputs": failed,
+                "built_at_mtime": cm._safe_mtime(wbp),
+            }), encoding="utf-8")
+            bad_count = cm.read_outcome(wbp)
+            check(f"{label} input counter -> partial/untrusted, never complete",
+                  bad_count is not None and bad_count.completion == oc.PARTIAL
+                  and bad_count.trusted is False and bad_count.current is True
+                  and bad_count.skipped_inputs is None and bad_count.failed_inputs is None
+                  and "non-negative integers" in (bad_count.diagnostic or "")
+                  and cm.read_completion(wbp) == oc.PARTIAL)
+
+        cm.meta_path(wbp).write_text(_json.dumps({
+            "schema_version": cm.SCHEMA_VERSION,
+            "completion": oc.COMPLETE,
+            "skipped_inputs": 1,
+            "failed_inputs": 0,
+            "built_at_mtime": cm._safe_mtime(wbp),
+        }), encoding="utf-8")
+        contradictory = cm.read_outcome(wbp)
+        check("complete plus a skipped input is contradictory -> partial/untrusted",
+              contradictory is not None and contradictory.completion == oc.PARTIAL
+              and contradictory.trusted is False
+              and "cannot report" in (contradictory.diagnostic or ""))
+
+        cm.meta_path(wbp).write_text(_json.dumps({
+            "schema_version": cm.SCHEMA_VERSION,
+            "completion": oc.COMPLETE,
+            "skipped_inputs": 0,
+            "failed_inputs": 0,
+            "built_at_mtime": cm._safe_mtime(wbp) - 1000.0,
+        }), encoding="utf-8")
+        check("a validated but stale structured record -> None",
+              cm.read_outcome(wbp) is None and cm.read_completion(wbp) is None)
 
         print("P1-R01 (round 3) write_outcome is atomic + scoped:")
         wok = tmp / "atomic" / "w.xlsx"
@@ -344,27 +474,35 @@ def main():
         with _patch(matrix, "_consolidated_stale", lambda *a: False), \
              _patch(matrix, "tsn_comparator_for", lambda rk: _Cmp()):
             r3 = matrix.consolidate_and_compare_tsn(store3, str(tsn3), tmp / "cw_out.xlsx",
-                                                    "ramp_summary", "ramp_summary", events=None)
+                                                    "ramp_summary", "ramp_summary", events=None,
+                                                    source_identity_check=lambda: True,
+                                                    source_workbook_identity=tsn_library.normalized_workbook_identity(tsn3))
         check("matrix REUSE of a GUI-Consolidate-written partial reads partial (bypass closed)",
               r3.completion == oc.PARTIAL)
 
         # ExportWorker._auto_consolidate (the post-export store consolidation) likewise.
         import reports as _reports
+        import owned_dir as _owned_dir
         from paths import env_tagged_filename                # noqa: E402
         ac_base = tmp / "ac" / "ssor-prod"
-        (ac_base / "consolidated").mkdir(parents=True, exist_ok=True)
+        ac_base.parent.mkdir(parents=True, exist_ok=True)
+        ac_lease = _owned_dir.require_owned_dir_lease(ac_base, kind="store")
+        (ac_base / "ramp_summary").mkdir()
+        (ac_base / "consolidated").mkdir()
 
         class _ACMod:
             FILENAME = "ramp_summary_consolidated.xlsx"
 
             def consolidate(self, events=None, confirm_overwrite=None, day=None,
-                            input_dir=None, out_path=None):
+                            input_dir=None, out_path=None, commit_guard=None):
+                assert callable(commit_guard) and commit_guard(out_path)
                 Path(out_path).write_text("data")            # a real file -> a real mtime
                 return ConsolidateResult(status="ok", output_path=str(out_path),
                                          completion=oc.PARTIAL, skipped_inputs=1)
 
         ew_ac = _gw.ExportWorker([], _queue.Queue(), _threading.Event(), _threading.Event(),
                                  auto_consolidate=True, out_base=str(ac_base))
+        ew_ac._owned_root_lease = ac_lease
         with _patch(_reports, "consolidator_for_spec", lambda s: _ACMod()):
             ew_ac._auto_consolidate(_types.SimpleNamespace(label="Ramp Summary", subdir="ramp_summary"),
                                     RunResult(saved=3), Events())
@@ -475,6 +613,12 @@ def main():
         check("...the workbook is preserved (unlink failed)", lk.exists())
         check("...a durable conservative marker keeps matrix reuse PARTIAL (no false green)",
               cm.read_completion(lk) == oc.PARTIAL)
+        lkrec = cm.read_outcome(lk)
+        check("...the emergency marker is explicitly untrusted and invents no counts",
+              lkrec is not None and lkrec.completion == oc.PARTIAL
+              and lkrec.skipped_inputs is None and lkrec.failed_inputs is None
+              and lkrec.trusted is False and lkrec.current is True
+              and bool(lkrec.diagnostic) and lkrec.source == "sidecar")
 
         ck = tmp / "comp_fail" / "wb.xlsx"
         ck.parent.mkdir(parents=True, exist_ok=True)
@@ -560,7 +704,9 @@ def main():
         with _patch(matrix, "_consolidated_stale", lambda *a: False), \
              _patch(matrix, "tsn_comparator_for", lambda rk: _Cmp()):
             r7 = matrix.consolidate_and_compare_tsn(st7, str(tsn7), tmp / "tw_out.xlsx",
-                                                    "ramp_summary", "ramp_summary", events=None)
+                                                    "ramp_summary", "ramp_summary", events=None,
+                                                    source_identity_check=lambda: True,
+                                                    source_workbook_identity=tsn_library.normalized_workbook_identity(tsn7))
         check("matrix REUSE of a three-way-failed partial -> cell records partial (no false green)",
               r7.completion == oc.PARTIAL)
 
@@ -572,7 +718,8 @@ def main():
         class _OKMod7:
             FILENAME = "x.xlsx"
 
-            def consolidate(self, events=None, confirm_overwrite=None, input_dir=None, out_path=None):
+            def consolidate(self, events=None, confirm_overwrite=None, input_dir=None,
+                            out_path=None, **_kwargs):
                 Path(out_path).write_text("data")
                 return ConsolidateResult(status="ok", output_path=str(out_path),
                                          completion=oc.PARTIAL, skipped_inputs=1)
@@ -619,7 +766,9 @@ def main():
              _patch(matrix, "tsn_comparator_for", lambda rk: _Cmp()):
             try:
                 matrix.consolidate_and_compare_tsn(st8, str(tsn8), tmp / "ws_out.xlsx",
-                                                   "ramp_summary", "ramp_summary", events=None)
+                                                   "ramp_summary", "ramp_summary", events=None,
+                                                   source_identity_check=lambda: True,
+                                                   source_workbook_identity=tsn_library.normalized_workbook_identity(tsn8))
             except ValueError:
                 raised8 = True
         check("matrix REUSE of a quarantined partial -> not-refreshed (never green)", raised8)
@@ -632,6 +781,7 @@ def main():
         sta_tmp = cm.meta_path(sta).with_name(cm.meta_path(sta).name + ".tmp")
         with open(sta_tmp, "w", encoding="utf-8") as _f:
             _json.dump({"schema_version": cm.SCHEMA_VERSION, "completion": "partial",
+                        "skipped_inputs": 1, "failed_inputs": 0,
                         "built_at_mtime": cm._safe_mtime(sta) - 1000.0}, _f)   # 1000s stale
         check("a valid but demonstrably-stale .tmp sentinel -> ignored (None, not partial)",
               cm.read_completion(sta) is None)
@@ -641,8 +791,14 @@ def main():
         cur_tmp = cm.meta_path(cur).with_name(cm.meta_path(cur).name + ".tmp")
         with open(cur_tmp, "w", encoding="utf-8") as _f:
             _json.dump({"schema_version": cm.SCHEMA_VERSION, "completion": "partial",
+                        "skipped_inputs": 1, "failed_inputs": 0,
                         "built_at_mtime": cm._safe_mtime(cur)}, _f)            # current
         check("a valid CURRENT .tmp sentinel -> partial", cm.read_completion(cur) == oc.PARTIAL)
+        cur_rec = cm.read_outcome(cur)
+        check("...structured sentinel retains exact counters and identifies its source",
+              cur_rec is not None and cur_rec.source == "sentinel"
+              and cur_rec.skipped_inputs == 1 and cur_rec.failed_inputs == 0
+              and cur_rec.trusted is True and cur_rec.current is True)
 
         # --- P1-R01 (round 9): an incompatible current 'complete' .tmp must NOT certify a
         #     failed PARTIAL write — it is rejected and the ladder quarantines instead. ---
@@ -656,6 +812,7 @@ def main():
         c9_tmp = cm.meta_path(c9).with_name(cm.meta_path(c9).name + ".tmp")
         with open(c9_tmp, "w", encoding="utf-8") as _f:          # PLANT a valid CURRENT 'complete' tmp
             _json.dump({"schema_version": cm.SCHEMA_VERSION, "completion": "complete",
+                        "skipped_inputs": 0, "failed_inputs": 0,
                         "built_at_mtime": cm._safe_mtime(c9)}, _f)
         _orig_open9 = _b9.open
 
@@ -682,7 +839,9 @@ def main():
              _patch(matrix, "tsn_comparator_for", lambda rk: _Cmp()):
             try:
                 matrix.consolidate_and_compare_tsn(st9, str(tsn9), tmp / "c9_out.xlsx",
-                                                   "ramp_summary", "ramp_summary", events=None)
+                                                   "ramp_summary", "ramp_summary", events=None,
+                                                   source_identity_check=lambda: True,
+                                                   source_workbook_identity=tsn_library.normalized_workbook_identity(tsn9))
             except ValueError:
                 raised9 = True
         check("matrix REUSE (Everything + by-day shared path) -> not-refreshed (no green match)", raised9)
@@ -698,6 +857,7 @@ def main():
         c10_final = cm.meta_path(c10)
         with open(c10_final, "w", encoding="utf-8") as _f:      # PLANT a valid CURRENT 'complete' FINAL
             _json.dump({"schema_version": cm.SCHEMA_VERSION, "completion": "complete",
+                        "skipped_inputs": 0, "failed_inputs": 0,
                         "built_at_mtime": cm._safe_mtime(c10)}, _f)
         _orig_open10 = _b10.open
 
@@ -723,7 +883,9 @@ def main():
         with _patch(matrix, "_consolidated_stale", lambda *a: False), \
              _patch(matrix, "tsn_comparator_for", lambda rk: _Cmp()):
             r10 = matrix.consolidate_and_compare_tsn(st10, str(tsn10), tmp / "c10_out.xlsx",
-                                                     "ramp_summary", "ramp_summary", events=None)
+                                                     "ramp_summary", "ramp_summary", events=None,
+                                                     source_identity_check=lambda: True,
+                                                     source_workbook_identity=tsn_library.normalized_workbook_identity(tsn10))
         check("matrix REUSE -> cell records partial (never a green match)", r10.completion == oc.PARTIAL)
 
         print()

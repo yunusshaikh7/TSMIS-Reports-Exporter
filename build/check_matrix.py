@@ -149,10 +149,14 @@ def test_staleness():
         os.utime(cmp_p, (t, t))
 
         def state(base_m, cell_m):
-            ages = {"ssor-prod": {sub: {"mtime": base_m}},
-                    "ars-prod": {sub: {"mtime": cell_m}}}
-            return matrix.comparison_state(dest, "ssor-prod", "ramp_detail",
-                                           "ars-prod", sub, ages, {})
+            missing = ("both" if base_m is None and cell_m is None else
+                       "baseline" if base_m is None else
+                       "cell" if cell_m is None else None)
+            return matrix._staleness(
+                t if cmp_p.exists() else None,
+                [{"name": "baseline", "mtime": base_m},
+                 {"name": "cell", "mtime": cell_m}],
+                None, (), missing)
 
         check("both sides older -> fresh",
               state(t - 100, t - 100)["stale"] is False
@@ -185,8 +189,9 @@ def test_staleness():
                                       "ars-prod", sub,
                                       {"ssor-prod": {sub: {"mtime": t - 100}},
                                        "ars-prod": {sub: {"mtime": t - 100}}}, rec)
-        check("trusted record's completion surfaces (partial)",
-              got["completion"] == "partial" and got["verdict"] == "diffs")
+        check("cache-only record is stale without strict generation metadata",
+              got["stale"] is True and got["reason"] == "outcome_missing"
+              and got["completion"] is None and got["verdict"] is None)
         stale_rec = {"ramp_detail": {"ars-prod": {
             "verdict": "diffs", "diff_cells": 3, "one_sided": 0,
             "built_at_mtime": t - 999, "completion": "partial"}}}
@@ -238,6 +243,8 @@ def test_orchestration_and_cache():
         check("cache recorded 1 diff cell", rec.get("diff_cells") == 1)
         check("cache recorded 1 one-sided row", rec.get("one_sided") == 1)
         check("cache recorded the verdict", rec.get("verdict") == "diff")
+        check("cache is bound to the strict artifact generation",
+              rec.get("generation_id") == res.artifact_generation.generation_id)
 
         # The snapshot surfaces the cached counts as a FRESH cell.
         snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod")

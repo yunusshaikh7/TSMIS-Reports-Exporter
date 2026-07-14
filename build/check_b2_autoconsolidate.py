@@ -10,7 +10,9 @@ Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_b2_autoconsolidate.py
 """
 import queue as queue_mod
+import shutil
 import sys
+import tempfile
 import threading
 from pathlib import Path
 
@@ -19,6 +21,7 @@ sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import reports
 import gui_worker
+import owned_dir
 import consolidate_ramp_summary
 import consolidate_ramp_detail
 import consolidate_highway_sequence
@@ -81,7 +84,7 @@ def test_runs_with_day_and_overwrite():
 
     class FakeMod:
         def consolidate(self, events=None, confirm_overwrite=None, day=None,
-                        input_dir=None, out_path=None):
+                        input_dir=None, out_path=None, commit_guard=None):
             seen["day"] = day
             seen["overwrite"] = confirm_overwrite("x.xlsx")
             return ConsolidateResult(status="ok",
@@ -158,16 +161,26 @@ def test_auto_consolidate_into_dest():
         FILENAME = "highway_log_consolidated.xlsx"
 
         def consolidate(self, events=None, confirm_overwrite=None, day=None,
-                        input_dir=None, out_path=None):
-            seen.update(day=day, input_dir=str(input_dir), out_path=str(out_path))
-            return ConsolidateResult(status="ok", summary_lines=["ok"])
+                        input_dir=None, out_path=None, commit_guard=None):
+            seen.update(day=day, input_dir=str(input_dir), out_path=str(out_path),
+                        guarded=callable(commit_guard) and commit_guard(out_path))
+            Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(out_path).write_text("data", encoding="utf-8")
+            return ConsolidateResult(status="ok", output_path=str(out_path),
+                                     summary_lines=["ok"])
 
     orig = reports.consolidator_for_spec
     reports.consolidator_for_spec = lambda spec: FakeMod()
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_b2_owned_"))
     try:
+        out_base = tmp / "All Reports (current)" / "ssor-prod"
+        out_base.parent.mkdir(parents=True)
+        lease = owned_dir.require_owned_dir_lease(out_base, kind="store")
+        (out_base / "highway_log").mkdir()
         w = gui_worker.ExportWorker([], queue_mod.Queue(), threading.Event(),
                                     threading.Event(), auto_consolidate=True,
-                                    out_base="Z:/x/All Reports (current)/ssor-prod")
+                                    out_base=out_base)
+        w._owned_root_lease = lease
         w._auto_consolidate(_FakeSpec("Highway Log", "highway_log"),
                             RunResult(output_dir="", saved=2), Events())
         norm = lambda s: (s or "").replace("\\", "/")
@@ -180,8 +193,11 @@ def test_auto_consolidate_into_dest():
         check("out_path = <dest>/<src-env>/consolidated/<src-env FILENAME>",
               norm(seen.get("out_path")).endswith(
                   "/ssor-prod/consolidated/ssor-prod highway_log_consolidated.xlsx"))
+        check("dest mode threads a live target-aware commit guard",
+              seen.get("guarded") is True)
     finally:
         reports.consolidator_for_spec = orig
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def main():

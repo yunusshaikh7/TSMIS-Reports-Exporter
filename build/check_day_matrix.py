@@ -23,6 +23,7 @@ import gui_matrix
 import matrix
 import paths
 import settings
+from openpyxl import Workbook
 
 _fail = []
 
@@ -154,6 +155,43 @@ def main():
               and "source_kind" in snap["tsn_meta"]["highway_log"])
         check("Highway Log's TSN row resolves to its consolidated workbook",
               snap["tsn_meta"]["highway_log"]["source_kind"] == "consolidated")
+        missing_pick = str(dest / "deleted-explicit.xlsx")
+        missing_snap = day_matrix.day_matrix_snapshot(
+            "ssor-prod", ["2026-06-17"], dest=str(dest),
+            tsn_files={"highway_log": missing_pick})
+        missing_meta = missing_snap["tsn_meta"]["highway_log"]
+        check("deleted explicit TSN pick stays visible and fail-closed by day",
+              missing_meta["source_kind"] == "missing_explicit"
+              and missing_meta.get("selection_missing") is True
+              and missing_meta.get("selected_path") == missing_pick
+              and missing_snap["cells"]["highway_log"]["2026-06-17"]["cmp"]
+                  ["missing_side"] == "tsn"
+              and not day_matrix.cells_to_rebuild(missing_snap, scope="all"))
+        pdf_to_tsn = {
+            "highway_log_pdf": "highway_log",
+            "intersection_detail_pdf": "intersection_detail",
+            "highway_detail_pdf": "highway_detail",
+            "highway_sequence_pdf": "highway_sequence",
+            "ramp_detail_pdf": "ramp_detail",
+        }
+        shared_missing = {}
+        for base in set(pdf_to_tsn.values()):
+            shared_missing[base] = {
+                "version": 1, "path": str(dest / f"deleted-{base}.xlsx"),
+                "identity": {"sha256": "0" * 64, "size": 1,
+                             "mtime_ns": 1, "file_id": "1:1"},
+            }
+        pdf_missing_snap = day_matrix.day_matrix_snapshot(
+            "ssor-prod", ["2026-06-17"], dest=str(dest),
+            tsn_files=shared_missing)
+        check("all five PDF rows inherit their shared missing explicit TSN state",
+              all(pdf_missing_snap["tsn_meta"][pdf]["source_kind"]
+                  == "missing_explicit"
+                  and pdf_missing_snap["tsn_meta"][pdf]["selected_path"]
+                  == shared_missing[base]["path"]
+                  and pdf_missing_snap["cells"][pdf]["2026-06-17"]["cmp"]
+                      ["missing_side"] in ("cell", "both")
+                  for pdf, base in pdf_to_tsn.items()))
         hl = snap["cells"]["highway_log"]["2026-06-17"]
         check("HL Excel cell: export present, comparable, not built",
               hl["export"]["present"] and hl["cmp"]["supported"]
@@ -199,12 +237,46 @@ def main():
         check("no TSN workbook raises",
               _raises(lambda: day_matrix.build_day_cell("ssor-prod", "2026-06-17",
                                                         "highway_log", notsn, None)))
+        try:
+            day_matrix.build_day_cell(
+                "ssor-prod", "2026-06-17", "highway_log", str(dest), None,
+                tsn_files={"highway_log": str(dest / "deleted-explicit.xlsx")})
+            missing_msg = ""
+        except ValueError as e:
+            missing_msg = str(e)
+        check("day build names missing explicit selection and recovery actions",
+              "selected TSN" in missing_msg and "re-pick" in missing_msg.lower()
+              and "clear" in missing_msg.lower())
 
         print("gui_api bridge — source/day/report validation + enqueue:")
         a = gui_api.GuiApi()
         info = a.day_matrix_info()
         check("day_matrix_info carries available_days + sources",
               "available_days" in info and len(info["sources"]) == 6)
+        picked = dest / "picked-shared-tsn.xlsx"
+        wb = Workbook(); wb.active["A1"] = "TSN"; wb.save(picked); wb.close()
+        picked_res = a.set_matrix_tsn_file("highway_log_pdf", str(picked))
+        saved_selection = settings.get_matrix_tsn_selections()
+        check("bridge canonicalizes a PDF-row pick and persists its verified identity",
+              picked_res.get("ok") is True
+              and set(saved_selection) == {"highway_log"}
+              and saved_selection["highway_log"].get("version") == 1
+              and saved_selection["highway_log"]["identity"].get("sha256"))
+        bad = dest / "bad.xlsx"; bad.write_bytes(b"not a workbook")
+        check("bridge rejects an unreadable/non-workbook explicit .xlsx",
+              bool(a.set_matrix_tsn_file("highway_log", str(bad)).get("error")))
+        check("bridge rejects a malformed non-path picker payload cleanly",
+              bool(a.set_matrix_tsn_file("highway_log", []).get("error")))
+        a.set_matrix_tsn_file("highway_log_pdf", "")
+        check("clearing through a PDF alias clears the canonical shared selection",
+              "highway_log" not in settings.get_matrix_tsn_selections())
+        settings.set_matrix_tsn_file("highway_log_pdf", str(dest / "legacy.xlsx"))
+        a.day_matrix_info()                       # normal snapshot boundary performs migration
+        migrated = settings.get_matrix_tsn_selections()
+        check("legacy PDF-keyed config migrates to one blocked base-key record",
+              "highway_log_pdf" not in migrated
+              and migrated.get("highway_log", {}).get("version") == 0)
+        a.set_matrix_tsn_file("highway_log", "")
         check("unknown source rejected", bool(a.set_day_matrix_source("zz-zz").get("error")))
         check("valid source set", a.set_day_matrix_source("ssor-prod").get("ok"))
         check("add a day with no export rejected",

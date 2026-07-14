@@ -99,6 +99,19 @@ def test_settings_dedup_and_atomicity():
         check("...and the writers' own values persisted",
               data.get("debug_logging") is True and data.get("batch_dest") == out2
               and data.get("matrix_baseline") == "ssor-prod" and "site_urls" in data)
+        selection = {
+            "version": 1, "path": r"C:\TSN\picked.xlsx",
+            "identity": {"sha256": "a" * 64, "size": 123,
+                         "mtime_ns": 456, "file_id": "1:2"},
+        }
+        settings.set_matrix_tsn_selection("highway_log", selection)
+        check("versioned TSN selection identity round-trips atomically",
+              settings.get_matrix_tsn_selections()["highway_log"] == selection
+              and settings.get_matrix_tsn_files()["highway_log"] == selection["path"])
+        settings.set_matrix_tsn_file("ramp_detail_pdf", r"C:\TSN\legacy.xlsx")
+        check("legacy path-only settings remain distinguishable for fail-closed migration",
+              settings.get_matrix_tsn_selections()["ramp_detail_pdf"]
+              == r"C:\TSN\legacy.xlsx")
         # atomic: a failed os.replace raises, leaves the prior config intact, no .tmp sibling
         before = settings.CONFIG_FILE.read_bytes()
         settings._cache = settings._cache_mtime = None

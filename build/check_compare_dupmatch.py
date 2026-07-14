@@ -109,7 +109,8 @@ def test_no_duplicates_unchanged():
     b = [["R1", "1", "9"], ["R2", "2", "2"]]
     kt, kn = keys_for(a, False), keys_for(b, False)
     mt, mn = pair_occurrences_by_similarity(SC, a, b, kt, kn, False)
-    check("keys unchanged when every key is unique", mt == kt and mn == kn)
+    check("keys unchanged when every key is unique",
+          list(mt) == kt and list(mn) == kn)
     c = count_diffs(SC, a, b, mt, mn, union_keys(mt, mn), False)
     check("the real single diff is still counted", c["diff_cells"] == 1)
 

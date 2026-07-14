@@ -18,6 +18,7 @@ make_notes_writer assertion writes a real in-memory workbook. Offline, CI-safe. 
     build\\.venv\\Scripts\\python.exe build\\check_compare_tsn_common.py
 """
 import contextlib
+import inspect
 import os
 import sys
 import tempfile
@@ -27,13 +28,20 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import compare_tsn_common as ctc            # noqa: E402
-from events import Events                   # noqa: E402
+from events import ConsolidateResult, Events  # noqa: E402
 
 _fail = []
 _SCRIPTS = ROOT / "scripts"
 _MODULES = ["compare_ramp_detail_tsn", "compare_ramp_summary_tsn",
             "compare_highway_sequence_tsn", "compare_intersection_detail_tsn",
             "compare_intersection_summary_tsn"]
+_GUARDED_FUNCTION_MODULES = ["compare_highway_log", "compare_highway_detail_tsn",
+                             *_MODULES]
+_GUARDED_INSTANCE_MODULES = ["compare_highway_detail_pdf",
+                             "compare_highway_log_pdf",
+                             "compare_highway_sequence_pdf",
+                             "compare_intersection_detail_pdf",
+                             "compare_ramp_detail_pdf"]
 
 
 def check(name, cond):
@@ -149,25 +157,26 @@ def test_driver_happy_path():
     def _fake_run_compare(sc, rows_t, rows_n, has_route, out_path, **kw):
         seen.update(sc=sc, rows_t=rows_t, rows_n=rows_n, has_route=has_route,
                     out_path=out_path, **kw)
-
-        class _R:  # a stand-in result object; the driver returns it unchanged
-            status = "ok"
-        return _R()
+        from openpyxl import Workbook
+        wb = Workbook(); wb.active.title = "Comparison"; wb.save(out_path); wb.close()
+        return ConsolidateResult(status="ok", output_path=str(out_path))
 
     ev, logs = _events()
     with _patch(ctc, "run_compare", _fake_run_compare):
         # warnings None from the loader must reach run_compare as the () default.
         ctc.run_files_compare("SCHEMA", a, b, out, banner="Ramp Detail Comparison — TSMIS vs TSN",
                               has_route=True, loader=lambda _t, _n: ([["t"]], [["n"]], None),
-                              mode="values", confirm_overwrite="CB", events=ev)
+                              mode="values", confirm_overwrite=lambda _p: True, events=ev)
     check("banner == the 6 canonical log lines (=*60, title, =*60, TSMIS:, TSN:, '')",
           logs == ["=" * 60, "Ramp Detail Comparison — TSMIS vs TSN", "=" * 60,
                    "TSMIS: tsmis.xlsx", "TSN:   tsn.xlsx", ""])
-    check("run_compare got schema/has_route/out_path/mode/name_a/name_b passed through",
+    check("run_compare got schema/has_route/mode/names via a transactional temp path",
           seen.get("sc") == "SCHEMA" and seen.get("has_route") is True
-          and seen.get("out_path") == out and seen.get("mode") == "values"
+          and Path(seen.get("out_path")).parent == out.parent
+          and ".tmp-" in Path(seen.get("out_path")).name
+          and seen.get("mode") == "values" and out.is_file()
           and seen.get("name_a") == "tsmis.xlsx" and seen.get("name_b") == "tsn.xlsx"
-          and seen.get("confirm_overwrite") == "CB")
+          and callable(seen.get("confirm_overwrite")))
     check("loader rows reach run_compare in order", seen.get("rows_t") == [["t"]] and seen.get("rows_n") == [["n"]])
     check("warnings None normalized to the run_compare () default", seen.get("warnings") == ())
 
@@ -177,6 +186,191 @@ def test_driver_happy_path():
         ctc.run_files_compare("SCHEMA", a, b, out, banner="B", has_route=False,
                               loader=lambda _t, _n: ([], [], ["a warning"]), events=_events()[0])
     check("explicit warnings list passes through unchanged", seen.get("warnings") == ["a warning"])
+
+
+def test_driver_target_guard():
+    print("run_files_compare target-aware guard reaches transaction + serializer:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_ctc_guard_"))
+    a, b, out = root / "a.xlsx", root / "b.xlsx", root / "out.xlsx"
+    a.write_bytes(b"a")
+    b.write_bytes(b"b")
+    guarded = []
+    seen = {}
+
+    def guard(path, **binding):
+        p = Path(path)
+        guarded.append((p, dict(binding)))
+        return p == root or p.parent == root
+
+    def _fake_run_compare(_sc, _rows_t, _rows_n, _has_route, out_path, **kw):
+        seen.update(out_path=Path(out_path), **kw)
+        from openpyxl import Workbook
+        wb = Workbook(); wb.active.title = "Comparison"; wb.save(out_path); wb.close()
+        return ConsolidateResult(status="ok", output_path=str(out_path))
+
+    with _patch(ctc, "run_compare", _fake_run_compare):
+        result = ctc.run_files_compare(
+            "SC", a, b, out, banner="B", has_route=True,
+            loader=lambda _a, _b: ([["a"]], [["b"]], None),
+            mode="values", events=_events()[0], commit_guard=guard)
+    guarded_paths = [p for p, _binding in guarded]
+    check("guarded driver succeeds and publishes the selected final",
+          result.status == "ok" and out.is_file())
+    check("the exact final and unpredictable transaction temp are guarded",
+          out in guarded_paths and seen.get("out_path") in guarded_paths
+          and ".tmp-" in seen.get("out_path").name)
+    check("the original target-aware callback reaches compare_core",
+          seen.get("commit_guard") is guard)
+    check("transaction temp checks carry a bound-parent identity",
+          any(p == seen.get("out_path") and binding.get("anchor_identity") is not None
+              for p, binding in guarded))
+
+    ran = [False]
+
+    def deny_temp(path, **_binding):
+        return ".tmp-" not in Path(path).name
+
+    def _must_not_run(*_args, **_kwargs):
+        ran[0] = True
+        return ConsolidateResult(status="ok")
+
+    with _patch(ctc, "run_compare", _must_not_run):
+        denied = ctc.run_files_compare(
+            "SC", a, b, root / "denied.xlsx", banner="B", has_route=True,
+            loader=lambda _a, _b: ([["a"]], [["b"]], None),
+            mode="values", events=_events()[0], commit_guard=deny_temp)
+    check("a guard that denies the allocated temp blocks serializer entry",
+          denied.status == "error" and not ran[0]
+          and not (root / "denied.xlsx").exists())
+    check("denial leaves no transaction temp behind",
+          not list(root.glob("*.tmp-*")))
+
+
+def test_compare_core_guard_boundary():
+    print("compare_core checks the exact output again immediately before save:")
+    import compare_core
+    root = Path(tempfile.mkdtemp(prefix="tsmis_core_guard_"))
+    out = root / "core.xlsx"
+    schema = compare_core.CompareSchema(
+        report_name="Guard Probe", header=["Key", "Value"],
+        id_noun="row", id_noun_plural="rows")
+    output_checks = [0]
+
+    def revoke_at_save(path):
+        p = Path(path)
+        if p == out:
+            output_checks[0] += 1
+            # initial selection + per-flavor entry pass; revoke on the exact
+            # third check, immediately before parent.mkdir/wb.save.
+            return output_checks[0] < 3
+        return True
+
+    result = compare_core.run_compare(
+        schema, [["1", "a"]], [["1", "a"]], False, out,
+        mode="values", commit_guard=revoke_at_save)
+    check("late guard loss returns an ownership error",
+          result.status == "error" and "ownership" in result.message.lower())
+    check("...no workbook is opened at the denied path", not out.exists())
+
+
+def test_all_comparator_guard_facades():
+    print("every file/PDF comparator exposes and forwards optional commit_guard:")
+    for name in _GUARDED_FUNCTION_MODULES:
+        mod = __import__(name)
+        sig = inspect.signature(mod.compare)
+        src = _src(name)
+        check(f"{name}: compare(commit_guard=None) is public-compatible",
+              "commit_guard" in sig.parameters
+              and sig.parameters["commit_guard"].default is None)
+        check(f"{name}: forwards the callback to the shared driver",
+              "commit_guard=commit_guard" in src)
+    for name in _GUARDED_INSTANCE_MODULES:
+        mod = __import__(name)
+        sig = inspect.signature(mod.TSMIS_PDF_VS_TSN.compare)
+        src = _src(name)
+        check(f"{name}: adapter.compare(commit_guard=None) is public-compatible",
+              "commit_guard" in sig.parameters
+              and sig.parameters["commit_guard"].default is None)
+        check(f"{name}: forwards the callback to the shared driver",
+              "commit_guard=commit_guard" in src)
+
+
+def test_driver_output_source_aliases():
+    """The public FILE driver must be safe without a GUI/Matrix wrapper."""
+    print("run_files_compare rejects direct and derived output/source aliases:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_ctc_alias_"))
+    a = root / "selected-source.xlsx"
+    b = root / "other-source.xlsx"
+    a.write_bytes(b"selected source A")
+    b.write_bytes(b"selected source B")
+    calls = []
+
+    def _destructive_run_compare(_sc, _rows_t, _rows_n, _has_route, out_path, **kw):
+        calls.append(Path(out_path))
+        Path(out_path).write_bytes(b"comparison replacement")
+        if kw.get("mode") == "both":
+            p = Path(out_path)
+            p.with_name(f"{p.stem} (values){p.suffix}").write_bytes(
+                b"derived comparison replacement")
+
+        class _R:
+            status = "ok"
+        return _R()
+
+    loader = lambda _t, _n: ([['t']], [['n']], None)
+    with _patch(ctc, "run_compare", _destructive_run_compare):
+        prior = a.read_bytes()
+        direct = ctc.run_files_compare(
+            "SCHEMA", a, b, a, banner="B", has_route=True, loader=loader,
+            mode="values", events=_events()[0])
+        check("direct driver rejects a picked output that is source A",
+              direct.status == "error" and calls == [])
+        check("...source A is byte-for-byte preserved", a.read_bytes() == prior)
+
+        calls.clear()
+        picked = root / "comparison.xlsx"
+        derived_source = picked.with_name(
+            f"{picked.stem} (values){picked.suffix}")
+        derived_source.write_bytes(b"selected source used by derived twin")
+        prior_derived = derived_source.read_bytes()
+        derived = ctc.run_files_compare(
+            "SCHEMA", derived_source, b, picked, banner="B", has_route=True,
+            loader=loader, mode="both", events=_events()[0])
+        check("mode=both rejects an unselected values twin that is source A",
+              derived.status == "error" and calls == [])
+        check("...the derived-twin source is byte-for-byte preserved",
+              derived_source.read_bytes() == prior_derived and not picked.exists())
+
+    # The direct driver now publishes through the same transactional boundary,
+    # so an alias that appears only after run_compare has serialized its temp is
+    # still rejected immediately before the final replace.
+    late_a = root / "late-source.xlsx"
+    late_b = root / "late-other.xlsx"
+    late_out = root / "late-output.xlsx"
+    late_a.write_bytes(b"late source")
+    late_b.write_bytes(b"late other")
+    late_prior = late_a.read_bytes()
+    late_calls = []
+
+    def _late_alias_run(_sc, _rows_t, _rows_n, _has_route, out_path, **_kw):
+        from openpyxl import Workbook
+        late_calls.append(Path(out_path))
+        wb = Workbook(); wb.active.title = "Comparison"; wb.save(out_path); wb.close()
+        os.link(late_a, late_out)
+        return ConsolidateResult(status="ok", output_path=str(out_path))
+
+    try:
+        with _patch(ctc, "run_compare", _late_alias_run):
+            late = ctc.run_files_compare(
+                "SCHEMA", late_a, late_b, late_out, banner="B", has_route=True,
+                loader=loader, mode="values", events=_events()[0])
+    except OSError:
+        check("late hardlink direct-driver probe skipped only when links are unavailable", True)
+    else:
+        check("a direct-driver destination that aliases late is rejected after serialization",
+              late.status == "error" and len(late_calls) == 1)
+        check("...the late-aliased source remains byte-for-byte intact",
+              late_a.read_bytes() == late_prior and late_out.read_bytes() == late_prior)
 
 
 # --------------------------------------------------------------------------- #
@@ -230,6 +424,10 @@ def main():
     test_notes_writer()
     test_driver_branches()
     test_driver_happy_path()
+    test_driver_target_guard()
+    test_compare_core_guard_boundary()
+    test_driver_output_source_aliases()
+    test_all_comparator_guard_facades()
     test_all_delegate()
     test_detail_aliases()
     test_notes_delegation()

@@ -56,11 +56,20 @@ def main():
 
     # 2a) Bug B: the data-sheet "Key (helper)" column is a LITERAL string, not a
     #     live COUNTIFS (which mis-numbers blank keys via Excel's blank-criterion
-    #     quirk). Row 2 of side A is 001/ORA/occurrence 1.
-    kcell = wb["AENV"].cell(row=2, column=wb["AENV"].max_column)
+    #     quirk). E2 uses a versioned opaque ordinal rather than lossy delimiter
+    #     concatenation, so component text can never collide.
+    aws = wb["AENV"]
+    header = [cell.value for cell in aws[1]]
+    assert header.count("Key (helper)") == 1, ("Key helper header", header)
+    key_col = header.index("Key (helper)") + 1
+    kcell = aws.cell(row=2, column=key_col)
     assert kcell.data_type != "f" and "COUNTIF" not in str(kcell.value), \
         ("Key (helper) must be a literal, not COUNTIFS", kcell.value)
-    assert str(kcell.value) == "001|ORA|1", ("key value", kcell.value)
+    helpers = [aws.cell(row=row, column=key_col).value
+               for row in range(2, len(ROWS_A) + 2)]
+    assert all(str(value).startswith("__CMP_E2_KEY_V1_") for value in helpers), \
+        ("opaque helper values", helpers)
+    assert len(set(helpers)) == len(helpers), ("helper values must be injective", helpers)
 
     # 2b) Bug A: the row-count self-checks count an always-present column (the
     #     back-link A / the numeric occurrence #), never the blank-able key

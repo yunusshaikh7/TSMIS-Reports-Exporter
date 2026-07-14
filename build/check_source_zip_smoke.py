@@ -109,13 +109,25 @@ def _candidate_archive(dest_zip):
     file so the developer's real staging area is never altered. This is the
     pre-commit (phase-review) artifact: it reflects the worktree, not HEAD."""
     tmp_index = dest_zip.parent / "candidate.index"
-    env = dict(os.environ, GIT_INDEX_FILE=str(tmp_index))
+    # A candidate containing modified/untracked files makes ``git add`` create
+    # temporary blob/tree objects. Keep those beside the throwaway index instead
+    # of requiring write access to the developer-owned ``.git/objects`` (the
+    # desktop sandbox intentionally exposes repository metadata read-only).
+    tmp_objects = dest_zip.parent / "candidate-objects"
+    tmp_objects.mkdir()
+    env = dict(
+        os.environ,
+        GIT_INDEX_FILE=str(tmp_index),
+        GIT_OBJECT_DIRECTORY=str(tmp_objects),
+        GIT_ALTERNATE_OBJECT_DIRECTORIES=str(ROOT / ".git" / "objects"),
+    )
 
     def g(*args, **kw):
         # autocrlf=false: archive the worktree bytes as-is (no eol conversion, no
         # noisy "LF will be replaced by CRLF" warnings, and the provenance content
         # match below is exact).
-        return subprocess.run(["git", "-c", "core.autocrlf=false", *args],
+        return subprocess.run(["git", "-c", "core.autocrlf=false",
+                               "-c", f"safe.directory={ROOT.as_posix()}", *args],
                               cwd=str(ROOT), env=env, check=True, **kw)
 
     try:
@@ -128,6 +140,7 @@ def _candidate_archive(dest_zip):
     finally:
         if tmp_index.exists():
             tmp_index.unlink()
+        shutil.rmtree(tmp_objects, ignore_errors=True)
 
 
 def _extract(zip_path, dest_dir):

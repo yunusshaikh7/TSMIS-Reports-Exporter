@@ -60,14 +60,15 @@ def test_compare_warning_blocks_match():
     assert "COULD NOT COMPARE" in res.summary_lines[0], res.summary_lines[0]
     assert any("route_099" in ln for ln in res.summary_lines), \
         ("skipped file must be listed in the summary", res.summary_lines)
-    wb = load_workbook(out, data_only=True)
-    banner = [c.value for row in wb["Summary"].iter_rows() for c in row
-              if isinstance(c.value, str) and "MATCH" in c.value.upper()]
+    wb = load_workbook(out, data_only=False)
+    banner = wb["Summary"]["B3"].value
     wb.close()
     os.remove(out)
-    assert banner and banner[0].startswith("✗"), \
-        ("workbook banner must NOT claim a clean ✓ match", banner)
-    assert "COULD NOT COMPARE EVERYTHING" in banner[0], banner
+    assert isinstance(banner, str) and banner.startswith("=IF("), \
+        ("workbook banner must be guarded by the freshness formula", banner)
+    assert "REGENERATE REQUIRED" in banner, banner
+    assert "COULD NOT COMPARE EVERYTHING" in banner, banner
+    assert "✓ EVERYTHING MATCHES" not in banner, banner
 
 
 def test_consolidate_partial_and_allfail():

@@ -9,7 +9,8 @@ sheet/header/alignment literals are hand-written here, NOT re-read from the kwar
 shim passes to `build_normalized`):
 
   * every `ConsolidateResult` field (status, message, summary_lines, completion,
-    skipped_inputs) -- exact text/order, incl. the producer PARTIAL warning for a
+    skipped_inputs) -- exact text/order, incl. explicit COMPLETE for detail
+    producers and the producer PARTIAL warning for a
     missing summary category;
   * the exact emitted event log line;
   * the sheet title, the header row, and every data row (details: the verbatim rows
@@ -18,7 +19,7 @@ shim passes to `build_normalized`):
   * every header cell's alignment AND font AND fill.
 
 It also locks the shared skeleton's exact strings + branches (deps gate, missing-raw,
-overwrite-confirm cancel, parse-error wrap, newest-by-mtime pick, `~$` lock skip), the
+overwrite-confirm cancel, parse-error wrap, exact-one admission, `~$` lock skip), the
 atomic-save `PermissionError` contract (prior artifact retained, no stray file), and the
 P5-A01 ImportError backstop. compare_core is untouched.
 
@@ -164,7 +165,7 @@ def test_detail_signatures():
             exp_sum = [f"{label}: 3 rows, 2 routes -> {out.name}"]
             check(f"{label}: result fields exact (status/msg/summary/completion/skipped)",
                   (r.status, r.message, list(r.summary_lines), r.completion, r.skipped_inputs)
-                  == ("ok", exp_msg, exp_sum, None, 0))
+                  == ("ok", exp_msg, exp_sum, oc.COMPLETE, 0))
             check(f"{label}: event log == one Normalizing line", logs == [f"Normalizing {label}: s.xlsx"])
             title, rows, head = _sig(out)
             check(f"{label}: sheet + header + data rows exact",
@@ -309,7 +310,8 @@ def test_shared_skeleton():
             r = rd_load.build_into(raw, tmp / "z.xlsx", events=_events()[0])
         check("workbook-symbol ImportError -> backstopped to the deps message (P5-A01)",
               r.status == "error" and r.message == _DEPS_XLSX)
-        # newest-by-mtime pick (not by name), Excel ~$ lock skipped
+        # Two ordinary candidates are ambiguous regardless of mtime; Excel ~$ locks
+        # do not count as candidates.
         raw2 = tmp / "rd2"
         raw2.mkdir()
         for nm, mt in (("a.xlsx", 3000.0), ("z.xlsx", 1000.0), ("~$lock.xlsx", 9000.0)):
@@ -322,9 +324,15 @@ def test_shared_skeleton():
             seen["path"] = p
             return list(rows), [("01", "DN")] * len(rows)
         with _patch(rd_load, "tsn_rows_with_dcr", _capture):
-            rd_load.build_into(raw2, tmp / "z2.xlsx", events=_events()[0])
-        check("newest raw by MTIME parsed (not by name); ~$ lock skipped",
-              Path(seen.get("path", "")).name == "a.xlsx")
+            ambiguous = rd_load.build_into(raw2, tmp / "z2.xlsx", events=_events()[0])
+        check("two ordinary raws are rejected (no newest-by-mtime selection)",
+              ambiguous.status == "error" and "Found 2 ordinary matching files" in ambiguous.message
+              and not seen)
+        (raw2 / "a.xlsx").unlink()
+        with _patch(rd_load, "tsn_rows_with_dcr", _capture):
+            accepted = rd_load.build_into(raw2, tmp / "z2.xlsx", events=_events()[0])
+        check("one ordinary raw accepted while ~$ owner lock is ignored",
+              accepted.status == "ok" and Path(seen.get("path", "")).name == "z.xlsx")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

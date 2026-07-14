@@ -107,7 +107,9 @@ def test_summary_aggregate_compare():
     blob, sheets = _summary(out)
     check("side labels are the environments", "SSOR-PROD" in blob and "ARS-PROD" in blob)
     check("keyed on Route", "keyed on Route" in blob)
-    check("exactly one differing cell (route 002 Total)", "1 differing cell" in blob)
+    check("exactly one differing cell (route 002 Total)",
+          res.comparison_outcome is not None
+          and res.comparison_outcome.counts.differing_cells == 1)
     check("env side sheets present",
           "SSOR-PROD" in sheets and "ARS-PROD" in sheets and "Comparison" in sheets)
 

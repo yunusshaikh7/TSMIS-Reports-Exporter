@@ -17,6 +17,7 @@ while everything present in both systems IS counted. No Excel; CI-safe.
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_compare_intersection_detail_tsn.py
 """
+import inspect
 import os
 import sys
 import tempfile
@@ -79,12 +80,17 @@ def _write_tsn(path, rows):
     wb = Workbook()
     ws = wb.active
     ws.title = idt.TSN_SHEET
+    # Exact order from the SHA-bound statewide raw TSN workbook.  Keeping this
+    # fixture faithful matters even though the production loader projects by
+    # header name: the independent Phase-3 reader deliberately rejects schema
+    # or order drift.
     cols = ["PP", "POST_MILE", "LOCATION", "DATE_REC", "HG", "CITY_CODE", "RU",
-            "TY_INT", "TY_CT", "LT_TY", "MAIN_SM", "MAIN_LC", "MAIN_RC", "MAIN_TF",
-            "MAIN_NL", "DESCRIPTION", "CS_SM", "CS_LC", "CS_RC", "CS_TF", "CS_NL",
-            "EFF_DATE_INT", "EFF_DATE_CT", "EFF_DATE_LT", "EFF_DATE_ML", "MAIN_EFF_DATE",
-            "MAIN_OVERRIDE", "CROSS_BEGIN_DATE", "EFF_DATE", "CROSS_ROUTE_NAME",
-            "CROSS_PM_PREFIX", "CROSS_POSTMILE", "CROSS_PM_SUFFIX", "X_CROSS_OVERRIDE"]
+            "EFF_DATE_INT", "TY_INT", "EFF_DATE_CT", "TY_CT", "EFF_DATE_LT", "LT_TY",
+            "EFF_DATE_ML", "MAIN_SM", "MAIN_LC", "MAIN_RC", "MAIN_TF", "MAIN_NL",
+            "X_CROSS_OVERRIDE", "MAIN_EFF_DATE", "MAIN_ADT", "DESCRIPTION",
+            "MAIN_OVERRIDE", "CROSS_BEGIN_DATE", "CS_SM", "CS_LC", "CS_RC", "CS_TF",
+            "CS_NL", "EFF_DATE", "CROSS_ADT", "CROSS_ROUTE_NAME", "CROSS_PM_PREFIX",
+            "CROSS_POSTMILE", "CROSS_PM_SUFFIX"]
     ws.append(cols)
     for r in rows:
         ws.append([r.get(c) for c in cols])
@@ -141,7 +147,7 @@ def test_schema():
           and not idt._header_ok(["Route"] + ["x"] * 35))
     check("Notes legend_writer set (documents the normalizations)", sc.legend_writer is not None)
     check("Report View extra_sheet_writer set (the printed two-line replica)",
-          sc.extra_sheet_writer is None)   # base schema is clean; the closure is added per-call in compare()
+          sc.extra_sheet_writer is None and not sc.report_view_diff_check)  # closure added per-call
     check("boolean normalize Y/1->Y, N/0->N (legacy 1/0 still folds)",
           idt._norm_bool("Y") == "Y" and idt._norm_bool("1") == "Y"
           and idt._norm_bool("N") == "N" and idt._norm_bool("0") == "N")
@@ -177,6 +183,13 @@ def test_schema():
           and any(spec == ("tn", "ML2") for c in idt._RV_GRID for spec in (c[2], c[5]))
           and not any(spec == ("cmp", "ML 2nd Eff-Date") for c in idt._RV_GRID
                       for spec in (c[2], c[5])))
+    cmp_fields = [spec[1] for column in idt._RV_GRID
+                  for spec in (column[2], column[5]) if spec[0] == "cmp"]
+    asserting_fields = [sc.header[index] for index in sc.field_indices
+                        if not sc.is_context(index)]
+    check("Report View grid contains every asserting non-key field exactly once",
+          set(cmp_fields) == set(asserting_fields)
+          and len(cmp_fields) == len(asserting_fields) == len(set(cmp_fields)))
     check("Report View: the TSN-only 2nd ML eff-date renders as a DATE",
           "ML2" in idt._RV_DATEONE and idt._RV_ONE["ML2"] == "MAIN_EFF_DATE")
     check("route from LOCATION '12 ORA 001' -> '001'", idt._norm_route("12 ORA 001") == "001")
@@ -192,6 +205,108 @@ def test_schema():
     check("numeric-0 boolean -> 'N' (not blank)", idt._norm_bool(0) == "N")
     check("date ISO from YY-MM-DD ('73-10-19' -> '1973-10-19')",
           idt._iso_date("73-10-19") == "1973-10-19")
+
+
+def test_report_view_typed_truth():
+    print("Report View typed comparison truth:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_id_rv_truth_"))
+    out = root / "report-view.xlsx"
+    # City Code, Main Line Length, Date of Record, and INT Type are hard
+    # differences; ML Eff-Date is soft. Formula-leading/error-looking values
+    # exercise the familiar view's literal-write boundary.
+    # R/U is made context only in this synthetic schema to prove an unequal but
+    # non-asserting cell cannot render/count/classify as a Report View diff.
+    sc = idt.dataclasses.replace(idt._SCHEMA, context_fields=("R/U",))
+
+    def row(side_b=False):
+        values = {name: "" for name in sc.header}
+        values.update({
+            "PM": "0.204",
+            "PR": "=1+1",
+            "Route Suffix": "#N/A",
+            "Description": "ASCII SPACE" if side_b else "  ASCII   SPACE  ",
+            "City Code": "case" if side_b else "Case",
+            "HG": "literal ≠ content",
+            "Date of Record": "@RIGHT" if side_b else "@LEFT",
+            "INT Type": "+RIGHT" if side_b else "+LEFT",
+            "Lighting Eff-Date": "-SAFE",
+            "Main Line Length": 0 if side_b else None,
+            "ML Eff-Date": "1974-01-01" if side_b else "1973-01-01",
+            "R/U": "R" if side_b else "U",
+        })
+        return ["001"] + [values[name] for name in sc.header]
+
+    wb = Workbook(write_only=True)
+    idt._write_report_view(
+        wb,
+        {"sc": sc, "rows_a": [row()], "rows_b": [row(True)]},
+        [{}],
+        ["12 ORA 001"],
+    )
+    wb.save(out)
+    wb.close()
+
+    wb = load_workbook(out, data_only=True)
+    try:
+        ws = wb["Report View"]
+
+        def grid_cell(line, field):
+            slot = 2 if line == 0 else 5
+            for grid_index, column in enumerate(idt._RV_GRID):
+                if column[slot] == ("cmp", field):
+                    return ws.cell(
+                        row=5 + line,
+                        column=len(idt._RV_AUX) + grid_index + 1,
+                    )
+            raise AssertionError(f"missing Report View field: {field}")
+
+        desc = grid_cell(1, "Description")
+        city = grid_cell(0, "City Code")
+        literal = grid_cell(0, "HG")
+        zero = grid_cell(1, "Main Line Length")
+        soft = grid_cell(0, "ML Eff-Date")
+        context = grid_cell(0, "R/U")
+        eq_formula = grid_cell(0, "PR")
+        eq_error = grid_cell(0, "Route Suffix")
+        plus_diff = grid_cell(0, "INT Type")
+        at_diff = grid_cell(0, "Date of Record")
+        minus_equal = grid_cell(0, "Lighting Eff-Date")
+        check("Report View ASCII-space equality follows shared Excel TRIM",
+              desc.value == "ASCII SPACE")
+        check("Report View equality remains case-sensitive",
+              city.value == "Case ≠ case")
+        check("equal literal difference-marker content is displayed but not counted",
+              literal.value == "literal ≠ content")
+        check("blank-vs-zero is asserting and preserves the dot display",
+              zero.value == "· ≠ 0")
+        check("only asserting unequal cells render as differences",
+              context.value == "U" and " ≠ " not in context.value)
+        check("Report View guards =/+/−/@ and Excel-error source literals",
+              eq_formula.value == "=1+1" and eq_formula.data_type == "s"
+              and eq_error.value == "#N/A" and eq_error.data_type == "s"
+              and plus_diff.value == "+LEFT ≠ +RIGHT" and plus_diff.data_type == "s"
+              and at_diff.value == "@LEFT ≠ @RIGHT" and at_diff.data_type == "s"
+              and minus_equal.value == "-SAFE" and minus_equal.data_type == "s")
+        check("hard and soft differences retain the red palette",
+              city.fill.fgColor.rgb[-6:] == idt._RV_FILLS["hard"][0]
+              and soft.fill.fgColor.rgb[-6:] == idt._RV_FILLS["soft"][0]
+              and literal.fill.fgColor.rgb[-6:] == idt._RV_FILLS["eq"][0])
+        data_rows = list(ws.iter_rows(min_row=5, values_only=True))
+        check("matched record writes its full typed Diffs total on exactly two rows",
+              len(data_rows) == 2
+              and all(record[0] == 4 and record[1] == 5
+                      for record in data_rows))
+    finally:
+        wb.close()
+
+    source = inspect.getsource(idt._write_report_view)
+    cmp_block = source.split('if kind == "cmp":', 1)[1].split(
+        'return ("", "blank")', 1)[0]
+    check("Report View cmp branch has no local strip/equality truth",
+          "compared_cell(sc, field_index[ref], ra, rb, off=1)" in cmp_block
+          and "cell.asserting" in cmp_block and "cell.equal" in cmp_block
+          and "aval(" not in cmp_block and ".strip(" not in cmp_block
+          and "tm == tn" not in cmp_block)
 
 
 def test_end_to_end():
@@ -232,6 +347,20 @@ def test_end_to_end():
     header, rows, sheets = _comparison(out)
     check("Notes sheet present (the indicator)", "Notes" in sheets)
     check("Report View sheet appended (the printed two-line replica)", "Report View" in sheets)
+    formula_wb = load_workbook(out, read_only=True, data_only=False)
+    try:
+        summary = formula_wb["Summary"]
+        report_checks = [row[2].value for row in summary.iter_rows()
+                         if len(row) >= 3
+                         and row[1].value ==
+                         "Report View Diffs agree with the Comparison"]
+        report_formula = str(report_checks[0]) if len(report_checks) == 1 else ""
+        check("Summary independently cross-checks the two-line Report View total",
+              len(report_checks) == 1
+              and "SUM('Report View'!B:B)=2*SUM(Comparison!" in report_formula
+              and '"OK","CHECK"' in report_formula)
+    finally:
+        formula_wb.close()
     pm = header.index("PM")
     by = {r[pm]: r for r in rows}
 
@@ -401,6 +530,7 @@ def test_added_columns():
 
 def main():
     test_schema()
+    test_report_view_typed_truth()
     test_end_to_end()
     test_old_format_refused()
     test_route_suffix_match()

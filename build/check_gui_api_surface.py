@@ -57,7 +57,8 @@ FROZEN_API = {
     "add_day_matrix_day", "apply_site_preset", "attach", "build_day_cell", "cancel_login",
     "cancel_run", "capture_site_source", "check_environments", "check_updates",
     "clear_saved_login", "open_site_captures_folder",
-    "consolidate_info", "consolidate_matrix_tsn", "day_matrix_info", "decline_overwrite",
+    "confirm_compare_overwrite", "consolidate_info", "consolidate_matrix_tsn",
+    "day_matrix_info", "decline_overwrite",
     "delete_chromium", "discard_batch", "download_chromium", "export_day_cell",
     "export_day_column", "export_day_row", "finish_login", "get_compare_folders",
     "day_matrix_evidence_cell",
@@ -108,8 +109,10 @@ def test_surface_identity():
 
 
 def test_touched_endpoint_signatures():
-    print("the two touched endpoints keep their exact source signature (arity lock):")
+    print("the touched comparison endpoints keep their exact source signatures (arity lock):")
     s = _src("gui_compare_api")          # S1: the compare endpoints' home
+    check("confirm_compare_overwrite(self, confirm_token=None, accepted=False)",
+          "def confirm_compare_overwrite(self, confirm_token=None, accepted=False):" in s)
     check("start_compare(self, report_key, tsmis_path, tsn_path, want_formulas=True, want_values=False)",
           "def start_compare(self, report_key, tsmis_path, tsn_path,\n"
           "                      want_formulas=True, want_values=False):" in s)
@@ -160,11 +163,27 @@ def test_begin_compare_unify():
     # the pre-P7b claim-before-suggest_name ordering), so a suggest-name error releases the
     # gate just like the baseline rather than running before any claim.
     check("_begin_compare takes a lazy `suggest` and calls suggest() inside the claim",
-          "def _begin_compare(self, label, mode, save_dir, suggest, build):" in s
+          "def _begin_compare(self, label, mode, save_dir, suggest, build, source_paths=()):" in s
           and "self._save_dialog_for_compare(save_dir, suggest())" in s)
     check("both endpoints pass the suggest-name as a lazy callable",
           "lambda: mod.suggest_name(tsmis_path)" in s
           and "lambda: adapter.suggest_name(pa, pb)" in s)
+    check("both endpoints bind their selected sources through worker-entry preflight",
+          "source_paths=(tsmis_path, tsn_path)" in s
+          and "source_paths=(pa, pb)" in s
+          and "comparison_output_paths(out, mode), source_paths," in s
+          and "require_sources_current=True" in s)
+    check("derived-values consent is operation-bound and single-use",
+          'self._compare_overwrite_token = pending' in s
+          and 'self._compare_overwrite_token = None       # matching token: single-use' in s
+          and 'pending["build"]' in s
+          and 'pending["source_paths"]' in s
+          and 'pending["mode"]' in s
+          and 'pending["out"]' in s)
+    check("single comparator transaction receives the selected final + authorizer",
+          "confirm_overwrite=confirm_destination" in s
+          and "result = run_fn(out, events=events" in s
+          and "def _comparison_overwrite_authorizer(" in s)
 
 
 def test_matrix_grouping():

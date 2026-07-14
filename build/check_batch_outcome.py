@@ -121,18 +121,22 @@ def _run_instore(run_result, auto=False, promote=True, had_prior=True, prior_emp
     spec = _RealSpec("Ramp Summary", "ramp_summary")
     dest = Path(tempfile.mkdtemp())
     out_base = dest / "ssor-prod"
+    if prior_empty or had_prior:
+        import owned_dir
+        owned_dir.ensure_owned_dir(out_base, kind="store")
     if prior_empty:                                  # a pre-existing but NON-usable (empty) dir
-        (out_base / spec.subdir).mkdir(parents=True)
+        (out_base / spec.subdir).mkdir()
     elif had_prior:                                  # a last-good live store before the refresh
         live = out_base / spec.subdir
-        live.mkdir(parents=True)
+        live.mkdir()
         (live / "old.xlsx").write_bytes(b"prior-good")
     ew = gw.ExportWorker([spec], q, threading.Event(), threading.Event(),
                          out_base=out_base, auto_consolidate=auto)
     swaps, cons = [], []
     ew._auto_consolidate = lambda s, r, e: cons.append((r.completion, r.artifact))
 
-    def _swap(live, staged):
+    def _swap(live, staged, guard=None):
+        check("store promotion receives the ownership lease guard", callable(guard))
         swaps.append((live, staged))
         return promote                               # the boolean _run_specs must honor (P2-B01)
     with _patch(gwx, "run_export", lambda *_a, **_k: run_result), \

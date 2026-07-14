@@ -24,9 +24,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import artifact_store        # noqa: E402
+import consolidation_meta    # noqa: E402
 import matrix                # noqa: E402
 import day_matrix            # noqa: E402
 import paths                 # noqa: E402
+from comparison_contract import ComparisonCounts, ComparisonOutcome  # noqa: E402
+from events import ConsolidateResult  # noqa: E402
 from openpyxl import Workbook  # noqa: E402
 
 _failures = []
@@ -42,6 +45,36 @@ def _xlsx(path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     wb = Workbook(); wb.active["A1"] = "x"; wb.save(str(path))
+
+
+def _complete_consolidation(path):
+    result = ConsolidateResult(
+        status="ok", output_path=str(path), completion="complete",
+        skipped_inputs=0, failed_inputs=0)
+    if not consolidation_meta.write_outcome(path, result):
+        raise AssertionError("could not publish consolidation outcome fixture")
+
+
+def _comparison(path, diff_cells=0, one_sided=0):
+    per_field = {"0:test": diff_cells} if diff_cells else {}
+    counts = ComparisonCounts(
+        known=True, paired_rows=max(diff_cells, 1),
+        side_a_only_rows=one_sided, differing_rows=diff_cells,
+        differing_cells=diff_cells, per_field_counts=per_field)
+    typed = ComparisonOutcome(
+        status="ok", completion="complete",
+        verdict="match" if not diff_cells and not one_sided else "diff",
+        counts=counts, pairing_quality="exact")
+
+    def produce(tmp):
+        _xlsx(tmp)
+        return ConsolidateResult(
+            status="ok", output_path=str(tmp), verdict=typed.verdict,
+            completion="complete", skipped_inputs=0, failed_inputs=0,
+            comparison_outcome=typed)
+
+    return artifact_store.commit_workbook(
+        path, produce, requested_mode="values")
 
 
 def _at(path, when):
@@ -61,8 +94,9 @@ def test_consolidated_stale(tmp):                             # CT-6a
         _at(store / name, 1000 + i)                  # r1=1000, r2=1001, r3=1002 (newest)
     consolidated = tmp / "consolidated" / "combined.xlsx"
     _xlsx(consolidated)
-    artifact_store.write_consolidated_fingerprint(consolidated, store)
     _at(consolidated, 2000)                          # NEWER than every route
+    artifact_store.write_consolidated_fingerprint(consolidated, store)
+    _complete_consolidation(consolidated)
 
     check("a freshly-built consolidated is not stale",
           matrix._consolidated_stale(consolidated, store) is False)
@@ -84,10 +118,11 @@ def test_cmp_state_fingerprint(tmp):                          # CT-6b
     (store / "r1.xlsx").write_bytes(b"a" * 10)
     (store / "r2.xlsx").write_bytes(b"b" * 20)
     out_path = tmp / "cmp_tsn.xlsx"
-    _xlsx(out_path)
+    result = _comparison(out_path, diff_cells=3)
     cmp_m = out_path.stat().st_mtime
     rec = {"verdict": "diff", "diff_cells": 3, "one_sided": 0, "built_at_mtime": cmp_m,
-           "completion": "complete", "input_fingerprint": artifact_store.fingerprint(store)}
+           "completion": "complete", "input_fingerprint": artifact_store.fingerprint(store),
+           "generation_id": result.artifact_generation.generation_id}
     sources = [{"name": "cell", "present": True, "mtime": cmp_m - 100},
                {"name": "tsn", "present": True, "mtime": cmp_m - 100}]
 
@@ -102,7 +137,8 @@ def test_cmp_state_fingerprint(tmp):                          # CT-6b
 
     legacy = dict(rec); legacy.pop("input_fingerprint")     # a pre-P2 record (no fingerprint)
     st3 = matrix._cmp_state(out_path, sources, legacy, fp_folders=(store,))
-    check("a legacy record (no fingerprint) never reads FALSELY stale", st3["stale"] is False)
+    check("a legacy record with no fingerprint is retryable, never false-fresh",
+          st3["stale"] is True and st3["reason"] == "cache_missing_or_mismatched")
 
 
 def test_comparison_state_fingerprint(tmp):                   # CT-6c
@@ -114,12 +150,13 @@ def test_comparison_state_fingerprint(tmp):                   # CT-6c
         (dest / env / subdir / "r1.xlsx").write_bytes(b"x" * 10)
         (dest / env / subdir / "r2.xlsx").write_bytes(b"y" * 10)
     out_path = matrix.comparison_path(dest, "ssor-prod", "highway_log", "ars-prod")
-    _xlsx(out_path)
+    result = _comparison(out_path)
     cmp_m = out_path.stat().st_mtime
     fp = matrix._cell_input_fingerprint(dest / "ars-prod" / subdir, dest / "ssor-prod" / subdir)
     results = {"highway_log": {"ars-prod": {
         "verdict": "match", "diff_cells": 0, "one_sided": 0, "built_at_mtime": cmp_m,
-        "input_fingerprint": fp}}}
+        "completion": "complete", "input_fingerprint": fp,
+        "generation_id": result.artifact_generation.generation_id}}}
     ages = {"ssor-prod": {subdir: {"mtime": cmp_m - 50}},
             "ars-prod": {subdir: {"mtime": cmp_m - 50}}}
 
@@ -150,6 +187,7 @@ def test_day_consolidated_gap(tmp):                           # CT-7
         hl_cons = matrix.consolidated_store_path(hl_dir, "highway_log")
         _xlsx(hl_cons)
         artifact_store.write_consolidated_fingerprint(hl_cons, hl_dir)
+        _complete_consolidation(hl_cons)
 
         snap = day_matrix.day_matrix_snapshot(source, [date], dest=str(tmp / "nodest"))
         dc = snap["day_consolidated"][date]
@@ -162,6 +200,7 @@ def test_day_consolidated_gap(tmp):                           # CT-7
         rs_cons = matrix.consolidated_store_path(rs_dir, "ramp_summary")
         _xlsx(rs_cons)
         artifact_store.write_consolidated_fingerprint(rs_cons, rs_dir)
+        _complete_consolidation(rs_cons)
         snap2 = day_matrix.day_matrix_snapshot(source, [date], dest=str(tmp / "nodest"))
         check("with every exported report consolidated, the day reads fresh",
               snap2["day_consolidated"][date]["fresh"] is True)

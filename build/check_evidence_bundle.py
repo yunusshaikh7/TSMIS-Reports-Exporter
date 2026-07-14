@@ -23,6 +23,8 @@ import types
 import zipfile
 from pathlib import Path
 
+from openpyxl import Workbook
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
@@ -95,8 +97,12 @@ def test_credential_exclusion_and_manifest():
         # mistake OR misguidance, a copy of the saved login AND copied browser/profile
         # DBs + an internal page's saved HTML. The positive allowlist (PDF/XLSX/XLS)
         # must accept ONLY the real source and REFUSE everything else (P13-B01).
-        (user / "intersection_detail_route_005.pdf").write_bytes(b"%PDF real route 5")
-        (user / "tsn_statewide.xlsx").write_bytes(b"PK fake workbook")          # allowed
+        (user / "intersection_detail_route_005.pdf").write_bytes(
+            b"%PDF-1.4\n" + b"#" + (b"A" * 80) + b"\n%%EOF")
+        wb = Workbook()
+        wb.active.append(["Route", "PM", "Description"])
+        wb.active.append(["001", "1.000", "clean workbook"])
+        wb.save(user / "tsn_statewide.xlsx")
         (user / "tsmis_auth.json").write_text('{"cookies":["' + _SECRET + '"]}', encoding="utf-8")
         (user / "Cookies").write_text(_COOKIE_SECRET, encoding="utf-8")          # browser DB
         (user / "Login Data").write_text(_LOGIN_SECRET, encoding="utf-8")        # browser DB
@@ -221,22 +227,23 @@ def test_self_test_capture_and_crash():
 def test_unreadable_not_listed_as_bundled():
     """P13-A01: a locked/unreadable allowlisted file (e.g. the log) is recorded under
     SKIPPED, never falsely listed under BUNDLE CONTENTS — so the manifest can't be
-    diagnostically false. ZipFile.write is monkeypatched to fail for the log only."""
+    diagnostically false. The allowlisted-entry writer is monkeypatched to fail for
+    the log only (logs are redacted through ``writestr`` before final scanning)."""
     print("P13-A01: an unreadable allowlisted file is NOT claimed as bundled:")
     import shutil
     saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
              paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
-    real_write = zipfile.ZipFile.write
+    real_write = evidence._write_allowlisted_entry
     root = Path(tempfile.mkdtemp(prefix="tsmis_ev_unr_"))
     try:
         _plant(root)
         _point_paths_at(root, saved)
 
-        def _flaky_write(self, src, arc=None, *a, **k):
+        def _flaky_write(zf, src, arc):
             if str(arc).startswith("logs/"):
                 raise OSError("simulated locked log")
-            return real_write(self, src, arc, *a, **k)
-        zipfile.ZipFile.write = _flaky_write
+            return real_write(zf, src, arc)
+        evidence._write_allowlisted_entry = _flaky_write
 
         out = root / "ev.zip"
         res = evidence.collect(out_path=out, emit=lambda *_: None, run_self_test=False)
@@ -251,16 +258,133 @@ def test_unreadable_not_listed_as_bundled():
         check("the manifest records it under SKIPPED — unreadable",
               "SKIPPED — unreadable" in manifest and "logs/tsmis.log" in manifest)
     finally:
-        zipfile.ZipFile.write = real_write
+        evidence._write_allowlisted_entry = real_write
         (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
          paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
         shutil.rmtree(root, ignore_errors=True)
+
+
+def test_final_member_credential_scan():
+    """CMP-AUD-117: sanitize allowlisted text and scan the exact final ZIP.
+
+    A credential in a diagnostic log is safely redacted. A hit inside an opaque
+    user-supplied PDF cannot be rewritten, so publication fails closed and a prior
+    good bundle at the destination remains untouched.
+    """
+    print("CMP-AUD-117: final ZIP member credential scan is fail-closed:")
+    import shutil
+    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+             paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
+    root = Path(tempfile.mkdtemp(prefix="tsmis_ev_scan_"))
+    user = Path(tempfile.mkdtemp(prefix="tsmis_ev_scan_user_"))
+    try:
+        _plant(root)
+        _point_paths_at(root, saved)
+        log_secret = "FINAL-LOG-SECRET-123"
+        (root / "logs" / "tsmis.log").write_text(
+            f"request failed\nAuthorization: Bearer {log_secret}\n", encoding="utf-8")
+
+        clean_out = root / "clean.zip"
+        clean_res = evidence.collect(out_path=clean_out, emit=lambda *_: None,
+                                     run_self_test=False)
+        check("a text-member credential is redacted and collection succeeds",
+              clean_res.get("ok") is True and clean_out.is_file())
+        with zipfile.ZipFile(clean_out) as zf:
+            _names, clean_blob = _zip_text(zf)
+        check("the log credential appears in NO final member",
+              log_secret.encode() not in clean_blob and b"[redacted]" in clean_blob)
+
+        binary_secret = "OPAQUE-PDF-SECRET-456"
+        (user / "source.pdf").write_bytes(
+            b"%PDF-1.4\nAuthorization: Bearer " + binary_secret.encode() + b"\n%%EOF")
+        guarded_out = root / "guarded.zip"
+        with zipfile.ZipFile(guarded_out, "w") as zf:
+            zf.writestr("prior-good.txt", "safe")
+        unsafe_res = evidence.collect(out_path=guarded_out, extra_dir=user,
+                                      emit=lambda *_: None, run_self_test=False)
+        check("an opaque member credential aborts publication",
+              unsafe_res.get("ok") is False)
+        with zipfile.ZipFile(guarded_out) as zf:
+            names = zf.namelist()
+            old_blob = b"".join(zf.read(n) for n in names)
+        check("a failed final scan preserves the prior good bundle",
+              names == ["prior-good.txt"] and binary_secret.encode() not in old_blob)
+
+        # XLSX is a nested ZIP. The final gate must inspect its decompressed XML,
+        # not merely the opaque compressed bytes stored in the outer bundle.
+        (user / "source.pdf").unlink()
+        nested_secret = "NESTED-XLSX-SECRET-789"
+        with zipfile.ZipFile(user / "source.xlsx", "w", zipfile.ZIP_DEFLATED) as xlsx:
+            xlsx.writestr(
+                "xl/sharedStrings.xml",
+                f"<sst><si><t>Authorization: Bearer {nested_secret}</t></si></sst>")
+        nested_out = root / "nested-guarded.zip"
+        nested_res = evidence.collect(out_path=nested_out, extra_dir=user,
+                                      emit=lambda *_: None, run_self_test=False)
+        check("a credential compressed inside an XLSX aborts publication",
+              nested_res.get("ok") is False and not nested_out.exists()
+              and "!xl/sharedStrings.xml" in nested_res.get("message", ""))
+
+        (user / "source.xlsx").unlink()
+        trailing_secret = "TRAILING-XLSX-SECRET-987"
+        trailing_xlsx = user / "trailing.xlsx"
+        wb = Workbook()
+        wb.active.append(["clean"])
+        wb.save(trailing_xlsx)
+        with trailing_xlsx.open("ab") as stream:
+            stream.write(
+                f"\nAuthorization: Bearer {trailing_secret}\n".encode("ascii"))
+        trailing_out = root / "trailing-guarded.zip"
+        trailing_res = evidence.collect(out_path=trailing_out, extra_dir=user,
+                                        emit=lambda *_: None, run_self_test=False)
+        check("credential bytes appended to an XLSX container abort publication",
+              trailing_res.get("ok") is False and not trailing_out.exists()
+              and trailing_secret not in trailing_res.get("message", ""))
+
+        trailing_xlsx.unlink()
+        comment_secret = "XLSX-COMMENT-SECRET-246"
+        commented_xlsx = user / "commented.xlsx"
+        with zipfile.ZipFile(commented_xlsx, "w", zipfile.ZIP_DEFLATED) as xlsx:
+            xlsx.writestr("xl/workbook.xml", "<workbook/>")
+            xlsx.comment = f"Bearer {comment_secret}".encode("ascii")
+        comment_out = root / "comment-guarded.zip"
+        comment_res = evidence.collect(out_path=comment_out, extra_dir=user,
+                                       emit=lambda *_: None, run_self_test=False)
+        check("a credential in an XLSX ZIP comment aborts publication",
+              comment_res.get("ok") is False and not comment_out.exists())
+
+        commented_xlsx.unlink()
+        named = user / "access_token=FILENAME-SECRET-321.pdf"
+        named.write_bytes(b"%PDF-1.4\nno credential in the body\n%%EOF")
+        named_out = root / "name-guarded.zip"
+        named_res = evidence.collect(out_path=named_out, extra_dir=user,
+                                     emit=lambda *_: None, run_self_test=False)
+        check("a credential-shaped ZIP member name aborts publication",
+              named_res.get("ok") is False and not named_out.exists())
+
+        named.unlink()
+        utf16_secret = "UTF16-SECRET-654"
+        (user / "utf16.pdf").write_bytes(
+            b"%PDF-1.4\n" +
+            f"Authorization: Bearer {utf16_secret}".encode("utf-16-le") +
+            b"\n%%EOF")
+        utf16_out = root / "utf16-guarded.zip"
+        utf16_res = evidence.collect(out_path=utf16_out, extra_dir=user,
+                                     emit=lambda *_: None, run_self_test=False)
+        check("a UTF-16 credential inside an opaque member aborts publication",
+              utf16_res.get("ok") is False and not utf16_out.exists())
+    finally:
+        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+         paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
+        shutil.rmtree(root, ignore_errors=True)
+        shutil.rmtree(user, ignore_errors=True)
 
 
 def main():
     test_credential_exclusion_and_manifest()
     test_self_test_capture_and_crash()
     test_unreadable_not_listed_as_bundled()
+    test_final_member_credential_scan()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

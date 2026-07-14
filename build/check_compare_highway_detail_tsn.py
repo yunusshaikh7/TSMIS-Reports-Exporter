@@ -15,6 +15,7 @@ bundle the family was reconciled against).
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_compare_highway_detail_tsn.py
 """
+import inspect
 import os
 import sys
 import tempfile
@@ -112,7 +113,7 @@ def test_schema():
     check("Notes legend_writer set (documents the normalizations)",
           sc.legend_writer is not None)
     check("base schema is clean; the Report View closure is added per-call",
-          sc.extra_sheet_writer is None)
+          sc.extra_sheet_writer is None and not sc.report_view_diff_check)
     check("35 shared columns (Post Mile + PS + the 33 remaining export columns)",
           len(hdt.SHARED_HEADER) == 35)
     # The canonical roadbed-aware key.
@@ -155,6 +156,113 @@ def test_schema():
           "an attribute diff 'hard'",
           hdt._rv_classify("RU Eff") == "soft" and hdt._rv_classify("PS") == "soft"
           and hdt._rv_classify("LB #Ln") == "hard")
+    cmp_fields = [spec[1] for column in hdt._RV_GRID
+                  for spec in (column[2], column[5]) if spec[0] == "cmp"]
+    asserting_fields = [sc.header[index] for index in sc.field_indices
+                        if not sc.is_context(index)]
+    check("Report View grid contains every asserting non-key field exactly once",
+          set(cmp_fields) == set(asserting_fields)
+          and len(cmp_fields) == len(asserting_fields) == len(set(cmp_fields)))
+
+
+def test_report_view_typed_truth():
+    print("Report View typed comparison truth:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_hd_rv_truth_"))
+    out = root / "report-view.xlsx"
+    # City, LB #Ln, and Length are hard differences; RU Eff and Date of Rec
+    # are soft. Formula-leading/error-looking values exercise the familiar
+    # view's literal-write boundary. AC is made
+    # context-only in this synthetic schema to exercise the asserting gate.
+    sc = hdt.dataclasses.replace(hdt._SCHEMA, context_fields=("AC",))
+
+    def row(side_b=False):
+        values = {name: "" for name in sc.header}
+        values.update({
+            "Post Mile": "000.204",
+            "PS": "=1+1",
+            "Description": "ASCII SPACE" if side_b else "  ASCII   SPACE  ",
+            "City": "case" if side_b else "Case",
+            "HG": "literal ≠ content",
+            "NA": "#N/A",
+            "Length": "+RIGHT" if side_b else "+LEFT",
+            "Date of Rec": "@RIGHT" if side_b else "@LEFT",
+            "Acc-Cont Eff": "-SAFE",
+            "LB #Ln": 0 if side_b else None,
+            "RU Eff": "74-01-01" if side_b else "73-01-01",
+            "AC": "F" if side_b else "E",
+        })
+        return ["007"] + [values[name] for name in sc.header]
+
+    wb = Workbook(write_only=True)
+    hdt._write_report_view(
+        wb,
+        {"sc": sc, "rows_a": [row()], "rows_b": [row(True)]},
+        [{}],
+    )
+    wb.save(out)
+    wb.close()
+
+    wb = load_workbook(out, data_only=True)
+    try:
+        ws = wb["Report View"]
+
+        def grid_cell(line, field):
+            slot = 2 if line == 0 else 5
+            for grid_index, column in enumerate(hdt._RV_GRID):
+                if column[slot] == ("cmp", field):
+                    return ws.cell(
+                        row=5 + line,
+                        column=len(hdt._RV_AUX) + grid_index + 1,
+                    )
+            raise AssertionError(f"missing Report View field: {field}")
+
+        desc = grid_cell(1, "Description")
+        city = grid_cell(0, "City")
+        literal = grid_cell(0, "HG")
+        zero = grid_cell(1, "LB #Ln")
+        soft = grid_cell(0, "RU Eff")
+        context = grid_cell(0, "AC")
+        eq_formula = grid_cell(0, "PS")
+        eq_error = grid_cell(1, "NA")
+        plus_diff = grid_cell(0, "Length")
+        at_diff = grid_cell(0, "Date of Rec")
+        minus_equal = grid_cell(0, "Acc-Cont Eff")
+        check("Report View ASCII-space equality follows shared Excel TRIM",
+              desc.value == "ASCII SPACE")
+        check("Report View equality remains case-sensitive",
+              city.value == "Case ≠ case")
+        check("equal literal difference-marker content is displayed but not counted",
+              literal.value == "literal ≠ content")
+        check("blank-vs-zero is asserting and preserves the dot display",
+              zero.value == "· ≠ 0")
+        check("only asserting unequal cells render as differences",
+              context.value == "E" and " ≠ " not in context.value)
+        check("Report View guards =/+/−/@ and Excel-error source literals",
+              eq_formula.value == "=1+1" and eq_formula.data_type == "s"
+              and eq_error.value == "#N/A" and eq_error.data_type == "s"
+              and plus_diff.value == "+LEFT ≠ +RIGHT" and plus_diff.data_type == "s"
+              and at_diff.value == "@LEFT ≠ @RIGHT" and at_diff.data_type == "s"
+              and minus_equal.value == "-SAFE" and minus_equal.data_type == "s")
+        check("hard and soft differences retain the red palette",
+              city.fill.fgColor.rgb[-6:] == hdt._RV_FILLS["hard"][0]
+              and soft.fill.fgColor.rgb[-6:] == hdt._RV_FILLS["soft"][0]
+              and literal.fill.fgColor.rgb[-6:] == hdt._RV_FILLS["eq"][0])
+        data_rows = list(ws.iter_rows(min_row=5, values_only=True))
+        check("matched record writes its full typed Diffs total on exactly two rows",
+              len(data_rows) == 2
+              and all(record[0] == 3 and record[1] == 5
+                      for record in data_rows))
+    finally:
+        wb.close()
+
+    source = inspect.getsource(hdt._write_report_view)
+    cmp_block = source.split('if kind == "cmp":', 1)[1].split(
+        'return ("", "blank")', 1)[0]
+    check("Report View cmp branch has no local strip/equality truth",
+          "compared_cell(sc, field_index[ref], ra, rb, off=1)" in cmp_block
+          and "cell.asserting" in cmp_block and "cell.equal" in cmp_block
+          and "aval(" not in cmp_block and ".strip(" not in cmp_block
+          and "tm == tn" not in cmp_block)
 
 
 def _tsn_base(pm, hg="D", **over):
@@ -207,6 +315,20 @@ def test_end_to_end():
     check("Notes sheet present (the normalization record)", "Notes" in sheets)
     check("Report View sheet appended (the printed two-line replica)",
           "Report View" in sheets)
+    formula_wb = load_workbook(out, read_only=True, data_only=False)
+    try:
+        summary = formula_wb["Summary"]
+        report_checks = [row[2].value for row in summary.iter_rows()
+                         if len(row) >= 3
+                         and row[1].value ==
+                         "Report View Diffs agree with the Comparison"]
+        report_formula = str(report_checks[0]) if len(report_checks) == 1 else ""
+        check("Summary independently cross-checks the two-line Report View total",
+              len(report_checks) == 1
+              and "SUM('Report View'!B:B)=2*SUM(Comparison!" in report_formula
+              and '"OK","CHECK"' in report_formula)
+    finally:
+        formula_wb.close()
     pm = header.index("Post Mile")
     by = {r[pm]: r for r in rows}
     check("both PMs matched (status Both)",
@@ -294,6 +416,7 @@ def test_normalized_library_idempotent():
 
 def main():
     test_schema()
+    test_report_view_typed_truth()
     test_end_to_end()
     test_roadbed_and_ps()
     test_normalized_library_idempotent()

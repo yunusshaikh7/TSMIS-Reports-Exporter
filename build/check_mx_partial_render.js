@@ -32,21 +32,35 @@ function check(name, cond) {
 
 const base = { built: true, stale: false };
 // A fully-valid identical comparison renders the green match.
-const full = mx({ ...base, diff_cells: 0, one_sided: 0, completion: "complete" });
+const full = mx({ ...base, diff_cells: 0, one_sided: 0,
+                  completion: "complete", verdict: "match" });
 check("complete match -> mx-match / identical",
       full.cls === "mx-match" && full.sub === "identical");
 // The SAME zero counts but PARTIAL inputs must NOT read as a valid match.
 const part = mx({ ...base, diff_cells: 0, one_sided: 0, completion: "partial" });
 check("partial match -> NOT the green mx-match", part.cls !== "mx-match");
-check("partial match -> mx-partial + an 'inputs incomplete' note",
-      part.cls === "mx-partial" && /incomplete/.test(part.sub));
-// A partial WITH diffs is still flagged (and the diff count survives in `main`).
+check("partial result -> mx-partial with no match/checkmark certification",
+      part.cls === "mx-partial" && part.main === "partial"
+      && !/[✓]|match/i.test(part.main + part.sub) && /refresh/.test(part.sub));
+// A partial WITH diffs is still flagged and keeps observed counts in its detail.
 const pd = mx({ ...base, diff_cells: 3, one_sided: 1, completion: "partial" });
-check("partial with diffs -> mx-partial, count preserved, incomplete note",
-      pd.cls === "mx-partial" && pd.main === "3 diffs" && /incomplete/.test(pd.sub));
-// Cross-env cells carry no completion -> behavior is unchanged.
+check("partial with diffs -> mx-partial, observed count preserved, retryable",
+      pd.cls === "mx-partial" && pd.main === "partial"
+      && /3 diffs/.test(pd.sub) && /refresh/.test(pd.sub));
+const capped = mx({ ...base, diff_cells: 0, one_sided: 0,
+                    completion: "partial", pairing_quality: "capped" });
+check("capped pairing -> partial with an honest re-scope instruction",
+      capped.cls === "mx-partial" && capped.main === "partial"
+      && /pairing capped/.test(capped.sub) && /re-scope/.test(capped.sub)
+      && !/[✓]|match/i.test(capped.main + capped.sub));
+// Missing typed completion can no longer inherit a green legacy default.
 const env = mx({ ...base, diff_cells: 0, one_sided: 0 });
-check("no completion (cross-env) -> unchanged mx-match", env.cls === "mx-match");
+check("no completion -> fail-closed re-run", env.cls === "mx-stale"
+      && env.main === "re-run" && /unknown/.test(env.sub));
+const contradiction = mx({ ...base, diff_cells: 0, one_sided: 0,
+                           completion: "complete", verdict: "diff" });
+check("complete verdict/count contradiction -> re-run, never green",
+      contradiction.cls === "mx-stale" && /disagree/.test(contradiction.sub));
 
 if (fails.length) {
   console.log(`\nFAILED: ${fails.length} check(s): ${fails.join(", ")}`);

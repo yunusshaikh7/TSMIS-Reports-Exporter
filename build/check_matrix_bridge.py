@@ -26,6 +26,7 @@ import batch_manifest
 import gui_api
 import gui_matrix
 import settings
+from openpyxl import Workbook
 
 _fail = []
 
@@ -264,7 +265,10 @@ def main():
         print("TSN file pick + scoped refresh + TSN-PDF consolidate gate:")
         check("tsn file bad subdir rejected",
               bool(a.set_matrix_tsn_file("nope", "/x.xlsx").get("error")))
-        check("tsn file set ok", a.set_matrix_tsn_file("highway_log", "/x.xlsx").get("ok"))
+        picked_tsn = dest / "picked-tsn.xlsx"
+        wb = Workbook(); wb.active["A1"] = "TSN"; wb.save(picked_tsn); wb.close()
+        check("tsn file set ok",
+              a.set_matrix_tsn_file("highway_log", str(picked_tsn)).get("ok"))
         a.set_matrix_tsn_file("highway_log", "")
         _touch(dest / "ssor-prod" / "ramp_detail" / "r1.xlsx")
         _touch(dest / "ars-prod" / "ramp_detail" / "r1.xlsx")

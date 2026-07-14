@@ -22,6 +22,7 @@ Run with the build venv:
 """
 import os
 import re
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -45,8 +46,13 @@ import evidence_ramp_detail as erd
 import highway_detail_columns as hdc
 import highway_log_columns as hlc
 import matrix_build
+import tsn_library
 import tsn_load_highway_detail as tlh
 import visual_evidence as ve
+import artifact_store
+import consolidation_meta
+from comparison_contract import ArtifactGeneration, ComparisonCounts, ComparisonOutcome
+from events import ConsolidateResult
 from openpyxl import Workbook, load_workbook
 
 _fail = []
@@ -107,6 +113,326 @@ wbp, imgp = ve.sibling_paths(Path(r"C:\x\comparisons\hd vs tsn.xlsx"))
 check("sibling naming: '(evidence).xlsx' + '(evidence images)' folder",
       wbp.name == "hd vs tsn (evidence).xlsx"
       and imgp.name == "hd vs tsn (evidence images)")
+_alias_tmp = Path(tempfile.mkdtemp(prefix="evidence_alias_guard_"))
+try:
+    _alias_cmp = _alias_tmp / "comparison.xlsx"
+    _alias_wb, _alias_img = ve.sibling_paths(_alias_cmp)
+    _alias_wb.write_bytes(b"selected source")
+    try:
+        ve._safe_sibling_paths(_alias_cmp, (_alias_wb,))
+        _wb_alias_rejected = False
+    except ValueError:
+        _wb_alias_rejected = True
+    check("the derived evidence workbook cannot alias a comparison source",
+          _wb_alias_rejected and _alias_wb.read_bytes() == b"selected source")
+    _alias_wb.unlink()
+    _alias_img.mkdir()
+    try:
+        ve._safe_sibling_paths(_alias_cmp, (_alias_img,))
+        _dir_alias_rejected = False
+    except ValueError:
+        _dir_alias_rejected = True
+    check("the derived evidence image folder cannot alias a source directory",
+          _dir_alias_rejected and _alias_img.is_dir())
+
+    # Stable identity must survive a rename+decoy race across the image-folder
+    # transaction, not merely compare the two current pathnames.
+    _swap_source = _alias_tmp / "swap-source"
+    _swap_source.mkdir()
+    (_swap_source / "selected.txt").write_bytes(b"selected source directory")
+    _swap_tmp = _alias_tmp / "rendered.tmp"
+    _swap_tmp.mkdir()
+    (_swap_tmp / "new.txt").write_bytes(b"new evidence")
+    _swap_target = _alias_tmp / "evidence-images"
+    _captured = ve.artifact_store.capture_source_identities((_swap_source,))
+    _real_guard = ve.artifact_store.ensure_outputs_do_not_alias_sources
+    _guard_calls = [0]
+
+    def _swap_then_guard(destinations, sources, **kwargs):
+        _guard_calls[0] += 1
+        if _guard_calls[0] == 2:
+            os.replace(_swap_source, _swap_target)
+            _swap_source.mkdir()                    # same-name decoy
+        return _real_guard(destinations, sources, **kwargs)
+
+    ve.artifact_store.ensure_outputs_do_not_alias_sources = _swap_then_guard
+    try:
+        try:
+            ve._swap_dir(
+                _swap_tmp, _swap_target, source_paths=(_swap_source,),
+                captured_sources=_captured)
+            _swap_rejected = False
+        except ValueError:
+            _swap_rejected = True
+    finally:
+        ve.artifact_store.ensure_outputs_do_not_alias_sources = _real_guard
+    check("a renamed evidence source plus decoy is rejected during folder swap",
+          _swap_rejected)
+    check("...the originally selected directory survives at its moved path",
+          (_swap_target / "selected.txt").read_bytes()
+          == b"selected source directory")
+
+    # A guard failure after canonical target -> quarantine used to escape the
+    # OSError-only handler and leave the canonical image directory missing.
+    _rollback_target = _alias_tmp / "rollback-images"
+    _rollback_target.mkdir()
+    (_rollback_target / "prior.txt").write_bytes(b"prior image set")
+    _rollback_tmp = _alias_tmp / "rollback-rendered"
+    _rollback_tmp.mkdir()
+    (_rollback_tmp / "new.txt").write_bytes(b"new image set")
+    _source_checks = [0]
+
+    def _fail_after_quarantine():
+        _source_checks[0] += 1
+        if _source_checks[0] == 2:
+            raise ValueError("source set changed after quarantine")
+
+    try:
+        ve._swap_dir(_rollback_tmp, _rollback_target,
+                     source_set_check=_fail_after_quarantine)
+        _rollback_rejected = False
+    except ValueError:
+        _rollback_rejected = True
+    check("ValueError after target quarantine restores the canonical directory",
+          _rollback_rejected
+          and (_rollback_target / "prior.txt").read_bytes() == b"prior image set"
+          and (_rollback_tmp / "new.txt").read_bytes() == b"new image set")
+
+    # The same rollback must run when the canonical publish first raises OSError
+    # and a guard then fails before the alternate move (the former pre-alt gap).
+    _late_target = _alias_tmp / "late-guard-images"
+    _late_target.mkdir()
+    (_late_target / "prior.txt").write_bytes(b"late prior image set")
+    _late_tmp = _alias_tmp / "late-guard-rendered"
+    _late_tmp.mkdir()
+    (_late_tmp / "new.txt").write_bytes(b"late new image set")
+    _late_checks = [0]
+    _real_replace = ve.os.replace
+
+    def _late_guard():
+        _late_checks[0] += 1
+        if _late_checks[0] == 3:       # fallback guard, after target -> old
+            raise ValueError("source set changed before alternate")
+
+    def _fail_canonical_publish(src, dst):
+        if Path(src) == _late_tmp and Path(dst) == _late_target:
+            raise PermissionError("simulated locked image destination")
+        return _real_replace(src, dst)
+
+    ve.os.replace = _fail_canonical_publish
+    try:
+        try:
+            ve._swap_dir(_late_tmp, _late_target,
+                         source_set_check=_late_guard)
+            _late_rejected = False
+        except ValueError:
+            _late_rejected = True
+    finally:
+        ve.os.replace = _real_replace
+    check("fallback guard failure also restores the quarantined prior set",
+          _late_rejected
+          and (_late_target / "prior.txt").read_bytes() == b"late prior image set"
+          and (_late_tmp / "new.txt").read_bytes() == b"late new image set")
+
+    # Fixed .old/.new names may already contain unrelated material. The swap
+    # now uses random per-operation names and must never delete those sentinels.
+    _foreign_target = _alias_tmp / "foreign-images"
+    _foreign_target.mkdir()
+    (_foreign_target / "prior.txt").write_bytes(b"prior")
+    _foreign_tmp = _alias_tmp / "foreign-rendered"
+    _foreign_tmp.mkdir()
+    (_foreign_tmp / "new.txt").write_bytes(b"published")
+    _fixed_old = _alias_tmp / "foreign-images.old"
+    _fixed_new = _alias_tmp / "foreign-images.new"
+    _fixed_old.mkdir(); (_fixed_old / "sentinel.txt").write_bytes(b"foreign old")
+    _fixed_new.mkdir(); (_fixed_new / "sentinel.txt").write_bytes(b"foreign new")
+    ve._swap_dir(_foreign_tmp, _foreign_target)
+    check("foreign fixed .old/.new directories survive a successful swap",
+          (_fixed_old / "sentinel.txt").read_bytes() == b"foreign old"
+          and (_fixed_new / "sentinel.txt").read_bytes() == b"foreign new"
+          and (_foreign_target / "new.txt").read_bytes() == b"published")
+
+    # Workbook lock fallback is random + exclusively reserved too; a legacy
+    # fixed '<stem>.new.xlsx' file is foreign and must remain byte-identical.
+    _fallback_wb = _alias_tmp / "fallback evidence.xlsx"
+    _fallback_wb.write_bytes(b"locked prior workbook")
+    _fixed_wb_alt = _alias_tmp / "fallback evidence.new.xlsx"
+    _fixed_wb_alt.write_bytes(b"foreign workbook sentinel")
+    _fallback_images = _alias_tmp / "fallback-images"; _fallback_images.mkdir()
+    _replace_calls = [0]
+    _real_replace = ve.os.replace
+
+    def _lock_only_primary(src, dst):
+        if Path(dst) == _fallback_wb and _replace_calls[0] == 0:
+            _replace_calls[0] += 1
+            raise PermissionError("simulated workbook open in Excel")
+        return _real_replace(src, dst)
+
+    ve.os.replace = _lock_only_primary
+    try:
+        _fallback_note = ve._write_workbook(
+            _fallback_wb, _fallback_images, [], {},
+            {"report": "Probe", "comparison": "probe.xlsx",
+             "examples": 1, "seed": "00000000",
+             "tsmis_dir": "A", "tsn_dir": "B"})
+    finally:
+        ve.os.replace = _real_replace
+    _random_alts = list(_alias_tmp.glob("fallback evidence.new-*.xlsx"))
+    check("foreign fixed workbook .new sentinel is preserved",
+          _fixed_wb_alt.read_bytes() == b"foreign workbook sentinel")
+    check("locked workbook diverts only to a disclosed random fallback",
+          len(_random_alts) == 1 and _random_alts[0].name in _fallback_note)
+
+    # Matrix/Everything evidence is nested under an exact comparisons lease.
+    # The lease must reach the workbook and image transactions as a target-aware
+    # predicate, not merely as a one-time worker preflight.
+    _leased_root = _alias_tmp / "leased-comparisons"
+    _lease = ve.owned_dir.require_owned_dir_lease(
+        _leased_root, kind="comparisons")
+    _leased_tmp = _leased_root / "fresh-images"
+    _leased_tmp.mkdir()
+    (_leased_tmp / "new.txt").write_bytes(b"new leased images")
+    _leased_target = _leased_root / "evidence-images"
+    ve._swap_dir(
+        _leased_tmp, _leased_target, commit_guard=_lease.guard,
+        tmp_directory_identity=ve.owned_dir.directory_identity(_leased_tmp))
+    check("a current comparisons lease authorizes the complete image swap",
+          (_leased_target / "new.txt").read_bytes() == b"new leased images")
+
+    _guarded_wb = _leased_root / "guarded evidence.xlsx"
+    _guarded_wb.write_bytes(b"prior guarded workbook")
+    _guarded_images = _leased_root / "guarded-images"
+    _guarded_images.mkdir()
+    _guard_paths = []
+
+    def _deny_workbook_publish(path=None, **kwargs):
+        if path is None:
+            return _lease.is_current()
+        path = Path(path)
+        _guard_paths.append(path)
+        return path != _guarded_wb and _lease.guard(path, **kwargs)
+
+    try:
+        ve._write_workbook(
+            _guarded_wb, _guarded_images, [], {},
+            {"report": "Probe", "comparison": "probe.xlsx",
+             "examples": 1, "seed": "00000000",
+             "tsmis_dir": "A", "tsn_dir": "B"},
+            commit_guard=_deny_workbook_publish)
+        _guarded_wb_rejected = False
+    except ve.owned_dir.OwnershipError:
+        _guarded_wb_rejected = True
+    check("a late target-aware workbook guard preserves the prior workbook",
+          _guarded_wb_rejected
+          and _guarded_wb.read_bytes() == b"prior guarded workbook"
+          and _guarded_wb in _guard_paths
+          and not list(_leased_root.glob(".guarded evidence.tmp-*.xlsx")))
+
+    # If the fresh temp becomes untrusted after prior images were quarantined,
+    # rollback is still allowed through the live lease and restores last-good.
+    _rollback_guard_target = _leased_root / "guard-rollback-images"
+    _rollback_guard_target.mkdir()
+    (_rollback_guard_target / "prior.txt").write_bytes(b"guarded prior")
+    _rollback_guard_tmp = _leased_root / "guard-rollback-fresh"
+    _rollback_guard_tmp.mkdir()
+    (_rollback_guard_tmp / "new.txt").write_bytes(b"guarded new")
+    _reject_guard_tmp = [False]
+    _real_replace = ve.os.replace
+
+    def _reject_temp_after_quarantine(src, dst):
+        result = _real_replace(src, dst)
+        if (Path(src) == _rollback_guard_target
+                and Path(dst).name.startswith(
+                    _rollback_guard_target.name + ".old-")):
+            _reject_guard_tmp[0] = True
+        return result
+
+    def _selective_guard(path=None, **kwargs):
+        if path is None:
+            return _lease.is_current()
+        if _reject_guard_tmp[0] and Path(path) == _rollback_guard_tmp:
+            return False
+        return _lease.guard(path, **kwargs)
+
+    ve.os.replace = _reject_temp_after_quarantine
+    try:
+        try:
+            ve._swap_dir(
+                _rollback_guard_tmp, _rollback_guard_target,
+                commit_guard=_selective_guard,
+                tmp_directory_identity=ve.owned_dir.directory_identity(
+                    _rollback_guard_tmp))
+            _late_lease_rejected = False
+        except ve.owned_dir.OwnershipError:
+            _late_lease_rejected = True
+    finally:
+        ve.os.replace = _real_replace
+    check("a guard failure after quarantine restores last-good images",
+          _late_lease_rejected
+          and (_rollback_guard_target / "prior.txt").read_bytes()
+          == b"guarded prior"
+          and (_rollback_guard_tmp / "new.txt").read_bytes()
+          == b"guarded new")
+
+    # Workbook serialization uses an exclusive unpredictable temp handle.  If
+    # a selected source is moved onto that temp after serialization but before
+    # publication, the post-save identity check must reject it and cleanup must
+    # retain (not unlink) the selected object.
+    _save_source = _alias_tmp / "save-source.xlsx"
+    _save_source.write_bytes(b"selected workbook source")
+    _save_prior = _save_source.read_bytes()
+    _save_target = _alias_tmp / "evidence.xlsx"
+    _save_img_dir = _alias_tmp / "empty-images"; _save_img_dir.mkdir()
+    _save_captured = ve.artifact_store.capture_source_identities((_save_source,))
+    _real_save = ve.Workbook.save
+    _moved_save_temp = [None]
+
+    def _save_then_swap_source(workbook, target):
+        _real_save(workbook, target)
+        target.flush()
+        target.close()
+        _moved_save_temp[0] = Path(target.name)
+        os.replace(_save_source, _moved_save_temp[0])
+        _save_source.write_bytes(b"same-path decoy")
+
+    ve.Workbook.save = _save_then_swap_source
+    try:
+        try:
+            ve._write_workbook(
+                _save_target, _save_img_dir, [], {},
+                {"report": "Probe", "comparison": "probe.xlsx",
+                 "examples": 1, "seed": "00000000",
+                 "tsmis_dir": "A", "tsn_dir": "B"},
+                source_paths=(_save_source,),
+                captured_sources=_save_captured)
+            _save_swap_rejected = False
+        except ValueError:
+            _save_swap_rejected = True
+    finally:
+        ve.Workbook.save = _real_save
+    check("a source moved onto the evidence temp at save-time is rejected",
+          _save_swap_rejected and not _save_target.exists())
+    check("...source-safe cleanup retains the selected workbook bytes",
+          _moved_save_temp[0].read_bytes() == _save_prior)
+    _moved_save_temp[0].unlink()
+
+    _pdf_a = _alias_tmp / "pdf-a"; _pdf_a.mkdir()
+    _pdf_b = _alias_tmp / "pdf-b"; _pdf_b.mkdir()
+    (_pdf_a / "one.pdf").write_bytes(b"one")
+    _pdf_initial = ve._pdf_source_files(_pdf_a, _pdf_b)
+    _pdf_expected = ve.artifact_store.canonical_path_identities(
+        (*_pdf_initial[0], *_pdf_initial[1]))
+    ve._ensure_pdf_source_set(_pdf_a, _pdf_b, _pdf_expected)
+    (_pdf_b / "late.pdf").write_bytes(b"late")
+    try:
+        ve._ensure_pdf_source_set(_pdf_a, _pdf_b, _pdf_expected)
+        _pdf_add_rejected = False
+    except ValueError:
+        _pdf_add_rejected = True
+    check("a PDF added after evidence discovery fails the set-equality tripwire",
+          _pdf_add_rejected)
+finally:
+    shutil.rmtree(_alias_tmp, ignore_errors=True)
 # The strip crop is a FULL-WIDTH page band stretched over the cell box
 # (v0.26.0): the adapters' xspan covers only the record's own words, so a crop
 # keyed to it clipped a blank cell's red box (drawn where the value WOULD
@@ -272,17 +598,13 @@ check("only the unique-key LB Wid diff is enumerated, with its district",
 print("TSN loader sidecar contract")
 tmp = Path(tempfile.mkdtemp())
 try:
-    raw = tmp / "raw.xlsx"
+    raw_dir = tmp / "raw"
+    raw_dir.mkdir()
+    raw = raw_dir / "raw.xlsx"
     wb = Workbook()
     ws = wb.active
     ws.title = cht.TSN_SHEET
-    cols = ["DIST", "CNTY", "RTE", "RTE_SFX", "PP", "POSTMILE", "E_IND", "HG",
-            "LENGTH", "REC_DATE", "AC", "ACC_EFF_DATE", "CITY", "POP_CODE",
-            "BEG_DATE", "DESCRIPTION", "NON_ADD", "M_WID", "M_VA",
-            "L_EFF_DATE", "L_ST", "L_NO_LANES", "L_SF", "L_OT_TOT", "L_OT_TR",
-            "L_TR_WID", "L_IN_TOT", "L_IN_TR", "M_EFF_DATE", "M_TYPE_CODE",
-            "M_CL", "M_BA", "R_EFF_DATE", "R_ST", "R_NO_LANES", "R_SF",
-            "R_IN_TOT", "R_IN_TR", "R_TR_WID", "R_OT_TOT", "R_OT_TR"]
+    cols = list(cht.TSN_RAW_HEADER)
     ws.append(cols)
     base = {c: "" for c in cols}
     base.update(DIST="06", CNTY="TUL.", RTE="99", PP="R", POSTMILE="004.972",
@@ -301,7 +623,7 @@ try:
 
     # the normalized library sheet: shared header + EXACTLY the sidecar columns
     out = tmp / "norm.xlsx"
-    res = tlh.build_into(tmp, out, events=None, confirm_overwrite=lambda p: True)
+    res = tlh.build_into(raw_dir, out, events=None, confirm_overwrite=lambda p: True)
     nwb = load_workbook(out)
     nws = nwb[cht.NORMALIZED_SHEET]
     hdr = [c.value for c in nws[1]]
@@ -439,17 +761,13 @@ check("a whitespace-run-only difference is NOT enumerated (compare_core's trim)"
 print("ID TSN loader sidecar contract")
 tmp2 = Path(tempfile.mkdtemp())
 try:
-    raw2 = tmp2 / "raw.xlsx"
+    raw_dir2 = tmp2 / "raw"
+    raw_dir2.mkdir()
+    raw2 = raw_dir2 / "raw.xlsx"
     wb2 = Workbook()
     ws2 = wb2.active
     ws2.title = idt.TSN_SHEET
-    cols2 = ["PP", "POST_MILE", "LOCATION", "DATE_REC", "HG", "CITY_CODE", "RU",
-             "TY_INT", "TY_CT", "LT_TY", "MAIN_SM", "MAIN_LC", "MAIN_RC", "MAIN_TF",
-             "MAIN_NL", "DESCRIPTION", "CS_SM", "CS_LC", "CS_RC", "CS_TF", "CS_NL",
-             "EFF_DATE_INT", "EFF_DATE_CT", "EFF_DATE_LT", "EFF_DATE_ML",
-             "MAIN_EFF_DATE", "MAIN_OVERRIDE", "CROSS_BEGIN_DATE", "EFF_DATE",
-             "CROSS_ROUTE_NAME", "CROSS_PM_PREFIX", "CROSS_POSTMILE",
-             "CROSS_PM_SUFFIX", "X_CROSS_OVERRIDE"]
+    cols2 = list(idt.TSN_RAW_HEADER)
     ws2.append(cols2)
     _b2 = {c: "" for c in cols2}
     _b2.update(PP="R", POST_MILE=" 000.204", LOCATION="04 CC. 004",
@@ -466,7 +784,7 @@ try:
           dcr2 == [("04", "CC")])
 
     out2 = tmp2 / "norm.xlsx"
-    res2 = tli.build_into(tmp2, out2, events=None, confirm_overwrite=lambda p: True)
+    res2 = tli.build_into(raw_dir2, out2, events=None, confirm_overwrite=lambda p: True)
     nwb2 = load_workbook(out2)
     nws2 = nwb2[idt.NORMALIZED_SHEET]
     hdr2 = [c.value for c in nws2[1]]
@@ -531,11 +849,46 @@ try:
         p.write_bytes(b"x")
         os.utime(p, (when, when))
 
-    def _gate_error(**over):
+    def _publish_comparison(p):
+        import hashlib
+        st = p.stat()
+        digest = hashlib.sha256(p.read_bytes()).hexdigest()
+        member = {
+            "flavor": "values", "relative_path": p.name, "path": str(p),
+            "canonical_path_at_write": str(p.resolve()),
+            "commit_role": "canonical", "sha256": digest,
+            "size": st.st_size, "mtime_ns": st.st_mtime_ns,
+        }
+        typed = ComparisonOutcome(
+            status="ok", completion="complete", verdict="match",
+            counts=ComparisonCounts(known=True, paired_rows=1),
+            pairing_quality="exact")
+        generation = ArtifactGeneration(
+            generation_id="evidence-fixture", members=(member,),
+            content_digests={"values": digest}, completion="complete",
+            publication_state="committed", requested_mode="values")
+        result = ConsolidateResult(
+            status="ok", output_path=str(p), verdict="match",
+            completion="complete", skipped_inputs=0, failed_inputs=0,
+            comparison_outcome=typed, artifact_generation=generation)
+        assert consolidation_meta.write_comparison_outcomes(result)
+
+    def _publish_consolidation(p):
+        assert consolidation_meta.write_outcome(
+            p, ConsolidateResult(
+                status="ok", output_path=str(p), completion="complete",
+                skipped_inputs=0, failed_inputs=0))
+
+    def _gate_error(expected_generation="evidence-fixture"):
         try:
             matrix.run_evidence_only("highway_detail_pdf", store,
                                      "highway_detail_pdf", tsn, cmpwb, pdfdir,
-                                     events=None, examples=2)
+                                     events=None, examples=2,
+                                     source_identity_check=lambda: True,
+                                     expected_generation_id=expected_generation,
+                                     source_workbook_identity=(
+                                         tsn_library.normalized_workbook_identity(tsn)),
+                                     live_tsn_path=tsn)
         except ValueError as e:
             return str(e)
         return None
@@ -549,18 +902,25 @@ try:
     check("an evidence-incapable row is refused with the reason",
           _cap_err and "doesn't support evidence images" in _cap_err)
 
+    _touch(tsn, time.time() - 200)
     err = _gate_error()
     check("missing comparison -> 'run the comparison first'",
           err and "run the comparison first" in err)
 
     now = time.time()
     _touch(cmpwb, now - 50)
+    _publish_comparison(cmpwb)
+    generation_err = _gate_error("wrong-generation")
+    check("cache generation mismatch is refused before evidence rendering",
+          generation_err and "cache generation do not match" in generation_err)
     err = _gate_error()
     check("missing consolidated -> 'run the comparison first'",
           err and "no consolidated" in err and "run the comparison first" in err)
 
     # a store file NEWER than the consolidated -> the store-changed refusal
     _touch(consolidated, now - 100)
+    artifact_store.write_consolidated_fingerprint(consolidated, store)
+    _publish_consolidation(consolidated)
     _touch(store / "highway_detail_route_001.pdf", now - 20)
     err = _gate_error()
     check("store changed since the consolidation -> refuse with the refresh hint",
@@ -593,7 +953,12 @@ try:
         try:
             res = matrix.run_evidence_only(
                 "highway_detail_pdf", store, "highway_detail_pdf", tsn, cmpwb,
-                pdfdir, events=None, examples=2)
+                pdfdir, events=None, examples=2,
+                source_identity_check=lambda: True,
+                expected_generation_id="evidence-fixture",
+                source_workbook_identity=(
+                    tsn_library.normalized_workbook_identity(tsn)),
+                live_tsn_path=tsn)
         finally:
             _ve2.generate = _real_gen
         check("fresh inputs -> ok result carrying the generator's note",
@@ -872,7 +1237,6 @@ check("evidence never keys off visible text (regex sanity: safe filename)",
 print("the pdf/ drop folder exists for the user (v0.21.1 — the update-day gap)")
 import paths                                              # noqa: E402
 import report_catalog                                     # noqa: E402
-import tsn_library                                        # noqa: E402
 _pdf_drop_reports = set(ve.TSN_PDF_REPORT.values()) - ve._TSN_PDFS_IN_RAW
 check("every pdf/-drop TSN source is catalog-flagged evidence_pdfs (and only those)",
       {report_catalog.TSN[[e.subdir for e in report_catalog.TSN].index(r)].evidence_pdfs
