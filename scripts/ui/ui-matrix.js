@@ -281,28 +281,34 @@ function mxCellContent(cmp, tsnMeta) {
     return { cls: "mx-missing", main: "needs export", sub: why };
   }
   if (!cmp.built) return { cls: "mx-stale", main: "compare", sub: "not built yet" };
+  const d = Number.isFinite(cmp.diff_cells) ? cmp.diff_cells : null;
+  const os = Number.isFinite(cmp.one_sided) ? cmp.one_sided : null;
+  if (cmp.completion === "partial" && d != null && os != null) {
+    const observed = `${d} diff${d === 1 ? "" : "s"}`
+      + (os ? ` + ${os} one-sided` : "");
+    const retry = cmp.pairing_quality === "capped"
+      ? "pairing capped — re-scope"
+      : "refresh";
+    return { cls: "mx-partial", main: "partial",
+             sub: `${observed} observed — ${retry}` };
+  }
   if (cmp.stale || cmp.diff_cells == null) {
     return { cls: "mx-stale",
              main: cmp.diff_cells == null ? "re-run" : String(cmp.diff_cells),
              sub: "stale — refresh" };
   }
-  const d = cmp.diff_cells || 0, os = cmp.one_sided || 0;
-  // P1-R01: a comparison built from a PARTIAL consolidation diffed INCOMPLETE inputs
-  // (a TSN/self cell whose consolidation left routes out). Surface it distinctly from
-  // a fully-valid result — an amber "partial" cell + an "inputs incomplete" note — so
-  // a green "✓ match" can never hide that inputs were missing. Cross-env cells carry
-  // no completion, so they're unaffected (undefined !== "partial").
-  const partial = !!cmp.completion && cmp.completion !== "complete";
+  if (cmp.completion !== "complete") {
+    return { cls: "mx-stale", main: "re-run", sub: "outcome unknown" };
+  }
   if (d === 0 && os === 0) {
-    return partial
-      ? { cls: "mx-partial", main: "✓ match", sub: "inputs incomplete" }
-      : { cls: "mx-match", main: "✓ match", sub: "identical" };
+    return cmp.verdict === "match"
+      ? { cls: "mx-match", main: "✓ match", sub: "identical" }
+      : { cls: "mx-stale", main: "re-run", sub: "verdict/counts disagree" };
   }
   const base = os ? `+${os} one-sided` : "";
-  const cls = partial ? "mx-partial"
-    : (d >= MX_HI || d + os >= MX_HI) ? "mx-diff-hi" : "mx-diff-lo";
+  const cls = (d >= MX_HI || d + os >= MX_HI) ? "mx-diff-hi" : "mx-diff-lo";
   return { cls, main: `${d} diff${d === 1 ? "" : "s"}`,
-           sub: partial ? (base ? `${base} · inputs incomplete` : "inputs incomplete") : base };
+           sub: base };
 }
 
 // A compact icon action button for a matrix cell (export / compare / open). Icons
@@ -362,13 +368,25 @@ function mxTsnPicker(tm, locked, rerender) {
 
   const hasFile = tm.source_kind === "file" || tm.source_kind === "consolidated";
   const needsCons = tm.source_kind === "pdfs";
+  const missingSelection = tm.selection_missing || tm.source_kind === "missing_explicit";
 
   // Line 1: status dot + truncated monospace filename (full path = tooltip).
   const fileLine = document.createElement("div");
   fileLine.className = "mxtp-file " + (hasFile ? "has-file" : needsCons ? "needs-cons" : "is-empty");
   const dot = document.createElement("span"); dot.className = "mxtp-dot";
   const name = document.createElement("span"); name.className = "mxtp-name";
-  if (hasFile) {
+  if (missingSelection) {
+    const picked = tm.selected_path || tm.file || "";
+    const reason = tm.selection_reason || "missing";
+    name.textContent = reason === "changed" ? "Selected TSN file changed"
+      : reason === "legacy_identity" ? "Selected TSN file needs re-pick"
+      : reason === "not_workbook" || reason === "unreadable"
+        ? "Selected TSN file can't be read"
+        : reason === "conflicting_aliases" ? "Conflicting TSN selections"
+        : "Selected TSN file is missing";
+    name.title = "The explicitly selected TSN workbook is unavailable:\n" + picked
+      + "\nRe-pick it, or Clear the selection to use the canonical library.";
+  } else if (hasFile) {
     const full = tm.source_path || "";
     name.textContent = full.split(/[\\/]/).pop() || "(file)";
     name.title = "TSN file in use:\n" + (full || name.textContent);
@@ -408,7 +426,7 @@ function mxTsnPicker(tm, locked, rerender) {
   choose.type = "button"; choose.className = "mx-linkbtn"; choose.disabled = locked;
   choose.title = "Pick a TSN workbook (.xlsx)";
   choose.append(icon("i-folder-open"), Object.assign(document.createElement("span"),
-    { textContent: hasFile ? "Replace…" : "Choose…" }));
+    { textContent: missingSelection ? "Re-pick…" : hasFile ? "Replace…" : "Choose…" }));
   choose.onclick = async () => {
     const r = await api.pick_matrix_tsn_file(tm.tsn_subdir);
     if (r && r.error) showMessage("error", "Can't pick", r.error);

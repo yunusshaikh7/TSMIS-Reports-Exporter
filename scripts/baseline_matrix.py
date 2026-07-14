@@ -27,7 +27,6 @@ import re
 import time
 from pathlib import Path
 
-import artifact_store
 import cache_envelope
 import matrix
 import outcome
@@ -144,7 +143,7 @@ def load_results():
     try:
         with open(_results_path(), encoding="utf-8") as f:
             data = json.load(f)
-        return cache_envelope.unwrap(data)
+        return cache_envelope.unwrap(data, output_identity="baseline-by-day")
     except OSError:  # silent-ok: not written yet (first run) — the expected empty-cache state
         return {}
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
@@ -158,13 +157,14 @@ def _result_key(date, source, row_key, baseline_id):
 
 
 def record_result(date, source, row_key, baseline_id, verdict, diff_cells,
-                  one_sided, built_at_mtime, completion=outcome.COMPLETE,
-                  input_fingerprint=None):
+                  one_sided, built_at_mtime, completion=None,
+                  input_fingerprint=None, generation_id=None):
     data = load_results()
     data[_result_key(date, source, row_key, baseline_id)] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
         "completion": completion,
+        "generation_id": generation_id,
         # Both sides are multi-file folders, so the identity fingerprint covers
         # BOTH (a route deleted on either side hides from the mtime check).
         "input_fingerprint": input_fingerprint,
@@ -179,6 +179,9 @@ def record_result(date, source, row_key, baseline_id, verdict, diff_cells,
     except OSError as e:
         log.warning("baseline_matrix: could not write results cache %s: %s: %s",
                     p, type(e).__name__, e)
+        raise ValueError(
+            "The comparison workbook was created, but its baseline result cache "
+            "could not be safely published. Refresh the cell.") from e
 
 
 # --------------------------------------------------------------------------- #
@@ -393,34 +396,37 @@ def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
 
     dir_a = OUTPUT_ROOT / day_folder_name(date, source)
     dest_path = out_path(date, source, row_key, baseline_id)
-    dest_path.parent.mkdir(parents=True, exist_ok=True)
     labels = (f"{source.upper()} {date}", baseline_label(source, baseline_id))
+    source_paths = (dir_a, bdir)
 
     # side A = the day under test, side B = the baseline (labels read
-    # "SSOR-PROD 2026-07-09 vs SSOR-PROD 2026-06-20"). F9: the adapter writes a
-    # temp; commit_workbook validates + os.replaces it onto the store path.
-    result = artifact_store.commit_workbook(
-        dest_path,
-        lambda tmp: adapter.compare_folders(
-            dir_a, bdir, tmp, events=events,
-            confirm_overwrite=lambda _p: True, mode="values", labels=labels),
-        expect_sheet="Comparison",
-        confirm_overwrite=confirm_overwrite or (lambda _p: True))
+    # "SSOR-PROD 2026-07-09 vs SSOR-PROD 2026-06-20"). The public adapter owns
+    # the single atomic transaction; a redundant outer transaction would reject
+    # the adapter's legitimate inner publication as a temp-identity replacement.
+    result = adapter.compare_folders(
+        dir_a, bdir, dest_path, events=events,
+        confirm_overwrite=confirm_overwrite or (lambda _p: True),
+        mode="values", labels=labels)
     if also_formulas and result.status == "ok":
         matrix._try_formulas(lambda fp: adapter.compare_folders(
             dir_a, bdir, fp, events=events,
             confirm_overwrite=lambda _p: True, mode="formulas", labels=labels),
-            dest_path, events)
+            dest_path, events, source_paths=source_paths)
 
     if result.status == "ok" and dest_path.exists():
-        diff_cells, one_sided = matrix.read_counts(dest_path)
+        published = matrix._published_comparison_result(dest_path, result)
+        typed = published.comparison_outcome
+        diff_cells = typed.counts.differing_cells
+        one_sided = (typed.counts.side_a_only_rows
+                     + typed.counts.side_b_only_rows)
         try:
             built_at = dest_path.stat().st_mtime
         except OSError:  # silent-ok: no mtime just means the cached record can't certify freshness
             built_at = None
-        record_result(date, source, row_key, baseline_id, result.verdict,
+        record_result(date, source, row_key, baseline_id, typed.verdict,
                       diff_cells, one_sided, built_at,
-                      completion=result.completion or outcome.COMPLETE,
+                      completion=typed.completion,
                       input_fingerprint=matrix._cell_input_fingerprint(
-                          tsmis_dir(date, source, subdir), bdir / subdir))
+                          tsmis_dir(date, source, subdir), bdir / subdir),
+                      generation_id=published.artifact_generation.generation_id)
     return result

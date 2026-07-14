@@ -544,33 +544,92 @@ def set_day_matrix_row_order(keys):
     return _set_order("day_matrix_row_order", keys)
 
 
-def get_matrix_tsn_files():
-    """{subdir: tsn_file_path} the user explicitly selected (keyed by the report's
-    store subdir, since the TSN dataset is per format — highway_log vs
-    highway_log_pdf)."""
+def _clean_tsn_selection(value):
+    """A persisted explicit-selection record, a legacy path string, or None."""
+    if isinstance(value, str):
+        return value.strip() or None             # legacy v0 path-only record
+    if not isinstance(value, dict):
+        return None
+    path = value.get("path")
+    if not isinstance(path, str) or not path.strip():
+        return None
+    out = dict(value)
+    out["path"] = path.strip()
+    if "identity" in out and not isinstance(out["identity"], dict):
+        out["identity"] = None
+    return out
+
+
+def get_matrix_tsn_selections():
+    """{dataset_key: selection record|legacy path} for explicit TSN choices.
+
+    Versioned records carry the content/file identity captured at pick time.
+    Historical string values are deliberately retained as strings so the resolver
+    can fail closed with a re-pick migration message instead of silently trusting
+    a path whose target may have changed.
+    """
     raw = _read_file().get("matrix_tsn_files")
     if isinstance(raw, dict):
-        return {k: v for k, v in raw.items()
-                if isinstance(k, str) and isinstance(v, str) and v.strip()}
+        out = {}
+        for key, value in raw.items():
+            cleaned = _clean_tsn_selection(value)
+            if isinstance(key, str) and key.strip() and cleaned is not None:
+                out[key.strip()] = cleaned
+        return out
     return {}
 
 
-def set_matrix_tsn_file(subdir, path):
-    """Set (or, with an empty path, clear) the TSN file for one report subdir.
-    Returns the new {subdir: path} map."""
+def get_matrix_tsn_files():
+    """Back-compatible {dataset_key: selected path} view for UI/diagnostics."""
+    out = {}
+    for key, selection in get_matrix_tsn_selections().items():
+        path = selection if isinstance(selection, str) else selection.get("path")
+        if path:
+            out[key] = path
+    return out
+
+
+def set_matrix_tsn_selections(selections):
+    """Atomically replace the explicit TSN-selection map (migration/internal API)."""
+    cleaned = {}
+    if isinstance(selections, dict):
+        for key, value in selections.items():
+            selection = _clean_tsn_selection(value)
+            if isinstance(key, str) and key.strip() and selection is not None:
+                cleaned[key.strip()] = selection
     data = dict(_read_file())
-    files = dict(get_matrix_tsn_files())
-    path = (path or "").strip()
-    if path:
-        files[subdir] = path
-    else:
-        files.pop(subdir, None)
-    if files:
-        data["matrix_tsn_files"] = files
+    if cleaned:
+        data["matrix_tsn_files"] = cleaned
     else:
         data.pop("matrix_tsn_files", None)
     _atomic_write(data)
-    log.info("settings: matrix_tsn_file[%s] -> %s", subdir, path or "(default)")
+    return get_matrix_tsn_selections()
+
+
+def set_matrix_tsn_selection(subdir, selection):
+    """Set/clear one versioned selection record without disturbing other reports."""
+    files = dict(get_matrix_tsn_selections())
+    cleaned = _clean_tsn_selection(selection)
+    if cleaned is None:
+        files.pop(subdir, None)
+    else:
+        files[subdir] = cleaned
+    result = set_matrix_tsn_selections(files)
+    path = cleaned if isinstance(cleaned, str) else (
+        cleaned.get("path") if isinstance(cleaned, dict) else None)
+    log.info("settings: matrix_tsn_selection[%s] -> %s", subdir, path or "(default)")
+    return result
+
+
+def set_matrix_tsn_file(subdir, path):
+    """Legacy path-only setter; non-empty values require re-pick before use.
+
+    The GUI uses ``set_matrix_tsn_selection`` with a verified identity. This shim
+    remains for old callers/config migration and intentionally does not manufacture
+    trust from a bare path.
+    """
+    path = (path or "").strip()
+    set_matrix_tsn_selection(subdir, path or None)
     return get_matrix_tsn_files()
 
 

@@ -8,6 +8,8 @@ gui_worker re-exports these so every existing import keeps working.
 import base64
 import dataclasses
 import logging
+import os
+import shutil
 import threading
 from pathlib import Path
 
@@ -25,7 +27,7 @@ from paths import env_tagged_filename
 
 log = logging.getLogger("tsmis.gui")
 
-def _swap_store_dir(live, staged):
+def _swap_store_dir(live, staged, guard=None):
     """Replace `live` with the freshly-exported `staged` store folder, JOURNALED (P2/F2).
 
     The Export-Everything store used to rmtree the live folder BEFORE re-export, so a
@@ -35,7 +37,7 @@ def _swap_store_dir(live, staged):
     backup — there is never a window with zero copies, and a locked `live` keeps the
     last-good (the refresh is discarded), never a half-merged folder. Caller already
     gated on a COMPLETE producer outcome (F1) before promoting."""
-    return artifact_store.promote_store(live, staged)
+    return artifact_store.promote_store(live, staged, guard=guard)
 
 
 def _coalesce_groups(specs):
@@ -87,6 +89,10 @@ class ExportWorker(threading.Thread):
         self.pause = pause_event or threading.Event()    # B1: between-route hold
         self.auto_consolidate = bool(auto_consolidate)   # B2: combine after each
         self.out_base = Path(out_base) if out_base else None   # B3: always-current dest base
+        self._owned_root_lease = None
+        # Absolute stage spelling -> stable directory identity.  A predictable
+        # `.staging` pathname is never authority by itself.
+        self._stage_ids = {}
         self.workers = workers              # >1 -> experimental parallel "fast mode"
         # None means "all routes"; otherwise the chosen subset. Stored as a
         # concrete list so the engine and the progress total agree.
@@ -98,6 +104,8 @@ class ExportWorker(threading.Thread):
         # per report type so each report's progress starts clean.
         self._route_status = {}
         self._tally_lock = threading.Lock()  # fast mode: several threads call _on_route
+        self._ownership_loss_lock = threading.Lock()
+        self._ownership_loss_reported = False
         self._cur_label = ""               # report currently running (shown in progress)
         self._report_i = 0                 # 1-based index of the current report
         self._report_n = len(self.specs)   # how many reports this run will do
@@ -135,6 +143,9 @@ class ExportWorker(threading.Thread):
         failure is logged, never fatal — the export itself already succeeded."""
         from pathlib import Path
         from reports import consolidator_for_spec
+        commit_guard = None
+        if self.out_base is not None:
+            self._require_store_lease("auto-consolidation write")
         mod = consolidator_for_spec(spec)
         if mod is None:
             self.q.put(("log", f"  Auto-consolidate: {spec.label} has no "
@@ -153,6 +164,18 @@ class ExportWorker(threading.Thread):
             day, input_dir = None, self.out_base / spec.subdir
             out_path = (self.out_base / "consolidated"
                         / env_tagged_filename(mod.FILENAME, self.out_base.name))
+            input_identity = owned_dir.directory_identity(input_dir)
+            self._owned_root_lease.require_safe_descendant(
+                input_dir, "auto-consolidation input read",
+                directory_identity=input_identity)
+
+            def commit_guard(path):
+                # Keep both the promoted input store and each destination
+                # spelling under the same still-current lease for the whole
+                # long consolidation.
+                return (self._owned_root_lease.is_safe_descendant(
+                            input_dir, directory_identity=input_identity)
+                        and self._owned_root_lease.is_safe_descendant(path))
         else:
             day = Path(result.output_dir).parent.name if result.output_dir else None
             input_dir = out_path = None
@@ -160,14 +183,18 @@ class ExportWorker(threading.Thread):
         self.q.put(("log", f"Auto-consolidating {spec.label}…"))
         try:
             res = mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
-                                  day=day, input_dir=input_dir, out_path=out_path)
+                                  day=day, input_dir=input_dir, out_path=out_path,
+                                  commit_guard=commit_guard)
             # P1-R01: persist the producer completion beside the workbook this writer
             # produced (the same reusable consolidated the matrix later reuses), through
             # the shared boundary — so an auto-consolidate partial can't be reused green.
             # A False return = the partial flag couldn't be recorded (the incomplete
             # combined file was discarded); surface it in the log (non-fatal — the export
             # itself already succeeded).
-            if not consolidation_meta.write_outcome(res.output_path or out_path, res):
+            if self.out_base is not None:
+                self._require_store_lease("consolidation outcome write")
+            if not consolidation_meta.write_outcome(
+                    res.output_path or out_path, res, commit_guard=commit_guard):
                 self.q.put(("log", "  Auto-consolidate: the outcome could not be recorded; "
                                    "the incomplete combined file was discarded (it will rebuild)."))
             lines = res.summary_lines or ([res.message] if res.message else [])
@@ -199,19 +226,48 @@ class ExportWorker(threading.Thread):
             return True
         return False
 
+    def _is_cancelled(self):
+        """Treat loss of the exact store lease like cancellation inside engines.
+
+        The exporter polls this immediately before each report save (as well as
+        between routes). That is the narrowest portable check before a save
+        strategy opens its output path; final staging promotion is guarded at
+        every filesystem mutation separately.
+        """
+        if self.cancel.is_set():
+            return True
+        lease = self._owned_root_lease
+        stages_current = (lease is None or all(
+            lease.is_safe_descendant(stage, directory_identity=identity)
+            for stage, identity in list(self._stage_ids.values())))
+        if lease is None or (lease.is_current() and stages_current):
+            return False
+        with self._ownership_loss_lock:
+            if not self._ownership_loss_reported:
+                self._ownership_loss_reported = True
+                msg = ("The Export Everything destination changed while the export "
+                       "was running. No further report files will be written or promoted.")
+                log.error(msg)
+                self.q.put(("log", msg))
+        return True
+
     def _build_events(self):
         """The Events sink for this worker — shared by run() (one export) and by
         BatchWorker, which reuses _run_specs once per environment (B3)."""
-        return Events(
+        events = Events(
             on_log=lambda t: self.q.put(("log", t)),
             on_route=self._on_route,
             should_skip=self._should_skip,
-            is_cancelled=self.cancel.is_set,
+            is_cancelled=self._is_cancelled,
             on_status=lambda w, t: self.q.put(("worker_status", (w, t))),
             screenshot_wanted=self._shot_wanted,
             on_screenshot=self._on_screenshot,
             is_paused=self.pause.is_set,
         )
+        # Export engines consult this immediately before every route save. It
+        # remains additive so direct/non-store Events users keep their old API.
+        events.destination_guard = self._destination_guard
+        return events
 
     def _run_specs(self, events, results):
         """Run every selected report once against the CURRENT site, appending
@@ -226,17 +282,17 @@ class ExportWorker(threading.Thread):
         saved off that single render (run_export_combined) instead of generating it
         twice. Fast mode keeps each edition its own PARALLEL pass (its route
         parallelism is the speed lever there; coalescing it is a follow-up)."""
-        # M03: the Export-Everything store's <src>-<env> folder is a directory the
-        # app creates inside a USER-CHOSEN destination. Stamp it app-owned ONCE here
-        # (before the loop) so "Delete all reports" / store recovery can prove
-        # ownership by marker, not by name alone. The marker survives the per-report
-        # stage->swap (that only renames child report subdirs).
-        if self.out_base is not None:
-            owned_dir.ensure_owned_dir(self.out_base, kind="store")
         fast = bool(self.workers and self.workers > 1)
         # Coalesce dual-edition pairs in the sequential path (a clear ~2x win); in
         # fast mode every group is a singleton so behavior is unchanged.
         groups = [[s] for s in self.specs] if fast else _coalesce_groups(self.specs)
+        # Ownership is deletion authority, so claim the store only when this
+        # invocation has real work and only through create-and-mark semantics.
+        # A pre-existing untrusted folder blocks before staging/report writes.
+        if (self.out_base is not None and groups
+                and not self.cancel.is_set()):
+            self._owned_root_lease = owned_dir.require_owned_dir_lease(
+                self.out_base, kind="store")
         self._report_n = len(groups)
         for gi, group in enumerate(groups, 1):
             if self.cancel.is_set():
@@ -257,8 +313,22 @@ class ExportWorker(threading.Thread):
             }))
             # B3 stage-and-swap: prep each edition's live dir + fresh `.staging`
             # sibling + env-tagged run_spec (see _prep_edition).
-            preps = [self._prep_edition(spec) for spec in group]
+            preps = []
             try:
+                for spec in group:
+                    preps.append(self._prep_edition(spec))
+            except Exception:
+                for _o, created_stage, _rs, _rd in preps:
+                    if created_stage is not None:
+                        try:
+                            self._discard_stage(
+                                created_stage, "failed-preparation staging cleanup")
+                        except owned_dir.OwnershipError as e:
+                            log.warning("store staging cleanup skipped: %s", e)
+                raise
+            try:
+                if self.out_base is not None:
+                    self._require_store_lease("export write")
                 if len(group) == 1 and fast:
                     from exporter_parallel import run_export_parallel  # lazy
                     _o, _s, run_spec, run_dir = preps[0]
@@ -278,8 +348,11 @@ class ExportWorker(threading.Thread):
                 # leave the live folders as they were, let the caller handle it.
                 for _o, stage_dir, _rs, _rd in preps:
                     if stage_dir is not None:
-                        import shutil
-                        shutil.rmtree(stage_dir, ignore_errors=True)
+                        try:
+                            self._discard_stage(
+                                stage_dir, "crashed-export staging cleanup")
+                        except owned_dir.OwnershipError as e:
+                            log.warning("store staging cleanup skipped: %s", e)
                 raise
             for spec, (out_dir, stage_dir, _rs, _rd), result in zip(group, preps, edition_results):
                 self._finish_edition(spec, result, out_dir, stage_dir, events, results)
@@ -296,10 +369,28 @@ class ExportWorker(threading.Thread):
         out_dir = (self.out_base / spec.subdir) if self.out_base else None
         stage_dir = None
         if out_dir is not None:
-            import shutil
+            self._require_store_lease("staging directory creation")
             stage_dir = out_dir.with_name(out_dir.name + ".staging")
-            shutil.rmtree(stage_dir, ignore_errors=True)
-            stage_dir.mkdir(parents=True, exist_ok=True)
+            self._owned_root_lease.require_safe_descendant(
+                stage_dir, "staging directory creation")
+            try:
+                # Exclusive creation: a stale, foreign, symlink, or junction
+                # stage is a hard stop and is never recursively cleared.
+                stage_dir.mkdir(exist_ok=False)
+            except FileExistsError as e:
+                raise owned_dir.OwnershipError(
+                    f"The staging folder '{stage_dir.name}' already exists. It was "
+                    "left untouched; retry after resolving the interrupted export.") from e
+            except OSError as e:
+                raise owned_dir.OwnershipError(
+                    f"The staging folder '{stage_dir.name}' could not be created "
+                    f"safely ({type(e).__name__}).") from e
+            stage_identity = owned_dir.directory_identity(stage_dir)
+            self._owned_root_lease.require_safe_descendant(
+                stage_dir, "export staging write",
+                directory_identity=stage_identity)
+            self._stage_ids[self._stage_key(stage_dir)] = (
+                stage_dir, stage_identity)
         run_spec = spec
         if self.out_base is not None:
             tag = self.out_base.name
@@ -308,6 +399,79 @@ class ExportWorker(threading.Thread):
                 filename=lambda r, _f=spec.filename, _t=tag: env_tagged_filename(_f(r), _t))
         run_dir = stage_dir if stage_dir is not None else out_dir
         return out_dir, stage_dir, run_spec, run_dir
+
+    def _require_store_lease(self, action):
+        if self.out_base is None:
+            return None
+        if self._owned_root_lease is None:
+            raise owned_dir.OwnershipError(
+                "The Export Everything destination has no active ownership lease.")
+        return self._owned_root_lease.require_current(action=action)
+
+    @staticmethod
+    def _stage_key(stage_dir):
+        return os.path.normcase(os.path.abspath(stage_dir))
+
+    def _stage_binding(self, stage_dir):
+        return self._stage_ids.get(self._stage_key(stage_dir))
+
+    def _forget_stage(self, stage_dir):
+        self._stage_ids.pop(self._stage_key(stage_dir), None)
+
+    def _destination_guard(self, path):
+        """Target-aware route/consolidation guard used at mutation boundaries."""
+        if self.out_base is None:
+            return True
+        lease = self._owned_root_lease
+        if lease is None:
+            return False
+        candidate = Path(os.path.abspath(path))
+        for stage, identity in list(self._stage_ids.values()):
+            try:
+                candidate.relative_to(Path(os.path.abspath(stage)))
+            except ValueError:  # silent-ok: this candidate belongs to another active stage
+                continue
+            return lease.is_safe_descendant(
+                candidate, anchor_path=stage, anchor_identity=identity)
+        return lease.is_safe_descendant(candidate)
+
+    def _promotion_guard(self, out_dir, stage_dir, stage_identity):
+        """Composite guard valid before and after staging is renamed live."""
+        lease = self._owned_root_lease
+        if lease is None or not lease.is_current():
+            return False
+        stage_at = None
+        for candidate in (stage_dir, out_dir):
+            if owned_dir.directory_identity(candidate) == stage_identity:
+                stage_at = candidate
+                break
+        if stage_at is None:
+            return False
+        if not lease.is_safe_descendant(
+                stage_at, directory_identity=stage_identity):
+            return False
+        if not owned_dir.is_plain_directory_tree(stage_at, stage_identity):
+            return False
+        # A prior live target is another mutation operand; reject it when it is
+        # itself a link/reparse. After commit it is the bound stage object above.
+        if out_dir.exists() and out_dir != stage_at:
+            return lease.is_safe_descendant(out_dir)
+        return True
+
+    def _discard_stage(self, stage_dir, action):
+        """Delete only the exact plain staging object this worker created."""
+        binding = self._stage_binding(stage_dir)
+        if binding is None:
+            raise owned_dir.OwnershipError(
+                "The staging folder is not bound to this export run.")
+        _stage, identity = binding
+        self._owned_root_lease.require_safe_descendant(
+            stage_dir, action, directory_identity=identity)
+        if not owned_dir.is_plain_directory_tree(stage_dir, identity):
+            raise owned_dir.OwnershipError(
+                "The staging folder changed or contains a linked entry; it was retained.")
+        shutil.rmtree(stage_dir)
+        self._forget_stage(stage_dir)
 
     def _finish_edition(self, spec, result, out_dir, stage_dir, events, results):
         """Post-process one finished edition: decide completion, promote or discard
@@ -329,10 +493,22 @@ class ExportWorker(threading.Thread):
             result.completion = outcome.run_completion(result, cancelled=cancelled)
         promoted = False
         # P2-A04: a prior store counts only if it's a USABLE store (holds an artifact).
+        if in_store:
+            self._owned_root_lease.require_safe_descendant(
+                out_dir, "store inspection")
         had_prior = bool(in_store and artifact_store.is_usable_store(out_dir))
         if in_store:
             if outcome.promotable(result.completion):
-                promoted = _swap_store_dir(out_dir, stage_dir)
+                self._require_store_lease("store promotion")
+                binding = self._stage_binding(stage_dir)
+                if binding is None:
+                    raise owned_dir.OwnershipError(
+                        "The export staging identity is unavailable for promotion.")
+                _stage, stage_identity = binding
+                promoted = _swap_store_dir(
+                    out_dir, stage_dir,
+                    guard=lambda: self._promotion_guard(
+                        out_dir, stage_dir, stage_identity))
                 if not promoted:
                     # P2-B01: a COMPLETE export whose journaled swap failed did NOT
                     # promote — the previous live copy is intact; must read as
@@ -340,10 +516,13 @@ class ExportWorker(threading.Thread):
                     log.warning("store refresh for %s: promotion FAILED — kept last-good, "
                                 "NOT promoted", spec.subdir)
             else:
-                import shutil
-                shutil.rmtree(stage_dir, ignore_errors=True)
+                self._discard_stage(stage_dir, "incomplete-export staging cleanup")
                 log.info("store refresh for %s was %s — kept last-good, discarded staging",
                          spec.subdir, result.completion)
+        if in_store:
+            # Promotion consumed it or the promotion layer retained it under a
+            # journal. Either way this worker must never write to the spelling again.
+            self._forget_stage(stage_dir)
         # Artifact reflects the ACTUAL store outcome (P2-B06: never falsely claim a
         # prior was preserved).
         if in_store and not promoted:
@@ -583,12 +762,18 @@ class ConsolidateWorker(threading.Thread):
                                          day=self.day)
             log.info("consolidate done: status=%s output=%s message=%s",
                      result.status, result.output_path or "-", result.message or "-")
-            # P1-R01: the GUI/console Consolidate tab writes the SAME reusable workbook
-            # the matrix reuses — persist its producer completion through the shared
-            # boundary so a partial consolidation here can't later read as green. A False
-            # return means the partial flag could NOT be recorded (publication failed) and
-            # the workbook was invalidated — report a degraded terminal, not success.
-            if not consolidation_meta.write_outcome(result.output_path, result):
+            # Ordinary consolidations still publish their one reusable workbook through
+            # the legacy single-path sidecar boundary. Comparisons are different: their
+            # central publication owns every member (values/formulas/generation metadata)
+            # as one transaction. A second generic write here would overwrite that richer
+            # record beside only the legacy primary path, so typed comparison/generation
+            # results deliberately bypass it.
+            centrally_published = (
+                getattr(result, "comparison_outcome", None) is not None
+                or getattr(result, "artifact_generation", None) is not None)
+            if (not centrally_published
+                    and not consolidation_meta.write_outcome(
+                        result.output_path, result)):
                 self.q.put(("error", ("general",
                             "Consolidation finished but its outcome could not be recorded; "
                             "the incomplete output was discarded. Close any open copy and "

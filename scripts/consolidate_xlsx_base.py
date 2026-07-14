@@ -17,7 +17,9 @@ prints/prompts/exits. Third-party imports are guarded so importing this module
 (and therefore each thin wrapper) never fails when a dependency is missing -- the
 caller gets a clean error result instead of an ImportError.
 """
+import os
 import re
+from pathlib import Path
 
 try:
     from openpyxl import Workbook, load_workbook
@@ -30,6 +32,7 @@ except ImportError:
 
 import outcome
 import artifact_store
+import consolidation_meta
 from compare_core import is_formula_injection   # shared formula-injection guard
 from events import ConsolidateResult, Events
 
@@ -81,7 +84,8 @@ def _stream_data_rows(path, sheet_name):
 def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
                      events=None, confirm_overwrite=None, existed_at_confirm=None,
                      header_override=None, header_comment=None,
-                     decorate_workbook=None):
+                     decorate_workbook=None, commit_guard=None,
+                     input_files=None):
     """Combine every per-route XLSX in `input_dir` (reading worksheet
     `sheet_name`) into one workbook at `out_path`, prepending a "Route" column so
     rows from different routes stay distinguishable.
@@ -97,8 +101,16 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
       * header_comment     — callable(label) -> openpyxl Comment | None, attached
         to each written header cell (a hover tooltip).
       * decorate_workbook  — callable(wb) run after the rows, before save (e.g.
-        to append a Legend sheet)."""
+        to append a Legend sheet).
+
+    ``input_files`` is an optional exact manifest for an attempt-scoped producer.
+    When supplied, only those direct children of ``input_dir`` are read; the
+    directory is not globbed. Ordinary per-route consolidators omit it and keep
+    their existing ``*.xlsx`` discovery behavior.
+    """
     events = events or Events()
+    input_dir = Path(input_dir)
+    out_path = Path(out_path)
     if not _DEPS_OK:
         return ConsolidateResult(
             status="error",
@@ -116,8 +128,25 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
     # Skip Excel owner-lock stubs (~$foo.xlsx appears the moment a per-route
     # export is open in Excel): they are not workbooks, and counting one as an
     # unreadable input falsely demoted the whole consolidation to PARTIAL.
-    files = sorted(p for p in input_dir.glob("*.xlsx")
-                   if not p.name.startswith("~$"))
+    if input_files is None:
+        files = sorted(p for p in input_dir.glob("*.xlsx")
+                       if not p.name.startswith("~$"))
+    else:
+        root = Path(os.path.abspath(input_dir))
+        files = []
+        seen = set()
+        for member in input_files:
+            candidate = Path(os.path.abspath(Path(member)))
+            if (candidate.parent != root or candidate.suffix.lower() != ".xlsx"
+                    or candidate.name.startswith("~$") or candidate in seen):
+                return ConsolidateResult(
+                    status="error",
+                    message=(f"The {report_name} conversion member manifest was "
+                             "invalid; nothing was combined."),
+                )
+            seen.add(candidate)
+            files.append(candidate)
+        files.sort(key=lambda p: p.name)
     if not files:
         return ConsolidateResult(
             status="error",
@@ -164,7 +193,15 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
             status="error",
             message=f"No readable {report_name} files were found in:\n{input_dir}.")
 
+    if not consolidation_meta.guard_allows(commit_guard, out_path):
+        return ConsolidateResult(
+            status="error",
+            message="The destination changed while consolidating; nothing was published.")
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if not consolidation_meta.guard_allows(commit_guard, out_path):
+        return ConsolidateResult(
+            status="error",
+            message="The destination changed while consolidating; nothing was published.")
 
     # Style objects are built here (not at module scope) so importing this module
     # never touches openpyxl -- the GUI can import it even if a dep is missing and
@@ -275,7 +312,9 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
         # inputs we ask before overwriting it, without abandoning a half-streamed wb.
         committed = artifact_store.atomic_save_if(
             wb, out_path,
-            lambda: artifact_store.confirm_late_overwrite(out_path, existed_at_confirm, confirm))
+            lambda: (consolidation_meta.guard_allows(commit_guard, out_path)
+                     and artifact_store.confirm_late_overwrite(
+                         out_path, existed_at_confirm, confirm)))
     except PermissionError:
         return ConsolidateResult(
             status="error",

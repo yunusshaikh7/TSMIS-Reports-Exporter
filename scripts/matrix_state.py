@@ -25,7 +25,6 @@ log = logging.getLogger("tsmis.matrix")
 BASELINE_DEFAULT = "ssor-prod"
 COMPARISONS_DIRNAME = "comparisons"
 _RESULTS_FILE = "_results.json"
-_NEQ = " ≠ "                       # the compare_core diff marker (read-only here)
 _MTIME_TOL_S = consolidation_meta._MTIME_TOL_S   # single home: the sidecar layer owns the tolerance
 
 
@@ -89,7 +88,7 @@ def load_results(dest, baseline_key):
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
-        return cache_envelope.unwrap(data)
+        return cache_envelope.unwrap(data, output_identity=baseline_key)
     except OSError:
         return {}                            # not written yet (first run) — expected
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
@@ -98,56 +97,75 @@ def load_results(dest, baseline_key):
         return {}
 
 
-def _save_results(dest, baseline_key, data):
+def _require_cache_guard(commit_guard, path, action):
+    """Raise when a target-aware ownership guard no longer authorizes ``path``.
+
+    Cache writes are part of the comparison publication, not disposable
+    telemetry.  Silently dropping a denied write would leave the workbook and
+    its rendered verdict out of sync, so ownership loss is an operation error.
+    """
+    if not consolidation_meta.guard_allows(commit_guard, path):
+        raise ValueError(
+            "The comparisons destination changed before the matrix "
+            f"{action}. The cache was left untouched; retry the comparison.")
+
+
+def _save_results(dest, baseline_key, data, commit_guard=None):
     p = _results_path(dest, baseline_key)
+    tmp = p.with_name(p.name + ".tmp")
+    _require_cache_guard(commit_guard, p.parent, "cache directory write")
+    _require_cache_guard(commit_guard, p, "cache write")
+    _require_cache_guard(commit_guard, tmp, "cache temporary write")
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_name(p.name + ".tmp")
+        _require_cache_guard(commit_guard, p, "cache write")
+        _require_cache_guard(commit_guard, tmp, "cache temporary write")
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cache_envelope.wrap(data, output_identity=baseline_key), f)
+        _require_cache_guard(commit_guard, p, "cache publication")
+        _require_cache_guard(commit_guard, tmp, "cache publication")
         os.replace(tmp, p)
     except OSError as e:
         log.warning("matrix: could not write results cache %s: %s: %s",
                     p, type(e).__name__, e)
+        raise ValueError(
+            "The comparison workbook was created, but its Matrix result cache "
+            "could not be safely published. Refresh the cell.") from e
 
 
 def record_result(dest, baseline_key, row_key, cell_key, verdict,
-                  diff_cells, one_sided, built_at_mtime, completion=outcome.COMPLETE,
-                  input_fingerprint=None):
+                  diff_cells, one_sided, built_at_mtime, completion=None,
+                  input_fingerprint=None, generation_id=None, commit_guard=None):
     data = load_results(dest, baseline_key)
     data.setdefault(row_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
         "completion": completion,        # P1-R01: partial inputs flagged durably
+        "generation_id": generation_id,
         # P2/F5: the cell's input-folder identity at build time; a later snapshot reads
         # the cell STALE when it differs (a route added/removed/resized — invisible to
         # the mtime check). Absent on legacy records -> the mtime check alone applies.
         "input_fingerprint": input_fingerprint,
     }
-    _save_results(dest, baseline_key, data)
+    _save_results(dest, baseline_key, data, commit_guard=commit_guard)
 
 
 # --------------------------------------------------------------------------- #
 # read discrepancy counts back from a produced VALUES workbook (no COM/F9)
 # --------------------------------------------------------------------------- #
 def read_counts(values_path, has_route=None):
-    """(diff_cells, one_sided) read straight off a VALUES-flavor comparison
-    workbook's Comparison sheet content: cells carrying the ' ≠ ' marker, and
-    non-'Both' statuses. The values flavor stores literal results, so no Excel
-    recalc is needed. Returns (None, None) if unreadable.
+    """Read ``(diff_cells, one_sided)`` from a VALUES comparison workbook.
 
-    The count columns are located by the INVARIANT header LABELS 'Status' and
-    'Diffs', which compare_core writes in EVERY flavor (the id_headers always end
-    `… "Status", "Diffs"` before the data fields — compare_core `Layout.id_headers`).
-    So the reader is correct whether column A is 'Route' (the Route-keyed layout)
-    OR an aggregate whose KEY field happens to be named 'Route' (the flat Ramp /
-    Intersection Summary cross-env adapters use has_route=False yet their schema
-    header begins with 'Route'). This is the F4/O4 fix: A1 alone is NOT a layout
-    signal — only the Status/Diffs positions are. `has_route` is accepted ONLY as an
-    explicit fallback when those labels are somehow absent (a foreign/malformed
-    sheet), so we never silently miscount. Layout:
-      has_route:  A Route | B key | C # | D A-Row | E B-Row | F Status | G Diffs | H.. fields
-      flat:       A key | B # | C A-Row | D B-Row | E Status | F Diffs | G.. fields
+    ``Status`` and ``Diffs`` are the structured truth columns emitted by every
+    current comparison layout. Visible field text is never inspected: the
+    spaced not-equal glyph is legitimate source content and cannot encode state.
+    A missing, duplicate, or malformed count contract returns ``(None, None)``
+    instead of guessing a layout or silently certifying zero differences.
+
+    Label lookup remains correct whether column A is the Route-keyed layout's
+    route or a flat aggregate whose identity field happens to be named Route.
+    ``has_route`` is retained only for call compatibility and cannot authorize a
+    positional fallback.
     """
     try:
         from openpyxl import load_workbook
@@ -161,35 +179,36 @@ def read_counts(values_path, has_route=None):
         rows_iter = ws.iter_rows(values_only=True)
         header = next(rows_iter, None) or ()     # row 1 (header); data follows
 
-        def _col_of(label):                      # 1-based index of an exact header label
-            for i, v in enumerate(header):
-                if isinstance(v, str) and v.strip() == label:
-                    return i + 1
-            return None
+        def _col_of(label):                      # unique 1-based exact label
+            matches = [i + 1 for i, value in enumerate(header)
+                       if value == label]
+            return matches[0] if len(matches) == 1 else None
 
         status_col = _col_of("Status")
         diffs_col = _col_of("Diffs")
-        if status_col is not None and diffs_col is not None:
-            first_field = diffs_col + 1          # data fields start right after 'Diffs'
-        else:
-            # Foreign/malformed sheet without the labelled columns — fall back to the
-            # explicit/derived has_route layout rather than silently miscounting.
-            if has_route is None:
-                a1 = header[0] if header else None
-                has_route = isinstance(a1, str) and a1.strip() == "Route"
-            status_col = 6 if has_route else 5
-            first_field = 8 if has_route else 7
+        if status_col is None or diffs_col is None:
+            log.debug("read_counts: Comparison lacks unique Status/Diffs labels")
+            return (None, None)
         one_sided = diff_cells = 0
         for row in rows_iter:                     # data rows (header consumed above)
             if row is None or all(v is None for v in row):
                 continue
             status = row[status_col - 1] if len(row) >= status_col else None
-            if status and status != "Both":
+            diffs = row[diffs_col - 1] if len(row) >= diffs_col else None
+            if status == "Both":
+                if (isinstance(diffs, bool) or not isinstance(diffs, (int, float))
+                        or not float(diffs).is_integer() or diffs < 0):
+                    log.debug("read_counts: matched row has invalid Diffs value %r", diffs)
+                    return (None, None)
+                diff_cells += int(diffs)
+            elif isinstance(status, str) and status:
+                if diffs not in (None, ""):
+                    log.debug("read_counts: one-sided row unexpectedly carries Diffs %r", diffs)
+                    return (None, None)
                 one_sided += 1
-            for ci in range(first_field - 1, len(row)):
-                v = row[ci]
-                if isinstance(v, str) and _NEQ in v:
-                    diff_cells += 1
+            else:
+                log.debug("read_counts: row has invalid Status value %r", status)
+                return (None, None)
         return (diff_cells, one_sided)
     except Exception as e:                       # noqa: BLE001
         log.debug("read_counts: can't read %s (%s: %s)", values_path,
@@ -214,9 +233,10 @@ def _cell_input_fingerprint(*folders):
 def _inputs_changed(rec_trusted, rec, *folders):
     """True iff a TRUSTED cache record carries a recorded input fingerprint that differs
     from the cell's CURRENT source-folder identity (R1-R03: a route added / removed /
-    resized since the comparison was built). False when the record is untrusted or has
-    no recorded fingerprint (a legacy record) — the mtime check then stands alone, so a
-    pre-P2 cache never reads falsely stale."""
+    resized since the comparison was built). False here when the record is untrusted or
+    has no recorded fingerprint; the caller treats either condition as
+    ``cache_missing_or_mismatched`` and therefore stale/rebuildable rather than falling
+    back to mtime-only trust."""
     if not rec_trusted or not rec:
         return False
     rec_fp = rec.get("input_fingerprint")
@@ -225,28 +245,103 @@ def _inputs_changed(rec_trusted, rec, *folders):
     return _cell_input_fingerprint(*folders) != rec_fp
 
 
-def _staleness(cmp_m, sources, rec, fp_folders, missing_side):
+def _nested_record(results, outer_key, inner_key):
+    """Read one nested cache record without trusting JSON container shapes."""
+    outer = results.get(outer_key, {}) if isinstance(results, dict) else {}
+    return outer.get(inner_key) if isinstance(outer, dict) else None
+
+
+def _published_comparison_result(path, result):
+    """Return the strict on-disk record for one just-built comparison.
+
+    A successful producer result is not enough: the Matrix cache may advertise
+    truth only after the workbook, typed outcome, and complete generation sidecar
+    agree.  This is also the shared boundary used by validation/day/baseline.
+    """
+    try:
+        return consolidation_meta.require_published_comparison(path, result)
+    except ValueError as e:
+        raise ValueError(
+            "The comparison workbook was created, but its published outcome "
+            f"cannot be trusted. Refresh the comparison before using it. ({e})") from e
+
+
+def _staleness(cmp_m, sources, rec, fp_folders, missing_side,
+               comparison_output=None):
     """The staleness verdict both cell readers share (S4 / ARC-03):
     {supported, built, mtime, stale, reason, missing_side, verdict, diff_cells,
     one_sided, completion}. `sources` is [{name, mtime}, ...] in reason order
     ("<name>_newer" / "both_newer"); the cached verdict/counts surface only
     while the record's built_at_mtime still matches the workbook; a trusted
     record's input fingerprint must match the current `fp_folders` identity
-    (R1-R03). Callers own `missing_side` (their side semantics differ)."""
+    (R1-R03). When `comparison_output` is supplied (all production snapshots),
+    verdict/counts/completion come only from its strict generation sidecar; the
+    cache is retained solely for source-freshness metadata. Callers own
+    `missing_side` (their side semantics differ)."""
     built = cmp_m is not None
-    verdict = diff_cells = one_sided = completion = None
-    rec_trusted = bool(built and rec
-                       and abs(float(rec.get("built_at_mtime", -1)) - cmp_m) < _MTIME_TOL_S)
-    if rec_trusted:
+    verdict = diff_cells = one_sided = completion = pairing_quality = None
+    publication_reason = None
+    published_generation = None
+    if built and comparison_output is not None:
+        published = consolidation_meta.read_comparison_outcome(comparison_output)
+        if published is None:
+            publication_reason = "outcome_missing"
+        elif not published.trusted:
+            publication_reason = "outcome_untrusted"
+            completion = outcome.PARTIAL
+        else:
+            typed = published.comparison_outcome
+            verdict = typed.verdict
+            diff_cells = typed.counts.differing_cells
+            one_sided = (typed.counts.side_a_only_rows
+                         + typed.counts.side_b_only_rows)
+            completion = typed.completion
+            pairing_quality = typed.pairing_quality
+            published_generation = published.artifact_generation.generation_id
+    rec_is_mapping = isinstance(rec, dict)
+    try:
+        rec_mtime = float(rec.get("built_at_mtime", -1)) if rec_is_mapping else None
+    except (TypeError, ValueError, OverflowError):  # silent-ok: malformed cache mtime makes the record untrusted
+        rec_mtime = None
+    rec_trusted = bool(built and rec_is_mapping and rec_mtime is not None
+                       and abs(rec_mtime - cmp_m) < _MTIME_TOL_S)
+    if rec_trusted and fp_folders:
+        recorded_fingerprint = rec.get("input_fingerprint")
+        if not isinstance(recorded_fingerprint, str) or not recorded_fingerprint:
+            rec_trusted = False
+    if (rec_trusted and comparison_output is not None
+            and rec.get("generation_id") != published_generation):
+        rec_trusted = False
+    if rec_trusted and comparison_output is None:
         verdict = rec.get("verdict")
         diff_cells = rec.get("diff_cells")
         one_sided = rec.get("one_sided")
         # P1-R01: a cell built from PARTIAL inputs carries it durably — the
         # matrix must flag "compared, but inputs were incomplete". Old records
         # (no field) read as complete.
-        completion = rec.get("completion", outcome.COMPLETE)
+        completion = rec.get("completion")
+    recorded_ids = rec.get("source_identities", {}) if rec_trusted else {}
+    if not isinstance(recorded_ids, dict):
+        recorded_ids = {}
+    current_ids = {s["name"]: s.get("identity") for s in sources
+                   if s.get("identity") is not None}
+    identity_changed = False
+    if recorded_ids:
+        identity_changed = recorded_ids != current_ids
+    elif any(s.get("identity_required") for s in sources):
+        # A pre-identity cache cannot certify that it used the selected bytes.
+        identity_changed = True
+
     if not built:
         stale, reason = True, "missing"
+    elif publication_reason is not None:
+        stale, reason = True, publication_reason
+    elif comparison_output is not None and not rec_trusted:
+        # The strict sidecar owns output truth, but the per-cell cache owns the
+        # source-folder set fingerprint. Losing either half cannot certify fresh.
+        stale, reason = True, "cache_missing_or_mismatched"
+    elif identity_changed:
+        stale, reason = True, "source_identity_changed"
     else:
         newer = [s["name"] for s in sources
                  if s.get("mtime") is not None and s["mtime"] > cmp_m + _MTIME_TOL_S]
@@ -257,9 +352,14 @@ def _staleness(cmp_m, sources, rec, fp_folders, missing_side):
             stale, reason = True, "inputs_changed"
         else:
             stale, reason = False, "fresh"
+    if not stale and completion == outcome.PARTIAL:
+        # A comparison over incomplete inputs is useful observed truth, but it
+        # is never a settled green generation. Keep it visible and retryable.
+        stale, reason = True, "partial"
     return {"supported": True, "built": built, "mtime": cmp_m, "stale": stale,
             "reason": reason, "missing_side": missing_side, "verdict": verdict,
-            "diff_cells": diff_cells, "one_sided": one_sided, "completion": completion}
+            "diff_cells": diff_cells, "one_sided": one_sided,
+            "completion": completion, "pairing_quality": pairing_quality}
 
 
 def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
@@ -282,18 +382,20 @@ def comparison_state(dest, baseline_key, row_key, cell_key, subdir,
     else:
         missing_side = None
 
+    cmp_path = comparison_path(dest, baseline_key, row_key, cell_key)
     try:
-        cmp_m = comparison_path(dest, baseline_key, row_key, cell_key).stat().st_mtime
+        cmp_m = cmp_path.stat().st_mtime
     except OSError:
         cmp_m = None
-    rec = (results.get(row_key, {}) or {}).get(cell_key)
+    rec = _nested_record(results, row_key, cell_key)
     # reason order matters: [baseline, cell] -> "baseline_newer"/"cell_newer".
     return _staleness(cmp_m,
                       [{"name": "baseline", "mtime": base_m},
                        {"name": "cell", "mtime": cell_m}],
                       rec,
                       (dest / cell_key / subdir, dest / baseline_key / subdir),
-                      missing_side)
+                      missing_side,
+                      comparison_output=cmp_path)
 
 
 # --------------------------------------------------------------------------- #
@@ -308,6 +410,8 @@ _TSN_RESULTS_FILE = "_tsn_results.json"
 
 
 def _safe_mtime(p):
+    if not p:
+        return None
     try:
         return Path(p).stat().st_mtime
     except OSError:
@@ -327,7 +431,8 @@ def tsn_comparisons_root(dest):
 
 def tsn_source(dest, subdir, selected_file=None):
     """Resolve the TSN dataset for a report `subdir`, returning {kind:
-    file|consolidated|pdfs|raw|none, path?, mtime?, pdf_count?, raw_count?}.
+    file|consolidated|pdfs|raw|missing_explicit|none, path?, mtime?, pdf_count?,
+    raw_count?, selected_path?}.
 
     Delegates to the canonical TSN library (tsn_library.resolve): an explicit
     user-picked `selected_file` wins; else the library's consolidated workbook;
@@ -335,6 +440,7 @@ def tsn_source(dest, subdir, selected_file=None):
     dest-scoped drop <dest>/_tsn_input/<subdir>/ and the global legacy locations
     (back-compat) — so an existing install keeps resolving until imported."""
     import tsn_library                              # lazy: no import cycle
+    subdir = tsn_library.canonical_dataset_key(subdir)
     return tsn_library.resolve(subdir, selected_file, legacy_dest=dest)
 
 
@@ -529,7 +635,7 @@ def load_tsn_results(dest):
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
-        return cache_envelope.unwrap(data)
+        return cache_envelope.unwrap(data, output_identity="tsn")
     except OSError:
         return {}                            # not written yet (first run) — expected
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
@@ -539,26 +645,39 @@ def load_tsn_results(dest):
 
 
 def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided,
-                      built_at_mtime, completion=outcome.COMPLETE, input_fingerprint=None):
+                      built_at_mtime, completion=None, input_fingerprint=None,
+                      source_identities=None, generation_id=None, commit_guard=None):
     data = load_tsn_results(dest)
     data.setdefault(result_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
         "completion": completion,        # P1-R01: partial inputs flagged durably
+        "generation_id": generation_id,
         # P2/F5: the cell's TSMIS source-folder identity at build time; a later snapshot
         # reads the cell stale when it differs. Absent on legacy records (mtime only).
         "input_fingerprint": input_fingerprint,
+        "source_identities": source_identities or {},
     }
     p = _tsn_results_path(dest)
+    tmp = p.with_name(p.name + ".tmp")
+    _require_cache_guard(commit_guard, p.parent, "TSN cache directory write")
+    _require_cache_guard(commit_guard, p, "TSN cache write")
+    _require_cache_guard(commit_guard, tmp, "TSN cache temporary write")
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_name(p.name + ".tmp")
+        _require_cache_guard(commit_guard, p, "TSN cache write")
+        _require_cache_guard(commit_guard, tmp, "TSN cache temporary write")
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cache_envelope.wrap(data, output_identity="tsn"), f)
+        _require_cache_guard(commit_guard, p, "TSN cache publication")
+        _require_cache_guard(commit_guard, tmp, "TSN cache publication")
         os.replace(tmp, p)
     except OSError as e:
         log.warning("matrix: could not write TSN results cache %s: %s: %s",
                     p, type(e).__name__, e)
+        raise ValueError(
+            "The comparison workbook was created, but its TSN Matrix result cache "
+            "could not be safely published. Refresh the cell.") from e
 
 
 # --- unified per-cell comparison state ------------------------------------- #
@@ -570,7 +689,8 @@ def _cmp_state(out_path, sources, rec, fp_folders=()):
     folder(s); a route added/removed/resized that the mtime check misses — F5/P2)."""
     missing = [s["name"] for s in sources if not s.get("present")]
     missing_side = missing[0] if missing else None
-    return _staleness(_safe_mtime(out_path), sources, rec, fp_folders, missing_side)
+    return _staleness(_safe_mtime(out_path), sources, rec, fp_folders, missing_side,
+                      comparison_output=out_path)
 
 
 # --------------------------------------------------------------------------- #
@@ -606,7 +726,9 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
     hidden = set(hidden or [])
     hidden_envs = set(hidden_envs or [])
     row_modes = row_modes or {}
-    tsn_files = tsn_files or {}
+    import tsn_library                              # lazy: canonical selection view
+    tsn_files, _selection_map_changed = tsn_library.canonicalize_selections(
+        tsn_files or {})
     rows = {k: v for k, v in all_defs.items() if k not in hidden}
     rows = {k: rows[k] for k in apply_order(list(rows.keys()), row_order)}
     all_envs = list(envs) if envs is not None else env_keys()
@@ -629,6 +751,7 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
     _absent = {"present": False, "mtime": None, "age_seconds": None}
 
     cells, modes_sel, modes_avail, tsn_meta = {}, {}, {}, {}
+    tsn_cache = {}
     for row_key, (label, subdir, _idx, adapter, _hr) in rows.items():
         mode = sel[row_key]
         modes_sel[row_key] = mode["id"]
@@ -638,14 +761,21 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
         env_subdir = mode.get("env_subdir", subdir)
         src = None
         if mode["kind"] == "tsn":
-            src = (tsn_source(dest, mode["tsn_subdir"], tsn_files.get(mode["tsn_subdir"]))
-                   if mode["supported"] else {"kind": "none"})
+            tsn_key = tsn_library.canonical_dataset_key(mode["tsn_subdir"])
+            if tsn_key not in tsn_cache:
+                tsn_cache[tsn_key] = (tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+                                      if mode["supported"] else {"kind": "none"})
+            src = tsn_cache[tsn_key]
+            selected_path = tsn_library.selection_path(tsn_files.get(tsn_key))
             tsn_meta[row_key] = {"supported": mode["supported"], "fmt": mode.get("fmt"),
                                  "source_kind": src.get("kind"), "source_path": src.get("path"),
                                  "pdf_count": src.get("pdf_count"),
-                                 "tsn_subdir": mode["tsn_subdir"],
-                                 "file": tsn_files.get(mode["tsn_subdir"]),
-                                 "input_dir": str(tsn_input_root(dest, mode["tsn_subdir"]))}
+                                 "tsn_subdir": tsn_key,
+                                 "file": selected_path,
+                                 "selected_path": src.get("selected_path"),
+                                 "selection_missing": src.get("kind") == "missing_explicit",
+                                 "selection_reason": src.get("selection_reason"),
+                                 "input_dir": str(tsn_input_root(dest, tsn_key))}
         per = {}
         for env in envs:
             export = ages.get(env, {}).get(env_subdir, _absent)
@@ -658,18 +788,20 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                 cmp = comparison_state(dest, baseline_key, row_key, env, env_subdir,
                                        ages, results)
             elif mode["kind"] == "tsn":
-                rec = (tsn_results.get(f"{row_key}|{mode['id']}", {}) or {}).get(env)
+                rec = _nested_record(tsn_results, f"{row_key}|{mode['id']}", env)
                 sources = [{"name": "cell", "present": export["present"], "mtime": export["mtime"]},
                            {"name": "tsn",
                             "present": src.get("kind") in ("file", "consolidated"),
-                            "mtime": src.get("mtime")}]
+                            "mtime": src.get("mtime"),
+                            "identity": src.get("identity_token"),
+                            "identity_required": True}]
                 # F5/P2: the TSMIS store folder is the multi-file side where a deleted
                 # route hides from mtime — fingerprint it (the TSN side is a file, mtime).
                 cmp = _cmp_state(mode_out_path(dest, baseline_key, row_key, env, mode),
                                  sources, rec, fp_folders=(dest / env / env_subdir,))
             else:                            # self: TSMIS PDF vs Excel
                 other = ages.get(env, {}).get(mode["other_subdir"], _absent)
-                rec = (tsn_results.get(f"{row_key}|{mode['id']}", {}) or {}).get(env)
+                rec = _nested_record(tsn_results, f"{row_key}|{mode['id']}", env)
                 sources = [{"name": "cell", "present": export["present"], "mtime": export["mtime"]},
                            {"name": "other", "present": other["present"], "mtime": other["mtime"]}]
                 # F5/P2: both sides are TSMIS store folders — fingerprint both (env first,

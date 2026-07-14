@@ -49,11 +49,14 @@ def _norm_route_key(token):
     m = _ROUTE_KEY_RE.match(str(token).strip())
     return m.group(1).zfill(3) + m.group(2).upper() if m else str(token).strip().upper()
 
+import artifact_store
 import compare_highway_log as _hl
 import consolidate_intersection_summary as _is
 import consolidate_ramp_summary as _rs
 from compare_core import CompareSchema, normalize_value, run_compare
 from compare_tsn_common import row_has_data
+from comparison_contract import (ComparisonCounts, ComparisonOutcome, LoadedSide,
+                                 comparison_result_boundary)
 from events import ConsolidateResult, Events
 from paths import OUTPUT_ROOT, parse_run_folder, today_str
 
@@ -327,12 +330,88 @@ def _load_intersection_summary_side(folder, label, events):
     return rows, skipped
 
 
+def _non_negative_result_count(result, field, report_name):
+    """Read a producer-owned loss count without silently normalizing bad truth."""
+    value = getattr(result, field, 0)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(
+            f"The {report_name} PDF converter returned an invalid {field} count; "
+            "the comparison was not created.")
+    return value
+
+
+def _pdf_loaded_side(result, loaded, *, label, report_name, source_pdf_count):
+    """Merge one PDF converter outcome with its converted-XLSX loader outcome.
+
+    The PDF consolidators can successfully publish a *partial* workbook.  Their
+    completion and loss counters are producer truth and must not disappear merely
+    because the converted XLSX files that remain are internally consistent.  Keep
+    those claims structured; do not scrape the consolidator's display-oriented
+    ``summary_lines``.
+    """
+    rows, header, converted_skips = loaded
+    producer_completion = getattr(result, "completion", None) or "unknown"
+    if producer_completion in ("failed", "no_data", "cancelled"):
+        raise ValueError(
+            f"The {report_name} PDF converter reported {producer_completion!r} "
+            "completion, so that side cannot be compared.")
+    producer_skipped = _non_negative_result_count(
+        result, "skipped_inputs", report_name)
+    producer_failed = _non_negative_result_count(
+        result, "failed_inputs", report_name)
+    converted_skips = tuple(str(item) for item in converted_skips)
+
+    warnings = list(converted_skips)
+    failures = []
+    if producer_skipped:
+        warnings.append(
+            f"{label}: {report_name} PDF conversion reported "
+            f"{producer_skipped} skipped input item(s).")
+    if producer_failed:
+        failures.append(
+            f"{label}: {report_name} PDF conversion reported "
+            f"{producer_failed} failed input file(s).")
+    if (producer_completion != "complete"
+            and not producer_skipped and not producer_failed):
+        warnings.append(
+            f"{label}: {report_name} PDF conversion completion was "
+            f"{producer_completion!r}, not complete.")
+
+    # Rows exist (the caller already rejected a failed/no-readable conversion), so
+    # any producer loss or converted-file loss is a comparable-but-partial side.
+    complete = (producer_completion == "complete"
+                and producer_skipped == 0 and producer_failed == 0
+                and not converted_skips)
+    return LoadedSide(
+        rows=tuple(tuple(row) for row in rows),
+        declared_schema=tuple(header),
+        route_universe=tuple(sorted({str(row[0]) for row in rows if row})),
+        completion="complete" if complete else "partial",
+        warnings=tuple(warnings),
+        failures=tuple(failures),
+        skipped_inputs=producer_skipped + len(converted_skips),
+        failed_inputs=producer_failed,
+        raw_identity_claims={
+            "pdf_consolidation": {
+                "status": str(getattr(result, "status", "") or ""),
+                "completion": str(producer_completion),
+                "skipped_inputs": producer_skipped,
+                "failed_inputs": producer_failed,
+            },
+        },
+        display_metrics={
+            "source_pdf_count": source_pdf_count,
+            "loaded_row_count": len(rows),
+        },
+    )
+
+
 def _load_highway_log_pdf_side(folder, label, events):
     """Parse one side's Highway Log PDFs (folder/highway_log_pdf/*.pdf) into
     consolidated-shape 31-column rows: convert them to per-route XLSX with the HL-PDF
     consolidator's own parser in a temp dir, then read those flat like any XLSX side.
-    Returns (rows, header, skipped). The PDF is the ACCURATE Highway Log source (the
-    vendor Excel drops rows), so this is the preferred cross-env Highway Log."""
+    Returns a LoadedSide. The PDF is the ACCURATE Highway Log source (the vendor
+    Excel drops rows), so this is the preferred cross-env Highway Log."""
     import consolidate_tsmis_highway_log_pdf as _hlpdf
     import highway_log_columns as hlc
     in_dir, pdfs = _find_input_dir(folder, _hlpdf.SUBDIR, "*.pdf")
@@ -352,8 +431,12 @@ def _load_highway_log_pdf_side(folder, label, events):
             raise ValueError(res.message or "Could not parse the Highway Log PDFs.")
         # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
         # excluded). Read them flat with the corrected 31-column header pinned.
-        return _load_xlsx_side(conv, label, "_perroute_", _hlpdf.SHEET_NAME,
-                               "Highway Log (PDF)", events, expected_header=hlc.HEADER)
+        loaded = _load_xlsx_side(
+            conv, label, "_perroute_", _hlpdf.SHEET_NAME,
+            "Highway Log (PDF)", events, expected_header=hlc.HEADER)
+        return _pdf_loaded_side(
+            res, loaded, label=label, report_name="Highway Log (PDF)",
+            source_pdf_count=len(pdfs))
     finally:
         shutil.rmtree(conv, ignore_errors=True)
         shutil.rmtree(combined_dir, ignore_errors=True)
@@ -363,7 +446,7 @@ def _load_highway_detail_pdf_side(folder, label, events):
     """Parse one side's Highway Detail PDFs (folder/highway_detail_pdf/*.pdf)
     into consolidated-shape 34-column rows: convert them to per-route XLSX with
     the HD-PDF consolidator's own parser in a temp dir, then read those flat like
-    any XLSX side. Returns (rows, header, skipped). The exact parallel of
+    any XLSX side. Returns a LoadedSide. The exact parallel of
     _load_intersection_detail_pdf_side below."""
     import consolidate_tsmis_highway_detail_pdf as _hdpdf
     import highway_detail_columns as hdc
@@ -384,8 +467,12 @@ def _load_highway_detail_pdf_side(folder, label, events):
             raise ValueError(res.message or "Could not parse the Highway Detail PDFs.")
         # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
         # excluded). Read them flat with the 34-column Highway Detail header pinned.
-        return _load_xlsx_side(conv, label, "_perroute_", _hdpdf.SHEET_NAME,
-                               "Highway Detail (PDF)", events, expected_header=hdc.HEADER)
+        loaded = _load_xlsx_side(
+            conv, label, "_perroute_", _hdpdf.SHEET_NAME,
+            "Highway Detail (PDF)", events, expected_header=hdc.HEADER)
+        return _pdf_loaded_side(
+            res, loaded, label=label, report_name="Highway Detail (PDF)",
+            source_pdf_count=len(pdfs))
     finally:
         shutil.rmtree(conv, ignore_errors=True)
         shutil.rmtree(combined_dir, ignore_errors=True)
@@ -395,7 +482,7 @@ def _load_intersection_detail_pdf_side(folder, label, events):
     """Parse one side's Intersection Detail PDFs (folder/intersection_detail_pdf/*.pdf)
     into consolidated-shape 36-column rows: convert them to per-route XLSX with the
     Int-Detail-PDF consolidator's own parser in a temp dir, then read those flat like
-    any XLSX side. Returns (rows, header, skipped). The exact parallel of
+    any XLSX side. Returns a LoadedSide. The exact parallel of
     _load_highway_log_pdf_side — both PDF sides are parsed offline the same way the
     PDF-vs-TSN comparison parses them, so the cross-env comparison is consistent."""
     import consolidate_tsmis_intersection_detail_pdf as _idpdf
@@ -417,8 +504,12 @@ def _load_intersection_detail_pdf_side(folder, label, events):
             raise ValueError(res.message or "Could not parse the Intersection Detail PDFs.")
         # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
         # excluded). Read them flat with the 36-column Intersection Detail header pinned.
-        return _load_xlsx_side(conv, label, "_perroute_", _idpdf.SHEET_NAME,
-                               "Intersection Detail (PDF)", events, expected_header=idc.HEADER)
+        loaded = _load_xlsx_side(
+            conv, label, "_perroute_", _idpdf.SHEET_NAME,
+            "Intersection Detail (PDF)", events, expected_header=idc.HEADER)
+        return _pdf_loaded_side(
+            res, loaded, label=label, report_name="Intersection Detail (PDF)",
+            source_pdf_count=len(pdfs))
     finally:
         shutil.rmtree(conv, ignore_errors=True)
         shutil.rmtree(combined_dir, ignore_errors=True)
@@ -428,7 +519,7 @@ def _load_highway_sequence_pdf_side(folder, label, events):
     """Parse one side's Highway Sequence PDFs (folder/highway_sequence_pdf/*.pdf)
     into consolidated-shape 9-column rows: convert them to per-route XLSX with the
     HSL-PDF consolidator's own parser in a temp dir, then read those flat like any
-    XLSX side. Returns (rows, header, skipped). The exact parallel of
+    XLSX side. Returns a LoadedSide. The exact parallel of
     _load_highway_detail_pdf_side; no expected_header pin — the converted files
     carry the Excel export's own header (with its two unnamed columns), exactly
     like the Excel side the HIGHWAY_SEQUENCE row reads."""
@@ -450,8 +541,12 @@ def _load_highway_sequence_pdf_side(folder, label, events):
             raise ValueError(res.message or "Could not parse the Highway Sequence PDFs.")
         # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
         # excluded). Read them flat like the Excel per-route files.
-        return _load_xlsx_side(conv, label, "_perroute_", _hslpdf.SHEET_NAME,
-                               "Highway Sequence (PDF)", events)
+        loaded = _load_xlsx_side(
+            conv, label, "_perroute_", _hslpdf.SHEET_NAME,
+            "Highway Sequence (PDF)", events)
+        return _pdf_loaded_side(
+            res, loaded, label=label, report_name="Highway Sequence (PDF)",
+            source_pdf_count=len(pdfs))
     finally:
         shutil.rmtree(conv, ignore_errors=True)
         shutil.rmtree(combined_dir, ignore_errors=True)
@@ -461,7 +556,7 @@ def _load_ramp_detail_pdf_side(folder, label, events):
     """Parse one side's Ramp Detail PDFs (folder/ramp_detail_pdf/*.pdf) into
     consolidated-shape rows: convert them to per-route XLSX with the RD-PDF
     consolidator's own parser in a temp dir, then read those flat like any XLSX
-    side. Returns (rows, header, skipped). The exact parallel of
+    side. Returns a LoadedSide. The exact parallel of
     _load_highway_sequence_pdf_side above; no expected_header pin — the
     converted files carry the Excel export's own (column-shifted) header plus
     the two print-only columns, identical on BOTH sides of a PDF-vs-PDF pair."""
@@ -483,11 +578,159 @@ def _load_ramp_detail_pdf_side(folder, label, events):
             raise ValueError(res.message or "Could not parse the Ramp Detail PDFs.")
         # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
         # excluded). Read them flat like the Excel per-route files.
-        return _load_xlsx_side(conv, label, "_perroute_", _rdpdf.SHEET_NAME,
-                               "Ramp Detail (PDF)", events)
+        loaded = _load_xlsx_side(
+            conv, label, "_perroute_", _rdpdf.SHEET_NAME,
+            "Ramp Detail (PDF)", events)
+        return _pdf_loaded_side(
+            res, loaded, label=label, report_name="Ramp Detail (PDF)",
+            source_pdf_count=len(pdfs))
     finally:
         shutil.rmtree(conv, ignore_errors=True)
         shutil.rmtree(combined_dir, ignore_errors=True)
+
+
+def _coerce_loaded_side(value, *, declared_schema=None):
+    """Accept the typed loader contract and the two historical tuple shapes."""
+    if isinstance(value, LoadedSide):
+        if not value.declared_schema and declared_schema is not None:
+            return replace(value, declared_schema=tuple(declared_schema))
+        if not value.declared_schema:
+            raise ValueError(
+                "The typed input loader did not declare its column schema; "
+                "the comparison was not created.")
+        return value
+
+    if declared_schema is None:
+        rows, header, skipped = value
+    else:
+        rows, skipped = value
+        header = declared_schema
+    skipped = tuple(str(item) for item in skipped)
+    return LoadedSide(
+        rows=tuple(tuple(row) for row in rows),
+        declared_schema=tuple(header),
+        completion="partial" if skipped else "complete",
+        warnings=skipped,
+        skipped_inputs=len(skipped),
+    )
+
+
+def _side_coverage_items(side, label):
+    """Return categorized diagnostics plus the fail-closed coverage decision."""
+    warnings = tuple(str(item) for item in side.warnings)
+    failures = tuple(str(item) for item in side.failures)
+    incomplete = (side.completion != "complete" or bool(warnings or failures)
+                  or side.skipped_inputs > 0 or side.failed_inputs > 0)
+    if incomplete and not warnings and not failures:
+        warnings = (f"{label}: loaded-side completion was {side.completion!r}, "
+                    "not complete.",)
+    return warnings, failures, incomplete
+
+
+def _side_coverage_diagnostic(role, label, side):
+    return {
+        "kind": "loaded_side_coverage",
+        "role": role,
+        "label": label,
+        "completion": side.completion,
+        "skipped_inputs": side.skipped_inputs,
+        "failed_inputs": side.failed_inputs,
+        "raw_identity_claims": dict(side.raw_identity_claims),
+        "display_metrics": dict(side.display_metrics),
+    }
+
+
+def _apply_pdf_coverage(result, sides):
+    """Attach side coverage only when no artifact generation was published.
+
+    Successful generations receive this truth inside run_compare, before commit.
+    This fallback preserves diagnostics on pre-publication terminal failures.
+    """
+    total_skipped = sum(side.skipped_inputs for _role, _label, side in sides)
+    total_failed = sum(side.failed_inputs for _role, _label, side in sides)
+    warning_items = []
+    failure_items = []
+    incomplete = False
+    diagnostics = []
+    for role, label, side in sides:
+        side_warnings, side_failures, side_incomplete = _side_coverage_items(
+            side, label)
+        warning_items.extend(side_warnings)
+        failure_items.extend(side_failures)
+        incomplete = incomplete or side_incomplete
+        diagnostics.append(_side_coverage_diagnostic(role, label, side))
+
+    # The legacy fields remain the compatibility surface, but they now carry the
+    # exact aggregate counts instead of compare_core's diagnostic-string count.
+    result.skipped_inputs = total_skipped
+    result.failed_inputs = total_failed
+    if getattr(result, "status", None) == "ok" and incomplete:
+        result.completion = "partial"
+        result.verdict = "diff"
+
+    typed = getattr(result, "comparison_outcome", None)
+    if isinstance(typed, ComparisonOutcome):
+        # compare_core received these same items as coverage warnings.  Re-split
+        # them here so failed inputs remain failures in the machine contract.
+        typed_completion = ("partial" if incomplete and typed.status == "ok"
+                            else typed.completion)
+        typed_verdict = ("diff" if incomplete and typed.status == "ok"
+                         else typed.verdict)
+        retained_warnings = [item for item in typed.warnings
+                             if item not in failure_items]
+        retained_failures = list(typed.failures)
+        for item in warning_items:
+            if item not in retained_warnings:
+                retained_warnings.append(item)
+        for item in failure_items:
+            if item not in retained_failures:
+                retained_failures.append(item)
+        result.comparison_outcome = replace(
+            typed,
+            completion=typed_completion,
+            verdict=typed_verdict,
+            warnings=tuple(retained_warnings),
+            failures=tuple(retained_failures),
+            coverage_diagnostics=(
+                tuple(typed.coverage_diagnostics) + tuple(diagnostics)),
+        )
+    else:
+        # The artifact transaction can fail after both sides were loaded but
+        # before compare_core's typed result is returned (validation, late alias,
+        # destination ownership).  Preserve the known side truth even then.
+        status = getattr(result, "status", None)
+        if status == "cancelled":
+            completion = "cancelled"
+        elif status == "error":
+            completion = "failed"
+        elif status == "ok":
+            # The coarse status is trustworthy, but no typed engine counts exist.
+            # Keep completion/verdict unknown rather than manufacturing success.
+            completion = "unknown"
+        else:
+            status, completion = "unknown", "unknown"
+        if status in ("error", "cancelled"):
+            # Keep the legacy and typed terminal axes consistent.
+            result.completion = completion
+        elif status == "ok":
+            # No engine-owned typed counts exist, so neither compatibility field
+            # may retain or manufacture a successful comparison claim.
+            result.completion = None
+            result.verdict = None
+        terminal_failures = list(failure_items)
+        message = str(getattr(result, "message", "") or "")
+        if status == "error" and message and message not in terminal_failures:
+            terminal_failures.insert(0, message)
+        result.comparison_outcome = ComparisonOutcome(
+            status=status,
+            completion=completion,
+            verdict="unknown",
+            counts=ComparisonCounts(),
+            warnings=tuple(warning_items),
+            failures=tuple(terminal_failures),
+            coverage_diagnostics=tuple(diagnostics),
+        )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -576,8 +819,24 @@ class EnvCompare:
                        key_field=self._resolve_key_field(header),
                        one_sided_note_extra="", trim_note_extra="")
 
+    def _effective_source_files(self, folder):
+        """Files this adapter can actually load from one selected side.
+
+        Capturing only the selected root misses an external hardlink to a
+        report file inside it.  Mirror each loader's narrow discovery pattern
+        so the alias guard sees the real input objects without stat-walking
+        unrelated report trees in a Matrix environment folder.
+        """
+        use_pdf = (self.flat_pdf_loader is not None
+                   or (self.sheet_name is None and self.side_loader is None))
+        _input_dir, files = _find_input_dir(
+            folder, self.subdir, "*.pdf" if use_pdf else "*.xlsx")
+        return tuple(files)
+
+    @comparison_result_boundary
     def compare_folders(self, dir_a, dir_b, out_path, events=None,
-                        confirm_overwrite=None, mode="formulas", labels=None):
+                        confirm_overwrite=None, mode="formulas", labels=None,
+                        commit_guard=None):
         """Compare the report's per-route files in run folder `dir_a` against
         `dir_b` and write the discrepancy workbook(s) to `out_path`. Returns
         a ConsolidateResult (same contract as the consolidators). `labels`
@@ -606,6 +865,41 @@ class EnvCompare:
                 status="error",
                 message="Pick two DIFFERENT folders — both sides point at "
                         f"the same one:\n{dir_a}")
+        destinations = artifact_store.comparison_output_paths(out_path, mode)
+        files_a = self._effective_source_files(dir_a)
+        files_b = self._effective_source_files(dir_b)
+        discovered_paths = (*files_a, *files_b)
+        discovered_set = artifact_store.canonical_path_identities(discovered_paths)
+        source_paths = (dir_a, dir_b, *discovered_paths)
+        try:
+            captured_sources = artifact_store.capture_source_identities(
+                source_paths)
+        except ValueError as e:
+            return ConsolidateResult(status="error", message=str(e))
+
+        def alias_error():
+            current_discovered = (*self._effective_source_files(dir_a),
+                                  *self._effective_source_files(dir_b))
+            if (artifact_store.canonical_path_identities(current_discovered)
+                    != discovered_set):
+                return ConsolidateResult(
+                    status="error",
+                    message=("Refusing to write the comparison: the discovered "
+                             "source file set changed while inputs were loading. "
+                             "Re-run after the source folders are stable."))
+            try:
+                artifact_store.ensure_outputs_do_not_alias_sources(
+                    destinations, source_paths,
+                    captured_sources=captured_sources,
+                    require_sources_current=True)
+            except ValueError as e:
+                return ConsolidateResult(status="error", message=str(e))
+            return None
+
+        blocked = alias_error()
+        if blocked is not None:
+            return blocked
+
         if labels is not None:
             la, lb = _cap_label(str(labels[0])), _cap_label(str(labels[1]))
             if la == lb:                     # sheet names must differ
@@ -622,13 +916,21 @@ class EnvCompare:
 
         try:
             if self.side_loader is not None:  # aggregate per-route XLSX (Intersection Summary)
-                rows_a, skip_a = self.side_loader(dir_a, la, events)
-                rows_b, skip_b = self.side_loader(dir_b, lb, events)
-                header, has_route = self.agg_header, False
+                loaded_a = _coerce_loaded_side(
+                    self.side_loader(dir_a, la, events),
+                    declared_schema=self.agg_header)
+                loaded_b = _coerce_loaded_side(
+                    self.side_loader(dir_b, lb, events),
+                    declared_schema=self.agg_header)
+                header, has_route = list(self.agg_header), False
             elif self.sheet_name is None:     # Ramp Summary: PDFs, route-keyed
-                rows_a, skip_a = _load_ramp_summary_side(dir_a, la, events)
-                rows_b, skip_b = _load_ramp_summary_side(dir_b, lb, events)
-                header, has_route = RS_HEADER, False
+                loaded_a = _coerce_loaded_side(
+                    _load_ramp_summary_side(dir_a, la, events),
+                    declared_schema=RS_HEADER)
+                loaded_b = _coerce_loaded_side(
+                    _load_ramp_summary_side(dir_b, lb, events),
+                    declared_schema=RS_HEADER)
+                header, has_route = list(RS_HEADER), False
             else:                             # flat (has_route=True): XLSX, or PDF-sourced
                 def _flat_load(d, lab):
                     if self.flat_pdf_loader is not None:
@@ -636,8 +938,10 @@ class EnvCompare:
                     return _load_xlsx_side(d, lab, self.subdir, self.sheet_name,
                                            self.REPORT_NAME, events,
                                            expected_header=self.expected_header)
-                rows_a, header, skip_a = _flat_load(dir_a, la)
-                rows_b, header_b, skip_b = _flat_load(dir_b, lb)
+                loaded_a = _coerce_loaded_side(_flat_load(dir_a, la))
+                loaded_b = _coerce_loaded_side(_flat_load(dir_b, lb))
+                header = list(loaded_a.declared_schema)
+                header_b = list(loaded_b.declared_schema)
                 if header != header_b:
                     return ConsolidateResult(
                         status="error",
@@ -656,17 +960,55 @@ class EnvCompare:
         # Files unreadable on EITHER side make the comparison incomplete — pass
         # them through so the verdict can't certify a clean match and the
         # workbook + summary list exactly what was left out.
-        warnings = skip_a + skip_b
-        if warnings:
-            events.on_log(f"⚠ {len(warnings)} input file(s) skipped across both "
-                          "sides — the comparison will be flagged incomplete.")
+        rows_a, rows_b = loaded_a.rows, loaded_b.rows
+        warn_a, fail_a, incomplete_a = _side_coverage_items(loaded_a, la)
+        warn_b, fail_b, incomplete_b = _side_coverage_items(loaded_b, lb)
+        warnings = list(warn_a + warn_b)
+        failures = list(fail_a + fail_b)
+        total_skipped = loaded_a.skipped_inputs + loaded_b.skipped_inputs
+        total_failed = loaded_a.failed_inputs + loaded_b.failed_inputs
+        input_completion = ("partial" if incomplete_a or incomplete_b
+                            else "complete")
+        coverage_diagnostics = (
+            _side_coverage_diagnostic("side_a", la, loaded_a),
+            _side_coverage_diagnostic("side_b", lb, loaded_b),
+        )
+        if warnings or failures:
+            events.on_log(
+                f"⚠ Incomplete input coverage across both sides "
+                f"({total_skipped} skipped, {total_failed} failed) — "
+                "the comparison will be flagged incomplete.")
 
         events.on_log("")
+        # A folder comparison may spend minutes loading a statewide side. Check
+        # again immediately before the direct run_compare write so a late alias
+        # cannot bypass this lower boundary.
+        blocked = alias_error()
+        if blocked is not None:
+            return blocked
         sc = self._schema(header, la, lb)
-        return run_compare(sc, rows_a, rows_b, has_route, out_path,
-                           events=events, confirm_overwrite=confirm_overwrite,
-                           mode=mode, name_a=str(dir_a.name), name_b=str(dir_b.name),
-                           warnings=warnings)
+        result = artifact_store.commit_workbook(
+            out_path,
+            lambda tmp: run_compare(
+                sc, rows_a, rows_b, has_route, tmp,
+                events=events, confirm_overwrite=lambda _p: True,
+                mode=mode, name_a=str(dir_a.name), name_b=str(dir_b.name),
+                warnings=warnings, commit_guard=commit_guard,
+                 input_completion=input_completion,
+                 skipped_inputs=total_skipped, failed_inputs=total_failed,
+                 failures=failures,
+                 coverage_diagnostics=coverage_diagnostics),
+            twin=(mode == "both"), expect_sheet="Comparison",
+            confirm_overwrite=confirm_overwrite,
+            source_paths=source_paths,
+            captured_sources=captured_sources,
+            commit_guard=commit_guard,
+            requested_mode=mode)
+        if (self.flat_pdf_loader is not None
+                and getattr(result, "artifact_generation", None) is None):
+            return _apply_pdf_coverage(
+                result, (("side_a", la, loaded_a), ("side_b", lb, loaded_b)))
+        return result
 
 
 # Highway Log: keep the Med Wid rule, the sample's widths, and the column

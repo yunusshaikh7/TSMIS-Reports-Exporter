@@ -42,6 +42,22 @@ class GuiMatrixMixin:
         return (self._valid_baseline(settings.get_matrix_baseline())
                 or matrix.BASELINE_DEFAULT)
 
+    @staticmethod
+    def _valid_tsn_dataset_keys():
+        import tsn_library
+        return {tsn_library.canonical_dataset_key(
+                    matrix.tsn_subdir_for(row_key, subdir, adapter))
+                for row_key, _label, subdir, _idx, adapter in matrix_rows()}
+
+    def _matrix_tsn_selections(self):
+        """Canonical, identity-bearing TSN choices; migrate legacy aliases once."""
+        import tsn_library
+        raw = settings.get_matrix_tsn_selections()
+        canonical, changed = tsn_library.canonicalize_selections(raw)
+        if changed:
+            settings.set_matrix_tsn_selections(canonical)
+        return canonical
+
     def _matrix_snapshot(self, base):
         """The matrix snapshot for `base`, with the user's hidden rows/columns,
         per-row modes and TSN files applied — used by matrix_info, the
@@ -51,7 +67,7 @@ class GuiMatrixMixin:
             hidden=settings.get_matrix_hidden_reports(),
             hidden_envs=settings.get_matrix_hidden_envs(),
             row_modes=settings.get_matrix_row_modes(),
-            tsn_files=settings.get_matrix_tsn_files(),
+            tsn_files=self._matrix_tsn_selections(),
             row_order=settings.get_matrix_row_order(),
             env_order=settings.get_matrix_env_order())
 
@@ -316,7 +332,7 @@ class GuiMatrixMixin:
         self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
         MatrixCompareWorker(dest, base, cells, self._gated_queue(), self.cancel_event,
-                            tsn_files=settings.get_matrix_tsn_files(),
+                            tsn_files=self._matrix_tsn_selections(),
                             force_consolidate=job.get("force", False),
                             also_formulas=settings.get_matrix_formulas(),
                             evidence=self._evidence_request()).start()
@@ -336,7 +352,7 @@ class GuiMatrixMixin:
         self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
                     "workers": 1})
         DayMatrixCompareWorker(source, cells, dest, self._gated_queue(), self.cancel_event,
-                               tsn_files=settings.get_matrix_tsn_files(),
+                               tsn_files=self._matrix_tsn_selections(),
                                force_consolidate=job.get("force", False),
                                also_formulas=settings.get_day_matrix_formulas(),
                                evidence=self._evidence_request()).start()
@@ -356,19 +372,23 @@ class GuiMatrixMixin:
         that's the point of the action; the matrix/day resolvers gate on
         comparison freshness and raise actionable errors."""
         dest = settings.get_batch_dest()
-        tsn_files = settings.get_matrix_tsn_files()
+        tsn_files = self._matrix_tsn_selections()
         examples = settings.get_evidence_examples()
         row, cell = job["row"], job["env"]
+        comparisons_dest = None
         if job.get("which") == "day":
             source = settings.get_day_matrix_source()
-            run_fn = (lambda events: day_matrix.evidence_for_day_cell(
+            run_fn = (lambda events, commit_guard=None:
+                      day_matrix.evidence_for_day_cell(
                 source, cell, row, dest, events, tsn_files=tsn_files,
-                examples=examples))
+                examples=examples, commit_guard=commit_guard))
         else:
             base = self._current_baseline()
-            run_fn = (lambda events: matrix.evidence_for_cell(
+            comparisons_dest = dest
+            run_fn = (lambda events, commit_guard=None:
+                      matrix.evidence_for_cell(
                 dest, row, cell, base, events, tsn_files=tsn_files,
-                examples=examples))
+                examples=examples, commit_guard=commit_guard))
         with self._lock:
             self._matrix = {"phase": "comparing", "row": row, "cell": cell,
                             "done": 0, "total": 1}
@@ -377,7 +397,8 @@ class GuiMatrixMixin:
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": "Evidence images…", "workers": 1})
         MatrixEvidenceWorker(run_fn, row, cell, self._gated_queue(),
-                             self.cancel_event).start()
+                             self.cancel_event,
+                             comparisons_dest=comparisons_dest).start()
         return True
 
     def _matrix_worker_count(self):
@@ -690,9 +711,22 @@ class GuiMatrixMixin:
     def set_matrix_tsn_file(self, subdir, path):
         """Set/clear the TSN file for a report subdir (the picker under the name).
         An empty path clears it (back to auto-find in _tsn_input/<subdir>/)."""
-        if subdir not in {sd for _k, _l, sd, _i, _a in matrix_rows()}:
+        import tsn_library
+        key = tsn_library.canonical_dataset_key(subdir)
+        if key not in self._valid_tsn_dataset_keys():
             return {"error": "Unknown report subdir."}
-        settings.set_matrix_tsn_file(subdir, path or "")
+        if not isinstance(path, str):
+            return {"error": "Pick an Excel workbook (.xlsx), or clear the selection."}
+        path = path.strip()
+        self._matrix_tsn_selections()             # persist any legacy alias migration first
+        if path:
+            try:
+                selection = tsn_library.create_explicit_selection(path)
+            except ValueError as e:
+                return {"error": str(e)}
+        else:
+            selection = None
+        settings.set_matrix_tsn_selection(key, selection)
         self._push_state()
         return {"ok": True}
 
@@ -702,9 +736,11 @@ class GuiMatrixMixin:
         the report's canonical TSN library folder (<library>/<subdir>/, where its
         raw/ + consolidated/ live); persists the choice. Returns {ok, path} or
         {cancelled}."""
-        if subdir not in {sd for _k, _l, sd, _i, _a in matrix_rows()}:
+        import tsn_library
+        key = tsn_library.canonical_dataset_key(subdir)
+        if key not in self._valid_tsn_dataset_keys():
             return {"error": "Unknown report subdir."}
-        start = TSN_LIBRARY_ROOT / subdir
+        start = TSN_LIBRARY_ROOT / key
         try:
             start.mkdir(parents=True, exist_ok=True)
         except OSError:
@@ -714,7 +750,12 @@ class GuiMatrixMixin:
             file_types=("Excel workbook (*.xlsx)",))
         if not picked:
             return {"cancelled": True}
-        settings.set_matrix_tsn_file(subdir, picked)
+        try:
+            selection = tsn_library.create_explicit_selection(picked)
+        except ValueError as e:
+            return {"error": str(e)}
+        self._matrix_tsn_selections()
+        settings.set_matrix_tsn_selection(key, selection)
         self._push_state()
         return {"ok": True, "path": picked}
 
@@ -949,7 +990,7 @@ class GuiMatrixMixin:
         return day_matrix.day_matrix_snapshot(
             settings.get_day_matrix_source(), settings.get_day_matrix_days(),
             hidden=settings.get_day_matrix_hidden(),
-            tsn_files=settings.get_matrix_tsn_files(),
+            tsn_files=self._matrix_tsn_selections(),
             dest=settings.get_batch_dest(),
             row_order=settings.get_day_matrix_row_order())
 

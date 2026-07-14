@@ -19,6 +19,14 @@
       </requestedPrivileges>
     </security>
   </trustInfo>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings xmlns:ws2="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+      <!-- Let the packaged executable use paths beyond legacy MAX_PATH when
+           Windows long-path policy also permits them.  Individual NTFS name
+           components remain limited to 255 UTF-16 code units. -->
+      <ws2:longPathAware>true</ws2:longPathAware>
+    </windowsSettings>
+  </application>
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>
       <!-- Windows 10 / 11 -->

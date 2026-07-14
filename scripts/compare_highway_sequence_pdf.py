@@ -113,14 +113,15 @@ class _HighwaySequenceFileCompare:
         return rows_a, rows_b, None
 
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
-                mode="formulas"):
+                mode="formulas", commit_guard=None):
         return run_files_compare(
             self._schema, path_a, path_b, out_path,
             banner=(f"Highway Sequence Comparison — {self.file_a_label} vs "
                     f"{self.file_b_label}"),
             has_route=True, loader=self._load_pair, deps_ok=_hsl._DEPS_OK,
             side_a=self.file_a_label, side_b=self.file_b_label,
-            events=events, confirm_overwrite=confirm_overwrite, mode=mode)
+            events=events, confirm_overwrite=confirm_overwrite, mode=mode,
+            commit_guard=commit_guard)
 
 
 TSMIS_PDF_VS_TSN = _HighwaySequenceFileCompare(

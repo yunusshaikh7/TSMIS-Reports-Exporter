@@ -24,8 +24,9 @@ gui_worker drive it.
 # resolves its patchable collaborators through THIS module at call time — so
 # `matrix.<name>` stays the one true patch/monkeypatch point.
 from matrix_state import (                                       # noqa: F401
-    BASELINE_DEFAULT, COMPARISONS_DIRNAME, _MTIME_TOL_S, _NEQ,
+    BASELINE_DEFAULT, COMPARISONS_DIRNAME, _MTIME_TOL_S,
     _cell_input_fingerprint, _cmp_state, _inputs_changed, _mode_by_id,
+    _published_comparison_result,
     _pdf_self_comparator, _results_path, _row_defs, _row_modes, _safe_mtime,
     _staleness, _tsn_results_path, apply_order, comparison_path,
     comparison_state, comparisons_root, default_env_label, env_keys,
@@ -37,7 +38,10 @@ from matrix_build import (                                       # noqa: F401
     _FORMULAS_TWIN_MAX_ROWS, _comparison_row_count, _consolidate_store_folder,
     _consolidated_filename, _consolidated_stale, _ensure_consolidated,
     _formulas_sibling, _pdf_store_consolidator, _try_formulas,
+    _compose_source_guard, _require_source_identity,
     build_cell_comparison, build_comparison, cells_to_rebuild,
+    captured_tsn_workbook,
     consolidate_and_compare_tsn, consolidate_tsn_pdfs, consolidated_state,
     consolidated_store_path, evidence_for_cell, evidence_opts_for,
-    run_evidence_only)
+    require_cached_tsn_identity, run_evidence_only, tsn_identity_check_for,
+    tsn_expected_workbook_identity)

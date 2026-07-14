@@ -123,8 +123,10 @@ class ConsolidateResult:
 
     Comparisons additionally set `verdict`: "match" when the two sides are
     identical (no differing cells, no one-sided rows), "diff" otherwise —
-    summary_lines[0] is then the human verdict line. The GUI keys its
-    quick-result dialog on this; consolidators leave it None.
+    summary_lines[0] is then the human verdict line.  During the typed-outcome
+    migration this legacy field remains for compatibility, but production UI
+    state is accepted only through the trusted returned/persisted comparison
+    generation; consolidators leave it None.
     """
     status: str = "ok"
     message: str = ""
@@ -139,3 +141,10 @@ class ConsolidateResult:
     completion: str = None
     skipped_inputs: int = 0        # inputs with no data / left out
     failed_inputs: int = 0         # inputs that failed to parse/read
+    # Phase-2 comparison migration.  These remain optional so every legacy
+    # constructor and consolidator keeps its exact call surface.  Comparison
+    # producers fill them with objects from comparison_contract; consumers use
+    # the fail-closed adapter when a legacy producer leaves them absent.
+    comparison_outcome: object = None
+    artifact_generation: object = None
+    attempt_state: object = None

@@ -70,9 +70,9 @@ except ImportError:
 import compare_tsn_common as ctc
 from compare_tsn_common import (load_consolidated_rows, row_has_data,
                                 suggest_route_name)
-from compare_core import (CompareSchema, normalize_value, keys_for,
+from compare_core import (CompareSchema, compared_cell, normalize_value, keys_for,
                           pair_occurrences_by_similarity, union_keys,
-                          _PROGRESS_EVERY)
+                          set_safe_literal_cell, _PROGRESS_EVERY)
 import highway_detail_columns as hdc
 
 log = logging.getLogger("tsmis.compare")
@@ -273,6 +273,19 @@ def _norm_route_token(rte, sfx=""):
     return f"{base}{tail}".upper()
 
 
+TSN_RAW_HEADER = (
+    "THY_ID", "DIST", "CNTY", "RTE", "RTE_SFX", "DIST_CNTY_ROUTE", "PP",
+    "POSTMILE", "E_IND", "LENGTH", "REC_DATE", "HG", "AC", "ACC_SIG",
+    "ACC_EFF_DATE", "CITY", "POP_CODE", "BEG_DATE", "ADT_AMT", "PROFILE",
+    "BREAK_DESC", "LK_BACK_ADT", "CHNGMILE", "DVM", "DESCRIPTION", "NON_ADD",
+    "LT_SIG", "L_EFF_DATE", "L_ST", "L_NO_LANES", "L_SF", "L_OT_TOT",
+    "L_OT_TR", "L_TR_WID", "L_IN_TOT", "L_IN_TR", "MED_SIG", "M_EFF_DATE",
+    "M_TYPE_CODE", "M_CL", "M_BA", "M_WID", "M_VA", "RT_SIG", "R_EFF_DATE",
+    "R_ST", "R_NO_LANES", "R_SF", "R_IN_TOT", "R_IN_TR", "R_TR_WID",
+    "R_OT_TOT", "R_OT_TR", "SEG_ORDER_ID", "REFERENCE_DATE", "EXTRACT_DATE",
+)
+
+
 # --------------------------------------------------------------------------- #
 # loaders -> consolidated-shape rows ([route, *SHARED_HEADER])
 # --------------------------------------------------------------------------- #
@@ -295,20 +308,16 @@ def _tsn_row(r, h):
     return row
 
 
+def require_tsn_raw_header(header):
+    ctc.require_exact_raw_header(header, TSN_RAW_HEADER, REPORT_NAME)
+
+
 def tsn_rows_from_raw(path):
-    wb = load_workbook(path, read_only=True, data_only=True)
-    try:
-        sn = TSN_SHEET if TSN_SHEET in wb.sheetnames else wb.sheetnames[0]
-        it = wb[sn].iter_rows(values_only=True)
-        header = list(next(it, []) or [])
-        h = {str(n).strip(): i for i, n in enumerate(header) if n is not None}
-        if "POSTMILE" not in h or "RTE" not in h:
-            raise ValueError("the TSN Highway Detail workbook is missing "
-                             "RTE/POSTMILE — pick the raw 'TSAR - HIGHWAY "
-                             "DETAIL' statewide export.")
-        return [_tsn_row(list(r), h) for r in it if row_has_data(r)]
-    finally:
-        wb.close()
+    with ctc.exact_raw_rows(
+            path, TSN_SHEET, TSN_RAW_HEADER, REPORT_NAME,
+            required_nonblank=("DIST", "CNTY", "RTE", "POSTMILE")) as (header, rows_in):
+        h = {n: i for i, n in enumerate(header)}
+        return [_tsn_row(r, h) for r in rows_in]
 
 
 def _normalized_row(r):
@@ -635,14 +644,25 @@ def _write_report_view(wb, ctx, tsn_one):
     rows_a, rows_b = ctx["rows_a"], ctx["rows_b"]
     ka, kb, union = ctx.get("keys_a"), ctx.get("keys_b"), ctx.get("union")
     if ka is None or kb is None or union is None:
-        ka = keys_for(rows_a, True, key_field=sc.key_field)
-        kb = keys_for(rows_b, True, key_field=sc.key_field)
-        ka, kb = pair_occurrences_by_similarity(sc, rows_a, rows_b, ka, kb, True)
-        union = union_keys(ka, kb)
+        is_cancelled = events.is_cancelled if events is not None else None
+        ka = keys_for(
+            rows_a, True, key_field=sc.key_field,
+            is_cancelled=is_cancelled)
+        kb = keys_for(
+            rows_b, True, key_field=sc.key_field,
+            is_cancelled=is_cancelled)
+        pairing = pair_occurrences_by_similarity(
+            sc, rows_a, rows_b, ka, kb, True, events)
+        if pairing.pairing_quality != "exact":
+            raise ValueError(
+                "Report View cannot discard capped duplicate-pairing state")
+        ka, kb = pairing.keys_a, pairing.keys_b
+        union = union_keys(ka, kb, is_cancelled)
     if events is not None:
         events.on_log(f"  Building the Report View tab ({len(union):,} records)…")
     amap = {k: i for i, k in enumerate(ka)}
     bmap = {k: j for j, k in enumerate(kb)}
+    field_index = {name: i for i, name in enumerate(sc.header)}
     fi = {name: 1 + i for i, name in enumerate(sc.header)}   # +1 leading route col
     NA_, NG = len(_RV_AUX), len(_RV_GRID)
     NC = NA_ + NG
@@ -682,14 +702,15 @@ def _write_report_view(wb, ctx, tsn_one):
         if kind == "tn":
             return (one.get(ref, "") if one else "", "tn")
         if kind == "cmp":
-            tm, tn = aval(ra, ref), aval(rb, ref)
-            if tm == tn:
-                return (tm, "eq")
+            cell = compared_cell(sc, field_index[ref], ra, rb, off=1)
+            if not cell.asserting or cell.equal:
+                return (cell.display, "eq")
+            tm, tn = cell.display_a, cell.display_b
             return (f"{tm or '·'} ≠ {tn or '·'}", _rv_classify(ref))
         return ("", "blank")
 
     def woc(val, status, alt, *, bottom=False, align=None):
-        c = WriteOnlyCell(ws, value=val)
+        c = set_safe_literal_cell(WriteOnlyCell(ws), val)
         c.alignment = align or (lft if status == "id" else ctr)
         c.border = _BD_BOTTOM if bottom else _BD_NORM
         c.fill = _FILL_CACHE.get((status, bool(alt)), _FILL_CACHE[("eq", bool(alt))])
@@ -836,7 +857,7 @@ def _load_pair(tsmis_path, tsn_path):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas"):
+            mode="formulas", commit_guard=None):
     """Build the Highway Detail TSMIS-vs-TSN comparison workbook(s). `tsmis_path`
     is the consolidated TSMIS Highway Detail workbook; `tsn_path` the TSN
     statewide (raw or normalized) workbook.
@@ -846,11 +867,14 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     compare_core stays unmodified). The TSN-only ADT/DCR columns come from the
     raw TSN file (None for a normalized library), read lazily inside the writer."""
     schema = dataclasses.replace(
-        _SCHEMA, extra_sheet_writer=lambda wb, ctx: _write_report_view(
-            wb, ctx, _tsn_onesided(Path(tsn_path))))
+        _SCHEMA,
+        extra_sheet_writer=lambda wb, ctx: _write_report_view(
+            wb, ctx, _tsn_onesided(Path(tsn_path))),
+        report_view_diff_check=("Report View", "B", 2))
     return ctc.run_files_compare(
         schema, tsmis_path, tsn_path, out_path,
         banner="Highway Detail Comparison — TSMIS vs TSN", has_route=True,
         loader=_load_pair, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
-        events=events, confirm_overwrite=confirm_overwrite, mode=mode)
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode,
+        commit_guard=commit_guard)

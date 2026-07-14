@@ -416,7 +416,8 @@ def _write_route_workbook(rows, out_path):
 # =============================================================================
 
 def consolidate(events=None, confirm_overwrite=None, day=None,
-                input_dir=None, out_path=None, converted_dir=None):
+                input_dir=None, out_path=None, converted_dir=None,
+                commit_guard=None):
     """Convert every TSMIS Highway Log PDF to a TSMIS-format per-route workbook,
     then combine them into one workbook (Route column added).
 
@@ -498,6 +499,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     return run_pdf_conversion(
         in_dir=in_dir, out=out, conv=conv, deps_ok=_DEPS_OK,
         events=events, confirm_overwrite=confirm_overwrite,
+        commit_guard=commit_guard,
         report_name=REPORT_NAME,
         banner_title="TSMIS Highway Log (PDF) Conversion",
         export_hint=("Export the 'Highway Log (PDF)' report first (it saves the "

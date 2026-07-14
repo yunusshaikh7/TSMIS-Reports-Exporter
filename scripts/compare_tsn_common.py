@@ -23,10 +23,15 @@ the semantic-identity proof). The comparison engine stays in `compare_core` — 
 module never touches it. Console-free; openpyxl is imported lazily (only inside the
 Notes writer, which runs solely when a workbook is actually being built).
 """
+import contextlib
 import re
 from pathlib import Path
 
+import artifact_store
+import consolidation_meta
+import outcome
 from compare_core import run_compare
+from comparison_contract import comparison_result_boundary
 from events import ConsolidateResult, Events
 from paths import today_str
 
@@ -39,6 +44,109 @@ def row_has_data(row):
     predicate every loader wrote inline (`any(c is not None and str(c).strip()
     != "" ...)`); one spelling so they can't drift."""
     return bool(row) and any(c is not None and str(c).strip() != "" for c in row)
+
+
+def require_exact_raw_header(header, expected, report_name):
+    """Require one report edition's complete, ordered raw-header contract.
+
+    Raw TSN workbooks are truth inputs, not best-effort tables: projecting by a
+    sparse name dictionary would otherwise turn every absent compared source
+    column into a clean-looking blank.  Equality here is deliberately exact --
+    missing, duplicate, renamed, reordered, or extra columns all fail before a
+    data row is projected.  The diagnostic calls out the first useful class of
+    drift while remaining deterministic for hermetic checks.
+    """
+    got = list(header or [])
+    want = list(expected)
+    if got == want:
+        return
+
+    duplicates = []
+    seen = set()
+    for value in got:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    missing = [value for value in want if value not in got]
+    unexpected = [value for value in got if value not in want]
+    if duplicates:
+        reason = "duplicate column(s): " + ", ".join(repr(v) for v in duplicates)
+    elif missing or unexpected:
+        pieces = []
+        if missing:
+            pieces.append("missing " + ", ".join(repr(v) for v in missing))
+        if unexpected:
+            pieces.append("unexpected " + ", ".join(repr(v) for v in unexpected))
+        reason = "; ".join(pieces)
+    else:
+        mismatch = next((i for i, pair in enumerate(zip(got, want))
+                         if pair[0] != pair[1]), min(len(got), len(want)))
+        reason = f"column order differs at position {mismatch + 1}"
+    raise ValueError(
+        f"the TSN {report_name} raw header does not match the complete "
+        f"{len(want)}-column source schema ({reason})")
+
+
+@contextlib.contextmanager
+def exact_raw_rows(path, sheet_name, expected_header, report_name,
+                   *, required_nonblank=()):
+    """Yield rows from one exact, literal TSN statewide workbook edition.
+
+    Raw truth is one physical document, not any sheet with familiar headings.
+    Require the sole worksheet to be the named, visible source sheet; inspect
+    formulas/errors rather than cached values; require the ordered header; and
+    fail rows whose mandatory identity claims are blank. Optional identity
+    components remain literal blanks and are never invented here.
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, read_only=True, data_only=False, keep_links=False)
+    try:
+        if wb.sheetnames != [sheet_name]:
+            got = ", ".join(repr(name) for name in wb.sheetnames) or "no worksheets"
+            raise ValueError(
+                f"the TSN {report_name} raw workbook must contain exactly one "
+                f"worksheet named {sheet_name!r} (found {got})")
+        ws = wb[sheet_name]
+        if ws.sheet_state != "visible":
+            raise ValueError(
+                f"the TSN {report_name} raw worksheet {sheet_name!r} must be visible")
+
+        cells = ws.iter_rows()
+        header_cells = list(next(cells, ()) or ())
+        for cell in header_cells:
+            if cell.data_type in {"f", "e"}:
+                raise ValueError(
+                    f"the TSN {report_name} raw workbook contains a formula/error "
+                    f"cell at {cell.coordinate}")
+        header = [cell.value for cell in header_cells]
+        require_exact_raw_header(header, expected_header, report_name)
+        indices = {name: header.index(name) for name in required_nonblank}
+
+        def rows():
+            for row_number, raw_cells in enumerate(cells, start=2):
+                raw_cells = list(raw_cells)
+                values = [cell.value for cell in raw_cells]
+                if not row_has_data(values):
+                    continue
+                for cell in raw_cells:
+                    if cell.data_type in {"f", "e"}:
+                        raise ValueError(
+                            f"the TSN {report_name} raw workbook contains a "
+                            f"formula/error cell at {cell.coordinate}")
+                missing = [name for name, index in indices.items()
+                           if index >= len(values)
+                           or values[index] is None
+                           or str(values[index]).strip() == ""]
+                if missing:
+                    raise ValueError(
+                        f"the TSN {report_name} raw row {row_number} is missing "
+                        f"required identity claim(s): {', '.join(missing)}")
+                yield values
+
+        yield header, rows()
+    finally:
+        wb.close()
 
 
 _ROUTE_TOKEN_RE = re.compile(r"route[ _-]*([0-9]+[A-Za-z]?)", re.IGNORECASE)
@@ -125,6 +233,95 @@ def iso_date(d):
 
 
 # --------------------------------------------------------------------------- #
+# producer completeness carried by selected workbook sidecars (Phase 2B)
+# --------------------------------------------------------------------------- #
+def _merge_input_outcomes(inputs, loader_warnings):
+    """Merge current producer outcomes with loader diagnostics.
+
+    ``inputs`` is ``((side_label, workbook_path), ...)``.  Only the coupled,
+    mtime-validated :func:`consolidation_meta.read_outcome` record is consumed;
+    summary prose and independently-read additive sidecar fields are never state.
+    ``None`` (truly absent or demonstrably stale) preserves legacy/raw behavior
+    without making a positive trust claim.
+
+    Returns ``(warnings, input_completion, skipped, failed, failures)`` for the
+    additive ``run_compare`` input contract.  A current failed/no-data/cancelled
+    producer artifact is unusable and raises ``ValueError`` before comparison.
+    """
+    original_warnings = (() if loader_warnings is None else loader_warnings)
+    merged_warnings = list(original_warnings)
+    added_warning = False
+    sidecar_skipped = 0
+    sidecar_failed = 0
+    structured_failures = []
+    records = []
+
+    for side, path in inputs:
+        record = consolidation_meta.read_outcome(path)
+        # The reader deliberately collapses absent and valid-but-stale to None.
+        # A defensive current check also prevents a foreign stub from gaining trust.
+        if record is None or not record.current:
+            records.append(None)
+            continue
+        records.append(record)
+        label = f"{side} input '{Path(path).name}'"
+
+        if record.completion in (outcome.FAILED, outcome.NO_DATA, outcome.CANCELLED):
+            raise ValueError(
+                f"{label} has a current producer outcome of "
+                f"'{record.completion}' and is not usable for comparison. "
+                "Rebuild it or select a complete/partial workbook.")
+
+        skipped = record.skipped_inputs
+        failed = record.failed_inputs
+        if (record.completion == outcome.COMPLETE and record.trusted
+                and skipped == 0 and failed == 0):
+            continue
+
+        # Anything current that is not the exact trusted-complete shape is
+        # incomplete. Valid partial records contribute exact counters; untrusted
+        # records intentionally expose None rather than invented zeroes.
+        if isinstance(skipped, int) and not isinstance(skipped, bool):
+            sidecar_skipped += skipped
+        if isinstance(failed, int) and not isinstance(failed, bool):
+            sidecar_failed += failed
+
+        if record.trusted:
+            detail = (f"producer outcome is '{record.completion}' "
+                      f"(skipped inputs: {skipped}; failed inputs: {failed})")
+        else:
+            detail = ("outcome metadata is current but untrusted"
+                      + (f" ({record.diagnostic})" if record.diagnostic else ""))
+        note = f"{label}: {detail}; comparison coverage is incomplete."
+        merged_warnings.append(note)
+        added_warning = True
+        if (not record.trusted or (isinstance(failed, int) and failed > 0)):
+            structured_failures.append(note)
+
+    has_incomplete_record = added_warning
+    all_current_complete = (len(records) == len(inputs) and bool(records)
+                            and all(record is not None
+                                    and record.trusted
+                                    and record.completion == outcome.COMPLETE
+                                    and record.skipped_inputs == 0
+                                    and record.failed_inputs == 0
+                                    for record in records))
+    input_completion = (outcome.PARTIAL if has_incomplete_record
+                        else outcome.COMPLETE if all_current_complete
+                        else None)
+
+    # Preserve the exact legacy warnings object/type when no sidecar diagnostic
+    # was added. None then lets run_compare retain its historical len(warnings)
+    # skipped count. Once a sidecar participates, pass exact combined counters so
+    # the explanatory warning itself is not miscounted as another skipped input.
+    warnings = merged_warnings if added_warning else original_warnings
+    skipped_inputs = ((len(original_warnings) + sidecar_skipped)
+                      if added_warning else None)
+    return (warnings, input_completion, skipped_inputs, sidecar_failed,
+            tuple(structured_failures))
+
+
+# --------------------------------------------------------------------------- #
 # shared Notes legend sheet (Highway Sequence + Intersection Detail)
 # --------------------------------------------------------------------------- #
 def make_notes_writer(title, lines, *, tab_color="ED7D31", col_width=110):
@@ -169,11 +366,13 @@ def make_notes_writer(title, lines, *, tab_color="ED7D31", col_width=110):
 # --------------------------------------------------------------------------- #
 # the shared compare() driver
 # --------------------------------------------------------------------------- #
+@comparison_result_boundary
 def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_route,
                       loader, deps_ok=True,
                       deps_msg="Required components are missing (openpyxl).",
                       side_a="TSMIS", side_b="TSN",
-                      events=None, confirm_overwrite=None, mode="formulas"):
+                      events=None, confirm_overwrite=None, mode="formulas",
+                      commit_guard=None):
     """The registry "files"-kind `compare()` skeleton shared by every file
     comparator: a deps gate -> path coercion + existence checks -> the log banner ->
     `loader(path_a, path_b)` (may raise ValueError for a bad input shape) ->
@@ -199,6 +398,27 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
             return ConsolidateResult(status="error",
                                      message=f"The {side} file doesn't exist:\n{p}")
 
+    destinations = artifact_store.comparison_output_paths(out_path, mode)
+    try:
+        captured_sources = artifact_store.capture_source_identities(
+            (tsmis_path, tsn_path))
+    except ValueError as e:
+        return ConsolidateResult(status="error", message=str(e))
+
+    def alias_error():
+        try:
+            artifact_store.ensure_outputs_do_not_alias_sources(
+                destinations, (tsmis_path, tsn_path),
+                captured_sources=captured_sources,
+                require_sources_current=True)
+        except ValueError as e:
+            return ConsolidateResult(status="error", message=str(e))
+        return None
+
+    blocked = alias_error()
+    if blocked is not None:
+        return blocked
+
     events.on_log("=" * 60)
     events.on_log(banner)
     events.on_log("=" * 60)
@@ -216,7 +436,38 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
     else:
         rows_t, rows_n, warnings = loaded
 
-    return run_compare(schema, rows_t, rows_n, has_route, out_path,
-                       events=events, confirm_overwrite=confirm_overwrite,
-                       mode=mode, name_a=tsmis_path.name, name_b=tsn_path.name,
-                       warnings=() if warnings is None else warnings)
+    # A selected consolidated workbook can be structurally readable while its
+    # producer explicitly reported incomplete coverage. Preserve that truth in
+    # every output flavor; absent/stale metadata remains the legacy/raw path.
+    try:
+        (warnings, input_completion, skipped_inputs, failed_inputs,
+         input_failures) = _merge_input_outcomes(
+            ((side_a, tsmis_path), (side_b, tsn_path)), warnings)
+    except ValueError as e:
+        return ConsolidateResult(status="error", message=str(e))
+
+    # Loading can be long enough for a destination to appear or be redirected.
+    # Recheck at the public write boundary so direct callers receive the same
+    # protection as GUI/Matrix callers wrapped by commit_workbook.
+    blocked = alias_error()
+    if blocked is not None:
+        return blocked
+
+    return artifact_store.commit_workbook(
+        out_path,
+        lambda tmp: run_compare(
+            schema, rows_t, rows_n, has_route, tmp,
+            events=events, confirm_overwrite=lambda _p: True,
+            mode=mode, name_a=tsmis_path.name, name_b=tsn_path.name,
+            warnings=() if warnings is None else warnings,
+            input_completion=input_completion,
+            skipped_inputs=skipped_inputs,
+            failed_inputs=failed_inputs,
+            failures=input_failures,
+            commit_guard=commit_guard),
+        twin=(mode == "both"), expect_sheet="Comparison",
+        confirm_overwrite=confirm_overwrite,
+        source_paths=(tsmis_path, tsn_path),
+        captured_sources=captured_sources,
+        commit_guard=commit_guard,
+        requested_mode=mode)

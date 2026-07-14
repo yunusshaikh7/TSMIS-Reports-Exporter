@@ -20,7 +20,7 @@ layouts embedded, each on its own tab — and `<comparison> (evidence images)/`
 holding the same examples as loose files in both layouts (stacked for reading,
 side-by-side for pasting into docs). Both writes are keep-last-good: a
 failed/cancelled run leaves the previous set untouched; files locked open in
-Excel divert to a ".new" sibling with a note.
+Excel divert to an unpredictable ".new-<token>" sibling with a note.
 
 Report-agnostic: everything report-specific comes from an adapter module
 (evidence_highway_detail — district TSN prints; evidence_intersection_detail —
@@ -32,7 +32,9 @@ import logging
 import os
 import random
 import re
+import secrets
 import shutil
+import tempfile
 from pathlib import Path
 
 try:
@@ -45,7 +47,10 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import artifact_store
+import owned_dir
 import paths
+from compare_core import set_safe_literal_cell
 
 log = logging.getLogger("tsmis.evidence")
 
@@ -184,11 +189,95 @@ def sibling_paths(comparison_path):
             p.with_name(f"{p.stem} (evidence images)"))
 
 
+def _pdf_source_files(tsmis_pdf_dir, tsn_dir):
+    """The exact PDF paths evidence discovery can consume, in stable order."""
+    return (tuple(sorted(Path(tsmis_pdf_dir).glob("*.pdf"))),
+            tuple(sorted(Path(tsn_dir).glob("*.pdf"))))
+
+
+def _ensure_pdf_source_set(tsmis_pdf_dir, tsn_dir, expected):
+    """Fail when a PDF is added/removed while the evidence generation runs."""
+    current = _pdf_source_files(tsmis_pdf_dir, tsn_dir)
+    if artifact_store.canonical_path_identities((*current[0], *current[1])) != expected:
+        raise ValueError(
+            "Refusing to publish evidence: the discovered PDF source set "
+            "changed while evidence was rendering. Re-run after the PDF "
+            "folders are stable.")
+
+
+def _safe_sibling_paths(comparison_path, source_paths, captured_sources=(),
+                        source_set_check=None, commit_guard=None):
+    """Return evidence siblings only after guarding every derived write path.
+
+    Runtime temp/quarantine/fallback names are allocated unpredictably and are
+    guarded when created; only the two deterministic public outputs exist here.
+    """
+    if source_set_check is not None:
+        source_set_check()
+    wb_path, img_dir = sibling_paths(comparison_path)
+    _require_output_guard(commit_guard, wb_path, "evidence workbook selection")
+    _require_output_guard(commit_guard, img_dir, "evidence image-folder selection")
+    artifact_store.ensure_outputs_do_not_alias_sources(
+        (wb_path, img_dir), source_paths,
+        directory_destinations=(img_dir,),
+        captured_sources=captured_sources, require_sources_current=True)
+    return wb_path, img_dir
+
+
+def _ensure_captured_current(captured):
+    """Verify an exclusively-created temp/quarantine still names our object."""
+    artifact_store.ensure_outputs_do_not_alias_sources(
+        (), (), captured_sources=captured, require_sources_current=True)
+
+
+def _require_output_guard(commit_guard, path=None, action="evidence write", **kwargs):
+    """Require the caller's exact output lease at a mutation boundary.
+
+    Target-aware guards accept ``path`` plus the same descendant-binding keyword
+    arguments as :meth:`owned_dir.OwnershipLease.guard`.  A legacy zero-argument
+    guard remains usable only when no identity binding is requested; silently
+    dropping an anchor/directory identity would reopen the replacement race this
+    guard exists to close.
+    """
+    if commit_guard is None:
+        return
+    try:
+        if path is None:
+            allowed = bool(commit_guard())
+        elif kwargs:
+            allowed = bool(commit_guard(Path(path), **kwargs))
+        else:
+            try:
+                allowed = bool(commit_guard(Path(path)))
+            except TypeError:
+                allowed = bool(commit_guard())
+    except Exception as e:                       # noqa: BLE001 - fail closed
+        raise owned_dir.OwnershipError(
+            f"The evidence output guard failed before the {action}; no output "
+            "was intentionally changed.") from e
+    if not allowed:
+        raise owned_dir.OwnershipError(
+            f"The app-owned comparison destination changed before the {action}. "
+            "The current path was left untouched; retry the comparison.")
+
+
+def _unique_dir_sibling(path, tag):
+    """Choose an unpredictable, currently absent sibling; never delete a collision."""
+    path = Path(path)
+    for _ in range(32):
+        candidate = path.with_name(
+            f"{path.name}.{tag}-{secrets.token_hex(8)}")
+        if not os.path.lexists(candidate):
+            return candidate
+    raise FileExistsError(
+        f"Could not allocate a collision-free evidence {tag} directory beside {path}.")
+
+
 # --------------------------------------------------------------------------- #
 # generation
 # --------------------------------------------------------------------------- #
 def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
-             events, examples=DEFAULT_EXAMPLES):
+             events, examples=DEFAULT_EXAMPLES, commit_guard=None):
     """Generate the evidence set for one finished vs-TSN comparison. Returns a
     result dict {note, rendered, fields_ok, fields_with_diffs, misses,
     workbook, folder} — `note` is the one summary line for the run log. Raises
@@ -202,11 +291,24 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     examples = clamp_examples(examples)
     tsmis_pdf_dir = Path(tsmis_pdf_dir)
     tsn_dir = tsn_pdf_dir(row_key)
-    n_tsmis = sum(1 for _ in tsmis_pdf_dir.glob("*.pdf")) if tsmis_pdf_dir.is_dir() else 0
+    tsmis_pdf_files, tsn_pdf_files = _pdf_source_files(tsmis_pdf_dir, tsn_dir)
+    source_paths = (consolidated, tsn_path, comparison_path,
+                    tsmis_pdf_dir, tsn_dir, *tsmis_pdf_files, *tsn_pdf_files)
+    initial_pdf_set = artifact_store.canonical_path_identities(
+        (*tsmis_pdf_files, *tsn_pdf_files))
+
+    def source_set_check():
+        _ensure_pdf_source_set(tsmis_pdf_dir, tsn_dir, initial_pdf_set)
+
+    captured_sources = artifact_store.capture_source_identities(source_paths)
+    wb_path, img_dir = _safe_sibling_paths(
+        comparison_path, source_paths, captured_sources, source_set_check,
+        commit_guard=commit_guard)
+    n_tsmis = len(tsmis_pdf_files)
     if not n_tsmis:
         raise ValueError(f"no {adapter.REPORT_LABEL} (PDF) export found in "
                          f"{tsmis_pdf_dir} — run that export first")
-    n_tsn = sum(1 for _ in Path(tsn_dir).glob("*.pdf")) if Path(tsn_dir).is_dir() else 0
+    n_tsn = len(tsn_pdf_files)
     if not n_tsn:
         raise ValueError(f"no TSN {adapter.REPORT_LABEL} PDFs in {tsn_dir}")
 
@@ -285,10 +387,23 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                         p.name, type(e).__name__, e)
 
     # render into a temp folder; swap in only on success (keep-last-good)
-    wb_path, img_dir = sibling_paths(comparison_path)
-    tmp_dir = img_dir.with_name(img_dir.name + ".tmp")
-    shutil.rmtree(tmp_dir, ignore_errors=True)
-    tmp_dir.mkdir(parents=True, exist_ok=True)
+    source_set_check()
+    _require_output_guard(commit_guard, img_dir.parent,
+                          "evidence output-folder creation")
+    img_dir.parent.mkdir(parents=True, exist_ok=True)
+    _require_output_guard(commit_guard, img_dir.parent,
+                          "evidence output-folder creation")
+    tmp_dir = Path(tempfile.mkdtemp(
+        prefix=f".{img_dir.name}.tmp-", dir=img_dir.parent))
+    tmp_dir_fs_identity = owned_dir.directory_identity(tmp_dir)
+    if tmp_dir_fs_identity is None:
+        raise owned_dir.OwnershipError(
+            "The temporary evidence image folder has no stable local identity; "
+            "it was not used.")
+    tmp_dir_identity = artifact_store.capture_source_identities((tmp_dir,))
+    _require_output_guard(
+        commit_guard, tmp_dir, "temporary evidence-folder creation",
+        directory_identity=tmp_dir_fs_identity)
     page_cache = {}
     entries, misses = [], {}
     rendered = 0
@@ -300,9 +415,14 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
             for ex in cand[f]:
                 if got >= examples:
                     break
+                _require_output_guard(
+                    commit_guard, tmp_dir, "evidence image write",
+                    directory_identity=tmp_dir_fs_identity)
                 ok, reason = _try_example(adapter, ex, f, tsmis_loc, tsn_loc,
                                           dist_index, tsmis_pdf_dir, tmp_dir,
-                                          got + 1, page_cache)
+                                          got + 1, page_cache,
+                                          commit_guard=commit_guard,
+                                          out_dir_identity=tmp_dir_fs_identity)
                 if ok:
                     got += 1
                     rendered += 1
@@ -319,7 +439,6 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         if events.is_cancelled():
             return _cancelled()
         if not rendered:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
             return {"note": "evidence: no verifiable examples could be rendered "
                             "(see the log)", "rendered": 0, "fields_ok": 0,
                     "fields_with_diffs": len(fields_with_diffs),
@@ -327,10 +446,30 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         wb_note = _write_workbook(wb_path, tmp_dir, entries, misses, dict(
             comparison=Path(comparison_path).name, report=adapter.REPORT_LABEL,
             seed=f"{seed:08x}", examples=examples,
-            tsmis_dir=str(tsmis_pdf_dir), tsn_dir=str(tsn_dir)))
-        dir_note = _swap_dir(tmp_dir, img_dir)
+            tsmis_dir=str(tsmis_pdf_dir), tsn_dir=str(tsn_dir)),
+            source_paths=source_paths, captured_sources=captured_sources,
+            source_set_check=source_set_check, commit_guard=commit_guard)
+        dir_note = _swap_dir(
+            tmp_dir, img_dir, source_paths=source_paths,
+            captured_sources=captured_sources,
+            source_set_check=source_set_check, commit_guard=commit_guard,
+            tmp_directory_identity=tmp_dir_fs_identity)
     finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        if os.path.lexists(tmp_dir):
+            try:
+                _ensure_captured_current(tmp_dir_identity)
+                artifact_store.ensure_outputs_do_not_alias_sources(
+                    (tmp_dir,), source_paths, directory_destinations=(tmp_dir,),
+                    captured_sources=captured_sources,
+                    require_sources_current=True)
+                _require_output_guard(
+                    commit_guard, tmp_dir, "temporary evidence-folder cleanup",
+                    directory_identity=tmp_dir_fs_identity)
+            except (ValueError, owned_dir.OwnershipError):
+                log.error("evidence: retained replaced/unsafe temp path instead of "
+                          "deleting foreign or source content: %s", tmp_dir)
+            else:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
 
     fields_ok = len({e["field"] for e in entries})
     note = (f"evidence: {rendered} example(s) across {fields_ok}/"
@@ -388,7 +527,8 @@ def _quote_note(va, vb):
 
 
 def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
-                 tsmis_pdf_dir, out_dir, k, page_cache):
+                 tsmis_pdf_dir, out_dir, k, page_cache, commit_guard=None,
+                 out_dir_identity=None):
     """Verify one candidate end-to-end and render both layouts. Returns
     (entry_dict, None) on success, (None, reason) otherwise."""
     trecs = tsmis_loc.get(ex["route"], {}).get(ex["key"], [])
@@ -437,8 +577,19 @@ def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
     safe = re.sub(r"[^A-Za-z0-9]+", "_", field).strip("_")
     stacked = out_dir / f"{safe}_{k}_stacked.png"
     pair = out_dir / f"{safe}_{k}_pair.png"
+    guard_kwargs = ({"anchor_path": out_dir,
+                     "anchor_identity": out_dir_identity}
+                    if out_dir_identity is not None else {})
+    _require_output_guard(commit_guard, stacked, "stacked evidence-image write",
+                          **guard_kwargs)
     _compose_stacked(title, sub, t_label, t_img, n_label, n_img, stacked, note=note)
+    _require_output_guard(commit_guard, pair, "paired evidence-image write",
+                          **guard_kwargs)
     _compose_pair(title, sub, t_label, t_img, n_label, n_img, pair, note=note)
+    _require_output_guard(commit_guard, stacked, "evidence image verification",
+                          **guard_kwargs)
+    _require_output_guard(commit_guard, pair, "evidence image verification",
+                          **guard_kwargs)
     return {"field": field, "route": ex["route"], "key": ex["key"],
             "va": ex["va"], "vb": ex["vb"], "note": note,
             "stacked": stacked.name, "pair": pair.name}, None
@@ -565,23 +716,31 @@ def _compose_pair(title, sub, l_label, l_img, r_label, r_img, out, note=""):
 # --------------------------------------------------------------------------- #
 # outputs (keep-last-good)
 # --------------------------------------------------------------------------- #
+def _safe_cell(ws, row, column, value, font=None):
+    """Write workbook content that may contain source/user-controlled text."""
+    cell = set_safe_literal_cell(ws.cell(row=row, column=column), value)
+    if font is not None:
+        cell.font = font
+    return cell
+
+
 def _image_sheet(wb, sheet_title, entries, img_dir, img_key, embed_w, fonts):
     """One image tab: the caption line + every example's `img_key` layout
     embedded, scaled to `embed_w` display pixels."""
     bold, small = fonts
     ev = wb.create_sheet(sheet_title)
     ev.sheet_properties.tabColor = "C00000"
-    ev.append(["Red box = the compared cell in each source PDF; gray box = the "
+    _safe_cell(ev, 1, 1,
+               "Red box = the compared cell in each source PDF; gray box = the "
                "record (its printed lines). Values shown are the compared "
-               "(normalized) forms."])
-    ev["A1"].font = small
+               "(normalized) forms.", small)
     r = 3
     for e in entries:
         note = e.get("note") or ""
-        ev.cell(row=r, column=1, value=(
+        _safe_cell(ev, r, 1, (
             f"{e['field']}   —   route {e['route']} @ {e['key']}   —   "
             f"TSMIS '{e['va']}' vs TSN '{e['vb']}'"
-            + (f"   —   {note}" if note else ""))).font = bold
+            + (f"   —   {note}" if note else "")), bold)
         img = XLImage(str(img_dir / e[img_key]))
         scale = min(1.0, embed_w / img.width)
         img.width, img.height = int(img.width * scale), int(img.height * scale)
@@ -589,11 +748,14 @@ def _image_sheet(wb, sheet_title, entries, img_dir, img_key, embed_w, fonts):
         r += 1 + max(1, round(img.height / _PX_PER_ROW)) + 2
 
 
-def _write_workbook(wb_path, img_dir, entries, misses, info):
+def _write_workbook(wb_path, img_dir, entries, misses, info, source_paths=(),
+                    captured_sources=(), source_set_check=None,
+                    commit_guard=None):
     """Write '<comparison> (evidence).xlsx' — a Summary sheet + BOTH image
     layouts embedded, each on its own tab (stacked for reading, side-by-side
     for pasting) — via a temp file + os.replace. Returns a short note when
-    the previous workbook was locked open and the new one diverted to .new."""
+    the previous workbook was locked open and the new one diverted to an
+    exclusively reserved, unpredictable .new-<token> sibling."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Summary"
@@ -601,28 +763,27 @@ def _write_workbook(wb_path, img_dir, entries, misses, info):
     bold = Font(name="Arial", size=10, bold=True)
     body = Font(name="Arial", size=10)
     small = Font(name="Arial", size=9, color="666666")
-    ws.append([f"{info['report']} — visual evidence"])
-    ws["A1"].font = title
-    ws.append([f"Comparison: {info['comparison']}   ·   examples per column: "
-               f"{info['examples']}   ·   sample seed: {info['seed']}"])
-    ws["A2"].font = small
-    ws.append([f"TSMIS PDFs: {info['tsmis_dir']}   ·   TSN PDFs: {info['tsn_dir']}"])
-    ws["A3"].font = small
-    ws.append([])
-    ws.append(["Column", "Route @ Post Mile", "TSMIS", "TSN", "Images"])
-    for c in "ABCDE":
-        ws[f"{c}5"].font = bold
+    _safe_cell(ws, 1, 1, f"{info['report']} — visual evidence", title)
+    _safe_cell(ws, 2, 1,
+               f"Comparison: {info['comparison']}   ·   examples per column: "
+               f"{info['examples']}   ·   sample seed: {info['seed']}", small)
+    _safe_cell(ws, 3, 1,
+               f"TSMIS PDFs: {info['tsmis_dir']}   ·   TSN PDFs: {info['tsn_dir']}",
+               small)
+    for col, value in enumerate(
+            ("Column", "Route @ Post Mile", "TSMIS", "TSN", "Images"), start=1):
+        _safe_cell(ws, 5, col, value, bold)
     r = 6
     for e in entries:
-        ws.cell(row=r, column=1, value=e["field"]).font = body
-        ws.cell(row=r, column=2, value=f"{e['route']} @ {e['key']}").font = body
-        ws.cell(row=r, column=3, value=e["va"]).font = body
-        ws.cell(row=r, column=4, value=e["vb"]).font = body
-        ws.cell(row=r, column=5, value=f"{e['stacked']}  /  {e['pair']}").font = body
+        _safe_cell(ws, r, 1, e["field"], body)
+        _safe_cell(ws, r, 2, f"{e['route']} @ {e['key']}", body)
+        _safe_cell(ws, r, 3, e["va"], body)
+        _safe_cell(ws, r, 4, e["vb"], body)
+        _safe_cell(ws, r, 5, f"{e['stacked']}  /  {e['pair']}", body)
         r += 1
     for f, why in misses.items():
-        ws.cell(row=r, column=1, value=f).font = body
-        ws.cell(row=r, column=2, value=f"no verifiable example — {why}").font = small
+        _safe_cell(ws, r, 1, f, body)
+        _safe_cell(ws, r, 2, f"no verifiable example — {why}", small)
         r += 1
     for col, width in (("A", 14), ("B", 24), ("C", 26), ("D", 26), ("E", 46)):
         ws.column_dimensions[col].width = width
@@ -632,45 +793,272 @@ def _write_workbook(wb_path, img_dir, entries, misses, info):
     _image_sheet(wb, "Evidence (side-by-side)", entries, img_dir, "pair",
                  _EMBED_W_PAIR, (bold, small))
 
-    tmp = wb_path.with_name(wb_path.name + ".tmp")
-    wb.save(tmp)
+    tmp = None
+    tmp_identity = ()
+
+    def discard_tmp():
+        if tmp is None or not os.path.lexists(tmp):
+            return
+        try:
+            _ensure_captured_current(tmp_identity)
+            artifact_store.ensure_outputs_do_not_alias_sources(
+                (tmp,), source_paths, captured_sources=captured_sources)
+            _require_output_guard(commit_guard, tmp,
+                                  "temporary evidence-workbook cleanup")
+        except (ValueError, owned_dir.OwnershipError):
+            log.error("evidence: retained replaced/unsafe workbook temp instead "
+                      "of deleting foreign or source content: %s", tmp)
+            return
+        Path(tmp).unlink(missing_ok=True)
+
+    def discard_reserved_alt(alt, identity):
+        if alt is None or not os.path.lexists(alt):
+            return
+        try:
+            _ensure_captured_current(identity)
+            _require_output_guard(commit_guard, alt,
+                                  "fallback workbook-reservation cleanup")
+        except (ValueError, owned_dir.OwnershipError):
+            log.error("evidence: retained replaced fallback reservation instead "
+                      "of deleting foreign content: %s", alt)
+            return
+        Path(alt).unlink(missing_ok=True)
+
+    if source_set_check is not None:
+        source_set_check()
+    _require_output_guard(commit_guard, wb_path.parent,
+                          "evidence workbook-folder creation")
+    wb_path.parent.mkdir(parents=True, exist_ok=True)
+    _require_output_guard(commit_guard, wb_path.parent,
+                          "evidence workbook-folder creation")
     try:
+        with tempfile.NamedTemporaryFile(
+                mode="w+b", prefix=f".{wb_path.stem}.tmp-",
+                suffix=wb_path.suffix, dir=wb_path.parent,
+                delete=False) as temp_handle:
+            tmp = Path(temp_handle.name)
+            tmp_identity = artifact_store.capture_source_identities((tmp,))
+            artifact_store.ensure_outputs_do_not_alias_sources(
+                (wb_path, tmp), source_paths,
+                captured_sources=captured_sources,
+                require_sources_current=True)
+            _require_output_guard(commit_guard, tmp,
+                                  "temporary evidence-workbook write")
+            wb.save(temp_handle)
+    except BaseException:
+        discard_tmp()
+        raise
+    try:
+        if source_set_check is not None:
+            source_set_check()
+        artifact_store.ensure_outputs_do_not_alias_sources(
+            (wb_path, tmp), source_paths,
+            captured_sources=captured_sources, require_sources_current=True)
+        _ensure_captured_current(tmp_identity)
+        _require_output_guard(commit_guard, tmp,
+                              "temporary evidence-workbook publish")
+        _require_output_guard(commit_guard, wb_path,
+                              "evidence-workbook publish")
         os.replace(tmp, wb_path)
         return None
+    except ValueError:
+        discard_tmp()
+        raise
     except OSError as e:                       # workbook open in Excel, etc.
         log.warning("evidence: workbook swap failed: %s: %s",
                     type(e).__name__, e)
-        alt = wb_path.with_name(wb_path.stem + ".new" + wb_path.suffix)
+        alt = None
+        alt_identity = ()
         try:
+            # Reserve an unpredictable fallback exclusively. A foreign fixed
+            # '<stem>.new.xlsx' sentinel is never named, replaced, or removed.
+            with tempfile.NamedTemporaryFile(
+                    mode="w+b", prefix=f"{wb_path.stem}.new-",
+                    suffix=wb_path.suffix, dir=wb_path.parent,
+                    delete=False) as alt_handle:
+                alt = Path(alt_handle.name)
+            alt_identity = artifact_store.capture_source_identities((alt,))
+            if source_set_check is not None:
+                source_set_check()
+            artifact_store.ensure_outputs_do_not_alias_sources(
+                (tmp, alt), source_paths, captured_sources=captured_sources,
+                require_sources_current=True)
+            _ensure_captured_current(tmp_identity)
+            _ensure_captured_current(alt_identity)
+            _require_output_guard(commit_guard, tmp,
+                                  "temporary evidence-workbook fallback")
+            _require_output_guard(commit_guard, alt,
+                                  "fallback evidence-workbook publish")
             os.replace(tmp, alt)
             return f"previous evidence workbook is locked open — new set saved as {alt.name}"
+        except ValueError:
+            discard_reserved_alt(alt, alt_identity)
+            discard_tmp()
+            raise
         except OSError:
-            Path(tmp).unlink(missing_ok=True)
+            discard_reserved_alt(alt, alt_identity)
+            discard_tmp()
             return "previous evidence workbook is locked open — new workbook not saved"
+        except BaseException:
+            discard_reserved_alt(alt, alt_identity)
+            discard_tmp()
+            raise
+    except BaseException:
+        discard_tmp()
+        raise
 
 
-def _swap_dir(tmp_dir, target):
-    """Swap the freshly-rendered image folder into place; the previous set
-    survives any failure. Returns a note when the swap had to divert."""
-    old = target.with_name(target.name + ".old")
-    shutil.rmtree(old, ignore_errors=True)
+def _swap_dir(tmp_dir, target, source_paths=(), captured_sources=(),
+              source_set_check=None, commit_guard=None,
+              tmp_directory_identity=None):
+    """Swap fresh images into place without touching guessed sibling names.
+
+    The prior set is quarantined under an unpredictable per-operation name.
+    Every failure after that rename restores it before propagating/returning;
+    observed collisions are preserved and refused, never recursively removed.
+    """
+    tmp_dir, target = Path(tmp_dir), Path(target)
+    old = _unique_dir_sibling(target, "old")
+    tmp_identity = artifact_store.capture_source_identities((tmp_dir,))
+    tmp_fs_identity = (tmp_directory_identity
+                       if tmp_directory_identity is not None
+                       else owned_dir.directory_identity(tmp_dir))
+    if commit_guard is not None and tmp_fs_identity is None:
+        raise owned_dir.OwnershipError(
+            "The temporary evidence image folder changed before publication; "
+            "it was left in place.")
+    old_identity = ()
+    old_fs_identity = None
+    old_moved = False
+
+    def ensure_swap_paths(*paths_to_check):
+        if source_set_check is not None:
+            source_set_check()
+        artifact_store.ensure_outputs_do_not_alias_sources(
+            paths_to_check, source_paths,
+            directory_destinations=paths_to_check,
+            captured_sources=captured_sources,
+            require_sources_current=True)
+
+    def restore_old():
+        """Rollback only; a changed source-set must not block restoration."""
+        nonlocal old_moved
+        if not old_moved:
+            return
+        if not os.path.lexists(old):
+            raise OSError(f"Evidence rollback lost its quarantine directory: {old}")
+        if os.path.lexists(target):
+            raise FileExistsError(
+                f"Evidence rollback refused to replace a newly appeared path: {target}")
+        _ensure_captured_current(old_identity)
+        _require_output_guard(
+            commit_guard, old, "evidence image-folder rollback",
+            directory_identity=old_fs_identity)
+        _require_output_guard(commit_guard, target,
+                              "evidence image-folder rollback")
+        # Do not require the compared sources to remain current for rollback:
+        # that very guard may be why publication aborted. Still refuse a target
+        # that now aliases the originally selected source object.
+        artifact_store.ensure_outputs_do_not_alias_sources(
+            (target,), source_paths, directory_destinations=(target,),
+            captured_sources=captured_sources,
+            require_sources_current=False)
+        os.replace(old, target)
+        old_moved = False
+        _require_output_guard(
+            commit_guard, target, "evidence image-folder rollback verification",
+            directory_identity=old_fs_identity)
+
+    def discard_old_after_success():
+        nonlocal old_moved
+        if not old_moved or not os.path.lexists(old):
+            old_moved = False
+            return
+        try:
+            _ensure_captured_current(old_identity)
+            _require_output_guard(
+                commit_guard, old, "prior evidence-folder cleanup",
+                directory_identity=old_fs_identity)
+            if not owned_dir.is_plain_directory_tree(old, old_fs_identity):
+                raise ValueError(
+                    "the prior evidence quarantine contains a linked or replaced path")
+            shutil.rmtree(old)
+            old_moved = False
+        except (OSError, ValueError) as e:
+            # Canonical publication succeeded. Retain an uncertain quarantine
+            # instead of recursively deleting foreign replacement content.
+            log.warning("evidence: retained prior image quarantine %s (%s: %s)",
+                        old, type(e).__name__, e)
+
     try:
-        if target.exists():
+        ensure_swap_paths(tmp_dir, target, old)
+        _ensure_captured_current(tmp_identity)
+        _require_output_guard(
+            commit_guard, tmp_dir, "temporary evidence-folder publication",
+            directory_identity=tmp_fs_identity)
+        _require_output_guard(commit_guard, target,
+                              "evidence image-folder publication")
+        _require_output_guard(commit_guard, old,
+                              "evidence quarantine reservation")
+        if os.path.lexists(old):
+            raise FileExistsError(f"Evidence quarantine path appeared before use: {old}")
+        if os.path.lexists(target):
             os.replace(target, old)
+            old_moved = True
+            old_identity = artifact_store.capture_source_identities((old,))
+            old_fs_identity = owned_dir.directory_identity(old)
+            if old_fs_identity is None:
+                raise owned_dir.OwnershipError(
+                    "The prior evidence image folder could not be bound after "
+                    "quarantine; it was retained.")
+            # Critical rollback boundary: every later guard failure is caught.
+            ensure_swap_paths(tmp_dir, target, old)
+            _ensure_captured_current(old_identity)
+            _require_output_guard(
+                commit_guard, old, "evidence quarantine verification",
+                directory_identity=old_fs_identity)
+            _require_output_guard(commit_guard, target,
+                                  "evidence image-folder publication")
+        _ensure_captured_current(tmp_identity)
+        _require_output_guard(
+            commit_guard, tmp_dir, "temporary evidence-folder publication",
+            directory_identity=tmp_fs_identity)
+        _require_output_guard(commit_guard, target,
+                              "evidence image-folder publication")
         os.replace(tmp_dir, target)
-        shutil.rmtree(old, ignore_errors=True)
+        _require_output_guard(
+            commit_guard, target, "evidence image-folder publish verification",
+            directory_identity=tmp_fs_identity)
+        discard_old_after_success()
         return None
     except OSError as e:                       # a file inside is locked open
         log.warning("evidence: image-folder swap failed: %s: %s",
                     type(e).__name__, e)
-        alt = target.with_name(target.name + ".new")
-        shutil.rmtree(alt, ignore_errors=True)
         try:
+            alt = _unique_dir_sibling(target, "new")
+            ensure_swap_paths(tmp_dir, alt)
+            _ensure_captured_current(tmp_identity)
+            _require_output_guard(
+                commit_guard, tmp_dir, "temporary evidence-folder fallback",
+                directory_identity=tmp_fs_identity)
+            _require_output_guard(commit_guard, alt,
+                                  "fallback evidence-folder publication")
+            if os.path.lexists(alt):
+                raise FileExistsError(f"Evidence fallback path appeared before use: {alt}")
             os.replace(tmp_dir, alt)
-            if old.exists() and not target.exists():
-                os.replace(old, target)        # restore the previous set
+            _require_output_guard(
+                commit_guard, alt, "fallback evidence-folder verification",
+                directory_identity=tmp_fs_identity)
+            restore_old()
             return f"previous images are locked open — new set saved to {alt.name}"
         except OSError:
-            if old.exists() and not target.exists():
-                os.replace(old, target)
+            restore_old()
             return "previous images are locked open — new image set not saved"
+        except BaseException:
+            restore_old()
+            raise
+    except BaseException:
+        # ValueError is the normal source-set/identity guard failure, but do the
+        # same rollback for any unexpected guard exception.
+        restore_old()
+        raise

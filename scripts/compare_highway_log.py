@@ -147,7 +147,7 @@ def _load_pair(path_a, path_b):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas"):
+            mode="formulas", commit_guard=None):
     """Build the comparison workbook(s). Returns a ConsolidateResult (same
     contract as the consolidators, so the GUI/console drive it identically).
 
@@ -159,4 +159,5 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         _SCHEMA, tsmis_path, tsn_path, out_path,
         banner="Highway Log Comparison — TSMIS vs TSN",
         has_route=None, loader=_load_pair, deps_ok=_DEPS_OK,
-        events=events, confirm_overwrite=confirm_overwrite, mode=mode)
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode,
+        commit_guard=commit_guard)

@@ -55,6 +55,7 @@ from reports import (COMPARE_DISPLAY, COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPO
                      CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_REPORTS, PICKER_ORDER,
                      consolidate_index_for_key, export_reports_status, matrix_rows)
 import outcome
+import consolidation_meta
 from gui_endpoint import _api_method, pick_path   # the shared js_api decorator + dialog unwrap
 import contract
 import gui_win32
@@ -300,8 +301,15 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         # Server-side confirmation for the one destructive op (delete all
         # reports): reset_preview issues a single-use token bound to the
         # include_input flag; start_reset requires it back, so the delete can't
-        # run without a preview having been shown first. (token, include_input).
+        # run without a preview having been shown first. The tuple also retains
+        # the exact identity-bound targets shown in that preview.
+        # (token, include_input, targets).
         self._reset_token = None
+        # Classic comparison mode="both" derives a second, values-only workbook
+        # without showing a second native Save dialog.  When that exact sibling
+        # already exists, _begin_compare parks the claimed operation here until
+        # the UI returns the single-use, operation-bound confirmation token.
+        self._compare_overwrite_token = None
         self.cancel_event = threading.Event()
         self.skip_event = threading.Event()
         self.pause_event = threading.Event()     # B1: between-route hold
@@ -917,42 +925,70 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
             log.info("taskbar flash skipped (%s: %s)", type(e).__name__, e)
 
     def _finish_consolidate(self, result):
+        is_comparison = (
+            getattr(result, "operation_kind", None) == "comparison"
+            or getattr(result, "comparison_outcome", None) is not None)
         if result.status == "ok":
             for line in result.summary_lines:
                 self._emit_log(line)
-            self._set_dot("ok" if self._authed else "bad", "Done")
-            # Comparisons carry a verdict: surface the quick answer in a
-            # dialog too — "everything matches" is the expected outcome
-            # between environments, so it deserves more than a log line.
-            if result.verdict and result.summary_lines:
-                head = result.summary_lines[0]
-                if result.verdict == "match":
-                    self._emit_modal("info", "Everything matches",
-                                     head + "\n\n"
-                                     "The saved workbook has the full "
-                                     "breakdown and self-checks.")
-                elif head.lstrip().startswith("⚠") or "COULD NOT COMPARE" in head:
-                    # Some inputs were unreadable: the engine keeps status ok +
-                    # verdict "diff" but leads summary_lines[0] with the literal
-                    # "⚠ COULD NOT COMPARE EVERYTHING". The rows that WERE
-                    # compared may all match, so titling this "Differences
-                    # found" would misread — call it incomplete instead.
-                    self._emit_modal("warning", "Comparison incomplete",
-                                     head + "\n\n"
-                                     "Some input files could not be read, so the "
-                                     "comparison is not complete. The saved "
-                                     "workbook lists exactly what was skipped.")
+            if is_comparison:
+                head = (result.summary_lines[0] if result.summary_lines
+                        else "Comparison finished.")
+                try:
+                    published = consolidation_meta.require_published_comparison(
+                        result.output_path, result)
+                except ValueError as e:
+                    self._set_dot("bad", "Result untrusted")
+                    self._emit_log(f"ERROR: comparison result is untrusted: {e}")
+                    self._emit_modal(
+                        "error", "Comparison result untrusted",
+                        "The workbook's published outcome could not be verified. "
+                        "Do not rely on it; close any open copy and run the "
+                        f"comparison again.\n\n{e}")
                 else:
-                    self._emit_modal("warning", "Differences found",
-                                     head + "\n\n"
-                                     "Open the saved workbook for the "
-                                     "cell-by-cell breakdown (Summary → "
-                                     "Comparison → Only-in sheets).")
+                    typed = published.comparison_outcome
+                    self._set_dot("ok" if self._authed else "bad", "Done")
+                    if typed.completion == outcome.PARTIAL:
+                        partial_reasons = []
+                        if typed.pairing_quality == "capped":
+                            partial_reasons.append(
+                                "At least one duplicate group exceeded the exact-"
+                                "pairing limit, so its displayed counts use "
+                                "deterministic positional fallback. Re-scope and "
+                                "run again to certify row identity.")
+                        if (typed.coverage_diagnostics or typed.warnings
+                                or typed.failures):
+                            partial_reasons.append(
+                                "Some input coverage was incomplete.")
+                        if not partial_reasons:
+                            partial_reasons.append(
+                                "The typed outcome is partial for a recorded "
+                                "non-certifying condition.")
+                        self._emit_modal(
+                            "warning", "Comparison incomplete",
+                            head + "\n\n" + " ".join(partial_reasons)
+                            + " The workbook contains observed differences, but "
+                            "this is not a complete match/difference certification.")
+                    elif typed.verdict == "match":
+                        self._emit_modal("info", "Everything matches",
+                                         head + "\n\n"
+                                         "The saved workbook has the full "
+                                         "breakdown and self-checks.")
+                    else:
+                        self._emit_modal(
+                            "warning", "Differences found",
+                            head + "\n\nOpen the saved workbook for the "
+                            "cell-by-cell breakdown (Summary → Comparison → "
+                            "Only-in sheets).")
+            else:
+                self._set_dot("ok" if self._authed else "bad", "Done")
         elif result.status == "cancelled":
             self._emit_log(result.message or "Cancelled.")
         else:
             self._emit_log(f"ERROR: {result.message}")
-            self._emit_modal("error", "Consolidation failed", result.message)
+            self._emit_modal(
+                "error", "Comparison failed" if is_comparison else "Consolidation failed",
+                result.message)
         self._flash_taskbar()
         self._end_task()
 

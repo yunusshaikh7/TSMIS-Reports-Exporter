@@ -31,10 +31,13 @@ through the injected `emit` sink + returns a result dict — never print/input/s
 The heavy self-test import lives inside `collect()`, so importing this module is cheap.
 """
 import logging
+import os
+import tempfile
 import time
 import zipfile
 from pathlib import Path
 
+import credential_safety
 import paths
 import settings
 import version
@@ -208,6 +211,28 @@ def _manifest(contents, unreadable, skipped_user, roots):
     return "\n".join(lines) + "\n"
 
 
+def _write_allowlisted_entry(zf, src, arc):
+    """Write one allowlisted entry, redacting diagnostics that are plain text.
+
+    Logs and run reports are useful precisely because they contain messages, so
+    dropping the whole file for one credential-shaped value is needlessly harsh.
+    User-provided PDF/Excel evidence is opaque and must remain byte-identical; the
+    final ZIP scanner rejects publication if one of those members contains a hit.
+    """
+    if arc.startswith("logs/") or arc.startswith("run_reports/"):
+        text = Path(src).read_text(encoding="utf-8", errors="replace")
+        zf.writestr(arc, credential_safety.redact_text(text))
+    else:
+        zf.write(src, arc)
+
+
+def _unlink_quiet(path):
+    try:
+        Path(path).unlink()
+    except OSError:  # silent-ok: temp cleanup after result is already reported; prior bundle stays
+        pass
+
+
 def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
             validation=None):
     """Build the credential-safe evidence zip. Returns a result dict:
@@ -243,7 +268,7 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
             log.warning("evidence: self-test raised (captured into the bundle)", exc_info=True)
     else:
         st_lines.append("self-test skipped (run --collect-evidence on the work PC to capture it).")
-    self_test_text = "\n".join(st_lines) + "\n"
+    self_test_text = credential_safety.redact_text("\n".join(st_lines) + "\n")
 
     # W1: the one-click validation manifest (counts/outcomes/folder names only —
     # never report data, per RM05). Both a readable digest and the raw JSON ride
@@ -254,10 +279,13 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
             import importlib
             import json as _json
             _val_mod = importlib.import_module("validation")   # not `import validation` — the param shadows it
-            validation_txt = "\n".join(_val_mod.summary_lines(validation)) + "\n"
-            validation_json = _json.dumps(validation, indent=2, default=str)
+            validation_txt = credential_safety.redact_text(
+                "\n".join(_val_mod.summary_lines(validation)) + "\n")
+            validation_json = credential_safety.redact_text(
+                _json.dumps(validation, indent=2, default=str))
         except Exception as e:                   # noqa: BLE001 — the bundle still ships
-            validation_txt = f"validation summary unavailable ({type(e).__name__}: {e})\n"
+            validation_txt = credential_safety.redact_text(
+                f"validation summary unavailable ({type(e).__name__}: {e})\n")
             log.warning("evidence: validation render failed (%s)", type(e).__name__)
 
     entries, skipped_user = _allowlisted_entries(extra_dir, roots, emit)
@@ -266,8 +294,14 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
     # any that were unreadable, then write the manifest LAST from that real set — so a
     # locked/unreadable log is listed under SKIPPED, never falsely claimed as bundled.
     written, unreadable = [], []
+    tmp_path = None
+    published_members = []
     try:
-        with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{out_path.name}.", suffix=".tmp",
+                                        dir=str(out_path.parent))
+        os.close(fd)
+        tmp_path = Path(tmp_name)
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("self_test.txt", self_test_text)
             if validation_txt is not None:
                 zf.writestr("validation.txt", validation_txt)
@@ -275,7 +309,7 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
                 zf.writestr("validation.json", validation_json)
             for src, arc in entries:
                 try:
-                    zf.write(src, arc)
+                    _write_allowlisted_entry(zf, src, arc)
                     written.append(arc)
                 except OSError as e:             # one locked file shouldn't sink the bundle
                     unreadable.append((arc, type(e).__name__))
@@ -284,17 +318,47 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
             _val_files = (["validation.txt"] if validation_txt is not None else []) \
                 + (["validation.json"] if validation_json is not None else [])
             contents = ["manifest.txt", "self_test.txt"] + _val_files + written
-            manifest_text = _manifest(contents, unreadable, skipped_user, roots)
+            manifest_text = credential_safety.redact_text(
+                _manifest(contents, unreadable, skipped_user, roots))
             zf.writestr("manifest.txt", manifest_text)
-    except OSError as e:
+
+        with zipfile.ZipFile(tmp_path, "r") as verify_zip:
+            published_members = verify_zip.namelist()
+        if len(published_members) != len(set(published_members)):
+            msg = ("Evidence bundle was not saved because two collected files "
+                   "would have the same archive name.")
+            emit(msg)
+            log.warning("evidence: duplicate archive member names rejected")
+            return {"ok": False, "path": str(out_path), "files": 0,
+                    "excluded": [str(r) for r in roots],
+                    "skipped_user": [p for p, _r in skipped_user], "message": msg}
+
+        # CMP-AUD-117: inspect the exact, closed ZIP that would be published. Text
+        # diagnostics were redacted above; an opaque PDF/XLSX hit cannot be safely
+        # rewritten, so retain any prior good bundle and fail closed.
+        hit = credential_safety.scan_zip_members(tmp_path)
+        if hit:
+            member, kind = hit
+            msg = (f"Evidence bundle was not saved because credential-like content "
+                   f"remained in {member} ({kind}). Remove/redact that source and retry.")
+            emit(msg)
+            log.warning("evidence: final credential scan rejected %s (%s)", member, kind)
+            return {"ok": False, "path": str(out_path), "files": 0,
+                    "excluded": [str(r) for r in roots],
+                    "skipped_user": [p for p, _r in skipped_user], "message": msg}
+        os.replace(tmp_path, out_path)
+    except (OSError, zipfile.BadZipFile) as e:
         msg = f"Could not write the evidence bundle to {out_path} ({type(e).__name__}: {e})."
         emit(msg)
         log.warning("evidence: %s", msg)
         return {"ok": False, "path": str(out_path), "files": 0,
                 "excluded": [str(r) for r in roots],
                 "skipped_user": [p for p, _r in skipped_user], "message": msg}
+    finally:
+        if tmp_path is not None:
+            _unlink_quiet(tmp_path)
 
-    total = len(written) + 2                      # + manifest.txt + self_test.txt
+    total = len(published_members)
     emit("")
     emit(f"Evidence bundle saved ({total} files): {out_path}")
     emit("  It has logs, run reports, the self-test output and only the report/TSN "

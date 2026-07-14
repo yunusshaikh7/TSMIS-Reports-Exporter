@@ -51,7 +51,7 @@ def out_path_for(day):
 
 
 def consolidate(events=None, confirm_overwrite=None, day=None,
-                input_dir=None, out_path=None):
+                input_dir=None, out_path=None, commit_guard=None):
     """Combine every per-route Highway Sequence XLSX into one workbook.
 
     `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") to read; None means
@@ -64,6 +64,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         sheet_name=SHEET_NAME, report_name=REPORT_NAME,
         title="Highway Sequence Consolidation",
         events=events, confirm_overwrite=confirm_overwrite,
+        commit_guard=commit_guard,
     )
 
 

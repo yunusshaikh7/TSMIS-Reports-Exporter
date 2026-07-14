@@ -154,28 +154,77 @@ class MatrixCompareWorker(threading.Thread):
         self.evidence = evidence
 
     def run(self):
-        events = Events(is_cancelled=self.cancel.is_set,
-                        on_log=lambda m: self.q.put(("log", m)))
-        # M03: the comparisons tree the matrix writes under the user-chosen
-        # destination is app-created — stamp it owned (by marker, not by name).
-        if self.dest:
-            owned_dir.ensure_owned_dir(Path(self.dest) / matrix.COMPARISONS_DIRNAME,
-                                       kind="comparisons")
         total = len(self.cells)
         done = errors = 0
+        comparisons_lease = None
+        store_lease = None
+        ownership_loss_reported = False
+
+        def _active_leases():
+            return tuple(lease for lease in (comparisons_lease, store_lease)
+                         if lease is not None)
+
+        def _target_guard(path=None, *, anchor_path=None, anchor_identity=None,
+                          directory_identity=None):
+            """Authorize a mutation only under one of this cell's exact roots."""
+            leases = _active_leases()
+            if not leases or not all(lease.is_current() for lease in leases):
+                return False
+            if path is None:
+                return True
+            return any(lease.is_safe_descendant(
+                path, anchor_path=anchor_path, anchor_identity=anchor_identity,
+                directory_identity=directory_identity) for lease in leases)
+
+        def _is_cancelled():
+            nonlocal ownership_loss_reported
+            if self.cancel.is_set():
+                return True
+            leases = _active_leases()
+            if not leases or all(lease.is_current() for lease in leases):
+                return False
+            if not ownership_loss_reported:
+                ownership_loss_reported = True
+                self.q.put(("log", "  The comparisons destination changed while "
+                                     "a cell was building. Its output will not be committed."))
+            return True
+
+        # Comparison engines poll this during long builds, and commit_workbook
+        # receives the same exact-identity predicate for its final replace.
+        events = Events(is_cancelled=_is_cancelled,
+                        on_log=lambda m: self.q.put(("log", m)))
         try:
+            # This is the one comparison worker that writes beneath the user's
+            # configured Export-Everything destination.  Claim only for actual
+            # work and stop before the builder on any pre-existing untrusted root.
+            if self.dest and total and not self.cancel.is_set():
+                comparisons_lease = owned_dir.require_owned_dir_lease(
+                    Path(self.dest) / matrix.COMPARISONS_DIRNAME,
+                    kind="comparisons")
             for row_key, cell_key, mode_id in self.cells:
                 if self.cancel.is_set():
                     break
+                store_lease = None
+                if comparisons_lease is not None:
+                    comparisons_lease.require_current(action="matrix build")
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
                                             "status": "running",
                                             "done": done, "total": total}))
                 try:
+                    # Cross-environment cells only publish beneath comparisons.
+                    # TSN/self cells also persist consolidation artifacts into the
+                    # cell's already app-created environment store; never create or
+                    # adopt that root from the comparison path.
+                    if self.dest and mode_id != "env":
+                        store_lease = owned_dir.require_existing_owned_dir_lease(
+                            Path(self.dest) / cell_key, kind="store")
                     res = matrix.build_comparison(
                         self.dest, row_key, cell_key, mode_id, self.baseline,
                         events=events, tsn_files=self.tsn_files,
                         force_consolidate=self.force_consolidate,
-                        also_formulas=self.also_formulas, evidence=self.evidence)
+                        also_formulas=self.also_formulas, evidence=self.evidence,
+                        commit_guard=(_target_guard
+                                      if comparisons_lease is not None else None))
                     status = res.status
                     if status != "ok":
                         errors += 1
@@ -189,6 +238,9 @@ class MatrixCompareWorker(threading.Thread):
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
                                             "status": status,
                                             "done": done, "total": total}))
+        except owned_dir.OwnershipError as e:
+            errors = max(errors, total - done)
+            self.q.put(("log", f"  Comparisons were not written: {e}"))
         finally:
             self.q.put(("matrix_done", {"done": done, "total": total,
                                         "errors": errors,
@@ -221,11 +273,8 @@ class DayMatrixCompareWorker(threading.Thread):
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
                         on_log=lambda m: self.q.put(("log", m)))
-        # M03: the comparisons/tsn tree the by-day matrix writes under the
-        # user-chosen destination is app-created — stamp it owned.
-        if self.dest:
-            owned_dir.ensure_owned_dir(Path(self.dest) / matrix.COMPARISONS_DIRNAME,
-                                       kind="comparisons")
+        # Day outputs live under OUTPUT_ROOT/comparisons/tsn-by-day. ``dest`` is
+        # only source/store context, so it must never be claimed as output.
         total = len(self.cells)
         done = errors = 0
         try:
@@ -285,10 +334,9 @@ class BaselineMatrixCompareWorker(threading.Thread):
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
                         on_log=lambda m: self.q.put(("log", m)))
-        # The comparisons/baseline-by-day tree lives under output/ — app-created,
-        # so stamp it owned (M03), like the by-day tree.
-        owned_dir.ensure_owned_dir(baseline_matrix.byday_root().parent,
-                                   kind="comparisons")
+        # Baseline outputs live under the app's dedicated OUTPUT_ROOT and Reset
+        # already scopes that root directly; user-destination ownership is neither
+        # needed nor useful here.
         total = len(self.cells)
         done = errors = 0
         try:
@@ -331,22 +379,50 @@ class MatrixEvidenceWorker(threading.Thread):
     ('matrix_cell', …) / ('matrix_done', …) events as the compare workers so
     the bridge lifecycle is identical."""
 
-    def __init__(self, run_fn, row_key, cell_label, queue, cancel_event):
+    def __init__(self, run_fn, row_key, cell_label, queue, cancel_event,
+                 comparisons_dest=None):
         super().__init__(daemon=True, name="matrix-evidence")
-        self.run_fn = run_fn                   # (events) -> ConsolidateResult
+        self.run_fn = run_fn                   # (events, commit_guard=...) -> result
         self.row_key = row_key
         self.cell_label = cell_label           # env key or date (display only)
         self.q = queue
         self.cancel = cancel_event
+        # User-selected Everything destination. None identifies the app-private
+        # Day Matrix path, which must not claim a batch root.
+        self.comparisons_dest = comparisons_dest
 
     def run(self):
-        events = Events(is_cancelled=self.cancel.is_set,
+        comparisons_lease = None
+
+        def _target_guard(path=None, *, anchor_path=None, anchor_identity=None,
+                          directory_identity=None):
+            lease = comparisons_lease
+            if lease is None:
+                return False
+            if path is None:
+                return lease.is_current()
+            return lease.is_safe_descendant(
+                path, anchor_path=anchor_path, anchor_identity=anchor_identity,
+                directory_identity=directory_identity)
+
+        def _is_cancelled():
+            return (self.cancel.is_set()
+                    or (comparisons_lease is not None
+                        and not comparisons_lease.is_current()))
+
+        events = Events(is_cancelled=_is_cancelled,
                         on_log=lambda m: self.q.put(("log", m)))
         errors = 0
         self.q.put(("matrix_cell", {"row": self.row_key, "cell": self.cell_label,
                                     "status": "running", "done": 0, "total": 1}))
         try:
-            res = self.run_fn(events)
+            if self.comparisons_dest:
+                comparisons_lease = owned_dir.require_existing_owned_dir_lease(
+                    Path(self.comparisons_dest) / matrix.COMPARISONS_DIRNAME,
+                    kind="comparisons")
+                res = self.run_fn(events, commit_guard=_target_guard)
+            else:
+                res = self.run_fn(events)
             status = res.status
             if status != "ok":
                 errors = 1

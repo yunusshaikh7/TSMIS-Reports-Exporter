@@ -5,8 +5,11 @@ ChromiumWorker (built-in browser download/delete), ValidationWorker (the
 one-click validate-and-package flow), UpdateWorker (the one-click update), and
 the launch-time CheckWorker. Verbatim moves; gui_worker re-exports.
 """
+import dataclasses
 import logging
 import re
+import secrets
+import stat
 import threading
 import time
 from pathlib import Path
@@ -33,6 +36,91 @@ _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_summary_excel",
                        "run_reports", "comparisons")
 
 
+def _entry_identity(path):
+    """Replacement-sensitive identity for one directory entry.
+
+    Unlike ``Path.resolve()``, this identifies the entry itself (including a
+    root reparse point) and works for both files and directories.  A filesystem
+    that cannot provide a stable file ID is intentionally ineligible for Reset.
+    """
+    try:
+        st = Path(path).lstat()
+    except OSError:  # silent-ok: an unavailable identity is the fail-closed result
+        return None
+    if not st.st_ino:
+        return None
+    attrs = getattr(st, "st_file_attributes", 0)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return (st.st_dev, st.st_ino, stat.S_IFMT(st.st_mode),
+            bool(attrs & reparse_flag))
+
+
+@dataclasses.dataclass(frozen=True)
+class ResetTarget:
+    """One exact entry the Reset preview authorized.
+
+    ``scope_root`` is the resolved parent inside which the entry may be
+    quarantined.  Store children additionally carry their purpose and the
+    ownership module's plain-directory identity so the marker can be rechecked
+    after the atomic rename and before recursive deletion.
+    """
+    label: str
+    path: Path
+    entry_identity: tuple
+    scope_root: Path
+    scope_identity: tuple
+    ownership_kind: str | None = None
+    directory_identity: tuple | None = None
+
+    def __iter__(self):
+        # Preserve the long-standing ``for label, path in reset_targets()`` API.
+        yield self.label
+        yield self.path
+
+
+def _capture_target(label, path, *, scope_root=None, ownership_kind=None):
+    """Bind a candidate path to its current entry, scope, and optional marker."""
+    path = Path(path)
+    try:
+        scope = Path(scope_root or path.parent).resolve(strict=True)
+        if path.parent.resolve(strict=True) != scope:
+            return None
+    except OSError:  # silent-ok: caller warns and excludes an identity it cannot bind
+        return None
+    entry_id = _entry_identity(path)
+    scope_id = _entry_identity(scope)
+    if entry_id is None or scope_id is None:
+        return None
+    directory_id = None
+    if ownership_kind is not None:
+        directory_id = owned_dir.directory_identity(path)
+        if (directory_id is None
+                or not owned_dir.is_owned(path, kind=ownership_kind)
+                or owned_dir.directory_identity(path) != directory_id):
+            return None
+    if (_entry_identity(path) != entry_id
+            or _entry_identity(scope) != scope_id):
+        return None
+    return ResetTarget(label=label, path=path, entry_identity=entry_id,
+                       scope_root=scope, scope_identity=scope_id,
+                       ownership_kind=ownership_kind,
+                       directory_identity=directory_id)
+
+
+def _append_target(targets, label, path, *, scope_root=None,
+                   ownership_kind=None, warnings=None):
+    target = _capture_target(label, path, scope_root=scope_root,
+                             ownership_kind=ownership_kind)
+    if target is not None:
+        targets.append(target)
+        return True
+    log.warning("reset: could not bind target identity for %s; left untouched", path)
+    if warnings is not None:
+        warnings.append(f"'{Path(path).name}' could not be bound to a stable file "
+                        "identity — left untouched")
+    return False
+
+
 def reset_targets(include_input=False, warnings=None):
     """The folders/files "Delete all reports" removes, as (label, Path) pairs
     that currently exist. Reports only — logs, the saved login, the Edge
@@ -41,13 +129,15 @@ def reset_targets(include_input=False, warnings=None):
     try:
         for p in sorted(OUTPUT_ROOT.iterdir()):
             if p.is_dir() and parse_run_folder(p.name):
-                targets.append((f"export run folder '{p.name}'", p))
+                _append_target(targets, f"export run folder '{p.name}'", p,
+                               scope_root=OUTPUT_ROOT, warnings=warnings)
     except OSError:
         pass
     for name in _LEGACY_OUTPUT_DIRS:
         p = OUTPUT_ROOT / name
         if p.is_dir():
-            targets.append((f"output folder '{name}'", p))
+            _append_target(targets, f"output folder '{name}'", p,
+                           scope_root=OUTPUT_ROOT, warnings=warnings)
     for fname, lbl in (("tsn_highway_log_consolidated.xlsx", "TSN consolidated workbook"),
                        ("tsmis_highway_log_pdf_consolidated.xlsx",
                         "TSMIS Highway Log (PDF) consolidated workbook"),
@@ -61,40 +151,68 @@ def reset_targets(include_input=False, warnings=None):
                         "TSMIS Ramp Detail (PDF) consolidated workbook")):
         p = OUTPUT_ROOT / fname
         if p.is_file():
-            targets.append((lbl, p))
+            _append_target(targets, lbl, p, scope_root=OUTPUT_ROOT,
+                           warnings=warnings)
     # The Export Everything "always-current" store (configurable destination,
     # default output/All Reports (current)) holds generated reports too. The
     # destination is user-chosen and NOT validated as app-owned, so NEVER rmtree
-    # it wholesale — only its known "<src-env>/" children (the exact folders the
-    # batch writer creates, BatchWorker out_base = dest/"<src>-<env>"). Any
-    # foreign files the user keeps alongside the store are left untouched.
+    # it wholesale. A child is selectable only when all three independent bounds
+    # agree: direct child of this configured root, expected app layout/name, and
+    # a current create-and-mark claim for that exact purpose. Any ambiguity is
+    # retained and explained in the preview.
     try:
         from settings import get_batch_dest
         from common import DATA_SOURCES, ENVIRONMENTS
         bdest = Path(get_batch_dest())
         known = {f"{s}-{e}" for s in DATA_SOURCES for e in ENVIRONMENTS}
         if bdest.is_dir():
+            resolved_root = bdest.resolve(strict=True)
             for child in sorted(bdest.iterdir()):
                 if not child.is_dir():
                     continue
-                # SEC-02 (v0.19.0): the ownership MARKER is now REQUIRED — it
-                # proves the app created this dir, whatever its name. The legacy
-                # name fallback (retired; it stamped-on-sight through v0.18.x) let
-                # a user folder that merely LOOKED like a store dir (e.g. their
-                # own 'ssor-prod') be deleted. An unmarked dir with a store-like
-                # name is now SURFACED as a warning and left untouched.
-                by_name = child.name in known or child.name == "comparisons"
-                if owned_dir.is_owned(child):
-                    targets.append(
-                        (f"Export Everything store: {child.name}", child))
-                elif by_name:
-                    log.warning("reset: %s looks like a store folder but has no "
-                                "ownership marker; leaving it untouched", child)
+                try:
+                    direct_child = child.parent.resolve(strict=True) == resolved_root
+                except OSError:  # silent-ok: unresolved provenance fails closed and warns below
+                    direct_child = False
+                expected_kind = ("store" if child.name in known else
+                                 "comparisons" if child.name == "comparisons" else None)
+                status = owned_dir.ownership_status(child, kind=expected_kind)
+                if direct_child and expected_kind and status == owned_dir.OWNED:
+                    _append_target(
+                        targets, f"Export Everything store: {child.name}", child,
+                        scope_root=resolved_root, ownership_kind=expected_kind,
+                        warnings=warnings)
+                    continue
+
+                if expected_kind:
+                    if status == owned_dir.LEGACY:
+                        reason = ("was marked by an older app version — left untouched; "
+                                  "re-export to re-adopt it after moving the old folder, "
+                                  "or delete it manually")
+                    elif status == owned_dir.WRONG_KIND:
+                        reason = (f"has an ownership marker for a different purpose "
+                                  f"(expected {expected_kind}) — left untouched")
+                    elif status == owned_dir.MISSING:
+                        reason = ("looks like a store folder but isn't marked as "
+                                  "created by this app — left untouched")
+                    else:
+                        reason = ("has an invalid or corrupt ownership marker — "
+                                  "left untouched")
+                    if not direct_child:
+                        reason = "is outside the configured store root — left untouched"
+                    log.warning("reset: %s %s", child, reason)
                     if warnings is not None:
-                        warnings.append(
-                            f"'{child.name}' looks like a store folder but isn't "
-                            "marked as created by this app — left untouched "
-                            "(delete it manually if it is one)")
+                        warnings.append(f"'{child.name}' {reason} "
+                                        "(delete it manually if appropriate)")
+                elif status != owned_dir.MISSING:
+                    # A marker alone cannot bless an unexpected layout/name. This
+                    # also keeps future/custom store shapes fail-closed until the
+                    # Reset contract explicitly understands them.
+                    reason = ("has an ownership marker but isn't an expected store "
+                              "folder — left untouched")
+                    log.warning("reset: %s %s", child, reason)
+                    if warnings is not None:
+                        warnings.append(f"'{child.name}' {reason}")
     except Exception as e:
         # The delete list is a PROMISE -- if the store can't be enumerated the
         # preview must say so, not silently omit it (the user would believe
@@ -105,11 +223,13 @@ def reset_targets(include_input=False, warnings=None):
             warnings.append("the Export Everything store could not be "
                             "inspected — its reports may not be listed")
     if FAILURES_DIR.is_dir():
-        targets.append(("failure screenshots", FAILURES_DIR))
+        _append_target(targets, "failure screenshots", FAILURES_DIR,
+                       scope_root=FAILURES_DIR.parent, warnings=warnings)
     if include_input:
         p = INPUT_ROOT / "tsn_highway_log"
         if p.is_dir():
-            targets.append(("TSN input PDFs", p))
+            _append_target(targets, "TSN input PDFs", p,
+                           scope_root=INPUT_ROOT, warnings=warnings)
         # The Export-Everything store's TSN drops (user-placed TSN datasets) are
         # inputs too, so they only clear with include_input (the generated TSN
         # comparison sheets under comparisons/tsn are covered by "comparisons").
@@ -121,7 +241,9 @@ def reset_targets(include_input=False, warnings=None):
             from settings import get_batch_dest
             tsn_in = Path(get_batch_dest()) / "_tsn_input"
             if tsn_in.is_dir():
-                targets.append(("Export Everything store: _tsn_input", tsn_in))
+                _append_target(targets, "Export Everything store: _tsn_input",
+                               tsn_in, scope_root=tsn_in.parent,
+                               warnings=warnings)
         except Exception as e:
             log.warning("reset: could not inspect the store's _tsn_input "
                         "(%s: %s)", type(e).__name__, str(e).splitlines()[0] if str(e) else "")
@@ -151,6 +273,104 @@ def measure_targets(targets):
         except OSError:
             pass
     return files, size
+
+
+def _entry_exists(path):
+    try:
+        Path(path).lstat()
+        return True
+    except OSError:  # silent-ok: used only to avoid overwriting a raced entry
+        return False
+
+
+def _scope_matches(target):
+    try:
+        return (_entry_identity(target.scope_root) == target.scope_identity
+                and target.path.parent.resolve(strict=True)
+                == target.scope_root.resolve(strict=True))
+    except OSError:  # silent-ok: an unresolved scope is the fail-closed mismatch result
+        return False
+
+
+def _restore_quarantine(target, quarantine):
+    """Best-effort restore without ever overwriting a raced replacement."""
+    quarantine = Path(quarantine)
+    if not _entry_exists(quarantine):
+        return "the selected entry is no longer reachable"
+    if _entry_exists(target.path):
+        return f"retained safely at '{quarantine}' because the original path is occupied"
+    try:
+        quarantine.rename(target.path)
+        return "restored to its original path and left untouched"
+    except OSError as e:
+        return (f"retained safely at '{quarantine}' because it could not be restored "
+                f"({type(e).__name__})")
+
+
+def _quarantine_target(target):
+    """Atomically detach exactly the previewed entry before deletion.
+
+    Returns ``(quarantine_path, None)`` when the handoff is proven, ``(None,
+    None)`` when the target is already gone, or ``(None, message)`` when it must
+    be retained.  The identity and ownership marker are checked only *after*
+    the rename, so replacing the source pathname cannot transfer deletion
+    authority to the replacement.
+    """
+    if not isinstance(target, ResetTarget):
+        return None, "has no preview-bound identity — left untouched"
+    if not _scope_matches(target):
+        return None, "its configured root changed after preview — left untouched"
+
+    quarantine = None
+    for _attempt in range(16):
+        candidate = target.scope_root / (
+            f".{target.path.name}.tsmis-reset-{secrets.token_hex(8)}")
+        if not _entry_exists(candidate):
+            quarantine = candidate
+            break
+    if quarantine is None:
+        return None, "could not reserve a safe quarantine name — left untouched"
+
+    try:
+        target.path.rename(quarantine)
+    except FileNotFoundError:
+        return None, None
+    except OSError as e:
+        return None, (f"could not be moved into the safe delete boundary "
+                      f"({type(e).__name__}) — left untouched")
+
+    reason = None
+    if (_entry_identity(target.scope_root) != target.scope_identity
+            or _entry_identity(quarantine) != target.entry_identity):
+        reason = "its directory entry changed after preview"
+    elif target.ownership_kind is not None:
+        if (owned_dir.directory_identity(quarantine) != target.directory_identity
+                or not owned_dir.is_owned(
+                    quarantine, kind=target.ownership_kind)
+                or owned_dir.directory_identity(quarantine)
+                != target.directory_identity
+                or _entry_identity(quarantine) != target.entry_identity):
+            reason = "its ownership marker or directory identity changed after preview"
+    if reason is not None:
+        restored = _restore_quarantine(target, quarantine)
+        return None, f"{reason}; {restored}"
+    return quarantine, None
+
+
+def _quarantine_still_matches(target, quarantine):
+    """Final fail-closed check immediately before the recursive delete."""
+    if (_entry_identity(target.scope_root) != target.scope_identity
+            or _entry_identity(quarantine) != target.entry_identity):
+        return False
+    if target.ownership_kind is None:
+        return True
+    if (owned_dir.directory_identity(quarantine) != target.directory_identity
+            or not owned_dir.is_owned(
+                quarantine, kind=target.ownership_kind)):
+        return False
+    return (owned_dir.directory_identity(quarantine) == target.directory_identity
+            and _entry_identity(quarantine) == target.entry_identity
+            and _entry_identity(target.scope_root) == target.scope_identity)
 
 
 class ValidationWorker(threading.Thread):
@@ -194,8 +414,16 @@ class ValidationWorker(threading.Thread):
                 "path": res.get("path"),
                 "comparisons_run": totals.get("comparisons_run", 0),
                 "comparisons_ok": totals.get("comparisons_ok", 0),
+                "comparisons_partial": totals.get("comparisons_partial", 0),
+                "comparisons_untrusted": totals.get("comparisons_untrusted", 0),
+                "comparisons_failed": totals.get("comparisons_failed", 0),
+                "comparisons_cancelled": totals.get("comparisons_cancelled", 0),
+                "comparisons_blocked": totals.get("comparisons_blocked", 0),
                 "cancelled": totals.get("cancelled", False),
             }
+            if not terminal["ok"]:
+                terminal["message"] = (res.get("message")
+                                       or "the evidence bundle could not be created")
         except Exception as e:                   # noqa: BLE001 — never wedge the gate
             log.warning("validation worker failed (%s: %s)", type(e).__name__,
                         str(e).splitlines()[0] if str(e) else "")
@@ -213,57 +441,101 @@ class ResetWorker(threading.Thread):
     Excel still holds are reported, never silently skipped. Posts progress as
     ('log', ...) lines and one final ('reset_done', {files, mb, errors})."""
 
-    def __init__(self, queue, include_input=False, cancel_event=None):
+    def __init__(self, queue, include_input=False, cancel_event=None, targets=None):
         super().__init__(daemon=True, name="reset")
         self.q = queue
         self.include_input = include_input
         self.cancel = cancel_event
+        # When launched from the GUI this is the exact immutable preview set.
+        # ``None`` preserves the direct/internal worker API, which takes one fresh
+        # bound snapshot at run start rather than operating on bare paths.
+        self.targets = tuple(targets) if targets is not None else None
 
     def run(self):
-        targets = reset_targets(self.include_input)
+        targets = (list(self.targets) if self.targets is not None
+                   else reset_targets(self.include_input))
         files, size = measure_targets(targets)
         errors = []
         cancelled = False
+        freed_files = 0
+        freed_size = 0
         ui = logging.getLogger("tsmis.ui")
         log.info("reset: deleting %d target(s), %d file(s), %.1f MB (input=%s)",
                  len(targets), files, size / 1e6, self.include_input)
-        for label, path in targets:
+        for target in targets:
+            label, path = target
             # Cancellable between targets (a partial delete is harmless -- a
             # re-run removes the rest). The current folder finishes first.
             if self.cancel is not None and self.cancel.is_set():
                 cancelled = True
                 self.q.put(("log", "  Cancelled — stopped after the current item."))
                 break
+            before_files, before_size = measure_targets([target])
+            quarantine, handoff_error = _quarantine_target(target)
+            if handoff_error:
+                msg = f"Could not safely delete {label}: {handoff_error}"
+                errors.append(msg)
+                ui.info("reset: %s", msg)
+                self.q.put(("log", f"  {msg}"))
+                continue
+            if quarantine is None:
+                self.q.put(("log", f"  {label} was already gone."))
+                continue
+
+            # An unpredictable, same-parent quarantine closes the path-replace
+            # race. Recheck once more at the destructive boundary in case the
+            # root or quarantine was disturbed after the handoff.
+            if not _quarantine_still_matches(target, quarantine):
+                restored = _restore_quarantine(target, quarantine)
+                msg = (f"Could not safely delete {label}: its identity changed at "
+                       f"the delete boundary; {restored}.")
+                errors.append(msg)
+                ui.info("reset: %s", msg)
+                self.q.put(("log", f"  {msg}"))
+                continue
             failures = []
 
             def on_error(_fn, p, _exc):
                 failures.append(str(p))
 
             try:
-                if path.is_file():
-                    path.unlink()
+                if quarantine.is_file():
+                    quarantine.unlink()
                 else:
                     # Junction/symlink-safe: a reparse point INSIDE (or AS) a
                     # target is unlinked, never recursed through, so "Delete all
                     # reports" can never escape into a link's target outside the
                     # folder being cleared (safe_delete; same onerror contract as
                     # shutil.rmtree so locked files are still reported).
-                    safe_delete.scoped_rmtree(path, onerror=on_error)
+                    safe_delete.scoped_rmtree(quarantine, onerror=on_error)
             except OSError as e:
-                failures.append(f"{path} ({type(e).__name__})")
+                failures.append(f"{quarantine} ({type(e).__name__})")
+            if _entry_exists(quarantine) and not failures:
+                failures.append(str(quarantine))
+            remaining_files, remaining_size = measure_targets(
+                [(label, quarantine)] if _entry_exists(quarantine) else [])
+            freed_files += max(0, before_files - remaining_files)
+            freed_size += max(0, before_size - remaining_size)
             if failures:
                 msg = (f"Could not delete {len(failures)} item(s) from {label} — "
                        "a file is probably open in Excel.")
+                if _entry_exists(quarantine):
+                    msg += " The remainder was " + _restore_quarantine(
+                        target, quarantine) + "."
                 errors.append(msg)
                 ui.info("reset: %s: %s", msg, failures[:5])
                 self.q.put(("log", f"  {msg}"))
             else:
                 self.q.put(("log", f"  Deleted {label}."))
-        # Report what was ACTUALLY freed (before − what remains), so files held
-        # open in Excel (or skipped by a cancel) aren't counted as deleted.
-        remaining_files, remaining_size = measure_targets(targets)
-        freed_files = max(0, files - remaining_files)
-        freed_size = max(0, size - remaining_size)
+            if not failures and _entry_exists(path):
+                # Something appeared at the approved pathname after quarantine.
+                # It is a different entry by construction and is never folded
+                # into this run's deletion authority.
+                msg = (f"A new item appeared at '{path}' during Reset and was left "
+                       "untouched; preview again if it should also be deleted.")
+                errors.append(msg)
+                ui.info("reset: %s", msg)
+                self.q.put(("log", f"  {msg}"))
         self.q.put(("reset_done", {"files": freed_files,
                                    "mb": round(freed_size / 1e6, 1),
                                    "errors": errors, "cancelled": cancelled}))

@@ -19,6 +19,7 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_highway_detail_tsn as hdt
+import outcome
 import tsn_library
 from events import ConsolidateResult
 
@@ -36,29 +37,18 @@ def tsn_rows_with_dcr(path):
     PLUS each row's (district, county) — a separate loop so the comparator's
     regression-locked loader stays untouched."""
     _s = hdt._s
-    wb = load_workbook(path, read_only=True, data_only=True)
-    try:
-        sn = hdt.TSN_SHEET if hdt.TSN_SHEET in wb.sheetnames else wb.sheetnames[0]
-        it = wb[sn].iter_rows(values_only=True)
-        header = list(next(it, []) or [])
-        h = {str(n).strip(): i for i, n in enumerate(header) if n is not None}
-        if "POSTMILE" not in h or "RTE" not in h:
-            raise ValueError("the TSN Highway Detail workbook is missing "
-                             "RTE/POSTMILE — pick the raw 'TSAR - HIGHWAY "
-                             "DETAIL' statewide export.")
+    with hdt.ctc.exact_raw_rows(
+            path, hdt.TSN_SHEET, hdt.TSN_RAW_HEADER, hdt.REPORT_NAME,
+            required_nonblank=("DIST", "CNTY", "RTE", "POSTMILE")) as (header, rows_in):
+        h = {n: i for i, n in enumerate(header)}
         rows, dcr = [], []
         di, ci = h.get("DIST"), h.get("CNTY")
-        for raw in it:
-            r = list(raw)
-            if not any(c not in (None, "") for c in r):
-                continue
+        for r in rows_in:
             rows.append(hdt._tsn_row(r, h))
             dist = _s(r[di]) if di is not None and di < len(r) else ""
             cnty = _s(r[ci]).rstrip(".") if ci is not None and ci < len(r) else ""
             dcr.append((dist, cnty))
         return rows, dcr
-    finally:
-        wb.close()
 
 
 def _project(raw_path):
@@ -73,7 +63,10 @@ def _project(raw_path):
             status="ok",
             message=f"Normalized {len(rows)} TSN Highway Detail rows ({n_routes} routes).",
             summary_lines=[f"TSN Highway Detail: {len(rows)} rows, {n_routes} routes "
-                           f"-> {out_name}"])
+                           f"-> {out_name}"],
+            completion=outcome.COMPLETE,
+            skipped_inputs=0,
+            failed_inputs=0)
 
     return rows, make_result
 

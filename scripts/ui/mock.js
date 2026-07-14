@@ -233,6 +233,7 @@ function makeMockApi() {
     };
   }
   let timer = null;
+  let mockCompareOverwrite = null;
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
 
@@ -743,7 +744,7 @@ function makeMockApi() {
     timer = setTimeout(nextEnv, 350);
   }
 
-  return {
+  const mockApi = {
     get_initial_state: async () => ({
       // P9: mirror the backend's bridge-enum surface (gui_api.get_initial_state ->
       // contract.initial_state_enums) so the preview's init payload matches production.
@@ -1531,9 +1532,23 @@ function makeMockApi() {
     pick_compare_folder: async () => ({
       path: "D:\\Archive\\2026-05-02 ssor-prod",
     }),
-    start_compare_env: async (_key, dirA, dirB, wantFormulas, wantValues) => {
+    start_compare_env: async (_key, dirA, dirB, wantFormulas, wantValues,
+                              _confirmed = false) => {
       if (!wantFormulas && !wantValues) {
         return { error: "Tick at least one output (values and/or live formulas)." };
+      }
+      if (wantFormulas && wantValues && !_confirmed) {
+        const token = `mock-compare-${Date.now()}-${Math.random()}`;
+        const path = "C:\\Tools\\TSMIS Exporter\\output\\Environment Comparison (values).xlsx";
+        mockCompareOverwrite = {
+          token,
+          launch: () => mockApi.start_compare_env(
+            _key, dirA, dirB, wantFormulas, wantValues, true),
+        };
+        return {
+          confirm_required: true, confirm_token: token, path,
+          message: `The automatically created values workbook already exists:\n\n${path}\n\nOverwrite this exact file? The formulas workbook remains the file selected in the Save dialog.`,
+        };
       }
       st.task = "compare";
       st.auth_dot = "busy"; st.auth_text = "Comparing…";
@@ -1562,9 +1577,23 @@ function makeMockApi() {
       }, 2400);
       return { ok: true };
     },
-    start_compare: async (_key, _t, _n, wantFormulas, wantValues) => {
+    start_compare: async (_key, _t, _n, wantFormulas, wantValues,
+                          _confirmed = false) => {
       if (!wantFormulas && !wantValues) {
         return { error: "Tick at least one output (values and/or live formulas)." };
+      }
+      if (wantFormulas && wantValues && !_confirmed) {
+        const token = `mock-compare-${Date.now()}-${Math.random()}`;
+        const path = "C:\\Users\\you\\Downloads\\TSMIS_vs_TSN_Route1_Comparison (values).xlsx";
+        mockCompareOverwrite = {
+          token,
+          launch: () => mockApi.start_compare(
+            _key, _t, _n, wantFormulas, wantValues, true),
+        };
+        return {
+          confirm_required: true, confirm_token: token, path,
+          message: `The automatically created values workbook already exists:\n\n${path}\n\nOverwrite this exact file? The formulas workbook remains the file selected in the Save dialog.`,
+        };
       }
       const kinds = wantFormulas && wantValues ? "values + live formulas"
         : wantFormulas ? "live formulas" : "values";
@@ -1585,6 +1614,15 @@ function makeMockApi() {
         pushState();
       }, 2400);
       return { ok: true };
+    },
+    confirm_compare_overwrite: async (confirmToken, accepted) => {
+      const pending = mockCompareOverwrite;
+      if (!pending || confirmToken !== pending.token) {
+        return { error: "That comparison confirmation is no longer valid. Start the comparison again." };
+      }
+      mockCompareOverwrite = null;
+      if (accepted !== true) return { cancelled: true };
+      return pending.launch();
     },
     decline_overwrite: async () => push({ t: "log", text: "Consolidation cancelled (kept existing file)." }),
     start_consolidate: async (key, day) => {
@@ -1667,6 +1705,7 @@ function makeMockApi() {
       return { ok: true };
     },
   };
+  return mockApi;
 }
 
 

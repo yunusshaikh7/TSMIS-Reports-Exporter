@@ -269,14 +269,15 @@ class GuiSettingsMixin:
         confirm dialog so the user approves a concrete list, not a vibe. Also
         issues the single-use confirm token start_reset requires (server-side
         gate: the delete can't run unless a preview was shown for the same
-        include_input)."""
+        include_input). The token also retains the exact identity-bound target
+        set, so execution cannot silently expand beyond the displayed preview."""
         include_input = bool(include_input)
         warns = []
         targets = reset_targets(include_input, warnings=warns)
         files, size = measure_targets(targets)
         token = secrets.token_urlsafe(16)
         with self._lock:
-            self._reset_token = (token, include_input)
+            self._reset_token = (token, include_input, tuple(targets))
         # Enumeration warnings ride the LABEL list only (no path -> the dialog
         # renders them as plain lines); the delete path never sees them.
         return {"targets": [label for label, _p in targets]
@@ -292,7 +293,8 @@ class GuiSettingsMixin:
         """Delete all generated reports. Server-side confirmation: requires the
         single-use token reset_preview issued for the SAME include_input, so a
         direct bridge call can't skip the preview the user approved. Logs, the
-        saved login and the settings always survive."""
+        saved login and the settings always survive. The worker receives the
+        exact target identities captured by the matching preview."""
         include_input = bool(include_input)
         with self._lock:
             expected = self._reset_token
@@ -302,6 +304,7 @@ class GuiSettingsMixin:
                            "must be shown first)")
             return {"error": "Please confirm the delete from the dialog "
                              "(open 'Delete all reports' again)."}
+        preview_targets = expected[2]
         err = self._claim_task_error("reset")
         if err:
             return err
@@ -314,7 +317,8 @@ class GuiSettingsMixin:
                     "label": "Deleting reports…"})
         self._push_state()
         ResetWorker(self._gated_queue(), include_input=include_input,
-                    cancel_event=self.cancel_event).start()
+                    cancel_event=self.cancel_event,
+                    targets=preview_targets).start()
         return {"ok": True}
 
     def _on_reset_done(self, payload):
@@ -325,8 +329,9 @@ class GuiSettingsMixin:
             for line in payload["errors"]:
                 self._emit_log(f"  {line}")
             self._emit_modal("warning", "Some files couldn't be deleted",
-                             "Close any report files still open in Excel, "
-                             "then run 'Delete all reports' again.")
+                             "Review the activity details. Close any report files "
+                             "still open in Excel, then open 'Delete all reports' "
+                             "again to preview what remains.")
         elif payload.get("cancelled"):
             self._emit_log(f"Cancelled — deleted {payload['files']} file(s) "
                            f"({payload['mb']} MB) before stopping. Logs, your "
@@ -359,8 +364,23 @@ class GuiSettingsMixin:
             ran = payload.get("comparisons_run", 0)
             ok = payload.get("comparisons_ok", 0)
             partial = payload.get("comparisons_partial", 0)
+            untrusted = payload.get("comparisons_untrusted", 0)
+            failed = payload.get("comparisons_failed", 0)
+            blocked = payload.get("comparisons_blocked", 0)
+            cancelled_cells = payload.get("comparisons_cancelled", 0)
             tail = " (cancelled early)" if payload.get("cancelled") else ""
-            ptail = f", {partial} on partial inputs" if partial else ""
+            buckets = []
+            if partial:
+                buckets.append(f"{partial} partial")
+            if untrusted:
+                buckets.append(f"{untrusted} untrusted")
+            if failed:
+                buckets.append(f"{failed} failed")
+            if blocked:
+                buckets.append(f"{blocked} blocked")
+            if cancelled_cells:
+                buckets.append(f"{cancelled_cells} cancelled")
+            ptail = f"; {', '.join(buckets)}" if buckets else ""
             self._emit_log(f"Validation complete{tail}: {ok} of {ran} sample "
                            f"comparisons fully OK{ptail}. Evidence bundle saved:")
             self._emit_log(f"  {payload.get('path')}")

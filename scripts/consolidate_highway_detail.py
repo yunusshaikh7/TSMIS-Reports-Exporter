@@ -54,7 +54,7 @@ def out_path_for(day):
 
 
 def consolidate(events=None, confirm_overwrite=None, day=None,
-                input_dir=None, out_path=None):
+                input_dir=None, out_path=None, commit_guard=None):
     """Combine every per-route Highway Detail XLSX into one workbook.
 
     `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") to read;
@@ -67,6 +67,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         sheet_name=SHEET_NAME, report_name=REPORT_NAME,
         title="Highway Detail Consolidation",
         events=events, confirm_overwrite=confirm_overwrite,
+        commit_guard=commit_guard,
         # The export labels are already correct; add the legend meanings as
         # hover tooltips + a Legend sheet.
         header_comment=hdc.comment_for,

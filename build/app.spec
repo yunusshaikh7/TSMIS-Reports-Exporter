@@ -67,7 +67,7 @@ MANIFEST = os.path.join(SPECPATH, "app.manifest")
 APP_MODULES = [
     "version", "paths", "common", "errors", "site_target", "timeouts", "routes",
     "browser_channels", "auth_nav", "report_nav", "edge_device", "session",
-    "events", "outcome", "cache_envelope",
+    "events", "outcome", "comparison_contract", "cache_envelope", "credential_safety",
     "consolidation_meta", "artifact_store", "contract", "task_coordinator",
     "safe_delete", "owned_dir",          # P12 fs-safety: junction-safe reset + M03 ownership marker
     "exporter", "exporter_parallel",

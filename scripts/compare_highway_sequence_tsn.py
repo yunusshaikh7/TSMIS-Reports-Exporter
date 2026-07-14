@@ -247,7 +247,7 @@ def _load_pair(tsmis_path, tsn_path):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas"):
+            mode="formulas", commit_guard=None):
     """Build the Highway Sequence TSMIS-vs-TSN comparison workbook(s). `tsmis_path`
     is the consolidated TSMIS Highway Sequence workbook; `tsn_path` the normalized
     TSN workbook (from consolidate_tsn_highway_sequence)."""
@@ -256,4 +256,5 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         banner="Highway Sequence Comparison — TSMIS vs TSN", has_route=True,
         loader=_load_pair, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
-        events=events, confirm_overwrite=confirm_overwrite, mode=mode)
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode,
+        commit_guard=commit_guard)

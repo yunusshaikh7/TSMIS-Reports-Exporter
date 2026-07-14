@@ -36,6 +36,7 @@ Console-free like the other consolidators: progress via events.on_log, overwrite
 through the confirm_overwrite callback, cancel honored between pages, a
 ConsolidateResult returned. The console UX lives in cli.run_consolidate_cli.
 """
+import io
 import logging
 import re
 from pathlib import Path
@@ -57,6 +58,7 @@ from events import ConsolidateResult, Events
 from pdf_table_lib import cluster_by_top, norm_route
 import outcome
 import artifact_store
+import tsn_district_contract as tdc
 from paths import INPUT_ROOT, OUTPUT_ROOT
 
 # Standalone / console (.bat) default locations — see the matching note in
@@ -105,7 +107,7 @@ COUNTY_RE = re.compile(r"^[A-Z]{2,4}\.?$")
 DIST_RE = re.compile(r"^\d{1,3}\.\d{3}$")
 # Centered group header: "DIST 01 RTE 001 DIR S-N" (route may be suffixed: 005S).
 GROUP_RE = re.compile(r"\bDIST\s+(\d+)\s+RTE\s+(\w+)\s+DIR\b")
-DISTRICT_FROM_NAME = re.compile(r"D(\d{1,2})", re.IGNORECASE)
+GROUP_LIKE_RE = re.compile(r"\bDIST\b.*\bRTE\b.*\bDIR\b", re.IGNORECASE)
 
 
 def _bucket(x0):
@@ -139,10 +141,9 @@ def _parse_line(ws):
 
 
 def parse_pdf(path, events, pdf_name=""):
-    """Parse one TSN district HSL PDF -> {route: [row_dict, ...]} in document
-    order. Each row_dict has county/pm/city/hg/ft/dist/description. Raises on
-    cancel (returns (None,) sentinel handled by caller via None result)."""
+    """Parse one HSL PDF -> ``(internal district, routes)`` in document order."""
     routes = {}
+    district_claims = []
     route = None
     county = None              # carried onto equate-annotation rows (no county token)
     last_row = None            # a wrapped description line attaches here
@@ -151,7 +152,7 @@ def parse_pdf(path, events, pdf_name=""):
         n_pages = len(pdf.pages)
         for page_no, page in enumerate(pdf.pages, 1):
             if events.is_cancelled():
-                return None
+                return None, None
             if page_no % 25 == 0:
                 events.on_log(f"    …page {page_no}/{n_pages}")
             words = page.extract_words(use_text_flow=False, keep_blank_chars=False)
@@ -160,11 +161,16 @@ def parse_pdf(path, events, pdf_name=""):
 
                 gm = GROUP_RE.search(text)
                 if gm:
+                    district_claims.append(gm.group(1))
                     route = _norm_route(gm.group(2))
                     routes.setdefault(route, [])
                     county = None
                     last_row = None
                     continue
+                if GROUP_LIKE_RE.search(text):
+                    raise ValueError(
+                        f"{pdf_name} p{page_no}: malformed DIST/RTE/DIR group header "
+                        f"cannot safely own following rows: {text!r}")
 
                 cols = _parse_line(line)
                 co = (cols.get("county") or [""])[0]
@@ -185,9 +191,9 @@ def parse_pdf(path, events, pdf_name=""):
                 # Data line: a county code AND a postmile in their windows.
                 if COUNTY_RE.match(co) and pm:
                     if route is None:
-                        events.on_log(f"    {pdf_name} p{page_no}: data before any "
-                                      "route header; line skipped")
-                        continue
+                        raise ValueError(
+                            f"{pdf_name} p{page_no}: recognizable highway-sequence "
+                            "data appeared before any owning route header")
                     county = co.rstrip(".")
                     flag = "".join(cols.get("flag") or [])
                     desc = " ".join(cols.get("desc") or []).strip() or None
@@ -213,7 +219,8 @@ def parse_pdf(path, events, pdf_name=""):
                             extra if not last_row["description"]
                             else last_row["description"] + ", " + extra)
 
-    return routes
+    district = tdc.document_district(district_claims, pdf_name or Path(path).name)
+    return district, routes
 
 
 # =============================================================================
@@ -295,7 +302,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     except OSError:
         pass
 
-    pdfs = sorted(in_dir.glob("*.pdf"))
+    pdfs = sorted(p for p in in_dir.glob("*.pdf") if p.is_file())
     if not pdfs:
         return ConsolidateResult(
             status="error",
@@ -313,17 +320,49 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     events.on_log("=" * 60)
     events.on_log("")
 
+    try:
+        source_manifest, source_bytes = tdc.capture_raw_manifest(pdfs, in_dir)
+    except ValueError as e:
+        return ConsolidateResult(
+            status="error",
+            message=f"The TSN Highway Sequence raw source could not be bound: {e}",
+        )
+
+    source_problem = [None]
+
+    def source_current():
+        try:
+            current_pdfs = sorted(p for p in in_dir.glob("*.pdf") if p.is_file())
+            current = tdc.canonical_raw_manifest(current_pdfs, in_dir)
+        except (OSError, ValueError) as e:
+            source_problem[0] = f"{type(e).__name__}: {e}"
+            return False
+        if current != source_manifest:
+            source_problem[0] = "the raw member names or bytes changed during conversion"
+            return False
+        return True
+
+    def source_changed():
+        detail = source_problem[0] or "the raw source changed during conversion"
+        return ConsolidateResult(
+            status="error",
+            message=(f"The TSN Highway Sequence raw source changed while it was being "
+                     f"normalized ({detail}); last-good output was preserved."),
+        )
+
     # route -> [row_dict]; same route may appear across districts (different
     # counties) — accumulate so all of a route's counties land in one workbook.
     by_route = {}
     failed = []
+    claimed_districts = {}
     for i, p in enumerate(pdfs, 1):
         if events.is_cancelled():
             return ConsolidateResult(status="cancelled", message="Cancelled by user.")
         prefix = f"[{i}/{len(pdfs)}] {p.name}"
         events.on_log(f"{prefix} parsing…")
         try:
-            route_rows = parse_pdf(str(p), events, pdf_name=p.name)
+            district, route_rows = parse_pdf(
+                io.BytesIO(source_bytes[p.name]), events, pdf_name=p.name)
         except Exception as e:
             events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
             failed.append(p.name)
@@ -334,6 +373,14 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             events.on_log(f"{prefix} no highway-sequence data found; skipping")
             failed.append(p.name)
             continue
+        if district in claimed_districts:
+            return ConsolidateResult(
+                status="error", failed_inputs=1,
+                message=(f"Duplicate internal district claim D{district}: "
+                         f"{claimed_districts[district]} and {p.name}. "
+                         "Nothing was published."),
+            )
+        claimed_districts[district] = p.name
         n = 0
         for route, rows in route_rows.items():
             by_route.setdefault(route, []).extend(rows)
@@ -344,7 +391,26 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         return ConsolidateResult(
             status="error",
             message=(f"None of the PDFs in:\n{in_dir}\n\ncontained readable "
-                     f"{REPORT_NAME} data. Are they the TSN Highway Locations PDFs?"))
+                         f"{REPORT_NAME} data. Are they the TSN Highway Locations PDFs?"))
+
+    if failed:
+        return ConsolidateResult(
+            status="error", failed_inputs=len(failed),
+            message=(f"The TSN Highway Sequence source is incomplete or unreadable: "
+                     f"{len(failed)} document(s) failed {failed}. Exactly one "
+                     "internally claimed document for every D01-D12 is required; "
+                     "nothing was published."),
+        )
+    try:
+        tdc.require_exact_universe(
+            (district, claimed_districts[district])
+            for district in claimed_districts)
+    except ValueError as e:
+        return ConsolidateResult(status="error", message=str(e))
+    if events.is_cancelled():
+        return ConsolidateResult(status="cancelled", message="Cancelled by user.")
+    if not source_current():
+        return source_changed()
 
     all_rows = [(route, d) for route in sorted(by_route)
                 for d in by_route[route]]
@@ -352,39 +418,49 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     out.parent.mkdir(parents=True, exist_ok=True)
     events.on_log("")
     events.on_log("Writing normalized workbook...")
+    final_gate = [None]
+
+    def may_publish():
+        if events.is_cancelled():
+            final_gate[0] = "cancelled"
+            return False
+        if not source_current():
+            final_gate[0] = "source"
+            return False
+        if not artifact_store.confirm_late_overwrite(out, existed_at_confirm, confirm):
+            final_gate[0] = "overwrite"
+            return False
+        return True
+
     try:
         # P12 TOCTOU: the overwrite gate is INSIDE _write_workbook, at the os.replace
         # (atomic_save_if) — a destination that appears during the BUILD is caught.
-        committed = _write_workbook(all_rows, out, proceed=lambda: artifact_store.confirm_late_overwrite(
-            out, existed_at_confirm, confirm))
+        committed = _write_workbook(all_rows, out, proceed=may_publish)
     except PermissionError:
         return ConsolidateResult(
             status="error",
             message=(f"Could not save {out.name}.\n\n"
                      "The file is probably open in Excel. Close it and try again."))
     if not committed:
+        if final_gate[0] == "source":
+            return source_changed()
+        if final_gate[0] == "cancelled":
+            return ConsolidateResult(status="cancelled", message="Cancelled by user.")
         return ConsolidateResult(status="cancelled",
                                  message="Cancelled. Existing file kept.")
 
     summary_lines = []
-    if failed:
-        summary_lines.append(
-            f"⚠ INCOMPLETE — {len(failed)} district PDF(s) failed {failed}; "
-            f"their routes are NOT in the workbook. See the log above.")
     summary_lines += [
-        f"District PDFs:  {len(pdfs) - len(failed)} parsed"
-        + (f", {len(failed)} failed" if failed else ""),
+        f"District PDFs:  {len(pdfs)} parsed; exact D01-D12",
         f"Routes:         {len(by_route)}",
         f"Rows:           {len(all_rows)}",
         f"Output file:    {out}",
     ]
-    # P1-B05: producer-owned completion — district PDFs that failed to parse are
-    # left-out inputs whose routes are NOT in the workbook, so it is PARTIAL (compared,
-    # but flagged), carried structurally (failed_inputs) rather than only in the warning.
-    return ConsolidateResult(status="ok", output_path=str(out),
-                             summary_lines=summary_lines,
-                             completion=outcome.PARTIAL if failed else outcome.COMPLETE,
-                             failed_inputs=len(failed))
+    result = ConsolidateResult(status="ok", output_path=str(out),
+                               summary_lines=summary_lines,
+                               completion=outcome.COMPLETE, failed_inputs=0)
+    result.tsn_raw_manifest = source_manifest
+    return result
 
 
 if __name__ == "__main__":

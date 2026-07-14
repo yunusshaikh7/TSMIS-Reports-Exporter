@@ -346,13 +346,16 @@ _AUTO_CONSOLIDATOR = (
 # tsn_load_* normalizers eagerly (the consolidate_*/compare_* modules above already
 # pull openpyxl/pdfplumber, so the catalog is console-free but not dependency-light).
 TSN = (
+    # v4: exact internal D01-D12 admission. The bump forces every stored library
+    # through the strict document-claim builder once instead of reusing a v3
+    # workbook that never established the source universe.
     # v3: the route-token normalizer was reconciled onto pdf_table_lib.norm_route
     # (a short SUFFIXED token now pads like TSMIS: '5S' -> '005S'; over-padded
     # digits collapse). Identical on the ordinary 'n/nn/nnn[X]' tokens real
     # district PDFs print, but the route KEYS the stored library, so the bump
     # re-keys any stored library on its next use (D2 auto-rebuild).
     TsnEntry("highway_log", "TSN Highway Log", "*.pdf", "district_pdfs",
-             "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into", normalization_version=3),
+             "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into", normalization_version=4),
     # Ramp Detail v3 (v0.26.0): the normalized shape appends the TSN District/
     # County sidecar columns (split from LOCATION "01-DN-101") — evidence locates
     # a row in the TSN statewide print with them; the comparison loader slices to
@@ -374,8 +377,9 @@ TSN = (
     TsnEntry("intersection_detail", "TSN Intersection Detail", "*.xlsx", "statewide_xlsx",
              "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into",
              normalization_version=3, evidence_pdfs=True),
+    # v3: exact internal D01-D12 admission; force prior v2 libraries through it.
     TsnEntry("highway_sequence", "TSN Highway Sequence", "*.pdf", "district_pdfs",
-             "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into", normalization_version=2),
+             "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into", normalization_version=3),
     # Highway Detail (v0.20.0): the statewide 56-column "TSAR - HIGHWAY DETAIL"
     # Excel extract. Verified consistent with the TSN district PDFs (57,647
     # records cross-checked, every shared field ≥99.9% identical), so the

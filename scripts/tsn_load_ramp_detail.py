@@ -19,6 +19,7 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_ramp_detail_tsn as rd
+import outcome
 import tsn_library
 from events import ConsolidateResult
 
@@ -45,26 +46,16 @@ def tsn_rows_with_dcr(path):
     """The raw statewide projection (rd.tsn_rows_from_raw's rows, same order)
     PLUS each row's (district, county) — a separate loop so the comparator's
     regression-locked loader stays untouched."""
-    wb = load_workbook(path, read_only=True, data_only=True)
-    try:
-        sn = rd.TSN_SHEET if rd.TSN_SHEET in wb.sheetnames else wb.sheetnames[0]
-        it = wb[sn].iter_rows(values_only=True)
-        header = list(next(it, []) or [])
-        h = {str(n).strip(): i for i, n in enumerate(header) if n is not None}
-        if "LOCATION" not in h or "PM" not in h:
-            raise ValueError("the TSN Ramp Detail workbook is missing LOCATION/PM "
-                             "columns — pick the raw 'TSAR - RAMPS DETAIL' export.")
+    with rd.ctc.exact_raw_rows(
+            path, rd.TSN_SHEET, rd.TSN_RAW_HEADER, rd.REPORT_NAME,
+            required_nonblank=("LOCATION", "PM")) as (header, rows_in):
+        h = {n: i for i, n in enumerate(header)}
         li = h["LOCATION"]
         rows, dcr = [], []
-        for raw in it:
-            r = list(raw)
-            if not any(c not in (None, "") for c in r):
-                continue
+        for r in rows_in:
             rows.append(rd._tsn_raw_row(r, h))
             dcr.append(_dist_cnty(r[li] if li < len(r) else None))
         return rows, dcr
-    finally:
-        wb.close()
 
 
 def _project(raw_path):
@@ -79,7 +70,10 @@ def _project(raw_path):
             status="ok",
             message=f"Normalized {len(rows)} TSN Ramp Detail rows ({n_routes} routes).",
             summary_lines=[f"TSN Ramp Detail: {len(rows)} rows, {n_routes} routes "
-                           f"-> {out_name}"])
+                           f"-> {out_name}"],
+            completion=outcome.COMPLETE,
+            skipped_inputs=0,
+            failed_inputs=0)
 
     return rows, make_result
 

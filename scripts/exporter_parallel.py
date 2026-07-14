@@ -64,6 +64,7 @@ from exporter import (
     _can_resume,
     _process_route,
     _record,
+    _require_safe_destination,
     _retry_failed_routes,
     _wait_while_paused,
 )
@@ -119,7 +120,7 @@ def _worker_events(real, stop, worker_no):
     `worker_no` (1-based) tags this worker's status line / screenshot requests
     so the GUI's per-browser rows stay distinguishable.
     """
-    return Events(
+    wrapped = Events(
         on_log=real.on_log,
         on_route=real.on_route,
         should_skip=lambda: False,
@@ -130,6 +131,11 @@ def _worker_events(real, stop, worker_no):
         is_paused=real.is_paused,
         worker_no=worker_no,
     )
+    # Preserve Export Everything's stage-bound target guard in each worker;
+    # direct fast-mode callers have no such attribute and remain unchanged.
+    if hasattr(real, "destination_guard"):
+        wrapped.destination_guard = real.destination_guard
+    return wrapped
 
 
 def _preflight_once(spec, events):
@@ -250,7 +256,9 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
 
     src, env = get_site()
     out_dir = Path(out_dir) if out_dir else output_run_dir(src, env) / spec.subdir   # default: env-labeled run folder
+    _require_safe_destination(events, out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    _require_safe_destination(events, out_dir)
     total = len(routes)
     n = min(n, total) or 1
     run_t0 = time.monotonic()
@@ -315,6 +323,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                             break                            # no work left -> done
                         prefix = f"{tag} Route {route}:"
                         out_path = out_dir / spec.filename(route)
+                        _require_safe_destination(wevents, out_path)
                         if _can_resume(out_path):
                             wevents.on_log(f"{prefix} already exists, skip")
                             wr.exists.append(route)

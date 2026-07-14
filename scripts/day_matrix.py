@@ -30,6 +30,7 @@ import time
 from pathlib import Path
 
 import cache_envelope
+import consolidation_meta
 import matrix
 import outcome
 import reports
@@ -119,7 +120,7 @@ def load_results():
     try:
         with open(_results_path(), encoding="utf-8") as f:
             data = json.load(f)
-        return cache_envelope.unwrap(data)
+        return cache_envelope.unwrap(data, output_identity="tsn-by-day")
     except OSError:
         return {}                            # not written yet (first run) — expected
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
@@ -129,26 +130,47 @@ def load_results():
 
 
 def record_result(date, source, row_key, verdict, diff_cells, one_sided,
-                  built_at_mtime, completion=outcome.COMPLETE, input_fingerprint=None):
+                  built_at_mtime, completion=None, input_fingerprint=None,
+                  source_identities=None, generation_id=None,
+                  commit_guard=None):
     data = load_results()
     data[f"{day_folder_name(date, source)}|{row_key}"] = {
         "verdict": verdict, "diff_cells": diff_cells,
         "one_sided": one_sided, "built_at_mtime": built_at_mtime,
         "completion": completion,        # P1-R01: partial inputs flagged durably
+        "generation_id": generation_id,
         # P2/F5: the day's TSMIS store-folder identity at build time; a later snapshot
         # reads the cell stale when it differs. Absent on legacy records (mtime only).
         "input_fingerprint": input_fingerprint,
+        "source_identities": source_identities or {},
     }
     p = _results_path()
+    tmp = p.with_name(p.name + ".tmp")
+
+    def _require_guard(path, action):
+        if not consolidation_meta.guard_allows(commit_guard, path):
+            raise ValueError(
+                "The TSN source generation or by-day destination changed before "
+                f"the {action}; refresh the comparison.")
+
     try:
+        _require_guard(p.parent, "cache directory write")
+        _require_guard(p, "cache write")
+        _require_guard(tmp, "cache temporary write")
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_name(p.name + ".tmp")
+        _require_guard(p, "cache write")
+        _require_guard(tmp, "cache temporary write")
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(cache_envelope.wrap(data, output_identity="tsn-by-day"), f)
+        _require_guard(p, "cache publication")
+        _require_guard(tmp, "cache publication")
         os.replace(tmp, p)
     except OSError as e:
         log.warning("day_matrix: could not write results cache %s: %s: %s",
                     p, type(e).__name__, e)
+        raise ValueError(
+            "The comparison workbook was created, but its by-day result cache "
+            "could not be safely published. Refresh the cell.") from e
 
 
 # --------------------------------------------------------------------------- #
@@ -225,7 +247,9 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
     source = source if source in sources() else SOURCE_DEFAULT
     days = [d for d in (days or []) if isinstance(d, str)]
     hidden = set(hidden or [])
-    tsn_files = tsn_files or {}
+    import tsn_library                              # lazy: canonical explicit choices
+    tsn_files, _selection_map_changed = tsn_library.canonicalize_selections(
+        tsn_files or {})
     all_rows = _day_rows()
     rows = [r for r in all_rows if r[0] not in hidden]
     by_key = {r[0]: r for r in rows}
@@ -239,6 +263,7 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
     _tsn_cache = {}
 
     def _tsn_for(sub):
+        sub = tsn_library.canonical_dataset_key(sub)
         if sub not in _tsn_cache:
             _tsn_cache[sub] = (matrix.tsn_source(dest, sub, tsn_files.get(sub))
                                if dest else {"kind": "none"})
@@ -254,11 +279,16 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
         if not supported:
             continue
         src = _tsn_for(tsn_subdir)
+        tsn_key = tsn_library.canonical_dataset_key(tsn_subdir)
         tsn_meta[row_key] = {
             "supported": True, "fmt": fmt,
             "source_kind": src.get("kind"), "source_path": src.get("path"),
             "pdf_count": src.get("pdf_count"),
-            "tsn_subdir": tsn_subdir, "file": tsn_files.get(tsn_subdir),
+            "tsn_subdir": tsn_key,
+            "file": tsn_library.selection_path(tsn_files.get(tsn_key)),
+            "selected_path": src.get("selected_path"),
+            "selection_missing": src.get("kind") == "missing_explicit",
+            "selection_reason": src.get("selection_reason"),
             "input_dir": (str(matrix.tsn_input_root(dest, tsn_subdir))
                           if dest else None)}
 
@@ -277,7 +307,10 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                 tsn_ready = src_tsn.get("kind") in ("file", "consolidated")
                 rec = results.get(f"{day_folder_name(date, source)}|{row_key}")
                 srcs = [{"name": "cell", "present": exp_m is not None, "mtime": exp_m},
-                        {"name": "tsn", "present": tsn_ready, "mtime": src_tsn.get("mtime")}]
+                        {"name": "tsn", "present": tsn_ready,
+                         "mtime": src_tsn.get("mtime"),
+                         "identity": src_tsn.get("identity_token"),
+                         "identity_required": True}]
                 # F5/P2: fingerprint the day's TSMIS store folder so a deleted route reads
                 # the cell stale (the TSN side is a file, captured by mtime).
                 cmp = matrix._cmp_state(day_out_path(date, source, row_key), srcs, rec,
@@ -347,7 +380,7 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
 
 
 def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
-                          examples=None):
+                          examples=None, commit_guard=None):
     """On-demand evidence for one by-day cell's EXISTING vs-TSN comparison.
     Resolves the same paths build_day_cell uses — but consolidates nothing,
     compares nothing, and does NOT heal the TSN library (a heal would rebuild
@@ -361,21 +394,40 @@ def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
     _k, _label, subdir, _fmt, supported, tsn_subdir = rows[row_key]
     if not supported:
         raise ValueError(f"no TSN comparison for {row_key} yet")
-    tsn_files = tsn_files or {}
-    src_tsn = matrix.tsn_source(dest, tsn_subdir, tsn_files.get(tsn_subdir))
+    import tsn_library
+    tsn_files, _selection_map_changed = tsn_library.canonicalize_selections(
+        tsn_files or {})
+    tsn_key = tsn_library.canonical_dataset_key(tsn_subdir)
+    src_tsn = matrix.tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+    if src_tsn.get("kind") == "missing_explicit":
+        raise ValueError(tsn_library.explicit_selection_problem(src_tsn))
     if src_tsn.get("kind") not in ("file", "consolidated"):
         raise ValueError("no consolidated TSN workbook available")
+    token, source_identity_check = matrix.tsn_identity_check_for(
+        tsn_key, src_tsn)
+    source_workbook_identity = matrix.tsn_expected_workbook_identity(
+        tsn_key, src_tsn, token)
+    record = load_results().get(
+        f"{day_folder_name(date, source)}|{row_key}")
+    expected_generation_id = matrix.require_cached_tsn_identity(record, token)
     import visual_evidence                               # lazy: pulls PIL/pdfium
-    return matrix.run_evidence_only(
+    result = matrix.run_evidence_only(
         row_key, tsmis_dir(date, source, subdir), subdir, src_tsn["path"],
         day_out_path(date, source, row_key),
         tsmis_dir(date, source, visual_evidence.pdf_subdir_for(row_key)),
-        events, examples=examples)
+        events, examples=examples, commit_guard=commit_guard,
+        source_identity_check=source_identity_check,
+        expected_generation_id=expected_generation_id,
+        source_workbook_identity=source_workbook_identity,
+        live_tsn_path=src_tsn["path"])
+    if src_tsn.get("selection"):
+        tsn_library.require_explicit_selection(src_tsn["selection"])
+    return result
 
 
 def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
                    confirm_overwrite=None, force_consolidate=False,
-                   also_formulas=False, evidence=None):
+                   also_formulas=False, evidence=None, commit_guard=None):
     """Build ONE (day, report) vs-TSN comparison: resolve the shared TSN dataset,
     consolidate that day's per-route export (reusing the day folder's persistent
     consolidated unless stale or `force_consolidate`), compare vs TSN, write the
@@ -393,17 +445,32 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     _k, _label, subdir, fmt, supported, tsn_subdir = rows[row_key]
     if not supported:
         raise ValueError(f"no TSN comparison for {row_key} yet")
-    tsn_files = tsn_files or {}
-    src_tsn = matrix.tsn_source(dest, tsn_subdir, tsn_files.get(tsn_subdir))
+    import tsn_library
+    tsn_files, _selection_map_changed = tsn_library.canonicalize_selections(
+        tsn_files or {})
+    tsn_key = tsn_library.canonical_dataset_key(tsn_subdir)
+    src_tsn = matrix.tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+    if src_tsn.get("kind") == "missing_explicit":
+        raise ValueError(tsn_library.explicit_selection_problem(src_tsn))
     if src_tsn.get("kind") not in ("file", "consolidated"):
         raise ValueError("no consolidated TSN workbook available")
     if src_tsn.get("kind") == "consolidated":
-        import tsn_library                               # lazy: no import cycle
-        healed = tsn_library.ensure_current(tsn_subdir, events)
+        # CMP-AUD-035: a typed freshness error is terminal. Never interpret it
+        # as the current/no-op None case and never compare stale consolidated bytes.
+        healed = tsn_library.ensure_current(tsn_key, events, source=src_tsn)
         if healed is not None:
             if healed.status != "ok":
-                raise ValueError(healed.message or "the TSN library rebuild failed")
-            src_tsn = matrix.tsn_source(dest, tsn_subdir, tsn_files.get(tsn_subdir))
+                raise ValueError(
+                    healed.message
+                    or "the TSN library is not certifiably current; comparison stopped")
+        src_tsn = matrix.tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+        if src_tsn.get("kind") != "consolidated":
+            raise ValueError(
+                "the canonical TSN source changed while it was being certified")
+    tsn_token, source_identity_check = matrix.tsn_identity_check_for(
+        tsn_key, src_tsn)
+    source_workbook_identity = matrix.tsn_expected_workbook_identity(
+        tsn_key, src_tsn, tsn_token)
 
     out_path = day_out_path(date, source, row_key)
     result = matrix.consolidate_and_compare_tsn(
@@ -411,24 +478,38 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
         events, confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
         also_formulas=also_formulas,
         evidence_opts=matrix.evidence_opts_for(
-            evidence, row_key, lambda sub: tsmis_dir(date, source, sub)))
+            evidence, row_key, lambda sub: tsmis_dir(date, source, sub)),
+        explicit_selection=src_tsn.get("selection"),
+        commit_guard=commit_guard,
+        source_identity_check=source_identity_check,
+        source_workbook_identity=source_workbook_identity)
     # P1-B05: reduce the TSN side too — a partial TSN consolidation (categories /
     # district PDFs left out) flags the by-day cell partial just like a partial TSMIS side.
-    if result.status == "ok" and src_tsn.get("completion") == outcome.PARTIAL:
-        result.completion = outcome.PARTIAL
     if result.status == "ok" and out_path.exists():
+        matrix._require_source_identity(
+            source_identity_check, "recording the by-day comparison cache")
+        cache_guard = matrix._compose_source_guard(
+            commit_guard, source_identity_check)
         # F4: detect the layout from the produced workbook — the aggregate reports
         # (Ramp / Intersection Summary) emit a flat sheet that a hardcoded
         # has_route=True would read one column off (0 diffs). The header decides.
-        diff_cells, one_sided = matrix.read_counts(out_path)
+        published = matrix._published_comparison_result(out_path, result)
+        typed = published.comparison_outcome
+        diff_cells = typed.counts.differing_cells
+        one_sided = (typed.counts.side_a_only_rows
+                     + typed.counts.side_b_only_rows)
         try:
             built_at = out_path.stat().st_mtime
         except OSError:
             built_at = None
         # F5/P2: record the day's TSMIS store-folder identity so a deleted route reads
         # the reused cell stale (same folder _cmp_state fingerprints in the snapshot).
-        record_result(date, source, row_key, result.verdict, diff_cells, one_sided,
-                      built_at, completion=result.completion or outcome.COMPLETE,
+        record_result(date, source, row_key, typed.verdict, diff_cells, one_sided,
+                      built_at, completion=typed.completion,
                       input_fingerprint=matrix._cell_input_fingerprint(
-                          tsmis_dir(date, source, subdir)))
+                          tsmis_dir(date, source, subdir)),
+                      source_identities=(
+                          {"tsn": tsn_token}),
+                      generation_id=published.artifact_generation.generation_id,
+                      commit_guard=cache_guard)
     return result

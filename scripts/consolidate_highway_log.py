@@ -56,7 +56,7 @@ def out_path_for(day):
 
 
 def consolidate(events=None, confirm_overwrite=None, day=None,
-                input_dir=None, out_path=None):
+                input_dir=None, out_path=None, commit_guard=None):
     """Combine every per-route Highway Log XLSX into one workbook.
 
     `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") to read; None means
@@ -69,6 +69,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         sheet_name=SHEET_NAME, report_name=REPORT_NAME,
         title="Highway Log Consolidation",
         events=events, confirm_overwrite=confirm_overwrite,
+        commit_guard=commit_guard,
         # Ship the CORRECTED column labels even though the vendor Excel header is
         # wrong: relabel by position, add hover tooltips + a Legend sheet.
         header_override=hlc.HEADER, header_comment=hlc.comment_for,

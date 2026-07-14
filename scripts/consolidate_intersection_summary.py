@@ -30,6 +30,7 @@ import summary_layout
 from compare_core import is_formula_injection
 import outcome
 import artifact_store
+import consolidation_meta
 from events import ConsolidateResult, Events
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
@@ -174,7 +175,7 @@ def _build_combined(wb, statewide, total):
     wb.active = wb.index(ws)
 
 
-def build_workbook(records, out_path, proceed=None):
+def build_workbook(records, out_path, proceed=None, commit_guard=None):
     """Per-route sheet (Route, Total, one column per category key) + Combined.
     `proceed` (P12) is the pre-replace overwrite gate atomic_save_if evaluates JUST
     BEFORE the os.replace; returns True iff committed (a declined `proceed` keeps the
@@ -208,7 +209,11 @@ def build_workbook(records, out_path, proceed=None):
 
     total_all = sum(r.get("total") or 0 for r in records)
     _build_combined(wb, statewide, total_all)
+    if not consolidation_meta.guard_allows(commit_guard, out_path):
+        return False
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if not consolidation_meta.guard_allows(commit_guard, out_path):
+        return False
     # F9 temp + os.replace + the P12 TOCTOU gate at the replace.
     return artifact_store.atomic_save_if(wb, out_path, proceed or (lambda: True))
 
@@ -217,7 +222,7 @@ def build_workbook(records, out_path, proceed=None):
 # entry point
 # --------------------------------------------------------------------------- #
 def consolidate(events=None, confirm_overwrite=None, day=None,
-                input_dir=None, out_path=None):
+                input_dir=None, out_path=None, commit_guard=None):
     """Parse every per-route Intersection Summary XLSX into one workbook.
     Console-free; honors cancel; returns a ConsolidateResult."""
     events = events or Events()
@@ -283,8 +288,12 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     try:
         # P12 TOCTOU: the overwrite gate is INSIDE build_workbook, at the os.replace
         # (atomic_save_if) — a destination that appears during the BUILD is caught.
-        committed = build_workbook(records, out_path, proceed=lambda: artifact_store.confirm_late_overwrite(
-            out_path, existed_at_confirm, confirm))
+        committed = build_workbook(
+            records, out_path,
+            proceed=lambda: (consolidation_meta.guard_allows(commit_guard, out_path)
+                             and artifact_store.confirm_late_overwrite(
+                                 out_path, existed_at_confirm, confirm)),
+            commit_guard=commit_guard)
     except PermissionError:
         return ConsolidateResult(
             status="error",

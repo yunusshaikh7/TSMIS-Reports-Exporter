@@ -42,8 +42,11 @@ Console-free like the other consolidators: progress via events.on_log,
 overwrite confirmed through the callback, cancel honored between pages, and a
 ConsolidateResult returned. The console UX lives in cli.run_consolidate_cli.
 """
+import io
 import logging
 import re
+import shutil
+import tempfile
 from pathlib import Path
 
 # pdfplumber wraps pdfminer.six, which can log noisy per-page font warnings;
@@ -58,9 +61,11 @@ except ImportError:
     _DEPS_OK = False
 
 import highway_log_columns as hlc               # the corrected column labels
+import consolidation_meta
 from consolidate_xlsx_base import consolidate_xlsx
+import owned_dir
 from pdf_table_lib import char_lines, norm_route, write_route_workbook
-import outcome
+import tsn_district_contract as tdc
 from events import ConsolidateResult, Events
 from paths import INPUT_ROOT, OUTPUT_ROOT
 
@@ -183,7 +188,6 @@ LOCATION_RE = re.compile(r"^[A-Z]?\d{3}\.\d{3}[A-Z]?$")
 GROUP_RE = (re.compile(r"^\d{2}$"), re.compile(r"^[A-Z]{2,4}$"),
             re.compile(r"^\d{1,3}[A-Z]?$"))
 DISTRICT_LINE_RE = re.compile(r"^District\s+0?(\d{1,2})$", re.IGNORECASE)
-DISTRICT_FROM_NAME = re.compile(r"D(\d{1,2})", re.IGNORECASE)
 
 # City/County/District totals blocks (cumulative mileage + DVMS/DVMT volume)
 # print BELOW the last data row of a group and WRAP onto their own lines. The
@@ -283,7 +287,7 @@ def parse_pdf(path, events, pdf_name=""):
     Returns (district, routes) where routes is {route: [row_dict, ...]} in
     document order. Raises RuntimeError on cancel (caught by the caller).
     """
-    district = None
+    district_claims = []
     routes = {}
     route = None
     last_row = None                   # description lines attach to this
@@ -292,7 +296,7 @@ def parse_pdf(path, events, pdf_name=""):
         n_pages = len(pdf.pages)
         for page_no, page in enumerate(pdf.pages, 1):
             if events.is_cancelled():
-                return district, None
+                return None, None
             if page_no % 25 == 0:
                 events.on_log(f"    …page {page_no}/{n_pages}")
             for top, words, line_chars in _lines(page):
@@ -313,8 +317,8 @@ def parse_pdf(path, events, pdf_name=""):
 
                 # Title page: "District 01" pins the district number.
                 m = DISTRICT_LINE_RE.match(" ".join(texts))
-                if m and district is None:
-                    district = m.group(1).zfill(2)
+                if m:
+                    district_claims.append(m.group(1))
                     continue
 
                 # Centered group header: "<district> <county> <route>".
@@ -322,18 +326,28 @@ def parse_pdf(path, events, pdf_name=""):
                         and GROUP_RE[0].match(texts[0])
                         and GROUP_RE[1].match(texts[1])
                         and GROUP_RE[2].match(texts[2])):
-                    district = district or texts[0].zfill(2)
+                    district_claims.append(texts[0])
                     route = _norm_route(texts[2])
                     routes.setdefault(route, [])
                     last_row = None                   # don't attach across groups
                     continue
+                # A centered line beginning with a district-like number and a
+                # short county-like token is structurally a group header. If it
+                # misses the exact district/county/route grammar, retaining the
+                # prior route would silently misattribute every following row.
+                if (len(texts) >= 2 and 250 <= first["x0"] <= 305
+                        and re.fullmatch(r"\d{1,2}", texts[0])
+                        and re.fullmatch(r"[A-Z0-9.]{2,5}", texts[1], re.IGNORECASE)):
+                    raise ValueError(
+                        f"{pdf_name} p{page_no}: malformed centered district/county/route "
+                        f"group header cannot safely own following rows: {' '.join(texts)!r}")
 
                 # Data line: starts with a postmile in the Location window.
                 if LOCATION_RE.match(texts[0]) and first["x0"] < 50:
                     if route is None:
-                        events.on_log(f"    {pdf_name} p{page_no}: data before "
-                                      "any route header; line skipped")
-                        continue
+                        raise ValueError(
+                            f"{pdf_name} p{page_no}: recognizable highway-log data "
+                            "appeared before any owning route header")
                     row = _parse_data_line(line_chars)
                     _normalize_row(row)
                     row["description"] = None
@@ -358,6 +372,7 @@ def parse_pdf(path, events, pdf_name=""):
                         text if not last_row["description"]
                         else last_row["description"] + ", " + text)
 
+    district = tdc.document_district(district_claims, pdf_name or Path(path).name)
     return district, routes
 
 
@@ -377,16 +392,19 @@ def _write_route_workbook(rows, out_path):
 # Entry point
 # =============================================================================
 
-def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
+def build_into(raw_dir, out_path, events=None, confirm_overwrite=None,
+               scratch_root=None, commit_guard=None):
     """Canonical-TSN-library entry point: parse the district PDFs in `raw_dir` and
     write the combined workbook to `out_path`. A thin wrapper over consolidate()
     so tsn_library can build any report through one uniform builder signature."""
     return consolidate(events=events, confirm_overwrite=confirm_overwrite,
-                       input_dir=raw_dir, out_path=out_path)
+                       input_dir=raw_dir, out_path=out_path,
+                       scratch_root=scratch_root, commit_guard=commit_guard)
 
 
 def consolidate(events=None, confirm_overwrite=None, day=None,
-                input_dir=None, out_path=None):
+                input_dir=None, out_path=None, scratch_root=None,
+                commit_guard=None):
     """Convert every TSN district Highway Log PDF to TSMIS-format per-route
     workbooks, then combine them all into one workbook (Route column added).
 
@@ -394,7 +412,10 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     and ignored — TSN PDFs are vendor snapshots in one fixed input folder, not
     dated exports. `input_dir`/`out_path` override the fixed legacy locations
     (the canonical TSN library passes its own raw/consolidated paths here);
-    when omitted they default to the legacy INPUT_DIR / OUT_PATH.
+    when omitted they default to the legacy INPUT_DIR / OUT_PATH. Every call uses
+    a private temporary conversion directory under ``scratch_root`` or, by
+    default, the requested output's parent. The temporary directory is never the
+    process-global ``CONVERTED_DIR`` and is removed after every terminal path.
 
     Console-free: reports progress via events.on_log, asks before overwriting
     through the confirm_overwrite(path)->bool callback, and returns a
@@ -417,7 +438,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     except OSError:
         pass
 
-    pdfs = sorted(in_dir.glob("*.pdf"))
+    pdfs = sorted(p for p in in_dir.glob("*.pdf") if p.is_file())
     if not pdfs:
         return ConsolidateResult(
             status="error",
@@ -437,102 +458,214 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     events.on_log("=" * 60)
     events.on_log("")
 
-    # The combined workbook reflects exactly THIS run's PDFs: clear previously
-    # converted files so districts removed from the input folder don't linger.
-    CONVERTED_DIR.mkdir(parents=True, exist_ok=True)
-    stale = list(CONVERTED_DIR.glob("tsn_highway_log_*.xlsx"))
-    for p in stale:
-        try:
-            p.unlink()
-        except OSError:
-            return ConsolidateResult(
-                status="error",
-                message=(f"Could not replace {p.name}.\n\n"
-                         "The file is probably open in Excel. Close it and try again."),
-            )
-    if stale:
-        events.on_log(f"Cleared {len(stale)} previously converted file(s).")
-
-    converted = 0
-    total_rows = 0
-    failed = []
-    written = set()                  # guard against duplicate district+route across PDFs
-    for i, p in enumerate(pdfs, 1):
-        if events.is_cancelled():
-            return ConsolidateResult(status="cancelled", message="Cancelled by user.")
-        prefix = f"[{i}/{len(pdfs)}] {p.name}"
-        events.on_log(f"{prefix} parsing…")
-        try:
-            district, route_rows = parse_pdf(str(p), events, pdf_name=p.name)
-        except Exception as e:
-            events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
-            failed.append(p.name)
-            continue
-        if route_rows is None:                       # cancelled mid-PDF
-            return ConsolidateResult(status="cancelled", message="Cancelled by user.")
-        if not route_rows:
-            events.on_log(f"{prefix} no highway-log data found; skipping")
-            failed.append(p.name)
-            continue
-        if district is None:                         # last resort: the filename
-            m = DISTRICT_FROM_NAME.search(p.stem)
-            district = m.group(1).zfill(2) if m else "00"
-        for route, rows in route_rows.items():
-            out_file = CONVERTED_DIR / f"tsn_highway_log_d{district}_route_{route}.xlsx"
-            if out_file.name in written:
-                events.on_log(f"  WARNING: district {district} route {route} already "
-                              f"converted from an earlier PDF; {p.name} replaces it "
-                              "(is the same district in the folder twice?)")
-            written.add(out_file.name)
-            try:
-                _write_route_workbook(rows, out_file)
-            except PermissionError:
-                return ConsolidateResult(
-                    status="error",
-                    message=(f"Could not save {out_file.name}.\n\n"
-                             "The file is probably open in Excel. Close it and try again."),
-                )
-            events.on_log(f"  district {district} route {route}: {len(rows)} rows "
-                          f"-> {out_file.name}")
-            converted += 1
-            total_rows += len(rows)
-
-    if converted == 0:
+    # Build under the requested output boundary unless the caller explicitly
+    # supplies another scratch boundary. This directory is ordinary temporary
+    # state (not a persistent Reset-owned store), but its exact filesystem
+    # identity is bound from creation through every write and final cleanup.
+    scratch_parent = Path(scratch_root) if scratch_root is not None else out.parent
+    scratch_parent = scratch_parent.absolute()
+    if not consolidation_meta.guard_allows(commit_guard, scratch_parent):
         return ConsolidateResult(
             status="error",
-            message=(f"None of the PDFs in:\n{in_dir}\n\ncontained readable "
-                     f"{REPORT_NAME} data. Are they the TSN California State "
-                     "Highway Log PDFs?"),
+            message="The destination changed while preparing the conversion; nothing was published.",
+        )
+    try:
+        scratch_parent.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return ConsolidateResult(
+            status="error",
+            message=(f"Could not create temporary conversion space under:\n"
+                     f"{scratch_parent}\n\n{type(e).__name__}: {e}"),
+        )
+    if not consolidation_meta.guard_allows(commit_guard, scratch_parent):
+        return ConsolidateResult(
+            status="error",
+            message="The destination changed while preparing the conversion; nothing was published.",
+        )
+    try:
+        conv = Path(tempfile.mkdtemp(prefix=".tsn-highway-log-attempt-",
+                                     dir=scratch_parent))
+    except OSError as e:
+        return ConsolidateResult(
+            status="error",
+            message=(f"Could not create temporary conversion space under:\n"
+                     f"{scratch_parent}\n\n{type(e).__name__}: {e}"),
+        )
+    conv_identity = owned_dir.directory_identity(conv)
+
+    def attempt_current(path):
+        return (conv_identity is not None
+                and owned_dir.directory_identity(conv) == conv_identity
+                and consolidation_meta.guard_allows(commit_guard, path))
+
+    def destination_changed():
+        return ConsolidateResult(
+            status="error",
+            message="The destination changed while converting PDFs; nothing was published.",
         )
 
-    events.on_log("")
+    try:
+        if not attempt_current(conv):
+            return destination_changed()
 
-    # Combine all converted per-route files with the shared XLSX core (header
-    # lock-in, Route column from the filename, streaming write). P12 TOCTOU: pass the
-    # REAL confirm + the existence we saw at the early prompt down into consolidate_xlsx
-    # so its pre-replace gate (atomic_save_if) catches a destination that APPEARED
-    # after that prompt — at the final os.replace — without re-prompting for the
-    # already-confirmed pre-existing case.
-    result = consolidate_xlsx(
-        input_dir=CONVERTED_DIR, out_path=out, sheet_name=SHEET_NAME,
-        report_name=REPORT_NAME, title="TSN Highway Log Consolidation",
-        events=events, confirm_overwrite=confirm, existed_at_confirm=existed_at_confirm,
-        header_override=hlc.HEADER, header_comment=hlc.comment_for,
-        decorate_workbook=hlc.write_legend_sheet,
-    )
-    if result.status == "ok":
-        result.summary_lines = [
-            f"District PDFs:  {len(pdfs) - len(failed)} converted"
-            + (f", {len(failed)} failed {failed}" if failed else ""),
-            f"Route files:    {converted} (in {CONVERTED_DIR})",
-        ] + result.summary_lines
-        # A district PDF that failed to parse means the combined output is missing
-        # those routes — escalate to a producer-owned partial (the converted files
-        # may have combined cleanly, but the source set was incomplete).
+        try:
+            source_manifest, source_bytes = tdc.capture_raw_manifest(pdfs, in_dir)
+        except ValueError as e:
+            return ConsolidateResult(
+                status="error",
+                message=f"The TSN Highway Log raw source could not be bound: {e}",
+            )
+
+        source_problem = [None]
+
+        def source_current():
+            try:
+                current_pdfs = sorted(
+                    p for p in in_dir.glob("*.pdf") if p.is_file())
+                current = tdc.canonical_raw_manifest(current_pdfs, in_dir)
+            except (OSError, ValueError) as e:
+                source_problem[0] = f"{type(e).__name__}: {e}"
+                return False
+            if current != source_manifest:
+                source_problem[0] = "the raw member names or bytes changed during conversion"
+                return False
+            return True
+
+        def source_changed():
+            detail = source_problem[0] or "the raw source changed during conversion"
+            return ConsolidateResult(
+                status="error",
+                message=(f"The TSN Highway Log raw source changed while it was being "
+                         f"normalized ({detail}); last-good output was preserved."),
+            )
+
+        converted = 0
+        failed = []
+        claimed_districts = {}
+        written = set()              # duplicate district+route diagnostic
+        generated = {}               # exact final member manifest for THIS attempt
+        for i, p in enumerate(pdfs, 1):
+            if events.is_cancelled():
+                return ConsolidateResult(status="cancelled", message="Cancelled by user.")
+            prefix = f"[{i}/{len(pdfs)}] {p.name}"
+            events.on_log(f"{prefix} parsing…")
+            try:
+                district, route_rows = parse_pdf(
+                    io.BytesIO(source_bytes[p.name]), events, pdf_name=p.name)
+            except Exception as e:
+                events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
+                failed.append(p.name)
+                continue
+            if route_rows is None:                   # cancelled mid-PDF
+                return ConsolidateResult(status="cancelled", message="Cancelled by user.")
+            if not route_rows:
+                events.on_log(f"{prefix} no highway-log data found; skipping")
+                failed.append(p.name)
+                continue
+            if district in claimed_districts:
+                return ConsolidateResult(
+                    status="error", failed_inputs=1,
+                    message=(f"Duplicate internal district claim D{district}: "
+                             f"{claimed_districts[district]} and {p.name}. "
+                             "Nothing was published."),
+                )
+            claimed_districts[district] = p.name
+            for route, rows in route_rows.items():
+                out_file = conv / f"tsn_highway_log_d{district}_route_{route}.xlsx"
+                if out_file.name in written:
+                    events.on_log(f"  WARNING: district {district} route {route} already "
+                                  f"converted from an earlier PDF; {p.name} replaces it "
+                                  "(is the same district in the folder twice?)")
+                written.add(out_file.name)
+                if not attempt_current(out_file):
+                    return destination_changed()
+                try:
+                    _write_route_workbook(rows, out_file)
+                except PermissionError:
+                    return ConsolidateResult(
+                        status="error",
+                        message=(f"Could not save {out_file.name}.\n\n"
+                                 "The file is probably open in Excel. Close it and try again."),
+                    )
+                if not attempt_current(out_file):
+                    return destination_changed()
+                generated[out_file.name] = out_file
+                events.on_log(f"  district {district} route {route}: {len(rows)} rows "
+                              f"-> {out_file.name}")
+                converted += 1
+
+        if converted == 0:
+            return ConsolidateResult(
+                status="error",
+                message=(f"None of the PDFs in:\n{in_dir}\n\ncontained readable "
+                         f"{REPORT_NAME} data. Are they the TSN California State "
+                         "Highway Log PDFs?"),
+            )
+
         if failed:
-            result.completion = outcome.PARTIAL
-            result.failed_inputs = max(result.failed_inputs, len(failed))
-    return result
+            return ConsolidateResult(
+                status="error", failed_inputs=len(failed),
+                message=(f"The TSN Highway Log source is incomplete or unreadable: "
+                         f"{len(failed)} document(s) failed {failed}. Exactly one "
+                         "internally claimed document for every D01-D12 is required; "
+                         "nothing was published."),
+            )
+        try:
+            tdc.require_exact_universe(
+                (district, claimed_districts[district])
+                for district in claimed_districts)
+        except ValueError as e:
+            return ConsolidateResult(status="error", message=str(e))
+        if not source_current():
+            return source_changed()
+
+        events.on_log("")
+        manifest = tuple(generated[name] for name in sorted(generated))
+        if (not attempt_current(conv)
+                or any(not attempt_current(member) or not member.is_file()
+                       for member in manifest)):
+            return destination_changed()
+
+        # Combine only the exact member generation produced above. No directory
+        # glob participates in this attempt, so a peer build cannot add an input
+        # even if it overlaps the parse/combine interval.
+        def publish_guard(path):
+            return attempt_current(path) and source_current()
+
+        result = consolidate_xlsx(
+            input_dir=conv, input_files=manifest,
+            out_path=out, sheet_name=SHEET_NAME,
+            report_name=REPORT_NAME, title="TSN Highway Log Consolidation",
+            events=events, confirm_overwrite=confirm,
+            existed_at_confirm=existed_at_confirm,
+            header_override=hlc.HEADER, header_comment=hlc.comment_for,
+            decorate_workbook=hlc.write_legend_sheet,
+            commit_guard=publish_guard,
+        )
+        if source_problem[0] and result.status != "ok":
+            return source_changed()
+        if result.status == "ok":
+            result.tsn_raw_manifest = source_manifest
+            result.summary_lines = [
+                f"District PDFs:  {len(pdfs)} converted; exact D01-D12",
+                f"Route files:    {len(manifest)} temporary conversion member(s)",
+            ] + result.summary_lines
+        return result
+    finally:
+        # Never traverse a replaced/linked attempt path. If identity or tree
+        # safety is lost, retain it and emit an explicit diagnostic for manual
+        # inspection instead of deleting an object the attempt no longer owns.
+        if (conv_identity is not None
+                and owned_dir.directory_identity(conv) == conv_identity
+                and owned_dir.is_plain_directory_tree(conv, identity=conv_identity)):
+            try:
+                shutil.rmtree(conv)
+            except OSError as e:
+                events.on_log(f"WARNING: temporary conversion folder was retained: "
+                              f"{conv} ({type(e).__name__}: {e})")
+        else:
+            events.on_log("WARNING: temporary conversion folder changed identity or "
+                          f"contains a linked entry; it was retained: {conv}")
 
 
 if __name__ == "__main__":

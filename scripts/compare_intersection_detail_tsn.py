@@ -69,9 +69,9 @@ except ImportError:
 import compare_tsn_common as ctc
 from compare_tsn_common import (load_consolidated_rows, row_has_data,
                                 suggest_route_name)
-from compare_core import (CompareSchema, normalize_value, keys_for,
+from compare_core import (CompareSchema, compared_cell, normalize_value, keys_for,
                           pair_occurrences_by_similarity, union_keys,
-                          _PROGRESS_EVERY)
+                          set_safe_literal_cell, _PROGRESS_EVERY)
 
 
 log = logging.getLogger("tsmis.compare")
@@ -150,6 +150,15 @@ _TSN_COL = {
     "Intrte Postmile": "CROSS_POSTMILE", "Intrte PM Suffix": "CROSS_PM_SUFFIX",
     "Xing Line Lgth": "X_CROSS_OVERRIDE",
 }
+TSN_RAW_HEADER = (
+    "PP", "POST_MILE", "LOCATION", "DATE_REC", "HG", "CITY_CODE", "RU",
+    "EFF_DATE_INT", "TY_INT", "EFF_DATE_CT", "TY_CT", "EFF_DATE_LT", "LT_TY",
+    "EFF_DATE_ML", "MAIN_SM", "MAIN_LC", "MAIN_RC", "MAIN_TF", "MAIN_NL",
+    "X_CROSS_OVERRIDE", "MAIN_EFF_DATE", "MAIN_ADT", "DESCRIPTION",
+    "MAIN_OVERRIDE", "CROSS_BEGIN_DATE", "CS_SM", "CS_LC", "CS_RC", "CS_TF",
+    "CS_NL", "EFF_DATE", "CROSS_ADT", "CROSS_ROUTE_NAME", "CROSS_PM_PREFIX",
+    "CROSS_POSTMILE", "CROSS_PM_SUFFIX",
+)
 # Consolidated-TSMIS VALUE position for each shared field (Route at 0; some header
 # labels are still shifted against their values — the eff-date sits under each block's
 # type label — so position, not label, stays authoritative; verified statewide against
@@ -279,20 +288,16 @@ def _tsn_row(r, h):
                      for f in SHARED_HEADER]
 
 
+def require_tsn_raw_header(header):
+    ctc.require_exact_raw_header(header, TSN_RAW_HEADER, REPORT_NAME)
+
+
 def tsn_rows_from_raw(path):
-    wb = load_workbook(path, read_only=True, data_only=True)
-    try:
-        sn = TSN_SHEET if TSN_SHEET in wb.sheetnames else wb.sheetnames[0]
-        it = wb[sn].iter_rows(values_only=True)
-        header = list(next(it, []) or [])
-        h = {str(n).strip(): i for i, n in enumerate(header) if n is not None}
-        if "LOCATION" not in h or "POST_MILE" not in h:
-            raise ValueError("the TSN Intersection Detail workbook is missing "
-                             "LOCATION/POST_MILE — pick the raw 'TSAR - INTERSECTION DETAIL' export.")
-        return [_tsn_row(list(r), h) for r in it
-                if row_has_data(r)]
-    finally:
-        wb.close()
+    with ctc.exact_raw_rows(
+            path, TSN_SHEET, TSN_RAW_HEADER, REPORT_NAME,
+            required_nonblank=("LOCATION", "POST_MILE")) as (header, rows_in):
+        h = {n: i for i, n in enumerate(header)}
+        return [_tsn_row(r, h) for r in rows_in]
 
 
 def _normalized_row(r):
@@ -674,10 +679,20 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
     # an older core that doesn't pass it.
     ka, kb, union = ctx.get("keys_a"), ctx.get("keys_b"), ctx.get("union")
     if ka is None or kb is None or union is None:
-        ka = keys_for(rows_a, True, key_field=sc.key_field)
-        kb = keys_for(rows_b, True, key_field=sc.key_field)
-        ka, kb = pair_occurrences_by_similarity(sc, rows_a, rows_b, ka, kb, True)
-        union = union_keys(ka, kb)
+        is_cancelled = events.is_cancelled if events is not None else None
+        ka = keys_for(
+            rows_a, True, key_field=sc.key_field,
+            is_cancelled=is_cancelled)
+        kb = keys_for(
+            rows_b, True, key_field=sc.key_field,
+            is_cancelled=is_cancelled)
+        pairing = pair_occurrences_by_similarity(
+            sc, rows_a, rows_b, ka, kb, True, events)
+        if pairing.pairing_quality != "exact":
+            raise ValueError(
+                "Report View cannot discard capped duplicate-pairing state")
+        ka, kb = pairing.keys_a, pairing.keys_b
+        union = union_keys(ka, kb, is_cancelled)
     # This rollup re-lays-out every record as two styled physical rows (~2x the union),
     # the slowest stretch of the largest comparison. Narrate it (header + per-N progress
     # below) so it isn't a silent multi-minute gap that reads as a freeze.
@@ -685,6 +700,7 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
         events.on_log(f"  Building the Report View tab ({len(union):,} records)…")
     amap = {k: i for i, k in enumerate(ka)}
     bmap = {k: j for j, k in enumerate(kb)}
+    field_index = {name: i for i, name in enumerate(sc.header)}
     fi = {name: 1 + i for i, name in enumerate(sc.header)}      # +1 for leading route col
     NA, NG = len(_RV_AUX), len(_RV_GRID)
     NC = NA + NG
@@ -735,9 +751,10 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
         if kind == "tm":
             return (aval(ra, ref), "tm")
         if kind == "cmp":
-            tm, tn = aval(ra, ref), aval(rb, ref)
-            if tm == tn:
-                return (tm, "eq")
+            cell = compared_cell(sc, field_index[ref], ra, rb, off=1)
+            if not cell.asserting or cell.equal:
+                return (cell.display, "eq")
+            tm, tn = cell.display_a, cell.display_b
             return (f"{tm or '·'} ≠ {tn or '·'}", _rv_classify(ref, tm, tn))
         return ("", "blank")
 
@@ -745,7 +762,7 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
         """A streamed data cell. Every status carries a (normal, ALT) band pair so a whole
         record alternates as one solid zebra band (white record vs grey record); an unknown
         status falls to 'eq' so a blank cell takes its record's band, not a stray shade."""
-        c = WriteOnlyCell(ws, value=val)
+        c = set_safe_literal_cell(WriteOnlyCell(ws), val)
         c.alignment = align or (lft if status == "id" else ctr)
         c.border = _BD_BOTTOM if bottom else _BD_NORM
         c.fill = _FILL_CACHE.get((status, bool(alt)),
@@ -915,7 +932,7 @@ def _load_pair(tsmis_path, tsn_path):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas"):
+            mode="formulas", commit_guard=None):
     """Build the Intersection Detail TSMIS-vs-TSN comparison workbook(s). `tsmis_path`
     is the consolidated TSMIS Intersection Detail workbook; `tsn_path` the TSN
     statewide (raw or normalized) workbook.
@@ -927,11 +944,14 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     lazily inside the writer, so they only open the workbooks when a sheet is actually
     built (after a successful load)."""
     schema = dataclasses.replace(
-        _SCHEMA, extra_sheet_writer=lambda wb, ctx: _write_report_view(
-            wb, ctx, _tsn_onesided(Path(tsn_path)), _tsmis_locations(Path(tsmis_path))))
+        _SCHEMA,
+        extra_sheet_writer=lambda wb, ctx: _write_report_view(
+            wb, ctx, _tsn_onesided(Path(tsn_path)), _tsmis_locations(Path(tsmis_path))),
+        report_view_diff_check=("Report View", "B", 2))
     return ctc.run_files_compare(
         schema, tsmis_path, tsn_path, out_path,
         banner="Intersection Detail Comparison — TSMIS vs TSN", has_route=True,
         loader=_load_pair, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
-        events=events, confirm_overwrite=confirm_overwrite, mode=mode)
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode,
+        commit_guard=commit_guard)

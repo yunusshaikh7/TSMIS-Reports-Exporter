@@ -207,5 +207,18 @@ async function startCompare() {
                                   $("cmpWantFormulas").checked,
                                   $("cmpWantValues").checked);
   }
+  if (res && res.confirm_required) {
+    const accepted = await showConfirm({
+      title: "Overwrite the values workbook?",
+      message: res.message ||
+        `The automatically created values workbook already exists:\n\n${res.path}\n\nOverwrite this exact file?`,
+      confirmLabel: "Overwrite values copy",
+      cancelLabel: "Keep existing file",
+      danger: true,
+    });
+    // The follow-up carries only the opaque token + decision. Inputs, output,
+    // and mode remain bound to the operation retained by the Python bridge.
+    res = await api.confirm_compare_overwrite(res.confirm_token, accepted);
+  }
   if (res && res.error) showMessage("error", "Could not start", res.error);
 }

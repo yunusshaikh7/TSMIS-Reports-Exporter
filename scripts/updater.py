@@ -1171,19 +1171,23 @@ def _recover_store_promotions():
     destination (`settings.get_batch_dest`), which may be ANY local path, so recover BOTH
     that destination AND `OUTPUT_ROOT` — deduplicated by resolved path, each isolated so
     one failure never blocks the other (P2-B03). Recovery is constrained to APP-OWNED
-    promotion locations via an ownership predicate (P2-B04): a store root must be a known
-    `<src>-<env>` folder and a journal's target a known export report subdir, so a planted
-    or unrelated `.promote` tree under a user destination is never acted on. Best-effort +
-    idempotent; never wedges startup."""
+    promotion locations via an ownership predicate (P2-B04 / CMP-AUD-090): a store root
+    under a user-chosen destination must be a known `<src>-<env>` folder carrying a CURRENT
+    purpose-bound create-and-mark claim, and a journal's target must be a known export
+    report subdir. The exact app-private `OUTPUT_ROOT` retains its deliberate legacy
+    location/name compatibility. Best-effort + idempotent; never wedges startup."""
     try:
         import artifact_store
+        import owned_dir
         from paths import OUTPUT_ROOT
     except Exception as e:                        # noqa: BLE001 — startup must not fail here
         log.warning("store-promotion recovery unavailable (%s: %s)", type(e).__name__, e)
         return
-    # Ownership context: the app's Export-Everything stores live at <dest>/<src>-<env>/<subdir>,
-    # so a trusted `.promote` parent is a DIRECT child of THIS recovery root, a known src-env
-    # folder, and (when a journal is read) names a known export subdir (P2-B04).
+    # Ownership context: the app's Export-Everything stores live at
+    # <dest>/<src>-<env>/<subdir>. A user-destination `.promote` parent must be a
+    # direct child, a known src-env folder, AND currently marked as a store the
+    # app created. OUTPUT_ROOT is a dedicated app output boundary and keeps the
+    # pre-marker direct-child/name policy for interrupted legacy promotions.
     try:
         import common
         import reports
@@ -1194,6 +1198,11 @@ def _recover_store_promotions():
                     "skipping recovery", type(e).__name__, e)
         return
 
+    try:
+        private_output_root = Path(OUTPUT_ROOT).resolve()
+    except OSError:
+        private_output_root = Path(OUTPUT_ROOT)
+
     def _owned_for(recovery_root):
         # The store root must be a DIRECT child of THIS exact recovery root (P2-B04 round 4: a
         # valid `<src>-<env>` NAME nested deeper, e.g. <root>/Project/ssor-prod, is NOT owned).
@@ -1201,14 +1210,35 @@ def _recover_store_promotions():
             rr = Path(recovery_root).resolve()
         except OSError:
             rr = Path(recovery_root)
+        app_private_root = rr == private_output_root
+        claimed_identities = {}
 
         def _is_owned(store_root, target):
+            store_root = Path(store_root)
             try:
                 if store_root.parent.resolve() != rr:
                     return False
             except OSError:
                 return False
             if store_root.name not in owned_roots:
+                return False
+            identity = owned_dir.directory_identity(store_root)
+            if identity is None:
+                return False
+            if (not app_private_root
+                    and not owned_dir.is_owned(store_root, kind="store")):
+                return False
+            if owned_dir.directory_identity(store_root) != identity:
+                return False
+            key = store_root.absolute()
+            claimed = claimed_identities.get(key)
+            if claimed is None:
+                # recover_promotions always calls the location-only gate first;
+                # a target check may only validate that already-captured lease.
+                if target is not None:
+                    return False
+                claimed_identities[key] = identity
+            elif identity != claimed:
                 return False
             return target is None or target in owned_targets   # None = the location-only gate
         return _is_owned

@@ -49,6 +49,12 @@ KEY_FIELD = SHARED_HEADER.index(KEY)      # 1
 CONTEXT_FIELDS = ("Ramp Name", "On/Off", "Ramp Type", "ADT")   # TSN-only -> non-asserting
 DATE_FIELDS = ("Date of Record",)
 NORMALIZED_SHEET = "Ramp Detail (TSN)"    # the library's normalized TSN workbook sheet
+TSN_RAW_HEADER = (
+    "RAM_CONNECTION_ID", "RAMP_NANE", "LOCATION", "PR", "PM", "PM_SFX",
+    "DATE_OF_RECORD", "HG", "AREA_4", "CITY_CODE", "POP", "ON_OFF",
+    "ADT_EFF_YEAR", "ADT", "RAMP_TYPE", "EFF_DATE", "DESCRIPTION",
+    "SEG_ORDER_ID",
+)
 
 # Notes sheet — the user-facing INDICATOR for the key/normalization/context
 # choices (the same make_notes_writer legend the other vs-TSN comparators carry).
@@ -133,22 +139,17 @@ def _tsn_raw_row(r, h):
             _v(g("RAMP_NANE")), _v(g("ON_OFF")), _v(g("RAMP_TYPE")), _v(g("ADT"))]
 
 
+def require_tsn_raw_header(header):
+    ctc.require_exact_raw_header(header, TSN_RAW_HEADER, REPORT_NAME)
+
+
 def tsn_rows_from_raw(path):
-    """Every route's rows from the raw TSN statewide workbook, consolidated shape."""
-    wb = load_workbook(path, read_only=True, data_only=True)
-    try:
-        sn = TSN_SHEET if TSN_SHEET in wb.sheetnames else wb.sheetnames[0]
-        it = wb[sn].iter_rows(values_only=True)
-        header = list(next(it, []) or [])
-        h = {str(n).strip(): i for i, n in enumerate(header) if n is not None}
-        if "LOCATION" not in h or "PM" not in h:
-            raise ValueError("the TSN Ramp Detail workbook is missing LOCATION/PM "
-                             "columns — pick the raw 'TSAR - RAMPS DETAIL' export.")
-        rows = [_tsn_raw_row(list(r), h) for r in it
-                if row_has_data(r)]
-        return rows
-    finally:
-        wb.close()
+    """Every route's rows from the exact raw statewide workbook."""
+    with ctc.exact_raw_rows(
+            path, TSN_SHEET, TSN_RAW_HEADER, REPORT_NAME,
+            required_nonblank=("LOCATION", "PM")) as (header, rows_in):
+        h = {n: i for i, n in enumerate(header)}
+        return [_tsn_raw_row(r, h) for r in rows_in]
 
 
 def _normalized_row(r):
@@ -241,7 +242,7 @@ def _load_pair(tsmis_path, tsn_path):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas"):
+            mode="formulas", commit_guard=None):
     """Build the Ramp Detail TSMIS-vs-TSN comparison workbook(s). `tsmis_path` is the
     consolidated TSMIS Ramp Detail workbook; `tsn_path` the TSN statewide (raw or
     normalized) workbook. Returns a ConsolidateResult."""
@@ -250,4 +251,5 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         banner="Ramp Detail Comparison — TSMIS vs TSN", has_route=True,
         loader=_load_pair, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
-        events=events, confirm_overwrite=confirm_overwrite, mode=mode)
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode,
+        commit_guard=commit_guard)

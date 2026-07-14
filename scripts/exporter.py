@@ -789,8 +789,35 @@ def _attempt_route(page, spec, route, prefix, out_path, events, timeout_ms):
     # no-download case is INCONCLUSIVE — a transient export-click flake looks
     # identical to a real no-op — so _process_route retries it once and records
     # "empty" only if it reproduces.
+    # A long report may have started under an owned output root that was
+    # replaced while the site generated it. This is the narrowest portable
+    # lease/cancel boundary before the save strategy opens its output path.
+    if events.is_cancelled():
+        raise RunCancelled()
+    _require_safe_destination(events, out_path)
     spec.save(page, out_path, timeout_ms)
     return "saved"
+
+
+def _require_safe_destination(events, path):
+    """Fail closed at a report-write boundary when a caller supplied a guard.
+
+    Normal/direct exports supply ordinary ``Events`` and preserve their prior
+    behavior. Export Everything attaches a target-aware guard binding each file
+    to the exact staging directory created for that run.
+    """
+    guard = getattr(events, "destination_guard", None)
+    if guard is None:
+        return Path(path)
+    try:
+        safe = bool(guard(Path(path)))
+    except Exception as e:  # noqa: BLE001 - a broken safety callback must stop writes
+        log.error("export destination guard failed (%s: %s)",
+                  type(e).__name__, e)
+        safe = False
+    if not safe:
+        raise RunCancelled()
+    return Path(path)
 
 
 def _process_route(page, spec, route, prefix, out_path, events, result, timeout_ms):
@@ -930,6 +957,7 @@ def _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms):
                 break
             prefix = f"[retry {i + 1}/{total}] Route {route}:"
             out_path = out_dir / spec.filename(route)
+            _require_safe_destination(events, out_path)
             if _can_resume(out_path):
                 result.exists.append(route)
                 _record(result, events, route, "exists")
@@ -997,7 +1025,9 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     # out_dir override (B3 "always-current" destination): write straight into the
     # caller's folder instead of the dated run folder. Default = the dated layout.
     out_dir = Path(out_dir) if out_dir else output_run_dir(src, env) / spec.subdir
+    _require_safe_destination(events, out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    _require_safe_destination(events, out_dir)
     result = RunResult(output_dir=str(out_dir))
     total = len(routes)
     run_t0 = time.monotonic()
@@ -1051,6 +1081,7 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
                 # stretch of already-exists skips still gets answered.
                 maybe_screenshot(page, events, note=f"Route {route}")
 
+                _require_safe_destination(events, out_path)
                 if _can_resume(out_path):
                     events.on_log(f"{prefix} already exists, skip")
                     result.exists.append(route)
@@ -1124,6 +1155,11 @@ def _process_route_combined(page, base_spec, route, prefix, targets, events, res
                 maybe_screenshot(page, events, note=prefix.strip())
                 events.on_status(events.worker_no, f"{prefix} saving…")
                 for spec, out_path in targets:      # Export-button saves first, PDF last
+                    # Recheck before EACH edition: an earlier save can be long,
+                    # and every output path is resolved independently.
+                    if events.is_cancelled():
+                        raise RunCancelled()
+                    _require_safe_destination(events, out_path)
                     spec.save(page, out_path, timeout_ms)
         except (AuthError, RunCancelled):
             raise
@@ -1265,7 +1301,9 @@ def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
     save_order = sorted(range(len(specs)), key=lambda i: _save_rebuilds_page(specs[i]))
     dirs, results = [], []
     for d in _combined_output_dirs(specs, out_dirs, src, env):
+        _require_safe_destination(events, d)
         d.mkdir(parents=True, exist_ok=True)
+        _require_safe_destination(events, d)
         dirs.append(d)
         results.append(RunResult(output_dir=str(d)))
     total = len(routes)
@@ -1310,6 +1348,8 @@ def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
                 prefix = f"[{i:>3}/{total}] Route {route}:"
                 maybe_screenshot(page, events, note=f"Route {route}")
                 targets = targets_for(route)
+                for _spec, target in targets:
+                    _require_safe_destination(events, target)
                 # Route-level resume: skip only when EVERY edition is already on disk
                 # (else regenerate + re-save all -- an idempotent overwrite).
                 if all(_can_resume(out_path) for _, out_path in targets):

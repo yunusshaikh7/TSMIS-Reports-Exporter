@@ -27,10 +27,11 @@ should_cancel poll cancels BETWEEN cells and the events sink's is_cancelled
 """
 import logging
 import platform
-import re
 import time
 from pathlib import Path
 
+import credential_safety
+import consolidation_meta
 import matrix
 import outcome
 import reports as _reports
@@ -46,22 +47,9 @@ log = logging.getLogger("tsmis.validation")
 # The vs-TSN mode id every registered comparison row is validated through.
 _TSN_MODE = "tsn"
 
-# Credential-like fragments scrubbed from any error message before it enters the
-# shipped bundle (RM05: paths/names are allowed; tokens/cookies/URL-hash tokens
-# are not). Defense-in-depth — comparison errors are "could not read/save X"
-# today, but a message is copied verbatim, so redact the moment one ever isn't.
-_CRED_RE = re.compile(
-    r"(?i)(access_token|token|cookie|sid|authorization|password|pwd|secret|bearer)"
-    r"\s*[=:]\s*\S+")
-_HASH_TOKEN_RE = re.compile(r"#\S{16,}")           # a token-in-URL-hash fragment
-
-
 def _scrub(msg):
-    """Redact credential-like fragments from a user/error message."""
-    if not msg:
-        return msg
-    msg = _CRED_RE.sub(r"\1=[redacted]", msg)
-    return _HASH_TOKEN_RE.sub("#[redacted]", msg)
+    """Redact complete credential values from a user/error message (RM05)."""
+    return credential_safety.redact_text(msg)
 
 
 # tsn_library.resolve kinds that mean "TSN data is present for this report".
@@ -138,13 +126,14 @@ def _envs_with_data(dest, subdir):
     return found
 
 
-def _ensure_tsn_ready(subdir, events):
+def _ensure_tsn_ready(subdir, events, selected_file=None, source=None):
     """True when `subdir` has TSN data the comparison can read — healing a
     present-but-unconsolidated (raw/pdfs) library first so it counts as a real
     comparison rather than a false 'no consolidated workbook' ERROR."""
     if not tsn_library.is_registered(subdir):
         return False
-    src = tsn_library.resolve(subdir)
+    src = source or (tsn_library.resolve(subdir, selected_file)
+                     if selected_file else tsn_library.resolve(subdir))
     kind = src.get("kind")
     if kind in ("pdfs", "raw"):
         events.on_log(f"Validation: consolidating the {subdir} TSN library…")
@@ -153,32 +142,66 @@ def _ensure_tsn_ready(subdir, events):
     return kind in _TSN_PRESENT_KINDS
 
 
-def _run_one(dest, row_key, env, baseline, events):
+def _run_one(dest, row_key, env, baseline, events, tsn_files=None):
     """One (report, env) comparison against the live store → a result record.
     Never raises — a failing family is recorded, not propagated."""
     events.on_log(f"Validation: comparing {row_key} ({env}) vs TSN…")
     t0 = time.monotonic()
     rec = {"row": row_key, "env": env}
     try:
-        res = matrix.build_comparison(dest, row_key, env, _TSN_MODE, baseline, events)
+        res = matrix.build_comparison(dest, row_key, env, _TSN_MODE, baseline, events,
+                                      tsn_files=tsn_files or {})
         rec["status"] = res.status
-        rec["completion"] = getattr(res, "completion", None) or outcome.COMPLETE
-        out_path = getattr(res, "output_path", None)
-        if res.status == "ok" and out_path:
-            diff_cells, one_sided = matrix.read_counts(out_path)
-            rec["diff_cells"] = diff_cells
-            rec["one_sided"] = one_sided
-            if diff_cells is None:
-                rec["counts_unreadable"] = True
-        elif res.status != "ok":
+        if res.status != "ok":
+            rec["classification"] = (
+                "cancelled" if res.status == "cancelled" else "failed")
+            rec["completion"] = (
+                outcome.CANCELLED if res.status == "cancelled" else outcome.FAILED)
             rec["message"] = _scrub((res.message or "").splitlines()[0][:200])
+        else:
+            out_path = getattr(res, "output_path", None)
+            if not out_path:
+                raise ValueError(
+                    "comparison returned success without a committed output path")
+            try:
+                published = consolidation_meta.require_published_comparison(
+                    out_path, res)
+            except ValueError as e:
+                rec["classification"] = "untrusted"
+                rec["completion"] = "unknown"
+                rec["message"] = _scrub(str(e).splitlines()[0][:200])
+            else:
+                typed = published.comparison_outcome
+                counts = typed.counts
+                rec.update({
+                    "classification": ("ok" if typed.completion == outcome.COMPLETE
+                                       else "partial"),
+                    "completion": typed.completion,
+                    "verdict": typed.verdict,
+                    "counts_known": counts.known,
+                    "paired_rows": counts.paired_rows,
+                    "side_a_only_rows": counts.side_a_only_rows,
+                    "side_b_only_rows": counts.side_b_only_rows,
+                    "differing_rows": counts.differing_rows,
+                    "diff_cells": counts.differing_cells,
+                    "one_sided": counts.side_a_only_rows + counts.side_b_only_rows,
+                    "asserted_cells": counts.asserted_cells,
+                    "context_cells": counts.context_cells,
+                    "skipped_inputs": published.skipped_inputs,
+                    "failed_inputs": published.failed_inputs,
+                    "generation_id": published.artifact_generation.generation_id,
+                })
     except ValueError as e:
         rec["status"] = "error"
+        rec["classification"] = "failed"
+        rec["completion"] = outcome.FAILED
         rec["message"] = _scrub(str(e).splitlines()[0][:200])
     except Exception as e:  # noqa: BLE001 — one family must not sink the run
         log.warning("validation: %s/%s raised (%s: %s)", row_key, env,
                     type(e).__name__, e)
         rec["status"] = "error"
+        rec["classification"] = "failed"
+        rec["completion"] = outcome.FAILED
         rec["message"] = _scrub(f"{type(e).__name__}: {str(e).splitlines()[0][:160]}")
     rec["seconds"] = round(time.monotonic() - t0, 1)
     return rec
@@ -190,14 +213,33 @@ def _comparisons_stage(events, should_cancel):
         return {"skipped": "no Export-Everything store yet (run an export first)",
                 "cells": []}
     baseline = settings.get_matrix_baseline()
+    raw_selections = settings.get_matrix_tsn_selections()
+    tsn_files, selections_changed = tsn_library.canonicalize_selections(raw_selections)
+    if selections_changed:
+        settings.set_matrix_tsn_selections(tsn_files)
     cells = []
-    tsn_rows = [(row_key, subdir) for row_key, _label, subdir, _idx, _ad
-                in _reports.matrix_rows()]
-    for row_key, subdir in tsn_rows:
+    tsn_rows = [(row_key, subdir, tsn_library.canonical_dataset_key(
+                 matrix.tsn_subdir_for(row_key, subdir, adapter)))
+                for row_key, _label, subdir, _idx, adapter in _reports.matrix_rows()]
+    tsn_ready = {}
+    for row_key, subdir, tsn_subdir in tsn_rows:
         if should_cancel():
             cells.append({"row": row_key, "skipped": "cancelled"})
             break
-        if not _ensure_tsn_ready(subdir, events):
+        selected = tsn_files.get(tsn_subdir)
+        if tsn_subdir not in tsn_ready:
+            selected_src = (tsn_library.resolve(tsn_subdir, selected)
+                            if selected else tsn_library.resolve(tsn_subdir))
+            ready = (False if selected_src.get("kind") == "missing_explicit"
+                     else _ensure_tsn_ready(tsn_subdir, events, selected,
+                                            source=selected_src))
+            tsn_ready[tsn_subdir] = (selected_src, ready)
+        selected_src, ready = tsn_ready[tsn_subdir]
+        if selected_src.get("kind") == "missing_explicit":
+            cells.append({"row": row_key,
+                          "skipped": tsn_library.explicit_selection_problem(selected_src)})
+            continue
+        if not ready:
             cells.append({"row": row_key, "skipped": "no TSN data in the library"})
             continue
         envs = _envs_with_data(dest, subdir)
@@ -208,12 +250,20 @@ def _comparisons_stage(events, should_cancel):
             if should_cancel():
                 cells.append({"row": row_key, "env": env, "skipped": "cancelled"})
                 break
-            cells.append(_run_one(dest, row_key, env, baseline, events))
+            cells.append(_run_one(dest, row_key, env, baseline, events,
+                                  tsn_files=tsn_files))
     return {"dest_name": Path(dest).name, "baseline": baseline, "cells": cells}
 
 
 def _is_full_ok(cell):
-    return cell.get("status") == "ok" and cell.get("completion", outcome.COMPLETE) == outcome.COMPLETE
+    return bool(
+        cell.get("status") == "ok"
+        and cell.get("classification") == "ok"
+        and cell.get("completion") == outcome.COMPLETE
+        and cell.get("verdict") in ("match", "diff")
+        and cell.get("counts_known") is True
+        and isinstance(cell.get("generation_id"), str)
+        and cell.get("generation_id"))
 
 
 def run_validation(events=None, should_cancel=None):
@@ -229,14 +279,23 @@ def run_validation(events=None, should_cancel=None):
     manifest["tsn_library"] = _tsn_stage(events)
     events.on_log("Validation: processing the sample comparisons…")
     manifest["comparisons"] = _comparisons_stage(events, should_cancel)
-    ran = [c for c in manifest["comparisons"]["cells"] if "status" in c]
+    all_cells = manifest["comparisons"]["cells"]
+    ran = [c for c in all_cells if "status" in c]
     full_ok = [c for c in ran if _is_full_ok(c)]
-    partial = [c for c in ran if c.get("status") == "ok" and not _is_full_ok(c)]
+    partial = [c for c in ran if c.get("classification") == "partial"]
+    untrusted = [c for c in ran if c.get("classification") == "untrusted"]
+    cancelled_cells = [c for c in ran if c.get("classification") == "cancelled"]
+    failed = [c for c in ran if c.get("classification") == "failed"]
+    blocked = [c for c in all_cells if "status" not in c]
     manifest["totals"] = {
+        "comparisons_expected": len(all_cells),
         "comparisons_run": len(ran),
         "comparisons_ok": len(full_ok),               # COMPLETE only — a full, trustable pass
         "comparisons_partial": len(partial),          # ran ok but on incomplete inputs
-        "comparisons_failed": len(ran) - len(full_ok) - len(partial),
+        "comparisons_untrusted": len(untrusted),
+        "comparisons_failed": len(failed),
+        "comparisons_cancelled": len(cancelled_cells),
+        "comparisons_blocked": len(blocked),
         "cancelled": should_cancel(),
         "seconds": round(time.monotonic() - t0, 1),
     }
@@ -263,10 +322,12 @@ def summary_lines(manifest):
         if c.get("skipped"):
             lines.append(f"{c['row']}: skipped — {c['skipped']}")
         elif c.get("status") == "ok":
-            partial = c.get("completion", outcome.COMPLETE) != outcome.COMPLETE
+            classification = c.get("classification")
+            partial = classification == "partial"
             qual = " (PARTIAL inputs)" if partial else ""
-            if c.get("counts_unreadable") or c.get("diff_cells") is None:
-                det = "ok — counts could not be read from the workbook"
+            if classification == "untrusted" or c.get("diff_cells") is None:
+                det = ("UNTRUSTED — "
+                       + c.get("message", "outcome metadata unavailable"))
             else:
                 det = (f"ok{qual} — {c['diff_cells']:,} diff cells / "
                        f"{c['one_sided']:,} one-sided")

@@ -210,7 +210,7 @@ def _load_pair(tsmis_path, tsn_path):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas"):
+            mode="formulas", commit_guard=None):
     """Build the Ramp Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s).
     `tsmis_path` is the consolidated TSMIS Ramp Summary workbook; `tsn_path` the
     TSN statewide PDF (or the library's normalized workbook)."""
@@ -219,4 +219,5 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         banner="Ramp Summary Comparison — TSMIS vs TSN (statewide category counts)",
         has_route=False, loader=_load_pair, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (pdfplumber, openpyxl).",
-        events=events, confirm_overwrite=confirm_overwrite, mode=mode)
+        events=events, confirm_overwrite=confirm_overwrite, mode=mode,
+        commit_guard=commit_guard)

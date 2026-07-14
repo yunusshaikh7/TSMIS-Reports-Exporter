@@ -28,7 +28,9 @@ Console-free; pdfplumber/openpyxl objects come from the callers (which gate on
 their own _DEPS_OK), so this module keeps the same lazy posture and never
 imports pdfplumber itself.
 """
+import os
 import re
+import uuid
 
 try:
     from openpyxl import Workbook
@@ -40,7 +42,9 @@ except ImportError:
 
 from compare_core import is_formula_injection   # shared formula-injection guard
 from consolidate_xlsx_base import consolidate_xlsx
+import consolidation_meta
 from events import ConsolidateResult, Events
+import owned_dir
 
 
 # --------------------------------------------------------------------------- #
@@ -208,7 +212,7 @@ def write_route_workbook(rows, out_path, *, sheet_name, header,
 def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
                        report_name, banner_title, export_hint, unreadable_hint,
                        converted_prefix, convert_one, write_one, finalize,
-                       consolidate_kwargs):
+                       consolidate_kwargs, commit_guard=None):
     """The convert-every-PDF-then-combine driver both TSMIS PDF consolidators
     wrote verbatim: deps gate -> glob + the no-inputs error -> the EARLY
     overwrite confirm (before any parsing) -> banner -> clear the stale
@@ -224,6 +228,11 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
     workbook. `finalize(result, ctx)` runs only on a successful combine.
     """
     events = events or Events()
+
+    def destination_changed():
+        return ConsolidateResult(
+            status="error",
+            message="The destination changed while converting PDFs; nothing was published.")
     if not deps_ok:
         return ConsolidateResult(
             status="error",
@@ -258,9 +267,24 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
 
     # The combined workbook reflects exactly THIS run's PDFs: clear previously
     # converted files so routes removed from the input folder don't linger.
+    if not consolidation_meta.guard_allows(commit_guard, conv):
+        return destination_changed()
     conv.mkdir(parents=True, exist_ok=True)
+    conv_identity = (owned_dir.directory_identity(conv)
+                     if commit_guard is not None else None)
+
+    def guarded(path):
+        return (consolidation_meta.guard_allows(commit_guard, path)
+                and (commit_guard is None
+                     or (conv_identity is not None
+                         and owned_dir.directory_identity(conv) == conv_identity)))
+
+    if not guarded(conv):
+        return destination_changed()
     stale = list(conv.glob(f"{converted_prefix}_*.xlsx"))
     for p in stale:
+        if not guarded(p):
+            return destination_changed()
         try:
             p.unlink()
         except OSError:
@@ -297,14 +321,29 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
                           f"PDF; {p.name} replaces it (is the same route in the "
                           "folder twice?)")
         written.add(out_file.name)
+        candidate = conv / f".{converted_prefix}.tmp-{uuid.uuid4().hex}.xlsx"
+        if not guarded(candidate) or not guarded(out_file):
+            return destination_changed()
         try:
-            write_one(rows, out_file)
+            # Serialize to an unpredictable sibling first, then revalidate the
+            # exact conversion directory and final path at the commit boundary.
+            write_one(rows, candidate)
+            if not guarded(candidate) or not guarded(out_file):
+                return destination_changed()
+            os.replace(candidate, out_file)
         except PermissionError:
+            if guarded(candidate):
+                try:
+                    candidate.unlink()
+                except OSError:  # silent-ok: the user-facing locked-file error is primary
+                    pass
             return ConsolidateResult(
                 status="error",
                 message=(f"Could not save {out_file.name}.\n\n"
                          "The file is probably open in Excel. Close it and try again."),
             )
+        if not guarded(out_file):
+            return destination_changed()
         events.on_log(f"  route {route}: {len(rows)} rows -> {out_file.name}")
         converted += 1
 
@@ -325,6 +364,7 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
     result = consolidate_xlsx(
         input_dir=conv, out_path=out,
         events=events, confirm_overwrite=confirm, existed_at_confirm=existed_at_confirm,
+        commit_guard=guarded,
         **consolidate_kwargs)
     if result.status == "ok":
         failed = ctx["failed"]
