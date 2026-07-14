@@ -691,8 +691,12 @@ def test_output_source_alias_guard(tmp):                       # CMP-AUD-041 / S
 
     # Canonicalization must defeat relative/dot aliases even when the path text
     # differs.  (Path.resolve also covers symlinks/junctions where available.)
+    # Build the alternate spelling on `direct`'s OWN drive (a `..` round-trip
+    # through its parent) rather than relative to cwd: on CI the checkout and the
+    # temp dir sit on different drives (D:\a\... vs C:\...\Temp), and a
+    # cross-mount os.path.relpath raises "path is on mount 'C:', start on 'D:'".
     producer.calls = 0
-    spelled_differently = Path(os.path.relpath(direct, Path.cwd()))
+    spelled_differently = direct.parent / ".." / direct.parent.name / direct.name
     res = commit(direct.resolve(), [spelled_differently])
     check("resolved aliases are rejected independent of path spelling",
           res is not None and res.status == "error" and producer.calls == 0)
