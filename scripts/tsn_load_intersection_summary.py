@@ -29,7 +29,11 @@ def _project(raw_path):
     counts = istsn.parse_tsn_pdf(raw_path)
     tsn_cats = istsn._SPEC.categories_for("tsn")     # TSN-applicable only (no TSMIS-only codes)
     missing = [key for key, slug in tsn_cats if counts.get(slug) is None]
-    rows = [[key, int(counts.get(slug, 0) or 0)] for key, slug in tsn_cats]
+    # A category the PDF didn't yield is OMITTED, never written as a fabricated
+    # zero (CMP-AUD-021 absent-vs-zero): the comparator's validation then refuses
+    # the incomplete table loudly instead of comparing invented counts.
+    rows = [[key, int(counts[slug])] for key, slug in tsn_cats
+            if counts.get(slug) is not None]
 
     def make_result(out_name):
         summary = [f"TSN Intersection Summary: {len(rows)} categories -> {out_name}",

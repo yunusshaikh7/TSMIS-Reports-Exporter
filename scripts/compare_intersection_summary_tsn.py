@@ -31,6 +31,8 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+from dataclasses import replace
+
 import compare_tsn_common as ctc
 import summary_layout
 from compare_core import CompareSchema
@@ -55,6 +57,53 @@ _SIGNALIZED_SLUG = next(
     (c.slug for sec in _SPEC.sections if sec.name == summary_layout._IS_CONTROL_TYPES
      for c in sec.cats if c.code == "S"), "is_control_types_s")
 _STALE_SIGNAL_KEY = re.compile(r"CONTROL TYPES:\s*([A-Za-z])\b")
+
+# The censused partition contract (CMP-AUD-020). TSMIS side: verified statewide
+# on the 6.19 and 7.9 exports (mirrors the consolidator's per-route tripwire) —
+# every block partitions the total exactly EXCEPT Highway Group, which the site
+# itself under-counts. TSN side: censused on the 2025-09 statewide print — five
+# blocks partition exactly; the blocks holding TSMIS-only codes (intersection
+# R/C/P/+, control R/O/Q, left-chan Y) sum short by exactly the untabulated
+# classes, the lane rows don't cover >8 lanes, and right-channelization leaves a
+# small censused remainder (3 on that print). Bounded residuals are EXPOSED as
+# notes, never fabricated into a category.
+_RULE = summary_layout.SectionRule
+_TSMIS_RULES = (
+    _RULE("HIGHWAY GROUP", "bounded",
+          reason="the TSMIS site under-counts the Highway Group block (a known "
+                 "site-side tabulation gap; every other block partitions exactly)"),
+    _RULE(summary_layout._IS_RURAL_URBAN, "exact"),
+    _RULE("INTERSECTION TYPE", "exact"),
+    _RULE("LIGHTING TYPE", "exact"),
+    _RULE(summary_layout._IS_CONTROL_TYPES, "exact"),
+    _RULE("MAINLINE NUM OF LANES", "exact"),
+    _RULE("MAINLINE MASTARM", "exact"),
+    _RULE("MAINLINE LEFT CHANNELIZATION", "exact"),
+    _RULE("MAINLINE RIGHT CHANNELIZATION", "exact"),
+    _RULE("MAINLINE TRAFFIC FLOW", "exact"),
+)
+_TSN_RULES = (
+    _RULE("HIGHWAY GROUP", "exact"),
+    _RULE(summary_layout._IS_RURAL_URBAN, "exact"),
+    _RULE("INTERSECTION TYPE", "bounded",
+          reason="the TSN summary doesn't tabulate the TSMIS-only intersection "
+                 "types (Roundabout/Circular/Midblock/no-data); see 'Only in "
+                 "TSMIS'"),
+    _RULE("LIGHTING TYPE", "exact"),
+    _RULE(summary_layout._IS_CONTROL_TYPES, "bounded",
+          reason="the TSN summary doesn't tabulate the TSMIS-only control types "
+                 "(Roundabout R / PHB O / Flash Beacon Q); see 'Only in TSMIS'"),
+    _RULE("MAINLINE NUM OF LANES", "bounded",
+          reason="the TSN print's lane rows don't cover every intersection "
+                 "(lanes above 8 are not tabulated)"),
+    _RULE("MAINLINE MASTARM", "exact"),
+    _RULE("MAINLINE LEFT CHANNELIZATION", "bounded",
+          reason="the TSN summary has no 'channelization not specified' (Y) row"),
+    _RULE("MAINLINE RIGHT CHANNELIZATION", "bounded",
+          reason="the TSN statewide print leaves a small censused remainder in "
+                 "this block (3 intersections on the 2025-09 print)"),
+    _RULE("MAINLINE TRAFFIC FLOW", "exact"),
+)
 
 
 def _slug_for_key(key_to_slug, key):
@@ -129,6 +178,7 @@ def parse_tsn_pdf(path):
     """The statewide TSN Intersection Summary PDF -> {slug: count}. Splits the page
     into 3 column bands and block-walks each independently (so each column's
     count+label rows pair correctly), merging the per-band counts."""
+    name = Path(path).name
     with pdfplumber.open(path) as pdf:
         page = _data_page(pdf)
         bands = [[], [], []]
@@ -137,7 +187,8 @@ def parse_tsn_pdf(path):
             bands[0 if x < _BAND_LEFT else (1 if x < _BAND_RIGHT else 2)].append(w)
         counts = {}
         for band in bands:
-            for slug, v in summary_layout.counts_from_rows(_SPEC, _cluster(band)).items():
+            for slug, v in summary_layout.counts_from_rows(
+                    _SPEC, _cluster(band), source=name).items():
                 counts[slug] = counts.get(slug, 0) + v
         m = _TOTAL_RE.search(page.extract_text() or "")
         counts["total_intersections"] = int(m.group(1).replace(",", "")) if m else None
@@ -164,15 +215,27 @@ def _load_tsn(path):
     try:
         sn = NORMALIZED_SHEET if NORMALIZED_SHEET in wb.sheetnames else wb.sheetnames[0]
         key_to_slug = {k: s for k, s in _CATEGORIES}
-        rec = {}
+        rec, seen = {}, set()
         it = wb[sn].iter_rows(values_only=True)
         next(it, None)
         for r in it:
-            if not r or r[0] is None or len(r) <= 1 or not isinstance(r[1], (int, float)):
+            if not r or r[0] is None:
                 continue
-            slug = _slug_for_key(key_to_slug, str(r[0]).strip())
-            if slug is not None:
-                rec[slug] = rec.get(slug, 0) + int(r[1])   # sum: stale J–P keys fold into S
+            key = str(r[0]).strip()
+            slug = _slug_for_key(key_to_slug, key)
+            if slug is None:
+                continue
+            if key in seen:                              # CMP-AUD-022
+                raise ValueError(f"{path.name} lists the category {key!r} twice "
+                                 "— refusing an ambiguous normalized table")
+            seen.add(key)
+            v = r[1] if len(r) > 1 else None
+            if v is None:
+                raise ValueError(f"{path.name}: the category {key!r} has no count")
+            # Sum, not overwrite: DISTINCT stale J–P/S keys legitimately fold
+            # into the one Signalized slug; a repeated EXACT key refused above.
+            rec[slug] = rec.get(slug, 0) + summary_layout.parse_count(
+                v, source=path.name, category=key)
         return rec
     finally:
         wb.close()
@@ -183,7 +246,11 @@ def _load_tsn(path):
 # --------------------------------------------------------------------------- #
 def _load_tsmis(path):
     """TSMIS side -> {slug: count}. Sums each category column of the consolidated
-    Intersection Summary workbook's per-route sheet."""
+    Intersection Summary workbook's per-route sheet. Strict (CMP-AUD-021/022):
+    count cells must be whole numbers (numeric text is parsed, never dropped;
+    fractions and booleans refuse), a duplicated category column refuses, and a
+    column the workbook lacks stays ABSENT — never a fabricated zero
+    (reconcile_counts decides whether it was required)."""
     name = Path(path).name
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
@@ -195,19 +262,29 @@ def _load_tsmis(path):
                              "consolidated TSMIS Intersection Summary workbook.")
         it = wb[TSMIS_SHEET].iter_rows(values_only=True)
         header = next(it, None) or ()
-        col_slug = {i: _KEY_TO_SLUG[str(h).strip()]
-                    for i, h in enumerate(header)
-                    if h is not None and str(h).strip() in _KEY_TO_SLUG}
-        if "Route" not in [str(h).strip() for h in header if h is not None]:
+        names = [str(h).strip() if h is not None else None for h in header]
+        if "Route" not in names:
             raise ValueError(f"{name} isn't a consolidated Intersection Summary "
                              "workbook (no 'Route' column) — consolidate first.")
-        sums = {}
+        col_slug, seen = {}, set()
+        for i, h in enumerate(names):
+            if not h or h not in _KEY_TO_SLUG:
+                continue
+            if h in seen:                                # CMP-AUD-022
+                raise ValueError(f"{name} has a duplicated category column "
+                                 f"({h!r}) — refusing to sum an ambiguous table")
+            seen.add(h)
+            col_slug[i] = (_KEY_TO_SLUG[h], h)
+        sums = {slug: 0 for slug, _h in col_slug.values()}
         for row in it:
             if not row or all(c is None for c in row):
                 continue
-            for i, slug in col_slug.items():
-                if i < len(row) and isinstance(row[i], (int, float)):
-                    sums[slug] = sums.get(slug, 0) + int(row[i])
+            for i, (slug, disp) in col_slug.items():
+                v = row[i] if i < len(row) else None
+                if v is None or (isinstance(v, str) and not v.strip()):
+                    continue                             # blank cell
+                sums[slug] += summary_layout.parse_count(v, source=name,
+                                                         category=disp)
         return sums
     finally:
         wb.close()
@@ -218,41 +295,66 @@ def _load_tsmis(path):
 # --------------------------------------------------------------------------- #
 def _rows(counts, side):
     """Rows for `side` ('tsmis'|'tsn'): the side's applicable categories only, so a
-    category the other system doesn't classify stays ONE-SIDED (Only in …)."""
-    return [[key, int(counts.get(slug, 0) or 0)]
-            for key, slug in _SPEC.categories_for(side)]
+    category the other system doesn't classify stays ONE-SIDED (Only in …).
+    Every emitted category must be PRESENT in `counts` (reconcile_counts
+    guarantees it) — an absent category is a hard error, never a fabricated
+    zero (CMP-AUD-020/021)."""
+    out = []
+    for key, slug in _SPEC.categories_for(side):
+        if slug not in counts:
+            raise ValueError(f"the {side.upper()} table is missing the "
+                             f"category {key!r} — cannot build comparison rows")
+        out.append([key, counts[slug]])
+    return out
 
 
 def suggest_name(tsmis_path):
     return f"TSMIS_vs_TSN_IntersectionSummary_Comparison {today_str()}.xlsx"
 
 
-def _load_pair(tsmis_path, tsn_path):
-    """(rows_t, rows_n, warnings) for the shared driver. The parse-integrity warning is
-    scoped to the categories TSN ACTUALLY classifies (the TSN-applicable set) — the
-    TSMIS-only codes are legitimately absent from the TSN PDF and must NOT be flagged."""
+def _load_pair(tsmis_path, tsn_path, note_sink=None, events=None):
+    """(rows_t, rows_n, warnings) for the shared driver. Both inputs are
+    INDEPENDENTLY validated before any row is built (CMP-AUD-020): every
+    side-applicable category and the grand total must be present (the
+    TSMIS-only codes are legitimately absent from the TSN PDF and are NOT
+    required there), and every block must partition the total per the censused
+    SectionRule contract — a table that doesn't reconcile refuses with a named
+    block instead of comparing garbage. Bounded residuals (the TSN-untabulated
+    classes; the site's Highway Group under-count) are EXPOSED via `note_sink`
+    onto the familiar sheet + the log — never fabricated into a category, and
+    never a warning (warnings mean unreadable inputs)."""
     tsmis_counts = _load_tsmis(tsmis_path)
     tsn_counts = _load_tsn(tsn_path)
-    warnings = []
-    if tsn_counts.get("total_intersections") is None:
-        warnings.append("TSN parse did not find the 'Total Intersections' figure — "
-                        "the statewide page may not have parsed; verify the TSN PDF.")
-    missing = [key for key, slug in _SPEC.categories_for("tsn")
-               if tsn_counts.get(slug) is None]
-    if missing:
-        warnings.append(f"TSN parse did not find {len(missing)} expected categor"
-                        f"{'y' if len(missing) == 1 else 'ies'}: "
-                        + ", ".join(missing[:6]) + ("…" if len(missing) > 6 else ""))
-    return _rows(tsmis_counts, "tsmis"), _rows(tsn_counts, "tsn"), warnings
+    notes = summary_layout.reconcile_counts(
+        _SPEC, tsmis_counts, "tsmis", _TSMIS_RULES,
+        source=Path(tsmis_path).name, side_label="TSMIS")
+    notes += summary_layout.reconcile_counts(
+        _SPEC, tsn_counts, "tsn", _TSN_RULES,
+        source=Path(tsn_path).name, side_label="TSN")
+    if note_sink is not None:
+        note_sink.clear()
+        note_sink.extend(notes)
+    if events is not None:
+        for n in notes:
+            events.on_log(f"note: {n}")
+    return _rows(tsmis_counts, "tsmis"), _rows(tsn_counts, "tsn"), []
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
             mode="formulas", commit_guard=None):
     """Build the Intersection Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s)."""
+    # CMP-AUD-020: a per-run holder the loader fills and the familiar-sheet
+    # writer reads, so censused-residual notes reach the display sheet without
+    # ever entering the compared universe.
+    notes = []
+    schema = replace(_SCHEMA, extra_sheet_writer=summary_layout.make_extra_sheet_writer(
+        _SPEC, extra_notes=notes))
     return ctc.run_files_compare(
-        _SCHEMA, tsmis_path, tsn_path, out_path,
+        schema, tsmis_path, tsn_path, out_path,
         banner="Intersection Summary Comparison — TSMIS vs TSN (statewide category counts)",
-        has_route=False, loader=_load_pair, deps_ok=_DEPS_OK,
+        has_route=False,
+        loader=lambda a, b: _load_pair(a, b, note_sink=notes, events=events),
+        deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (pdfplumber, openpyxl).",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
         commit_guard=commit_guard)

@@ -77,7 +77,10 @@ def parse_route(path):
             a = row[0] if len(row) > 0 else None
             b = row[1] if len(row) > 1 else None
             if isinstance(a, (int, float)) and not isinstance(a, bool):
-                feed.append((int(a), b))
+                # Raw value, not int(a): counts_from_rows parses strictly, so a
+                # fractional count fails this route loudly instead of silently
+                # truncating (CMP-AUD-021).
+                feed.append((a, b))
                 continue
             if a is None:
                 continue
@@ -89,7 +92,8 @@ def parse_route(path):
             if m and route is None:
                 route = m.group(1)
             feed.append((None, a))             # header / subheader text
-        counts = summary_layout.counts_from_rows(_SPEC, feed)
+        counts = summary_layout.counts_from_rows(_SPEC, feed,
+                                                 source=Path(path).name)
     finally:
         wb.close()
     if route is None:

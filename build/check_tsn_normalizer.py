@@ -190,8 +190,10 @@ def _summary_case(loader, cmp_mod, cats, label, sheet, align, total_slug, total_
     ev, logs = _events()
     with _patch(cmp_mod, "parse_tsn_pdf", lambda _p, c=counts: dict(c)):
         r = loader.build_into(raw, out, events=ev)
-    exp_rows = [[key, (0 if counts.get(slug) is None else counts[slug])]
-                for key, slug in cats]
+    # A category the parse didn't yield is OMITTED from the normalized rows —
+    # never written as a fabricated 0 (CMP-AUD-021 absent-vs-zero).
+    exp_rows = [[key, counts[slug]] for key, slug in cats
+                if counts.get(slug) is not None]
     return r, logs, _sig(out), exp_rows, counts[total_slug]
 
 
@@ -219,17 +221,22 @@ def test_summary_signatures():
                   (title, rows[0], rows[1:]) == (sheet, _SUM_HEADER, exp_rows))
             check(f"{label} FULL: header cell align/font/fill == frozen",
                   all(s == (align, _FONT, _FILL) for s in head))
-            # PARTIAL: drop category 0 -> partial + skipped_inputs=1 + the warning line first
+            # PARTIAL: drop category 0 -> partial + skipped_inputs=1 + the warning line
+            # first; the dropped category is OMITTED from the rows, never a
+            # fabricated [key, 0] (CMP-AUD-021 absent-vs-zero).
             out = tmp / f"{sheet}_part.xlsx"
             r, logs, (title, rows, head), exp_rows, total = _summary_case(
                 loader, cmp_mod, cats, label, sheet, align, tslug, tlabel, 0, out)
             warn = (f"⚠ INCOMPLETE — 1 category not found in the PDF: {cats[0][0]}")
-            exp_sum = [warn, f"{label}: {n} categories -> {out.name}", f"{tlabel}: {total}"]
+            exp_sum = [warn, f"{label}: {n - 1} categories -> {out.name}",
+                       f"{tlabel}: {total}"]
             check(f"{label} PARTIAL: result fields exact (partial + 1 skipped + warning)",
                   (r.status, r.message, list(r.summary_lines), r.completion, r.skipped_inputs)
-                  == ("ok", f"Normalized {label} ({n} categories).", exp_sum, oc.PARTIAL, 1))
-            check(f"{label} PARTIAL: dropped category row is [key, 0]",
-                  rows[1] == [cats[0][0], 0])
+                  == ("ok", f"Normalized {label} ({n - 1} categories).", exp_sum,
+                      oc.PARTIAL, 1))
+            check(f"{label} PARTIAL: dropped category row is OMITTED (no fabricated 0)",
+                  rows[1] != [cats[0][0], 0] and len(rows) - 1 == n - 1
+                  and (title, rows[1:]) == (sheet, exp_rows))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

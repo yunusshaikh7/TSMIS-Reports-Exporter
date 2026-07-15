@@ -8,11 +8,17 @@ per side (has_route=False; key = category, value = count). The check locks:
   * the canonical category list (unique keys; the TSN-only P/V "Dummy" ramp types
     and the grand Total are present);
   * the TSMIS loader SUMMING a consolidated workbook's per-route columns to slugs
-    (incl. a category column the workbook lacks -> 0, the old-export case);
+    strictly (CMP-AUD-021/022: numeric text parses, fractions/booleans refuse,
+    duplicate columns refuse, an absent column stays absent — never a fabricated 0);
+  * the independent per-side validation (CMP-AUD-020): every block must partition
+    the grand total per the censused contract (the TSMIS Ramp-Types block is
+    bounded by the P/V-not-tabulated residual, EXPOSED as a familiar-sheet note),
+    all-zero categories under a non-zero total refuse, and a missing category or
+    total is a hard stop;
   * end-to-end through compare()/the VALUES workbook (read back with openpyxl, no
-    Excel, CI-safe): a category present on one side only (P) compares as 0-vs-N, a
-    TSMIS-only metric (Ramp Points w/out linework) lands in 'Only in TSMIS' and on
-    the familiar sheet, and there is NO Route column (has_route=False).
+    Excel, CI-safe): P/V stay one-sided ('Only in TSN', CMP-AUD-024/025 — never a
+    fabricated 0-vs-N), the Ramp Points footnote is display-only, and there is NO
+    Route column (has_route=False).
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_compare_ramp_summary_tsn.py
@@ -54,6 +60,44 @@ def _write_tsmis(path, displays, perroute):
         ws.append([d.get(x, "") for x in displays])
     wb.save(path)
     wb.close()
+
+
+# The full consolidated column set (every compared category + total + footnote),
+# in the consolidator's own display spelling.
+_ALL_DISPLAYS = ["Route"] + list(cmp._SLUG_TO_DISPLAY.values())
+_D = cmp._SLUG_TO_DISPLAY   # slug -> display header
+
+
+def _route_row(route, total, *, right, divided=0, on=None, nolw, diamond):
+    """One arithmetically CONSISTENT per-route row (the censused partition
+    contract): hwy == total; population == total; on/off + no-linework == total;
+    ramp-types + no-linework <= total (the P/V residual). P/V stay blank, like
+    every real TSMIS export."""
+    d = {disp: 0 for disp in _ALL_DISPLAYS}
+    d["Route"] = route
+    d[_D["hwy_right"]] = right
+    d[_D["hwy_divided"]] = divided
+    d[_D["pop_rural_inside"]] = total
+    d[_D["onoff_on"]] = (total - nolw) if on is None else on
+    d[_D["ramp_points_no_linework"]] = nolw
+    d[_D["ramp_D_diamond"]] = diamond
+    d[_D["ramp_P_dummy_paired"]] = ""
+    d[_D["ramp_V_dummy_volume"]] = ""
+    d[_D["total_ramps"]] = total
+    return d
+
+
+def _tsn_rows(total, *, right, divided, undivided, p, v):
+    """A CONSISTENT full 31-row normalized TSN table: all four blocks partition
+    `total` exactly (P/V included, the censused TSN contract)."""
+    vals = {slug: 0 for _k, slug in cmp._CATEGORIES}
+    vals["hwy_right"], vals["hwy_divided"], vals["hwy_undivided"] = right, divided, undivided
+    vals["onoff_on"] = total
+    vals["pop_urban_inside"] = total
+    vals["ramp_P_dummy_paired"], vals["ramp_V_dummy_volume"] = p, v
+    vals["ramp_D_diamond"] = total - p - v
+    vals["total_ramps"] = total
+    return [(_KEY[slug], val) for slug, val in vals.items()]
 
 
 def _write_tsn_norm(path, rows):
@@ -101,22 +145,51 @@ def test_schema_and_categories():
 
 
 def test_tsmis_loader_sums():
-    print("TSMIS loader sums per-route columns to slugs:")
+    print("TSMIS loader sums per-route columns to slugs (strict, CMP-AUD-021/022):")
     root = Path(tempfile.mkdtemp(prefix="tsmis_rs_sum_"))
     p = root / "consol.xlsx"
-    # Two routes; include P (blank) but OMIT V entirely (old-export case -> 0).
+    # Two routes; include P (blank) but OMIT V entirely.
     displays = ["Route", "Right", "Divided", "P-DummyPair", "Total Ramps", "Pts w/o Linework"]
     _write_tsmis(p, displays, [
         {"Route": "001", "Right": 4, "Divided": 10, "P-DummyPair": "", "Total Ramps": 14, "Pts w/o Linework": 2},
-        {"Route": "002", "Right": 6, "Divided": 10, "P-DummyPair": "", "Total Ramps": 16, "Pts w/o Linework": 1},
+        {"Route": "002", "Right": "6", "Divided": 10, "P-DummyPair": "", "Total Ramps": 16, "Pts w/o Linework": 1},
     ])
     s = cmp._load_tsmis(p)
-    check("hwy_right summed (4+6=10)", s["hwy_right"] == 10)
+    check("hwy_right summed, numeric TEXT parsed (4+'6'=10, not dropped)",
+          s["hwy_right"] == 10)
     check("hwy_divided summed (10+10=20)", s["hwy_divided"] == 20)
-    check("blank P column totals 0", s["ramp_P_dummy_paired"] == 0)
-    check("missing V column totals 0 (old export)", s["ramp_V_dummy_volume"] == 0)
+    check("blank P column is PRESENT with 0 (column exists, cells blank)",
+          s["ramp_P_dummy_paired"] == 0)
+    check("missing V column stays ABSENT (never a fabricated 0)",
+          "ramp_V_dummy_volume" not in s)
     check("total_ramps summed (14+16=30)", s["total_ramps"] == 30)
     check("ramp_points summed (2+1=3)", s["ramp_points_no_linework"] == 3)
+
+    # Strict count refusals, with the file + column named (CMP-AUD-021).
+    for label, bad, needle in (("fractional 1.9", 1.9, "fractional"),
+                               ("boolean True", True, "boolean"),
+                               ("malformed text 'ten'", "ten", "not a whole number")):
+        pb = root / f"consol_{needle.split()[0]}.xlsx"
+        _write_tsmis(pb, displays, [
+            {"Route": "001", "Right": bad, "Divided": 10, "P-DummyPair": "",
+             "Total Ramps": 14, "Pts w/o Linework": 2}])
+        try:
+            cmp._load_tsmis(pb)
+            check(f"{label} count refuses", False)
+        except ValueError as e:
+            check(f"{label} count refuses naming file + column",
+                  needle in str(e) and pb.name in str(e) and "'Right'" in str(e))
+
+    # A duplicated category column refuses (CMP-AUD-022).
+    pd = root / "consol_dupcol.xlsx"
+    _write_tsmis(pd, displays + ["Right"], [
+        {"Route": "001", "Right": 4, "Divided": 10, "P-DummyPair": "",
+         "Total Ramps": 14, "Pts w/o Linework": 2}])
+    try:
+        cmp._load_tsmis(pd)
+        check("duplicated category column refuses", False)
+    except ValueError as e:
+        check("duplicated category column refuses", "duplicated" in str(e))
 
 
 def test_end_to_end():
@@ -125,19 +198,15 @@ def test_end_to_end():
     tsmis_path = root / "tsmis.xlsx"
     tsn_path = root / "tsn.xlsx"
     out_path = root / "cmp.xlsx"
-    displays = ["Route", "Right", "Divided", "P-DummyPair", "Total Ramps", "Pts w/o Linework"]
-    _write_tsmis(tsmis_path, displays, [
-        {"Route": "001", "Right": 4, "Divided": 10, "P-DummyPair": "", "Total Ramps": 14, "Pts w/o Linework": 2},
-        {"Route": "002", "Right": 6, "Divided": 10, "P-DummyPair": "", "Total Ramps": 16, "Pts w/o Linework": 1},
+    # Two CONSISTENT routes (total 30): hwy right 10 + divided 20; on 27 + nolw 3;
+    # rural-inside 30; diamond 25 + nolw 3 = 28 -> P/V residual 2 (exposed note).
+    _write_tsmis(tsmis_path, _ALL_DISPLAYS, [
+        _route_row("001", 14, right=4, divided=10, nolw=2, diamond=11),
+        _route_row("002", 16, right=6, divided=10, nolw=1, diamond=14),
     ])
-    # TSN: hwy_right matches (10), hwy_divided differs (25), P present (5) vs TSMIS 0,
-    # total differs (40). Every other category is absent both sides -> 0 == 0.
-    _write_tsn_norm(tsn_path, [
-        (_KEY["hwy_right"], 10),
-        (_KEY["hwy_divided"], 25),
-        (_KEY["ramp_P_dummy_paired"], 5),
-        (_KEY["total_ramps"], 40),
-    ])
+    # CONSISTENT full TSN table (total 40): right matches (10), divided differs
+    # (25), undivided differs (0 vs 5), P/V carried (5/3), diamond 32, total 40.
+    _write_tsn_norm(tsn_path, _tsn_rows(40, right=10, divided=25, undivided=5, p=5, v=3))
     res = cmp.compare(tsmis_path, tsn_path, out_path, events=Events(),
                       confirm_overwrite=lambda _p: True, mode="values")
     check("compare ok", res.status == "ok")
@@ -159,7 +228,8 @@ def test_end_to_end():
     check("P and V are the two TSN-only rows", tsn_only == 2)
 
     ndiff = sum(1 for r in rows if DIFF in r[cnt_col])
-    check("exactly 2 differing SHARED categories (Divided, Total)", ndiff == 2)
+    check("exactly 7 differing SHARED categories "
+          "(Divided/Undivided/On/Rural-I/Urban-I/Diamond/Total)", ndiff == 7)
     check("P - Dummy Paired is Only in TSN (value 5), not a fabricated 0-vs-5 diff",
           by_cat[_KEY["ramp_P_dummy_paired"]][status_col] == "TSN only")
     check("matching category (Right=10) shows no diff marker",
@@ -173,6 +243,11 @@ def test_end_to_end():
           any("P - Dummy Paired" in c for c in flat))
     check("familiar sheet shows the Ramp Points footnote",
           any("Ramp Points w/out linework" in c for c in flat))
+    # CMP-AUD-020: the bounded Ramp-Types residual (2 ramps in TSN-only P/V
+    # classes) is EXPOSED as a note on the familiar sheet, never fabricated
+    # into a category and never a warning.
+    check("familiar sheet exposes the P/V residual note (28 of 30, 2 not)",
+          any("Ramp Types" in c and "2 not" in c and "TSMIS" in c for c in flat))
     # CMP-AUD-024: the footnote value (2+1=3) reaches the display sheet out of band,
     # keyed by footnote.key, without ever being a compared row.
     check("footnote value rides the out-of-band channel (2+1=3)",
@@ -181,6 +256,81 @@ def test_end_to_end():
     check("the footnote is not a compared category on either side",
           not any("Ramp Points" in str(r[cat_col]) for r in rows))
     print(f"      (both={both}, TSN-only={tsn_only}, TSMIS-only={tsmis_only}, diffs={ndiff})")
+
+
+def test_validation_refusals():
+    """CMP-AUD-020/021/022: a table that does not reconcile refuses with a named
+    block; missing categories/totals are hard stops; duplicates refuse; the
+    contract-change tripwire fires on a non-zero TSMIS P/V count."""
+    print("independent per-side validation (CMP-AUD-020/021/022):")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_rs_val_"))
+    good_tsn = root / "tsn_good.xlsx"
+    _write_tsn_norm(good_tsn, _tsn_rows(40, right=10, divided=25, undivided=5, p=5, v=3))
+    good_tsmis = root / "tsmis_good.xlsx"
+    _write_tsmis(good_tsmis, _ALL_DISPLAYS,
+                 [_route_row("001", 14, right=4, divided=10, nolw=2, diamond=11)])
+
+    def refuses(label, tsmis, tsn, *needles):
+        try:
+            cmp._load_pair(tsmis, tsn)
+            check(label, False)
+        except ValueError as e:
+            check(label, all(n in str(e) for n in needles))
+
+    # All-zero categories under a non-zero total (both sides agreeing!) refuse.
+    z = _route_row("001", 10, right=0, divided=0, nolw=0, diamond=0)
+    z[_D["pop_rural_inside"]] = 0
+    z[_D["onoff_on"]] = 0
+    zp = root / "tsmis_zero.xlsx"
+    _write_tsmis(zp, _ALL_DISPLAYS, [z])
+    refuses("all-zero TSMIS categories + total=10 refuse naming the block",
+            zp, good_tsn, "Highway Groups", "does not reconcile")
+    zn = root / "tsn_zero.xlsx"
+    _write_tsn_norm(zn, [(k, 10 if s == "total_ramps" else 0)
+                         for k, s in cmp._CATEGORIES])
+    refuses("all-zero TSN categories + total=10 refuse too",
+            good_tsmis, zn, "does not reconcile")
+
+    # A missing required category / total is a hard stop, never a fabricated 0.
+    displays_missing = [d for d in _ALL_DISPLAYS if d != _D["hwy_right"]]
+    row = _route_row("001", 14, right=4, divided=10, nolw=2, diamond=11)
+    row.pop(_D["hwy_right"])
+    mp = root / "tsmis_missing.xlsx"
+    _write_tsmis(mp, displays_missing, [row])
+    refuses("missing TSMIS category column is a hard stop naming the category",
+            mp, good_tsn, "R - Right", "missing")
+    tn = root / "tsn_missing_total.xlsx"
+    _write_tsn_norm(tn, [(k, 0) for k, s in cmp._CATEGORIES if s != "total_ramps"])
+    refuses("missing TSN grand total is a hard stop",
+            good_tsmis, tn, "grand total")
+
+    # Duplicate exact normalized key refuses (was: last-wins, CMP-AUD-022).
+    dn = root / "tsn_dup.xlsx"
+    _write_tsn_norm(dn, [(_KEY["hwy_right"], 4), (_KEY["hwy_right"], 7)])
+    try:
+        cmp._load_tsn(dn)
+        check("duplicate exact normalized key refuses (no last-wins)", False)
+    except ValueError as e:
+        check("duplicate exact normalized key refuses (no last-wins)",
+              "twice" in str(e))
+
+    # Fractional normalized count refuses (was: silent truncation, CMP-AUD-021).
+    fn = root / "tsn_frac.xlsx"
+    _write_tsn_norm(fn, [(_KEY["hwy_right"], 1.9)])
+    try:
+        cmp._load_tsn(fn)
+        check("fractional normalized count refuses", False)
+    except ValueError as e:
+        check("fractional normalized count refuses", "fractional" in str(e))
+
+    # The P/V contract-change tripwire: a NON-ZERO TSMIS P count means the form
+    # started tabulating the TSN-only classes — refuse instead of one-siding it.
+    pv = _route_row("001", 14, right=4, divided=10, nolw=2, diamond=11)
+    pv[_D["ramp_P_dummy_paired"]] = 3
+    pp = root / "tsmis_pv.xlsx"
+    _write_tsmis(pp, _ALL_DISPLAYS, [pv])
+    refuses("non-zero TSMIS P count trips the contract-change refusal",
+            pp, good_tsn, "Dummy Paired", "update")
 
 
 def test_corrupt_pdf_is_valueerror():
@@ -204,6 +354,7 @@ def main():
     test_schema_and_categories()
     test_tsmis_loader_sums()
     test_end_to_end()
+    test_validation_refusals()
     test_corrupt_pdf_is_valueerror()
     print()
     if _fail:

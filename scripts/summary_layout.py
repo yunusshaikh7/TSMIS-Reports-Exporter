@@ -300,6 +300,145 @@ INTERSECTION_SUMMARY_SPEC = SummarySpec(
 
 
 # =============================================================================
+# Strict count parsing + the censused partition contract (CMP-AUD-020/021)
+# =============================================================================
+
+def parse_count(value, *, source, category):
+    """The ONE strict count parser for every aggregate-summary read path
+    (CMP-AUD-021). A category count must be a non-negative whole number: a
+    plain int, an integral float (how openpyxl surfaces some numerics), or an
+    integer string (commas allowed). Booleans, fractional numbers, and any
+    other text raise ValueError naming the source and category — malformed
+    data must never silently coerce into a different count."""
+    if isinstance(value, bool):
+        raise ValueError(f"{source}: the {category!r} count is a boolean "
+                         f"({value!r}), not a whole number")
+    if isinstance(value, int):
+        n = value
+    elif isinstance(value, float):
+        if not value.is_integer():
+            raise ValueError(f"{source}: the {category!r} count {value!r} is "
+                             "fractional — counts must be whole numbers")
+        n = int(value)
+    elif isinstance(value, str):
+        s = value.strip().replace(",", "")
+        if not s:
+            raise ValueError(f"{source}: the {category!r} count cell is empty text")
+        try:
+            n = int(s, 10)
+        except ValueError:
+            raise ValueError(f"{source}: the {category!r} count {value!r} is "
+                             "not a whole number") from None
+    else:
+        raise ValueError(f"{source}: the {category!r} count has unsupported "
+                         f"type {type(value).__name__}")
+    if n < 0:
+        raise ValueError(f"{source}: the {category!r} count {n} is negative")
+    return n
+
+
+@dataclass(frozen=True)
+class SectionRule:
+    """The censused partition contract for ONE section on ONE side
+    (CMP-AUD-020). `mode`:
+
+      * "exact"   — the side's categories in this section must sum exactly to
+                    the grand total;
+      * "bounded" — the section may sum BELOW the total only; the censused
+                    `reason` names the source classes the side genuinely does
+                    not tabulate, and the residual is EXPOSED as a note —
+                    never fabricated into any category.
+
+    `extra_slugs` are non-category slugs ADDED to the section sum (the Ramp
+    Summary no-linework footnote participates in two TSMIS partitions)."""
+    section: str
+    mode: str
+    reason: str = ""
+    extra_slugs: tuple = ()
+
+
+def reconcile_counts(spec, counts, side, rules, *, source, side_label):
+    """Independently validate one side's {slug: count} table against `spec`
+    and that side's censused SectionRule contract (CMP-AUD-020). Verifies:
+
+      * every consulted count is a strict non-negative int (defense in depth
+        over the loaders' parse_count);
+      * the grand total and every side-applicable category are PRESENT — a
+        missing source fact is a hard stop, never a fabricated zero;
+      * every section partitions the grand total per its rule.
+
+    Returns the note lines exposing bounded residuals (empty when every block
+    is exact); raises ValueError (naming `source`) on any violation."""
+    rules_by_name = {}
+    for rule in rules:
+        if rule.section in rules_by_name:
+            raise ValueError(f"{source}: duplicate SectionRule for {rule.section!r}")
+        rules_by_name[rule.section] = rule
+    section_names = {s.name for s in spec.sections}
+    missing_rules = [s.name for s in spec.sections if s.name not in rules_by_name]
+    unknown_rules = [n for n in rules_by_name if n not in section_names]
+    if missing_rules or unknown_rules:
+        raise ValueError(f"{source}: the SectionRule contract does not match "
+                         f"the spec (missing {missing_rules}, unknown "
+                         f"{unknown_rules})")
+
+    def count_of(slug, label):
+        v = counts.get(slug)
+        if v is None:
+            return None
+        if isinstance(v, bool) or not isinstance(v, int) or v < 0:
+            raise ValueError(f"{source}: the {label!r} count {v!r} is not a "
+                             "non-negative whole number")
+        return v
+
+    if spec.total is None:
+        raise ValueError(f"{source}: the report spec has no grand-total category")
+    total = count_of(spec.total.slug, spec.total.key)
+    if total is None:
+        raise ValueError(f"{source}: the grand total ({spec.total.key}) was "
+                         "not found — cannot validate the category table")
+
+    missing = [c.key for sec in spec.sections for c in sec.cats
+               if c.sides in ("both", side) and count_of(c.slug, c.key) is None]
+    if missing:
+        raise ValueError(
+            f"{source}: {len(missing)} expected categor"
+            f"{'y is' if len(missing) == 1 else 'ies are'} missing: "
+            + ", ".join(missing[:6]) + ("…" if len(missing) > 6 else ""))
+
+    notes = []
+    for sec in spec.sections:
+        rule = rules_by_name[sec.name]
+        ssum = sum(count_of(c.slug, c.key) for c in sec.cats
+                   if c.sides in ("both", side))
+        for slug in rule.extra_slugs:
+            extra = count_of(slug, slug)
+            if extra is None:
+                raise ValueError(f"{source}: the '{sec.name}' partition needs "
+                                 f"{slug!r}, which is missing")
+            ssum += extra
+        if rule.mode == "exact":
+            if ssum != total:
+                raise ValueError(
+                    f"{source}: the '{sec.name}' block sums {ssum:,} of "
+                    f"{total:,} — the source layout may have changed (renamed "
+                    "header, new code, or dropped rows); refusing to compare "
+                    "a table that does not reconcile")
+        elif rule.mode == "bounded":
+            if ssum > total:
+                raise ValueError(
+                    f"{source}: the '{sec.name}' block sums {ssum:,}, MORE "
+                    f"than the total {total:,} — the table does not reconcile")
+            if ssum < total:
+                notes.append(f"{side_label} '{sec.name}': {ssum:,} of {total:,} "
+                             f"tabulated ({total - ssum:,} not — {rule.reason}).")
+        else:
+            raise ValueError(f"{source}: unknown SectionRule mode {rule.mode!r} "
+                             f"for {sec.name!r}")
+    return notes
+
+
+# =============================================================================
 # Spec-driven block-walk: a (count, text) row sequence -> {slug: count}
 # Shared by the TSN PDF parser and the TSMIS per-route consolidator (both feed a
 # (count_or_None, code-text) stream; block headers switch the active block).
@@ -328,11 +467,14 @@ def _plain_code(text):
     return None
 
 
-def counts_from_rows(spec, rows):
+def counts_from_rows(spec, rows, *, source="source rows"):
     """Map a (count_or_None, text) row stream to {slug: count} using `spec`'s
     block structure. A row whose text matches a block header switches the active
     block; data rows (numeric count) map by within-block code. The Rural/Urban
-    block's two '-O OUTSIDE CITY' rows are bound to their R-RURAL / U-URBAN parent."""
+    block's two '-O OUTSIDE CITY' rows are bound to their R-RURAL / U-URBAN
+    parent; the parent updates from the LABEL even on a count-less row, and a
+    count-carrying '-O' with NO parent in the block is an error (CMP-AUD-023 —
+    it must never silently default to Rural). Counts are strict (parse_count)."""
     headers = {_norm_header(s.name): s for s in spec.sections}
     for s in spec.sections:                      # renamed-header aliases (parse-only)
         for alias in s.aliases:
@@ -345,16 +487,24 @@ def counts_from_rows(spec, rows):
         if h in headers:
             cur, ru_parent = headers[h], None
             continue
-        if count is None or cur is None:
+        if cur is None:
             continue
         if cur.name == _IS_RURAL_URBAN:
             up = t.upper()
+            # Parent context comes from the LABEL, before any numeric gate: a
+            # count-less R-RURAL/U-URBAN row still names the parent its
+            # following '-O OUTSIDE CITY' row belongs to (CMP-AUD-023).
             if up.startswith("R-RURAL"):
                 ru_parent, code = "R", "R"
             elif up.startswith("U-URBAN"):
                 ru_parent, code = "U", "U"
             elif up.startswith("-O"):
-                code = f"{ru_parent or 'R'}-O"
+                if ru_parent is None and count is not None:
+                    raise ValueError(
+                        f"{source}: an '-O OUTSIDE CITY' row (count {count!r}) "
+                        "has no preceding R-RURAL/U-URBAN parent — the count "
+                        "cannot be attributed")
+                code = f"{ru_parent}-O" if ru_parent is not None else None
             elif up.startswith("+"):
                 code = "+"
             else:
@@ -363,9 +513,12 @@ def counts_from_rows(spec, rows):
             code = _plain_code(t)
             if cur.name == _IS_CONTROL_TYPES and code in _CONTROL_SIGNAL_FOLD:
                 code = "S"                       # fold TSN signal sub-types J–P -> S
+        if count is None:
+            continue
         cat = by_block[cur.name].get(code) if code is not None else None
         if cat is not None:
-            out[cat.slug] = out.get(cat.slug, 0) + int(count)
+            out[cat.slug] = out.get(cat.slug, 0) + parse_count(
+                count, source=source, category=f"{cur.name}: {t}")
     return out
 
 
@@ -388,7 +541,7 @@ def _as_int(v):
         return None
 
 
-def make_extra_sheet_writer(spec, footnote_values=None):
+def make_extra_sheet_writer(spec, footnote_values=None, extra_notes=None):
     """Return an extra_sheet_writer(wb, ctx) that appends `spec`'s familiar
     category-comparison sheet. ctx carries rows_a/rows_b (each [key, count]) and
     the side labels — see compare_core.CompareSchema.extra_sheet_writer.
@@ -397,15 +550,21 @@ def make_extra_sheet_writer(spec, footnote_values=None):
     OUT OF BAND — footnotes are display-only and are deliberately NOT in the compared
     rows, so a footnote can never become a one-sided comparison row or move the verdict.
     The comparator binds a fresh mapping per run and the loader populates it before the
-    writer runs. When omitted, footnote display falls back to the compared rows (legacy)."""
+    writer runs. When omitted, footnote display falls back to the compared rows (legacy).
+
+    `extra_notes` (CMP-AUD-020, opt-in): a per-run list of note LINES the loader
+    fills (the censused bounded-partition residuals, e.g. the 22 TSMIS ramps in
+    TSN-only P/V classes). Display-only exposure on the familiar sheet — never a
+    warning (warnings mean unreadable inputs and would mark the run incomplete)."""
     def writer(wb, ctx):
         if not _OPX:
             return None
-        return _render(wb, ctx, spec, footnote_values=footnote_values)
+        return _render(wb, ctx, spec, footnote_values=footnote_values,
+                       extra_notes=extra_notes)
     return writer
 
 
-def _render(wb, ctx, spec, footnote_values=None):
+def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     sc = ctx["sc"]
     side_a, side_b = sc.side_a, sc.side_b          # the side LABELS ("TSMIS"/"TSN")
     file_a, file_b = ctx.get("side_a", ""), ctx.get("side_b", "")   # the source filenames
@@ -449,6 +608,8 @@ def _render(wb, ctx, spec, footnote_values=None):
         ws.append([cell(f"{side_a} = {file_a}    {side_b} = {file_b}", note_font)])
     for n in spec.notes:
         ws.append([cell(n, note_font)])
+    for n in (extra_notes or ()):
+        ws.append([cell(str(n), note_font)])
     ws.append([])
     ws.append([cell("Category", head_font), cell(side_a, head_font, align=right),
                cell(side_b, head_font, align=right), cell("Δ", head_font, align=right)])

@@ -31,7 +31,11 @@ def _project(raw_path):
     skipped_inputs, not just the warning line — P1-B05)."""
     counts = rstsn.parse_tsn_pdf(raw_path)
     missing = [key for key, slug in rstsn._CATEGORIES if counts.get(slug) is None]
-    rows = [[key, int(counts.get(slug, 0) or 0)] for key, slug in rstsn._CATEGORIES]
+    # A category the PDF didn't yield is OMITTED, never written as a fabricated
+    # zero (CMP-AUD-021 absent-vs-zero): the comparator's validation then refuses
+    # the incomplete table loudly instead of comparing invented counts.
+    rows = [[key, int(counts[slug])] for key, slug in rstsn._CATEGORIES
+            if counts.get(slug) is not None]
 
     def make_result(out_name):
         summary = [f"TSN Ramp Summary: {len(rows)} categories -> {out_name}",

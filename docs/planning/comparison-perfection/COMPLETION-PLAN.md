@@ -19,24 +19,33 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 
 | | |
 |---|---|
-| **Branch** | `comparison-perfection` @ `2e6da15` — pushed to origin, **CI green** |
+| **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | 238 total · **CMP-AUD-238 & 024 & 025 Resolved this session**; 115/035 partially remediated |
-| **Next action** | **CMP-AUD-020–023** — shared aggregate-Summary-loader correctness (see the RESUME block below) |
+| **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020, 021, 022, 023**; 115/035 partially remediated |
+| **Next action** | **Intersection Summary's remaining reds: CMP-AUD-076, 144, 145, 146, 183, 184** (see the RESUME block below) |
 
-> ### ▶ RESUME HERE (fresh context, 2026-07-14)
-> **Do this next: CMP-AUD-020, 021, 022, 023** — aggregate Summary loader correctness in
-> `summary_layout.py` + `compare_ramp_summary_tsn.py` + `compare_intersection_summary_tsn.py`.
-> - **020** totals don't reconcile (loader only checks TSN keys present); **021** numeric-text
->   coercion (`"10"`→0) + fractional truncation; **022** duplicate normalized categories
->   (last-wins / summed); **023** Rural/Urban parent-context misclassification (`summary_layout:331-369`).
-> - **Method (mandatory, proven this session):** (1) read the finding in `comparison-audit-findings.md`;
->   (2) write/extend a red fixture and confirm RED on current code; (3) fix; (4) confirm GREEN;
->   (5) **verify against the real corpus** and, for anything touching Ramp/Intersection Summary
->   counts, **re-confirm the accepted oracles hold** (Ramp Summary vs TSN MUST stay
->   **29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical / 24 differing**; Intersection Summary
->   oracle is **58 shared / 8 TSMIS-only / 0 TSN-only**, totals TSMIS 16,459 / TSN 16,626);
+> ### ▶ RESUME HERE (2026-07-14, after the Summary-loader batch)
+> **Done this batch — CMP-AUD-020/021/022/023 (aggregate Summary loader correctness):**
+> `summary_layout.parse_count` (one strict count parser), `SectionRule` +
+> `reconcile_counts` (censused per-side partition contracts, measured on the real
+> corpus before encoding), duplicate key/column refusal, Rural/Urban parent-from-label
+> + counted-orphan refusal, absent-vs-zero preserved end to end (loaders, `_rows`,
+> and the TSN normalizers no longer fabricate zeros), bounded residuals EXPOSED as
+> familiar-sheet notes via a per-run out-of-band channel (never warnings). Both
+> oracles re-verified post-fix on the real corpus: **Ramp 29/0/2 · 5 identical ·
+> 24 differing (15,216 vs 15,410)**; **Intersection 58/8/0 · 5 identical ·
+> 53 differing (16,459 vs 16,626)** — and the ars-prod 7.9 re-consolidation stays
+> 217/217 byte-identical.
+>
+> **Do this next: CMP-AUD-076, 144, 145, 146, 183, 184** — the Intersection Summary
+> family's remaining product reds (read each in `comparison-audit-findings.md` first).
+> - **Method (mandatory, proven):** (1) read the finding; (2) red fixture confirmed RED on
+>   current code; (3) fix; (4) GREEN; (5) **verify against the real corpus** and, for anything
+>   touching Ramp/Intersection Summary counts, **re-confirm the accepted oracles hold**
+>   (Ramp Summary vs TSN MUST stay **29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical /
+>   24 differing**; Intersection Summary MUST stay **58 shared / 8 TSMIS-only / 0 TSN-only /
+>   5 identical / 53 differing**, totals TSMIS 16,459 / TSN 16,626);
 >   (6) local gate `build/.venv/Scripts/python.exe build/run_checks.py -j 4 -k` **AND**
 >   `uvx ruff check scripts --select E9,F63,F7,F82,F811,F401`; (7) commit + push + `gh run watch`.
 > - **Owner directive (2026-07-14):** *one-sided fields are EXPECTED and CORRECT.* Categories in
@@ -45,11 +54,17 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   is faithful representation, not forcing symmetry.
 > - **Real inputs:** Ramp Summary — `Downloads\TSMIS\ground-truth\All Reports 7.9\2026-07-09 ssor-prod\consolidated\tsar_ramp_summary_consolidated 2026-07-09 ssor-prod.xlsx`
 >   vs `Downloads\TSMIS\tsn_library\ramp_summary\raw\Ramp Summary Statewide_TSN.pdf`.
+>   Intersection Summary — consolidate the ars-prod 217-route tree
+>   `Downloads\TSMIS\ground-truth\All Reports 7.9\2026-07-09 ars-prod\intersection_summary\`
+>   into a scratchpad workbook (the ground truth deliberately keeps no generated
+>   consolidations) vs `Downloads\TSMIS\tsn_library\intersection_summary\raw\Intersection Summary Statewide_TSN.pdf`.
 > - **Traps:** CI is Windows two-drive (D: checkout, C: temp) — no cross-drive `relpath`/cwd;
 >   ruff is NOT in `build/.venv` (use `uvx`); `build/` has non-blocking F401s (ignore); the
->   `check_phase*` audit instruments are excluded from the gate on purpose.
-> - After the Summary batch: Intersection Summary's remaining reds, then the bigger structural
->   findings. Full sequence + external gates in the sections below.
+>   `check_phase*` audit instruments are excluded from the gate on purpose; console prints of
+>   comparison cells need `PYTHONIOENCODING=utf-8` (the ` ≠ ` marker breaks cp1252).
+> - After the IS reds: the bigger structural findings (Wave 3: CMP-AUD-098 source-capture
+>   digests; Wave 4: 045 PhysicalKey integration, 220, 218, 199, 197). Full sequence + external
+>   gates in the sections below.
 
 **What "you are here" means honestly:** the recovered engine rewrite already *implements*
 much of the Phase 3–8 machinery (typed contracts, identity infra, ownership, transactional
@@ -213,6 +228,7 @@ no family-gate owner yet. Wave 5 assigns them.
 
 ## 11. Progress log (append-only — real progress, not recursion)
 
+- **2026-07-14 — Wave 2: CMP-AUD-020 + 021 + 022 + 023 Resolved (aggregate Summary loader correctness).** One strict count parser (`summary_layout.parse_count`) now feeds every aggregate read path (numeric text parses; fractions/booleans/negatives refuse with file+category context); duplicate exact normalized keys and duplicated consolidated columns refuse (distinct stale J–P/S keys still fold); the Rural/Urban parent binds from the LABEL (a count-less U parent no longer misfiles `-O` to Rural; a counted orphan refuses); and both `_load_pair`s independently validate each side against a **censused partition contract** (`SectionRule` + `reconcile_counts`) measured on the real corpus before encoding — exact blocks must reconcile, bounded blocks may only run SHORT with their residual EXPOSED as familiar-sheet notes (TSMIS ramp P/V residual 22; IS Highway Group −676; TSN IS untabulated classes −40/−40/−30/−3/−3), and all-zero-categories-under-a-total refuses even when both sides agree. Absent-vs-zero preserved end to end (the TSN normalizers no longer write fabricated `[key, 0]` rows). 12 defects probed RED pre-fix → all green post-fix; **both real-corpus oracles reproduce exactly** (Ramp 29/0/2·5·24, totals 15,216/15,410; IS 58/8/0·5·53, totals 16,459/16,626); ars-prod 7.9 re-consolidation 217/217 byte-identical. Suite 121/121 + ruff clean.
 - **2026-07-14 — Wave 2: CMP-AUD-024 + CMP-AUD-025 Resolved (Ramp Summary vs TSN).** The `Ramp Points w/out linework` footnote is now display-only (out-of-band channel, never a compared row) and P/V are `Only in TSN` (not fabricated TSMIS zeros), mirroring the Intersection Summary recipe with no `compare_core` change. Proved red→green in the hermetic check **and verified on the real 7.9 SSOR-prod corpus — reproduces the accepted oracle exactly: 29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical / 24 differing.** This is the first fully data-verified semantic fix; the Ramp Summary vs TSN comparison now represents the data correctly.
 - **2026-07-14 — Wave 1: CMP-AUD-035 type-exactness fixed.** `version`/`member_count`/`byte_length`/`schema_version` now require exact `int` (rejecting `1.0`/`True` aliases) in the raw-manifest, normalized-identity, and certificate validators. Verified on 726 persisted objects + a real canonical manifest; guarded red→green in `check_tsn_district_source_contract`. The direct-builder post-`os.replace` TOCTOU recheck (part 2) remains open. Suite 121/121.
 - **2026-07-14 — Wave 1: CMP-AUD-115 typed-contract invariants added.** Enforced `differing_cells <= asserted_cells` and "a complete diff must carry a difference" in `comparison_contract.py` (verified on 198 real persisted counts; 6 unrealistic test fixtures corrected). Declined Codex's trace-index-bound sub-claim — trace indices are global ordinals, not population-bounded. The finding's core (workbook-artifact schema enforcement) remains open. Suite 121/121.

@@ -16,8 +16,13 @@ Each side reduces to {category-slug -> count}; the comparison key is the categor
 summary_layout, shared with the familiar-layout sheet appended via extra_sheet_writer.
 
 Reconciled on the 6.19 ground truth: TSN total 15410 vs TSMIS 15215; P (Dummy
-Paired)=122 and V (Dummy, Volume only)=81 are TSN-only classifications, so they
-compare as 0 (TSMIS) vs the TSN count. Console-free; engine in compare_core.
+Paired) and V (Dummy, Volume only) are TSN-only classifications, so they stay
+one-sided ('Only in TSN' — CMP-AUD-024/025, never a fabricated TSMIS zero).
+Both sides are independently validated before comparing (CMP-AUD-020/021/022):
+strict whole-number counts, no duplicate categories, and the censused partition
+contract (each block must reconcile against the grand total; the TSMIS
+Ramp-Types block is bounded by the P/V-not-tabulated residual, which is exposed
+as a note). Console-free; engine in compare_core.
 """
 import re
 from pathlib import Path
@@ -62,7 +67,37 @@ _SCHEMA = CompareSchema(
 
 # slug -> the consolidated workbook's row-2 display header (authoritative, from the
 # consolidator's own GROUPS), so the TSMIS sum maps columns to the same slugs.
-_SLUG_TO_DISPLAY = {slug: disp for _grp, cols in rs.GROUPS for slug, disp in cols}
+# COUNT columns only: the Source/Route/Audit columns carry text or formulas and
+# must never be parsed as counts (CMP-AUD-021).
+_COUNT_SLUGS = ({slug for _key, slug in _CATEGORIES}
+                | {f.slug for f in _SPEC.footnotes})
+_SLUG_TO_DISPLAY = {slug: disp for _grp, cols in rs.GROUPS for slug, disp in cols
+                    if slug in _COUNT_SLUGS}
+
+_NOLW = "ramp_points_no_linework"
+
+# The censused partition contract (CMP-AUD-020), verified statewide on the 7.9
+# ssor-prod consolidated set (126 routes) and the raw TSN statewide PDF: the
+# TSMIS form counts its no-linework footnote inside the On/Off and Ramp-Type
+# partitions but does not tabulate the TSN-only P/V dummy classes (their ramps
+# are the bounded Ramp-Types residual — 22 on the censused pull, proved P=2/V=20
+# by the same-pull Ramp Detail); the TSN statewide page partitions all four
+# blocks exactly, P/V included.
+_TSMIS_RULES = (
+    summary_layout.SectionRule("Highway Groups", "exact"),
+    summary_layout.SectionRule("On/Off Indicator", "exact", extra_slugs=(_NOLW,)),
+    summary_layout.SectionRule("Population Groups", "exact"),
+    summary_layout.SectionRule(
+        "Ramp Types", "bounded", extra_slugs=(_NOLW,),
+        reason="the TSMIS summary doesn't tabulate the TSN-only P/V dummy "
+               "classes; those ramps appear in the 'Only in TSN' rows"),
+)
+_TSN_RULES = (
+    summary_layout.SectionRule("Highway Groups", "exact"),
+    summary_layout.SectionRule("On/Off Indicator", "exact"),
+    summary_layout.SectionRule("Population Groups", "exact"),
+    summary_layout.SectionRule("Ramp Types", "exact"),
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -119,15 +154,24 @@ def _load_tsn(path):
     try:
         sn = NORMALIZED_SHEET if NORMALIZED_SHEET in wb.sheetnames else wb.sheetnames[0]
         key_to_slug = {k: s for k, s in _CATEGORIES}
-        rec = {}
+        rec, seen = {}, set()
         it = wb[sn].iter_rows(values_only=True)
         next(it, None)                                   # header
         for r in it:
             if not r or r[0] is None:
                 continue
-            slug = key_to_slug.get(str(r[0]).strip())
-            if slug is not None and len(r) > 1 and isinstance(r[1], (int, float)):
-                rec[slug] = int(r[1])
+            key = str(r[0]).strip()
+            slug = key_to_slug.get(key)
+            if slug is None:
+                continue
+            if key in seen:                              # CMP-AUD-022
+                raise ValueError(f"{name} lists the category {key!r} twice — "
+                                 "refusing an ambiguous normalized table")
+            seen.add(key)
+            v = r[1] if len(r) > 1 else None
+            if v is None:
+                raise ValueError(f"{name}: the category {key!r} has no count")
+            rec[slug] = summary_layout.parse_count(v, source=name, category=key)
         return rec
     finally:
         wb.close()
@@ -139,8 +183,12 @@ def _load_tsn(path):
 def _load_tsmis(path):
     """TSMIS side -> {slug: count}. Sums each category column of the consolidated
     Ramp Summary workbook's per-route 'TSAR Ramps Summary' sheet (== its Combined
-    sheet's live totals). Categories the workbook lacks (e.g. an older export with
-    no P/V columns) total 0, so they still compare against the TSN count."""
+    sheet's live totals). Strict (CMP-AUD-021/022): count cells must be whole
+    numbers (numeric text is parsed, never dropped; fractions and booleans
+    refuse), a duplicated category column refuses, and a column the workbook
+    lacks stays ABSENT — never a fabricated zero (reconcile_counts decides
+    whether it was required). Blank cells (the never-tabulated P/V columns)
+    contribute nothing."""
     name = Path(path).name
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
@@ -153,19 +201,32 @@ def _load_tsmis(path):
         it = wb[TSMIS_SHEET].iter_rows(values_only=True)
         next(it, None)                                   # row 1: group headers
         header = next(it, None) or ()                    # row 2: display headers
-        disp_to_col = {str(h).strip(): i for i, h in enumerate(header) if h is not None}
-        if "Route" not in disp_to_col:
+        names = [str(h).strip() if h is not None else None for h in header]
+        if "Route" not in names:
             raise ValueError(f"{name} isn't a consolidated Ramp Summary workbook "
                              "(no 'Route' column) — consolidate the per-route "
                              "exports first.")
-        sums = {slug: 0 for slug in _SLUG_TO_DISPLAY}
+        display_to_slug = {disp: slug for slug, disp in _SLUG_TO_DISPLAY.items()}
+        col_slug, seen = {}, set()
+        for i, h in enumerate(names):
+            slug = display_to_slug.get(h) if h else None
+            if slug is None:
+                continue
+            if slug in seen:                             # CMP-AUD-022
+                raise ValueError(f"{name} has a duplicated category column "
+                                 f"({h!r}) — refusing to sum an ambiguous table")
+            seen.add(slug)
+            col_slug[i] = (slug, h)
+        sums = {slug: 0 for slug, _h in col_slug.values()}
         for row in it:
             if not row or all(c is None for c in row):
                 continue
-            for slug, disp in _SLUG_TO_DISPLAY.items():
-                ci = disp_to_col.get(disp)
-                if ci is not None and ci < len(row) and isinstance(row[ci], (int, float)):
-                    sums[slug] += int(row[ci])
+            for i, (slug, disp) in col_slug.items():
+                v = row[i] if i < len(row) else None
+                if v is None or (isinstance(v, str) and not v.strip()):
+                    continue                             # blank cell (e.g. P/V)
+                sums[slug] += summary_layout.parse_count(v, source=name,
+                                                         category=disp)
         return sums
     finally:
         wb.close()
@@ -176,13 +237,20 @@ def _load_tsmis(path):
 # --------------------------------------------------------------------------- #
 def _rows(counts, side):
     """[[category_key, count], ...] for the categories EMITTED on `side`
-    ('tsmis' | 'tsn'), in display order. A category absent from `counts` is emitted
-    as 0 so the shared set aligns. Categories one system doesn't classify (P/V are
-    TSN-only) are absent on the other side, so they land in 'Only in …' — matching
-    the Intersection Summary recipe. Footnotes are NEVER emitted here (CMP-AUD-024):
-    they are display-only and ride an out-of-band channel to the familiar sheet."""
-    return [[key, int(counts.get(slug, 0) or 0)]
-            for key, slug in _SPEC.categories_for(side)]
+    ('tsmis' | 'tsn'), in display order. Every emitted category must be PRESENT
+    in `counts` (reconcile_counts guarantees it before this runs) — an absent
+    category is a hard error, never a fabricated zero (CMP-AUD-020/021).
+    Categories one system doesn't classify (P/V are TSN-only) are absent on the
+    other side, so they land in 'Only in …' — matching the Intersection Summary
+    recipe. Footnotes are NEVER emitted here (CMP-AUD-024): they are display-only
+    and ride an out-of-band channel to the familiar sheet."""
+    out = []
+    for key, slug in _SPEC.categories_for(side):
+        if slug not in counts:
+            raise ValueError(f"the {side.upper()} table is missing the "
+                             f"category {key!r} — cannot build comparison rows")
+        out.append([key, counts[slug]])
+    return out
 
 
 def _footnote_values(tsmis_counts):
@@ -204,25 +272,49 @@ def suggest_name(tsmis_path):
     return f"TSMIS_vs_TSN_RampSummary_Comparison {today_str()}.xlsx"
 
 
-def _load_pair(tsmis_path, tsn_path, footnote_sink=None):
+def _load_pair(tsmis_path, tsn_path, footnote_sink=None, note_sink=None,
+               events=None):
     """(rows_t, rows_n, warnings) for the shared driver. Each side emits only the
-    categories it classifies (P/V are TSN-only, so they land in 'Only in TSN'). A
-    statewide TSN page should fill every TSN category; flag any the parser missed so an
-    incomplete parse can't masquerade as a clean comparison. Display-only footnote
-    values are put in `footnote_sink` (CMP-AUD-024) — never into the compared rows."""
+    categories it classifies (P/V are TSN-only, so they land in 'Only in TSN').
+
+    Both inputs are INDEPENDENTLY validated before any row is built
+    (CMP-AUD-020): every side-applicable category and the grand total must be
+    present, and every block must partition the total per the censused
+    SectionRule contract — a table that doesn't reconcile (e.g. all-zero
+    categories under a non-zero total, a renamed header, dropped rows) refuses
+    with a named block instead of comparing garbage. Bounded residuals (the
+    TSMIS ramps in TSN-only P/V classes) are EXPOSED via `note_sink` onto the
+    familiar sheet + the log — never fabricated into a category, and never a
+    warning (warnings mean unreadable inputs). Display-only footnote values ride
+    `footnote_sink` (CMP-AUD-024) — never the compared rows."""
     tsmis_counts = _load_tsmis(tsmis_path)
     tsn_counts = _load_tsn(tsn_path)
+    tsmis_name, tsn_name = Path(tsmis_path).name, Path(tsn_path).name
+    for slug, label in (("ramp_P_dummy_paired", "P - Dummy Paired"),
+                        ("ramp_V_dummy_volume", "V - Dummy, Volume only")):
+        if tsmis_counts.get(slug):
+            raise ValueError(
+                f"{tsmis_name} carries a non-zero '{label}' count "
+                f"({tsmis_counts[slug]}) — the TSMIS summary is not supposed "
+                "to tabulate the TSN-only P/V classes, so the one-sided "
+                "comparison contract no longer holds; the comparator needs an "
+                "update for this source change")
+    notes = summary_layout.reconcile_counts(
+        _SPEC, tsmis_counts, "tsmis", _TSMIS_RULES,
+        source=tsmis_name, side_label="TSMIS")
+    notes += summary_layout.reconcile_counts(
+        _SPEC, tsn_counts, "tsn", _TSN_RULES,
+        source=tsn_name, side_label="TSN")
     if footnote_sink is not None:
         footnote_sink.clear()
         footnote_sink.update(_footnote_values(tsmis_counts))
-    warnings = []
-    missing = [key for key, slug in _SPEC.categories_for("tsn")
-               if tsn_counts.get(slug) is None]
-    if missing:
-        warnings.append(f"TSN parse did not find {len(missing)} categor"
-                        f"{'y' if len(missing) == 1 else 'ies'}: "
-                        + ", ".join(missing[:6]) + ("…" if len(missing) > 6 else ""))
-    return _rows(tsmis_counts, "tsmis"), _rows(tsn_counts, "tsn"), warnings
+    if note_sink is not None:
+        note_sink.clear()
+        note_sink.extend(notes)
+    if events is not None:
+        for n in notes:
+            events.on_log(f"note: {n}")
+    return _rows(tsmis_counts, "tsmis"), _rows(tsn_counts, "tsn"), []
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
@@ -230,16 +322,18 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     """Build the Ramp Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s).
     `tsmis_path` is the consolidated TSMIS Ramp Summary workbook; `tsn_path` the
     TSN statewide PDF (or the library's normalized workbook)."""
-    # CMP-AUD-024: a per-run holder the loader fills and the familiar-sheet writer reads,
-    # so footnotes reach the display sheet without ever entering the compared universe.
-    footnotes = {}
+    # CMP-AUD-024/020: per-run holders the loader fills and the familiar-sheet
+    # writer reads, so footnotes + censused-residual notes reach the display
+    # sheet without ever entering the compared universe.
+    footnotes, notes = {}, []
     schema = replace(_SCHEMA, extra_sheet_writer=summary_layout.make_extra_sheet_writer(
-        _SPEC, footnote_values=footnotes))
+        _SPEC, footnote_values=footnotes, extra_notes=notes))
     return ctc.run_files_compare(
         schema, tsmis_path, tsn_path, out_path,
         banner="Ramp Summary Comparison — TSMIS vs TSN (statewide category counts)",
         has_route=False,
-        loader=lambda a, b: _load_pair(a, b, footnote_sink=footnotes),
+        loader=lambda a, b: _load_pair(a, b, footnote_sink=footnotes,
+                                       note_sink=notes, events=events),
         deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (pdfplumber, openpyxl).",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,

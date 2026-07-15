@@ -1100,7 +1100,7 @@ controls.
 ### CMP-AUD-020 — aggregate vs-TSN paths do not reconcile totals
 
 Priority: P1  
-Status: Verified with complete normalized category universes  
+Status: Resolved 2026-07-14 — censused per-side partition contract enforced; real-data verified  
 Primary code: `scripts/compare_ramp_summary_tsn.py:197-209`,
 `scripts/compare_intersection_summary_tsn.py:230-246`
 
@@ -1124,10 +1124,37 @@ those absent categories. Intersection must reconcile every partition except the
 explicitly exempt Highway Group. All-zero categories plus Total=10 must be incomplete
 even if both sides agree.
 
+**Remediation (2026-07-14).** `summary_layout.SectionRule` + `reconcile_counts`
+now validate each side independently in both `_load_pair`s, before any comparison
+row is built: the grand total and every side-applicable category must be PRESENT
+(hard stop, never a fabricated zero — `_rows` also refuses absent categories),
+and every block must partition the total per a censused per-side contract.
+Contracts were derived by measurement, not assumption (partition probe over the
+real corpus): Ramp TSMIS = Highway/Population exact, On/Off+no-linework exact,
+Ramp-Types+no-linework bounded by the P/V-not-tabulated residual (22 on the 7.9
+pull, matching the Detail-proved P=2/V=20); Ramp TSN = all four blocks exact
+(P/V included); Intersection TSMIS = every block exact except the bounded
+site-under-counted Highway Group (−676 on ars-prod 7.9); Intersection TSN = five
+blocks exact, five bounded with named censused reasons (untabulated TSMIS-only
+codes −40/−40/−30; lanes >8 −3; right-channelization remainder −3 on the 2025-09
+print). Bounded residuals may only run SHORT and are EXPOSED as familiar-sheet
+notes + log lines via a per-run out-of-band channel (never a warning — warnings
+mean unreadable inputs and would mark the run incomplete; never a fabricated
+category value). A non-zero TSMIS P/V count trips a contract-change refusal.
+All-zero-categories-plus-total now refuses on both sides even when they agree.
+Red→green fixtures live in both `check_compare_*_tsn.py` (`test_validation_refusals`
++ the rebuilt arithmetically-consistent e2e fixtures); the accepted oracles
+reproduce exactly on the real corpus post-fix (Ramp 29/0/2, 5 identical /
+24 differing, totals 15,216 vs 15,410; Intersection 58/8/0, 5 identical /
+53 differing, totals 16,459 vs 16,626), with the residual notes rendering as
+censused. Same-pull Detail P/V canary reconciliation for the bound corpus remains
+a Stage-9/10 oracle task; route-universe validation (dropped/duplicated route
+detection) is NOT covered here and stays with the source-capture work (CMP-AUD-098).
+
 ### CMP-AUD-021 — aggregate count coercion silently changes data
 
 Priority: P1  
-Status: Verified through all four aggregate loaders  
+Status: Resolved 2026-07-14 — one strict count parser promoted through every aggregate read path  
 Primary code: `scripts/compare_ramp_summary_tsn.py:123-128`, `159-166`,
 `scripts/compare_intersection_summary_tsn.py:170-175`, `204-222`,
 `scripts/summary_layout.py:376-390`
@@ -1147,10 +1174,28 @@ Correction requirements: promote one strict count parser. Accept integers,
 comma-formatted integer strings, and integral floats; reject booleans, fractions, and
 malformed text with source/category context. Preserve absent versus explicit zero.
 
-### CMP-AUD-022 — duplicate normalized categories are silently corrupted
+**Remediation (2026-07-14).** `summary_layout.parse_count` is the one strict
+parser: accepts ints, integral floats, and comma-formatted integer strings;
+rejects booleans, fractions, negatives, and malformed text with a ValueError
+naming the source file and category/column. It is now used by both `_load_tsmis`
+loaders (per cell; blank cells contribute nothing — the never-tabulated P/V
+columns), both `_load_tsn` normalized-workbook branches (a present row with no
+count refuses), and the shared `counts_from_rows` block-walk (which the IS
+consolidator now feeds RAW cell values, so a fractional per-route cell fails
+that route loudly instead of silently truncating). Absent vs explicit zero is
+preserved end to end: an absent column/row stays absent (reconcile_counts
+decides whether it was required — CMP-AUD-020), and the two TSN normalizers
+(`tsn_load_ramp_summary` / `tsn_load_intersection_summary`) now OMIT a category
+the PDF didn't yield instead of writing a fabricated `[key, 0]` row (the PARTIAL
+producer marking is unchanged; `check_tsn_normalizer` locks the omission).
+Red→green: numeric text "10" now counts as 10 (was 0/absent), 1.9 refuses (was
+1), True refuses (was 1), "1,234" parses as 1234 (was dropped). Real-corpus
+oracles unchanged (see CMP-AUD-020). The pre-existing latent `str(v or "")`
+antipattern note in `_norm_control_type` (Intersection Detail) is out of this
+finding's scope and remains tracked in memory.
 
 Priority: P1  
-Status: Verified with duplicate-key normalized workbooks  
+Status: Resolved 2026-07-14 — duplicate exact keys/columns refuse; only distinct legacy keys fold  
 Primary code: `scripts/compare_ramp_summary_tsn.py:123-129`,
 `scripts/compare_intersection_summary_tsn.py:170-176`
 
@@ -1163,10 +1208,21 @@ Correction requirements: track original keys, reject duplicate exact keys, and a
 only distinct documented legacy signal keys to fold. Test repeated normal keys,
 distinct J/P/S folding, and repeated J itself.
 
+**Remediation (2026-07-14).** Both `_load_tsn` normalized-workbook branches track
+ORIGINAL keys and refuse an exact repeat ("lists the category … twice"); the
+Intersection fold still sums, but only across DISTINCT stale J–P/S keys (a
+repeated J itself refuses). Both `_load_tsmis` loaders likewise refuse a
+duplicated category COLUMN header (previously ramp last-wins / intersection
+double-summed by column index). Fixtures: repeated normal key, repeated J,
+distinct J/P/S fold (still 2235), and duplicated columns, in both
+`check_compare_*_tsn.py`. Statewide-PDF band merging (the same block continuing
+across column bands) is unaffected — duplicate detection applies where original
+keys exist: the normalized workbooks and the consolidated columns.
+
 ### CMP-AUD-023 — Rural/Urban parent context can misclassify counts
 
 Priority: P1  
-Status: Verified with a block-level fixture  
+Status: Resolved 2026-07-14 — parent context from labels; counted orphans refuse  
 Primary code: `scripts/summary_layout.py:331-369`
 
 A count-less `U-URBAN -I` parent row is skipped before updating parent state. The
@@ -1177,6 +1233,17 @@ pass while category values are wrong.
 Correction requirements: update parent context from labels before numeric gating and
 treat orphan children as ambiguous errors. A count-less U parent followed by U-O must
 map correctly or fail loudly, never move to R-O.
+
+**Remediation (2026-07-14).** `counts_from_rows` now updates the Rural/Urban
+parent from the LABEL before any numeric gate, so a count-less `U-URBAN` parent
+still binds its following `-O OUTSIDE CITY` to U-O; a COUNTED `-O` with no
+parent in the block raises ("no preceding R-RURAL/U-URBAN parent") instead of
+defaulting to Rural, while a count-less orphan label is ignored (no count to
+misfile). The function is shared by the IS TSN PDF parser and the IS per-route
+consolidator: the consolidator's per-file try/except turns the orphan error into
+a loud per-route FAILED, and re-consolidating the real ars-prod 7.9 tree stays
+217/217 with counts byte-identical to the pre-change output. Fixtures in
+`check_compare_intersection_summary_tsn.test_block_walk`.
 
 ### CMP-AUD-024 — non-compared Ramp footnote forces a difference
 
