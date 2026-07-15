@@ -601,9 +601,15 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
         ws.column_dimensions[col].width = w
 
     ws.append([cell(spec.title, title_font, title_fill)])
+    # CMP-AUD-184: this shared line must describe what the cells actually do —
+    # a structurally one-sided category stays BLANK on the absent side (blank ≠
+    # an explicit source 0) — and must not cite another family's categories;
+    # the family-specific detail rides spec.notes.
     ws.append([cell(f"Counts per category. Δ = {side_b} − {side_a}; a non-zero Δ is "
-                    "flagged. Categories one system doesn't classify show 0 on that "
-                    "side (e.g. TSN-only ramp types P / V).", note_font)])
+                    "flagged. A category one system doesn't classify stays BLANK "
+                    "on that side (no Δ) and is listed under 'Only in …' in the "
+                    "Comparison sheet; an explicit 0 is a real source zero.",
+                    note_font)])
     if file_a or file_b:
         ws.append([cell(f"{side_a} = {file_a}    {side_b} = {file_b}", note_font)])
     for n in spec.notes:

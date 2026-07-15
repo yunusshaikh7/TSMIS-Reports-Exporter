@@ -241,6 +241,14 @@ def test_end_to_end():
     check("familiar sheet labels sides TSMIS and TSN", "TSMIS" in flat and "TSN" in flat)
     check("familiar sheet lists the P - Dummy Paired row",
           any("P - Dummy Paired" in c for c in flat))
+    # CMP-AUD-184: the shared note must describe the cells truthfully — a
+    # one-sided category stays BLANK on the absent side, never a claimed 0.
+    check("familiar note says one-sided categories stay BLANK (no zero-fill claim)",
+          any("stays BLANK" in c and "real source zero" in c for c in flat)
+          and not any("show 0 on that side" in c for c in flat))
+    p_row = next((r for r in fr if r and r[0] == "P - Dummy Paired"), None)
+    check("P row shows BLANK TSMIS / 5 TSN / BLANK Δ on the familiar sheet",
+          p_row is not None and p_row[1] == "" and p_row[2] == "5" and p_row[3] == "")
     check("familiar sheet shows the Ramp Points footnote",
           any("Ramp Points w/out linework" in c for c in flat))
     # CMP-AUD-020: the bounded Ramp-Types residual (2 ramps in TSN-only P/V

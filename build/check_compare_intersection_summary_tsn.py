@@ -249,7 +249,74 @@ def test_end_to_end():
           any("HIGHWAY GROUP" in c and "2 not" in c and "TSMIS" in c for c in flat))
     check("familiar sheet exposes the TSN intersection-type residual note (1 not)",
           any("INTERSECTION TYPE" in c and "1 not" in c and "TSN" in c for c in flat))
+    # CMP-AUD-184: the note must describe the cells truthfully (structural
+    # absence stays BLANK, distinguished from an explicit source 0) and must not
+    # cite another family's categories on this sheet.
+    check("familiar note says one-sided categories stay BLANK (no zero-fill claim)",
+          any("stays BLANK" in c and "real source zero" in c for c in flat)
+          and not any("show 0 on that side" in c for c in flat))
+    check("familiar note no longer cites Ramp P/V on the Intersection sheet",
+          not any("ramp types P / V" in c for c in flat))
     print(f"      (both={both}, only-TSMIS={tonly}, only-TSN={nonly})")
+
+
+def test_one_sided_familiar_agreement():
+    """CMP-AUD-184 mutation sweep: EVERY structurally one-sided Intersection
+    category must agree across the familiar sheet (value on the classifying
+    side, BLANK absent side, BLANK Δ) and the generic Comparison status
+    ('Only in TSMIS'), in BOTH the formulas and values workbooks."""
+    print("one-sided familiar/Comparison agreement, both modes (CMP-AUD-184):")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_is_184_"))
+    tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
+    # Give every TSMIS-only category a non-zero count, inside blocks that still
+    # reconcile: control 1+2+3+2+2=10; int-type 1+2+3+1+3=10; left-chan 2+8=10.
+    vals = _consistent_tsmis()
+    vals.update({
+        "is_control_types_a": 1, "is_control_types_s": 2,
+        "is_control_types_r": 3, "is_control_types_o": 2, "is_control_types_q": 2,
+        "is_intersection_type_f": 1, "is_intersection_type_r": 2,
+        "is_intersection_type_c": 3, "is_intersection_type_p": 1,
+        "is_intersection_type_plus": 3,
+        "is_mainline_left_channelization_y": 2,
+        "is_mainline_left_channelization_n": 8,
+    })
+    _write_tsmis(tsmis, _ALL_KEYS, [_tsmis_table(10, vals)])
+    _write_tsn(tsn, _tsn_table(_consistent_tsn()))
+    res = cmp.compare(tsmis, tsn, out, events=Events(),
+                      confirm_overwrite=lambda _p: True, mode="both")
+    check("compare ok (both modes)", res.status == "ok")
+    one_sided = [(sec.name, c) for sec in SPEC.sections for c in sec.cats
+                 if c.sides == "tsmis"]
+    check("sweep covers all 8 TSMIS-only categories", len(one_sided) == 8)
+
+    values_twin = out.with_name(f"{out.stem} (values){out.suffix}")
+    for path, label in ((out, "formulas"), (values_twin, "values")):
+        fh, fr = _sheet(path, SPEC.sheet_name)
+        # Familiar rows keyed by (section, label): several sections share the
+        # '+ - NO DATA GIVEN' label, so a flat label lookup is ambiguous.
+        section_names = {s.name for s in SPEC.sections}
+        by_sec_label, cur = {}, None
+        for r in fr:
+            if not r or not r[0]:
+                continue
+            if r[0] in section_names:
+                cur = r[0]
+            elif cur is not None:
+                by_sec_label[(cur, r[0])] = r
+        agree = []
+        for sec_name, c in one_sided:
+            row = by_sec_label.get((sec_name, c.label))
+            v = vals.get(c.slug, 0)
+            agree.append(row is not None and row[1] == str(v)
+                         and row[2] == "" and row[3] == "")
+        check(f"{label}: every one-sided row shows value/BLANK/BLANK", all(agree))
+    # Generic statuses read from the VALUES twin (the formulas twin's Status
+    # cells are formulas, unreadable under data_only).
+    header, rows = _sheet(values_twin, "Comparison")
+    si, ci = header.index("Status"), header.index("Category")
+    status_by_key = {r[ci]: r[si] for r in rows}
+    check("generic Comparison marks all 8 'TSMIS only'",
+          all(status_by_key.get(c.key) == "TSMIS only" for _s, c in one_sided))
 
 
 def test_validation_refusals():
@@ -383,6 +450,7 @@ def main():
     test_block_walk()
     test_end_to_end()
     test_validation_refusals()
+    test_one_sided_familiar_agreement()
     test_stale_library_fold()
     test_corrupt_pdf_is_valueerror()
     print()

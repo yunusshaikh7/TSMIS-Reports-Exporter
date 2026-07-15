@@ -6092,7 +6092,7 @@ mutation above.
 ### CMP-AUD-184 — Intersection Summary's familiar view note contradicts its structural-absence cells and cites Ramp categories
 
 Priority: P2  
-Status: Verified in the Stage-8 formulas/values workbook inspection  
+Status: Resolved 2026-07-14 — the shared note now states the blank/one-sided truth; Ramp example removed  
 Primary code: `scripts/summary_layout.py::make_extra_sheet_writer` and the Intersection
 Summary familiar-view note configuration
 
@@ -6108,6 +6108,21 @@ Correction requirements: make the familiar note family-specific; say that struct
 absence remains blank and one-sided, distinguish an explicit source zero from absence,
 remove the Ramp P/V example, and mutation-test every one-sided Intersection category in
 both formulas and values views so note, cells, delta, and generic status agree.
+
+**Remediation (2026-07-14).** The shared `_render` note line now states what the
+cells actually do: "A category one system doesn't classify stays BLANK on that
+side (no Δ) and is listed under 'Only in …' in the Comparison sheet; an explicit
+0 is a real source zero" — no zero-fill claim, no cross-family example (the
+family-specific detail rides each spec's own `notes`, which for Ramp already
+names P/V and for Intersection the signal fold/roundabout). New
+`test_one_sided_familiar_agreement` sweeps ALL 8 TSMIS-only Intersection
+categories with non-zero counts through mode="both": familiar row shows
+value/BLANK/BLANK in the formulas AND values workbooks (section-scoped lookup —
+several blocks share the '+ - NO DATA GIVEN' label) and the generic Comparison
+marks each 'TSMIS only'. The Ramp check asserts the same note truth plus the
+P row rendering BLANK/5/BLANK. Real-corpus re-verify: both oracles unchanged
+(29/0/2·5·24; 58/8/0·5·53) and the regenerated real workbook carries the
+corrected note.
 
 ### CMP-AUD-185 — Ramp Detail omits District and hides a real District disagreement as identical
 
