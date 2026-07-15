@@ -107,8 +107,8 @@ class SummarySpec:
 # Ramp Summary canonical spec (slugs == consolidate_ramp_summary column slugs)
 # =============================================================================
 
-def _c(slug, label, key):
-    return Cat(slug=slug, label=label, key=key)
+def _c(slug, label, key, sides="both"):
+    return Cat(slug=slug, label=label, key=key, sides=sides)
 
 
 RAMP_SUMMARY_SPEC = SummarySpec(
@@ -149,9 +149,9 @@ RAMP_SUMMARY_SPEC = SummarySpec(
             _c("ramp_K_split",       "K - Split Ramp",             "Ramp Type: K - Split Ramp"),
             _c("ramp_L_loop_noleft", "L - Loop without Left Turn", "Ramp Type: L - Loop without Left Turn"),
             _c("ramp_M_two_way",     "M - Two way Ramp Segment",   "Ramp Type: M - Two way Ramp Segment"),
-            _c("ramp_P_dummy_paired","P - Dummy Paired",           "Ramp Type: P - Dummy Paired"),
+            _c("ramp_P_dummy_paired","P - Dummy Paired",           "Ramp Type: P - Dummy Paired", sides="tsn"),
             _c("ramp_R_rest_area",   "R - Rest Area, Vista Pt",    "Ramp Type: R - Rest Area, Vista Point, Truck Scale"),
-            _c("ramp_V_dummy_volume","V - Dummy, Volume only",     "Ramp Type: V - Dummy, Volume only"),
+            _c("ramp_V_dummy_volume","V - Dummy, Volume only",     "Ramp Type: V - Dummy, Volume only", sides="tsn"),
             _c("ramp_Z_other",       "Z - Other",                  "Ramp Type: Z - Other"),
         )),
     ),
@@ -388,18 +388,24 @@ def _as_int(v):
         return None
 
 
-def make_extra_sheet_writer(spec):
+def make_extra_sheet_writer(spec, footnote_values=None):
     """Return an extra_sheet_writer(wb, ctx) that appends `spec`'s familiar
     category-comparison sheet. ctx carries rows_a/rows_b (each [key, count]) and
-    the side labels — see compare_core.CompareSchema.extra_sheet_writer."""
+    the side labels — see compare_core.CompareSchema.extra_sheet_writer.
+
+    `footnote_values` (CMP-AUD-024, opt-in): a {footnote.key: value} mapping supplied
+    OUT OF BAND — footnotes are display-only and are deliberately NOT in the compared
+    rows, so a footnote can never become a one-sided comparison row or move the verdict.
+    The comparator binds a fresh mapping per run and the loader populates it before the
+    writer runs. When omitted, footnote display falls back to the compared rows (legacy)."""
     def writer(wb, ctx):
         if not _OPX:
             return None
-        return _render(wb, ctx, spec)
+        return _render(wb, ctx, spec, footnote_values=footnote_values)
     return writer
 
 
-def _render(wb, ctx, spec):
+def _render(wb, ctx, spec, footnote_values=None):
     sc = ctx["sc"]
     side_a, side_b = sc.side_a, sc.side_b          # the side LABELS ("TSMIS"/"TSN")
     file_a, file_b = ctx.get("side_a", ""), ctx.get("side_b", "")   # the source filenames
@@ -476,7 +482,10 @@ def _render(wb, ctx, spec):
         ws.append([])
         ws.append([cell(f"Reported by {side_a} only (not a {side_b} category):", note_font)])
         for fnote in spec.footnotes:
-            a = va.get(fnote.key)
+            # Footnote values come out of band (CMP-AUD-024) so they never enter the
+            # compared universe; fall back to the compared row only for legacy callers.
+            a = (footnote_values.get(fnote.key) if footnote_values is not None
+                 else va.get(fnote.key))
             ws.append([cell(fnote.label, body, align=left),
                        cell(a, body, align=right), cell("", body), cell("", body)])
     return ws

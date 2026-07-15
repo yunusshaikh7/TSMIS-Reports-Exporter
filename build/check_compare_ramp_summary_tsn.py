@@ -151,14 +151,17 @@ def test_end_to_end():
 
     both = sum(1 for r in rows if r[status_col] == "Both")
     tsmis_only = sum(1 for r in rows if r[status_col] == "TSMIS only")
-    check("31 categories matched on both sides", both == 31)
-    check("Ramp Points w/out linework is the lone TSMIS-only row", tsmis_only == 1)
+    tsn_only = sum(1 for r in rows if r[status_col] == "TSN only")
+    # CMP-AUD-024/025: P and V are TSN-only (not fabricated TSMIS zeros); the linework
+    # footnote is display-only, so there are NO TSMIS-only comparison rows.
+    check("29 shared categories matched on both sides", both == 29)
+    check("no TSMIS-only comparison rows (footnote is display-only)", tsmis_only == 0)
+    check("P and V are the two TSN-only rows", tsn_only == 2)
 
     ndiff = sum(1 for r in rows if DIFF in r[cnt_col])
-    check("exactly 3 differing categories (Divided, P, Total)", ndiff == 3)
-    check("P - Dummy Paired compares 0 (TSMIS) vs 5 (TSN)",
-          DIFF in by_cat[_KEY["ramp_P_dummy_paired"]][cnt_col]
-          and by_cat[_KEY["ramp_P_dummy_paired"]][cnt_col].startswith("0"))
+    check("exactly 2 differing SHARED categories (Divided, Total)", ndiff == 2)
+    check("P - Dummy Paired is Only in TSN (value 5), not a fabricated 0-vs-5 diff",
+          by_cat[_KEY["ramp_P_dummy_paired"]][status_col] == "TSN only")
     check("matching category (Right=10) shows no diff marker",
           DIFF not in by_cat[_KEY["hwy_right"]][cnt_col])
 
@@ -170,7 +173,14 @@ def test_end_to_end():
           any("P - Dummy Paired" in c for c in flat))
     check("familiar sheet shows the Ramp Points footnote",
           any("Ramp Points w/out linework" in c for c in flat))
-    print(f"      (both={both}, TSMIS-only={tsmis_only}, diffs={ndiff})")
+    # CMP-AUD-024: the footnote value (2+1=3) reaches the display sheet out of band,
+    # keyed by footnote.key, without ever being a compared row.
+    check("footnote value rides the out-of-band channel (2+1=3)",
+          cmp._footnote_values(cmp._load_tsmis(tsmis_path))
+          == {"Ramp Points w/out linework": 3})
+    check("the footnote is not a compared category on either side",
+          not any("Ramp Points" in str(r[cat_col]) for r in rows))
+    print(f"      (both={both}, TSN-only={tsn_only}, TSMIS-only={tsmis_only}, diffs={ndiff})")
 
 
 def test_corrupt_pdf_is_valueerror():

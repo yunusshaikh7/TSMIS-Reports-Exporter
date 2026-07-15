@@ -302,8 +302,8 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-021 | P1 | Verified | Aggregate counts silently ignore text and truncate fractions |
 | CMP-AUD-022 | P1 | Verified | Duplicate normalized categories overwrite or double-count silently |
 | CMP-AUD-023 | P1 | Verified | Rural/Urban parent tracking can move counts to the wrong category |
-| CMP-AUD-024 | P1 | Verified | A non-compared Ramp footnote makes every vs-TSN run differ |
-| CMP-AUD-025 | P2 | Verified | Ramp P/V taxonomy contradicts its declared one-sided contract |
+| CMP-AUD-024 | P1 | Resolved | The `Ramp Points w/out linework` footnote is now display-only (out-of-band to the familiar sheet), never a compared row. Real 7.9 SSOR-prod run matches the oracle: 0 TSMIS-only |
+| CMP-AUD-025 | P2 | Resolved | P/V are marked `sides="tsn"` and routed via `categories_for(side)`, so they are `Only in TSN`, not fabricated TSMIS zeros. Real run matches the oracle: 29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical / 24 differing |
 | CMP-AUD-026 | P1 | Resolved | PDF comparison paths discard producer partial outcomes |
 | CMP-AUD-027 | P1 | Verified | Header-only route files disappear from route coverage |
 | CMP-AUD-028 | P1 | Verified | Missing configured key columns silently fall back to column zero |
@@ -1225,6 +1225,25 @@ Correction requirements: mark and emit P/V by side as TSN-only for this Summary 
 preserve absence separately from numeric zero; keep any display placeholder
 non-asserting; and pin row status, counts, familiar-view text, and verdict behavior to
 the accepted 29-shared/2-TSN-only contract.
+
+**Remediation — 2026-07-14 (CMP-AUD-024 + CMP-AUD-025, both Resolved).** Mirrored the
+Intersection Summary recipe, which already routes one-sided categories correctly:
+
+- P/V categories are marked `sides="tsn"` in `summary_layout.RAMP_SUMMARY_SPEC`, and
+  `compare_ramp_summary_tsn._rows` now emits `_SPEC.categories_for(side)` per side (TSMIS
+  gets 29, TSN gets 31). P and V therefore land in `Only in TSN` — no fabricated TSMIS
+  zero, no `Both` status.
+- The `Ramp Points w/out linework` footnote no longer rides the compared rows. `compare()`
+  binds a per-run `{footnote.key: value}` holder that the loader fills and
+  `make_extra_sheet_writer(spec, footnote_values=…)` reads, so the value still shows on the
+  familiar sheet but is never a comparison row (0 TSMIS-only). No `compare_core` change —
+  the schema gets a per-run `extra_sheet_writer` via `dataclasses.replace`.
+
+Proved red→green in `check_compare_ramp_summary_tsn` (the pre-fix engine fails on
+`both==31`/`tsmis_only==1`/P-as-diff; the fix passes) **and verified on the real 7.9
+SSOR-prod pair**: the fixed comparator reproduces the accepted Stage-8 oracle exactly —
+**29 shared / 2 TSN-only (P, V) / 0 TSMIS-only / 5 identical / 24 differing**. Full suite
+121/121, ruff clean.
 
 ### CMP-AUD-026 — PDF comparison paths discard producer completeness
 

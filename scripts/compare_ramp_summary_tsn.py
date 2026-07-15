@@ -29,6 +29,8 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+from dataclasses import replace
+
 import compare_tsn_common as ctc
 import consolidate_ramp_summary as rs
 import summary_layout
@@ -172,18 +174,26 @@ def _load_tsmis(path):
 # --------------------------------------------------------------------------- #
 # rows over the canonical category list
 # --------------------------------------------------------------------------- #
-def _rows(counts, with_footnotes=False):
-    """[[category_key, count], ...] over every canonical category, in display
-    order. A category absent from `counts` is emitted as 0 so both sides align on
-    the full set (rather than becoming a one-sided row). `with_footnotes` appends
-    the TSMIS-only metrics (e.g. Ramp Points w/out linework) — emitted on the TSMIS
-    side ONLY, so they land in 'Only in TSMIS' and on the familiar sheet's footer."""
-    out = [[key, int(counts.get(slug, 0) or 0)] for key, slug in _CATEGORIES]
-    if with_footnotes:
-        for f in _SPEC.footnotes:
-            v = counts.get(f.slug)
-            if v is not None:
-                out.append([f.key, int(v)])
+def _rows(counts, side):
+    """[[category_key, count], ...] for the categories EMITTED on `side`
+    ('tsmis' | 'tsn'), in display order. A category absent from `counts` is emitted
+    as 0 so the shared set aligns. Categories one system doesn't classify (P/V are
+    TSN-only) are absent on the other side, so they land in 'Only in …' — matching
+    the Intersection Summary recipe. Footnotes are NEVER emitted here (CMP-AUD-024):
+    they are display-only and ride an out-of-band channel to the familiar sheet."""
+    return [[key, int(counts.get(slug, 0) or 0)]
+            for key, slug in _SPEC.categories_for(side)]
+
+
+def _footnote_values(tsmis_counts):
+    """{footnote.key: value} for the display-only footnotes (e.g. Ramp Points w/out
+    linework). CMP-AUD-024: passed out of band to the familiar sheet so a footnote can
+    never become a one-sided comparison row or change the verdict."""
+    out = {}
+    for f in _SPEC.footnotes:
+        v = tsmis_counts.get(f.slug)
+        if v is not None:
+            out[f.key] = int(v)
     return out
 
 
@@ -194,19 +204,25 @@ def suggest_name(tsmis_path):
     return f"TSMIS_vs_TSN_RampSummary_Comparison {today_str()}.xlsx"
 
 
-def _load_pair(tsmis_path, tsn_path):
-    """(rows_t, rows_n, warnings) for the shared driver. A statewide TSN page should
-    fill every category; flag any the parser missed so an incomplete parse can't
-    masquerade as a clean comparison. The TSMIS-only footnote metrics ride the TSMIS side."""
+def _load_pair(tsmis_path, tsn_path, footnote_sink=None):
+    """(rows_t, rows_n, warnings) for the shared driver. Each side emits only the
+    categories it classifies (P/V are TSN-only, so they land in 'Only in TSN'). A
+    statewide TSN page should fill every TSN category; flag any the parser missed so an
+    incomplete parse can't masquerade as a clean comparison. Display-only footnote
+    values are put in `footnote_sink` (CMP-AUD-024) — never into the compared rows."""
     tsmis_counts = _load_tsmis(tsmis_path)
     tsn_counts = _load_tsn(tsn_path)
+    if footnote_sink is not None:
+        footnote_sink.clear()
+        footnote_sink.update(_footnote_values(tsmis_counts))
     warnings = []
-    missing = [key for key, slug in _CATEGORIES if tsn_counts.get(slug) is None]
+    missing = [key for key, slug in _SPEC.categories_for("tsn")
+               if tsn_counts.get(slug) is None]
     if missing:
         warnings.append(f"TSN parse did not find {len(missing)} categor"
                         f"{'y' if len(missing) == 1 else 'ies'}: "
                         + ", ".join(missing[:6]) + ("…" if len(missing) > 6 else ""))
-    return _rows(tsmis_counts, with_footnotes=True), _rows(tsn_counts), warnings
+    return _rows(tsmis_counts, "tsmis"), _rows(tsn_counts, "tsn"), warnings
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
@@ -214,10 +230,17 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     """Build the Ramp Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s).
     `tsmis_path` is the consolidated TSMIS Ramp Summary workbook; `tsn_path` the
     TSN statewide PDF (or the library's normalized workbook)."""
+    # CMP-AUD-024: a per-run holder the loader fills and the familiar-sheet writer reads,
+    # so footnotes reach the display sheet without ever entering the compared universe.
+    footnotes = {}
+    schema = replace(_SCHEMA, extra_sheet_writer=summary_layout.make_extra_sheet_writer(
+        _SPEC, footnote_values=footnotes))
     return ctc.run_files_compare(
-        _SCHEMA, tsmis_path, tsn_path, out_path,
+        schema, tsmis_path, tsn_path, out_path,
         banner="Ramp Summary Comparison — TSMIS vs TSN (statewide category counts)",
-        has_route=False, loader=_load_pair, deps_ok=_DEPS_OK,
+        has_route=False,
+        loader=lambda a, b: _load_pair(a, b, footnote_sink=footnotes),
+        deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (pdfplumber, openpyxl).",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
         commit_guard=commit_guard)
