@@ -18,6 +18,7 @@ Real openpyxl; no browser/network. Run from the repo root:
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -170,6 +171,58 @@ def test_comparison_state_fingerprint(tmp):                   # CT-6c
     check("...with reason 'inputs_changed'", st2["reason"] == "inputs_changed")
 
 
+def test_midcompare_race(tmp):                                # CT-6d / CMP-AUD-098
+    """A mid-comparison source mutation must NEVER render fresh. The record
+    binds the PRE-comparison capture (the bytes the comparator actually read);
+    after the mutation that no longer matches the folder, so the cell reads
+    stale even when the new source mtime precedes the output mtime (the
+    finding's exact raced-fresh setup). The same test demonstrates the RED
+    mechanism: a record carrying the POST-mutation fingerprint (what the
+    pre-fix code recorded) reads fresh — the documented defect."""
+    print("CT-6d mid-comparison mutation (CMP-AUD-098) — raced results read STALE:")
+    store = tmp / "race_store"; store.mkdir()
+    (store / "r1.xlsx").write_bytes(b"OLD-BYTES")
+    fp_before = matrix._cell_input_fingerprint(store)
+
+    # The comparator "reads OLD"; the source then changes to NEW before the
+    # record is written (contents AND identity change; mtime kept in the past).
+    (store / "r1.xlsx").write_bytes(b"NEW-BYTES-LONGER")
+    past = time.time() - 100
+    os.utime(store / "r1.xlsx", (past, past))
+    out_path = tmp / "cmp_race.xlsx"
+    result = _comparison(out_path, diff_cells=0)
+    cmp_m = out_path.stat().st_mtime
+
+    events_lines = []
+    class _Ev:
+        def on_log(self, s):
+            events_lines.append(s)
+    recorded = matrix._fingerprint_for_record(fp_before, (store,),
+                                              out_path.name, _Ev())
+    check("the record binds the PRE-comparison capture", recorded == fp_before)
+    check("...and the race is announced", any("recorded already-stale" in s
+                                              for s in events_lines))
+    check("the formulas twin is SKIPPED after a race",
+          matrix._twin_inputs_unchanged(fp_before, (store,), out_path.name) is False)
+
+    sources = [{"name": "cell", "present": True, "mtime": past},
+               {"name": "tsn", "present": True, "mtime": past}]
+    rec = {"verdict": "match", "diff_cells": 0, "one_sided": 0,
+           "built_at_mtime": cmp_m, "completion": "complete",
+           "input_fingerprint": recorded,
+           "generation_id": result.artifact_generation.generation_id}
+    st = matrix._cmp_state(out_path, sources, rec, fp_folders=(store,))
+    check("the raced 0/0 'match' reads STALE (never fresh)",
+          st["stale"] is True and st["reason"] == "inputs_changed")
+
+    # RED demonstration: the pre-fix code fingerprinted AFTER production —
+    # binding the NEW identity to the OLD-bytes workbook — and rendered fresh.
+    red_rec = dict(rec, input_fingerprint=matrix._cell_input_fingerprint(store))
+    red = matrix._cmp_state(out_path, sources, red_rec, fp_folders=(store,))
+    check("(red mechanism) a post-mutation fingerprint would have read FRESH",
+          red["stale"] is False)
+
+
 def test_day_consolidated_gap(tmp):                           # CT-7
     print("CT-7 day_matrix — a missing day consolidation reads NOT fresh:")
     out = tmp / "out"; out.mkdir()
@@ -212,7 +265,8 @@ def test_day_consolidated_gap(tmp):                           # CT-7
 def main():
     # Each test runs in its own clean temp root to avoid cross-test residue.
     for fn in (test_consolidated_stale, test_cmp_state_fingerprint,
-               test_comparison_state_fingerprint, test_day_consolidated_gap):
+               test_comparison_state_fingerprint, test_midcompare_race,
+               test_day_consolidated_gap):
         with tempfile.TemporaryDirectory() as td:
             fn(Path(td))
     print()

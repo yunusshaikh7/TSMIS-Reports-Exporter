@@ -23,7 +23,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020–023, 184, 183, 144, 145, 146**; 115/035 partially remediated |
-| **Next action** | **Wave 3: CMP-AUD-098 + 076** (durable source-capture/provenance) — the Intersection Summary family's product reds are now CLEAR (see the RESUME block below) |
+| **Next action** | **CMP-AUD-076** (durable cross-family comparison provenance: recipe key, canonical selection, input identity + fingerprint in a structured workbook sheet + sidecar) — 098's comparison half is DONE; its evidence half rides Stage 10 |
 
 > ### ▶ RESUME HERE (2026-07-14, after the Summary-loader batch)
 > **Done this batch — CMP-AUD-020/021/022/023 (aggregate Summary loader correctness):**
@@ -260,6 +260,8 @@ no family-gate owner yet. Wave 5 assigns them.
 ---
 
 ## 11. Progress log (append-only — real progress, not recursion)
+
+- **2026-07-14 — Wave 3: CMP-AUD-098 comparison-pipeline half Resolved (mid-comparison mutation races).** All four comparison record sites (Matrix env / vs-TSN / self, by-day, baseline) capture the source-folder fingerprint BEFORE any read and record that capture, so a mid-build mutation auto-invalidates (the recorded binding mismatches the folders → `inputs_changed` stale, never a fresh 0/0) and is announced; the formulas twin skips loudly when inputs moved after the values build. CT-6d reproduces the finding's exact raced-fresh setup green + demonstrates the red mechanism. The evidence-gate half stays with Stage 10. Suite 121/121 + ruff clean.
 
 - **2026-07-14 — Wave 2: CMP-AUD-144 + 145 + 146 Resolved (normalizer source-claim batch; summaries' `normalization_version` 2→3).** `parse_tsn_source_claims` captures the print identity (required exactly-once via `compare_tsn_common.tsn_print_identity`), all 62 printed pre-fold rows, the J–P components behind the derived Signalized 2,648 (cross-checked in the normalizer AND the raw compare path), and the declared TSNR-bound CONTROL F correction (printed-descriptor drift refuses). Claims ride `producer_extra` into the library sidecar and surface as familiar-sheet notes (identity · derived-S composition · declared correction) with an explicit no-claims diagnostic for older normalizations. Verified on both real statewide PDFs; both oracles unchanged. Suite 121/121 + ruff clean.
 

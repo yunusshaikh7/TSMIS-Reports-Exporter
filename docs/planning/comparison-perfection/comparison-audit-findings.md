@@ -3775,7 +3775,7 @@ for environment, day-TSN, baseline-day, PDF-vs-Excel, and hidden/unsupported cel
 ### CMP-AUD-098 — a mid-comparison source mutation can be recorded as fresh
 
 Priority: P1  
-Status: Verified through real Matrix orchestration with a controlled mutation  
+Status: Partially remediated 2026-07-14 — the comparison-pipeline half is fixed (pre-comparison capture recorded; raced results auto-invalidate); the evidence-gate half remains Stage-10 work  
 Primary code: `scripts/matrix_build.py:127-179,662-680`,
 `scripts/baseline_matrix.py:399-425`, `scripts/day_matrix.py:419-433`,
 `scripts/matrix_state.py:205-260`, `scripts/matrix_build.py:389-431`
@@ -3816,7 +3816,30 @@ discovering them. Highway Log/Sequence TSN PDFs come from canonical `raw/`; High
 Detail, Intersection Detail, and Ramp Detail use the separate optional `pdf/` sets. The
 latter and all TSMIS PDFs are outside the canonical normalized token. Restoring the
 original file before the final file-ID/set check can certify images rendered from other
-bytes. Stage 10 must snapshot the exact discovered PDF read set into identity-bound
+bytes.
+
+**Remediation, comparison-pipeline half (2026-07-14).** All four comparison
+record sites — Matrix env cells (`build_cell_comparison`), vs-TSN/self cells
+(`build_comparison`), by-day cells (`day_matrix.build_day_cell`), and baseline
+cells (`baseline_matrix`) — now capture the TSMIS source-folder fingerprint
+BEFORE any consolidation/comparison read (the automatic chain included) and
+record THAT capture (`matrix_build._fingerprint_for_record`): the cache binds
+the output to the bytes the comparator actually read. A mutation anywhere in
+the read→temp-save→validation→commit→cache-write window makes the recorded
+(pre) fingerprint mismatch the current folders, so `_inputs_changed` reports
+the cell STALE immediately — the raced result is invalidated, never fresh —
+and the race is announced (log + events). The live-formulas twin is SKIPPED
+loudly when the folders changed after the values build
+(`_twin_inputs_unchanged`), so a twin can never be built from different bytes
+than its committed values sibling. The TSN side already had this protection
+(`captured_tsn_workbook` private snapshot + identity recheck at cache write).
+Fixture: `check_p2_freshness.test_midcompare_race` (CT-6d) reproduces the
+finding's exact raced-fresh setup (new source mtime before the output mtime),
+proves the raced 0/0 "match" now reads stale, and demonstrates the red
+mechanism (a post-mutation fingerprint reads fresh) in the same test.
+**Still open in this finding:** the on-demand evidence gate's mid-generation
+mutation window and the Stage-10 PDF read-set snapshotting — deferred with
+Stage 10 (evidence oracles), not silently dropped. Stage 10 must snapshot the exact discovered PDF read set into identity-bound
 attempt storage (preserving basenames for adapter lookup), make all locate/render work
 use those captures, retain original semantic provenance/current checks, and bind a
 path/size/SHA-256 manifest to the evidence generation. Added/removed/renamed/mutated PDF

@@ -454,6 +454,41 @@ def _try_formulas(compare_call, out_path, events=None, source_paths=(),
 
 
 # --------------------------------------------------------------------------- #
+# CMP-AUD-098: pre-comparison input capture. The cache record must bind the
+# output to the bytes the comparator actually READ — fingerprinting after
+# production would bind a mid-comparison mutation's NEW identity to a workbook
+# built from the OLD bytes and render the raced cell permanently fresh.
+# --------------------------------------------------------------------------- #
+def _fingerprint_for_record(fp_before, folders, out_name, events=None):
+    """The input fingerprint to RECORD: always the PRE-comparison capture. When
+    the folders' identity moved during the build, the recorded (pre) value no
+    longer matches the current folders, so the freshness reader immediately
+    reports the cell STALE — the raced result is invalidated, never fresh —
+    and the race is announced (log + events)."""
+    if _cell_input_fingerprint(*folders) != fp_before:
+        msg = (f"sources changed while {out_name} was being built; the "
+               "comparison is recorded already-stale and must be rebuilt")
+        log.warning("matrix: %s", msg)
+        if events is not None:
+            events.on_log(f"⚠ {msg}")
+    return fp_before
+
+
+def _twin_inputs_unchanged(fp_before, folders, out_name, events=None):
+    """True iff the source folders still match the pre-comparison capture; a
+    changed identity SKIPS the live-formulas twin (it would be built from
+    different bytes than the just-committed values workbook), loudly."""
+    if _cell_input_fingerprint(*folders) == fp_before:
+        return True
+    msg = (f"sources changed after the values workbook of {out_name} was "
+           "built; skipping the live-formulas copy (it would not match)")
+    log.warning("matrix: %s", msg)
+    if events is not None:
+        events.on_log(f"⚠ {msg}")
+    return False
+
+
+# --------------------------------------------------------------------------- #
 # orchestration: build one cell's comparison (pure delegation to compare_env)
 # --------------------------------------------------------------------------- #
 def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
@@ -479,6 +514,9 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
     out_path = comparison_path(dest, baseline_key, row_key, cell_key)
     _require_commit_guard(commit_guard, "comparison build", out_path)
     source_paths = (dest / cell_key, dest / baseline_key)
+    # CMP-AUD-098: capture the input identity BEFORE the comparator reads.
+    fp_folders = (dest / cell_key / subdir, dest / baseline_key / subdir)
+    fp_before = _cell_input_fingerprint(*fp_folders)
 
     # side A = the cell env, side B = the baseline (labels read "ARS-TEST vs SSOR-PROD").
     # F9/S2: the public adapter owns its atomic temp/validation/publication
@@ -487,7 +525,9 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
         dest / cell_key, dest / baseline_key, out_path, events=events,
         confirm_overwrite=confirm_overwrite or (lambda _p: True), mode="values",
         commit_guard=commit_guard)
-    if also_formulas and result.status == "ok":
+    if (also_formulas and result.status == "ok"
+            and _twin_inputs_unchanged(fp_before, fp_folders, out_path.name,
+                                       events)):
         _try_formulas(lambda fp: adapter.compare_folders(
             dest / cell_key, dest / baseline_key, fp, events=events,
             confirm_overwrite=lambda _p: True, mode="formulas",
@@ -510,11 +550,13 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
             built_at = None
         # F5/P2: record the inputs' identity (cell + baseline export folders, in that
         # order) so a later snapshot reads the cell stale when a route changed.
+        # CMP-AUD-098: the PRE-comparison capture is recorded — a mid-build
+        # mutation therefore reads immediately stale, never fresh.
         record_result(dest, baseline_key, row_key, cell_key, typed.verdict,
                       diff_cells, one_sided, built_at,
                       completion=typed.completion,
-                      input_fingerprint=_cell_input_fingerprint(
-                          dest / cell_key / subdir, dest / baseline_key / subdir),
+                      input_fingerprint=_fingerprint_for_record(
+                          fp_before, fp_folders, out_path.name, events),
                       generation_id=published.artifact_generation.generation_id,
                       commit_guard=commit_guard)
     return result
@@ -1115,6 +1157,15 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
 
     dest = Path(dest)
     out_path = mode_out_path(dest, baseline_key, row_key, cell_key, mode)
+    # CMP-AUD-098: capture the TSMIS source-folder identity BEFORE any
+    # consolidation or comparison work reads it (the automatic
+    # consolidate→compare chain included); same folders/order as the snapshot.
+    if mode["kind"] == "tsn":
+        fp_folders = (dest / cell_key / mode["env_subdir"],)
+    else:                                # self: TSMIS PDF vs Excel (both folders)
+        fp_folders = (dest / cell_key / mode["env_subdir"],
+                      dest / cell_key / mode["other_subdir"])
+    fp_before = _cell_input_fingerprint(*fp_folders)
     import tsn_library                              # lazy: explicit-selection contract
     tsn_files, _selection_map_changed = tsn_library.canonicalize_selections(
         tsn_files or {})
@@ -1207,18 +1258,15 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         diff_cells = typed.counts.differing_cells
         one_sided = (typed.counts.side_a_only_rows
                      + typed.counts.side_b_only_rows)
-        # F5/P2: fingerprint the cell's TSMIS source folder(s) in the SAME order the
-        # snapshot's _cmp_state does (env first; + 'other' for the self PDF-vs-Excel mode),
-        # so a route added/removed/resized reads the reused cell stale.
-        if mode["kind"] == "tsn":
-            fp_folders = (dest / cell_key / mode["env_subdir"],)
-        else:                                # self: TSMIS PDF vs Excel (both folders)
-            fp_folders = (dest / cell_key / mode["env_subdir"],
-                          dest / cell_key / mode["other_subdir"])
+        # F5/P2: the cell's TSMIS source-folder identity, in the SAME order the
+        # snapshot's _cmp_state fingerprints (env first; + 'other' for the self
+        # PDF-vs-Excel mode). CMP-AUD-098: the PRE-comparison capture is what
+        # gets recorded — a mid-build mutation reads immediately stale.
         record_tsn_result(dest, f"{row_key}|{mode['id']}", cell_key, typed.verdict,
                           diff_cells, one_sided, _safe_mtime(out_path),
                           completion=typed.completion,
-                          input_fingerprint=_cell_input_fingerprint(*fp_folders),
+                          input_fingerprint=_fingerprint_for_record(
+                              fp_before, fp_folders, out_path.name, events),
                           source_identities=(
                               {"tsn": tsn_token}
                               if mode["kind"] == "tsn"

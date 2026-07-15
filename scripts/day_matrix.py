@@ -472,6 +472,10 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
         tsn_key, src_tsn, tsn_token)
 
     out_path = day_out_path(date, source, row_key)
+    # CMP-AUD-098: capture the day's TSMIS store-folder identity BEFORE the
+    # consolidate→compare chain reads it.
+    fp_folders = (tsmis_dir(date, source, subdir),)
+    fp_before = matrix._cell_input_fingerprint(*fp_folders)
     result = matrix.consolidate_and_compare_tsn(
         tsmis_dir(date, source, subdir), src_tsn["path"], out_path, row_key, subdir,
         events, confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
@@ -503,10 +507,12 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
             built_at = None
         # F5/P2: record the day's TSMIS store-folder identity so a deleted route reads
         # the reused cell stale (same folder _cmp_state fingerprints in the snapshot).
+        # CMP-AUD-098: the PRE-comparison capture is recorded — a mid-build
+        # mutation therefore reads immediately stale, never fresh.
         record_result(date, source, row_key, typed.verdict, diff_cells, one_sided,
                       built_at, completion=typed.completion,
-                      input_fingerprint=matrix._cell_input_fingerprint(
-                          tsmis_dir(date, source, subdir)),
+                      input_fingerprint=matrix._fingerprint_for_record(
+                          fp_before, fp_folders, out_path.name, events),
                       source_identities=(
                           {"tsn": tsn_token}),
                       generation_id=published.artifact_generation.generation_id,

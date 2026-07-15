@@ -37,6 +37,7 @@ from matrix_state import (                                       # noqa: F401
 from matrix_build import (                                       # noqa: F401
     _FORMULAS_TWIN_MAX_ROWS, _comparison_row_count, _consolidate_store_folder,
     _consolidated_filename, _consolidated_stale, _ensure_consolidated,
+    _fingerprint_for_record, _twin_inputs_unchanged,
     _formulas_sibling, _pdf_store_consolidator, _try_formulas,
     _compose_source_guard, _require_source_identity,
     build_cell_comparison, build_comparison, cells_to_rebuild,

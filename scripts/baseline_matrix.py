@@ -397,6 +397,9 @@ def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
     dest_path = out_path(date, source, row_key, baseline_id)
     labels = (f"{source.upper()} {date}", baseline_label(source, baseline_id))
     source_paths = (dir_a, bdir)
+    # CMP-AUD-098: capture the input identity BEFORE the comparator reads.
+    fp_folders = (tsmis_dir(date, source, subdir), bdir / subdir)
+    fp_before = matrix._cell_input_fingerprint(*fp_folders)
 
     # side A = the day under test, side B = the baseline (labels read
     # "SSOR-PROD 2026-07-09 vs SSOR-PROD 2026-06-20"). The public adapter owns
@@ -406,7 +409,9 @@ def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
         dir_a, bdir, dest_path, events=events,
         confirm_overwrite=confirm_overwrite or (lambda _p: True),
         mode="values", labels=labels)
-    if also_formulas and result.status == "ok":
+    if (also_formulas and result.status == "ok"
+            and matrix._twin_inputs_unchanged(fp_before, fp_folders,
+                                              dest_path.name, events)):
         matrix._try_formulas(lambda fp: adapter.compare_folders(
             dir_a, bdir, fp, events=events,
             confirm_overwrite=lambda _p: True, mode="formulas", labels=labels),
@@ -422,10 +427,12 @@ def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
             built_at = dest_path.stat().st_mtime
         except OSError:  # silent-ok: no mtime just means the cached record can't certify freshness
             built_at = None
+        # CMP-AUD-098: the PRE-comparison capture is recorded — a mid-build
+        # mutation therefore reads immediately stale, never fresh.
         record_result(date, source, row_key, baseline_id, typed.verdict,
                       diff_cells, one_sided, built_at,
                       completion=typed.completion,
-                      input_fingerprint=matrix._cell_input_fingerprint(
-                          tsmis_dir(date, source, subdir), bdir / subdir),
+                      input_fingerprint=matrix._fingerprint_for_record(
+                          fp_before, fp_folders, dest_path.name, events),
                       generation_id=published.artifact_generation.generation_id)
     return result
