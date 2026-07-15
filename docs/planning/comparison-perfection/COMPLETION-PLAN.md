@@ -39,13 +39,38 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > 217/217 byte-identical.
 >
 > **Do this next: CMP-AUD-144 + 145 + 146** as ONE normalizer source-claim batch (a single
-> `normalization_version` bump: preserve the six printed J–P control rows + the raw
-> CONTROL F descriptor + printed report identity/timing/submitter in the normalized
-> sidecar, exposed in Notes/evidence); **183 and 184 are Resolved**; **076** (durable
-> cross-family provenance) folds into Wave 3 beside 098. Read each finding in
-> `comparison-audit-findings.md` first. 183 follow-ups parked: matrix auto-rebuild when a
-> consolidated workbook lacks a route census (then harden census-required), typed-contract
-> census surfacing (Phase-5/7 overlay), and Ramp's own universe contract (CMP-AUD-071).
+> `normalization_version` bump per report). Census done (2026-07-14, both raw statewide
+> PDFs, 3 pages each: legal cover / REPORT PARAMETERS / data page):
+> - **Identity fields (146):** report id `OTM22250` (IS) / `OTM22270` (RS) on all 3 pages;
+>   page 2 `REPORT DATE : 09/15/2025`, `REFERENCE DATE : 09/15/2025`,
+>   `SUBMITTOR : TRLBUGNI`, `REPORT TITLE : ' … '`, `EVENT ID : 4843738` (IS) /
+>   `4843742` (RS — the value sits on the NEXT LINE after `EVENT ID :`), `LOCATION
+>   CRITERIA:` → `STATEWIDE`; page-3 header carries the report id, date, `Event ID`, and
+>   the generation time (`04:53 PM` IS / `05:10 PM` RS). Multiplicity rule: a field may
+>   appear on several pages but must have exactly ONE distinct value; conflicting or
+>   missing values refuse. Page-1 policy text = dispositioned legal furniture.
+> - **Printed control claims (144):** J 207 / K 36 / L 107 / M 65 / N 210 / P 2023
+>   (sum 2648 == the derived folded S); capture ALL printed rows (block, code, raw label,
+>   count) pre-fold; validate derived S == component sum.
+> - **Declared correction (145):** the print's `F-FOUR WAY FLASHER (RED ON ALL)` equals
+>   G's text; canonical F = Red on Mainline per `TSNR - Intersection Control and Geometry
+>   Type_4.25.24_AT 1.xlsx`. Record {printed, canonical, decision source} as a declared
+>   correction; refuse if the print's F or G label drifts from the censused text
+>   (re-census on drift).
+> - **Plan:** new `parse_tsn_source_claims(path)` per comparator (separate pdfplumber
+>   pass; identity fields + printed rows + declarations); `_project` puts claims into
+>   `result.producer_extra["tsn_source_claims"]`; `tsn_library.build_normalized` merges
+>   producer extra into its sidecar write; `_load_pair` exposes identity + derived-S +
+>   correction notes (fresh parse on the raw path; `read_extra` on the normalized path,
+>   absent → explicit no-claims note); bump each report's `normalization_version` so D2
+>   rebuilds libraries with claims; update `check_tsn_normalizer` (monkeypatch the claims
+>   parser), both comparator checks, and re-verify both oracles (must stay 29/0/2·5·24 and
+>   58/8/0·5·53).
+>
+> **183 and 184 are Resolved**; **076** (durable cross-family provenance) folds into
+> Wave 3 beside 098. 183 follow-ups parked: matrix auto-rebuild when a consolidated
+> workbook lacks a route census (then harden census-required), typed-contract census
+> surfacing (Phase-5/7 overlay), and Ramp's own universe contract (CMP-AUD-071).
 > - **Method (mandatory, proven):** (1) read the finding; (2) red fixture confirmed RED on
 >   current code; (3) fix; (4) GREEN; (5) **verify against the real corpus** and, for anything
 >   touching Ramp/Intersection Summary counts, **re-confirm the accepted oracles hold**
