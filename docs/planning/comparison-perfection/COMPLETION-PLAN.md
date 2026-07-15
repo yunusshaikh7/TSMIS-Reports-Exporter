@@ -38,7 +38,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > 53 differing (16,459 vs 16,626)** — and the ars-prod 7.9 re-consolidation stays
 > 217/217 byte-identical.
 >
-> **Do this next: CMP-AUD-144 + 145 + 146** as ONE normalizer source-claim batch (a single
+> **DONE (2026-07-14): CMP-AUD-144 + 145 + 146 shipped** as one normalizer source-claim batch (a single
 > `normalization_version` bump per report). Census done (2026-07-14, both raw statewide
 > PDFs, 3 pages each: legal cover / REPORT PARAMETERS / data page):
 > - **Identity fields (146):** report id `OTM22250` (IS) / `OTM22270` (RS) on all 3 pages;
@@ -67,8 +67,10 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   parser), both comparator checks, and re-verify both oracles (must stay 29/0/2·5·24 and
 >   58/8/0·5·53).
 >
-> **183 and 184 are Resolved**; **076** (durable cross-family provenance) folds into
-> Wave 3 beside 098. 183 follow-ups parked: matrix auto-rebuild when a consolidated
+> **Do this next: Wave 3 — CMP-AUD-098 (durable source-capture digests) + 076 (durable
+> cross-family provenance)** — read both findings first; they share the capture/persist
+> infrastructure (`artifact_store.capture_source_identities` exists as the seam). 183/184
+> are Resolved. 183 follow-ups parked: matrix auto-rebuild when a consolidated
 > workbook lacks a route census (then harden census-required), typed-contract census
 > surfacing (Phase-5/7 overlay), and Ramp's own universe contract (CMP-AUD-071).
 > - **Method (mandatory, proven):** (1) read the finding; (2) red fixture confirmed RED on
