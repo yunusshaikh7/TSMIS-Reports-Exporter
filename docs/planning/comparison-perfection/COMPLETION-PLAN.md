@@ -67,7 +67,32 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   parser), both comparator checks, and re-verify both oracles (must stay 29/0/2·5·24 and
 >   58/8/0·5·53).
 >
-> **Do this next: CMP-AUD-076 (durable cross-family comparison provenance).** 098's
+> **Do this next: Wave 4 — CMP-AUD-045 family-projector integration.** Opening brief
+> (censused 2026-07-14): the E2 typed-identity CORE is green; the four KNOWN_RED
+> contracts in `check_compare_physical_identity` fail because projectors hand the engine
+> plain route/PM strings. **Integration API:** each loader path emits its KEY CELL as a
+> `comparison_contract.PhysicalKey` (with `physical_identity.canonical_components`, e.g.
+> postmile/county) so `keys_for` keys become (route, PhysicalKey); the engine + Hungarian
+> pairing already honor it (similarity pairing then runs only within genuine duplicates
+> of the approved tuple). Promote each KNOWN_RED into TESTS as its family lands.
+> **Approved tuples:** HSL route+county+complete glued PM (vs-TSN path already does this
+> — the CROSS-ENV path doesn't); RD D4 `(Route, County, norm_pm(PM))` with PR/PM_SFX
+> separately asserted; ID `(base Route, County, complete PP, numeric Post Mile)` with
+> suffix/PR/District separately asserted. **Blocked (do NOT infer):** Highway Log needs
+> its raw county claim retained + a collision census first; Highway Detail Excel is
+> vendor-pending county. **Re-bless targets = the accepted Stage-8 oracles:** RD Excel
+> 15,212 paired / 4 / 198 / 14,471 identical / 741 differing rows / 847 cells; RD PDF
+> …774/998; PDF↔Excel 15,216 with exactly 4 Description renders; ID 16,199 / 260 / 427 /
+> 16,053 / 21,675 cells / 518,368 asserting / 106 exact duplicate groups (production
+> currently shows 15 false Description differences the oracle lacks). Real collision
+> counts are bound in `comparison-phase4-red-fixture-index.md`. **Batch discipline (gate
+> doc):** E2 runs focused adversarial fixtures + full gate + bound real-data canaries +
+> installed-Excel `CalculateFullRebuild` parity before the next batch; test county
+> resets, value swaps, prefix/suffix variants, real duplicate tuples, mid-list inserts
+> on EVERY triangle edge. Start with **Ramp Detail** (smallest triangle, D4 approved,
+> both oracle legs bound, County present in all its sources).
+>
+> **DONE EARLIER — CMP-AUD-076 (durable cross-family comparison provenance).** 098's
 > comparison half is DONE (2026-07-14: pre-read fingerprint capture recorded at all four
 > record sites — Matrix env / vs-TSN+self / by-day / baseline; raced results
 > auto-invalidate via `_fingerprint_for_record`; the formulas twin skips loudly on a
