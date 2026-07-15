@@ -155,6 +155,27 @@ def test_detail_flat_compare():
     check("PM 1.000 Ctrl Type S vs F is a genuine diff", DIFF in by["1.000"][ctrl])
     check("PM 0.204 unchanged row has no diff", DIFF not in " ".join(by["0.204"]))
 
+    # CMP-AUD-076 (folder-kind): the committed comparison persists a durable
+    # provenance record — full canonical FOLDER selections, roles = the derived
+    # side labels, and the exact discovered member census per side.
+    import compare_tsn_common as ctc
+    prov = ctc.read_comparison_provenance(out)
+    check("a provenance sidecar exists beside the env comparison", prov is not None)
+    ins = prov.get("inputs") or []
+    check("both sides recorded as folder-kind with full selections",
+          [i.get("kind") for i in ins] == ["folder", "folder"]
+          and str(a.parent) in ins[0]["selection"]
+          and str(b.parent) in ins[1]["selection"])
+    check("roles are the derived side labels",
+          ins[0].get("role") == "SSOR-PROD" and ins[1].get("role") == "ARS-PROD")
+    check("the exact discovered member census is recorded per side",
+          all(i["member_count"] == 1
+              and i["members"][0]["name"] == "intersection_detail_route_001.xlsx"
+              and i["members"][0]["size"] > 0 for i in ins))
+    check("the record binds the committed generation",
+          prov.get("generation_id") == res.artifact_generation.generation_id
+          and prov.get("recipe", {}).get("report") == "Intersection Detail")
+
 
 def main():
     test_wiring()

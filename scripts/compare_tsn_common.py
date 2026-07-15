@@ -285,6 +285,7 @@ def capture_input_provenance(sides):
         producer = consolidation_meta.read_outcome(path)
         captured.append({
             "role": role,
+            "kind": "file",
             "name": path.name,
             "selection": str(path.resolve(strict=False)),
             "sha256": digest,

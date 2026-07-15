@@ -51,10 +51,29 @@ def _norm_route_key(token):
 
 import artifact_store
 import compare_highway_log as _hl
+import compare_tsn_common as ctc
 import consolidate_intersection_summary as _is
 import consolidate_ramp_summary as _rs
 from compare_core import CompareSchema, normalize_value, run_compare
 from compare_tsn_common import row_has_data
+
+
+def _member_census(files):
+    """[{name, size, mtime_ns}] for the exact discovered member set, statted
+    before any loader reads (CMP-AUD-076 folder-kind provenance). Raises
+    ValueError when a discovered member can't be statted — an input we cannot
+    identify must not be compared."""
+    census = []
+    for f in files:
+        p = Path(f)
+        try:
+            st = p.stat()
+        except OSError as e:
+            raise ValueError(f"Could not capture the input identity for "
+                             f"{p.name}: {type(e).__name__}: {e}")
+        census.append({"name": p.name, "size": st.st_size,
+                       "mtime_ns": st.st_mtime_ns})
+    return census
 from comparison_contract import (ComparisonCounts, ComparisonOutcome, LoadedSide,
                                  comparison_result_boundary)
 from events import ConsolidateResult, Events
@@ -874,6 +893,17 @@ class EnvCompare:
         try:
             captured_sources = artifact_store.capture_source_identities(
                 source_paths)
+            # CMP-AUD-076: the exact discovered member census per side, statted
+            # BEFORE any loader reads (folder-kind provenance: the census IS the
+            # effective input identity; a per-member content digest would be a
+            # full re-read of hundreds of files — the discovery-set tripwire +
+            # captured identities guard the read window instead).
+            prov_sides = [
+                {"kind": "folder",
+                 "selection": str(d.resolve(strict=False)),
+                 "member_count": len(files),
+                 "members": _member_census(files)}
+                for d, files in ((dir_a, files_a), (dir_b, files_b))]
         except ValueError as e:
             return ConsolidateResult(status="error", message=str(e))
 
@@ -1004,6 +1034,14 @@ class EnvCompare:
             captured_sources=captured_sources,
             commit_guard=commit_guard,
             requested_mode=mode)
+        # CMP-AUD-076: bind the pre-read member census to the committed
+        # generation, beside the workbook (additive evidence; no-op unless a
+        # generation actually committed).
+        prov_sides[0]["role"], prov_sides[1]["role"] = la, lb
+        ctc.write_comparison_provenance(
+            result, out_path, report=self.REPORT_NAME,
+            banner=f"{self.REPORT_NAME} Comparison — {la} vs {lb}",
+            inputs=prov_sides, commit_guard=commit_guard)
         if (self.flat_pdf_loader is not None
                 and getattr(result, "artifact_generation", None) is None):
             return _apply_pdf_coverage(

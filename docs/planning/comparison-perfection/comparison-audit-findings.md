@@ -3022,7 +3022,7 @@ CMP-AUD-082 integration gate; it must not be hidden by the central publisher fix
 ### CMP-AUD-076 — saved comparisons lack durable source provenance
 
 Priority: P2  
-Status: Partially remediated 2026-07-14 — file-kind comparisons persist durable input provenance; folder-kind (compare_env) + the in-workbook sheet remain  
+Status: Partially remediated 2026-07-14 — file-kind AND folder-kind comparisons persist durable input provenance; the in-workbook sheet + schema-v4 fold-in remain  
 Primary code: `scripts/compare_tsn_common.py:219-222`,
 `scripts/compare_env.py:666-669`, `scripts/compare_core.py:1503-1504`,
 `scripts/consolidation_meta.py:157-163`
@@ -3078,6 +3078,18 @@ provenance (member census + metadata fingerprint — `fingerprint()` is
 (name,size,mtime_ns) metadata, stated honestly), the in-workbook structured
 Provenance sheet, moved-file/alias mutation coverage beyond copies, and folding
 the sidecar into the strict schema-v4 payload (Phase-5 artifact epoch).
+
+**Folder-kind half (2026-07-14, same day).** `compare_env.compare_folders` now
+captures the exact discovered member census per side (name/size/mtime_ns,
+statted BEFORE any loader reads — the census is the effective input identity;
+a per-member content digest would re-read hundreds of files, and the existing
+discovery-set tripwire + captured identities already guard the read window)
+and persists {folder-kind roles = the derived side labels, full canonical
+folder selections, member counts + census, recipe, committed generation} via
+the same `.provenance.json` writer. Both kinds carry an explicit `kind` field.
+Fixture: the Intersection Detail env e2e asserts the folder record end to end
+through the strict publication machinery. Folder-kind real-corpus exercise
+rides the next work-PC visit (with the owed baseline-matrix two-day run).
 
 ### CMP-AUD-077 — comparison results discard structured discrepancy counts
 
