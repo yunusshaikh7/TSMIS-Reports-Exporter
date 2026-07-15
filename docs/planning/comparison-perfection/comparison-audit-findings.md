@@ -313,7 +313,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-032 | P1 | Verified | Cross-env flat schemas trust the first file, not the report contract |
 | CMP-AUD-033 | P1 | Verified | Normalized TSN loaders ignore their declared headers |
 | CMP-AUD-034 | P1 | Verified | Consolidated TSMIS loaders accept semantically invalid layouts |
-| CMP-AUD-035 | P1 | Remediated; r7 accepted | Strict raw admission, coherent complete-only certification, immutable normalized-workbook consumption, and token-bound publication/caches are permanent-green; r3-r6 remain rejected |
+| CMP-AUD-035 | P1 | Partially remediated — reopened 2026-07-14 | Original raw-admission r7 remains accepted, but the 2026-07-14 review found two related-and-open TSN defects: certificate validation is not type-exact (`1.0`/`True` alias required ints) and the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
 | CMP-AUD-036 | P1 | Verified | Ramp PDF accepts a truncated four-column workbook |
 | CMP-AUD-037 | P1 | Verified | Direct comparisons trust stale normalized libraries |
 | CMP-AUD-038 | P2 | Verified | Date normalization masks malformed and impossible dates |
@@ -516,6 +516,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-235 | P2 | Remediated and verified by retained-field/member mutations and final replays | Frozen-tree stability treats Windows' lazily populated directory `st_size` as source mutation |
 | CMP-AUD-236 | P2 | Remediated; the interrupted attempt was rejected and a clean r2 completed | An external 20-minute audit wrapper interrupted Highway Log Excel publication and left incomplete temporary residue |
 | CMP-AUD-237 | P2 | Remediated and verified by producer-format controls and two final-gate replays | The Highway Log audit consumer imposed a newline/canonical-format convention that identity-bound producer JSON did not promise |
+| CMP-AUD-238 | P2 | Verified | The public comparison decoder accepts `NaN`/duplicate-key/unknown-field payloads, and `frozen=True` contract objects are shallowly mutable (validated `per_field_counts` can be changed after construction) |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -1445,7 +1446,27 @@ gate to width alone.
 ### CMP-AUD-035 — raw TSN admission can certify incomplete or ambiguous truth
 
 Priority: P1  
-Status: Remediated — current-code r7 production witness accepted  
+Status: Partially remediated — original r7 admission witness accepted; **reopened
+2026-07-14** for two related TSN defects (below)  
+
+**Reopened 2026-07-14 (Codex review, verified against code).** The original raw-admission
+remediation stands, but two related defects in the same TSN-admission domain are open:
+
+1. **Certificate validation is not type-exact.** `tsn_district_contract.validate_raw_manifest`
+   (and the `tsn_library` sidecar checks) compare with Python `==`/`!=`, so `version=1.0`,
+   `member_count=True`, or `byte_length=1.0` alias the required ints and pass. The bound
+   byte identities stay truthful, so this is schema strictness, not a content P1 —
+   correct by rejecting non-`int` (and `bool`) values exactly.
+2. **Direct TSN builders lack a post-`os.replace` raw-source recheck.** The direct Highway
+   Sequence and Highway Log consolidators run their last source check *before*
+   `atomic_save_if` performs `os.replace`, so a source change in that interval can return
+   success for stale bytes. The canonical `tsn_library.build_consolidated` path already
+   rehashes post-builder; the gap is limited to direct builder/CLI use. Correct by
+   re-verifying the raw source after the replace.
+
+Both are scheduled in Wave 1 (contract & validation hardening).
+
+
 Primary code: `scripts/compare_ramp_detail_tsn.py:136-149`,
 `scripts/compare_intersection_detail_tsn.py:281-295`,
 `scripts/compare_highway_detail_tsn.py:298-312`
@@ -8594,6 +8615,45 @@ error values          00F75200F1F48D77C81DCB0138AA216E7B92A32AE2125EE592CE887BF1
   `production_comparison_semantics_exact=false`,
   `stage8_base_oracle_complete=true`, and
   `comparison_end_to_end_perfect=false`. No product correction was made.
+
+### CMP-AUD-238 — the public comparison decoder is permissive and its frozen objects are shallowly mutable
+
+Found by the 2026-07-14 Codex adversarial review of the recovered engine and
+independently reproduced against the code. Two related public-contract defects in
+`scripts/comparison_contract.py`:
+
+- **Permissive decode.** `from_json` decodes with a bare `json.loads`, which accepts
+  `NaN`/`Infinity` (Python's default `parse_constant`) and duplicate object keys
+  (last-wins). `to_json` uses `allow_nan=False`, so a payload can decode but fail to
+  re-encode — an asymmetric, non-round-trippable public contract. `from_dict` also
+  ignores unknown tagged-envelope fields rather than rejecting them. A payload
+  containing `NaN` was reproduced: it decoded successfully and then could not be
+  re-encoded.
+- **Shallow immutability.** `ComparisonCounts` is `frozen=True`, but `per_field_counts`
+  is stored as a live `dict`. Its validated invariant (values sum to `differing_cells`,
+  from `__post_init__`) can be violated by mutating the mapping in place after
+  construction — reproduced by assigning `counts.per_field_counts[...] = N`.
+
+Schema-v3 **sidecar** reading independently rejects duplicate/nonfinite/noncanonical
+payloads, so this is not currently a schema-v3 bypass; it is a real public-API defect.
+It does not fit CMP-AUD-231, so it carries its own ID.
+
+Correction (Wave 1): `from_json`/`from_dict` must reject `NaN`/`Infinity`, duplicate
+keys, and unknown envelope fields (strict, symmetric with `to_json`); frozen contract
+objects must wrap their mappings (e.g. `MappingProxyType`) so a validated invariant
+cannot be mutated away. Capture the defect red before the change.
+
+### Note — ACL "lease-leak" hypothesis disproved (2026-07-14)
+
+The reconciliation flagged that three audit directories were ACL-locked against the
+owner and hypothesized a leaked product `OwnershipLease`/reserved-temp. The Codex review
+disproved it against the code: the two Highway Sequence replay roots are created by audit
+code with `os.mkdir(..., 0o700)` and the intersection `source-transaction-*` directory by
+`tempfile.TemporaryDirectory`; none contains `.tsmis-owned.json` or the publication lock;
+`OwnershipLease` holds no OS handle; and the real publication lock is closed in `finally`.
+The directories were merely inaccessible to the sandbox account (protected DACLs omitting
+the inherited sandbox ACE), not to the owner. **No product lease-release defect; no new
+finding.** Relevant existing audit-residue context: CMP-AUD-203, CMP-AUD-236.
 
 ## Remediation order after the audit
 
