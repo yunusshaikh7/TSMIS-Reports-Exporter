@@ -87,7 +87,13 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > adds a sheet to EVERY comparison workbook — sweep golden checks that assert exact sheet
 > lists, and mind `compare_core` correctness-locked semantics: content additive only).
 > Mutation tests required: same basenames in different dirs, copies, aliases, moved
-> files, folder discoveries with overlapping members. 183/184 are Resolved. 183 follow-ups parked: matrix auto-rebuild when a consolidated
+> files, folder discoveries with overlapping members. Seam facts (censused):
+> `capture_source_identities` records INODE identity only (`_stat_identity` — no content
+> digest; the exact gap 076 names), and `artifact_store.fingerprint(folder)` is a
+> (name,size,mtime_ns) METADATA identity — for file-kind comparisons persist a real
+> sha256 (the loaders read the whole file anyway); for folder-kind, the member census +
+> metadata fingerprint is the proportionate record (state the distinction honestly in
+> the ledger). 183/184 are Resolved. 183 follow-ups parked: matrix auto-rebuild when a consolidated
 > workbook lacks a route census (then harden census-required), typed-contract census
 > surfacing (Phase-5/7 overlay), and Ramp's own universe contract (CMP-AUD-071).
 > - **Method (mandatory, proven):** (1) read the finding; (2) red fixture confirmed RED on
