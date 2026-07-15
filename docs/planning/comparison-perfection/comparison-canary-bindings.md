@@ -1274,3 +1274,28 @@ The pre-fix production numbers (750/861 Excel, 783/1,012 PDF, Description
 `check_compare_physical_identity` (RD contracts promoted to TESTS),
 `check_compare_ramp_detail_tsn` (canonical-display keys + the two-county swap
 + v3-library refusal), `check_visual_evidence` (county-aware RD adapter).
+
+## 2026-07-14 — Intersection Detail production re-bless against `ID-79` (CMP-AUD-045-ID)
+
+The ID-79-integrated production comparators (county+PP-aware `PhysicalKey`,
+District + County asserted compared fields, `intersection_detail` library v4)
+reproduce the accepted ID-79 oracle **exactly, all three legs**, from the bound
+inputs (both ars-prod 7.9 217-route trees scratch-consolidated + the raw
+`TSAR - INTERSECTION DETAIL_TSN.xlsx`):
+
+| Flavor | Paired | TSMIS/TSN only | Identical / differing | Cells | Asserted |
+|---|---:|---:|---:|---:|---:|
+| Excel vs raw TSN | 16,199 | 260 / 427 | 146 / 16,053 | 21,676 | 550,766 |
+| PDF vs raw TSN | 16,199 | 260 / 427 | 146 / 16,053 | 21,683 | 550,766 |
+| PDF vs Excel | 16,459 | 0 / 0 | 16,450 / 9 | 9 | 559,606 |
+
+Pairing quality `exact` on every leg (TSN's 15 real duplicate groups ride the
+Hungarian assignment). The 9 PDF↔Excel differences remain the 8 trailing-tab
+Excel Descriptions (database data the PDF render drops) plus the REAL
+`108/TUO/<blank>/5.87` HG defect (Excel `U` vs PDF+TSN `D`) — no edge-trimming
+in this family. The pre-fix production shape (Route+PM keys, District/County
+invisible, canary 21,675) is retired. Hermetic locks:
+`check_compare_physical_identity` (ID contracts promoted, 8 green / 2
+known-red), `check_compare_intersection_detail_tsn` (canonical displays, PP
+identity probe, pre-v4 refusal), `check_visual_evidence` (county-aware ID
+adapter, 34 FIELDS).

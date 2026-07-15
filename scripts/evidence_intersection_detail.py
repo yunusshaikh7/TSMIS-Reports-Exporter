@@ -81,22 +81,22 @@ def _load_tsn_with_sidecar(path):
     try:
         if idt.NORMALIZED_SHEET in wb.sheetnames:
             it = wb[idt.NORMALIZED_SHEET].iter_rows(values_only=True)
-            header = list(next(it, []) or [])
-            has_sidecar = len(header) >= 1 + len(idt.SHARED_HEADER) + 2
+            header = [_S(c) for c in (next(it, []) or [])]
+            # CMP-AUD-045: the county-aware identity needs the v3 sidecars —
+            # same rule as the comparison loader, surfaced as the rebuild note.
+            if "TSN County" not in header:
+                return [], None, ("the normalized TSN library predates the "
+                                  "evidence columns — rebuild the TSN library "
+                                  "(Settings) and run the comparison again")
             rows, sidecar = [], defaultdict(list)
             for r in it:
                 if not r or all(c in (None, "") for c in r):
                     continue
                 row = idt._normalized_row(r)   # re-projected like the comparison
                 rows.append(row)
-                if has_sidecar:
-                    dist = _S(r[1 + len(idt.SHARED_HEADER)])
-                    cnty = _S(r[2 + len(idt.SHARED_HEADER)]).rstrip(".")
-                    sidecar[(row[0], row[_KEY_I])].append((dist, cnty))
-            if not has_sidecar:
-                return rows, None, ("the normalized TSN library predates the "
-                                    "evidence columns — rebuild the TSN library "
-                                    "(Settings) and run the comparison again")
+                dist = _S(r[1 + len(idt.SHARED_HEADER)])
+                cnty = _S(r[2 + len(idt.SHARED_HEADER)]).rstrip(".")
+                sidecar[(row[0], row[_KEY_I])].append((dist, cnty))
             return rows, sidecar, None
     finally:
         wb.close()
@@ -134,7 +134,10 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
                 va, vb = _xl_trim(ra[1 + i]), _xl_trim(rb[1 + i])
                 if va != vb:
                     dist, cnty = (sidecar.get((route, key)) or [("", "")])[0]
-                    diffs[f].append(dict(route=route, key=key, field=f,
+                    # The engine's locators key on the plain normalized-PM text
+                    # (+ county for TSN); the ID-79 PhysicalKey's str payload IS
+                    # that text (CMP-AUD-045).
+                    diffs[f].append(dict(route=route, key=str(key), field=f,
                                          va=va, vb=vb, dist=dist, cnty=cnty))
     return diffs
 
@@ -161,7 +164,8 @@ def tsmis_pdf_path(pdf_dir, route):
 # merged Description). Route Suffix boxes the Location cell — that's where the
 # print carries the suffix ('11 IMP 008U'); the site leaves the 'S' column blank.
 _TSMIS_CELL = {
-    "PR": (1, 0), "Route Suffix": (1, 3), "Date of Record": (1, 4), "HG": (1, 5),
+    "PR": (1, 0), "Route Suffix": (1, 3), "District": (1, 3), "County": (1, 3),
+    "Date of Record": (1, 4), "HG": (1, 5),
     "City Code": (1, 6), "R/U": (1, 7),
     "INT Type Eff-Date": (1, 8), "INT Type": (1, 9),
     "Control Type Eff-Date": (1, 10), "Control Type": (1, 11),
@@ -254,6 +258,9 @@ def tsmis_value(rec, field):
     """The compared value this PDF record carries for `field` (verification)."""
     if field == "Route Suffix":
         return idt._split_route(rec["row"][3])[1]
+    if field in ("District", "County"):
+        district, county = idt._dist_cnty(rec["row"][3])
+        return district if field == "District" else county
     return project(field, rec["row"][_TSMIS_SRC[field]])
 
 
@@ -316,7 +323,9 @@ _L2_WIN = [
 # the TSN print carries X_CROSS_OVERRIDE on LINE 1 where TSMIS prints it on the
 # record's second line — each side boxes its own layout.
 TSN_CELL = {
-    "PR": (1, "PP"), "Route Suffix": (1, "LOC"), "Date of Record": (1, "DATE_REC"),
+    "PR": (1, "PP"), "Route Suffix": (1, "LOC"),
+    "District": (1, "LOC"), "County": (1, "LOC"),
+    "Date of Record": (1, "DATE_REC"),
     "HG": (1, "HG"), "City Code": (1, "CITY"), "R/U": (1, "RU"),
     "INT Type Eff-Date": (1, "EFF_DATE_INT"), "INT Type": (1, "TY_INT"),
     "Control Type Eff-Date": (1, "EFF_DATE_CT"), "Control Type": (1, "TY_CT"),
@@ -467,6 +476,9 @@ def _tsn_raw(rec, field):
     """The raw print token for `field` (signature flags stripped from dates)."""
     if field == "Route Suffix":
         return idt._split_route(rec["a1"]["LOC"][0])[1]
+    if field in ("District", "County"):
+        district, county = idt._dist_cnty(rec["a1"]["LOC"][0])
+        return district if field == "District" else county
     line, name = TSN_CELL[field]
     text = (rec["a1"] if line == 1 else rec["a2"])[name][0]
     return _FLAGGED_DATE_RE.sub("", text)
@@ -474,7 +486,7 @@ def _tsn_raw(rec, field):
 
 def tsn_value(rec, field):
     """The compared value this print record carries for `field`."""
-    if field == "Route Suffix":
+    if field in ("Route Suffix", "District", "County"):
         return _tsn_raw(rec, field)
     return project(field, _tsn_raw(rec, field))
 

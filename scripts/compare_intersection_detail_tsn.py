@@ -67,6 +67,7 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_tsn_common as ctc
+import comparison_contract as cc
 from compare_tsn_common import (load_consolidated_rows, row_has_data,
                                 suggest_route_name)
 from compare_core import (CompareSchema, compared_cell, normalize_value, keys_for,
@@ -85,8 +86,13 @@ KEY = "PM"
 # mainline block, then the cross-street block, then the intersecting route). Every
 # field present in both systems is compared and counted — nothing is suppressed
 # (CONTEXT_FIELDS is empty, below; the position-aligned policy compares every column).
+# District + County are COMPARED fields (the accepted ID-79 oracle asserts them
+# — 34 asserting fields per paired row; both derive from each source's Location
+# and are construction-equal on paired rows, so they add assertion coverage and
+# visible provenance without changing any difference count).
 SHARED_HEADER = [
-    "PR", "Route Suffix", "PM", "Date of Record", "HG", "City Code", "R/U",
+    "PR", "Route Suffix", "PM", "District", "County",
+    "Date of Record", "HG", "City Code", "R/U",
     "INT Type Eff-Date", "INT Type",
     "Control Type Eff-Date", "Control Type",
     "Lighting Eff-Date", "Lighting",
@@ -211,6 +217,57 @@ def _norm_route(tok):
     return _split_route(tok)[0]
 
 
+def _dist_cnty(loc):
+    """LOCATION '12 ORA 210U' / '04 CC. 004' -> ('12', 'ORA'/'CC')."""
+    parts = ("" if loc is None else str(loc)).strip().upper().replace("-", " ").split()
+    dist = parts[0] if parts else ""
+    cnty = parts[1].rstrip(".") if len(parts) >= 2 else ""
+    return (f"{int(dist):02d}" if dist.isdigit() else dist), cnty
+
+
+def _decimal_pm(pm_raw):
+    """The ID-79 oracle's Decimal-canonical numeric postmile as text: leading
+    zeros stripped (norm_pm), then trailing zeros and a bare dot stripped —
+    '005.870' -> '5.87', '001.000' -> '1', '0.000' -> '0'."""
+    s = _norm_pm(pm_raw)
+    neg, t = s.startswith("-"), s.lstrip("-")
+    if "." in t:
+        ip, fp = t.split(".", 1)
+        fp = fp.rstrip("0")
+        t = ip + ("." + fp if fp else "")
+    return ("-" + t) if neg and t not in ("", "0") else t
+
+
+def _raw_text(v):
+    return "" if v is None else str(v)
+
+
+def _physical_id_key(base_route, county, pp_raw, pm_raw, claims, source_hint):
+    """The accepted ID-79 PhysicalKey (CMP-AUD-045): canonical identity is
+    exactly `(base Route, County, complete PP, numeric Post Mile)` — the
+    complete PP is PART of identity (six real within-county groups carry
+    distinct PPs at one numeric PM), rendered as the canonical postmile
+    component `PP + Decimal-canonical PM` (e.g. "R5.87"); the route SUFFIX
+    stays a compared column and conserved claim, never a key component. The
+    key's str payload is the normalized PM the sheets display; a row without a
+    usable county or postmile refuses loudly."""
+    pm_display = _norm_pm(pm_raw)
+    pp = _raw_text(pp_raw).strip().upper()
+    numeric = _decimal_pm(pm_raw)
+    if not county:
+        raise ValueError(f"Intersection Detail row (route {base_route}, PM "
+                         f"{pm_display}) has no usable county in {source_hint} "
+                         "— cannot key it to a physical location")
+    if not numeric:
+        raise ValueError(f"Intersection Detail row (route {base_route}, "
+                         f"{source_hint}) has no usable numeric postmile")
+    identity = cc.make_physical_identity(
+        base_route, county, f"{pp}{numeric}",
+        tuple(cc.RawIdentityClaim(name, value) for name, value in claims),
+        f"{base_route} / {county} / {pp}{numeric}")
+    return cc.physical_key(pm_display, identity)
+
+
 # PM + date canon shared with Ramp Detail, homed in compare_tsn_common (P5b/S04);
 # iso_date also handles this report's 2-digit TSN year. Names kept so the loaders, the
 # Report View, and the golden canary still resolve idt._norm_pm / idt._iso_date.
@@ -283,8 +340,18 @@ def _tsn_row(r, h):
     def g(name):
         i = h.get(name)
         return r[i] if i is not None and i < len(r) else None
-    base, route_suffix = _split_route(g("LOCATION"))
-    return [base] + [route_suffix if f == "Route Suffix" else _project(f, g(_TSN_COL[f]))
+    loc = g("LOCATION")
+    base, route_suffix = _split_route(loc)
+    district, county = _dist_cnty(loc)
+    key = _physical_id_key(base, county, g("PP"), g("POST_MILE"), (
+        ("route", base), ("route_suffix", route_suffix),
+        ("location", _raw_text(loc)),
+        ("postmile_prefix", _raw_text(g("PP"))),
+        ("postmile", _raw_text(g("POST_MILE")))), f"LOCATION {loc!r}")
+    derived = {"Route Suffix": route_suffix, KEY: key,
+               "District": district, "County": county}
+    return [base] + [derived[f] if f in derived
+                     else _project(f, g(_TSN_COL[f]))
                      for f in SHARED_HEADER]
 
 
@@ -301,18 +368,33 @@ def tsn_rows_from_raw(path):
 
 
 def _normalized_row(r):
-    """Re-project one row from the normalized TSN-library sheet onto the shared
-    shape, RE-APPLYING the field normalizations (control-type crosswalk, booleans,
-    PM, date). The projections are idempotent on already-normalized values, so this
-    is a no-op for a freshly-built library BUT repairs a STALE one — a library
-    workbook built before a normalization change (e.g. before the J–P→`S` signal
-    crosswalk) would otherwise feed raw codes straight through `_v` and flag a phantom
-    'S ≠ P' (a fresh library shows the crosswalked code 'S', a stale one the raw 'P').
-    Normalizing at COMPARE time means a normalization change takes effect immediately,
-    without rebuilding the library."""
-    vals = list(r)[:len(SHARED_HEADER) + 1]
-    vals += [None] * (len(SHARED_HEADER) + 1 - len(vals))
-    return [_v(vals[0])] + [_project(f, vals[i + 1]) for i, f in enumerate(SHARED_HEADER)]
+    """Re-project one row from the normalized TSN-library sheet (v3: ['Route'] +
+    SHARED_HEADER + the District/County sidecars) onto the shared shape,
+    RE-APPLYING the field normalizations (control-type crosswalk, booleans,
+    PM, date). The projections are idempotent on already-normalized values, so
+    this is a no-op for a freshly-built library BUT repairs a STALE one.
+    The ID-79 PhysicalKey is rebuilt from the row's base route + County sidecar
+    + PR/PM columns (CMP-AUD-045 — the sidecars are no longer sliced away; the
+    v3 shape already carries everything, so no library rebuild is needed)."""
+    width = len(SHARED_HEADER) + 1
+    vals = list(r)[:width + 2]                    # + District/County sidecars
+    vals += [None] * (width + 2 - len(vals))
+    base = _raw_text(vals[0]).strip()
+    district, county = (_raw_text(vals[width]).strip(),
+                        _raw_text(vals[width + 1]).strip().rstrip("."))
+    pp = vals[1 + SHARED_HEADER.index("PR")]
+    pm = vals[1 + SHARED_HEADER.index(KEY)]
+    suffix_i = 1 + SHARED_HEADER.index("Route Suffix")
+    key = _physical_id_key(base, county, pp, pm, (
+        ("route", base), ("route_suffix", _raw_text(vals[suffix_i])),
+        ("district", district), ("county", county),
+        ("postmile_prefix", _raw_text(pp)), ("postmile", _raw_text(pm))),
+        "the library's TSN County sidecar")
+    out = [base] + [_project(f, vals[i + 1]) for i, f in enumerate(SHARED_HEADER)]
+    out[1 + SHARED_HEADER.index(KEY)] = key
+    out[1 + SHARED_HEADER.index("District")] = district
+    out[1 + SHARED_HEADER.index("County")] = county
+    return out
 
 
 def _load_tsn(path):
@@ -324,7 +406,14 @@ def _load_tsn(path):
     try:
         if NORMALIZED_SHEET in wb.sheetnames:
             it = wb[NORMALIZED_SHEET].iter_rows(values_only=True)
-            next(it, None)
+            header = [_raw_text(c).strip() for c in (next(it, None) or ())]
+            # CMP-AUD-045: the county-aware identity needs the v3 sidecars; a
+            # pre-v3 library predates them and would silently re-weaken the key.
+            if "TSN County" not in header or "District" not in header:
+                raise ValueError(
+                    f"{path.name} is an older normalized TSN Intersection "
+                    "Detail library (before the county-aware physical "
+                    "identity) — rebuild the TSN library and retry.")
             rows = [_normalized_row(r)
                     for r in it if r and any(c not in (None, "") for c in r)]
             return rows, True
@@ -336,8 +425,22 @@ def _load_tsn(path):
 def _tsmis_row(r):
     def at(i):
         return r[i] if i < len(r) else None
-    base, route_suffix = _split_route(at(_TSMIS_ROUTE_POS))
-    return [base] + [route_suffix if f == "Route Suffix" else _project(f, at(_TSMIS_POS[f]))
+    loc = at(_TSMIS_ROUTE_POS)
+    base, route_suffix = _split_route(loc)
+    district, county = _dist_cnty(loc)
+    key = _physical_id_key(base, county, at(_TSMIS_POS["PR"]),
+                           at(_TSMIS_POS[KEY]), (
+        ("route", base), ("route_suffix", route_suffix),
+        ("location", _raw_text(loc)),
+        ("postmile_prefix", _raw_text(at(_TSMIS_POS["PR"]))),
+        ("postmile", _raw_text(at(_TSMIS_POS[KEY]))),
+        # The export's S column (position 3), conserved as a source claim —
+        # NOT identity (the accepted ID-79 tuple carries no suffix).
+        ("postmile_suffix", _raw_text(at(3)))), f"Location {loc!r}")
+    derived = {"Route Suffix": route_suffix, KEY: key,
+               "District": district, "County": county}
+    return [base] + [derived[f] if f in derived
+                     else _project(f, at(_TSMIS_POS[f]))
                      for f in SHARED_HEADER]
 
 

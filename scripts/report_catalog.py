@@ -385,9 +385,14 @@ TSN = (
     # sidecar columns (split from LOCATION) — evidence locates a row in the TSN
     # statewide print with them; the comparison loader slices to the shared width
     # and never sees them. The bump re-projects any stored library on next use (D2).
+    # v4 (CMP-AUD-045-ID): District + County join the shared width (the
+    # accepted ID-79 oracle asserts them) and the comparison loader rebuilds
+    # the county+PP-aware physical identity from the sidecars instead of
+    # slicing them away. The bump rebuilds stored libraries (D2); pre-v4
+    # libraries are refused by the loader with a rebuild hint.
     TsnEntry("intersection_detail", "TSN Intersection Detail", "*.xlsx", "statewide_xlsx",
              "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into",
-             normalization_version=3, evidence_pdfs=True),
+             normalization_version=4, evidence_pdfs=True),
     # v3: exact internal D01-D12 admission; force prior v2 libraries through it.
     TsnEntry("highway_sequence", "TSN Highway Sequence", "*.pdf", "district_pdfs",
              "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into", normalization_version=3),

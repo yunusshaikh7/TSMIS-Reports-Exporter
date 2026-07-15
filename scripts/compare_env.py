@@ -1141,9 +1141,46 @@ INTERSECTION_SUMMARY = EnvCompare(
 # (The export header is offset within each type/eff-date pair, but BOTH env sides share
 # the identical layout, so the position-wise comparison is valid; intersections sharing
 # a postmile pair by data similarity in compare_core. id_noun = intersection.)
+def _intersection_detail_env_keys(header, key_field):
+    """CMP-AUD-045: the Intersection Detail cross-env key builder — the same
+    accepted ID-79 PhysicalKey the vs-TSN paths bake in, built per row from the
+    export's own columns (County + base route from the Location column; the
+    cell before the Post Mile column is the complete PP, PART of identity;
+    the route suffix stays a conserved claim). Degrades to the plain key column
+    (logged) on layout drift, like _resolve_key_field."""
+    import compare_intersection_detail_tsn as _idt
+    loc_field = next((i for i, name in enumerate(header)
+                      if name is not None
+                      and str(name).strip().casefold() == "location"), None)
+    if loc_field is None or key_field == 0:
+        log.warning("env compare intersection_detail: no Location column / key "
+                    "column in header %r; falling back to the plain PM key",
+                    header)
+        return None
+
+    def normalizer(row, off, kf):
+        route = "" if row[0] is None else str(row[0])
+        loc = row[off + loc_field]
+        _district, county = _idt._dist_cnty(loc)
+        _base, route_suffix = _idt._split_route(loc)
+        pp = row[off + kf - 1]
+        pm_raw = row[off + kf]
+        def cell(field):
+            i = off + field
+            return _idt._raw_text(row[i]) if 0 <= field < len(header) and i < len(row) else ""
+        return _idt._physical_id_key(route, county, pp, pm_raw, (
+            ("route", route), ("route_suffix", route_suffix),
+            ("location", _idt._raw_text(loc)),
+            ("postmile_prefix", _idt._raw_text(pp)),
+            ("postmile", _idt._raw_text(pm_raw)),
+            ("postmile_suffix", cell(kf + 1))), f"Location {loc!r}")
+    return normalizer
+
+
 INTERSECTION_DETAIL = EnvCompare(
     "intersection_detail", "Intersection Detail", "intersection_detail",
     sheet_name="Intersection Detail", key_col="Post Mile",
+    physical_key_builder=_intersection_detail_env_keys,
     base_schema=CompareSchema(
         report_name="Intersection Detail", header=["Post Mile"],
         id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"))

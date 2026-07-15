@@ -4,7 +4,7 @@ July-2026 export format.
 
 Locks: the CompareSchema wiring (PM key; NO context fields — every shared column is
 compared and counted; boolean fields; the Notes legend_writer), the July-2026 shape
-(33 shared fields ending in 'Xing Line Lgth'; the second ML eff-date gone — TSN's
+(35 shared fields ending in 'Xing Line Lgth', District/County joined per ID-79; the second ML eff-date gone — TSN's
 MAIN_EFF_DATE is Report-View-only now), the old-format refusal (a pre-update
 consolidated workbook errors with a re-export hint instead of being mis-read by
 position), the Y/N<->legacy-1/0 boolean normalization, the control-type crosswalk,
@@ -118,8 +118,10 @@ def test_schema():
     check("side names TSMIS / TSN", sc.side_a == "TSMIS" and sc.side_b == "TSN")
     check("position-aligned: NO context fields (nothing suppressed or greyed)",
           tuple(sc.context_fields) == ())
-    check("33 shared fields, ending in the new 'Xing Line Lgth'",
-          len(sc.header) == 33 and sc.header[-1] == "Xing Line Lgth")
+    check("35 shared fields (District + County joined per ID-79), ending in "
+          "'Xing Line Lgth'",
+          len(sc.header) == 35 and sc.header[-1] == "Xing Line Lgth"
+          and sc.header[3:5] == ["District", "County"])
     check("the second ML eff-date left the shared header (TSN MAIN_EFF_DATE is "
           "Report-View-only now)", "ML 2nd Eff-Date" not in sc.header)
     check("all 7 date cols + Main Line Length + intersecting route + Xing Line "
@@ -187,9 +189,16 @@ def test_schema():
                   for spec in (column[2], column[5]) if spec[0] == "cmp"]
     asserting_fields = [sc.header[index] for index in sc.field_indices
                         if not sc.is_context(index)]
-    check("Report View grid contains every asserting non-key field exactly once",
-          set(cmp_fields) == set(asserting_fields)
-          and len(cmp_fields) == len(asserting_fields) == len(set(cmp_fields)))
+    # District + County are asserted key-adjacent fields (ID-79) that CANNOT
+    # differ on a paired row (county is inside the pairing identity; district is
+    # county-determined) — the printed replica shows both inside its LOCATION
+    # cell, so they carry no dedicated grid cell. Any anomaly still flags on the
+    # generic Comparison sheet.
+    rv_exempt = {"District", "County"}
+    check("Report View grid contains every asserting non-key field exactly once "
+          "(District/County shown via LOCATION)",
+          set(cmp_fields) == set(asserting_fields) - rv_exempt
+          and len(cmp_fields) == len(set(cmp_fields)))
     check("Report View: the TSN-only 2nd ML eff-date renders as a DATE",
           "ML2" in idt._RV_DATEONE and idt._RV_ONE["ML2"] == "MAIN_EFF_DATE")
     check("route from LOCATION '12 ORA 001' -> '001'", idt._norm_route("12 ORA 001") == "001")
@@ -375,28 +384,28 @@ def test_end_to_end():
     diffs_col = header.index("Diffs")
     # Normalizations still produce a MATCH (the point of "make normalization clear,
     # even though it leads to a match").
-    check("Lighting Y/Y equal — no diff", DIFF not in by["0.204"][light])
+    check("Lighting Y/Y equal — no diff", DIFF not in by["001 / ORA / R0.204"][light])
     check("Control Type S(TSMIS)/P(TSN) crosswalk to 'S' — no diff",
-          DIFF not in by["0.204"][ctrl] and by["0.204"][ctrl] == "S")
+          DIFF not in by["001 / ORA / R0.204"][ctrl] and by["001 / ORA / R0.204"][ctrl] == "S")
     check("Xing Line Lgth '250' vs TSN '0250' zero-pad-normalized — no diff",
-          DIFF not in by["0.204"][xll] and by["0.204"][xll] == "250")
+          DIFF not in by["001 / ORA / R0.204"][xll] and by["001 / ORA / R0.204"][xll] == "250")
     check("Date of Record MATCHES now (the July-2026 fix — no wholesale diff)",
-          DIFF not in by["0.204"][dor])
+          DIFF not in by["001 / ORA / R0.204"][dor])
     check("Main Line Length '100'(TSMIS) vs blank(TSN) is a counted diff",
-          DIFF in by["0.204"][mll])
+          DIFF in by["001 / ORA / R0.204"][mll])
     # Everything present in both systems is COUNTED (no suppression):
     check("CS Mastarm blank(TSMIS) vs N(TSN) is a COUNTED diff (no coalescing)",
-          DIFF in by["0.204"][cs_sm])
+          DIFF in by["001 / ORA / R0.204"][cs_sm])
     check("Int St Eff-Date historical(1973) vs TSN bulk stamp(2022) is a COUNTED diff",
-          DIFF in by["0.204"][int_st])
+          DIFF in by["001 / ORA / R0.204"][int_st])
     check("PM 0.204 counts 5 cross-street + Int St + Main Line Length (7)",
-          by["0.204"][diffs_col] in ("7", "7.0"))
+          by["001 / ORA / R0.204"][diffs_col] in ("7", "7.0"))
     # A NON-signalized control change (A vs B) is NOT crosswalked -> still a genuine diff.
     check("Control Type A(TSMIS) vs B(TSN) — non-signalized, still a genuine diff",
-          DIFF in by["1.000"][ctrl])
-    check("ML Num Lanes 4 vs 3 is a genuine diff", DIFF in by["1.000"][nl])
+          DIFF in by["001 / ORA / R1"][ctrl])
+    check("ML Num Lanes 4 vs 3 is a genuine diff", DIFF in by["001 / ORA / R1"][nl])
     check("PM 1.000 counts Control + ML Num Lanes (2)",
-          by["1.000"][diffs_col] in ("2", "2.0"))
+          by["001 / ORA / R1"][diffs_col] in ("2", "2.0"))
     total = sum(1 for r in rows for c in r if DIFF in c)
     check("total counted diff cells across both rows == 9", total == 9)
     print(f"      (rows={len(rows)}, total diff cells={total})")
@@ -461,9 +470,11 @@ def test_normalized_path_crosswalk():
     """A normalized TSN-library workbook carrying RAW control codes (a library built
     before the crosswalk existed — 'stale') must STILL get the crosswalk applied when
     read: _load_tsn re-projects the normalized sheet at compare time. Regression lock
-    for the 'Signalized ≠ P' bug. ALSO: a v3 library carrying the District/County
-    sidecar columns must load with them SLICED OFF (the comparison never sees them)."""
-    print("normalized-library path: crosswalk re-applied + sidecar sliced:")
+    for the 'Signalized ≠ P' bug. ALSO (CMP-AUD-045): the v3 District/County
+    sidecars are READ into the physical key (no longer sliced away) — the output
+    rows stay the shared width, the key carries the sidecar county, and a
+    pre-v3 library without the sidecars REFUSES with a rebuild hint."""
+    print("normalized-library path: crosswalk re-applied + county-aware key:")
     root = Path(tempfile.mkdtemp(prefix="tsmis_id_norm_"))
     norm = root / "tsn_norm.xlsx"
     wb = Workbook()
@@ -481,15 +492,33 @@ def test_normalized_path_crosswalk():
     wb.save(norm)
     wb.close()
     rows, _ = idt._load_tsn(norm)
-    check("sidecar columns are SLICED OFF (rows are the shared width)",
+    check("output rows stay the shared width (sidecars consumed into the key)",
           all(len(r) == 1 + len(idt.SHARED_HEADER) for r in rows))
     pm_i = 1 + idt.SHARED_HEADER.index("PM")
     ct_i = 1 + idt.SHARED_HEADER.index("Control Type")
-    by_pm = {r[pm_i]: r[ct_i] for r in rows}
+    by_pm = {str(r[pm_i]): r[ct_i] for r in rows}
     check("raw 'P' in a normalized library workbook -> 'S' on read",
           by_pm.get("1.000") == "S")
     check("raw 'J' likewise -> 'S'", by_pm.get("2.000") == "S")
     check("non-signal 'A' unchanged", by_pm.get("3.000") == "A")
+    comps = dict(rows[0][pm_i].physical_identity.canonical_components)
+    check("the key carries the sidecar county (CMP-AUD-045)",
+          comps == {"route": "001", "county": "ORA", "postmile": "1"})
+    # A pre-v3 library (no sidecar columns) refuses with a rebuild hint.
+    old_lib = root / "tsn_old.xlsx"
+    wb2 = Workbook()
+    ws2 = wb2.active
+    ws2.title = idt.NORMALIZED_SHEET
+    ws2.append(["Route"] + idt.SHARED_HEADER)
+    ws2.append(nrow("001", "1.000", "A", sidecar=())[:1 + len(idt.SHARED_HEADER)])
+    wb2.save(old_lib)
+    wb2.close()
+    try:
+        idt._load_tsn(old_lib)
+        check("a pre-v3 (sidecar-less) library refuses with a rebuild hint", False)
+    except ValueError as e:
+        check("a pre-v3 (sidecar-less) library refuses with a rebuild hint",
+              "older normalized" in str(e) and "rebuild" in str(e))
 
 
 def test_added_columns():
@@ -517,7 +546,7 @@ def test_added_columns():
     res = idt.compare(tsmis, tsn, out, events=Events(), confirm_overwrite=lambda _p: True, mode="values")
     check("compare ok", res.status == "ok")
     header, rows, _ = _comparison(out)
-    row = {r[header.index("PM")]: r for r in rows}["0.204"]
+    row = {r[header.index("PM")]: r for r in rows}["001 / ORA / R0.204"]
     check("INT Type Eff-Date is COMPARED and flags (1970 vs 1973 — genuine)",
           DIFF in row[header.index("INT Type Eff-Date")])
     check("Main Line Length is COMPARED and matches (100=100)",

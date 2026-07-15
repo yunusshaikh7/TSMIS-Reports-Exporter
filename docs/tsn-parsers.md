@@ -61,7 +61,7 @@ side is per-route throughout. This yields **two comparison shapes**:
 | Ramp Summary | PDF | **statewide aggregate** (one category-count table) | per-route PDF ×126 | **AGGREGATE** |
 | Intersection Summary | PDF | **statewide aggregate** | current per-route XLSX ×217 (legacy 6.19 ×218) | **AGGREGATE** |
 | Ramp Detail | XLSX `Sheet 1` | statewide flat (15410 rows × 18 col; 126 rtes) | per-route XLSX ×126 | **FLAT** (D4 key: route+county+normalized PM; PR/PM_SFX conserved claims; **integrated + re-blessed 2026-07-14**) |
-| Intersection Detail | XLSX `Sheet 1` | statewide flat (16626 rows × 36 col; 216 route+suffix tokens / 211 bases) | per-route XLSX ×218 | **FLAT** (required: base route+county+PP+PM; current family integration red) |
+| Intersection Detail | XLSX `Sheet 1` | statewide flat (16626 rows × 36 col; 216 route+suffix tokens / 211 bases) | per-route XLSX ×218 | **FLAT** (ID-79 key: base route+county+PP+Decimal PM; **integrated + re-blessed 2026-07-14**) |
 | Highway Sequence | PDF | **per-district**, exactly one internally claimed D01–D12 | per-route XLSX ×252 | **FLAT** (route+**county**+complete PM) |
 | Highway Log | PDF | exactly one internally claimed D01–D12 | per-route XLSX + PDF | **FLAT** — admission green; normalized county retention/identity integration still red |
 | Highway Detail | XLSX `Sheet 1` | statewide flat (60,083 rows × 56 col; 273 routes) | per-route XLSX + PDF | **FLAT** — TSN route+county+complete PM; TSMIS Excel county derivation blocked |

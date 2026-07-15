@@ -675,9 +675,11 @@ import consolidate_tsmis_intersection_detail_pdf as idpdf    # noqa: E402
 import evidence_intersection_detail as eid                   # noqa: E402
 import tsn_load_intersection_detail as tli                   # noqa: E402
 
-check("ID FIELDS = every shared column except the key (32, Route Suffix included)",
+check("ID FIELDS = every shared column except the key (34 — District/County "
+      "joined per ID-79; Route Suffix included)",
       eid.FIELDS == [f for f in idt.SHARED_HEADER if f != idt.KEY]
-      and "Route Suffix" in eid.FIELDS and len(eid.FIELDS) == 32)
+      and "Route Suffix" in eid.FIELDS and "District" in eid.FIELDS
+      and "County" in eid.FIELDS and len(eid.FIELDS) == 34)
 check("ID TSMIS cell map covers exactly FIELDS",
       set(eid._TSMIS_CELL) == set(eid.FIELDS))
 check("ID TSN cell map covers exactly FIELDS",
@@ -812,8 +814,11 @@ try:
           note2 is None and len(ar2) == 1 and len(br2) == 1
           and len(br2[0]) == 1 + len(idt.SHARED_HEADER)
           and sc22.get(("004", br2[0][1 + idt.KEY_FIELD])) == [("04", "CC")])
-    check("both sides land on the same normalized PM key",
-          ar2[0][1 + idt.KEY_FIELD] == br2[0][1 + idt.KEY_FIELD] == "0.204")
+    # CMP-AUD-045: the keys are county-aware PhysicalKeys — identity-equal
+    # across sides, displaying the normalized PM text.
+    check("both sides land on the same physical key (display '0.204')",
+          ar2[0][1 + idt.KEY_FIELD] == br2[0][1 + idt.KEY_FIELD]
+          and str(ar2[0][1 + idt.KEY_FIELD]) == "0.204")
 
     old2 = tmp2 / "old.xlsx"
     ow2 = Workbook()

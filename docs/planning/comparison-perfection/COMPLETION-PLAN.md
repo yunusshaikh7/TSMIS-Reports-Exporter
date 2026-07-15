@@ -22,8 +22,8 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185**; 045 RD-integrated (HSL/ID/HL/HD remain); 098 pipeline half; 133/115/035 partial |
-| **Next action** | **Wave 4 continues** — the Intersection Detail family next (045 ID integration + its reds vs CORE-ID-78), then HSL (199 + its 045 leg); 220/218/197 after |
+| **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185**; 045 RD+ID integrated & re-blessed (HSL remains; HL/HD blocked); 098 pipeline half; 133/115/035 partial |
+| **Next action** | **Wave 4 continues** — the Highway Sequence family (CMP-AUD-199 identity + its 045 leg + 155/156/158/159), then 220/218/197; HL needs its county census first, HD-Excel vendor-pending |
 
 > ### ▶ RESUME HERE (2026-07-14, after the Summary-loader batch)
 > **Done this batch — CMP-AUD-020/021/022/023 (aggregate Summary loader correctness):**
@@ -361,6 +361,8 @@ no family-gate owner yet. Wave 5 assigns them.
 ---
 
 ## 11. Progress log (append-only — real progress, not recursion)
+
+- **2026-07-14 — Wave 4: the Intersection Detail family re-blessed against ID-79 EXACTLY (CMP-AUD-045-ID).** Every ID path keys on the accepted 4-part PhysicalKey (base route, county, complete PP inside the canonical postmile as PP+Decimal-PM, suffixes conserved as claims); District + County joined the compared header (the oracle's 34 asserted fields — the first re-bless attempt matched every diff count but the asserted denominators, which factored exactly to the two missing columns: 16,199×34=550,766); the v4 library reads its sidecars into the key (pre-v4 refused); the ID KNOWN_RED contracts were corrected from the glued-suffix expectation with oracle evidence and promoted (identity gate 8 green / 2 known-red — HSL only). All three legs equal the oracle exactly incl. asserted cells and exact pairing quality over TSN's 15 real duplicate groups; the 9 PDF↔Excel diffs stay honest (8 database trailing-tabs + the real 108/TUO HG defect). Gate 121/121 + ruff.
 
 - **2026-07-14 — Wave 4: the Ramp Detail family re-blessed against RD-79 EXACTLY (CMP-AUD-045-RD + 135 + 185 resolved; 133 partial).** Every RD path keys on the owner-approved D4 `PhysicalKey` (route, county, norm_pm) — raw TSN, the v4 library (District/County/PM-Suffix sidecars read, v3 refused), Excel/PDF consolidated, and cross-env via the new `EnvCompare.physical_key_builder` → engine `key_normalizer` hook; prefix/suffix/Location/District ride as conserved raw claims (the KNOWN_RED contracts' glued-canonical expectation was corrected to D4 with corpus evidence — PR diffs 0, 313 unmatched TSN suffixes — and promoted into TESTS). District is compared everywhere (the 005/SD/72.366 12-vs-11 disagreement now surfaces); TSN Descriptions are preserved (edges trimmed per the accepted oracle's reading contract — two censused route-126 trailing-tab rows; internal whitespace per D2) and the TSMIS strip is route-matched. All three production legs + every per-field count equal the accepted oracle: 15,212/4/198 · 14,471/741/847 (Excel), …/774/998 (PDF, On/Off 95 + Ramp Type 60), 15,216 · 4/4 (PDF↔Excel). Gate 121/121 + ruff; identity gate 6 green / 3 known-red (HSL/ID pending).
 

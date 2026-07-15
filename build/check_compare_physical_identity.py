@@ -328,6 +328,12 @@ def test_ramp_env_county_identity():
 
 
 def test_intersection_env_county_identity():
+    # CMP-AUD-045, GREEN since the ID projector batch. The canonical postmile is
+    # the accepted ID-79 form `complete PP + Decimal-canonical PM` ("R1" for
+    # PP=R, PM=001.000) — NOT the glued padded-PM+suffix this contract
+    # originally expected: the accepted oracle's tuple is (base Route, County,
+    # complete PP, numeric Post Mile), with the route/PM SUFFIX a conserved
+    # claim only.
     header = ["P", "Post Mile", "S", "Location", "City Code", "R/U", "Description"]
     schema = compare_env.INTERSECTION_DETAIL._schema(header, "A", "B")
     rows_a = [
@@ -339,7 +345,19 @@ def test_intersection_env_county_identity():
         ["001", "R", "001.000", "E", "07 LA 001", "A", "U", "DESC-A"],
     ]
     _assert_exact_physical_swap(
-        schema, rows_a, rows_b, 6, "R1.000E")
+        schema, rows_a, rows_b, 6, "R1")
+    # PP is PART of identity for ID (six real within-county groups): the same
+    # county+numeric-PM under a DIFFERENT complete PP is a different location.
+    keys = keys_for(rows_a, True, schema.key_field, schema.key_normalizer)
+    other_pp = [list(rows_a[0]), list(rows_a[0])]
+    other_pp[1][1] = "M"                          # same county/PM, PP R vs M
+    keys_pp = keys_for(other_pp, True, schema.key_field, schema.key_normalizer)
+    assert keys_pp[0][1] != keys_pp[1][1], "distinct complete PPs must not collide"
+    claims = dict((c.name, c.value)
+                  for c in keys[0][1].physical_identity.raw_claims)
+    assert claims == {"route": "001", "route_suffix": "",
+                      "location": "01 DN 001", "postmile_prefix": "R",
+                      "postmile": "001.000", "postmile_suffix": "E"}, claims
 
 
 def _claims(*items):
@@ -414,18 +432,12 @@ def test_ramp_direct_projectors_retain_physical_identity():
     assert ramp_pdf[3] == "01", ramp_pdf
 
 
-def test_hsl_id_direct_projectors_retain_physical_identity():
-    hsl_row = hsl._tsmis_row([
-        "001", "ORA.", "CITY", "R", "001.000", "E", "D", "H", "0.1", "DESC",
-    ])
-    _assert_identity(
-        hsl_row, key_field=hsl.KEY_FIELD,
-        route="001", county="ORA", postmile="R001.000E",
-        raw_claims=_claims(
-            ("route", "001"), ("county", "ORA."),
-            ("postmile_prefix", "R"), ("postmile", "001.000"),
-            ("postmile_suffix", "E")))
-
+def test_id_direct_projector_retains_physical_identity():
+    """CMP-AUD-045, GREEN since the ID projector batch: every direct
+    Intersection Detail path (the PDF flavor reuses this same loader) bakes the
+    accepted ID-79 PhysicalKey — canonical postmile = complete PP +
+    Decimal-canonical PM ("R1" for PP=R, PM=001.000); the route/PM suffixes and
+    Location stay conserved claims."""
     intersection = [None] * 36
     intersection[0] = "001"
     intersection[1] = "R"
@@ -435,9 +447,38 @@ def test_hsl_id_direct_projectors_retain_physical_identity():
     id_row = idt._tsmis_row(intersection)
     _assert_identity(
         id_row, key_field=idt.KEY_FIELD,
-        route="001", county="DN", postmile="R1.000E",
+        route="001", county="DN", postmile="R1",
         raw_claims=_claims(
-            ("route", "001"), ("location", "01 DN 001"),
+            ("route", "001"), ("route_suffix", ""),
+            ("location", "01 DN 001"),
+            ("postmile_prefix", "R"), ("postmile", "001.000"),
+            ("postmile_suffix", "E")))
+
+    tsn_header = {"LOCATION": 0, "PP": 1, "POST_MILE": 2, "HG": 3,
+                  "DESCRIPTION": 4}
+    tsn_row = idt._tsn_row(["01 DN 001", "R", "001.000", "D", "DESC"],
+                           tsn_header)
+    _assert_identity(
+        tsn_row, key_field=idt.KEY_FIELD,
+        route="001", county="DN", postmile="R1",
+        raw_claims=_claims(
+            ("route", "001"), ("route_suffix", ""),
+            ("location", "01 DN 001"),
+            ("postmile_prefix", "R"), ("postmile", "001.000")))
+    # Decimal canonical: '005.870' -> '5.87'; zero -> '0'.
+    assert idt._decimal_pm("005.870") == "5.87"
+    assert idt._decimal_pm("0.000") == "0"
+
+
+def test_hsl_direct_projector_retains_physical_identity():
+    hsl_row = hsl._tsmis_row([
+        "001", "ORA.", "CITY", "R", "001.000", "E", "D", "H", "0.1", "DESC",
+    ])
+    _assert_identity(
+        hsl_row, key_field=hsl.KEY_FIELD,
+        route="001", county="ORA", postmile="R001.000E",
+        raw_claims=_claims(
+            ("route", "001"), ("county", "ORA."),
             ("postmile_prefix", "R"), ("postmile", "001.000"),
             ("postmile_suffix", "E")))
 
@@ -457,6 +498,12 @@ TESTS = (
     ("Ramp env uses county identity", test_ramp_env_county_identity),
     ("Ramp direct/PDF projectors retain structured identity",
      test_ramp_direct_projectors_retain_physical_identity),
+    # Promoted by the Intersection Detail projector batch (CMP-AUD-045-ID):
+    # the accepted 4-part tuple with complete PP inside the canonical postmile.
+    ("Intersection env uses county identity",
+     test_intersection_env_county_identity),
+    ("Intersection direct/PDF projector retains structured identity",
+     test_id_direct_projector_retains_physical_identity),
 )
 
 # CMP-AUD-045 red fixture.  The typed identity CORE is green (the TESTS above), but the
@@ -472,10 +519,8 @@ KNOWN_RED = (
     ("Highway Sequence env uses county + glued PM",
      test_highway_sequence_env_county_and_glued_pm,
      "environment projector did not supply PhysicalKey"),
-    ("Intersection env uses county identity", test_intersection_env_county_identity,
-     "environment projector did not supply PhysicalKey"),
-    ("HSL/ID direct projectors retain structured identity",
-     test_hsl_id_direct_projectors_retain_physical_identity,
+    ("HSL direct projector retains structured identity",
+     test_hsl_direct_projector_retains_physical_identity,
      "engine-consumed key cell is not PhysicalKey"),
 )
 

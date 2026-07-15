@@ -150,10 +150,14 @@ def test_detail_flat_compare():
     pm = header.index("Post Mile")
     by = {r[pm]: r for r in rows}
     ctrl = header.index("Ctrl Type")
-    check("both postmiles matched (route+PM keyed, no spurious one-sided)",
-          "0.204" in by and "1.000" in by)
-    check("PM 1.000 Ctrl Type S vs F is a genuine diff", DIFF in by["1.000"][ctrl])
-    check("PM 0.204 unchanged row has no diff", DIFF not in " ".join(by["0.204"]))
+    # CMP-AUD-045: the Comparison key column shows the canonical identity
+    # display (route / county / PP+Decimal-PM).
+    check("both postmiles matched (county-aware keyed, no spurious one-sided)",
+          "001 / ORA / R0.204" in by and "001 / ORA / R1" in by)
+    check("PM 1.000 Ctrl Type S vs F is a genuine diff",
+          DIFF in by["001 / ORA / R1"][ctrl])
+    check("PM 0.204 unchanged row has no diff",
+          DIFF not in " ".join(by["001 / ORA / R0.204"]))
 
     # CMP-AUD-076 (folder-kind): the committed comparison persists a durable
     # provenance record — full canonical FOLDER selections, roles = the derived

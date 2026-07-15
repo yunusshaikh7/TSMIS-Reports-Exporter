@@ -98,8 +98,10 @@ _RD_HEADER = ["Route", "PR", "PM", "District", "Date of Record", "HG", "Area 4",
 # TSN District/County sidecar (read by the visual-evidence generator; the comparison
 # loader slices it off). Hand-written (the golden tripwire stays independent of
 # idt.SHARED_HEADER), so a future header drift is caught.
+# v4 (CMP-AUD-045-ID): District + County join the shared width.
 _ID_SIDECAR = ["TSN District", "TSN County"]
-_ID_HEADER = ["Route", "PR", "Route Suffix", "PM", "Date of Record", "HG", "City Code", "R/U",
+_ID_HEADER = ["Route", "PR", "Route Suffix", "PM", "District", "County",
+              "Date of Record", "HG", "City Code", "R/U",
               "INT Type Eff-Date", "INT Type", "Control Type Eff-Date", "Control Type",
               "Lighting Eff-Date", "Lighting", "ML Eff-Date", "ML Mastarm", "ML Left Chan",
               "ML Right Chan", "ML Traffic Flow", "ML Num Lanes",

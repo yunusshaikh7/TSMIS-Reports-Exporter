@@ -2188,7 +2188,7 @@ because its header is blank.
 ### CMP-AUD-045 — PM-only identity is too weak
 
 Priority: P1  
-Status: Partially remediated — core green; **Ramp Detail family integrated + re-blessed 2026-07-14**; HSL/ID/HL/HD remain  
+Status: Partially remediated — core green; **Ramp Detail AND Intersection Detail integrated + re-blessed 2026-07-14**; HSL remains (HL/HD blocked pending census/vendor)  
 Primary code: `scripts/compare_env.py:689-719`,
 `scripts/compare_core.py:445-490`,
 `scripts/consolidate_tsn_highway_log.py:280-361,459-495`,
@@ -2262,6 +2262,30 @@ oracle EXACTLY, all three legs and every per-field count** — Excel vs raw TSN
 15,212/4/198 · 14,471/741/847 (District 1, Description 185, PR 0); PDF vs raw
 TSN …/774/998 (On/Off 95, Ramp Type 60); PDF vs Excel 15,216 · 4/4. Blocked
 families unchanged: HL needs its county census, HD-Excel is vendor-pending.
+
+**Intersection Detail remediation (2026-07-14, same day).** Every ID path —
+raw TSN, the v4 normalized library (District/County sidecars read into the
+key; pre-v4 refused with a rebuild hint), the shared consolidated loader both
+flavors ride, and the cross-env adapter via the same `physical_key_builder`
+hook — keys rows with the accepted ID-79 PhysicalKey `(base Route, County,
+complete PP, numeric Post Mile)`: the complete PP is INSIDE the canonical
+postmile (`PP + Decimal-canonical PM`, e.g. "R5.87" — six real within-county
+groups carry distinct PPs at one numeric PM), while the route/PM suffixes and
+Location ride as conserved claims. The ID KNOWN_RED contracts' glued
+`R1.000E` expectation was corrected (the accepted tuple has NO suffix and a
+Decimal-canonical PM) and both promoted into TESTS — the identity gate is now
+8 green / 2 known-red (HSL only). District + County joined `SHARED_HEADER` as
+asserted compared fields (the oracle asserts 34 fields per paired row —
+construction-equal, zero difference cells, visible provenance; the Report View
+shows them inside its LOCATION cell). No edge-trimming (unlike RD): ID's 8
+trailing-tab Excel Descriptions are database data both Excel and raw TSN
+carry — the 9 PDF↔Excel differences stay honest, including the REAL
+`108/TUO/<blank>/5.87` HG defect (Excel `U` vs PDF+TSN `D`).
+**Re-blessed against the accepted ID-79 oracle EXACTLY, all three legs**:
+Excel vs raw TSN 16,199/260/427 · 146/16,053 · 21,676 cells · 550,766
+asserted; PDF vs raw TSN … · 21,683 · 550,766; PDF vs Excel 16,459 ·
+16,450/9 · 9 · 559,606 — all with exact pairing quality across TSN's 15 real
+duplicate groups (the Hungarian assignment's first statewide engagement).
 
 Raw-source re-verification on 2026-07-12 bound the user-provided, raw-only TSN library
 before implementation:
