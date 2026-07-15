@@ -84,13 +84,23 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > the same evidenced way as RD, then promote. Reuse the RD pattern: `_physical_pm_key`-
 > style builder (canonical postmile = complete PP + numeric PM, e.g. `R1.000`?
 > — derive the exact canonical string from the oracle script's identity, read
-> `build/phase8_intersection_detail_comparison.py` FIRST), the
-> `EnvCompare.physical_key_builder` hook for the ID env adapter, the ID library
-> v3→v4 bump if sidecar/shape changes, evidence adapter county-awareness
-> (`evidence_intersection_detail`), and the edge-trim question (the 8 tab-ending
-> Excel Descriptions stay DIFFS in PDF↔Excel per the oracle — so ID does NOT
-> edge-trim across representations; check the oracle's exact reading rules before
-> assuming RD's).
+> `build/phase8_intersection_detail_comparison.py` FIRST — **census DONE
+> 2026-07-14**: `physical_key = (route, county, complete_pp, numeric_pm)` with
+> `_location` giving (district, county dot-stripped upper, base route `%03d`,
+> suffix separate); `_numeric_pm` = Decimal canonical — `normalize_pm` →
+> `Decimal.normalize()` `format 'f'`, trailing zeros + dot stripped, `0` for zero
+> (so "005.870"→"5.87"); the engine's 3-component canonical postmile = complete
+> PP + that Decimal form GLUED (e.g. "R5.87"; the ID KNOWN_RED's "R1.000E" is
+> wrong twice: padded PM + suffix included). **NO edge-trimming in ID** — the 8
+> trailing-tab Excel Descriptions are DATABASE data both Excel and raw TSN carry
+> (equal on the Excel-vs-TSN leg without trimming; the 9 PDF↔Excel diffs = those
+> 8 + the real 108/TUO HG defect, because the PDF render drops tabs) — do NOT
+> copy RD's `_edge_text`. ID's normalizer is ALREADY conservation-exact
+> (raw-vs-r7 16,626/0) and the v3 library already carries District/County
+> sidecars + PR/Route Suffix in the shared width → likely NO
+> `normalization_version` bump — the loaders just STOP SLICING the sidecar), the
+> `EnvCompare.physical_key_builder` hook for the ID env adapter, and evidence
+> adapter county-awareness (`evidence_intersection_detail`).
 >
 > **DONE — Ramp Detail (2026-07-14): re-blessed against RD-79 EXACTLY** (all three
 > legs + every per-field count; 045-RD/135/185 resolved; 133 partial; lib v4).
