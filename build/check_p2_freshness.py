@@ -60,7 +60,8 @@ def _comparison(path, diff_cells=0, one_sided=0):
     counts = ComparisonCounts(
         known=True, paired_rows=max(diff_cells, 1),
         side_a_only_rows=one_sided, differing_rows=diff_cells,
-        differing_cells=diff_cells, per_field_counts=per_field)
+        differing_cells=diff_cells, per_field_counts=per_field,
+        asserted_cells=diff_cells)
     typed = ComparisonOutcome(
         status="ok", completion="complete",
         verdict="match" if not diff_cells and not one_sided else "diff",

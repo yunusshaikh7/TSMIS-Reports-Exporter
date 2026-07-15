@@ -78,7 +78,7 @@ def _result(paths, requested_mode, generation_id, completion="complete", status=
     else:
         counts = ComparisonCounts(
             known=True, paired_rows=2, differing_rows=1, differing_cells=1,
-            per_field_counts={"0:A": 1})
+            per_field_counts={"0:A": 1}, asserted_cells=1)
         typed_outcome = ComparisonOutcome(
             status="ok", completion="partial", verdict="diff", counts=counts,
             warnings=("one input was incomplete",), pairing_quality="exact")
@@ -249,7 +249,8 @@ def main():
             status="ok", completion="complete", verdict="diff",
             counts=ComparisonCounts(
                 known=True, paired_rows=2, differing_rows=1,
-                differing_cells=1, per_field_counts={"1:Value": 1}),
+                differing_cells=1, per_field_counts={"1:Value": 1},
+                asserted_cells=1),
             pairing_trace=(_exact_pairing_trace(),), duplicate_group_count=1,
             pairing_quality="exact")
         check("exact pairing trace publication succeeds",
@@ -544,7 +545,8 @@ def main():
             status="ok", completion="complete", verdict="diff",
             counts=ComparisonCounts(
                 known=True, paired_rows=2, differing_rows=1,
-                differing_cells=1, per_field_counts={"0:A": 1}),
+                differing_cells=1, per_field_counts={"0:A": 1},
+                asserted_cells=1),
             pairing_quality="exact")
         _install_payload((formulas,), alternate.to_dict())
         check("valid but different payload manifests cannot be mixed across peers",
@@ -853,7 +855,8 @@ with cm._comparison_publication_lease(parent):
             status="ok", completion="complete", verdict="diff",
             counts=ComparisonCounts(
                 known=True, paired_rows=2, differing_rows=1,
-                differing_cells=1, per_field_counts={"0:X": 1}),
+                differing_cells=1, per_field_counts={"0:X": 1},
+                asserted_cells=1),
             pairing_quality="exact")
         winning_prepared = cm._prepare_comparison_publication(winning_result)
         for descriptor, (relative, raw) in zip(

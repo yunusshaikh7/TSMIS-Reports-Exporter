@@ -127,7 +127,8 @@ def main():
                     counts=ComparisonCounts(
                         known=True, paired_rows=1, side_a_only_rows=1,
                         side_b_only_rows=1, differing_rows=1,
-                        differing_cells=1, per_field_counts={"0:F1": 1}),
+                        differing_cells=1, per_field_counts={"0:F1": 1},
+                        asserted_cells=1),
                     pairing_quality="exact")
 
                 def produce(tmp):

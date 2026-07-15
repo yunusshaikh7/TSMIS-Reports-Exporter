@@ -4235,6 +4235,23 @@ statuses, typed labelled counts, source/generation identity, and cross-sheet/cou
 verdict invariants. Missing labels must fail closed. Add semantic corruption cases to
 commit, cache, validation, open, and evidence gates.
 
+**Remediation progress — 2026-07-14 (typed-contract count/verdict invariants).** The
+2026-07-14 review flagged, under this finding's "count/verdict invariants" scope, that the
+typed contract itself accepted semantically impossible truth. Two invariants added to
+`comparison_contract.py` (proved red→green in `check_comparison_contract`; suite 121/121):
+(1) `ComparisonCounts` requires `differing_cells <= asserted_cells` — a differing cell is
+an asserting cell that is not equal, so differing cells are a strict subset (verified
+against 198 genuine persisted `ComparisonCounts`, 0 violations; six unrealistic test
+fixtures that set `differing_cells>0` with `asserted_cells=0` were corrected); (2) a
+*complete* `diff` verdict must carry at least one difference (the mirror of the existing
+match rule). A third proposed sub-claim — bounding pairing-trace side indices by the
+declared population — was **evaluated and declined**: `PairingTrace` side indices are
+global row ordinals, not positions bounded by the group's sizes or the aggregate counts,
+so a population bound would be incorrect; per-side uniqueness across traces is already
+enforced. **Still open (the core of this finding):** the workbook-artifact schema
+enforcement above — required sheets/headers, valid row-status/universe, source/generation
+identity, and cross-sheet agreement — is unchanged.
+
 ### CMP-AUD-116 — failed validation records default to complete
 
 Priority: P1  

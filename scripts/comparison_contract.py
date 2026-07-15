@@ -508,6 +508,12 @@ class ComparisonCounts:
             if sum(self.per_field_counts.values()) != self.differing_cells:
                 raise ValueError(
                     "known per_field_counts must sum to differing_cells")
+            # CMP-AUD-115: a differing cell is an asserting cell that is not equal,
+            # so differing cells are a subset of asserted cells. Verified against 198
+            # genuine persisted ComparisonCounts (0 violations).
+            if self.differing_cells > self.asserted_cells:
+                raise ValueError(
+                    "differing_cells cannot exceed asserted_cells")
 
     @property
     def identical_rows(self) -> int:
@@ -858,6 +864,19 @@ class ComparisonOutcome:
             if (self.counts.differing_cells or self.counts.side_a_only_rows
                     or self.counts.side_b_only_rows):
                 raise ValueError("a match verdict contradicts the structured counts")
+        # CMP-AUD-115: the mirror of the match rule. A *complete* diff must carry at
+        # least one difference (differing cell or one-sided row); otherwise it is a
+        # match mislabelled as a diff. (Partial diffs may not have finished, so this is
+        # scoped to complete.) Trace-index bounds are deliberately NOT asserted here:
+        # PairingTrace side indices are global row ordinals, not positions bounded by
+        # the group's declared sizes or the aggregate counts, so a population bound
+        # would be incorrect; per-side uniqueness across traces is checked below.
+        if (self.verdict == "diff" and self.completion == "complete"
+                and self.counts.known):
+            if not (self.counts.differing_cells or self.counts.side_a_only_rows
+                    or self.counts.side_b_only_rows):
+                raise ValueError(
+                    "a complete diff verdict must carry at least one difference")
         if self.pairing_quality == "capped":
             if self.completion != "partial" or self.verdict != "diff":
                 raise ValueError(

@@ -229,6 +229,22 @@ def main():
     assert rejects(lambda: frozen_gen.content_digests.__setitem__("z", 1))
     assert rejects(lambda: frozen_gen.producer_versions.update({"z": 1}))
 
+    # CMP-AUD-115: typed count/verdict invariants.
+    # differing cells are a subset of asserted cells (differing <= asserted)
+    assert rejects(lambda: cc.ComparisonCounts(
+        known=True, paired_rows=1, differing_rows=1, differing_cells=2,
+        per_field_counts={"a": 2}, asserted_cells=1))
+    # a complete diff verdict must carry at least one difference (mirror of match)
+    assert rejects(lambda: cc.ComparisonOutcome(
+        status="ok", completion="complete", verdict="diff",
+        counts=counts(differing_rows=0, differing_cells=0),
+        source_identities=(source,), pairing_quality="exact"))
+    # a complete diff WITH a difference is accepted (the invariant is not over-broad)
+    assert cc.ComparisonOutcome(
+        status="ok", completion="complete", verdict="diff",
+        counts=counts(side_a_only_rows=1), source_identities=(source,),
+        pairing_quality="exact") is not None
+
     assert rejects(lambda: cc.RawIdentityClaim("", "raw"))
     for invalid_claim_value in (
             [], {}, ("tuple",), math.nan, math.inf, object()):
