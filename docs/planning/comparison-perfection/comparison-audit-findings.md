@@ -313,7 +313,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-032 | P1 | Verified | Cross-env flat schemas trust the first file, not the report contract |
 | CMP-AUD-033 | P1 | Verified | Normalized TSN loaders ignore their declared headers |
 | CMP-AUD-034 | P1 | Verified | Consolidated TSMIS loaders accept semantically invalid layouts |
-| CMP-AUD-035 | P1 | Partially remediated — reopened 2026-07-14 | Original raw-admission r7 remains accepted, but the 2026-07-14 review found two related-and-open TSN defects: certificate validation is not type-exact (`1.0`/`True` alias required ints) and the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
+| CMP-AUD-035 | P1 | Partially remediated — type-exactness fixed 2026-07-14; TOCTOU pending | Original raw-admission r7 accepted. Type-exact validation now rejects float/bool aliases of `version`/`member_count`/`byte_length`/`schema_version` in the raw-manifest, normalized-identity, and certificate checks (red→green). Still open: the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
 | CMP-AUD-036 | P1 | Verified | Ramp PDF accepts a truncated four-column workbook |
 | CMP-AUD-037 | P1 | Verified | Direct comparisons trust stale normalized libraries |
 | CMP-AUD-038 | P2 | Verified | Date normalization masks malformed and impossible dates |
@@ -1452,11 +1452,15 @@ Status: Partially remediated — original r7 admission witness accepted; **reope
 **Reopened 2026-07-14 (Codex review, verified against code).** The original raw-admission
 remediation stands, but two related defects in the same TSN-admission domain are open:
 
-1. **Certificate validation is not type-exact.** `tsn_district_contract.validate_raw_manifest`
+1. **Certificate validation is not type-exact.** ~~`tsn_district_contract.validate_raw_manifest`
    (and the `tsn_library` sidecar checks) compare with Python `==`/`!=`, so `version=1.0`,
-   `member_count=True`, or `byte_length=1.0` alias the required ints and pass. The bound
-   byte identities stay truthful, so this is schema strictness, not a content P1 —
-   correct by rejecting non-`int` (and `bool`) values exactly.
+   `member_count=True`, or `byte_length=1.0` alias the required ints and pass.~~ **Fixed
+   2026-07-14:** `validate_raw_manifest` now requires exact `int` (rejecting `bool`) for
+   `version`/`member_count`/`byte_length` before the canonical dict-equality (which would
+   otherwise admit `1.0==1`/`True==1`); `validate_normalized_workbook_identity` and the
+   `tsn_library` certificate `schema_version` check are hardened the same way. Verified
+   against 726 persisted objects (0 floats) and a real canonical manifest; guarded red→green
+   in `check_tsn_district_source_contract`.
 2. **Direct TSN builders lack a post-`os.replace` raw-source recheck.** The direct Highway
    Sequence and Highway Log consolidators run their last source check *before*
    `atomic_save_if` performs `os.replace`, so a source change in that interval can return

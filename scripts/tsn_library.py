@@ -287,8 +287,9 @@ def validate_normalized_workbook_identity(value):
     if not isinstance(value, dict) or set(value) != _NORMALIZED_IDENTITY_KEYS:
         raise ValueError("normalized workbook identity shape is invalid")
     size = value.get("byte_length")
-    if (value.get("version") != _NORMALIZED_WORKBOOK_IDENTITY_VERSION
+    if (not isinstance(value.get("version"), int)  # CMP-AUD-035: reject 1.0 aliasing 1
             or isinstance(value.get("version"), bool)
+            or value.get("version") != _NORMALIZED_WORKBOOK_IDENTITY_VERSION
             or value.get("algorithm") != "sha256"
             or not isinstance(size, int) or isinstance(size, bool) or size < 0
             or not _sha256_text(value.get("sha256"))):
@@ -615,8 +616,9 @@ def status(report):
                        if isinstance(certificate, dict) else None)
     base_fields_valid = bool(
         isinstance(certificate, dict)
-        and certificate.get("schema_version") == consolidation_meta.SCHEMA_VERSION
+        and isinstance(certificate.get("schema_version"), int)  # CMP-AUD-035
         and not isinstance(certificate.get("schema_version"), bool)
+        and certificate.get("schema_version") == consolidation_meta.SCHEMA_VERSION
         and certificate.get("record_type") is None
         and isinstance(certificate.get("completion"), str)
         and certificate.get("completion") in outcome.COMPLETIONS

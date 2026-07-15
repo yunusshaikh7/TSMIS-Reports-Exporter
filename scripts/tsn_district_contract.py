@@ -186,12 +186,20 @@ def validate_raw_manifest(value):
     """Return a strict, deterministic raw manifest or raise ``ValueError``."""
     if not isinstance(value, dict) or set(value) != _MANIFEST_KEYS:
         raise ValueError("TSN raw manifest shape is invalid")
-    if (value.get("version") != RAW_MANIFEST_VERSION
+    if (not isinstance(value.get("version"), int)  # CMP-AUD-035: reject 1.0 aliasing 1
             or isinstance(value.get("version"), bool)
+            or value.get("version") != RAW_MANIFEST_VERSION
             or value.get("algorithm") != RAW_MANIFEST_ALGORITHM
             or value.get("serialization") != RAW_MANIFEST_SERIALIZATION
             or value.get("root_scope") != "report_raw_dir"):
         raise ValueError("TSN raw manifest version or serialization is invalid")
+    # CMP-AUD-035: member_count/byte_length are only otherwise checked by the canonical
+    # dict-equality below, and `True == 1`/`1.0 == 1`, so a bool/float would alias the
+    # canonical integer. Require exact ints here.
+    for _int_field in ("member_count", "byte_length"):
+        _v = value.get(_int_field)
+        if not isinstance(_v, int) or isinstance(_v, bool):
+            raise ValueError(f"TSN raw manifest {_int_field} must be an exact integer")
     members = value.get("members")
     if not isinstance(members, list):
         raise ValueError("TSN raw manifest members must be a list")

@@ -112,6 +112,18 @@ def test_manifest_helpers(root):
     malformed["sha256"] = "A" * 64
     check("uppercase/corrupt aggregate SHA-256 is rejected",
           rejected(lambda: contract.validate_raw_manifest(malformed), "canonical"))
+    # CMP-AUD-035: reject float/bool aliases of the canonical integers that the
+    # value==canonical dict-equality would otherwise admit (1.0==1, True==1).
+    check("version rejects a float alias of the canonical int",
+          rejected(lambda: contract.validate_raw_manifest(dict(manifest, version=1.0)),
+                   "version"))
+    check("byte_length rejects a float alias of the canonical int",
+          rejected(lambda: contract.validate_raw_manifest(
+              dict(manifest, byte_length=float(manifest["byte_length"]))), "byte_length"))
+    _one_member = contract.canonical_raw_manifest([upper], raw)
+    check("member_count rejects a bool alias of the canonical int (True==1)",
+          rejected(lambda: contract.validate_raw_manifest(
+              dict(_one_member, member_count=True)), "member_count"))
     lower.write_bytes(b"ALPHA")
     changed = contract.canonical_raw_manifest([upper, lower], raw)
     check("same-length byte change changes the canonical manifest",
