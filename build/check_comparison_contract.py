@@ -212,6 +212,23 @@ def main():
     unknown = dict(counts_env, unexpected_field=1)
     assert rejects(lambda: cc.from_dict(unknown)), "unknown envelope field accepted"
 
+    # CMP-AUD-238 (immutability): frozen contract mappings refuse post-construction
+    # mutation, so a validated invariant cannot be edited away.
+    frozen_counts = cc.ComparisonCounts(
+        known=True, paired_rows=1, differing_rows=1, differing_cells=1,
+        per_field_counts={"f": 1}, asserted_cells=1)
+    assert rejects(lambda: frozen_counts.per_field_counts.__setitem__("g", 9))
+    assert rejects(lambda: frozen_counts.per_field_counts.update({"g": 9}))
+    assert rejects(lambda: frozen_counts.per_field_counts.clear())
+    assert sum(frozen_counts.per_field_counts.values()) == frozen_counts.differing_cells
+    frozen_side = cc.LoadedSide(completion="complete",
+                                raw_identity_claims={"r": "x"}, display_metrics={"m": 1})
+    assert rejects(lambda: frozen_side.raw_identity_claims.__setitem__("z", 1))
+    assert rejects(lambda: frozen_side.display_metrics.clear())
+    frozen_gen = cc.ArtifactGeneration()
+    assert rejects(lambda: frozen_gen.content_digests.__setitem__("z", 1))
+    assert rejects(lambda: frozen_gen.producer_versions.update({"z": 1}))
+
     assert rejects(lambda: cc.RawIdentityClaim("", "raw"))
     for invalid_claim_value in (
             [], {}, ("tuple",), math.nan, math.inf, object()):
@@ -496,7 +513,7 @@ def main():
         elif isinstance(node, ast.ImportFrom) and node.module:
             imported.add(node.module.split(".")[0])
     assert imported <= {
-        "__future__", "dataclasses", "functools", "json", "math", "re",
+        "__future__", "copy", "dataclasses", "functools", "json", "math", "re",
         "typing",
     }, imported
 

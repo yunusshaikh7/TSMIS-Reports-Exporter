@@ -516,7 +516,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-235 | P2 | Remediated and verified by retained-field/member mutations and final replays | Frozen-tree stability treats Windows' lazily populated directory `st_size` as source mutation |
 | CMP-AUD-236 | P2 | Remediated; the interrupted attempt was rejected and a clean r2 completed | An external 20-minute audit wrapper interrupted Highway Log Excel publication and left incomplete temporary residue |
 | CMP-AUD-237 | P2 | Remediated and verified by producer-format controls and two final-gate replays | The Highway Log audit consumer imposed a newline/canonical-format convention that identity-bound producer JSON did not promise |
-| CMP-AUD-238 | P2 | Partially remediated — decoder hardened 2026-07-14; immutability pending | Decoder now rejects `NaN`/`Infinity`, duplicate keys, and unknown envelope fields (red→green in `check_comparison_contract`). Still open: `frozen=True` contract objects are shallowly mutable (`per_field_counts` etc.) — deferred because wrapping requires reworking `to_dict`/`asdict` across four types |
+| CMP-AUD-238 | P2 | Resolved | Decoder rejects `NaN`/`Infinity`, duplicate keys, and unknown envelope fields; the five frozen contract mappings are wrapped in an immutable `FrozenMap` (`dict` subclass — `asdict`/`json`/deepcopy safe) so validated invariants cannot be mutated away. Red→green in `check_comparison_contract`; suite 121/121, ruff clean |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -8655,6 +8655,18 @@ frozen contract mappings (`ComparisonCounts.per_field_counts`,
 serializable by `dataclasses.asdict` ("cannot pickle mappingproxy"), so closing it
 requires reworking each type's `to_dict`; deferred to a focused batch to avoid rushing a
 foundational serialization change.
+
+**Remediation — 2026-07-14 (immutability half; finding now Resolved).** Added `FrozenMap`,
+a `dict` subclass that refuses every post-construction mutator (`__setitem__`,
+`__delitem__`, `update`, `clear`, `pop`, `popitem`, `setdefault`). It stays a real `dict`,
+so `dataclasses.asdict`, `json.dumps`, `_jsonable`, and equality with a plain `dict` all
+keep working, and a custom `__deepcopy__` keeps `copy.deepcopy` from hitting the blocked
+`__setitem__`. The five frozen-contract mapping fields are wrapped in `__post_init__` via
+`object.__setattr__` (`ComparisonCounts.per_field_counts`,
+`LoadedSide.raw_identity_claims`/`display_metrics`,
+`ArtifactGeneration.content_digests`/`producer_versions`). Round-trips are byte-identical;
+`check_comparison_contract` gained mutation-rejection assertions (red on the pre-wrap
+engine, green after); full suite 121/121, ruff clean.
 
 ### Note — ACL "lease-leak" hypothesis disproved (2026-07-14)
 

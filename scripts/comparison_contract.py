@@ -10,6 +10,7 @@ being migrated and is never considered complete or comparable.
 """
 from __future__ import annotations
 
+import copy
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from functools import wraps
 import json
@@ -102,6 +103,44 @@ def _mapping(value) -> Dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError("expected an object")
     return dict(value)
+
+
+class FrozenMap(dict):
+    """A read-only ``dict`` for the mapping fields of frozen contract objects.
+
+    CMP-AUD-238: a ``frozen=True`` dataclass blocks attribute *reassignment* but not
+    mutation of a stored ``dict``'s contents, so a validated invariant (e.g.
+    ``per_field_counts`` summing to ``differing_cells``) could be edited away after
+    construction. This subclass refuses every post-construction mutation while staying a
+    real ``dict`` — so ``dataclasses.asdict``, ``json.dumps``, ``_jsonable``, and
+    equality with a plain ``dict`` all keep working (``MappingProxyType`` breaks
+    ``asdict``). The built-in ``dict`` constructor does not route through
+    ``__setitem__``, so wrapping stays cheap.
+    """
+
+    __slots__ = ()
+
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("a comparison-contract mapping is immutable")
+
+    __setitem__ = __delitem__ = update = clear = _immutable
+    pop = popitem = setdefault = _immutable
+
+    def __copy__(self):
+        return FrozenMap(self)
+
+    def __deepcopy__(self, memo):
+        return FrozenMap({copy.deepcopy(k, memo): copy.deepcopy(v, memo)
+                          for k, v in self.items()})
+
+
+def _frozen_map(value) -> "FrozenMap":
+    """Return ``value`` as an immutable :class:`FrozenMap` (empty for ``None``)."""
+    if value is None:
+        return FrozenMap()
+    if not isinstance(value, Mapping):
+        raise ValueError("expected an object")
+    return FrozenMap(value)
 
 
 def _rows(value) -> Tuple[Any, ...]:
@@ -390,6 +429,10 @@ class LoadedSide:
     display_metrics: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "raw_identity_claims",
+                           _frozen_map(self.raw_identity_claims))
+        object.__setattr__(self, "display_metrics",
+                           _frozen_map(self.display_metrics))
         _require_choice("completion", self.completion, COMPLETIONS)
         _require_count("skipped_inputs", self.skipped_inputs)
         _require_count("failed_inputs", self.failed_inputs)
@@ -441,6 +484,8 @@ class ComparisonCounts:
     context_cells: int = 0
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "per_field_counts",
+                           _frozen_map(self.per_field_counts))
         if not isinstance(self.known, bool):
             raise ValueError("known must be a boolean")
         for name in ("paired_rows", "side_a_only_rows", "side_b_only_rows",
@@ -977,6 +1022,10 @@ class ArtifactGeneration:
     requested_mode: str = ""
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "content_digests",
+                           _frozen_map(self.content_digests))
+        object.__setattr__(self, "producer_versions",
+                           _frozen_map(self.producer_versions))
         _require_choice("completion", self.completion, COMPLETIONS)
         _require_choice("publication_state", self.publication_state,
                         PUBLICATION_STATES)

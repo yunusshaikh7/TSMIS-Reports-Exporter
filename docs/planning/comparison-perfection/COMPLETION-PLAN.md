@@ -188,6 +188,7 @@ no family-gate owner yet. Wave 5 assigns them.
 
 ## 11. Progress log (append-only — real progress, not recursion)
 
+- **2026-07-14 — Wave 1: CMP-AUD-238 Resolved.** Hardened the public comparison-contract decoder (rejects `NaN`/`Infinity`, duplicate keys, unknown envelope fields) and made the five frozen-contract mappings immutable via a `FrozenMap` `dict` subclass (asdict/json/deepcopy safe). Both halves proved red→green; suite 121/121, ruff clean, CI green.
 - **2026-07-14 — Codex adversarial review complete.** Verified 4 actionable findings against code; added CMP-AUD-238, reopened CMP-AUD-035; disproved the lease-leak hypothesis. CI made green (fixed a cross-drive test bug + 3 ruff F401s the recovered work carried in).
 - **2026-07-14 — Evidence base backed up + verified.** Two locations → `Desktop\AI Workspace\Claude\comparison-audit-evidence\` (`.codex` 4.28 GB / 19,017 files + repo `tmp/` 2.31 GB / 2,045 files), each with a SHA-256 manifest, 0 missing.
 - **2026-07-14 — Stage 8 confirmed 7/7 on disk.** Owner unlocked the ACL-locked Highway Sequence gate roots; both replays hash byte-for-byte to the recorded values.
