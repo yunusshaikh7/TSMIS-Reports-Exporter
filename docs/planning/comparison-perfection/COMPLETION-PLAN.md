@@ -90,7 +90,22 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > installed-Excel `CalculateFullRebuild` parity before the next batch; test county
 > resets, value swaps, prefix/suffix variants, real duplicate tuples, mid-list inserts
 > on EVERY triangle edge. Start with **Ramp Detail** (smallest triangle, D4 approved,
-> both oracle legs bound, County present in all its sources).
+> both oracle legs bound, County present in all its sources). **RD integration census
+> (2026-07-14):** `PhysicalKey` is a str subclass (display = the source PM text; equality/
+> hash/order ride `PhysicalIdentity(canonical_components=(("route",r),("county",c),
+> ("postmile",norm_pm)), raw_claims=(RawIdentityClaim…,) non-empty, display auto)`) — the
+> workbook writer + engine consume it transparently, and `check_compare_physical_identity`
+> TESTS show green construction patterns. County per RD path: raw TSN `LOCATION`
+> "01-DN-101" (the `_ROUTE_FROM_LOCATION` regex currently DISCARDS district+county);
+> TSMIS consolidated position 1 Location "12 ORA 001" (currently unused in `_tsmis_row`);
+> normalized library sidecar `["TSN District", "TSN County"]` after Route+SHARED_HEADER
+> (indices 13/14 — `_normalized_row` currently slices to `[:13]`, exactly the finding's
+> "loaders sliced them away"); the PDF flavor shares the positional consolidated shape
+> (Location at 1). Cross-env RD is `EnvCompare(..., key_col="PM")` — generic, so the env
+> path needs a per-report key-projection hook on EnvCompare (design carefully; it serves
+> HSL too). Preserve PR/PM_SFX/District as raw claims, never key components. Re-bless =
+> the RD Stage-8 oracle numbers above; also re-verify the RD evidence adapter (dual-row
+> aware) after keys change, and promote the RD KNOWN_RED contract into TESTS.
 >
 > **DONE EARLIER — CMP-AUD-076 (durable cross-family comparison provenance).** 098's
 > comparison half is DONE (2026-07-14: pre-read fingerprint capture recorded at all four
