@@ -19,12 +19,37 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 
 | | |
 |---|---|
-| **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
+| **Branch** | `comparison-perfection` @ `2e6da15` — pushed to origin, **CI green** |
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | 237 total · 53 resolved · **122 reproduced-and-open** (44 carried by family gates + 78 unowned) |
-| **Last review** | Codex adversarial pass complete — added **CMP-AUD-238**, reopened **CMP-AUD-035**, **disproved** the lease-leak hypothesis (audit residue) |
-| **Next action** | **Wave 1 — contract & validation hardening** (see [§5](#5-execution-waves-the-near-term)) |
+| **Findings** | 238 total · **CMP-AUD-238 & 024 & 025 Resolved this session**; 115/035 partially remediated |
+| **Next action** | **CMP-AUD-020–023** — shared aggregate-Summary-loader correctness (see the RESUME block below) |
+
+> ### ▶ RESUME HERE (fresh context, 2026-07-14)
+> **Do this next: CMP-AUD-020, 021, 022, 023** — aggregate Summary loader correctness in
+> `summary_layout.py` + `compare_ramp_summary_tsn.py` + `compare_intersection_summary_tsn.py`.
+> - **020** totals don't reconcile (loader only checks TSN keys present); **021** numeric-text
+>   coercion (`"10"`→0) + fractional truncation; **022** duplicate normalized categories
+>   (last-wins / summed); **023** Rural/Urban parent-context misclassification (`summary_layout:331-369`).
+> - **Method (mandatory, proven this session):** (1) read the finding in `comparison-audit-findings.md`;
+>   (2) write/extend a red fixture and confirm RED on current code; (3) fix; (4) confirm GREEN;
+>   (5) **verify against the real corpus** and, for anything touching Ramp/Intersection Summary
+>   counts, **re-confirm the accepted oracles hold** (Ramp Summary vs TSN MUST stay
+>   **29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical / 24 differing**; Intersection Summary
+>   oracle is **58 shared / 8 TSMIS-only / 0 TSN-only**, totals TSMIS 16,459 / TSN 16,626);
+>   (6) local gate `build/.venv/Scripts/python.exe build/run_checks.py -j 4 -k` **AND**
+>   `uvx ruff check scripts --select E9,F63,F7,F82,F811,F401`; (7) commit + push + `gh run watch`.
+> - **Owner directive (2026-07-14):** *one-sided fields are EXPECTED and CORRECT.* Categories in
+>   one summary but not the other (e.g. P/V only in TSN, TSMIS-only intersection codes) must be
+>   represented as `Only in …`, **not** eliminated and **not** fabricated as zero-vs-count. Goal
+>   is faithful representation, not forcing symmetry.
+> - **Real inputs:** Ramp Summary — `Downloads\TSMIS\ground-truth\All Reports 7.9\2026-07-09 ssor-prod\consolidated\tsar_ramp_summary_consolidated 2026-07-09 ssor-prod.xlsx`
+>   vs `Downloads\TSMIS\tsn_library\ramp_summary\raw\Ramp Summary Statewide_TSN.pdf`.
+> - **Traps:** CI is Windows two-drive (D: checkout, C: temp) — no cross-drive `relpath`/cwd;
+>   ruff is NOT in `build/.venv` (use `uvx`); `build/` has non-blocking F401s (ignore); the
+>   `check_phase*` audit instruments are excluded from the gate on purpose.
+> - After the Summary batch: Intersection Summary's remaining reds, then the bigger structural
+>   findings. Full sequence + external gates in the sections below.
 
 **What "you are here" means honestly:** the recovered engine rewrite already *implements*
 much of the Phase 3–8 machinery (typed contracts, identity infra, ownership, transactional
