@@ -67,7 +67,35 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   parser), both comparator checks, and re-verify both oracles (must stay 29/0/2·5·24 and
 >   58/8/0·5·53).
 >
-> **Do this next: Wave 4 — CMP-AUD-045 family-projector integration.** Opening brief
+> **Do this next: Wave 4, Intersection Detail family** (045-ID vs the accepted
+> `ID-79` oracle). Tuple: **(base Route, County, complete PP, numeric Post Mile)** —
+> unlike RD, the PREFIX is a key component (six within-county groups carry distinct PPs
+> at one numeric PM); route SUFFIX / PR / District stay conserved claims. Re-bless
+> targets (ars-prod 7.9 trees ×217 + raw `TSAR - INTERSECTION DETAIL_TSN.xlsx`):
+> Excel vs raw TSN **16,199 / 260 / 427 · 146 identical / 16,053 differing / 21,676
+> cells / 550,766 asserted**; PDF vs TSN same split / **21,683** cells; PDF↔Excel
+> **16,459 · 16,450 / 9 · 9 cells** (8 tab-ending Excel Descriptions + the REAL
+> `108/TUO/<blank>/5.87` HG defect — Excel `U` vs PDF+TSN `D`, stays visible);
+> raw-vs-normalized 16,626 / 0. TSN has **15 exact duplicate groups (30 occurrences)**
+> — the Hungarian pairing engages for real; persist the typed trace. NOTE the current
+> product canary 21,675 ≠ the oracle's 21,676 (Excel) — expect the golden check's
+> numbers to MOVE to the oracle's. Correct the ID KNOWN_RED glued expectation
+> (`R1.000E` includes the suffix; the ID tuple has NO suffix — prefix+numeric-PM only)
+> the same evidenced way as RD, then promote. Reuse the RD pattern: `_physical_pm_key`-
+> style builder (canonical postmile = complete PP + numeric PM, e.g. `R1.000`?
+> — derive the exact canonical string from the oracle script's identity, read
+> `build/phase8_intersection_detail_comparison.py` FIRST), the
+> `EnvCompare.physical_key_builder` hook for the ID env adapter, the ID library
+> v3→v4 bump if sidecar/shape changes, evidence adapter county-awareness
+> (`evidence_intersection_detail`), and the edge-trim question (the 8 tab-ending
+> Excel Descriptions stay DIFFS in PDF↔Excel per the oracle — so ID does NOT
+> edge-trim across representations; check the oracle's exact reading rules before
+> assuming RD's).
+>
+> **DONE — Ramp Detail (2026-07-14): re-blessed against RD-79 EXACTLY** (all three
+> legs + every per-field count; 045-RD/135/185 resolved; 133 partial; lib v4).
+>
+> **EARLIER — the original Wave-4 brief (CMP-AUD-045 map):** Opening brief
 > (censused 2026-07-14): the E2 typed-identity CORE is green; the four KNOWN_RED
 > contracts in `check_compare_physical_identity` fail because projectors hand the engine
 > plain route/PM strings. **Integration API:** each loader path emits its KEY CELL as a
