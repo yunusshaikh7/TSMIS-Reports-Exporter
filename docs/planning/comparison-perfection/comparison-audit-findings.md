@@ -516,7 +516,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-235 | P2 | Remediated and verified by retained-field/member mutations and final replays | Frozen-tree stability treats Windows' lazily populated directory `st_size` as source mutation |
 | CMP-AUD-236 | P2 | Remediated; the interrupted attempt was rejected and a clean r2 completed | An external 20-minute audit wrapper interrupted Highway Log Excel publication and left incomplete temporary residue |
 | CMP-AUD-237 | P2 | Remediated and verified by producer-format controls and two final-gate replays | The Highway Log audit consumer imposed a newline/canonical-format convention that identity-bound producer JSON did not promise |
-| CMP-AUD-238 | P2 | Verified | The public comparison decoder accepts `NaN`/duplicate-key/unknown-field payloads, and `frozen=True` contract objects are shallowly mutable (validated `per_field_counts` can be changed after construction) |
+| CMP-AUD-238 | P2 | Partially remediated — decoder hardened 2026-07-14; immutability pending | Decoder now rejects `NaN`/`Infinity`, duplicate keys, and unknown envelope fields (red→green in `check_comparison_contract`). Still open: `frozen=True` contract objects are shallowly mutable (`per_field_counts` etc.) — deferred because wrapping requires reworking `to_dict`/`asdict` across four types |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -8642,6 +8642,19 @@ Correction (Wave 1): `from_json`/`from_dict` must reject `NaN`/`Infinity`, dupli
 keys, and unknown envelope fields (strict, symmetric with `to_json`); frozen contract
 objects must wrap their mappings (e.g. `MappingProxyType`) so a validated invariant
 cannot be mutated away. Capture the defect red before the change.
+
+**Remediation — 2026-07-14 (decoder half).** `from_json` now parses with
+`parse_constant` (rejects `NaN`/`Infinity`/`-Infinity`) and an `object_pairs_hook`
+(rejects duplicate keys); `from_dict` requires the exact `{schema_version, type, value}`
+envelope (rejects unknown fields). Proved red→green in `build/check_comparison_contract.py`
+(the added block fails on the pre-fix engine — "duplicate top-level key accepted" — and
+passes after); full gate 121/121, ruff clean. **Still open:** shallow immutability of the
+frozen contract mappings (`ComparisonCounts.per_field_counts`,
+`LoadedSide.raw_identity_claims`/`display_metrics`,
+`ArtifactGeneration.content_digests`/`producer_versions`). `MappingProxyType` is not
+serializable by `dataclasses.asdict` ("cannot pickle mappingproxy"), so closing it
+requires reworking each type's `to_dict`; deferred to a focused batch to avoid rushing a
+foundational serialization change.
 
 ### Note — ACL "lease-leak" hypothesis disproved (2026-07-14)
 

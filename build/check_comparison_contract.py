@@ -190,6 +190,28 @@ def main():
     else:
         raise AssertionError("contract dataclasses must be frozen")
 
+    # CMP-AUD-238: the public decoder must be strict and symmetric with to_json.
+    # A canonical counts envelope for mutation.
+    counts_env = cc.to_dict(cc.ComparisonCounts(
+        known=True, paired_rows=1, differing_rows=1, differing_cells=1,
+        per_field_counts={"f": 1}, asserted_cells=1))
+    counts_body = json.dumps(counts_env["value"])
+    ok_json = json.dumps(counts_env)
+    assert cc.from_json(ok_json) is not None      # the canonical form still round-trips
+    # non-finite literals are rejected at the parse layer (to_json forbids them too)
+    for lit in ("NaN", "Infinity", "-Infinity"):
+        bad = ('{"schema_version":%d,"type":"ComparisonCounts","value":%s}'
+               % (cc.CONTRACT_SCHEMA_VERSION,
+                  counts_body.replace('"differing_cells": 1', f'"differing_cells": {lit}')))
+        assert rejects(lambda text=bad: cc.from_json(text)), f"non-finite {lit} accepted"
+    # duplicate object keys are rejected, not last-wins
+    dup = ('{"schema_version":%d,"schema_version":%d,"type":"ComparisonCounts","value":%s}'
+           % (cc.CONTRACT_SCHEMA_VERSION, cc.CONTRACT_SCHEMA_VERSION, counts_body))
+    assert rejects(lambda: cc.from_json(dup)), "duplicate top-level key accepted"
+    # unknown envelope fields are rejected
+    unknown = dict(counts_env, unexpected_field=1)
+    assert rejects(lambda: cc.from_dict(unknown)), "unknown envelope field accepted"
+
     assert rejects(lambda: cc.RawIdentityClaim("", "raw"))
     for invalid_claim_value in (
             [], {}, ("tuple",), math.nan, math.inf, object()):

@@ -1152,6 +1152,10 @@ def from_dict(value: Mapping[str, Any]) -> ContractType:
     """Restore a tagged contract representation produced by :func:`to_dict`."""
     if not isinstance(value, Mapping):
         raise ValueError("comparison contract payload must be an object")
+    # CMP-AUD-238: the envelope is exactly {schema_version, type, value}. An unknown
+    # extra field is a malformed payload, not something to silently ignore.
+    _require_exact_fields(value, ("schema_version", "type", "value"),
+                          "comparison contract envelope")
     if value.get("schema_version") != CONTRACT_SCHEMA_VERSION:
         raise ValueError("unsupported comparison contract schema_version")
     cls = _TYPES.get(value.get("type"))
@@ -1166,8 +1170,29 @@ def to_json(value: ContractType) -> str:
                       allow_nan=False)
 
 
+def _reject_nonfinite(literal: str):
+    # CMP-AUD-238: json.loads accepts NaN/Infinity by default; to_json forbids them
+    # (allow_nan=False), so accepting them on read is an asymmetric contract that can
+    # decode a payload it can never re-encode. Reject at the parse layer.
+    raise ValueError(
+        f"comparison contract payload contains a non-finite literal ({literal})")
+
+
+def _reject_duplicate_keys(pairs):
+    # CMP-AUD-238: default json.loads silently keeps the last of duplicate object keys.
+    seen: Dict[str, Any] = {}
+    for key, val in pairs:
+        if key in seen:
+            raise ValueError(
+                f"comparison contract payload has a duplicate key: {key!r}")
+        seen[key] = val
+    return seen
+
+
 def from_json(text: str) -> ContractType:
-    return from_dict(json.loads(text))
+    return from_dict(json.loads(
+        text, parse_constant=_reject_nonfinite,
+        object_pairs_hook=_reject_duplicate_keys))
 
 
 def loaded_side_from_legacy(rows, *, declared_schema=(), route_universe=(),
