@@ -32,8 +32,7 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_tsn_common as ctc
-from compare_tsn_common import (load_consolidated_rows, row_has_data,
-                                suggest_route_name)
+from compare_tsn_common import load_consolidated_rows, suggest_route_name
 from compare_core import CompareSchema, normalize_value
 
 REPORT_NAME = "Ramp Detail"

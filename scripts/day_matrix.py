@@ -32,7 +32,6 @@ from pathlib import Path
 import cache_envelope
 import consolidation_meta
 import matrix
-import outcome
 import reports
 from paths import OUTPUT_ROOT, list_output_days, parse_run_folder, today_str
 
