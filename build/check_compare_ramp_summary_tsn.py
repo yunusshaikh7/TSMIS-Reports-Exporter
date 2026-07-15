@@ -374,10 +374,14 @@ def test_provenance_sidecar():
     ins = prov.get("inputs") or []
     check("both inputs recorded with roles", [i.get("role") for i in ins]
           == ["TSMIS", "TSN"])
+    # Compare resolved-to-resolved: the CI runner's temp dirs use 8.3 short
+    # names (RUNNER~1) that resolve() expands, so the unresolved fixture path
+    # is not a substring of the recorded canonical selection there.
     check("FULL canonical selections disambiguate the same basenames",
           all(i["name"] == "same.xlsx" for i in ins)
           and ins[0]["selection"] != ins[1]["selection"]
-          and str(a_dir) in ins[0]["selection"] and str(b_dir) in ins[1]["selection"])
+          and str(a_dir.resolve()) in ins[0]["selection"]
+          and str(b_dir.resolve()) in ins[1]["selection"])
     check("distinct content digests + stat identity captured",
           ins[0]["sha256"] != ins[1]["sha256"]
           and all(len(i["sha256"]) == 64 and i["size"] > 0 and i["mtime_ns"] > 0
@@ -391,7 +395,7 @@ def test_provenance_sidecar():
     ph, pr = _sheet(out, "Provenance")
     flatp = " ".join(c for row in [ph] + pr for c in row)
     check("a Provenance sheet shows both full selections + digests",
-          str(a_dir) in flatp and str(b_dir) in flatp
+          str(a_dir.resolve()) in flatp and str(b_dir.resolve()) in flatp
           and ins[0]["sha256"] in flatp and ins[1]["sha256"] in flatp
           and "captured before the inputs were read" in flatp)
 

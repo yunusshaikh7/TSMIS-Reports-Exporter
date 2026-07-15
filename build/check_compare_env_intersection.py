@@ -162,10 +162,11 @@ def test_detail_flat_compare():
     prov = ctc.read_comparison_provenance(out)
     check("a provenance sidecar exists beside the env comparison", prov is not None)
     ins = prov.get("inputs") or []
+    # Resolved-to-resolved (the CI runner's 8.3 short temp names expand).
     check("both sides recorded as folder-kind with full selections",
           [i.get("kind") for i in ins] == ["folder", "folder"]
-          and str(a.parent) in ins[0]["selection"]
-          and str(b.parent) in ins[1]["selection"])
+          and str(a.parent.resolve()) in ins[0]["selection"]
+          and str(b.parent.resolve()) in ins[1]["selection"])
     check("roles are the derived side labels",
           ins[0].get("role") == "SSOR-PROD" and ins[1].get("role") == "ARS-PROD")
     check("the exact discovered member census is recorded per side",
@@ -183,7 +184,7 @@ def test_detail_flat_compare():
     finally:
         wb.close()
     check("a Provenance sheet shows folder selections + member counts",
-          str(a.parent) in flatp and str(b.parent) in flatp
+          str(a.parent.resolve()) in flatp and str(b.parent.resolve()) in flatp
           and "1 discovered source file(s)" in flatp)
 
 
