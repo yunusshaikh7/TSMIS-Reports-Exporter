@@ -148,3 +148,9 @@ class ConsolidateResult:
     comparison_outcome: object = None
     artifact_generation: object = None
     attempt_state: object = None
+    # Additive producer metadata for the workbook's outcome sidecar
+    # (consolidation_meta.write_outcome extra=...). A consolidator that
+    # discovers facts a later consumer must reconcile (e.g. the Intersection
+    # Summary ordered route census, CMP-AUD-183) puts them here; the drivers
+    # pass it through verbatim. None for every producer without such facts.
+    producer_extra: dict = None

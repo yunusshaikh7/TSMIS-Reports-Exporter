@@ -31,9 +31,11 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+from collections import Counter
 from dataclasses import replace
 
 import compare_tsn_common as ctc
+import consolidation_meta
 import summary_layout
 from compare_core import CompareSchema
 from paths import today_str
@@ -244,13 +246,64 @@ def _load_tsn(path):
 # --------------------------------------------------------------------------- #
 # TSMIS side: SUM the consolidated workbook's per-route columns -> {slug: count}
 # --------------------------------------------------------------------------- #
-def _load_tsmis(path):
+def _validate_route_universe(routes, name, workbook_path, note_sink):
+    """CMP-AUD-183: the aggregated route universe must be sound — every data row
+    carries a usable route identity and no route appears twice — and, when the
+    producer recorded its ordered `route_census` in the outcome sidecar, must
+    match that census EXACTLY (a dropped, added, renamed, reordered, or
+    suffix-collapsed row refuses). A census-less workbook (older consolidation,
+    or a copy without its sidecar) keeps the internal checks and gets an
+    explicit no-census diagnostic instead of a silent pass."""
+    cleaned = []
+    for row_no, rv in routes:
+        s = ("" if rv is None else str(rv)).strip()
+        if isinstance(rv, bool) or not s or not s.isalnum() or len(s) > 8:
+            raise ValueError(f"{name}: sheet row {row_no} has no usable route "
+                             f"identity ({rv!r}) — its counts cannot be attributed")
+        cleaned.append(s)
+    if not cleaned:
+        raise ValueError(f"{name} has no route rows — nothing to aggregate")
+    dupes = sorted(r for r, n in Counter(cleaned).items() if n > 1)
+    if dupes:
+        raise ValueError(f"{name}: route(s) {', '.join(dupes[:6])} appear on more "
+                         "than one row — refusing to aggregate an ambiguous "
+                         "route universe")
+    census = consolidation_meta.read_extra(workbook_path, "route_census")
+    if census is None:
+        note = (f"TSMIS route universe: {len(cleaned)} routes; no producer route "
+                "census recorded (older consolidation) — internal checks only.")
+    elif (not isinstance(census, list)
+          or not all(isinstance(r, str) and r for r in census)):
+        raise ValueError(f"{name}: the producer route census beside the workbook "
+                         "is malformed — re-consolidate before comparing")
+    elif census != cleaned:
+        detail = (f"workbook has {len(cleaned)} route rows, the census records "
+                  f"{len(census)}")
+        for i, (want, got) in enumerate(zip(census, cleaned)):
+            if want != got:
+                detail = (f"first divergence at row {i + 2}: census {want!r} vs "
+                          f"workbook {got!r}")
+                break
+        raise ValueError(f"{name}: the aggregated routes do not match the "
+                         f"producer's route census ({detail}) — a route was "
+                         "dropped, added, renamed, or reordered after "
+                         "consolidation; re-consolidate before comparing")
+    else:
+        note = (f"TSMIS route universe verified against the producer census: "
+                f"{len(cleaned)} routes ({cleaned[0]}–{cleaned[-1]}).")
+    if note_sink is not None:
+        note_sink.append(note)
+
+
+def _load_tsmis(path, note_sink=None):
     """TSMIS side -> {slug: count}. Sums each category column of the consolidated
     Intersection Summary workbook's per-route sheet. Strict (CMP-AUD-021/022):
     count cells must be whole numbers (numeric text is parsed, never dropped;
     fractions and booleans refuse), a duplicated category column refuses, and a
     column the workbook lacks stays ABSENT — never a fabricated zero
-    (reconcile_counts decides whether it was required)."""
+    (reconcile_counts decides whether it was required). The route universe is
+    validated per CMP-AUD-183 (see _validate_route_universe); the census status
+    line lands in `note_sink`."""
     name = Path(path).name
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
@@ -266,6 +319,7 @@ def _load_tsmis(path):
         if "Route" not in names:
             raise ValueError(f"{name} isn't a consolidated Intersection Summary "
                              "workbook (no 'Route' column) — consolidate first.")
+        route_col = names.index("Route")
         col_slug, seen = {}, set()
         for i, h in enumerate(names):
             if not h or h not in _KEY_TO_SLUG:
@@ -276,15 +330,18 @@ def _load_tsmis(path):
             seen.add(h)
             col_slug[i] = (_KEY_TO_SLUG[h], h)
         sums = {slug: 0 for slug, _h in col_slug.values()}
-        for row in it:
+        routes = []
+        for row_no, row in enumerate(it, start=2):
             if not row or all(c is None for c in row):
                 continue
+            routes.append((row_no, row[route_col] if route_col < len(row) else None))
             for i, (slug, disp) in col_slug.items():
                 v = row[i] if i < len(row) else None
                 if v is None or (isinstance(v, str) and not v.strip()):
                     continue                             # blank cell
                 sums[slug] += summary_layout.parse_count(v, source=name,
                                                          category=disp)
+        _validate_route_universe(routes, name, path, note_sink)
         return sums
     finally:
         wb.close()
@@ -319,13 +376,16 @@ def _load_pair(tsmis_path, tsn_path, note_sink=None, events=None):
     TSMIS-only codes are legitimately absent from the TSN PDF and are NOT
     required there), and every block must partition the total per the censused
     SectionRule contract — a table that doesn't reconcile refuses with a named
-    block instead of comparing garbage. Bounded residuals (the TSN-untabulated
-    classes; the site's Highway Group under-count) are EXPOSED via `note_sink`
-    onto the familiar sheet + the log — never fabricated into a category, and
-    never a warning (warnings mean unreadable inputs)."""
-    tsmis_counts = _load_tsmis(tsmis_path)
+    block instead of comparing garbage. The TSMIS route universe is validated
+    and reconciled against the producer's route census (CMP-AUD-183). Bounded
+    residuals (the TSN-untabulated classes; the site's Highway Group
+    under-count) and the census status are EXPOSED via `note_sink` onto the
+    familiar sheet + the log — never fabricated into a category, and never a
+    warning (warnings mean unreadable inputs)."""
+    notes = []
+    tsmis_counts = _load_tsmis(tsmis_path, note_sink=notes)   # + route census status
     tsn_counts = _load_tsn(tsn_path)
-    notes = summary_layout.reconcile_counts(
+    notes += summary_layout.reconcile_counts(
         _SPEC, tsmis_counts, "tsmis", _TSMIS_RULES,
         source=Path(tsmis_path).name, side_label="TSMIS")
     notes += summary_layout.reconcile_counts(

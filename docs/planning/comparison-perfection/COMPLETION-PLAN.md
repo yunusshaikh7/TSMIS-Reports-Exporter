@@ -22,8 +22,8 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020, 021, 022, 023, 184**; 115/035 partially remediated |
-| **Next action** | **CMP-AUD-183** (IS route universe), then 144/145/146 (normalizer source-claim batch); 076 folds into Wave 3 with 098 (see the RESUME block below) |
+| **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020, 021, 022, 023, 184, 183**; 115/035 partially remediated |
+| **Next action** | **CMP-AUD-144 + 145 + 146** as ONE normalizer source-claim batch (single `normalization_version` bump); 076 folds into Wave 3 with 098 (see the RESUME block below) |
 
 > ### ▶ RESUME HERE (2026-07-14, after the Summary-loader batch)
 > **Done this batch — CMP-AUD-020/021/022/023 (aggregate Summary loader correctness):**
@@ -38,10 +38,14 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > 53 differing (16,459 vs 16,626)** — and the ars-prod 7.9 re-consolidation stays
 > 217/217 byte-identical.
 >
-> **Do this next: CMP-AUD-183** (IS route-universe validation), then **144 + 145 + 146**
-> as ONE normalizer source-claim batch (a single `normalization_version` bump); **184 is
-> Resolved**; **076** (durable cross-family provenance) folds into Wave 3 beside 098.
-> Read each finding in `comparison-audit-findings.md` first.
+> **Do this next: CMP-AUD-144 + 145 + 146** as ONE normalizer source-claim batch (a single
+> `normalization_version` bump: preserve the six printed J–P control rows + the raw
+> CONTROL F descriptor + printed report identity/timing/submitter in the normalized
+> sidecar, exposed in Notes/evidence); **183 and 184 are Resolved**; **076** (durable
+> cross-family provenance) folds into Wave 3 beside 098. Read each finding in
+> `comparison-audit-findings.md` first. 183 follow-ups parked: matrix auto-rebuild when a
+> consolidated workbook lacks a route census (then harden census-required), typed-contract
+> census surfacing (Phase-5/7 overlay), and Ramp's own universe contract (CMP-AUD-071).
 > - **Method (mandatory, proven):** (1) read the finding; (2) red fixture confirmed RED on
 >   current code; (3) fix; (4) GREEN; (5) **verify against the real corpus** and, for anything
 >   touching Ramp/Intersection Summary counts, **re-confirm the accepted oracles hold**
@@ -230,6 +234,7 @@ no family-gate owner yet. Wave 5 assigns them.
 
 ## 11. Progress log (append-only — real progress, not recursion)
 
+- **2026-07-14 — Wave 2: CMP-AUD-183 Resolved (Intersection Summary route universe).** The consolidator now refuses blank/malformed route identities, excludes every claimant of a duplicated route (loud FAILED ×2 + PARTIAL, never a silent double-count), and persists the ordered `route_census` through the new generic `ConsolidateResult.producer_extra` → `write_outcome(extra=…)` path (all four drivers pass it through). The comparison loader always validates internal universe soundness and, with a census beside the workbook, requires an EXACT ordered match — dropped/extra/renamed/reordered/suffix-collapsed rows refuse with the first divergence named; the census status is a familiar-sheet note + log line (census-less legacy workbooks keep internal checks + an explicit diagnostic). Real-corpus positive control bound in the canary ledger: 217 routes (008U/010S/014U/058U/178S/210U suffixed; 170 absent), oracle unchanged (58/8/0 · 5/53), and the finding's exact 905-deleted / 001-duplicated mutations now REFUSE. Suite 121/121 + ruff clean.
 - **2026-07-14 — Wave 2: CMP-AUD-184 Resolved (familiar-view note contract).** The shared familiar-sheet note no longer claims one-sided categories "show 0" and no longer cites Ramp P/V on every family's sheet — it now states the truth (structural absence stays BLANK with no Δ, listed under 'Only in …'; an explicit 0 is a real source zero), with family detail in each spec's own notes. New mutation sweep: all 8 TSMIS-only Intersection categories agree across familiar cells (value/BLANK/BLANK), both formulas+values workbooks, and the generic 'TSMIS only' statuses. Oracles unchanged on the real corpus. Suite 121/121 + ruff clean.
 - **2026-07-14 — Wave 2: CMP-AUD-020 + 021 + 022 + 023 Resolved (aggregate Summary loader correctness).** One strict count parser (`summary_layout.parse_count`) now feeds every aggregate read path (numeric text parses; fractions/booleans/negatives refuse with file+category context); duplicate exact normalized keys and duplicated consolidated columns refuse (distinct stale J–P/S keys still fold); the Rural/Urban parent binds from the LABEL (a count-less U parent no longer misfiles `-O` to Rural; a counted orphan refuses); and both `_load_pair`s independently validate each side against a **censused partition contract** (`SectionRule` + `reconcile_counts`) measured on the real corpus before encoding — exact blocks must reconcile, bounded blocks may only run SHORT with their residual EXPOSED as familiar-sheet notes (TSMIS ramp P/V residual 22; IS Highway Group −676; TSN IS untabulated classes −40/−40/−30/−3/−3), and all-zero-categories-under-a-total refuses even when both sides agree. Absent-vs-zero preserved end to end (the TSN normalizers no longer write fabricated `[key, 0]` rows). 12 defects probed RED pre-fix → all green post-fix; **both real-corpus oracles reproduce exactly** (Ramp 29/0/2·5·24, totals 15,216/15,410; IS 58/8/0·5·53, totals 16,459/16,626); ars-prod 7.9 re-consolidation 217/217 byte-identical. Suite 121/121 + ruff clean.
 - **2026-07-14 — Wave 2: CMP-AUD-024 + CMP-AUD-025 Resolved (Ramp Summary vs TSN).** The `Ramp Points w/out linework` footnote is now display-only (out-of-band channel, never a compared row) and P/V are `Only in TSN` (not fabricated TSMIS zeros), mirroring the Intersection Summary recipe with no `compare_core` change. Proved red→green in the hermetic check **and verified on the real 7.9 SSOR-prod corpus — reproduces the accepted oracle exactly: 29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical / 24 differing.** This is the first fully data-verified semantic fix; the Ramp Summary vs TSN comparison now represents the data correctly.

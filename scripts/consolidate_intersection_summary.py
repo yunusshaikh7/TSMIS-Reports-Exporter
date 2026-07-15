@@ -269,7 +269,14 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
             failed.append(p.name)
             continue
-        rec = {"route": route, "counts": counts, "total": total}
+        # CMP-AUD-183: a statewide aggregation needs a sound route identity per
+        # row — a blank/malformed identity can't be attributed and must not sum.
+        route = str(route).strip() if route is not None else ""
+        if not route or not route.isalnum() or len(route) > 8:
+            events.on_log(f"{prefix} FAILED (no usable route identity: {route!r})")
+            failed.append(p.name)
+            continue
+        rec = {"route": route, "counts": counts, "total": total, "file": p.name}
         drift = _layout_drift(counts, total)
         if drift:
             events.on_log(f"{prefix} FAILED (layout drift): {drift}")
@@ -280,6 +287,22 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         else:
             events.on_log(f"{prefix} skipped: no intersection data")
             blank.append(p.name)
+
+    # CMP-AUD-183: two inputs claiming the SAME route identity make the
+    # statewide table ambiguous (identical duplicates double-count; conflicting
+    # ones can't be arbitrated here) — exclude every claimant loudly, so the
+    # run reports PARTIAL instead of silently aggregating a corrupt universe.
+    by_route = {}
+    for rec in records:
+        by_route.setdefault(rec["route"], []).append(rec)
+    duplicated = {route: recs for route, recs in by_route.items() if len(recs) > 1}
+    if duplicated:
+        for route, recs in sorted(duplicated.items()):
+            names = ", ".join(rec["file"] for rec in recs)
+            events.on_log(f"FAILED (duplicate route {route}): {len(recs)} files "
+                          f"claim the same route — {names}")
+            failed.extend(rec["file"] for rec in recs)
+        records = [rec for rec in records if rec["route"] not in duplicated]
 
     if not records:
         return ConsolidateResult(
@@ -318,10 +341,17 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         f"Empty:       {len(blank)} {blank if blank else ''}",
         f"Output file: {out_path}",
     ]
+    # CMP-AUD-183: persist the ordered route identities the workbook was built
+    # from, so the comparison loader can reconcile the aggregated universe
+    # against the producer's own census (dropped/extra/reordered/renamed rows
+    # become detectable from the saved artifact). Rides the outcome sidecar via
+    # the drivers' write_outcome(extra=result.producer_extra).
     return ConsolidateResult(status="ok", output_path=str(out_path),
                              summary_lines=summary_lines,
                              completion=outcome.PARTIAL if incomplete else outcome.COMPLETE,
-                             skipped_inputs=len(blank), failed_inputs=len(failed))
+                             skipped_inputs=len(blank), failed_inputs=len(failed),
+                             producer_extra={
+                                 "route_census": [rec["route"] for rec in records]})
 
 
 if __name__ == "__main__":

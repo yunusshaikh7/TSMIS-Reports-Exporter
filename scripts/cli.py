@@ -375,7 +375,8 @@ def run_consolidate_cli(consolidate_fn):
     # (no-op unless status ok) so a partial dated consolidation here can't later read
     # as a green complete cell. A False return means the partial flag could NOT be
     # recorded (publication failed) -> we must not announce a plain success below.
-    published = consolidation_meta.write_outcome(result.output_path, result)
+    published = consolidation_meta.write_outcome(
+        result.output_path, result, extra=getattr(result, "producer_extra", None))
 
     if result.status == "cancelled":
         print(result.message or "Cancelled.")

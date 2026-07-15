@@ -194,7 +194,9 @@ class ExportWorker(threading.Thread):
             if self.out_base is not None:
                 self._require_store_lease("consolidation outcome write")
             if not consolidation_meta.write_outcome(
-                    res.output_path or out_path, res, commit_guard=commit_guard):
+                    res.output_path or out_path, res,
+                    extra=getattr(res, "producer_extra", None),
+                    commit_guard=commit_guard):
                 self.q.put(("log", "  Auto-consolidate: the outcome could not be recorded; "
                                    "the incomplete combined file was discarded (it will rebuild)."))
             lines = res.summary_lines or ([res.message] if res.message else [])
@@ -773,7 +775,8 @@ class ConsolidateWorker(threading.Thread):
                 or getattr(result, "artifact_generation", None) is not None)
             if (not centrally_published
                     and not consolidation_meta.write_outcome(
-                        result.output_path, result)):
+                        result.output_path, result,
+                        extra=getattr(result, "producer_extra", None))):
                 self.q.put(("error", ("general",
                             "Consolidation finished but its outcome could not be recorded; "
                             "the incomplete output was discarded. Close any open copy and "

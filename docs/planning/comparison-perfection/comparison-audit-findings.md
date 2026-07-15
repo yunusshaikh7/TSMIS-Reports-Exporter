@@ -6065,8 +6065,7 @@ CMP-AUD-045 and CMP-AUD-157 remain product-red and are not allowlisted away.
 ### CMP-AUD-183 — Intersection Summary aggregation accepts dropped and duplicate routes without validating its route universe
 
 Priority: P1  
-Status: Verified with isolated production-loader mutations against the authoritative
-217-route 7.9 corpus  
+Status: Resolved 2026-07-14 — route universe validated + producer census reconciled; real-data verified  
 Primary code: `scripts/compare_intersection_summary_tsn.py::_load_tsmis/_load_pair` and
 `scripts/consolidate_intersection_summary.py::consolidate`
 
@@ -6088,6 +6087,32 @@ reordered, and suffix-collapsed routes; reconcile the exact producer/source mani
 before statewide aggregation; surface the route census in structured comparison
 diagnostics; and permanently bind the 217-route Excel/PDF positive control plus each
 mutation above.
+
+**Remediation (2026-07-14).** Producer side: `consolidate()` refuses blank/
+malformed route identities per file (FAILED, loud), excludes EVERY claimant of a
+duplicated route identity (both files FAILED, PARTIAL — identical duplicates
+would double-count and conflicting ones cannot be arbitrated), and persists the
+ordered `route_census` via the new generic `ConsolidateResult.producer_extra` →
+`write_outcome(extra=…)` path (cli, gui_worker_export ×2, matrix_build now pass
+it through). Comparison side: `_load_tsmis` always validates internal soundness
+(usable route identity per data row, no route on more than one row, non-empty
+universe) and, whenever a census is recorded beside the workbook, requires the
+aggregated routes to match it EXACTLY (dropped/extra/renamed/reordered/
+suffix-collapsed all refuse with the first divergence named); the census status
+is surfaced as a familiar-sheet note + log line. Real-corpus positive control:
+the ars-prod 7.9 tree consolidates to the exact 217-route census (suffixed
+008U/010S/014U/058U/178S/210U; 170 absent), the comparison census-verifies with
+the oracle unchanged (58/8/0 · 5/53), and the finding's two isolated mutations
+(route 905 deleted; route 001 duplicated) now REFUSE on a sidecar-coupled copy.
+Fixtures: `check_compare_intersection_summary_tsn.test_route_universe` (13
+mutations incl. census-less diagnostics) + the consolidator duplicate/census
+checks in `check_consolidate_intersection`. Honest scope limits: a workbook
+whose sidecar is absent (older consolidation, or a copy without it) keeps
+internal checks only and gets an EXPLICIT no-census diagnostic — hardening to
+require the census needs a matrix auto-rebuild migration (roadmap follow-up);
+surfacing the census through the TYPED comparison contract (LoadedSide claims)
+stays with the Phase-5/7 overlay work; Ramp Summary's separate 126-route
+contract remains CMP-AUD-071.
 
 ### CMP-AUD-184 — Intersection Summary's familiar view note contradicts its structural-absence cells and cites Ramp categories
 

@@ -160,6 +160,37 @@ def test_summary():
     check("the drift names the offending block",
           "MAINLINE MASTARM" in (cis._layout_drift(broken_counts, 5) or ""))
 
+    # CMP-AUD-183: the ordered route census rides the result for the outcome
+    # sidecar, and duplicate route claims are excluded LOUDLY (both files
+    # failed, PARTIAL), never silently double-counted.
+    check("the result carries the ordered route census (producer_extra)",
+          res.producer_extra == {"route_census": ["001", "002"]})
+    in3 = tmp / "in3"
+    in3.mkdir()
+    _write_is_route(in3 / "intersection_summary_route_001.xlsx", "001", 5,
+                    _full_blocks(3, 2, 4, 1, 5))
+    _write_is_route(in3 / "intersection_summary_route_001b.xlsx", "001", 5,
+                    _full_blocks(5, 0, 5, 0, 5))
+    _write_is_route(in3 / "intersection_summary_route_002.xlsx", "002", 5,
+                    _full_blocks(5, 0, 5, 0, 5))
+    out3 = tmp / "out3.xlsx"
+    logs3 = []
+    res3 = cis.consolidate(events=Events(on_log=logs3.append),
+                           confirm_overwrite=lambda _p: True,
+                           input_dir=in3, out_path=out3)
+    check("duplicate route claims -> BOTH files fail, result PARTIAL",
+          res3.status == "ok" and res3.completion == outcome.PARTIAL
+          and res3.failed_inputs == 2)
+    check("...the duplicate is named in the log",
+          any("duplicate route 001" in ln for ln in logs3))
+    check("...the census carries only the unambiguous route",
+          res3.producer_extra == {"route_census": ["002"]})
+    wb3 = load_workbook(out3, read_only=True, data_only=True)
+    rows3 = list(wb3[cis.SHEET_NAME].iter_rows(values_only=True))[1:]
+    wb3.close()
+    check("...the workbook holds one row (002), no double-counted 001",
+          [str(r[0]) for r in rows3] == ["002"])
+
 
 def main():
     print("config (no drift):")

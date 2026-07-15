@@ -408,6 +408,102 @@ def test_validation_refusals():
         check("duplicated TSMIS category column refuses", "duplicated" in str(e))
 
 
+def _stamp_census(path, routes):
+    """Write a producer outcome sidecar carrying `route_census` beside `path`,
+    the way the drivers do (write_outcome extra=result.producer_extra)."""
+    import consolidation_meta
+    import outcome as oc
+    from events import ConsolidateResult
+    res = ConsolidateResult(status="ok", output_path=str(path),
+                            completion=oc.COMPLETE)
+    assert consolidation_meta.write_outcome(path, res,
+                                            extra={"route_census": routes})
+
+
+def _three_route_rows():
+    """Three consistent per-route rows (001, 008U, 010), total 10 each."""
+    row = _tsmis_table(10, _consistent_tsmis())
+    rows = []
+    for route in ("001", "008U", "010"):
+        r = list(row)
+        r[0] = route
+        rows.append(r)
+    return rows
+
+
+def test_route_universe():
+    """CMP-AUD-183: the aggregated route universe is validated — blank/malformed
+    and duplicate route rows always refuse; with the producer's route census
+    beside the workbook, dropped/extra/reordered/suffix-collapsed rows refuse
+    too; a census-less workbook gets an explicit no-census diagnostic."""
+    print("route-universe validation (CMP-AUD-183):")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_is_183_"))
+    census = ["001", "008U", "010"]
+
+    def loads(label, rows, stamp=None, *needles):
+        p = root / f"{label.replace(' ', '_')[:24]}.xlsx"
+        _write_tsmis(p, _ALL_KEYS, rows)
+        if stamp is not None:
+            _stamp_census(p, stamp)
+        notes = []
+        try:
+            cmp._load_tsmis(p, note_sink=notes)
+            check(label, not needles)
+            return notes
+        except ValueError as e:
+            check(label, bool(needles) and all(n in str(e) for n in needles))
+            return notes
+
+    # Clean + census -> loads, census-verified note.
+    notes = loads("census match loads and is verified", _three_route_rows(), census)
+    check("...census-verified note (3 routes, 001–010)",
+          any("verified against the producer census" in n and "3 routes" in n
+              for n in notes))
+    # Clean, NO census -> loads with the explicit no-census diagnostic.
+    notes = loads("census-less workbook loads with internal checks", _three_route_rows())
+    check("...explicit no-census diagnostic note",
+          any("no producer route census" in n for n in notes))
+
+    # Internal soundness (census or not): duplicates and blank identities refuse.
+    dup = _three_route_rows()
+    dup.append(list(dup[0]))
+    loads("duplicate route row refuses (identical copy)", dup, None,
+          "more than one row")
+    conflict = _three_route_rows()
+    extra_row = list(conflict[0])
+    extra_row[1] = 4
+    conflict.append(extra_row)
+    loads("duplicate route row refuses (conflicting copy)", conflict, None,
+          "more than one row")
+    blank = _three_route_rows()
+    blank[1][0] = "  "
+    loads("blank route identity refuses", blank, None, "no usable route identity")
+    malformed = _three_route_rows()
+    malformed[1][0] = "008 U"
+    loads("malformed route identity refuses", malformed, None,
+          "no usable route identity")
+
+    # Census reconciliation: dropped / extra / reordered / suffix-collapsed.
+    loads("dropped route refuses against the census", _three_route_rows()[:2], census,
+          "do not match the producer's route census", "3")
+    four = _three_route_rows()
+    extra2 = list(four[0])
+    extra2[0] = "020"
+    four.append(extra2)
+    loads("extra route refuses against the census", four, census,
+          "do not match the producer's route census")
+    reordered = [_three_route_rows()[i] for i in (1, 0, 2)]
+    loads("reordered routes refuse against the census", reordered, census,
+          "do not match the producer's route census")
+    collapsed = _three_route_rows()
+    collapsed[1][0] = "008"
+    loads("suffix-collapsed route refuses against the census", collapsed, census,
+          "census '008U' vs workbook '008'")
+    # A malformed census is a producer-claim defect, not a silent legacy pass.
+    loads("malformed census refuses", _three_route_rows(), ["001", 8, "010"],
+          "census", "malformed")
+
+
 def test_stale_library_fold():
     """A normalized library built BEFORE the signal fold (separate J–P category rows
     + the old 'S - SIGNALIZED' key) is REUSED, not rebuilt, after the code change
@@ -450,6 +546,7 @@ def main():
     test_block_walk()
     test_end_to_end()
     test_validation_refusals()
+    test_route_universe()
     test_one_sided_familiar_agreement()
     test_stale_library_fold()
     test_corrupt_pdf_is_valueerror()

@@ -63,16 +63,18 @@ def test_central_comparison_publication_is_not_overwritten():
 def test_ordinary_consolidation_still_publishes():
     print("ordinary one-workbook consolidation remains unchanged:")
     result = ConsolidateResult(status="ok", output_path="consolidated.xlsx",
-                               completion="partial", skipped_inputs=1)
+                               completion="partial", skipped_inputs=1,
+                               producer_extra={"route_census": ["001"]})
     writes = []
 
-    def write(path, observed_result):
-        writes.append((path, observed_result))
+    def write(path, observed_result, extra=None):
+        writes.append((path, observed_result, extra))
         return True
 
     messages, _calls = run_worker(result, write)
-    check("ordinary result calls generic writer exactly once with legacy path/result",
-          writes == [("consolidated.xlsx", result)])
+    check("ordinary result calls generic writer exactly once with legacy "
+          "path/result + the producer extra (CMP-AUD-183)",
+          writes == [("consolidated.xlsx", result, {"route_census": ["001"]})])
     check("successful ordinary publication still emits consolidate_done",
           messages == [("consolidate_done", result)])
 
@@ -83,13 +85,13 @@ def test_ordinary_publication_failure_stays_degraded():
                                completion="partial", skipped_inputs=1)
     writes = []
 
-    def fail_write(path, observed_result):
-        writes.append((path, observed_result))
+    def fail_write(path, observed_result, extra=None):
+        writes.append((path, observed_result, extra))
         return False
 
     messages, _calls = run_worker(result, fail_write)
     check("failed ordinary publication still attempts the generic writer once",
-          writes == [("partial.xlsx", result)])
+          writes == [("partial.xlsx", result, None)])
     check("failed ordinary publication emits no consolidate_done",
           not any(kind == "consolidate_done" for kind, _payload in messages))
     expected = (

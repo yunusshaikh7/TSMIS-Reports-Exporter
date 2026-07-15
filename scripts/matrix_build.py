@@ -651,7 +651,8 @@ def _consolidate_store_folder(subdir, env_dir, out_path, events,
     # comparison surfaces not-refreshed and keeps the prior cell rather than diffing a
     # workbook that might read complete.
     if not consolidation_meta.write_outcome(
-            out_path, res, commit_guard=commit_guard):
+            out_path, res, extra=getattr(res, "producer_extra", None),
+            commit_guard=commit_guard):
         raise ValueError(f"the {subdir} consolidation finished but its outcome could not "
                          "be recorded; the incomplete workbook was invalidated — re-run")
     # P2/F5: record the source folder's input fingerprint beside the workbook so a later

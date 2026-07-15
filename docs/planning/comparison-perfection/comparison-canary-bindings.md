@@ -1224,3 +1224,26 @@ Terminal state is `accepted_stage8_base_family_audit_only` with
 CMP-AUD-045/047/048/049/050/066/067/157. The bounded source/oracle/leg/gate closeout
 changed no product code; the frozen 321-file product-script manifest is 7,423,809 bytes
 at SHA-256 `df7bb8fc3d997d60d82ecb93344f821e858feb015eed62fffe859958c9151bea`.
+
+## 2026-07-14 — Intersection Summary route-universe positive control (CMP-AUD-183)
+
+Bound to the authoritative 217-file ars-prod tree
+`Downloads\TSMIS\ground-truth\All Reports 7.9\2026-07-09 ars-prod\intersection_summary\`
+(the same corpus as the Stage-8 Intersection Summary oracle) versus the raw
+`Downloads\TSMIS\tsn_library\intersection_summary\raw\Intersection Summary Statewide_TSN.pdf`:
+
+- the production consolidator's persisted `route_census` is exactly **217 ordered
+  routes, `001`–`905`**, with the suffixed identities
+  `008U, 010S, 014U, 058U, 178S, 210U` and **route `170` absent** (the dated
+  universe fact — 6.19 had 218);
+- the production comparison census-verifies (familiar-sheet note
+  `TSMIS route universe verified against the producer census: 217 routes (001–905).`)
+  and reproduces the accepted Stage-8 oracle unchanged: 58 shared / 8 TSMIS-only /
+  0 TSN-only, 5 identical / 53 differing, totals 16,459 / 16,626;
+- the finding's two isolated mutations on a sidecar-coupled copy now REFUSE:
+  route `905` deleted → "the aggregated routes do not match the producer's route
+  census"; route `001` duplicated → "route(s) 001 appear on more than one row".
+
+Re-run via the production modules (consolidate → `write_outcome(extra=result.
+producer_extra)` → compare); the hermetic mutation battery lives in
+`build/check_compare_intersection_summary_tsn.py::test_route_universe`.
