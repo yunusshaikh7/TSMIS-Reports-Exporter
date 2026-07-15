@@ -504,6 +504,54 @@ def test_route_universe():
           "census", "malformed")
 
 
+def test_source_claims():
+    """CMP-AUD-144/145/146: identity fields are required exactly-once; the
+    censused F/G descriptors refuse on drift; the derived-S cross-check holds."""
+    print("TSN source claims (CMP-AUD-144/145/146):")
+    import compare_tsn_common as ctc
+    text = ("OTM22250\nREPORT DATE : 09/15/2025\nREFERENCE DATE : 09/15/2025\n"
+            "SUBMITTOR : TRLBUGNI\nREPORT TITLE : ' T '\nEVENT ID :\n4843738\n"
+            "LOCATION CRITERIA:\nSTATEWIDE\n04:53 PM\n")
+    ident = ctc.tsn_print_identity(text, "t.pdf")
+    check("identity extracted (incl. next-line EVENT ID)",
+          ident["event_id"] == "4843738" and ident["report_id"] == "OTM22250"
+          and ident["generated_time"] == "04:53 PM")
+    try:
+        ctc.tsn_print_identity(text.replace("SUBMITTOR : TRLBUGNI\n", ""), "t.pdf")
+        check("a missing identity field refuses", False)
+    except ValueError as e:
+        check("a missing identity field refuses", "submitter not found" in str(e))
+    try:
+        ctc.tsn_print_identity(text + "\nOTM99999\n", "t.pdf")
+        check("conflicting identity values refuse", False)
+    except ValueError as e:
+        check("conflicting identity values refuse", "conflicting" in str(e))
+
+    rows = [(None, "<---CONTROL TYPES--->"), (207, "J-SIGNAL PRETIMED (2) (2 PHASE)"),
+            (7, cmp._RAW_CONTROL_F), (29, cmp._RAW_CONTROL_G)]
+    claims = cmp._claims_from_rows(rows, text, "t.pdf")
+    check("printed rows + J component captured pre-fold",
+          claims["signal_components"] == [["J", 207]]
+          and [cmp._SPEC.sections[4].name, 207, "J-SIGNAL PRETIMED (2) (2 PHASE)"]
+          in claims["printed_rows"])
+    check("the declared F correction binds the TSNR decision source",
+          claims["declared_corrections"][0]["decision_source"] == cmp._TSNR_DECISION_SOURCE)
+    try:
+        cmp._claims_from_rows([(None, "<---CONTROL TYPES--->"),
+                               (7, "F-FOUR-WAY FLASHER (RED ON MAINLINE)"),
+                               (29, cmp._RAW_CONTROL_G)], text, "t.pdf")
+        check("a drifted printed F descriptor refuses (re-census)", False)
+    except ValueError as e:
+        check("a drifted printed F descriptor refuses (re-census)",
+              "no longer matches the censused text" in str(e))
+    try:
+        cmp.validate_claims_against_counts(claims, {cmp._SIGNALIZED_SLUG: 999})
+        check("derived-S / component-sum disagreement refuses", False)
+    except ValueError as e:
+        check("derived-S / component-sum disagreement refuses",
+              "does not equal the sum" in str(e))
+
+
 def test_stale_library_fold():
     """A normalized library built BEFORE the signal fold (separate J–P category rows
     + the old 'S - SIGNALIZED' key) is REUSED, not rebuilt, after the code change
@@ -548,6 +596,7 @@ def main():
     test_validation_refusals()
     test_route_universe()
     test_one_sided_familiar_agreement()
+    test_source_claims()
     test_stale_library_fold()
     test_corrupt_pdf_is_valueerror()
     print()

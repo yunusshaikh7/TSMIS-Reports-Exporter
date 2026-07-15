@@ -188,7 +188,18 @@ def _summary_case(loader, cmp_mod, cats, label, sheet, align, total_slug, total_
     raw.mkdir(parents=True, exist_ok=True)
     (raw / "s.pdf").write_bytes(b"x")
     ev, logs = _events()
-    with _patch(cmp_mod, "parse_tsn_pdf", lambda _p, c=counts: dict(c)):
+    # CMP-AUD-144/145/146: _project also captures the print's source claims;
+    # the fake supplies a coherent record (IS: signal components summing to the
+    # folded S count, so validate_claims_against_counts passes).
+    claims = {"schema_version": 1,
+              "identity": {"report_id": "OTM00000", "event_id": "1",
+                           "report_date": "01/01/2025", "reference_date": "01/01/2025",
+                           "submitter": "TEST", "report_title": "t",
+                           "generated_time": "01:00 PM", "location_criteria": "STATEWIDE"}}
+    if "is_control_types_s" in counts:
+        claims["signal_components"] = [["J", counts["is_control_types_s"]]]
+    with _patch(cmp_mod, "parse_tsn_pdf", lambda _p, c=counts: dict(c)), \
+         _patch(cmp_mod, "parse_tsn_source_claims", lambda _p, c=claims: dict(c)):
         r = loader.build_into(raw, out, events=ev)
     # A category the parse didn't yield is OMITTED from the normalized rows —
     # never written as a fabricated 0 (CMP-AUD-021 absent-vs-zero).

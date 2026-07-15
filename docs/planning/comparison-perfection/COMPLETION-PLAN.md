@@ -22,8 +22,8 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020, 021, 022, 023, 184, 183**; 115/035 partially remediated |
-| **Next action** | **CMP-AUD-144 + 145 + 146** as ONE normalizer source-claim batch (single `normalization_version` bump); 076 folds into Wave 3 with 098 (see the RESUME block below) |
+| **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020–023, 184, 183, 144, 145, 146**; 115/035 partially remediated |
+| **Next action** | **Wave 3: CMP-AUD-098 + 076** (durable source-capture/provenance) — the Intersection Summary family's product reds are now CLEAR (see the RESUME block below) |
 
 > ### ▶ RESUME HERE (2026-07-14, after the Summary-loader batch)
 > **Done this batch — CMP-AUD-020/021/022/023 (aggregate Summary loader correctness):**
@@ -258,6 +258,8 @@ no family-gate owner yet. Wave 5 assigns them.
 ---
 
 ## 11. Progress log (append-only — real progress, not recursion)
+
+- **2026-07-14 — Wave 2: CMP-AUD-144 + 145 + 146 Resolved (normalizer source-claim batch; summaries' `normalization_version` 2→3).** `parse_tsn_source_claims` captures the print identity (required exactly-once via `compare_tsn_common.tsn_print_identity`), all 62 printed pre-fold rows, the J–P components behind the derived Signalized 2,648 (cross-checked in the normalizer AND the raw compare path), and the declared TSNR-bound CONTROL F correction (printed-descriptor drift refuses). Claims ride `producer_extra` into the library sidecar and surface as familiar-sheet notes (identity · derived-S composition · declared correction) with an explicit no-claims diagnostic for older normalizations. Verified on both real statewide PDFs; both oracles unchanged. Suite 121/121 + ruff clean.
 
 - **2026-07-14 — Wave 2: CMP-AUD-183 Resolved (Intersection Summary route universe).** The consolidator now refuses blank/malformed route identities, excludes every claimant of a duplicated route (loud FAILED ×2 + PARTIAL, never a silent double-count), and persists the ordered `route_census` through the new generic `ConsolidateResult.producer_extra` → `write_outcome(extra=…)` path (all four drivers pass it through). The comparison loader always validates internal universe soundness and, with a census beside the workbook, requires an EXACT ordered match — dropped/extra/renamed/reordered/suffix-collapsed rows refuse with the first divergence named; the census status is a familiar-sheet note + log line (census-less legacy workbooks keep internal checks + an explicit diagnostic). Real-corpus positive control bound in the canary ledger: 217 routes (008U/010S/014U/058U/178S/210U suffixed; 170 absent), oracle unchanged (58/8/0 · 5/53), and the finding's exact 905-deleted / 001-duplicated mutations now REFUSE. Suite 121/121 + ruff clean.
 - **2026-07-14 — Wave 2: CMP-AUD-184 Resolved (familiar-view note contract).** The shared familiar-sheet note no longer claims one-sided categories "show 0" and no longer cites Ramp P/V on every family's sheet — it now states the truth (structural absence stays BLANK with no Δ, listed under 'Only in …'; an explicit 0 is a real source zero), with family detail in each spec's own notes. New mutation sweep: all 8 TSMIS-only Intersection categories agree across familiar cells (value/BLANK/BLANK), both formulas+values workbooks, and the generic 'TSMIS only' statuses. Oracles unchanged on the real corpus. Suite 121/121 + ruff clean.

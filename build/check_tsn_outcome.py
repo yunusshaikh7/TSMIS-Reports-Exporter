@@ -31,6 +31,23 @@ import day_matrix as dm               # noqa: E402
 import paths                          # noqa: E402
 import tsn_library                    # noqa: E402
 from events import ConsolidateResult, Events   # noqa: E402
+
+# CMP-AUD-144/145/146: the summary normalizers now also capture the print's
+# source claims. These tests exercise COMPLETION mechanics on fake PDF bytes,
+# so stub coherent claims module-wide (the IS component sum matches the fakes'
+# S count of 1; the claims capture itself is covered by the comparator checks).
+import compare_intersection_summary_tsn as _istsn_mod   # noqa: E402
+import compare_ramp_summary_tsn as _rstsn_mod           # noqa: E402
+
+_FAKE_IDENTITY = {"report_id": "OTM00000", "event_id": "1",
+                  "report_date": "01/01/2025", "reference_date": "01/01/2025",
+                  "submitter": "TEST", "report_title": "t",
+                  "generated_time": "01:00 PM", "location_criteria": "STATEWIDE"}
+_rstsn_mod.parse_tsn_source_claims = lambda _p: {
+    "schema_version": 1, "identity": dict(_FAKE_IDENTITY)}
+_istsn_mod.parse_tsn_source_claims = lambda _p: {
+    "schema_version": 1, "identity": dict(_FAKE_IDENTITY),
+    "signal_components": [["J", 1]]}
 from comparison_contract import ComparisonCounts, ComparisonOutcome  # noqa: E402
 from openpyxl import Workbook         # noqa: E402
 

@@ -197,6 +197,125 @@ def parse_tsn_pdf(path):
     return counts
 
 
+# --------------------------------------------------------------------------- #
+# TSN source claims (CMP-AUD-144/145/146): the print's own words, preserved.
+# --------------------------------------------------------------------------- #
+# The censused raw CONTROL F/G descriptors (the 2025-09 statewide print): the
+# print's F text erroneously repeats G's "(RED ON ALL)" meaning; the canonical
+# F mapping (Red on Mainline) comes from the authoritative TSNR crosswalk. The
+# mapping is a DECLARED CORRECTION, not an equality — if either printed label
+# drifts from this census, refuse and re-census rather than silently remapping.
+_RAW_CONTROL_F = "F-FOUR WAY FLASHER (RED ON ALL)"
+_RAW_CONTROL_G = "G-FOUR WAY FLASHER (RED ON ALL)"
+_TSNR_DECISION_SOURCE = "TSNR - Intersection Control and Geometry Type_4.25.24_AT 1.xlsx"
+
+
+def _claims_from_rows(band_rows, full_text, source):
+    """The print's source claims (CMP-AUD-144/145/146) from the clustered data
+    rows + full document text: report identity, EVERY printed (block, count,
+    raw-label) row pre-fold, the J–P signal components behind the derived
+    Signalized count, and the declared CONTROL F correction. Refuses if the
+    censused F/G descriptors drifted."""
+    headers = {summary_layout._norm_header(s.name): s.name for s in _SPEC.sections}
+    for s in _SPEC.sections:
+        for alias in s.aliases:
+            headers[summary_layout._norm_header(alias)] = s.name
+    printed, cur = [], None
+    for count, text in band_rows:
+        t = str(text or "").strip()
+        h = summary_layout._norm_header(t)
+        if h in headers:
+            cur = headers[h]
+            continue
+        if cur is not None and count is not None:
+            printed.append([cur, int(count), t])
+    control = {t.split("-", 1)[0].strip().upper(): (n, t)
+               for blk, n, t in printed
+               if blk == summary_layout._IS_CONTROL_TYPES and "-" in t}
+    components = [[c, control[c][0]] for c in "JKLMNPS" if c in control
+                  and c in summary_layout._CONTROL_SIGNAL_FOLD | {"S"}]
+    for code, censused in (("F", _RAW_CONTROL_F), ("G", _RAW_CONTROL_G)):
+        got = control.get(code, (None, None))[1]
+        if got != censused:
+            raise ValueError(
+                f"{source}: the print's CONTROL {code} descriptor ({got!r}) no "
+                f"longer matches the censused text ({censused!r}) — the source "
+                "label changed; re-census the declared F/G correction before "
+                "normalizing")
+    return {
+        "schema_version": 1,
+        "identity": ctc.tsn_print_identity(full_text, source),
+        "printed_rows": printed,
+        "signal_components": components,
+        "declared_corrections": [{
+            "block": summary_layout._IS_CONTROL_TYPES, "code": "F",
+            "printed": _RAW_CONTROL_F,
+            "canonical": "4-WAY FLASHER (RED/MAINLINE)",
+            "decision_source": _TSNR_DECISION_SOURCE,
+        }],
+    }
+
+
+def parse_tsn_source_claims(path):
+    """The statewide TSN PDF's source claims (see _claims_from_rows)."""
+    path = Path(path)
+    try:
+        with pdfplumber.open(path) as pdf:
+            full_text = "\n".join(pg.extract_text() or "" for pg in pdf.pages)
+            page = _data_page(pdf)
+            bands = [[], [], []]
+            for w in page.extract_words():
+                x = w["x0"]
+                bands[0 if x < _BAND_LEFT else (1 if x < _BAND_RIGHT else 2)].append(w)
+            rows = [r for band in bands for r in _cluster(band)]
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(f"Could not read {path.name}: {type(e).__name__}: {e}")
+    return _claims_from_rows(rows, full_text, path.name)
+
+
+def validate_claims_against_counts(claims, counts):
+    """CMP-AUD-144: the derived Signalized count must equal the sum of the
+    print's own J–P (+ any printed S) component claims, exactly."""
+    components = claims.get("signal_components") or []
+    total = sum(n for _c, n in components)
+    derived = counts.get(_SIGNALIZED_SLUG)
+    if components and derived != total:
+        raise ValueError(
+            f"the derived Signalized count ({derived}) does not equal the sum "
+            f"of the print's J–P/S component claims ({total}) — the fold and "
+            "the source claims disagree")
+
+
+def claims_notes(claims, side_label="TSN"):
+    """Human-readable exposure lines for the familiar sheet + log."""
+    if not claims:
+        return [f"{side_label} print: no source-claims record beside this "
+                "normalized workbook (older normalization) — rebuild the TSN "
+                "library to capture the print identity."]
+    ident = claims.get("identity") or {}
+    notes = []
+    if ident:
+        notes.append(
+            f"{side_label} print identity: {ident.get('report_id')} · Event "
+            f"{ident.get('event_id')} · reference {ident.get('reference_date')} "
+            f"· submitted by {ident.get('submitter')} · generated "
+            f"{ident.get('generated_time')} ({ident.get('location_criteria')}).")
+    comps = claims.get("signal_components") or []
+    if comps:
+        notes.append(
+            f"{side_label} Signalized (S) is derived: the print's "
+            + " + ".join(f"{c} {n:,}" for c, n in comps)
+            + f" = {sum(n for _c, n in comps):,} signal sub-type records.")
+    for corr in claims.get("declared_corrections") or ():
+        notes.append(
+            f"Declared correction: the {side_label} print labels {corr['block']} "
+            f"{corr['code']} {corr['printed']!r} (a known print defect); the "
+            f"canonical meaning is {corr['canonical']!r} per {corr['decision_source']}.")
+    return notes
+
+
 def _load_tsn(path):
     """TSN side -> {slug: count}. Raw statewide PDF, or the library's normalized
     Category|Count workbook."""
@@ -385,6 +504,15 @@ def _load_pair(tsmis_path, tsn_path, note_sink=None, events=None):
     notes = []
     tsmis_counts = _load_tsmis(tsmis_path, note_sink=notes)   # + route census status
     tsn_counts = _load_tsn(tsn_path)
+    # CMP-AUD-144/145/146: the print's own claims — fresh from a raw PDF (and
+    # cross-checked against the folded counts), or the normalization sidecar's
+    # record for a library workbook (absent -> explicit diagnostic note).
+    if Path(tsn_path).suffix.lower() == ".pdf":
+        claims = parse_tsn_source_claims(tsn_path)
+        validate_claims_against_counts(claims, tsn_counts)
+    else:
+        claims = consolidation_meta.read_extra(tsn_path, "tsn_source_claims")
+    notes += claims_notes(claims)
     notes += summary_layout.reconcile_counts(
         _SPEC, tsmis_counts, "tsmis", _TSMIS_RULES,
         source=Path(tsmis_path).name, side_label="TSMIS")

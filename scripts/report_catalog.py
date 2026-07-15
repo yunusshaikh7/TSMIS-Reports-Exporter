@@ -364,10 +364,15 @@ TSN = (
     TsnEntry("ramp_detail", "TSN Ramp Detail", "*.xlsx", "statewide_xlsx",
              "tsn_ramp_detail_normalized.xlsx", "tsn_load_ramp_detail:build_into",
              normalization_version=3, evidence_pdfs=True),
+    # v3 (both summaries): the sidecar now carries tsn_source_claims — the
+    # print's identity/timing/submitter, the IS pre-fold printed rows + J–P
+    # signal components, and the declared CONTROL F correction (CMP-AUD-144/
+    # 145/146). Rows unchanged; the bump rebuilds stored libraries so every
+    # normalized workbook gains its claims record (D2 auto-rebuild).
     TsnEntry("ramp_summary", "TSN Ramp Summary", "*.pdf", "statewide_pdf",
-             "tsn_ramp_summary_normalized.xlsx", "tsn_load_ramp_summary:build_into", normalization_version=2),
+             "tsn_ramp_summary_normalized.xlsx", "tsn_load_ramp_summary:build_into", normalization_version=3),
     TsnEntry("intersection_summary", "TSN Intersection Summary", "*.pdf", "statewide_pdf",
-             "tsn_intersection_summary_normalized.xlsx", "tsn_load_intersection_summary:build_into", normalization_version=2),
+             "tsn_intersection_summary_normalized.xlsx", "tsn_load_intersection_summary:build_into", normalization_version=3),
     # Intersection Detail v3 (v0.22.0, the July-2026 site update): the normalized
     # shape follows the reshaped comparison header (the second ML eff-date left it,
     # 'Xing Line Lgth'/X_CROSS_OVERRIDE joined) AND appends the TSN District/County

@@ -193,6 +193,51 @@ def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_m
 
 
 # --------------------------------------------------------------------------- #
+# TSN print identity (CMP-AUD-146) — the statewide summary prints' report
+# identity/timing/submitter facts, extracted from the FULL document text.
+# --------------------------------------------------------------------------- #
+# field -> regex over the joined page texts. A field may print on several pages
+# (report id / event id repeat on the data-page header) but must carry exactly
+# ONE distinct value; page-1 policy prose is legal furniture, not identity.
+_IDENTITY_PATTERNS = {
+    "report_id": r"\b(OTM\d+)\b",
+    "report_date": r"REPORT DATE\s*:\s*(\d{2}/\d{2}/\d{4})",
+    "reference_date": r"REFERENCE DATE\s*:\s*(\d{2}/\d{2}/\d{4})",
+    "submitter": r"SUBMITTOR\s*:\s*(\S+)",
+    "report_title": r"REPORT TITLE\s*:\s*'\s*(.*?)\s*'",
+    # The value can sit on the NEXT line ("EVENT ID :" / "4843742" on the Ramp
+    # print) and prints colon-less on the data page ("Event ID 4843738").
+    "event_id": r"EVENT ID\s*:?\s*\n?\s*(\d+)\b",
+    "generated_time": r"\b(\d{2}:\d{2} [AP]M)\b",
+    "location_criteria": r"LOCATION CRITERIA:\s*\n\s*([^\n]+)",
+}
+
+
+def tsn_print_identity(full_text, source):
+    """{field: value} for the statewide TSN print's report identity (CMP-AUD-146):
+    report id, report/reference dates, submitter, title, event id, generation
+    time, location criteria. Every field is REQUIRED and must resolve to exactly
+    one distinct value — a print we cannot identify (or that carries conflicting
+    identities) refuses instead of normalizing anonymous data."""
+    out = {}
+    problems = []
+    for field, pattern in _IDENTITY_PATTERNS.items():
+        values = {m.strip() for m in re.findall(pattern, full_text,
+                                                re.IGNORECASE | re.MULTILINE)}
+        if not values:
+            problems.append(f"{field} not found")
+        elif len(values) > 1:
+            problems.append(f"{field} has conflicting values: "
+                            + ", ".join(sorted(values)[:4]))
+        else:
+            out[field] = next(iter(values))
+    if problems:
+        raise ValueError(f"{source}: the TSN print's identity could not be "
+                         "established — " + "; ".join(problems))
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # shared normalizers (Ramp Detail + Intersection Detail, verbatim)
 # --------------------------------------------------------------------------- #
 def norm_pm(pm):

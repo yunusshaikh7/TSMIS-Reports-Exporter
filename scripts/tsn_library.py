@@ -1004,7 +1004,11 @@ def build_consolidated(report, events=None, confirm_overwrite=None, force=False)
     # an error result rather than the success-shaped one (the worker/UI surfaces it).
     published = consolidation_meta.write_outcome(
         out, result,
-        extra={"tsn_normalization_version": spec.normalization_version,
+        # The producer's own claims (e.g. the summaries' tsn_source_claims,
+        # CMP-AUD-144/145/146) merge in additively; the library's binding keys
+        # stay authoritative on collision.
+        extra={**(getattr(result, "producer_extra", None) or {}),
+               "tsn_normalization_version": spec.normalization_version,
                "tsn_raw_manifest": raw_manifest,
                "tsn_normalized_workbook_identity": workbook_identity,
                "tsn_artifact_identity_token": identity_token})

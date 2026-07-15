@@ -27,6 +27,11 @@ def _project(raw_path):
     TSMIS-only codes); a missing category makes the workbook PARTIAL (carried via
     skipped_inputs — P1-B05)."""
     counts = istsn.parse_tsn_pdf(raw_path)
+    # CMP-AUD-144/145/146: capture the print's own claims (identity, every
+    # printed row pre-fold, the J–P components behind the derived Signalized
+    # count, the declared CONTROL F correction) and cross-check the fold.
+    claims = istsn.parse_tsn_source_claims(raw_path)
+    istsn.validate_claims_against_counts(claims, counts)
     tsn_cats = istsn._SPEC.categories_for("tsn")     # TSN-applicable only (no TSMIS-only codes)
     missing = [key for key, slug in tsn_cats if counts.get(slug) is None]
     # A category the PDF didn't yield is OMITTED, never written as a fabricated
@@ -47,7 +52,8 @@ def _project(raw_path):
             message=f"Normalized TSN Intersection Summary ({len(rows)} categories).",
             summary_lines=summary,
             completion=outcome.PARTIAL if missing else outcome.COMPLETE,
-            skipped_inputs=len(missing))
+            skipped_inputs=len(missing),
+            producer_extra={"tsn_source_claims": claims})
 
     return rows, make_result
 

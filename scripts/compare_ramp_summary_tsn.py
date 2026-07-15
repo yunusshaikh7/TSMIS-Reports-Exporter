@@ -38,6 +38,7 @@ from dataclasses import replace
 
 import compare_tsn_common as ctc
 import consolidate_ramp_summary as rs
+import consolidation_meta
 import summary_layout
 from compare_core import CompareSchema
 from paths import today_str
@@ -129,6 +130,36 @@ def parse_tsn_pdf(path):
         m = re.search(r"Total number of Ramps:\s*([\d,]+)", page.extract_text() or "", re.I)
         rec["total_ramps"] = int(m.group(1).replace(",", "")) if m else None
     return rec
+
+
+def parse_tsn_source_claims(path):
+    """The statewide TSN Ramp Summary print's source claims (CMP-AUD-146):
+    the report identity/timing/submitter facts, required exactly-once across
+    the document (the Ramp print has no fold or declared label correction, so
+    identity is its whole claims record)."""
+    path = Path(path)
+    try:
+        with pdfplumber.open(path) as pdf:
+            full_text = "\n".join(pg.extract_text() or "" for pg in pdf.pages)
+    except Exception as e:
+        raise ValueError(f"Could not read {path.name}: {type(e).__name__}: {e}")
+    return {"schema_version": 1,
+            "identity": ctc.tsn_print_identity(full_text, path.name)}
+
+
+def claims_notes(claims, side_label="TSN"):
+    """Human-readable exposure lines for the familiar sheet + log."""
+    if not claims:
+        return [f"{side_label} print: no source-claims record beside this "
+                "normalized workbook (older normalization) — rebuild the TSN "
+                "library to capture the print identity."]
+    ident = claims.get("identity") or {}
+    if not ident:
+        return []
+    return [f"{side_label} print identity: {ident.get('report_id')} · Event "
+            f"{ident.get('event_id')} · reference {ident.get('reference_date')} "
+            f"· submitted by {ident.get('submitter')} · generated "
+            f"{ident.get('generated_time')} ({ident.get('location_criteria')})."]
 
 
 def _load_tsn(path):
@@ -299,7 +330,14 @@ def _load_pair(tsmis_path, tsn_path, footnote_sink=None, note_sink=None,
                 "to tabulate the TSN-only P/V classes, so the one-sided "
                 "comparison contract no longer holds; the comparator needs an "
                 "update for this source change")
-    notes = summary_layout.reconcile_counts(
+    # CMP-AUD-146: the print's identity claims — fresh from a raw PDF, or the
+    # normalization sidecar's record (absent -> explicit diagnostic note).
+    if Path(tsn_path).suffix.lower() == ".pdf":
+        claims = parse_tsn_source_claims(tsn_path)
+    else:
+        claims = consolidation_meta.read_extra(tsn_path, "tsn_source_claims")
+    notes = claims_notes(claims)
+    notes += summary_layout.reconcile_counts(
         _SPEC, tsmis_counts, "tsmis", _TSMIS_RULES,
         source=tsmis_name, side_label="TSMIS")
     notes += summary_layout.reconcile_counts(

@@ -5202,7 +5202,7 @@ under the final generator bytes.
 ### CMP-AUD-144 — Intersection Summary normalization irreversibly folds six authoritative printed control categories into one count
 
 Priority: P1  
-Status: Verified during the independent Stage-6 source-conservation pass  
+Status: Resolved 2026-07-14 — printed J–P claims preserved + derived-S cross-checked; real-data verified  
 Primary code: Intersection Summary normalizer, loader, comparison schema, sidecar, and
 Report View/evidence consumers
 
@@ -5223,7 +5223,7 @@ exact separate from full-conservation truth until reconstruction is possible.
 ### CMP-AUD-145 — Intersection Summary drops the TSN PDF's erroneous raw CONTROL F label while applying the proven RED/MAINLINE canonical mapping
 
 Priority: P1  
-Status: Verified during Stage-6 and refined by the authoritative TSNR crosswalk in Stage 8  
+Status: Resolved 2026-07-14 — raw F descriptor retained as a declared TSNR-bound correction; drift refuses  
 Primary code: Intersection Summary category map, normalized labels, comparison/evidence
 
 The statewide TSN Summary PDF prints CONTROL F as `FOUR WAY FLASHER (RED ON ALL)` and
@@ -5247,7 +5247,7 @@ mutation-test raw F, raw G, canonical F/G, and decision-source drift independent
 ### CMP-AUD-146 — normalized Summary artifacts omit printed report identity, timing, and submitter provenance
 
 Priority: P1  
-Status: Verified during independent Stage-6 Summary source conservation  
+Status: Resolved 2026-07-14 — print identity/timing/submitter captured, typed, required exactly-once; exposed in Notes  
 Primary code: Summary normalizers/sidecars, comparison Notes/provenance, Matrix/evidence
 
 The accepted `r7` Intersection Summary workbook and sidecar bind the raw PDF bytes but do
@@ -5273,6 +5273,36 @@ the exact source values; reject missing/multiple/malformed metadata; expose rele
 facts in comparison Notes/evidence; and explicitly disposition genuine legal/presentation
 text without allowing that label to swallow report identity. Category equality alone
 may not certify full source conservation.
+
+**Remediation for CMP-AUD-144/145/146 (2026-07-14, one normalizer batch —
+summaries' `normalization_version` 2→3).** New `parse_tsn_source_claims` per
+summary comparator captures, before any fold: the print identity
+(`compare_tsn_common.tsn_print_identity` — report id / report+reference dates /
+submitter / title / event id / generation time / location, each REQUIRED with
+exactly one distinct value across all pages; the Ramp print's next-line
+`EVENT ID :` shape handled; page-1 policy prose dispositioned as legal
+furniture), every printed (block, count, raw-label) row (62 on the censused IS
+print), the J–P signal components (207+36+107+65+210+2023 = 2,648, cross-checked
+against the derived folded S by `validate_claims_against_counts` in both the
+normalizer and the raw-compare path), and the declared CONTROL F correction
+({printed `F-FOUR WAY FLASHER (RED ON ALL)`, canonical `4-WAY FLASHER
+(RED/MAINLINE)`, decision source TSNR 4.25.24} — a drifted printed F or G
+descriptor refuses for re-census). Claims ride
+`ConsolidateResult.producer_extra["tsn_source_claims"]` into the library
+sidecar (`build_normalized` merges producer extra; the version bump D2-rebuilds
+stored libraries so every normalized workbook gains its record). Comparisons
+expose the claims as familiar-sheet notes + log lines — identity, derived-S
+composition, and the declared correction — from a fresh parse on the raw path
+or `read_extra` on the normalized path (absent → explicit no-claims
+diagnostic). Verified on both real statewide PDFs (censused values reproduced
+exactly; both oracles unchanged: 29/0/2·5·24 and 58/8/0·5·53). Fixtures:
+`check_compare_intersection_summary_tsn.test_source_claims`, claims stubs in
+`check_tsn_normalizer` / `check_tsn_outcome` / `check_tsn_raw_source_contract`.
+Honest scope: the workbook rows remain Category|Count (reconstruction lives in
+the sidecar claims record, per the finding's "or an equivalently bound
+provenance record"); Report View/evidence surfaces beyond the summaries'
+familiar sheets don't exist for these families; the TSMIS-side print provenance
+loss stays with CMP-AUD-076.
 
 ### CMP-AUD-147 — Highway Detail detached acceptance can say accepted when audit invariants are false
 

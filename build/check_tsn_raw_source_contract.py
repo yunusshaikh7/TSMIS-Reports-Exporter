@@ -780,7 +780,20 @@ def test_summary_exact_one():
             counts = {slug: i + 1 for i, (_key, slug) in enumerate(categories)}
             counts[total_slug] = 999
             out = root / f"{label}_one.xlsx"
-            with patch(comparator, "parse_tsn_pdf", lambda _p, c=counts: dict(c)):
+            # CMP-AUD-144/146: stub the claims capture coherently (the IS
+            # component sum must equal the fake folded S count).
+            claims = {"schema_version": 1,
+                      "identity": {"report_id": "OTM00000", "event_id": "1",
+                                   "report_date": "01/01/2025",
+                                   "reference_date": "01/01/2025",
+                                   "submitter": "TEST", "report_title": "t",
+                                   "generated_time": "01:00 PM",
+                                   "location_criteria": "STATEWIDE"}}
+            if "is_control_types_s" in counts:
+                claims["signal_components"] = [["J", counts["is_control_types_s"]]]
+            with patch(comparator, "parse_tsn_pdf", lambda _p, c=counts: dict(c)), \
+                 patch(comparator, "parse_tsn_source_claims",
+                       lambda _p, c=claims: dict(c)):
                 accepted = loader.build_into(raw, out)
             _title, rows = workbook_rows(out)
             check(f"{label}: one PDF plus owner-lock succeeds COMPLETE",

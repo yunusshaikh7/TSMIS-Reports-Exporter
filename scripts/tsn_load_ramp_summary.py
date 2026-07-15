@@ -30,6 +30,9 @@ def _project(raw_path):
     the PDF didn't yield makes the workbook PARTIAL (carried structurally via
     skipped_inputs, not just the warning line — P1-B05)."""
     counts = rstsn.parse_tsn_pdf(raw_path)
+    # CMP-AUD-146: capture the print's identity claims (report id/dates/
+    # submitter/event/generation time) — an unidentifiable print refuses.
+    claims = rstsn.parse_tsn_source_claims(raw_path)
     missing = [key for key, slug in rstsn._CATEGORIES if counts.get(slug) is None]
     # A category the PDF didn't yield is OMITTED, never written as a fabricated
     # zero (CMP-AUD-021 absent-vs-zero): the comparator's validation then refuses
@@ -49,7 +52,8 @@ def _project(raw_path):
             message=f"Normalized TSN Ramp Summary ({len(rows)} categories).",
             summary_lines=summary,
             completion=outcome.PARTIAL if missing else outcome.COMPLETE,
-            skipped_inputs=len(missing))
+            skipped_inputs=len(missing),
+            producer_extra={"tsn_source_claims": claims})
 
     return rows, make_result
 
