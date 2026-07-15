@@ -23,7 +23,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020–023, 184, 183, 144, 145, 146**; 115/035 partially remediated |
-| **Next action** | **CMP-AUD-076** (durable cross-family comparison provenance: recipe key, canonical selection, input identity + fingerprint in a structured workbook sheet + sidecar) — 098's comparison half is DONE; its evidence half rides Stage 10 |
+| **Next action** | **CMP-AUD-076 remainder** (compare_env folder-kind provenance + the in-workbook Provenance sheet), then Wave 4 (045 PhysicalKey integration, 220, 218, 199, 197) |
 
 > ### ▶ RESUME HERE (2026-07-14, after the Summary-loader batch)
 > **Done this batch — CMP-AUD-020/021/022/023 (aggregate Summary loader correctness):**
@@ -283,6 +283,8 @@ no family-gate owner yet. Wave 5 assigns them.
 ---
 
 ## 11. Progress log (append-only — real progress, not recursion)
+
+- **2026-07-14 — Wave 3: CMP-AUD-076 file-kind half Resolved (durable comparison provenance).** Every file-kind comparison (the `run_files_compare` driver, all 12+ comparators) captures each input's full canonical selection + streaming sha256 + stat identity + coupled producer completion BEFORE the loaders read, logs the full selections under the banner, and persists the record (+ recipe + committed generation/member digests) as a tolerant guard-disciplined `.provenance.json` beside the workbook. Same-basename inputs are now durably distinguishable; copies keep their digest under their own selection; absence reads as an older comparison. Real-corpus verified (real sidecars beside both summary comparisons; oracles unchanged). Remainder: compare_env folder-kind + the in-workbook sheet + schema-v4 fold-in. Suite 121/121 + ruff clean.
 
 - **2026-07-14 — Wave 3: CMP-AUD-098 comparison-pipeline half Resolved (mid-comparison mutation races).** All four comparison record sites (Matrix env / vs-TSN / self, by-day, baseline) capture the source-folder fingerprint BEFORE any read and record that capture, so a mid-build mutation auto-invalidates (the recorded binding mismatches the folders → `inputs_changed` stale, never a fresh 0/0) and is announced; the formulas twin skips loudly when inputs moved after the values build. CT-6d reproduces the finding's exact raced-fresh setup green + demonstrates the red mechanism. The evidence-gate half stays with Stage 10. Suite 121/121 + ruff clean.
 

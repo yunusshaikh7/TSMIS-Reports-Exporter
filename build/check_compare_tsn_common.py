@@ -167,9 +167,15 @@ def test_driver_happy_path():
         ctc.run_files_compare("SCHEMA", a, b, out, banner="Ramp Detail Comparison — TSMIS vs TSN",
                               has_route=True, loader=lambda _t, _n: ([["t"]], [["n"]], None),
                               mode="values", confirm_overwrite=lambda _p: True, events=ev)
-    check("banner == the 6 canonical log lines (=*60, title, =*60, TSMIS:, TSN:, '')",
-          logs == ["=" * 60, "Ramp Detail Comparison — TSMIS vs TSN", "=" * 60,
-                   "TSMIS: tsmis.xlsx", "TSN:   tsn.xlsx", ""])
+    # CMP-AUD-076: two full-selection lines follow the concise-name pair (the
+    # basename alone is ambiguous — A\same.xlsx vs B\same.xlsx).
+    check("banner == the 8 canonical log lines (incl. the two full selections)",
+          logs[:5] == ["=" * 60, "Ramp Detail Comparison — TSMIS vs TSN", "=" * 60,
+                       "TSMIS: tsmis.xlsx", "TSN:   tsn.xlsx"]
+          and len(logs) == 8 and logs[7] == ""
+          and logs[5].startswith("  TSMIS selection: ") and "tsmis.xlsx" in logs[5]
+          and "(sha256 " in logs[5]
+          and logs[6].startswith("  TSN selection: ") and "tsn.xlsx" in logs[6])
     check("run_compare got schema/has_route/mode/names via a transactional temp path",
           seen.get("sc") == "SCHEMA" and seen.get("has_route") is True
           and Path(seen.get("out_path")).parent == out.parent

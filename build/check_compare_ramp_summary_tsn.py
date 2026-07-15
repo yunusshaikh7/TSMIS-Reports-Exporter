@@ -341,6 +341,73 @@ def test_validation_refusals():
             pp, good_tsn, "Dummy Paired", "update")
 
 
+def test_provenance_sidecar():
+    """CMP-AUD-076: a committed comparison persists a durable provenance record —
+    the recipe, each input's FULL canonical selection (basenames are ambiguous),
+    its pre-read sha256 + stat identity, and the committed generation binding.
+    Same basenames in different directories stay distinguishable; a byte-copy
+    records the same digest under its own selection; absence reads as None."""
+    print("durable comparison provenance (CMP-AUD-076):")
+    import shutil
+
+    import compare_tsn_common as ctc
+    root = Path(tempfile.mkdtemp(prefix="tsmis_rs_prov_"))
+    a_dir, b_dir = root / "A", root / "B"
+    a_dir.mkdir(), b_dir.mkdir()
+    # SAME basename on both sides, different directories + different bytes.
+    tsmis_path = a_dir / "same.xlsx"
+    tsn_path = b_dir / "same.xlsx"
+    _write_tsmis(tsmis_path, _ALL_DISPLAYS,
+                 [_route_row("001", 14, right=4, divided=10, nolw=2, diamond=11)])
+    _write_tsn_norm(tsn_path, _tsn_rows(40, right=10, divided=25, undivided=5, p=5, v=3))
+    out = root / "cmp.xlsx"
+    res = cmp.compare(tsmis_path, tsn_path, out, events=Events(),
+                      confirm_overwrite=lambda _p: True, mode="values")
+    check("compare ok", res.status == "ok")
+
+    prov = ctc.read_comparison_provenance(out)
+    check("a provenance sidecar exists beside the workbook", prov is not None)
+    check("schema + recipe recorded (report + banner)",
+          prov.get("schema_version") == 1
+          and prov.get("recipe", {}).get("report") == "Ramp Summary"
+          and "TSMIS vs TSN" in prov.get("recipe", {}).get("banner", ""))
+    ins = prov.get("inputs") or []
+    check("both inputs recorded with roles", [i.get("role") for i in ins]
+          == ["TSMIS", "TSN"])
+    check("FULL canonical selections disambiguate the same basenames",
+          all(i["name"] == "same.xlsx" for i in ins)
+          and ins[0]["selection"] != ins[1]["selection"]
+          and str(a_dir) in ins[0]["selection"] and str(b_dir) in ins[1]["selection"])
+    check("distinct content digests + stat identity captured",
+          ins[0]["sha256"] != ins[1]["sha256"]
+          and all(len(i["sha256"]) == 64 and i["size"] > 0 and i["mtime_ns"] > 0
+                  for i in ins))
+    check("the record binds the committed generation + member digests",
+          prov.get("generation_id") == res.artifact_generation.generation_id
+          and prov.get("members") == dict(res.artifact_generation.content_digests))
+
+    # A byte-copy elsewhere records the SAME digest under its OWN selection.
+    c_dir = root / "C"
+    c_dir.mkdir()
+    copied = c_dir / "same.xlsx"
+    shutil.copy2(tsmis_path, copied)
+    out2 = root / "cmp2.xlsx"
+    res2 = cmp.compare(copied, tsn_path, out2, events=Events(),
+                       confirm_overwrite=lambda _p: True, mode="values")
+    prov2 = ctc.read_comparison_provenance(out2)
+    check("a copy keeps the digest but records its own selection",
+          res2.status == "ok"
+          and prov2["inputs"][0]["sha256"] == ins[0]["sha256"]
+          and prov2["inputs"][0]["selection"] != ins[0]["selection"])
+
+    check("absence reads as None (older comparison), never fabricated",
+          ctc.read_comparison_provenance(root / "never_built.xlsx") is None)
+    junk = root / "junk.xlsx"
+    ctc.provenance_path(junk).write_text("{not json", encoding="utf-8")
+    check("a corrupt sidecar reads as None (logged), never trusted",
+          ctc.read_comparison_provenance(junk) is None)
+
+
 def test_corrupt_pdf_is_valueerror():
     """A corrupt/truncated statewide PDF must honor the loader contract:
     ValueError (run_files_compare reports it cleanly), never a raw pdfplumber
@@ -363,6 +430,7 @@ def main():
     test_tsmis_loader_sums()
     test_end_to_end()
     test_validation_refusals()
+    test_provenance_sidecar()
     test_corrupt_pdf_is_valueerror()
     print()
     if _fail:

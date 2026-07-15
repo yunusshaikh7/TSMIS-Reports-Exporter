@@ -3022,7 +3022,7 @@ CMP-AUD-082 integration gate; it must not be hidden by the central publisher fix
 ### CMP-AUD-076 — saved comparisons lack durable source provenance
 
 Priority: P2  
-Status: Verified with same-basename sources in different directories  
+Status: Partially remediated 2026-07-14 — file-kind comparisons persist durable input provenance; folder-kind (compare_env) + the in-workbook sheet remain  
 Primary code: `scripts/compare_tsn_common.py:219-222`,
 `scripts/compare_env.py:666-669`, `scripts/compare_core.py:1503-1504`,
 `scripts/consolidation_meta.py:157-163`
@@ -3054,6 +3054,30 @@ effective input identity, content fingerprint, and producer metadata in a struct
 workbook sheet and sidecar. Keep human display concise while retaining unambiguous
 machine-readable evidence. Test same basenames, copies, aliases, moved files, and
 folder discoveries with overlapping members.
+
+**Remediation, file-kind half (2026-07-14).** `run_files_compare` — the shared
+driver behind every file-kind comparator — now captures each input's identity
+BEFORE any loader reads it (`capture_input_provenance`: role, basename, FULL
+canonical selection, streaming sha256, size, mtime_ns, and the producer
+completion read through the coupled mtime-validated outcome reader) and, after
+a successful commit, persists the record as a tolerant `.provenance.json`
+sidecar beside the workbook (`write_comparison_provenance`, the write_outcome
+pattern: guard-disciplined temp+replace; a write failure logs and never fails
+the comparison; absence reads as an older comparison). The record binds the
+recipe (report + banner), both inputs, the committed `generation_id`, and the
+member digests. The run log now prints both FULL selections + digest prefixes
+under the concise banner names. `artifact_store.fingerprint` excludes the new
+sidecar. Fixtures: `test_provenance_sidecar` (same basenames in different
+directories disambiguated; a byte-copy keeps the digest under its own
+selection; absent/corrupt sidecars read None), the updated 8-line driver
+banner lock, and the coupled-reader read-twice lock. Real-corpus: both summary
+comparisons persist real records (full Downloads selections, real digests, the
+ssor-prod consolidated workbook's `complete` producer completion) with both
+oracles unchanged. **Still open in this finding:** compare_env's folder-kind
+provenance (member census + metadata fingerprint — `fingerprint()` is
+(name,size,mtime_ns) metadata, stated honestly), the in-workbook structured
+Provenance sheet, moved-file/alias mutation coverage beyond copies, and folding
+the sidecar into the strict schema-v4 payload (Phase-5 artifact epoch).
 
 ### CMP-AUD-077 — comparison results discard structured discrepancy counts
 

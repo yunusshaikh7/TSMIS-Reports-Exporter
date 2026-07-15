@@ -87,7 +87,11 @@ def test_current_complete_and_absent_stale():
     complete = record("complete")
     result, seen, a, b = run_case("values", complete, complete)
     kw = seen["compare_kwargs"]
-    check("both current complete records are read once", seen["reads"] == [a, b])
+    # CMP-AUD-076: the provenance capture reads each side's coupled outcome
+    # record too (for the per-input producer completion), so each side is read
+    # through the SAME mtime-validated reader twice — capture, then merge.
+    check("both current complete records are read via the coupled reader "
+          "(capture + merge)", seen["reads"] == [a, b, a, b])
     check("both current complete records authorize complete input coverage",
           kw["input_completion"] == "complete"
           and kw["warnings"] == () and kw["skipped_inputs"] is None

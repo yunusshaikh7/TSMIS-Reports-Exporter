@@ -51,7 +51,8 @@ _FP_SCHEMA = 1
 _UNREADABLE = "unreadable"
 # Names excluded from a store fingerprint: Excel lock files, our own sidecars, and the
 # in-flight temp / staging siblings this module itself creates.
-_FP_EXCLUDED_SUFFIXES = (_FP_SUFFIX, ".outcome.json", ".staging")
+_FP_EXCLUDED_SUFFIXES = (_FP_SUFFIX, ".outcome.json", ".provenance.json",
+                         ".staging")
 _COMPARISON_PUBLICATION_LOCK_NAME = ".tsmis-comparison-publication.lock"
 _COMPARISON_PAYLOAD_RE = re.compile(
     r"^\.cmpv3-[0-9a-f]{64}-[0-9]{6}-[0-9a-f]{64}"

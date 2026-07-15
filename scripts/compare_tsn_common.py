@@ -24,6 +24,10 @@ module never touches it. Console-free; openpyxl is imported lazily (only inside 
 Notes writer, which runs solely when a workbook is actually being built).
 """
 import contextlib
+import hashlib
+import json
+import logging
+import os
 import re
 from pathlib import Path
 
@@ -34,6 +38,8 @@ from compare_core import run_compare
 from comparison_contract import comparison_result_boundary
 from events import ConsolidateResult, Events
 from paths import today_str
+
+log = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- #
@@ -235,6 +241,120 @@ def tsn_print_identity(full_text, source):
         raise ValueError(f"{source}: the TSN print's identity could not be "
                          "established — " + "; ".join(problems))
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Durable comparison provenance (CMP-AUD-076) — the saved artifact must be able
+# to say exactly WHAT it compared: the full canonical selections (basenames are
+# ambiguous — A\same.xlsx vs B\same.xlsx), each input's pre-read content digest
+# and stat identity, the producer's recorded completion, and the recipe facts.
+# Persisted as a tolerant `.provenance.json` sidecar beside the workbook (the
+# write_outcome pattern: guard-disciplined temp+replace; absence reads as an
+# older comparison, never a silent pass). Folding this into the strict schema-v4
+# payload is Phase-5 artifact-epoch work.
+# --------------------------------------------------------------------------- #
+PROVENANCE_SUFFIX = ".provenance.json"
+_PROVENANCE_SCHEMA = 1
+_SHA_CHUNK = 1024 * 1024
+
+
+def _sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(_SHA_CHUNK), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def capture_input_provenance(sides):
+    """[{role, name, selection, sha256, size, mtime_ns}] for ``sides`` =
+    ((role_label, path), ...), hashed BEFORE any loader reads (CMP-AUD-098
+    discipline: the record binds what the comparison actually consumed; the
+    publication boundary's current-source recheck refuses a mid-run swap).
+    Raises ValueError when an input can't be read — a comparison whose inputs
+    can't be identified must not run."""
+    captured = []
+    for role, raw in sides:
+        path = Path(raw)
+        try:
+            st = path.stat()
+            digest = _sha256_file(path)
+        except OSError as e:
+            raise ValueError(f"Could not capture the {role} input identity for "
+                             f"{path.name}: {type(e).__name__}: {e}")
+        producer = consolidation_meta.read_outcome(path)
+        captured.append({
+            "role": role,
+            "name": path.name,
+            "selection": str(path.resolve(strict=False)),
+            "sha256": digest,
+            "size": st.st_size,
+            "mtime_ns": st.st_mtime_ns,
+            "producer_completion": (producer.completion if producer is not None
+                                    else None),
+        })
+    return captured
+
+
+def provenance_path(workbook_path):
+    p = Path(workbook_path)
+    return p.with_name(p.name + PROVENANCE_SUFFIX)
+
+
+def write_comparison_provenance(result, out_path, *, report, banner, inputs,
+                                commit_guard=None):
+    """Persist the provenance sidecar beside a JUST-COMMITTED comparison.
+    Additive evidence, never a gate: only a result that committed real bytes
+    (an attached artifact generation) gets a record; a write failure logs and
+    leaves the comparison result intact (absent provenance reads as an older
+    comparison). Guard discipline mirrors consolidation_meta.write_outcome."""
+    generation = getattr(result, "artifact_generation", None)
+    if getattr(result, "status", None) != "ok" or generation is None:
+        return False
+    target = provenance_path(out_path)
+    tmp = target.with_name(target.name + ".tmp")
+    if not (consolidation_meta.guard_allows(commit_guard, Path(out_path))
+            and consolidation_meta.guard_allows(commit_guard, target)
+            and consolidation_meta.guard_allows(commit_guard, tmp)):
+        log.warning("comparison provenance for %s: destination changed; "
+                    "no sidecar write", Path(out_path).name)
+        return False
+    payload = {
+        "schema_version": _PROVENANCE_SCHEMA,
+        "recipe": {"report": report, "banner": banner},
+        "inputs": inputs,
+        "generation_id": generation.generation_id,
+        "members": dict(generation.content_digests),
+    }
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        if not (consolidation_meta.guard_allows(commit_guard, Path(out_path))
+                and consolidation_meta.guard_allows(commit_guard, target)):
+            return False
+        os.replace(tmp, target)
+        return True
+    except OSError as e:
+        log.warning("comparison provenance for %s could not be written "
+                    "(%s: %s)", Path(out_path).name, type(e).__name__, e)
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        return False
+
+
+def read_comparison_provenance(workbook_path):
+    """The provenance record beside a comparison workbook, or None (absent /
+    unreadable / wrong shape — an older comparison; never a fabricated one)."""
+    try:
+        with open(provenance_path(workbook_path), encoding="utf-8") as f:
+            data = json.load(f)
+    except OSError:      # silent-ok: absent sidecar is the pre-076 state
+        return None
+    except ValueError as e:
+        log.info("comparison provenance beside %s unreadable (%s: %s)",
+                 Path(workbook_path).name, type(e).__name__, e)
+        return None
+    return data if isinstance(data, dict) else None
 
 
 # --------------------------------------------------------------------------- #
@@ -464,12 +584,24 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
     if blocked is not None:
         return blocked
 
+    # CMP-AUD-076: capture each input's full canonical selection + content
+    # digest BEFORE any loader reads it, and log the full selections (the
+    # banner keeps concise names; basenames alone are ambiguous).
+    try:
+        input_provenance = capture_input_provenance(
+            ((side_a, tsmis_path), (side_b, tsn_path)))
+    except ValueError as e:
+        return ConsolidateResult(status="error", message=str(e))
+
     events.on_log("=" * 60)
     events.on_log(banner)
     events.on_log("=" * 60)
     pad = max(len(side_a), len(side_b)) + 1
     events.on_log(f"{side_a + ':':<{pad}} {tsmis_path.name}")
     events.on_log(f"{side_b + ':':<{pad}} {tsn_path.name}")
+    for rec in input_provenance:
+        events.on_log(f"  {rec['role']} selection: {rec['selection']} "
+                      f"(sha256 {rec['sha256'][:12]}…)")
     events.on_log("")
 
     try:
@@ -498,7 +630,7 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
     if blocked is not None:
         return blocked
 
-    return artifact_store.commit_workbook(
+    committed = artifact_store.commit_workbook(
         out_path,
         lambda tmp: run_compare(
             schema, rows_t, rows_n, has_route, tmp,
@@ -516,3 +648,10 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
         captured_sources=captured_sources,
         commit_guard=commit_guard,
         requested_mode=mode)
+    # CMP-AUD-076: bind the pre-read input identities to the committed
+    # generation, beside the workbook (additive evidence, never a gate).
+    write_comparison_provenance(committed, out_path,
+                                report=getattr(schema, "report_name", str(schema)),
+                                banner=banner, inputs=input_provenance,
+                                commit_guard=commit_guard)
+    return committed
