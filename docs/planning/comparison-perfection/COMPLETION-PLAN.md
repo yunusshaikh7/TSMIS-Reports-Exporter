@@ -67,10 +67,27 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   parser), both comparator checks, and re-verify both oracles (must stay 29/0/2·5·24 and
 >   58/8/0·5·53).
 >
-> **Do this next: Wave 3 — CMP-AUD-098 (durable source-capture digests) + 076 (durable
-> cross-family provenance)** — read both findings first; they share the capture/persist
-> infrastructure (`artifact_store.capture_source_identities` exists as the seam). 183/184
-> are Resolved. 183 follow-ups parked: matrix auto-rebuild when a consolidated
+> **Do this next: CMP-AUD-076 (durable cross-family comparison provenance).** 098's
+> comparison half is DONE (2026-07-14: pre-read fingerprint capture recorded at all four
+> record sites — Matrix env / vs-TSN+self / by-day / baseline; raced results
+> auto-invalidate via `_fingerprint_for_record`; the formulas twin skips loudly on a
+> mid-build change; CT-6d in `check_p2_freshness` locks it); 098's evidence-gate half
+> rides Stage 10. **076 design notes (censused 2026-07-14):** the cited line numbers have
+> drifted — the defects are (a) `run_files_compare`'s banner + `compare_core`'s Summary
+> record only source BASENAMES (`A\same.xlsx` vs `B\same.xlsx` indistinguishable);
+> (b) `compare_env` records folder basenames; (c) the outcome sidecar carries no recipe/
+> selection/content identity. Build on what exists: `run_files_compare` already calls
+> `artifact_store.capture_source_identities(...)` BEFORE loading (the capture seam), and
+> the typed `ArtifactGeneration` already has `content_digests` + `producer_versions`
+> mappings (FrozenMap since CMP-AUD-238) — the machine-readable home. Plan: persist
+> {stable recipe key, role/side labels, canonical full selection, effective input
+> identity + content fingerprint, producer metadata (input consolidation outcomes; the
+> TSN sidecar identity/claims)} into (1) the typed generation record and (2) a small
+> structured Provenance sheet appended to the comparison workbook (human-concise; NOTE:
+> adds a sheet to EVERY comparison workbook — sweep golden checks that assert exact sheet
+> lists, and mind `compare_core` correctness-locked semantics: content additive only).
+> Mutation tests required: same basenames in different dirs, copies, aliases, moved
+> files, folder discoveries with overlapping members. 183/184 are Resolved. 183 follow-ups parked: matrix auto-rebuild when a consolidated
 > workbook lacks a route census (then harden census-required), typed-contract census
 > surfacing (Phase-5/7 overlay), and Ramp's own universe contract (CMP-AUD-071).
 > - **Method (mandatory, proven):** (1) read the finding; (2) red fixture confirmed RED on
