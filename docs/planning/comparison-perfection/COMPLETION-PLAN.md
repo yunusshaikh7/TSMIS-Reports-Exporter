@@ -67,7 +67,44 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   parser), both comparator checks, and re-verify both oracles (must stay 29/0/2·5·24 and
 >   58/8/0·5·53).
 >
-> **Do this next: Wave 4, Intersection Detail family** (045-ID vs the accepted
+> **Do this next: Wave 4, Highway Sequence family** (CMP-AUD-199 + the 045 HSL leg +
+> the four HSL audit reds 155/156/158/159 — omitted provenance, 565 blanked pointer
+> tokens, 46 dropped pre-county equates, one invented comma). Facts staged:
+> - HSL's **vs-TSN comparator already implements** the approved county + complete
+>   glued-PM identity (`compare_highway_sequence_tsn` — the finding says so and the
+>   KNOWN_RED direct contract exercises `hsl._tsmis_row`); what remains for 045-HSL is
+>   the ENV path (`compare_env.HIGHWAY_SEQUENCE`, key_col="PM" — reuse the
+>   `physical_key_builder` hook exactly like RD/ID) + promoting the LAST two KNOWN_RED
+>   contracts (env swap expects canonical postmile `R001.000E` — padded glue WITH
+>   suffix, HSL's own convention; VERIFY against the HSL oracle script's identity rule
+>   before trusting it, the way RD's and ID's glued expectations were corrected).
+> - **Method proven twice (RD, ID)**: (1) read the family's oracle script FIRST
+>   (`build/phase8_*.py` — its `physical_key` + `_text`/reading rules adjudicate every
+>   dispute: RD edge-trims Descriptions, ID does NOT — never assume across families);
+>   (2) read the family's canary binding for exact re-bless targets (HSL's is
+>   `## Active Stage-8 base comparison oracle — Highway Sequence (HSL-79-current)` in
+>   comparison-canary-bindings.md — note HSL's July-9 pair subtleties: 60,494 Excel /
+>   60,493 PDF rows, the retained historical fixture is NOT current truth);
+>   (3) implement every path in ONE commit (engine rejects mixed typed/legacy keys);
+>   (4) correct+promote KNOWN_RED with evidence; (5) fixtures + gate + ruff;
+>   (6) re-bless on the real corpus; (7) docs + honest CI watch.
+> - **Re-bless diagnostics that worked**: factor a mismatched count (ID's asserted
+>   denominators were exactly ×34 vs ×32 → two missing assertion columns); diff the
+>   per-field/per-row sets between legs (RD's +2 Description diffs → the two
+>   trailing-tab rows → the oracle's edge-trim reading contract).
+> - **CI discipline**: verify the watched RUN ID belongs to the pushed SHA (a
+>   just-pushed commit's run may not be first in `gh run list` yet); never `|| echo`
+>   over the exit code; fixture path assertions compare RESOLVED-to-RESOLVED (the
+>   runner's 8.3 short temp names).
+> - HL stays BLOCKED on its raw county-retention + collision census; HD-Excel on the
+>   vendor county answer. After HSL: 220 (pairing objective), 218 (Spot Check
+>   independence), 197 (CRLF shared-reader), then Wave 5.
+>
+> **DONE — Intersection Detail (2026-07-14): re-blessed against ID-79 EXACTLY** (all
+> three legs incl. asserted cells; District+County asserted; v4 lib; identity gate
+> 8 green / 2 known-red).
+>
+> **EARLIER — the ID brief (kept for its census):** (045-ID vs the accepted
 > `ID-79` oracle). Tuple: **(base Route, County, complete PP, numeric Post Mile)** —
 > unlike RD, the PREFIX is a key component (six within-county groups carry distinct PPs
 > at one numeric PM); route SUFFIX / PR / District stay conserved claims. Re-bless
