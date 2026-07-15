@@ -16,7 +16,7 @@ and [verification-and-testing.md](verification-and-testing.md).
 > **Comparison-perfection reset (2026-07-12):** this long-lived document contains
 > historical implementation/count notes that are useful evidence but no longer own
 > acceptance. Start with the owner dashboard
-> [planning/comparison-perfection/comparison-perfection-project.md](planning/comparison-perfection/comparison-perfection-project.md)
+> [planning/comparison-perfection/archive/comparison-perfection-project.md](planning/comparison-perfection/archive/comparison-perfection-project.md)
 > and exact source record
 > [planning/comparison-perfection/comparison-phase4-tsn-source-rebaseline.md](planning/comparison-perfection/comparison-phase4-tsn-source-rebaseline.md).
 > Any `route + PM`, `never regress`, or approved-count wording below describes a prior

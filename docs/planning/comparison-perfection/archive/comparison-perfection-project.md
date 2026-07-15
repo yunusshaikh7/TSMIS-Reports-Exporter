@@ -1,16 +1,18 @@
 # Comparison perfection project
 
+> **Archived — historical.** Superseded by the current surface: [COMPLETION-PLAN.md](../COMPLETION-PLAN.md) (plan & status) and [README.md](../README.md). Kept verbatim as point-in-time history; counts/hashes here reflect when it was written.
+
 Last updated: 2026-07-14  
 Project state: audit closeout complete through Stage 8; product code frozen; implementation handed off/deferred  
-Folder index: [README.md](README.md)  
+Folder index: [README.md](../README.md)  
 New-AI reconciliation prompt: [new-ai-reconciliation-prompt.md](new-ai-reconciliation-prompt.md)  
-Primary finding ledger: [comparison-audit-findings.md](comparison-audit-findings.md)  
-Execution plan: [comparison-remediation-plan.md](comparison-remediation-plan.md)  
-Canary ledger: [comparison-canary-bindings.md](comparison-canary-bindings.md)  
-Phase-4 fixture/source index: [comparison-phase4-red-fixture-index.md](comparison-phase4-red-fixture-index.md)  
+Primary finding ledger: [comparison-audit-findings.md](../comparison-audit-findings.md)  
+Execution plan: [comparison-remediation-plan.md](../comparison-remediation-plan.md)  
+Canary ledger: [comparison-canary-bindings.md](../comparison-canary-bindings.md)  
+Phase-4 fixture/source index: [comparison-phase4-red-fixture-index.md](../comparison-phase4-red-fixture-index.md)  
 Implementation handoff: [comparison-implementation-handoff.md](comparison-implementation-handoff.md)  
 
-Raw TSN source re-baseline: [comparison-phase4-tsn-source-rebaseline.md](comparison-phase4-tsn-source-rebaseline.md)
+Raw TSN source re-baseline: [comparison-phase4-tsn-source-rebaseline.md](../comparison-phase4-tsn-source-rebaseline.md)
 
 ## At-a-glance progress
 
@@ -263,15 +265,15 @@ Use this order instead of treating every planning file as equal:
 | Need | Authoritative document |
 |---|---|
 | Owner directives, progress, current blockers, document navigation | This project dashboard |
-| Every issue, reproduction, correction requirement, and status | [comparison-audit-findings.md](comparison-audit-findings.md) |
+| Every issue, reproduction, correction requirement, and status | [comparison-audit-findings.md](../comparison-audit-findings.md) |
 | Frozen scope, unfinished work, and ordered implementation handoff | [comparison-implementation-handoff.md](comparison-implementation-handoff.md) |
-| Phase/batch sequencing and dependency gates | [comparison-remediation-plan.md](comparison-remediation-plan.md) |
-| Phase-4 finding-to-red-check/canary ownership | [comparison-phase4-red-fixture-index.md](comparison-phase4-red-fixture-index.md) |
-| Exact raw/evidence member hashes, source roles, builder witness, identity facts | [comparison-phase4-tsn-source-rebaseline.md](comparison-phase4-tsn-source-rebaseline.md) |
-| Accepted/provisional/blocked real-data counts and artifact hashes | [comparison-canary-bindings.md](comparison-canary-bindings.md) |
-| Approved Phase-3 semantic decisions | [comparison-phase3-decision-gates.md](comparison-phase3-decision-gates.md) |
+| Phase/batch sequencing and dependency gates | [comparison-remediation-plan.md](../comparison-remediation-plan.md) |
+| Phase-4 finding-to-red-check/canary ownership | [comparison-phase4-red-fixture-index.md](../comparison-phase4-red-fixture-index.md) |
+| Exact raw/evidence member hashes, source roles, builder witness, identity facts | [comparison-phase4-tsn-source-rebaseline.md](../comparison-phase4-tsn-source-rebaseline.md) |
+| Accepted/provisional/blocked real-data counts and artifact hashes | [comparison-canary-bindings.md](../comparison-canary-bindings.md) |
+| Approved Phase-3 semantic decisions | [comparison-phase3-decision-gates.md](../comparison-phase3-decision-gates.md) |
 | Claude/Fable advisory reviews | [claude-comparison-audit-second-opinion.md](claude-comparison-audit-second-opinion.md) and [fable5-comparison-remediation-decisions.md](fable5-comparison-remediation-decisions.md) |
-| Executable test catalog and latest suite closure | [../../verification-and-testing.md](../../verification-and-testing.md) |
+| Executable test catalog and latest suite closure | [../../verification-and-testing.md](../../../verification-and-testing.md) |
 
 Historical comparison outputs and prose are evidence only. When documents disagree,
 the owner directives and exact source facts in this dashboard/source record win; the

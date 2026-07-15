@@ -30,7 +30,7 @@ considered resolved until the full Phase-1 gate recorded below passes.
 
 Do not begin Stage 11 product remediation from this record alone. A new explicit
 implementation authorization must start from
-[comparison-implementation-handoff.md](comparison-implementation-handoff.md), preserve
+[comparison-implementation-handoff.md](archive/comparison-implementation-handoff.md), preserve
 existing dirty product changes, and use finding-owned pre-red/post-green/full gates.
 
 ## Reconciled conclusions

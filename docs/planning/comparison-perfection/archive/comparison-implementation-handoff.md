@@ -1,5 +1,7 @@
 # Comparison implementation handoff
 
+> **Archived — historical.** Superseded by the current surface: [COMPLETION-PLAN.md](../COMPLETION-PLAN.md) (plan & status) and [README.md](../README.md). Kept verbatim as point-in-time history; counts/hashes here reflect when it was written.
+
 Last updated: 2026-07-14  
 Status: audit closeout complete; product remediation not started or authorized by this closeout
 
@@ -116,7 +118,7 @@ implementation is reorganized.
    conservation before any perfection or release claim.
 
 The detailed finding record remains
-[comparison-audit-findings.md](comparison-audit-findings.md); sequencing details remain
-in [comparison-remediation-plan.md](comparison-remediation-plan.md); source bindings and
+[comparison-audit-findings.md](../comparison-audit-findings.md); sequencing details remain
+in [comparison-remediation-plan.md](../comparison-remediation-plan.md); source bindings and
 accepted audit facts remain in
-[comparison-phase4-tsn-source-rebaseline.md](comparison-phase4-tsn-source-rebaseline.md).
+[comparison-phase4-tsn-source-rebaseline.md](../comparison-phase4-tsn-source-rebaseline.md).

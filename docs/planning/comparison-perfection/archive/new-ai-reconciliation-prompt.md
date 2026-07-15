@@ -1,5 +1,7 @@
 # New-AI comparison-project reconciliation prompt
 
+> **Archived — historical.** Superseded by the current surface: [COMPLETION-PLAN.md](../COMPLETION-PLAN.md) (plan & status) and [README.md](../README.md). Kept verbatim as point-in-time history; counts/hashes here reflect when it was written.
+
 You are taking over a long-running comparison-perfection project in:
 
 `C:\Users\Yunus\Projects\TSMIS-Reports-Exporter`

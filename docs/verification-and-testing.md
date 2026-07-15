@@ -276,7 +276,7 @@ and 839-byte acceptance SHA-256
 This accepts only the base audit: product comparison, physical-source identity,
 workbook/evidence, and end-to-end perfection remain false under the documented findings.
 No product code was changed during this closeout; implementation and Stages 9–12 are
-deferred to [the implementation handoff](planning/comparison-perfection/comparison-implementation-handoff.md).
+deferred to [the implementation handoff](planning/comparison-perfection/archive/comparison-implementation-handoff.md).
 
 `.github/workflows/checks.yml` runs them **blocking** on every push/PR (after a
 `compileall` of `scripts build version.py`). CI forces `PYTHONIOENCODING=utf-8`

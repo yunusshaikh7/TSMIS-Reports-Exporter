@@ -97,7 +97,7 @@ workbook-evidence, and end-to-end perfection remain false. CMP-AUD-045/047/048/0
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
 Implementation is frozen; resume only from
-[docs/planning/comparison-perfection/comparison-implementation-handoff.md](docs/planning/comparison-perfection/comparison-implementation-handoff.md)
+[docs/planning/comparison-perfection/archive/comparison-implementation-handoff.md](docs/planning/comparison-perfection/archive/comparison-implementation-handoff.md)
 after explicit owner authorization.
 New reviewers start at
 [docs/planning/comparison-perfection/README.md](docs/planning/comparison-perfection/README.md)
@@ -151,7 +151,7 @@ companion TSMIS PDF, and has no source-faithful PDF-vs-Excel mode. Its Spot Chec
 trusts Comparison's status and source-row links, so an internally consistent wrong pair
 can still display `OK`. Do not use a clean sample image set or Spot Check alone to bless
 HSL. The live source-first status and exact findings are in
-[docs/planning/comparison-perfection/comparison-perfection-project.md](docs/planning/comparison-perfection/comparison-perfection-project.md)
+[docs/planning/comparison-perfection/archive/comparison-perfection-project.md](docs/planning/comparison-perfection/archive/comparison-perfection-project.md)
 and [docs/planning/comparison-perfection/comparison-audit-findings.md](docs/planning/comparison-perfection/comparison-audit-findings.md).
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
@@ -216,7 +216,7 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   [docs/planning/comparison-perfection/comparison-phase3-decision-gates.md](docs/planning/comparison-perfection/comparison-phase3-decision-gates.md).
 - **Comparison perfection is source-first and end to end.** Before changing any
   comparison family, read
-  [docs/planning/comparison-perfection/comparison-perfection-project.md](docs/planning/comparison-perfection/comparison-perfection-project.md).
+  [docs/planning/comparison-perfection/archive/comparison-perfection-project.md](docs/planning/comparison-perfection/archive/comparison-perfection-project.md).
   Its at-a-glance table is the owner-facing progress surface; update it whenever a
   comparison stage changes, a blocker is added/removed, or the next promotion proof
   changes. Keep detailed bugs/hashes in the linked finding/source/canary ledgers rather

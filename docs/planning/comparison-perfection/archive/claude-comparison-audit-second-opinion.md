@@ -1,5 +1,7 @@
 # Second opinion — adversarial comparison audit (CMP-AUD-001…120)
 
+> **Archived — historical.** Superseded by the current surface: [COMPLETION-PLAN.md](../COMPLETION-PLAN.md) (plan & status) and [README.md](../README.md). Kept verbatim as point-in-time history; counts/hashes here reflect when it was written.
+
 Date: 2026-07-11
 Role: independent pre-implementation review of `docs/planning/comparison-perfection/comparison-audit-findings.md`.
 No product code, ledger content, or other planning files were modified; the only file this

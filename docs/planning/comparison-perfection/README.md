@@ -1,76 +1,53 @@
-# Comparison-perfection planning
+# Comparison-perfection
 
-Last updated: 2026-07-14  
-Status: Stage 6 and the Stage-8 base audit are complete at 7/7; the complete
-comparison-perfection audit, product remediation, evidence proof, and release
-acceptance are not complete
+Last updated: 2026-07-14
 
-This folder is the dedicated planning and evidence index for the comparison-perfection
-project. It was separated from the general planning archive so a new reviewer can
-reconcile the project without treating every historical planning document as current.
+The dedicated planning + evidence folder for the comparison-perfection project. It is
+organized so you can see **where the project is** without reading days of audit history.
 
-## Start here
+## ▶ Start here
 
-If a new AI or engineer is taking over, begin with
-[new-ai-reconciliation-prompt.md](new-ai-reconciliation-prompt.md). Its first pass is
-read-only reconciliation. It asks the reviewer to decide—based on dependencies rather
-than assumption—whether the deferred Stage 9–10 companion/historical/evidence audit
-should finish before any product correction.
+**[COMPLETION-PLAN.md](COMPLETION-PLAN.md)** — the single "you are here" surface: current
+position, the full phase map to completion, the execution waves, external dependencies,
+and an append-only progress log. Read it first; everything else is data it points into.
 
-For ordinary status review, read in this order:
+## Structure
 
-1. [comparison-perfection-project.md](comparison-perfection-project.md) — owner
-   directives, progress, completed audit layers, and deferred stages.
-2. [comparison-implementation-handoff.md](comparison-implementation-handoff.md) —
-   frozen product boundary and takeover sequence.
-3. [comparison-audit-findings.md](comparison-audit-findings.md) — authoritative stable
-   finding ledger through CMP-AUD-237.
-4. [comparison-canary-bindings.md](comparison-canary-bindings.md) — exact sources,
-   counts, result identities, and accepted/rejected witness boundaries.
-5. [comparison-phase4-tsn-source-rebaseline.md](comparison-phase4-tsn-source-rebaseline.md)
-   — raw TSN roles, manifests, normalization, and source facts.
-6. [comparison-remediation-plan.md](comparison-remediation-plan.md) — dependency and
-   implementation sequencing reference.
+```
+COMPLETION-PLAN.md   ← the plan & status (start here)
+README.md            ← this index
+reference/ (below)   ← living data ledgers — trust these over any prose
+archive/             ← retired status/handoff/reconciliation history (point-in-time)
+```
 
-## Supporting records
+### Reference — living data
 
-| Document | Purpose |
+| Document | Role |
 |---|---|
-| [comparison-phase4-red-fixture-index.md](comparison-phase4-red-fixture-index.md) | Finding-to-red-fixture and family-gate ownership |
-| [comparison-phase3-decision-gates.md](comparison-phase3-decision-gates.md) | Approved comparison-engine semantic decisions |
-| [claude-comparison-audit-second-opinion.md](claude-comparison-audit-second-opinion.md) | Advisory Claude review; evidence, not authority |
-| [fable5-comparison-remediation-decisions.md](fable5-comparison-remediation-decisions.md) | Advisory Fable decision record; evidence, not authority |
+| [comparison-audit-findings.md](comparison-audit-findings.md) | The authoritative 237-finding ledger |
+| [comparison-canary-bindings.md](comparison-canary-bindings.md) | Exact sources, counts, result/acceptance hashes |
+| [comparison-phase4-tsn-source-rebaseline.md](comparison-phase4-tsn-source-rebaseline.md) | Raw TSN roles, manifests, source facts |
+| [comparison-phase3-decision-gates.md](comparison-phase3-decision-gates.md) | Approved comparison-engine semantics (D1–D7) |
+| [comparison-phase4-red-fixture-index.md](comparison-phase4-red-fixture-index.md) | Finding → red-fixture / family-gate ownership |
+| [comparison-remediation-plan.md](comparison-remediation-plan.md) | The detailed Phase 0–10 roadmap |
+
+### Archive — history
+
+[archive/](archive/README.md) holds the retired dashboard, handoff, reconciliation
+report, takeover prompt, and the advisory Claude/Fable reviews. Kept verbatim as
+point-in-time history; their counts and hashes are as-written, not current. Trust
+`COMPLETION-PLAN.md` and the reference ledgers over anything there.
+
+## Current boundary (snapshot — the plan is authoritative)
+
+- Stage 6 raw→normalized conservation: **7/7**.
+- Stage 8 base TSMIS-vs-TSN audit: **7/7** (witnesses hash-verified on disk).
+- Stages 9–10 companion/historical/evidence, Stage 11 remediation, Stage 12 release: **open**.
+- 122 reproduced-and-open findings (44 family-gate + 78 unowned).
+- Branch `comparison-perfection`, CI green, gate 121/121 (+4 documented-red under CMP-AUD-045).
 
 The separate repository-wide Fable audit remains at
-[../fable5-repo-improvement-audit.md](../fable5-repo-improvement-audit.md). It is not a
-comparison-project planning document and must retain its protected SHA-256
-`9deedb03d284af4bf005be16600c30544b05e0ba54801a4532b05587418b6d0e`.
-
-## Current boundary
-
-- Stage 6 raw-to-normalized conservation: 7/7 audit coverage.
-- Stage 8 current base TSMIS-vs-TSN truth: 7/7 audit coverage.
-- Stages 9–10 companion-format, historical-edition, and exhaustive evidence work:
-  deferred, not complete.
-- Stage 11 product remediation: not authorized by the final audit closeout.
-- Stage 12 release acceptance: not complete.
-- The seven family gates carry 44 unique known product/evidence finding IDs red; a new
-  reviewer must independently reconcile that set rather than treating the count as
-  authority.
-
-> **Superseded (2026-07-14, Batch 0).** The takeover baseline below is now HISTORY. The
-> worktree has been committed to branch `comparison-perfection`, and two authorized fixes
-> have since changed product source, so `df7bb8fc…` **no longer reproduces — by design**.
-> Do not treat that drift as tampering and do not restore the old digest. The current
-> boundary is the source-only manifest
-> `d87951b2e7cd6b7f9107741c51af8c372da6fb5ea0c12595285070d633271809`
-> (135 files / 2,890,535 bytes). Full execution record, including the gate baseline:
-> [reconciliation-report.md](reconciliation-report.md) §14.
-
-The dirty takeover baseline for `scripts/` was 321 files / 7,423,809 bytes, canonical
-manifest 34,351 bytes, SHA-256
-`df7bb8fc3d997d60d82ecb93344f821e858feb015eed62fffe859958c9151bea`.
-It identified the frozen worktree state; it did not certify correctness or attribution.
-Do not reset, rewrite, or clean the existing product changes merely to match Git HEAD.
+[../fable5-repo-improvement-audit.md](../fable5-repo-improvement-audit.md) with its protected
+SHA-256 `9deedb03d284af4bf005be16600c30544b05e0ba54801a4532b05587418b6d0e`.
 
 Return to the general [documentation index](../../INDEX.md).

@@ -1,5 +1,7 @@
 # Comparison-project reconciliation report
 
+> **Archived — historical.** Superseded by the current surface: [COMPLETION-PLAN.md](../COMPLETION-PLAN.md) (plan & status) and [README.md](../README.md). Kept verbatim as point-in-time history; counts/hashes here reflect when it was written.
+
 Reconciliation date: 2026-07-14
 Scope: read-only takeover reconciliation. No product, test, audit-tool, source-data,
 generated-artifact, or existing-document file was changed.

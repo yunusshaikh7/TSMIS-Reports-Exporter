@@ -5,7 +5,7 @@ State: raw members bound; r7 accepted as current-code Stage-5 witness; r2 retain
 pre-hardening semantic baseline; r3-r6 rejected; all three source-format oracles accepted;
 Stage-6 independent conservation complete at 7/7; Stage-8 base audit complete at 7/7;
 product perfection and end-to-end evidence remain red  
-Governing charter: [comparison-perfection-project.md](comparison-perfection-project.md)  
+Governing charter: [comparison-perfection-project.md](archive/comparison-perfection-project.md)  
 Finding/fixture owner: CMP-AUD-035 in
 [comparison-phase4-red-fixture-index.md](comparison-phase4-red-fixture-index.md)
 
@@ -667,7 +667,7 @@ Stage-8 base auditing is closed at 7/7 families. This accepts the bound source a
 projection audits and records observed current-product behavior; it does not accept
 product perfection, full physical-source conservation, workbook-cell evidence, or
 end-to-end evidence. The remaining implementation boundary is recorded in
-[comparison-implementation-handoff.md](comparison-implementation-handoff.md).
+[comparison-implementation-handoff.md](archive/comparison-implementation-handoff.md).
 
 ### Ramp Summary — source truth/value projection accepted, product semantics red
 
