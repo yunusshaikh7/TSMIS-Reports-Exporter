@@ -1137,13 +1137,13 @@ _sh.rmtree(_hs_tmp, ignore_errors=True)
 # --------------------------------------------------------------------------- #
 print("Ramp Detail adapter (v0.26.0): fields, maps, projections, dual-row discipline")
 check("FIELDS = the union of both flavors' compared columns (PM key + the two "
-      "always-context TSN columns excluded)",
-      erd.FIELDS == ["PR", "Date of Record", "HG", "Area 4", "City Code", "R/U",
-                     "Description", "On/Off", "Ramp Type"])
+      "always-context TSN columns excluded; District joined in CMP-AUD-185)",
+      erd.FIELDS == ["PR", "District", "Date of Record", "HG", "Area 4",
+                     "City Code", "R/U", "Description", "On/Off", "Ramp Type"])
 check("field -> TSMIS print column / TSN print window maps are complete",
       all(f in erd._TSMIS_COL for f in erd.FIELDS)
       and all(f in erd.TSN_CELL for f in erd.FIELDS)
-      and set(erd._TSMIS_COL.values()) <= set(crdpdf._COL_ORDER)
+      and set(erd._TSMIS_COL.values()) <= set(crdpdf._COL_ORDER) | {"loc"}
       and all(n in {w[0] for w in erd._L_WIN} for n in erd.TSN_CELL.values()))
 check("TSN windows are x-ordered and non-overlapping (the fixed template)",
       all(erd._L_WIN[i][2] <= erd._L_WIN[i + 1][1]
@@ -1162,11 +1162,17 @@ check("verification projection == the PDF flavor's per-field normalization + TRI
 # Dual-row discipline: the Excel row's comparison keeps On/Off + Ramp Type as
 # context (never enumerated); the PDF row's comparison COMPARES them. Ramp Name
 # and ADT never enumerate on either row.
-_rd_a = ["001", "R", "000.606", "1976-02-25", "D", "Y", "DAPT", "U",
+# The PM key cells carry the D4 PhysicalKey (CMP-AUD-045); District is a
+# compared column, equal here so it never enumerates.
+_rd_k = crd_cmp._physical_pm_key("001", "ORA", "000.606",
+                                 (("route", "001"),), "fixture")
+_rd_a = ["001", "R", _rd_k, "12", "1976-02-25", "D", "Y", "DAPT", "U",
          "NB OFF X", "", "O", "D", ""]
-_rd_b = ["001", "M", "000.606", "1976-02-25", "L", "Y", "DAPT", "U",
+_rd_b = ["001", "M", crd_cmp._physical_pm_key("001", "ORA", "000.606",
+                                              (("route", "001"),), "fixture"),
+         "12", "1976-02-25", "L", "Y", "DAPT", "U",
          "NB OFF Y", "RAMP NM", "F", "L", "070"]
-_dc = {("001", "000.606"): [("12", "ORA")]}
+_dc = {("001", _rd_k): [("12", "ORA")]}
 _dx = erd.enumerate_diffs([_rd_a], [_rd_b], {"dc": _dc, "pdf": False})
 check("Excel-row enumerate_diffs skips the print-only + TSN-only columns",
       set(_dx) == {"PR", "HG", "Description"}
@@ -1215,9 +1221,10 @@ check("_is_pdf_consolidated tells the two consolidated shapes apart",
 _wbn = Workbook()
 _wsn = _wbn.active
 _wsn.title = crd_cmp.NORMALIZED_SHEET
-_wsn.append(["Route"] + crd_cmp.SHARED_HEADER)         # v2: NO sidecar columns
+_wsn.append(["Route"] + [h for h in crd_cmp.SHARED_HEADER if h != "District"]
+            + ["TSN District", "TSN County"])           # v3: pre-county identity
 _wsn.append(["001", "R", "000.606", "1976-02-25", "D", "Y", "DAPT", "U",
-             "NB OFF X", "", "O", "D", ""])
+             "NB OFF X", "", "O", "D", "", "12", "ORA"])
 _wbn.save(_rd_tmp / "tsn_v2.xlsx")
 _t_r, _t_n, _meta, _note = erd.load_sides(str(_rd_tmp / "pdf_cons.xlsx"),
                                           str(_rd_tmp / "tsn_v2.xlsx"))

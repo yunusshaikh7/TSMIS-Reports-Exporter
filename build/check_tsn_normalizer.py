@@ -87,9 +87,12 @@ _IS_SHEET = "Intersection Summary (TSN)"
 # District/County sidecar (read by the visual-evidence generator; the comparison
 # loader slices it off). Hand-written (the golden tripwire stays independent of
 # rd.SHARED_HEADER), so a future header drift is caught.
-_RD_SIDECAR = ["TSN District", "TSN County"]
-_RD_HEADER = ["Route", "PR", "PM", "Date of Record", "HG", "Area 4", "City Code", "R/U",
-              "Description", "Ramp Name", "On/Off", "Ramp Type", "ADT"] + _RD_SIDECAR
+# v4 (CMP-AUD-045/185): District joins the shared width; the raw PM suffix
+# joins the district/county sidecars.
+_RD_SIDECAR = ["TSN District", "TSN County", "TSN PM Suffix"]
+_RD_HEADER = ["Route", "PR", "PM", "District", "Date of Record", "HG", "Area 4",
+              "City Code", "R/U", "Description", "Ramp Name", "On/Off",
+              "Ramp Type", "ADT"] + _RD_SIDECAR
 # Re-blessed to the v0.22.0 July-2026 layout: the second ML eff-date left the shared
 # header, 'Xing Line Lgth' joined at the tail, and the v3 normalized sheet appends the
 # TSN District/County sidecar (read by the visual-evidence generator; the comparison
@@ -144,8 +147,8 @@ def test_detail_signatures():
                 (rd_load, "TSN Ramp Detail", _RD_SHEET, _RD_HEADER,
                  len(_RD_HEADER) - len(_RD_SIDECAR),
                  (rd_load, "tsn_rows_with_dcr"),
-                 lambda syn: (lambda _p, s=syn: (list(s), [("01", "DN")] * len(s))),
-                 lambda syn: [r + ["01", "DN"] for r in syn]),
+                 lambda syn: (lambda _p, s=syn: (list(s), [("01", "DN", "E")] * len(s))),
+                 lambda syn: [r + ["01", "DN", "E"] for r in syn]),
                 (id_load, "TSN Intersection Detail", _ID_SHEET, _ID_HEADER,
                  len(_ID_HEADER) - len(_ID_SIDECAR),
                  (id_load, "tsn_rows_with_dcr"),

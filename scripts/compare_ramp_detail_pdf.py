@@ -80,12 +80,21 @@ def _null_blank(v):
 def _pdf_row(r):
     def at(i):
         return r[i] if i < len(r) else None
-    desc = _rd._strip_desc_prefix(at(10))
+    route = _rd._norm_route(at(0))
+    desc = _rd._strip_desc_prefix(at(10), route)
     if desc == _NULL_DESC:
         desc = ""
     onoff = _null_blank(_rd._v(at(12)))
-    return [_rd._norm_route(at(0)),
-            _rd._v(at(2)), _rd._norm_pm(at(3)), _rd._iso_date(at(4)),
+    loc = _rd._raw_text(at(1)).strip()
+    district, county = _rd._dist_cnty(loc)
+    # CMP-AUD-045: the same D4 PhysicalKey as every other Ramp Detail path.
+    key = _rd._physical_pm_key(route, county, at(3), (
+        ("route", route), ("location", loc),
+        ("postmile_prefix", _rd._raw_text(at(2))),
+        ("postmile", _rd._raw_text(at(3))),
+        ("postmile_suffix", _rd._raw_text(at(5)))), f"Location {loc!r}")
+    return [route,
+            _rd._v(at(2)), key, district, _rd._iso_date(at(4)),
             _rd._v(at(6)), _null_blank(_rd._v(at(7))), _rd._v(at(8)), _rd._v(at(9)),
             _collapse(desc),
             "",                                        # Ramp Name: TSN-only
@@ -129,8 +138,8 @@ def _load_excel_collapsed(path):
 _NOTES_PDF_VS_TSN = ctc.make_notes_writer(
     "Ramp Detail — TSMIS (PDF) vs TSN: comparison notes",
     (
-        "Rows are keyed on Route + PM (postmile), normalized to the TSN zero-padded "
-        "form ('9.6' and '009.600' are the same ramp).",
+        "Rows are keyed on Route + County + PM (postmile, normalized — '9.6' and "
+        "'009.600' are the same ramp; County from each source's Location).",
         "Date of Record is compared as an ISO date — display-format differences "
         "(6/1/2024 vs 2024-06-01) never count.",
         "Description is compared after stripping the TSMIS leading \"<route>/\" "

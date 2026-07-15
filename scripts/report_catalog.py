@@ -361,9 +361,15 @@ TSN = (
     # a row in the TSN statewide print with them; the comparison loader slices to
     # the shared width and never sees them. The bump re-projects any stored
     # library on next use (D2 auto-rebuild).
+    # v4 (CMP-AUD-045/135/185): District joins the shared width, the raw PM
+    # suffix joins the sidecars, TSN Descriptions are preserved byte-for-byte
+    # (no prefix strip on the TSN side), and the comparison loader rebuilds the
+    # county-aware D4 physical identity from the sidecars instead of slicing
+    # them away. The bump rebuilds stored libraries (D2); pre-v4 libraries are
+    # refused by the loader with a rebuild hint.
     TsnEntry("ramp_detail", "TSN Ramp Detail", "*.xlsx", "statewide_xlsx",
              "tsn_ramp_detail_normalized.xlsx", "tsn_load_ramp_detail:build_into",
-             normalization_version=3, evidence_pdfs=True),
+             normalization_version=4, evidence_pdfs=True),
     # v3 (both summaries): the sidecar now carries tsn_source_claims — the
     # print's identity/timing/submitter, the IS pre-fold printed rows + J–P
     # signal components, and the declared CONTROL F correction (CMP-AUD-144/

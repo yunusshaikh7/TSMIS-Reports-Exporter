@@ -32,6 +32,7 @@ except ImportError:
     _DEPS_OK = False
 
 import compare_tsn_common as ctc
+import comparison_contract as cc
 from compare_tsn_common import load_consolidated_rows, suggest_route_name
 from compare_core import CompareSchema, normalize_value
 
@@ -41,9 +42,13 @@ TSN_SHEET = "Sheet 1"                     # the raw TSN statewide sheet
 
 # The shared comparison header (key + fields), in display order. PM is the key.
 # Compared fields assert; CONTEXT_FIELDS are shown but never counted as a diff.
+# District is COMPARED (CMP-AUD-185): every source exposes it (inside Location /
+# the library sidecar), and omitting it hid the one real District disagreement
+# (005/SD/72.366 — TSMIS 12 vs TSN 11) behind an "identical" row.
 KEY = "PM"
-SHARED_HEADER = ["PR", "PM", "Date of Record", "HG", "Area 4", "City Code", "R/U",
-                 "Description", "Ramp Name", "On/Off", "Ramp Type", "ADT"]
+SHARED_HEADER = ["PR", "PM", "District", "Date of Record", "HG", "Area 4",
+                 "City Code", "R/U", "Description", "Ramp Name", "On/Off",
+                 "Ramp Type", "ADT"]
 KEY_FIELD = SHARED_HEADER.index(KEY)      # 1
 CONTEXT_FIELDS = ("Ramp Name", "On/Off", "Ramp Type", "ADT")   # TSN-only -> non-asserting
 DATE_FIELDS = ("Date of Record",)
@@ -60,17 +65,26 @@ TSN_RAW_HEADER = (
 _write_notes_sheet = ctc.make_notes_writer(
     "Ramp Detail — TSMIS vs TSN: comparison notes",
     (
-        "Rows are keyed on Route + PM (postmile), normalized to the TSN zero-padded "
-        "form ('9.6' and '009.600' are the same ramp).",
+        "Rows are keyed on Route + County + PM (postmile, normalized to the TSN "
+        "zero-padded form — '9.6' and '009.600' are the same ramp). County comes "
+        "from each source's Location ('01-DN-101'); the same route+postmile in "
+        "two counties is two different physical ramps, never paired.",
+        "District IS compared (both sources carry it inside Location); the PM "
+        "prefix (PR) and suffix are conserved source facts shown per side, not "
+        "extra key components.",
         "Date of Record is compared as an ISO date — display-format differences "
         "(6/1/2024 vs 2024-06-01) never count.",
-        "Description is compared after stripping the TSMIS leading \"<route>/\" "
-        "prefix (\"001/NB OFF …\" vs TSN \"NB OFF …\").",
+        "Description: the TSMIS export prepends the row's own route (\"001/NB "
+        "OFF …\"); exactly that added prefix is stripped before comparing. A "
+        "leading number TSN itself prints is authoritative data, never removed; "
+        "only text EDGES are trimmed on both sides (two statewide TSN rows "
+        "carry trailing tabs no representation prints).",
         "CONTEXT columns (shown for reference, never counted as a difference): "
         "Ramp Name, On/Off, Ramp Type and ADT are TSN database columns with no "
         "TSMIS counterpart — counting them would flood the workbook with one-sided "
         "cells that say nothing about agreement.",
-        "One-sided rows are ramps one system lists at a postmile the other doesn't.",
+        "One-sided rows are ramps one system lists at a physical location "
+        "(route + county + postmile) the other doesn't.",
     ))
 
 _SCHEMA = CompareSchema(
@@ -92,7 +106,36 @@ _SCHEMA = CompareSchema(
 )
 
 _ROUTE_FROM_LOCATION = re.compile(r"^\s*\d{2}-[A-Za-z]{2,3}-(\w+)\s*$")  # "01-DN-101" -> "101"
-_DESC_PREFIX = re.compile(r"^\s*\d+\s*/\s*")     # TSMIS "001/NB OFF…" -> "NB OFF…"
+_DESC_PREFIX = re.compile(r"^\s*(\d+)\s*/\s*")    # TSMIS "001/NB OFF…" -> "NB OFF…"
+
+
+def _dist_cnty(loc):
+    """LOCATION '01-DN-101' / '04-CC.-004' -> ('01', 'DN'/'CC')."""
+    parts = ("" if loc is None else str(loc)).strip().upper().split("-")
+    dist = parts[0].strip() if parts else ""
+    cnty = parts[1].strip().rstrip(".") if len(parts) >= 2 else ""
+    return dist, cnty
+
+
+def _physical_pm_key(route, county, pm_raw, claims, source_hint):
+    """The D4 PhysicalKey for one Ramp Detail row (CMP-AUD-045): canonical
+    identity is exactly the owner-approved `(Route, County, norm_pm(PM))` tuple
+    (RD-79 accepted oracle) — the PM prefix and suffix stay conserved RAW CLAIMS,
+    never key components (on the bound corpus PR differs on zero paired rows,
+    and TSN's 313 print suffixes have no TSMIS counterpart; gluing either would
+    fabricate one-sided rows out of physically identical ramps). The key's str
+    payload is the normalized PM (what the side sheets display); a row whose
+    county can't be established refuses loudly."""
+    pm = _norm_pm(pm_raw)
+    if not county:
+        raise ValueError(f"Ramp Detail row (route {route}, PM {pm}) has no "
+                         f"usable county in {source_hint} — cannot key it to a "
+                         "physical location")
+    identity = cc.make_physical_identity(
+        route, county, pm,
+        tuple(cc.RawIdentityClaim(name, value) for name, value in claims),
+        f"{route} / {county} / {pm}")
+    return cc.physical_key(pm, identity)
 
 
 # --------------------------------------------------------------------------- #
@@ -111,8 +154,33 @@ _norm_pm = ctc.norm_pm
 _iso_date = ctc.iso_date
 
 
-def _strip_desc_prefix(text):
-    return _DESC_PREFIX.sub("", ("" if text is None else str(text)).strip())
+def _strip_desc_prefix(text, route=None):
+    """CMP-AUD-135: remove ONLY the TSMIS-export-added outer '<route>/' prefix.
+    With `route` given (the comparison loaders), the leading number must BE the
+    row's own route — a DIFFERENT numeric prefix is source data and survives
+    (the accepted RD-79 oracle's declared TSMIS reading contract). Without a
+    route (legacy/verification callers) any single leading 'digits/' strips —
+    corpus-equivalent, since every TSMIS export line leads with its own route."""
+    t = ("" if text is None else str(text)).strip()
+    m = _DESC_PREFIX.match(t)
+    if not m:
+        return t
+    if route is not None:
+        rm = re.match(r"\d+", str(route))
+        if rm is None or int(m.group(1)) != int(rm.group(0)):
+            return t
+    return t[m.end():]
+
+
+def _edge_text(v):
+    """Comparison-side Description projection: text edges are trimmed (tabs
+    included) like the accepted oracle's declared value reading — the raw TSN
+    extract carries trailing tabs on two censused route-126 rows that no TSMIS
+    representation prints; INTERNAL whitespace still compares per D2 (no
+    folding). Conservation is untouched: the normalized library and the raw
+    claims keep the source text byte-for-byte."""
+    v = _v(v)
+    return v.strip() if isinstance(v, str) else v
 
 
 def _v(x):
@@ -122,8 +190,16 @@ def _v(x):
 # --------------------------------------------------------------------------- #
 # TSN side: raw statewide "Sheet 1" OR the library's normalized workbook
 # --------------------------------------------------------------------------- #
+def _raw_text(v):
+    return "" if v is None else str(v)
+
+
 def _tsn_raw_row(r, h):
-    """Project one raw TSN Sheet-1 row (h = {NAME: idx}) to [route, *SHARED_HEADER]."""
+    """Project one raw TSN Sheet-1 row (h = {NAME: idx}) to [route, *SHARED_HEADER].
+    The PM cell is the D4 PhysicalKey (CMP-AUD-045); District is a compared field
+    (CMP-AUD-185); the DESCRIPTION is preserved byte-for-byte — TSN's own leading
+    numeric prefixes are authoritative data (CMP-AUD-135), only the TSMIS side
+    strips its export-added route prefix."""
     def g(name):
         i = h.get(name)
         return r[i] if i is not None and i < len(r) else None
@@ -131,10 +207,16 @@ def _tsn_raw_row(r, h):
     loc = "" if _loc_raw is None else str(_loc_raw)
     m = _ROUTE_FROM_LOCATION.match(loc)
     route = _norm_route(m.group(1)) if m else loc.strip().upper()
+    district, county = _dist_cnty(loc)
+    key = _physical_pm_key(route, county, g("PM"), (
+        ("route", route), ("location", loc),
+        ("postmile_prefix", _raw_text(g("PR"))),
+        ("postmile", _raw_text(g("PM"))),
+        ("postmile_suffix", _raw_text(g("PM_SFX")))), f"LOCATION {loc!r}")
     return [route,
-            _v(g("PR")), _norm_pm(g("PM")), _iso_date(g("DATE_OF_RECORD")),
+            _v(g("PR")), key, district, _iso_date(g("DATE_OF_RECORD")),
             _v(g("HG")), _v(g("AREA_4")), _v(g("CITY_CODE")), _v(g("POP")),
-            _strip_desc_prefix(g("DESCRIPTION")),
+            _edge_text(g("DESCRIPTION")),
             _v(g("RAMP_NANE")), _v(g("ON_OFF")), _v(g("RAMP_TYPE")), _v(g("ADT"))]
 
 
@@ -152,29 +234,43 @@ def tsn_rows_from_raw(path):
 
 
 def _normalized_row(r):
-    """Re-project one row from the normalized TSN-library sheet onto the shared
+    """Re-project one row from the normalized TSN-library sheet (v4: ['Route'] +
+    SHARED_HEADER + the District/County/PM-Suffix sidecars) onto the shared
     shape, RE-APPLYING the FORMAT normalizations (PM zero-pad, ISO date) so a
-    STALE library — one built before a PM/date normalization change — can't feed
-    raw values through `_v` and flag phantom format diffs (the Intersection
-    Detail `_normalized_row` defense). Both re-projections are idempotent on
-    already-normalized values, so this is a no-op for a fresh library.
-    Description deliberately is NOT re-stripped: `_strip_desc_prefix` is not
-    idempotent (a stripped description that itself starts "N/…" would lose
-    another segment), and semantic normalizer changes are owned by the D2
-    `normalization_version` rebuild, not compare-time repair."""
-    vals = list(r)[:len(SHARED_HEADER) + 1]
-    vals += [None] * (len(SHARED_HEADER) + 1 - len(vals))
+    STALE library can't feed raw values through `_v` and flag phantom format
+    diffs. The D4 PhysicalKey is REBUILT from the row's route + County sidecar +
+    PM (CMP-AUD-045 — the sidecars are no longer sliced away), with the sidecar
+    facts conserved as raw claims. Description is NOT re-stripped: the v4
+    library preserves TSN's text byte-for-byte (CMP-AUD-135), and semantic
+    normalizer changes are owned by the D2 `normalization_version` rebuild."""
+    width = len(SHARED_HEADER) + 1
+    vals = list(r)[:width + 3]                    # + District/County/PM-Suffix sidecars
+    vals += [None] * (width + 3 - len(vals))
+    route = "" if vals[0] is None else str(vals[0])
     pm_i = 1 + SHARED_HEADER.index("PM")
     date_i = 1 + SHARED_HEADER.index("Date of Record")
-    out = [_v(c) for c in vals]
-    out[pm_i] = _norm_pm(vals[pm_i])
+    district, county, pm_sfx = (_raw_text(vals[width]).strip(),
+                                _raw_text(vals[width + 1]).strip(),
+                                _raw_text(vals[width + 2]))
+    key = _physical_pm_key(route, county, vals[pm_i], (
+        ("route", route), ("district", district), ("county", county),
+        ("postmile_prefix", _raw_text(vals[1])),
+        ("postmile", _raw_text(vals[pm_i])),
+        ("postmile_suffix", pm_sfx)), "the library's TSN County sidecar")
+    out = [_v(c) for c in vals[:width]]
+    out[pm_i] = key
     out[date_i] = _iso_date(vals[date_i])
+    desc_i = 1 + SHARED_HEADER.index("Description")
+    out[desc_i] = _edge_text(vals[desc_i])
     return out
 
 
 def _load_tsn(path):
     """TSN side -> (rows, has_route=True). Reads the raw statewide Sheet-1, or the
-    library's already-normalized workbook (header 'Route' + SHARED_HEADER)."""
+    library's already-normalized workbook (header 'Route' + SHARED_HEADER + the
+    v4 sidecars). A pre-v4 library (no District column / no PM-Suffix sidecar)
+    predates the county-aware physical identity and REFUSES with a rebuild hint —
+    comparing through it would silently re-weaken the key (CMP-AUD-045)."""
     name = Path(path).name
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
@@ -184,7 +280,13 @@ def _load_tsn(path):
         sheets = wb.sheetnames
         if NORMALIZED_SHEET in sheets:                       # normalized library copy
             it = wb[NORMALIZED_SHEET].iter_rows(values_only=True)
-            next(it, None)                                   # header row
+            header = [("" if c is None else str(c).strip())
+                      for c in (next(it, None) or ())]
+            if "District" not in header or "TSN PM Suffix" not in header:
+                raise ValueError(
+                    f"{name} is an older normalized TSN Ramp Detail library "
+                    "(before the county-aware physical identity) — rebuild the "
+                    "TSN library and retry.")
             rows = [_normalized_row(r)
                     for r in it if r and any(c not in (None, "") for c in r)]
             return rows, True
@@ -197,15 +299,23 @@ def _load_tsn(path):
 # TSMIS side: the consolidated Ramp Detail workbook (columns read BY POSITION)
 # --------------------------------------------------------------------------- #
 # Consolidated value positions (Route prepended): Route0 Location1 PR2 PM3 Date4
-# blank5 HG6 Area4 7 City8 R/U9 Description10 (blank11). The header LABELS shift
+# suffix5 HG6 Area4 7 City8 R/U9 Description10 (blank11). The header LABELS shift
 # right of City Code/R/U/Description, so position — not name — is authoritative.
 def _tsmis_row(r):
     def at(i):
         return r[i] if i < len(r) else None
-    return [_norm_route(at(0)),
-            _v(at(2)), _norm_pm(at(3)), _iso_date(at(4)),
+    route = _norm_route(at(0))
+    loc = _raw_text(at(1)).strip()
+    district, county = _dist_cnty(loc)
+    key = _physical_pm_key(route, county, at(3), (
+        ("route", route), ("location", loc),
+        ("postmile_prefix", _raw_text(at(2))),
+        ("postmile", _raw_text(at(3))),
+        ("postmile_suffix", _raw_text(at(5)))), f"Location {loc!r}")
+    return [route,
+            _v(at(2)), key, district, _iso_date(at(4)),
             _v(at(6)), _v(at(7)), _v(at(8)), _v(at(9)),
-            _strip_desc_prefix(at(10)),
+            _strip_desc_prefix(at(10), route),               # the export-added prefix
             "", "", "", ""]                                  # TSN-only context: blank here
 
 

@@ -1247,3 +1247,30 @@ Bound to the authoritative 217-file ars-prod tree
 Re-run via the production modules (consolidate → `write_outcome(extra=result.
 producer_extra)` → compare); the hermetic mutation battery lives in
 `build/check_compare_intersection_summary_tsn.py::test_route_universe`.
+
+## 2026-07-14 — Ramp Detail production re-bless against `RD-79` (CMP-AUD-045/135/185)
+
+The D4-integrated production comparators (county-aware `PhysicalKey`, District
+compared, TSN Descriptions preserved with oracle-contract edge trimming,
+route-matched TSMIS prefix strip, `ramp_detail` library v4) reproduce the
+accepted RD-79 oracle **exactly, all three legs and every per-field count**,
+from the same bound inputs (the ssor-prod 7.9 Excel consolidated workbook, the
+scratch-consolidated 126-route ramp_detail_pdf tree, and the raw
+`TSAR - RAMPS DETAIL_TSN_11.04.2025IT.xlsx`):
+
+| Flavor | Paired | TSMIS/TSN only | Identical / differing rows | Cells |
+|---|---:|---:|---:|---:|
+| Excel vs raw TSN | 15,212 | 4 / 198 | 14,471 / 741 | 847 |
+| PDF vs raw TSN | 15,212 | 4 / 198 | 14,438 / 774 | 998 |
+| PDF vs Excel | 15,216 | 0 / 0 | 15,212 / 4 | 4 |
+
+Per-field: District 1 (the 005/SD/72.366 12-vs-11 disagreement now visible),
+Date 15, HG 364, Area 4 58, City 156, R/U 68, PR 0; Description 185 (Excel) /
+181 (PDF) / 4 (PDF↔Excel); On/Off 95 and Ramp Type 60 on the PDF leg. The two
+route-126 trailing-tab rows compare equal per the oracle's declared edge-trim
+reading contract; the four route-010 `_x000d_` rows stay honest differences.
+The pre-fix production numbers (750/861 Excel, 783/1,012 PDF, Description
+200/196, District omitted) are retired. Hermetic locks:
+`check_compare_physical_identity` (RD contracts promoted to TESTS),
+`check_compare_ramp_detail_tsn` (canonical-display keys + the two-county swap
++ v3-library refusal), `check_visual_evidence` (county-aware RD adapter).

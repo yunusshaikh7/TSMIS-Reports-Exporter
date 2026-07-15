@@ -2188,7 +2188,7 @@ because its header is blank.
 ### CMP-AUD-045 — PM-only identity is too weak
 
 Priority: P1  
-Status: Partially remediated — shared typed-identity core green; family integration red  
+Status: Partially remediated — core green; **Ramp Detail family integrated + re-blessed 2026-07-14**; HSL/ID/HL/HD remain  
 Primary code: `scripts/compare_env.py:689-719`,
 `scripts/compare_core.py:445-490`,
 `scripts/consolidate_tsn_highway_log.py:280-361,459-495`,
@@ -2242,6 +2242,26 @@ without a source-backed county derivation.
 Similarity pairing may run only within genuine duplicates of the approved family tuple.
 Test county resets, value swaps, prefix/suffix-only field variants, real duplicate tuples,
 and mid-list inserts on every triangle edge.
+
+**Ramp Detail remediation (2026-07-14).** Every RD path — raw TSN, the v4
+normalized library (District/County/PM-Suffix sidecars now READ, not sliced),
+the Excel and PDF consolidated loaders, and the cross-env adapter (a new
+`EnvCompare.physical_key_builder` hook producing the engine `key_normalizer`) —
+keys rows with the owner-approved D4 `PhysicalKey`
+`(Route, County, norm_pm(PM))`; PR/PM_SFX/Location/District ride as conserved
+raw claims, never key components (the original KNOWN_RED contracts expected a
+glued `R1.000E` canonical, which contradicts the accepted RD-79 oracle — PR
+differs on zero paired rows and TSN's 313 print suffixes have no TSMIS
+counterpart, so gluing would fabricate one-sided rows; the contracts were
+corrected to D4 with this evidence and PROMOTED into TESTS, 6 green / 3
+known-red remaining for HSL/ID). Similarity pairing now runs only within
+genuine D4 duplicates (the one real TSMIS group, 101/LA/1.284). The Comparison
+sheet's key column shows the side-independent canonical
+"route / county / postmile" display. **Re-blessed against the accepted RD-79
+oracle EXACTLY, all three legs and every per-field count** — Excel vs raw TSN
+15,212/4/198 · 14,471/741/847 (District 1, Description 185, PR 0); PDF vs raw
+TSN …/774/998 (On/Off 95, Ramp Type 60); PDF vs Excel 15,216 · 4/4. Blocked
+families unchanged: HL needs its county census, HD-Excel is vendor-pending.
 
 Raw-source re-verification on 2026-07-12 bound the user-provided, raw-only TSN library
 before implementation:
@@ -4890,7 +4910,7 @@ sheet-name, cell-type, or cell-value differences across 5,547,205 cells.
 ### CMP-AUD-133 — normalized Detail libraries discard source-backed identity, print, and Report View facts
 
 Priority: P1  
-Status: Verified from exact raw/r7 sources and current Stage-8 production Report Views  
+Status: Partially remediated 2026-07-14 — RD's PM_SFX identity claim now conserved (v4 sidecar); the remaining column dispositions stay open  
 Primary code: `scripts/tsn_load_ramp_detail.py`,
 `scripts/compare_ramp_detail_tsn.py`, `scripts/tsn_load_intersection_detail.py`,
 `scripts/compare_intersection_detail_tsn.py`, `scripts/tsn_load_highway_detail.py`,
@@ -5014,7 +5034,7 @@ these changes before accepting the Ramp Stage-6 result.
 ### CMP-AUD-135 — Ramp normalization deletes all 15 source-backed numeric Description prefixes
 
 Priority: P1  
-Status: Verified on all 15 exact authoritative rows; corrected Stage-6 audit accepted; no product correction applied  
+Status: Resolved 2026-07-14 — TSN Descriptions preserved (edges trimmed per the oracle's reading contract); the TSMIS strip is route-matched; re-blessed  
 Primary code: `scripts/compare_ramp_detail_tsn.py:_strip_desc_prefix`,
 `scripts/compare_ramp_detail_tsn.py:_tsn_raw_row`,
 `scripts/tsn_load_ramp_detail.py:tsn_rows_with_dcr`
@@ -5059,6 +5079,20 @@ Description, then verify the remainder against the source. Bind all 15 rows as a
 pre-fix red manifest and re-run raw-to-normalized, TSMIS-Excel-vs-TSN,
 TSMIS-PDF-vs-TSN, TSN-XLSX-vs-PDF, and both-PDF evidence gates before accepting the
 semantic change. Historical normalized bytes/counts do not override the raw facts.
+
+**Remediation (2026-07-14, with the RD family batch).** The TSN side no longer
+strips Descriptions — `_tsn_raw_row` and the v4 normalized library conserve the
+source text (all 15 authoritative leading numeric prefixes survive; the v4
+`normalization_version` bump rebuilds stored libraries). The TSMIS side strips
+exactly its export-added outer prefix, and only when the leading number IS the
+row's own route (`_strip_desc_prefix(text, route)` — a different numeric prefix
+is source data, per the accepted oracle's declared TSMIS reading contract).
+Comparison-side Description projection trims text EDGES on both sides (tabs
+included) exactly like the oracle's `_text` reading — the raw extract carries
+trailing tabs on two censused route-126 rows no TSMIS representation prints;
+INTERNAL whitespace still compares per D2. Conservation is untouched (library +
+raw claims keep source bytes). Re-blessed: the Excel leg's Description count is
+the oracle's exact 185 (was 200 under the old strip), the PDF leg's 181.
 
 ### CMP-AUD-136 — the independent XLSX reader can parse synchronized A-to-B-to-A bytes between equal live-file hashes
 
@@ -6256,8 +6290,7 @@ corrected note.
 ### CMP-AUD-185 — Ramp Detail omits District and hides a real District disagreement as identical
 
 Priority: P1  
-Status: Verified by the accepted source-bound Stage-8 oracle and all four vs-TSN
-production legs  
+Status: Resolved 2026-07-14 — District is a compared field on every RD leg; the 005/SD/72.366 disagreement now surfaces; re-blessed  
 Primary code: `scripts/compare_ramp_detail_tsn.py::SHARED_HEADER/_raw_tsn_row/
 _tsmis_row/_normalized_row`, inherited by
 `scripts/compare_ramp_detail_pdf.py::_RampDetailFileCompare`
@@ -6297,6 +6330,14 @@ counts, diagnostics, and evidence; bind the exact `005/SD/72.366` positive disag
 and same-source PDF↔Excel agreement; mutate District independently on each source/format;
 and require corrected production counts to equal the accepted source oracle rather than
 the pre-fix 861/1,012 canaries.
+
+**Remediation (2026-07-14, with the RD family batch).** `District` joined
+`SHARED_HEADER` as a compared field on every Ramp Detail path (from each
+source's Location; from the library's District sidecar on the normalized path)
+and in the evidence adapter's FIELDS/maps (the print Location column / LOC
+window). Re-blessed: every leg reports exactly the oracle's District 1 — the
+`005/SD/72.366` TSMIS-12-vs-TSN-11 disagreement is now visible instead of an
+"identical" row.
 
 ### CMP-AUD-186 — Highway Detail truncates multi-baseline line-two records as complete
 

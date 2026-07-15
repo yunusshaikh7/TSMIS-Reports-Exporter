@@ -747,7 +747,7 @@ def test_detail_success_outcomes():
                   tsn_library._statewide_raw_candidates(raw, "*.xlsx") == [source])
             check(f"{label}: exact normalized header and exactly one emitted row",
                   title == sheet and rows[0] == expected_header and len(rows[1:]) == 1
-                  and rows[1][:-2] == base_row)
+                  and rows[1][:len(base_row)] == base_row)
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

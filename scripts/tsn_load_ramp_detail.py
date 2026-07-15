@@ -25,36 +25,33 @@ from events import ConsolidateResult
 
 RAW_GLOB = "*.xlsx"
 
-# Sidecar columns APPENDED after the shared header (normalization_version 3, the
-# Intersection Detail pattern): each row's TSN district + county, split out of
-# its LOCATION ("01-DN-101"). The comparison's loader slices them off
-# (compare_ramp_detail_tsn's _normalized_row reads exactly the shared width);
-# the visual-evidence generator reads them to find a row in the TSN statewide
-# print.
-SIDECAR_HEADER = ["TSN District", "TSN County"]
+# Sidecar columns APPENDED after the shared header (normalization_version 4):
+# each row's TSN district + county (split out of its LOCATION "01-DN-101") plus
+# the raw PM suffix. Since v4 the comparison's loader READS the County sidecar to
+# rebuild the D4 physical identity (CMP-AUD-045) and conserves the suffix as a
+# raw claim (it is never a key component); the visual-evidence generator reads
+# district/county to find a row in the TSN statewide print.
+SIDECAR_HEADER = ["TSN District", "TSN County", "TSN PM Suffix"]
 
-
-def _dist_cnty(loc):
-    """LOCATION '01-DN-101' / '04-CC.-004' -> ('01', 'DN'/'CC')."""
-    parts = ("" if loc is None else str(loc)).strip().upper().split("-")
-    dist = parts[0].strip() if parts else ""
-    cnty = parts[1].strip().rstrip(".") if len(parts) >= 2 else ""
-    return dist, cnty
+# The LOCATION split lives with the comparator (shared by every RD path).
+_dist_cnty = rd._dist_cnty
 
 
 def tsn_rows_with_dcr(path):
     """The raw statewide projection (rd.tsn_rows_from_raw's rows, same order)
-    PLUS each row's (district, county) — a separate loop so the comparator's
-    regression-locked loader stays untouched."""
+    PLUS each row's (district, county, pm_suffix) — a separate loop so the
+    comparator's regression-locked loader stays untouched."""
     with rd.ctc.exact_raw_rows(
             path, rd.TSN_SHEET, rd.TSN_RAW_HEADER, rd.REPORT_NAME,
             required_nonblank=("LOCATION", "PM")) as (header, rows_in):
         h = {n: i for i, n in enumerate(header)}
-        li = h["LOCATION"]
+        li, si = h["LOCATION"], h["PM_SFX"]
         rows, dcr = [], []
         for r in rows_in:
             rows.append(rd._tsn_raw_row(r, h))
-            dcr.append(_dist_cnty(r[li] if li < len(r) else None))
+            dist, cnty = _dist_cnty(r[li] if li < len(r) else None)
+            sfx = r[si] if si < len(r) and r[si] is not None else ""
+            dcr.append((dist, cnty, str(sfx)))
         return rows, dcr
 
 

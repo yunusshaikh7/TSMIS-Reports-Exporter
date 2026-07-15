@@ -115,28 +115,30 @@ def _load_tsn_with_sidecar(path):
     try:
         if rd.NORMALIZED_SHEET in wb.sheetnames:
             it = wb[rd.NORMALIZED_SHEET].iter_rows(values_only=True)
-            header = list(next(it, []) or [])
-            has_sidecar = len(header) >= 1 + len(rd.SHARED_HEADER) + 2
+            header = [_S(c) for c in (next(it, []) or [])]
+            # v4 gate (CMP-AUD-045): a pre-v4 library lacks the District column
+            # / PM-Suffix sidecar the county-aware identity needs — same rule as
+            # the comparison loader, surfaced as the evidence rebuild note.
+            if "District" not in header or "TSN PM Suffix" not in header:
+                return [], None, ("the normalized TSN library predates the "
+                                  "county-aware evidence columns — rebuild the "
+                                  "TSN library (Settings) and run the "
+                                  "comparison again")
             rows, sidecar = [], defaultdict(list)
             for r in it:
                 if not r or all(c in (None, "") for c in r):
                     continue
                 row = rd._normalized_row(r)    # re-projected like the comparison
                 rows.append(row)
-                if has_sidecar:
-                    dist = _S(r[1 + len(rd.SHARED_HEADER)])
-                    cnty = _S(r[2 + len(rd.SHARED_HEADER)]).rstrip(".")
-                    sidecar[(row[0], row[_KEY_I])].append((dist, cnty))
-            if not has_sidecar:
-                return rows, None, ("the normalized TSN library predates the "
-                                    "evidence columns — rebuild the TSN library "
-                                    "(Settings) and run the comparison again")
+                dist = _S(r[1 + len(rd.SHARED_HEADER)])
+                cnty = _S(r[2 + len(rd.SHARED_HEADER)]).rstrip(".")
+                sidecar[(row[0], row[_KEY_I])].append((dist, cnty))
             return rows, sidecar, None
     finally:
         wb.close()
     rows, dcr = tsn_rows_with_dcr(path)          # a RAW statewide file
     sidecar = defaultdict(list)
-    for row, (dist, cnty) in zip(rows, dcr):
+    for row, (dist, cnty, _sfx) in zip(rows, dcr):
         sidecar[(row[0], row[_KEY_I])].append((dist, cnty))
     return rows, sidecar, None
 
@@ -171,7 +173,10 @@ def enumerate_diffs(tsmis_rows, tsn_rows, meta):
                 va, vb = _xl_trim(ra[1 + i]), _xl_trim(rb[1 + i])
                 if va != vb:
                     dist, cnty = (sidecar.get((route, key)) or [("", "")])[0]
-                    diffs[f].append(dict(route=route, key=key, field=f,
+                    # The engine's locators key on the plain normalized-PM text
+                    # (+ county for TSN); the D4 PhysicalKey's str payload IS
+                    # that text (CMP-AUD-045).
+                    diffs[f].append(dict(route=route, key=str(key), field=f,
                                          va=va, vb=vb, dist=dist, cnty=cnty))
     return diffs
 
@@ -184,7 +189,9 @@ def project(field, raw):
     (null-render tokens to blank, the print's N -> TSN's O, Description prefix
     strip + whitespace collapse) + compare_core's cell trim."""
     v = rd._v(raw)
-    if field == "Date of Record":
+    if field == "District":
+        v = rd._dist_cnty(raw)[0]
+    elif field == "Date of Record":
         v = rd._iso_date(raw)
     elif field == "Description":
         v = rdp._collapse(rd._strip_desc_prefix(raw))
@@ -205,9 +212,10 @@ def tsmis_pdf_path(pdf_dir, route):
 
 
 # shared field -> the consolidator's column key (see rdpdf._COL_ORDER).
-_TSMIS_COL = {"PR": "pr", "Date of Record": "date", "HG": "hg", "Area 4": "area4",
-              "City Code": "city", "R/U": "ru", "Description": "desc",
-              "On/Off": "onoff", "Ramp Type": "rtype"}
+# District (CMP-AUD-185) lives inside the print's Location column on both PDFs.
+_TSMIS_COL = {"PR": "pr", "District": "loc", "Date of Record": "date", "HG": "hg",
+              "Area 4": "area4", "City Code": "city", "R/U": "ru",
+              "Description": "desc", "On/Off": "onoff", "Ramp Type": "rtype"}
 # ... and the window each column spans (boundary names in rdpdf's dict), for
 # boxing a BLANK cell.
 _COL_WIN = {"pr": ("loc_pr", "pr_pm"), "date": ("pm_date", "date_hg"),
@@ -318,8 +326,8 @@ _L_WIN = [
     ("TYPE", 418, 442), ("EFF_DATE", 442, 513), ("DESC", 513, 800),
 ]
 # shared comparison field -> window name.
-TSN_CELL = {"PR": "PR", "Date of Record": "DATE_REC", "HG": "HG",
-            "Area 4": "AREA4", "City Code": "CITY", "R/U": "RU",
+TSN_CELL = {"PR": "PR", "District": "LOC", "Date of Record": "DATE_REC",
+            "HG": "HG", "Area 4": "AREA4", "City Code": "CITY", "R/U": "RU",
             "On/Off": "ONOFF", "Ramp Type": "TYPE", "Description": "DESC"}
 _PM_LINE_RE = re.compile(r"^\d{3}\.\d{3}$")
 _LOC_RE = re.compile(r"^(\d{2})-([A-Z]{1,4}\.?)-(\w+)$")

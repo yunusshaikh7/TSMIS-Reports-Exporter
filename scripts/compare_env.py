@@ -764,7 +764,7 @@ class EnvCompare:
     def __init__(self, key, report_name, subdir, sheet_name=None,
                  expected_header=None, base_schema=None, key_col=None,
                  force_header=None, side_loader=None, agg_header=None,
-                 flat_pdf_loader=None):
+                 flat_pdf_loader=None, physical_key_builder=None):
         self.key = key                        # "ramp_summary" | "ramp_detail" | …
         self.REPORT_NAME = report_name
         self.subdir = subdir
@@ -793,6 +793,12 @@ class EnvCompare:
         # Resolved to a header index per loaded layout; falls back to the first
         # column (the original behavior) when the named column isn't present.
         self.key_col = key_col
+        # CMP-AUD-045 (opt-in): callable(header, key_field) -> a compare_core
+        # key_normalizer that builds the report's county-aware PhysicalKey from
+        # each row, or None to degrade to the plain key column (logged). Wired
+        # into every per-run schema so cross-environment pairing can never
+        # match physically different locations that share a postmile.
+        self.physical_key_builder = physical_key_builder
 
     def suggest_name(self, dir_a, dir_b):
         la, lb = _side_labels(Path(dir_a), Path(dir_b))
@@ -832,10 +838,14 @@ class EnvCompare:
         cmp_widths = dict(base.cmp_widths)
         if "Description" in header and "Description" not in cmp_widths:
             cmp_widths["Description"] = 30
+        key_field = self._resolve_key_field(header)
+        key_normalizer = base.key_normalizer
+        if self.physical_key_builder is not None:
+            key_normalizer = self.physical_key_builder(header, key_field)
         return replace(base, header=header, side_a=la, side_b=lb,
                        sides_noun="environments",
                        data_widths=widths, cmp_widths=cmp_widths,
-                       key_field=self._resolve_key_field(header),
+                       key_field=key_field, key_normalizer=key_normalizer,
                        one_sided_note_extra="", trim_note_extra="")
 
     def _effective_source_files(self, folder):
@@ -1071,9 +1081,44 @@ RAMP_SUMMARY = EnvCompare(
         report_name="Ramp Summary", header=RS_HEADER,
         id_noun="route", id_noun_plural="routes",
         scope_flat="All routes (one row per route)"))
+def _ramp_detail_env_keys(header, key_field):
+    """CMP-AUD-045: the Ramp Detail cross-env key builder — the same D4
+    county-aware PhysicalKey the vs-TSN paths bake into their rows, built here
+    per row from the export's own columns (County from the Location column;
+    the cells before the PM column and after the Date column are the PM prefix
+    and suffix, conserved as raw claims only). Degrades to the plain key column
+    (logged) when the layout doesn't expose Location or a usable PM position —
+    layout drift falls back to the old behavior rather than crashing, exactly
+    like _resolve_key_field."""
+    import compare_ramp_detail_tsn as _rd
+    loc_field = next((i for i, name in enumerate(header)
+                      if name is not None
+                      and str(name).strip().casefold() == "location"), None)
+    if loc_field is None or key_field == 0:
+        log.warning("env compare ramp_detail: no Location column / key column "
+                    "in header %r; falling back to the plain PM key", header)
+        return None
+
+    def normalizer(row, off, kf):
+        route = "" if row[0] is None else str(row[0])
+        loc = _rd._raw_text(row[off + loc_field]).strip()
+        _district, county = _rd._dist_cnty(loc)
+        pm_raw = row[off + kf]
+
+        def cell(field):
+            i = off + field
+            return _rd._raw_text(row[i]) if 0 <= field < len(header) and i < len(row) else ""
+        return _rd._physical_pm_key(route, county, pm_raw, (
+            ("route", route), ("location", loc),
+            ("postmile_prefix", cell(kf - 1)),
+            ("postmile", _rd._raw_text(pm_raw)),
+            ("postmile_suffix", cell(kf + 2))), f"Location {loc!r}")
+    return normalizer
+
+
 RAMP_DETAIL = EnvCompare(
     "ramp_detail", "Ramp Detail", "ramp_detail", sheet_name="TSAR - Ramp Detail",
-    key_col="PM")
+    key_col="PM", physical_key_builder=_ramp_detail_env_keys)
 HIGHWAY_SEQUENCE = EnvCompare(
     "highway_sequence", "Highway Sequence", "highway_sequence",
     sheet_name="Highway Locations", key_col="PM")
