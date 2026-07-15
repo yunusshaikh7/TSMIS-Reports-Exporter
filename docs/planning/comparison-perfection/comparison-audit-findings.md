@@ -3022,7 +3022,7 @@ CMP-AUD-082 integration gate; it must not be hidden by the central publisher fix
 ### CMP-AUD-076 — saved comparisons lack durable source provenance
 
 Priority: P2  
-Status: Partially remediated 2026-07-14 — file-kind AND folder-kind comparisons persist durable input provenance; the in-workbook sheet + schema-v4 fold-in remain  
+Status: Resolved 2026-07-14 — durable provenance in a sidecar + in-workbook sheet for every comparison; only the strict schema-v4 fold-in remains (Phase-5 artifact epoch)  
 Primary code: `scripts/compare_tsn_common.py:219-222`,
 `scripts/compare_env.py:666-669`, `scripts/compare_core.py:1503-1504`,
 `scripts/consolidation_meta.py:157-163`
@@ -3090,6 +3090,21 @@ the same `.provenance.json` writer. Both kinds carry an explicit `kind` field.
 Fixture: the Intersection Detail env e2e asserts the folder record end to end
 through the strict publication machinery. Folder-kind real-corpus exercise
 rides the next work-PC visit (with the owed baseline-matrix two-day run).
+
+**Final piece (2026-07-14, same day).** `run_compare` gained an opt-in additive
+`provenance=` kwarg (default None → every direct caller byte-identical, honoring
+the correctness lock): both drivers now pass the pre-read record, and the
+workbook itself carries a concise human-facing **Provenance sheet** — the
+recipe, each input's role/kind, FULL canonical selection, content digest (file)
+or discovered member count (folder), and the producer completion — with the
+note that the machine binding (committed generation) lives in the sidecar.
+Verified on the real corpus (the regenerated summary comparisons carry the
+sheet with the real Downloads selections + digests; oracles unchanged) and the
+full gate (no sheet-list assertion anywhere broke). Moved files and aliases are
+covered by construction: the record persists the resolved compare-time
+selection (a later move cannot retroactively alter it) and `resolve()`
+canonicalizes aliases at capture. The only remainder is folding the sidecar
+into the strict schema-v4 payload — Phase-5 artifact-epoch work, tracked there.
 
 ### CMP-AUD-077 — comparison results discard structured discrepancy counts
 

@@ -3083,11 +3083,47 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
         ws.append(cells)
 
 
+def _write_provenance_sheet(wb, provenance):
+    """Append the small human-facing "Provenance" sheet (CMP-AUD-076): what the
+    comparison actually consumed — the recipe, each input's role/kind, its FULL
+    canonical selection, and its identity facts (content digest for a file; the
+    discovered member count for a folder) — captured BEFORE the inputs were
+    read. Write-only-safe (create_sheet + append only). The machine-readable
+    record incl. the committed generation binding is the `.provenance.json`
+    sidecar beside the workbook; this sheet is its concise display."""
+    ws = wb.create_sheet("Provenance")
+    ws.sheet_properties.tabColor = "808080"
+    for col, w in (("A", 12), ("B", 110)):
+        ws.column_dimensions[col].width = w
+    recipe = provenance.get("recipe") or {}
+    ws.append(["Comparison Provenance"])
+    ws.append(["What this workbook compared — captured before the inputs "
+               "were read."])
+    ws.append([])
+    ws.append(["Report", recipe.get("report", "")])
+    ws.append(["Run", recipe.get("banner", "")])
+    for rec in provenance.get("inputs") or ():
+        ws.append([])
+        ws.append([str(rec.get("role", "")), str(rec.get("selection", ""))])
+        if rec.get("kind") == "folder":
+            ws.append(["", f"{rec.get('member_count', 0)} discovered source "
+                           "file(s); the exact member census is in the "
+                           "provenance sidecar"])
+        else:
+            ws.append(["", f"sha256 {rec.get('sha256', '')}"])
+        if rec.get("producer_completion") is not None:
+            ws.append(["", f"producer completion: {rec['producer_completion']}"])
+    ws.append([])
+    ws.append(["Note", "The machine-readable record (including the committed "
+                       "generation binding) is the .provenance.json sidecar "
+                       "beside this workbook."])
+
+
 def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                 confirm_overwrite=None, mode="formulas",
                 name_a="", name_b="", warnings=(), commit_guard=None,
                 input_completion=None, skipped_inputs=None, failed_inputs=0,
-                failures=(), coverage_diagnostics=()):
+                failures=(), coverage_diagnostics=(), provenance=None):
     """Build the comparison workbook(s) from two loaded row sets. Returns a
     ConsolidateResult (same contract as the consolidators, so the GUI/console
     drive it identically). The CALLER owns input loading + shape validation;
@@ -3564,6 +3600,8 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         if _write_snapshot_sheet(
                 wb, b, rows_n, lay, events, hk_n) is None:
             return cancelled
+        if provenance is not None:           # CMP-AUD-076 (opt-in, additive)
+            _write_provenance_sheet(wb, provenance)
         events.on_log("Saving…")
         if not output_allowed(path.parent) or not output_allowed(path):
             close_unsaved(wb)

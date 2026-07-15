@@ -22,8 +22,8 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020–023, 184, 183, 144, 145, 146**; 115/035 partially remediated |
-| **Next action** | **CMP-AUD-076 final piece** (the in-workbook Provenance sheet — content-additive; sweep sheet-list assertions) OR start **Wave 4** (045 PhysicalKey integration, 220, 218, 199, 197) |
+| **Findings** | 238 total · **Resolved this takeover: CMP-AUD-238, 024, 025, 020–023, 184, 183, 144, 145, 146, 076**; 098 comparison half done (evidence half = Stage 10); 115/035 partial |
+| **Next action** | **Wave 4** — CMP-AUD-045 (PhysicalKey into the family projectors), 220 (pairing objective), 218 (Spot Check independence), 199 (HSL identity), 197 (CRLF shared-reader) |
 
 > ### ▶ RESUME HERE (2026-07-14, after the Summary-loader batch)
 > **Done this batch — CMP-AUD-020/021/022/023 (aggregate Summary loader correctness):**
@@ -283,6 +283,8 @@ no family-gate owner yet. Wave 5 assigns them.
 ---
 
 ## 11. Progress log (append-only — real progress, not recursion)
+
+- **2026-07-14 — Wave 3: CMP-AUD-076 Resolved (in-workbook Provenance sheet completes it).** `run_compare` gained the opt-in additive `provenance=` kwarg (None default keeps every caller byte-identical); both drivers pass the pre-read record, so every comparison workbook now displays what it compared — recipe, roles, full canonical selections, digests / member counts, producer completions — while the `.provenance.json` sidecar keeps the machine binding to the committed generation. Real-corpus verified; oracles unchanged; gate 121/121 (no sheet-list assertions broke). Only the schema-v4 fold-in remains, tracked under Phase 5.
 
 - **2026-07-14 — Wave 3: CMP-AUD-076 folder-kind half (compare_env provenance).** Cross-environment comparisons persist the exact discovered member census per side (statted pre-read; the census is the effective identity — the discovery-set tripwire guards the read window), roles = derived side labels, full folder selections, recipe + generation binding, through the same tolerant sidecar writer. Hermetic e2e through the strict publication machinery. Remaining in 076: the in-workbook Provenance sheet + schema-v4 fold-in. Suite 121/121 + ruff clean.
 

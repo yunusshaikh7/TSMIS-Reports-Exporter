@@ -631,6 +631,10 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
     if blocked is not None:
         return blocked
 
+    prov_display = {"recipe": {"report": getattr(schema, "report_name",
+                                                 str(schema)),
+                               "banner": banner},
+                    "inputs": input_provenance}
     committed = artifact_store.commit_workbook(
         out_path,
         lambda tmp: run_compare(
@@ -642,6 +646,7 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
             skipped_inputs=skipped_inputs,
             failed_inputs=failed_inputs,
             failures=input_failures,
+            provenance=prov_display,
             commit_guard=commit_guard),
         twin=(mode == "both"), expect_sheet="Comparison",
         confirm_overwrite=confirm_overwrite,

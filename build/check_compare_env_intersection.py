@@ -175,6 +175,16 @@ def test_detail_flat_compare():
     check("the record binds the committed generation",
           prov.get("generation_id") == res.artifact_generation.generation_id
           and prov.get("recipe", {}).get("report") == "Intersection Detail")
+    from openpyxl import load_workbook
+    wb = load_workbook(out, read_only=True, data_only=True)
+    try:
+        flatp = " ".join(str(c) for row in wb["Provenance"].iter_rows(values_only=True)
+                         for c in row if c is not None)
+    finally:
+        wb.close()
+    check("a Provenance sheet shows folder selections + member counts",
+          str(a.parent) in flatp and str(b.parent) in flatp
+          and "1 discovered source file(s)" in flatp)
 
 
 def main():

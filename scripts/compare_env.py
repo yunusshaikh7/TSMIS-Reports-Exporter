@@ -1017,6 +1017,11 @@ class EnvCompare:
         if blocked is not None:
             return blocked
         sc = self._schema(header, la, lb)
+        prov_sides[0]["role"], prov_sides[1]["role"] = la, lb
+        prov_display = {"recipe": {"report": self.REPORT_NAME,
+                                   "banner": f"{self.REPORT_NAME} Comparison "
+                                             f"— {la} vs {lb}"},
+                        "inputs": prov_sides}
         result = artifact_store.commit_workbook(
             out_path,
             lambda tmp: run_compare(
@@ -1027,6 +1032,7 @@ class EnvCompare:
                  input_completion=input_completion,
                  skipped_inputs=total_skipped, failed_inputs=total_failed,
                  failures=failures,
+                 provenance=prov_display,
                  coverage_diagnostics=coverage_diagnostics),
             twin=(mode == "both"), expect_sheet="Comparison",
             confirm_overwrite=confirm_overwrite,
@@ -1037,7 +1043,6 @@ class EnvCompare:
         # CMP-AUD-076: bind the pre-read member census to the committed
         # generation, beside the workbook (additive evidence; no-op unless a
         # generation actually committed).
-        prov_sides[0]["role"], prov_sides[1]["role"] = la, lb
         ctc.write_comparison_provenance(
             result, out_path, report=self.REPORT_NAME,
             banner=f"{self.REPORT_NAME} Comparison — {la} vs {lb}",

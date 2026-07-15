@@ -386,6 +386,15 @@ def test_provenance_sidecar():
           prov.get("generation_id") == res.artifact_generation.generation_id
           and prov.get("members") == dict(res.artifact_generation.content_digests))
 
+    # The concise human display: a Provenance SHEET inside the workbook carrying
+    # the full selections + digests (the sidecar remains the machine binding).
+    ph, pr = _sheet(out, "Provenance")
+    flatp = " ".join(c for row in [ph] + pr for c in row)
+    check("a Provenance sheet shows both full selections + digests",
+          str(a_dir) in flatp and str(b_dir) in flatp
+          and ins[0]["sha256"] in flatp and ins[1]["sha256"] in flatp
+          and "captured before the inputs were read" in flatp)
+
     # A byte-copy elsewhere records the SAME digest under its OWN selection.
     c_dir = root / "C"
     c_dir.mkdir()
