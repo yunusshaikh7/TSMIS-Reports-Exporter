@@ -48,11 +48,19 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   Compare with the oracle reference: `build/phase8_highway_sequence_comparison.py`
 >   `_cost`/`_assign_group` (Levenshtein with lru_cache; positions =
 >   within-group ordinals in file order).
-> - **Census first**: the typed pairing-trace/cost vocabulary
->   (`comparison_contract` trace records, schema-v3 persisted payloads,
->   `check_compare_audit` pins) — if the persisted cost SHAPE changes, extend
->   additively; cached generations must stay readable. Profile the Levenshtein
->   matrix build under the cap.
+> - **Census first**: the typed pairing-trace/cost vocabulary — STARTED
+>   2026-07-16: `comparison_contract.PairingTrace` (~line 581) pins
+>   `total_cost`/`positional_cost` as `_require_exact_count` INTS (persisted in
+>   schema-v3 payloads; `check_compare_audit` pins). Plan: KEEP those two as the
+>   asserted-diff totals they are (the "exact never worse than positional"
+>   monotonicity fixture stays meaningful), and carry the new objective's
+>   components ADDITIVELY (new int fields or a versioned `algorithm` string) —
+>   check `PairingTrace.from_dict` (~706) field-set strictness first: old
+>   persisted generations MUST stay readable (tolerant defaults or a schema
+>   bump via `cache_envelope`). The assignment itself lives in
+>   `compare_core.pair_occurrences_by_similarity` (~845; `_row_diff_count`
+>   ~668 is the current asserted-only cost). Profile the Levenshtein matrix
+>   build under the cap.
 > - **Fold in the HSL vs-TSN `_x000d_` decode** (the 197 remainder for HSL):
 >   add the OOXML decode to HSL's `_v` (matches the oracle's xlsx-unescape on
 >   the TSMIS side; the PDF render and raw-TSN sides carry no escapes). RD's
