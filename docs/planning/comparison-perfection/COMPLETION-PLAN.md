@@ -25,8 +25,64 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-16, after the Highway Sequence family batch)
-> **DONE this batch — the whole HSL family in one commit
+> ### ▶ RESUME HERE (2026-07-16, after the same-source render-artifact fix)
+>
+> **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
+> will get us to perfect reports; if it leads to perfection it's approved, if it
+> can lead to discrepancies it's not. Your call."* — correctness decides; changes
+> that provably move comparisons toward source truth are pre-approved; anything
+> that could introduce a discrepancy is not. Every change still carries exact
+> red→green + real-corpus + oracle evidence.
+>
+> **Do this next: CMP-AUD-220 — the approved assignment/verdict split**
+> (owner approval recorded in `comparison-phase3-decision-gates.md` §D3
+> amendment 2026-07-16). One compare_core batch:
+> - **Change**: `pair_occurrences_by_similarity`/`_row_diff_count` currently
+>   build the duplicate-group cost from ASSERTED-only diff counts. New
+>   assignment cost = the source-proven tuple **(all-COMPARED-field diff count,
+>   summed character edit distance, |within-group position gap|)** — context
+>   fields participate in ASSIGNMENT (they distinguish physical occurrences),
+>   while VERDICTS/counts stay asserted-only (unchanged). The D3.2
+>   lexicographic-vector tie rule stays as the final tie-break; the
+>   100,000-cell cap + capped/partial fail-closed semantics unchanged.
+>   Compare with the oracle reference: `build/phase8_highway_sequence_comparison.py`
+>   `_cost`/`_assign_group` (Levenshtein with lru_cache; positions =
+>   within-group ordinals in file order).
+> - **Census first**: the typed pairing-trace/cost vocabulary
+>   (`comparison_contract` trace records, schema-v3 persisted payloads,
+>   `check_compare_audit` pins) — if the persisted cost SHAPE changes, extend
+>   additively; cached generations must stay readable. Profile the Levenshtein
+>   matrix build under the cap.
+> - **Fold in the HSL vs-TSN `_x000d_` decode** (the 197 remainder for HSL):
+>   add the OOXML decode to HSL's `_v` (matches the oracle's xlsx-unescape on
+>   the TSMIS side; the PDF render and raw-TSN sides carry no escapes). RD's
+>   loaders untouched (RD-79 preserved bytes; its vs-TSN decision is the last
+>   197 remainder, censused separately).
+> - **Re-bless targets** (the `verify_hsl_corpus.py`/`verify_hsl_oracle_objective.py`
+>   harness pattern; rebuild from the a5532b5-era scratchpad or the commit
+>   messages): HSL vs-TSN must land EXACTLY on the Stage-8 oracle table —
+>   Excel 4,894 rows / **5,589 cells** {Desc 4,894, FT 695}; PDF 4,916 /
+>   **5,001** {4,916, 85}; same-source stays 1,410/3,721. RD-79 and ID-79 are
+>   ALREADY EXACT under the old objective, so they must re-bless UNCHANGED
+>   (RD: 1 real duplicate group 101/LA/1.284; ID: 15 TSN groups — if any count
+>   moves, STOP and factor it; the family oracles used the source objective, so
+>   agreement is expected). HL Route-1 969 unchanged-or-explained. Engine
+>   fixtures with 2×2 duplicate groups (`check_compare_physical_identity`
+>   engine tests, `check_compare_keyfield`) — the position term prefers
+>   order-preserving pairs; verify each fixture's intent.
+> - Then **CMP-AUD-218** (Spot Check independence — full staged brief below),
+>   then the RD-vs-TSN 197 remainder, then Wave 5.
+>
+> **DONE 2026-07-16 (same day, later): the same-source render-artifact fix**
+> (owner-reported ID PDF↔Excel false positives; commit a5532b5, CI green):
+> `compare_tsn_common.same_source_render_text` (OOXML `_xHHHH_` decode incl.
+> `_x005F_` literals + edge-whitespace padding; PhysicalKey passthrough) at the
+> load boundary of the three PDF-vs-Excel flavors ONLY. Corpus: ID 16,459/0/0
+> (only the real 108/TUO HG defect remains); RD 15,216 fully identical; HSL
+> 1,410/3,721 == the oracle EXACTLY. The owner's same reply approved CMP-AUD-220
+> (recorded in the D3 gate doc).
+>
+> **DONE earlier 2026-07-16 — the whole HSL family in one commit
 > (CMP-AUD-045-HSL / 155 / 156 / 158 / 159 / 199 / 204):**
 > - **Normalizer v4** (`consolidate_tsn_highway_sequence`, catalog bump 3→4 + a
 >   `TSN Normalization` marker sheet the loader gates on): pointer distance tokens
