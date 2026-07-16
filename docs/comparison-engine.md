@@ -815,27 +815,38 @@ contain the chosen report — see [gui.md](gui.md).
   seen in the field: TSMIS printed 059.739 after 059.759 while TSN kept it in order). The Excel MATCH
   lookups pair each union row with both files regardless of position. Per-route alignment keeps the
   matcher fast on consolidated inputs (50k+ rows).
-- **Duplicate-key pairing by SIMILARITY, not file order** (v0.13.1) —
+- **Duplicate-key pairing by SOURCE IDENTITY, not file order** (v0.13.1; the objective upgraded
+  2026-07-16 per CMP-AUD-220's owner-approved assignment/verdict split) —
   `pair_occurrences_by_similarity(sc, rows_t, rows_n, keys_t, keys_n, has_route, events)`, run after
   `keys_for`, before `union_keys`. When a key legitimately repeats (two segments at the same
   postmile), the occurrence # used to be assigned in file order, so a row that matched the other
   side's SECOND instance was flagged as a difference against its FIRST. This re-numbers the
-  occurrence component of duplicate keys WITHIN each `(route, key)` group present on BOTH sides so
-  the most-alike rows (fewest differing fields, via the SAME `_xl_trim`/`_medwid_norm`/ditto rules as
-  `count_diffs` — `_row_diff_count`) share an occurrence #; the larger side's leftovers get higher,
-  side-unique occurrence numbers (stay one-sided). At or below
+  occurrence component of duplicate keys WITHIN each `(route, key)` group present on BOTH sides.
+  The assignment minimizes the lexicographic **(all-compared-field diff count, summed character
+  edit distance, |within-group position gap|)** tuple — context and ditto cells help decide WHICH
+  physical occurrences correspond (they distinguish rows), while VERDICTS and every count stay
+  asserted-only (`_row_diff_count`; identity may legitimately pair rows that cost MORE asserting
+  cells than file order — the count follows the identity, never the reverse). Values ride the SAME
+  `_xl_trim`/`_medwid_norm` normalization as `count_diffs`, computed in one `compared_cell` pass
+  per candidate (`_pair_cost_components`; `_char_distance` is the Stage-8 oracle's Levenshtein with
+  a per-group symmetric memo). The larger side's leftovers get higher, side-unique occurrence
+  numbers (stay one-sided). At or below
   `_PAIR_GROUP_CAP=100,000` matrix cells, `_min_cost_pairs` runs a genuinely rectangular Hungarian
-  solver and is exact for every group. It minimizes scalar differing-cell cost first, then the
-  lexicographically smallest smaller-side assignment vector; side A owns the tie when dimensions
-  are equal. Above the cap, only deterministic positional diagnostics are produced: pairing quality
+  solver and is exact for every group: the objective tuple is encoded order-preservingly into one
+  exact integer, then the lexicographically smallest smaller-side assignment vector breaks ties;
+  side A owns the tie when dimensions are equal. Above the cap, only deterministic positional
+  diagnostics are produced: pairing quality
   is `capped`, completion is partial, and neither a match nor certified differences can be claimed.
   Every duplicate group carries a strict typed trace of original indices, assignment vector,
-  selected pairs/costs, dimensions, algorithm, quality, and positional comparison. Cancellation is
+  selected pairs/costs, dimensions, algorithm, quality, and positional comparison — v2
+  (`SOURCE_PAIRING_ALGORITHM`) traces additionally persist per-pair and group objective triples,
+  with monotonicity bound to the objective; v1 payloads keep their own invariants, stay readable,
+  and serialize byte-identically (None fields omitted). Cancellation is
   polled through matrix construction, Hungarian scans, capped fallback, trace materialization, and
   counting; cancellation returns unknown/empty truth and writes nothing. Workbook lookups use
   injective opaque ordinal tokens rather than flattened route/key text. Locked by
-  `check_compare_dupmatch.py`, `check_compare_pairing_policy.py`, and
-  `check_compare_cancellation.py`.
+  `check_compare_dupmatch.py`, `check_compare_pairing_policy.py` (incl. the source-identity and
+  context-mutation fixtures), and `check_compare_cancellation.py`.
 - **`count_diffs`** — the Python mirror: overall totals, per-field diff counts, per-route aggregates
   (consolidated), and the FIRST matched-with-differences row (Spot Check default). The same numbers
   back the run summary AND become the literal cells of the values workbook. Uses `_xl_trim` (Excel

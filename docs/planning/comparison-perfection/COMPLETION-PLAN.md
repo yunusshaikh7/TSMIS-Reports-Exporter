@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-16, after the same-source render-artifact fix)
+> ### ▶ RESUME HERE (2026-07-16, after the CMP-AUD-220 assignment/verdict split)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -34,52 +34,51 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
-> **Do this next: CMP-AUD-220 — the approved assignment/verdict split**
-> (owner approval recorded in `comparison-phase3-decision-gates.md` §D3
-> amendment 2026-07-16). One compare_core batch:
-> - **Change**: `pair_occurrences_by_similarity`/`_row_diff_count` currently
->   build the duplicate-group cost from ASSERTED-only diff counts. New
->   assignment cost = the source-proven tuple **(all-COMPARED-field diff count,
->   summed character edit distance, |within-group position gap|)** — context
->   fields participate in ASSIGNMENT (they distinguish physical occurrences),
->   while VERDICTS/counts stay asserted-only (unchanged). The D3.2
->   lexicographic-vector tie rule stays as the final tie-break; the
->   100,000-cell cap + capped/partial fail-closed semantics unchanged.
->   Compare with the oracle reference: `build/phase8_highway_sequence_comparison.py`
->   `_cost`/`_assign_group` (Levenshtein with lru_cache; positions =
->   within-group ordinals in file order).
-> - **Census first**: the typed pairing-trace/cost vocabulary — STARTED
->   2026-07-16: `comparison_contract.PairingTrace` (~line 581) pins
->   `total_cost`/`positional_cost` as `_require_exact_count` INTS (persisted in
->   schema-v3 payloads; `check_compare_audit` pins). Plan: KEEP those two as the
->   asserted-diff totals they are (the "exact never worse than positional"
->   monotonicity fixture stays meaningful), and carry the new objective's
->   components ADDITIVELY (new int fields or a versioned `algorithm` string) —
->   check `PairingTrace.from_dict` (~706) field-set strictness first: old
->   persisted generations MUST stay readable (tolerant defaults or a schema
->   bump via `cache_envelope`). The assignment itself lives in
->   `compare_core.pair_occurrences_by_similarity` (~845; `_row_diff_count`
->   ~668 is the current asserted-only cost). Profile the Levenshtein matrix
->   build under the cap.
-> - **Fold in the HSL vs-TSN `_x000d_` decode** (the 197 remainder for HSL):
->   add the OOXML decode to HSL's `_v` (matches the oracle's xlsx-unescape on
->   the TSMIS side; the PDF render and raw-TSN sides carry no escapes). RD's
->   loaders untouched (RD-79 preserved bytes; its vs-TSN decision is the last
->   197 remainder, censused separately).
-> - **Re-bless targets** (the `verify_hsl_corpus.py`/`verify_hsl_oracle_objective.py`
->   harness pattern; rebuild from the a5532b5-era scratchpad or the commit
->   messages): HSL vs-TSN must land EXACTLY on the Stage-8 oracle table —
->   Excel 4,894 rows / **5,589 cells** {Desc 4,894, FT 695}; PDF 4,916 /
->   **5,001** {4,916, 85}; same-source stays 1,410/3,721. RD-79 and ID-79 are
->   ALREADY EXACT under the old objective, so they must re-bless UNCHANGED
->   (RD: 1 real duplicate group 101/LA/1.284; ID: 15 TSN groups — if any count
->   moves, STOP and factor it; the family oracles used the source objective, so
->   agreement is expected). HL Route-1 969 unchanged-or-explained. Engine
->   fixtures with 2×2 duplicate groups (`check_compare_physical_identity`
->   engine tests, `check_compare_keyfield`) — the position term prefers
->   order-preserving pairs; verify each fixture's intent.
-> - Then **CMP-AUD-218** (Spot Check independence — full staged brief below),
->   then the RD-vs-TSN 197 remainder, then Wave 5.
+> **DONE 2026-07-16 (latest): CMP-AUD-220 + the 197 HSL half — the
+> assignment/verdict split is live engine-wide and the product is
+> ORACLE-EXACT on every Highway Sequence leg.**
+> - `pair_occurrences_by_similarity` now assigns every within-cap duplicate
+>   group by the source-identity objective — lexicographic (all-compared-field
+>   diff count, summed char edit distance, |position gap|), one compared-cell
+>   pass per candidate (`_pair_cost_components` + the oracle-mirroring
+>   `_char_distance`), encoded order-preservingly into the exact solver; the
+>   D3.2 smallest-vector tie rule and the 100k capped semantics are unchanged.
+>   Verdicts/counts stay asserted-only. New `SOURCE_PAIRING_ALGORITHM` traces
+>   carry additive `objective`/`objective_total`/`objective_positional`
+>   triples (monotonicity binds the OBJECTIVE — identity may legitimately cost
+>   more asserting cells than file order); v1 payloads keep their invariants,
+>   stay readable, AND serialize byte-identically (None fields omitted — the
+>   41,000-trace sidecar scale pin still measures 16,795,872 bytes exactly).
+>   HSL's `_v` gained the shared `decode_ooxml_escapes` (byte-equivalent to
+>   openpyxl's unescape = the oracle's xlsx reading).
+> - **Corpus proof (ssor-prod 7.9 + the bound 12-PDF TSN v4 build): the
+>   PRODUCT engine lands on the Stage-8 oracle table EXACTLY on all three HSL
+>   legs** — Excel 4,894 rows / 5,589 cells {Desc 4,894, FT 695}; PDF 4,916 /
+>   5,001 {4,916, 85}; same-source 1,410 / 3,721; all shapes exact; zero
+>   literal `_x000d_` survives the loader. The independent oracle-objective
+>   recount and the same-source hard-assert harness both pass unchanged.
+> - **Family re-bless**: RD (3 legs, the one 101/LA/1.284 group) and ID
+>   (3 legs, 16/16/18 groups) pair BYTE-IDENTICALLY under both objectives —
+>   no count moved. HL Route-1 exact on the locked 299/18/69/221/969 canary;
+>   the June statewide diagnostic pair re-pairs 57/1,002 groups toward
+>   full-content identity (asserted cells in changed groups 457→500; 96/16
+>   one-sided membership moves) — measured and recorded, not canary-bound.
+>   **HD statewide was NOT re-measured** (no consolidated input on the dev
+>   PC; golden fixtures pass) — re-measure before any HD statewide re-bless
+>   claim. Profile under the cap: adversarial 316×316 all-distinct 17.4s
+>   (no real group exceeds ~12 rows), realistic near-cap 1.1s, 1×100k 0.9s.
+> - Checks: `check_compare_pairing_policy` (component pins + the
+>   source-identity fixture + the finding's mutation tests),
+>   `check_comparison_contract` (v2 round-trip/rejections/legacy bytes),
+>   `check_comparison_sidecars` (v2 persistence), `check_compare_cancellation`
+>   (the new cost seam), `check_compare_tsn_common` (decode ==
+>   openpyxl byte-for-byte), `check_compare_highway_sequence_tsn` (`_v`
+>   decode pins). Harnesses: this session's scratchpad
+>   `verify_families_220.py` / `verify_hsl_corpus_220.py` / `profile_220.py`
+>   (+ the a5532b5-era `verify_hsl_oracle_objective.py`/`verify_same_source.py`
+>   rerun as-is).
+> - Remaining under 197: only RD's vs-TSN family decision (census whether the
+>   four RD `_x000d_` cells' TSN partners differ anyway; RD-79 preserved bytes).
 >
 > **DONE 2026-07-16 (same day, later): the same-source render-artifact fix**
 > (owner-reported ID PDF↔Excel false positives; commit a5532b5, CI green):
@@ -125,13 +124,12 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   (-7 = -10 Desc +3 FT Excel; -6 = -9 +3 PDF) equal CMP-AUD-220's own bound
 >   reconciliation arithmetic digit for digit. Zero unexplained residue.
 >
-> **✅ CMP-AUD-220 UNBLOCKED (2026-07-16): the owner approved the recommendation**
-> (*"Whatever you did is approved as long as it results in all correct
-> comparisons"*) — the approval record is appended to the D3 gate doc
+> **✅ CMP-AUD-220 UNBLOCKED → IMPLEMENTED (2026-07-16): the owner approved the
+> recommendation** (*"Whatever you did is approved as long as it results in all
+> correct comparisons"*) — the approval record is appended to the D3 gate doc
 > (assignment/verdict split: the source-proven objective may drive ASSIGNMENT;
-> counts/verdicts stay asserted-only). Implement it as the next compare_core
-> batch per the memo below (all-family re-bless; the condition binds — every
-> comparison must prove correct). The original memo, kept for its analysis:
+> counts/verdicts stay asserted-only). Implemented the same day as option (B)
+> exactly — see the DONE record above. The original memo, kept for its analysis:
 > - **The conflict.** `comparison-phase3-decision-gates.md` fixed-architecture
 >   item 5 (owner-approved 2026-07-12): *"Duplicate-pair cost is computed only from
 >   the same asserting compared-cell equality state. Context/non-asserting cells
@@ -162,8 +160,9 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   profiled under the 100,000-cell cap; the typed trace/tie-break vocabulary
 >   needs a deterministic extension (the oracle's position term already breaks
 >   most ties); every family re-blesses.
-> - **Until the owner appends an approval record to the D3 gate doc, do NOT touch
->   the pairing objective.** Work continues on the non-gated queue below.
+> - ~~Until the owner appends an approval record to the D3 gate doc, do NOT touch
+>   the pairing objective.~~ The approval was recorded and the batch shipped —
+>   see the DONE record above.
 >
 > **Do this next: CMP-AUD-218 — Spot Check independence.** Censused 2026-07-16;
 > implement as one fresh-context batch:
@@ -517,6 +516,8 @@ no family-gate owner yet. Wave 5 assigns them.
 ---
 
 ## 11. Progress log (append-only — real progress, not recursion)
+
+- **2026-07-16 — CMP-AUD-220 Resolved + CMP-AUD-197's HSL vs-TSN half (the owner-approved assignment/verdict split; compare_core batch).** `pair_occurrences_by_similarity` now assigns every within-cap duplicate group by the source-identity objective — the lexicographic (all-compared-field diff count, summed character edit distance, |within-group position gap|) tuple, one `compared_cell` pass per candidate via the new `_pair_cost_components` + the oracle-mirroring `_char_distance` (per-group symmetric memo), encoded order-preservingly into the exact integer solver so the D3.2 smallest-vector tie rule and the 100,000-cell capped/partial semantics are untouched. Verdicts/counts stay asserted-only: `PairingPair.cost`/`total_cost`/`positional_cost` remain asserting-cell sums; the new `SOURCE_PAIRING_ALGORITHM` traces carry additive `objective`/`objective_total`/`objective_positional` triples with monotonicity bound to the OBJECTIVE (the finding's own violation class — identity may cost more asserting cells than file order — is now a pinned fixture); v1 payloads keep their invariants, stay readable, and serialize byte-identically (None-omission; the 41,000-trace scale pin still measures 16,795,872 bytes). HSL's `_v` gained the shared `decode_ooxml_escapes` (byte-equivalent to openpyxl's unescape, pinned against it). **Corpus: the PRODUCT is now ORACLE-EXACT on all three HSL legs** — Excel 4,894/5,589 {Desc 4,894, FT 695}, PDF 4,916/5,001 {4,916, 85}, same-source 1,410/3,721, shapes exact, zero literal `_x000d_` — and the independent oracle-objective recount + same-source hard asserts pass unchanged. Family re-bless: RD (3 legs, 1 group) and ID (3 legs, 16/16/18 groups) pair byte-identically under both objectives; HL Route-1 exact at 299/18/69/221/969; HL's June statewide diagnostic pair re-pairs 57/1,002 groups toward full-content identity (asserted 457→500 in changed groups; 96/16 one-sided moves — measured, not canary-bound); HD statewide NOT re-measured (no local consolidated input — disclosed in the ledger). Profile under the cap: 17.4s adversarial 316×316 all-distinct / 1.1s realistic / 0.9s boundary. The finding's mutation tests (each context field moved → the occurrence follows the source row) are pinned in `check_compare_pairing_policy`. Gate 121/121 + ruff clean.
 
 - **2026-07-16 — the same-source render-artifact fix (owner-reported; CMP-AUD-197's same-source half).** The owner reported eight "HILLCREST RD ≠ HILLCREST RD" Description false positives in an Intersection Detail PDF-vs-Excel workbook — byte inspection proved them the censused trailing-tab class (`'HILLCREST RD\t\t'`; Excel TRIM collapses spaces only, so tabs survived), which ID-79 had deliberately kept as honest byte differences. The owner ruled the class false positives; `compare_tsn_common.same_source_render_text` now applies render-artifact equivalence (OOXML `_xHHHH_` decode incl. `_x005F_` literals + edge-whitespace padding; PhysicalKey passthrough) at the load boundary of the three PDF-vs-Excel flavors ONLY — every vs-TSN leg keeps its oracle's byte semantics (pinned in `check_compare_tsn_common`). Corpus-verified: ID (ars-prod pair) 16,459/0/0 with exactly the one real 108/TUO HG defect left; RD (ssor-prod) 15,216/0/0 fully identical (the 4 `_x000d_` gone); HSL (ssor-prod) 1,410 rows / 3,721 cells == the Stage-8 oracle EXACTLY. The same owner reply approved the CMP-AUD-220 recommendation — the approval record (assignment/verdict split) is appended to the D3 gate doc; 220 is the next batch. Gate 121/121 + ruff clean.
 

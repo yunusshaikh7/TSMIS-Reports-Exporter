@@ -267,6 +267,18 @@ compared-cell equality state. The condition binds: implementation must prove
 all comparisons correct — the exact-DP/cap/typed-trace architecture stays, and
 every family's canaries re-bless with exact evidence before the change ships.
 
+**Implemented 2026-07-16 (same day).** `compare_core` assigns within-cap
+duplicate groups by the approved objective (encoded order-preservingly into
+the exact solver; the D3.1 lex tie rule and D3.2 cap semantics byte-unchanged);
+verdicts/counts stay asserted-only; traces carry the additive
+`SOURCE_PAIRING_ALGORITHM` objective vocabulary while v1 payloads validate and
+serialize byte-identically. The binding condition was met with exact evidence:
+the product reproduces the Stage-8 HSL oracle table digit-for-digit on all
+three legs; RD/ID pair byte-identically under both objectives on every leg;
+HL Route-1 stays 299/18/69/221/969. Full record: the CMP-AUD-220 execution
+disposition in `comparison-audit-findings.md` and the 2026-07-16 progress-log
+entry in `COMPLETION-PLAN.md`.
+
 ## Why Route-1 cannot decide D2 or D3
 
 The bound `HL-R1-E1` canary remains essential regression evidence: exact hashed inputs,

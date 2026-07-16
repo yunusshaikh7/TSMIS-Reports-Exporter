@@ -113,6 +113,17 @@ def test_schema():
           hs._desc_plain("1/103 SEP 53-145") == "1/103 SEP 53-145")
     check("desc collapses double spaces",
           hs._desc_plain("SB ON  ARGYLE AV") == "SB ON ARGYLE AV")
+    # CMP-AUD-197 (HSL half): the TSMIS Excel export's OOXML control escapes
+    # are encoded CRs — _v decodes them exactly as the Stage-8 oracle's
+    # xlsx-unescape does (byte-equivalent seam pinned in
+    # check_compare_tsn_common), so the four censused `_x000d_` cells compare
+    # as their real line-break content on the vs-TSN legs too.
+    check("_v decodes the censused _x000d_ escape to a break-space",
+          hs._v("WEIGH STA_x000d_(BOTH DIRS)") == "WEIGH STA (BOTH DIRS)")
+    check("_v keeps the _x005F_-escaped literal token (OOXML spec)",
+          hs._v("TAG_x005F_x000d_") == "TAG_x000d_")
+    check("_desc_plain rides the decode (collapse after unescape)",
+          hs._desc_plain("ABC_x000d_ DEF") == "ABC DEF")
     # CMP-AUD-045: the projector bakes the typed key — canonical identity is
     # the COMPLETE GLUED postmile (prefix + padded PM + equate suffix).
     row = hs._tsmis_row(

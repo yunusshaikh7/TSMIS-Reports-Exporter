@@ -299,7 +299,8 @@ def test_retained_greedy_traps(c):
 
 
 def test_pairing_cost_semantics(c):
-    print("\nPair cost consumes the approved asserting compared-cell state:")
+    print("\nPair cost consumes the approved asserting compared-cell state,")
+    print("assignment components the approved source-identity state (220):")
     header = ["Key", "Ordinary", "Med-Wid", "Context", "Ditto", "BlankZero",
               "Literal marker"]
     schema = core.CompareSchema(
@@ -309,16 +310,23 @@ def test_pairing_cost_semantics(c):
         ditto_nonasserting=True)
     base = ["K", "SAME", "6V", "same", "same", "same", "same"]
     mark = core._DIFF_MARK
+    # expected = (asserting cost, all-compared-field diffs, char distance):
+    # the first is the persisted verdict cost, the last two the CMP-AUD-220
+    # assignment objective's per-cell components.
     cases = (
-        ("ordinary case remains significant", 1, {1: "ABC"}, {1: "abc"}),
-        ("Med-Wid 06V/6V costs zero", 0, {2: "06V"}, {2: "6V"}),
-        ("raw signed Med-Wid anomaly costs one", 1, {2: "-06V"}, {2: "-6V"}),
-        ("context difference costs zero", 0, {3: "left"}, {3: "right"}),
-        ("ditto difference costs zero", 0, {4: "+"}, {4: "other"}),
-        ("blank and zero cost one", 1, {5: ""}, {5: 0}),
-        ("equal literal marker content costs zero", 0,
+        ("ordinary case remains significant", (1, 1, 3),
+         {1: "ABC"}, {1: "abc"}),
+        ("Med-Wid 06V/6V costs zero", (0, 0, 0), {2: "06V"}, {2: "6V"}),
+        ("raw signed Med-Wid anomaly costs one", (1, 1, 1),
+         {2: "-06V"}, {2: "-6V"}),
+        ("context difference asserts zero but drives assignment", (0, 1, 4),
+         {3: "left"}, {3: "right"}),
+        ("ditto difference asserts zero but drives assignment", (0, 1, 5),
+         {4: "+"}, {4: "other"}),
+        ("blank and zero cost one", (1, 1, 1), {5: ""}, {5: 0}),
+        ("equal literal marker content costs zero", (0, 0, 0),
          {6: f"A{mark}B"}, {6: f"A{mark}B"}),
-        ("different literal marker content costs one", 1,
+        ("different literal marker content costs one", (1, 1, 1),
          {6: f"A{mark}B"}, {6: f"A{mark}C"}),
     )
     for name, expected, changes_a, changes_b in cases:
@@ -328,11 +336,95 @@ def test_pairing_cost_semantics(c):
         for index, value in changes_b.items():
             row_b[index] = value
         try:
-            actual = core._row_diff_count(schema, row_a, row_b, 0)
+            asserted = core._row_diff_count(schema, row_a, row_b, 0)
+            components = core._pair_cost_components(
+                schema, row_a, row_b, 0, {})
         except Exception as exc:
-            actual = exc
-        c.check(name, actual == expected,
-                f"expected cost {expected}; production returned {actual!r}")
+            asserted = components = exc
+        c.check(name,
+                asserted == expected[0] and components == expected,
+                f"expected {expected}; asserted={asserted!r}; "
+                f"components={components!r}")
+
+
+def test_source_identity_assignment(c):
+    print("\nCMP-AUD-220: context identity drives assignment, never verdicts:")
+    schema = core.CompareSchema(
+        report_name="E2 Identity", header=["Key", "Desc", "City"],
+        side_a="A", side_b="B", id_noun="row", id_noun_plural="rows",
+        sides_noun="sides", context_fields=("City",))
+    # Source truth: the SACRAMENTO occurrence on side A corresponds to the
+    # SACRAMENTO occurrence on side B; both descriptions genuinely changed.
+    # The retired asserted-only objective cross-paired on the equal
+    # descriptions and reported zero differences.
+    rows_a = [["K", "STREET A", "SACRAMENTO"], ["K", "STREET B", "FRESNO"]]
+    rows_b = [["K", "STREET B", "SACRAMENTO"], ["K", "STREET A", "FRESNO"]]
+    try:
+        pairing = core.pair_occurrences_by_similarity(
+            schema, rows_a, rows_b, core.keys_for(rows_a, False),
+            core.keys_for(rows_b, False), False)
+        trace = pairing.pairing_trace[0]
+        counts = core.count_diffs(
+            schema, rows_a, rows_b, pairing.keys_a, pairing.keys_b,
+            core.union_keys(pairing.keys_a, pairing.keys_b), False)
+        observed = (tuple(trace.assignment_vector), counts["diff_cells"],
+                    trace.algorithm)
+    except Exception as exc:
+        trace = None
+        observed = exc
+    c.check("context fields pair the physical occurrences (order-preserving)",
+            observed == ((0, 1), 2, "rectangular-hungarian-source-lex-v2"),
+            repr(observed))
+    c.check("the trace carries the source objective and its monotonicity",
+            trace is not None
+            and trace.objective_total == (2, 2, 0)
+            and trace.objective_positional == (2, 2, 0)
+            and all(pair.objective == (1, 1, 0) for pair in trace.pairs),
+            repr(trace))
+
+    # The finding's mutation requirement: move each context field inside the
+    # group and prove the corresponding occurrence follows the source row
+    # rather than an arbitrary low-asserted-difference assignment.
+    mutation_schema = core.CompareSchema(
+        report_name="E2 Identity Mutations",
+        header=["Key", "Desc", "C1", "C2", "C3"],
+        side_a="A", side_b="B", id_noun="row", id_noun_plural="rows",
+        sides_noun="sides", context_fields=("C1", "C2", "C3"))
+    rows_a = [["K", "P", "C1", "C2", "C3"], ["K", "Q", "D1", "D2", "D3"]]
+    rows_b = [["K", "P", "D1", "D2", "D3"], ["K", "Q2", "C1", "C2", "C3"]]
+    for moved in ("C1", "C2", "C3"):
+        index = mutation_schema.header.index(moved)
+        mutated_a = [list(row) for row in rows_a]
+        mutated_b = [list(row) for row in rows_b]
+        mutated_a[1][index] = "MOVED"
+        mutated_b[0][index] = "MOVED"
+        try:
+            mutated = core.pair_occurrences_by_similarity(
+                mutation_schema, mutated_a, mutated_b,
+                core.keys_for(mutated_a, False),
+                core.keys_for(mutated_b, False), False)
+            vector = tuple(mutated.pairing_trace[0].assignment_vector)
+        except Exception as exc:
+            vector = exc
+        c.check(f"occurrence follows the source row when {moved} moves",
+                vector == (1, 0), repr(vector))
+
+    # The identity-demanded pairing may cost MORE asserting cells than file
+    # order (asserted 2 > positional 1 here); v1's monotonicity would have
+    # refused this trace, so the objective owns monotonicity instead.
+    try:
+        pairing = core.pair_occurrences_by_similarity(
+            mutation_schema, rows_a, rows_b, core.keys_for(rows_a, False),
+            core.keys_for(rows_b, False), False)
+        trace = pairing.pairing_trace[0]
+        observed = (tuple(trace.assignment_vector), trace.total_cost,
+                    trace.positional_cost)
+        monotone = trace.objective_total <= trace.objective_positional
+    except Exception as exc:
+        observed = exc
+        monotone = False
+    c.check("identity may cost more asserting cells than file order",
+            observed == ((1, 0), 2, 1) and monotone, repr(observed))
 
 
 def test_malformed_matrix_rejection(c):
@@ -709,6 +801,7 @@ def main():
     test_lexicographic_policy(c)
     test_retained_greedy_traps(c)
     test_pairing_cost_semantics(c)
+    test_source_identity_assignment(c)
     test_malformed_matrix_rejection(c)
     test_cap_boundary(c)
     test_public_pairing_results(c)

@@ -44,7 +44,7 @@ import outcome
 from comparison_contract import (
     CAPPED_FALLBACK_POLICY,
     CAPPED_PAIRING_ALGORITHM,
-    EXACT_PAIRING_ALGORITHM,
+    SOURCE_PAIRING_ALGORITHM,
     CappedGroupDiagnostic,
     ComparisonCounts,
     PairingPair,
@@ -666,15 +666,68 @@ def compared_cell(sc, f, rt, rn, off):
 
 
 def _row_diff_count(sc, rt, rn, off):
-    """Differing compared-fields between two rows, using the comparison's own
-    normalization (TRIM + Med Wid) — identical to the per-row diff the workbook
-    counts. This is the similarity cost: lower = more alike."""
+    """Differing ASSERTING compared-fields between two rows, using the
+    comparison's own normalization (TRIM + Med Wid) — identical to the per-row
+    diff the workbook counts. This is the verdict vocabulary (the persisted
+    per-pair cost) and the capped path's diagonal diagnostic; the within-cap
+    assignment objective is ``_pair_cost_components``."""
     d = 0
     for f in sc.field_indices:
         cell = compared_cell(sc, f, rt, rn, off)
         if cell.asserting and not cell.equal:
             d += 1
     return d
+
+
+def _char_distance(a, b, cache):
+    """Exact Levenshtein distance between two normalized cell texts, memoized
+    per duplicate-group build (the same value pair recurs across a group's
+    matrix; the distance is symmetric, so the key is order-normalized).
+    Mirrors the Stage-8 oracle's reference implementation."""
+    if a == b:
+        return 0
+    key = (a, b) if a <= b else (b, a)
+    hit = cache.get(key)
+    if hit is not None:
+        return hit
+    left, right = key
+    if len(left) < len(right):
+        left, right = right, left
+    previous = list(range(len(right) + 1))
+    for left_index, left_character in enumerate(left, 1):
+        current = [left_index]
+        for right_index, right_character in enumerate(right, 1):
+            current.append(min(
+                current[-1] + 1,
+                previous[right_index] + 1,
+                previous[right_index - 1]
+                + (left_character != right_character),
+            ))
+        previous = current
+    cache[key] = previous[-1]
+    return previous[-1]
+
+
+def _pair_cost_components(sc, rt, rn, off, char_cache):
+    """One candidate pair's cost components in a single compared-cell pass:
+    ``(asserting diffs, all-compared-field diffs, summed char edit distance)``.
+
+    The asserting count stays the persisted ``PairingPair.cost`` — the verdict
+    vocabulary. The other two feed the source-identity assignment objective
+    (CMP-AUD-220, approved 2026-07-16): context and ditto cells distinguish
+    which physical occurrences correspond without ever asserting a
+    difference, exactly the Stage-8 oracle's all-field reading."""
+    asserting = compared = chars = 0
+    for f in sc.field_indices:
+        cell = compared_cell(sc, f, rt, rn, off)
+        if cell.equal:
+            continue
+        compared += 1
+        chars += _char_distance(
+            cell.normalized_a, cell.normalized_b, char_cache)
+        if cell.asserting:
+            asserting += 1
+    return asserting, compared, chars
 
 
 def _min_cost_pairs(cost, is_cancelled=None):
@@ -845,8 +898,12 @@ class OccurrencePairing:
 def pair_occurrences_by_similarity(sc, rows_t, rows_n, keys_t, keys_n,
                                    has_route, events=None):
     """Re-number the occurrence component of DUPLICATE keys so that, within each
-    (route, key) group present on BOTH sides, rows pair by data SIMILARITY (the
-    most-alike rows share an occurrence #) instead of by file order. Matched
+    (route, key) group present on BOTH sides, rows pair by SOURCE IDENTITY
+    instead of by file order: the assignment minimizes the lexicographic
+    (all-compared-field diff count, summed character edit distance, |position
+    gap|) tuple, so context and ditto cells help decide WHICH physical
+    occurrences correspond while verdicts/counts stay asserted-only
+    (CMP-AUD-220, the approved D3 assignment/verdict split). Matched
     pairs are numbered 1.. in side-A file order; the larger side's leftovers get
     higher, side-unique occurrence numbers (so they stay one-sided). Groups with
     no duplicate, or a key on only one side, are untouched (occurrence # = file
@@ -897,6 +954,9 @@ def pair_occurrences_by_similarity(sc, rows_t, rows_n, keys_t, keys_n,
             assignment = tuple(range(min(na, nb)))
             total = sum(pair_costs)
             positional_cost = total
+            pair_objectives = {}
+            objective_total = None
+            objective_positional = None
             quality = "capped"
             exact = False
             algorithm = CAPPED_PAIRING_ALGORITHM
@@ -910,17 +970,44 @@ def pair_occurrences_by_similarity(sc, rows_t, rows_n, keys_t, keys_n,
                 fallback_cost=total,
             ))
         else:
-            cost = []
+            asserting = []
+            diffs = []
+            chars = []
+            char_cache = {}
             for ti in tis:
-                cost_row = []
+                asserting_row, diffs_row, chars_row = [], [], []
                 for ni in nis:
                     _raise_if_cancelled(is_cancelled)
-                    cost_row.append(
-                        _row_diff_count(sc, rows_t[ti], rows_n[ni], off))
-                cost.append(cost_row)
+                    one = _pair_cost_components(
+                        sc, rows_t[ti], rows_n[ni], off, char_cache)
+                    asserting_row.append(one[0])
+                    diffs_row.append(one[1])
+                    chars_row.append(one[2])
+                asserting.append(asserting_row)
+                diffs.append(diffs_row)
+                chars.append(chars_row)
+            # Encode the lexicographic source-identity objective — (all-
+            # compared-field diffs, char edit distance, |position gap|) — as
+            # one exact integer per cell (CMP-AUD-220). Each weight strictly
+            # bounds every feasible assignment's lower components, so scalar
+            # order equals tuple order; _min_cost_pairs then appends the
+            # approved smallest-smaller-side-vector tie rule (D3.2) unchanged.
+            smaller_size = min(na, nb)
+            position_weight = smaller_size * (max(na, nb) - 1) + 1
+            max_chars = max(max(row) for row in chars)
+            chars_weight = (smaller_size * max_chars + 1) * position_weight
+            _raise_if_cancelled(is_cancelled)
+            cost = [
+                [diffs[a][b] * chars_weight + chars[a][b] * position_weight
+                 + abs(a - b) for b in range(nb)]
+                for a in range(na)
+            ]
             pairs = _min_cost_pairs(
                 cost, is_cancelled)         # local (side-A, side-B) indices
-            pair_costs = [cost[a][b] for a, b in pairs]
+            pair_costs = [asserting[a][b] for a, b in pairs]
+            pair_objectives = {
+                (a, b): (diffs[a][b], chars[a][b], abs(a - b))
+                for a, b in pairs}
             if smaller_side == "a":
                 assignment = tuple(
                     b for a, b in sorted(pairs, key=lambda pair: pair[0]))
@@ -928,13 +1015,24 @@ def pair_occurrences_by_similarity(sc, rows_t, rows_n, keys_t, keys_n,
                 assignment = tuple(
                     a for a, b in sorted(pairs, key=lambda pair: pair[1]))
             total = sum(pair_costs)
-            positional_cost = sum(cost[a][b] for a, b in positional_pairs)
-            if total > positional_cost:
+            positional_cost = sum(
+                asserting[i][i] for i in range(smaller_size))
+            objective_total = tuple(
+                sum(pair_objectives[pair][index] for pair in pairs)
+                for index in range(3))
+            objective_positional = (
+                sum(diffs[i][i] for i in range(smaller_size)),
+                sum(chars[i][i] for i in range(smaller_size)),
+                0,
+            )
+            # The minimized quantity is the objective; the asserted total may
+            # legitimately exceed file order when context identity demands it.
+            if objective_total > objective_positional:
                 raise AssertionError(
                     "exact duplicate pairing is worse than file order")
             quality = "exact"
             exact = True
-            algorithm = EXACT_PAIRING_ALGORITHM
+            algorithm = SOURCE_PAIRING_ALGORITHM
 
         cost_by_pair = {}
         for pair_no, pair in enumerate(pairs):
@@ -953,6 +1051,7 @@ def pair_occurrences_by_similarity(sc, rows_t, rows_n, keys_t, keys_n,
                 side_a_index=tis[a],
                 side_b_index=nis[b],
                 cost=cost_by_pair[(a, b)],
+                objective=pair_objectives.get((a, b)),
             ))
         typed_pairs = tuple(typed_pairs)
         _raise_if_cancelled(is_cancelled)
@@ -971,6 +1070,8 @@ def pair_occurrences_by_similarity(sc, rows_t, rows_n, keys_t, keys_n,
             algorithm=algorithm,
             exact=exact,
             quality=quality,
+            objective_total=objective_total,
+            objective_positional=objective_positional,
         ))
         matched_t = {a for a, _ in pairs}
         matched_n = {b for _, b in pairs}

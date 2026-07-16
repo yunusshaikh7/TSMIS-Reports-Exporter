@@ -76,10 +76,16 @@ _WS_RE = re.compile(r"[\t\n\r\f\v]")
 
 
 def _v(x):
-    """compare_core.normalize_value plus tab/newline collapse (the TSMIS export
-    pads Description with trailing tabs that Excel TRIM does not strip)."""
+    """compare_core.normalize_value plus the OOXML `_xHHHH_` escape decode and
+    tab/newline collapse. The TSMIS export pads Description with trailing tabs
+    that Excel TRIM does not strip, and its censused `_x000d_` literals are
+    encoded CRs (CMP-AUD-197): the Stage-8 oracle xlsx-unescapes every side it
+    reads, and the decode is byte-equivalent to openpyxl's — a no-op on the
+    escape-free raw-TSN and PDF-render sides."""
     nv = normalize_value(x)
-    return _WS_RE.sub(" ", nv).strip() if isinstance(nv, str) else nv
+    if not isinstance(nv, str):
+        return nv
+    return _WS_RE.sub(" ", ctc.decode_ooxml_escapes(nv)).strip()
 
 
 def _raw_text(x):

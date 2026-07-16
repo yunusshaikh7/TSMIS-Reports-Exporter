@@ -84,11 +84,14 @@ numeric prefixes; TSMIS strips only its own-route label), rebuilt the TSN normal
 source-exact at v4 (CMP-AUD-155/156/158/159 — 69,804 rows incl. the 46 blank-county
 equates, the 565 pointer tokens, no invented comma, sidecar identity/direction/policy
 claims), and put typed physical identity on every HSL path (the CMP-AUD-045 gate is
-10 green / 0 known-red — RD, ID, and HSL integrated; HL/HD stay blocked). The one
-remaining vs-TSN red is the shared asserted-only duplicate objective (CMP-AUD-220,
-plus the four CMP-AUD-197 `_x000d_` cells): the live aggregate counts sit an
-exactly-attributed −7 / −6 / +4 cells from the Stage-8 oracle's — do not re-bless
-them as source truth until 220/197 land. The cache-backed residual classifier
+10 green / 0 known-red — RD, ID, and HSL integrated; HL/HD stay blocked). The
+2026-07-16 CMP-AUD-220 batch then landed the owner-approved assignment/verdict split
+(duplicate ASSIGNMENT minimizes the source-identity tuple — all-compared-field diffs,
+char edit distance, position gap — while verdicts/counts stay asserted-only) plus the
+HSL `_x000d_` decode (197's HSL half), so **the live HSL vs-TSN aggregate counts now
+equal the Stage-8 oracle's exactly** (Excel 4,894/5,589; PDF 4,916/5,001; same-source
+1,410/3,721); RD/ID re-blessed byte-identical, HL Route-1 969 intact, HD statewide
+awaits re-measure. The cache-backed residual classifier
 reproduces those persisted maps and aggregate arithmetic. Its original zero-unexplained claim was
 withdrawn after CMP-AUD-221 through 223 exposed unconditional attribution, post-resolve
 link checks, and an output/input alias hazard. The hardened classifier now proves every
@@ -241,11 +244,17 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   Historical outputs/counts never override source facts, and a missing source fact is a
   hard stop rather than permission to infer it.
 - **Duplicate identity is exact, typed, and auditable.** Within the 100,000-cell
-  product cap, use the rectangular Hungarian assignment and the approved
-  lexicographically-smallest smaller-side vector; never reintroduce greedy or file-order
-  certification. Above the cap, positional output is partial/capped diagnosis only and
+  product cap, use the rectangular Hungarian assignment under the owner-approved
+  source-identity objective — the lexicographic (all-compared-field diff count, char
+  edit distance, |position gap|) tuple, where context/ditto cells decide WHICH
+  occurrences correspond while verdicts and counts stay asserted-only (the CMP-AUD-220
+  assignment/verdict split; D3 amendment 2026-07-16) — with the approved
+  lexicographically-smallest smaller-side vector as the final tie; never reintroduce
+  greedy, file-order, or asserted-only-assignment certification. Above the cap,
+  positional output is partial/capped diagnosis only and
   can never be green or a match. Persist the complete typed duplicate trace and capped
-  diagnostics. Workbook lookups use versioned opaque ordinal tokens—never delimiter-
+  diagnostics (v2 traces carry the objective triples; v1 payloads stay readable and
+  byte-stable). Workbook lookups use versioned opaque ordinal tokens—never delimiter-
   flattened route/key text. Cancellation during source validation, pairing, or count
   construction returns unknown counts/quality with no trace or workbook mutation.
 - **A generated workbook certifies only its build-time identity.** The visible source

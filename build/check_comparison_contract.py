@@ -76,6 +76,23 @@ def main():
         ),
         total_cost=2, positional_cost=3,
         algorithm=cc.EXACT_PAIRING_ALGORITHM, exact=True, quality="exact")
+    # CMP-AUD-220: the source-objective (v2) shape. The asserted total (3)
+    # legitimately exceeds file order's (1) — identity is decided by the
+    # lexicographic objective, whose monotonicity binds instead.
+    source_trace = cc.PairingTrace(
+        key_components=("002", "001.000"),
+        side_a_size=2, side_b_size=2, matrix_cells=4,
+        side_a_indices=(50, 51), side_b_indices=(60, 61),
+        smaller_side="a", assignment_vector=(1, 0),
+        pairs=(
+            cc.PairingPair(side_a_index=50, side_b_index=61, cost=2,
+                           objective=(2, 3, 1)),
+            cc.PairingPair(side_a_index=51, side_b_index=60, cost=1,
+                           objective=(1, 1, 1)),
+        ),
+        total_cost=3, positional_cost=1,
+        algorithm=cc.SOURCE_PAIRING_ALGORITHM, exact=True, quality="exact",
+        objective_total=(3, 4, 2), objective_positional=(7, 7, 0))
     match = cc.ComparisonOutcome(
         status="ok", completion="complete", verdict="match", counts=exact,
         source_identities=(source,), pairing_quality="exact")
@@ -340,6 +357,42 @@ def main():
     malformed_trace = exact_trace.to_dict()
     malformed_trace["pairs"] = ["not-an-object"]
     assert rejects(lambda: cc.PairingTrace.from_dict(malformed_trace))
+
+    # CMP-AUD-220: the v2 vocabulary round-trips, every persisted pre-v2
+    # payload stays readable, and each algorithm keeps its own invariants.
+    # A v1 trace serializes byte-identically to the historical 14-field shape
+    # (no null objective noise — persisted digests stay stable).
+    assert cc.PairingTrace.from_dict(source_trace.to_dict()) == source_trace
+    legacy_shape = exact_trace.to_dict()
+    assert "objective_total" not in legacy_shape
+    assert "objective_positional" not in legacy_shape
+    assert all("objective" not in pair for pair in legacy_shape["pairs"])
+    assert cc.PairingTrace.from_dict(legacy_shape) == exact_trace
+    serialized = source_trace.to_dict()
+    assert serialized["objective_total"] == [3, 4, 2]
+    assert serialized["pairs"][0]["objective"] == [2, 3, 1]
+    assert rejects(lambda: replace(
+        source_trace, algorithm=cc.EXACT_PAIRING_ALGORITHM))
+    assert rejects(lambda: replace(
+        source_trace, objective_total=None, objective_positional=None))
+    assert rejects(lambda: replace(source_trace, objective_total=(3, 4)))
+    assert rejects(lambda: replace(source_trace, objective_total=(3, 4, True)))
+    assert rejects(lambda: replace(source_trace, objective_total=(2, 4, 2)))
+    assert rejects(lambda: replace(
+        source_trace, objective_positional=(3, 3, 0)))
+    assert rejects(lambda: replace(
+        source_trace,
+        pairs=(cc.PairingPair(side_a_index=50, side_b_index=61, cost=2,
+                              objective=(2, 3, 1)),
+               cc.PairingPair(side_a_index=51, side_b_index=60, cost=1))))
+    assert rejects(lambda: replace(
+        exact_trace, objective_total=(0, 0, 0),
+        objective_positional=(0, 0, 0)))
+    assert rejects(lambda: replace(
+        capped_trace, objective_total=(5, 5, 0),
+        objective_positional=(5, 5, 0)))
+    assert rejects(lambda: cc.PairingPair(0, 1, 0, objective=(1,)))
+    assert rejects(lambda: cc.PairingPair(0, 1, 0, objective=(1, -1, 0)))
 
     assert rejects(lambda: replace(capped_diagnostic, matrix_cells=7))
     assert rejects(lambda: replace(capped_diagnostic, cap=6))

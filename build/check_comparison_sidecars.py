@@ -25,6 +25,7 @@ from comparison_contract import (  # noqa: E402
     CAPPED_FALLBACK_POLICY,
     CAPPED_PAIRING_ALGORITHM,
     EXACT_PAIRING_ALGORITHM,
+    SOURCE_PAIRING_ALGORITHM,
     CappedGroupDiagnostic,
     ComparisonCounts,
     ComparisonOutcome,
@@ -194,6 +195,20 @@ def _exact_pairing_trace():
         algorithm=EXACT_PAIRING_ALGORITHM, exact=True, quality="exact")
 
 
+def _source_pairing_trace():
+    """The CMP-AUD-220 v2 shape: per-pair source objectives + group totals."""
+    return PairingTrace(
+        key_components=("R|X", "K2"),
+        side_a_size=2, side_b_size=2, matrix_cells=4,
+        side_a_indices=(10, 11), side_b_indices=(20, 21),
+        smaller_side="a", assignment_vector=(1, 0),
+        pairs=(PairingPair(10, 21, 0, objective=(0, 0, 1)),
+               PairingPair(11, 20, 1, objective=(1, 1, 1))),
+        total_cost=1, positional_cost=2,
+        algorithm=SOURCE_PAIRING_ALGORITHM, exact=True, quality="exact",
+        objective_total=(1, 1, 2), objective_positional=(2, 2, 0))
+
+
 def _capped_pairing_trace():
     side_a = tuple(range(317))
     side_b = tuple(range(316))
@@ -261,6 +276,31 @@ def main():
               and trace_read.comparison_outcome == trace_result.comparison_outcome
               and trace_read.comparison_outcome.pairing_trace[0]
                   .assignment_vector == (1, 0))
+
+        source_book = root / "pairing-source.xlsx"
+        source_book.write_bytes(b"PK-pairing-source-workbook")
+        source_result = _result(
+            (("values", source_book),), "values", "g-pairing-source")
+        source_result.verdict = "diff"
+        source_result.comparison_outcome = ComparisonOutcome(
+            status="ok", completion="complete", verdict="diff",
+            counts=ComparisonCounts(
+                known=True, paired_rows=2, differing_rows=1,
+                differing_cells=1, per_field_counts={"1:Value": 1},
+                asserted_cells=1),
+            pairing_trace=(_source_pairing_trace(),), duplicate_group_count=1,
+            pairing_quality="exact")
+        check("source-objective (v2) pairing trace publication succeeds",
+              cm.write_comparison_outcomes(source_result))
+        source_read = cm.read_comparison_outcome(source_book)
+        check("v2 objectives and per-pair triples strict-round-trip",
+              source_read is not None and source_read.trusted
+              and source_read.comparison_outcome
+                  == source_result.comparison_outcome
+              and source_read.comparison_outcome.pairing_trace[0]
+                  .objective_total == (1, 1, 2)
+              and source_read.comparison_outcome.pairing_trace[0]
+                  .pairs[0].objective == (0, 0, 1))
 
         capped_book = root / "pairing-capped.xlsx"
         capped_book.write_bytes(b"PK-pairing-capped-workbook")

@@ -1069,9 +1069,37 @@ raw`, the 3,866,949-byte authoritative set) and verified against the same-run ss
   (all-field diffs, char distance, position) reproduces the oracle's complete
   per-field tables EXACTLY on all three legs (with the four proven-CRLF `_x000d_`
   Excel cells unescaped) — so the loader values/identities carry zero residual
-  defects, and the live product's remaining deltas are precisely CMP-AUD-220
+  defects, and the live product's remaining deltas were precisely CMP-AUD-220
   (assignment objective; live counts asserted 5,582 / 4,995 / 3,725 vs the oracle's
   5,589 / 5,001 / 3,721+4) plus CMP-AUD-197 (the four `_x000d_` cells).
+
+**Post-CMP-AUD-220 product counts (2026-07-16, same day, later — the live
+current-canary numbers).** With the owner-approved assignment/verdict split and
+the HSL `_v` OOXML decode live, the PRODUCT ENGINE itself lands on the Stage-8
+oracle table EXACTLY on the same inputs — these are now the bound HSL vs-TSN
+comparison canaries:
+
+- Excel-vs-TSN: asserted **4,894 rows / 5,589 cells {Description 4,894,
+  FT 695}**; all-field 23,691 / 30,005 {City 15,026, Desc 4,894, Distance
+  6,972, FT 695, HG 2,418}; shape 60,494/69,804/57,072/3,422/12,732;
+- PDF-vs-TSN: asserted **4,916 / 5,001 {Description 4,916, FT 85}**; all-field
+  23,872 / 29,189 {City 15,140, Desc 4,916, Distance 7,056, FT 85, HG 1,992};
+  shape 60,493/69,804/57,505/2,988/12,299;
+- PDF-vs-Excel: **1,410 / 3,721 {Desc 1,133, FT 1,129, HG 910, PM Suffix
+  549}**, 60,493/0/1 — unchanged;
+- zero literal `_x000d_` survives the vs-TSN loader (the 197 HSL half).
+
+Cross-family assignment re-bless bound to the same batch: RD (all 3 legs, the
+one 101/LA/1.284 duplicate group) and ID (all 3 legs, 16/16/18 groups) pair
+byte-identically under old and new objectives — every RD/ID canary above is
+unchanged; HL Route-1 stays exactly **299 both / 18 / 69 / 221 / 969**; the
+June `ground-truth/inputs` HL statewide diagnostic pair re-pairs 57/1,002
+duplicate groups toward full-content identity (asserted cells in changed
+groups 457→500; 96 TSMIS / 16 TSN one-sided membership moves) — that pair is
+a diagnostic input, not a bound canary. **Highway Detail statewide was NOT
+re-measured** (no consolidated HD input on the dev PC; golden fixtures cover
+the engine seam) — the HD statewide numbers above predate the objective change
+and must be re-measured before their next re-bless claim.
 
 These are product-code verification facts for the Wave-4 batch; they do not advance
 the Stage-8 family acceptance above (direct-source runner, permanent mutations,

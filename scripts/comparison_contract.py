@@ -37,8 +37,19 @@ PAIRING_QUALITIES = frozenset({
 })
 PAIRING_TRACE_QUALITIES = frozenset({"exact", "capped"})
 EXACT_PAIRING_ALGORITHM = "rectangular-hungarian-lex-v1"
+# CMP-AUD-220 (owner-approved D3 amendment 2026-07-16): the source-identity
+# objective. Assignment minimizes the lexicographic (all-compared-field diff
+# count, summed character edit distance, |within-group position gap|) tuple —
+# context and ditto cells distinguish physical occurrences — while verdicts
+# and counts stay asserted-only. v1 traces (asserted-only objective) remain
+# readable and keep their own invariants.
+SOURCE_PAIRING_ALGORITHM = "rectangular-hungarian-source-lex-v2"
+EXACT_PAIRING_ALGORITHMS = (EXACT_PAIRING_ALGORITHM, SOURCE_PAIRING_ALGORITHM)
 CAPPED_PAIRING_ALGORITHM = "positional-above-cap"
 CAPPED_FALLBACK_POLICY = "positional"
+# The v2 objective fields serialize only when present (see _jsonable), so v1
+# payload bytes are unchanged by the additive schema.
+_OMITTED_WHEN_NONE = ("objective", "objective_total", "objective_positional")
 
 
 def _require_choice(name: str, value: str, choices) -> None:
@@ -58,14 +69,21 @@ def _require_exact_count(name: str, value: int, *, positive: bool = False) -> No
         raise ValueError(f"{name} must be a {qualifier} integer")
 
 
-def _require_exact_fields(value: Mapping[str, Any], names, label: str) -> None:
+def _require_exact_fields(
+        value: Mapping[str, Any], names, label: str, optional=()) -> None:
+    """Require exactly ``names``, tolerating only ``optional`` extras.
+
+    ``optional`` exists for additive schema evolution: an old persisted payload
+    (without the newer fields) must stay readable, while any unknown field is
+    still a shape error rather than silently dropped evidence."""
     if not isinstance(value, Mapping):
         raise ValueError(f"{label} must be an object")
     expected = frozenset(names)
+    allowed = expected | frozenset(optional)
     actual = frozenset(value)
-    if actual != expected:
+    if not (expected <= actual <= allowed):
         missing = sorted(expected - actual)
-        extra = sorted(actual - expected)
+        extra = sorted(actual - allowed)
         raise ValueError(
             f"{label} has a non-canonical shape; missing={missing!r}, "
             f"extra={extra!r}")
@@ -79,6 +97,18 @@ def _canonical_key_components(value) -> Tuple[str, ...]:
         raise ValueError("key_components must not be empty")
     if any(type(item) is not str for item in items):
         raise ValueError("key_components must contain only strings")
+    return items
+
+
+def _canonical_objective(name: str, value) -> Tuple[int, int, int]:
+    """A source-identity objective as its exact (all-compared-field diff count,
+    summed character edit distance, position gap) triple of non-negative ints."""
+    if not isinstance(value, (list, tuple)) or len(value) != 3:
+        raise ValueError(
+            f"{name} must be a (field diffs, char distance, position) triple")
+    items = tuple(value)
+    for index, item in enumerate(items):
+        _require_exact_count(f"{name}[{index}]", item)
     return items
 
 
@@ -556,25 +586,40 @@ class ComparisonCounts:
 
 @dataclass(frozen=True)
 class PairingPair:
-    """One selected pair of original/source rows and its asserting-cell cost."""
+    """One selected pair of original/source rows and its asserting-cell cost.
+
+    ``cost`` stays the asserting-cell diff count — the verdict vocabulary.
+    ``objective`` is the pair's source-identity assignment triple under
+    ``SOURCE_PAIRING_ALGORITHM`` (CMP-AUD-220); it is ``None`` on v1 and
+    capped traces, so every persisted pre-v2 payload remains readable."""
 
     side_a_index: int
     side_b_index: int
     cost: int
+    objective: Optional[Tuple[int, int, int]] = None
 
     def __post_init__(self) -> None:
         _require_exact_count("side_a_index", self.side_a_index)
         _require_exact_count("side_b_index", self.side_b_index)
         _require_exact_count("cost", self.cost)
+        if self.objective is not None:
+            object.__setattr__(
+                self, "objective",
+                _canonical_objective("objective", self.objective))
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        if data.get("objective") is None:
+            del data["objective"]
+        return data
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "PairingPair":
         names = ("side_a_index", "side_b_index", "cost")
-        _require_exact_fields(value, names, "pairing pair")
-        return cls(**{name: value[name] for name in names})
+        _require_exact_fields(value, names, "pairing pair",
+                              optional=("objective",))
+        return cls(**{name: value[name] for name in names},
+                   objective=value.get("objective"))
 
 
 @dataclass(frozen=True)
@@ -603,6 +648,12 @@ class PairingTrace:
     algorithm: str
     exact: bool
     quality: str
+    # CMP-AUD-220: the source-identity objective's selected/positional totals
+    # (all-compared-field diffs, char edit distance, position gap), required
+    # exactly when algorithm == SOURCE_PAIRING_ALGORITHM.  total_cost /
+    # positional_cost above stay the asserting-cell sums on both algorithms.
+    objective_total: Optional[Tuple[int, int, int]] = None
+    objective_positional: Optional[Tuple[int, int, int]] = None
 
     def __post_init__(self) -> None:
         key = _canonical_key_components(self.key_components)
@@ -677,15 +728,57 @@ class PairingTrace:
         if self.total_cost != sum(pair.cost for pair in pairs):
             raise ValueError("total_cost must equal the sum of selected pair costs")
 
+        objective_total = self.objective_total
+        objective_positional = self.objective_positional
+        if objective_total is not None:
+            objective_total = _canonical_objective(
+                "objective_total", objective_total)
+            object.__setattr__(self, "objective_total", objective_total)
+        if objective_positional is not None:
+            objective_positional = _canonical_objective(
+                "objective_positional", objective_positional)
+            object.__setattr__(
+                self, "objective_positional", objective_positional)
+        carries_objectives = (
+            objective_total is not None or objective_positional is not None
+            or any(pair.objective is not None for pair in pairs))
+
         if self.exact:
             if self.quality != "exact":
                 raise ValueError("an exact trace must have quality='exact'")
-            if self.algorithm != EXACT_PAIRING_ALGORITHM:
+            if self.algorithm not in EXACT_PAIRING_ALGORITHMS:
                 raise ValueError(
-                    f"an exact trace must use {EXACT_PAIRING_ALGORITHM!r}")
-            if self.total_cost > self.positional_cost:
-                raise ValueError(
-                    "exact pairing cannot cost more than positional pairing")
+                    f"an exact trace must use one of {EXACT_PAIRING_ALGORITHMS!r}")
+            if self.algorithm == EXACT_PAIRING_ALGORITHM:
+                # v1 minimized the asserted count itself, so the selected total
+                # can never exceed file order and no source objective exists.
+                if self.total_cost > self.positional_cost:
+                    raise ValueError(
+                        "exact pairing cannot cost more than positional pairing")
+                if carries_objectives:
+                    raise ValueError(
+                        "a v1 exact trace must not carry source objectives")
+            else:
+                # v2 minimizes the source-identity objective; the asserted
+                # totals remain evidence but are no longer the minimized
+                # quantity, so monotonicity binds the objective instead.
+                if objective_total is None or objective_positional is None:
+                    raise ValueError(
+                        "a source-objective trace requires selected and "
+                        "positional objective totals")
+                if any(pair.objective is None for pair in pairs):
+                    raise ValueError(
+                        "a source-objective trace requires per-pair objectives")
+                summed = tuple(
+                    sum(pair.objective[index] for pair in pairs)
+                    for index in range(3))
+                if objective_total != summed:
+                    raise ValueError(
+                        "objective_total must equal the sum of pair objectives")
+                if objective_total > objective_positional:
+                    raise ValueError(
+                        "exact source pairing cannot exceed positional pairing "
+                        "in the lexicographic objective")
         else:
             if self.quality != "capped":
                 raise ValueError("a non-exact D3 trace must have quality='capped'")
@@ -698,6 +791,9 @@ class PairingTrace:
             if self.total_cost != self.positional_cost:
                 raise ValueError(
                     "a capped positional trace must report its positional cost")
+            if carries_objectives:
+                raise ValueError(
+                    "a capped trace must not carry source objectives")
 
     def to_dict(self) -> Dict[str, Any]:
         return _jsonable(self)
@@ -710,7 +806,9 @@ class PairingTrace:
             "assignment_vector", "pairs", "total_cost", "positional_cost",
             "algorithm", "exact", "quality",
         )
-        _require_exact_fields(value, names, "pairing trace")
+        _require_exact_fields(
+            value, names, "pairing trace",
+            optional=("objective_total", "objective_positional"))
         raw_pairs = value["pairs"]
         if not isinstance(raw_pairs, (list, tuple)):
             raise ValueError("pairs must be an array")
@@ -731,6 +829,8 @@ class PairingTrace:
             algorithm=value["algorithm"],
             exact=value["exact"],
             quality=value["quality"],
+            objective_total=value.get("objective_total"),
+            objective_positional=value.get("objective_positional"),
         )
 
 
@@ -1197,10 +1297,19 @@ def _jsonable(value: Any) -> Any:
             "physical_identity": _jsonable(value.physical_identity),
         }
     if is_dataclass(value):
-        return {
+        data = {
             item.name: _jsonable(getattr(value, item.name))
             for item in fields(value)
         }
+        # Additive schema evolution: the v2 source-objective fields serialize
+        # ONLY when present, so a v1 PairingTrace/PairingPair keeps its exact
+        # historical byte shape (persisted digests and the measured sidecar
+        # scale boundary stay stable across the upgrade).
+        if type(value) in (PairingPair, PairingTrace):
+            for name in _OMITTED_WHEN_NONE:
+                if name in data and data[name] is None:
+                    del data[name]
+        return data
     if isinstance(value, Mapping):
         return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):

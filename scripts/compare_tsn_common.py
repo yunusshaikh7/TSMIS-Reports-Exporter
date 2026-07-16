@@ -506,20 +506,27 @@ _OOXML_ESCAPE_RE = re.compile(r"_x([0-9A-Fa-f]{4})_")
 _EDGE_WHITESPACE = " \t\r\n\f\v"
 
 
+def decode_ooxml_escapes(text):
+    """Decode OOXML `_xHHHH_` escapes in a str (hex digits in either case;
+    `_x005F_xHHHH_` decodes to the literal `_xHHHH_` per the OOXML spec,
+    because the leftmost scan consumes the `_x005F_` first). Byte-equivalent
+    to openpyxl.utils.escape.unescape — the Stage-8 oracles' xlsx reading —
+    so vs-TSN loaders may share it (CMP-AUD-197's HSL half) without drifting
+    from the accepted oracle semantics."""
+    return _OOXML_ESCAPE_RE.sub(
+        lambda m: chr(int(m.group(1), 16)), text)
+
+
 def same_source_render_text(value):
     """One cell under same-source render equivalence: decode OOXML `_xHHHH_`
-    escapes (both hex cases; `_x005F_xHHHH_` decodes to the literal `_xHHHH_`
-    per the OOXML spec, because the scan consumes the `_x005F_` first), map the
-    decoded/whitespace-class characters' EDGES away, and keep interior breaks
-    as separation (they collapse to one space, exactly how the print renders a
-    wrapped value; compare_core's TRIM twin collapses space runs at compare
-    time). Non-strings — including PhysicalKey cells, a str SUBCLASS the
-    engine's identity rides on — pass through untouched."""
+    escapes, map the decoded/whitespace-class characters' EDGES away, and keep
+    interior breaks as separation (they collapse to one space, exactly how the
+    print renders a wrapped value; compare_core's TRIM twin collapses space
+    runs at compare time). Non-strings — including PhysicalKey cells, a str
+    SUBCLASS the engine's identity rides on — pass through untouched."""
     if type(value) is not str:
         return value
-    decoded = _OOXML_ESCAPE_RE.sub(
-        lambda m: chr(int(m.group(1), 16)), value)
-    cleaned = re.sub(r"[\t\r\n\f\v]", " ", decoded)
+    cleaned = re.sub(r"[\t\r\n\f\v]", " ", decode_ooxml_escapes(value))
     return cleaned.strip(_EDGE_WHITESPACE)
 
 

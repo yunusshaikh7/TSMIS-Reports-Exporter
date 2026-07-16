@@ -79,11 +79,14 @@ def test_exact_cost_build_and_existing_output(c):
     print("\nexact cost-matrix cancellation and overwrite preservation:")
     rows_a = _duplicate_rows(4, "A")
     rows_b = _duplicate_rows(4, "B")
-    real_diff = core._row_diff_count
+    # The within-cap matrix build computes its source-identity components via
+    # _pair_cost_components (CMP-AUD-220); the capped diagonal below still
+    # rides _row_diff_count.
+    real_cost = core._pair_cost_components
     armed = {"value": False, "calls": 0}
 
     def arm_after_first_cost(*args, **kwargs):
-        value = real_diff(*args, **kwargs)
+        value = real_cost(*args, **kwargs)
         armed["calls"] += 1
         armed["value"] = True
         return value
@@ -93,7 +96,7 @@ def test_exact_cost_build_and_existing_output(c):
         sentinel = b"last-good-comparison"
         output.write_bytes(sentinel)
         try:
-            with patch(core, "_row_diff_count", arm_after_first_cost):
+            with patch(core, "_pair_cost_components", arm_after_first_cost):
                 result = core.run_compare(
                     SCHEMA, rows_a, rows_b, False, output,
                     mode="values",

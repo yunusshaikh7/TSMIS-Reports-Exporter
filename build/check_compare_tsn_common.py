@@ -470,6 +470,30 @@ def test_same_source_render_equivalence():
           and not hsp.TSMIS_PDF_VS_TSN._same_source)
 
 
+def test_decode_ooxml_escapes():
+    """The shared decode seam (CMP-AUD-197's HSL vs-TSN half rides it too):
+    byte-equivalent to openpyxl.utils.escape.unescape — the Stage-8 oracles'
+    xlsx reading — on every censused shape."""
+    print("decode_ooxml_escapes matches openpyxl's unescape byte-for-byte:")
+    from openpyxl.utils.escape import unescape as xlsx_unescape
+    d = ctc.decode_ooxml_escapes
+    fixtures = (
+        "A_x000d_B",                # the censused lowercase CR escape
+        "A_x000D_B",                # hex-digit case-insensitivity
+        "_X000D_",                  # uppercase prefix is NOT an escape
+        "TAG_x005F_x000d_",         # literal-preserving _x005F_ consumption
+        "_x00zz_",                  # non-hex stays literal
+        "plain text, no escapes",
+        "edge_x0009_",              # encoded tab
+        "_x000a__x000d_",           # adjacent escapes
+    )
+    for fixture in fixtures:
+        check(f"decode == openpyxl unescape for {fixture!r}",
+              d(fixture) == xlsx_unescape(fixture))
+    check("the censused CR decodes to a real CR",
+          d("A_x000d_B") == "A\rB")
+
+
 def main():
     test_normalizers()
     test_notes_writer()
@@ -483,6 +507,7 @@ def main():
     test_detail_aliases()
     test_notes_delegation()
     test_same_source_render_equivalence()
+    test_decode_ooxml_escapes()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

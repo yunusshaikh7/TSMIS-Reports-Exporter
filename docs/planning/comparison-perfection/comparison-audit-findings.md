@@ -498,7 +498,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-217 | P1 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Source-core hashes capture members and later reparses their paths instead of parsing the exact bytes whose identity was bound |
 | CMP-AUD-218 | P1 | Verified by wrong-pair and false-one-sided mutations in both twins of all five legs | Spot Check calls its verdict independent while trusting Comparison's status and source-row pairing |
 | CMP-AUD-219 | P2 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Historical TSMIS PDF rows are hardcoded with the current-PDF source role |
-| CMP-AUD-220 | P1 | Verified and exactly reconciled on all four current Highway Sequence vs-TSN legs | Duplicate matching ignores three source fields and changes hundreds of pair/one-sided assignments |
+| CMP-AUD-220 | P1 | Remediated engine-wide via the owner-approved assignment/verdict split; the product is oracle-exact on every Highway Sequence leg | Duplicate matching ignores three source fields and changes hundreds of pair/one-sided assignments |
 | CMP-AUD-221 | P1 | Remediated and verified in two byte-identical hardened classifier replays | Residual classifier declares every changed duplicate assignment explained without testing whether its asserted cause actually produced the assignment |
 | CMP-AUD-222 | P2 | Remediated and verified with real Windows file/directory link mutations | Residual-classifier indirect-input guards resolve paths before checking for symlinks |
 | CMP-AUD-223 | P1 | Remediated and verified with hardlink, lexical, and bound-input output rejections | Residual classifier can atomically overwrite one of its frozen inputs through an aliased `--output` after the final input guard |
@@ -6889,11 +6889,18 @@ RD 15,216/0/0 fully identical (the 4 `_x000d_` gone); HSL 1,410 rows / 3,721
 cells {Desc 1,133, FT 1,129, HG 910, PM Suffix 549} — the Stage-8 oracle table
 EXACTLY.** Notes updated in all three flavors; contract fixtures in
 `check_compare_tsn_common` (escape cases, `_x005F_`, tab padding, PhysicalKey
-passthrough, real-diff control, and the flavor opt-in census). REMAINING in
-this finding: the HSL vs-TSN load-boundary decode (its four Excel-vs-TSN cells
-still carry the literal escape; counts move with the CMP-AUD-220 batch, whose
-owner approval is now recorded in the D3 gate doc) and the family-aware
-decision for RD's vs-TSN legs (RD-79's accepted oracle preserved its bytes).
+passthrough, real-diff control, and the flavor opt-in census). The HSL vs-TSN
+load-boundary decode LANDED with the CMP-AUD-220 batch (2026-07-16, same day,
+later): `compare_highway_sequence_tsn._v` now applies the shared
+`compare_tsn_common.decode_ooxml_escapes` (proven byte-equivalent to
+openpyxl's unescape — the Stage-8 oracle's xlsx reading — in
+`check_compare_tsn_common`), so the four `_x000d_` Excel cells compare as
+their real CRLF content on the vs-TSN legs too; zero literals survive the
+loader on the 7.9 corpus, and the legs land on the oracle table exactly (see
+the 220 execution disposition). REMAINING in this finding: only the
+family-aware decision for RD's vs-TSN legs (RD-79's accepted oracle preserved
+its bytes — census whether the four RD cells' TSN partners differ anyway
+before deciding).
 
 ### CMP-AUD-198 — permanent installed-Excel escape probe over-specifies optional COM open arguments
 
@@ -6981,11 +6988,13 @@ product loaders reproduce the source contract: **60,493 paired / 0 PDF-only / 1
 Excel-only**, with FT 1,129 / HG 910 / **PM Suffix 549** exactly (the 272 two-row moves
 = 544 cells + the five missing-Excel suffixes) — the route-152 / SCR / `T003.273`
 swap class is structurally gone (suffix is no longer identity). Description counts
-1,137 vs the oracle's 1,133: the +4 is exactly the four `_x000d_` Cactus City cells
-(CMP-AUD-197, open) — re-pairing the same loaded rows under the oracle's assignment
+1,137 vs the oracle's 1,133: the +4 was exactly the four `_x000d_` Cactus City cells
+(CMP-AUD-197 — closed for this leg by the same-source render rule later the same
+day) — re-pairing the same loaded rows under the oracle's assignment
 objective with those four unescaped reproduces the full 1,410-row / 3,721-cell
-per-field table EXACTLY, so no other residual exists. The remaining engine-side
-assignment-objective difference is CMP-AUD-220 (open). Contract fixtures:
+per-field table EXACTLY, so no other residual exists. The engine-side
+assignment-objective difference was CMP-AUD-220 (since remediated — the product
+now reproduces this leg's oracle table exactly). Contract fixtures:
 `check_compare_physical_identity` (same-source identity, suffix compared) and the
 updated Notes describe the two-cell suffix-move representation.
 
@@ -7191,8 +7200,9 @@ loaded rows under the oracle's assignment objective reproduces the oracle's comp
 per-field tables EXACTLY on all three legs (Excel-vs-TSN 23,691 rows / 30,005 cells /
 asserted 5,589 with Description 4,894; PDF-vs-TSN 29,189 / asserted 5,001 with
 4,916; the four `_x000d_` Excel cells unescaped per CMP-AUD-197's proven CRLF
-equivalence) — the 81 false-cleans and 15 fabricated states are gone, and the only
-remaining engine-side delta is the CMP-AUD-220 assignment objective (open). Fixtures:
+equivalence) — the 81 false-cleans and 15 fabricated states are gone; the last
+engine-side delta was the CMP-AUD-220 assignment objective, since remediated
+(the PRODUCT now lands on these oracle tables directly). Fixtures:
 `check_compare_highway_sequence_tsn` (own-route strip / cross-route kept / TSN
 verbatim, and the false-clean class now surfaces end to end) and
 `check_visual_evidence` (side-aware projection).
@@ -7732,6 +7742,44 @@ Correction must use the source-proven duplicate objective, persist its complete 
 then compute FT/Description truth on those fixed pairs. Mutation tests must change each
 context field inside a duplicate group and prove the corresponding occurrence follows
 the source row rather than an arbitrary low-asserted-difference assignment.
+
+Execution disposition (2026-07-16, the owner-approved D3 assignment/verdict
+split): `compare_core.pair_occurrences_by_similarity` now builds every
+within-cap duplicate group's assignment from the source-identity objective —
+the lexicographic (all-compared-field diff count, summed character edit
+distance, |within-group position gap|) tuple, computed in one compared-cell
+pass per candidate (`_pair_cost_components` + the oracle-mirroring
+`_char_distance`), encoded order-preservingly into the exact integer solver so
+the D3.2 smallest-smaller-side-vector tie rule and the 100,000-cell
+capped/partial semantics are unchanged. Verdicts and counts stay asserted-only:
+`PairingPair.cost`/`total_cost`/`positional_cost` remain the asserting-cell
+sums, and the new `SOURCE_PAIRING_ALGORITHM` traces carry additive
+`objective`/`objective_total`/`objective_positional` triples with monotonicity
+bound to the objective (the v1 asserted-monotonicity provably cannot hold —
+identity may legitimately cost more asserting cells than file order; persisted
+v1 payloads keep their own invariants and stay readable). The 197 HSL half
+landed in the same batch (`_v` gains the openpyxl-equivalent OOXML decode).
+Corpus proof on the ssor-prod 7.9 pair + the bound 12-PDF TSN build: the
+PRODUCT engine is now ORACLE-EXACT on all three Highway Sequence legs — shape,
+all-field, asserted, and per-field tables (Excel 4,894 rows / 5,589 cells
+{Desc 4,894, FT 695}; PDF 4,916 / 5,001 {4,916, 85}; same-source 1,410 /
+3,721) — with zero residue. Family re-bless: RD (3 legs, the one 101/LA/1.284
+group) and ID (3 legs, 16/16/18 groups) pair byte-identically under both
+objectives — no count moved; HL Route-1 is exact on the locked
+299/18/69/221/969 canary, and the June statewide diagnostic pair re-pairs
+57/1,002 groups toward full-content identity (asserted cells in changed groups
+457→500, one-sided membership moves 96 TSMIS/16 TSN rows — the
+verdict-follows-identity direction this finding mandates; measured, not
+canary-bound). Highway Detail statewide was NOT re-measured (no consolidated
+input on the dev PC; its golden fixtures pass) — re-measure before any HD
+statewide re-bless claim. Fixtures: `check_compare_pairing_policy`
+(component semantics, the source-identity fixture, the finding's per-field
+mutation tests, the asserted-exceeds-positional class),
+`check_comparison_contract` (v2 round-trip, legacy-payload compat, the
+rejection matrix), `check_comparison_sidecars` (v2 persistence),
+`check_compare_cancellation` (the new cost seam). Profile under the cap:
+316×316 all-distinct strings 17.4s (a shape no real corpus produces; largest
+real group ≈ 12), realistic near-cap 1.1s, the 1×100,000 boundary 0.9s.
 
 ### CMP-AUD-221 — residual assignment classification is structurally tautological
 
