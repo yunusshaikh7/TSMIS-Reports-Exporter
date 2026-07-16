@@ -488,6 +488,48 @@ def _merge_input_outcomes(inputs, loader_warnings):
 
 
 # --------------------------------------------------------------------------- #
+# same-source (PDF vs Excel) render-artifact equivalence — CMP-AUD-197 class
+# --------------------------------------------------------------------------- #
+# Owner ruling (2026-07-16, on the Intersection Detail PDF-vs-Excel report of
+# eight "HILLCREST RD ≠ HILLCREST RD"-style cells): in a SAME-SOURCE self-check
+# both sides render the SAME report, so a difference must be a data
+# disagreement — an export-encoding artifact the other render structurally
+# cannot carry is a false positive. Two censused artifact classes:
+#   * the Excel export's OOXML control escapes ("…_x000d_" = an encoded CR per
+#     installed Excel; the print renders nothing/whitespace there), and
+#   * the Excel export's edge tab padding ("HILLCREST RD\t\t"; Excel TRIM
+#     collapses SPACES only, so tabs survived to flag).
+# Applied ONLY by the PDF-vs-Excel flavors, at their load boundary — every
+# vs-TSN leg keeps its accepted oracle's byte-exact semantics (both machine
+# formats genuinely carry these bytes there, and they compare equal).
+_OOXML_ESCAPE_RE = re.compile(r"_x([0-9A-Fa-f]{4})_")
+_EDGE_WHITESPACE = " \t\r\n\f\v"
+
+
+def same_source_render_text(value):
+    """One cell under same-source render equivalence: decode OOXML `_xHHHH_`
+    escapes (both hex cases; `_x005F_xHHHH_` decodes to the literal `_xHHHH_`
+    per the OOXML spec, because the scan consumes the `_x005F_` first), map the
+    decoded/whitespace-class characters' EDGES away, and keep interior breaks
+    as separation (they collapse to one space, exactly how the print renders a
+    wrapped value; compare_core's TRIM twin collapses space runs at compare
+    time). Non-strings — including PhysicalKey cells, a str SUBCLASS the
+    engine's identity rides on — pass through untouched."""
+    if type(value) is not str:
+        return value
+    decoded = _OOXML_ESCAPE_RE.sub(
+        lambda m: chr(int(m.group(1), 16)), value)
+    cleaned = re.sub(r"[\t\r\n\f\v]", " ", decoded)
+    return cleaned.strip(_EDGE_WHITESPACE)
+
+
+def same_source_render_rows(rows):
+    """`same_source_render_text` over every cell of every loaded row (typed
+    key cells pass through by construction)."""
+    return [[same_source_render_text(cell) for cell in row] for row in rows]
+
+
+# --------------------------------------------------------------------------- #
 # shared Notes legend sheet (Highway Sequence + Intersection Detail)
 # --------------------------------------------------------------------------- #
 def make_notes_writer(title, lines, *, tab_color="ED7D31", col_width=110):

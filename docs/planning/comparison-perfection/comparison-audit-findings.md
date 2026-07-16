@@ -6872,6 +6872,29 @@ the Notes. The fix must remove exactly these four false current differences with
 normalizing away the 2,154 genuine raw-whitespace serialization differences, the four
 paired PDF Description omissions, or the Excel-only route-010 row.
 
+**Remediation (2026-07-16) — the SAME-SOURCE half.** The owner reported the sibling
+class live (Intersection Detail PDF-vs-Excel: eight "HILLCREST RD ≠ HILLCREST RD"
+cells — the Excel export's censused trailing-tab padding, which Excel TRIM's
+space-only collapse let through) and ruled the whole class false positives
+(*"approved as long as it results in all correct comparisons"*).
+`compare_tsn_common.same_source_render_text` now applies render-artifact
+equivalence at the load boundary of every PDF-vs-Excel flavor (and ONLY those —
+each vs-TSN leg keeps its accepted oracle's byte-exact semantics): OOXML
+`_xHHHH_` escapes decode per installed Excel (both hex cases;
+`_x005F_xHHHH_` preserves the literal token; interior breaks stay separation),
+and edge whitespace-class padding never counts. PhysicalKey cells pass through
+by identity. Corpus-verified on the 7.9 pairs: **ID 16,459/0/0 with exactly the
+one real 108/TUO HG defect remaining (was 9 cells — the 8 tab rows are gone);
+RD 15,216/0/0 fully identical (the 4 `_x000d_` gone); HSL 1,410 rows / 3,721
+cells {Desc 1,133, FT 1,129, HG 910, PM Suffix 549} — the Stage-8 oracle table
+EXACTLY.** Notes updated in all three flavors; contract fixtures in
+`check_compare_tsn_common` (escape cases, `_x005F_`, tab padding, PhysicalKey
+passthrough, real-diff control, and the flavor opt-in census). REMAINING in
+this finding: the HSL vs-TSN load-boundary decode (its four Excel-vs-TSN cells
+still carry the literal escape; counts move with the CMP-AUD-220 batch, whose
+owner approval is now recorded in the D3 gate doc) and the family-aware
+decision for RD's vs-TSN legs (RD-79's accepted oracle preserved its bytes).
+
 ### CMP-AUD-198 — permanent installed-Excel escape probe over-specifies optional COM open arguments
 
 Priority: P2  

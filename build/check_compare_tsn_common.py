@@ -425,6 +425,51 @@ def test_notes_delegation():
         check(f"{label}: legend_writer emits a 'Notes' sheet", "Notes" in wb.sheetnames)
 
 
+def test_same_source_render_equivalence():
+    """The same-source (PDF vs Excel) render-artifact rule (owner ruling
+    2026-07-16, the CMP-AUD-197 class): OOXML escapes decode, edge tab padding
+    never counts, PhysicalKey cells pass through by identity, real data
+    differences still flag — and every PDF-vs-Excel flavor (and ONLY those)
+    opts in."""
+    print("same-source render equivalence (CMP-AUD-197 class):")
+    import comparison_contract as cc
+    from compare_core import _xl_trim
+    t = ctc.same_source_render_text
+    # the owner-reported Intersection Detail class: Excel edge tab padding
+    check("trailing-tab Excel padding compares equal",
+          _xl_trim(t("HILLCREST RD\t\t")) == _xl_trim(t("HILLCREST RD"))
+          and _xl_trim(t("HARRIS ROAD \t\t")) == _xl_trim(t("HARRIS ROAD")))
+    # OOXML escapes: both hex cases decode; _x005F_ preserves a literal
+    check("OOXML _x000d_/_x000D_ escapes decode away at the edge",
+          t("CACTUS CITY REST AREA_x000d_") == "CACTUS CITY REST AREA"
+          and t("FOO_x000D_") == "FOO")
+    check("_x005F_ escaping preserves the literal token (OOXML spec)",
+          t("TAG_x005F_x000d_") == "TAG_x000d_")
+    check("interior encoded breaks keep separation (a space)",
+          _xl_trim(t("LINE1_x000d_LINE2")) == _xl_trim("LINE1 LINE2"))
+    check("real data differences still differ",
+          _xl_trim(t("HILLCREST RD")) != _xl_trim(t("HILLCREST ROAD")))
+    ident = cc.make_physical_identity(
+        "001", "ORA", "R1.000", (cc.RawIdentityClaim("route", "001"),), "x")
+    key = cc.physical_key("R1.000", ident)
+    rows = ctc.same_source_render_rows([["001", "ORA", key, "DESC\t"]])
+    check("PhysicalKey cells pass through by identity; text normalizes",
+          rows[0][2] is key and type(rows[0][2]) is cc.PhysicalKey
+          and rows[0][3] == "DESC")
+    # the flavors: every PDF-vs-Excel self-check opts in; no vs-TSN leg does
+    import compare_intersection_detail_pdf as idp
+    import compare_ramp_detail_pdf as rdp
+    import compare_highway_sequence_pdf as hsp
+    check("all three PDF-vs-Excel flavors are same-source",
+          idp.TSMIS_PDF_VS_EXCEL._same_source
+          and rdp.TSMIS_PDF_VS_EXCEL._same_source
+          and hsp.TSMIS_PDF_VS_EXCEL._same_source)
+    check("no vs-TSN flavor is same-source (oracle byte semantics kept)",
+          not idp.TSMIS_PDF_VS_TSN._same_source
+          and not rdp.TSMIS_PDF_VS_TSN._same_source
+          and not hsp.TSMIS_PDF_VS_TSN._same_source)
+
+
 def main():
     test_normalizers()
     test_notes_writer()
@@ -437,6 +482,7 @@ def main():
     test_all_delegate()
     test_detail_aliases()
     test_notes_delegation()
+    test_same_source_render_equivalence()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

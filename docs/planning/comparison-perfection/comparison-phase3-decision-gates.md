@@ -254,6 +254,19 @@ The user/domain owner approved before E2 implementation:
 
 The exact rectangular minimum-cost objective inside the cap remains fixed.
 
+**Amendment — owner approval, 2026-07-16 (CMP-AUD-220).** In response to the
+decision memo (COMPLETION-PLAN RESUME block, 2026-07-16) the owner replied:
+*"Whatever you did is approved as long as it results in all correct
+comparisons."* Recorded as approval of the recommended **assignment/verdict
+split**, superseding fixed-architecture item 5's "context cells cannot
+influence assignment" clause: the duplicate-pair ASSIGNMENT cost may use the
+source-proven objective (all compared source fields + character edit distance
++ source position, per the Stage-8 Highway Sequence oracle's `_cost`), while
+the asserting VERDICT and every count remain computed only from asserting
+compared-cell equality state. The condition binds: implementation must prove
+all comparisons correct — the exact-DP/cap/typed-trace architecture stays, and
+every family's canaries re-bless with exact evidence before the change ships.
+
 ## Why Route-1 cannot decide D2 or D3
 
 The bound `HL-R1-E1` canary remains essential regression evidence: exact hashed inputs,

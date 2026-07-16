@@ -23,7 +23,8 @@ flag as differences. The GUI's Compare tab drives these through COMPARE_REPORTS
 from dataclasses import replace
 
 import compare_intersection_detail_tsn as _id
-from compare_tsn_common import run_files_compare, suggest_route_name
+from compare_tsn_common import (run_files_compare, same_source_render_rows,
+                                suggest_route_name)
 
 
 class _IntDetailFileCompare:
@@ -33,15 +34,21 @@ class _IntDetailFileCompare:
     file (the TSN loader for vs-TSN, the consolidated-TSMIS loader for vs-Excel);
     the first file is always the PDF-consolidated TSMIS workbook. The compare()
     skeleton lives in compare_tsn_common — this class is the schema override +
-    the loader pairing."""
+    the loader pairing. `same_source=True` (the PDF-vs-Excel self-check) applies
+    the shared render-artifact equivalence at load: both sides render the SAME
+    report, so the Excel export's OOXML escapes and edge tab padding are false
+    positives, not data differences (owner ruling 2026-07-16 — the eight
+    censused trailing-tab Descriptions like "HILLCREST RD\\t\\t"); the vs-TSN
+    legs keep the accepted ID-79 byte-exact semantics."""
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
-                 one_sided_note_extra=None, drop_notes=False):
+                 one_sided_note_extra=None, drop_notes=False, same_source=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
         self._name_tag = name_tag
         self._load_b = load_b
+        self._same_source = same_source
         schema = replace(_id._SCHEMA, side_a=side_a, side_b=side_b)
         if one_sided_note_extra is not None:
             schema = replace(schema, one_sided_note_extra=one_sided_note_extra)
@@ -57,6 +64,9 @@ class _IntDetailFileCompare:
     def _load_pair(self, path_a, path_b):
         rows_a, _ = _id._load_tsmis(path_a)   # PDF side: same 36-col consolidated layout
         rows_b, _ = self._load_b(path_b)
+        if self._same_source:
+            rows_a = same_source_render_rows(rows_a)
+            rows_b = same_source_render_rows(rows_b)
         return rows_a, rows_b, None
 
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
@@ -83,4 +93,4 @@ TSMIS_PDF_VS_EXCEL = _IntDetailFileCompare(
     name_tag="TSMIS_PDF_vs_Excel_IntersectionDetail",
     load_b=_id._load_tsmis,
     one_sided_note_extra=" (intersections one source lists at a postmile the other doesn't)",
-    drop_notes=True)
+    drop_notes=True, same_source=True)

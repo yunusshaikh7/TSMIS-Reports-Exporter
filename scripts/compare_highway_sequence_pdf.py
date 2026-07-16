@@ -99,9 +99,11 @@ _NOTES_PDF_VS_EXCEL = (
     "a listing artifact. Descriptions are compared verbatim on both sides (no "
     "route-label stripping — both renders print the same labels).",
     "The print is an HTML render, so whitespace runs inside a Description collapse "
-    "to one space; the comparison collapses both sides, so padding never counts. A "
-    "handful of Excel cells carry a literal line-break escape (\"_x000D_\") the "
-    "print omits — those surface honestly as Description differences.",
+    "to one space; the comparison collapses both sides, so padding never counts. "
+    "The same-source rule also decodes the Excel export's OOXML escapes (a "
+    "handful of cells carry an encoded line break, \"_x000d_\") and ignores edge "
+    "tab padding — encoding artifacts one render structurally cannot carry are "
+    "never counted as data differences.",
 )
 
 
@@ -175,7 +177,7 @@ class _HighwaySequenceFileCompare:
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_a, load_b,
                  base_schema, notes_title, notes_lines, tsn_claims=False,
-                 one_sided_note_extra=None):
+                 one_sided_note_extra=None, same_source=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
@@ -185,6 +187,11 @@ class _HighwaySequenceFileCompare:
         self._notes_title = notes_title
         self._notes_lines = notes_lines
         self._tsn_claims = tsn_claims
+        # PDF-vs-Excel self-check (owner ruling 2026-07-16, the CMP-AUD-197
+        # class): decode the Excel export's OOXML escapes + drop edge tab
+        # padding at load — render artifacts, not data differences. The vs-TSN
+        # legs keep their oracle-exact byte semantics.
+        self._same_source = same_source
         schema = replace(base_schema, side_a=side_a, side_b=side_b,
                          legend_writer=ctc.make_notes_writer(
                              notes_title, notes_lines))
@@ -205,6 +212,9 @@ class _HighwaySequenceFileCompare:
     def _load_pair(self, path_a, path_b):
         rows_a, _ = self._load_a(path_a)
         rows_b, _ = self._load_b(path_b)
+        if self._same_source:
+            rows_a = ctc.same_source_render_rows(rows_a)
+            rows_b = ctc.same_source_render_rows(rows_b)
         return rows_a, rows_b, None
 
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
@@ -237,4 +247,5 @@ TSMIS_PDF_VS_EXCEL = _HighwaySequenceFileCompare(
     notes_title=_NOTES_PDF_VS_EXCEL_TITLE, notes_lines=_NOTES_PDF_VS_EXCEL,
     one_sided_note_extra=(" (a row genuinely present in only one render — the "
                           "by-design equate suffix moves now pair up and surface "
-                          "as PM Suffix cells, see Notes)"))
+                          "as PM Suffix cells, see Notes)"),
+    same_source=True)

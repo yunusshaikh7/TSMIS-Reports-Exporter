@@ -115,8 +115,12 @@ and use the linked reconciliation prompt before deciding whether to finish Stage
 or propose implementation.
 **Ramp Detail (PDF) was
 blessed the same way in v0.26.0 on the `All Reports 7.9` pair** (15,216/15,216 rows parse
-back vs the same-day Excel; PDF↔Excel identical 15,212/15,216 — the 4 residuals are the
-Excel's `_x000d_` escapes the print omits; the print carries the On/Off + Ramp Type
+back vs the same-day Excel; PDF↔Excel now identical 15,216/15,216 — the 4 `_x000d_`
+residuals were the Excel export's encoded CRs, ruled render artifacts by the owner on
+2026-07-16 and decoded by the same-source rule (`compare_tsn_common
+.same_source_render_text`, which also ignores edge tab padding — the Intersection
+Detail PDF↔Excel false-positive class — in every PDF-vs-Excel flavor, never the
+vs-TSN legs); the print carries the On/Off + Ramp Type
 columns the Excel export DROPS, so the PDF-vs-TSN flavor compares two MORE columns than
 Excel-vs-TSN can — +151 diff cells of new coverage statewide). Where the live site
 still greys a report, `select_report` fails fast rather than stalling.

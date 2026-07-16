@@ -23,7 +23,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **identity gate 10 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | **CMP-AUD-220 is OWNER-GATED** (it supersedes the approved D3 fixed-architecture item 5 — decision memo in the RESUME block; recommendation: approve the assignment/verdict split). Meanwhile: **218** (Spot Check independence), then **197** (`_x000d_` family-aware reader); HL needs its county census first, HD-Excel vendor-pending |
+| **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
 > ### ▶ RESUME HERE (2026-07-16, after the Highway Sequence family batch)
 > **DONE this batch — the whole HSL family in one commit
@@ -61,10 +61,13 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   (-7 = -10 Desc +3 FT Excel; -6 = -9 +3 PDF) equal CMP-AUD-220's own bound
 >   reconciliation arithmetic digit for digit. Zero unexplained residue.
 >
-> **⛔ CMP-AUD-220 is OWNER-GATED — a decision memo (2026-07-16):**
-> The Wave-4 finale (the shared duplicate-assignment objective) turned out to be a
-> business-rule supersession only the owner can approve, so it is PARKED with this
-> memo instead of implemented by fiat:
+> **✅ CMP-AUD-220 UNBLOCKED (2026-07-16): the owner approved the recommendation**
+> (*"Whatever you did is approved as long as it results in all correct
+> comparisons"*) — the approval record is appended to the D3 gate doc
+> (assignment/verdict split: the source-proven objective may drive ASSIGNMENT;
+> counts/verdicts stay asserted-only). Implement it as the next compare_core
+> batch per the memo below (all-family re-bless; the condition binds — every
+> comparison must prove correct). The original memo, kept for its analysis:
 > - **The conflict.** `comparison-phase3-decision-gates.md` fixed-architecture
 >   item 5 (owner-approved 2026-07-12): *"Duplicate-pair cost is computed only from
 >   the same asserting compared-cell equality state. Context/non-asserting cells
@@ -450,6 +453,8 @@ no family-gate owner yet. Wave 5 assigns them.
 ---
 
 ## 11. Progress log (append-only — real progress, not recursion)
+
+- **2026-07-16 — the same-source render-artifact fix (owner-reported; CMP-AUD-197's same-source half).** The owner reported eight "HILLCREST RD ≠ HILLCREST RD" Description false positives in an Intersection Detail PDF-vs-Excel workbook — byte inspection proved them the censused trailing-tab class (`'HILLCREST RD\t\t'`; Excel TRIM collapses spaces only, so tabs survived), which ID-79 had deliberately kept as honest byte differences. The owner ruled the class false positives; `compare_tsn_common.same_source_render_text` now applies render-artifact equivalence (OOXML `_xHHHH_` decode incl. `_x005F_` literals + edge-whitespace padding; PhysicalKey passthrough) at the load boundary of the three PDF-vs-Excel flavors ONLY — every vs-TSN leg keeps its oracle's byte semantics (pinned in `check_compare_tsn_common`). Corpus-verified: ID (ars-prod pair) 16,459/0/0 with exactly the one real 108/TUO HG defect left; RD (ssor-prod) 15,216/0/0 fully identical (the 4 `_x000d_` gone); HSL (ssor-prod) 1,410 rows / 3,721 cells == the Stage-8 oracle EXACTLY. The same owner reply approved the CMP-AUD-220 recommendation — the approval record (assignment/verdict split) is appended to the D3 gate doc; 220 is the next batch. Gate 121/121 + ruff clean.
 
 - **2026-07-16 — Wave 4: the Highway Sequence family, one commit (CMP-AUD-045-HSL + 155 + 156 + 158 + 159 + 199 + 204 Resolved).** Normalizer v4 (catalog 3→4 + a `TSN Normalization` marker sheet the comparison loader gates on): the 565 printed pointer tokens conserved verbatim with a loud refusal on any foreign distance token; the 46 pre-county `EQUATES TO` annotations conserved with their blank County; wrapped descriptions joined on a single space (no invented comma); and the CMP-AUD-155 claims capture (cover reliability NOTE + identity fields exactly-once per document, per-route printed directions with conflict refusal, cross-member same-pull enforcement) riding `producer_extra` → the library sidecar → per-run Notes. Typed physical identity on every HSL path — canonical (Route, County, complete GLUED postmile "R001.000E"; verified against the Stage-8 oracle's `Row.identity` — HSL is the one family whose canonical keeps the equate suffix), with reserved `"(county not printed)"` / `"(no postmile printed)"` markers for the corpus-proven blank rows; both KNOWN_RED contracts promoted → **the CMP-AUD-045 identity gate is 10 green / 0 known-red**. CMP-AUD-199: PDF-vs-Excel got its own same-source profile (suffix OUT of identity, "PM Suffix" compared, every column asserted, descriptions verbatim) — 60,493/0/1 with PM Suffix 549 + HG 910 exact, the route-152 swap class structurally gone. CMP-AUD-204: TSN descriptions verbatim (154 numeric prefixes preserved); the TSMIS strip is own-route-token-only with 205's padding rule; evidence projection side-aware. Corpus verify: the v4 rebuild reproduced the bound census (69,804 rows; directions S-N 190 / W-E 172 / E-W 5 / N-S 2; one policy text), all three leg SHAPES equal `EXPECTED_CURRENT_LEGS` exactly, and re-pairing the product-loaded rows under the oracle's own assignment objective reproduces every per-field cell count EXACTLY — the live product's asserted deltas (-7 = -10 Desc + 3 FT Excel; -6 = -9 + 3 PDF) equal CMP-AUD-220's bound reconciliation arithmetic digit for digit, and the four `_x000d_` cells are 197's. Zero unexplained residue; next: 220 (shared assignment objective) → 218 → 197. Suite 121/121 + ruff clean.
 

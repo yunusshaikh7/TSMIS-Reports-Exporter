@@ -180,9 +180,11 @@ _NOTES_PDF_VS_EXCEL = ctc.make_notes_writer(
         "On/Off and Ramp Type are PRINT-ONLY columns the Excel export drops — shown "
         "as context for reference (blank on the Excel side), never counted as a "
         "difference.",
-        "A handful of Excel cells carry a literal line-break escape (\"_x000d_\") "
-        "the print omits — those surface honestly as Description differences "
-        "(4 statewide: route 010's rest-area ramps).",
+        "The same-source rule decodes the Excel export's OOXML escapes (a handful "
+        "of cells carry an encoded line break, \"_x000d_\" — 4 statewide: route "
+        "010's rest-area ramps) and ignores edge tab padding — encoding artifacts "
+        "one render structurally cannot carry are never counted as data "
+        "differences.",
         "One-sided rows are ramps one render lists at a postmile the other doesn't "
         "(none statewide on a same-run pair).",
     ))
@@ -199,12 +201,19 @@ class _RampDetailFileCompare:
     vs-Excel); the first file is always the PDF-consolidated TSMIS workbook."""
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
-                 legend_writer, context_fields=None, one_sided_note_extra=None):
+                 legend_writer, context_fields=None, one_sided_note_extra=None,
+                 same_source=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
         self._name_tag = name_tag
         self._load_b = load_b
+        # PDF-vs-Excel self-check (owner ruling 2026-07-16, the CMP-AUD-197
+        # class): both sides render the SAME report, so the Excel export's
+        # OOXML escapes ("…_x000d_") and edge tab padding are render artifacts,
+        # not data differences. The vs-TSN legs keep the accepted RD-79
+        # byte-exact semantics (same_source stays False there).
+        self._same_source = same_source
         schema = replace(_rd._SCHEMA, side_a=side_a, side_b=side_b,
                          legend_writer=legend_writer)
         if context_fields is not None:
@@ -219,6 +228,9 @@ class _RampDetailFileCompare:
     def _load_pair(self, path_a, path_b):
         rows_a, _ = _load_tsmis_pdf(path_a)
         rows_b, _ = self._load_b(path_b)
+        if self._same_source:
+            rows_a = ctc.same_source_render_rows(rows_a)
+            rows_b = ctc.same_source_render_rows(rows_b)
         return rows_a, rows_b, None
 
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
@@ -250,4 +262,5 @@ TSMIS_PDF_VS_EXCEL = _RampDetailFileCompare(
     load_b=_load_excel_collapsed,
     legend_writer=_NOTES_PDF_VS_EXCEL,
     one_sided_note_extra=(" (none expected on a same-run pair — the two renders "
-                          "list the same ramps)"))
+                          "list the same ramps)"),
+    same_source=True)
