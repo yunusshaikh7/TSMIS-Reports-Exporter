@@ -1050,6 +1050,34 @@ evidence/flat-view coverage, terminal artifact-universe checks, detached accepta
 and two byte-identical complete family replays.
 `HSL-PDF-79` below remains the separately named historical cross-bundle canary.
 
+**Product-loader verification (2026-07-16 — NOT family acceptance).** The Wave-4
+Highway Sequence batch (CMP-AUD-045/155/156/158/159/199/204) rebuilt the normalized
+TSN workbook at v4 from the 12 bound raw PDFs (`HSL Bundle 7.8\TSN\highway_sequence\
+raw`, the 3,866,949-byte authoritative set) and verified against the same-run ssor-prod
+7.9 consolidated pair:
+
+- normalized workbook: **69,804 rows** (68,806 data + 998 equates; 46 blank-County
+  annotations, all `EQUATES TO`), 283 `*P*` + 282 `-------->` pointer tokens verbatim,
+  the KER 014 `018.365` join with no invented comma, 154 numeric-prefix Descriptions
+  preserved, direction census {S-N 190, W-E 172, E-W 5, N-S 2}, one distinct policy
+  text, identity claims OTM22025 / 15-SEP-25 / 15 SEP 2025 across all 12 documents;
+- product leg SHAPES == `EXPECTED_CURRENT_LEGS` exactly: Excel-vs-TSN
+  60,494 / 69,804 / **57,072 / 3,422 / 12,732**; PDF-vs-TSN 60,493 / 69,804 /
+  **57,505 / 2,988 / 12,299**; PDF-vs-Excel **60,493 / 0 / 1** (CMP-AUD-199's
+  suffix-free identity; PM Suffix 549 and HG 910 exact as compared cells);
+- re-pairing the product-LOADED rows under the oracle's own assignment objective
+  (all-field diffs, char distance, position) reproduces the oracle's complete
+  per-field tables EXACTLY on all three legs (with the four proven-CRLF `_x000d_`
+  Excel cells unescaped) — so the loader values/identities carry zero residual
+  defects, and the live product's remaining deltas are precisely CMP-AUD-220
+  (assignment objective; live counts asserted 5,582 / 4,995 / 3,725 vs the oracle's
+  5,589 / 5,001 / 3,721+4) plus CMP-AUD-197 (the four `_x000d_` cells).
+
+These are product-code verification facts for the Wave-4 batch; they do not advance
+the Stage-8 family acceptance above (direct-source runner, permanent mutations,
+evidence coverage, detached acceptance, and the two byte-identical replays remain
+owner-gated).
+
 ## Remaining canary queue
 
 | Canary | Flavor / acceptance fact | Corpus source | State / blocker |

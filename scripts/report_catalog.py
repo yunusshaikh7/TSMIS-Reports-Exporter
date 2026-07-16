@@ -394,8 +394,17 @@ TSN = (
              "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into",
              normalization_version=4, evidence_pdfs=True),
     # v3: exact internal D01-D12 admission; force prior v2 libraries through it.
+    # v4 (CMP-AUD-155/156/158/159): the row universe and values are source-exact
+    # — the 565 printed pointer tokens ("*P*"/"-------->") kept verbatim in
+    # Distance, the 46 pre-county "EQUATES TO" annotations kept with their blank
+    # County, wrapped descriptions joined without an invented comma — and the
+    # print's identity/direction/policy claims ride the sidecar
+    # (tsn_source_claims). The rows sheet kept its SHAPE, so the workbook
+    # carries a "TSN Normalization" marker sheet; the comparison loader refuses
+    # a pre-v4 file with a rebuild hint, and this bump rebuilds stored
+    # libraries (D2 auto-rebuild).
     TsnEntry("highway_sequence", "TSN Highway Sequence", "*.pdf", "district_pdfs",
-             "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into", normalization_version=3),
+             "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into", normalization_version=4),
     # Highway Detail (v0.20.0): the statewide 56-column "TSAR - HIGHWAY DETAIL"
     # Excel extract. Verified consistent with the TSN district PDFs (57,647
     # records cross-checked, every shared field ≥99.9% identical), so the

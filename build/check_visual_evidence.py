@@ -1044,8 +1044,11 @@ check("field -> TSMIS print column / TSN print window maps are complete",
       all(f in ehsl._TSMIS_COL for f in ehsl.FIELDS)
       and all(f == "Description" or f in ehsl._TSN_WIN for f in ehsl.FIELDS))
 check("verification projection == the comparator's per-field normalization + TRIM "
-      "(route-prefix strip + whitespace collapse on Description; county period)",
-      ehsl.project("Description", "001/NB  OFF TO X ") == "NB OFF TO X"
+      "(SIDE-AWARE Description per CMP-AUD-204: TSMIS strips its OWN-route "
+      "label only, TSN is verbatim; county period)",
+      ehsl.project("Description", "001/NB  OFF TO X ", route="001") == "NB OFF TO X"
+      and ehsl.project("Description", "1/103 SEP", route="680") == "1/103 SEP"
+      and ehsl.project("Description", "1/103 SEP", side="tsn") == "1/103 SEP"
       and ehsl.project("County", "LA.") == "LA"
       and ehsl.project("FT", " H\t") == "H")
 check("canonical key: 'COUNTY GLUED-POSTMILE', county normalized",
@@ -1119,6 +1122,9 @@ _wsn = _wbn.active
 _wsn.title = ctnsl.NORMALIZED_SHEET
 _wsn.append(ctnsl.NORMALIZED_HEADER)
 _wsn.append(["001", "ORA", "R000.129", None, "D", "H", "000.102", "X"])
+_mkn = _wbn.create_sheet(ctnsl.MARKER_SHEET)          # the v4 shape marker
+_mkn.append(["Report", ctnsl.REPORT_NAME])
+_mkn.append(["Normalization version", ctnsl.NORMALIZATION_VERSION])
 _wbn.save(_hs_tmp / "tsn.xlsx")
 _r_t, _r_n, _sc3, _note3 = ehsl.load_sides(str(_hs_tmp / "per_route.xlsx"),
                                            str(_hs_tmp / "tsn.xlsx"))
@@ -1133,10 +1139,25 @@ _wsc.append(["001", "ORA", None, "R", "000.129", None, "D", "H", "000.124", "X"]
 _wbc.save(_hs_tmp / "consolidated.xlsx")
 _r_t, _r_n, _sc4, _note4 = ehsl.load_sides(str(_hs_tmp / "consolidated.xlsx"),
                                            str(_hs_tmp / "tsn.xlsx"))
-check("load_sides accepts the consolidated + normalized-TSN pair (glued key both sides)",
+check("load_sides accepts the consolidated + normalized-TSN pair (typed glued "
+      "PhysicalKey both sides, CMP-AUD-045)",
       _sc4 == {"routing": "per-print"} and _note4 is None
-      and len(_r_t) == 1 and _r_t[0][0] == "001" and _r_t[0][2] == "R000.129"
-      and len(_r_n) == 1 and _r_n[0][2] == "R000.129")
+      and len(_r_t) == 1 and _r_t[0][0] == "001" and str(_r_t[0][2]) == "R000.129"
+      and dict(_r_t[0][2].physical_identity.canonical_components)["postmile"]
+      == "R000.129"
+      and len(_r_n) == 1 and str(_r_n[0][2]) == "R000.129"
+      and _r_t[0][2] == _r_n[0][2])
+# a pre-v4 normalized workbook (no marker sheet) is refused with the rebuild note
+_wbo = Workbook()
+_wso = _wbo.active
+_wso.title = ctnsl.NORMALIZED_SHEET
+_wso.append(ctnsl.NORMALIZED_HEADER)
+_wso.append(["001", "ORA", "R000.129", None, "D", "H", "000.102", "X"])
+_wbo.save(_hs_tmp / "tsn_old.xlsx")
+_r_t, _r_n, _sc5, _note5 = ehsl.load_sides(str(_hs_tmp / "consolidated.xlsx"),
+                                           str(_hs_tmp / "tsn_old.xlsx"))
+check("load_sides refuses a pre-v4 normalized TSN workbook with the rebuild note",
+      _sc5 is None and "older TSN Highway Sequence converter" in (_note5 or ""))
 _sh.rmtree(_hs_tmp, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #

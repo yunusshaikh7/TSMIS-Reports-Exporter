@@ -36,6 +36,7 @@ each PDF cell back through the comparison's normalization before accepting an
 example. Console-free; pdfplumber/openpyxl gated by the engine.
 """
 import logging
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -68,9 +69,27 @@ _TSN_WIN = {"County": ctnsl.W_COUNTY, "City": ctnsl.W_CITY, "PM": ctnsl.W_PM,
 
 
 def _canon(county, glued_pm):
-    """The comparison's composite key: 'COUNTY POSTMILE' (county normalized the
-    comparator's way — the TSMIS export writes 'LA.' where TSN writes 'LA')."""
+    """The within-route locating key: 'COUNTY POSTMILE' (county normalized the
+    comparator's way — the TSMIS export writes 'LA.' where TSN writes 'LA').
+    The string twin of the comparison rows' PhysicalKey identity."""
     return f"{chsl._norm_county(county)} {(glued_pm or '').strip()}".strip()
+
+
+def _row_key(r):
+    """A comparison row's locating key string, from its PhysicalKey identity
+    (CMP-AUD-045: the key cell is typed; its canonical county/postmile carry
+    the reserved '(county not printed)'/'(no postmile printed)' markers, which
+    map back to blanks here so print lookups see the printed text)."""
+    key = r[1 + chsl.KEY_FIELD]
+    ident = getattr(key, "physical_identity", None)
+    if ident is not None:
+        comp = dict(ident.canonical_components)
+        county = "" if comp["county"] == chsl._NO_COUNTY_KEY else comp["county"]
+        pm = "" if comp["postmile"] == chsl._NO_PM_KEY else comp["postmile"]
+        return f"{county} {pm}".strip()
+    county = r[1 + chsl.SHARED_HEADER.index("County")]
+    return f"{'' if county is None else str(county).strip()} " \
+           f"{'' if key is None else str(key).strip()}".strip()
 
 
 # --------------------------------------------------------------------------- #
@@ -109,11 +128,11 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
         a_ct, b_ct = defaultdict(int), defaultdict(int)
         a_by, b_by = {}, {}
         for r in a_route[route]:
-            k = chsl._key_county_pm(r, 1, key_field)
+            k = _row_key(r)
             a_ct[k] += 1
             a_by[k] = r
         for r in b_route[route]:
-            k = chsl._key_county_pm(r, 1, key_field)
+            k = _row_key(r)
             b_ct[k] += 1
             b_by[k] = r
         for key in set(a_by) & set(b_by):
@@ -133,13 +152,16 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
 # --------------------------------------------------------------------------- #
 # verification projection
 # --------------------------------------------------------------------------- #
-def project(field, raw):
+def project(field, raw, side="tsmis", route=None):
     """A raw PDF cell value -> the compared form, per the comparator's own
-    per-field normalization (Description strips the TSMIS "<route>/" prefix and
-    collapses whitespace; County drops the TSMIS trailing period) + the
-    engine's Excel TRIM."""
+    per-field normalization + the engine's Excel TRIM. Description is
+    SIDE-AWARE (CMP-AUD-204): the TSMIS side strips its own-route leading
+    label only; the TSN side is verbatim (numeric prefixes are authoritative
+    source claims)."""
     if field == "Description":
-        return _xl_trim(chsl._norm_desc(raw))
+        if side == "tsn":
+            return _xl_trim(chsl._desc_plain(raw))
+        return _xl_trim(chsl._desc_tsmis(raw, route))
     if field == "County":
         return _xl_trim(chsl._norm_county(raw))
     return _xl_trim(chsl._v(raw))
@@ -193,6 +215,8 @@ def locate_tsmis(pdf_path, needed_keys):
     drift fails the gate."""
     found = defaultdict(list)
     stopped = False
+    m = re.search(r"route_([0-9A-Za-z]+)\.pdf$", str(pdf_path))
+    file_route = m.group(1) if m else None
     with pdfplumber.open(pdf_path) as pdf:
         for page_no, page in enumerate(pdf.pages, 1):
             if stopped:
@@ -234,6 +258,7 @@ def locate_tsmis(pdf_path, needed_keys):
                 line_words = [w for ws in cols.values() for w in ws]
                 bottom = max(w["bottom"] for w in line_words)
                 rec = {"cols": cols, "vals": vals, "boundaries": b,
+                       "route": file_route,
                        "page": page_no, "top": top, "bottom": bottom,
                        "desc": []}
                 if cols["desc"]:
@@ -268,11 +293,14 @@ def locate_tsmis(pdf_path, needed_keys):
 
 def tsmis_value(rec, field):
     """The compared value this PDF record carries for `field` (verification).
-    PM re-glues the print's prefix/PM/suffix windows, like the comparison."""
+    PM re-glues the print's prefix/PM/suffix windows, like the comparison; the
+    record's own route (stamped at locate time) drives the own-route-label
+    Description strip."""
     if field == "PM":
         v = rec["vals"]
         return project(field, f"{v['prefix']}{v['pm']}{v['suffix']}")
-    return project(field, rec["vals"][_TSMIS_COL[field]])
+    return project(field, rec["vals"][_TSMIS_COL[field]],
+                   route=rec.get("route"))
 
 
 def tsmis_box(rec, field):
@@ -325,9 +353,9 @@ def locate_tsn(pdf_dir, needed_routes, needed_keys):
     """{('', route, composite_key): [record]} scanning EVERY district print in
     `pdf_dir`, route-filtered. LOCKSTEP with consolidate_tsn_highway_sequence
     .parse_pdf (the group-header route switch, carried county, the
-    equate-annotation synthesis, the column buckets, ', ' description joins) —
-    it only ADDS position capture and the per-record district/county/src
-    provenance."""
+    equate-annotation synthesis, the column buckets, single-space description
+    joins, verbatim pointer distance tokens) — it only ADDS position capture
+    and the per-record district/county/src provenance."""
     found = defaultdict(list)
     for p in sorted(Path(pdf_dir).glob("*.pdf")):
         try:
@@ -336,6 +364,10 @@ def locate_tsn(pdf_dir, needed_routes, needed_keys):
             log.warning("evidence: %s unparseable: %s: %s",
                         p.name, type(e).__name__, e)
     return found
+# LOCKSTEP note: _scan_tsn_print above mirrors consolidate_tsn_highway_sequence
+# .parse_pdf's v4 row rules — pointer distance tokens verbatim (CMP-AUD-156),
+# pre-county equate annotations kept with a blank county (CMP-AUD-158), and
+# single-space wrapped-description joins (CMP-AUD-159).
 
 
 def _scan_tsn_print(path, needed_routes, needed_keys, found):
@@ -361,8 +393,10 @@ def _scan_tsn_print(path, needed_routes, needed_keys, found):
                 pm = next((t for t in (cols.get("pm") or [])
                            if ctnsl.LOCATION_RE.match(t)), None)
                 if "EQUATES" in text and pm and not ctnsl.COUNTY_RE.match(co):
-                    # the synthetic equate-annotation row (county carried)
-                    if route is None or county is None:
+                    # the synthetic equate-annotation row (county carried;
+                    # a pre-county annotation keeps its blank county, exactly
+                    # like the consolidator — CMP-AUD-158)
+                    if route is None:
                         continue
                     open_row = dict(county=county, pm=pm, city=None, hg=None,
                                     ft=None, dist=None, description="EQUATES TO")
@@ -376,8 +410,10 @@ def _scan_tsn_print(path, needed_routes, needed_keys, found):
                     county = co.rstrip(".")
                     flag = "".join(cols.get("flag") or [])
                     desc = " ".join(cols.get("desc") or []).strip() or None
-                    dist = next((t for t in (cols.get("dist") or [])
-                                 if ctnsl.DIST_RE.match(t)), None)
+                    # verbatim first token — numeric distance OR the printed
+                    # pointer markers, exactly like the consolidator (CMP-AUD-156)
+                    dists = cols.get("dist") or []
+                    dist = dists[0] if dists else None
                     open_row = dict(
                         county=county, pm=pm,
                         city=(cols.get("city") or [None])[0],
@@ -393,9 +429,10 @@ def _scan_tsn_print(path, needed_routes, needed_keys, found):
                     extra = " ".join(cols["desc"]).strip()
                     if not extra:
                         continue
+                    # single-space join, like the consolidator (CMP-AUD-159)
                     open_row["description"] = (
                         extra if not open_row["description"]
-                        else open_row["description"] + ", " + extra)
+                        else open_row["description"] + " " + extra)
                     if open_rec is not None:
                         seg_words = [w for w in line
                                      if ctnsl._bucket(w["x0"]) == "desc"]
@@ -435,11 +472,12 @@ def _keep_tsn(found, needed_routes, needed_keys, path, district, county, route,
 
 
 def tsn_value(rec, field):
-    """The compared value this print record carries for `field`."""
+    """The compared value this print record carries for `field` (TSN side:
+    Description verbatim — CMP-AUD-204)."""
     key = {"County": "county", "PM": "pm", "City": "city", "HG": "hg",
            "FT": "ft", "Distance To Next Point": "dist",
            "Description": "description"}[field]
-    return project(field, rec["rowd"].get(key))
+    return project(field, rec["rowd"].get(key), side="tsn")
 
 
 def tsn_box(rec, field):

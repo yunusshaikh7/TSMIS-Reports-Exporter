@@ -2188,7 +2188,7 @@ because its header is blank.
 ### CMP-AUD-045 — PM-only identity is too weak
 
 Priority: P1  
-Status: Partially remediated — core green; **Ramp Detail AND Intersection Detail integrated + re-blessed 2026-07-14**; HSL remains (HL/HD blocked pending census/vendor)  
+Status: Partially remediated — core green; **Ramp Detail + Intersection Detail (2026-07-14) and Highway Sequence (2026-07-16) integrated + corpus-verified; the identity gate is 10 green / 0 known-red**; HL/HD remain blocked pending census/vendor  
 Primary code: `scripts/compare_env.py:689-719`,
 `scripts/compare_core.py:445-490`,
 `scripts/consolidate_tsn_highway_log.py:280-361,459-495`,
@@ -2286,6 +2286,34 @@ Excel vs raw TSN 16,199/260/427 · 146/16,053 · 21,676 cells · 550,766
 asserted; PDF vs raw TSN … · 21,683 · 550,766; PDF vs Excel 16,459 ·
 16,450/9 · 9 · 559,606 — all with exact pairing quality across TSN's 15 real
 duplicate groups (the Hungarian assignment's first statewide engagement).
+
+**Highway Sequence remediation (2026-07-16).** Every HSL path — the v4 normalized
+TSN loader (marker-sheet gated; pre-v4 refused with a rebuild hint), the shared
+consolidated loader both TSMIS flavors ride, the new PDF-vs-Excel same-source
+loader, and the cross-env adapter via the same `physical_key_builder` hook
+(engaging only on the real export shape: County named, PM flanked by the two
+UNNAMED prefix/suffix columns; anything else logs and falls back) — keys rows
+with the oracle-approved PhysicalKey `(Route, County, complete glued postmile)`:
+zero padding, realignment prefix, and equate suffix exactly as printed
+("R001.000E" — the ONE family whose canonical keeps the suffix; the
+PDF-vs-Excel leg alone excludes it per CMP-AUD-199 and compares it as the
+"PM Suffix" column). The raw prefix/PM/suffix (and County text with its
+TSMIS-only trailing period) ride as conserved claims. Rows printing NO county
+(the 46 CMP-AUD-158 annotations) or NO postmile (five TSMIS rows per render)
+key under the reserved `"(county not printed)"` / `"(no postmile printed)"`
+markers — disclosed, unpairable with real geometry, never fabricated. Both
+KNOWN_RED contracts were verified against the Stage-8 oracle's `Row.identity`
+(the glued expectation is CORRECT for HSL, unlike RD/ID) and PROMOTED —
+**the CMP-AUD-045 identity gate is now 10 green / 0 known-red; every
+unblocked family is integrated**. Corpus-verified on the current ssor-prod 7.9
+pair vs the oracle's `EXPECTED_CURRENT_LEGS`: all three leg SHAPES exact
+(60,494/69,804/57,072/3,422/12,732 · 60,493/69,804/57,505/2,988/12,299 ·
+60,493/60,494/60,493/0/1), and re-pairing the product-loaded rows under the
+oracle's assignment objective reproduces every per-field cell count EXACTLY
+(the residual product deltas are precisely CMP-AUD-220's objective + the four
+CMP-AUD-197 `_x000d_` cells — no other residue). HL still needs its raw county
+retention + collision census; HD-Excel remains vendor-pending — do NOT infer
+either.
 
 Raw-source re-verification on 2026-07-12 bound the user-provided, raw-only TSN library
 before implementation:
@@ -5644,6 +5672,24 @@ reliability warning in source-bound normalized provenance; reject cross-page/mem
 inconsistency; expose relevant facts in Notes/evidence; and mutation-test each field
 independently from row projection.
 
+**Remediation (2026-07-16).** `consolidate_tsn_highway_sequence.parse_pdf` now parses
+every cover (report id, `Reference Date:`, `District:`, the `* * * N O T E * * *`
+reliability policy — each required, missing refuses) and every data page's identity
+band (report id, title, report date, `Ref Dt`, generation time) under the exactly-one-
+distinct-value multiplicity rule; `GROUP_RE` captures the per-route printed direction
+(conflicting directions within a document refuse), and `_cross_member_claims` refuses a
+member from a different pull (report id/title/date/reference dates must agree across
+all 12 districts; generation time and the policy stay per-document). The claims record
+rides `producer_extra["tsn_source_claims"]` into the library sidecar and surfaces in
+every vs-TSN Notes sheet via `_schema_with_claims` (identity line, direction census,
+the reliability policy — with an explicit rebuild hint when the record is absent). The
+real-corpus rebuild reproduced the bound census exactly: 12 documents, one distinct
+policy text, directions {S-N 190, W-E 172, E-W 5, N-S 2}. Contract fixtures:
+`check_tsn_district_source_contract` (missing-NOTE cover, conflicting directions,
+cross-member reference-date disagreement, claims presence) and
+`check_compare_highway_sequence_tsn`. Evidence exposure beyond Notes remains with the
+Stage-10 evidence rework (CMP-AUD-218/098).
+
 ### CMP-AUD-156 — Highway Sequence's numeric-only distance parser erases a real printed landmark pointer
 
 Priority: P1  
@@ -5663,6 +5709,19 @@ non-numeric distance-domain value; bind its district/page/route/postmile identit
 distinguish pointer semantics from numeric distance and true blank; add missing/moved/
 changed/extra-pointer mutations; and re-run raw PDF→normalized→comparison→evidence truth
 without silently coercing the marker away.
+
+**Remediation (2026-07-16).** The parser now takes the distance window's first token
+verbatim and validates it against the censused domain — numeric, `*P*`, or
+`-------->`; any OTHER token refuses loudly ("unrecognized DISTANCE TO NXT POINT
+token … re-census"), so a drifted layout can never again silently blank a claim
+(`consolidate_tsn_highway_sequence.POINTER_TOKENS`, normalization v4 with the
+`TSN Normalization` marker sheet + loader refusal + D2 rebuild). The evidence TSN
+scan mirrors the rule. Real-corpus rebuild: exactly 283 `*P*` + 282 `-------->`
+(565) conserved through the normalized workbook and the comparison loader
+(Distance is a context column: displayed verbatim, never counted). Fixtures:
+`check_compare_highway_sequence_tsn` (verbatim one-sided display) and
+`check_tsn_district_source_contract`; the foreign-token refusal is pinned in the
+green probe/gate fixtures.
 
 ### CMP-AUD-157 — Highway Log normalization drops group ownership, three printed ADT fields, totals, and report provenance
 
@@ -5713,6 +5772,19 @@ first/middle/final, moved county headers, and added/removed/changed equates; and
 the comparison/evidence layer to disclose ambiguous ownership without pairing it to an
 invented county.
 
+**Remediation (2026-07-16).** The parser now emits every annotation (a route-less one
+refuses as unowned); a pre-county annotation keeps its BLANK county exactly as
+printed. The comparison loader keys such rows under the reserved
+`"(county not printed)"` canonical marker (`compare_highway_sequence_tsn
+._physical_pm_key`) — self-describing in the Comparison key column, structurally
+unable to pair with any real county, mirroring the Stage-8 oracle's
+"explicitly unkeyed TSN-only" disposition — and the Notes disclose the class.
+Real-corpus rebuild: 69,758 → **69,804 rows** (998 equates, exactly 46
+blank-county, all `EQUATES TO`), and the complete-raw leg shapes now reproduce
+the oracle exactly (TSN-only 12,732 / 12,299 — the keyable 12,686/12,253 plus
+the 46). Normalization v4 + marker-sheet refusal + D2 rebuild; fixtures in
+`check_compare_highway_sequence_tsn` and `check_compare_physical_identity`.
+
 ### CMP-AUD-159 — Highway Sequence fabricates punctuation when joining one wrapped printed Description
 
 Priority: P1  
@@ -5729,6 +5801,14 @@ Correction requirements: join wrapped source fragments under an explicit whitesp
 continuation contract without invented punctuation; bind this exact row plus punctuation-
 present and punctuation-absent neighbors; reject orphan/ambiguous continuations; and
 re-run raw PDF→normalized→comparison/evidence cell truth before re-blessing.
+
+**Remediation (2026-07-16).** Wrapped continuations now join on a single space (the
+continuation contract stays: description-window words only, no county/postmile
+token, attached to the open row); the evidence TSN scan mirrors it. Real-corpus
+rebuild: D09 / KER / 014 / `018.365` reads exactly
+`KEMWATER CHEMICAL PLANT - RT/FRONTAGE ROAD - LT.` — no invented characters.
+Normalization v4; the joined-value pin lives in the gate fixtures
+(`check_compare_highway_sequence_tsn` + the batch's green probe).
 
 ### CMP-AUD-160 — the first Highway Sequence conservation gate misclassified the library placeholder as comparison truth
 
@@ -6869,6 +6949,23 @@ zero PDF-only, one Excel-only, with 3,721 same-source cells including all 549 su
 `bb7c8550724b71e657781f86579e25b2f70c96bf8bf3380d049f70118f98961f`
 authenticates both the observed product output and the deliberate contract failure.
 
+**Remediation (2026-07-16).** `compare_highway_sequence_pdf` now gives PDF-vs-Excel its
+own same-source profile (`SS_HEADER`/`_tsmis_row_same_source`/`_SS_SCHEMA`): rows key
+on the typed PhysicalKey (Route, County, prefixed postmile WITHOUT the suffix), "PM
+Suffix" is a compared column, EVERY column is asserted (no context suppression), and
+Descriptions are compared verbatim on both sides. On the current ssor-prod 7.9 pair the
+product loaders reproduce the source contract: **60,493 paired / 0 PDF-only / 1
+Excel-only**, with FT 1,129 / HG 910 / **PM Suffix 549** exactly (the 272 two-row moves
+= 544 cells + the five missing-Excel suffixes) — the route-152 / SCR / `T003.273`
+swap class is structurally gone (suffix is no longer identity). Description counts
+1,137 vs the oracle's 1,133: the +4 is exactly the four `_x000d_` Cactus City cells
+(CMP-AUD-197, open) — re-pairing the same loaded rows under the oracle's assignment
+objective with those four unescaped reproduces the full 1,410-row / 3,721-cell
+per-field table EXACTLY, so no other residual exists. The remaining engine-side
+assignment-objective difference is CMP-AUD-220 (open). Contract fixtures:
+`check_compare_physical_identity` (same-source identity, suffix compared) and the
+updated Notes describe the two-cell suffix-move representation.
+
 ### CMP-AUD-200 — Highway Sequence product witness is externally terminated after 180 seconds
 
 Priority: P2  
@@ -7057,6 +7154,25 @@ The expanded residual artifact is 2,475,505 bytes at SHA-256
 Two hardened exact-byte runs are identical. It reconstructs every persisted pair/cell,
 binds the 81/15 effects and 90/94/154/154 source-projection populations, and leaves zero
 unexplained residue. It remains explicitly non-acceptance and cache-backed.
+
+**Remediation (2026-07-16).** The symmetric strip is gone. `_desc_plain` (the TSN side
+and both PDF-vs-Excel sides) compares Descriptions VERBATIM apart from whitespace
+collapse — all 154 numeric-prefix TSN Descriptions (108 owning-route + 46 cross-route)
+survive load, corpus-verified — and `_desc_tsmis` (the TSMIS side of the vs-TSN legs
+only) removes the leading label ONLY when its token names that row's own route
+(canonical, padding-insensitive comparison; `s[m.end():].lstrip()` also removes only
+the delimiter padding, the CMP-AUD-205 rule), so the 90 cross-route TSMIS prefixes per
+form are kept and nested tokens strip once at most. The evidence projection is
+side-aware through the same functions. On the current pair, re-pairing the product-
+loaded rows under the oracle's assignment objective reproduces the oracle's complete
+per-field tables EXACTLY on all three legs (Excel-vs-TSN 23,691 rows / 30,005 cells /
+asserted 5,589 with Description 4,894; PDF-vs-TSN 29,189 / asserted 5,001 with
+4,916; the four `_x000d_` Excel cells unescaped per CMP-AUD-197's proven CRLF
+equivalence) — the 81 false-cleans and 15 fabricated states are gone, and the only
+remaining engine-side delta is the CMP-AUD-220 assignment objective (open). Fixtures:
+`check_compare_highway_sequence_tsn` (own-route strip / cross-route kept / TSN
+verbatim, and the false-clean class now surfaces end to end) and
+`check_visual_evidence` (side-aware projection).
 
 ### CMP-AUD-205 — Highway Sequence audit projection leaves separator padding after an approved TSMIS route label
 

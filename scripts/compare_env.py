@@ -1119,9 +1119,65 @@ def _ramp_detail_env_keys(header, key_field):
 RAMP_DETAIL = EnvCompare(
     "ramp_detail", "Ramp Detail", "ramp_detail", sheet_name="TSAR - Ramp Detail",
     key_col="PM", physical_key_builder=_ramp_detail_env_keys)
+
+
+def _hsl_unnamed_col(label):
+    """True for a header cell the export left BLANK (compare_env labels those
+    '(col X)'): the Highway Sequence prefix/suffix columns are exactly the two
+    unnamed cells flanking PM in the real export layout."""
+    return label is None or re.fullmatch(
+        r"\(col [A-Z]+\)", str(label).strip()) is not None
+
+
+def _highway_sequence_env_keys(header, key_field):
+    """CMP-AUD-045: the Highway Sequence cross-env key builder — the same
+    oracle-approved (Route, County, complete glued postmile) PhysicalKey the
+    vs-TSN paths bake into their rows, built here per row from the export's own
+    columns (County by name; the UNNAMED cells immediately before/after the PM
+    column are the realignment prefix and equate suffix, glued INTO the
+    canonical postmile — HSL's convention, unlike Ramp Detail's D4). Degrades
+    to the plain key column (logged) when the layout doesn't expose County or
+    the unnamed prefix/suffix flanks — layout drift falls back to the old
+    behavior rather than gluing arbitrary neighbor columns into identity."""
+    import compare_highway_sequence_tsn as _hsl
+    county_field = next((i for i, name in enumerate(header)
+                         if name is not None
+                         and str(name).strip().casefold() == "county"), None)
+    if county_field is None or key_field == 0:
+        log.warning("env compare highway_sequence: no County column / key column "
+                    "in header %r; falling back to the plain PM key", header)
+        return None
+    if (key_field - 1 <= 0 or key_field + 1 >= len(header)
+            or not _hsl_unnamed_col(header[key_field - 1])
+            or not _hsl_unnamed_col(header[key_field + 1])):
+        log.warning("env compare highway_sequence: PM at %d is not flanked by "
+                    "the unnamed prefix/suffix columns in header %r; falling "
+                    "back to the plain PM key", key_field, header)
+        return None
+
+    def normalizer(row, off, kf):
+        route = "" if row[0] is None else str(row[0])
+        county_raw = row[off + county_field]
+
+        def cell(field):
+            i = off + field
+            return _hsl._raw_text(row[i]) if 0 <= field < len(header) and i < len(row) else ""
+        prefix, pm_raw, suffix = cell(kf - 1), row[off + kf], cell(kf + 1)
+        return _hsl._physical_pm_key(
+            route, county_raw,
+            _hsl._glue_pm(prefix, pm_raw, suffix),
+            (("route", route), ("county", _hsl._raw_text(county_raw)),
+             ("postmile_prefix", prefix),
+             ("postmile", _hsl._raw_text(pm_raw)),
+             ("postmile_suffix", suffix)),
+            f"the {row[0]!r} export row")
+    return normalizer
+
+
 HIGHWAY_SEQUENCE = EnvCompare(
     "highway_sequence", "Highway Sequence", "highway_sequence",
-    sheet_name="Highway Locations", key_col="PM")
+    sheet_name="Highway Locations", key_col="PM",
+    physical_key_builder=_highway_sequence_env_keys)
 HIGHWAY_LOG = EnvCompare(
     "highway_log", "Highway Log", "highway_log", sheet_name=_hl.SHEET_NAME,
     base_schema=_HL_BASE, force_header=_hl.EXPECTED_HEADER)

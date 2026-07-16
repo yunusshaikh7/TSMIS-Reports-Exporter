@@ -290,7 +290,15 @@ def tsn_highway_sequence_late_save():
         saved_universe = M.tdc.require_exact_universe
         _row = {"county": "04", "pm": "0.000", "city": "", "hg": "", "ft": "",
                 "dist": "", "description": ""}
-        M.parse_pdf = lambda _p, _e, pdf_name="": ("01", {"001": [_row]})
+        _claims = {"member": "d1.pdf", "district": "01",
+                   "report_id": "OTM22025", "report_title": "Highway Locations",
+                   "report_date": "15-SEP-25", "reference_date": "15 SEP 2025",
+                   "cover_reference_date": "15-SEP-25",
+                   "generation_time": "01:05 PM", "pages": 2,
+                   "policy_sha256": "0" * 64,
+                   "policy_text": "* * * N O T E * * * boilerplate",
+                   "directions": {"001": "S-N"}}
+        M.parse_pdf = lambda _p, _e, pdf_name="": ("01", {"001": [_row]}, _claims)
         M.tdc.require_exact_universe = lambda claimed: tuple(claimed)
         try:
             res = _run_with_late_save_appearance(out_path, lambda: M.consolidate(

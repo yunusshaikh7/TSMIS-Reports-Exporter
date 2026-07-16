@@ -76,13 +76,20 @@ same-run truth. The current July-9 pair is 60,494 Excel / 60,493 PDF rows: route
 `003.809` is fixed in Excel, four paired PDF Descriptions are blank, and one described
 Excel row is absent from PDF. Installed Excel also proves the four lowercase `_x000d_`
 values are CRLF, not substantive differences. The Stage-8 audit further proves
-PDF↔Excel must pair on route/county/prefix/base PM with suffix asserted; the product
-still uses the older glued-suffix identity and remains red pending remediation. The
-vs-TSN product is also red: its symmetric Description rule mutates all 154 TSN numeric
-prefixes and 90 cross-route TSMIS prefixes per form, and its asserted-only duplicate
-objective changes hundreds of source occurrence assignments. Do not re-bless its current
-aggregate counts as source truth. The cache-backed residual classifier reproduces those
-persisted maps and aggregate arithmetic. Its original zero-unexplained claim was
+PDF↔Excel must pair on route/county/prefix/base PM with suffix asserted — and **since
+the 2026-07-16 Wave-4 batch the product does exactly that** (CMP-AUD-199: "PM Suffix"
+is a compared column; 60,493 / 0 PDF-only / 1 Excel-only corpus-exact). The same batch
+removed the symmetric Description rule (CMP-AUD-204 — TSN text verbatim incl. its 154
+numeric prefixes; TSMIS strips only its own-route label), rebuilt the TSN normalizer
+source-exact at v4 (CMP-AUD-155/156/158/159 — 69,804 rows incl. the 46 blank-county
+equates, the 565 pointer tokens, no invented comma, sidecar identity/direction/policy
+claims), and put typed physical identity on every HSL path (the CMP-AUD-045 gate is
+10 green / 0 known-red — RD, ID, and HSL integrated; HL/HD stay blocked). The one
+remaining vs-TSN red is the shared asserted-only duplicate objective (CMP-AUD-220,
+plus the four CMP-AUD-197 `_x000d_` cells): the live aggregate counts sit an
+exactly-attributed −7 / −6 / +4 cells from the Stage-8 oracle's — do not re-bless
+them as source truth until 220/197 land. The cache-backed residual classifier
+reproduces those persisted maps and aggregate arithmetic. Its original zero-unexplained claim was
 withdrawn after CMP-AUD-221 through 223 exposed unconditional attribution, post-resolve
 link checks, and an output/input alias hazard. The hardened classifier now proves every
 assignment objective, rejects an arbitrary swap and real Windows link/alias probes, and
@@ -92,13 +99,16 @@ Stage-8 base-family audits are complete: **7/7**. Highway Log closed on exact 25
 Excel/PDF source witnesses, its accepted-red Stage-6 chain, an independent projection
 oracle, two clean seven-file product-leg universes, and two byte-identical final-gate
 result/acceptance pairs. The gate accepts only the base audit: product, full-physical,
-workbook-evidence, and end-to-end perfection remain false. CMP-AUD-045/047/048/049/050/
-066/067/157 remain open, and no product code changed during the bounded closeout. Exact
+workbook-evidence, and end-to-end perfection remain false. CMP-AUD-047/048/049/050/
+066/067/157 remain open (045 is integrated for every unblocked family as of
+2026-07-16; its HL/HD legs stay blocked on the county census / vendor answer), and no
+product code changed during the bounded closeout itself. Exact
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
-Implementation is frozen; resume only from
-[docs/planning/comparison-perfection/archive/comparison-implementation-handoff.md](docs/planning/comparison-perfection/archive/comparison-implementation-handoff.md)
-after explicit owner authorization.
+The owner-authorized remediation is live on branch `comparison-perfection`; the single
+resume surface is the "RESUME HERE" block in
+[docs/planning/comparison-perfection/COMPLETION-PLAN.md](docs/planning/comparison-perfection/COMPLETION-PLAN.md)
+(the archived implementation handoff is historical).
 New reviewers start at
 [docs/planning/comparison-perfection/README.md](docs/planning/comparison-perfection/README.md)
 and use the linked reconciliation prompt before deciding whether to finish Stages 9–10

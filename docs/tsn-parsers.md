@@ -170,17 +170,31 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   The **G/RF** field is one fused 2-char token = **HG (1st char) + FT (2nd char)** (`"DH"` → HG `D`, FT `H`).
   POSTMILE carries a glued realignment prefix (`R010.179`) and/or equate suffix (`050.025E`). Equate points
   print as a `Rxxx.xxx EQUATES TO` annotation line; TSMIS records the same equate as an `END R REALIGNMENT`
-  row at that postmile — the parser **emits the equate line** (county carried from context) so the two pair.
-- **Parser** `consolidate_tsn_highway_sequence.py` (writes ONE normalized workbook, sheet
-  `Highway Locations (TSN)`, header `[Route, County, PM, City, HG, FT, Distance To Next Point, Description]`):
-  word-level extraction with x0-windows `county[0,44) city[44,98) pm[98,168) flag[168,205) dist[205,270)
-  desc[270,…)`; lines clustered with `Y_TOLERANCE=3` (a plain `round(top)` splits jittered rows and drops
-  them). A route appears across MULTIPLE district PDFs (different counties) — rows accumulate per route.
-- **Compare shape:** **FLAT, key = route + COUNTY + PM.** California postmiles are **county-relative** (a route
-  restarts at `000.000` in each county it crosses), so the postmile alone is not unique across a route. The
-  key is composited via `key_normalizer` → `"COUNTY POSTMILE"` (shown in the key column); **County also stays
-  its own visible column**. Landmarks still sharing a (route, county, PM) — e.g. a `COUNTY BEGIN` marker at the
-  same postmile — are paired by `compare_core`'s similarity matcher.
+  row at that postmile — the parser **emits the equate line** (county carried from context; **an annotation
+  printed BEFORE the route's first county-bearing row keeps its BLANK county** — 46 statewide, CMP-AUD-158).
+  The DIST-TO-NXT position also prints **pointer markers `*P*` / `-------->`** (283 + 282 statewide) —
+  conserved verbatim; any other non-numeric token there refuses (CMP-AUD-156).
+- **Parser** `consolidate_tsn_highway_sequence.py` — **normalization v4** (writes ONE normalized workbook,
+  sheet `Highway Locations (TSN)`, header `[Route, County, PM, City, HG, FT, Distance To Next Point,
+  Description]`, plus a `TSN Normalization` **marker sheet** the comparison loader gates on — pre-v4
+  workbooks refuse with a rebuild hint): word-level extraction with x0-windows `county[0,44) city[44,98)
+  pm[98,168) flag[168,205) dist[205,270) desc[270,…)`; lines clustered with `Y_TOLERANCE=3` (a plain
+  `round(top)` splits jittered rows and drops them); wrapped descriptions join on a **single space** (the
+  print has no punctuation between wrapped lines — CMP-AUD-159). A route appears across MULTIPLE district
+  PDFs (different counties) — rows accumulate per route. **Source claims (CMP-AUD-155):** every cover's
+  report id / `Reference Date:` / `District:` / reliability NOTE and every data page's identity band are
+  captured under an exactly-once-per-document rule (per-route printed DIRECTIONS too; conflicts refuse), the
+  12 documents must agree on the report identity (a member from another pull refuses), and the record rides
+  `producer_extra["tsn_source_claims"]` → the library sidecar → the comparison Notes.
+- **Compare shape:** **FLAT, typed key = (route, COUNTY, complete glued PM).** California postmiles are
+  **county-relative** (a route restarts at `000.000` in each county it crosses), so the postmile alone is not
+  unique across a route. Every loader bakes a `comparison_contract.PhysicalKey` whose canonical components
+  are the route, normalized county, and the complete glued postmile **including the equate suffix**
+  (`"R001.000E"` — HSL's own convention, per the Stage-8 oracle; the PDF-vs-Excel flavor alone keys WITHOUT
+  the suffix and compares it as its own `PM Suffix` column, CMP-AUD-199). Rows printing no county / no
+  postmile key under the explicit `"(county not printed)"` / `"(no postmile printed)"` markers. **County
+  also stays its own visible column**. Landmarks still sharing a (route, county, PM) — e.g. a `COUNTY BEGIN`
+  marker at the same postmile — are paired by `compare_core`'s similarity matcher.
 
   **Column map (shared header; key = route+county+PM):**
 
@@ -189,10 +203,10 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   | County *(in key)* | 1 | CO. | **strip trailing period** (TSMIS `LA.`/`SB.`/`SM.`/`SF.`/`CC.`/`DN.`/`ED.`/`SD.`/`SJ.` → `LA`…); else whole counties go one-sided |
   | PM *(key)* | 3+4+5 (prefix+PM+suffix) | POSTMILE | glued canonical form on both sides |
   | FT | 7 | flag[1] | **compared** — genuine feature-type diffs (H↔I, R↔H) |
-  | Description | 9 | DESCRIPTION | **compared** — strip TSMIS leading `^\d{1,3}[A-Z]?/` route prefix, collapse whitespace runs |
+  | Description | 9 | DESCRIPTION | **compared** — TSMIS's leading label is stripped ONLY when its token names the row's OWN route; **TSN text is verbatim** (its 154 numeric prefixes — 46 naming a DIFFERENT route — are source claims; CMP-AUD-204); whitespace runs collapse |
   | HG | 6 | flag[0] | **context** — TSMIS blanks it for whole counties; TSN always fills U/D |
   | City | 2 | CITY | **context** — TSN assigns a city code far more aggressively than TSMIS |
-  | Distance To Next Point | 8 | DIST | **context** — measured to each system's OWN next listed point; TSN lists finer breaks → smaller gap (listing artifact, not a disagreement) |
+  | Distance To Next Point | 8 | DIST | **context** — measured to each system's OWN next listed point; TSN lists finer breaks → smaller gap; TSN's `*P*`/`-------->` pointer markers display verbatim |
 
 - **One-sided rows are expected & honest** (same as Highway Log: *"mostly TSN segment breaks and TSMIS
   realignment markers"*) — TSN lists every segment break incl. unnamed ones; TSMIS omits most. The
@@ -200,16 +214,21 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   into the base route → they read as routes-only-in-TSMIS.
 - **Drop folder / consolidator / comparator / golden check:** `tsn_library/highway_sequence/` (raw district
   PDFs → `consolidate_tsn_highway_sequence.build_into`) · TSMIS via `consolidate_highway_sequence` (no rollup —
-  a normal worksheet) · `compare_highway_sequence_tsn` (`"files"` adapter, `key_field=PM`,
-  `key_normalizer=county|PM`, `context_fields=(HG, City, Distance To Next Point)`, Notes legend indicator) ·
-  `check_compare_highway_sequence_tsn.py`.
-- **Approved counts (CANARY — 6.19 statewide set; never regress):** TSN normalized **69,758 rows / 263 routes**
-  (12 district PDFs); TSMIS consolidated **60,439 rows**. Comparison: union **73,127**, **both 57,070**,
-  only-TSMIS **3,369**, only-TSN **12,688**, matched-with-diffs **4,843**, **diff cells 5,538**, identical
-  **52,227**; routes both **242**, only-TSMIS **10** (the S/U suffixed), only-TSN **21**. Per-field diffs:
-  **FT 699**, **Description 4,839**; **County/City/HG/Distance = 0** (key/context — never count). Verified 3
-  ways: golden check + full compare-suite + live independent recompute (which confirmed the engine's
-  similarity pairing reduces FT 1,504→699 false order-pairs).
+  a normal worksheet) · `compare_highway_sequence_tsn` (`"files"` adapter, `key_field=PM`, typed
+  `PhysicalKey` rows — no scalar key_normalizer, `context_fields=(HG, City, Distance To Next Point)`,
+  Notes legend + per-run source-claims lines) · `check_compare_highway_sequence_tsn.py`.
+- **Approved counts (CANARY — current 7.9 same-run pair + the bound 12-PDF raw set; v4 semantics,
+  2026-07-16):** TSN normalized **69,804 rows / 263 routes** (68,806 data + 998 equates; 46 blank-county;
+  565 pointer tokens; 154 numeric-prefix Descriptions). Leg shapes (paired / TSMIS-only / TSN-only):
+  Excel-vs-TSN **57,072 / 3,422 / 12,732**; PDF-vs-TSN **57,505 / 2,988 / 12,299**; PDF-vs-Excel
+  **60,493 / 0 / 1** with PM Suffix 549 · HG 910 · FT 1,129 compared cells exact. Live asserted cells:
+  Excel **5,582** / PDF **4,995** / PDF↔Excel **3,725** — each an EXACTLY-attributed distance from the
+  Stage-8 oracle's 5,589 / 5,001 / 3,721 (**CMP-AUD-220**'s assignment objective: −7 = −10 Desc + 3 FT and
+  −6 = −9 + 3, the finding's own arithmetic; **CMP-AUD-197**'s four `_x000d_` cells: +4). Re-pairing the
+  same loaded rows under the oracle's objective reproduces the oracle table exactly, so these numbers MOVE
+  when 220/197 land — never re-bless the live counts as source truth while those stay open.
+  *(Historical v3 canary, superseded: 6.19 set — 69,758 TSN rows, both 57,070, FT 699 / Description 4,839
+  under the old symmetric-strip semantics; kept only to date the change.)*
 - **Stage-8 current-source correction (2026-07-13; product remediation pending):** the
   7.8-Excel/first-7.9-PDF figures below are a historical cross-bundle fixture. The
   freshest same-run pair contains **60,494 Excel / 60,493 PDF** rows; route 037
@@ -416,9 +435,12 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
 - **Drop folder / consolidator / comparator / golden check:** `tsn_library/intersection_detail/` (raw XLSX → normalized via `tsn_load_intersection_detail.build_into`) · `consolidate_intersection_detail` (DONE) · `compare_intersection_detail_tsn` (FLAT; reads TSMIS **by position**, base-route key + `Route Suffix` compared column, **`CONTEXT_FIELDS = ()`** compare-everything, control-type crosswalk → `S`, numeric zero-pad norm, booleans normalized, a **"Report View" replica sheet** via the opt-in `extra_sheet_writer`, Notes sheet) · `check_compare_intersection_detail_tsn.py`. The **PDF edition** reuses this schema + loaders via `compare_intersection_detail_pdf` (`TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`). Shares the `compare_tsn_common` (`ctc`) substrate. Live in both matrices.
 - **Counts (CANARY):** the **v0.17.8 compare-everything** policy (`CONTEXT_FIELDS = ()`) supersedes the v0.17.0 suppressed-context numbers — every shared column now counts, so the statewide diff total rises sharply. The real-data canary is **≈163,310 diff cells (Excel)** (real TSN/TSMIS, local-only ground truth — RM04) — down from v0.18.1's 163,353 after the **v0.18.3 numeric-0 fix**: `_norm_num` now canonicalizes a real numeric 0 to `'0'` instead of blanking it (`str(v or "")` dropped a falsy 0 to `""`), so TSN's numeric-0 intersecting-route postmile reads `'0'` and matches TSMIS's text `'0.000'` — 43 phantom 0-vs-blank Intrte-Postmile cells cleared (on real data the fix touches ONLY that field). The **PDF edition** shifts by the same fix. The **offline lock** is `check_compare_intersection_detail_tsn.py`'s synthetic behavior fixture: the S-crosswalk (S/P → `S`, no diff; non-signalized A vs B → diff), the Y/N↔1/0 boolean norm, Date-of-Record now COUNTED, the 5 cross-street + Date-of-Record diffs counted at PM 0.204, the Report View soft(date + route-suffix)/hard(attribute) split, the **numeric-0→'0' canon** (a real 0 preserved, not blanked), and **one-sided locations rendered as "Only in TSMIS/TSN"** in the Report View (a side-colored band, kept out of the per-record Major/Diffs tally — not a row of field mismatches). TSN normalized **16,626 rows / 216 routes**; TSMIS consolidated **16,473** (218 routes). **Re-blessed 2026-07-03 (v0.18.5):** the D1 falsy-zero eradication (`norm_pm`/`_split_route`/ramp-detail tokens now keep a real numeric 0) + the D2 versioned library + the F1 Report-View rework proved **cell-for-cell IDENTICAL** on the real statewide pair (~2.79M cells, 0 mismatches) — canary unchanged at **163,310 / 677 one-sided**. Since v0.18.5 the library carries a **`tsn_normalization_version` stamp** (from `report_catalog.TSN`, currently **2**) in its consolidation sidecar: an absent/mismatched stamp reads STALE and the matrix/by-day compare paths **auto-rebuild from raw** (`tsn_library.ensure_current`) before reading it — bump the catalog version with ANY normalizer change and re-bless this canary. **v0.19.0:** the Intersection Detail canary was re-blessed AGAIN after the R1/V1 engine refactors (compare_tsn_common skeleton + compare_core's shared `compared_cell`): **2,789,732 cells IDENTICAL, canary unchanged 163,310 / 677**. The **Highway Log** TSN entry is now `normalization_version` **3** (R2: its route-token normalizer reconciled onto `pdf_table_lib.norm_route` — a short suffixed token now pads like TSMIS, '5S'→'005S'; proven identical on all 263 real routes, so the bump is defensive re-keying only).
 
-> **Current version correction (2026-07-12):** Highway Log is now normalization
-> version **4** and Highway Sequence version **3**. Both bumps force every existing
-> library through exact internal D01-D12 admission; the older version numbers above are
+> **Current version correction (2026-07-16):** Highway Log is normalization
+> version **4** and Highway Sequence is now version **4** as well (the 2026-07-12
+> v3 bump forced exact internal D01-D12 admission; the 2026-07-16 v4 bump is the
+> CMP-AUD-155/156/158/159 source-exact rebuild — pointer tokens, blank-county
+> equates, single-space joins, sidecar claims, and the `TSN Normalization`
+> marker sheet the loader gates on). The older version numbers above are
 > historical canary narrative, not the current catalog contract.
 
 ### Highway Detail — TSN  *(BUILT + verified — v0.20.0, the statewide-bundle reconciliation)*

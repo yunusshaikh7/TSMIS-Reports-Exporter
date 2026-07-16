@@ -134,7 +134,7 @@ def test_reuse_cardinality(root):
     print("library reuse content manifest + cardinality:")
     with patch(tsn_library.paths, "TSN_LIBRARY_ROOT", root / "library"):
         for current_report, expected_version in (("highway_log", 4),
-                                                  ("highway_sequence", 3)):
+                                                  ("highway_sequence", 4)):
             spec = tsn_library.get(current_report)
             raw = tsn_library.raw_dir(current_report)
             raw.mkdir(parents=True)
@@ -196,12 +196,26 @@ def _claimed(path):
 
 
 class _FakePage:
+    def __init__(self, text=""):
+        self._text = text
+
     def extract_words(self, **_kwargs):
         return []
 
+    def extract_text(self):
+        return self._text
+
+
+# A structurally valid HSL cover (CMP-AUD-155: parse_pdf reads page 1's report
+# id / Reference Date / District / reliability NOTE before any data page).
+_HSL_COVER = ("OTM22025\nHighway Locations\nReference Date: 15-SEP-25\n"
+              "District: 01\n* * * N O T E * * *\nThe landmark descriptions "
+              "may be wrong at Route Breaks and Equates.")
+
 
 class _FakePdf:
-    pages = [_FakePage()]
+    def __init__(self, pages=None):
+        self.pages = [_FakePage()] if pages is None else pages
 
     def __enter__(self):
         return self
@@ -229,12 +243,16 @@ def test_parser_ownership_guards():
               rejected(lambda: hl.parse_pdf(io.BytesIO(b"pdf"), Events(), "source.pdf"),
                        "before any owning route"))
 
+    # HSL parses page 1 as the COVER (CMP-AUD-155) and data pages after it, so
+    # the guard fixtures are two-page fakes: a valid cover + the bad data page.
+    hsl_open = lambda _path: _FakePdf([_FakePage(_HSL_COVER), _FakePage()])
+
     hsl_malformed = [[
         {"text": "DIST", "x0": 250}, {"text": "01", "x0": 280},
         {"text": "RTE", "x0": 300}, {"text": "???", "x0": 330},
         {"text": "DIR", "x0": 360}, {"text": "S-N", "x0": 390},
     ]]
-    with patch(hsl.pdfplumber, "open", fake_open), \
+    with patch(hsl.pdfplumber, "open", hsl_open), \
             patch(hsl, "_cluster_lines", lambda _words: hsl_malformed):
         check("HSL malformed DIST/RTE/DIR header fails before route carry-over",
               rejected(lambda: hsl.parse_pdf(io.BytesIO(b"pdf"), Events(), "source.pdf"),
@@ -243,19 +261,41 @@ def test_parser_ownership_guards():
     hsl_unowned = [[
         {"text": "MEN", "x0": 1}, {"text": "000.000", "x0": 110},
     ]]
-    with patch(hsl.pdfplumber, "open", fake_open), \
+    with patch(hsl.pdfplumber, "open", hsl_open), \
             patch(hsl, "_cluster_lines", lambda _words: hsl_unowned):
         check("HSL recognizable data without an owning route fails",
               rejected(lambda: hsl.parse_pdf(io.BytesIO(b"pdf"), Events(), "source.pdf"),
                        "before any owning route"))
 
+    # a cover missing the reliability NOTE refuses before any data page is read
+    with patch(hsl.pdfplumber, "open",
+               lambda _path: _FakePdf([_FakePage("OTM22025 only"), _FakePage()])):
+        check("HSL cover without the reliability NOTE fails",
+              rejected(lambda: hsl.parse_pdf(io.BytesIO(b"pdf"), Events(), "source.pdf"),
+                       "reliability NOTE"))
+
 
 def test_highway_sequence_boundary(root):
     print("Highway Sequence production boundary:")
 
+    def _fake_claims(district, pdf_name, reference_date="15 SEP 2025"):
+        # the CMP-AUD-155 per-document claims record parse_pdf now returns
+        return {
+            "member": pdf_name or f"member-{district}.pdf",
+            "district": district,
+            "report_id": "OTM22025", "report_title": "Highway Locations",
+            "report_date": "15-SEP-25", "reference_date": reference_date,
+            "cover_reference_date": "15-SEP-25",
+            "generation_time": "01:05 PM", "pages": 2,
+            "policy_sha256": "0" * 64,
+            "policy_text": "* * * N O T E * * * boilerplate",
+            "directions": {district: "S-N"},
+        }
+
     def parse(path, _events, pdf_name=""):
         district = _claimed(path)
-        return district, {district: [{"district": district}]}
+        return (district, {district: [{"district": district}]},
+                _fake_claims(district, pdf_name))
 
     def write(_rows, out, proceed=None):
         if proceed is not None and not proceed():
@@ -286,6 +326,26 @@ def test_highway_sequence_boundary(root):
         check("HSL duplicate D01 fails before publication",
               dup.status == "error" and "Duplicate internal district claim D01" in dup.message
               and not duplicate_out.exists())
+        check("HSL complete result carries the source claims (CMP-AUD-155)",
+              (getattr(good, "producer_extra", None) or {}).get(
+                  "tsn_source_claims", {}).get("report_id") == "OTM22025")
+
+        # CMP-AUD-155: one member from a DIFFERENT TSN pull refuses.
+        def parse_mixed(path, _events, pdf_name=""):
+            district = _claimed(path)
+            ref = "16 SEP 2025" if district == "05" else "15 SEP 2025"
+            return (district, {district: [{"district": district}]},
+                    _fake_claims(district, pdf_name, reference_date=ref))
+
+        mixed_raw = _raw_set(root / "hsl-mixed-pull", range(1, 13))
+        mixed_out = root / "hsl-mixed-pull.xlsx"
+        with patch(hsl, "parse_pdf", parse_mixed):
+            mixed = hsl.consolidate(
+                input_dir=mixed_raw, out_path=mixed_out, events=Events())
+        check("HSL cross-member reference-date disagreement fails before publication",
+              mixed.status == "error"
+              and "disagree on the reference date" in mixed.message
+              and not mixed_out.exists())
 
         changed_raw = _raw_set(root / "hsl-source-change", range(1, 13))
         changed_out = root / "hsl-source-change.xlsx"

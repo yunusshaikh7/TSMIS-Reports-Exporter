@@ -8,7 +8,7 @@ the living data ledgers are listed under [Reference](#reference) below.
 
 ## 1. YOU ARE HERE
 
-_Updated 2026-07-14._
+_Updated 2026-07-16._
 
 ```
 Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 8 ── 9 ── 10
@@ -20,85 +20,88 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | | |
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
-| **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **4 identity contracts documented-red** under CMP-AUD-045 |
+| **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **identity gate 10 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185**; 045 RD+ID integrated & re-blessed (HSL remains; HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | **Wave 4 continues** — the Highway Sequence family (CMP-AUD-199 identity + its 045 leg + 155/156/158/159), then 220/218/197; HL needs its county census first, HD-Excel vendor-pending |
+| **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
+| **Next action** | **Wave 4 finale — CMP-AUD-220** (the shared duplicate-assignment objective; compare_core-locked, all-family re-bless), then 218 (Spot Check independence), 197 (`_x000d_` family-aware reader); HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-14, after the Summary-loader batch)
-> **Done this batch — CMP-AUD-020/021/022/023 (aggregate Summary loader correctness):**
-> `summary_layout.parse_count` (one strict count parser), `SectionRule` +
-> `reconcile_counts` (censused per-side partition contracts, measured on the real
-> corpus before encoding), duplicate key/column refusal, Rural/Urban parent-from-label
-> + counted-orphan refusal, absent-vs-zero preserved end to end (loaders, `_rows`,
-> and the TSN normalizers no longer fabricate zeros), bounded residuals EXPOSED as
-> familiar-sheet notes via a per-run out-of-band channel (never warnings). Both
-> oracles re-verified post-fix on the real corpus: **Ramp 29/0/2 · 5 identical ·
-> 24 differing (15,216 vs 15,410)**; **Intersection 58/8/0 · 5 identical ·
-> 53 differing (16,459 vs 16,626)** — and the ars-prod 7.9 re-consolidation stays
-> 217/217 byte-identical.
+> ### ▶ RESUME HERE (2026-07-16, after the Highway Sequence family batch)
+> **DONE this batch — the whole HSL family in one commit
+> (CMP-AUD-045-HSL / 155 / 156 / 158 / 159 / 199 / 204):**
+> - **Normalizer v4** (`consolidate_tsn_highway_sequence`, catalog bump 3→4 + a
+>   `TSN Normalization` marker sheet the loader gates on): pointer distance tokens
+>   verbatim with a refusal on any foreign token (156), the 46 pre-county equates
+>   conserved with their blank County (158), single-space wrap joins (159), and the
+>   CMP-AUD-155 claims capture (cover NOTE policy + identity band exactly-once per
+>   document; per-route directions with conflict refusal; `_cross_member_claims`
+>   refuses a member from a different pull) riding `producer_extra` → sidecar →
+>   per-run Notes via `_schema_with_claims`.
+> - **Typed identity everywhere** (045): `_physical_pm_key` — canonical
+>   (Route, County, complete GLUED postmile "R001.000E"; the one family whose
+>   canonical keeps the suffix), reserved `"(county not printed)"` /
+>   `"(no postmile printed)"` markers for the legitimately blank rows (46 TSN
+>   annotations; 5 TSMIS PM-less rows per render — both corpus-proven), claims
+>   lossless; wired into `_tsmis_row`, `_load_tsn` (v4-gated), the NEW same-source
+>   loader, and `compare_env.HIGHWAY_SEQUENCE` via `physical_key_builder` (engages
+>   only on the real shape: County named + PM flanked by the two UNNAMED columns;
+>   else logs + falls back). **Both KNOWN_RED promoted → the identity gate is
+>   10 green / 0 known-red.**
+> - **CMP-AUD-199**: PDF-vs-Excel keys WITHOUT the suffix; "PM Suffix" is a compared
+>   column; ALL columns asserted; descriptions verbatim both sides
+>   (`compare_highway_sequence_pdf.SS_HEADER/_SS_SCHEMA/_tsmis_row_same_source`).
+> - **CMP-AUD-204**: `_desc_plain` (TSN + same-source, verbatim) / `_desc_tsmis`
+>   (own-route label only, canonical token compare, `.lstrip()` per 205's rule);
+>   evidence projection side-aware.
+> - **Corpus verify (ssor-prod 7.9 pair + the 12 bound raw PDFs)**: normalized
+>   69,804 rows / 46 blank-county / 283+282 pointers / no comma / 154 prefixes /
+>   directions {S-N 190, W-E 172, E-W 5, N-S 2}; all three leg SHAPES ==
+>   `EXPECTED_CURRENT_LEGS` exactly; re-pairing the product-loaded rows under the
+>   ORACLE's assignment objective reproduces every per-field count EXACTLY (+197's
+>   four `_x000d_` cells unescaped) — and the live product's asserted deltas
+>   (-7 = -10 Desc +3 FT Excel; -6 = -9 +3 PDF) equal CMP-AUD-220's own bound
+>   reconciliation arithmetic digit for digit. Zero unexplained residue.
 >
-> **DONE (2026-07-14): CMP-AUD-144 + 145 + 146 shipped** as one normalizer source-claim batch (a single
-> `normalization_version` bump per report). Census done (2026-07-14, both raw statewide
-> PDFs, 3 pages each: legal cover / REPORT PARAMETERS / data page):
-> - **Identity fields (146):** report id `OTM22250` (IS) / `OTM22270` (RS) on all 3 pages;
->   page 2 `REPORT DATE : 09/15/2025`, `REFERENCE DATE : 09/15/2025`,
->   `SUBMITTOR : TRLBUGNI`, `REPORT TITLE : ' … '`, `EVENT ID : 4843738` (IS) /
->   `4843742` (RS — the value sits on the NEXT LINE after `EVENT ID :`), `LOCATION
->   CRITERIA:` → `STATEWIDE`; page-3 header carries the report id, date, `Event ID`, and
->   the generation time (`04:53 PM` IS / `05:10 PM` RS). Multiplicity rule: a field may
->   appear on several pages but must have exactly ONE distinct value; conflicting or
->   missing values refuse. Page-1 policy text = dispositioned legal furniture.
-> - **Printed control claims (144):** J 207 / K 36 / L 107 / M 65 / N 210 / P 2023
->   (sum 2648 == the derived folded S); capture ALL printed rows (block, code, raw label,
->   count) pre-fold; validate derived S == component sum.
-> - **Declared correction (145):** the print's `F-FOUR WAY FLASHER (RED ON ALL)` equals
->   G's text; canonical F = Red on Mainline per `TSNR - Intersection Control and Geometry
->   Type_4.25.24_AT 1.xlsx`. Record {printed, canonical, decision source} as a declared
->   correction; refuse if the print's F or G label drifts from the censused text
->   (re-census on drift).
-> - **Plan:** new `parse_tsn_source_claims(path)` per comparator (separate pdfplumber
->   pass; identity fields + printed rows + declarations); `_project` puts claims into
->   `result.producer_extra["tsn_source_claims"]`; `tsn_library.build_normalized` merges
->   producer extra into its sidecar write; `_load_pair` exposes identity + derived-S +
->   correction notes (fresh parse on the raw path; `read_extra` on the normalized path,
->   absent → explicit no-claims note); bump each report's `normalization_version` so D2
->   rebuilds libraries with claims; update `check_tsn_normalizer` (monkeypatch the claims
->   parser), both comparator checks, and re-verify both oracles (must stay 29/0/2·5·24 and
->   58/8/0·5·53).
->
-> **Do this next: Wave 4, Highway Sequence family** (CMP-AUD-199 + the 045 HSL leg +
-> the four HSL audit reds 155/156/158/159 — omitted provenance, 565 blanked pointer
-> tokens, 46 dropped pre-county equates, one invented comma). Facts staged:
-> - HSL's **vs-TSN comparator already implements** the approved county + complete
->   glued-PM identity (`compare_highway_sequence_tsn` — the finding says so and the
->   KNOWN_RED direct contract exercises `hsl._tsmis_row`); what remains for 045-HSL is
->   the ENV path (`compare_env.HIGHWAY_SEQUENCE`, key_col="PM" — reuse the
->   `physical_key_builder` hook exactly like RD/ID) + promoting the LAST two KNOWN_RED
->   contracts (env swap expects canonical postmile `R001.000E` — padded glue WITH
->   suffix, HSL's own convention; VERIFY against the HSL oracle script's identity rule
->   before trusting it, the way RD's and ID's glued expectations were corrected).
-> - **Method proven twice (RD, ID)**: (1) read the family's oracle script FIRST
->   (`build/phase8_*.py` — its `physical_key` + `_text`/reading rules adjudicate every
->   dispute: RD edge-trims Descriptions, ID does NOT — never assume across families);
->   (2) read the family's canary binding for exact re-bless targets (HSL's is
->   `## Active Stage-8 base comparison oracle — Highway Sequence (HSL-79-current)` in
->   comparison-canary-bindings.md — note HSL's July-9 pair subtleties: 60,494 Excel /
->   60,493 PDF rows, the retained historical fixture is NOT current truth);
->   (3) implement every path in ONE commit (engine rejects mixed typed/legacy keys);
->   (4) correct+promote KNOWN_RED with evidence; (5) fixtures + gate + ruff;
->   (6) re-bless on the real corpus; (7) docs + honest CI watch.
-> - **Re-bless diagnostics that worked**: factor a mismatched count (ID's asserted
->   denominators were exactly ×34 vs ×32 → two missing assertion columns); diff the
->   per-field/per-row sets between legs (RD's +2 Description diffs → the two
->   trailing-tab rows → the oracle's edge-trim reading contract).
-> - **CI discipline**: verify the watched RUN ID belongs to the pushed SHA (a
->   just-pushed commit's run may not be first in `gh run list` yet); never `|| echo`
->   over the exit code; fixture path assertions compare RESOLVED-to-RESOLVED (the
->   runner's 8.3 short temp names).
-> - HL stays BLOCKED on its raw county-retention + collision census; HD-Excel on the
->   vendor county answer. After HSL: 220 (pairing objective), 218 (Spot Check
->   independence), 197 (CRLF shared-reader), then Wave 5.
+> **Do this next: CMP-AUD-220 — the shared duplicate-assignment objective.** This is
+> the Wave-4 finale and it is **compare_core-locked, cross-family work**:
+> - The defect: `pair_occurrences_by_similarity` + `_row_diff_count` minimize
+>   ASSERTED-only cells (ties → the lexicographic vector). The source-proven
+>   objective (the HSL Stage-8 oracle's `_cost`) is
+>   `(all-field diff count, character edit distance, |position gap|)` under the same
+>   typed key — context fields legitimately determine WHICH occurrences correspond
+>   while staying non-asserting in the verdict. On HSL it changes 445/448 Excel and
+>   357/360 PDF duplicate groups vs raw/normalized TSN (bound in the finding, and
+>   re-derived live this batch).
+> - Before ANY change: read
+>   `docs/planning/comparison-perfection/comparison-phase3-decision-gates.md`
+>   (pairing changes are gated) and the CLAUDE.md `compare_core` conventions
+>   (rectangular Hungarian + "lexicographically-smallest smaller-side vector" is the
+>   APPROVED convention — 220's correction must either supersede it through the
+>   decision gate or slot the source objective inside it; get the owner's gate
+>   answer from the docs, not by fiat). The 100,000-cell Hungarian cap and the typed
+>   duplicate trace must survive; cost components must stay deterministic.
+> - Blast radius: EVERY family's canaries (RD-79 / ID-79 exact re-bless numbers
+>   pinned in the ledger + bindings; HL Route-1 969; the golden checks' counted
+>   cells). Expect HSL asserted counts to MOVE to the oracle's (5,589 / 5,001 /
+>   3,721+4) — re-verify with the scratchpad harness pattern from this batch
+>   (`verify_hsl_corpus.py` / `verify_hsl_oracle_objective.py`, rebuildable from
+>   the batch commit message). RD/ID must re-bless EXACTLY unchanged-or-explained
+>   (their duplicate groups: RD 1 real TSMIS group; ID 15 TSN groups — measure
+>   whether the objective changes their assignments before assuming).
+> - Char-distance performance: the oracle's Levenshtein is O(n·m) per candidate
+>   pair with an lru_cache — fine for ≤12-member groups; compare_core's cap
+>   already bounds group sizes. Profile before shipping regardless.
+> - After 220: **CMP-AUD-218** (Spot Check independence — it currently trusts
+>   Comparison's status + row links; an internally-consistent wrong pair still
+>   shows OK), then **CMP-AUD-197** (the `_x000d_` shared-reader fix must be
+>   FAMILY-AWARE: HSL's oracle unescapes to CRLF≡space — the four Cactus City
+>   cells become equal — but RD-79's ACCEPTED oracle keeps its 4 `_x000d_` rows as
+>   honest PDF↔Excel differences; a blanket unescape would break RD's re-bless).
+>   Then Wave 5 (127/130/131/118-120/214 + the unowned-findings triage).
+> - HL stays BLOCKED on its raw county-retention + collision census; HD-Excel on
+>   the vendor county answer. Do NOT infer either.
+> - **CI discipline** (unchanged): verify the watched RUN ID belongs to the pushed
+>   SHA; never `|| echo` over the exit code; fixture paths compare
+>   RESOLVED-to-RESOLVED (8.3 short temp names); PYTHONIOENCODING=utf-8 for ` ≠ `.
 >
 > **DONE — Intersection Detail (2026-07-14): re-blessed against ID-79 EXACTLY** (all
 > three legs incl. asserted cells; District+County asserted; v4 lib; identity gate
@@ -398,6 +401,8 @@ no family-gate owner yet. Wave 5 assigns them.
 ---
 
 ## 11. Progress log (append-only — real progress, not recursion)
+
+- **2026-07-16 — Wave 4: the Highway Sequence family, one commit (CMP-AUD-045-HSL + 155 + 156 + 158 + 159 + 199 + 204 Resolved).** Normalizer v4 (catalog 3→4 + a `TSN Normalization` marker sheet the comparison loader gates on): the 565 printed pointer tokens conserved verbatim with a loud refusal on any foreign distance token; the 46 pre-county `EQUATES TO` annotations conserved with their blank County; wrapped descriptions joined on a single space (no invented comma); and the CMP-AUD-155 claims capture (cover reliability NOTE + identity fields exactly-once per document, per-route printed directions with conflict refusal, cross-member same-pull enforcement) riding `producer_extra` → the library sidecar → per-run Notes. Typed physical identity on every HSL path — canonical (Route, County, complete GLUED postmile "R001.000E"; verified against the Stage-8 oracle's `Row.identity` — HSL is the one family whose canonical keeps the equate suffix), with reserved `"(county not printed)"` / `"(no postmile printed)"` markers for the corpus-proven blank rows; both KNOWN_RED contracts promoted → **the CMP-AUD-045 identity gate is 10 green / 0 known-red**. CMP-AUD-199: PDF-vs-Excel got its own same-source profile (suffix OUT of identity, "PM Suffix" compared, every column asserted, descriptions verbatim) — 60,493/0/1 with PM Suffix 549 + HG 910 exact, the route-152 swap class structurally gone. CMP-AUD-204: TSN descriptions verbatim (154 numeric prefixes preserved); the TSMIS strip is own-route-token-only with 205's padding rule; evidence projection side-aware. Corpus verify: the v4 rebuild reproduced the bound census (69,804 rows; directions S-N 190 / W-E 172 / E-W 5 / N-S 2; one policy text), all three leg SHAPES equal `EXPECTED_CURRENT_LEGS` exactly, and re-pairing the product-loaded rows under the oracle's own assignment objective reproduces every per-field cell count EXACTLY — the live product's asserted deltas (-7 = -10 Desc + 3 FT Excel; -6 = -9 + 3 PDF) equal CMP-AUD-220's bound reconciliation arithmetic digit for digit, and the four `_x000d_` cells are 197's. Zero unexplained residue; next: 220 (shared assignment objective) → 218 → 197. Suite 121/121 + ruff clean.
 
 - **2026-07-14 — Wave 4: the Intersection Detail family re-blessed against ID-79 EXACTLY (CMP-AUD-045-ID).** Every ID path keys on the accepted 4-part PhysicalKey (base route, county, complete PP inside the canonical postmile as PP+Decimal-PM, suffixes conserved as claims); District + County joined the compared header (the oracle's 34 asserted fields — the first re-bless attempt matched every diff count but the asserted denominators, which factored exactly to the two missing columns: 16,199×34=550,766); the v4 library reads its sidecars into the key (pre-v4 refused); the ID KNOWN_RED contracts were corrected from the glued-suffix expectation with oracle evidence and promoted (identity gate 8 green / 2 known-red — HSL only). All three legs equal the oracle exactly incl. asserted cells and exact pairing quality over TSN's 15 real duplicate groups; the 9 PDF↔Excel diffs stay honest (8 database trailing-tabs + the real 108/TUO HG defect). Gate 121/121 + ruff.
 

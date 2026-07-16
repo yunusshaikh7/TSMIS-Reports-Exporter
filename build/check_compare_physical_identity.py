@@ -33,6 +33,7 @@ import comparison_contract as cc  # noqa: E402
 from events import Events  # noqa: E402
 from openpyxl import load_workbook  # noqa: E402
 import compare_env  # noqa: E402
+import compare_highway_sequence_pdf as hslpdf  # noqa: E402
 import compare_highway_sequence_tsn as hsl  # noqa: E402
 import compare_intersection_detail_tsn as idt  # noqa: E402
 import compare_ramp_detail_pdf as rdpdf  # noqa: E402
@@ -278,6 +279,13 @@ def test_canonical_display_is_side_order_independent():
 
 
 def test_highway_sequence_env_county_and_glued_pm():
+    # CMP-AUD-045, GREEN since the Highway Sequence projector batch. The
+    # canonical postmile is the oracle-approved COMPLETE GLUED form
+    # ("R001.000E" — zero padding, realignment prefix, AND equate suffix, per
+    # the Stage-8 HSL comparison oracle's Row.identity) — unlike RD (norm_pm)
+    # and ID (PP + Decimal PM), so never assume the canonical form across
+    # families. County folds into the identity; prefix/PM/suffix stay
+    # conserved raw claims.
     header = [
         "County", "City", "(col C)", "PM", "(col E)", "HG", "FT",
         "Distance To Next Point", "Description",
@@ -471,6 +479,14 @@ def test_id_direct_projector_retains_physical_identity():
 
 
 def test_hsl_direct_projector_retains_physical_identity():
+    """CMP-AUD-045/199, GREEN since the Highway Sequence projector batch: the
+    vs-TSN projector bakes the complete-glued-postmile PhysicalKey (suffix IN
+    the canonical, HSL's own convention), the TSN loader builds the same
+    identity — with the 46 blank-County raw annotations keyed under the
+    explicit "(county not printed)" marker (CMP-AUD-158), never dropped — and
+    the PDF-vs-Excel same-source projector keys WITHOUT the equate suffix
+    (CMP-AUD-199: the two renders seat "E" on different rows of one equate
+    pair, so it is a compared "PM Suffix" cell there, not identity)."""
     hsl_row = hsl._tsmis_row([
         "001", "ORA.", "CITY", "R", "001.000", "E", "D", "H", "0.1", "DESC",
     ])
@@ -481,6 +497,31 @@ def test_hsl_direct_projector_retains_physical_identity():
             ("route", "001"), ("county", "ORA."),
             ("postmile_prefix", "R"), ("postmile", "001.000"),
             ("postmile_suffix", "E")))
+
+    # The same-source (PDF vs Excel) projector: suffix excluded from identity,
+    # exposed as the compared "PM Suffix" column; descriptions verbatim.
+    ss_row = hslpdf._tsmis_row_same_source([
+        "001", "ORA.", "CITY", "R", "001.000", "E", "D", "H", "0.1", "1/DESC",
+    ])
+    _assert_identity(
+        ss_row, key_field=hslpdf.SS_KEY_FIELD,
+        route="001", county="ORA", postmile="R001.000",
+        raw_claims=_claims(
+            ("route", "001"), ("county", "ORA."),
+            ("postmile_prefix", "R"), ("postmile", "001.000"),
+            ("postmile_suffix", "E")))
+    assert ss_row[1 + hslpdf.SS_HEADER.index("PM Suffix")] == "E", ss_row
+    assert ss_row[1 + hslpdf.SS_HEADER.index("Description")] == "1/DESC", ss_row
+    assert hslpdf._SS_SCHEMA.context_fields == ()
+
+    # The TSN loader's explicit unknown-county disclosure (CMP-AUD-158): a raw
+    # annotation printed before county context keys under the reserved marker —
+    # it can never pair with a real county, and it is never dropped.
+    key = hsl._physical_pm_key(
+        "001", None, "R000.000", (("route", "001"), ("county", ""),
+                                  ("postmile", "R000.000")), "probe")
+    components = dict(key.physical_identity.canonical_components)
+    assert components["county"] == "(county not printed)", components
 
 
 TESTS = (
@@ -504,25 +545,22 @@ TESTS = (
      test_intersection_env_county_identity),
     ("Intersection direct/PDF projector retains structured identity",
      test_id_direct_projector_retains_physical_identity),
+    # Promoted by the Highway Sequence projector batch (CMP-AUD-045/158/199):
+    # complete glued-postmile identity on the direct/env/TSN paths, the
+    # blank-county/blank-postmile reserved markers, and the same-source
+    # (PDF vs Excel) suffix-excluded identity with "PM Suffix" compared.
+    ("Highway Sequence env uses county + glued PM",
+     test_highway_sequence_env_county_and_glued_pm),
+    ("HSL direct/same-source projectors retain structured identity",
+     test_hsl_direct_projector_retains_physical_identity),
 )
 
-# CMP-AUD-045 red fixture.  The typed identity CORE is green (the TESTS above), but the
-# report-family projectors were never wired to it: they still hand the engine plain
-# route/PM strings.  These four contracts therefore FAIL today, by design.
-#
-# They are not left hard-red — a permanently red gate is a gate nobody reads.  Instead
-# each one asserts the *known* defect: it must still fail, and fail with exactly the
-# recorded signature.  So this fixture goes red the moment the defect DRIFTS, and goes
-# red again the moment it is FIXED (telling the implementer to promote it into TESTS).
-# Promote these into TESTS as part of the CMP-AUD-045 projector batch.
-KNOWN_RED = (
-    ("Highway Sequence env uses county + glued PM",
-     test_highway_sequence_env_county_and_glued_pm,
-     "environment projector did not supply PhysicalKey"),
-    ("HSL direct projector retains structured identity",
-     test_hsl_direct_projector_retains_physical_identity,
-     "engine-consumed key cell is not PhysicalKey"),
-)
+# CMP-AUD-045 red fixture, now fully promoted: all four report families
+# (RD, ID, HSL ×2 contracts) graduated into TESTS above. The mechanism stays
+# for the next finding that needs a live red fixture: each entry is
+# (label, test, exact-failure-signature) — it must FAIL with that signature
+# until fixed, then be promoted into TESTS.
+KNOWN_RED = ()
 
 
 def main():

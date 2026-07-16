@@ -27,6 +27,18 @@ Reconciled by hand against the per-route TSMIS "Highway Locations" XLSX
     honestly as one-sided rows in the comparison (as they already do for the
     Highway Log — "mostly TSN segment splits and TSMIS realignment markers").
 
+Normalization v4 is SOURCE-EXACT (CMP-AUD-155/156/158/159): the printed
+DISTANCE TO NXT POINT pointer markers ("*P*" / "-------->") are conserved
+verbatim and any other non-numeric token there refuses; the 46 statewide
+annotations printed before their route's first county-bearing row are conserved
+with their BLANK county (never dropped or backfilled — the cover itself warns
+equate ownership may be wrong); wrapped descriptions join on a single space (no
+invented punctuation); and every document's identity claims (cover NOTE policy,
+report id/dates/times exactly-once, per-route printed directions) are captured,
+cross-member-checked, and persisted via producer_extra → the library sidecar.
+The workbook carries a "TSN Normalization" marker sheet the comparison loader
+gates on (the rows sheet kept its shape, so the marker is the version signal).
+
 Unlike word-fusion-prone Highway Log, HSL columns are widely spaced, so
 word-level extraction (with the 2-char flag split) is safe; only the postmile
 token must be classed by its x-window. Columns are calibrated to the OTM22025
@@ -36,6 +48,7 @@ Console-free like the other consolidators: progress via events.on_log, overwrite
 through the confirm_overwrite callback, cancel honored between pages, a
 ConsolidateResult returned. The console UX lives in cli.run_consolidate_cli.
 """
+import hashlib
 import io
 import logging
 import re
@@ -81,6 +94,16 @@ NORMALIZED_SHEET = "Highway Locations (TSN)"
 NORMALIZED_HEADER = ["Route", "County", "PM", "City", "HG", "FT",
                      "Distance To Next Point", "Description"]
 
+# v4 (CMP-AUD-155/156/158/159): the row universe and values are source-exact —
+# printed pointer tokens kept, pre-county equates kept (blank County), wrapped
+# descriptions joined without invented punctuation — and the print's identity/
+# direction/policy claims ride the sidecar. The rows sheet is unchanged in
+# SHAPE, so the loader detects an old workbook via this marker sheet instead
+# (report_catalog's TsnEntry version must match; check_compare_highway_sequence_tsn
+# asserts the pair).
+NORMALIZATION_VERSION = 4
+MARKER_SHEET = "TSN Normalization"
+
 
 # =============================================================================
 # PDF layout — calibrated to OTM22025 "Highway Locations" (verified D01..D12)
@@ -105,9 +128,32 @@ LOCATION_RE = re.compile(r"^[A-Z]?\d{3}\.\d{3}[A-Z]?$")
 COUNTY_RE = re.compile(r"^[A-Z]{2,4}\.?$")
 # A distance-to-next value ("000.056"); TSN prints 3-int-digit zero-padded.
 DIST_RE = re.compile(r"^\d{1,3}\.\d{3}$")
-# Centered group header: "DIST 01 RTE 001 DIR S-N" (route may be suffixed: 005S).
-GROUP_RE = re.compile(r"\bDIST\s+(\d+)\s+RTE\s+(\w+)\s+DIR\b")
+# The print's two non-numeric DISTANCE TO NXT POINT claims (CMP-AUD-156): a
+# point/pointer marker occupying the distance data position. Censused across
+# all 12 districts / 1,540 pages: exactly these two forms (283 "*P*" +
+# 282 "-------->" = 565). Conserved verbatim; any OTHER token in the distance
+# window refuses loudly (layout drift needs a re-census, not a silent blank).
+POINTER_TOKENS = ("*P*", "-------->")
+# Centered group header: "DIST 01 RTE 001 DIR S-N" (route may be suffixed:
+# 005S). The direction is a per-route source claim (CMP-AUD-155) — captured,
+# consistency-checked, and persisted with the sidecar claims.
+GROUP_RE = re.compile(r"\bDIST\s+(\d{1,2})\s+RTE\s+([0-9A-Z]+)\s+DIR\s+([NSEW]-[NSEW])\b")
 GROUP_LIKE_RE = re.compile(r"\bDIST\b.*\bRTE\b.*\bDIR\b", re.IGNORECASE)
+
+# CMP-AUD-155 — the print's identity claims. Every data page carries a header
+# band (the lines above and including the DIST/RTE/DIR line): the report id,
+# report date, title, "Ref Dt", and the generation time; the cover (page 1)
+# carries the report id, "Reference Date:", "District:", and the TSN
+# reliability NOTE. Each field must resolve to exactly ONE distinct value per
+# document; report identity must also agree across the 12 districts.
+REPORT_ID_RE = re.compile(r"\bOTM\d+\b")
+REPORT_TITLE_RE = re.compile(r"\bHighway\s+Locations\b")
+REPORT_DATE_RE = re.compile(r"\b\d{2}-[A-Z]{3}-\d{2}\b")
+REF_DT_RE = re.compile(r"\bRef\s+Dt\s+(\d{2}\s+[A-Z]{3}\s+\d{4})\b")
+GEN_TIME_RE = re.compile(r"\b\d{2}:\d{2}\s+[AP]M\b")
+COVER_REF_DATE_RE = re.compile(r"Reference\s+Date:\s*([0-9A-Z-]+)")
+COVER_DISTRICT_RE = re.compile(r"District:\s*(\d{1,2})\b")
+POLICY_MARKER = "* * * N O T E * * *"
 
 
 def _bucket(x0):
@@ -140,30 +186,102 @@ def _parse_line(ws):
     return cols
 
 
+def _single_claim(pdf_name, name, values):
+    """CMP-AUD-155 multiplicity rule: a printed identity field may appear on
+    many pages but must resolve to exactly ONE distinct value per document;
+    conflicting or missing values refuse (re-census the print before trusting)."""
+    distinct = sorted(set(values))
+    if len(distinct) != 1:
+        seen = distinct if distinct else "no value at all"
+        raise ValueError(
+            f"{pdf_name}: the print's {name} must appear with exactly one "
+            f"distinct value across the document; saw {seen}")
+    return distinct[0]
+
+
+def _parse_cover(page, pdf_name):
+    """Page 1 of every district print is the cover: the report id, the
+    'Reference Date:' line, the 'District:' line, and the TSN reliability NOTE
+    warning that equate/boundary descriptions may be wrong (CMP-AUD-155). Every
+    role is required — a cover missing them is not a TSN Highway Sequence print."""
+    text = page.extract_text() or ""
+    flat = " ".join(text.split())
+    start = flat.find(POLICY_MARKER)
+    if start < 0:
+        raise ValueError(
+            f"{pdf_name}: the cover's TSN reliability NOTE ({POLICY_MARKER!r}) "
+            "is missing — not a TSN Highway Sequence cover page")
+    policy = flat[start:]
+    return {
+        "report_id": _single_claim(
+            pdf_name, "cover report id", REPORT_ID_RE.findall(flat)),
+        "cover_reference_date": _single_claim(
+            pdf_name, "cover Reference Date", COVER_REF_DATE_RE.findall(flat)),
+        "cover_district": _single_claim(
+            pdf_name, "cover District", COVER_DISTRICT_RE.findall(flat)),
+        "policy_text": policy,
+        "policy_sha256": hashlib.sha256(policy.encode("utf-8")).hexdigest(),
+    }
+
+
 def parse_pdf(path, events, pdf_name=""):
-    """Parse one HSL PDF -> ``(internal district, routes)`` in document order."""
+    """Parse one HSL PDF -> ``(internal district, routes, claims)`` in document
+    order. `claims` is the document's CMP-AUD-155 source-claims record: report
+    identity/timing (exactly one distinct value each), the cover's reliability
+    NOTE, and the per-route printed direction."""
     routes = {}
     district_claims = []
+    directions = {}            # route -> printed DIR ("S-N"…); conflict refuses
+    band = {"report id": [], "report title": [], "report date": [],
+            "reference date (Ref Dt)": [], "generation time": []}
     route = None
     county = None              # carried onto equate-annotation rows (no county token)
     last_row = None            # a wrapped description line attaches here
 
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
-        for page_no, page in enumerate(pdf.pages, 1):
+        if not n_pages:
+            raise ValueError(f"{pdf_name}: the PDF has no pages")
+        cover = _parse_cover(pdf.pages[0], pdf_name)
+        district_claims.append(cover["cover_district"])
+        for page_no, page in enumerate(pdf.pages[1:], 2):
             if events.is_cancelled():
-                return None, None
+                return None, None, None
             if page_no % 25 == 0:
                 events.on_log(f"    …page {page_no}/{n_pages}")
             words = page.extract_words(use_text_flow=False, keep_blank_chars=False)
-            for line in _cluster_lines(words):
-                text = " ".join(w["text"] for w in line)
+            lines = _cluster_lines(words)
+            texts = [" ".join(w["text"] for w in ws) for ws in lines]
 
+            # CMP-AUD-155: the page's identity band = every line above and
+            # including the DIST/RTE/DIR group header. Collect the printed
+            # identity fields; each must resolve to ONE distinct value.
+            group_idx = next(
+                (i for i, t in enumerate(texts) if GROUP_RE.search(t)), None)
+            if group_idx is not None:
+                band_text = " ".join(texts[:group_idx + 1])
+                band["report id"] += REPORT_ID_RE.findall(band_text)
+                band["report title"] += REPORT_TITLE_RE.findall(band_text)
+                band["report date"] += REPORT_DATE_RE.findall(band_text)
+                band["reference date (Ref Dt)"] += REF_DT_RE.findall(band_text)
+                band["generation time"] += GEN_TIME_RE.findall(band_text)
+
+            for line, text in zip(lines, texts):
                 gm = GROUP_RE.search(text)
                 if gm:
                     district_claims.append(gm.group(1))
                     route = _norm_route(gm.group(2))
                     routes.setdefault(route, [])
+                    # The printed direction is a per-route source claim
+                    # (CMP-AUD-155); a route printing two directions in one
+                    # document is a source inconsistency, not a choice.
+                    direction = gm.group(3)
+                    prev = directions.get(route)
+                    if prev is not None and prev != direction:
+                        raise ValueError(
+                            f"{pdf_name} p{page_no}: route {route} printed "
+                            f"conflicting directions {prev!r} and {direction!r}")
+                    directions[route] = direction
                     county = None
                     last_row = None
                     continue
@@ -180,12 +298,19 @@ def parse_pdf(path, events, pdf_name=""):
                 # window, NO county token. TSMIS records the same equate as an
                 # "END R REALIGNMENT" row at that postmile, so emit it (county
                 # carried from context) to pair the two rather than orphan it.
+                # CMP-AUD-158: an annotation printed BEFORE the route's first
+                # county-bearing row is conserved WITH ITS BLANK COUNTY — the
+                # source cover itself warns equate descriptions may be wrong, so
+                # its unknown ownership is disclosed, never backfilled or dropped.
                 if "EQUATES" in text and pm and not COUNTY_RE.match(co):
-                    if route is not None and county is not None:
-                        row = dict(county=county, pm=pm, city=None, hg=None,
-                                   ft=None, dist=None, description="EQUATES TO")
-                        routes[route].append(row)
-                        last_row = row
+                    if route is None:
+                        raise ValueError(
+                            f"{pdf_name} p{page_no}: an EQUATES annotation appeared "
+                            "before any owning route header")
+                    row = dict(county=county, pm=pm, city=None, hg=None,
+                               ft=None, dist=None, description="EQUATES TO")
+                    routes[route].append(row)
+                    last_row = row
                     continue
 
                 # Data line: a county code AND a postmile in their windows.
@@ -197,8 +322,18 @@ def parse_pdf(path, events, pdf_name=""):
                     county = co.rstrip(".")
                     flag = "".join(cols.get("flag") or [])
                     desc = " ".join(cols.get("desc") or []).strip() or None
-                    dist = next((t for t in (cols.get("dist") or [])
-                                 if DIST_RE.match(t)), None)
+                    # CMP-AUD-156: the DISTANCE TO NXT POINT position carries
+                    # either a numeric distance or a printed pointer marker
+                    # ("*P*" / "-------->"); both are source claims, conserved
+                    # verbatim. Any other token there is layout drift — refuse.
+                    dists = cols.get("dist") or []
+                    dist = dists[0] if dists else None
+                    if dist is not None and not (
+                            DIST_RE.match(dist) or dist in POINTER_TOKENS):
+                        raise ValueError(
+                            f"{pdf_name} p{page_no}: unrecognized DISTANCE TO NXT "
+                            f"POINT token {dist!r} — the print layout drifted; "
+                            "re-census before trusting this conversion")
                     row = dict(
                         county=county, pm=pm,
                         city=(cols.get("city") or [None])[0],
@@ -211,16 +346,64 @@ def parse_pdf(path, events, pdf_name=""):
 
                 # A wrapped description continuation: text only in the description
                 # window, no county/postmile -> append to the open row.
+                # CMP-AUD-159: fragments join on a single space — the source
+                # prints no punctuation between wrapped lines, so none may be
+                # invented.
                 if (last_row is not None and cols.get("desc")
                         and not cols.get("county") and not cols.get("pm")):
                     extra = " ".join(cols["desc"]).strip()
                     if extra:
                         last_row["description"] = (
                             extra if not last_row["description"]
-                            else last_row["description"] + ", " + extra)
+                            else last_row["description"] + " " + extra)
 
     district = tdc.document_district(district_claims, pdf_name or Path(path).name)
-    return district, routes
+    claims = {
+        "member": pdf_name or Path(path).name,
+        "district": district,
+        "report_id": _single_claim(
+            pdf_name, "report id", [cover["report_id"], *band["report id"]]),
+        "report_title": _single_claim(pdf_name, "report title", band["report title"]),
+        "report_date": _single_claim(pdf_name, "report date", band["report date"]),
+        "reference_date": _single_claim(
+            pdf_name, "reference date (Ref Dt)", band["reference date (Ref Dt)"]),
+        "cover_reference_date": cover["cover_reference_date"],
+        "generation_time": _single_claim(
+            pdf_name, "generation time", band["generation time"]),
+        "pages": n_pages,
+        "policy_sha256": cover["policy_sha256"],
+        "policy_text": cover["policy_text"],
+        "directions": directions,
+    }
+    return district, routes, claims
+
+
+def _cross_member_claims(document_claims):
+    """CMP-AUD-155: the 12 district prints must agree on the report identity —
+    a member from a DIFFERENT TSN pull (another report/reference date) silently
+    poisoning the library is exactly the cross-member inconsistency this
+    refuses. Generation times legitimately differ per district and stay
+    per-document; the reliability policy is conserved per document (distinct
+    texts recorded, never required identical)."""
+    record = {"schema_version": 1}
+    for field in ("report_id", "report_title", "report_date",
+                  "reference_date", "cover_reference_date"):
+        values = sorted({str(d[field]) for d in document_claims})
+        if len(values) != 1:
+            members = {d["member"]: str(d[field]) for d in document_claims}
+            raise ValueError(
+                f"the district prints disagree on the {field.replace('_', ' ')} "
+                f"({members}) — all 12 must come from the same TSN pull")
+        record[field] = values[0]
+    record["documents"] = [
+        {"member": d["member"], "district": d["district"],
+         "generation_time": d["generation_time"], "pages": d["pages"],
+         "policy_sha256": d["policy_sha256"],
+         "directions": dict(sorted(d["directions"].items()))}
+        for d in sorted(document_claims, key=lambda d: d["district"])
+    ]
+    record["policy_texts"] = sorted({d["policy_text"] for d in document_claims})
+    return record
 
 
 # =============================================================================
@@ -267,6 +450,14 @@ def _write_workbook(all_rows, out_path, proceed=None):
             else:
                 cells.append(v)
         ws.append(cells)
+
+    # The v4 shape marker (CMP-AUD-156/158/159): the rows sheet is unchanged in
+    # WIDTH, so a bare pre-v4 workbook is indistinguishable by shape — this
+    # sheet is what the comparison loader gates on (the library path already
+    # auto-rebuilds via report_catalog's normalization_version, D2).
+    marker = wb.create_sheet(MARKER_SHEET)
+    marker.append(["Report", REPORT_NAME])
+    marker.append(["Normalization version", NORMALIZATION_VERSION])
     # F9 temp + os.replace + the P12 TOCTOU gate at the replace.
     return artifact_store.atomic_save_if(wb, out_path, proceed or (lambda: True))
 
@@ -355,13 +546,14 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     by_route = {}
     failed = []
     claimed_districts = {}
+    document_claims = []
     for i, p in enumerate(pdfs, 1):
         if events.is_cancelled():
             return ConsolidateResult(status="cancelled", message="Cancelled by user.")
         prefix = f"[{i}/{len(pdfs)}] {p.name}"
         events.on_log(f"{prefix} parsing…")
         try:
-            district, route_rows = parse_pdf(
+            district, route_rows, doc_claims = parse_pdf(
                 io.BytesIO(source_bytes[p.name]), events, pdf_name=p.name)
         except Exception as e:
             events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
@@ -381,6 +573,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                          "Nothing was published."),
             )
         claimed_districts[district] = p.name
+        document_claims.append(doc_claims)
         n = 0
         for route, rows in route_rows.items():
             by_route.setdefault(route, []).extend(rows)
@@ -407,6 +600,12 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             for district in claimed_districts)
     except ValueError as e:
         return ConsolidateResult(status="error", message=str(e))
+    try:
+        source_claims = _cross_member_claims(document_claims)
+    except ValueError as e:
+        return ConsolidateResult(
+            status="error",
+            message=f"The TSN Highway Sequence source claims are inconsistent: {e}")
     if events.is_cancelled():
         return ConsolidateResult(status="cancelled", message="Cancelled by user.")
     if not source_current():
@@ -454,12 +653,18 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         f"District PDFs:  {len(pdfs)} parsed; exact D01-D12",
         f"Routes:         {len(by_route)}",
         f"Rows:           {len(all_rows)}",
+        f"Print identity: {source_claims['report_id']} "
+        f"{source_claims['report_title']} · report {source_claims['report_date']} "
+        f"· reference {source_claims['reference_date']}",
         f"Output file:    {out}",
     ]
     result = ConsolidateResult(status="ok", output_path=str(out),
                                summary_lines=summary_lines,
                                completion=outcome.COMPLETE, failed_inputs=0)
     result.tsn_raw_manifest = source_manifest
+    # CMP-AUD-155: the print's identity/direction/policy claims ride the
+    # library sidecar (tsn_library.build_normalized merges producer_extra).
+    result.producer_extra = {"tsn_source_claims": source_claims}
     return result
 
 

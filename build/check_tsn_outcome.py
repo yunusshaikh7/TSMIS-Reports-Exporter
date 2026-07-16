@@ -149,7 +149,17 @@ def test_producers():
 
         def _parse_both_ok(path, events, pdf_name=None):
             district = Path(pdf_name).name[1:3]
-            return district, {district: [{"row": 1}]}       # non-empty -> a route landed
+            # non-empty routes -> a route landed; the CMP-AUD-155 claims record
+            # must be per-document valid AND cross-member consistent.
+            return district, {district: [{"row": 1}]}, {
+                "member": Path(pdf_name).name, "district": district,
+                "report_id": "OTM22025", "report_title": "Highway Locations",
+                "report_date": "15-SEP-25", "reference_date": "15 SEP 2025",
+                "cover_reference_date": "15-SEP-25",
+                "generation_time": "01:05 PM", "pages": 2,
+                "policy_sha256": "0" * 64,
+                "policy_text": "* * * N O T E * * * boilerplate",
+                "directions": {district: "S-N"}}
 
         def _parse_one_fails(path, events, pdf_name=None):
             if "D02" in str(pdf_name):
