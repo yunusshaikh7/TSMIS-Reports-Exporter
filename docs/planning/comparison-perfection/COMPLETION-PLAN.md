@@ -98,10 +98,49 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > - **Until the owner appends an approval record to the D3 gate doc, do NOT touch
 >   the pairing objective.** Work continues on the non-gated queue below.
 >
-> **Do this next: CMP-AUD-218 — Spot Check independence** (it currently trusts
-> Comparison's status + source-row links, so an internally-consistent wrong pair
-> still shows six OKs in every leg — the five-leg Summary/Spot semantic oracle
-> binds the wrong-pair and false-one-sided mutations that must start failing).
+> **Do this next: CMP-AUD-218 — Spot Check independence.** Censused 2026-07-16;
+> implement as one fresh-context batch:
+> - **The defect** (`compare_core._write_spot_check`, ~line 2074): Spot Check's
+>   `$C$11` (status) and `$C$12`/`$F$12` (both data-sheet rows) are
+>   `INDEX(Comparison!…, $C$6)` pulls, and EVERY field lookup rides those rows —
+>   so a consistently-relinked wrong pair or a falsely one-sided status/link set
+>   still shows six OKs (mutation-proven across all five legs in the finding).
+> - **The design**: (1) add a hidden injective per-row TOKEN column to the
+>   Comparison sheet (the row's `__CMP_E2_KEY_V1_<ordinal>` helper key as a
+>   LITERAL, appended after the state chunks in BOTH twins —
+>   `_write_comparison` ~1944 formulas branch AND values branch; the data
+>   sheets' hidden `lay.key_col` column already carries the same tokens as
+>   literals in both twins, which is what `_row_link` MATCHes, ~1435).
+>   (2) Spot Check derives `T = INDEX(Comparison!<c_token>, $C$6)`, then the
+>   INDEPENDENT rows `IFERROR(MATCH(T, <side>!$<key_col>:$<key_col>, 0), "")` —
+>   `$C$12`/`$F$12` BECOME those independent cells (keep the addresses: golden
+>   checks pin them; `check_compare_physical_identity` pins Spot `F7`), and
+>   membership derives from `ISNUMBER(MATCH(...))` per side, NOT from
+>   Comparison's status. (3) a new "Row integrity" line EXACT-compares
+>   Comparison's claimed trow/nrow/status against the independent derivation
+>   (OK/CHECK, loud CF); the one-sided callout + `independent_status` ride the
+>   independent membership; the per-field K/L recomputation automatically
+>   becomes truly independent once C12/F12 are.
+> - **Blast radius to check while implementing**: `lay` construction
+>   (~1178-1332) — append `c_token` cleanly after the state chunks (Comparison's
+>   auto_filter/CF ranges end at `last_field_col`, so a hidden trailing column
+>   is outside them, like the state chunks; keep it hidden);
+>   `_write_snapshot_sheet` (~1905) + `_build_snapshot_freshness_expr` (~2665)
+>   bind SOURCE sheets, not Comparison width — verify; Summary SELF-CHECK
+>   COUNT formulas over Comparison columns (grep `SELF-CHECK`); `read_counts`
+>   is label-based (safe); the Spot Check structural pins live in
+>   `check_compare_audit` (~94) and `check_compare_equality_policy`
+>   (~567-693 formula scans + ~762-886 the installed-Excel COM recalc model).
+> - **The gate** (finding's acceptance): structural pins that C12/F12 MATCH the
+>   token into the data sheets and never INDEX Comparison's row links; plus the
+>   two mutation cases — a consistently RELINKED pair and a FALSE one-sided
+>   status/link set — proven to say CHECK via installed-Excel
+>   `CalculateFullRebuild` (the check_compare_equality_policy COM section is
+>   the template, incl. its no-Excel skip behavior for CI).
+> - **Canary discipline**: counts/status/display semantics must stay
+>   byte-identical (Route-1 969; the RD/ID/HSL goldens; values↔formulas twin
+>   parity) — this batch adds a hidden column + rewires Spot Check only.
+>
 > Then **CMP-AUD-197** (the `_x000d_` reader fix must be FAMILY-AWARE: HSL's
 > oracle unescapes to CRLF≡space — the four Cactus City cells become equal — but
 > RD-79's ACCEPTED oracle keeps its 4 `_x000d_` rows as honest PDF↔Excel
