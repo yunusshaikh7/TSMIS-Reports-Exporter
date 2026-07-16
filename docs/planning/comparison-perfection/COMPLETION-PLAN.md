@@ -23,7 +23,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **identity gate 10 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | **Wave 4 finale — CMP-AUD-220** (the shared duplicate-assignment objective; compare_core-locked, all-family re-bless), then 218 (Spot Check independence), 197 (`_x000d_` family-aware reader); HL needs its county census first, HD-Excel vendor-pending |
+| **Next action** | **CMP-AUD-220 is OWNER-GATED** (it supersedes the approved D3 fixed-architecture item 5 — decision memo in the RESUME block; recommendation: approve the assignment/verdict split). Meanwhile: **218** (Spot Check independence), then **197** (`_x000d_` family-aware reader); HL needs its county census first, HD-Excel vendor-pending |
 
 > ### ▶ RESUME HERE (2026-07-16, after the Highway Sequence family batch)
 > **DONE this batch — the whole HSL family in one commit
@@ -61,42 +61,52 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   (-7 = -10 Desc +3 FT Excel; -6 = -9 +3 PDF) equal CMP-AUD-220's own bound
 >   reconciliation arithmetic digit for digit. Zero unexplained residue.
 >
-> **Do this next: CMP-AUD-220 — the shared duplicate-assignment objective.** This is
-> the Wave-4 finale and it is **compare_core-locked, cross-family work**:
-> - The defect: `pair_occurrences_by_similarity` + `_row_diff_count` minimize
->   ASSERTED-only cells (ties → the lexicographic vector). The source-proven
->   objective (the HSL Stage-8 oracle's `_cost`) is
->   `(all-field diff count, character edit distance, |position gap|)` under the same
->   typed key — context fields legitimately determine WHICH occurrences correspond
->   while staying non-asserting in the verdict. On HSL it changes 445/448 Excel and
->   357/360 PDF duplicate groups vs raw/normalized TSN (bound in the finding, and
->   re-derived live this batch).
-> - Before ANY change: read
->   `docs/planning/comparison-perfection/comparison-phase3-decision-gates.md`
->   (pairing changes are gated) and the CLAUDE.md `compare_core` conventions
->   (rectangular Hungarian + "lexicographically-smallest smaller-side vector" is the
->   APPROVED convention — 220's correction must either supersede it through the
->   decision gate or slot the source objective inside it; get the owner's gate
->   answer from the docs, not by fiat). The 100,000-cell Hungarian cap and the typed
->   duplicate trace must survive; cost components must stay deterministic.
-> - Blast radius: EVERY family's canaries (RD-79 / ID-79 exact re-bless numbers
->   pinned in the ledger + bindings; HL Route-1 969; the golden checks' counted
->   cells). Expect HSL asserted counts to MOVE to the oracle's (5,589 / 5,001 /
->   3,721+4) — re-verify with the scratchpad harness pattern from this batch
->   (`verify_hsl_corpus.py` / `verify_hsl_oracle_objective.py`, rebuildable from
->   the batch commit message). RD/ID must re-bless EXACTLY unchanged-or-explained
->   (their duplicate groups: RD 1 real TSMIS group; ID 15 TSN groups — measure
->   whether the objective changes their assignments before assuming).
-> - Char-distance performance: the oracle's Levenshtein is O(n·m) per candidate
->   pair with an lru_cache — fine for ≤12-member groups; compare_core's cap
->   already bounds group sizes. Profile before shipping regardless.
-> - After 220: **CMP-AUD-218** (Spot Check independence — it currently trusts
->   Comparison's status + row links; an internally-consistent wrong pair still
->   shows OK), then **CMP-AUD-197** (the `_x000d_` shared-reader fix must be
->   FAMILY-AWARE: HSL's oracle unescapes to CRLF≡space — the four Cactus City
->   cells become equal — but RD-79's ACCEPTED oracle keeps its 4 `_x000d_` rows as
->   honest PDF↔Excel differences; a blanket unescape would break RD's re-bless).
->   Then Wave 5 (127/130/131/118-120/214 + the unowned-findings triage).
+> **⛔ CMP-AUD-220 is OWNER-GATED — a decision memo (2026-07-16):**
+> The Wave-4 finale (the shared duplicate-assignment objective) turned out to be a
+> business-rule supersession only the owner can approve, so it is PARKED with this
+> memo instead of implemented by fiat:
+> - **The conflict.** `comparison-phase3-decision-gates.md` fixed-architecture
+>   item 5 (owner-approved 2026-07-12): *"Duplicate-pair cost is computed only from
+>   the same asserting compared-cell equality state. Context/non-asserting cells
+>   cannot influence assignment."* CMP-AUD-220 (verified Stage-8, AFTER that
+>   approval) proves that objective changes WHICH physical occurrence pairs with
+>   which relative to source truth in 445/448 Excel and 357/360 PDF HSL duplicate
+>   groups, and its correction requirement mandates the source-proven objective —
+>   the oracle's `(all-field diff count, character edit distance, |position gap|)`
+>   for ASSIGNMENT while the VERDICT stays asserted-only ("pairing identity and
+>   asserting verdict are separate decisions"). Both this batch's live measurement
+>   and the finding's bound arithmetic agree digit-for-digit on the effect
+>   (asserted −7 = −10 Desc +3 FT Excel; −6 = −9 +3 PDF vs the oracle).
+> - **The options.** (A) Keep item 5 → the product's assignments stay a
+>   permanently-attributed distance from source truth (the route-152-style
+>   occurrence swaps stay possible wherever context distinguishes duplicates);
+>   220 gets dispositioned "by approved design", contradicting its correction
+>   requirement and the source-first rule. (B) Approve 220's split: context/source
+>   fields MAY determine assignment (the oracle objective), counts stay
+>   asserted-only — a compare_core-locked change + an all-family re-bless
+>   (RD-79/ID-79 exact numbers, HL Route-1 969, all golden checks; HSL's asserted
+>   counts MOVE to 5,589 / 5,001 / 3,721+4; this batch's scratchpad harnesses
+>   `verify_hsl_corpus.py` / `verify_hsl_oracle_objective.py` are the re-verify
+>   pattern). (C) Something narrower (e.g. per-family opt-in via CompareSchema).
+> - **Recommendation: (B)** — the north star is "properly represent the data",
+>   220's evidence is source-owned and exactly reconciled, and (B) preserves
+>   item 5's real intent (context never inflates COUNTS) while fixing what it
+>   got wrong (identity ≠ verdict). Costs: the Levenshtein cost component must be
+>   profiled under the 100,000-cell cap; the typed trace/tie-break vocabulary
+>   needs a deterministic extension (the oracle's position term already breaks
+>   most ties); every family re-blesses.
+> - **Until the owner appends an approval record to the D3 gate doc, do NOT touch
+>   the pairing objective.** Work continues on the non-gated queue below.
+>
+> **Do this next: CMP-AUD-218 — Spot Check independence** (it currently trusts
+> Comparison's status + source-row links, so an internally-consistent wrong pair
+> still shows six OKs in every leg — the five-leg Summary/Spot semantic oracle
+> binds the wrong-pair and false-one-sided mutations that must start failing).
+> Then **CMP-AUD-197** (the `_x000d_` reader fix must be FAMILY-AWARE: HSL's
+> oracle unescapes to CRLF≡space — the four Cactus City cells become equal — but
+> RD-79's ACCEPTED oracle keeps its 4 `_x000d_` rows as honest PDF↔Excel
+> differences; a blanket shared-reader unescape would break RD's re-bless).
+> Then Wave 5 (127/130/131/118-120/214 + the unowned-findings triage).
 > - HL stays BLOCKED on its raw county-retention + collision census; HD-Excel on
 >   the vendor county answer. Do NOT infer either.
 > - **CI discipline** (unchanged): verify the watched RUN ID belongs to the pushed
