@@ -290,6 +290,37 @@ def require_current_normalization(wb, name, version, detail):
             "the TSN library and pick the fresh normalized workbook.")
 
 
+def require_shared_header_prefix(header, expected_prefix, sidecars, name, report):
+    """CMP-AUD-033: bind a normalized-library sheet to its EXACT shared-header
+    prefix before any row is read. The normalized loaders discard the header and
+    read cells BY POSITION, so a semantically REORDERED or RENAMED header would
+    silently mis-map every column (a reordered workbook loaded PM as a county
+    code). `expected_prefix` is the ordered ['Route'] + SHARED_HEADER the loader
+    reads by position; `sidecars` is the exact set of documented columns that
+    must follow it (order-independent, once each — the normalizer always writes
+    all of them, and only them). Rejects a header whose prefix is missing,
+    renamed, reordered, or duplicated, or whose trailing columns are not exactly
+    the documented sidecars. Case/whitespace on the cell text is tolerated (the
+    header is stripped); the column NAMES and ORDER must match."""
+    hdr = [("" if c is None else str(c).strip()) for c in header]
+    prefix = [str(c).strip() for c in expected_prefix]
+    n = len(prefix)
+    if hdr[:n] != prefix:
+        raise ValueError(
+            f"{name} is not a current normalized TSN {report} library — its "
+            f"column layout does not match the expected order ('{prefix[0]}', "
+            f"'{prefix[1]}', ...), so reading it by position would mis-map every "
+            "field — rebuild the TSN library and pick the fresh normalized "
+            "workbook.")
+    trailing = [c for c in hdr[n:] if c]
+    if sorted(trailing) != sorted(str(c).strip() for c in sidecars):
+        raise ValueError(
+            f"{name} does not carry exactly the documented TSN {report} sidecar "
+            f"columns {sorted(str(c).strip() for c in sidecars)} (found "
+            f"{sorted(trailing)}) — rebuild the TSN library and pick the fresh "
+            "normalized workbook.")
+
+
 def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_msg,
                            header_ok=None, row_transform=list):
     """The consolidated-workbook loader skeleton three vs-TSN comparators wrote

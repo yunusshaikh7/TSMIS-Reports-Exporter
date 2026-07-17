@@ -311,7 +311,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-030 | P2 | Verified | Duplicate route files are silently merged |
 | CMP-AUD-031 | P2 | Verified | Flat report route keys do not normalize `1` and `001` |
 | CMP-AUD-032 | P1 | Verified | Cross-env flat schemas trust the first file, not the report contract |
-| CMP-AUD-033 | P1 | Verified | Normalized TSN loaders ignore their declared headers |
+| CMP-AUD-033 | P1 | Remediated 2026-07-17 — all four normalized loaders bind the exact ["Route"]+SHARED_HEADER prefix + documented sidecars before reading positionally | Normalized TSN loaders ignore their declared headers |
 | CMP-AUD-034 | P1 | Verified | Consolidated TSMIS loaders accept semantically invalid layouts |
 | CMP-AUD-035 | P1 | Partially remediated — type-exactness fixed 2026-07-14; TOCTOU pending | Original raw-admission r7 accepted. Type-exact validation now rejects float/bool aliases of `version`/`member_count`/`byte_length`/`schema_version` in the raw-manifest, normalized-identity, and certificate checks (red→green). Still open: the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
 | CMP-AUD-036 | P1 | Verified | Ramp PDF accepts a truncated four-column workbook |
@@ -1527,6 +1527,10 @@ Correction requirements: bind each normalized sheet to an exact, versioned share
 header prefix; permit only documented sidecar columns after that prefix. Reject
 missing, duplicated, reordered, or renamed shared columns before reading any row.
 Exercise the raw, current-library, legacy-library, and adversarial reordered paths.
+
+**Remediated 2026-07-17.** All four normalized-library loaders (`_load_tsn` in Ramp Detail / Highway Sequence / Intersection Detail / Highway Detail) now call the shared `compare_tsn_common.require_shared_header_prefix(header, ['Route'] + SHARED_HEADER, sidecars, name, report)` BEFORE reading any row. It binds the header to the EXACT ordered `['Route'] + SHARED_HEADER` prefix (rejecting missing, renamed, reordered, or duplicated shared columns — cell whitespace tolerated) and requires the trailing columns to be exactly the documented sidecars (RD: TSN District/County/PM Suffix; ID + HD: TSN District/County; HSL: none), rejecting an undocumented or missing sidecar. This subsumes the ad-hoc pre-county-aware shape checks it replaced in RD/ID and gives HD/HSL (which validated nothing) a real contract. The comparator owns the documented sidecar list (`_NORMALIZED_SIDECARS`), which `check_tsn_normalization_marker` proves equals the loader's `SIDECAR_HEADER` (the same mirror discipline as `NORMALIZATION_VERSION`). Because the loaders read the shared width positionally, the validator runs alongside the CMP-AUD-037 marker gate — a reordered header is refused whether or not it also carries a marker.
+
+Proof: red→green by git-stash — pre-fix all four loaders ACCEPTED a header with its first two shared columns swapped (reading them positionally, one mis-mapped row returned); post-fix all four REFUSE. `check_tsn_normalization_marker` locks the helper unit contract (exact accepts; reordered / renamed / missing-sidecar / undocumented-trailing / duplicated all refuse), the per-loader reorder refusal for all four families, and the sidecar mirror. Each family check's own current-library fixture (with the exact header + sidecars) still loads, and the pre-county-aware fixtures now refuse through this gate. Real-corpus: the rebuilt statewide RD/ID/HD libraries (exact `['Route'] + SHARED_HEADER + sidecars` headers) are still accepted by `_load_tsn`; HSL's consolidator writes `['Route'] + SHARED_HEADER` verbatim. Offline gate 123/123.
 
 ### CMP-AUD-034 — consolidated TSMIS layout gates do not establish semantics
 

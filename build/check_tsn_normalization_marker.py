@@ -34,8 +34,12 @@ from events import ConsolidateResult
 from openpyxl import Workbook, load_workbook
 
 import compare_highway_detail_tsn as hdt
+import compare_highway_sequence_tsn as hsl
 import compare_intersection_detail_tsn as idt
 import compare_ramp_detail_tsn as rd
+import tsn_load_highway_detail as _load_hd
+import tsn_load_intersection_detail as _load_id
+import tsn_load_ramp_detail as _load_rd
 
 _fail = []
 
@@ -156,10 +160,78 @@ def test_build_normalized_stamps():
             wb2.close()
 
 
+def test_shared_header_helper():
+    print("require_shared_header_prefix helper (CMP-AUD-033):")
+    prefix = ["Route", "County", "PM", "Desc"]
+    sidecars = ("TSN District", "TSN County")
+    ok_hdr = prefix + list(sidecars)
+    ctc.require_shared_header_prefix(ok_hdr, prefix, sidecars, "x.xlsx", "R")
+    check("exact prefix + documented sidecars accepts", True)
+    ctc.require_shared_header_prefix(["Route", " County ", "PM", "Desc"] + list(sidecars),
+                                     prefix, sidecars, "x.xlsx", "R")
+    check("whitespace on the header cells is tolerated", True)
+
+    def refused(hdr):
+        try:
+            ctc.require_shared_header_prefix(hdr, prefix, sidecars, "x.xlsx", "R")
+            return False
+        except ValueError as e:
+            return "rebuild" in str(e)
+    check("a reordered prefix refuses",
+          refused(["Route", "PM", "County", "Desc"] + list(sidecars)))
+    check("a renamed prefix column refuses",
+          refused(["Route", "Cnty", "PM", "Desc"] + list(sidecars)))
+    check("a missing sidecar refuses", refused(prefix + ["TSN District"]))
+    check("an undocumented trailing column refuses", refused(ok_hdr + ["Bonus"]))
+    check("a shared column duplicated among the sidecars refuses",
+          refused(ok_hdr + ["PM"]))
+
+
+def _reordered_norm(sheet, shared, sidecars, path):
+    swapped = [shared[1], shared[0]] + list(shared[2:])   # swap the first two shared cols
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws.append(["Route"] + swapped + list(sidecars))
+    ws.append(["001"] + ["x"] * (len(swapped) + len(sidecars)))
+    ctc.write_normalization_marker(wb, 99)                # pass any marker gate; isolate the reorder
+    wb.save(path)
+    wb.close()
+
+
+def test_loaders_bind_header():
+    print("each normalized loader binds its header before reading (CMP-AUD-033):")
+    fams = [("RD", rd, rd.NORMALIZED_SHEET, rd._NORMALIZED_SIDECARS),
+            ("ID", idt, idt.NORMALIZED_SHEET, idt._NORMALIZED_SIDECARS),
+            ("HD", hdt, hdt.NORMALIZED_SHEET, hdt._NORMALIZED_SIDECARS),
+            ("HSL", hsl, hsl.tsn_hsl.NORMALIZED_SHEET, ())]
+    with tempfile.TemporaryDirectory() as d:
+        for tag, mod, sheet, sidecars in fams:
+            p = Path(d) / f"{tag}_reordered.xlsx"
+            _reordered_norm(sheet, list(mod.SHARED_HEADER), sidecars, p)
+            try:
+                mod._load_tsn(str(p))
+                check(f"{tag} _load_tsn refuses a reordered shared header", False)
+            except ValueError as e:
+                check(f"{tag} _load_tsn refuses a reordered shared header",
+                      "column layout does not match" in str(e) and "rebuild" in str(e))
+
+
+def test_sidecar_mirror():
+    print("comparator _NORMALIZED_SIDECARS mirrors the loader SIDECAR_HEADER:")
+    for tag, mod, loader in (("RD", rd, _load_rd), ("ID", idt, _load_id),
+                             ("HD", hdt, _load_hd)):
+        check(f"{tag}: comparator sidecars == loader SIDECAR_HEADER",
+              list(mod._NORMALIZED_SIDECARS) == list(loader.SIDECAR_HEADER))
+
+
 def main():
     test_helper()
     test_mirror_invariant()
     test_build_normalized_stamps()
+    test_shared_header_helper()
+    test_loaders_bind_header()
+    test_sidecar_mirror()
     print()
     if _fail:
         print(f"{len(_fail)} CHECK(S) FAILED:")

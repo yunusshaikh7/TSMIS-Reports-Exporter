@@ -255,7 +255,13 @@ def _load_tsn(path):
                 "an invented join comma) — rebuild the TSN library and pick "
                 "the fresh normalized workbook.")
         it = wb[sn].iter_rows(values_only=True)
-        next(it, None)                         # header
+        header = [("" if c is None else str(c).strip())
+                  for c in (next(it, None) or ())]
+        # CMP-AUD-033: bind the header to the exact ["Route"] + SHARED_HEADER
+        # layout (no sidecars) before reading BY POSITION — the loader trusted
+        # any sheet, so a reordered/renamed header silently mis-mapped columns.
+        ctc.require_shared_header_prefix(
+            header, ["Route"] + SHARED_HEADER, (), name, REPORT_NAME)
         width = len(SHARED_HEADER) + 1         # Route + fields
         pm_idx = 1 + KEY_FIELD
         county_idx = 1 + SHARED_HEADER.index("County")

@@ -282,8 +282,10 @@ def test_two_county_and_v3_refusal():
         rd._load_tsn(stale)
         check("a v3 library refuses with a rebuild hint", False)
     except ValueError as e:
-        check("a v3 library refuses with a rebuild hint",
-              "older normalized" in str(e) and "rebuild" in str(e))
+        # CMP-AUD-033: the exact-header-prefix gate now catches the missing
+        # District column (a pre-county-aware shape) before the marker gate.
+        check("a v3 (District-less) library refuses with a rebuild hint",
+              "column layout does not match" in str(e) and "rebuild" in str(e))
 
     # CMP-AUD-037: a CURRENT-shape library (District + the sidecars) that carries
     # no normalization marker, or a stale one, is refused on the direct path —

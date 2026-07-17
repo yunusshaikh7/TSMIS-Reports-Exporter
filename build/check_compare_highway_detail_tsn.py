@@ -392,12 +392,15 @@ def test_normalized_library_idempotent():
     wb = Workbook()
     ws = wb.active
     ws.title = hdt.NORMALIZED_SHEET
-    ws.append(["Route"] + hdt.SHARED_HEADER)
+    ws.append(["Route"] + hdt.SHARED_HEADER + list(hdt._NORMALIZED_SIDECARS))
 
     def nrow(route, pm, hg="D", **fields):
+        # The normalized shape carries the TSN District/County sidecars after the
+        # shared header (CMP-AUD-033 binds the layout; _normalized_row slices to
+        # the shared width, so the sidecar values are reference-only here).
         d = {"Post Mile": pm, "HG": hg}
         d.update(fields)
-        return [route] + [d.get(f, "") for f in hdt.SHARED_HEADER]
+        return [route] + [d.get(f, "") for f in hdt.SHARED_HEADER] + ["07", "LA"]
 
     # A stale library that stored the RAW TSN forms: NA 'A', unpadded lanes,
     # an unpadded WDA — all must normalize on read.
@@ -422,7 +425,7 @@ def test_normalized_library_idempotent():
     wb2 = Workbook()
     ws2 = wb2.active
     ws2.title = hdt.NORMALIZED_SHEET
-    ws2.append(["Route"] + hdt.SHARED_HEADER)
+    ws2.append(["Route"] + hdt.SHARED_HEADER + list(hdt._NORMALIZED_SIDECARS))
     ws2.append(nrow("001", "000.080", hg="R"))
     wb2.save(nomark)
     wb2.close()

@@ -60,6 +60,11 @@ NORMALIZED_SHEET = "Ramp Detail (TSN)"    # the library's normalized TSN workboo
 # byte-identical, but a bare v4 library carried no marker and the direct path
 # trusted it; the bump forces D2 to rebuild stored libraries so they gain it.
 NORMALIZATION_VERSION = 5
+# CMP-AUD-033: the documented sidecar columns that follow ["Route"] + SHARED_HEADER
+# in the normalized workbook (tsn_load_ramp_detail.SIDECAR_HEADER mirrors this;
+# check_tsn_normalization_marker gates the mirror). _load_tsn binds the header to
+# this exact contract before reading positionally.
+_NORMALIZED_SIDECARS = ("TSN District", "TSN County", "TSN PM Suffix")
 TSN_RAW_HEADER = (
     "RAM_CONNECTION_ID", "RAMP_NANE", "LOCATION", "PR", "PM", "PM_SFX",
     "DATE_OF_RECORD", "HG", "AREA_4", "CITY_CODE", "POP", "ON_OFF",
@@ -307,14 +312,16 @@ def _load_tsn(path):
             it = wb[NORMALIZED_SHEET].iter_rows(values_only=True)
             header = [("" if c is None else str(c).strip())
                       for c in (next(it, None) or ())]
-            if "District" not in header or "TSN PM Suffix" not in header:
-                raise ValueError(
-                    f"{name} is an older normalized TSN Ramp Detail library "
-                    "(before the county-aware physical identity) — rebuild the "
-                    "TSN library and retry.")
-            # CMP-AUD-037: a v4-shaped library (District + PM-Suffix present) but
-            # missing the in-workbook marker predates the direct-path freshness
-            # gate — refuse it. The library path already auto-rebuilds via D2.
+            # CMP-AUD-033: bind the header to the exact ["Route"] + SHARED_HEADER
+            # prefix + documented sidecars before reading BY POSITION, so a
+            # reordered / renamed / pre-county-aware header is refused rather
+            # than silently mis-mapping every column.
+            ctc.require_shared_header_prefix(
+                header, ["Route"] + SHARED_HEADER, _NORMALIZED_SIDECARS,
+                name, REPORT_NAME)
+            # CMP-AUD-037: a correctly-shaped library missing the in-workbook
+            # marker predates the direct-path freshness gate — refuse it. The
+            # library path already auto-rebuilds via D2.
             ctc.require_current_normalization(
                 wb, name, NORMALIZATION_VERSION,
                 "pre-v5: no in-workbook normalization marker")

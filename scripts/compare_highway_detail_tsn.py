@@ -88,6 +88,10 @@ NORMALIZED_SHEET = "Highway Detail (TSN)"
 # the rows are byte-identical, and the bump forces D2 to rebuild stored
 # libraries so they gain the marker.
 NORMALIZATION_VERSION = 3
+# CMP-AUD-033: the documented sidecar columns that follow ["Route"] +
+# SHARED_HEADER in the normalized workbook (tsn_load_highway_detail.SIDECAR_HEADER
+# mirrors this; check_tsn_normalization_marker gates the mirror).
+_NORMALIZED_SIDECARS = ("TSN District", "TSN County")
 
 KEY = "Post Mile"
 # The shared comparison header: the canonical Post Mile key, the derived PS
@@ -358,14 +362,22 @@ def _load_tsn(path):
         raise ValueError(f"Could not open {path.name}: {type(e).__name__}: {e}")
     try:
         if NORMALIZED_SHEET in wb.sheetnames:
+            it = wb[NORMALIZED_SHEET].iter_rows(values_only=True)
+            header = [("" if c is None else str(c).strip())
+                      for c in (next(it, None) or ())]
+            # CMP-AUD-033: bind the header to the exact ["Route"] + SHARED_HEADER
+            # prefix + documented sidecars before reading BY POSITION — HD's
+            # loader trusted any normalized sheet, so a reordered/renamed header
+            # silently mis-mapped every column.
+            ctc.require_shared_header_prefix(
+                header, ["Route"] + SHARED_HEADER, _NORMALIZED_SIDECARS,
+                path.name, REPORT_NAME)
             # CMP-AUD-037: HD's direct loader had no freshness gate — a normalized
             # workbook from any prior normalizer was trusted. Refuse a pre-v3
             # library (no in-workbook marker); the library path auto-rebuilds (D2).
             ctc.require_current_normalization(
                 wb, path.name, NORMALIZATION_VERSION,
                 "pre-v3: no in-workbook normalization marker")
-            it = wb[NORMALIZED_SHEET].iter_rows(values_only=True)
-            next(it, None)
             rows = [_normalized_row(r)
                     for r in it if r and any(c not in (None, "") for c in r)]
             return rows, True

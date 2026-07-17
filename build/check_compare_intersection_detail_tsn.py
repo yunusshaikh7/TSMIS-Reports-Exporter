@@ -519,8 +519,10 @@ def test_normalized_path_crosswalk():
         idt._load_tsn(old_lib)
         check("a pre-v3 (sidecar-less) library refuses with a rebuild hint", False)
     except ValueError as e:
+        # CMP-AUD-033: the exact-header gate now catches the missing sidecars
+        # (a pre-county-aware shape) before the marker gate.
         check("a pre-v3 (sidecar-less) library refuses with a rebuild hint",
-              "older normalized" in str(e) and "rebuild" in str(e))
+              "sidecar" in str(e) and "rebuild" in str(e))
     # CMP-AUD-037: a CURRENT-shape library (the sidecars present) that carries no
     # normalization marker predates the direct-path freshness gate — the shape
     # check can't see it, so the marker version refuses it.

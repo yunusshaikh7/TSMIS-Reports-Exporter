@@ -600,6 +600,18 @@ marker (Highway Sequence v4, Highway Log v5). Pinned in `check_tsn_normalization
 (helper round-trip incl. write-only + the mirror invariant + the real `build_normalized`
 seam) plus each family check's refusal/acceptance flow.
 
+**Exact header binding (CMP-AUD-033, 2026-07-17).** The same four `_load_tsn` loaders
+discard the header and read cells BY POSITION, so a semantically reordered or renamed
+normalized workbook silently mis-mapped every column (a reordered sheet loaded PM as a
+county code). Each now calls `compare_tsn_common.require_shared_header_prefix` first: it
+binds the header to the EXACT ordered `['Route'] + SHARED_HEADER` prefix (rejecting
+missing / renamed / reordered / duplicated shared columns; cell whitespace tolerated) and
+requires the trailing columns to be exactly the documented sidecars (Ramp Detail: TSN
+District/County/PM Suffix; Intersection + Highway Detail: TSN District/County; Highway
+Sequence: none). The comparator owns the sidecar list (`_NORMALIZED_SIDECARS`), gated equal
+to the loader's `SIDECAR_HEADER` by `check_tsn_normalization_marker`. This runs alongside
+the 037 marker gate, so a reordered header is refused with or without a marker.
+
 ### 9c. TSMIS vs TSN Ramp Detail — `compare_ramp_detail_tsn.py` (`"files"`, group `tsn`; remediation pending)
 
 The current **v0.17.0 product comparator** was the recipe later reports followed, but its

@@ -360,10 +360,15 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > cross-env `_resolve_key_field` fell back to column 0 when the configured key
 > column was missing → two key-less workbooks returned a false MATCH; now it
 > raises, the `_schema` call site returns a typed error, all four keyed adapters
-> covered + the end-to-end fail-closed fixture). **Next: 033** (bind the
-> normalized-sheet loaders to an exact versioned shared-header prefix — the
-> direct companion to 037's marker), then **034** (versioned positional-layout
-> contracts for the consolidated TSMIS loaders). **F's 210 is DEFERRED**: it is a multi-part evidence FEATURE (new
+> covered + the end-to-end fail-closed fixture). **033 CLOSED 2026-07-17** (all
+> four normalized `_load_tsn` loaders now bind the exact `['Route']+SHARED_HEADER`
+> prefix + documented sidecars via `compare_tsn_common.require_shared_header_prefix`
+> before reading positionally — pre-fix a reordered header was read column-by-column
+> and mis-mapped; the sidecar list is comparator-owned and mirror-gated; red→green
+> across all four + the real libraries still load). **Next: 034** (versioned
+> positional-layout contracts for the CONSOLIDATED TSMIS loaders — the shared
+> `load_consolidated_rows` requires only a leading `Route`, so a junk-header shifted
+> export is read as the intended schema). **F's 210 is DEFERRED**: it is a multi-part evidence FEATURE (new
 > Excel-cell image evidence + a PDF-vs-Excel Matrix hook + UI camera un-gating +
 > the triangle ledger), not a single-batch correctness fix — it needs its own
 > mini-plan and should not be started as a sprawling incomplete change. After
