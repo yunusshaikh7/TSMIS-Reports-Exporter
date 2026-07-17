@@ -275,17 +275,44 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > — never a complete workbook with a blank Route. NEW
 > `check_pdf_route_universe` (12 pins; 8 pre-fix failures by git-stash).
 >
-> **Do this next: the unowned-findings triage sweep**, plus the ONE
-> remaining census from the HL same-source sweep: the "— MER 059" line
-> (route 059 p5, x0 354.4, top 515.7 — group-header-SHAPED with a dashed
-> district slot, centered mid-gap between an equate row's description and
-> the next data row; the parser's group test refuses it because
-> GROUP_RE[0] wants digits, so it attaches as a Description tail — ONE cell
-> statewide). Classify only with evidence: scan all 252 prints for
-> em-dash-leading lines and inspect each in context BEFORE writing a rule
-> (a wrong classification can move description text — "can lead to
-> discrepancies" territory). HD-Excel county stays vendor-blocked — never
-> infer it.
+> **THE UNOWNED-FINDINGS TRIAGE (2026-07-17) — the sweep's deliverable.**
+> First, 17 stale statuses were reconciled with their own remediation
+> records (`66562c7`): 020/021/023/076/135/146/183/184/185 tables now
+> mirror their Resolved records, 098/115 their partials, and the six
+> HSL-batch findings (155/156/158/159/199/204) are Remediated in both the
+> table and the record Status lines. **112 findings remain open**, bucketed:
+> - **A. RE-VERIFY-FIRST shortlist (likely closed by shipped work — check
+>   each record's exact case, then flip or reopen):** 006 (RD PM identity
+>   vs the 045-RD physical key), 037 (stale-library trust vs the v3/v4/v5
+>   marker + D2 gates, per family), 040 (identical-inputs-as-two-sources vs
+>   the 066 marker's role split — the same-file alias case may remain), 065
+>   (HSL same-source suppressed fields vs 199's all-columns SS_HEADER), 071
+>   (Ramp Summary route universe vs 050's refusals).
+> - **B. PDF-parser robustness (HD/ID):** 051–062 + 044 — a dedicated
+>   parser-hardening wave (spill/orphan/fallback/truncation/vestigial/
+>   cancellation classes).
+> - **C. Loader/validation contracts:** 027/028/029/030/031/032/033/034/
+>   036/063/070 — refusal-first loader wave.
+> - **D. Cross-env validation:** 018/019/022/046.
+> - **E. Matrix/day/GUI lifecycle:** 010/013/016/072/073/074/079/082/083/
+>   084/088/089/091–104 (the largest bucket; mostly P2 state-machine
+>   honesty).
+> - **F. Evidence truth:** 106/107/108/109/110/112 + 208/209/210 (the
+>   Stage-10 evidence-gate arc; 210 is now UNBLOCKED by 067's same-source
+>   schemas — the adapters can ride them).
+> - **G. Source-semantics / vendor data:** 009/038/039/042/043/133/138/
+>   142/144/145/186/192 (several are data facts to conserve/expose rather
+>   than code defects; 192 is a stale vendor payload fact).
+> - **H. Stage-8 instrument hardening (non-product):** 187/206/211/212/
+>   213/215/216/217/219/221–237.
+> - **I. Labels/docs trivia:** 014/015/086 + the P3 tail.
+> Plus the ONE remaining census from the HL same-source sweep: the
+> "— MER 059" line (route 059 p5, x0 354.4 — group-header-SHAPED, dashed
+> district slot; ONE cell statewide; scan all 252 prints for em-dash
+> lines and classify with evidence BEFORE any rule). **Next actionable
+> batch: bucket A's five re-verifies** (each is a bounded record-vs-current-
+> behavior check), then F's 210 (evidence over the same-source schemas).
+> HD-Excel county stays vendor-blocked — never infer it.
 >
 > **DONE 2026-07-17 (after 067): the TSMIS-PDF HL star-description
 > recovery — the TSN-v5 mirror.** The star-guard is POSITIONAL now: a
