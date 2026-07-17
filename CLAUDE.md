@@ -298,9 +298,11 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   malformed metadata, or returned/persisted disagreement is untrusted; missing/stale
   metadata is stale. Comparison schema v3 uses one bounded canonical compressed payload
   shared by small peer envelopes; inline schema v2 remains read-compatible. Publication
-  is parent-serialized across local threads/processes, installs chunks crash-safely
-  without replacement, and succeeds only when the persisted outcome/generation/member
-  exactly equals its own attempt. Peers are validated before the payload is decoded
+  is parent-serialized across local threads/processes, installs chunks
+  process-interruption-safely without replacement (power-loss durability is NOT
+  claimed — readers fail closed on torn state; cleanup unlinks are bound to the
+  verified inode via a Windows handle), and succeeds only when the persisted
+  outcome/generation/member exactly equals its own attempt. Peers are validated before the payload is decoded
   once; over-limit or high-expansion payloads fail closed. No-artifact terminal results
   are not sent through this committed-generation reducer. `cache_envelope.py` versions
   the matrix/by-day caches. Matrix

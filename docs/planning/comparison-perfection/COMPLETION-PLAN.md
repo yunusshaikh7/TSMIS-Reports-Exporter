@@ -194,12 +194,32 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   the pairing objective.~~ The approval was recorded and the batch shipped —
 >   see the DONE record above.
 >
-> **Do this next: Wave 5 remainder** — 127 (payload-chunk lifecycle), 130
-> (stat-then-unlink cleanup), 131 (power-loss durability), 118/119/120 (the
-> validation TSN-library trio), plus the unowned-findings triage (no staged
-> briefs — read each finding first). Then the HL county-retention +
-> collision census (unblocks 045-HL/047/048/157) and the HD statewide
-> re-measure (HD-Excel county stays vendor-blocked; do NOT infer).
+> **Do this next: Wave 5 remainder** — 118/119/120 (the validation
+> TSN-library trio), plus the unowned-findings triage (no staged briefs —
+> read each finding first). Then the HL county-retention + collision census
+> (unblocks 045-HL/047/048/157) and the HD statewide re-measure (HD-Excel
+> county stays vendor-blocked; do NOT infer).
+>
+> **DONE 2026-07-16 (after 214): the CMP-AUD-127/130/131 artifact-lifecycle
+> trio.**
+> - **130**: `_unlink_through_verified_handle` — Windows deletions verify
+>   identity ON the handle (volume serial + file index vs `(st_dev, st_ino,
+>   S_IFMT)`, reparse/directory rejected) and remove via delete-on-close, so
+>   the finding's controlled same-path replacement now survives (red→green
+>   proven; `_safe_unlink_sidecar` + `_unlink_bound_payload_temp` ride it;
+>   POSIX keeps the honestly documented best-effort fallback).
+> - **127**: `_collect_superseded_payload_chunks` — post-publication,
+>   same-lease, reference-aware collection (strict sibling manifest union;
+>   sentinel/malformed/unlistable ⇒ retain ALL; exact reserved names only;
+>   guard + grace window + content-must-match-own-name-digest; removal via
+>   the 130 primitive; exception-isolated so publication success can never
+>   become failure). Gated end-to-end in `check_comparison_sidecars`
+>   (supersession, suspension, near-match/mismatch/grace retention).
+> - **131**: the sanctioned claims-narrowing option — every crash-safety
+>   claim now says process-interruption safety with power loss explicitly
+>   unproven (code docstrings + CLAUDE.md + engine doc), and the fail-closed
+>   read side is named as the conservative sentinel through that boundary.
+> Gate 121/121 + ruff (incl. a new silent-swallow waiver census).
 >
 > **DONE 2026-07-16 (after 197): CMP-AUD-214 — banner and header on distinct
 > rows.** `F_FIRST` 16→17 (banner keeps row 15, header row 16); everything

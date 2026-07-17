@@ -405,11 +405,11 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-124 | P2 | Resolved | Uppercase output basenames could not publish strict comparison metadata |
 | CMP-AUD-125 | P1 | Resolved | Interrupted payload writes can permanently poison deterministic chunk names |
 | CMP-AUD-126 | P1 | Resolved | Payload limits permit multi-gigabyte decode pressure and redundant peer decoding |
-| CMP-AUD-127 | P2 | Verified | Superseded comparison payload chunks have no bounded lifecycle |
+| CMP-AUD-127 | P2 | Remediated: post-publication reference-aware collection under the parent lease (sentinel/malformed-sibling/grace/mismatch all retain; identity-bound handle unlinks) | Superseded comparison payload chunks have no bounded lifecycle |
 | CMP-AUD-128 | P1 | Resolved | Overlapping metadata publishers can both claim success for one persisted generation |
 | CMP-AUD-129 | P2 | Resolved | Payload and sidecar names can exceed packaged Windows path limits |
-| CMP-AUD-130 | P2 | Verified | Stat-then-unlink cleanup can delete a foreign same-path replacement |
-| CMP-AUD-131 | P2 | Verified | Publication is process-interruption safe but not proven power-loss durable |
+| CMP-AUD-130 | P2 | Remediated: Windows deletions go through an identity-verified handle (delete-on-close bound to the checked inode); raced foreign replacements survive, gated in check_comparison_sidecars | Stat-then-unlink cleanup can delete a foreign same-path replacement |
+| CMP-AUD-131 | P2 | Remediated via the sanctioned claims-narrowing option: every crash-safety claim now says process-interruption safety, power loss explicitly unproven, fail-closed reads named as the conservative sentinel | Publication is process-interruption safe but not proven power-loss durable |
 | CMP-AUD-132 | P1 | Resolved | Highway Log intermediates are attempt-scoped and exact-manifest bound |
 | CMP-AUD-133 | P1 | Verified | Normalized Detail libraries discard source-backed identity, print, and Report View facts |
 | CMP-AUD-134 | P1 | Remediated | The first Stage-6 Ramp oracle could certify without final source revalidation and understated printed-field loss |
@@ -4803,6 +4803,25 @@ remain untouched. Cleanup failure should log and retain an orphan without conver
 successfully published generation into false failure. Broad suffix deletion is
 forbidden.
 
+Execution disposition (2026-07-16):
+`consolidation_meta._collect_superseded_payload_chunks` runs immediately after
+a fully validated publication (`exact_records`), under the SAME exclusive
+parent lease, and only then. Live references are the union of
+`comparison_payload` manifests across every sibling `*.outcome.json` read
+STRICTLY — any present publication sentinel, any unreadable/malformed sibling
+record, or an unlistable parent aborts collection entirely (retain all).
+Candidates are exact `_PAYLOAD_BASENAME_RE` names only (near-match `.zlib`
+files are invisible), must be guard-allowed, ordinary/non-reparse, older than
+the 15-minute grace window, and their CONTENT must hash to the digest embedded
+in their own name (a mismatched chunk is retained as evidence); removal goes
+through the CMP-AUD-130 identity-verified handle primitive, never a pathname
+unlink, and any failure logs + retains without ever failing the publication
+(the whole collector is exception-isolated). Gated in
+`check_comparison_sidecars`: supersession across generations reclaims exactly
+the dead chunks; sentinel and malformed-sibling suspension; near-match,
+mismatched-content, and grace-window retention; the live generation stays
+trusted throughout.
+
 ### CMP-AUD-128 — overlapping publishers can both claim one output
 
 Priority: P1  
@@ -4888,6 +4907,25 @@ strongly than it is. Exercise a replacement immediately before delete for fixed
 sentinels and random temps. A different trusted generation or foreign replacement must
 survive without being marked, quarantined, or removed.
 
+Execution disposition (2026-07-16):
+`consolidation_meta._unlink_through_verified_handle` opens the name with
+DELETE+FILE_READ_ATTRIBUTES and full sharing WITHOUT following reparse points,
+verifies the identity ON THE HANDLE (`GetFileInformationByHandle` volume
+serial + 64-bit file index against the caller's `(st_dev, st_ino, S_IFMT)`,
+rejecting directories/reparse points), then marks `FileDispositionInfo`
+delete-on-close — the check and the removal are bound to one file object, so
+a same-path replacement racing in after the caller's stat is observed as a
+mismatch and retained, and one racing in after the disposition survives at
+the name while only the verified inode dies. `_safe_unlink_sidecar` and
+`_unlink_bound_payload_temp` ride it (non-Windows keeps the honestly
+documented best-effort pathname fallback). Red→green: the finding's
+controlled replacement interposed after the helpers' LAST stat deleted the
+foreign file on the legacy path and retains it (reporting False) on the live
+path; permanent gates in `check_comparison_sidecars` exercise the race for
+both helpers plus verified-absence and identity-mismatch retention. A ctypes
+signature defect found during red→green (default `c_int` restype truncating
+`INVALID_HANDLE_VALUE`) was fixed with full restype/argtypes declarations.
+
 ### CMP-AUD-131 — power-loss durability is not established
 
 Priority: P2  
@@ -4907,6 +4945,20 @@ flushes on supported platforms (with explicit failure behavior) or narrow every 
 to process-interruption safety and keep a conservative sentinel through any unproven
 durability boundary. Add subprocess termination at each write/install/final/sentinel
 boundary; power-loss guarantees must not be inferred from in-process monkeypatches.
+
+Execution disposition (2026-07-16): the sanctioned claims-narrowing option.
+Every "crash-safe" claim now states PROCESS-INTERRUPTION safety and explicitly
+disclaims sudden-power-loss durability (module docstring, the
+`_publish_payload_chunk` docstring, CLAUDE.md's transactional-artifacts
+convention, and the engine doc's schema-v3 paragraph), naming why (temp
+contents are flushed/fsynced but directory entries never are, and sidecar
+temps flush userspace buffers only). The conservative sentinel through the
+unproven boundary is the existing fail-closed read side: sentinels dominate
+reads until full validation, strict peer/digest/manifest validation marks any
+torn or inconsistent state untrusted/partial, and no green can be produced
+from a torn publication. The durable-flush + kill-point-gate alternative
+remains available as future work if power-loss certification is ever wanted;
+no such guarantee is claimed anywhere today.
 
 ### CMP-AUD-132 — Highway Log TSN normalization shares a global intermediate directory
 

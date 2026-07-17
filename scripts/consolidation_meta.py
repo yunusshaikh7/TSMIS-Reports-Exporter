@@ -11,7 +11,11 @@ write/read boundary — and reuse recovers it here, so no writer can bypass it.
 
 Robustness:
   * the sidecar is SCHEMA-VERSIONED and written ATOMICALLY (tmp + ``os.replace``) so a
-    crash mid-write can't leave a truncated file as the live sidecar;
+    PROCESS INTERRUPTION mid-write can't leave a truncated file as the live sidecar.
+    Sudden-power-loss durability is NOT claimed (CMP-AUD-131): temp contents are
+    flushed but directory entries are not fsynced, so a power cut may lose or tear a
+    just-installed file — the read side fails closed on anything malformed or
+    inconsistent, which is the conservative sentinel through that unproven boundary;
   * read VALIDATES schema/vocabulary/types and DEGRADES SAFELY — a present-but-unusable
     sidecar reads as ``partial`` (conservative: a current-version artifact whose outcome
     can't be trusted must never render as a green ``complete``), while a workbook with NO
@@ -566,6 +570,88 @@ def _ordinary_directory_identity(path):
             or bool(getattr(st, "st_file_attributes", 0) & reparse)):
         return None
     return _entry_identity(st)
+
+
+def _unlink_through_verified_handle(path, expected_identity):
+    """Delete exactly the verified inode through a Windows handle (CMP-AUD-130).
+
+    Pathname stat-then-unlink has a race: a same-path replacement between the
+    identity check and the ``unlink`` deletes the FOREIGN file. Here the
+    identity is verified on the very handle whose delete-on-close disposition
+    performs the removal, so the check and the deletion are bound to one file
+    object — a replacement present at open time is observed as an identity
+    mismatch and retained untouched, and a replacement racing in AFTER the
+    disposition is set survives at the name while only our inode dies.
+
+    Returns ``"deleted"``, ``"absent"``, ``"retained"`` (mismatch, reparse,
+    directory, or any uncertainty — fail closed, keep the file), or
+    ``"unsupported"`` (non-Windows/ctypes-less: callers keep their documented
+    best-effort pathname semantics).
+    """
+    if os.name != "nt":
+        return "unsupported"
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except Exception:  # silent-ok: no ctypes -> documented best-effort fallback
+        return "unsupported"
+
+    class _ByHandleInfo(ctypes.Structure):
+        _fields_ = [("dwFileAttributes", wintypes.DWORD),
+                    ("ftCreationTime", wintypes.FILETIME),
+                    ("ftLastAccessTime", wintypes.FILETIME),
+                    ("ftLastWriteTime", wintypes.FILETIME),
+                    ("dwVolumeSerialNumber", wintypes.DWORD),
+                    ("nFileSizeHigh", wintypes.DWORD),
+                    ("nFileSizeLow", wintypes.DWORD),
+                    ("nNumberOfLinks", wintypes.DWORD),
+                    ("nFileIndexHigh", wintypes.DWORD),
+                    ("nFileIndexLow", wintypes.DWORD)]
+
+    class _DispositionInfo(ctypes.Structure):
+        _fields_ = [("DeleteFile", wintypes.BOOLEAN)]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    kernel32.CreateFileW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    kernel32.GetFileInformationByHandle.restype = wintypes.BOOL
+    kernel32.GetFileInformationByHandle.argtypes = [
+        wintypes.HANDLE, ctypes.POINTER(_ByHandleInfo)]
+    kernel32.SetFileInformationByHandle.restype = wintypes.BOOL
+    kernel32.SetFileInformationByHandle.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    DELETE, FILE_READ_ATTRIBUTES = 0x00010000, 0x0080
+    SHARE_ALL, OPEN_EXISTING = 0x7, 3
+    FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+    NOT_ORDINARY = 0x400 | 0x10          # reparse point / directory
+    handle = kernel32.CreateFileW(
+        ctypes.c_wchar_p(os.fspath(path)), DELETE | FILE_READ_ATTRIBUTES,
+        SHARE_ALL, None, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, None)
+    if handle is None or handle == wintypes.HANDLE(-1).value:
+        # ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND == verified absence.
+        return ("absent" if ctypes.get_last_error() in (2, 3) else "retained")
+    try:
+        info = _ByHandleInfo()
+        if not kernel32.GetFileInformationByHandle(handle, ctypes.byref(info)):
+            return "retained"
+        identity = (info.dwVolumeSerialNumber,
+                    (info.nFileIndexHigh << 32) | info.nFileIndexLow,
+                    stat.S_IFREG)
+        if (info.dwFileAttributes & NOT_ORDINARY
+                or identity != tuple(expected_identity)):
+            return "retained"
+        disposition = _DispositionInfo(True)
+        if not kernel32.SetFileInformationByHandle(
+                handle, 4,                       # FileDispositionInfo
+                ctypes.byref(disposition), ctypes.sizeof(disposition)):
+            return "retained"
+        return "deleted"
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 def _publication_lock_key(parent):
@@ -1293,11 +1379,20 @@ def _install_payload_temp_no_replace(source, destination):
 
 
 def _unlink_bound_payload_temp(path, expected_identity, commit_guard=None):
-    """Best-effort cleanup that can remove only the temp inode we created."""
+    """Best-effort cleanup bound to the temp inode we created (CMP-AUD-130).
+
+    On Windows the removal happens through an identity-verified handle, so a
+    same-path replacement racing in after the stat below is retained
+    untouched. Elsewhere this remains pathname stat-then-unlink — best effort
+    ONLY (the check and the unlink are not atomic there), acceptable for an
+    unpredictable, non-authoritative temp name.
+    """
     current = _ordinary_file_stat(path)
     if (current is None or _entry_identity(current) != expected_identity
             or not guard_allows(commit_guard, Path(path).parent)
             or not guard_allows(commit_guard, path)):
+        return
+    if _unlink_through_verified_handle(path, expected_identity) != "unsupported":
         return
     try:
         Path(path).unlink()
@@ -1306,13 +1401,18 @@ def _unlink_bound_payload_temp(path, expected_identity, commit_guard=None):
 
 
 def _publish_payload_chunk(path, raw, descriptor, commit_guard=None):
-    """Crash-safely install a content-addressed chunk or reuse exact bytes.
+    """Install a content-addressed chunk process-interruption-safely, or
+    reuse exact bytes.
 
     The deterministic final name is never opened for writing.  Bytes are fully
     written, fsynced, and identity-validated at an unpredictable sibling temp,
     then installed atomically without replacement.  A kill before install can
     leave only a non-authoritative temp; a kill after install leaves complete
     bytes.  A raced destination is reusable only when it is byte-identical.
+    Sudden POWER LOSS is not covered (CMP-AUD-131): the parent directory entry
+    is never fsynced, so the installed name may not survive a power cut —
+    readers fail closed on missing or hash-mismatched chunks, which keeps the
+    unproven durability boundary conservative rather than certified.
     """
     path = Path(path)
     if (type(raw) is not bytes
@@ -1620,6 +1720,15 @@ def _sentinel_path(workbook):
 
 
 def _safe_unlink_sidecar(path, commit_guard=None):
+    """Remove one sidecar bound to the inode observed here (CMP-AUD-130).
+
+    On Windows the removal happens through an identity-verified handle: the
+    identity check and the deletion apply to one file object, so a same-path
+    replacement racing in after ``before`` was captured is retained untouched
+    and reported as ``False`` (uncertain — fail closed). Elsewhere the legacy
+    pathname unlink remains, honestly best-effort between its own stat and
+    unlink.
+    """
     path = Path(path)
     before = _ordinary_file_stat(path)
     if before is None:
@@ -1635,6 +1744,19 @@ def _safe_unlink_sidecar(path, commit_guard=None):
     current = _ordinary_file_stat(path)
     if current is None or _entry_identity(current) != _entry_identity(before):
         return False
+    disposition = _unlink_through_verified_handle(path, _entry_identity(before))
+    if disposition == "absent":
+        return True
+    if disposition == "retained":
+        return False
+    if disposition == "deleted":
+        try:
+            path.lstat()
+        except (FileNotFoundError, NotADirectoryError):  # silent-ok: verified absence is success
+            return True
+        except OSError:  # silent-ok: unverifiable post-unlink state fails closed
+            return False
+        return False                      # a foreign object reappeared: uncertain
     try:
         path.unlink()
     except FileNotFoundError:  # silent-ok: concurrent absence satisfies unlink
@@ -1648,6 +1770,111 @@ def _safe_unlink_sidecar(path, commit_guard=None):
     except OSError:  # silent-ok: unverifiable post-unlink state fails closed
         return False
     return False
+
+
+_PAYLOAD_COLLECT_GRACE_SECONDS = 15 * 60
+_PAYLOAD_CHUNK_SHA_RE = re.compile(
+    r"^\.cmpv3-[0-9a-f]{64}-[0-9]{6}-([0-9a-f]{64})")
+
+
+def _live_payload_chunk_references(parent):
+    """Union of chunk names referenced by every sibling metadata record.
+
+    ``None`` aborts collection conservatively: a present publication sentinel
+    means a protected or mid-flight state exists, and an unreadable or
+    malformed sibling record means the live-reference set is unknowable — in
+    either case everything is retained (CMP-AUD-127).
+    """
+    try:
+        entries = list(os.scandir(parent))
+    except OSError:  # silent-ok: unlistable parent makes references unknowable -> retain all
+        return None
+    if any(entry.name.endswith(_COMPARISON_META_SUFFIX
+                                + _COMPARISON_SENTINEL_SUFFIX)
+           for entry in entries):
+        return None
+    live = set()
+    for entry in entries:
+        if not entry.name.endswith(_COMPARISON_META_SUFFIX):
+            continue
+        try:
+            record = _read_strict_json(Path(entry.path))
+        except (ValueError, OSError):  # silent-ok: unreadable sibling record -> retain all
+            return None
+        if record is _ABSENT or not isinstance(record, Mapping):
+            continue
+        manifest = record.get("comparison_payload")
+        if manifest is None:
+            continue          # inline v2 / untrusted markers reference nothing
+        try:
+            manifest = _strict_payload_manifest(manifest)
+        except (TypeError, ValueError):  # silent-ok: malformed manifest -> retain all
+            return None
+        live.update(chunk["relative_path"] for chunk in manifest["chunks"])
+    return live
+
+
+def _collect_superseded_payload_chunks(parent, lease, commit_guard=None):
+    """Reclaim provably superseded schema-v3 payload chunks (CMP-AUD-127).
+
+    Runs only immediately after a fully validated publication, under the same
+    exclusive parent lease. Conservative by construction: any publication
+    sentinel, unreadable sibling record, guard denial, young mtime (the grace
+    window), non-ordinary file, content that does not match the digest
+    embedded in the chunk's OWN name, or handle-verification failure retains
+    the candidate — a retained orphan is logged, never an error, and a
+    collection problem can never turn a successful publication into failure.
+    Only exact reserved-namespace basenames are candidates (near-match
+    ``.zlib`` files are invisible here), and every removal goes through the
+    identity-verified handle primitive, never a broad pathname unlink.
+    """
+    parent = Path(parent)
+    try:
+        if (not _publication_lease_current(lease, commit_guard)
+                or not guard_allows(commit_guard, parent)):
+            return
+        live = _live_payload_chunk_references(parent)
+        if live is None:
+            return
+        now = time.time()
+        collected = retained = 0
+        for entry in os.scandir(parent):
+            name = entry.name
+            if not _PAYLOAD_BASENAME_RE.match(name) or name in live:
+                continue
+            path = parent / name
+            candidate_stat = _ordinary_file_stat(path)
+            if (not guard_allows(commit_guard, path)
+                    or candidate_stat is None
+                    or now - candidate_stat.st_mtime
+                        < _PAYLOAD_COLLECT_GRACE_SECONDS):
+                retained += 1
+                continue
+            digest = _PAYLOAD_CHUNK_SHA_RE.match(name)
+            try:
+                raw = _read_bound_bytes(
+                    path, _MAX_COMPARISON_PAYLOAD_CHUNK_BYTES,
+                    "superseded comparison payload chunk")
+            except ValueError:  # silent-ok: an over-limit candidate is retained evidence
+                retained += 1
+                continue
+            if (raw is _ABSENT or digest is None
+                    or hashlib.sha256(raw).hexdigest() != digest.group(1)):
+                retained += 1     # mismatched chunk: retained as evidence
+                continue
+            if (not _publication_lease_current(lease, commit_guard)
+                    or _unlink_through_verified_handle(
+                        path, _entry_identity(candidate_stat)) != "deleted"):
+                retained += 1
+                continue
+            collected += 1
+        if collected or retained:
+            log.info("comparison payload collection under %s: %d superseded "
+                     "chunk(s) reclaimed, %d candidate(s) retained",
+                     parent, collected, retained)
+    except Exception as e:  # silent-ok: collection may never fail a publication
+        log.warning("comparison payload collection skipped: %s: %s",
+                    type(e).__name__, e)
 
 
 def _protect_comparison_members(prepared, commit_guard=None):
@@ -1857,6 +2084,11 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
                 trusted_winner = record.artifact_generation.generation_id
             break
     if exact_records:
+        # The publication is fully validated; reclaim provably superseded
+        # payload chunks under this same lease (CMP-AUD-127). Collection is
+        # conservative and can never turn this success into failure.
+        _collect_superseded_payload_chunks(
+            prepared["payload_parent"], lease, commit_guard)
         return True
     if trusted_winner is not None:
         # A different fully trusted generation won. Never poison, overwrite, or

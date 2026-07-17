@@ -1148,6 +1148,142 @@ with cm._comparison_publication_lease(parent):
               not quarantine.exists() and quarantined.is_file()
               and quarantined.read_bytes() == quarantine_bytes)
 
+        # ---- CMP-AUD-130: deletions are bound to the verified inode --------
+        # A controlled same-path replacement lands AFTER the helper's last
+        # stat (the exact race the finding proved): the foreign file must
+        # survive untouched and the cleanup must report uncertainty, because
+        # the Windows deletion re-verifies identity on the very handle whose
+        # delete-on-close disposition performs the removal.
+        race = root / "race-target.meta.json"
+        race.write_bytes(b"OLD-INODE")
+        foreign_src = root / "race-foreign.meta.json"
+        original_stat_fn = cm._ordinary_file_stat
+
+        def swap_after_call(target, n_calls):
+            state = {"n": 0}
+
+            def patched(path):
+                st = original_stat_fn(path)
+                if Path(path) == target and st is not None:
+                    state["n"] += 1
+                    if state["n"] == n_calls:
+                        foreign_src.write_bytes(b"FOREIGN-REPLACEMENT")
+                        os.replace(foreign_src, target)
+                return st
+            return patched
+
+        cm._ordinary_file_stat = swap_after_call(race, 2)   # after before+current
+        try:
+            race_claim = cm._safe_unlink_sidecar(race)
+        finally:
+            cm._ordinary_file_stat = original_stat_fn
+        check("CMP-AUD-130: a foreign same-path replacement survives sidecar cleanup",
+              race.is_file() and race.read_bytes() == b"FOREIGN-REPLACEMENT")
+        check("...and the raced sidecar cleanup reports False, not success",
+              race_claim is False)
+
+        temp_race = root / ".cmpv3-payload.tmp-raceprobe"
+        temp_race.write_bytes(b"OLD-TEMP")
+        temp_identity = cm._entry_identity(original_stat_fn(temp_race))
+        cm._ordinary_file_stat = swap_after_call(temp_race, 1)  # its single stat
+        try:
+            cm._unlink_bound_payload_temp(temp_race, temp_identity)
+        finally:
+            cm._ordinary_file_stat = original_stat_fn
+        check("CMP-AUD-130: a foreign replacement survives payload-temp cleanup",
+              temp_race.is_file()
+              and temp_race.read_bytes() == b"FOREIGN-REPLACEMENT")
+
+        legit = root / "legit-unlink.meta.json"
+        legit.write_bytes(b"LEGIT")
+        check("CMP-AUD-130: the verified inode itself still deletes cleanly",
+              cm._safe_unlink_sidecar(legit) is True and not legit.exists())
+
+        # ---- CMP-AUD-127: superseded chunks are collected, conservatively --
+        gcroot = root / "gc127"
+        gcroot.mkdir()
+        gc_book = gcroot / "collect-me.xlsx"
+        gc_book.write_bytes(b"PK-collect-127")
+
+        def reserved_chunks():
+            return {entry.name for entry in os.scandir(gcroot)
+                    if cm._PAYLOAD_BASENAME_RE.match(entry.name)}
+
+        check("127: generation A publishes",
+              cm.write_comparison_outcomes(
+                  _result((("values", gc_book),), "values", "g-127-a")))
+        chunks_a = reserved_chunks()
+        check("127: generation A produced payload chunks", bool(chunks_a))
+
+        near_match = gcroot / "near-match.comparison-payload.zlib"
+        near_match.write_bytes(b"NOT-A-RESERVED-NAME")
+        mismatched = gcroot / cm._payload_primary_basename(
+            "ab" * 32, 0, "cd" * 32)
+        mismatched.write_bytes(b"WRONG-CONTENT")
+        orphan_bytes = b"orphaned-but-content-valid"
+        orphan = gcroot / cm._payload_primary_basename(
+            "11" * 32, 0, hashlib.sha256(orphan_bytes).hexdigest())
+        orphan.write_bytes(orphan_bytes)
+        stale = time.time() - 86_400
+        for planted in (mismatched, orphan):
+            os.utime(planted, (stale, stale))
+
+        foreign_sentinel = cm._sentinel_path(gcroot / "other.xlsx")
+        foreign_sentinel.write_text("{}", encoding="utf-8")
+        original_grace = cm._PAYLOAD_COLLECT_GRACE_SECONDS
+        cm._PAYLOAD_COLLECT_GRACE_SECONDS = 0.0
+        try:
+            check("127: generation B publishes while a sentinel exists",
+                  cm.write_comparison_outcomes(
+                      _result((("values", gc_book),), "values", "g-127-b",
+                          completion="partial")))
+            check("127: a publication sentinel suspends ALL collection",
+                  chunks_a <= reserved_chunks() and orphan.is_file())
+            foreign_sentinel.unlink()
+            malformed = gcroot / "bad.xlsx.outcome.json"
+            malformed.write_bytes(b"{not json")
+            check("127: generation C publishes beside a malformed record",
+                  cm.write_comparison_outcomes(
+                      _result((("values", gc_book),), "values", "g-127-c",
+                          completion="partial")))
+            check("127: an unreadable sibling record suspends ALL collection",
+                  chunks_a <= reserved_chunks() and orphan.is_file())
+            malformed.unlink()
+            check("127: generation D publishes cleanly",
+                  cm.write_comparison_outcomes(
+                      _result((("values", gc_book),), "values", "g-127-d",
+                          completion="partial")))
+            after = reserved_chunks()
+            check("127: superseded generations' chunks were reclaimed",
+                  not (chunks_a & after) and after)
+            check("127: the content-valid stale orphan was reclaimed too",
+                  not orphan.exists())
+            check("127: D's live chunks stay trusted and readable",
+                  cm.read_comparison_outcome(gc_book).trusted)
+            check("127: a near-match .zlib file is untouched",
+                  near_match.read_bytes() == b"NOT-A-RESERVED-NAME")
+            check("127: an unreferenced MISMATCHED reserved-name chunk is "
+                  "retained as evidence",
+                  mismatched.read_bytes() == b"WRONG-CONTENT")
+        finally:
+            cm._PAYLOAD_COLLECT_GRACE_SECONDS = original_grace
+        chunks_d = reserved_chunks()
+        check("127: generation E publishes under the real grace window",
+              cm.write_comparison_outcomes(
+                  _result((("values", gc_book),), "values", "g-127-e")))
+        check("127: the grace window retains freshly superseded chunks",
+              chunks_d <= reserved_chunks())
+        if os.name == "nt":
+            check("CMP-AUD-130: the handle primitive reports verified absence",
+                  cm._unlink_through_verified_handle(
+                      root / "never-existed.meta.json", (0, 0, 0)) == "absent")
+            wrong = root / "wrong-identity.meta.json"
+            wrong.write_bytes(b"KEEP-ME")
+            check("CMP-AUD-130: an identity mismatch is retained untouched",
+                  cm._unlink_through_verified_handle(
+                      wrong, (1, 2, 3)) == "retained"
+                  and wrong.read_bytes() == b"KEEP-ME")
+
         print()
         if _failures:
             print(f"FAILED: {len(_failures)} check(s): {_failures}")

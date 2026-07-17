@@ -245,8 +245,11 @@ generation. `consolidation_meta.write_comparison_outcomes` first protects every 
 conservative sentinel. Schema v3 stores one canonical compressed `ComparisonOutcome` in shared,
 content-addressed sibling chunks and keeps a small identical manifest in each peer envelope;
 strict inline schema-v2 records remain read-compatible. The writer holds a permanent parent-scoped
-thread/process lease through sentinel creation, crash-safe no-replace chunk installation, every
-final, sentinel cleanup, and an exact-own-generation postcheck. Conflicting chunk names use one of
+thread/process lease through sentinel creation, process-interruption-safe no-replace chunk
+installation (power-loss durability is not claimed — directory entries are never fsynced and
+readers fail closed on torn state, CMP-AUD-131), every
+final, sentinel cleanup (identity-bound: Windows deletions go through a verified handle so a
+same-path foreign replacement survives, CMP-AUD-130), and an exact-own-generation postcheck. Conflicting chunk names use one of
 eight deterministic exact-byte fallback slots and are never replaced. Readers validate every
 envelope, peer, sentinel, workbook digest, manifest, and generation binding before decoding the
 shared payload once. The decoded limit is 64 MiB in at most sixteen 4 MiB chunks with a 32:1
