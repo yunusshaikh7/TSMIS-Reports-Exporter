@@ -1106,6 +1106,18 @@ the Stage-8 family acceptance above (direct-source runner, permanent mutations,
 evidence coverage, detached acceptance, and the two byte-identical replays remain
 owner-gated).
 
+**CMP-AUD-218 workbook-shape note (2026-07-16, later).** The comparison
+workbook's Comparison sheet gained one hidden trailing literal column
+(`__CMP_E2_KEY_V1_TOKEN`, both twins) and Spot Check gained the independent
+key-token row match + Row-integrity line. NO count, status, or display
+semantics moved: the same ssor-prod 7.9 HSL PDF-vs-Excel build returns the
+bound 1,410 / 3,721 exactly, its token column is complete + injective over the
+full 60,494-row union in both twins, the clean installed-Excel rebuild reads
+all-OK (Row integrity OK, Summary SELF-CHECK OK), and a planted
+consistently-relinked pair flips Row integrity to CHECK at statewide scale.
+Pre-218 workbook BYTES are not comparable (one extra hidden column); every
+bound COUNT canary in this file is unchanged.
+
 ## Remaining canary queue
 
 | Canary | Flavor / acceptance fact | Corpus source | State / blocker |

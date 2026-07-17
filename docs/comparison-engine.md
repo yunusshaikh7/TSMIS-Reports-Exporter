@@ -175,7 +175,13 @@ text.
 - **Spot Check** — one row under a microscope: type a Comparison row number (or find by key), the
   sheet lays it out field-by-field with the RAW values from both data sheets next to an
   INDEPENDENTLY recomputed verdict (same TRIM / Med-Wid rules, computed straight from the data
-  sheets, NEVER reading the Comparison's answer) and an `Agree?` OK/CHECK column. Opens pre-set to
+  sheets, NEVER reading the Comparison's answer) and an `Agree?` OK/CHECK column. **The two source
+  rows themselves are derived independently too (CMP-AUD-218):** the row's hidden literal key
+  token (Comparison's trailing `__CMP_E2_KEY_V1_TOKEN` column, written in both flavors) is
+  MATCHed into each side's literal `Key (helper)` column — Comparison's stored row links are
+  never consumed for row matching — and the **Row integrity** line (row 14, loud CF)
+  EXACT-compares Comparison's claimed rows/status against that derivation, so a consistently
+  relinked pair or a falsely one-sided status says CHECK. Opens pre-set to
   `first_diff_row` (the first matched row with differences). Stays LIVE in both flavors.
 - **Comparison** — one row per `(route,) key + occurrence` in document order. Matched cells show
   the matched value; differing cells show `a ≠ b` in red. Hidden, versioned state-mask columns

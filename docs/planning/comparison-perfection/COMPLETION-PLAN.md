@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-16, after the CMP-AUD-220 assignment/verdict split)
+> ### ▶ RESUME HERE (2026-07-16, after CMP-AUD-218 Spot Check independence)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -34,7 +34,37 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
-> **DONE 2026-07-16 (latest): CMP-AUD-220 + the 197 HSL half — the
+> **DONE 2026-07-16 (latest): CMP-AUD-218 — Spot Check row matching is
+> INDEPENDENT.** The Comparison sheet now carries a hidden trailing
+> `__CMP_E2_KEY_V1_TOKEN` column — each row's opaque helper key as a LITERAL
+> in both twins (injective, guarded, outside the visible filter/CF geometry;
+> `_Layout.c_token`; the Excel-limit guard counts it). Spot Check pulls the
+> selected row's token (`M12 = INDEX(Comparison!<token col>, $C$6)`), MATCHes
+> it into each side's literal "Key (helper)" column (`K12`/`L12`), and
+> `$C$12`/`$F$12` — the cells every field lookup and the K/L independent
+> recomputation ride — display those INDEPENDENT rows; the one-sided callout
+> rides the independent membership; the new Row-integrity line (row 14, loud
+> CF) EXACT-compares Comparison's claimed trow/nrow/status against the
+> derivation, and is the ONLY claimed-link consumer on the sheet. F_FIRST=16
+> and every pinned Spot geometry unchanged; counts/status/display semantics
+> byte-identical. Red→green under installed Excel: pre-fix BOTH finding
+> forgeries (consistently relinked pair; falsely one-sided status/link set)
+> showed all-OK; post-fix both say CHECK (per-field AND Row integrity) while
+> the untouched workbook stays all-OK. Permanent gates:
+> `check_compare_audit.test_p5_spot_row_matching_independent` (structural,
+> both twins) + `check_compare_equality_policy --excel` (plants both
+> forgeries → CHECK via `CalculateFullRebuild`; CI stays hermetic); the
+> keyfield/equality-policy width pins updated to the new physical last
+> column. Real corpus (ssor-prod 7.9 HSL PDF-vs-Excel, 60,493×60,494):
+> counts canary-exact 1,410/3,721; token column complete + injective in both
+> twins; clean COM rebuild all-OK; the planted relink says CHECK at scale;
+> Summary SELF-CHECK all OK. Gate 121/121 + ruff. The frozen
+> `check_phase8_highway_sequence_summary_spot.py` witness models the PRE-fix
+> behavior — a post-fix Spot audit needs a NEW instrument version.
+> CMP-AUD-214 (the Spot banner-overwrite display defect) stays open for
+> Wave 5.
+>
+> **DONE 2026-07-16 (earlier): CMP-AUD-220 + the 197 HSL half — the
 > assignment/verdict split is live engine-wide and the product is
 > ORACLE-EXACT on every Highway Sequence leg.**
 > - `pair_occurrences_by_similarity` now assigns every within-cap duplicate
@@ -164,8 +194,38 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   the pairing objective.~~ The approval was recorded and the batch shipped —
 >   see the DONE record above.
 >
-> **Do this next: CMP-AUD-218 — Spot Check independence.** Censused 2026-07-16;
-> implement as one fresh-context batch:
+> **Do this next: CMP-AUD-197 — the RD vs-TSN remainder. Census DONE
+> 2026-07-16 (read-only; facts below) — next session implements or rules.**
+> - **The four cells' TSN partners carry the DECODED form.** ssor-prod 7.9 RD
+>   Excel consolidated rows 3483–3486 (route 010, 08-RIV-010, PMs 071.863 /
+>   072.028 / 072.200 / 072.355 — the Cactus City quartet) end
+>   `…REST AREA_x000d_\n`; the bound raw TSN extract (`TSAR - RAMPS
+>   DETAIL_TSN_11.04.2025IT.xlsx`, rows 10690–10693, same PMs) has ZERO
+>   literal `_x000d_` anywhere and prints `…REST AREA\n`. So the Excel export
+>   encodes a database CR as literal `_x000d_` text; TSN itself never does.
+>   Today's Excel-vs-TSN counts these 4 Descriptions as diffs purely from that
+>   export encoding (edge-trim removes the `\n` both sides but not the literal
+>   `_x000d_`); PDF-vs-TSN is unaffected (the PDF render drops the CR).
+> - **The fix shape (needs its own oracle amendment) — MEASURED 2026-07-16
+>   through the product engine on the bound corpus:** today's Excel-vs-TSN
+>   reproduces RD-79 exactly (15,212 both / 4 / 198 / **741 rows / 847
+>   cells**; per-field {Area 4: 58, City Code: 156, Date of Record: 15,
+>   Description: 185, District: 1, HG: 364, R/U: 68}); the four Cactus rows
+>   pair correctly and EACH has Description as its SOLE diff
+>   (`…REST AREA_x000d_` vs TSN's clean `…REST AREA`). Decoding OOXML escapes
+>   on RD's vs-TSN TSMIS side (HSL's `_v` precedent —
+>   `compare_tsn_common.decode_ooxml_escapes`) therefore lands on exactly
+>   **737 rows / 843 cells (Description 185→181)**. RD-79's PDF↔Excel
+>   4-render facts are already owner-ruled artifacts (a5532b5) — this amends
+>   only the Excel-vs-TSN leg, same source-first justification: the raw TSN
+>   extract (zero `_x000d_` anywhere) proves the bytes are an Excel-export
+>   encoding, not data. Red fixture → RD `_v`/loader decode → re-measure →
+>   737/843 → update the RD golden check + bindings + an explained RD-79
+>   oracle-amendment note.
+> Then Wave 5 (127/130/131/118-120/214 + the unowned-findings triage).
+>
+> **The consumed CMP-AUD-218 brief (implemented 2026-07-16 — kept for its
+> census):**
 > - **The defect** (`compare_core._write_spot_check`, ~line 2074): Spot Check's
 >   `$C$11` (status) and `$C$12`/`$F$12` (both data-sheet rows) are
 >   `INDEX(Comparison!…, $C$6)` pulls, and EVERY field lookup rides those rows —
@@ -228,11 +288,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   five-leg witness that MODELS the old C12/F12←Comparison behavior — never
 >   edit it; a post-fix Spot audit needs a NEW instrument version.
 >
-> Then **CMP-AUD-197** (the `_x000d_` reader fix must be FAMILY-AWARE: HSL's
-> oracle unescapes to CRLF≡space — the four Cactus City cells become equal — but
-> RD-79's ACCEPTED oracle keeps its 4 `_x000d_` rows as honest PDF↔Excel
-> differences; a blanket shared-reader unescape would break RD's re-bless).
-> Then Wave 5 (127/130/131/118-120/214 + the unowned-findings triage).
+> (The 197/Wave-5 sequencing moved up into "Do this next" above.)
 > - HL stays BLOCKED on its raw county-retention + collision census; HD-Excel on
 >   the vendor county answer. Do NOT infer either.
 > - **CI discipline** (unchanged): verify the watched RUN ID belongs to the pushed

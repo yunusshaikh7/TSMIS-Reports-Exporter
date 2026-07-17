@@ -22,6 +22,7 @@ Optional installed-Excel evaluation (COM; default remains hermetic):
 from __future__ import annotations
 
 import argparse
+import shutil
 from decimal import Decimal
 from pathlib import Path
 
@@ -753,6 +754,7 @@ def test_workbook_policy(c, run_excel=False):
             wf.close()
         if run_excel:
             _test_installed_excel(c, formulas_path, values_path, expected_masks)
+            _test_spot_integrity_mutations(c, formulas_path, expected_masks)
 
 
 def _test_installed_excel(c, formulas_path, values_path, expected_masks):
@@ -901,6 +903,122 @@ def _test_installed_excel(c, formulas_path, values_path, expected_masks):
         literal.close()
 
 
+def _plant_spot_link_forgery(source, dest, kind, row_first, row_second):
+    """Copy the formulas workbook and forge Comparison's row links consistently.
+
+    ``relink`` swaps two Both-rows' stored link formulas (every downstream
+    status/state/display recomputes consistently for the wrong pair);
+    ``one_sided`` suppresses the second link so the row recomputes as falsely
+    one-sided. Spot Check is then pointed at the forged row.
+    """
+    shutil.copyfile(source, dest)
+    wb = load_workbook(dest, data_only=False)
+    try:
+        comparison = wb["Comparison"]
+        left_col = _header_col(comparison, "LEFT Row")
+        right_col = _header_col(comparison, "RIGHT Row")
+        if kind == "relink":
+            for col in (left_col, right_col):
+                first = comparison.cell(row_first, col).value
+                second = comparison.cell(row_second, col).value
+                comparison.cell(row_first, col).value = second
+                comparison.cell(row_second, col).value = first
+        else:
+            comparison.cell(row_first, right_col).value = '=""'
+        wb["Spot Check"]["C6"] = row_first
+        wb.save(dest)
+    finally:
+        wb.close()
+
+
+def _spot_row_integrity(path):
+    wb = load_workbook(path, data_only=True)
+    try:
+        return wb["Spot Check"]["C14"].value
+    finally:
+        wb.close()
+
+
+def _test_spot_integrity_mutations(c, formulas_path, expected_masks):
+    """CMP-AUD-218 permanent gate (installed Excel): a consistently relinked
+    pair and a falsely one-sided status/link set must both flip Spot Check's
+    Row-integrity line to CHECK after ``CalculateFullRebuild``; the untouched
+    workbook must read OK. Spot Check's row matching itself never consumes
+    Comparison's stored links, so the forgeries stay visible even though every
+    downstream Comparison cell recomputes consistently with them.
+    """
+    print("\nSpot Check row-matching independence (CMP-AUD-218):")
+    try:
+        import win32com.client as win32
+    except Exception as exc:
+        c.check("installed Excel COM dependency is available for the "
+                "CMP-AUD-218 gate", False, f"{type(exc).__name__}: {exc}")
+        return
+
+    inspection = load_workbook(formulas_path, data_only=False)
+    try:
+        comparison = inspection["Comparison"]
+        both_rows = sorted(
+            _row_for(comparison, key)
+            for key, mask in expected_masks.items() if "U" not in mask)
+    finally:
+        inspection.close()
+    if len(both_rows) < 2:
+        c.check("CMP-AUD-218 fixture provides two matched rows to forge",
+                False, repr(both_rows))
+        return
+    row_first, row_second = both_rows[:2]
+
+    base = Path(formulas_path)
+    forgeries = {
+        "relink": base.with_name("spot218_relink.xlsx"),
+        "one_sided": base.with_name("spot218_onesided.xlsx"),
+    }
+    for kind, dest in forgeries.items():
+        _plant_spot_link_forgery(formulas_path, dest, kind,
+                                 row_first, row_second)
+
+    excel = book = None
+    try:
+        excel = win32.DispatchEx("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        for path in (base, *forgeries.values()):
+            book = excel.Workbooks.Open(str(path.resolve()),
+                                        UpdateLinks=0, ReadOnly=False)
+            excel.CalculateFullRebuild()
+            book.Save()
+            book.Close(SaveChanges=False)
+            book = None
+        c.check("installed Excel: the untouched and both forged workbooks "
+                "rebuild and save", True)
+    except Exception as exc:
+        c.check("installed Excel: the untouched and both forged workbooks "
+                "rebuild and save", False, f"{type(exc).__name__}: {exc}")
+        return
+    finally:
+        if book is not None:
+            try:
+                book.Close(SaveChanges=False)
+            except Exception:
+                pass
+        if excel is not None:
+            try:
+                excel.Quit()
+            except Exception:
+                pass
+
+    verdicts = {kind: _spot_row_integrity(dest)
+                for kind, dest in forgeries.items()}
+    c.check("installed Excel: the untouched workbook's Row integrity reads OK",
+            _spot_row_integrity(base) == "OK",
+            repr(_spot_row_integrity(base)))
+    c.check("installed Excel: a consistently relinked pair says CHECK",
+            verdicts["relink"] == "CHECK", repr(verdicts))
+    c.check("installed Excel: a falsely one-sided status/link set says CHECK",
+            verdicts["one_sided"] == "CHECK", repr(verdicts))
+
+
 def test_state_chunk_planning(c):
     """Wide schemas chunk deterministically and reject an impossible field."""
     fields = [f"F{i}" for i in range(1, 121)]
@@ -926,8 +1044,10 @@ def test_state_chunk_planning(c):
             and all(chunk["header"].startswith("__CMP_E1_STATE_V1_C")
                     for chunk in layout.state_chunks)
             and all(len(formula) <= 8192 for formula in formulas)
-            and layout.comparison_physical_n_cols
-                    == layout.state_chunks[-1]["col_idx"],
+            # The hidden CMP-AUD-218 row-token column trails the state chunks
+            # and is the physical last column the Excel-limit guard sees.
+            and layout.c_token_idx == layout.state_chunks[-1]["col_idx"] + 1
+            and layout.comparison_physical_n_cols == layout.c_token_idx,
             f"chunks={len(layout.state_chunks)}; lengths="
             f"{[len(formula) for formula in formulas]!r}")
 

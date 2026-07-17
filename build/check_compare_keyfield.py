@@ -82,10 +82,12 @@ def main():
     assert res.status == "ok", res.status
     wb = load_workbook(out, data_only=False)
     header_cells = list(next(wb["Comparison"].iter_rows(max_row=1)))
-    # E1 appends versioned hidden state-mask columns after every visible field;
-    # key-field geometry is the user-visible prefix, not those internal twins.
+    # E1 appends versioned hidden state-mask columns after every visible field,
+    # and CMP-AUD-218 appends the hidden row-token column after those; key-field
+    # geometry is the user-visible prefix, not those internal twins.
     hdr = [c.value for c in header_cells
-           if not str(c.value).startswith("__CMP_E1_STATE_V1_")]
+           if not str(c.value).startswith("__CMP_E1_STATE_V1_")
+           and c.value != "__CMP_E2_KEY_V1_TOKEN"]
     state_cells = [c for c in header_cells
                    if str(c.value).startswith("__CMP_E1_STATE_V1_")]
     assert state_cells and all(wb["Comparison"].column_dimensions[c.column_letter].hidden
@@ -102,7 +104,8 @@ def main():
     assert res.status == "ok", res.status
     wb = load_workbook(out, data_only=False)
     hdr = [c.value for c in next(wb["Comparison"].iter_rows(max_row=1))
-           if not str(c.value).startswith("__CMP_E1_STATE_V1_")]
+           if not str(c.value).startswith("__CMP_E1_STATE_V1_")
+           and c.value != "__CMP_E2_KEY_V1_TOKEN"]
     wb.close()
     assert hdr[0] == "County" and hdr[6:] == ["PM", "Desc"], \
         ("key_field=0 must keep the original layout", hdr)

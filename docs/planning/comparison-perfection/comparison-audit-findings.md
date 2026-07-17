@@ -496,7 +496,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-215 | P2 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Source-core mutation probes prove that mutated objects differ instead of proving the real gate rejects them |
 | CMP-AUD-216 | P1 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Raw semantic legs omit 46 blank-County TSN equates while labeling the 69,758-row subset as authoritative raw TSN |
 | CMP-AUD-217 | P1 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Source-core hashes capture members and later reparses their paths instead of parsing the exact bytes whose identity was bound |
-| CMP-AUD-218 | P1 | Verified by wrong-pair and false-one-sided mutations in both twins of all five legs | Spot Check calls its verdict independent while trusting Comparison's status and source-row pairing |
+| CMP-AUD-218 | P1 | Remediated: Spot Check row matching rides the hidden Comparison key token + a Row-integrity line; both finding mutations proven CHECK under installed Excel | Spot Check calls its verdict independent while trusting Comparison's status and source-row pairing |
 | CMP-AUD-219 | P2 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Historical TSMIS PDF rows are hardcoded with the current-PDF source role |
 | CMP-AUD-220 | P1 | Remediated engine-wide via the owner-approved assignment/verdict split; the product is oracle-exact on every Highway Sequence leg | Duplicate matching ignores three source fields and changes hundreds of pair/one-sided assignments |
 | CMP-AUD-221 | P1 | Remediated and verified in two byte-identical hardened classifier replays | Residual classifier declares every changed duplicate assignment explained without testing whether its asserted cause actually produced the assignment |
@@ -5688,7 +5688,7 @@ policy text, directions {S-N 190, W-E 172, E-W 5, N-S 2}. Contract fixtures:
 `check_tsn_district_source_contract` (missing-NOTE cover, conflicting directions,
 cross-member reference-date disagreement, claims presence) and
 `check_compare_highway_sequence_tsn`. Evidence exposure beyond Notes remains with the
-Stage-10 evidence rework (CMP-AUD-218/098).
+Stage-10 evidence rework (CMP-AUD-098; 218's Spot Check half was remediated 2026-07-16).
 
 ### CMP-AUD-156 — Highway Sequence's numeric-only distance parser erases a real printed landmark pointer
 
@@ -7685,6 +7685,39 @@ Comparison's state/display was recomputed consistently; all six Spot verdicts st
 one-sided; all six again say `OK`. CMP-AUD-218 is therefore mutation-verified across the
 complete current five-leg surface. The future corrected gate must make both cases say
 `CHECK`.
+
+Execution disposition (2026-07-16): the Comparison sheet now carries a hidden
+trailing `__CMP_E2_KEY_V1_TOKEN` column — each row's opaque helper key written
+as a LITERAL in both workbook twins (injective, guarded, outside the visible
+filter/CF geometry; `_Layout.c_token`, and the Excel-limit guard counts it).
+Spot Check derives the selected row's token (`M12 =
+INDEX(Comparison!<token col>, C6)`) and MATCHes it into each side's literal
+"Key (helper)" column (`K12`/`L12`); `$C$12`/`$F$12` — the cells every field
+lookup and the K/L independent recomputation ride — display those independent
+rows, and the one-sided callout now rides the independent membership instead of
+Comparison's status. A new Row-integrity line on row 14 EXACT-compares
+Comparison's claimed trow/nrow/status against the independent derivation with
+loud conditional formatting (`F_FIRST` stays 16; every pinned Spot geometry is
+unchanged). Red→green: on the pre-fix writer both planted forgeries (a
+consistently relinked pair; a falsely one-sided status/link set) showed all-OK
+under installed-Excel `CalculateFullRebuild`; post-fix both say `CHECK`
+per-field AND on Row integrity, while the untouched workbook stays all-OK.
+Permanent gates: `check_compare_audit.test_p5_spot_row_matching_independent`
+pins on both twins that K12/L12/C12/F12 and the callout never read
+`INDEX(Comparison!` (the Row-integrity line is the sole claimed-link consumer)
+and that the token column is hidden/literal/injective;
+`check_compare_equality_policy --excel` plants both forgeries and requires
+CHECK via `CalculateFullRebuild` (hermetic CI skips COM, as designed).
+Real-corpus verify (ssor-prod 7.9 HSL PDF-vs-Excel, 60,493×60,494): counts
+canary-exact (1,410 / 3,721), token column complete + injective over the full
+union in both twins, clean rebuild Spot all-OK with Row integrity OK, the
+planted relink CHECK at scale, Summary SELF-CHECK all OK.
+`check_phase8_highway_sequence_summary_spot.py` remains the FROZEN witness of
+the pre-fix behavior; any post-fix Spot audit needs a new instrument version.
+Out of scope here: CMP-AUD-214 (the banner-overwrite display defect) stays
+open, and a forged token column itself remains detectable only through the
+identity displays/back-links (the token is a pointer into the snapshot-bound
+data-sheet key columns; Comparison itself is still not snapshot-bound).
 
 ### CMP-AUD-219 — historical TSMIS PDF rows carry the current-PDF source label
 

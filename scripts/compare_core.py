@@ -1380,9 +1380,18 @@ class _Layout:
             for offset, field_idx in enumerate(fields, start=1):
                 self._state_field_location[field_idx] = (chunk, offset)
             state_pos = end + 1
-        self.comparison_physical_n_cols = (
+        last_state_col_idx = (
             self.state_chunks[-1]["col_idx"] if self.state_chunks
             else self.f0 + self.n_fields - 1)
+        # Hidden injective row token: the row's opaque helper key, written as a
+        # LITERAL in both workbook twins after the state chunks. Spot Check
+        # re-derives the selected row's data-sheet rows by MATCHing this token
+        # into each side's literal "Key (helper)" column, so its row matching
+        # never trusts Comparison's own row links or status (CMP-AUD-218).
+        self.c_token_idx = last_state_col_idx + 1
+        self.c_token = get_column_letter(self.c_token_idx)
+        self.c_token_header = f"__{_HELPER_KEY_VERSION}_TOKEN"
+        self.comparison_physical_n_cols = self.c_token_idx
         self.comparison_physical_last_col = get_column_letter(
             self.comparison_physical_n_cols)
 
@@ -2066,6 +2075,7 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None):
 
     for chunk in lay.state_chunks:
         ws.column_dimensions[chunk["col"]].hidden = True
+    ws.column_dimensions[lay.c_token].hidden = True
 
     # Conditional formatting keeps the familiar presentation but reads the
     # hidden state code, never display text.  One rule per state chunk lets the
@@ -2093,7 +2103,8 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None):
     link_cols = {3, 4} if lay.has_route else {2, 3}   # trow / nrow positions
     ws.append(_header_row(ws, lay.id_headers
                           + [sc.header[i] for i in lay.field_indices]
-                          + [chunk["header"] for chunk in lay.state_chunks],
+                          + [chunk["header"] for chunk in lay.state_chunks]
+                          + [lay.c_token_header],
                           lay.sc.header_comment))
     if not isinstance(helper_tokens, dict) or set(helper_tokens) != set(union):
         raise ValueError(
@@ -2127,6 +2138,7 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None):
             row += [_field_formula(lay, r, f)
                     for f in lay.field_indices]
             row += state_formulas
+            row.append(helper_tokens[(route, loc, occ)])
         else:
             k = (route, loc, occ)
             rt, rn = vals["by_t"].get(k), vals["by_n"].get(k)
@@ -2151,15 +2163,17 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None):
                 _row_link_value(sc.side_b, nr, lay) if nr else None,
                 status,
                 ndiff if status == "Both" else None,
-            ] + fields + mask_chunks
+            ] + fields + mask_chunks + [helper_tokens[k]]
         # Guard literal cells against formula injection without touching our own
-        # formulas: in the formulas flavor only the key/route id cells are
-        # literals (everything else is an =formula or a HYPERLINK link); in the
-        # values flavor every non-link cell is a literal. (HYPERLINK cells must
-        # stay formulas, so they're never guarded.)
+        # formulas: in the formulas flavor only the key/route id cells and the
+        # trailing row token are literals (everything else is an =formula or a
+        # HYPERLINK link); in the values flavor every non-link cell is a
+        # literal. (HYPERLINK cells must stay formulas, so they're never
+        # guarded.)
         if vals is None:
             guard_set = {0} if lay.has_route else set()
             guard_set.add(1 if lay.has_route else 0)         # the key (loc) cell
+            guard_set.add(len(row) - 1)                      # the row token
         else:
             guard_set = set(range(len(row))) - link_cols
         ws.append([_styled(ws, v, link_font if j in link_cols else body_font,
@@ -2180,11 +2194,18 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
     both data sheets next to an INDEPENDENTLY recomputed verdict (same
     TRIM / Med Wid rules, computed straight from the data sheets, never
     reading the Comparison sheet's answer) and an Agree? column that flags
-    any disagreement with what the Comparison sheet displays. On one-sided
-    rows the verdict column carries the status itself (tinted) plus a loud
-    callout line — the Status cell alone is easy to miss — and Agree? still
-    verifies the displayed value against that system's data sheet. Opens
-    pre-set to `default_row`, the first matched row with differences."""
+    any disagreement with what the Comparison sheet displays. The two
+    data-sheet rows themselves are derived INDEPENDENTLY too (CMP-AUD-218):
+    the row's hidden key token (Comparison's trailing literal column) is
+    MATCHed into each side's literal "Key (helper)" column, so a forged
+    Comparison row link or status can never pick which rows get audited;
+    the "Row integrity" line EXACT-compares Comparison's stored links and
+    status against that independent derivation and shouts CHECK on any
+    disagreement. On one-sided rows the verdict column carries the
+    independently derived status itself (tinted) plus a loud callout line —
+    the Status cell alone is easy to miss — and Agree? still verifies the
+    displayed value against that system's data sheet. Opens pre-set to
+    `default_row`, the first matched row with differences."""
     sc = lay.sc
     a, b = sc.side_a, sc.side_b
     ws = wb.create_sheet("Spot Check")
@@ -2207,7 +2228,11 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
     last = n_union + 1
     inp = "$C$6"                                   # the row-number input cell
     trow_cell, nrow_cell = "$C$12", "$F$12"        # matched data-sheet rows
-    status = "$C$11"                               # the row's status cell
+    status = "$C$11"                               # Comparison's claimed status
+    # Hidden independent-derivation cells (columns K:M are hidden anyway):
+    # the selected row's key token, then its MATCHed row in each data sheet.
+    token_cell = "$M$12"
+    trow_ind, nrow_ind = "$K$12", "$L$12"
     F_FIRST = 16                                   # first field row
     F_LAST = F_FIRST + lay.n_fields - 1
     has_medwid = bool(lay.medwid_field_indices)
@@ -2241,6 +2266,12 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
         fill=PatternFill(bgColor="FFC7CE"), font=Font(color="9C0006", bold=True)))
     ws.conditional_formatting.add(f"G{F_FIRST}:G{F_LAST}", CellIsRule(
         operator="equal", formula=['"OK"'], font=Font(color="2E7D32", bold=True)))
+    # The Row-integrity verdict gets the same loud treatment.
+    ws.conditional_formatting.add("C14", CellIsRule(
+        operator="equal", formula=['"CHECK"'],
+        fill=PatternFill(bgColor="FFC7CE"), font=Font(color="9C0006", bold=True)))
+    ws.conditional_formatting.add("C14", CellIsRule(
+        operator="equal", formula=['"OK"'], font=Font(color="2E7D32", bold=True)))
 
     grid = {}
 
@@ -2259,7 +2290,10 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
                 "directly (TRIM" + (" + the Med Wid rule" if has_medwid else "")
                 + ") WITHOUT reading the "
                 "Comparison sheet — Agree? = OK means both computations "
-                "reached the same answer.", note_font)
+                "reached the same answer. The two source rows themselves are "
+                "key-matched independently of Comparison's row links; the "
+                "'Row integrity' line flags any disagreement with what "
+                "Comparison stored.", note_font)
     put((4, 2), f"In difference cells the order is always:   "
                 f"{a} value{_DIFF_MARK}{b} value   ({a} first, {b} second).",
         bold_font)
@@ -2303,7 +2337,8 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
     def cmp_idx(col):
         return f"INDEX(Comparison!${col}:${col},{inp})"
 
-    banner(9, "WHAT THE COMPARISON SHEET SHOWS FOR THAT ROW")
+    banner(9, "THE SELECTED ROW — COMPARISON'S CLAIMS + THE INDEPENDENT "
+              "KEY MATCH")
     if lay.has_route:
         put((10, 2), "Route:", bold_font)
         put((10, 3), f'=IFERROR({cmp_idx(lay.c_route)},"")', body_font)
@@ -2315,22 +2350,62 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
     put((11, 3), f'=IFERROR({cmp_idx(lay.c_status)},"")', bold_font)
     put((11, 5), "Diffs counted:", bold_font)
     put((11, 6), f'=IFERROR({cmp_idx(lay.c_diffs)},"")', bold_font)
-    put((12, 2), f"{a} sheet row:", bold_font)
-    put((12, 3), f'=IFERROR(IF({cmp_idx(lay.c_trow)}="","",'
-                 f'HYPERLINK("#{_sref(a)}!"&{cmp_idx(lay.c_trow)}&'
-                 f'":"&{cmp_idx(lay.c_trow)},'
-                 f'{cmp_idx(lay.c_trow)})),"")', link_font)
-    put((12, 5), f"{b} sheet row:", bold_font)
-    put((12, 6), f'=IFERROR(IF({cmp_idx(lay.c_nrow)}="","",'
-                 f'HYPERLINK("#{_sref(b)}!"&{cmp_idx(lay.c_nrow)}&'
-                 f'":"&{cmp_idx(lay.c_nrow)},'
-                 f'{cmp_idx(lay.c_nrow)})),"")', link_font)
-    # Loud one-sided callout: the Status cell alone is easy to miss.
-    put((13, 2), f'=IF({status}="{lay.only_a}","⚠ THIS {sc.id_noun.upper()} EXISTS ONLY IN '
+    # The two data-sheet rows are derived INDEPENDENTLY (CMP-AUD-218): the
+    # row's hidden literal key token (Comparison's trailing token column) is
+    # MATCHed into each side's literal "Key (helper)" column. Comparison's
+    # own stored row links are never read here — they are only EXACT-compared
+    # against this derivation on the Row-integrity line below, so a forged
+    # link or status can no longer choose which source rows get audited.
+    tok_col = lay.c_token
+    tok_idx = f'INDEX(Comparison!${tok_col}:${tok_col},{inp})'
+    put((12, 13), _checked_formula(                      # M12: the key token
+        f'=IFERROR(IF({tok_idx}="","",{tok_idx}),"")',
+        "Spot key token"), body_font)
+    for column, side in ((11, a), (12, b)):              # K12/L12: MATCHed rows
+        put((12, column), _checked_formula(
+            f'=IF({token_cell}="","",IFERROR(MATCH({token_cell},'
+            f'{_sref(side)}!${lay.key_col}:${lay.key_col},0),""))',
+            f"Spot independent {side} row"), body_font)
+    put((12, 2), f"{a} row (key-matched):", bold_font)
+    put((12, 3), f'=IF({trow_ind}="","",'
+                 f'HYPERLINK("#{_sref(a)}!"&{trow_ind}&'
+                 f'":"&{trow_ind},{trow_ind}))', link_font)
+    put((12, 5), f"{b} row (key-matched):", bold_font)
+    put((12, 6), f'=IF({nrow_ind}="","",'
+                 f'HYPERLINK("#{_sref(b)}!"&{nrow_ind}&'
+                 f'":"&{nrow_ind},{nrow_ind}))', link_font)
+    put((12, 8), "← matched from the row's hidden key token, never from "
+                 "Comparison's stored links", note_font)
+    # Loud one-sided callout, riding the INDEPENDENT membership: the Status
+    # cell alone is easy to miss, and a forged status must not steer this.
+    put((13, 2), f'=IF(AND({trow_ind}<>"",{nrow_ind}=""),'
+                 f'"⚠ THIS {sc.id_noun.upper()} EXISTS ONLY IN '
                  f'{a} — there is no {b} row to compare; {b} values below '
-                 f'are blank.",IF({status}="{lay.only_b}","⚠ THIS {sc.id_noun.upper()} EXISTS '
+                 f'are blank.",IF(AND({trow_ind}="",{nrow_ind}<>""),'
+                 f'"⚠ THIS {sc.id_noun.upper()} EXISTS '
                  f'ONLY IN {b} — there is no {a} row to compare; {a} '
                  f'values below are blank.",""))', alert_font)
+    # Row integrity: Comparison's stored links and status must EXACTLY equal
+    # the independent derivation. A consistently relinked pair or a falsely
+    # one-sided status/link set says CHECK here even when every downstream
+    # display was recomputed to match the forgery.
+    independent_row_status = (
+        f'IF(AND({trow_ind}="",{nrow_ind}=""),"(no data-sheet match)",'
+        f'IF({nrow_ind}="","{lay.only_a}",'
+        f'IF({trow_ind}="","{lay.only_b}","Both")))')
+    claimed_t, claimed_n = cmp_idx(lay.c_trow), cmp_idx(lay.c_nrow)
+    put((14, 2), "Row integrity:", bold_font)
+    put((14, 3), _checked_formula(
+        f'=IF(OR({inp}<2,{token_cell}=""),"",'
+        f'IF(AND(IF({claimed_t}="","",{claimed_t})={trow_ind},'
+        f'IF({claimed_n}="","",{claimed_n})={nrow_ind},'
+        f'EXACT({cmp_idx(lay.c_status)},{independent_row_status})),'
+        f'"OK","CHECK"))',
+        "Spot row integrity"), bold_font, None, center)
+    put((14, 4), '=IF($C$14="CHECK","⚠ Comparison\'s stored row links or '
+                 'status DISAGREE with the independent key match — do not '
+                 'trust this row until the workbook is regenerated.","")',
+        alert_font)
 
     # --- field-by-field ---------------------------------------------------
     banner(15, "FIELD BY FIELD — RECOMPUTED FROM THE DATA SHEETS "
@@ -2450,6 +2525,11 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
         "you click elsewhere. Each data-sheet row links back to its "
         "Comparison row. Values are shown exactly as stored (before TRIM).",
         note_font)
+    put((F_LAST + 4, 2),
+        "• Row integrity: OK means Comparison's stored row links and status "
+        "exactly equal an independent MATCH of this row's hidden key token "
+        "into both data sheets — the row pairing itself is verified, not "
+        "assumed.", note_font)
 
     # Emit the sparse grid (append-only streaming sheet).
     n_rows = max(r for r, _c in grid)
