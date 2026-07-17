@@ -304,6 +304,23 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   filename without reconciling the document's own route before captioning
 >   (visual_evidence.py:248-286,390-444).
 >
+> **The 067 census start (2026-07-17 — bind before implementing):** the
+> PDF-vs-Excel self-check flavors reuse cross-system (vs-TSN) projectors,
+> erasing the render differences they exist to detect. HSL's instance is
+> ALREADY FIXED (CMP-AUD-199's source-faithful `SS_HEADER`/`_SS_SCHEMA` +
+> `_tsmis_row_same_source`, suffix excluded from identity and compared as
+> "PM Suffix") and RD's same-source loader shipped in v0.26.0 — re-verify
+> both against the finding's exact mutation cases before dispositioning.
+> REMAINING: HL (the roadbed-canonical key normalizer infers Excel
+> `000.100` → `000.100R`; roadbed/ditto semantics are correctness-locked —
+> read docs/highway_log/comparison-study.md + the Phase-3 decision gates
+> BEFORE touching; "surface canonical and raw identity separately" is the
+> finding's own escape hatch), HD (`pm_canon` HG-fill + the TSN-only NA
+> crosswalk in the pdf flavor), ID (control-type `J`→`S` fold + the
+> display-rewrite `S ≠ A`). Each family needs a same-source
+> projector/schema, a per-family mutation matrix, and a PDF↔Excel canary
+> re-bless with explained deltas.
+>
 > **DONE 2026-07-16 (after 047/048): the HD statewide re-measure — EXACT.**
 > The bound 7.7-bundle harness re-run under the post-220 objective
 > reproduces **48,644 / 2,599 / 11,439 / 208,596 {RU Eff 48,211}**
