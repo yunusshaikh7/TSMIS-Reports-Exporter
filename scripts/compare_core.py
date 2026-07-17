@@ -2233,7 +2233,10 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
     # the selected row's key token, then its MATCHed row in each data sheet.
     token_cell = "$M$12"
     trow_ind, nrow_ind = "$K$12", "$L$12"
-    F_FIRST = 16                                   # first field row
+    # Banner and header occupy DISTINCT rows (CMP-AUD-214): the field-by-field
+    # banner keeps row 15, the header row sits at F_FIRST - 1 = 16, and the
+    # field rows start at 17 — the header no longer overwrites the banner.
+    F_FIRST = 17                                   # first field row
     F_LAST = F_FIRST + lay.n_fields - 1
     has_medwid = bool(lay.medwid_field_indices)
 

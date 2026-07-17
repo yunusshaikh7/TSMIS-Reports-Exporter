@@ -577,16 +577,18 @@ def test_workbook_policy(c, run_excel=False):
                 for side in ("A", "B")
                 for stage in ("TRIM", "CORE", "VALID", "MASK", "CANON")
             ]
+            # The header row sits at 16 and fields start at 17 since the
+            # CMP-AUD-214 banner/header split (the banner keeps row 15).
             for book_name, book in (("values", wv), ("formulas", wf)):
                 ws = book["Spot Check"]
-                actual_headers = [ws.cell(15, col).value for col in range(20, 30)]
+                actual_headers = [ws.cell(16, col).value for col in range(20, 30)]
                 if actual_headers != expected_spot_headers:
                     spot_helper_failures.append((book_name, "headers", actual_headers))
                 for col in range(20, 30):
-                    letter = ws.cell(15, col).column_letter
+                    letter = ws.cell(16, col).column_letter
                     if not ws.column_dimensions[letter].hidden:
                         spot_helper_failures.append((book_name, "visible", letter))
-                for row in range(16, ws.max_row + 1):
+                for row in range(17, ws.max_row + 1):
                     for col in range(20, 30):
                         cell = ws.cell(row, col)
                         if cell.data_type == "f":
@@ -613,38 +615,38 @@ def test_workbook_policy(c, run_excel=False):
             ]
             for book_name, book in (("values", wv), ("formulas", wf)):
                 ws = book["Spot Check"]
-                actual = [ws.cell(15, col).value for col in range(11, 14)]
+                actual = [ws.cell(16, col).value for col in range(11, 14)]
                 if actual != expected_state_headers:
                     spot_state_failures.append((book_name, "headers", actual))
                 for col in range(11, 14):
-                    letter = ws.cell(15, col).column_letter
+                    letter = ws.cell(16, col).column_letter
                     if not ws.column_dimensions[letter].hidden:
                         spot_state_failures.append((book_name, "visible", letter))
-                    for row in (16, 17):
+                    for row in (17, 18):
                         cell = ws.cell(row, col)
                         if cell.data_type != "f" or len(str(cell.value)) > 8192:
                             spot_state_failures.append(
                                 (book_name, cell.coordinate, cell.data_type,
                                  len(str(cell.value))))
             spot_ws = wf["Spot Check"]
-            spot_text_state = str(spot_ws["K16"].value)
-            spot_med_state = str(spot_ws["K17"].value)
-            spot_expected = str(spot_ws["L16"].value)
-            spot_cmp_state = str(spot_ws["M16"].value)
-            spot_cmp_display = str(spot_ws["F16"].value)
-            spot_agree = str(spot_ws["G16"].value)
+            spot_text_state = str(spot_ws["K17"].value)
+            spot_med_state = str(spot_ws["K18"].value)
+            spot_expected = str(spot_ws["L17"].value)
+            spot_cmp_state = str(spot_ws["M17"].value)
+            spot_cmp_display = str(spot_ws["F17"].value)
+            spot_agree = str(spot_ws["G17"].value)
             c.check("formula: Spot Check independently recomputes state and the full "
                     "display, then EXACT-compares both twins",
                     not spot_state_failures
                     and "EXACT(" in spot_text_state.upper()
                     and "ISBLANK(INDEX(LEFT!C:C" in spot_text_state.upper()
-                    and "EXACT($X17,$AC17)" in spot_med_state.upper()
-                    and '$K16="D"' in spot_expected.upper()
+                    and "EXACT($X18,$AC18)" in spot_med_state.upper()
+                    and '$K17="D"' in spot_expected.upper()
                     and MARK in spot_expected
                     and "MID(INDEX(COMPARISON!$" in spot_cmp_state.upper()
                     and "ISBLANK(INDEX(COMPARISON!" in spot_cmp_display.upper()
-                    and "EXACT($K16,$M16)" in spot_agree.upper()
-                    and "EXACT($L16,$F16)" in spot_agree.upper(),
+                    and "EXACT($K17,$M17)" in spot_agree.upper()
+                    and "EXACT($L17,$F17)" in spot_agree.upper(),
                     f"failures={spot_state_failures[:3]!r}; state={spot_text_state}; "
                     f"med={spot_med_state}; expected={spot_expected}; "
                     f"comparison_state={spot_cmp_state}; agree={spot_agree}")
@@ -874,16 +876,16 @@ def _test_installed_excel(c, formulas_path, values_path, expected_masks):
         spot = calculated["Spot Check"]
         blankish = lambda value: value in (None, "")
         spot_actual = {
-            "text_state": spot["K16"].value,
-            "text_cmp_state": spot["M16"].value,
-            "text_agree": spot["G16"].value,
-            "med_state": spot["K17"].value,
-            "med_cmp_state": spot["M17"].value,
-            "med_expected": spot["L17"].value,
-            "med_display": spot["F17"].value,
-            "med_agree": spot["G17"].value,
-            "med_left_canon": spot["H17"].value,
-            "med_right_canon": spot["I17"].value,
+            "text_state": spot["K17"].value,
+            "text_cmp_state": spot["M17"].value,
+            "text_agree": spot["G17"].value,
+            "med_state": spot["K18"].value,
+            "med_cmp_state": spot["M18"].value,
+            "med_expected": spot["L18"].value,
+            "med_display": spot["F18"].value,
+            "med_agree": spot["G18"].value,
+            "med_left_canon": spot["H18"].value,
+            "med_right_canon": spot["I18"].value,
         }
         c.check("installed Excel: Spot Check catches Med-Wid blank-v-zero with "
                 "independent state and exact full-display agreement",

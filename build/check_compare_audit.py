@@ -92,14 +92,14 @@ def test_p2_state_mask_is_truth():
                        for rule in comparison.conditional_formatting[region]
                        for formula in (rule.formula or ())]
         spot = wb["Spot Check"]
-        agreement = str(spot["G16"].value)
+        agreement = str(spot["G17"].value)          # first field row (CMP-AUD-214)
 
         assert "SUBSTITUTE(" in diffs and '"D"' in diffs, diffs
         assert per_field, summary_formulas
         assert any("MID($" in formula and '="D"' in formula
                    for formula in cf_formulas), cf_formulas
-        assert ("EXACT($K16,$M16)" in agreement
-                and "EXACT($L16,$F16)" in agreement), agreement
+        assert ("EXACT($K17,$M17)" in agreement
+                and "EXACT($L17,$F17)" in agreement), agreement
         assert all(spot.column_dimensions[col].hidden for col in ("K", "L", "M"))
 
         # The separator may appear in display formulas and prose, but no truth
@@ -167,6 +167,18 @@ def test_p5_spot_row_matching_independent():
             assert ("EXACT(" in integrity and "$K$12" in integrity
                     and "$L$12" in integrity
                     and "INDEX(Comparison!" in integrity), integrity
+            # CMP-AUD-214: banner and header on DISTINCT rows — exactly one
+            # banner (row 15), one header row (16), fields from 17; nothing
+            # overwritten or orphaned.
+            banner_cells = [cell.coordinate for row in spot.iter_rows()
+                            for cell in row
+                            if isinstance(cell.value, str)
+                            and "FIELD BY FIELD" in cell.value]
+            assert banner_cells == ["B15"], banner_cells
+            header_cells = [cell.coordinate for row in spot.iter_rows()
+                            for cell in row if cell.value == "Field"]
+            assert header_cells == ["B16"], header_cells
+            assert spot["B17"].value == "V", spot["B17"].value
         finally:
             wb.close()
     os.remove(out); os.remove(values_out)

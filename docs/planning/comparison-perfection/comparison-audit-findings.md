@@ -492,7 +492,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-211 | P2 | Remediated and independently verified in the raw-product development witness | Raw-product witness hashes a payload chunk and then separately reads different bytes for decompression |
 | CMP-AUD-212 | P2 | Remediated and independently verified in the raw-product development witness | Raw-product witness accepts well-named comparison payload chunks that no sidecar references |
 | CMP-AUD-213 | P2 | Remediated and verified in the five-leg development semantic oracle; direct-source permanent gate pending | Highway Sequence audit checks Summary and Spot Check formula quantity but not their cell semantics |
-| CMP-AUD-214 | P2 | Verified in the shared writer and both twins of all five Highway Sequence legs | Spot Check immediately overwrites its intended field-by-field banner with the header row |
+| CMP-AUD-214 | P2 | Remediated: banner row 15 / header row 16 / fields from 17; pins shifted atomically; exactly-one-banner gate on both twins | Spot Check immediately overwrites its intended field-by-field banner with the header row |
 | CMP-AUD-215 | P2 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Source-core mutation probes prove that mutated objects differ instead of proving the real gate rejects them |
 | CMP-AUD-216 | P1 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Raw semantic legs omit 46 blank-County TSN equates while labeling the 69,758-row subset as authoritative raw TSN |
 | CMP-AUD-217 | P1 | Remediated and verified in the direct-source r2 checkpoint; permanent acceptance pending | Source-core hashes capture members and later reparses their paths instead of parsing the exact bytes whose identity was bound |
@@ -7578,6 +7578,25 @@ Five-leg execution evidence: the exact semantic oracle finds no intended banner 
 `B15="Field"` in the formula and values workbook for every normalized-TSN, raw-TSN, and
 PDF-vs-Excel leg (10/10 workbooks). The field calculations remain intact. This is a
 verified product defect, not an audit-oracle omission.
+
+Execution disposition (2026-07-16): `_write_spot_check` now separates the two
+rows — the FIELD BY FIELD banner keeps row 15, the header row writes at
+`F_FIRST - 1 = 16`, and the field rows start at `F_FIRST = 17`; every
+formula, helper header, CF range, and note derives from `F_FIRST`, so the
+sheet shifted atomically (the rows-2–14 block, including the CMP-AUD-218
+derivation/Row-integrity cells, is unchanged). Red→green fixture proven on
+both twins (pre-fix: no banner text anywhere and `B15="Field"`; post-fix:
+exactly one banner at `B15`, exactly one header row at 16, first field at
+`B17`, `Agree?` formulas at row 17). Pins shifted atomically:
+`check_compare_audit` (Agree? at `G17`, `EXACT($K17,$M17)`/`EXACT($L17,$F17)`,
+plus a new exactly-one-banner/one-header/no-overwrite gate on both twins) and
+`check_compare_equality_policy` (helper-header rows 15→16, field-row scans
+16/17→17/18, all K/L/M/F/G/H/I cell reads +1 in the hermetic and COM
+sections). The frozen `check_phase8_highway_sequence_summary_spot.py` remains
+the pre-fix witness. Counts/status/display semantics are byte-identical; only
+Spot-sheet addresses from row 15 down shifted. Gate 121/121; the equality
+policy's installed-Excel COM section re-ran green including the CMP-AUD-218
+mutation gate.
 
 ### CMP-AUD-215 — source-core mutation probes do not exercise the gates they claim to harden
 
