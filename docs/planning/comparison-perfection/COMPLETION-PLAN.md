@@ -206,6 +206,27 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > - **Canary discipline**: counts/status/display semantics must stay
 >   byte-identical (Route-1 969; the RD/ID/HSL goldens; values↔formulas twin
 >   parity) — this batch adds a hidden column + rewires Spot Check only.
+> - **Census delta (2026-07-16, read against the live code — start here):**
+>   `_row_link` (~1536) is the MATCH pattern to reuse —
+>   `MATCH(<token literal>, <side>!$<key_col>:$<key_col>, 0)`; Spot's version
+>   MATCHes the T cell reference instead of a literal. `helper_tokens` is
+>   validated injective over the union at `_write_comparison` entry
+>   (~2098-2102); the formulas branch embeds tokens only inside `_row_link`
+>   formulas and the values branch writes none — BOTH branches must write the
+>   new literal token cell (values branch appends it after `mask_chunks`;
+>   formulas branch after `state_formulas`; add it to that branch's literal
+>   guard set). `lay.comparison_physical_n_cols` (~1383) has exactly ONE
+>   consumer — the Excel-limit guard (~3547) — and NO tail sentinel binds the
+>   Comparison sheet (snapshots bind SOURCE sheets only), so `c_token` extends
+>   the width cleanly. **F_FIRST=16 must NOT shift**: `check_compare_audit`
+>   (~94) pins Spot `G16` (`EXACT($K16,$M16)` + `EXACT($L16,$F16)`) and K/L/M
+>   hidden; `check_compare_equality_policy` (~567-693) pins the row-15 helper
+>   headers at columns 11-13 and 20-29 in BOTH twins plus formula shapes —
+>   put the new Row-integrity line on the currently EMPTY row 14. The one
+>   Spot writer serves both twins (values Spot stays live), so one rewiring
+>   covers both. `check_phase8_highway_sequence_summary_spot.py` is the FROZEN
+>   five-leg witness that MODELS the old C12/F12←Comparison behavior — never
+>   edit it; a post-fix Spot audit needs a NEW instrument version.
 >
 > Then **CMP-AUD-197** (the `_x000d_` reader fix must be FAMILY-AWARE: HSL's
 > oracle unescapes to CRLF≡space — the four Cactus City cells become equal — but
