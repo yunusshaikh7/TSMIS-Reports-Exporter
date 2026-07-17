@@ -1118,6 +1118,18 @@ consistently-relinked pair flips Row integrity to CHECK at statewide scale.
 Pre-218 workbook BYTES are not comparable (one extra hidden column); every
 bound COUNT canary in this file is unchanged.
 
+**CMP-AUD-197 RD amendment (2026-07-16, later).** RD-79's **Excel-vs-TSN**
+leg is amended: the four Cactus City Description diffs (route 010 @ 71.863 /
+72.028 / 72.200 / 72.355) were the Excel export's OOXML-encoded CR
+(`…_x000d_\n`) against a raw TSN extract that carries ZERO literal `_x000d_`
+anywhere — export encoding, not data. With the load-boundary decode
+(`compare_ramp_detail_tsn._v` / `_strip_desc_prefix`), the bound RD
+Excel-vs-TSN canary is now **15,212 both / 4 / 198 · 737 differing rows /
+843 cells {Area 4 58, City Code 156, Date of Record 15, Description 181,
+District 1, HG 364, R/U 68}** (was 741 / 847 {Description 185}; every other
+number identical). PDF-vs-TSN stays exactly **774 / 998** and PDF-vs-Excel
+stays **15,216 fully identical** — both re-measured post-decode.
+
 ## Remaining canary queue
 
 | Canary | Flavor / acceptance fact | Corpus source | State / blocker |

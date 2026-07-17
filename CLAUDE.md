@@ -91,7 +91,13 @@ char edit distance, position gap — while verdicts/counts stay asserted-only) p
 HSL `_x000d_` decode (197's HSL half), so **the live HSL vs-TSN aggregate counts now
 equal the Stage-8 oracle's exactly** (Excel 4,894/5,589; PDF 4,916/5,001; same-source
 1,410/3,721); RD/ID re-blessed byte-identical, HL Route-1 969 intact, HD statewide
-awaits re-measure. The cache-backed residual classifier
+awaits re-measure. The same day, **CMP-AUD-218 made Spot Check's row matching
+independent** (a hidden Comparison key-token column MATCHed into the data sheets +
+a Row-integrity line; forged row links/status now say CHECK — COM-mutation-gated),
+and **CMP-AUD-197 closed for every current family**: RD's vs-TSN loader decodes the
+Excel export's OOXML escapes too (the four Cactus City `_x000d_` cells were export
+encoding — the raw TSN extract carries none), amending RD's Excel-vs-TSN canary to
+737 rows / 843 cells {Desc 181} with the PDF legs unchanged. The cache-backed residual classifier
 reproduces those persisted maps and aggregate arithmetic. Its original zero-unexplained claim was
 withdrawn after CMP-AUD-221 through 223 exposed unconditional attribution, post-resolve
 link checks, and an output/input alias hazard. The hardened classifier now proves every

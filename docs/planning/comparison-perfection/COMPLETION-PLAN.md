@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-16, after CMP-AUD-218 Spot Check independence)
+> ### ▶ RESUME HERE (2026-07-16, after CMP-AUD-218 + the CMP-AUD-197 close)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -194,35 +194,32 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   the pairing objective.~~ The approval was recorded and the batch shipped —
 >   see the DONE record above.
 >
-> **Do this next: CMP-AUD-197 — the RD vs-TSN remainder. Census DONE
-> 2026-07-16 (read-only; facts below) — next session implements or rules.**
-> - **The four cells' TSN partners carry the DECODED form.** ssor-prod 7.9 RD
->   Excel consolidated rows 3483–3486 (route 010, 08-RIV-010, PMs 071.863 /
->   072.028 / 072.200 / 072.355 — the Cactus City quartet) end
->   `…REST AREA_x000d_\n`; the bound raw TSN extract (`TSAR - RAMPS
->   DETAIL_TSN_11.04.2025IT.xlsx`, rows 10690–10693, same PMs) has ZERO
->   literal `_x000d_` anywhere and prints `…REST AREA\n`. So the Excel export
->   encodes a database CR as literal `_x000d_` text; TSN itself never does.
->   Today's Excel-vs-TSN counts these 4 Descriptions as diffs purely from that
->   export encoding (edge-trim removes the `\n` both sides but not the literal
->   `_x000d_`); PDF-vs-TSN is unaffected (the PDF render drops the CR).
-> - **The fix shape (needs its own oracle amendment) — MEASURED 2026-07-16
->   through the product engine on the bound corpus:** today's Excel-vs-TSN
->   reproduces RD-79 exactly (15,212 both / 4 / 198 / **741 rows / 847
->   cells**; per-field {Area 4: 58, City Code: 156, Date of Record: 15,
->   Description: 185, District: 1, HG: 364, R/U: 68}); the four Cactus rows
->   pair correctly and EACH has Description as its SOLE diff
->   (`…REST AREA_x000d_` vs TSN's clean `…REST AREA`). Decoding OOXML escapes
->   on RD's vs-TSN TSMIS side (HSL's `_v` precedent —
->   `compare_tsn_common.decode_ooxml_escapes`) therefore lands on exactly
->   **737 rows / 843 cells (Description 185→181)**. RD-79's PDF↔Excel
->   4-render facts are already owner-ruled artifacts (a5532b5) — this amends
->   only the Excel-vs-TSN leg, same source-first justification: the raw TSN
->   extract (zero `_x000d_` anywhere) proves the bytes are an Excel-export
->   encoding, not data. Red fixture → RD `_v`/loader decode → re-measure →
->   737/843 → update the RD golden check + bindings + an explained RD-79
->   oracle-amendment note.
-> Then Wave 5 (127/130/131/118-120/214 + the unowned-findings triage).
+> **Do this next: Wave 5** — 127 (payload-chunk lifecycle), 130
+> (stat-then-unlink cleanup), 131 (power-loss durability), 118/119/120 (the
+> validation TSN-library trio), 214 (the Spot Check banner-overwrite display
+> defect), plus the unowned-findings triage. Read each finding in the ledger
+> first; none has a staged brief yet. HL stays BLOCKED on its raw
+> county-retention + collision census; HD-Excel on the vendor county answer
+> (do NOT infer either); HD statewide comparison counts must be re-measured
+> before any HD statewide re-bless claim.
+>
+> **DONE 2026-07-16 (after 218): CMP-AUD-197 is CLOSED for every current
+> family — the RD vs-TSN half landed.** The census settled the deferred
+> family decision with source facts: RD's four Cactus City Excel cells
+> (route 010 @ 71.863/72.028/72.200/72.355) end `…REST AREA_x000d_\n` while
+> the bound raw TSN extract (zero literal `_x000d_` anywhere) prints
+> `…REST AREA\n` — pure Excel-export encoding (unlike HSL, whose TSN partners
+> carry `(cid:13)` strings and stay different post-decode).
+> `compare_ramp_detail_tsn._v` + `_strip_desc_prefix` now decode OOXML
+> escapes at the load boundary (decode-before-trim; both hex cases;
+> `_x005F_` literals preserved; interior decoded characters survive),
+> red→green pinned in `check_compare_ramp_detail_tsn`. Corpus (product
+> engine, bound inputs): Excel-vs-TSN **741/847 {Desc 185} → 737/843
+> {Desc 181}** with the 15,212/4/198 shape and every other per-field count
+> identical (RD-79's Excel-vs-TSN leg amended source-first, recorded in the
+> bindings); PDF-vs-TSN exactly 774/998; PDF-vs-Excel 15,216 fully identical.
+> Gate 121/121 + ruff. Harnesses: scratchpad `measure_197_rd.py` /
+> `verify_197_rd_all_legs.py` (session 119c7c70).
 >
 > **The consumed CMP-AUD-218 brief (implemented 2026-07-16 — kept for its
 > census):**

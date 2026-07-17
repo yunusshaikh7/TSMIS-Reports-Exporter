@@ -475,7 +475,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-194 | P2 | Remediated in independent source-oracle draft | Highway Sequence source oracle treats two visually composed legend labels as contiguous PDF text |
 | CMP-AUD-195 | P2 | Remediated in independent source-oracle draft | Highway Sequence source oracle confuses harmless header-label width movement with a changed data grid |
 | CMP-AUD-196 | P2 | Remediated and installed-Excel verified in source-oracle draft | Highway Sequence display projection recognizes only one case of the OOXML carriage-return escape |
-| CMP-AUD-197 | P1 | Verified with raw OOXML and installed Excel | Highway Sequence comparison reports four decoded carriage returns as literal `_x000d_` Description differences |
+| CMP-AUD-197 | P1 | Remediated for every current family: same-source flavors (owner-ruled render artifacts), the HSL vs-TSN loader, and the RD vs-TSN loader (family-censused; RD-79's Excel-vs-TSN leg amended 847→843 with source-first evidence) | Highway Sequence comparison reports four decoded carriage returns as literal `_x000d_` Description differences |
 | CMP-AUD-198 | P2 | Remediated in source-bound installed-Excel artifact | Permanent installed-Excel escape probe over-specifies optional COM open arguments and cannot bind its proof artifact |
 | CMP-AUD-199 | P1 | Verified on the complete current TSMIS Excel/PDF pair | Highway Sequence PDF-vs-Excel uses the changing equation suffix as identity, hiding moved-vs-missing semantics and forcing a route-152 cross-pair |
 | CMP-AUD-200 | P2 | Remediated in source-bound current product witness | Highway Sequence product witness is externally terminated after 180 seconds and leaves a non-result partial conversion tree |
@@ -6897,10 +6897,29 @@ openpyxl's unescape — the Stage-8 oracle's xlsx reading — in
 `check_compare_tsn_common`), so the four `_x000d_` Excel cells compare as
 their real CRLF content on the vs-TSN legs too; zero literals survive the
 loader on the 7.9 corpus, and the legs land on the oracle table exactly (see
-the 220 execution disposition). REMAINING in this finding: only the
-family-aware decision for RD's vs-TSN legs (RD-79's accepted oracle preserved
-its bytes — census whether the four RD cells' TSN partners differ anyway
-before deciding).
+the 220 execution disposition).
+
+**Remediation (2026-07-16, later) — the RD vs-TSN half. The finding is now
+CLOSED for every current family.** The family census settled the deferred
+decision with source facts: the four Cactus City cells (route 010 @ 71.863 /
+72.028 / 72.200 / 72.355) end `…REST AREA_x000d_\n` in the ssor-prod 7.9
+Excel consolidated, while their partners in the bound raw TSN extract
+(`TSAR - RAMPS DETAIL_TSN_11.04.2025IT.xlsx`, which contains ZERO literal
+`_x000d_` anywhere) end `…REST AREA\n` — unlike HSL (whose TSN partners carry
+their own `(cid:13)` strings, making the decode difference-preserving there),
+RD's TSN side is clean, so the product's four Description diffs were pure
+Excel-export encoding. `compare_ramp_detail_tsn._v` and `_strip_desc_prefix`
+now decode OOXML escapes at the load boundary (decode-before-trim; both hex
+cases; `_x005F_` literals preserved; interior decoded characters survive as
+real compared content), pinned red→green in `check_compare_ramp_detail_tsn`.
+Corpus re-measure through the product engine: Excel-vs-TSN moves from the
+accepted RD-79 numbers 741 differing rows / 847 cells {Description 185} to
+**737 / 843 {Description 181}** with every other per-field count and the
+15,212 / 4 / 198 shape identical — an explained amendment to RD-79's
+Excel-vs-TSN leg justified source-first (the raw extract proves the bytes
+are not data); PDF-vs-TSN stays exactly the accepted 774 / 998 and
+PDF-vs-Excel stays 15,216 fully identical (no double-decode drift through
+the shared `_v`).
 
 ### CMP-AUD-198 — permanent installed-Excel escape probe over-specifies optional COM open arguments
 

@@ -114,6 +114,23 @@ def test_schema():
           and rd._iso_date("1992-09-28 00:00:00") == "1992-09-28")
     check("description drops the TSMIS '001/' route prefix",
           rd._strip_desc_prefix("001/NB OFF TO DOHENY") == "NB OFF TO DOHENY")
+    # CMP-AUD-197 (the RD vs-TSN half): the loader reads cells the way
+    # installed Excel does — OOXML _xHHHH_ escapes decode at the load
+    # boundary. The bound raw TSN extract carries ZERO literal _x000d_, so
+    # the four Cactus City Excel cells (route 010) were export-encoding
+    # artifacts, not data differences.
+    check("OOXML escapes decode at the load boundary (both hex cases)",
+          rd._v("A_x000d_B") == "A\rB" and rd._v("A_x000D_B") == "A\rB")
+    check("the _x005F_ escaped literal underscore is preserved",
+          rd._v("TAG_x005F_x000d_") == "TAG_x000d_")
+    check("TSMIS Description decodes BEFORE the edge trim (Cactus City)",
+          rd._strip_desc_prefix("010/EBOFF TO CACTUS_x000d_\n", "010")
+          == "EBOFF TO CACTUS")
+    check("TSN-side Description edge-trim decodes consistently",
+          rd._edge_text("EBOFF TO CACTUS\n") == "EBOFF TO CACTUS"
+          and rd._edge_text("X_x000d_") == "X")
+    check("a decoded INTERIOR carriage return survives as real content",
+          rd._v("A_x000d_ B") == "A\r B")
 
 
 def test_end_to_end():

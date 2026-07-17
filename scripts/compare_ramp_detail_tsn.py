@@ -160,8 +160,12 @@ def _strip_desc_prefix(text, route=None):
     row's own route — a DIFFERENT numeric prefix is source data and survives
     (the accepted RD-79 oracle's declared TSMIS reading contract). Without a
     route (legacy/verification callers) any single leading 'digits/' strips —
-    corpus-equivalent, since every TSMIS export line leads with its own route."""
-    t = ("" if text is None else str(text)).strip()
+    corpus-equivalent, since every TSMIS export line leads with its own route.
+    OOXML escapes decode BEFORE the edge trim (CMP-AUD-197): the four Cactus
+    City cells end `…_x000d_\\n` in the Excel export — an encoded CR the raw
+    TSN extract never carries — and decode-then-trim removes exactly that
+    export artifact while a trailing literal token would otherwise survive."""
+    t = ctc.decode_ooxml_escapes("" if text is None else str(text)).strip()
     m = _DESC_PREFIX.match(t)
     if not m:
         return t
@@ -184,7 +188,16 @@ def _edge_text(v):
 
 
 def _v(x):
-    return normalize_value(x)
+    """normalize_value + the installed-Excel OOXML decode (CMP-AUD-197):
+    `_xHHHH_` escapes are how the Excel export serializes control characters
+    (both hex cases; `_x005F_xHHHH_` stays a literal token), so reading them
+    decoded IS reading the cell the way installed Excel displays it. The raw
+    TSN extract carries none, so the TSN side is byte-unchanged; interior
+    decoded characters survive as real compared content (no folding)."""
+    nv = normalize_value(x)
+    if not isinstance(nv, str):
+        return nv
+    return ctc.decode_ooxml_escapes(nv)
 
 
 # --------------------------------------------------------------------------- #
