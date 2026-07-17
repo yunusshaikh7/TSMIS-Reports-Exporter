@@ -355,10 +355,20 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > "— MER 059" line (route 059 p5, x0 354.4 — group-header-SHAPED, dashed
 > district slot; ONE cell statewide; scan all 252 prints for em-dash
 > lines and classify with evidence BEFORE any rule). **Next actionable
-> batch: F's 210** (evidence over the 067 same-source schemas — the adapters
-> can ride them), then the "— MER 059" census, then buckets B–I. (Bucket A is
-> DONE: 065/040-file/006/037 closed, 071 → C.) HD-Excel county stays
-> vendor-blocked — never infer it.
+> batch: the C-bucket refusal-first loader gates** — the same
+> red→green-refusal pattern as 037/050/066, starting with **028** (the cross-env
+> `_resolve_key_field` silently falls back to column 0 when the configured key
+> column is missing → two key-less workbooks returned a false MATCH; make it
+> fail-closed), then **033** (bind the normalized-sheet loaders to an exact
+> versioned shared-header prefix — the direct companion to 037's marker) and
+> **034** (versioned positional-layout contracts for the consolidated TSMIS
+> loaders). **F's 210 is DEFERRED**: it is a multi-part evidence FEATURE (new
+> Excel-cell image evidence + a PDF-vs-Excel Matrix hook + UI camera un-gating +
+> the triangle ledger), not a single-batch correctness fix — it needs its own
+> mini-plan and should not be started as a sprawling incomplete change. After
+> the C gates: 210's feature, the "— MER 059" census, then buckets B/D/E/G/H/I.
+> (Bucket A is DONE: 065/040-file/006/037 closed, 071 → C.) HD-Excel county
+> stays vendor-blocked — never infer it.
 >
 > **DONE 2026-07-17 (after 067): the TSMIS-PDF HL star-description
 > recovery — the TSN-v5 mirror.** The star-guard is POSITIONAL now: a
