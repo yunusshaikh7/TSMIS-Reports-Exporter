@@ -20,12 +20,12 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | | |
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
-| **Gate** | 121/121 offline checks + ruff(scripts) + byte-compile green; **identity gate 10 green / 0 known-red** (CMP-AUD-045 fully promoted) |
+| **Gate** | **124/124 offline** checks (128 full CI with the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
+| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; the C-bucket loader-validation gates **028 + 033 + 036** shipped CI-green this session. **Next: pick the next C gate by tractability** — 070 (ID identity derivation, output-affecting → oracle re-confirm), 034 (column-shifted consolidated-layout contracts), or lighter 030/027/063 — then the "— MER 059" census, then buckets B/D/E/G/H/I. 210 is DEFERRED (a multi-part evidence feature). HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 + 066 + 067 + 006 + 037 closures)
+> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, then the C-bucket gates 028 + 033 + 036)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
