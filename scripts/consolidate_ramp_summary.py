@@ -836,6 +836,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     records = []
     failed = []
     blank = []
+    route_sources = {}       # route -> the PDF that produced it (CMP-AUD-050)
     for i, p in enumerate(pdfs, 1):
         if events.is_cancelled():
             return ConsolidateResult(status="cancelled", message="Cancelled by user.")
@@ -849,13 +850,32 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         # A one-page / truncated PDF parses without error but carries no ramp
         # data (page 2 holds the figures) — don't write it as a blank route row,
         # and don't let a folder full of them overwrite a good workbook.
-        if record_has_data(rec):
-            records.append(rec)
-            events.on_log(f"{prefix} parsed")
-        else:
+        if not record_has_data(rec):
             events.on_log(f"{prefix} skipped: no ramp data "
                           "(one-page / truncated PDF?)")
             blank.append(p.name)
+            continue
+        # CMP-AUD-050: a populated record must own exactly one nonblank
+        # route, and two PDFs claiming the same route must never both be
+        # appended (the vs-TSN aggregate loader would sum them — a 5-count
+        # and a 7-count duplicate once became statewide count 12).
+        route = "" if rec.get("route") is None else str(rec["route"]).strip()
+        if not route:
+            events.on_log(f"{prefix} FAILED: no route identity parsed from "
+                          "the PDF")
+            failed.append(p.name)
+            continue
+        if route in route_sources:
+            return ConsolidateResult(
+                status="error",
+                message=(f"Two PDFs both claim route {route}: "
+                         f"{route_sources[route]} and {p.name} (is the same "
+                         "route in the folder twice?). Nothing was written; "
+                         "remove the duplicate and run again."),
+            )
+        route_sources[route] = p.name
+        records.append(rec)
+        events.on_log(f"{prefix} parsed")
 
     # Nothing usable parsed → do NOT write (a blank/header-only workbook would
     # overwrite a good prior consolidation). Leave the existing file untouched.

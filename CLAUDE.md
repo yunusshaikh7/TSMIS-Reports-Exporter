@@ -122,10 +122,13 @@ Stage-8 base-family audits are complete: **7/7**. Highway Log closed on exact 25
 Excel/PDF source witnesses, its accepted-red Stage-6 chain, an independent projection
 oracle, two clean seven-file product-leg universes, and two byte-identical final-gate
 result/acceptance pairs. The gate accepts only the base audit: product, full-physical,
-workbook-evidence, and end-to-end perfection remain false. CMP-AUD-049/050/066/067
-remain open (047/048 shipped 2026-07-16; 157 + 045-HL shipped 2026-07-17; 045's
-HD-Excel leg stays blocked on the vendor county answer — never infer it), and no
-product code changed during the bounded closeout itself. Exact
+workbook-evidence, and end-to-end perfection remain false. CMP-AUD-049/066/067
+remain open (047/048 shipped 2026-07-16; 157 + 045-HL + 050 shipped 2026-07-17 —
+050: the shared PDF-conversion driver and Ramp Summary now REFUSE duplicate or
+blank route claims with both source PDFs named, never overwriting or
+double-counting by file order; 045's HD-Excel leg stays blocked on the vendor
+county answer — never infer it), and no product code changed during the bounded
+closeout itself. Exact
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
 The owner-authorized remediation is live on branch `comparison-perfection`; the single

@@ -263,11 +263,43 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   v5-only — every other row byte-identical (the corpus-level form of 157's
 >   source-only mutation test).
 >
-> **Do this next: CMP-AUD-049/050 (route identity/universe enforcement),
-> 066 (PDF role provenance — the HL vs-TSN instance already closed), 067
-> (TSN projections hiding PDF-vs-Excel source differences), then the
-> unowned-findings triage sweep.** HD-Excel county stays vendor-blocked —
-> never infer it.
+> **DONE 2026-07-17 (after the HL batch): CMP-AUD-050 — PDF conversion
+> enforces a route universe.** Both paths keep a route→source map and REFUSE
+> instead of absorbing by file order: the shared `run_pdf_conversion` driver
+> (all five table-PDF consolidators) errors on a blank route identity or a
+> second PDF claiming an already-converted route (both source PDFs named;
+> the combined workbook not written; last-good preserved; the old
+> warn-overwrite-double-count path is gone), and Ramp Summary's collection
+> loop refuses duplicates the same way while a populated no-route record
+> becomes a named FAILED input (loud ⚠ INCOMPLETE banner, PARTIAL, counted)
+> — never a complete workbook with a blank Route. NEW
+> `check_pdf_route_universe` (12 pins; 8 pre-fix failures by git-stash).
+>
+> **Do this next: CMP-AUD-049 (filename/document/emitted route agreement in
+> the five PDF converters + direct per-route comparison identity + evidence
+> adapters), then 066 (PDF role provenance — the HL vs-TSN instance already
+> closed by the v5 marker gate), 067 (TSN projections hiding PDF-vs-Excel
+> source differences), then the unowned-findings triage sweep.** HD-Excel
+> county stays vendor-blocked — never infer it.
+>
+> **The 049 census (2026-07-17, partial — bind before implementing):**
+> - Converter half: every convert_one currently computes
+>   `route = name_route or pdf_route` with a WARN-only disagreement path
+>   ("using the filename") — `consolidate_tsmis_highway_log_pdf.convert_one`
+>   is the template (parse_pdf already returns the cover route). The honest
+>   rule: the DOCUMENT's route is authoritative; a filename token merely
+>   corroborates; disagreement or a missing in-document route = a NAMED
+>   failed input (finalize already escalates PARTIAL). Each family's
+>   in-document route source: HL cover "Route 006" (parsed today), HD DCR
+>   "11 IMP 007", HSL page banners, RD page banners, ID Location field —
+>   census which are already parsed vs need extraction before coding.
+> - Direct-compare half: per-route workbooks carry NO Route column, so
+>   content-level identity does not exist — the enforceable rule is
+>   filename-token agreement between the two picked files (refuse "Route
+>   001" vs "Route 002"), with consolidated inputs unaffected.
+> - Evidence half: adapters construct the PDF path from the expected route
+>   filename without reconciling the document's own route before captioning
+>   (visual_evidence.py:248-286,390-444).
 >
 > **DONE 2026-07-16 (after 047/048): the HD statewide re-measure — EXACT.**
 > The bound 7.7-bundle harness re-run under the post-220 objective

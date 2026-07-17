@@ -217,9 +217,12 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
     wrote verbatim: deps gate -> glob + the no-inputs error -> the EARLY
     overwrite confirm (before any parsing) -> banner -> clear the stale
     converted files -> the per-PDF loop (cancel, parse via `convert_one`,
-    duplicate-route warning, write via `write_one`, the locked-file error) ->
-    the none-readable error -> `consolidate_xlsx` -> the shared summary lines +
-    the report's `finalize` (its ⚠ notes + producer-owned PARTIAL escalation).
+    the CMP-AUD-050 route-universe gate — a blank route identity or two PDFs
+    converting to the same route REFUSES with both sources named, never
+    overwriting or double-counting by file order — write via `write_one`,
+    the locked-file error) -> the none-readable error -> `consolidate_xlsx`
+    -> the shared summary lines + the report's `finalize` (its ⚠ notes +
+    producer-owned PARTIAL escalation).
 
     `convert_one(p, prefix, events, ctx)` owns the per-report step: route
     resolution, parse, its own stats in `ctx`, and its own skip logging (it
@@ -298,7 +301,7 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
 
     ctx = {"failed": [], "pdfs": len(pdfs)}
     converted = 0
-    written = set()                  # guard against duplicate route across PDFs
+    route_sources = {}               # route -> the PDF that produced it (CMP-AUD-050)
     for i, p in enumerate(pdfs, 1):
         if events.is_cancelled():
             return ConsolidateResult(status="cancelled", message="Cancelled by user.")
@@ -315,12 +318,29 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
         if step[0] == "skip":
             continue
         _tag, route, rows = step
+        # CMP-AUD-050: every converted PDF must own exactly one nonblank
+        # route, and two PDFs claiming the same route must never silently
+        # overwrite or double-count by file order — the combined workbook is
+        # not written.
+        route = "" if route is None else str(route).strip()
+        if not route:
+            return ConsolidateResult(
+                status="error",
+                message=(f"{p.name} produced no usable route identity; the "
+                         f"combined {report_name} workbook was not written. "
+                         "Re-export that route's PDF, then run again."),
+            )
+        if route in route_sources:
+            return ConsolidateResult(
+                status="error",
+                message=(f"Two PDFs both convert to route {route}: "
+                         f"{route_sources[route]} and {p.name} (is the same "
+                         f"route in the folder twice?). The combined "
+                         f"{report_name} workbook was not written; remove "
+                         "the duplicate and run again."),
+            )
+        route_sources[route] = p.name
         out_file = conv / f"{converted_prefix}_route_{route}.xlsx"
-        if out_file.name in written:
-            events.on_log(f"  WARNING: route {route} already converted from an earlier "
-                          f"PDF; {p.name} replaces it (is the same route in the "
-                          "folder twice?)")
-        written.add(out_file.name)
         candidate = conv / f".{converted_prefix}.tmp-{uuid.uuid4().hex}.xlsx"
         if not guarded(candidate) or not guarded(out_file):
             return destination_changed()

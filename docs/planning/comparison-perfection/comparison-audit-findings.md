@@ -328,7 +328,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
 | CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
 | CMP-AUD-049 | P1 | Verified | Direct/PDF route provenance is not enforced |
-| CMP-AUD-050 | P1 | Verified | PDF routes can overwrite, double-count, or remain blank |
+| CMP-AUD-050 | P1 | Remediated (2026-07-17) | PDF routes can overwrite, double-count, or remain blank |
 | CMP-AUD-051 | P1 | Verified | Highway Detail PM spill creates phantom PDF records |
 | CMP-AUD-052 | P1 | Verified | Highway Detail header words swallow real line-two data |
 | CMP-AUD-053 | P1 | Verified | Highway Detail orphan reconciliation never fires |
@@ -2553,7 +2553,7 @@ report family.
 ### CMP-AUD-050 — PDF conversion does not enforce a route universe
 
 Priority: P1  
-Status: Verified in shared table conversion and Ramp Summary consolidation  
+Status: Remediated 2026-07-17  
 Primary code: `scripts/pdf_table_lib.py:276-307`,
 `scripts/consolidate_ramp_summary.py:260-295,690-780`
 
@@ -2571,6 +2571,25 @@ maintain a route-to-source map before writing. A duplicate must fail or produce 
 explicitly reconciled partial result; it must never overwrite or double-count by file
 order. Summary counts must report unique emitted routes, and route provenance must be
 retained in the workbook/result.
+
+**Remediation (2026-07-17).** Both paths now keep a route→source-PDF map and
+refuse instead of absorbing by file order. The shared driver
+(`run_pdf_conversion`, all five table-PDF consolidators): a blank/None route
+identity or a second PDF converting to an already-claimed route returns an
+error NAMING both source PDFs — the combined workbook is not written and
+last-good is preserved (the old warn-overwrite-double-count path is gone, so
+`converted` counts unique emitted routes by construction). Ramp Summary's
+collection loop: a duplicate route refuses the same way before anything is
+written; a POPULATED record with no parseable route becomes a named FAILED
+input — the run publishes without it under the existing loud
+"⚠ INCOMPLETE" banner with `completion=PARTIAL` and `failed_inputs`
+counted, never a complete workbook with a blank Route row. Red→green pinned
+in the new `check_pdf_route_universe` (fake-converter driver runs + patched
+Ramp Summary collection: duplicate names both sources / blank refuses or
+fails loudly / distinct routes still publish COMPLETE; 8 pre-fix failures
+under git-stash). The CMP-AUD-049 halves (filename-vs-document route
+agreement in the converters, direct per-route comparison identity, evidence
+adapters) remain open.
 
 ### CMP-AUD-051 — Highway Detail line-one spill creates phantom records
 
