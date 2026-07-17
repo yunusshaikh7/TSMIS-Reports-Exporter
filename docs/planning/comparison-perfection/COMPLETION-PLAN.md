@@ -194,14 +194,41 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   the pairing objective.~~ The approval was recorded and the batch shipped —
 >   see the DONE record above.
 >
-> **Do this next: Wave 5** — 127 (payload-chunk lifecycle), 130
-> (stat-then-unlink cleanup), 131 (power-loss durability), 118/119/120 (the
-> validation TSN-library trio), 214 (the Spot Check banner-overwrite display
-> defect), plus the unowned-findings triage. Read each finding in the ledger
-> first; none has a staged brief yet. HL stays BLOCKED on its raw
-> county-retention + collision census; HD-Excel on the vendor county answer
-> (do NOT infer either); HD statewide comparison counts must be re-measured
-> before any HD statewide re-bless claim.
+> **Do this next: Wave 5** — 214 first (staged below), then 127
+> (payload-chunk lifecycle), 130 (stat-then-unlink cleanup), 131 (power-loss
+> durability), 118/119/120 (the validation TSN-library trio), plus the
+> unowned-findings triage (the others have no staged briefs — read each
+> finding first). HL stays BLOCKED on its raw county-retention + collision
+> census; HD-Excel on the vendor county answer (do NOT infer either); HD
+> statewide comparison counts must be re-measured before any HD statewide
+> re-bless claim.
+>
+> **Staged: CMP-AUD-214 — the Spot field-by-field banner (one fresh-context
+> geometry batch; censused 2026-07-16 against the live post-218 writer):**
+> - **The defect**: `_write_spot_check` calls `banner(15, "FIELD BY FIELD —
+>   RECOMPUTED …")` then writes the header row at `F_FIRST - 1` = 15 — the
+>   headers replace the banner in the shared `grid` dict, so the intended
+>   reviewer statement never appears (10/10 workbooks; `B15="Field"`).
+> - **The acceptance** (from the finding): banner and header on DISTINCT
+>   rows, all offsets updated ATOMICALLY, both flavors reopened; the gate
+>   pins exactly one banner + one header + the expected cell map.
+> - **The geometry (post-218 rows are FULL through 14)**: 2 title / 3 note /
+>   4 order / 5 manual-calc / 6 input / 7 find / 8 empty / 9 claims banner /
+>   10 identity / 11 status+diffs / 12 key-matched rows (+K12/L12/M12 hidden
+>   derivations) / 13 one-sided callout / 14 Row integrity. So the banner
+>   keeps row 15, the HEADER ROW moves to 16, and `F_FIRST` becomes 17.
+> - **Atomic pin updates required**: `check_compare_audit` (~line 101: Spot
+>   `G16` → `G17`; the p5 test's row-12/14 cells do NOT move);
+>   `check_compare_equality_policy` — the row-15 helper-header pins at cols
+>   11-13 and 20-29 move to row 16, the rows-(16,17) formula scans move to
+>   (17,18), `K16/K17/L16/M16/F16/G16` → `K17/K18/L17/M17/F17/G17`, and the
+>   COM fixture reads (`K16/M16/G16`, `K17/M17/L17/F17/G17/H17/I17`) shift
+>   +1; the 218 mutation-gate cells (C6/C14) do NOT move. The frozen
+>   `check_phase8_highway_sequence_summary_spot.py` stays untouched (pre-fix
+>   witness). `spot_physical_n_cols` and every Comparison-side pin are
+>   unaffected.
+> - **Canary discipline**: counts/status/display semantics byte-identical;
+>   only Spot-sheet row addresses below row 14 shift by +1.
 >
 > **DONE 2026-07-16 (after 218): CMP-AUD-197 is CLOSED for every current
 > family — the RD vs-TSN half landed.** The census settled the deferred
