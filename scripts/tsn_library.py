@@ -1159,7 +1159,7 @@ def _write_normalized_workbook(sheet, header, header_align, rows):
 
 def build_normalized(raw_dir, out_path, *, glob, deps_ok, deps_msg, no_raw_what,
                      no_raw_hint, log_label, sheet, header, header_align, project,
-                     events=None, confirm_overwrite=None):
+                     events=None, confirm_overwrite=None, marker_version=None):
     """Shared driver for the single-file TSN normalizers (S04). Requires exactly
     one ordinary `glob` file in `raw_dir`, parses it via `project`, and writes the normalized
     workbook (one `sheet`, the styled `header`, then the projected rows) to
@@ -1271,6 +1271,14 @@ def build_normalized(raw_dir, out_path, *, glob, deps_ok, deps_msg, no_raw_what,
 
     try:
         wb = _write_normalized_workbook(sheet, header, header_align, rows)
+        if marker_version is not None:
+            # CMP-AUD-037: the XLSX-sourced families (RD/ID/HD) stamp their
+            # normalized workbook with the version so the DIRECT comparison path
+            # can refuse a stale library (the matrix/library path already gates
+            # via the certificate, D2). create_sheet + append works on the
+            # write-only workbook.
+            import compare_tsn_common as _ctc
+            _ctc.write_normalization_marker(wb, marker_version, report_name=log_label)
     except ImportError:
         # The `deps_ok` probe is a single `from openpyxl import Workbook`; this is the
         # centralized backstop for a partial/frozen-pruned openpyxl whose WriteOnlyCell /

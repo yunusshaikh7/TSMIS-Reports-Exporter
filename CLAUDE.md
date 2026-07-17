@@ -150,10 +150,16 @@ TSMIS-PDF Highway Log parser dropped asterisk-leading printed Descriptions
 four real rows recovered, statewide Description class 5→1. The 2026-07-17
 unowned-findings triage then bucketed the 112 remaining findings A–I and
 closed bucket A: CMP-AUD-065 (already fixed by 199), the 040 file half (066),
-and CMP-AUD-006 (the RD physical-identity postmile is Decimal-canonical now —
+CMP-AUD-006 (the RD physical-identity postmile is Decimal-canonical now —
 `decimal_pm` shared with Intersection Detail; `9.6`/`9.600`/`009.600` are one
 ramp; the statewide coincidence census proved ZERO pairing changes, only
-1,755 canonical-key display texts). Exact
+1,755 canonical-key display texts), and CMP-AUD-037 (the last direct-path
+freshness gap — the three XLSX-sourced vs-TSN families now stamp an in-workbook
+"TSN Normalization" marker and their `_load_tsn` refuses a pre-current library:
+RD v5 / ID v5 / HD v3, HD's loader had none before; the shared
+`compare_tsn_common` marker helpers, the catalog-mirror invariant gated by
+`check_tsn_normalization_marker`; marker-only bumps proven row-identical on the
+real statewide corpus). Exact
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
 The owner-authorized remediation is live on branch `comparison-perfection`; the single

@@ -235,6 +235,61 @@ def reject_pdf_source(path, side_label, report_noun):
             f"{report_noun} workbook built from the Excel exports.")
 
 
+# --------------------------------------------------------------------------- #
+# In-workbook normalization marker (CMP-AUD-037) — the DIRECT-path freshness gate
+# for the XLSX-sourced TSN families (Ramp Detail / Intersection Detail / Highway
+# Detail). The matrix/library path already refuses a stale library via its
+# certificate (report_catalog's normalization_version, D2), but a classic file
+# comparison trusted ANY workbook carrying the normalized sheet — so a library
+# built by an older normalizer was silently compared, resurrecting whatever that
+# version got wrong. The consolidator families (HSL/HL) carry their own marker
+# sheet; this is the shared mechanics the loader families reuse. The normalized
+# rows sheet keeps its WIDTH across a marker-only bump, so the marker is the only
+# reliable signal on a bare direct-path file.
+# --------------------------------------------------------------------------- #
+NORMALIZATION_MARKER_SHEET = "TSN Normalization"
+_NORM_VERSION_LABEL = "Normalization version"
+
+
+def write_normalization_marker(wb, version, *, report_name=None):
+    """Stamp a normalized TSN workbook with its normalization `version`
+    (CMP-AUD-037). Uses create_sheet + append so it works on the write-only
+    normalized workbook too (`ws['A1'] =` TypeErrors in write-only mode). The
+    marker is a plain trailing sheet; the data sheet is untouched."""
+    ws = wb.create_sheet(NORMALIZATION_MARKER_SHEET)
+    if report_name:
+        ws.append(["Report", report_name])
+    ws.append([_NORM_VERSION_LABEL, int(version)])
+
+
+def normalization_marker_version(wb):
+    """The declared normalization version from an OPEN workbook's marker sheet,
+    or 0 when the sheet is absent OR malformed. Fail-safe by design: a 0 means
+    the caller refuses with the rebuild hint, so a corrupt marker never passes
+    as current."""
+    if NORMALIZATION_MARKER_SHEET not in wb.sheetnames:
+        return 0
+    for r in wb[NORMALIZATION_MARKER_SHEET].iter_rows(values_only=True):
+        if r and str(r[0]).strip() == _NORM_VERSION_LABEL:
+            try:
+                return int(r[1])
+            except (TypeError, ValueError, IndexError):  # silent-ok: a malformed marker reads as version 0 — the caller then refuses with the rebuild hint (fail-safe)
+                return 0
+    return 0
+
+
+def require_current_normalization(wb, name, version, detail):
+    """Refuse an OPEN normalized TSN workbook older than `version` on the DIRECT
+    comparison path (CMP-AUD-037). `detail` names what a pre-current file is
+    missing; `name` is the display filename. A shape-stable marker-only bump
+    means every width/label gate still passes a stale library — only the marker
+    distinguishes it, so this is the authoritative freshness check."""
+    if normalization_marker_version(wb) < version:
+        raise ValueError(
+            f"{name} was built by an older TSN converter ({detail}) — rebuild "
+            "the TSN library and pick the fresh normalized workbook.")
+
+
 def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_msg,
                            header_ok=None, row_transform=list):
     """The consolidated-workbook loader skeleton three vs-TSN comparators wrote

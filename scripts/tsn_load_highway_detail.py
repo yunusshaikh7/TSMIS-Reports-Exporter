@@ -85,4 +85,5 @@ def build_into(raw_dir, out_path, events=None, confirm_overwrite=None):
         sheet=hdt.NORMALIZED_SHEET,
         header=["Route"] + hdt.SHARED_HEADER + SIDECAR_HEADER,
         header_align={"horizontal": "center", "vertical": "center", "wrap_text": True},
-        project=_project)
+        project=_project,
+        marker_version=hdt.NORMALIZATION_VERSION)   # CMP-AUD-037 direct-path freshness marker

@@ -80,6 +80,14 @@ REPORT_NAME = "Highway Detail"
 TSMIS_SHEET = "Highway Detail"            # consolidated sheet (Route prepended)
 TSN_SHEET = "Sheet 1"                     # raw statewide DB dump
 NORMALIZED_SHEET = "Highway Detail (TSN)"
+# CMP-AUD-037: the DIRECT-path freshness marker version (the catalog's
+# highway_detail normalization_version MIRRORS this; tsn_load_highway_detail
+# .build_into stamps it, _load_tsn refuses anything older). HD's direct loader
+# had NO stale-library gate at all — a normalized workbook from any prior
+# normalizer was trusted. v3 is a marker-only bump over the v2 sidecar shape;
+# the rows are byte-identical, and the bump forces D2 to rebuild stored
+# libraries so they gain the marker.
+NORMALIZATION_VERSION = 3
 
 KEY = "Post Mile"
 # The shared comparison header: the canonical Post Mile key, the derived PS
@@ -350,6 +358,12 @@ def _load_tsn(path):
         raise ValueError(f"Could not open {path.name}: {type(e).__name__}: {e}")
     try:
         if NORMALIZED_SHEET in wb.sheetnames:
+            # CMP-AUD-037: HD's direct loader had no freshness gate — a normalized
+            # workbook from any prior normalizer was trusted. Refuse a pre-v3
+            # library (no in-workbook marker); the library path auto-rebuilds (D2).
+            ctc.require_current_normalization(
+                wb, path.name, NORMALIZATION_VERSION,
+                "pre-v3: no in-workbook normalization marker")
             it = wb[NORMALIZED_SHEET].iter_rows(values_only=True)
             next(it, None)
             rows = [_normalized_row(r)

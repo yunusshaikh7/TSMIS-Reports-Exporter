@@ -578,6 +578,28 @@ typed-date fold (openpyxl cell typing, value-identical). Guarded end to end by t
 `check_compare_same_source` mutation matrix (every finding mutation red pre-fix,
 identical-render MATCH pins everywhere).
 
+**Direct-path freshness marker (CMP-AUD-037, 2026-07-17).** The matrix/library path
+refuses a stale normalized TSN library through the D2 certificate
+(`normalization_version`), but a *classic file comparison* trusted ANY workbook that
+carried the normalized sheet — so a library built by an older normalizer was silently
+compared, resurrecting whatever that version got wrong (an otherwise-identical row split
+into two one-sided rows for "005" vs "5"). The XLSX-sourced families now stamp their
+normalized workbook with an in-workbook **"TSN Normalization"** marker sheet (the shared
+`compare_tsn_common.write_normalization_marker` / `normalization_marker_version` /
+`require_current_normalization`; `tsn_library.build_normalized(marker_version=…)` writes
+it, the write-only workbook included), and each direct loader (`_load_tsn`) refuses a
+pre-current file with a rebuild hint before trusting the sheet — **Highway Detail's loader
+had no freshness gate at all before this**. The version constant lives in each comparator
+(`NORMALIZATION_VERSION` — Ramp Detail 5, Intersection Detail 5, Highway Detail 3; the
+`tsn_load_*` loader already imports the comparator, so this direction avoids a cycle) and
+the catalog `normalization_version` MIRRORS it. Each was a marker-ONLY bump: the normalized
+rows are byte-identical to the prior version (proven on the real statewide corpus — an
+unmarked rebuild's data rows equal the marked rebuild's exactly), so the D2 rebuild that
+adds the marker moves no comparison count. This mirrors the consolidator families' own
+marker (Highway Sequence v4, Highway Log v5). Pinned in `check_tsn_normalization_marker`
+(helper round-trip incl. write-only + the mirror invariant + the real `build_normalized`
+seam) plus each family check's refusal/acceptance flow.
+
 ### 9c. TSMIS vs TSN Ramp Detail — `compare_ramp_detail_tsn.py` (`"files"`, group `tsn`; remediation pending)
 
 The current **v0.17.0 product comparator** was the recipe later reports followed, but its

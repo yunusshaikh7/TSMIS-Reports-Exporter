@@ -80,6 +80,13 @@ REPORT_NAME = "Intersection Detail"
 TSMIS_SHEET = "Intersection Detail"      # consolidated sheet (Route prepended)
 TSN_SHEET = "Sheet 1"                     # raw statewide DB dump
 NORMALIZED_SHEET = "Intersection Detail (TSN)"
+# CMP-AUD-037: the DIRECT-path freshness marker version (the catalog's
+# intersection_detail normalization_version MIRRORS this; tsn_load_
+# intersection_detail.build_into stamps it, _load_tsn refuses anything older).
+# v5 is a marker-only bump over the v4 county-aware shape — the normalized rows
+# are byte-identical, but a bare v4 library carried no marker and the direct
+# path trusted it; the bump forces D2 to rebuild stored libraries so they gain it.
+NORMALIZATION_VERSION = 5
 
 KEY = "PM"
 # Column order mirrors the source report (each effective-date next to its type, the
@@ -409,6 +416,12 @@ def _load_tsn(path):
                     f"{path.name} is an older normalized TSN Intersection "
                     "Detail library (before the county-aware physical "
                     "identity) — rebuild the TSN library and retry.")
+            # CMP-AUD-037: a v4-shaped library (the sidecars present) but missing
+            # the in-workbook marker predates the direct-path freshness gate —
+            # refuse it. The library path already auto-rebuilds via D2.
+            ctc.require_current_normalization(
+                wb, path.name, NORMALIZATION_VERSION,
+                "pre-v5: no in-workbook normalization marker")
             rows = [_normalized_row(r)
                     for r in it if r and any(c not in (None, "") for c in r)]
             return rows, True

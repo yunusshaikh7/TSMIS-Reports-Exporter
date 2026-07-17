@@ -25,6 +25,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import compare_ramp_detail_tsn as rd
+import compare_tsn_common as ctc
 from events import Events
 from openpyxl import Workbook, load_workbook
 
@@ -59,16 +60,24 @@ def _write_tsmis(path, rows):
     wb.close()
 
 
-def _write_tsn(path, rows, sidecars=("TSN District", "TSN County", "TSN PM Suffix")):
+def _write_tsn(path, rows, sidecars=("TSN District", "TSN County", "TSN PM Suffix"),
+               marker_version="current"):
     """rows: [route, PR, PM, District, Date, HG, Area4, City, R/U, Desc,
     RampName, OnOff, RampType, ADT, dist, cnty, sfx] — the v4 normalized shape
-    (District in the shared width + the District/County/PM-Suffix sidecars)."""
+    (District in the shared width + the District/County/PM-Suffix sidecars).
+    Stamps the CMP-AUD-037 normalization marker at the current version by
+    default so _load_tsn accepts it; pass marker_version=None to model a
+    pre-marker library, or an int to model a stale one."""
     wb = Workbook()
     ws = wb.active
     ws.title = rd.NORMALIZED_SHEET
     ws.append(["Route"] + rd.SHARED_HEADER + list(sidecars))
     for r in rows:
         ws.append(r)
+    if marker_version == "current":
+        marker_version = rd.NORMALIZATION_VERSION
+    if marker_version is not None:
+        ctc.write_normalization_marker(wb, marker_version)
     wb.save(path)
     wb.close()
 
@@ -275,6 +284,35 @@ def test_two_county_and_v3_refusal():
     except ValueError as e:
         check("a v3 library refuses with a rebuild hint",
               "older normalized" in str(e) and "rebuild" in str(e))
+
+    # CMP-AUD-037: a CURRENT-shape library (District + the sidecars) that carries
+    # no normalization marker, or a stale one, is refused on the direct path —
+    # the shape gate can't see it, so the marker version is the authoritative
+    # freshness check.
+    nomark = root / "nomarker.xlsx"
+    _write_tsn(nomark, [], marker_version=None)
+    try:
+        rd._load_tsn(nomark)
+        check("a marker-less current-shape library refuses (CMP-AUD-037)", False)
+    except ValueError as e:
+        check("a marker-less current-shape library refuses (CMP-AUD-037)",
+              "older TSN converter" in str(e) and "rebuild" in str(e))
+    old = root / "stale-marker.xlsx"
+    _write_tsn(old, [], marker_version=rd.NORMALIZATION_VERSION - 1)
+    try:
+        rd._load_tsn(old)
+        check("a stale-marker library refuses (CMP-AUD-037)", False)
+    except ValueError as e:
+        check("a stale-marker library refuses (CMP-AUD-037)",
+              "older TSN converter" in str(e))
+    # ...and the current marker is accepted (the round-trip closes green).
+    good = root / "good.xlsx"
+    _write_tsn(good, [])
+    try:
+        rows, has_route = rd._load_tsn(good)
+        check("a current-marker library is accepted", rows == [] and has_route is True)
+    except ValueError:
+        check("a current-marker library is accepted", False)
 
 
 def main():

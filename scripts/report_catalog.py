@@ -377,9 +377,14 @@ TSN = (
     # county-aware D4 physical identity from the sidecars instead of slicing
     # them away. The bump rebuilds stored libraries (D2); pre-v4 libraries are
     # refused by the loader with a rebuild hint.
+    # v5 (CMP-AUD-037): the normalized workbook now carries a "TSN Normalization"
+    # marker sheet so the DIRECT comparison path can refuse a stale library (the
+    # library path already gated via the certificate). Marker-only — the rows are
+    # byte-identical to v4; the bump forces D2 to rebuild stored libraries so
+    # they gain the marker. Mirrors compare_ramp_detail_tsn.NORMALIZATION_VERSION.
     TsnEntry("ramp_detail", "TSN Ramp Detail", "*.xlsx", "statewide_xlsx",
              "tsn_ramp_detail_normalized.xlsx", "tsn_load_ramp_detail:build_into",
-             normalization_version=4, evidence_pdfs=True),
+             normalization_version=5, evidence_pdfs=True),
     # v3 (both summaries): the sidecar now carries tsn_source_claims — the
     # print's identity/timing/submitter, the IS pre-fold printed rows + J–P
     # signal components, and the declared CONTROL F correction (CMP-AUD-144/
@@ -400,9 +405,14 @@ TSN = (
     # the county+PP-aware physical identity from the sidecars instead of
     # slicing them away. The bump rebuilds stored libraries (D2); pre-v4
     # libraries are refused by the loader with a rebuild hint.
+    # v5 (CMP-AUD-037): the normalized workbook now carries a "TSN Normalization"
+    # marker sheet so the DIRECT comparison path can refuse a stale library.
+    # Marker-only — the rows are byte-identical to v4; the bump forces D2 to
+    # rebuild stored libraries so they gain the marker. Mirrors
+    # compare_intersection_detail_tsn.NORMALIZATION_VERSION.
     TsnEntry("intersection_detail", "TSN Intersection Detail", "*.xlsx", "statewide_xlsx",
              "tsn_intersection_detail_normalized.xlsx", "tsn_load_intersection_detail:build_into",
-             normalization_version=4, evidence_pdfs=True),
+             normalization_version=5, evidence_pdfs=True),
     # v3: exact internal D01-D12 admission; force prior v2 libraries through it.
     # v4 (CMP-AUD-155/156/158/159): the row universe and values are source-exact
     # — the 565 printed pointer tokens ("*P*"/"-------->") kept verbatim in
@@ -423,9 +433,15 @@ TSN = (
     # v2 (v0.21.0): the normalized sheet appends the TSN District/County sidecar
     # columns — evidence locates a row's district print with them; the
     # comparison loader slices to the shared width and never sees them.
+    # v3 (CMP-AUD-037): the normalized workbook now carries a "TSN Normalization"
+    # marker sheet so the DIRECT comparison path can refuse a stale library (HD's
+    # direct loader previously had NO freshness gate at all). Marker-only — the
+    # rows are byte-identical to v2; the bump forces D2 to rebuild stored
+    # libraries so they gain the marker. Mirrors
+    # compare_highway_detail_tsn.NORMALIZATION_VERSION.
     TsnEntry("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
              "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into",
-             normalization_version=2, evidence_pdfs=True),
+             normalization_version=3, evidence_pdfs=True),
 )
 
 

@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 + 066 + 067 + 006 closures)
+> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 + 066 + 067 + 006 + 037 closures)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -34,7 +34,41 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
-> **DONE 2026-07-16 (latest): CMP-AUD-218 — Spot Check row matching is
+> **DONE 2026-07-17 (latest): CMP-AUD-037 CLOSED — the direct-path
+> normalization-freshness gate now covers all five families.** The matrix/
+> library path already refused a stale library via the D2 certificate, but a
+> classic FILE comparison trusted any workbook carrying the normalized sheet —
+> so a library built by an older normalizer was silently compared (an
+> otherwise-identical row split into "005" vs "5"). HSL v4 / HL v5 (their
+> consolidators' markers) already closed their direct paths; the three
+> XLSX-sourced families now do too:
+> - **Shared mechanics** in `compare_tsn_common`: `write_normalization_marker`
+>   (create_sheet + append — the write-only normalized workbook included) /
+>   `normalization_marker_version(wb)` (0 on absent OR malformed — fail-safe) /
+>   `require_current_normalization(wb, name, version, detail)`. Each normalized
+>   workbook carries an in-workbook **"TSN Normalization"** marker sheet, written
+>   by `tsn_library.build_normalized(marker_version=…)` (an opt-in param — RS/IS
+>   and other callers pass nothing and stay unmarked).
+> - **Gate + version**: each comparator's `_load_tsn` refuses a pre-current
+>   library with a rebuild hint (**HD had NO freshness gate at all before**; RD/ID
+>   keep their prior sidecar-shape refusals for the truly-old case, the marker
+>   catching the newer shape-valid-but-stale case). `NORMALIZATION_VERSION` lives
+>   in each comparator (RD 5, ID 5, HD 3 — the loader already imports the
+>   comparator, so this direction avoids a cycle); the catalog mirrors it
+>   (RD 4→5, ID 4→5, HD 2→3). Each is a MARKER-ONLY bump — the normalized rows
+>   are byte-identical, so the D2 rebuild that adds the marker moves no count.
+> - **Proof**: red→green by git-stash (all three ACCEPT a marker-less library
+>   pre-fix, REFUSE post-fix); NEW `check_tsn_normalization_marker` (helper
+>   round-trip incl. write-only + malformed→0; the catalog-mirror invariant; the
+>   real `build_normalized` writer seam stamps + preserves the data sheet + writes
+>   nothing when asked not to); per-family refusal/acceptance in each family
+>   check; REAL-CORPUS rebuild of all three statewide libraries from their bound
+>   raw XLSX (RD 15,410 rows, ID 16,626, HD 60,083 — each marked at the new
+>   version, `_load_tsn` accepts the marked build + refuses a marker-stripped
+>   copy) with the RD unmarked-vs-marked rebuild BYTE-IDENTICAL (additive-only).
+>   Offline gate **123/123** (full CI 128 with the 5 JS checks).
+>
+> **DONE 2026-07-16: CMP-AUD-218 — Spot Check row matching is
 > INDEPENDENT.** The Comparison sheet now carries a hidden trailing
 > `__CMP_E2_KEY_V1_TOKEN` column — each row's opaque helper key as a LITERAL
 > in both twins (injective, guarded, outside the visible filter/CF geometry;
@@ -285,9 +319,11 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   CLOSED by 199 (context_fields empty — all columns compared). 040 file
 >   half CLOSED by 066 (the same file refuses BOTH role gates,
 >   probe-verified); its folder run-root/subfolder aliasing half stays open
->   (→ D/E). 037 partially closed (HSL v4 + HL v5 direct-path marker gates);
->   **ID/HD/RD direct vs-TSN loaders still ungated — the fix = in-workbook
->   markers + gates for those three (version bump + re-bless each)**. 006
+>   (→ D/E). **037 CLOSED 2026-07-17** (all three XLSX-sourced families now gate
+>   the direct path: RD v5 / ID v5 / HD v3 in-workbook "TSN Normalization"
+>   markers + `_load_tsn` refusals — HD's loader had none before; the shared
+>   `compare_tsn_common` helpers; the mirror invariant gated; marker-only bumps,
+>   rows byte-identical on the real corpus — see the DONE block above). 006
 >   CLOSED the same day: the RD physical identity's postmile component is
 >   DECIMAL-canonical (`compare_tsn_common.decimal_pm`; ID's `_decimal_pm`
 >   delegates), so `9.6`/`9.600`/`009.600` are ONE ramp and the zero
@@ -319,11 +355,10 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > "— MER 059" line (route 059 p5, x0 354.4 — group-header-SHAPED, dashed
 > district slot; ONE cell statewide; scan all 252 prints for em-dash
 > lines and classify with evidence BEFORE any rule). **Next actionable
-> batch: 037's three family markers** (ID/HD/RD in-workbook normalization
-> markers + direct-loader gates — a version bump + re-bless each), then F's
-> 210 (evidence over the 067 same-source schemas), then the "— MER 059"
-> census, then buckets B–I. (Bucket A is DONE: 065/040-file/006 closed,
-> 037 partial, 071 → C.) HD-Excel county stays vendor-blocked — never infer it.
+> batch: F's 210** (evidence over the 067 same-source schemas — the adapters
+> can ride them), then the "— MER 059" census, then buckets B–I. (Bucket A is
+> DONE: 065/040-file/006/037 closed, 071 → C.) HD-Excel county stays
+> vendor-blocked — never infer it.
 >
 > **DONE 2026-07-17 (after 067): the TSMIS-PDF HL star-description
 > recovery — the TSN-v5 mirror.** The star-guard is POSITIONAL now: a

@@ -53,6 +53,13 @@ KEY_FIELD = SHARED_HEADER.index(KEY)      # 1
 CONTEXT_FIELDS = ("Ramp Name", "On/Off", "Ramp Type", "ADT")   # TSN-only -> non-asserting
 DATE_FIELDS = ("Date of Record",)
 NORMALIZED_SHEET = "Ramp Detail (TSN)"    # the library's normalized TSN workbook sheet
+# CMP-AUD-037: the DIRECT-path freshness marker version (the catalog's
+# ramp_detail normalization_version MIRRORS this; tsn_load_ramp_detail.build_into
+# stamps it, _load_tsn's normalized branch refuses anything older). v5 is a
+# marker-only bump over the v4 county-aware shape — the normalized rows are
+# byte-identical, but a bare v4 library carried no marker and the direct path
+# trusted it; the bump forces D2 to rebuild stored libraries so they gain it.
+NORMALIZATION_VERSION = 5
 TSN_RAW_HEADER = (
     "RAM_CONNECTION_ID", "RAMP_NANE", "LOCATION", "PR", "PM", "PM_SFX",
     "DATE_OF_RECORD", "HG", "AREA_4", "CITY_CODE", "POP", "ON_OFF",
@@ -305,6 +312,12 @@ def _load_tsn(path):
                     f"{name} is an older normalized TSN Ramp Detail library "
                     "(before the county-aware physical identity) — rebuild the "
                     "TSN library and retry.")
+            # CMP-AUD-037: a v4-shaped library (District + PM-Suffix present) but
+            # missing the in-workbook marker predates the direct-path freshness
+            # gate — refuse it. The library path already auto-rebuilds via D2.
+            ctc.require_current_normalization(
+                wb, name, NORMALIZATION_VERSION,
+                "pre-v5: no in-workbook normalization marker")
             rows = [_normalized_row(r)
                     for r in it if r and any(c not in (None, "") for c in r)]
             return rows, True

@@ -26,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import compare_intersection_detail_tsn as idt
+import compare_tsn_common as ctc
 from events import Events
 from openpyxl import Workbook, load_workbook
 
@@ -489,6 +490,7 @@ def test_normalized_path_crosswalk():
     ws.append(nrow("001", "1.000", "P"))     # stale RAW signal sub-type
     ws.append(nrow("001", "2.000", "J"))     # another stale RAW signal sub-type
     ws.append(nrow("001", "3.000", "A"))     # non-signal, must stay "A"
+    ctc.write_normalization_marker(wb, idt.NORMALIZATION_VERSION)  # CMP-AUD-037 current marker
     wb.save(norm)
     wb.close()
     rows, _ = idt._load_tsn(norm)
@@ -519,6 +521,23 @@ def test_normalized_path_crosswalk():
     except ValueError as e:
         check("a pre-v3 (sidecar-less) library refuses with a rebuild hint",
               "older normalized" in str(e) and "rebuild" in str(e))
+    # CMP-AUD-037: a CURRENT-shape library (the sidecars present) that carries no
+    # normalization marker predates the direct-path freshness gate — the shape
+    # check can't see it, so the marker version refuses it.
+    nomark = root / "tsn_nomarker.xlsx"
+    wb3 = Workbook()
+    ws3 = wb3.active
+    ws3.title = idt.NORMALIZED_SHEET
+    ws3.append(["Route"] + idt.SHARED_HEADER + ["TSN District", "TSN County"])
+    ws3.append(nrow("001", "1.000", "A"))
+    wb3.save(nomark)
+    wb3.close()
+    try:
+        idt._load_tsn(nomark)
+        check("a marker-less current-shape library refuses (CMP-AUD-037)", False)
+    except ValueError as e:
+        check("a marker-less current-shape library refuses (CMP-AUD-037)",
+              "older TSN converter" in str(e) and "rebuild" in str(e))
 
 
 def test_added_columns():

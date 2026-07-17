@@ -25,6 +25,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import compare_highway_detail_tsn as hdt
+import compare_tsn_common as ctc
 from events import Events
 from openpyxl import Workbook, load_workbook
 
@@ -402,6 +403,7 @@ def test_normalized_library_idempotent():
     # an unpadded WDA — all must normalize on read.
     ws.append(nrow("001", "000.080", hg="R", **{"NA": "A", "LB #Ln": "02",
                                                 "Med V/WDA": "8V"}))
+    ctc.write_normalization_marker(wb, hdt.NORMALIZATION_VERSION)  # CMP-AUD-037 current marker
     wb.save(norm)
     wb.close()
     rows, _ = hdt._load_tsn(norm)
@@ -412,6 +414,24 @@ def test_normalized_library_idempotent():
     check("stale '8V' WDA pads to '08V'", r[ix["Med V/WDA"]] == "08V")
     check("the roadbed key rebuilds from the stored HG ('000.080' + R)",
           r[ix["Post Mile"]] == "000.080R")
+
+    # CMP-AUD-037: HD's direct loader had NO freshness gate — a normalized
+    # workbook from any prior normalizer was trusted. A marker-less (or stale)
+    # library now refuses with a rebuild hint; a current one is accepted.
+    nomark = root / "tsn_nomarker.xlsx"
+    wb2 = Workbook()
+    ws2 = wb2.active
+    ws2.title = hdt.NORMALIZED_SHEET
+    ws2.append(["Route"] + hdt.SHARED_HEADER)
+    ws2.append(nrow("001", "000.080", hg="R"))
+    wb2.save(nomark)
+    wb2.close()
+    try:
+        hdt._load_tsn(nomark)
+        check("a marker-less library refuses (CMP-AUD-037)", False)
+    except ValueError as e:
+        check("a marker-less library refuses (CMP-AUD-037)",
+              "older TSN converter" in str(e) and "rebuild" in str(e))
 
 
 def main():
