@@ -193,6 +193,7 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
     header = list(expected_header) if expected_header else None
     rows = []
     skipped = []
+    seen_routes = set()
     for i, p in enumerate(files, 1):
         if events.is_cancelled():
             raise ValueError("Cancelled by user.")
@@ -228,7 +229,29 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
                 skipped.append(f"{label} {p.name}: column layout differs from "
                                "the other files")
                 continue
-            route = _route_from_name(p)
+            # Route identity is the NORMALIZED token from the export's
+            # "<report>_route_<token>.xlsx" name (CMP-AUD-031) — zero-pad-normalized
+            # so "route_1" and "route_001" are ONE route (not two one-sided rows),
+            # and NEVER an arbitrary file stem promoted to a route. A file without
+            # that naming contract is not a per-route export and is skipped LOUDLY.
+            m_route = _ROUTE_FROM_NAME.search(p.name)
+            if not m_route:
+                events.on_log(f"  [{label}] {p.name}: not a "
+                              "'<report>_route_<n>' export; skipping")
+                skipped.append(f"{label} {p.name}: not a recognized "
+                               "'..._route_<n>.xlsx' export name")
+                continue
+            route = _norm_route_key(m_route.group(1))
+            # One route per file per side (CMP-AUD-030): a repeat is a stale copy
+            # or a split export silently doubling coverage — disclose it as
+            # incomplete instead of concatenating the rows.
+            if route in seen_routes:
+                events.on_log(f"  [{label}] {p.name}: duplicate route {route}; "
+                              "skipping")
+                skipped.append(f"{label} {p.name}: duplicate route {route} "
+                               "(already provided by another file on this side)")
+                continue
+            seen_routes.add(route)
             n = len(header)
             count = 0
             norm = value_normalizer if value_normalizer is not None \

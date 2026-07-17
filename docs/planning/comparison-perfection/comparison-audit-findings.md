@@ -308,8 +308,8 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-027 | P1 | Verified | Header-only route files disappear from route coverage |
 | CMP-AUD-028 | P1 | Remediated 2026-07-17 — a configured identity column is mandatory; `_resolve_key_field` fails closed instead of keying on column 0 | Missing configured key columns silently fall back to column zero |
 | CMP-AUD-029 | P2 | Verified | Generic XLSX discovery includes Excel owner-lock files |
-| CMP-AUD-030 | P2 | Verified | Duplicate route files are silently merged |
-| CMP-AUD-031 | P2 | Verified | Flat report route keys do not normalize `1` and `001` |
+| CMP-AUD-030 | P2 | Remediated 2026-07-17 — `_load_xlsx_side` keeps a per-side seen-route set; a duplicate route is skipped into the incompleteness channel, never concatenated | Duplicate route files are silently merged |
+| CMP-AUD-031 | P2 | Remediated 2026-07-17 — the flat XLSX route key is `_norm_route_key`-normalized and the `..._route_<n>` naming contract is required; a non-route file is skipped, never promoted from its stem | Flat report route keys do not normalize `1` and `001` |
 | CMP-AUD-032 | P1 | Verified | Cross-env flat schemas trust the first file, not the report contract |
 | CMP-AUD-033 | P1 | Remediated 2026-07-17 — all four normalized loaders bind the exact ["Route"]+SHARED_HEADER prefix + documented sidecars before reading positionally | Normalized TSN loaders ignore their declared headers |
 | CMP-AUD-034 | P1 | Verified | Consolidated TSMIS loaders accept semantically invalid layouts |
@@ -1453,6 +1453,22 @@ Correction requirements: normalize and detect duplicate route tokens before read
 rows. Unless a report explicitly supports multi-file routes, duplicates must fail or
 make the side incomplete.
 
+**Remediated 2026-07-17** (with CMP-AUD-031 — one `_load_xlsx_side` batch). The loader
+now keeps a per-side `seen_routes` set keyed on the NORMALIZED route (031). When a file
+resolves to a route already seen on that side, it is skipped LOUDLY into the existing
+`skipped` incompleteness channel (`"duplicate route <n> (already provided by another
+file on this side)"`) instead of concatenating its rows — so a stale copy or split
+export can never silently double a side's coverage or masquerade as a clean match. None
+of the flat XLSX reports (Ramp Detail / Highway Sequence / Highway Detail / Highway Log)
+supports multi-file routes, so the check is unconditional on that path. Proof
+(`build/check_compare_env_route_universe.py::test_030_duplicate_route_flagged`, red→green
+by git-stash — pre-fix both files' rows concatenated with an empty `skipped`): two files
+resolving to route `001` on one side now yield exactly one file's rows plus a duplicate
+disclosure. Output-safety: the real ssor-prod corpus loads byte-identically fixed vs
+unfixed — Ramp Detail 15,216 rows / 126 routes / 0 skipped, Highway Sequence 60,494 rows
+/ 252 routes / 0 skipped (each route appears once; `005` and `005S` stay distinct).
+Offline gate 125/125.
+
 ### CMP-AUD-031 — flat report route padding creates false one-sided rows
 
 Priority: P2  
@@ -1471,6 +1487,26 @@ Correction requirements: normalize flat route tokens consistently before duplica
 detection and row construction. Test numeric and suffixed pairs such as `1/001` and
 `1S/001S`. Require the route-export naming contract or reject an unrecognized name;
 do not promote an arbitrary stem into a valid route.
+
+**Remediated 2026-07-17** (with CMP-AUD-030 — one `_load_xlsx_side` batch). The flat
+XLSX loader no longer keys a side off the raw filename token or an arbitrary stem. It
+now (a) requires the `..._route_<n>.xlsx` export naming contract — a file without the
+`_ROUTE_FROM_NAME` pattern is skipped LOUDLY (`"not a recognized '..._route_<n>.xlsx'
+export name"`) rather than promoting its stem to a route identity, and (b) runs the
+matched token through the same `_norm_route_key` zero-pad normalizer the Ramp Summary
+path already used, so `route_1` and `route_001` resolve to the one route `001` (never
+two one-sided rows) while suffixed routes stay distinct (`005S`→`005S`, `1S`→`001S`).
+`_route_from_name` is untouched (still the Ramp Summary PDF fallback); only the flat
+XLSX call site changed. Proof (`build/check_compare_env_route_universe.py`:
+`test_031_route_token_normalized` + `test_031_non_route_name_rejected`, red→green by
+git-stash — pre-fix `route_1` keyed as `"1"` and `totally_unrelated.xlsx` was promoted
+to route `"TOTALLY_UNRELATED"`): the normalized token is `001`, and a non-route file is
+skipped while the real route export beside it still contributes. The positive control
+`test_030_031_canonical_side_unchanged` proves `005` vs `005S` stay separate with zero
+skips. Output-safety: on canonical export names `_norm_route_key(m.group(1))` equals the
+old `_route_from_name(p)` exactly, so the real ssor-prod corpus loads byte-identically
+fixed vs unfixed (Ramp Detail routehash `fbbfdfc974e319d8`, Highway Sequence
+`96808159b7c7d8d0`, both 0 skipped). Offline gate 125/125.
 
 ### CMP-AUD-032 — candidate discovery is filename-order dependent
 

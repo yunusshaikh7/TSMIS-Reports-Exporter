@@ -20,12 +20,12 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | | |
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
-| **Gate** | **124/124 offline** checks (128 full CI with the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
+| **Gate** | **125/125 offline** checks (full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; the C-bucket loader-validation gates **028 + 033 + 036** shipped CI-green this session. **Next: pick the next C gate by tractability** — 070 (ID identity derivation, output-affecting → oracle re-confirm), 034 (column-shifted consolidated-layout contracts), or lighter 030/027/063 — then the "— MER 059" census, then buckets B/D/E/G/H/I. 210 is DEFERRED (a multi-part evidence feature). HD-Excel county vendor-pending |
+| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; the C-bucket loader-validation gates **028 + 033 + 036 + 030 + 031** shipped CI-green this session. **Next: pick the next C gate by tractability** — 070 (ID identity derivation, output-affecting → oracle re-confirm), 034 (column-shifted consolidated-layout contracts), 027 (header-only route presence — needs empty-route representation, not just a skip), or lighter 029/063 — then the "— MER 059" census, then buckets B/D/E/G/H/I. 210 is DEFERRED (a multi-part evidence feature). HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, then the C-bucket gates 028 + 033 + 036)
+> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, then the C-bucket gates 028 + 033 + 036 + 030 + 031)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -34,7 +34,38 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
-> **DONE 2026-07-17 (latest): CMP-AUD-037 CLOSED — the direct-path
+> **DONE 2026-07-17 (latest): CMP-AUD-030 + CMP-AUD-031 CLOSED — the cross-env
+> flat XLSX loader's per-route universe is now faithful.** `_load_xlsx_side`
+> (the shared cross-environment / baseline-matrix loader for Ramp Detail /
+> Highway Sequence / Highway Detail / Highway Log) keyed each side off the RAW
+> `..._route_<token>` filename token, so two silent-corruption holes lived in
+> that mapping:
+> - **031**: the token was used raw (or an arbitrary file stem when no `_route_`
+>   pattern matched), never zero-pad-normalized — so `route_1` and `route_001`
+>   keyed as two DIFFERENT routes (one route split into two one-sided rows) and a
+>   canonical workbook named `totally_unrelated.xlsx` was promoted to route
+>   `TOTALLY_UNRELATED` and cleanly matched. **Fix**: require the
+>   `..._route_<n>.xlsx` naming contract (a non-route file is skipped LOUDLY,
+>   never promoted from its stem) and run the matched token through the same
+>   `_norm_route_key` normalizer the Ramp Summary path already used. `005S` stays
+>   `005S`; `_route_from_name` (the Ramp Summary PDF fallback) is untouched.
+> - **030**: no seen-route set existed, so two files resolving to the same route
+>   on one side silently concatenated (a stale copy / split export doubling
+>   coverage). **Fix**: a per-side `seen_routes` set; a repeat is skipped into the
+>   existing `skipped` incompleteness channel, never concatenated.
+> - **Proof**: NEW `check_compare_env_route_universe.py` (3 red→green fixtures by
+>   git-stash — normalize, non-route rejection, duplicate disclosure — plus a
+>   `005` vs `005S` positive control). **Output-safety**: the real ssor-prod
+>   corpus loads BYTE-IDENTICALLY fixed vs unfixed — Ramp Detail
+>   15,216 rows / 126 routes / routehash `fbbfdfc974e319d8` / 0 skipped, Highway
+>   Sequence 60,494 rows / 252 routes / routehash `96808159b7c7d8d0` / 0 skipped
+>   (on canonical names `_norm_route_key(m.group(1))` == the old
+>   `_route_from_name(p)` exactly). Offline gate **125/125**. (027 — header-only
+>   route presence — stays OPEN in the same function: its correct fix surfaces the
+>   empty route in coverage rather than a plain skip, since some reports may
+>   legitimately export a data-less route; handled as its own batch.)
+>
+> **DONE 2026-07-17: CMP-AUD-037 CLOSED — the direct-path
 > normalization-freshness gate now covers all five families.** The matrix/
 > library path already refused a stale library via the D2 certificate, but a
 > classic FILE comparison trusted any workbook carrying the normalized sheet —

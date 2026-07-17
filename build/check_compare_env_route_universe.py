@@ -1,0 +1,134 @@
+"""Golden checks for the cross-environment loader's per-route universe integrity
+(CMP-AUD-030 + CMP-AUD-031 in scripts/compare_env.py::_load_xlsx_side).
+
+The flat per-route XLSX loader keys every side by the route pulled from each
+"<report>_route_<token>.xlsx" export name. Two silent-corruption holes lived in
+that mapping:
+
+  CMP-AUD-031  the route token was used RAW (the uppercased capture, or an
+               arbitrary file stem when no "_route_" pattern matched), never run
+               through the same zero-pad normalizer the Ramp Summary path uses.
+               So "route_1.xlsx" and "route_001.xlsx" keyed as two DIFFERENT
+               routes (a route split into two one-sided rows), and a canonical
+               workbook named "totally_unrelated.xlsx" was promoted to a bogus
+               route "TOTALLY_UNRELATED" and cleanly matched.
+
+  CMP-AUD-030  no seen-route set existed, so two files that resolve to the SAME
+               route on one side were silently concatenated (a stale copy or a
+               split export doubling coverage) with no input diagnostic.
+
+The fix normalizes the token, requires the "..._route_<n>" export naming
+contract (a non-route file is skipped LOUDLY, never promoted to a route), and
+rejects a duplicate route on a side into the existing `skipped` incompleteness
+channel — so neither hole can masquerade as a clean match. Canonical distinct
+routes (including "005" vs "005S", which must stay separate) are unaffected.
+
+Run with the build venv:
+    build\\.venv\\Scripts\\python.exe build\\check_compare_env_route_universe.py
+"""
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+
+import compare_env as env
+from events import Events
+from openpyxl import Workbook
+
+_SHEET = "Highway Locations"
+_HEADER = ["County", "City", "R", "PM", "X", "Description"]
+
+
+def _make_side(files):
+    """files: [(filename, [data_row, ...]), ...]. Build a highway_sequence side
+    folder with one XLSX per entry (all sharing _HEADER) and return its parent."""
+    base = Path(tempfile.mkdtemp())
+    d = base / "highway_sequence"
+    d.mkdir(parents=True)
+    for name, data in files:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = _SHEET
+        ws.append(_HEADER)
+        for r in data:
+            ws.append(r)
+        wb.save(d / name)
+    return base
+
+
+def _load(base):
+    return env._load_xlsx_side(base, "X", "highway_sequence", _SHEET,
+                               "Highway Sequence", Events())
+
+
+def test_031_route_token_normalized():
+    """route_1 must resolve to the normalized route 001 (not the raw "1"), so a
+    cross-side pairing can't split one route into two one-sided rows."""
+    base = _make_side([("hs_route_1.xlsx", [["ORA", "", "R", "1.0", "", "A"]])])
+    rows, _header, skipped = _load(base)
+    assert rows, "the route_1 export must contribute a row"
+    assert rows[0][0] == "001", (
+        "route_1 must normalize to 001 (was the raw token)", rows[0][0])
+    assert not skipped, skipped
+
+
+def test_031_non_route_name_rejected():
+    """A workbook without the ..._route_<n> contract must NOT be promoted to a
+    route identity from its stem — it is skipped LOUDLY. The real route export
+    beside it still contributes."""
+    base = _make_side([
+        ("hs_route_005.xlsx", [["ORA", "", "R", "5.0", "", "V"]]),
+        ("totally_unrelated.xlsx", [["ORA", "", "R", "1.0", "", "A"]]),
+    ])
+    rows, _header, skipped = _load(base)
+    routes = {r[0] for r in rows}
+    assert routes == {"005"}, (
+        "only the real per-route export may contribute a route", routes)
+    assert any("totally_unrelated" in s for s in skipped), (
+        "the non-route file must be disclosed as skipped", skipped)
+
+
+def test_030_duplicate_route_flagged():
+    """Two files that resolve to the same route on one side must not silently
+    concatenate — the duplicate is skipped into the incompleteness channel."""
+    base = _make_side([
+        ("a_route_001.xlsx", [["ORA", "", "R", "1.0", "", "PM1"]]),
+        ("b_route_001.xlsx", [["ORA", "", "R", "2.0", "", "PM2"]]),
+    ])
+    rows, _header, skipped = _load(base)
+    assert len(rows) == 1, (
+        "duplicate-route files must not concatenate their rows", len(rows))
+    assert any("duplicate" in s.lower() and "001" in s for s in skipped), (
+        "the duplicate route must be disclosed as skipped", skipped)
+
+
+def test_030_031_canonical_side_unchanged():
+    """Positive control: distinct canonical routes — including 005 vs 005S,
+    which must stay SEPARATE — all contribute with zero skips."""
+    base = _make_side([
+        ("hs_route_001.xlsx", [["ORA", "", "R", "1.0", "", "A"]]),
+        ("hs_route_005.xlsx", [["ORA", "", "R", "5.0", "", "B"]]),
+        ("hs_route_005S.xlsx", [["ORA", "", "R", "5.5", "", "C"]]),
+    ])
+    rows, _header, skipped = _load(base)
+    routes = sorted(r[0] for r in rows)
+    assert routes == ["001", "005", "005S"], (
+        "005 and 005S must stay distinct and all contribute", routes)
+    assert not skipped, skipped
+
+
+def main():
+    test_031_route_token_normalized()
+    test_031_non_route_name_rejected()
+    test_030_duplicate_route_flagged()
+    test_030_031_canonical_side_unchanged()
+    print("OK  cross-env route universe: tokens zero-pad-normalized, the "
+          "..._route_<n> naming contract is required (no promoted stems), "
+          "duplicate routes are disclosed as incomplete, and distinct "
+          "canonical routes (005 vs 005S) are unaffected.")
+
+
+if __name__ == "__main__":
+    main()
