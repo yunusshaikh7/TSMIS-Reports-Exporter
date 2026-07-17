@@ -298,10 +298,10 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-017 | P1 | Resolved | Skipped comparison inputs are cached and rendered as complete |
 | CMP-AUD-018 | P1 | Verified | Intersection cross-env bypasses its layout-drift validator |
 | CMP-AUD-019 | P1 | Verified | Ramp cross-env accepts a one-field partial parse as complete |
-| CMP-AUD-020 | P1 | Verified | Aggregate vs-TSN loaders do not reconcile section totals |
-| CMP-AUD-021 | P1 | Verified | Aggregate counts silently ignore text and truncate fractions |
+| CMP-AUD-020 | P1 | Resolved 2026-07-14 (censused per-side partition contract enforced; real-data verified) | Aggregate vs-TSN loaders do not reconcile section totals |
+| CMP-AUD-021 | P1 | Resolved 2026-07-14 (one strict count parser through every aggregate read path) | Aggregate counts silently ignore text and truncate fractions |
 | CMP-AUD-022 | P1 | Verified | Duplicate normalized categories overwrite or double-count silently |
-| CMP-AUD-023 | P1 | Verified | Rural/Urban parent tracking can move counts to the wrong category |
+| CMP-AUD-023 | P1 | Resolved 2026-07-14 (parent context from labels; counted orphans refuse) | Rural/Urban parent tracking can move counts to the wrong category |
 | CMP-AUD-024 | P1 | Resolved | The `Ramp Points w/out linework` footnote is now display-only (out-of-band to the familiar sheet), never a compared row. Real 7.9 SSOR-prod run matches the oracle: 0 TSMIS-only |
 | CMP-AUD-025 | P2 | Resolved | P/V are marked `sides="tsn"` and routed via `categories_for(side)`, so they are `Only in TSN`, not fabricated TSMIS zeros. Real run matches the oracle: 29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical / 24 differing |
 | CMP-AUD-026 | P1 | Resolved | PDF comparison paths discard producer partial outcomes |
@@ -354,7 +354,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-073 | P2 | Verified | Classic picker blocks two supported raw-PDF inputs |
 | CMP-AUD-074 | P2 | Verified | Universal file hint promises unsupported per-route inputs |
 | CMP-AUD-075 | P1 | Partially remediated | Both-mode completion is persisted for only one output |
-| CMP-AUD-076 | P2 | Verified | Saved comparisons lack durable source provenance |
+| CMP-AUD-076 | P2 | Resolved 2026-07-14 (durable provenance sidecar + in-workbook sheet; only the strict schema-v4 fold-in remains, Phase-5) | Saved comparisons lack durable source provenance |
 | CMP-AUD-077 | P2 | Resolved | Comparison results discard their structured discrepancy counts |
 | CMP-AUD-078 | P3 | Resolved | Comparison failures are titled as consolidation failures |
 | CMP-AUD-079 | P2 | Verified | Compare sub-tab switching can hide every Cancel control |
@@ -376,7 +376,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-095 | P2 | Verified | Source switches retain invalid source-scoped days and baselines |
 | CMP-AUD-096 | P2 | Verified | Invalid scoped rebuild filters silently broaden to the whole matrix |
 | CMP-AUD-097 | P2 | Verified | Unified matrix state cannot report that both inputs are missing |
-| CMP-AUD-098 | P1 | Verified | Inputs changed during comparison can be certified as the fresh sources |
+| CMP-AUD-098 | P1 | Partially remediated 2026-07-14 (the comparison-pipeline half; the evidence-gate half remains Stage-10 work) | Inputs changed during comparison can be certified as the fresh sources |
 | CMP-AUD-099 | P2 | Verified | Baseline switching rebuilds baseline-independent Matrix modes |
 | CMP-AUD-100 | P2 | Partially remediated | Matrix cache identity and nested record schemas are not validated |
 | CMP-AUD-101 | P2 | Verified | Open Comparisons opens the wrong tree for non-environment modes |
@@ -393,7 +393,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-112 | P1 | Verified | Evidence can verify old PDF records but rasterize replacement bytes |
 | CMP-AUD-113 | P3 | Resolved | Evidence bundle member counts omit validation files |
 | CMP-AUD-114 | P1 | Resolved | Unreadable comparison results are counted and shown as fully OK |
-| CMP-AUD-115 | P1 | Verified | Comparison artifact validation accepts semantically empty workbooks |
+| CMP-AUD-115 | P1 | Partially remediated 2026-07-14 (typed-contract count/verdict invariants) | Comparison artifact validation accepts semantically empty workbooks |
 | CMP-AUD-116 | P1 | Resolved | Failed validation records default to complete |
 | CMP-AUD-117 | P1 | Resolved | Bearer credentials survive redaction into the evidence ZIP |
 | CMP-AUD-118 | P2 | Remediated: _ensure_tsn_ready first-builds raw-only libraries (ensure_current None -> build_consolidated); raw-awaiting-build is a blocked capability in the digest | Validation skips imported raw-only TSN data instead of building it |
@@ -413,7 +413,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-132 | P1 | Resolved | Highway Log intermediates are attempt-scoped and exact-manifest bound |
 | CMP-AUD-133 | P1 | Verified | Normalized Detail libraries discard source-backed identity, print, and Report View facts |
 | CMP-AUD-134 | P1 | Remediated | The first Stage-6 Ramp oracle could certify without final source revalidation and understated printed-field loss |
-| CMP-AUD-135 | P1 | Verified | Ramp normalization deletes all 15 source-backed numeric Description prefixes |
+| CMP-AUD-135 | P1 | Resolved 2026-07-14 (TSN Descriptions preserved; the TSMIS strip route-matched; re-blessed) | Ramp normalization deletes all 15 source-backed numeric Description prefixes |
 | CMP-AUD-136 | P1 | Remediated | The independent XLSX reader can parse synchronized A-to-B-to-A bytes between equal live-file hashes |
 | CMP-AUD-137 | P1 | Remediated | The independent XLSX reader folds error cells into ordinary strings instead of rejecting them |
 | CMP-AUD-138 | P1 | Verified | Highway Detail converts exact decimal Length through binary64 and rounds one source row downward |
@@ -424,7 +424,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-143 | P2 | Remediated | The Highway Detail audit's decisive Length projection inherits mutable ambient Decimal rounding context |
 | CMP-AUD-144 | P1 | Verified | Intersection Summary normalization irreversibly folds six authoritative printed control categories into one count |
 | CMP-AUD-145 | P1 | Verified | Intersection Summary drops the TSN PDF's erroneous raw CONTROL F label while applying the now-proven RED/MAINLINE canonical mapping |
-| CMP-AUD-146 | P1 | Verified | Normalized Summary artifacts omit printed report identity, timing, and submitter provenance |
+| CMP-AUD-146 | P1 | Resolved 2026-07-14 (print identity/timing/submitter captured, typed, exactly-once; exposed in Notes) | Normalized Summary artifacts omit printed report identity, timing, and submitter provenance |
 | CMP-AUD-147 | P1 | Remediated | Highway Detail detached acceptance can say accepted when audit invariants are false |
 | CMP-AUD-148 | P2 | Remediated | Intersection Summary's J-component mutation probe treats the projector's correct fail-closed rejection as an audit failure |
 | CMP-AUD-149 | P1 | Remediated | Summary PDF audits do not bind every loaded parser module and can miss same-version code drift |
@@ -433,11 +433,11 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-152 | P1 | Remediated | Ramp Summary detached acceptance can be published for an audit-false result and has no explicit accepted Boolean |
 | CMP-AUD-153 | P1 | Remediated | Ramp Summary claims complete PDF source-role disposition without exact observed-role coverage |
 | CMP-AUD-154 | P2 | Remediated | Intersection Summary's per-category conservation omits multiset, target-row, and per-source-disposition typed digests |
-| CMP-AUD-155 | P1 | Verified | Highway Sequence normalization drops district, direction, report provenance, and source reliability policy facts |
-| CMP-AUD-156 | P1 | Verified | Highway Sequence's numeric-only distance parser erases a real printed landmark pointer |
+| CMP-AUD-155 | P1 | Remediated 2026-07-16 (normalizer v4 claims capture; sidecar + Notes) | Highway Sequence normalization drops district, direction, report provenance, and source reliability policy facts |
+| CMP-AUD-156 | P1 | Remediated 2026-07-16 (pointer tokens verbatim + foreign-token refusal, v4) | Highway Sequence's numeric-only distance parser erases a real printed landmark pointer |
 | CMP-AUD-157 | P1 | Remediated (2026-07-17, HL normalizer v5) | Highway Log normalization drops group ownership, three printed ADT fields, totals, and report provenance |
-| CMP-AUD-158 | P1 | Verified | Highway Sequence drops EQUATES TO annotations that appear before county context exists |
-| CMP-AUD-159 | P1 | Verified | Highway Sequence fabricates punctuation when joining one wrapped printed Description |
+| CMP-AUD-158 | P1 | Remediated 2026-07-16 (pre-county equates conserved with blank County, v4) | Highway Sequence drops EQUATES TO annotations that appear before county context exists |
+| CMP-AUD-159 | P1 | Remediated 2026-07-16 (single-space wrap joins — no invented comma, v4) | Highway Sequence fabricates punctuation when joining one wrapped printed Description |
 | CMP-AUD-160 | P1 | Resolved | The first Highway Sequence conservation gate misclassified the library placeholder as comparison truth |
 | CMP-AUD-161 | P1 | Resolved | The Highway Sequence conservation gate asserted the wrong typed r7 acceptance vocabulary |
 | CMP-AUD-162 | P1 | Resolved | The Highway Sequence conservation gate assumed printed and physical PDF page numbers were one-to-one |
@@ -461,9 +461,9 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-180 | P1 | Resolved | Highway Log records but does not terminally bind or stability-check its 47 loaded PDF parser modules |
 | CMP-AUD-181 | P1 | Resolved | Highway Log displays but does not terminally bind its full physical-key collision census |
 | CMP-AUD-182 | P1 | Resolved | Highway Log computes decisive source manifests without comparing them to frozen oracle values |
-| CMP-AUD-183 | P1 | Verified | Intersection Summary aggregation accepts dropped and duplicate routes without validating its route universe |
-| CMP-AUD-184 | P2 | Verified | Intersection Summary's familiar view note contradicts its structural-absence cells and cites Ramp categories |
-| CMP-AUD-185 | P1 | Verified | Ramp Detail omits District and hides a real District disagreement as identical |
+| CMP-AUD-183 | P1 | Resolved 2026-07-14 (route universe validated + producer census reconciled; real-data verified) | Intersection Summary aggregation accepts dropped and duplicate routes without validating its route universe |
+| CMP-AUD-184 | P2 | Resolved 2026-07-14 (the shared note states the blank/one-sided truth) | Intersection Summary's familiar view note contradicts its structural-absence cells and cites Ramp categories |
+| CMP-AUD-185 | P1 | Resolved 2026-07-14 (District compared on every RD leg; the 005/SD/72.366 disagreement surfaces; re-blessed) | Ramp Detail omits District and hides a real District disagreement as identical |
 | CMP-AUD-186 | P1 | Verified on current 7.9 | Highway Detail truncates multi-baseline line-two records and erases their attributes as complete |
 | CMP-AUD-187 | P2 | Verified in audit harness | Independent oracle builds statewide key order quadratically |
 | CMP-AUD-188 | P2 | Remediated in accepted audit artifact | Highway Detail product witness loses all returned evidence when its monolithic run exceeds the execution wrapper |
@@ -477,12 +477,12 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-196 | P2 | Remediated and installed-Excel verified in source-oracle draft | Highway Sequence display projection recognizes only one case of the OOXML carriage-return escape |
 | CMP-AUD-197 | P1 | Remediated for every current family: same-source flavors (owner-ruled render artifacts), the HSL vs-TSN loader, and the RD vs-TSN loader (family-censused; RD-79's Excel-vs-TSN leg amended 847→843 with source-first evidence) | Highway Sequence comparison reports four decoded carriage returns as literal `_x000d_` Description differences |
 | CMP-AUD-198 | P2 | Remediated in source-bound installed-Excel artifact | Permanent installed-Excel escape probe over-specifies optional COM open arguments and cannot bind its proof artifact |
-| CMP-AUD-199 | P1 | Verified on the complete current TSMIS Excel/PDF pair | Highway Sequence PDF-vs-Excel uses the changing equation suffix as identity, hiding moved-vs-missing semantics and forcing a route-152 cross-pair |
+| CMP-AUD-199 | P1 | Remediated 2026-07-16 (suffix-less same-source keys; PM Suffix compared; corpus-exact) | Highway Sequence PDF-vs-Excel uses the changing equation suffix as identity, hiding moved-vs-missing semantics and forcing a route-152 cross-pair |
 | CMP-AUD-200 | P2 | Remediated in source-bound current product witness | Highway Sequence product witness is externally terminated after 180 seconds and leaves a non-result partial conversion tree |
 | CMP-AUD-201 | P2 | Remediated in exact product-source parity artifact | Highway Sequence parity probe requires worksheet dimensions that streaming product workbooks legitimately omit |
 | CMP-AUD-202 | P2 | Remediated in three clean per-leg witnesses and independent twin audit | Highway Sequence comparison witness gives three large comparison legs one shared 600-second wrapper and is terminated during leg two |
 | CMP-AUD-203 | P2 | Remediated in three clean per-leg witnesses and independent artifact-universe audit | Highway Sequence witness would reject the product's intentional permanent publication lease as unfinished output |
-| CMP-AUD-204 | P1 | Verified on raw and normalized authoritative TSN plus both current TSMIS formats | Highway Sequence comparison deletes authoritative TSN numeric Description prefixes and false-cleans 81 current differences |
+| CMP-AUD-204 | P1 | Remediated 2026-07-16 (TSN Descriptions verbatim incl. numeric prefixes; own-route strip only TSMIS-side) | Highway Sequence comparison deletes authoritative TSN numeric Description prefixes and false-cleans 81 current differences |
 | CMP-AUD-205 | P2 | Remediated in corrected draft and direct-source r2 checkpoint; final acceptance replay pending | Highway Sequence audit projection removes a valid TSMIS outer route label but leaves its separator space on three rows |
 | CMP-AUD-206 | P2 | Remediated in clean streaming-verified raw-TSN development twin | Highway Sequence raw-twin verifier requires optional worksheet dimensions from its own write-only XLSX |
 | CMP-AUD-207 | P2 | Remediated in corrected draft and direct-source r2 checkpoint; final acceptance replay pending | Highway Sequence duplicate-cost projection recognizes only current TSMIS source names and treats historical Excel as TSN |
@@ -5981,7 +5981,7 @@ category stays identical. Regenerate deterministic result/acceptance before prom
 ### CMP-AUD-155 — Highway Sequence normalization drops district, direction, report provenance, and source reliability policy facts
 
 Priority: P1  
-Status: Verified during Stage-6 authoritative PDF source inspection  
+Status: Remediated 2026-07-16 (the HSL v4 batch) — was: Verified during Stage-6 authoritative PDF source inspection  
 Primary code: Highway Sequence TSN PDF parser/normalizer, sidecar, comparison Notes,
 Report View/evidence
 
@@ -6020,7 +6020,7 @@ Stage-10 evidence rework (CMP-AUD-098; 218's Spot Check half was remediated 2026
 ### CMP-AUD-156 — Highway Sequence's numeric-only distance parser erases a real printed landmark pointer
 
 Priority: P1  
-Status: Verified on the authoritative D01 final page before Stage-6 implementation  
+Status: Remediated 2026-07-16 (the HSL v4 batch) — was: Verified on the authoritative D01 final page before Stage-6 implementation  
 Primary code: Highway Sequence TSN PDF distance/landmark parser and normalized projection
 
 The full 1,540-page census contains 565 nonnumeric printed `DISTANCE TO NXT POINT` claims:
@@ -6153,7 +6153,7 @@ remediation is accepted.
 ### CMP-AUD-158 — Highway Sequence drops EQUATES TO annotations that appear before county context exists
 
 Priority: P1  
-Status: Verified by the full 12-PDF / 1,540-page Stage-6 census  
+Status: Remediated 2026-07-16 (the HSL v4 batch) — was: Verified by the full 12-PDF / 1,540-page Stage-6 census  
 Primary code: Highway Sequence TSN PDF route/equate ownership parser and normalized rows
 
 The authoritative PDFs print 998 `EQUATES TO` annotations. Current normalization emits
@@ -6186,7 +6186,7 @@ the 46). Normalization v4 + marker-sheet refusal + D2 rebuild; fixtures in
 ### CMP-AUD-159 — Highway Sequence fabricates punctuation when joining one wrapped printed Description
 
 Priority: P1  
-Status: Verified by the full Stage-6 source census  
+Status: Remediated 2026-07-16 (the HSL v4 batch) — was: Verified by the full Stage-6 source census  
 Primary code: Highway Sequence TSN PDF wrapped-description joiner and normalized projection
 
 At D09 / KER / Route 014 / postmile `018.365`, the PDF prints two lines:
@@ -7341,7 +7341,7 @@ all three invariants pass for all four cells.
 ### CMP-AUD-199 — Highway Sequence PDF-vs-Excel uses the changing equation suffix as identity
 
 Priority: P1  
-Status: Verified on all 60,494 current Excel and 60,493 current PDF rows  
+Status: Remediated 2026-07-16 (the HSL family batch) — was: Verified on all 60,494 current Excel and 60,493 current PDF rows  
 Primary code: `scripts/compare_highway_sequence_pdf.py` reuses
 `compare_highway_sequence_tsn.py`'s glued prefix+PM+suffix key
 
@@ -7541,7 +7541,7 @@ ordinary file remains a hard failure; the lease exception did not broaden.
 ### CMP-AUD-204 — Highway Sequence comparison deletes authoritative TSN numeric Description prefixes
 
 Priority: P1  
-Status: Verified on raw and normalized authoritative TSN plus both current TSMIS formats  
+Status: Remediated 2026-07-16 (the HSL family batch) — was: Verified on raw and normalized authoritative TSN plus both current TSMIS formats  
 Primary code: `scripts/compare_highway_sequence_tsn.py`, `_norm_desc` and `_load_tsn`;
 inherited by `scripts/compare_highway_sequence_pdf.py` and Highway Sequence evidence
 
