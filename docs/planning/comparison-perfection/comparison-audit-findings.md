@@ -3090,6 +3090,24 @@ unexpected key token in structured parser diagnostics, and make the result at le
 partial until the token is supported. Test every known code, blank, lowercase, joined
 tokens, multiple characters, and unknown values on both sides of the PM.
 
+**Scope 2026-07-17 (next C-gate; census-first, output/completion-affecting).** The
+accepted vocabulary already exists: `PREFIX_SET = frozenset("CDGHLMNRST")` in BOTH
+`consolidate_tsmis_highway_sequence_pdf.py` and `consolidate_tsmis_ramp_detail_pdf.py`;
+HSL's documented nonblank equate SUFFIX is `E`. The two defect sites: (1) an unexpected
+PREFIX is logged but KEPT under a complete outcome — `…_highway_sequence_pdf.py:290`
+(`if vals["prefix"] and vals["prefix"] not in PREFIX_SET: … (kept)`) and
+`…_ramp_detail_pdf.py:301` (the `vals["pr"]` equivalent); (2) HSL never validates the
+equate suffix at all (a `Z` is silently accepted). Fix: version the vocab, add a
+structured unexpected-token DIAGNOSTIC count, and escalate the producer outcome to at
+least PARTIAL when an unknown prefix/suffix appears (never silently complete). This is
+output/completion-affecting, so it is **census-first, like CMP-AUD-070/034**: parse the
+statewide HSL-PDF + RD-PDF corpora and confirm ONLY `PREFIX_SET` prefixes and `{blank,
+E}` suffixes appear, so the escalation never false-fires on real data (every current
+statewide consolidation must stay COMPLETE). The census is a SLOW, RAM-heavy pdfplumber
+sweep — serialize it (the memory lesson: 3 concurrent statewide pdfplumber jobs starved
+RAM). If any unknown token appears on real data, it becomes a data question, not an
+autonomous escalation. Remains open.
+
 ### CMP-AUD-064 — PDF parser anomaly counts masquerade as skipped input counts
 
 Priority: P2  
