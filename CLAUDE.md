@@ -91,7 +91,8 @@ char edit distance, position gap — while verdicts/counts stay asserted-only) p
 HSL `_x000d_` decode (197's HSL half), so **the live HSL vs-TSN aggregate counts now
 equal the Stage-8 oracle's exactly** (Excel 4,894/5,589; PDF 4,916/5,001; same-source
 1,410/3,721); RD/ID re-blessed byte-identical, HL Route-1 969 intact, HD statewide
-awaits re-measure. The same day, **CMP-AUD-218 made Spot Check's row matching
+re-measured EXACT (48,644/2,599/11,439/208,596, RU Eff 48,211 — the objective change
+moved nothing). The same day, **CMP-AUD-218 made Spot Check's row matching
 independent** (a hidden Comparison key-token column MATCHed into the data sheets +
 a Row-integrity line; forged row links/status now say CHECK — COM-mutation-gated),
 and **CMP-AUD-197 closed for every current family**: RD's vs-TSN loader decodes the

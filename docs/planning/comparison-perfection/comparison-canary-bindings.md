@@ -1096,10 +1096,18 @@ unchanged; HL Route-1 stays exactly **299 both / 18 / 69 / 221 / 969**; the
 June `ground-truth/inputs` HL statewide diagnostic pair re-pairs 57/1,002
 duplicate groups toward full-content identity (asserted cells in changed
 groups 457→500; 96 TSMIS / 16 TSN one-sided membership moves) — that pair is
-a diagnostic input, not a bound canary. **Highway Detail statewide was NOT
-re-measured** (no consolidated HD input on the dev PC; golden fixtures cover
-the engine seam) — the HD statewide numbers above predate the objective change
-and must be re-measured before their next re-bless claim.
+a diagnostic input, not a bound canary. **Highway Detail statewide was
+re-measured 2026-07-16 (later the same day) and is EXACT under the post-220
+objective**: the bound 7.7-bundle harness (`hd_full_verify.py`, re-run
+unchanged but for the filed-bundle path) reproduces **48,644 both / 2,599
+TSMIS-only / 11,439 TSN-only / 208,596 differing cells with RU Eff 48,211**
+digit-for-digit — the objective change moved nothing statewide (RD/ID-class
+behavior; consolidate `complete`, TSN normalize 60,083 rows / 273 routes,
+both exact). The bundle's PDF↔Excel self-check leg reports 2,487 both /
+5 cells on 3 rows with one-sided 2/5 against the pre-v0.26.0 README's 3/5 —
+the v0.26.0 HD-PDF July-print parser fix legitimately changed that
+secondary leg's parse; the bound statewide vs-TSN canary above is what this
+re-measure blesses.
 
 These are product-code verification facts for the Wave-4 batch; they do not advance
 the Stage-8 family acceptance above (direct-source runner, permanent mutations,

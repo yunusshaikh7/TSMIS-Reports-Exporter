@@ -195,10 +195,17 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   see the DONE record above.
 >
 > **Do this next: the HL 157/045 batch** (the census is DONE — facts below;
-> 047/048 SHIPPED), then read the HD statewide re-measure result (launched —
-> scratchpad `hd_full_verify_220.py`; bound pre-220 numbers
-> 48,644/2,599/11,439/208,596) into the bindings, then 049/050/066/067 and
-> the unowned-findings triage sweep. HD-Excel county stays vendor-blocked.
+> 047/048 SHIPPED), then 049/050/066/067 and the unowned-findings triage
+> sweep. HD-Excel county stays vendor-blocked.
+>
+> **DONE 2026-07-16 (after 047/048): the HD statewide re-measure — EXACT.**
+> The bound 7.7-bundle harness re-run under the post-220 objective
+> reproduces **48,644 / 2,599 / 11,439 / 208,596 {RU Eff 48,211}**
+> digit-for-digit (consolidate complete; TSN normalize 60,083/273 exact) —
+> the assignment-objective change moved nothing in HD statewide, closing the
+> "awaits re-measure" disclosure (recorded in the bindings; the PDF↔Excel
+> self-check leg's 2/5 one-sided vs the pre-v0.26.0 README's 3/5 is the
+> documented v0.26.0 HD-PDF parser fix, not a vs-TSN fact).
 >
 > **THE HL COUNTY/COLLISION CENSUS (2026-07-16, the 045-HL unblock —
 > measured over the 12 live-library district prints with the production
