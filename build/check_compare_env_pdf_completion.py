@@ -60,7 +60,7 @@ def test_each_converter_result_becomes_a_loaded_side():
     state = {"partial": True}
 
     def stub_xlsx(_folder, _label, _subdir, _sheet, _report, _events,
-                  expected_header=None):
+                  expected_header=None, value_normalizer=None):
         rows, header = _converted_rows(expected_header)
         skips = ["converted workbook could not be read"] if state["partial"] else []
         return rows, header, skips

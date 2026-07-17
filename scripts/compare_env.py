@@ -172,7 +172,7 @@ def _find_input_dir(base, subdir, pattern):
 # ---------------------------------------------------------------------------
 
 def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
-                    expected_header=None):
+                    expected_header=None, value_normalizer=None):
     """Read every per-route XLSX under one side into consolidated-shape rows
     ([route, *row]) the way the consolidators do: the header is locked from
     the first readable file (or must equal `expected_header` when the report
@@ -180,7 +180,11 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
     (rows, header, skipped) — `skipped` is the list of "<side> <file>: <reason>"
     strings that the caller folds into the comparison's incompleteness warning,
     so a route unreadable on a side can never masquerade as a clean match.
-    Raises ValueError with a user-safe message when nothing is readable."""
+    Raises ValueError with a user-safe message when nothing is readable.
+    `value_normalizer` (CMP-AUD-047) replaces the generic ``normalize_value``
+    with the report's OWN projection so cross-environment loading judges
+    values exactly like the report's dedicated comparator (Highway Log's
+    tab/newline collapse); None keeps the generic projection."""
     in_dir, files = _find_input_dir(folder, subdir, "*.xlsx")
     if not files:
         raise ValueError(
@@ -227,10 +231,12 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
             route = _route_from_name(p)
             n = len(header)
             count = 0
+            norm = value_normalizer if value_normalizer is not None \
+                else normalize_value
             for r in rows_iter:
                 r = list(r)[:n] + [None] * max(0, n - len(r))
                 if row_has_data(r):
-                    rows.append([route] + [normalize_value(v) for v in r])
+                    rows.append([route] + [norm(v) for v in r])
                     count += 1
             events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
                           f"+{count} rows")
@@ -449,10 +455,13 @@ def _load_highway_log_pdf_side(folder, label, events):
         if res.status != "ok":
             raise ValueError(res.message or "Could not parse the Highway Log PDFs.")
         # The per-route XLSX now sit in `conv` (the combined file is in combined_dir,
-        # excluded). Read them flat with the corrected 31-column header pinned.
+        # excluded). Read them flat with the corrected 31-column header pinned and
+        # the SAME Highway Log projection the dedicated comparator uses
+        # (CMP-AUD-047 — projection parity across every Highway Log entry point).
         loaded = _load_xlsx_side(
             conv, label, "_perroute_", _hlpdf.SHEET_NAME,
-            "Highway Log (PDF)", events, expected_header=hlc.HEADER)
+            "Highway Log (PDF)", events, expected_header=hlc.HEADER,
+            value_normalizer=_hl._hl_normalize)
         return _pdf_loaded_side(
             res, loaded, label=label, report_name="Highway Log (PDF)",
             source_pdf_count=len(pdfs))
@@ -764,7 +773,8 @@ class EnvCompare:
     def __init__(self, key, report_name, subdir, sheet_name=None,
                  expected_header=None, base_schema=None, key_col=None,
                  force_header=None, side_loader=None, agg_header=None,
-                 flat_pdf_loader=None, physical_key_builder=None):
+                 flat_pdf_loader=None, physical_key_builder=None,
+                 value_normalizer=None, header_canonicalizer=None):
         self.key = key                        # "ramp_summary" | "ramp_detail" | …
         self.REPORT_NAME = report_name
         self.subdir = subdir
@@ -799,6 +809,18 @@ class EnvCompare:
         # into every per-run schema so cross-environment pairing can never
         # match physically different locations that share a postmile.
         self.physical_key_builder = physical_key_builder
+        # CMP-AUD-047 (opt-in): the report's OWN cell projection, applied by
+        # the XLSX side loader instead of the generic normalize_value so the
+        # cross-environment verdicts match the dedicated comparator's
+        # (Highway Log collapses the export's tab/newline padding).
+        self.value_normalizer = value_normalizer
+        # CMP-AUD-048 (opt-in): callable(header) -> the CANONICAL header for a
+        # recognized layout edition, or None for an unrecognized layout. When
+        # set, both sides canonicalize independently BEFORE layout equality —
+        # the documented canonical/vendor editions compare and display the
+        # corrected names, while an unrecognized same-width header is refused
+        # instead of compared positionally on faith.
+        self.header_canonicalizer = header_canonicalizer
 
     def suggest_name(self, dir_a, dir_b):
         la, lb = _side_labels(Path(dir_a), Path(dir_b))
@@ -977,11 +999,30 @@ class EnvCompare:
                         return self.flat_pdf_loader(d, lab, events)
                     return _load_xlsx_side(d, lab, self.subdir, self.sheet_name,
                                            self.REPORT_NAME, events,
-                                           expected_header=self.expected_header)
+                                           expected_header=self.expected_header,
+                                           value_normalizer=self.value_normalizer)
                 loaded_a = _coerce_loaded_side(_flat_load(dir_a, la))
                 loaded_b = _coerce_loaded_side(_flat_load(dir_b, lb))
                 header = list(loaded_a.declared_schema)
                 header_b = list(loaded_b.declared_schema)
+                if self.header_canonicalizer is not None:
+                    # CMP-AUD-048: each side canonicalizes INDEPENDENTLY, so
+                    # one canonical-labelled and one vendor-labelled export of
+                    # the same layout compare (displaying corrected names),
+                    # while an unrecognized header is refused by NAME rather
+                    # than trusted positionally.
+                    canon_a = self.header_canonicalizer(header)
+                    canon_b = self.header_canonicalizer(header_b)
+                    if canon_a is None or canon_b is None:
+                        bad = la if canon_a is None else lb
+                        return ConsolidateResult(
+                            status="error",
+                            message=(f"The {bad} side's {self.REPORT_NAME} "
+                                     "files do not use a recognized "
+                                     f"{self.REPORT_NAME} column layout — "
+                                     "re-export them with a supported app "
+                                     "version."))
+                    header, header_b = list(canon_a), list(canon_b)
                 if header != header_b:
                     return ConsolidateResult(
                         status="error",
@@ -1178,9 +1219,23 @@ HIGHWAY_SEQUENCE = EnvCompare(
     "highway_sequence", "Highway Sequence", "highway_sequence",
     sheet_name="Highway Locations", key_col="PM",
     physical_key_builder=_highway_sequence_env_keys)
+def _hl_canonical_header(header):
+    """Either supported Highway Log edition (canonical or vendor labels, with
+    or without a leading Route) -> the canonical corrected header for layout
+    equality; None = not a recognized Highway Log layout (CMP-AUD-048)."""
+    import highway_log_columns as hlc
+    has_route = hlc.recognize(list(header))
+    if has_route is None:
+        return None
+    return ([hlc.ROUTE_COL] + list(hlc.HEADER)) if has_route \
+        else list(hlc.HEADER)
+
+
 HIGHWAY_LOG = EnvCompare(
     "highway_log", "Highway Log", "highway_log", sheet_name=_hl.SHEET_NAME,
-    base_schema=_HL_BASE, force_header=_hl.EXPECTED_HEADER)
+    base_schema=_HL_BASE, force_header=_hl.EXPECTED_HEADER,
+    value_normalizer=_hl._hl_normalize,
+    header_canonicalizer=_hl_canonical_header)
 # Intersection Summary: the per-route export is a CATEGORY-summary sheet (not a flat
 # table), so it's compared the AGGREGATE way (one row of category counts per route,
 # route-keyed) via the consolidator's own block-walk parser — the analog of Ramp

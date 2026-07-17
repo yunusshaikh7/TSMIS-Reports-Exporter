@@ -194,10 +194,52 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   the pairing objective.~~ The approval was recorded and the batch shipped —
 >   see the DONE record above.
 >
-> **Do this next: the HL county-retention + collision census** (unblocks
-> 045-HL/047/048/157), then the HL family findings, then the HD statewide
-> re-measure (HD-Excel county stays vendor-blocked; do NOT infer). The
-> Wave-5 unowned-findings triage sweep remains open behind those.
+> **Do this next: the HL 157/045 batch** (the census is DONE — facts below;
+> 047/048 SHIPPED), then read the HD statewide re-measure result (launched —
+> scratchpad `hd_full_verify_220.py`; bound pre-220 numbers
+> 48,644/2,599/11,439/208,596) into the bindings, then 049/050/066/067 and
+> the unowned-findings triage sweep. HD-Excel county stays vendor-blocked.
+>
+> **THE HL COUNTY/COLLISION CENSUS (2026-07-16, the 045-HL unblock —
+> measured over the 12 live-library district prints with the production
+> parsing primitives, county tracked from the group headers the parser
+> currently grammar-checks and then DISCARDS):**
+> - Inventory: **60,083 data rows** (== the known library row count exactly)
+>   across 12 districts / **65 district-county groups** / 263 routes.
+> - Duplicate (route, verbatim Location) groups statewide: **798** (728 pairs,
+>   the rest 3–10); **437 span more than one COUNTY; 273 span more than one
+>   DISTRICT** (route 001 @ 000.000 exists in EIGHT counties). County
+>   genuinely distinguishes repeated postmiles within a route — on the TSN
+>   side.
+> - **The TSMIS Highway Log export has NO county column** (its 31 columns
+>   carry the numeric "Cnty Odom" only, which IS a compared column and
+>   already feeds the 220 source-identity assignment objective). County can
+>   therefore NOT be a two-sided key component; the honest 045-HL identity is
+>   (Route, canonical Location) + occurrence pairing under the source-identity
+>   objective, with **district/county (+ the CMP-AUD-157 owner qualifier,
+>   e.g. D01 p40 `01 MEN 101 U`) retained as TSN-side sidecar CLAIMS** — a
+>   normalization_version bump — powering audit visibility and evidence, not
+>   the key. The census harness is scratchpad `census_hl_county.py`
+>   (session 119c7c70); its roadbed-canonical section is INVALID (the
+>   canonicalizer was misapplied — single-char keys) and must be re-run with
+>   the comparator's real key path if canonical-key collision numbers are
+>   ever needed; the verbatim-Location census above is the authoritative
+>   unblock evidence.
+> - 157's remaining scope for the batch: retain group ownership + the owner
+>   qualifier + the three printed ADT claims + totals + report provenance
+>   with typed dispositions, reconcile totals against row universes, and the
+>   qualifier corpus census (my census matched 3-token headers; qualifiers
+>   ride token 4+ and need their own scan).
+>
+> **DONE 2026-07-16 (after the validation trio): CMP-AUD-047 + 048 — the
+> Highway Log cross-environment adapter.** `_load_xlsx_side` accepts the
+> report's own `value_normalizer` (HL passes `_hl_normalize`; the HL-PDF
+> conversion read too) and `EnvCompare.header_canonicalizer` canonicalizes
+> EACH side before layout equality (canonical/vendor editions compare with
+> corrected labels; unrecognized same-width layouts are refused by name).
+> Red→green proven by git-stash (4/4 checks fail pre-fix) in the NEW
+> `check_compare_env_highway_log`; the gate grew to **122**. One stub
+> signature updated (`check_compare_env_pdf_completion`).
 >
 > **DONE 2026-07-16 (after the lifecycle trio): the CMP-AUD-118/119/120
 > validation TSN trio.** `_ensure_tsn_ready` first-builds raw-only libraries

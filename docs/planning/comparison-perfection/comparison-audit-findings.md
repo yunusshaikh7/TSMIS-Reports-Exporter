@@ -325,8 +325,8 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-044 | P1 | Verified | Data beneath trailing blank headers is silently discarded |
 | CMP-AUD-045 | P1 | Partially remediated | Shared typed identity core green; report-family integration remains red |
 | CMP-AUD-046 | P2 | Verified | Shifted exports report differences under the wrong fields |
-| CMP-AUD-047 | P2 | Verified | Highway Log cross-env skips its whitespace normalization |
-| CMP-AUD-048 | P2 | Verified | Two supported Highway Log header editions cannot compare |
+| CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
+| CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
 | CMP-AUD-049 | P1 | Verified | Direct/PDF route provenance is not enforced |
 | CMP-AUD-050 | P1 | Verified | PDF routes can overwrite, double-count, or remain blank |
 | CMP-AUD-051 | P1 | Verified | Highway Detail PM spill creates phantom PDF records |
@@ -2447,6 +2447,15 @@ Correction requirements: every Highway Log entry point must use the same project
 function before keying/comparison. Run a field-by-field projection parity suite across
 direct Excel, direct PDF variants, Excel cross-env, and PDF cross-env.
 
+Execution disposition (2026-07-16): `compare_env._load_xlsx_side` accepts a
+per-report `value_normalizer` (CMP-AUD-047) and `EnvCompare` carries it; the
+Highway Log registration passes `_hl_normalize` (the dedicated comparator's
+tab/newline collapse) and the Highway Log (PDF) conversion path passes the
+same projection to its converted-XLSX read, so every Highway Log entry point
+now projects identically. Red->green in `check_compare_env_highway_log`: a
+Description identical but for trailing tab padding compared ok/diff pre-fix
+and compares clean (0 cells) post-fix.
+
 ### CMP-AUD-048 — supported Highway Log header editions conflict
 
 Priority: P2  
@@ -2463,6 +2472,16 @@ using one supported edition on each side fail with `different column layouts`.
 Correction requirements: recognize and canonicalize each side independently before
 layout equality. Reject an unrecognized same-width header, while accepting every
 documented canonical/vendor pairing and displaying only the corrected semantic names.
+
+Execution disposition (2026-07-16): `EnvCompare` carries a
+`header_canonicalizer` applied to EACH side before layout equality; Highway
+Log's maps either documented edition (canonical or vendor labels, with or
+without a leading Route) to the corrected canonical header via
+`highway_log_columns.recognize`, and an unrecognized same-width layout is now
+REFUSED by name ('do not use a recognized … column layout') instead of being
+compared positionally on faith. Red->green in `check_compare_env_highway_log`
+(canonical-vs-vendor compares clean with corrected display labels; the
+supported pairing no longer errors; the fake 31-column layout errors).
 
 ### CMP-AUD-049 — Direct and PDF route identity is not enforced
 
