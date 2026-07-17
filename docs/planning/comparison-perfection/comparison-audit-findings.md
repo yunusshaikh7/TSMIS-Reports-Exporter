@@ -314,7 +314,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-033 | P1 | Remediated 2026-07-17 — all four normalized loaders bind the exact ["Route"]+SHARED_HEADER prefix + documented sidecars before reading positionally | Normalized TSN loaders ignore their declared headers |
 | CMP-AUD-034 | P1 | Verified | Consolidated TSMIS loaders accept semantically invalid layouts |
 | CMP-AUD-035 | P1 | Partially remediated — type-exactness fixed 2026-07-14; TOCTOU pending | Original raw-admission r7 accepted. Type-exact validation now rejects float/bool aliases of `version`/`member_count`/`byte_length`/`schema_version` in the raw-manifest, normalized-identity, and certificate checks (red→green). Still open: the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
-| CMP-AUD-036 | P1 | Verified | Ramp PDF accepts a truncated four-column workbook |
+| CMP-AUD-036 | P1 | Remediated 2026-07-17 — the RD-PDF source gate requires the exact PDF-consolidated width + the trailing On/Off/Ramp Type sentinels | Ramp PDF accepts a truncated four-column workbook |
 | CMP-AUD-037 | P1 | Remediated 2026-07-17 — all five families gate the direct path (HSL v4 + HL v5 markers; RD v5 / ID v5 / HD v3 in-workbook markers + loader gates; marker-only bumps, rows byte-identical on the real corpus) | Direct comparisons trust stale normalized libraries |
 | CMP-AUD-038 | P2 | Verified | Date normalization masks malformed and impossible dates |
 | CMP-AUD-039 | P1 | Verified | Detail Report View counts contradict the main comparison |
@@ -1971,6 +1971,8 @@ blank. Both PDF-vs-TSN and PDF-vs-Excel inherit this source loader.
 Correction requirements: require the exact PDF-consolidated width, order, and all
 print-only sentinels, including `Ramp Type`. Refuse truncated and Excel-shaped inputs;
 test every prefix truncation and a valid PDF-consolidated control.
+
+**Remediated 2026-07-17.** `compare_ramp_detail_pdf._load_tsmis_pdf` now gates on `_pdf_header_ok`: after trimming trailing blank cells, the header must be EXACTLY `_PDF_WIDTH` (14 = `['Route']` + the RD-PDF consolidator's 13-column print HEADER) columns, carry `PM` among the first five, and END in the two print-only sentinels `('On/Off', 'Ramp Type')` — the columns the Excel export drops. This refuses the fabricated four-column `Route/Location/PM/On-Off` shape (and every prefix truncation, which the old `PM in first five + On/Off anywhere` gate expanded with blank fields) and an Excel-consolidated pick (no print-only columns). Proof (`build/check_compare_ramp_detail_pdf.py`, red→green by git-stash — pre-fix the four-column workbook loaded one fabricated row): the full PDF-consolidated control loads; the four-column shape, a truncated shape that still carries both sentinels, an Excel-consolidated pick, and every prefix truncation all refuse; `_PDF_WIDTH` is pinned equal to `1 + len(consolidator.HEADER)` and the sentinels equal its last two labels (drift guard). Real-corpus: a fresh two-route consolidation of the bound 7.9 ssor-prod RD PDFs (324 rows) still loads through the tightened gate. Offline gate 124/124.
 
 ### CMP-AUD-037 — direct comparison bypasses normalized-library freshness
 

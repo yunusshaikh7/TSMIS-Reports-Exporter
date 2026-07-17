@@ -103,18 +103,43 @@ def _pdf_row(r):
             ""]                                        # ADT: TSN-only
 
 
+# CMP-AUD-036: the PDF-consolidated workbook is exactly ["Route"] + the RD-PDF
+# consolidator's 13-column print HEADER (14 columns), and its DISTINGUISHING
+# feature is the two TRAILING print-only labels On/Off + Ramp Type the Excel
+# export drops. check_compare_ramp_detail_pdf pins _PDF_WIDTH against the
+# consolidator's own HEADER length.
+_PDF_WIDTH = 14
+_PDF_SENTINELS = ("On/Off", "Ramp Type")
+
+
+def _pdf_header_ok(h):
+    """A PDF-consolidated Ramp Detail layout: the EXACT 14-column width (trailing
+    blanks trimmed), PM among the first five cells, and the two print-only
+    sentinels as the final two columns IN ORDER. The old gate ('PM in the first
+    five and On/Off anywhere') accepted a truncated four-column
+    Route/Location/PM/On-Off workbook and expanded it with every absent field
+    fabricated as blank (CMP-AUD-036); this refuses truncated inputs and an
+    Excel-consolidated pick (which has neither print-only column)."""
+    core = list(h)
+    while core and core[-1] == "":
+        core.pop()
+    return (len(core) == _PDF_WIDTH and "PM" in core[:5]
+            and tuple(core[-2:]) == _PDF_SENTINELS)
+
+
 def _load_tsmis_pdf(path):
     """TSMIS (PDF) side -> (rows, has_route=True). The PDF-CONSOLIDATED Ramp
-    Detail workbook — the Excel layout plus the two print-only columns, which
-    the header gate requires so an Excel-consolidated pick fails fast."""
+    Detail workbook — the Excel layout plus the two print-only columns, whose
+    exact width + trailing sentinels the header gate requires so a truncated or
+    Excel-consolidated pick fails fast (CMP-AUD-036)."""
     return load_consolidated_rows(
         path, _rd.TSMIS_SHEET,
         missing_sheet_hint="pick the consolidated TSMIS Ramp Detail (PDF) workbook.",
         bad_header_msg="isn't a PDF-CONSOLIDATED Ramp Detail workbook "
-                       "(expected the On/Off / Ramp Type columns the PDF "
-                       "consolidator adds) — consolidate the 'TSAR: Ramp Detail "
-                       "(PDF)' exports first.",
-        header_ok=lambda h: "PM" in h[:5] and "On/Off" in h,
+                       "(expected the full print layout ending in the On/Off / "
+                       "Ramp Type columns the PDF consolidator adds) — "
+                       "consolidate the 'TSAR: Ramp Detail (PDF)' exports first.",
+        header_ok=_pdf_header_ok,
         row_transform=_pdf_row)
 
 

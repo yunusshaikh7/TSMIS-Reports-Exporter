@@ -365,10 +365,18 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > prefix + documented sidecars via `compare_tsn_common.require_shared_header_prefix`
 > before reading positionally — pre-fix a reordered header was read column-by-column
 > and mis-mapped; the sidecar list is comparator-owned and mirror-gated; red→green
-> across all four + the real libraries still load). **Next: 034** (versioned
-> positional-layout contracts for the CONSOLIDATED TSMIS loaders — the shared
-> `load_consolidated_rows` requires only a leading `Route`, so a junk-header shifted
-> export is read as the intended schema). **F's 210 is DEFERRED**: it is a multi-part evidence FEATURE (new
+> across all four + the real libraries still load). **036 CLOSED 2026-07-17** (the
+> Ramp Detail (PDF) source gate accepted a fabricated four-column
+> `Route/Location/PM/On-Off` workbook and expanded it with blank fields — it now
+> requires the exact PDF-consolidated width + the trailing On/Off/Ramp Type
+> sentinels; red→green + real 324-row consolidation still loads). **Next
+> candidates (pick by tractability): 070** (the Intersection loader derives Route
+> + Suffix from Location instead of the explicit source fields — but it touches
+> the identity derivation, so it is output-affecting and needs oracle
+> re-confirm), **034** (versioned positional-layout contracts for the CONSOLIDATED
+> TSMIS `_load_tsmis` loaders — HARDER: the RD/ID consolidated headers are
+> column-SHIFTED, so validate the documented shifted signature not width), or the
+> lighter **030/027/063**. **F's 210 is DEFERRED**: it is a multi-part evidence FEATURE (new
 > Excel-cell image evidence + a PDF-vs-Excel Matrix hook + UI camera un-gating +
 > the triangle ledger), not a single-batch correctness fix — it needs its own
 > mini-plan and should not be started as a sprawling incomplete change. After
