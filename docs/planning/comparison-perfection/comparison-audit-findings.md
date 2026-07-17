@@ -348,7 +348,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-067 | P1 | Remediated 2026-07-17 (same-source projections in all four families; HSL was fixed by 199/204, RD never had an instance) | TSN projections hide PDF-vs-Excel source differences |
 | CMP-AUD-068 | P2 | Verified | PDF-vs-TSN Detail paths omit Report View |
 | CMP-AUD-069 | P2 | Verified | Ramp PDF comparisons mislabel their file roles in diagnostics |
-| CMP-AUD-070 | P1 | Verified | Intersection loader ignores explicit route and suffix fields |
+| CMP-AUD-070 | P1 | Resolved 2026-07-17 — NOT A DEFECT: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified); the prescribed "use the file route" fix would introduce discrepancies | Intersection loader ignores explicit route and suffix fields |
 | CMP-AUD-071 | P1 | Verified | Ramp Summary comparison does not validate its route universe |
 | CMP-AUD-072 | P2 | Verified | Stale folder discovery can overwrite a newer recipe selection |
 | CMP-AUD-073 | P2 | Verified | Classic picker blocks two supported raw-PDF inputs |
@@ -3419,6 +3419,32 @@ those rows (a genuine cross-reference vs a data anomaly). The finding's earlier 
 explicit fields, not this col-0-vs-Location relationship. Census script:
 `_scratch`-equivalent `census_070.py` (session scratchpad; results recorded here).
 Remains **open, re-classified from "lighter C-gate" to owner-gated output-affecting.**
+
+**RESOLVED 2026-07-17 — NOT A DEFECT; the current loader is correct (owner-endorsed
+direction).** A row-by-row comparison of all 259 against the raw TSN extract settled it:
+the 259 are **route-origin / junction rows** (descriptions: `BEG RTE 20`, `JCT 9-RIVER
+ST`, `JCT 12/29`) — the FILE route is the report the row appears in, but the intersection
+physically sits on the CROSSING route, so the Location names the crossing route. **TSN
+represents them identically by route: for 259/259 TSN carries the same physical route +
+county as TSMIS's Location (NOT the file route), and 259/259 have a byte-exact TSN
+description twin** at a DIFFERENT postmile (TSMIS stamps the mainline's PM, e.g. `000.000`;
+TSN stamps the crossing route's actual PM, e.g. `059.803`). So the current loader — which
+keys by the Location (physical) route on BOTH sides — is CORRECT and matches TSN; the
+prescribed fix (key by the FILE route) would make TSMIS DISAGREE with TSN on all 259 rows,
+introducing discrepancies. The "require file route == Location route" half would falsely
+flag 259 legitimate equate rows. The one-sidedness of these rows is a mainline-PM vs
+crossing-PM difference, already reflected in the accepted one-sided counts. Key validated:
+the same physical key matched 16,200/16,200 (100%) agreeing rows and 0/259 disagreeing.
+Evidence sheet: session scratchpad `CMP-AUD-070 route-vs-location (7.8).xlsx`.
+
+**Audit spillover (owner-requested): no OTHER report has this trap live.** Ramp Detail's
+comparison IS code-asymmetric (TSMIS keys by the file route at col 0; TSN by the Location
+route) but BENIGN — ramps are always physically on their own mainline route, so file route
+== Location route on all 15,216 statewide rows (0 disagreements); it's latent fragility
+only. Highway Detail (explicit `RTE` col) and Highway Sequence (parsed route) have no
+crossing-route-in-Location duality; Highway Log keys by district/county/route-group
+ownership. The forthcoming per-row "source file" provenance column (owner-requested) will
+make this class of file-vs-physical divergence visible on every TSMIS-only comparison tab.
 
 ### CMP-AUD-071 — Ramp Summary comparison does not validate its route universe
 
