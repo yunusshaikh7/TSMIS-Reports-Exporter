@@ -23,9 +23,9 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Gate** | **125/125 offline** checks (full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; the C-bucket loader-validation gates **028 + 033 + 036 + 030 + 031** shipped CI-green this session. **Next: pick the next C gate by tractability** — 070 (ID identity derivation, output-affecting → oracle re-confirm), 034 (column-shifted consolidated-layout contracts), 027 (header-only route presence — needs empty-route representation, not just a skip), or lighter 029/063 — then the "— MER 059" census, then buckets B/D/E/G/H/I. 210 is DEFERRED (a multi-part evidence feature). HD-Excel county vendor-pending |
+| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; the C-bucket loader-validation gates **028 + 033 + 036 + 030 + 031 + 029** shipped CI-green this session. **Next: pick the next C gate by tractability** — 070 (ID identity derivation, output-affecting → oracle re-confirm), 034 (column-shifted consolidated-layout contracts), 027 (header-only route presence — needs empty-route representation, not just a skip), or lighter 063 — then the "— MER 059" census, then buckets B/D/E/G/H/I. 210 is DEFERRED (a multi-part evidence feature). HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, then the C-bucket gates 028 + 033 + 036 + 030 + 031)
+> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, then the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -64,6 +64,19 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   route presence — stays OPEN in the same function: its correct fix surfaces the
 >   empty route in coverage rather than a plain skip, since some reports may
 >   legitimately export a data-less route; handled as its own batch.)
+>
+> **DONE 2026-07-17: CMP-AUD-029 CLOSED — the generic cross-env XLSX discovery
+> now filters Office owner-lock stubs.** `_find_input_dir` (the single glob
+> chokepoint `_load_xlsx_side` + the Ramp/Intersection Summary + PDF-side loaders
+> all pass through) dropped `~$`-prefixed names, matching the owner-lock filter the
+> shared consolidator / Intersection Summary / `baseline_matrix` / `day_matrix` /
+> `tsn_library` / `validation` already applied. A `~$` stub could open-fail into a
+> skip and mark identical exports incomplete (then CMP-AUD-017 could cache the
+> matrix cell green). Red→green in `check_compare_env_route_universe`
+> (`test_029_owner_lock_ignored`: pre-fix a `~$hs_route_001.xlsx` stub → "could not
+> open" skip; post-fix ignored, `skipped` empty). Output-safe (`~$` files exist
+> only while Excel holds a file open; the real corpus has none → identical member
+> set). Offline gate **125/125**.
 >
 > **DONE 2026-07-17: CMP-AUD-037 CLOSED — the direct-path
 > normalization-freshness gate now covers all five families.** The matrix/

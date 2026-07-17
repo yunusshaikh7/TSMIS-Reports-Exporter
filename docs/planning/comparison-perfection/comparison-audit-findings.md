@@ -307,7 +307,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-026 | P1 | Resolved | PDF comparison paths discard producer partial outcomes |
 | CMP-AUD-027 | P1 | Verified | Header-only route files disappear from route coverage |
 | CMP-AUD-028 | P1 | Remediated 2026-07-17 — a configured identity column is mandatory; `_resolve_key_field` fails closed instead of keying on column 0 | Missing configured key columns silently fall back to column zero |
-| CMP-AUD-029 | P2 | Verified | Generic XLSX discovery includes Excel owner-lock files |
+| CMP-AUD-029 | P2 | Remediated 2026-07-17 — `_find_input_dir` excludes `~$` owner-lock stubs, so the generic cross-env XLSX path matches every other loader | Generic XLSX discovery includes Excel owner-lock files |
 | CMP-AUD-030 | P2 | Remediated 2026-07-17 — `_load_xlsx_side` keeps a per-side seen-route set; a duplicate route is skipped into the incompleteness channel, never concatenated | Duplicate route files are silently merged |
 | CMP-AUD-031 | P2 | Remediated 2026-07-17 — the flat XLSX route key is `_norm_route_key`-normalized and the `..._route_<n>` naming contract is required; a non-route file is skipped, never promoted from its stem | Flat report route keys do not normalize `1` and `001` |
 | CMP-AUD-032 | P1 | Verified | Cross-env flat schemas trust the first file, not the report contract |
@@ -1437,6 +1437,20 @@ incomplete comparison; CMP-AUD-017 can then render its matrix cache green.
 Correction requirements: exclude owner-lock files before folder selection/loading in
 every XLSX path. Identical exports plus a lock stub must remain complete with zero
 skipped inputs.
+
+**Remediated 2026-07-17.** `_find_input_dir` — the single discovery chokepoint the
+generic cross-env `_load_xlsx_side` and Ramp Summary / Intersection Summary / PDF-side
+loaders all glob through — now drops `~$`-prefixed names (`if not
+p.name.startswith("~$")`), the same owner-lock filter the shared consolidator
+(`consolidate_xlsx_base`), Intersection Summary, `baseline_matrix`, `day_matrix`,
+`tsn_library`, and `validation` already applied. A lock stub can no longer open-fail
+into a skip and mark identical exports incomplete. Output-safe: `~$` files exist only
+transiently while Excel holds a file open, so the real corpus (which has none) globs an
+identical member set. Proof
+(`build/check_compare_env_route_universe.py::test_029_owner_lock_ignored`, red→green:
+pre-fix a `~$hs_route_001.xlsx` stub beside the real export produced a "could not open"
+skip; post-fix the stub is ignored and `skipped` is empty). The redundant `~$` re-filter
+inside `_load_intersection_summary_side` is now a harmless no-op. Offline gate 125/125.
 
 ### CMP-AUD-030 — duplicate route files merge without disclosure
 

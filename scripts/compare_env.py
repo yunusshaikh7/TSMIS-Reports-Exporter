@@ -161,7 +161,14 @@ def _find_input_dir(base, subdir, pattern):
     report folder). Returns (dir, files) — files possibly empty."""
     base = Path(base)
     for candidate in (base / subdir, base):
-        files = sorted(candidate.glob(pattern)) if candidate.is_dir() else []
+        # Exclude Office owner-lock stubs (~$foo.xlsx) — they appear the moment a
+        # per-route export is open in Excel and are not report inputs
+        # (CMP-AUD-029). Counting one as a member would open-fail and turn
+        # identical exports into an incomplete comparison merely because a file
+        # was open. Every other XLSX path already filters them (the shared
+        # consolidator, Intersection Summary); this is the generic cross-env one.
+        files = sorted(p for p in candidate.glob(pattern)
+                       if not p.name.startswith("~$")) if candidate.is_dir() else []
         if files:
             return candidate, files
     return base / subdir, []

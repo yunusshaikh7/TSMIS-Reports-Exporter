@@ -104,6 +104,20 @@ def test_030_duplicate_route_flagged():
         "the duplicate route must be disclosed as skipped", skipped)
 
 
+def test_029_owner_lock_ignored():
+    """An Office owner-lock stub (~$...) beside a real per-route export must be
+    ignored entirely — not counted as a member and skipped-as-incomplete.
+    Merely having the workbook open in Excel cannot turn identical exports into
+    an incomplete comparison (CMP-AUD-029)."""
+    base = _make_side([("hs_route_001.xlsx", [["ORA", "", "R", "1.0", "", "A"]])])
+    lock = base / "highway_sequence" / "~$hs_route_001.xlsx"
+    lock.write_bytes(b"\x00\x02lockstub-not-a-workbook")  # an Excel lock stub
+    rows, _header, skipped = _load(base)
+    assert {r[0] for r in rows} == {"001"}, [r[0] for r in rows]
+    assert not skipped, (
+        "the owner-lock stub must be ignored, not skipped as incomplete", skipped)
+
+
 def test_030_031_canonical_side_unchanged():
     """Positive control: distinct canonical routes — including 005 vs 005S,
     which must stay SEPARATE — all contribute with zero skips."""
@@ -123,6 +137,7 @@ def main():
     test_031_route_token_normalized()
     test_031_non_route_name_rejected()
     test_030_duplicate_route_flagged()
+    test_029_owner_lock_ignored()
     test_030_031_canonical_side_unchanged()
     print("OK  cross-env route universe: tokens zero-pad-normalized, the "
           "..._route_<n> naming contract is required (no promoted stems), "
