@@ -373,7 +373,7 @@ def test_tsn_stage_heals_stale_library():
     with _Patch(_tsn, "reports", lambda: [_Spec("stale_lib", 2), _Spec("fresh_lib", 2)]), \
          _Patch(_tsn, "status", status), \
          _Patch(_tsn, "ensure_current", ensure_current):
-        rows = validation._tsn_stage(Events())
+        rows = validation._tsn_stage(Events(), lambda: False)
 
     by = {r["report"]: r for r in rows}
     check("a stale present-raw library is HEALED and reads current after",
@@ -383,6 +383,81 @@ def test_tsn_stage_heals_stale_library():
           by["fresh_lib"]["healed"] is None)
     check("each row records the normalization version",
           by["stale_lib"]["normalization_version"] == 2)
+
+    # CMP-AUD-120: a pre-cancelled validation must never rewrite a library.
+    healed.clear()
+    with _Patch(_tsn, "reports", lambda: [_Spec("stale_lib", 2)]), \
+         _Patch(_tsn, "status", lambda sub: dict(statuses[sub])), \
+         _Patch(_tsn, "ensure_current", ensure_current):
+        rows = validation._tsn_stage(Events(), lambda: True)
+    check("CMP-AUD-120: pre-cancelled validation attempts NO heal",
+          healed == [] and rows[0]["healed"] is None
+          and rows[0]["cancelled_before_heal"] is True)
+    check("CMP-AUD-120/119: the digest says 'cancelled before heal', not STALE",
+          validation._tsn_state_text(rows[0]) == "cancelled before heal")
+
+
+def test_tsn_state_truth_table():
+    """CMP-AUD-119: the digest never hides a heal attempt or invents success."""
+    print("validation TSN digest truth table (CMP-AUD-119):")
+    base = {"raw_count": 3, "consolidated_present": True,
+            "current_before": False, "cancelled_before_heal": False}
+    t = validation._tsn_state_text
+    check("healed to current is disclosed as HEALED, not bare 'current'",
+          t({**base, "healed": "ok", "current_after": True})
+          == "HEALED → current")
+    check("a heal that did NOT reach current is an alarm, never HEALED",
+          t({**base, "healed": "ok", "current_after": False})
+          == "HEAL RAN BUT STILL STALE")
+    check("a failed heal says HEAL FAILED",
+          t({**base, "healed": "error", "current_after": False})
+          == "HEAL ERROR")
+    check("a cancelled heal says HEAL CANCELLED",
+          t({**base, "healed": "cancelled", "current_after": False})
+          == "HEAL CANCELLED")
+    check("an untouched current library still reads 'current'",
+          t({**base, "current_before": True, "healed": None,
+             "current_after": True}) == "current")
+    check("raw-only data is a blocked capability, not absent data "
+          "(CMP-AUD-118)",
+          t({**base, "consolidated_present": False, "healed": None,
+             "current_after": False}) == "raw imported, awaiting first build")
+    check("genuinely empty library reads 'no data'",
+          t({**base, "consolidated_present": False, "raw_count": 0,
+             "healed": None, "current_after": False}) == "no data")
+    check("stale with no raw to rebuild from says so",
+          t({**base, "raw_count": 0, "healed": None,
+             "current_after": False}) == "STALE (no raw to rebuild from)")
+
+
+def test_ensure_tsn_ready_first_build():
+    """CMP-AUD-118: raw-only libraries get the explicit first build."""
+    print("validation raw-only first build (CMP-AUD-118):")
+    import tsn_library as _tsn
+    built = []
+
+    def build_consolidated(sub, events=None):
+        built.append(sub)
+        return ConsolidateResult(status="ok", message="first build")
+
+    with _Patch(_tsn, "is_registered", lambda r: True), \
+         _Patch(_tsn, "resolve", lambda r, *_a: {"kind": "raw"}), \
+         _Patch(_tsn, "ensure_current", lambda r, events=None: None), \
+         _Patch(_tsn, "build_consolidated", build_consolidated):
+        ready = validation._ensure_tsn_ready("ramp_detail", Events())
+    check("raw-only + no consolidated triggers the FIRST build and is ready",
+          ready is True and built == ["ramp_detail"])
+
+    built.clear()
+    with _Patch(_tsn, "is_registered", lambda r: True), \
+         _Patch(_tsn, "resolve", lambda r, *_a: {"kind": "raw"}), \
+         _Patch(_tsn, "ensure_current", lambda r, events=None: None), \
+         _Patch(_tsn, "build_consolidated",
+                lambda r, events=None: ConsolidateResult(
+                    status="error", message="bad raw")):
+        ready = validation._ensure_tsn_ready("ramp_detail", Events())
+    check("a failing first build reports not-ready (never a silent skip)",
+          ready is False)
 
 
 def test_missing_explicit_tsn_is_not_substituted():
@@ -506,6 +581,8 @@ if __name__ == "__main__":
     test_evidence_carries_manifest()
     test_trust_semantics()
     test_tsn_stage_heals_stale_library()
+    test_tsn_state_truth_table()
+    test_ensure_tsn_ready_first_build()
     test_missing_explicit_tsn_is_not_substituted()
     test_worker_always_posts_terminal()
     if _fail:

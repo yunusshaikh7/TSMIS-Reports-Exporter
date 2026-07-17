@@ -396,9 +396,9 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-115 | P1 | Verified | Comparison artifact validation accepts semantically empty workbooks |
 | CMP-AUD-116 | P1 | Resolved | Failed validation records default to complete |
 | CMP-AUD-117 | P1 | Resolved | Bearer credentials survive redaction into the evidence ZIP |
-| CMP-AUD-118 | P2 | Verified | Validation skips imported raw-only TSN data instead of building it |
-| CMP-AUD-119 | P2 | Verified | Validation reports TSN healing with an inverted truth table |
-| CMP-AUD-120 | P2 | Verified | Pre-cancelled validation still mutates TSN libraries |
+| CMP-AUD-118 | P2 | Remediated: _ensure_tsn_ready first-builds raw-only libraries (ensure_current None -> build_consolidated); raw-awaiting-build is a blocked capability in the digest | Validation skips imported raw-only TSN data instead of building it |
+| CMP-AUD-119 | P2 | Remediated: _tsn_state_text renders the complete truth table (HEALED-to-current disclosed, heal-but-stale alarmed, HEAL FAILED/CANCELLED, awaiting-first-build, cancelled-before-heal); before/attempt/after preserved in JSON | Validation reports TSN healing with an inverted truth table |
+| CMP-AUD-120 | P2 | Remediated: _tsn_stage polls should_cancel before every heal and records cancelled_before_heal; builders receive the events sink for mid-build cancellation | Pre-cancelled validation still mutates TSN libraries |
 | CMP-AUD-121 | P2 | Resolved | Full exact duplicate traces can exceed the comparison-sidecar size ceiling |
 | CMP-AUD-122 | P2 | Resolved | Duplicate pairing and typed counting ignored cancellation |
 | CMP-AUD-123 | P1 | Resolved | Live workbook edits could certify stale build-time identity and pairing |
@@ -4585,6 +4585,16 @@ raw data is imported but awaits a build; count the capability as blocked, not ab
 Test every raw kind, initial build, failed/partial/cancelled build, no-data source, and
 subsequent current/stale runs.
 
+Execution disposition (2026-07-16): `_ensure_tsn_ready` now takes the explicit
+first-build path — when `ensure_current` returns ``None`` (its deliberate
+no-consolidated-yet state) the raw/pdfs kind calls
+`tsn_library.build_consolidated(subdir, events=events)` and readiness is that
+build's real status; a failing first build reports not-ready rather than a
+silent skip, and the digest renders raw-only data as "raw imported, awaiting
+first build" (a blocked capability, never absent data). Gated in
+`check_validation` (first-build trigger, failing-build refusal, and the
+digest state).
+
 ### CMP-AUD-119 — TSN heal reporting uses an inverted truth table
 
 Priority: P2  
@@ -4606,6 +4616,17 @@ Correction requirements: define and test a complete truth table for current,
 healed-and-current, attempted-but-stale, raw-awaiting-build, absent, partial, failed,
 and cancelled. Preserve before/attempt/after state in both JSON and human digest.
 
+Execution disposition (2026-07-16): `validation._tsn_state_text` renders the
+complete table with the heal attempt never hidden — ``healed=='ok'`` says
+"HEALED → current" when current was reached and "HEAL RAN BUT STILL STALE"
+when it was not (the inverted branch is gone); any other attempt status
+renders "HEAL FAILED"/"HEAL CANCELLED"/"HEAL PARTIAL"; an untouched current
+library still reads "current"; raw-only reads "raw imported, awaiting first
+build"; empty reads "no data"; stale-with-no-raw says so; and a heal skipped
+by cancellation reads "cancelled before heal". The JSON record preserves
+before/attempt/after (`current_before`/`healed`/`current_after`, plus the new
+`cancelled_before_heal`). Every branch is pinned in `check_validation`.
+
 ### CMP-AUD-120 — pre-cancelled validation still rebuilds TSN libraries
 
 Priority: P2  
@@ -4626,6 +4647,17 @@ Correction requirements: poll before every TSN report, propagate cancellation in
 each builder, and distinguish not-started, interrupted, and completed-before-cancel
 mutations. Test pre-start, mid-first-build, between reports, after build/before
 comparison, and application shutdown.
+
+Execution disposition (2026-07-16): `_tsn_stage` polls ``should_cancel()``
+before EVERY report's heal and records ``cancelled_before_heal`` — a
+pre-cancelled validation reads statuses for the record but never invokes
+`ensure_current` (not-started is explicit); builders receive the events sink,
+whose worker-wired ``is_cancelled`` cancels a running build (interrupted
+renders as "HEAL CANCELLED" via the 119 table), and a heal that finished
+before the cancel arrived stays truthfully "HEALED → current" with the later
+comparison cells recording "cancelled". The comparisons stage already polled
+between cells. Pinned in `check_validation` (pre-cancel attempts no heal and
+the digest says "cancelled before heal").
 
 ### CMP-AUD-121 — full exact duplicate traces exceed the sidecar ceiling
 

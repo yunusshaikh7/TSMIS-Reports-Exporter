@@ -194,11 +194,22 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   the pairing objective.~~ The approval was recorded and the batch shipped —
 >   see the DONE record above.
 >
-> **Do this next: Wave 5 remainder** — 118/119/120 (the validation
-> TSN-library trio), plus the unowned-findings triage (no staged briefs —
-> read each finding first). Then the HL county-retention + collision census
-> (unblocks 045-HL/047/048/157) and the HD statewide re-measure (HD-Excel
-> county stays vendor-blocked; do NOT infer).
+> **Do this next: the HL county-retention + collision census** (unblocks
+> 045-HL/047/048/157), then the HL family findings, then the HD statewide
+> re-measure (HD-Excel county stays vendor-blocked; do NOT infer). The
+> Wave-5 unowned-findings triage sweep remains open behind those.
+>
+> **DONE 2026-07-16 (after the lifecycle trio): the CMP-AUD-118/119/120
+> validation TSN trio.** `_ensure_tsn_ready` first-builds raw-only libraries
+> (`ensure_current` None → `build_consolidated`; failing build = not-ready,
+> never a silent skip); `_tsn_state_text` renders the complete 119 truth
+> table (HEALED→current disclosed, heal-but-stale alarmed, HEAL
+> FAILED/CANCELLED, raw-awaiting-first-build, no-data, stale-no-raw,
+> cancelled-before-heal) with before/attempt/after preserved in JSON
+> (`cancelled_before_heal` added); `_tsn_stage` polls `should_cancel` before
+> every heal so a pre-cancelled validation never rewrites a library, and
+> builders receive the events sink for mid-build cancellation. All branches
+> pinned in `check_validation`. Gate 121/121 + ruff.
 >
 > **DONE 2026-07-16 (after 214): the CMP-AUD-127/130/131 artifact-lifecycle
 > trio.**

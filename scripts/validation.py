@@ -22,8 +22,10 @@ the "process the real samples" promise, disclosed to the user before it runs.
 
 Everything RECORDED is COUNTS + OUTCOMES + folder NAMES — never report data
 (the bundle's RM05 promise). Console-free: events + return value only; the
-should_cancel poll cancels BETWEEN cells and the events sink's is_cancelled
-(wired by the worker) cancels DURING a long single comparison.
+should_cancel poll cancels BETWEEN cells AND before every mutating TSN
+heal/build (CMP-AUD-120 — a pre-cancelled run never rewrites a library),
+and the events sink's is_cancelled (wired by the worker) cancels DURING a
+long single comparison or build.
 """
 import logging
 import platform
@@ -76,12 +78,19 @@ def _site():
         return ("unknown", "unknown")
 
 
-def _tsn_stage(events):
+def _tsn_stage(events, should_cancel):
+    """Per registered report: freshness before, the D2 heal attempt, freshness
+    after. Cancellation is polled BEFORE every heal (CMP-AUD-120): a cancelled
+    validation may keep READING statuses for the record, but it never rewrites
+    a canonical library; the not-attempted state is recorded explicitly."""
     out = []
     for spec in tsn_library.reports():
         before = tsn_library.status(spec.subdir)
         healed = None
-        if before["consolidated_present"] and before["raw_present"] and not before["current"]:
+        cancelled_before = bool(should_cancel())
+        if (not cancelled_before
+                and before["consolidated_present"] and before["raw_present"]
+                and not before["current"]):
             events.on_log(f"Validation: rebuilding the {spec.label} TSN library…")
             res = tsn_library.ensure_current(spec.subdir, events=events)
             healed = getattr(res, "status", None) if res is not None else None
@@ -91,6 +100,7 @@ def _tsn_stage(events):
             "raw_count": before["raw_count"],
             "consolidated_present": before["consolidated_present"],
             "current_before": before["current"],
+            "cancelled_before_heal": cancelled_before,
             "healed": healed,
             "current_after": after["current"],
             "normalization_version": spec.normalization_version,
@@ -128,8 +138,10 @@ def _envs_with_data(dest, subdir):
 
 def _ensure_tsn_ready(subdir, events, selected_file=None, source=None):
     """True when `subdir` has TSN data the comparison can read — healing a
-    present-but-unconsolidated (raw/pdfs) library first so it counts as a real
-    comparison rather than a false 'no consolidated workbook' ERROR."""
+    stale library, and FIRST-BUILDING a present-but-unconsolidated (raw/pdfs)
+    one (CMP-AUD-118: `ensure_current` deliberately returns None when nothing
+    is consolidated yet, so raw-only data needs the explicit first-build path;
+    it is imported-awaiting-build capability, never a false 'no TSN data')."""
     if not tsn_library.is_registered(subdir):
         return False
     src = source or (tsn_library.resolve(subdir, selected_file)
@@ -138,6 +150,8 @@ def _ensure_tsn_ready(subdir, events, selected_file=None, source=None):
     if kind in ("pdfs", "raw"):
         events.on_log(f"Validation: consolidating the {subdir} TSN library…")
         res = tsn_library.ensure_current(subdir, events=events)
+        if res is None:
+            res = tsn_library.build_consolidated(subdir, events=events)
         return getattr(res, "status", None) == "ok"
     return kind in _TSN_PRESENT_KINDS
 
@@ -276,7 +290,7 @@ def run_validation(events=None, should_cancel=None):
     manifest = {"generated": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "environment": _env_stage()}
     events.on_log("Validation: checking the TSN library…")
-    manifest["tsn_library"] = _tsn_stage(events)
+    manifest["tsn_library"] = _tsn_stage(events, should_cancel)
     events.on_log("Validation: processing the sample comparisons…")
     manifest["comparisons"] = _comparisons_stage(events, should_cancel)
     all_cells = manifest["comparisons"]["cells"]
@@ -305,16 +319,39 @@ def run_validation(events=None, should_cancel=None):
     return manifest
 
 
+def _tsn_state_text(r):
+    """The complete CMP-AUD-119 truth table — the heal ATTEMPT is never hidden.
+
+    A rebuild that ran is always disclosed (even when it reached current), a
+    rebuild that ran but did NOT reach current is an alarm rather than a
+    certification, raw awaiting its first build is a blocked capability rather
+    than absent data, and a heal skipped because the user had already
+    cancelled says so."""
+    healed = r.get("healed")
+    if healed == "ok":
+        return ("HEALED → current" if r["current_after"]
+                else "HEAL RAN BUT STILL STALE")
+    if healed is not None:
+        return f"HEAL {str(healed).upper()}"     # failed / cancelled / partial
+    if r.get("cancelled_before_heal") and not r["current_before"]:
+        return "cancelled before heal"
+    if r["current_after"]:
+        return "current"
+    if not r["consolidated_present"]:
+        return ("raw imported, awaiting first build" if r["raw_count"]
+                else "no data")
+    return ("STALE (no raw to rebuild from)" if not r["raw_count"]
+            else "STALE")
+
+
 def summary_lines(manifest):
     """A short human-readable digest for the bundle's report text."""
     env = manifest["environment"]
     lines = [f"app v{env['app_version']} ({env['build']}) · python {env['python']} · "
              f"site {env['site']}"]
     for r in manifest["tsn_library"]:
-        state = "current" if r["current_after"] else (
-            "HEALED" if r["healed"] == "ok" else
-            "no data" if not r["consolidated_present"] else "STALE")
-        lines.append(f"TSN {r['report']}: {state} (raw files: {r['raw_count']})")
+        lines.append(f"TSN {r['report']}: {_tsn_state_text(r)} "
+                     f"(raw files: {r['raw_count']})")
     comps = manifest["comparisons"]
     if comps.get("skipped"):
         lines.append(f"comparisons: {comps['skipped']}")
