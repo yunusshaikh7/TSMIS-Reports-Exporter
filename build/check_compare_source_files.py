@@ -57,6 +57,17 @@ def test_source_files_from_consolidated():
     assert ctc.source_files_from_consolidated(str(pr), "Data", "highway_log") == []
 
 
+def test_source_files_from_rows():
+    """The cross-env / baseline path names each row from the route prepended at
+    column 0 (no consolidated workbook to read)."""
+    rows = [["001", "a"], ["005S", "b"], [None, "c"]]
+    assert ctc.source_files_from_rows(rows, "tsar_ramp_detail", "xlsx") == [
+        "tsar_ramp_detail_route_001.xlsx",
+        "tsar_ramp_detail_route_005S.xlsx", ""], rows
+    assert ctc.source_files_from_rows([["014U"]], "intersection_detail", "pdf") == [
+        "intersection_detail_route_014U.pdf"]
+
+
 def test_write_source_files_sheet_write_only():
     """The companion sheet is written into a WRITE-ONLY workbook (the streaming
     shape the real comparison uses) and lists side/row/route/file per row."""
@@ -81,6 +92,7 @@ def test_write_source_files_sheet_write_only():
 
 def main():
     test_source_files_from_consolidated()
+    test_source_files_from_rows()
     test_write_source_files_sheet_write_only()
     print("OK  Source Files provenance: filenames come from the consolidated Route "
           "column (the file route), blank rows are filtered, PDF flavors name the "

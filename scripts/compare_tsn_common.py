@@ -389,6 +389,18 @@ def source_files_from_consolidated(path, sheet, prefix, ext="xlsx"):
         wb.close()
 
 
+def source_files_from_rows(rows, prefix, ext):
+    """Per-row source filename `<prefix>_route_<route>.<ext>` from the route already
+    prepended at column 0. For sides loaded straight from per-route files with no
+    consolidated workbook to read (the cross-environment / baseline path, where both
+    sides are per-route TSMIS exports and the loader prepends the route)."""
+    out = []
+    for r in rows:
+        route = "" if not r or r[0] is None else str(r[0]).strip()
+        out.append(f"{prefix}_route_{route}.{ext}" if route else "")
+    return out
+
+
 def write_source_files_sheet(wb, side_specs, sheet_title="Source Files"):
     """Append a companion "Source Files" sheet documenting which per-route export
     each TSMIS row came from. `side_specs` = [(side_name, rows, files), ...] where

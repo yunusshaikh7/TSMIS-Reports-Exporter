@@ -791,6 +791,44 @@ def _apply_pdf_coverage(result, sides):
     return result
 
 
+# Source Files provenance (cross-env / baseline): the per-route export prefix + ext
+# per report subdir. Both sides are per-route TSMIS exports and the loader prepends
+# the route, so each row's source filename is reconstructed from column 0.
+_SOURCE_FILE_SPEC = {
+    "ramp_detail": ("tsar_ramp_detail", "xlsx"),
+    "highway_sequence": ("highway_sequence", "xlsx"),
+    "highway_detail": ("highway_detail", "xlsx"),
+    "highway_log": ("highway_log", "xlsx"),
+    "intersection_detail": ("intersection_detail", "xlsx"),
+    "ramp_detail_pdf": ("tsar_ramp_detail", "pdf"),
+    "highway_sequence_pdf": ("highway_sequence", "pdf"),
+    "highway_detail_pdf": ("highway_detail", "pdf"),
+    "intersection_detail_pdf": ("intersection_detail", "pdf"),
+    "highway_log_pdf": ("highway_log", "pdf"),
+}
+
+
+def _compose_source_files(sc, subdir, rows_a, rows_b, la, lb):
+    """Compose the default 'Source Files' sheet onto `sc` for a cross-env comparison
+    (both sides are per-route TSMIS exports). No-op for subdirs without a known spec
+    (e.g. the Ramp/Intersection Summary per-route parsers)."""
+    spec = _SOURCE_FILE_SPEC.get(subdir)
+    if spec is None:
+        return sc
+    prefix, ext = spec
+    prev = sc.extra_sheet_writer
+
+    def _writer(wb, ctx):
+        if prev is not None:
+            prev(wb, ctx)
+        ctc.write_source_files_sheet(wb, [
+            (la, rows_a, ctc.source_files_from_rows(rows_a, prefix, ext)),
+            (lb, rows_b, ctc.source_files_from_rows(rows_b, prefix, ext)),
+        ])
+
+    return replace(sc, extra_sheet_writer=_writer)
+
+
 # ---------------------------------------------------------------------------
 # Per-report adapters
 # ---------------------------------------------------------------------------
@@ -1109,6 +1147,9 @@ class EnvCompare:
             # (via _resolve_key_field) refuses a header that lacks it rather
             # than silently keying on column 0 and certifying a false match.
             return ConsolidateResult(status="error", message=str(e))
+        # Default provenance: both sides are per-route TSMIS exports, so name the
+        # source file each row came from (from the route prepended at column 0).
+        sc = _compose_source_files(sc, self.subdir, rows_a, rows_b, la, lb)
         prov_sides[0]["role"], prov_sides[1]["role"] = la, lb
         prov_display = {"recipe": {"report": self.REPORT_NAME,
                                    "banner": f"{self.REPORT_NAME} Comparison "
