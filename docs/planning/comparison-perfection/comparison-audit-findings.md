@@ -1607,6 +1607,33 @@ insertions, deletions, and block shifts. Where the upstream export's labels are 
 to be shifted, validate the documented shifted signature rather than weakening the
 gate to width alone.
 
+**Prep 2026-07-17 (next-safe C-gate; the CONSOLIDATED-side analog of CMP-AUD-033).**
+This is a safe-by-construction refusal gate: bind each `_load_tsmis` loader to the
+EXACT documented consolidated header (which, for the label-shifted families, IS the
+"documented shifted signature") instead of the current weak width/last-label checks.
+The exact headers captured from the real ssor-prod 7.9 corpus (each carrying fixed
+None cells at the header-less export columns — part of the signature, not noise):
+- **Ramp Detail** (w12, None at 2/5/8): `['Route','Location',None,'PM','Date of
+  Record',None,'HG','Area 4',None,'City Code','R/U','Description']`
+- **Highway Sequence** (w10, None at 3/5): `['Route','County','City',None,'PM',None,
+  'HG','FT','Distance To Next Point','Description']`
+- **Intersection Detail** (w36, no blanks): `['Route','P','Post Mile','S','Location',
+  'Date of Record','H/G','City Code','R/U','INT Type','INT Eff-Date','Ctrl T','Ctrl
+  Type','Light Eff-Date','Light T/Y','ML Eff-Date','ML S/M','ML L/C','ML R/C','ML
+  T/P','ML N/L','Description','Main Line Lgth','Inter Eff-Date','Inter S','Inter L',
+  'Inter R','Inter T','Inter N','Int St Eff-Date','Intrte S','Intrte Route','Intrte
+  Post','Intrte Mile','Xing P/S','Xing Line Lgth']`
+- **Highway Detail**: capture still owed — the quick 2-route consolidation via
+  `consolidate_highway_detail.consolidate` did not emit a workbook (path/signature to
+  debug); capture it before binding.
+Two prerequisites before shipping (both to retire the false-rejection risk an exact
+bind introduces): (1) capture HD's header; (2) a **full-corpus header-stability census
+across BOTH data sources (ssor + ars)** proving the exact header is identical on every
+route — an exact bind that a single ars route or edition-variant fails would falsely
+reject valid input. Then wire each `_header_ok`/`load_consolidated_rows` to the bound
+signature, red→green per family (junk/shifted refused; real header passes), real-corpus
+per family. Capture script: session scratchpad `capture_034_headers.py`. Remains open.
+
 ### CMP-AUD-035 — raw TSN admission can certify incomplete or ambiguous truth
 
 Priority: P1  
