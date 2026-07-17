@@ -281,10 +281,19 @@ would swallow the description. (`Y_TOLERANCE = 3`, `WORD_GAP = 1.5`,
 `URL_MARK = "tsmis.dot.ca.gov"` skips the page-footer URL line.)
 
 ### Line classification (`parse_pdf`)
-- `Route 006` cover line (`ROUTE_HEADER_RE`, 2-token) → pins `route` (the
-  filename via `ROUTE_FROM_NAME` is primary; a mismatch logs a WARNING and uses
-  the filename).
-- `*`-prefixed TOTALS line → **closes the open row** (`last_row = None`).
+- `Route 006` cover line (`ROUTE_HEADER_RE`, 2-token) → pins the DOCUMENT's
+  own route claim (authoritative since CMP-AUD-049 — the filename token
+  merely corroborates; disagreement or a missing cover is a named FAILED
+  input in convert_one).
+- `*`-prefixed line: POSITIONAL since the CMP-AUD-067 sweep. At the LEFT
+  MARGIN (`first_x0 < col0_right`, the totals stars, x0 ≈ 35) it **closes
+  the open row** (`last_row = None`); INSIDE the description band it is a
+  PRINTED description and falls through to the description-attach branch —
+  the statewide set carries exactly four such rows ("**** CODE ACCIDENTS
+  TO" on 065 R009.327 + three bare "*"), which the vendor Excel and the TSN
+  print both carry (the TSN side recovered its half in normalizer v5,
+  CMP-AUD-157). Before any geometry exists (`col0_right` None) the
+  conservative close-and-drop stands.
 - Centered `<district> <county> <route>` group header (`GROUP_RE`,
   `first_x0 > page.width * 0.30`; county codes may bear a period —
   `^[A-Z]{2,4}\.?$`, e.g. `07 LA. 005S`) → resets `last_row` (don't attach

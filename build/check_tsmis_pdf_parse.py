@@ -160,6 +160,63 @@ def check_header_bottom():
                              line(30, "2026")]) is None
 
 
+def check_star_descriptions():
+    """The 067 statewide sweep proved the star-guard DROPPED printed
+    Descriptions: '**** CODE ACCIDENTS TO' (065 R009.327) and three bare '*'
+    rows print in the DESCRIPTION band (x0 ≈ 156) while the totals stars
+    print at the left margin (x0 ≈ 35) — the vendor Excel and the TSN print
+    both carry the text (the TSN side recovered it in normalizer v5,
+    CMP-AUD-157). A description-band star line must CONSERVE (attach to the
+    open row exactly like any description line); a left-margin totals star
+    must still CLOSE the row. The evidence adapter's LOCKSTEP twin captures
+    the same star description box."""
+    import tempfile
+    from pathlib import Path
+
+    sys.path.insert(0, os.path.dirname(__file__))
+    from _hl_fixture_pdf import make_pdf
+
+    import evidence_highway_log as ehl
+    from events import Events
+
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_hl_star_"))
+    p = tmp / "highway_log_route_001.pdf"
+    # col0 wide enough for a full glued postmile token; the rest packed after.
+    rects = ([(30, 200, 40, 12)]
+             + [(72 + i * 16, 200, 15, 12) for i in range(M.N_PDF_COLS - 1)])
+    make_pdf(p, [[
+        (100, 100, "Route 001"),
+        (31, 202, "001.000"),
+        (156, 215, "**** CODE ACCIDENTS TO"),
+        (31, 230, "002.000"),
+        (156, 245, "*"),
+        (34, 260, "*** *** KER COUNTY TOTALS (MILEAGE) TOTAL 024.982"),
+        (156, 275, "MUST NOT ATTACH"),
+    ]], rects_per_page=[rects])
+
+    route, rows, stats = M.parse_pdf(str(p), Events())
+    assert route == "001", route
+    assert len(rows) == 2, [r[0] for r in rows]
+    assert rows[0][M._DESC_IDX] == "**** CODE ACCIDENTS TO", \
+        repr(rows[0][M._DESC_IDX])
+    assert rows[1][M._DESC_IDX] == "*", repr(rows[1][M._DESC_IDX])
+    assert "MUST NOT ATTACH" not in (rows[1][M._DESC_IDX] or ""), \
+        repr(rows[1][M._DESC_IDX])
+
+    # The evidence adapter's twin: the star description joins the located
+    # record's text and contributes a snip box.
+    canon = ehl._canon(rows[0], off=0)
+    found = ehl.locate_tsmis(p, {canon})
+    assert canon in found and found[canon], "row 1 not located"
+    rec = found[canon][0]
+    assert rec["row"][M._DESC_IDX] == "**** CODE ACCIDENTS TO", \
+        repr(rec["row"][M._DESC_IDX])
+    assert len(rec["desc"]) == 1, rec["desc"]
+
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     check_layout_guard()
     check_norm_route()
@@ -168,10 +225,11 @@ def main():
     check_assign_columns_conserves()
     check_carried_line_crossings()
     check_header_bottom()
+    check_star_descriptions()
     print("OK  TSMIS Highway Log (PDF) parse: 30->31 column mapping, conserving "
           "character assignment, Location normalization, route padding, "
-          "carried-geometry validation, and content-based header detection all "
-          "locked.")
+          "carried-geometry validation, content-based header detection, and "
+          "description-band star conservation all locked.")
 
 
 if __name__ == "__main__":

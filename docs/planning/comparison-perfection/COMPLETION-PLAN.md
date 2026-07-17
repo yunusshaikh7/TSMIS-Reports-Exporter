@@ -275,17 +275,37 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > — never a complete workbook with a blank Route. NEW
 > `check_pdf_route_universe` (12 pins; 8 pre-fix failures by git-stash).
 >
-> **Do this next: the unowned-findings triage sweep**, plus the NEW
-> follow-up the 067 statewide sweep surfaced: **the TSMIS-PDF Highway Log
-> parser DROPS asterisk-leading printed Descriptions** (ssor 7.9 same-source
-> run: "(blank) ≠ *" ×2 + "(blank) ≠ **** CODE ACCIDENTS TO" — the vendor
-> Excel carries them; the exact mirror of the TSN v5 star-recovery,
-> CMP-AUD-157: `consolidate_tsmis_highway_log_pdf`'s star-guard
-> (`texts[0].startswith("*") → close row`) must learn to conserve
-> DESCRIPTION-band star lines while still closing on totals stars — reuse
-> 157's x-position discrimination), and one PDF row whose Description grew a
-> "— MER 059" tail (a parse-association question — census before fixing).
-> HD-Excel county stays vendor-blocked — never infer it.
+> **Do this next: the unowned-findings triage sweep**, plus the ONE
+> remaining census from the HL same-source sweep: the "— MER 059" line
+> (route 059 p5, x0 354.4, top 515.7 — group-header-SHAPED with a dashed
+> district slot, centered mid-gap between an equate row's description and
+> the next data row; the parser's group test refuses it because
+> GROUP_RE[0] wants digits, so it attaches as a Description tail — ONE cell
+> statewide). Classify only with evidence: scan all 252 prints for
+> em-dash-leading lines and inspect each in context BEFORE writing a rule
+> (a wrong classification can move description text — "can lead to
+> discrepancies" territory). HD-Excel county stays vendor-blocked — never
+> infer it.
+>
+> **DONE 2026-07-17 (after 067): the TSMIS-PDF HL star-description
+> recovery — the TSN-v5 mirror.** The star-guard is POSITIONAL now: a
+> left-margin totals star (x0 ≈ 35 < col0_right) still closes the open row;
+> a star line INSIDE the description band (x0 ≈ 156 — "**** CODE ACCIDENTS
+> TO" on 065 R009.327 + the three bare "*" rows on 041/031.050, 041/009.920,
+> 145/005.010) is a PRINTED description and now attaches like any other
+> description line (`consolidate_tsmis_highway_log_pdf` + the
+> `evidence_highway_log` LOCKSTEP twin; conservative close-and-drop stands
+> before geometry exists). Red→green in `check_tsmis_pdf_parse
+> .check_star_descriptions` on a rect-bearing fixture PDF
+> (`_hl_fixture_pdf.make_pdf` gained `rects_per_page` — the TSMIS HL parser
+> windows on zebra rects) incl. the totals-close and adapter-twin pins; all
+> four REAL rows recovered on the ssor 7.9 prints (values == the vendor
+> Excel == TSN v5). Statewide same-source rerun: Description class **5 → 1**
+> (only the MER-tail census case remains), fully identical rows 51,261 →
+> **51,265** (+4 = exactly the recovered rows), 620 cells / 619 rows, every
+> other class byte-unchanged (LB T-W 608, Sig Chg 11, 2 PDF-only). Gate
+> 127/127. The parsing doc's line-classification section now pins the
+> positional rule.
 >
 > **DONE 2026-07-17 (after 066): CMP-AUD-067 CLOSED — same-source
 > projections separated from cross-system normalization in all four

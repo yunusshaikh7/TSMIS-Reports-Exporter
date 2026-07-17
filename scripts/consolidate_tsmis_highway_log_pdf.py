@@ -277,6 +277,7 @@ def parse_pdf(path, events, pdf_name=""):
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
         page_windows = None           # carried forward if a page lacks a data band
+        col0_right = None             # carried with the windows (star-line band test)
         for page_no, page in enumerate(pdf.pages, 1):
             if events.is_cancelled():
                 return route, None, None
@@ -315,8 +316,18 @@ def parse_pdf(path, events, pdf_name=""):
                 # "* * * ... TOTALS ..." summary lines mark the END of a segment's
                 # data + description, so they CLOSE the open row: any footer
                 # fragment that follows must not attach to the preceding
-                # Description.
-                if texts[0].startswith("*"):
+                # Description. POSITIONAL since the 067 sweep: the totals stars
+                # print at the LEFT MARGIN (x0 ≈ 35), but the print also carries
+                # star-leading DESCRIPTIONS in the description band (x0 ≈ 156 —
+                # "**** CODE ACCIDENTS TO" and three bare "*" rows statewide;
+                # the vendor Excel and the TSN print both carry them, and TSN
+                # normalizer v5 recovered its side, CMP-AUD-157). A star line
+                # INSIDE the description band falls through to the ordinary
+                # description-attach branch below and is CONSERVED; without
+                # geometry yet (col0_right None) the conservative close-and-drop
+                # stands.
+                if texts[0].startswith("*") and (col0_right is None
+                                                 or first_x0 < col0_right):
                     last_row = None
                     continue
 

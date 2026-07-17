@@ -194,7 +194,11 @@ def locate_tsmis(pdf_path, needed_keys):
                 if top <= cutoff:
                     continue
                 first_x0 = words[0]["x0"]
-                if texts[0].startswith("*"):
+                # POSITIONAL star-guard (the parser's twin): a left-margin
+                # totals star closes the record; a description-band star line
+                # is a PRINTED description and falls through to attach.
+                if texts[0].startswith("*") and (col0_right is None
+                                                 or first_x0 < col0_right):
                     open_rec = open_row = None
                     continue
                 if (len(texts) >= 3 and first_x0 > page.width * 0.30

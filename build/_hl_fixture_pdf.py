@@ -16,8 +16,15 @@ def _esc(text):
     return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
 
 
-def _page_stream(runs):
-    parts = ["BT", f"/F1 {FONT_SIZE} Tf"]
+def _page_stream(runs, rects=()):
+    parts = []
+    for x, top, w, h in rects:
+        # A filled light-grey cell rect (pdfplumber reads it from the `re` op)
+        # — the TSMIS Highway Log parser derives its column windows from the
+        # zebra-shaded data-band rects, so fixtures for it need real rects.
+        y = PAGE_H - top - h
+        parts.append(f"q 0.9 0.9 0.9 rg {x:.2f} {y:.2f} {w:.2f} {h:.2f} re f Q")
+    parts += ["BT", f"/F1 {FONT_SIZE} Tf"]
     for x, top, text in runs:
         y = PAGE_H - top - FONT_SIZE
         parts.append(f"1 0 0 1 {x:.2f} {y:.2f} Tm ({_esc(text)}) Tj")
@@ -25,14 +32,17 @@ def _page_stream(runs):
     return "\n".join(parts).encode("latin-1")
 
 
-def make_pdf(path, pages):
-    """pages: list of [(x, top, text)] run-lists -> a minimal valid PDF."""
+def make_pdf(path, pages, rects_per_page=None):
+    """pages: list of [(x, top, text)] run-lists -> a minimal valid PDF.
+    `rects_per_page` (optional): a parallel list of [(x, top, w, h)] filled
+    cell rects per page (for parsers that window on shaded bands)."""
     objs = []
     kids = []
     for i, runs in enumerate(pages):
         content_num = 4 + i * 2
         page_num = content_num + 1
-        stream = _page_stream(runs)
+        rects = () if rects_per_page is None else rects_per_page[i]
+        stream = _page_stream(runs, rects)
         objs.append((content_num,
                      b"<< /Length %d >>\nstream\n%s\nendstream"
                      % (len(stream), stream)))
