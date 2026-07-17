@@ -422,7 +422,14 @@ def _load_tsn(path):
     return tsn_rows_from_raw(path), True
 
 
-def _tsmis_row(r):
+def _tsmis_row_with(r, project):
+    """One consolidated TSMIS row with `project(field, raw)` supplying the
+    value projection. The 045 physical pairing key and the Location-derived
+    provenance are IDENTICAL for every caller; only the value projection
+    varies — `_project` for the vs-TSN comparison (cross-system crosswalks),
+    a verbatim projection for the same-source PDF-vs-Excel flavor
+    (CMP-AUD-067: crosswalks must not erase render differences between two
+    TSMIS renders)."""
     def at(i):
         return r[i] if i < len(r) else None
     loc = at(_TSMIS_ROUTE_POS)
@@ -440,8 +447,12 @@ def _tsmis_row(r):
     derived = {"Route Suffix": route_suffix, KEY: key,
                "District": district, "County": county}
     return [base] + [derived[f] if f in derived
-                     else _project(f, at(_TSMIS_POS[f]))
+                     else project(f, at(_TSMIS_POS[f]))
                      for f in SHARED_HEADER]
+
+
+def _tsmis_row(r):
+    return _tsmis_row_with(r, _project)
 
 
 def _load_tsmis(path):

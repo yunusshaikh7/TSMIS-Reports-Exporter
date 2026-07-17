@@ -345,7 +345,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-064 | P2 | Verified | PDF parser anomaly counts masquerade as skipped input counts |
 | CMP-AUD-065 | P1 | Verified | Sequence PDF-vs-Excel suppresses three same-source fields |
 | CMP-AUD-066 | P1 | Remediated 2026-07-17 (HL vs-TSN half via the v5 marker; the PDF-role halves via the PDF-conversion marker; RD structurally protected) | PDF comparison roles are not provenance-validated |
-| CMP-AUD-067 | P1 | Verified | TSN projections hide PDF-vs-Excel source differences |
+| CMP-AUD-067 | P1 | Remediated 2026-07-17 (same-source projections in all four families; HSL was fixed by 199/204, RD never had an instance) | TSN projections hide PDF-vs-Excel source differences |
 | CMP-AUD-068 | P2 | Verified | PDF-vs-TSN Detail paths omit Report View |
 | CMP-AUD-069 | P2 | Verified | Ramp PDF comparisons mislabel their file roles in diagnostics |
 | CMP-AUD-070 | P1 | Verified | Intersection loader ignores explicit route and suffix fields |
@@ -3066,6 +3066,70 @@ documented PDF/Excel render equivalences; surface canonical and raw identity sep
 when canonical pairing is still required. Add a per-family mutation matrix for every
 crosswalk/normalizer, proving each non-approved source difference changes the verdict
 and retains the raw values in output.
+
+**Remediation (2026-07-17).** The finding's exact isolated mutations were first
+REPLAYED against the then-current flavors (fixtures under the CMP-AUD-066
+marker): HSL's instance was already fixed by CMP-AUD-199/204 ("001/JCT 5" vs
+"JCT 5" flags), Ramp Detail never had one (verbatim loader — a Description
+mutation flags raw), and the ID/HD/HL instances all REPRODUCED verbatim
+("EVERYTHING MATCHES" / the rewritten "S ≠ A"). Each family then got a
+same-source projection that separates PAIRING identity from cross-system value
+reconciliation:
+  * **Intersection Detail** — `_tsmis_row_with(r, project)` (one row body, two
+    projections) + `_load_tsmis_same_source`: the 045 physical pairing key and
+    Location-derived provenance are IDENTICAL to the vs-TSN projection, but
+    every value cell is verbatim — the control-type J→S crosswalk (and the
+    boolean/date/numeric folds) exist to bridge TSN's encodings and no longer
+    touch two TSMIS renders. PDF `J` vs Excel `S` now FLAGS and a J-vs-A cell
+    displays the RAW "J ≠ A".
+  * **Highway Detail** — the same `_tsmis_row_with` seam + `SS_HEADER` =
+    SHARED_HEADER + "PM (raw)": the canonical roadbed-aware Post Mile stays the
+    PAIRING key (the vendor Excel genuinely drops roadbed letters, so verbatim
+    keys would explode one-sided rows), the RAW printed token is its own
+    compared trailing cell (a dropped R/L SURFACES instead of hiding inside the
+    key), NA and every other value cell compare verbatim (the TSN-only
+    'A'→blank fold no longer applies), and the one kept normalization is the
+    typed-date render equivalence (openpyxl cell typing, value-identical).
+  * **Highway Log** — after re-reading the locked
+    docs/highway_log/comparison-study.md + the Phase-3 decision gates: the §7b
+    roadbed-canonical key and the ditto non-asserting convention are UNTOUCHED
+    (pairing semantics correctness-locked), and the same-source flavor appends
+    "Location (raw)" as its own compared cell (`_load_pair_same_source` +
+    `_SS_HEADER`, a flavor-scoped schema — no shared-engine edit): an Excel
+    "1.000" whose dittoed block implies R used to match the PDF's explicit
+    "1.000R" with zero differences. (The stale highway_log_columns comment
+    claiming PDF-vs-Excel is "unaffected" by the key normalizer was
+    probe-refuted — the flavor inherits it from the shared schema.)
+Red→green: the new `check_compare_same_source` mutation matrix (HSL/RD pinned
+green as permanent guards; ID two pins, HD two pins, HL one pin all red
+pre-fix; identical-render MATCH pins hold everywhere); gate 127/127.
+**Statewide re-verifies (fresh consolidations from the bound 7.9 sets, under
+the full 049+066+067 stack — zero identity/role refusals anywhere):**
+  * ID (ars-prod): **16,459 / 0 / 0 with exactly ONE differing cell — HG
+    "D ≠ U", the known real 108/TUO defect** — the verbatim projector surfaced
+    ZERO new classes statewide (a no-delta re-bless; the crosswalk's statewide
+    reach was nil, which is exactly why the mutation matrix, not the corpus,
+    is the guard).
+  * HD (ars-prod): **the row TOPOLOGY is exactly the v0.26.0 reference —
+    50,730 matched / 50,171 fully identical / 559 differing rows / 476 + 543 =
+    1,019 one-sided — pairing unchanged as designed**, while the cell
+    accounting is now verbatim: 1,622 differing cells, including the
+    previously-INVISIBLE classes the fix exists to surface — "PM (raw)" 5 (the
+    vendor Excel's dropped roadbed letters), NA 6 (the A-vs-blank class the
+    TSN fold hid), PS 5 — beside the known real render classes (Length 374,
+    the LB block ~148 each, dates/HG/AC/City…), all within the SAME 559 rows
+    the old projector already flagged.
+  * HL (ssor-prod): **51,884 matched / 51,261 fully identical / 623 differing
+    rows / 624 differing cells / 2 PDF-only, 0 Excel-only** — the classes are
+    the flavor DOING ITS JOB: "LB T-W Wid" 608 (the known vendor-Excel
+    blanked-width bug), "Sig Chg. Date" 11, Description 5. "Location (raw)"
+    contributed ZERO cells statewide — the dropped-roadbed class is LATENT on
+    this pull (like ID's crosswalk). NEW FINDING surfaced by the verbatim
+    Description class: the TSMIS-PDF parser DROPS asterisk-leading printed
+    Descriptions ("(blank) ≠ *" ×2, "(blank) ≠ **** CODE ACCIDENTS TO") — the
+    exact mirror of the TSN v5 star-recovery (CMP-AUD-157), bound as a
+    follow-up work item in the plan; a "— MER 059" Description tail on one PDF
+    row is censused there too.
 
 ### CMP-AUD-068 — PDF-vs-TSN Detail paths omit Report View
 

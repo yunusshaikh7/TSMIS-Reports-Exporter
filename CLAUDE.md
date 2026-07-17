@@ -122,23 +122,30 @@ Stage-8 base-family audits are complete: **7/7**. Highway Log closed on exact 25
 Excel/PDF source witnesses, its accepted-red Stage-6 chain, an independent projection
 oracle, two clean seven-file product-leg universes, and two byte-identical final-gate
 result/acceptance pairs. The gate accepts only the base audit: product, full-physical,
-workbook-evidence, and end-to-end perfection remain false. CMP-AUD-067
-remains open (047/048 shipped 2026-07-16; 157 + 045-HL + 050 + all three
-CMP-AUD-049 halves + 066 shipped 2026-07-17 — 050: the shared PDF-conversion
-driver and Ramp Summary now REFUSE duplicate or blank route claims with both
-source PDFs named, never overwriting or double-counting by file order; 049:
-the DOCUMENT's own route claim — page banners (HSL/RD/HD), the ID cover's
+workbook-evidence, and end-to-end perfection remain false. Every owned
+provenance/projection finding is now closed (047/048 shipped 2026-07-16;
+157 + 045-HL + 050 + all three CMP-AUD-049 halves + 066 + 067 shipped
+2026-07-17 — 050: the shared PDF-conversion driver and Ramp Summary REFUSE
+duplicate or blank route claims with both source PDFs named; 049: the
+DOCUMENT's own route claim — page banners (HSL/RD/HD), the ID cover's
 "ROUTE : NNN" parameter, the HL cover line — is the authoritative per-route
 identity in all five PDF converters AND the evidence adapters
-(`reconcile_route_identity` / `RouteIdentityError`); a renamed or
-unidentified PDF is a named FAILED input / excluded from captioning, proven
-refusal-free on all 1,099 statewide 7.9 per-route documents; 066: every
-PDF-sourced workbook carries a very-hidden `TSMIS PDF Conversion` marker and
-the HL/HSL/HD/ID flavors enforce roles — the TSMIS (PDF) side requires it,
-the TSMIS (Excel) side rejects it, pre-marker PDF workbooks re-consolidate
-once (RD's print-only columns already protect it structurally); 045's
-HD-Excel leg stays blocked on the vendor county answer — never infer it),
-and no product code changed during the bounded closeout itself. Exact
+(`reconcile_route_identity` / `RouteIdentityError`), proven refusal-free on
+all 1,099 statewide 7.9 per-route documents; 066: every PDF-sourced workbook
+carries a very-hidden `TSMIS PDF Conversion` marker — the TSMIS (PDF)
+comparison role requires it, the TSMIS (Excel) role rejects it, pre-marker
+PDF workbooks re-consolidate once; 067: the PDF-vs-Excel self-check flavors
+project SAME-SOURCE values verbatim on the shared physical pairing keys —
+ID's J→S fold and display rewrite are gone, HD surfaces "PM (raw)" + verbatim
+NA, HL surfaces "Location (raw)" with the §7b roadbed key + ditto conventions
+untouched, all guarded by the `check_compare_same_source` mutation matrix,
+with statewide re-verifies: ID 16,459/0/0 + only the real 108/TUO HG cell,
+HD topology exactly the v0.26.0 reference, HL measured
+51,884/51,261/623/624; 045's HD-Excel leg stays blocked on the vendor county
+answer — never infer it), and no product code changed during the bounded
+closeout itself. The 067 sweep surfaced one NEW follow-up: the TSMIS-PDF
+Highway Log parser drops asterisk-leading printed Descriptions (the mirror
+of the TSN v5 star-recovery) — bound in the plan. Exact
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
 The owner-authorized remediation is live on branch `comparison-perfection`; the single

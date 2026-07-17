@@ -22,8 +22,51 @@ name the two file pickers.
 from dataclasses import replace
 
 import compare_highway_detail_tsn as _hd
-from compare_tsn_common import (reject_pdf_source, require_pdf_source,
-                                run_files_compare, suggest_route_name)
+from compare_tsn_common import (load_consolidated_rows, reject_pdf_source,
+                                require_pdf_source, run_files_compare,
+                                suggest_route_name)
+
+# --------------------------------------------------------------------------- #
+# the same-source (PDF vs Excel) shape — CMP-AUD-067
+# --------------------------------------------------------------------------- #
+# The canonical roadbed-aware Post Mile stays the PAIRING key (the Excel
+# export genuinely drops roadbed letters the print carries, so verbatim keys
+# would explode one-sided rows), but the RAW printed token becomes its own
+# compared trailing cell — a dropped R/L now SURFACES instead of hiding
+# inside the canonical key. Every other value cell is verbatim: the vs-TSN
+# reconciliations (the NA 'A'→blank fold, numeric/length/WDA padding, the
+# whitespace collapse) exist to bridge TSN's encodings and must not erase
+# render differences between two TSMIS renders. The one kept normalization is
+# the typed-date render equivalence (openpyxl may type a date cell in one
+# workbook and store text in the other — the printed value is identical).
+SS_HEADER = list(_hd.SHARED_HEADER) + ["PM (raw)"]
+
+
+def _project_same_source(field, raw):
+    if field in _hd.DATE_FIELDS:
+        return _hd._norm_date(raw)
+    return _hd._s(_hd._v(raw))
+
+
+def _tsmis_row_same_source(r):
+    return _hd._tsmis_row_with(
+        r, _project_same_source,
+        extra=lambda _at, token: [_hd._s(_hd._v(token))])
+
+
+def _load_tsmis_same_source(path):
+    return load_consolidated_rows(
+        path, _hd.TSMIS_SHEET,
+        missing_sheet_hint="pick the consolidated TSMIS Highway Detail workbook.",
+        bad_header_msg="isn't a CONSOLIDATED Highway Detail workbook "
+                       "(expected a leading 'Route' column) — consolidate first.",
+        row_transform=_tsmis_row_same_source)
+
+
+_SS_SCHEMA = replace(
+    _hd._SCHEMA, header=SS_HEADER,
+    data_widths=dict(_hd._SCHEMA.data_widths, **{"PM (raw)": 12}),
+    cmp_widths=dict(_hd._SCHEMA.cmp_widths, **{"PM (raw)": 12}))
 
 
 class _HighwayDetailFileCompare:
@@ -35,14 +78,16 @@ class _HighwayDetailFileCompare:
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
                  one_sided_note_extra=None, drop_notes=False,
-                 excel_side_b=False):
+                 excel_side_b=False, load_a=None, base_schema=None):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
         self._excel_side_b = excel_side_b   # CMP-AUD-066 role enforcement
         self._name_tag = name_tag
+        self._load_a = load_a or _hd._load_tsmis
         self._load_b = load_b
-        schema = replace(_hd._SCHEMA, side_a=side_a, side_b=side_b)
+        schema = replace(base_schema or _hd._SCHEMA,
+                         side_a=side_a, side_b=side_b)
         if one_sided_note_extra is not None:
             schema = replace(schema, one_sided_note_extra=one_sided_note_extra)
         if drop_notes:
@@ -61,7 +106,7 @@ class _HighwayDetailFileCompare:
         require_pdf_source(path_a, self.file_a_label, "Highway Detail")
         if self._excel_side_b:
             reject_pdf_source(path_b, self.file_b_label, "Highway Detail")
-        rows_a, _ = _hd._load_tsmis(path_a)   # PDF side: same 34-col consolidated layout
+        rows_a, _ = self._load_a(path_a)   # PDF side: same 34-col consolidated layout
         rows_b, _ = self._load_b(path_b)
         return rows_a, rows_b, None
 
@@ -87,6 +132,7 @@ TSMIS_PDF_VS_EXCEL = _HighwayDetailFileCompare(
     report_name="Highway Detail — TSMIS PDF vs Excel",
     side_a="TSMIS (PDF)", side_b="TSMIS (Excel)",
     name_tag="TSMIS_PDF_vs_Excel_HighwayDetail",
-    load_b=_hd._load_tsmis,
+    load_a=_load_tsmis_same_source, load_b=_load_tsmis_same_source,
+    base_schema=_SS_SCHEMA,
     one_sided_note_extra=" (locations one source lists at a postmile the other doesn't)",
     drop_notes=True, excel_side_b=True)

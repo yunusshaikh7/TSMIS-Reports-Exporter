@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 + 066 closures — route identity + PDF-role provenance)
+> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 + 066 + 067 closures)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -275,13 +275,36 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > — never a complete workbook with a blank Route. NEW
 > `check_pdf_route_universe` (12 pins; 8 pre-fix failures by git-stash).
 >
-> **Do this next: CMP-AUD-067** (census below — HSL/RD re-verify the
-> finding's exact mutations against the 199/v0.26.0 same-source loaders
-> before dispositioning; HL's roadbed half is correctness-locked — read
-> docs/highway_log/comparison-study.md + the Phase-3 decision gates FIRST;
-> HD pm_canon HG-fill + NA crosswalk; ID J→S fold + display rewrite),
-> **then the unowned-findings triage sweep.** HD-Excel county stays
-> vendor-blocked — never infer it.
+> **Do this next: the unowned-findings triage sweep**, plus the NEW
+> follow-up the 067 statewide sweep surfaced: **the TSMIS-PDF Highway Log
+> parser DROPS asterisk-leading printed Descriptions** (ssor 7.9 same-source
+> run: "(blank) ≠ *" ×2 + "(blank) ≠ **** CODE ACCIDENTS TO" — the vendor
+> Excel carries them; the exact mirror of the TSN v5 star-recovery,
+> CMP-AUD-157: `consolidate_tsmis_highway_log_pdf`'s star-guard
+> (`texts[0].startswith("*") → close row`) must learn to conserve
+> DESCRIPTION-band star lines while still closing on totals stars — reuse
+> 157's x-position discrimination), and one PDF row whose Description grew a
+> "— MER 059" tail (a parse-association question — census before fixing).
+> HD-Excel county stays vendor-blocked — never infer it.
+>
+> **DONE 2026-07-17 (after 066): CMP-AUD-067 CLOSED — same-source
+> projections separated from cross-system normalization in all four
+> families.** Probes first (HSL fixed by 199/204; RD never had an instance;
+> ID/HD/HL reproduced), then per family: ID verbatim values on the shared
+> 045 pairing key (`_tsmis_row_with` seam — J→S fold + display rewrite
+> gone); HD `SS_HEADER` + "PM (raw)" compared cell + verbatim NA (canonical
+> pairing kept — the finding's own hatch); HL "Location (raw)" compared
+> cell in the PDF-vs-Excel flavor only (§7b key + ditto conventions
+> UNTOUCHED; the stale "PDF-vs-Excel unaffected" comment was
+> probe-refuted). NEW `check_compare_same_source` mutation matrix (5 red
+> pre-fix + HSL/RD guards); gate 127/127. Statewide (fresh consolidations,
+> zero refusals under the 049+066 stack): ID **16,459/0/0 + exactly the one
+> real 108/TUO HG cell** (no-delta re-bless); HD **topology == the v0.26.0
+> reference exactly** (50,730/50,171/559 rows/1,019 one-sided) with
+> verbatim cells 1,622 incl. the newly-visible PM (raw) 5 / NA 6 / PS 5;
+> HL measured reference **51,884/51,261/623 rows/624 cells/2 PDF-only**
+> {LB T-W 608 = the vendor blank-width bug, Sig Chg 11, Desc 5;
+> Location (raw) 0 statewide — latent, matrix-guarded}.
 >
 > **DONE 2026-07-17 (after the 049 closure): CMP-AUD-066 CLOSED — PDF-role
 > provenance.** Every workbook written FROM PDFs carries a very-hidden

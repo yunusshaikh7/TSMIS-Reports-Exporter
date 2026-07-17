@@ -561,6 +561,23 @@ its print-only On/Off + Ramp Type columns already make the Excel shape unloadabl
 the PDF side. Historical Excel-consolidated workbooks stay fully usable on the Excel
 role. Pinned in `check_pdf_role_provenance`.
 
+**Same-source projections (CMP-AUD-067, 2026-07-17).** The PDF-vs-Excel self-check
+flavors no longer reuse the cross-system (vs-TSN) value projections — those crosswalks
+exist to bridge TSN's encodings and were erasing the render differences the self-checks
+exist to detect. Each family now separates PAIRING identity from value projection:
+Highway Sequence already had its own same-source loader (CMP-AUD-199/204); Ramp Detail
+was always verbatim; **Intersection Detail** projects every value cell verbatim on the
+unchanged 045 physical pairing key (`_tsmis_row_with` — the control-type J→S fold and
+its display rewrite no longer apply between two TSMIS renders); **Highway Detail** keeps
+the canonical roadbed-aware Post Mile as the pairing key but appends the RAW printed
+token as its own compared "PM (raw)" cell and compares NA (and everything else)
+verbatim; **Highway Log** keeps the §7b roadbed-canonical key + ditto conventions
+untouched and appends "Location (raw)" as a compared cell in the PDF-vs-Excel flavor
+only. The one kept normalization outside the owner-ruled render equivalences is HD's
+typed-date fold (openpyxl cell typing, value-identical). Guarded end to end by the
+`check_compare_same_source` mutation matrix (every finding mutation red pre-fix,
+identical-render MATCH pins everywhere).
+
 ### 9c. TSMIS vs TSN Ramp Detail — `compare_ramp_detail_tsn.py` (`"files"`, group `tsn`; remediation pending)
 
 The current **v0.17.0 product comparator** was the recipe later reports followed, but its

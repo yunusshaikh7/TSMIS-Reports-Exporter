@@ -360,7 +360,16 @@ def _load_tsn(path):
     return tsn_rows_from_raw(path), True
 
 
-def _tsmis_row(r):
+def _tsmis_row_with(r, project, extra=None):
+    """One consolidated TSMIS row with `project(field, raw)` supplying the
+    value projection and `extra(at, token)` optionally appending trailing
+    cells. The canonical roadbed-aware Post Mile KEY and the PS derivation
+    are IDENTICAL for every caller (pairing semantics are shared); only the
+    value projection varies — `_project` for the vs-TSN comparison
+    (cross-system reconciliation), a verbatim projection for the same-source
+    PDF-vs-Excel flavor, which also appends the RAW printed Post Mile as its
+    own compared cell so a dropped roadbed letter can no longer hide inside
+    the canonical key (CMP-AUD-067)."""
     def at(i):
         return r[i] if i < len(r) else None
     token = _s(at(_TSMIS_POS["Post Mile"]))
@@ -372,8 +381,14 @@ def _tsmis_row(r):
         elif f == "PS":
             row.append(pm_suffix(token))
         else:
-            row.append(_project(f, at(_TSMIS_POS[f])))
+            row.append(project(f, at(_TSMIS_POS[f])))
+    if extra is not None:
+        row.extend(extra(at, token))
     return row
+
+
+def _tsmis_row(r):
+    return _tsmis_row_with(r, _project)
 
 
 def _load_tsmis(path):

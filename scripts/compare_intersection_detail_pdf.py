@@ -23,9 +23,36 @@ flag as differences. The GUI's Compare tab drives these through COMPARE_REPORTS
 from dataclasses import replace
 
 import compare_intersection_detail_tsn as _id
-from compare_tsn_common import (reject_pdf_source, require_pdf_source,
-                                run_files_compare, same_source_render_rows,
-                                suggest_route_name)
+from compare_tsn_common import (load_consolidated_rows, reject_pdf_source,
+                                require_pdf_source, run_files_compare,
+                                same_source_render_rows, suggest_route_name)
+
+
+def _tsmis_row_same_source(r):
+    """The same-source (PDF-vs-Excel) row projection: the 045 physical pairing
+    key + Location-derived provenance are IDENTICAL to the vs-TSN projection
+    (`_id._tsmis_row_with` owns the one body), but every VALUE cell is
+    verbatim (`_id._v`) — the cross-system crosswalks (the control-type J→S
+    fold, boolean/date/numeric reconciliation) exist to bridge TSN's
+    encodings and must NOT erase render differences between two TSMIS renders
+    of the SAME report (CMP-AUD-067). The flavor-level
+    `same_source_render_rows` still applies the owner-ruled render
+    equivalences (OOXML escapes, edge tab padding)."""
+    return _id._tsmis_row_with(r, lambda _f, raw: _id._v(raw))
+
+
+def _load_tsmis_same_source(path):
+    return load_consolidated_rows(
+        path, _id.TSMIS_SHEET,
+        missing_sheet_hint="pick the consolidated TSMIS Intersection Detail workbook.",
+        bad_header_msg="isn't a CONSOLIDATED Intersection Detail workbook in the "
+                       "current (July 2026) site format — a leading 'Route' column "
+                       "and the 'Xing Line Lgth' tail column are expected. "
+                       "Consolidate a fresh post-update export; pre-update exports "
+                       "used the old 36-column layout, which this version doesn't "
+                       "compare.",
+        header_ok=_id._header_ok,
+        row_transform=_tsmis_row_same_source)
 
 
 class _IntDetailFileCompare:
@@ -44,11 +71,12 @@ class _IntDetailFileCompare:
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
                  one_sided_note_extra=None, drop_notes=False, same_source=False,
-                 excel_side_b=False):
+                 excel_side_b=False, load_a=None):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
         self._name_tag = name_tag
+        self._load_a = load_a or _id._load_tsmis
         self._load_b = load_b
         self._same_source = same_source
         self._excel_side_b = excel_side_b   # CMP-AUD-066 role enforcement
@@ -71,7 +99,7 @@ class _IntDetailFileCompare:
         require_pdf_source(path_a, self.file_a_label, "Intersection Detail")
         if self._excel_side_b:
             reject_pdf_source(path_b, self.file_b_label, "Intersection Detail")
-        rows_a, _ = _id._load_tsmis(path_a)   # PDF side: same 36-col consolidated layout
+        rows_a, _ = self._load_a(path_a)   # PDF side: same 36-col consolidated layout
         rows_b, _ = self._load_b(path_b)
         if self._same_source:
             rows_a = same_source_render_rows(rows_a)
@@ -100,6 +128,6 @@ TSMIS_PDF_VS_EXCEL = _IntDetailFileCompare(
     report_name="Intersection Detail — TSMIS PDF vs Excel",
     side_a="TSMIS (PDF)", side_b="TSMIS (Excel)",
     name_tag="TSMIS_PDF_vs_Excel_IntersectionDetail",
-    load_b=_id._load_tsmis,
+    load_a=_load_tsmis_same_source, load_b=_load_tsmis_same_source,
     one_sided_note_extra=" (intersections one source lists at a postmile the other doesn't)",
     drop_notes=True, same_source=True, excel_side_b=True)

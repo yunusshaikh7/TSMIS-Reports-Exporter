@@ -22,8 +22,32 @@ the PDF-vs-Excel pair doesn't mislabel both TSMIS sides as "TSMIS"/"TSN".
 from dataclasses import replace
 
 import compare_highway_log as _hl
+import highway_log_columns as hlc
 from compare_tsn_common import (reject_pdf_source, require_pdf_source,
                                 run_files_compare, suggest_route_name)
+
+# --------------------------------------------------------------------------- #
+# the same-source (PDF vs Excel) shape — CMP-AUD-067
+# --------------------------------------------------------------------------- #
+# The roadbed-canonical Location stays the PAIRING key (§7b semantics
+# unchanged — the vendor Excel genuinely drops roadbed letters the print
+# carries, and canonical pairing keeps those rows aligned), but the RAW
+# printed Location joins as its own compared trailing cell: an Excel "1.000"
+# whose dittoed block implies R used to match the PDF's explicit "1.000R"
+# with zero differences — the drop was invisible because the projected token
+# was also the key.
+_SS_HEADER = list(hlc.HEADER) + ["Location (raw)"]
+
+
+def _load_pair_same_source(path_a, path_b):
+    rows_a, rows_b, extra, has_route = _hl._load_pair(path_a, path_b)
+    off = 1 if has_route else 0
+
+    def with_raw(rows):
+        return [list(r) + ["" if (off >= len(r) or r[off] is None)
+                           else str(r[off])] for r in rows]
+
+    return with_raw(rows_a), with_raw(rows_b), extra, has_route
 
 
 class _HighwayLogFileCompare:
@@ -35,7 +59,7 @@ class _HighwayLogFileCompare:
 
     def __init__(self, report_name, side_a, side_b, name_tag,
                  one_sided_note_extra="", trim_note_extra="",
-                 tsn_side_b=False):
+                 tsn_side_b=False, same_source=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
@@ -44,12 +68,22 @@ class _HighwayLogFileCompare:
         # CMP-AUD-157/045-HL) and its conserved source claims ride the Notes
         # sheet; the PDF-vs-Excel flavor has no TSN side and stays plain.
         self._tsn_side_b = tsn_side_b
+        # CMP-AUD-067: the same-source flavor appends the raw Location as its
+        # own compared cell (see _SS_HEADER above).
+        self._same_source = same_source
         # Reuse the approved Highway Log schema; override only the side names and
         # the report-specific notes (compare_core's formula/label text is
         # regression-locked and is NOT touched here).
         self._schema = replace(_hl._SCHEMA, side_a=side_a, side_b=side_b,
                                one_sided_note_extra=one_sided_note_extra,
                                trim_note_extra=trim_note_extra)
+        if same_source:
+            self._schema = replace(
+                self._schema, header=_SS_HEADER,
+                data_widths=dict(_hl._SCHEMA.data_widths,
+                                 **{"Location (raw)": 12}),
+                cmp_widths=dict(_hl._SCHEMA.cmp_widths,
+                                **{"Location (raw)": 12}))
 
     def suggest_name(self, path_a):
         """Output filename suggestion, route- / consolidated-aware, with a
@@ -62,7 +96,9 @@ class _HighwayLogFileCompare:
         comparison modules (ConsolidateResult returned)."""
         schema = (_hl._schema_with_claims(path_b, schema=self._schema)
                   if self._tsn_side_b else self._schema)
-        base_loader = _hl._load_pair_tsn if self._tsn_side_b else _hl._load_pair
+        base_loader = (_hl._load_pair_tsn if self._tsn_side_b
+                       else (_load_pair_same_source if self._same_source
+                             else _hl._load_pair))
 
         def loader(pa, pb):
             # CMP-AUD-066: the "TSMIS (PDF)" side must carry the
@@ -101,4 +137,5 @@ TSMIS_PDF_VS_EXCEL = _HighwayLogFileCompare(
     one_sided_note_extra=" (rows the Excel export added or dropped relative to "
                          "the PDF — a sign of the export bug)",
     trim_note_extra=" — the TSMIS Excel export pads Description with trailing "
-                    "blanks")
+                    "blanks",
+    same_source=True)
