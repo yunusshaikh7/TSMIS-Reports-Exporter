@@ -352,6 +352,53 @@ def exact_consolidated_header_ok(*expected):
                            for c in header] in exps
 
 
+def source_files_from_consolidated(path, sheet, prefix, ext="xlsx"):
+    """The per-row source export filename `<prefix>_route_<route>.<ext>`, one per
+    data row, read from the CONSOLIDATED workbook's leading `Route` column (col 0)
+    in the SAME order and with the SAME `row_has_data` filter the loaders use — so
+    it index-aligns with the transformed rows. The FILE route (col 0) is used, not a
+    downstream re-derivation, so for Intersection Detail it names the export a row
+    actually came from even when the compared route differs (a junction/equate row).
+    Returns [] if the workbook/sheet can't be read."""
+    from openpyxl import load_workbook
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception as e:
+        log.warning("source-file provenance: could not open %s (%s: %s); the "
+                    "Source Files sheet is omitted", Path(path).name,
+                    type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        return []
+    try:
+        if sheet not in wb.sheetnames:
+            return []
+        it = wb[sheet].iter_rows(values_only=True)
+        next(it, None)                                   # header
+        out = []
+        for r in it:
+            if row_has_data(r):
+                route = "" if not r or r[0] is None else str(r[0]).strip()
+                out.append(f"{prefix}_route_{route}.{ext}" if route else "")
+        return out
+    finally:
+        wb.close()
+
+
+def write_source_files_sheet(wb, side_specs, sheet_title="Source Files"):
+    """Append a companion "Source Files" sheet documenting which per-route export
+    each TSMIS row came from. `side_specs` = [(side_name, rows, files), ...] where
+    `rows` are that side's transformed rows and `files` the index-aligned source
+    filenames (from `source_files_from_consolidated`). Write-only-safe (create_sheet
+    + append plain values), so it works with the streaming comparison workbook and
+    needs no change to the correctness-locked engine. Rows the side actually wrote
+    are listed in order, so row N here corresponds to data-sheet row N+1."""
+    ws = wb.create_sheet(sheet_title)
+    ws.append(["Side", "Row #", "Route (as compared)", "Source File"])
+    for side_name, rows, files in side_specs:
+        for i, (row, fn) in enumerate(zip(rows, files), start=1):
+            route = "" if not row or row[0] is None else str(row[0])
+            ws.append([side_name, i, route, fn])
+
+
 def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_msg,
                            header_ok=None, row_transform=list):
     """The consolidated-workbook loader skeleton three vs-TSN comparators wrote
