@@ -354,8 +354,18 @@ TSN = (
     # digits collapse). Identical on the ordinary 'n/nn/nnn[X]' tokens real
     # district PDFs print, but the route KEYS the stored library, so the bump
     # re-keys any stored library on its next use (D2 auto-rebuild).
+    # v5 (CMP-AUD-157/045-HL): detached route-suffix group headers
+    # ("07 LA 005 S") own their rows as the suffixed TSMIS route (005S —
+    # 317 rows statewide were misattributed to base routes), asterisk-leading
+    # printed Descriptions are conserved, and the district/county/route
+    # ownership manifest + ADT/totals/provenance claims ride the sidecar
+    # (tsn_source_claims) with typed dispositions and the totals
+    # reconciliation. The rows sheet kept its SHAPE, so the workbook carries
+    # a "TSN Normalization" marker sheet; the comparison loaders refuse a
+    # pre-v5 file with a rebuild hint, and this bump rebuilds stored
+    # libraries (D2 auto-rebuild).
     TsnEntry("highway_log", "TSN Highway Log", "*.pdf", "district_pdfs",
-             "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into", normalization_version=4),
+             "tsn_highway_log_consolidated.xlsx", "consolidate_tsn_highway_log:build_into", normalization_version=5),
     # Ramp Detail v3 (v0.26.0): the normalized shape appends the TSN District/
     # County sidecar columns (split from LOCATION "01-DN-101") — evidence locates
     # a row in the TSN statewide print with them; the comparison loader slices to

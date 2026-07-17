@@ -27,8 +27,15 @@ and [verification-and-testing.md](verification-and-testing.md).
 > Intersection Route suffix/PR/District/explicit Route/physical `S` remain separately
 > asserted/conserved fields. Highway Detail TSN needs route+county+complete PM while its
 > vendor-pending TSMIS Excel flavor remains blocked without an authoritative county
-> derivation. Highway Log's raw county claim is currently discarded and is being
-> re-censused rather than presumed exempt.
+> derivation. Highway Log (normalizer v5, 2026-07-17): identity is
+> (Route incl. any detached printed suffix — "07 LA 005 S" keys as TSMIS's 005S —
+> roadbed-canonical Location); the TSMIS export has no County column, so the raw
+> district/county/route group ownership (2,363 header occurrences) rides the
+> `tsn_source_claims` sidecar as a conserved per-document claim, alongside the three
+> per-row ADT claims (digest-bound), every typed totals block (TOTAL=CONST+UNCONST and
+> suffixed-sections-zero are hard build gates; route/county-vs-additive-sums recorded,
+> not certified), and the print identity; pre-v5 files are refused by the vs-TSN
+> loaders with a rebuild hint.
 >
 > TSN XLSX/PDF pairs are semantic, source-date-aware oracles. Different IT export times
 > may produce an exact explainable delta; they do not permit silent normalization. The
@@ -63,7 +70,7 @@ side is per-route throughout. This yields **two comparison shapes**:
 | Ramp Detail | XLSX `Sheet 1` | statewide flat (15410 rows × 18 col; 126 rtes) | per-route XLSX ×126 | **FLAT** (D4 key: route+county+normalized PM; PR/PM_SFX conserved claims; **integrated + re-blessed 2026-07-14**) |
 | Intersection Detail | XLSX `Sheet 1` | statewide flat (16626 rows × 36 col; 216 route+suffix tokens / 211 bases) | per-route XLSX ×218 | **FLAT** (ID-79 key: base route+county+PP+Decimal PM; **integrated + re-blessed 2026-07-14**) |
 | Highway Sequence | PDF | **per-district**, exactly one internally claimed D01–D12 | per-route XLSX ×252 | **FLAT** (route+**county**+complete PM) |
-| Highway Log | PDF | exactly one internally claimed D01–D12 | per-route XLSX + PDF | **FLAT** — admission green; normalized county retention/identity integration still red |
+| Highway Log | PDF | exactly one internally claimed D01–D12 | per-route XLSX + PDF | **FLAT** — admission green; **integrated + re-blessed 2026-07-17 (v5)**: suffix-aware route identity (005S…), county/ownership + ADT + totals + provenance conserved as sidecar claims with reconciliation gates |
 | Highway Detail | XLSX `Sheet 1` | statewide flat (60,083 rows × 56 col; 273 routes) | per-route XLSX + PDF | **FLAT** — TSN route+county+complete PM; TSMIS Excel county derivation blocked |
 
 - **AGGREGATE**: TSN is one statewide category-count table; SUM the TSMIS per-route counts

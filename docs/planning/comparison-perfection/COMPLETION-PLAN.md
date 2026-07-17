@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-16, after CMP-AUD-218 + the CMP-AUD-197 close)
+> ### ▶ RESUME HERE (2026-07-17, after the HL 157/045-HL batch — normalizer v5)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -194,9 +194,80 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   the pairing objective.~~ The approval was recorded and the batch shipped —
 >   see the DONE record above.
 >
-> **Do this next: the HL 157/045 batch** (the census is DONE — facts below;
-> 047/048 SHIPPED), then 049/050/066/067 and the unowned-findings triage
-> sweep. HD-Excel county stays vendor-blocked.
+> **DONE 2026-07-17: the HL 157/045 batch — CMP-AUD-157 closed, 045-HL
+> integrated, TSN Highway Log normalizer v5.**
+> - **The owner qualifier is the route suffix (proven, not inferred).** The
+>   full-corpus census found exactly 19 four-token group headers; their
+>   (route, letter) combos are exactly TSMIS's ten suffixed routes (005S 008U
+>   010S 014U 015S 058U 101U 178S 210U 880S; 317 rows across 11
+>   (district,county) sections — 005S 47, 008U 6, 010S 110, 014U 16, 015S 53,
+>   058U 6, 101U 11, 178S 12, 210U 41 = LA 7 + SBD 34, 880S 15). Row-verified:
+>   TSMIS 101U's 8 rows are postmile-for-postmile a subset of the
+>   "01 MEN 101 U" section (equate included), and the print's own
+>   COUNTY/ROUTE totals for suffixed sections are ALL-ZERO (22/22 lines) —
+>   the source itself excludes them from the base route. v5 keys those rows
+>   as the suffixed route; a non-single-letter 4th token (or a 5th) refuses.
+> - **v4 dropped real printed Descriptions**: the zero-residue instrument
+>   found asterisk-leading desc-band lines eaten as totals — exactly FOUR
+>   rows statewide (065/R009.327 "**** CODE ACCIDENTS TO"; bare "*" on
+>   041/031.050, 041/009.920, 145/005.010), and the TSMIS export prints the
+>   SAME text on the SAME four rows, so every one was a manufactured false
+>   Description difference until now. v5 conserves them; totals star lines
+>   print left of the desc band.
+> - **CMP-AUD-157 claims + reconciliation**: `tsn_source_claims` carries the
+>   per-document ownership manifest (2,363 header occurrences, rows sum
+>   60,083), the three per-row ADT claims (token-split around the P/S flag —
+>   immune to the 448pt window overhang; digest-bound;
+>   `tsn_only_no_tsmis_column_conserved_by_digest`), every typed totals block
+>   (wrap-rejoined across page breaks INCLUDING past the reprinted page-top
+>   group header; stranded keyword/value halves conserved as stray
+>   fragments), report identity (OTM52010 · 09/15/25 · title · cover year
+>   2025; per-page and cross-member agreement enforced), and the
+>   reconciliation record. HARD GATES: TOTAL=CONST+UNCONST on every parsed
+>   mileage line; suffixed sections all-zero; zero unexplained below-band
+>   residue (refusal lists it). RECORDED (disclosed, never certified):
+>   route/county totals vs additive NA-aware MI sums (the print's
+>   odometer-based accounting), volume Length/DVM tracking.
+> - **Wiring**: catalog normalization_version 4→5 (D2 auto-rebuild); the
+>   marker sheet + `_load_pair_tsn` gate refuse pre-v5 TSN files in BOTH
+>   vs-TSN flavors (PDF-vs-Excel ungated — closes CMP-AUD-066's HL
+>   PDF-vs-TSN instance as a side effect); `_schema_with_claims` writes
+>   Legend + a claims Notes sheet.
+> - **Gates**: NEW `check_tsn_highway_log_claims` (26 pins, hand-rolled
+>   fixture PDFs through the production pdfplumber pipeline —
+>   `build/_hl_fixture_pdf.py` shared writer; red-proven by git stash);
+>   identity gate 11 green / 0 known-red
+>   (`test_highway_log_route_and_location_identity`); marker-gate +
+>   Notes pins in `check_compare_highway_log`; isolation +
+>   district-source-contract fakes updated to the 3-tuple/v5 contract.
+> - **Corpus (the 12 live-library prints)**: build complete — 12 documents,
+>   380 per-route members (369 base + the 11 suffixed sections = exactly the
+>   route-totals census), 60,083 rows, 11 suffixed sections, print identity
+>   agreed. **Route-1 canary re-blessed EXACT** (299/18/69/221/969, all 30
+>   per-field counts identical, 8,970 asserted; the v5 per-route TSN rows are
+>   tuple-identical to the frozen HL-R1-E1 input; new input filed as
+>   `ground-truth/inputs/tsn_highway_log_route 1 v5.xlsx` and bound in the
+>   bindings doc). Corpus verify PASS: 60,083 rows / 273 routes (263 + ten
+>   suffixed, counts census-exact) / the four recovered descriptions match
+>   the TSMIS-side rows / ownership sums 60,083 over 2,363 occurrences /
+>   tcu 2,914 clean ×12 docs / suffixed-zero 22/22. **Statewide TSMIS-vs-TSN
+>   v5 measured reference** (7.9 ssor-prod TSMIS 51,884×252 vs TSN v5
+>   60,083×273; ~10-month vintage gap — reference, never a match target):
+>   48,351 paired / 3,533 / 11,732 / 39,623 differing rows / 140,643 cells /
+>   1,437,881 asserted — and ALL ten suffixed routes now pair (v4 had their
+>   284 TSMIS rows structurally unpairable); 21 TSN-only routes stay honestly
+>   one-sided (vintage). Full numbers in the bindings doc. **The v4-vs-v5
+>   statewide row-diff proof is EXACT** (same 12 raw prints, HEAD module vs
+>   v5): 60,083 rows both; exactly 317 rows moved base→suffixed route;
+>   exactly the four desc-recovered rows; 0 unexplained v4-only, 0 unmatched
+>   v5-only — every other row byte-identical (the corpus-level form of 157's
+>   source-only mutation test).
+>
+> **Do this next: CMP-AUD-049/050 (route identity/universe enforcement),
+> 066 (PDF role provenance — the HL vs-TSN instance already closed), 067
+> (TSN projections hiding PDF-vs-Excel source differences), then the
+> unowned-findings triage sweep.** HD-Excel county stays vendor-blocked —
+> never infer it.
 >
 > **DONE 2026-07-16 (after 047/048): the HD statewide re-measure — EXACT.**
 > The bound 7.7-bundle harness re-run under the post-220 objective

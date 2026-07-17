@@ -133,7 +133,7 @@ def test_manifest_helpers(root):
 def test_reuse_cardinality(root):
     print("library reuse content manifest + cardinality:")
     with patch(tsn_library.paths, "TSN_LIBRARY_ROOT", root / "library"):
-        for current_report, expected_version in (("highway_log", 4),
+        for current_report, expected_version in (("highway_log", 5),
                                                   ("highway_sequence", 4)):
             spec = tsn_library.get(current_report)
             raw = tsn_library.raw_dir(current_report)
@@ -387,9 +387,31 @@ def test_highway_sequence_boundary(root):
 def test_highway_log_boundary(root):
     print("Highway Log production boundary:")
 
+    def claims(district, pdf_name):
+        """The minimal v5 claims record consolidate() consumes (cross-member
+        identity + the two hard-gated reconciliation buckets, empty=clean)."""
+        return {
+            "member": pdf_name or district, "district": district,
+            "report_id": "OTM52010",
+            "report_title": "California State Highway Log",
+            "report_date": "09/15/25", "cover_year": "2025",
+            "pages": 1, "n_rows": 1, "cover_furniture": [], "ownership": [],
+            "adt": {"disposition": "tsn_only_no_tsmis_column_conserved_by_digest",
+                    "rows": 1, "non_empty": {}, "flag_vocabulary": {},
+                    "digest_sha256": "0" * 64},
+            "totals": {"disposition": "conserved_by_digest_typed_reconciled",
+                       "kind_counts": {}, "digest_sha256": "0" * 64,
+                       "stray_fragments": [],
+                       "reconciliation": {
+                           "tcu": {"checked": 0, "mismatches": []},
+                           "suffixed_zero": {"checked": 0, "mismatches": []},
+                       }},
+        }
+
     def parse(path, _events, pdf_name=""):
         district = _claimed(path)
-        return district, {district: [{"district": district}]}
+        return (district, {district: [{"district": district}]},
+                claims(district, pdf_name))
 
     def write(rows, out):
         Path(out).write_text(rows[0]["district"], encoding="utf-8")

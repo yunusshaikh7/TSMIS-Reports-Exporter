@@ -19,6 +19,7 @@ overwrite via the confirm_overwrite callback, cancel honored between phases,
 ConsolidateResult returned.
 """
 import re
+from dataclasses import replace
 from pathlib import Path
 
 try:
@@ -27,10 +28,12 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import consolidation_meta
+import consolidate_tsn_highway_log as tsn_hl   # marker/version + claims shape
 import highway_log_columns as hlc       # the corrected column labels (one source)
 from compare_core import CompareSchema, normalize_value
-from compare_tsn_common import (row_has_data, run_files_compare,
-                                suggest_route_name)
+from compare_tsn_common import (make_notes_writer, row_has_data,
+                                run_files_compare, suggest_route_name)
 
 REPORT_NAME = "Highway Log"          # registry label (comparison type)
 SHEET_NAME = "Highway Log"           # required sheet in both inputs
@@ -146,6 +149,123 @@ def _load_pair(path_a, path_b):
     return rows_a, rows_b, None, route_a
 
 
+def _tsn_normalization_version(path):
+    """The TSN-side workbook's declared normalization version (0 when the
+    marker sheet is absent — the rows sheet kept its 31-column SHAPE across
+    v5, so the marker is the only reliable signal on a bare file; the
+    library path additionally auto-rebuilds via report_catalog, D2)."""
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception:  # silent-ok: an unopenable file re-fails in _load_input with its own message
+        return 0
+    try:
+        if tsn_hl.MARKER_SHEET not in wb.sheetnames:
+            return 0
+        for r in wb[tsn_hl.MARKER_SHEET].iter_rows(values_only=True):
+            if r and str(r[0]).strip() == "Normalization version":
+                try:
+                    return int(r[1])
+                except (TypeError, ValueError, IndexError):  # silent-ok: a malformed marker reads as version 0 — the caller then refuses with the rebuild hint (fail-safe)
+                    return 0
+        return 0
+    finally:
+        wb.close()
+
+
+def require_current_tsn(path):
+    """Refuse a pre-v5 TSN Highway Log workbook (CMP-AUD-157/045-HL): it
+    merges detached suffixed-route sections (e.g. "07 LA 005 S" = route
+    005S) into the base route, drops asterisk-leading printed Descriptions,
+    and carries no conserved source claims — silently comparing it would
+    resurrect the misattribution as false one-sided rows on both sides."""
+    if _tsn_normalization_version(path) < tsn_hl.NORMALIZATION_VERSION:
+        raise ValueError(
+            f"{Path(path).name} was built by an older TSN Highway Log "
+            "converter (pre-v5: suffixed-route sections like 005S merged "
+            "into the base route, asterisk-leading descriptions dropped) — "
+            "rebuild the TSN library and pick the fresh normalized workbook.")
+
+
+def _load_pair_tsn(tsmis_path, tsn_path):
+    """The vs-TSN pair loader: the TSN side must be a current (v5) normalized
+    workbook; the TSMIS side is any recognized Highway Log export."""
+    require_current_tsn(tsn_path)
+    return _load_pair(tsmis_path, tsn_path)
+
+
+# --------------------------------------------------------------------------- #
+# Notes sheet — the conserved TSN source claims (CMP-AUD-157)
+# --------------------------------------------------------------------------- #
+_NOTES_TITLE = "Highway Log — TSMIS vs TSN: source claims"
+_NOTES_LINES = (
+    "Rows are keyed on Route + Location (roadbed-canonical). The TSMIS Highway "
+    "Log export has no County column, so county can never be part of the "
+    "two-sided key: the TSN print's district/county/route group ownership is "
+    "conserved per document in the normalized workbook's sidecar (the numeric "
+    "\"Cnty Odom\" column IS compared and participates in duplicate pairing).",
+    "The print marks some sections with a detached route-suffix token "
+    "(\"07 LA 005 S\") — those rows belong to the suffixed TSMIS route "
+    "(005S), and the print's own COUNTY/ROUTE totals for them are all-zero.",
+)
+
+
+def claims_notes(claims, side_label="TSN"):
+    """Human-readable exposure lines for the Notes sheet: the print identity
+    the 12 districts agreed on, the suffixed-route sections, and the
+    ADT/totals dispositions with their reconciliation summary."""
+    if not claims:
+        return [f"{side_label} print: no source-claims record beside this "
+                "normalized workbook — rebuild the TSN library to capture "
+                "the print identity, group ownership, ADT and totals claims."]
+    docs = claims.get("documents") or []
+    lines = [f"{side_label} print identity: {claims.get('report_id')} "
+             f"{claims.get('report_title')} · report {claims.get('report_date')} "
+             f"· cover year {claims.get('cover_year')} · "
+             f"{len(docs)} district print(s)."]
+    suffixed = claims.get("suffixed_route_sections") or []
+    if suffixed:
+        lines.append("Detached suffixed-route sections: "
+                     + " · ".join(suffixed) + ".")
+    tcu = sum((d.get("totals", {}).get("reconciliation", {})
+               .get("tcu", {}).get("checked", 0)) for d in docs)
+    r_chk = sum((d.get("totals", {}).get("reconciliation", {})
+                 .get("route", {}).get("checked", 0)) for d in docs)
+    r_ok = sum((d.get("totals", {}).get("reconciliation", {})
+                .get("route", {}).get("exact", 0)) for d in docs)
+    c_chk = sum((d.get("totals", {}).get("reconciliation", {})
+                 .get("county", {}).get("checked", 0)) for d in docs)
+    c_ok = sum((d.get("totals", {}).get("reconciliation", {})
+                .get("county", {}).get("exact", 0)) for d in docs)
+    lines.append(
+        f"Printed totals: conserved by digest and typed; TOTAL = CONST + "
+        f"UNCONST verified exactly on {tcu} mileage line(s); suffixed "
+        f"sections verified all-zero. Route/county totals vs additive row "
+        f"sums: {r_ok}/{r_chk} and {c_ok}/{c_chk} exact (measured — the "
+        "print's odometer-based accounting is disclosed, not certified).")
+    lines.append(
+        "The print's three ADT columns (Look Back / P-S flag / Look Ahead) "
+        "have no TSMIS counterpart: conserved by per-document digest in the "
+        "sidecar, never compared, never fabricated.")
+    return lines
+
+
+def _schema_with_claims(tsn_path, schema=None):
+    """The per-run schema: the Legend sheet plus a Notes sheet carrying the
+    normalized workbook's persisted source claims (read from its sidecar —
+    absent claims get an explicit rebuild hint instead of silence)."""
+    base = schema if schema is not None else _SCHEMA
+    claim_lines = claims_notes(
+        consolidation_meta.read_extra(Path(tsn_path), "tsn_source_claims"))
+    notes = make_notes_writer(_NOTES_TITLE,
+                              tuple(_NOTES_LINES) + tuple(claim_lines))
+
+    def _legend_and_notes(wb):
+        hlc.write_legend_sheet(wb)
+        notes(wb)
+
+    return replace(base, legend_writer=_legend_and_notes)
+
+
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
             mode="formulas", commit_guard=None):
     """Build the comparison workbook(s). Returns a ConsolidateResult (same
@@ -156,8 +276,8 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     opens instantly, no F9), or "both" (two files: the picked name for the
     formulas copy and '<name> (values).xlsx' next to it)."""
     return run_files_compare(
-        _SCHEMA, tsmis_path, tsn_path, out_path,
+        _schema_with_claims(tsn_path), tsmis_path, tsn_path, out_path,
         banner="Highway Log Comparison — TSMIS vs TSN",
-        has_route=None, loader=_load_pair, deps_ok=_DEPS_OK,
+        has_route=None, loader=_load_pair_tsn, deps_ok=_DEPS_OK,
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
         commit_guard=commit_guard)

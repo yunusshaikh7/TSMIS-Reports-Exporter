@@ -84,7 +84,20 @@ numeric prefixes; TSMIS strips only its own-route label), rebuilt the TSN normal
 source-exact at v4 (CMP-AUD-155/156/158/159 — 69,804 rows incl. the 46 blank-county
 equates, the 565 pointer tokens, no invented comma, sidecar identity/direction/policy
 claims), and put typed physical identity on every HSL path (the CMP-AUD-045 gate is
-10 green / 0 known-red — RD, ID, and HSL integrated; HL/HD stay blocked). The
+**11 green / 0 known-red since 2026-07-17** — RD, ID, HSL, and HL integrated; only
+HD-Excel stays vendor-blocked). **The 2026-07-17 HL batch closed CMP-AUD-157 +
+045-HL with TSN Highway Log normalizer v5**: detached suffixed-route group headers
+("07 LA 005 S") key their rows as the suffixed TSMIS route (005S… — 317 rows
+statewide un-misattributed, exactly TSMIS's ten suffixed routes), asterisk-leading
+printed Descriptions are conserved (four rows statewide — 065's "**** CODE
+ACCIDENTS TO" + three bare "*" — each a manufactured false diff, TSMIS prints the
+same text on the same rows), and district/county/route
+ownership + the three ADT claims + typed totals + report provenance ride the
+sidecar with reconciliation gates (TOTAL=CONST+UNCONST exact; suffixed sections
+all-zero; zero-residue line accounting refuses unclassified content); the vs-TSN
+loaders refuse pre-v5 files with a rebuild hint (marker sheet + D2 catalog bump
+4→5) and the comparison Notes expose the claims; HL Route-1 re-blessed EXACT
+(299/18/69/221/969). The
 2026-07-16 CMP-AUD-220 batch then landed the owner-approved assignment/verdict split
 (duplicate ASSIGNMENT minimizes the source-identity tuple — all-compared-field diffs,
 char edit distance, position gap — while verdicts/counts stay asserted-only) plus the
@@ -109,9 +122,9 @@ Stage-8 base-family audits are complete: **7/7**. Highway Log closed on exact 25
 Excel/PDF source witnesses, its accepted-red Stage-6 chain, an independent projection
 oracle, two clean seven-file product-leg universes, and two byte-identical final-gate
 result/acceptance pairs. The gate accepts only the base audit: product, full-physical,
-workbook-evidence, and end-to-end perfection remain false. CMP-AUD-047/048/049/050/
-066/067/157 remain open (045 is integrated for every unblocked family as of
-2026-07-16; its HL/HD legs stay blocked on the county census / vendor answer), and no
+workbook-evidence, and end-to-end perfection remain false. CMP-AUD-049/050/066/067
+remain open (047/048 shipped 2026-07-16; 157 + 045-HL shipped 2026-07-17; 045's
+HD-Excel leg stays blocked on the vendor county answer — never infer it), and no
 product code changed during the bounded closeout itself. Exact
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).

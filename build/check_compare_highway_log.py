@@ -44,7 +44,9 @@ def check(name, cond, detail=""):
         _fail.append(name)
 
 
-def _write_hl(path, rows, consolidated=False):
+def _write_hl(path, rows, consolidated=False, marker=False):
+    """`marker=True` stamps the v5 "TSN Normalization" sheet — a TSN-side
+    fixture must carry it since the CMP-AUD-157/045-HL loader gate."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Highway Log"
@@ -53,6 +55,9 @@ def _write_hl(path, rows, consolidated=False):
     n = len(header)
     for r in rows:
         ws.append(list(r)[:n] + [None] * max(0, n - len(r)))
+    if marker:
+        import consolidate_tsn_highway_log as tsn_hl
+        tsn_hl._write_marker_sheet(wb)
     wb.save(path)
     wb.close()
 
@@ -76,7 +81,7 @@ def test_hl_compare():
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_hlcmp_"))
     a, b = tmp / "TSMIS Route 005.xlsx", tmp / "TSN Route 005.xlsx"
     _write_hl(a, [_hl_row("1.000", "SAME"), _hl_row("2.000", "OLD")])
-    _write_hl(b, [_hl_row("1.000", "SAME"), _hl_row("2.000", "NEW")])
+    _write_hl(b, [_hl_row("1.000", "SAME"), _hl_row("2.000", "NEW")], marker=True)
     out = tmp / "out.xlsx"
     res = hl.compare(str(a), str(b), str(out), confirm_overwrite=lambda p: True,
                      mode="values")
@@ -85,10 +90,23 @@ def test_hl_compare():
     check("approved sheet set present",
           all(s in names for s in ("Summary", "Comparison", "Only in TSMIS",
                                    "Only in TSN", "TSMIS", "TSN")), str(names))
+    check("Legend AND the claims Notes sheet are both present (CMP-AUD-157)",
+          "Legend" in names and "Notes" in names, str(names))
+
+    # the marker gate (CMP-AUD-157/045-HL): a pre-v5 TSN side refuses
+    b_old = tmp / "TSN old.xlsx"
+    _write_hl(b_old, [_hl_row("1.000", "SAME")])
+    res_old = hl.compare(str(a), str(b_old), str(tmp / "out_old.xlsx"),
+                         confirm_overwrite=lambda p: True, mode="values")
+    check("a pre-v5 (markerless) TSN side refuses with the rebuild hint",
+          res_old.status == "error"
+          and "older TSN Highway Log converter" in res_old.message
+          and "rebuild the TSN library" in res_old.message, res_old.message)
 
     ca, cb = tmp / "TSMIS Consolidated.xlsx", tmp / "TSN Consolidated.xlsx"
     _write_hl(ca, [["001"] + _hl_row("1.000", "X")], consolidated=True)
-    _write_hl(cb, [["001"] + _hl_row("1.000", "Y")], consolidated=True)
+    _write_hl(cb, [["001"] + _hl_row("1.000", "Y")], consolidated=True,
+              marker=True)
     res2 = hl.compare(str(ca), str(cb), str(tmp / "out2.xlsx"),
                       confirm_overwrite=lambda p: True, mode="values")
     check("consolidated compare runs ok (dynamic route-ness)",
@@ -112,13 +130,29 @@ def test_pdf_flavors():
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_hlpdf_"))
     a, b = tmp / "pdf.xlsx", tmp / "tsn.xlsx"
     _write_hl(a, [_hl_row("1.000", "P")])
-    _write_hl(b, [_hl_row("1.000", "Q")])
+    _write_hl(b, [_hl_row("1.000", "Q")], marker=True)
     res = hlp.TSMIS_PDF_VS_TSN.compare(str(a), str(b), str(tmp / "o.xlsx"),
                                        confirm_overwrite=lambda p: True, mode="values")
     check("HL PDF-vs-TSN runs ok", res.status == "ok", res.message)
     names = _sheets(res.output_path)
     check("HL PDF side labels reach the data sheets",
           "TSMIS (PDF)" in names and "TSN (PDF)" in names, str(names))
+    b_old = tmp / "tsn_old.xlsx"
+    _write_hl(b_old, [_hl_row("1.000", "Q")])
+    res_gate = hlp.TSMIS_PDF_VS_TSN.compare(str(a), str(b_old),
+                                            str(tmp / "og.xlsx"),
+                                            confirm_overwrite=lambda p: True,
+                                            mode="values")
+    check("HL PDF-vs-TSN refuses a pre-v5 TSN side",
+          res_gate.status == "error"
+          and "older TSN Highway Log converter" in res_gate.message,
+          res_gate.message)
+    res_ex = hlp.TSMIS_PDF_VS_EXCEL.compare(str(a), str(b_old),
+                                            str(tmp / "oe.xlsx"),
+                                            confirm_overwrite=lambda p: True,
+                                            mode="values")
+    check("HL PDF-vs-Excel has no TSN side and does NOT gate on the marker",
+          res_ex.status == "ok", res_ex.message)
     resm = hlp.TSMIS_PDF_VS_EXCEL.compare(str(tmp / "nope.xlsx"), str(b),
                                           str(tmp / "o2.xlsx"))
     check("HL PDF missing-file error names the flavor's OWN side label",

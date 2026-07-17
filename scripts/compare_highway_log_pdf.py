@@ -33,11 +33,16 @@ class _HighwayLogFileCompare:
     just the schema override + the labels."""
 
     def __init__(self, report_name, side_a, side_b, name_tag,
-                 one_sided_note_extra="", trim_note_extra=""):
+                 one_sided_note_extra="", trim_note_extra="",
+                 tsn_side_b=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
         self._name_tag = name_tag
+        # A TSN side b must be a CURRENT normalized workbook (v5 marker;
+        # CMP-AUD-157/045-HL) and its conserved source claims ride the Notes
+        # sheet; the PDF-vs-Excel flavor has no TSN side and stays plain.
+        self._tsn_side_b = tsn_side_b
         # Reuse the approved Highway Log schema; override only the side names and
         # the report-specific notes (compare_core's formula/label text is
         # regression-locked and is NOT touched here).
@@ -54,11 +59,14 @@ class _HighwayLogFileCompare:
                 confirm_overwrite=None, mode="formulas", commit_guard=None):
         """Build the comparison workbook(s). Same contract as the other
         comparison modules (ConsolidateResult returned)."""
+        schema = (_hl._schema_with_claims(path_b, schema=self._schema)
+                  if self._tsn_side_b else self._schema)
+        loader = _hl._load_pair_tsn if self._tsn_side_b else _hl._load_pair
         return run_files_compare(
-            self._schema, path_a, path_b, out_path,
+            schema, path_a, path_b, out_path,
             banner=(f"Highway Log Comparison — {self.file_a_label} vs "
                     f"{self.file_b_label}"),
-            has_route=None, loader=_hl._load_pair, deps_ok=_hl._DEPS_OK,
+            has_route=None, loader=loader, deps_ok=_hl._DEPS_OK,
             side_a=self.file_a_label, side_b=self.file_b_label,
             events=events, confirm_overwrite=confirm_overwrite, mode=mode,
             commit_guard=commit_guard)
@@ -72,7 +80,8 @@ TSMIS_PDF_VS_TSN = _HighwayLogFileCompare(
     side_a="TSMIS (PDF)", side_b="TSN (PDF)",
     name_tag="TSMIS_PDF_vs_TSN",
     one_sided_note_extra=" (mostly TSN segment splits and TSMIS realignment "
-                         "markers)")
+                         "markers)",
+    tsn_side_b=True)
 
 TSMIS_PDF_VS_EXCEL = _HighwayLogFileCompare(
     report_name="Highway Log — TSMIS PDF vs Excel",

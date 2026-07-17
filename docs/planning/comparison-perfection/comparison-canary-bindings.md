@@ -65,6 +65,55 @@ The timestamps are not trusted identity; SHA-256 and exact role/path are.
   rows and all 30 Spot Check `Agree?` rows read `OK`.
 - Both input files were SHA-256 rechecked after the run and matched the pre-run values
   above. The outputs are temporary evidence; their paths are deliberately not an oracle.
+
+### v5 re-bless — 2026-07-17 (CMP-AUD-157/045-HL: the TSN normalizer v5 gate)
+
+The HL vs-TSN loaders now REFUSE a pre-v5 TSN workbook (no "TSN Normalization"
+marker sheet), so the frozen TSN input above can no longer feed the comparator —
+by design, not by accident. The re-blessed TSN input was built from the live
+library's `D01 Highway Log TSN.pdf` with the v5 module and the production
+per-route writer:
+
+| Role | Exact file | Length | SHA-256 |
+|---|---|---:|---|
+| TSN (v5) | `C:\Users\Yunus\Downloads\TSMIS\ground-truth\inputs\tsn_highway_log_route 1 v5.xlsx` | 49,648 | `531F10887BC7EC714E7C993B05AC5A146478F614D964163715CCBFCD679E668D` |
+
+- The v5 file's DATA ROWS are exactly the frozen input's rows (tuple-for-tuple;
+  D01 route 001 has no suffixed section and no asterisk-leading description, so
+  v5 moves nothing there). Workbook BYTES differ run-to-run (openpyxl docProps
+  timestamps + the added marker/legend sheets); the SHA above binds the exact
+  filed artifact, and the rows are the oracle.
+- The real comparator (frozen TSMIS input vs the v5 TSN input, `mode="both"`)
+  reproduced the locked result EXACTLY: typed complete/diff, 299 paired,
+  18/69 one-sided, 221 differing rows, 78 identical, 969 differing cells,
+  8,970 asserted — and every one of the 30 per-field counts is identical to
+  the pre-Phase-3 baseline table. Both frozen inputs were SHA-256 rechecked
+  after the run and unchanged.
+- Harness: session 119c7c70 scratchpad `route1_canary_v5.py`.
+
+### HL statewide v5 measured reference — 2026-07-17 (diagnostic, NOT a canary)
+
+TSMIS = `All Reports 7.9\2026-07-09 ssor-prod\consolidated\highway_log_consolidated
+2026-07-09 ssor-prod.xlsx` (51,884 rows / 252 routes; 284 rows on the ten suffixed
+routes); TSN = the v5 normalized consolidated built from the 12 live-library raw
+prints (60,083 rows / 273 routes / report date 09/15/25). The ~10-month source
+vintage gap makes this a measured reference for future drift comparison — never a
+match target. Typed result (values mode, `compare_highway_log.compare`):
+
+- 48,351 paired / 3,533 TSMIS-only / 11,732 TSN-only; 39,623 differing rows
+  (140,643 differing cells); 8,728 fully identical; 1,437,881 asserted cells;
+  12,649 context (ditto) cells.
+- **Every one of the 252 TSMIS routes pairs, including all ten suffixed routes**
+  — under v4 the ten suffixed routes were structurally unpairable (their 284
+  TSMIS rows read "Only in TSMIS" while TSN's 317 rows inflated the base
+  routes). 21 TSN-only routes remain (rows tinted "entire route"), a data-vintage
+  fact, honestly one-sided.
+- Largest per-field counts (vintage drift): Cnty Odom 21,257 · Sig Chg. Date
+  17,914 · MI 9,038 · Med TCB 8,535 · LB ST 6,856 — full table in the session
+  transcript; the workbook was temporary evidence.
+- Harnesses: scratchpad `statewide_hl_v5_compare.py`; the v5 build via the
+  production `consolidate()` (12 documents, 380 per-route members = 369 base +
+  the 11 suffixed sections; claims sidecar saved beside the scratch build).
 - A read-only D2 token census over 8,736 nonblank TSMIS cells and 10,131 nonblank TSN
   cells found zero Boolean cells, control-whitespace/NBSP strings, Excel-error-token
   strings, literal difference markers, numeric values over 15 significant digits,

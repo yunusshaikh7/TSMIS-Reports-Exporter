@@ -524,6 +524,51 @@ def test_hsl_direct_projector_retains_physical_identity():
     assert components["county"] == "(county not printed)", components
 
 
+def test_highway_log_route_and_location_identity():
+    """CMP-AUD-045-HL, GREEN since the Highway Log v5 batch: the honest HL
+    identity is (Route, roadbed-canonical Location). Route is suffix-aware —
+    a detached printed suffix token ("07 LA 005 S") owns its rows as the
+    suffixed TSMIS route (005S), never merged into the base route (the
+    2026-07-17 census: exactly TSMIS's ten suffixed routes, 317 rows, with
+    the print's own all-zero totals excluding them from the base). County
+    can NOT be a two-sided key component — the TSMIS Highway Log export has
+    no County column — so the TSN print's district/county ownership is a
+    conserved sidecar CLAIM (the numeric "Cnty Odom" column IS compared and
+    participates in the CMP-AUD-220 duplicate-assignment objective)."""
+    import tempfile
+
+    import compare_highway_log as chl
+    import consolidate_tsn_highway_log as tsn_hl
+    import highway_log_columns as hlc
+    from events import Events
+
+    # Location identity: the schema keys through the roadbed canonicalizer.
+    assert chl._SCHEMA.key_normalizer is hlc.roadbed_canonical_location
+    # County is physically absent from the compared layout.
+    assert not any("county" in str(h).lower() for h in hlc.HEADER), hlc.HEADER
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from _hl_fixture_pdf import band, cover, data_row, group, make_pdf
+
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_hl_identity_"))
+    runs = (band(1)
+            + group("07", "LA", "005", "S")
+            + data_row(100, "001.000", "1.000", "000.000")
+            + group("07", "LA", "005", top=140)
+            + data_row(160, "001.000", "1.000", "000.000"))
+    pdf = tmp / "D07 identity.pdf"
+    make_pdf(pdf, [cover("07"), runs])
+    _d, routes, claims = tsn_hl.parse_pdf(pdf, Events(),
+                                          pdf_name="D07 identity.pdf")
+    assert sorted(routes) == ["005", "005S"], sorted(routes)
+    assert [len(routes[r]) for r in ("005", "005S")] == [1, 1]
+    assert [(o["route"], o["county"], o["suffix"], o["n_rows"])
+            for o in claims["ownership"]] == [
+        ("005S", "LA", "S", 1), ("005", "LA", "", 1)]
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)
+
+
 TESTS = (
     ("engine preserves exact per-side PhysicalKey claims",
      test_engine_preserves_each_side_raw_claim),
@@ -553,6 +598,11 @@ TESTS = (
      test_highway_sequence_env_county_and_glued_pm),
     ("HSL direct/same-source projectors retain structured identity",
      test_hsl_direct_projector_retains_physical_identity),
+    # Promoted by the Highway Log v5 batch (CMP-AUD-045-HL/157): suffix-aware
+    # Route + roadbed-canonical Location identity; county conserved as a
+    # TSN-side sidecar claim (no TSMIS County column exists to pair against).
+    ("Highway Log route identity is suffix-aware; county is a claim",
+     test_highway_log_route_and_location_identity),
 )
 
 # CMP-AUD-045 red fixture, now fully promoted: all four report families

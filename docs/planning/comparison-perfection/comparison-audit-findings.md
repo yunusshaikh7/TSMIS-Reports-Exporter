@@ -323,7 +323,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-042 | P1 | Verified | Normalized Highway Detail erases every PS equation marker |
 | CMP-AUD-043 | P1 | Verified | Formula Report View stays stale after live recalculation |
 | CMP-AUD-044 | P1 | Verified | Data beneath trailing blank headers is silently discarded |
-| CMP-AUD-045 | P1 | Partially remediated | Shared typed identity core green; report-family integration remains red |
+| CMP-AUD-045 | P1 | Partially remediated (HL integrated 2026-07-17; only HD-Excel stays vendor-blocked) | Shared typed identity core green; report-family integration remains red |
 | CMP-AUD-046 | P2 | Verified | Shifted exports report differences under the wrong fields |
 | CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
 | CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
@@ -435,7 +435,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-154 | P2 | Remediated | Intersection Summary's per-category conservation omits multiset, target-row, and per-source-disposition typed digests |
 | CMP-AUD-155 | P1 | Verified | Highway Sequence normalization drops district, direction, report provenance, and source reliability policy facts |
 | CMP-AUD-156 | P1 | Verified | Highway Sequence's numeric-only distance parser erases a real printed landmark pointer |
-| CMP-AUD-157 | P1 | Verified | Highway Log normalization drops group ownership, three printed ADT fields, totals, and report provenance |
+| CMP-AUD-157 | P1 | Remediated (2026-07-17, HL normalizer v5) | Highway Log normalization drops group ownership, three printed ADT fields, totals, and report provenance |
 | CMP-AUD-158 | P1 | Verified | Highway Sequence drops EQUATES TO annotations that appear before county context exists |
 | CMP-AUD-159 | P1 | Verified | Highway Sequence fabricates punctuation when joining one wrapped printed Description |
 | CMP-AUD-160 | P1 | Resolved | The first Highway Sequence conservation gate misclassified the library placeholder as comparison truth |
@@ -2188,7 +2188,7 @@ because its header is blank.
 ### CMP-AUD-045 — PM-only identity is too weak
 
 Priority: P1  
-Status: Partially remediated — core green; **Ramp Detail + Intersection Detail (2026-07-14) and Highway Sequence (2026-07-16) integrated + corpus-verified; the identity gate is 10 green / 0 known-red**; HL/HD remain blocked pending census/vendor  
+Status: Partially remediated — core green; **Ramp Detail + Intersection Detail (2026-07-14), Highway Sequence (2026-07-16), and Highway Log (2026-07-17) integrated + corpus-verified; the identity gate is 11 green / 0 known-red**; only HD-Excel remains blocked pending the vendor county answer  
 Primary code: `scripts/compare_env.py:689-719`,
 `scripts/compare_core.py:445-490`,
 `scripts/consolidate_tsn_highway_log.py:280-361,459-495`,
@@ -2314,6 +2314,35 @@ oracle's assignment objective reproduces every per-field cell count EXACTLY
 CMP-AUD-197 `_x000d_` cells — no other residue). HL still needs its raw county
 retention + collision census; HD-Excel remains vendor-pending — do NOT infer
 either.
+
+**Highway Log remediation (2026-07-17).** The 2026-07-16 county/collision census
+plus a same-day owner-qualifier census settled the honest HL identity:
+**(Route, roadbed-canonical Location)** — county can never be a two-sided key
+component because the TSMIS Highway Log export has NO County column (the numeric
+"Cnty Odom" IS compared and feeds the CMP-AUD-220 assignment objective), so the
+TSN print's district/county/route group ownership is conserved as a per-document
+sidecar CLAIM (`tsn_source_claims.documents[].ownership`, one entry per printed
+group header with page/district/county/route token/suffix/row count). The
+qualifier census resolved CMP-AUD-157's open token-4 question with a decisive
+source correspondence: exactly 19 four-token headers statewide, and their
+(route, letter) combinations are exactly TSMIS's ten suffixed routes (005S 008U
+010S 014U 015S 058U 101U 178S 210U 880S) — row-verified (TSMIS 101U's 8 rows
+are postmile-for-postmile a subset of the "01 MEN 101 U" section, equate
+included) and confirmed by the print's own accounting (every suffixed section's
+COUNTY/ROUTE totals print all-zero, excluding those rows from the base route).
+The detached suffix therefore JOINS the route identity: normalizer v5 keys
+"07 LA 005 S" rows as route 005S, un-misattributing **317 rows statewide**
+that v4 merged into base routes (previously: every TSMIS suffixed-route row was
+falsely "Only in TSMIS" while the 317 TSN rows inflated the base routes).
+Gates: the identity gate grew to **11 green / 0 known-red**
+(`test_highway_log_route_and_location_identity` — suffix separation through
+the production pdfplumber pipeline on hand-rolled fixture PDFs, county-as-claim,
+`_SCHEMA.key_normalizer is roadbed_canonical_location`), the v5 marker sheet +
+loader gate refuse pre-v5 TSN workbooks in both vs-TSN flavors (PDF-vs-Excel
+ungated — no TSN side), and the locked Route-1 canary re-blessed EXACTLY
+(299/18/69/221/969, all 30 per-field counts identical, 8,970 asserted; the v5
+per-route TSN Route-001 rows are byte-equal to the frozen HL-R1-E1 input).
+Only HD-Excel remains blocked (vendor county answer) — do NOT infer it.
 
 Raw-source re-verification on 2026-07-12 bound the user-provided, raw-only TSN library
 before implementation:
@@ -2863,6 +2892,12 @@ than CMP-AUD-040's same-file alias. Intersection Detail behaved the same with tw
 native-Excel copies, while Ramp Detail's richer PDF header correctly rejected its
 native-Excel control. The paths and file identities were different, so path
 de-duplication cannot establish that either required source was ever compared.
+
+**2026-07-17 partial:** the Highway Log v5 marker gate (CMP-AUD-157/045-HL) closes
+this finding's HL PDF-vs-TSN instance as a side effect — the TSN side must now carry
+the "TSN Normalization" marker sheet, so a TSMIS workbook (which never has one) can
+no longer stand in as `TSN (PDF)`. The PDF-role halves (TSMIS (PDF) vs Excel across
+HL/HSL/HD/ID) and the other families remain open.
 
 Correction requirements: persist durable producer/report/source-role metadata and
 validate it against each picker role before loading rows. Distinct copies, renamed
@@ -5854,6 +5889,77 @@ persist comparison-relevant source provenance; reconcile totals independently ag
 row universes; mutation-test source-only changes that leave current normalized rows
 unchanged; and require zero unexplained raw-PDF→normalized/evidence residue before family
 remediation is accepted.
+
+**Remediation (2026-07-17, normalizer v5 — catalog `normalization_version`
+4→5, D2 auto-rebuild; marker-sheet gate on manually-picked files).**
+- **The owner qualifier is the route suffix.** The full-corpus census found
+  exactly 19 four-token group headers whose (route, letter) combinations are
+  exactly TSMIS's ten suffixed routes; the print's own COUNTY/ROUTE totals for
+  those sections are all-zero. No meaning was guessed: the correspondence was
+  row-verified against the TSMIS per-route exports before the suffix joined the
+  route identity (see the CMP-AUD-045 Highway Log record). A 4th token that is
+  not a single letter — or any fifth token — refuses (unknown grammar cannot
+  own rows).
+- **Group ownership conserved.** `tsn_source_claims.documents[].ownership`
+  carries one entry per printed header occurrence (2,363 statewide):
+  page/district/county/route token/detached suffix/normalized route/row count —
+  rows are reconstructible per document in order, and the manifest's row
+  counts sum to the exact corpus row count.
+- **The three ADT claims conserved by digest.** Per row the ADT zone is
+  re-tokenized by word gap and split around the single P/S flag (the fixed
+  448pt window boundary bleeds wide Look Back figures, so window-center
+  assignment would corrupt the claim); non-numeric Look Ahead claims ("D-C",
+  "END") stay verbatim. The sidecar records per-document non-empty counts, the
+  flag vocabulary, and the SHA-256 of the canonical per-row stream — typed
+  disposition `tsn_only_no_tsmis_column_conserved_by_digest` (no TSMIS
+  counterpart exists; never compared, never fabricated).
+- **Totals typed, digest-bound, and reconciled against row universes.** Every
+  star block (Volume/CITY/COUNTY+CUMULATIVE/ROUTE/DISTRICT/End-of-Report,
+  wrapped continuations rejoined) parses into typed values with overflow
+  markers ("##########"/"**********") typed as overflow. HARD GATES (a
+  violation refuses publication): TOTAL == CONST + UNCONST on every fully
+  parsed mileage group (census harness 2,258/2,258 star lines; the
+  production parser checks 2,914 groups including the county-cumulative
+  sections — 0 mismatches statewide) and all-zero totals on every suffixed
+  section (22/22 lines). Corpus block census: 1,234 city / 657 county /
+  380 route / 12 district / 7,613 volume / 12 centered "*** End of Report ***"
+  markers (typed end_of_report). RECORDED MEASUREMENTS (disclosed
+  in the sidecar + comparison Notes, never certified): route/county totals
+  vs the additive MI sums (NA='N' non-additive rows excluded, keyed across
+  non-contiguous sections) measure 234/369 and 427/641 exact — the print's
+  odometer-based accounting is not fully modeled — and Volume Length is
+  exact on 6,063/7,613 sections (+7 within 0.001) with DVM within ±1 of
+  Length × ADT on 3,196 (289 print zero, 3 overflow).
+- **Provenance conserved.** Per document: report id (OTM52010), band date,
+  title, cover year, page count — one distinct value per document enforced,
+  and the 12 members must agree (`_cross_member_claims` refuses a member from
+  a different pull).
+- **Zero-residue accounting.** Every below-band line must classify (data /
+  description / group header / district line / totals block or fragment /
+  cover furniture) or the parse REFUSES listing the residue. The instrument
+  immediately found real dropped content: asterisk-leading printed
+  Descriptions on exactly FOUR rows statewide (YUB 065 R009.327
+  "**** CODE ACCIDENTS TO"; bare "*" on 041/031.050, 041/009.920,
+  145/005.010 — the TSMIS export prints the same text on the same four
+  rows, so each was a manufactured false Description difference) are now
+  conserved; totals star lines print left of the description band and still
+  close the open row. It also surfaced two page-break wrap shapes the block
+  grammar now models: a totals object continues BELOW the next page's
+  reprinted group header (blocks survive group headers and bind their owning
+  route/county at OPEN time), and rare stranded keyword/value halves of a
+  split line are conserved verbatim as stray fragments (strict totals
+  vocabulary only), never guessed onto a block.
+- **Mutation test.** A source-only ADT digit change leaves the normalized
+  rows byte-identical while the claims digest moves
+  (`check_tsn_highway_log_claims`, fixture-PDF-driven through the production
+  pipeline). The corpus-level proof: the v4 (pre-batch HEAD module) and v5
+  consolidated workbooks built from the SAME 12 raw prints differ by exactly
+  the 317 route-moved rows and the four recovered Descriptions — 0
+  unexplained v4-only rows, 0 unmatched v5-only rows; every other one of the
+  60,083 rows is byte-identical.
+- The comparison Notes sheet exposes the conserved claims per run (print
+  identity, suffixed sections, ADT/totals dispositions + reconciliation
+  summary); absent claims get an explicit rebuild hint.
 
 ### CMP-AUD-158 — Highway Sequence drops EQUATES TO annotations that appear before county context exists
 

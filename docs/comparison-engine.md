@@ -522,6 +522,17 @@ TSN** / TSMIS / TSN, plus a **Routes sheet in consolidated mode**. Consolidated 
 impossible to overlook. Med Wid compares after zero-pad normalization (TSMIS `0Z` = TSN `00Z`,
 `6V`/`06V`).
 
+**Since the TSN normalizer's v5 (CMP-AUD-157/045-HL, 2026-07-17)** the TSN side must be a
+CURRENT normalized workbook: `_load_pair_tsn` refuses a file without the v5 "TSN Normalization"
+marker sheet with a rebuild hint (a pre-v5 file merges the detached suffixed-route sections —
+"07 LA 005 S" = route 005S, 317 rows statewide — into the base routes and drops asterisk-leading
+printed Descriptions). The per-run schema (`_schema_with_claims`) writes the Legend AND a
+**Notes** sheet exposing the normalized workbook's conserved source claims from its sidecar
+(print identity, the suffixed sections, the ADT/totals dispositions + totals reconciliation
+summary); absent claims get an explicit rebuild hint. The honest HL identity is
+(Route, roadbed-canonical Location); the TSMIS export has no County column, so the TSN print's
+district/county/route ownership rides the sidecar as a per-document CLAIM, never a key.
+
 ### 9b. Highway Log (PDF) — `compare_highway_log_pdf.py` (`"files"`, group `highway_log`)
 
 Two file-vs-file comparisons (v0.14.0) that sidestep the buggy vendor Excel by sourcing the TSMIS
@@ -533,8 +544,8 @@ actual sides (not hard-coded TSMIS/TSN).
 
 | instance | sides | purpose |
 |---|---|---|
-| `TSMIS_PDF_VS_TSN` | "TSMIS (PDF)" vs "TSN (PDF)" | accurate replacement for 9a — BOTH sides from PDFs, so the PDF-vs-PDF nature is explicit and the vendor Excel bug never enters |
-| `TSMIS_PDF_VS_EXCEL` | "TSMIS (PDF)" vs "TSMIS (Excel)" | diffs PDF-parsed data against the vendor Excel of the SAME report to pinpoint the export's errors |
+| `TSMIS_PDF_VS_TSN` | "TSMIS (PDF)" vs "TSN (PDF)" | accurate replacement for 9a — BOTH sides from PDFs, so the PDF-vs-PDF nature is explicit and the vendor Excel bug never enters; `tsn_side_b=True` applies 9a's v5 marker gate + claims Notes to its TSN side |
+| `TSMIS_PDF_VS_EXCEL` | "TSMIS (PDF)" vs "TSMIS (Excel)" | diffs PDF-parsed data against the vendor Excel of the SAME report to pinpoint the export's errors; no TSN side, so no marker gate |
 
 ### 9c. TSMIS vs TSN Ramp Detail — `compare_ramp_detail_tsn.py` (`"files"`, group `tsn`; remediation pending)
 

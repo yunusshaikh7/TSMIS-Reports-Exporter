@@ -64,6 +64,27 @@ with tempfile.TemporaryDirectory(prefix="tsn-hl-isolation-") as td:
     parse_barrier = None
     write_barrier = None
 
+    def fake_claims(district, member):
+        """The minimal v5 claims shape consolidate() consumes: cross-member
+        identity fields, the per-document blocks it repackages, and the two
+        hard-gated reconciliation buckets (empty = reconciled)."""
+        return {
+            "member": member, "district": district,
+            "report_id": "OTM52010", "report_title": "California State Highway Log",
+            "report_date": "09/15/25", "cover_year": "2025",
+            "pages": 1, "n_rows": 1, "cover_furniture": [], "ownership": [],
+            "adt": {"disposition": "tsn_only_no_tsmis_column_conserved_by_digest",
+                    "rows": 1, "non_empty": {}, "flag_vocabulary": {},
+                    "digest_sha256": "0" * 64},
+            "totals": {"disposition": "conserved_by_digest_typed_reconciled",
+                       "kind_counts": {}, "digest_sha256": "0" * 64,
+                       "stray_fragments": [],
+                       "reconciliation": {
+                           "tcu": {"checked": 0, "mismatches": []},
+                           "suffixed_zero": {"checked": 0, "mismatches": []},
+                       }},
+        }
+
     def fake_parse(path, events, pdf_name=""):
         del path, events
         source = Path(pdf_name).stem.split("_")[-1]
@@ -73,7 +94,7 @@ with tempfile.TemporaryDirectory(prefix="tsn-hl-isolation-") as td:
             parse_barrier.wait(timeout=5)
         district = {"A": "01", "B": "02"}.get(source, "03")
         route = {"A": "001", "B": "002"}.get(source, "003")
-        return district, {route: [{"source": source}]}
+        return district, {route: [{"source": source}]}, fake_claims(district, pdf_name)
 
     def fake_write(rows, out_path):
         out_path = Path(out_path)
