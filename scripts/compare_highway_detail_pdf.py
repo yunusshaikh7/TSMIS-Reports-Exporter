@@ -86,8 +86,13 @@ class _HighwayDetailFileCompare:
         self._name_tag = name_tag
         self._load_a = load_a or _hd._load_tsmis
         self._load_b = load_b
+        # Source Files: side A is the PDF export (.pdf); side B is the Excel export
+        # (.xlsx) for the same-source self-check, else the statewide TSN (no source).
         schema = replace(base_schema or _hd._SCHEMA,
-                         side_a=side_a, side_b=side_b)
+                         side_a=side_a, side_b=side_b,
+                         source_file_a=("highway_detail", _hd.TSMIS_SHEET, "pdf"),
+                         source_file_b=(("highway_detail", _hd.TSMIS_SHEET, "xlsx")
+                                        if excel_side_b else ()))
         if one_sided_note_extra is not None:
             schema = replace(schema, one_sided_note_extra=one_sided_note_extra)
         if drop_notes:

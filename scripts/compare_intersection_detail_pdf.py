@@ -80,7 +80,14 @@ class _IntDetailFileCompare:
         self._load_b = load_b
         self._same_source = same_source
         self._excel_side_b = excel_side_b   # CMP-AUD-066 role enforcement
-        schema = replace(_id._SCHEMA, side_a=side_a, side_b=side_b)
+        # Source Files provenance: side A is always the PDF export (.pdf); side B is
+        # the Excel export (.xlsx) for the same-source self-check, and the statewide
+        # TSN (no per-route source) otherwise.
+        schema = replace(
+            _id._SCHEMA, side_a=side_a, side_b=side_b,
+            source_file_a=("intersection_detail", _id.TSMIS_SHEET, "pdf"),
+            source_file_b=(("intersection_detail", _id.TSMIS_SHEET, "xlsx")
+                           if excel_side_b else ()))
         if one_sided_note_extra is not None:
             schema = replace(schema, one_sided_note_extra=one_sided_note_extra)
         if drop_notes:

@@ -194,9 +194,14 @@ class _HighwaySequenceFileCompare:
         # padding at load — render artifacts, not data differences. The vs-TSN
         # legs keep their oracle-exact byte semantics.
         self._same_source = same_source
+        # Source Files: side A is the PDF export (.pdf); side B is the Excel export
+        # (.xlsx) for the same-source self-check, else the statewide TSN (no source).
         schema = replace(base_schema, side_a=side_a, side_b=side_b,
                          legend_writer=ctc.make_notes_writer(
-                             notes_title, notes_lines))
+                             notes_title, notes_lines),
+                         source_file_a=("highway_sequence", _hsl.TSMIS_SHEET, "pdf"),
+                         source_file_b=(("highway_sequence", _hsl.TSMIS_SHEET, "xlsx")
+                                        if same_source else ()))
         if one_sided_note_extra is not None:
             schema = replace(schema, one_sided_note_extra=one_sided_note_extra)
         self._schema = schema

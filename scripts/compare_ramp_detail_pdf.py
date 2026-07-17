@@ -239,8 +239,13 @@ class _RampDetailFileCompare:
         # not data differences. The vs-TSN legs keep the accepted RD-79
         # byte-exact semantics (same_source stays False there).
         self._same_source = same_source
+        # Source Files: side A is the PDF export (.pdf); side B is the Excel export
+        # (.xlsx) for the same-source self-check, else the statewide TSN (no source).
         schema = replace(_rd._SCHEMA, side_a=side_a, side_b=side_b,
-                         legend_writer=legend_writer)
+                         legend_writer=legend_writer,
+                         source_file_a=("tsar_ramp_detail", _rd.TSMIS_SHEET, "pdf"),
+                         source_file_b=(("tsar_ramp_detail", _rd.TSMIS_SHEET, "xlsx")
+                                        if same_source else ()))
         if context_fields is not None:
             schema = replace(schema, context_fields=context_fields)
         if one_sided_note_extra is not None:
