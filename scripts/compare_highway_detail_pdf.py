@@ -22,7 +22,8 @@ name the two file pickers.
 from dataclasses import replace
 
 import compare_highway_detail_tsn as _hd
-from compare_tsn_common import run_files_compare, suggest_route_name
+from compare_tsn_common import (reject_pdf_source, require_pdf_source,
+                                run_files_compare, suggest_route_name)
 
 
 class _HighwayDetailFileCompare:
@@ -33,10 +34,12 @@ class _HighwayDetailFileCompare:
     vs-Excel); the first file is always the PDF-consolidated TSMIS workbook."""
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
-                 one_sided_note_extra=None, drop_notes=False):
+                 one_sided_note_extra=None, drop_notes=False,
+                 excel_side_b=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
+        self._excel_side_b = excel_side_b   # CMP-AUD-066 role enforcement
         self._name_tag = name_tag
         self._load_b = load_b
         schema = replace(_hd._SCHEMA, side_a=side_a, side_b=side_b)
@@ -52,6 +55,12 @@ class _HighwayDetailFileCompare:
         return suggest_route_name(path_a, "Highway_Detail", self._name_tag)
 
     def _load_pair(self, path_a, path_b):
+        # CMP-AUD-066: the "TSMIS (PDF)" side must carry the PDF-conversion
+        # marker; a vs-Excel second side must not (the TSN side keeps its own
+        # normalization gate inside its loader).
+        require_pdf_source(path_a, self.file_a_label, "Highway Detail")
+        if self._excel_side_b:
+            reject_pdf_source(path_b, self.file_b_label, "Highway Detail")
         rows_a, _ = _hd._load_tsmis(path_a)   # PDF side: same 34-col consolidated layout
         rows_b, _ = self._load_b(path_b)
         return rows_a, rows_b, None
@@ -80,4 +89,4 @@ TSMIS_PDF_VS_EXCEL = _HighwayDetailFileCompare(
     name_tag="TSMIS_PDF_vs_Excel_HighwayDetail",
     load_b=_hd._load_tsmis,
     one_sided_note_extra=" (locations one source lists at a postmile the other doesn't)",
-    drop_notes=True)
+    drop_notes=True, excel_side_b=True)

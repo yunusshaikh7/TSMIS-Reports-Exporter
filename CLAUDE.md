@@ -122,19 +122,23 @@ Stage-8 base-family audits are complete: **7/7**. Highway Log closed on exact 25
 Excel/PDF source witnesses, its accepted-red Stage-6 chain, an independent projection
 oracle, two clean seven-file product-leg universes, and two byte-identical final-gate
 result/acceptance pairs. The gate accepts only the base audit: product, full-physical,
-workbook-evidence, and end-to-end perfection remain false. CMP-AUD-066/067
-remain open (047/048 shipped 2026-07-16; 157 + 045-HL + 050 + all three
-CMP-AUD-049 halves shipped 2026-07-17 — 050: the shared PDF-conversion driver
-and Ramp Summary now REFUSE duplicate or blank route claims with both source
-PDFs named, never overwriting or double-counting by file order; 049: the
-DOCUMENT's own route claim — page banners (HSL/RD/HD), the ID cover's
+workbook-evidence, and end-to-end perfection remain false. CMP-AUD-067
+remains open (047/048 shipped 2026-07-16; 157 + 045-HL + 050 + all three
+CMP-AUD-049 halves + 066 shipped 2026-07-17 — 050: the shared PDF-conversion
+driver and Ramp Summary now REFUSE duplicate or blank route claims with both
+source PDFs named, never overwriting or double-counting by file order; 049:
+the DOCUMENT's own route claim — page banners (HSL/RD/HD), the ID cover's
 "ROUTE : NNN" parameter, the HL cover line — is the authoritative per-route
 identity in all five PDF converters AND the evidence adapters
 (`reconcile_route_identity` / `RouteIdentityError`); a renamed or
 unidentified PDF is a named FAILED input / excluded from captioning, proven
-refusal-free on all 1,099 statewide 7.9 per-route documents; 045's HD-Excel
-leg stays blocked on the vendor county answer — never infer it), and no
-product code changed during the bounded closeout itself. Exact
+refusal-free on all 1,099 statewide 7.9 per-route documents; 066: every
+PDF-sourced workbook carries a very-hidden `TSMIS PDF Conversion` marker and
+the HL/HSL/HD/ID flavors enforce roles — the TSMIS (PDF) side requires it,
+the TSMIS (Excel) side rejects it, pre-marker PDF workbooks re-consolidate
+once (RD's print-only columns already protect it structurally); 045's
+HD-Excel leg stays blocked on the vendor county answer — never infer it),
+and no product code changed during the bounded closeout itself. Exact
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
 The owner-authorized remediation is live on branch `comparison-perfection`; the single

@@ -177,13 +177,15 @@ class _HighwaySequenceFileCompare:
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_a, load_b,
                  base_schema, notes_title, notes_lines, tsn_claims=False,
-                 one_sided_note_extra=None, same_source=False):
+                 one_sided_note_extra=None, same_source=False,
+                 excel_side_b=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
         self._name_tag = name_tag
         self._load_a = load_a
         self._load_b = load_b
+        self._excel_side_b = excel_side_b   # CMP-AUD-066 role enforcement
         self._notes_title = notes_title
         self._notes_lines = notes_lines
         self._tsn_claims = tsn_claims
@@ -210,6 +212,12 @@ class _HighwaySequenceFileCompare:
             lines=self._notes_lines)
 
     def _load_pair(self, path_a, path_b):
+        # CMP-AUD-066: the "TSMIS (PDF)" side must carry the PDF-conversion
+        # marker; a vs-Excel second side must not (the TSN side keeps its own
+        # v4 normalization gate inside _load_tsn).
+        ctc.require_pdf_source(path_a, self.file_a_label, "Highway Sequence")
+        if self._excel_side_b:
+            ctc.reject_pdf_source(path_b, self.file_b_label, "Highway Sequence")
         rows_a, _ = self._load_a(path_a)
         rows_b, _ = self._load_b(path_b)
         if self._same_source:
@@ -248,4 +256,4 @@ TSMIS_PDF_VS_EXCEL = _HighwaySequenceFileCompare(
     one_sided_note_extra=(" (a row genuinely present in only one render — the "
                           "by-design equate suffix moves now pair up and surface "
                           "as PM Suffix cells, see Notes)"),
-    same_source=True)
+    same_source=True, excel_side_b=True)

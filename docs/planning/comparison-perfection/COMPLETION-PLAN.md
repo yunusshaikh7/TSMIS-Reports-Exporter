@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 closure — document-authoritative route identity)
+> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 + 066 closures — route identity + PDF-role provenance)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -275,18 +275,35 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > — never a complete workbook with a blank Route. NEW
 > `check_pdf_route_universe` (12 pins; 8 pre-fix failures by git-stash).
 >
-> **Do this next: CMP-AUD-066's PDF-role halves** (design censused
-> 2026-07-17: ONE producer marker on PDF-sourced workbooks — the PDF role
-> REQUIRES it, the Excel role REJECTS it, so both confusion directions close
-> while unmarked historical Excel workbooks stay usable; per-route HL
-> converted files need the marker too — the HL flavors accept per-route
-> pairs; refusals carry re-consolidate hints like the TSN v5 gate; expect
-> PDF-side canary re-generation + re-bless in every self-check family),
-> **then 067** (census below — HSL/RD re-verify the finding's exact
-> mutations against the 199/v0.26.0 same-source loaders before
-> dispositioning; HL's roadbed half is correctness-locked — gates first),
+> **Do this next: CMP-AUD-067** (census below — HSL/RD re-verify the
+> finding's exact mutations against the 199/v0.26.0 same-source loaders
+> before dispositioning; HL's roadbed half is correctness-locked — read
+> docs/highway_log/comparison-study.md + the Phase-3 decision gates FIRST;
+> HD pm_canon HG-fill + NA crosswalk; ID J→S fold + display rewrite),
 > **then the unowned-findings triage sweep.** HD-Excel county stays
 > vendor-blocked — never infer it.
+>
+> **DONE 2026-07-17 (after the 049 closure): CMP-AUD-066 CLOSED — PDF-role
+> provenance.** Every workbook written FROM PDFs carries a very-hidden
+> versioned `TSMIS PDF Conversion` marker (per-route via
+> `write_route_workbook(pdf_source_marker=True)` — OPT-IN because the TSN HL
+> consolidator shares that writer and stays unmarked; combined via
+> `run_pdf_conversion`'s decorate wrapper, append()-based for the write-only
+> combine). HL/HSL/HD/ID flavors enforce roles at load
+> (`compare_tsn_common.require_pdf_source` / `reject_pdf_source`): the
+> TSMIS (PDF) side requires a valid marker (unmarked/pre-marker → refusal
+> with the re-consolidate hint = the legacy path), the TSMIS (Excel) side
+> rejects ANY marker presence (malformed included — `pdf_source_marker_state`
+> fails closed, -1), the vs-TSN flavors' PDF sides gate identically, TSN
+> sides keep v4/v5. RD needs no gate (its 13-col PDF header already rejects
+> the Excel shape — the finding verified that itself). Proof: NEW
+> `check_pdf_role_provenance` (15 red pre-fix — every mismatched-role run
+> returned ok), gate 126/126 (check_compare_highway_log's PDF-side fixtures
+> now marked like real conversions), REAL e2e: the route-051 HL conversion
+> stamps both artifacts, the honest real pair vs the vendor Excel compares
+> 82/82 identical, swapped roles refuse. Operational: pre-marker PDF-sourced
+> workbooks (stores/old runs) refuse on the PDF role until re-consolidated
+> once — the message says so.
 >
 > **DONE 2026-07-17: CMP-AUD-049 CLOSED — all three halves; the document's
 > own route claim is now the authoritative per-route identity everywhere.**

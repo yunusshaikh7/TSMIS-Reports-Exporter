@@ -545,7 +545,21 @@ actual sides (not hard-coded TSMIS/TSN).
 | instance | sides | purpose |
 |---|---|---|
 | `TSMIS_PDF_VS_TSN` | "TSMIS (PDF)" vs "TSN (PDF)" | accurate replacement for 9a — BOTH sides from PDFs, so the PDF-vs-PDF nature is explicit and the vendor Excel bug never enters; `tsn_side_b=True` applies 9a's v5 marker gate + claims Notes to its TSN side |
-| `TSMIS_PDF_VS_EXCEL` | "TSMIS (PDF)" vs "TSMIS (Excel)" | diffs PDF-parsed data against the vendor Excel of the SAME report to pinpoint the export's errors; no TSN side, so no marker gate |
+| `TSMIS_PDF_VS_EXCEL` | "TSMIS (PDF)" vs "TSMIS (Excel)" | diffs PDF-parsed data against the vendor Excel of the SAME report to pinpoint the export's errors; no TSN side, so no TSN-marker gate |
+
+**PDF-role provenance (CMP-AUD-066, 2026-07-17).** Every workbook the app writes FROM PDFs —
+the five per-route converted files and every combined conversion — carries a very-hidden
+versioned `TSMIS PDF Conversion` marker sheet (`pdf_table_lib.write_pdf_source_marker`;
+opt-in on `write_route_workbook` because the TSN Highway Log consolidator shares that
+writer and stays unmarked). The HL / HSL / HD / ID flavors enforce roles at load
+(`compare_tsn_common.require_pdf_source` / `reject_pdf_source`): a "TSMIS (PDF)" side
+must carry a valid marker (an unmarked or pre-marker workbook refuses with a
+re-consolidate hint — re-consolidating once re-earns the role), a "TSMIS (Excel)" side
+must NOT carry one (valid or malformed — `pdf_source_marker_state` fails closed both
+ways), and the vs-TSN flavors' PDF sides gate identically. Ramp Detail needs no gate:
+its print-only On/Off + Ramp Type columns already make the Excel shape unloadable as
+the PDF side. Historical Excel-consolidated workbooks stay fully usable on the Excel
+role. Pinned in `check_pdf_role_provenance`.
 
 ### 9c. TSMIS vs TSN Ramp Detail — `compare_ramp_detail_tsn.py` (`"files"`, group `tsn`; remediation pending)
 

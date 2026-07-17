@@ -23,7 +23,8 @@ flag as differences. The GUI's Compare tab drives these through COMPARE_REPORTS
 from dataclasses import replace
 
 import compare_intersection_detail_tsn as _id
-from compare_tsn_common import (run_files_compare, same_source_render_rows,
+from compare_tsn_common import (reject_pdf_source, require_pdf_source,
+                                run_files_compare, same_source_render_rows,
                                 suggest_route_name)
 
 
@@ -42,13 +43,15 @@ class _IntDetailFileCompare:
     legs keep the accepted ID-79 byte-exact semantics."""
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
-                 one_sided_note_extra=None, drop_notes=False, same_source=False):
+                 one_sided_note_extra=None, drop_notes=False, same_source=False,
+                 excel_side_b=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
         self._name_tag = name_tag
         self._load_b = load_b
         self._same_source = same_source
+        self._excel_side_b = excel_side_b   # CMP-AUD-066 role enforcement
         schema = replace(_id._SCHEMA, side_a=side_a, side_b=side_b)
         if one_sided_note_extra is not None:
             schema = replace(schema, one_sided_note_extra=one_sided_note_extra)
@@ -62,6 +65,12 @@ class _IntDetailFileCompare:
         return suggest_route_name(path_a, "Intersection_Detail", self._name_tag)
 
     def _load_pair(self, path_a, path_b):
+        # CMP-AUD-066: the "TSMIS (PDF)" side must carry the PDF-conversion
+        # marker; a vs-Excel second side must not (the TSN side keeps its own
+        # normalization gate inside its loader).
+        require_pdf_source(path_a, self.file_a_label, "Intersection Detail")
+        if self._excel_side_b:
+            reject_pdf_source(path_b, self.file_b_label, "Intersection Detail")
         rows_a, _ = _id._load_tsmis(path_a)   # PDF side: same 36-col consolidated layout
         rows_b, _ = self._load_b(path_b)
         if self._same_source:
@@ -93,4 +102,4 @@ TSMIS_PDF_VS_EXCEL = _IntDetailFileCompare(
     name_tag="TSMIS_PDF_vs_Excel_IntersectionDetail",
     load_b=_id._load_tsmis,
     one_sided_note_extra=" (intersections one source lists at a postmile the other doesn't)",
-    drop_notes=True, same_source=True)
+    drop_notes=True, same_source=True, excel_side_b=True)

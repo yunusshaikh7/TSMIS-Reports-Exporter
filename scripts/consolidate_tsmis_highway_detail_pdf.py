@@ -451,7 +451,8 @@ def _write_route_workbook(rows, out_path):
     sheet name + 34 columns the Excel export uses, tooltips + Legend included)."""
     write_route_workbook(rows, out_path, sheet_name=SHEET_NAME, header=HD_HEADER,
                          apply_tooltips=hdc.apply_header_tooltips,
-                         decorate=hdc.write_legend_sheet)
+                         decorate=hdc.write_legend_sheet,
+                         pdf_source_marker=True)
 
 
 # =============================================================================

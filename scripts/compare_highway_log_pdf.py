@@ -22,7 +22,8 @@ the PDF-vs-Excel pair doesn't mislabel both TSMIS sides as "TSMIS"/"TSN".
 from dataclasses import replace
 
 import compare_highway_log as _hl
-from compare_tsn_common import run_files_compare, suggest_route_name
+from compare_tsn_common import (reject_pdf_source, require_pdf_source,
+                                run_files_compare, suggest_route_name)
 
 
 class _HighwayLogFileCompare:
@@ -61,7 +62,17 @@ class _HighwayLogFileCompare:
         comparison modules (ConsolidateResult returned)."""
         schema = (_hl._schema_with_claims(path_b, schema=self._schema)
                   if self._tsn_side_b else self._schema)
-        loader = _hl._load_pair_tsn if self._tsn_side_b else _hl._load_pair
+        base_loader = _hl._load_pair_tsn if self._tsn_side_b else _hl._load_pair
+
+        def loader(pa, pb):
+            # CMP-AUD-066: the "TSMIS (PDF)" side must carry the
+            # PDF-conversion marker; the "TSMIS (Excel)" side must not (the
+            # TSN side keeps its own v5 normalization gate in _load_pair_tsn).
+            require_pdf_source(pa, self.file_a_label, "Highway Log")
+            if not self._tsn_side_b:
+                reject_pdf_source(pb, self.file_b_label, "Highway Log")
+            return base_loader(pa, pb)
+
         return run_files_compare(
             schema, path_a, path_b, out_path,
             banner=(f"Highway Log Comparison — {self.file_a_label} vs "

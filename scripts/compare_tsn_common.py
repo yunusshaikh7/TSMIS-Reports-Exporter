@@ -200,6 +200,41 @@ def require_per_route_identity(path_a, path_b):
             "workbooks.")
 
 
+def require_pdf_source(path, side_label, report_noun):
+    """CMP-AUD-066 (PDF-role half): the "TSMIS (PDF)" side of a comparison
+    must actually BE one of this app's PDF conversions — those workbooks carry
+    a very-hidden versioned provenance marker (pdf_table_lib). An Excel
+    consolidation has the same visible shape, so shape alone certified
+    Excel-vs-Excel runs as PDF-vs-Excel. Unmarked (incl. pre-marker) picks
+    refuse with a re-consolidate hint; a malformed marker refuses too (it
+    cannot certify a version)."""
+    from pdf_table_lib import pdf_source_marker_state
+
+    if pdf_source_marker_state(path) < 1:
+        raise ValueError(
+            f"{Path(path).name} was not produced by this app's {report_noun} "
+            f"(PDF) conversion (it has no valid PDF-conversion marker), so it "
+            f"cannot stand as the {side_label} side — its rows may come from "
+            f"the Excel export. Consolidate the {report_noun} (PDF) report "
+            "(re-consolidate if this file predates the marker), then pick "
+            "that workbook.")
+
+
+def reject_pdf_source(path, side_label, report_noun):
+    """CMP-AUD-066 (the mirror): the "TSMIS (Excel)" side must NOT be a
+    PDF-sourced workbook — comparing a PDF conversion against itself would
+    certify a 'PDF vs Excel' match no Excel export ever entered. Any marker
+    presence (valid or malformed) refuses."""
+    from pdf_table_lib import pdf_source_marker_state
+
+    if pdf_source_marker_state(path) != 0:
+        raise ValueError(
+            f"{Path(path).name} is one of this app's {report_noun} (PDF) "
+            f"conversions (it carries the PDF-conversion marker), so it "
+            f"cannot stand as the {side_label} side. Pick the consolidated "
+            f"{report_noun} workbook built from the Excel exports.")
+
+
 def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_msg,
                            header_ok=None, row_transform=list):
     """The consolidated-workbook loader skeleton three vs-TSN comparators wrote

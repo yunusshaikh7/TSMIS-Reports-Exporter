@@ -344,7 +344,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-063 | P2 | Verified | Sequence/Ramp PDFs certify invalid post-mile code tokens |
 | CMP-AUD-064 | P2 | Verified | PDF parser anomaly counts masquerade as skipped input counts |
 | CMP-AUD-065 | P1 | Verified | Sequence PDF-vs-Excel suppresses three same-source fields |
-| CMP-AUD-066 | P1 | Verified | PDF comparison roles are not provenance-validated |
+| CMP-AUD-066 | P1 | Remediated 2026-07-17 (HL vs-TSN half via the v5 marker; the PDF-role halves via the PDF-conversion marker; RD structurally protected) | PDF comparison roles are not provenance-validated |
 | CMP-AUD-067 | P1 | Verified | TSN projections hide PDF-vs-Excel source differences |
 | CMP-AUD-068 | P2 | Verified | PDF-vs-TSN Detail paths omit Report View |
 | CMP-AUD-069 | P2 | Verified | Ramp PDF comparisons mislabel their file roles in diagnostics |
@@ -2988,14 +2988,47 @@ de-duplication cannot establish that either required source was ever compared.
 **2026-07-17 partial:** the Highway Log v5 marker gate (CMP-AUD-157/045-HL) closes
 this finding's HL PDF-vs-TSN instance as a side effect — the TSN side must now carry
 the "TSN Normalization" marker sheet, so a TSMIS workbook (which never has one) can
-no longer stand in as `TSN (PDF)`. The PDF-role halves (TSMIS (PDF) vs Excel across
-HL/HSL/HD/ID) and the other families remain open.
+no longer stand in as `TSN (PDF)`.
 
 Correction requirements: persist durable producer/report/source-role metadata and
 validate it against each picker role before loading rows. Distinct copies, renamed
 files, wrong producer editions, and missing/stale/malformed metadata must not certify a
 source-specific comparison. Provide an explicit legacy-import workflow if unmarked
 historical workbooks must remain usable.
+
+**Remediation (2026-07-17, the PDF-role halves — the finding closed).** Every
+workbook this app writes FROM PDFs now carries a very-hidden versioned
+`TSMIS PDF Conversion` marker sheet: the five per-route converted files
+(`pdf_table_lib.write_route_workbook(pdf_source_marker=True)` — an OPT-IN
+seam, because the TSN Highway Log consolidator shares that writer and must
+stay unmarked) and every combined conversion workbook (`run_pdf_conversion`
+wraps the report's `decorate_workbook`, append()-based so the write-only
+combine path works). The four vulnerable families' flavors enforce roles at
+load: the `TSMIS (PDF)` side REQUIRES a valid marker
+(`compare_tsn_common.require_pdf_source` — unmarked and pre-marker picks
+refuse with a re-consolidate hint, the explicit legacy path: re-consolidate
+once and the workbook re-earns its role), the `TSMIS (Excel)` side REJECTS
+any marker presence (`reject_pdf_source` — valid OR malformed: a corrupted
+marker still says PDF-sourced), and the vs-TSN flavors' `TSMIS (PDF)` sides
+gate identically while their TSN sides keep their own normalization-marker
+gates. `pdf_source_marker_state` fails CLOSED both ways (-1 for
+present-but-malformed is never valid for the PDF role and never clean for
+the Excel role). Unmarked HISTORICAL EXCEL workbooks stay fully usable — no
+migration needed on the Excel role. Ramp Detail needs no gate: its
+13-column PDF-only header (On/Off + Ramp Type) already rejects the Excel
+shape structurally, as this finding itself verified. Red→green: the new
+`check_pdf_role_provenance` (writer/opt-in/fail-closed pins + all four
+families' require/reject/honest-pair flows + the three vs-TSN PDF-side
+refusals; 15 red pre-fix — every mismatched-role run returned ok) and the
+gate grew to 126/126 (one check-fixture update: check_compare_highway_log's
+PDF-side fixtures now carry the marker like every real conversion). Real
+corpus: converting the real ssor-prod 7.9 route-051 Highway Log PDF stamps
+BOTH artifacts (per-route + combined, marker state 1); the honest real pair
+(that conversion vs the real vendor Excel export) compares — 82/82
+locations identical; the SWAPPED roles refuse with the exact hint.
+Operational note: PDF-sourced consolidated workbooks written BEFORE this
+change (stores, old run folders) refuse on the PDF role until
+re-consolidated once — the refusal message says exactly that.
 
 ### CMP-AUD-067 — TSN projections hide PDF-vs-Excel source differences
 

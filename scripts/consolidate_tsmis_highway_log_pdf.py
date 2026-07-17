@@ -411,7 +411,8 @@ def _write_route_workbook(rows, out_path):
     name + 31 columns the Excel export uses)."""
     write_route_workbook(rows, out_path, sheet_name=SHEET_NAME, header=TSMIS_HEADER,
                          apply_tooltips=hlc.apply_header_tooltips,
-                         decorate=hlc.write_legend_sheet)
+                         decorate=hlc.write_legend_sheet,
+                         pdf_source_marker=True)
 
 
 # =============================================================================

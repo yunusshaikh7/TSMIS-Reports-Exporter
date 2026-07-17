@@ -33,7 +33,7 @@ import re
 import uuid
 
 try:
-    from openpyxl import Workbook
+    from openpyxl import Workbook, load_workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
     _DEPS_OK = True
@@ -237,13 +237,62 @@ def carried_line_crossings(chars, windows, word_gap):
 # --------------------------------------------------------------------------- #
 # TSMIS-format per-route workbooks
 # --------------------------------------------------------------------------- #
+# CMP-AUD-066: every workbook this app writes FROM PDFs carries a very-hidden
+# versioned marker sheet, so the PDF-vs-Excel comparison flavors can prove
+# their "TSMIS (PDF)" side really is a PDF conversion and their "TSMIS (Excel)"
+# side really is not. The TSN Highway Log consolidator shares
+# write_route_workbook and must stay UNMARKED (it is not a TSMIS PDF
+# conversion; it carries its own "TSN Normalization" marker instead) — hence
+# the opt-in `pdf_source_marker=` seam rather than an unconditional stamp.
+PDF_SOURCE_MARKER_SHEET = "TSMIS PDF Conversion"
+PDF_SOURCE_MARKER_VERSION = 1
+
+
+def write_pdf_source_marker(wb):
+    """Stamp `wb` as produced by this app's TSMIS PDF conversion (066).
+    append()-based so it works on BOTH ordinary and write-only workbooks
+    (consolidate_xlsx builds the combined workbook write-only)."""
+    ws = wb.create_sheet(PDF_SOURCE_MARKER_SHEET)
+    ws.append([PDF_SOURCE_MARKER_SHEET])
+    ws.append([PDF_SOURCE_MARKER_VERSION])
+    ws.sheet_state = "veryHidden"
+
+
+def pdf_source_marker_state(path):
+    """The workbook's PDF-conversion marker: >0 = the marker's version, 0 = no
+    marker sheet at all, -1 = a marker sheet exists but is malformed. Callers
+    fail closed on BOTH roles: requiring the marker accepts only >0, and
+    rejecting it refuses anything != 0 (a corrupted marker still says
+    "PDF-sourced", it just can't certify a version)."""
+    try:
+        wb = load_workbook(path, read_only=True)
+    except Exception:  # silent-ok: the caller's own load reports unreadable files
+        return 0
+    try:
+        if PDF_SOURCE_MARKER_SHEET not in wb.sheetnames:
+            return 0
+        vals = [r[0] for r in wb[PDF_SOURCE_MARKER_SHEET].iter_rows(
+            min_row=1, max_row=2, max_col=1, values_only=True)]
+        if (len(vals) == 2 and vals[0] == PDF_SOURCE_MARKER_SHEET
+                and isinstance(vals[1], (int, float)) and int(vals[1]) > 0):
+            return int(vals[1])
+        return -1
+    except Exception:  # silent-ok: malformed content = present-but-unreadable
+        return -1
+    finally:
+        wb.close()
+
+
 def write_route_workbook(rows, out_path, *, sheet_name, header,
-                         row_values=None, apply_tooltips=None, decorate=None):
+                         row_values=None, apply_tooltips=None, decorate=None,
+                         pdf_source_marker=False):
     """Write one route's rows as a TSMIS-format workbook (the same sheet name +
     columns the report's Excel export uses): the standard blue header row,
     frozen panes, per-column widths (Description wide), the formula-injection
     guard on every data cell, and the report's optional header tooltips /
-    workbook decoration (e.g. the Highway Log Legend sheet)."""
+    workbook decoration (e.g. the Highway Log Legend sheet).
+    `pdf_source_marker=True` (the five TSMIS PDF consolidators) stamps the
+    CMP-AUD-066 provenance marker; the TSN consolidator leaves it off."""
     header_fill = PatternFill("solid", start_color="305496")
     header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
     header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -272,6 +321,8 @@ def write_route_workbook(rows, out_path, *, sheet_name, header,
                 cell.data_type = "s"
     if decorate is not None:
         decorate(wb)                         # e.g. a "Legend" tab
+    if pdf_source_marker:
+        write_pdf_source_marker(wb)
     wb.save(out_path)
 
 
@@ -454,6 +505,18 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
     # consolidate_xlsx so its pre-replace gate (atomic_save_if) catches a destination
     # that APPEARED after that prompt — at the final os.replace — without
     # re-prompting for the already-confirmed pre-existing case.
+    # CMP-AUD-066: every combined workbook this driver writes is BY
+    # CONSTRUCTION a PDF conversion, so the provenance marker rides the
+    # report's own decoration.
+    base_decorate = consolidate_kwargs.get("decorate_workbook")
+
+    def _decorate_with_marker(wb):
+        if base_decorate is not None:
+            base_decorate(wb)
+        write_pdf_source_marker(wb)
+
+    consolidate_kwargs = dict(consolidate_kwargs,
+                              decorate_workbook=_decorate_with_marker)
     result = consolidate_xlsx(
         input_dir=conv, out_path=out,
         events=events, confirm_overwrite=confirm, existed_at_confirm=existed_at_confirm,

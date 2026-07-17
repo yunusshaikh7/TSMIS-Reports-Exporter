@@ -337,7 +337,8 @@ def parse_pdf(path, events):
 def _write_route_workbook(rows, out_path):
     """Write one route's rows as a TSMIS-format Intersection Detail workbook (same
     sheet name + 35 columns the Excel export uses)."""
-    write_route_workbook(rows, out_path, sheet_name=SHEET_NAME, header=INTD_HEADER)
+    write_route_workbook(rows, out_path, sheet_name=SHEET_NAME, header=INTD_HEADER,
+                         pdf_source_marker=True)
 
 
 # =============================================================================

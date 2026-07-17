@@ -44,9 +44,11 @@ def check(name, cond, detail=""):
         _fail.append(name)
 
 
-def _write_hl(path, rows, consolidated=False, marker=False):
+def _write_hl(path, rows, consolidated=False, marker=False, pdf_marker=False):
     """`marker=True` stamps the v5 "TSN Normalization" sheet — a TSN-side
-    fixture must carry it since the CMP-AUD-157/045-HL loader gate."""
+    fixture must carry it since the CMP-AUD-157/045-HL loader gate.
+    `pdf_marker=True` stamps the CMP-AUD-066 PDF-conversion marker — a
+    "TSMIS (PDF)"-side fixture must carry it since the role-provenance gate."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Highway Log"
@@ -58,6 +60,9 @@ def _write_hl(path, rows, consolidated=False, marker=False):
     if marker:
         import consolidate_tsn_highway_log as tsn_hl
         tsn_hl._write_marker_sheet(wb)
+    if pdf_marker:
+        from pdf_table_lib import write_pdf_source_marker
+        write_pdf_source_marker(wb)
     wb.save(path)
     wb.close()
 
@@ -147,7 +152,7 @@ def test_pdf_flavors():
     print("the PDF-sourced flavors ride the same skeleton:")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_hlpdf_"))
     a, b = tmp / "pdf route 7.xlsx", tmp / "tsn route 7.xlsx"
-    _write_hl(a, [_hl_row("1.000", "P")])
+    _write_hl(a, [_hl_row("1.000", "P")], pdf_marker=True)
     _write_hl(b, [_hl_row("1.000", "Q")], marker=True)
     res = hlp.TSMIS_PDF_VS_TSN.compare(str(a), str(b), str(tmp / "o.xlsx"),
                                        confirm_overwrite=lambda p: True, mode="values")
@@ -169,7 +174,8 @@ def test_pdf_flavors():
                                             str(tmp / "oe.xlsx"),
                                             confirm_overwrite=lambda p: True,
                                             mode="values")
-    check("HL PDF-vs-Excel has no TSN side and does NOT gate on the marker",
+    check("HL PDF-vs-Excel has no TSN side and does NOT gate on the TSN marker "
+          "(its Excel side stays unmarked by design)",
           res_ex.status == "ok", res_ex.message)
     b5 = tmp / "excel route 5.xlsx"
     _write_hl(b5, [_hl_row("1.000", "Q")])
@@ -202,6 +208,10 @@ def test_pdf_flavors():
         ws.title = idt.TSMIS_SHEET
         ws.append(["Route"] + [f"c{i}" for i in range(1, 35)] + ["Xing Line Lgth"])
         ws.append(id_row("001", "1.000", d))
+        if p is ia:
+            # The "TSMIS (PDF)" side must carry the CMP-AUD-066 marker.
+            from pdf_table_lib import write_pdf_source_marker
+            write_pdf_source_marker(wb)
         wb.save(p)
         wb.close()
     res2 = idp.TSMIS_PDF_VS_EXCEL.compare(str(ia), str(ib), str(tmp / "o3.xlsx"),

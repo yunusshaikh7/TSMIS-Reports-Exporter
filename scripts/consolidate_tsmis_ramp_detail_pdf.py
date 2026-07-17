@@ -343,7 +343,8 @@ def _write_route_workbook(rows, out_path):
     two appended print-only columns). Empty strings become None so blank cells
     match the Excel export's."""
     write_route_workbook(rows, out_path, sheet_name=SHEET_NAME, header=HEADER,
-                         row_values=lambda r: [v if v else None for v in r])
+                         row_values=lambda r: [v if v else None for v in r],
+                         pdf_source_marker=True)
 
 
 # =============================================================================
