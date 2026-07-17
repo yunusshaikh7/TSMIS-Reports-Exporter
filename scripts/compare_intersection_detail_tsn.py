@@ -192,15 +192,26 @@ _TSMIS_POS = {
     "Intrte Postmile": 33, "Intrte PM Suffix": 34, "Xing Line Lgth": 35,
 }
 _TSMIS_ROUTE_POS = 4                       # consolidated "Location" column ("12 ORA 001")
-# CMP-AUD-034: the EXACT July-2026 consolidated header (['Route'] + the 35 current
-# source columns). _tsmis_row reads every field BY POSITION, so this is bound
-# EXACTLY — the old "len==36 and last=='Xing Line Lgth'" gate let a junk-relabelled
-# or block-shifted 36-cell header through and mis-map every field. A pre-update
-# workbook (the 37-column duplicated-'ML Eff-Date' layout) and any other edition are
-# refused. Verified statewide-stable + data-source/edition-independent (2026-07-17
-# census); the Intersection Detail (PDF) consolidator emits the IDENTICAL header,
-# so the PDF-vs-Excel self-check (which shares this _header_ok) stays valid.
+# CMP-AUD-034: the EXACT consolidated header (['Route'] + the 35 source columns),
+# bound exactly — _tsmis_row reads every field BY POSITION, so the old "len==36 and
+# last=='Xing Line Lgth'" gate let a junk-relabelled/block-shifted header mis-map
+# every field. TWO valid site editions are accepted (the value POSITIONS are
+# identical across both — only the LABELS differ — so the by-position reader is
+# unaffected; a pre-July-2026 37-column layout or any real column move still matches
+# neither and is refused):
+#   * CURRENT (the 2026-07-17 build): the site corrected its long-misaligned header
+#     labels — 'P'->'PP', 'S'->'PS', the INT Type/INT Eff-Date labels swapped to sit
+#     over their own values, 'Ctrl T'->'Ctrl T Eff-Date', 'Xing P/S'->'Int PS'.
+#   * LEGACY (7.8/7.9): the prior labels, kept for backward compatibility.
 _TSMIS_HEADER = [
+    "Route", "PP", "Post Mile", "PS", "Location", "Date of Record", "H/G",
+    "City Code", "R/U", "INT Eff-Date", "INT Type", "Ctrl T Eff-Date", "Ctrl Type",
+    "Light Eff-Date", "Light T/Y", "ML Eff-Date", "ML S/M", "ML L/C", "ML R/C",
+    "ML T/P", "ML N/L", "Description", "Main Line Lgth", "Inter Eff-Date",
+    "Inter S", "Inter L", "Inter R", "Inter T", "Inter N", "Int St Eff-Date",
+    "Intrte S", "Intrte Route", "Intrte Post", "Intrte Mile", "Int PS",
+    "Xing Line Lgth"]
+_TSMIS_HEADER_LEGACY = [
     "Route", "P", "Post Mile", "S", "Location", "Date of Record", "H/G",
     "City Code", "R/U", "INT Type", "INT Eff-Date", "Ctrl T", "Ctrl Type",
     "Light Eff-Date", "Light T/Y", "ML Eff-Date", "ML S/M", "ML L/C", "ML R/C",
@@ -211,7 +222,7 @@ _TSMIS_HEADER = [
 _HEADER_LEN = len(_TSMIS_HEADER)           # 36 (kept for any positional references)
 
 
-_header_ok = ctc.exact_consolidated_header_ok(_TSMIS_HEADER)
+_header_ok = ctc.exact_consolidated_header_ok(_TSMIS_HEADER, _TSMIS_HEADER_LEGACY)
 
 
 # --------------------------------------------------------------------------- #

@@ -102,10 +102,31 @@ def test_load_tsmis_refuses_a_shifted_workbook_end_to_end():
             assert raised, (name, "a block-shifted consolidated workbook must be refused")
 
 
+def test_intersection_detail_accepts_both_editions():
+    """CMP-AUD-034 + the 2026-07-17 edition: the ID loader binds TWO valid header
+    editions — the current (2026-07-17 relabelled) and the legacy (7.8/7.9) — which
+    share value POSITIONS but differ in LABELS, so the by-position reader is
+    unaffected. Both are accepted (backward compat + supersede); junk still refused."""
+    cur = list(idt._TSMIS_HEADER)
+    leg = list(idt._TSMIS_HEADER_LEGACY)
+    assert cur != leg, "the two editions must differ (labels changed)"
+    assert len(cur) == len(leg), "the editions must be the same width (labels only)"
+    assert idt._header_ok(cur), "the current (2026-07-17) edition must be accepted"
+    assert idt._header_ok(leg), "the legacy (7.8/7.9) edition must be accepted"
+    # the specific relabels are present in exactly one edition each
+    assert "PP" in cur and "PP" not in leg and "P" in leg
+    assert "Int PS" in cur and "Xing P/S" in leg
+    # junk of the same width is still refused
+    assert not idt._header_ok(["Route"] + ["x"] * (len(cur) - 1))
+    # a pre-July-2026 wider layout (37 cols) is refused
+    assert not idt._header_ok(["Route"] + ["x"] * 36)
+
+
 def main():
     test_predicate_accepts_exact_rejects_drift()
     test_old_gates_accepted_the_junk()
     test_load_tsmis_refuses_a_shifted_workbook_end_to_end()
+    test_intersection_detail_accepts_both_editions()
     print("OK  consolidated-layout gate (CMP-AUD-034): all four _load_tsmis loaders "
           "bind their exact documented header — relabels, block shifts, insertions, "
           "and deletions are refused (the old width/last-label/PM gates accepted "

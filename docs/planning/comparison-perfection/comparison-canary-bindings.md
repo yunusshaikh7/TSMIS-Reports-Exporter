@@ -215,6 +215,26 @@ Immutable evidence:
 | pairing trace JSONL | 16,106 / 4,532,544 bytes | `3a0f2b3f13b2ac69291d301783831fe9e61278b9e4b6d2ec364db6ff6117e922` |
 | route provenance JSONL | 259 / 53,082 bytes | `a45a52211cdd8111e01ae3bd5a2b398a8b1713331460c92a9194fcf40a69087e` |
 
+**2026-07-17 SITE EDITION — supersedes the 7.8 reference above (legacy kept for
+backward compatibility).** The site shipped a new Intersection Detail build
+(`ground-truth/Intersection Detail 2026-07-17/`, ssor-prod). Two changes, both
+verified: (1) a **LABEL-ONLY** header correction — `P`→`PP`, `S`→`PS`, the INT
+Type/INT Eff-Date labels realigned to sit over their own values, `Ctrl T`→`Ctrl T
+Eff-Date`, `Xing P/S`→`Int PS` — with EVERY value in the SAME position (proven
+cell-for-cell; the by-position loaders are unaffected). `compare_intersection_detail_tsn`
+accepts BOTH editions via `exact_consolidated_header_ok(_TSMIS_HEADER,
+_TSMIS_HEADER_LEGACY)` (034 gate preserved — junk/shift/wrong-edition still refused).
+(2) a real **DATA refresh** — Int St Eff-Date updated from historical dates to the
+bulk stamp `22-01-01` on 16,053 rows (aligning with TSN, which stores bulk stamps),
+plus HG (682) and PM-suffix (307) edits, and the equate/junction rows normalized
+(0 file≠Location rows, down from 259 — CMP-AUD-070 now moot as well as not-a-defect).
+Same 217 routes / 16,459 rows. Observed vs-TSN canary on the NEW edition (same TSN
+library; the same harness reproduces the 7.8 **21,675** exactly): **16,886 comparison
+rows / 5,092 differing cells** (Int St Eff-Date 16,041→104). A full hash-bound
+independent-oracle re-bless of the new edition is the follow-up; this observed count,
+plus the label-only-header + real-data-refresh proof, is the current binding note.
+Harness: session scratchpad `id_new_vs_old_canary.py` / `id_whatchanged.py`.
+
 An independent first/corrected-pass reconciliation proved exactly 142 removed
 artifacts and zero additions. Every removal was field `Intrte Postmile`; exactly two
 rows became fully equal; four removals occurred inside duplicate groups; trace costs
