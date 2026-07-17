@@ -71,8 +71,8 @@ except ImportError:
 from intersection_detail_columns import HEADER as INTD_HEADER
 import outcome
 from pdf_table_lib import (assign_columns, cluster_by_top, contiguous_windows,
-                           median, norm_route, run_pdf_conversion,
-                           write_route_workbook)
+                           median, norm_route, reconcile_route_identity,
+                           run_pdf_conversion, write_route_workbook)
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
 
@@ -141,6 +141,16 @@ OLD_PM_RE = re.compile(r"^\d{1,2}\.\d{3}$")
 # or the period-bearing county codes "04 CC. 004" / "10 SJ. 120". This guards the
 # rowA classification against any stray non-data line and is cheap to evaluate.
 LOCATION_RE = re.compile(r"\d{2}\s+[A-Z]")
+# The document's own route claim (CMP-AUD-049): the cover's REPORT PARAMETERS
+# block prints the export's SUBJECT route ("ROUTE : 020"; suffixed routes one
+# token, "ROUTE : 178S") — matched on a line's spaceless chars. The per-record
+# Location cells canNOT identify the document: an intersection OF this route
+# WITH another route prints the OTHER route's mainline in Location, so
+# multi-route Location sets are NORMAL (118 of the 217 statewide 7.9 per-route
+# prints carry them — censused before this rule was coded). Only the cover
+# parameter is the document's claim about itself.
+COVER_ROUTE_RE = re.compile(r"^ROUTE:([0-9]+[A-Za-z]?)$")
+_COVER_SCAN_PAGES = 2                   # the parameter block sits on the cover
 # Route token out of "intersection_detail_route_<ROUTE>.pdf".
 ROUTE_FROM_NAME = re.compile(r"route[_ -]*([0-9]+[A-Za-z]?)", re.IGNORECASE)
 
@@ -256,8 +266,10 @@ def parse_pdf(path, events):
     never arrived — should be 0; `no_grid` when the column geometry couldn't be
     derived; `old_layout` when the file matches the PRE-July-2026 print instead —
     unpadded postmiles, no rowB intersection numbers; `vestigial` counts rowA
-    values in the dropped 21st column, a layout-drift canary that should be 0).
-    Returns (None, None) if cancelled.
+    values in the dropped 21st column, a layout-drift canary that should be 0;
+    `doc_routes` = the cover's own ROUTE-parameter claim, CMP-AUD-049 —
+    captured before the geometry gate, so a record-less or grid-less document
+    still identifies itself). Returns (None, None) if cancelled.
 
     A line whose Post Mile column holds a zero-padded postmile is a rowA; its rowB
     is the NEXT line whose column 1 holds the plain-integer intersection number —
@@ -266,16 +278,28 @@ def parse_pdf(path, events):
     page boundary still pairs. A second rowA arriving before any rowB surfaces as
     an orphan, never a silent drop."""
     rows = []
+    doc_routes = set()          # the cover's own ROUTE parameter (049)
     pending_a = None            # a rowA (21 grid vals) awaiting its rowB
     orphans = 0
     old_pm_hits = 0
     vestigial = 0
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
+        # The cover's ROUTE parameter is captured BEFORE the geometry gate so
+        # even a record-less print (an intersection-less route) or a grid-less
+        # document still identifies itself.
+        for page in pdf.pages[:_COVER_SCAN_PAGES]:
+            for _top, chars in _cluster_lines(page):
+                cm = COVER_ROUTE_RE.match("".join(c["text"] for c in chars))
+                if cm:
+                    doc_routes.add(cm.group(1))
+            if doc_routes:
+                break
         win_a, win_b = _doc_windows(pdf)
         if win_a is None:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
-                        "no_grid": True, "old_layout": False, "vestigial": 0}
+                        "no_grid": True, "old_layout": False, "vestigial": 0,
+                        "doc_routes": sorted(doc_routes)}
         for page_no, page in enumerate(pdf.pages, 1):
             if events.is_cancelled():
                 return None, None
@@ -303,7 +327,7 @@ def parse_pdf(path, events):
         orphans += 1
     return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
                   "no_grid": False, "old_layout": not rows and old_pm_hits > 0,
-                  "vestigial": vestigial}
+                  "vestigial": vestigial, "doc_routes": sorted(doc_routes)}
 
 
 # =============================================================================
@@ -330,9 +354,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     read; None means the newest run folder, falling back to the legacy flat layout.
     Console-free; honors events.is_cancelled() between pages. The convert-loop
     skeleton lives in pdf_table_lib.run_pdf_conversion; this module supplies the
-    layout knowledge: the per-PDF step (route from the FILENAME — the print layout
-    carries no route label; orphan reconciliation; the pre-update-layout refusal)
-    and the ⚠-note / PARTIAL-escalation policy.
+    layout knowledge: the per-PDF step (route from the cover's own "ROUTE :
+    NNN" parameter, the filename token corroborating — CMP-AUD-049; the
+    per-record Location cells canNOT identify the document, see
+    COVER_ROUTE_RE; orphan reconciliation; the pre-update-layout refusal) and
+    the ⚠-note / PARTIAL-escalation policy.
     """
     day = day or latest_output_day()
     in_dir = Path(input_dir) if input_dir else input_dir_for(day)
@@ -341,11 +367,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     def convert_one(p, prefix, ev, ctx):
         name_m = ROUTE_FROM_NAME.search(p.stem)
-        route = _norm_route(name_m.group(1)) if name_m else None
-        if not route:
-            ev.on_log(f"{prefix} no route in filename; skipping")
-            ctx["failed"].append(p.name)
-            return ("skip",)
+        name_route = _norm_route(name_m.group(1)) if name_m else None
         rows, pstats = parse_pdf(str(p), ev)
         if rows is None:                             # cancelled mid-PDF
             return ("cancelled",)
@@ -368,6 +390,12 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         if not rows:
             ev.on_log(f"{prefix} no intersection data found; skipping")
             ctx["failed"].append(p.name)
+            return ("skip",)
+        route = reconcile_route_identity(
+            p.name, name_route,
+            [_norm_route(t) for t in pstats["doc_routes"]], ev, ctx,
+            claim_desc="the cover's \"ROUTE : NNN\" parameter")
+        if route is None:
             return ("skip",)
         return ("ok", route, rows)
 

@@ -63,7 +63,8 @@ import highway_log_columns as hlc               # the corrected column labels
 import outcome
 from pdf_table_lib import (assign_columns, carried_line_crossings, char_lines,
                            contiguous_windows, median, norm_route,
-                           run_pdf_conversion, write_route_workbook)
+                           reconcile_route_identity, run_pdf_conversion,
+                           write_route_workbook)
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
 
@@ -247,8 +248,9 @@ def _carried_line_misfits(line_chars, windows, row):
 def parse_pdf(path, events, pdf_name=""):
     """Parse one TSMIS Highway Log PDF into TSMIS-format rows.
 
-    Returns (route, rows, stats): `route` from the in-PDF cover (cross-checked
-    against the filename by the caller), `rows` a list of 31-column row lists in
+    Returns (route, rows, stats): `route` from the in-PDF cover (the
+    document's own authoritative identity — the caller reconciles it against
+    the filename token, CMP-AUD-049), `rows` a list of 31-column row lists in
     document order (all counties concatenated — county is a section marker, not a
     column), and `stats` a row-drop reconciliation dict (emitted, pages,
     skipped_no_geometry, stale_geometry_pages, carried_validated_pages).
@@ -299,7 +301,8 @@ def parse_pdf(path, events, pdf_name=""):
                     continue
                 if any(URL_MARK in t for t in texts):
                     continue                          # page-footer URL
-                # Cover page: "Route 006" pins the route (filename is primary).
+                # Cover page: "Route 006" pins the document's own route claim
+                # (authoritative — the filename merely corroborates, 049).
                 if route is None and len(texts) == 2:
                     m = ROUTE_HEADER_RE.match(" ".join(texts))
                     if m:
@@ -430,8 +433,9 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     confirm_overwrite(path)->bool callback, a ConsolidateResult returned. Honors
     events.is_cancelled() between pages. The convert-loop skeleton lives in
     pdf_table_lib.run_pdf_conversion; this module supplies the layout knowledge:
-    the per-PDF step (route from filename cross-checked against the PDF cover;
-    parse reconciliation stats) and the ⚠-note / PARTIAL-escalation policy.
+    the per-PDF step (route from the PDF cover's own "Route NNN" claim, the
+    filename token corroborating — CMP-AUD-049; parse reconciliation stats)
+    and the ⚠-note / PARTIAL-escalation policy.
     """
     # input_dir/out_path/converted_dir are OPTIONAL overrides (the matrix points
     # them at an Export-Everything store folder + a scratch dir). When omitted the
@@ -456,17 +460,14 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             if pstats["carried_validated_pages"]:
                 ev.on_log(f"    {pstats['carried_validated_pages']} band-less page(s) "
                           "validated against carried geometry.")
-        route = name_route or pdf_route
-        if not route:
-            ev.on_log(f"{prefix} no route could be determined; skipping")
-            ctx["failed"].append(p.name)
-            return ("skip",)
-        if pdf_route and name_route and pdf_route != name_route:
-            ev.on_log(f"  WARNING: filename says route {name_route} but the PDF "
-                      f"header says {pdf_route}; using {route} (the filename).")
         if not rows:
             ev.on_log(f"{prefix} no highway-log data found; skipping")
             ctx["failed"].append(p.name)
+            return ("skip",)
+        route = reconcile_route_identity(
+            p.name, name_route, [pdf_route] if pdf_route else [], ev, ctx,
+            claim_desc="the cover's \"Route NNN\" line")
+        if route is None:
             return ("skip",)
         return ("ok", route, rows)
 

@@ -327,7 +327,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-046 | P2 | Verified | Shifted exports report differences under the wrong fields |
 | CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
 | CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
-| CMP-AUD-049 | P1 | Partially remediated (2026-07-17: the direct-compare half; converter + evidence halves open) | Direct/PDF route provenance is not enforced |
+| CMP-AUD-049 | P1 | Remediated 2026-07-17 (direct-compare, converter, and evidence halves) | Direct/PDF route provenance is not enforced |
 | CMP-AUD-050 | P1 | Remediated (2026-07-17) | PDF routes can overwrite, double-count, or remain blank |
 | CMP-AUD-051 | P1 | Verified | Highway Detail PM spill creates phantom PDF records |
 | CMP-AUD-052 | P1 | Verified | Highway Detail header words swallow real line-two data |
@@ -2561,11 +2561,67 @@ filename is the only verifiable identity; every export and conversion this app
 writes carries the token). Consolidated pairs stay content-keyed and
 unaffected; the Route-1 canary re-verified 299/18/69/221/969 under the rule.
 Red→green pinned in `check_compare_highway_log` (3 pre-fix failures by
-git-stash). REMAINING OPEN: the converter half (the five PDF converters emit
-the FILENAME route on disagreement — only HL even parses its in-document cover
-route today; HD/HSL/RD/ID are filename-only and need banner/DCR/Location
-extraction first) and the evidence-adapter half (route-named PDF paths are not
-reconciled against the document's own route before captioning).
+git-stash).
+
+**2026-07-17 (the converter half — the finding's producer core).** The five
+PDF converters now treat the DOCUMENT's own route claim as the authoritative
+identity; the filename token merely corroborates
+(`pdf_table_lib.reconcile_route_identity`, called from every family's
+convert_one): a missing claim, conflicting claims, or a filename that
+disagrees is a NAMED FAILED input (each family's finalize escalates PARTIAL —
+never a silent relabel), and a token-less filename now converts under the
+document's route instead of being skipped. Per-family in-document sources
+(censused on the bound 7.9 statewide sets before coding): Highway Sequence
+and Ramp Detail read every data page's banner ("District: 10 Route: 004
+Direction: W – E" / "Route: 004 Direction: W – E") in the band the parsers
+previously skipped (`BANNER_ROUTE_RE`; claims returned as
+`stats["doc_routes"]`); Highway Detail matches the data pages' "Ref Date: …
+Route NNN Page N" banner on the SPACELESS group text, captured BEFORE the
+geometry gate so a grid-less document still identifies itself; Intersection
+Detail (no page banner) reads its cover's REPORT-PARAMETERS "ROUTE : 020"
+line (`COVER_ROUTE_RE`, captured before the geometry gate) — NOT the
+per-record Location cells: the census proved an intersection OF the subject
+route WITH another route prints the OTHER route's mainline in Location
+(118 of 217 real per-route prints carry multi-route Location sets, e.g.
+route_009 claims {001, 009}), so rows are data and only the cover parameter
+is the document's claim about itself; Highway Log's already-parsed cover
+"Route NNN" line is now authoritative instead of losing to the filename
+WARN. Ramp Summary needs no converter change — its route already comes from
+the document's own parsed content (CMP-AUD-050 added its blank/duplicate
+refusals).
+
+**2026-07-17 (the evidence half — the finding's captioning core).** Every
+evidence adapter's `locate_tsmis` now captures the same in-document claims
+in LOCKSTEP with its consolidator twin and raises
+`pdf_table_lib.RouteIdentityError` (via `require_document_route`) when the
+document does not confirm the route the filename names; the engine's
+extracted `visual_evidence._locate_tsmis_sources` catches that error
+DISTINCTLY — the PDF is excluded from evidence with a loud ⚠ note and its
+examples become misses, while merely-unreadable PDFs keep their separate
+path. A renamed foreign-route PDF can no longer be verified or captioned as
+the requested route.
+
+**Proof.** Red→green: the new `check_pdf_route_identity` (the helper
+contract; all five families' mismatch/missing/conflict/token-less/agreement
+flows through the real consolidate() with parse_pdf stubbed; REAL-parser
+banner/cover capture on hand-rolled fixture PDFs incl. suffixed routes, the
+geometry-less Highway Detail document, and the record-less Intersection
+Detail cover; all five adapters' refusal + agreement twins; the engine
+exclusion; the ID cover-regex shapes incl. the ROUTE:ALL non-claim) — 34
+rule/parser pins failed pre-fix and every adapter pin failed "did not
+raise" pre-fix; the whole check passes post-fix and joined the gate (125).
+Statewide census through the PRODUCTION parsers over the bound 7.9 sets —
+every real per-route document's claims equal its filename route with ZERO
+refusals: RD 126/126 (15,216 rows), HSL 252/252 (60,493), HD 252/252
+(51,206), HL 252/252 (51,886), ID 217/217 under the cover parameter
+(16,459; the superseded rows-based census leg is what MEASURED the 118
+multi-route-Location documents and forced the cover redesign — the census
+did its job before the wrong rule could ship). Real end-to-end: three real
+Ramp Detail PDFs (004, 051, suffixed 880S) convert COMPLETE, and a REAL
+renamed print (880S content saved as `tsar_ramp_detail_route_002.pdf`)
+refuses loudly — named FAILED input, PARTIAL, both routes in the log; all
+five adapters locate real per-route PDFs (incl. 008U/178S/020) with zero
+refusals.
 
 ### CMP-AUD-050 — PDF conversion does not enforce a route universe
 
@@ -2604,9 +2660,9 @@ counted, never a complete workbook with a blank Route row. Red→green pinned
 in the new `check_pdf_route_universe` (fake-converter driver runs + patched
 Ramp Summary collection: duplicate names both sources / blank refuses or
 fails loudly / distinct routes still publish COMPLETE; 8 pre-fix failures
-under git-stash). The CMP-AUD-049 halves (filename-vs-document route
-agreement in the converters, direct per-route comparison identity, evidence
-adapters) remain open.
+under git-stash). All three CMP-AUD-049 halves (direct per-route comparison
+identity, filename-vs-document route agreement in the converters, evidence
+adapters) closed the same day — see that finding's record.
 
 ### CMP-AUD-051 — Highway Detail line-one spill creates phantom records
 

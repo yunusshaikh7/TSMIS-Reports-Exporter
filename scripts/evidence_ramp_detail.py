@@ -49,7 +49,7 @@ import compare_ramp_detail_pdf as rdp
 import compare_ramp_detail_tsn as rd
 import consolidate_tsmis_ramp_detail_pdf as rdpdf
 from compare_core import _xl_trim
-from pdf_table_lib import cluster_by_top
+from pdf_table_lib import cluster_by_top, norm_route, require_document_route
 from tsn_load_ramp_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
 
 log = logging.getLogger("tsmis.evidence")
@@ -229,11 +229,19 @@ def locate_tsmis(pdf_path, needed_keys):
     13-column row plus geometry (page, y-extent, per-column words, boundaries).
 
     LOCKSTEP: this walk mirrors consolidate_tsmis_ramp_detail_pdf.parse_pdf
-    step for step (the per-page header anchors, the banner/header skip, the
-    PM-window row test, the desc-fragment attach) — it only ADDS position
-    capture. A behavior change there must land here too; check_visual_evidence
-    pins the shared pieces so a drift fails the gate."""
+    step for step (the per-page header anchors, the banner/header skip with
+    the CMP-AUD-049 banner-claim capture, the PM-window row test, the
+    desc-fragment attach) — it only ADDS position capture. A behavior change
+    there must land here too; check_visual_evidence pins the shared pieces so
+    a drift fails the gate.
+
+    CMP-AUD-049 (evidence half): raises pdf_table_lib.RouteIdentityError when
+    the document's own page-banner claims don't confirm the route the
+    filename names."""
     found = defaultdict(list)
+    doc_routes = set()                  # the pages' own route claims (049)
+    m = re.search(r"route_([0-9A-Za-z]+)\.pdf$", str(pdf_path))
+    file_route = m.group(1) if m else None
     with pdfplumber.open(pdf_path) as pdf:
         for page_no, page in enumerate(pdf.pages, 1):
             words = page.extract_words()
@@ -243,6 +251,10 @@ def locate_tsmis(pdf_path, needed_keys):
             page_rows, frags = [], []
             for top, line_words in rdpdf._cluster_lines(words):
                 if top <= hdr_bottom + 2:
+                    bm = rdpdf.BANNER_ROUTE_RE.search(
+                        " ".join(w["text"] for w in line_words))
+                    if bm:
+                        doc_routes.add(bm.group(1))
                     continue
                 cols = {k: [] for k in rdpdf._COL_ORDER}
                 for w in line_words:
@@ -282,6 +294,10 @@ def locate_tsmis(pdf_path, needed_keys):
                                        "b": b, "page": page_no,
                                        "top": pr["top"], "bottom": pr["bottom"],
                                        "words": pr["words"]})
+    require_document_route(
+        Path(pdf_path).name, norm_route(file_route) if file_route else None,
+        [norm_route(t) for t in doc_routes],
+        claim_desc="the page banner's \"Route: NNN\"")
     return found
 
 

@@ -61,8 +61,8 @@ from highway_detail_columns import HEADER as HD_HEADER
 import highway_detail_columns as hdc
 import outcome
 from pdf_table_lib import (assign_columns, cluster_by_top, contiguous_windows,
-                           median, norm_route, run_pdf_conversion,
-                           write_route_workbook)
+                           median, norm_route, reconcile_route_identity,
+                           run_pdf_conversion, write_route_workbook)
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
 
@@ -153,6 +153,12 @@ THEAD_RE = re.compile(r"POSTMILE|DESCRIPTION|EFF-|ACC-|ROADBED|MEDIAN|DATEOF|"
                       r"T-W|WDA|S#S")
 DCR_ROW_RE = re.compile(r"^\d{2}[A-Z]{2,4}\.?\d{1,3}[A-Z]?$")
 PAGE_FURNITURE_RE = re.compile(r"RefDate:|Page\d+$")
+# The document's own route claim: the data pages' header banner ("Ref Date:
+# 2026-07-10 Route 004 Page 44" — matched on the SPACELESS group text like the
+# other furniture regexes; censused on the 7.9/ARS statewide set, suffixed
+# routes print as one token). CMP-AUD-049: this in-document claim, not the
+# filename, is the authoritative identity.
+BANNER_ROUTE_RE = re.compile(r"^RefDate:.*?Route([0-9]+[A-Za-z]?)Page\d+$")
 # Route token out of "highway_detail_route_<ROUTE>.pdf".
 ROUTE_FROM_NAME = re.compile(r"route[_ -]*([0-9]+[A-Za-z]?)", re.IGNORECASE)
 
@@ -315,7 +321,10 @@ def parse_pdf(path, events):
     contract; `single_line` = records whose print carried NO second line,
     emitted with a blank attribute tail; `fallback_pages` = data pages parsed
     on the document-median fallback grid; `no_grid` when no page yielded any
-    geometry). Returns (None, None) if cancelled.
+    geometry; `doc_routes` = the distinct routes the page banners claim for
+    the document itself, CMP-AUD-049 — captured before the geometry gate, so
+    a grid-less document still identifies itself). Returns (None, None) if
+    cancelled.
 
     The two window sets are derived PER PAGE from that page's own shaded bands
     (each print page is its own auto-layout table — see _page_windows). The
@@ -334,6 +343,7 @@ def parse_pdf(path, events):
     effective dates at all, and pages whose window grid splits a date across
     columns; both parse now."""
     rows = []
+    doc_routes = set()                 # the pages' own route claims (049)
     orphans = 0
     single_line = 0
     fallback_pages = []
@@ -360,6 +370,16 @@ def parse_pdf(path, events):
                 return None, None
             if page_no % 25 == 0:
                 events.on_log(f"    …page {page_no}/{n_pages}")
+            # The page banner carries the document's own route claim —
+            # captured BEFORE the geometry gate so even a page that yields no
+            # parseable grid still identifies itself (CMP-AUD-049). The main
+            # row loop below is untouched: banner groups remain page
+            # furniture there, exactly as before.
+            groups = _row_groups(page)
+            for group in groups:
+                bm = BANNER_ROUTE_RE.match(_group_text(group))
+                if bm:
+                    doc_routes.add(bm.group(1))
             win1, win2 = _page_windows(page)
             if win1 is None or win2 is None:
                 # No shaded band on this page: the cover/legend pages (no data
@@ -379,7 +399,7 @@ def parse_pdf(path, events):
                 any_grid = True
             page_rows = 0
             in_thead = False           # inside a (reprinted) table header run
-            for group in _row_groups(page):
+            for group in groups:
                 vals1 = _group_values(group, win1)
                 if _is_line1(vals1):
                     _flush_pending()   # the previous record had no line 2
@@ -415,9 +435,11 @@ def parse_pdf(path, events):
         _flush_pending()               # a line 1 dangling at the document end
         if not any_grid and not rows:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
-                        "single_line": 0, "fallback_pages": [], "no_grid": True}
+                        "single_line": 0, "fallback_pages": [], "no_grid": True,
+                        "doc_routes": sorted(doc_routes)}
     return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
-                  "single_line": single_line, "fallback_pages": fallback_pages}
+                  "single_line": single_line, "fallback_pages": fallback_pages,
+                  "doc_routes": sorted(doc_routes)}
 
 
 # =============================================================================
@@ -446,9 +468,10 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     read; None means the newest run folder, falling back to the legacy flat
     layout. Console-free; honors events.is_cancelled() between pages. The
     convert-loop skeleton lives in pdf_table_lib.run_pdf_conversion; this module
-    supplies the layout knowledge (route from the FILENAME — the print layout
-    carries no per-route label row; orphan reconciliation) and the ⚠-note /
-    PARTIAL-escalation policy."""
+    supplies the layout knowledge (route from the page banner's own "Ref Date:
+    … Route NNN Page N" claim, the filename token corroborating —
+    CMP-AUD-049; orphan reconciliation) and the ⚠-note / PARTIAL-escalation
+    policy."""
     day = day or latest_output_day()
     in_dir = Path(input_dir) if input_dir else input_dir_for(day)
     out = Path(out_path) if out_path else out_path_for(day)
@@ -456,11 +479,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     def convert_one(p, prefix, ev, ctx):
         name_m = ROUTE_FROM_NAME.search(p.stem)
-        route = _norm_route(name_m.group(1)) if name_m else None
-        if not route:
-            ev.on_log(f"{prefix} no route in filename; skipping")
-            ctx["failed"].append(p.name)
-            return ("skip",)
+        name_route = _norm_route(name_m.group(1)) if name_m else None
         rows, pstats = parse_pdf(str(p), ev)
         if rows is None:                             # cancelled mid-PDF
             return ("cancelled",)
@@ -483,6 +502,12 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         if not rows:
             ev.on_log(f"{prefix} no highway data found; skipping")
             ctx["failed"].append(p.name)
+            return ("skip",)
+        route = reconcile_route_identity(
+            p.name, name_route,
+            [_norm_route(t) for t in pstats["doc_routes"]], ev, ctx,
+            claim_desc="the page banner's \"Ref Date: … Route NNN Page N\"")
+        if route is None:
             return ("skip",)
         return ("ok", route, rows)
 

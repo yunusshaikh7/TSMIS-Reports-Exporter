@@ -43,7 +43,7 @@ except ImportError:
 import compare_intersection_detail_tsn as idt
 import consolidate_tsmis_intersection_detail_pdf as idpdf
 from compare_core import _xl_trim
-from pdf_table_lib import cluster_by_top, median
+from pdf_table_lib import cluster_by_top, median, require_document_route
 from tsn_load_intersection_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
 
 log = logging.getLogger("tsmis.evidence")
@@ -220,15 +220,42 @@ def locate_tsmis(pdf_path, needed_keys):
     LOCKSTEP: this walk mirrors consolidate_tsmis_intersection_detail_pdf
     .parse_pdf step for step (the document grids from both band shapes, the
     padded-postmile rowA test, the old-layout line skip, the integer-column-1
-    rowB pairing that steps over page furniture) — it only ADDS position
+    rowB pairing that steps over page furniture, the CMP-AUD-049 cover
+    ROUTE-parameter capture before the geometry gate) — it only ADDS position
     capture. A behavior change there must land here too; check_visual_evidence
-    pins the shared pieces so a drift fails the gate."""
+    pins the shared pieces so a drift fails the gate.
+
+    CMP-AUD-049 (evidence half): raises pdf_table_lib.RouteIdentityError when
+    the cover's own "ROUTE : NNN" parameter doesn't confirm the route the
+    filename names (the per-record Location cells canNOT identify the
+    document — an intersection with another route prints the OTHER route's
+    mainline Location; see idpdf.COVER_ROUTE_RE)."""
     found = defaultdict(list)
+    doc_routes = set()                 # the cover's own ROUTE parameter (049)
+    fm = re.search(r"route_([0-9A-Za-z]+)\.pdf$", str(pdf_path))
+    file_route = fm.group(1) if fm else None
+
+    def require_identity():
+        require_document_route(
+            Path(pdf_path).name,
+            idpdf._norm_route(file_route) if file_route else None,
+            [idpdf._norm_route(t) for t in doc_routes],
+            claim_desc="the cover's \"ROUTE : NNN\" parameter")
+
     pending = pending_meta = None
     with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages[:idpdf._COVER_SCAN_PAGES]:
+            for _top, chars in idpdf._cluster_lines(page):
+                cm = idpdf.COVER_ROUTE_RE.match(
+                    "".join(c["text"] for c in chars))
+                if cm:
+                    doc_routes.add(cm.group(1))
+            if doc_routes:
+                break
         win_a, win_b = idpdf._doc_windows(pdf)
         if win_a is None:
-            return found
+            require_identity()         # a grid-less document must still be
+            return found               # the route it is asked to verify
         edges_a = _doc_edges(pdf, idpdf.N_COLS_A)
         edges_b = _doc_edges(pdf, idpdf.N_COLS_B)
         for page_no, page in enumerate(pdf.pages, 1):
@@ -251,6 +278,7 @@ def locate_tsmis(pdf_path, needed_keys):
                                 {"row": row, "m1": pending_meta,
                                  "m2": _lmeta(chars, page_no, win_b, edges_b)})
                         pending = pending_meta = None
+    require_identity()
     return found
 
 

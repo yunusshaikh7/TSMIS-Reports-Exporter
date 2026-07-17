@@ -69,7 +69,8 @@ except ImportError:
     _DEPS_OK = False
 
 import outcome
-from pdf_table_lib import norm_route, run_pdf_conversion, write_route_workbook
+from pdf_table_lib import (norm_route, reconcile_route_identity,
+                           run_pdf_conversion, write_route_workbook)
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
 
@@ -137,6 +138,11 @@ TRAILER_HEADING = "Unresolved Intersections"
 _HEADER_WORDS = ("COUNTY", "CITY", "PM", "HG", "FT", "NEXT", "DESCRIPTION")
 # Route token out of "highway_sequence_route_<ROUTE>.pdf".
 ROUTE_FROM_NAME = re.compile(r"route[_ -]*([0-9]+[A-Za-z]?)", re.IGNORECASE)
+# The document's own route claim: every data page's banner line above the
+# column header ("District: 10 Route: 004 Direction: W – E" — censused on the
+# 7.9 statewide set, suffixed routes print as one token, "005S"). CMP-AUD-049:
+# this in-document claim, not the filename, is the authoritative identity.
+BANNER_ROUTE_RE = re.compile(r"\bRoute:\s*([0-9]+[A-Za-z]?)\b")
 
 
 def _page_header(words):
@@ -241,8 +247,11 @@ def parse_pdf(path, events):
     rows (see HEADER). Returns (rows, stats): rows in document order; stats a
     reconciliation dict (emitted, pages, data_pages, plus the loud counters —
     `unclassified` lines and `stray_frags` desc fragments that attached nowhere;
-    both should be 0). Returns (None, None) if cancelled."""
+    both should be 0 — and `doc_routes`, the distinct routes the page banners
+    claim for the document itself, CMP-AUD-049). Returns (None, None) if
+    cancelled."""
     rows = []
+    doc_routes = set()                  # the pages' own route claims (049)
     unclassified = stray_frags = 0
     data_pages = 0
     stopped = False
@@ -267,6 +276,10 @@ def parse_pdf(path, events):
             frags = []                      # (top, text) desc-only lines
             for top, line_words in _cluster_lines(words):
                 if top <= hdr_bottom + 2:
+                    m = BANNER_ROUTE_RE.search(
+                        " ".join(w["text"] for w in line_words))
+                    if m:
+                        doc_routes.add(m.group(1))
                     continue                # the banner / column-header band
                 text = " ".join(w["text"] for w in line_words)
                 if text.startswith(TRAILER_HEADING):
@@ -303,7 +316,8 @@ def parse_pdf(path, events):
                 pr[1][8] = join_desc_parts(parts)
             rows.extend(pr[1] for pr in page_rows)
     return rows, {"emitted": len(rows), "pages": n_pages, "data_pages": data_pages,
-                  "unclassified": unclassified, "stray_frags": stray_frags}
+                  "unclassified": unclassified, "stray_frags": stray_frags,
+                  "doc_routes": sorted(doc_routes)}
 
 
 # =============================================================================
@@ -332,8 +346,9 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     exports to read; None means the newest run folder, falling back to the
     legacy flat layout. Console-free; honors events.is_cancelled() between
     pages. The convert-loop skeleton lives in pdf_table_lib.run_pdf_conversion;
-    this module supplies the layout knowledge (route from the FILENAME, like the
-    other PDF editions) and the ⚠-note / PARTIAL-escalation policy."""
+    this module supplies the layout knowledge (route from the page banners'
+    own "Route: NNN" claim, the filename token corroborating — CMP-AUD-049)
+    and the ⚠-note / PARTIAL-escalation policy."""
     day = day or latest_output_day()
     in_dir = Path(input_dir) if input_dir else input_dir_for(day)
     out = Path(out_path) if out_path else out_path_for(day)
@@ -341,11 +356,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     def convert_one(p, prefix, ev, ctx):
         name_m = ROUTE_FROM_NAME.search(p.stem)
-        route = norm_route(name_m.group(1)) if name_m else None
-        if not route:
-            ev.on_log(f"{prefix} no route in filename; skipping")
-            ctx["failed"].append(p.name)
-            return ("skip",)
+        name_route = norm_route(name_m.group(1)) if name_m else None
         rows, pstats = parse_pdf(str(p), ev)
         if rows is None:                             # cancelled mid-PDF
             return ("cancelled",)
@@ -358,6 +369,12 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         if not rows:
             ev.on_log(f"{prefix} no highway data found; skipping")
             ctx["failed"].append(p.name)
+            return ("skip",)
+        route = reconcile_route_identity(
+            p.name, name_route,
+            [norm_route(t) for t in pstats["doc_routes"]], ev, ctx,
+            claim_desc="the page banner's \"Route: NNN\"")
+        if route is None:
             return ("skip",)
         return ("ok", route, rows)
 

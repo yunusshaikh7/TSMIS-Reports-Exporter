@@ -39,7 +39,8 @@ except ImportError:
 import compare_highway_detail_tsn as cht
 import consolidate_tsmis_highway_detail_pdf as chd
 import highway_detail_columns as hdc
-from pdf_table_lib import cluster_by_top, median, norm_route
+from pdf_table_lib import (cluster_by_top, median, norm_route,
+                           require_document_route)
 from tsn_load_highway_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
 
 log = logging.getLogger("tsmis.evidence")
@@ -232,14 +233,27 @@ def locate_tsmis(pdf_path, needed_keys):
     LOCKSTEP: this walk mirrors consolidate_tsmis_highway_detail_pdf.parse_pdf
     step for step (per-page windows, physical row groups, the postmile line-1
     test, the DATE_TOKEN furniture guard, the cross-page pending carry, the
-    document-median fallback) — it only ADDS position capture. A behavior
-    change there must land here too; check_visual_evidence pins the shared
-    pieces so a drift fails the gate."""
+    document-median fallback, the CMP-AUD-049 banner-claim capture BEFORE the
+    geometry gate) — it only ADDS position capture. A behavior change there
+    must land here too; check_visual_evidence pins the shared pieces so a
+    drift fails the gate.
+
+    CMP-AUD-049 (evidence half): raises pdf_table_lib.RouteIdentityError when
+    the document's own page-banner claims don't confirm the route the
+    filename names."""
     found = defaultdict(list)
+    doc_routes = set()                 # the pages' own route claims (049)
+    fm = re.search(r"route_([0-9A-Za-z]+)\.pdf$", str(pdf_path))
+    file_route = fm.group(1) if fm else None
     doc_win = {}
     pending = pending_meta = None
     with pdfplumber.open(pdf_path) as pdf:
         for page_no, page in enumerate(pdf.pages, 1):
+            groups = chd._row_groups(page)
+            for group in groups:
+                bm = chd.BANNER_ROUTE_RE.match(chd._group_text(group))
+                if bm:
+                    doc_routes.add(bm.group(1))
             win1, win2 = chd._page_windows(page)
             fb = False
             if win1 is None or win2 is None:
@@ -251,7 +265,7 @@ def locate_tsmis(pdf_path, needed_keys):
                     continue
                 fb = True
             e1, e2 = _page_edges(page)
-            for group in chd._row_groups(page):
+            for group in groups:
                 vals1 = chd._group_values(group, win1)
                 if chd._is_line1(vals1):
                     pending = vals1
@@ -267,6 +281,10 @@ def locate_tsmis(pdf_path, needed_keys):
                             {"row": row, "m1": pending_meta,
                              "m2": _gmeta(group, page_no, win2, e2, fb)})
                     pending = pending_meta = None
+    require_document_route(
+        Path(pdf_path).name, norm_route(file_route) if file_route else None,
+        [norm_route(t) for t in doc_routes],
+        claim_desc="the page banner's \"Ref Date: … Route NNN Page N\"")
     return found
 
 

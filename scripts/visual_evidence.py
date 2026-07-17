@@ -51,6 +51,7 @@ import artifact_store
 import owned_dir
 import paths
 from compare_core import set_safe_literal_cell
+from pdf_table_lib import RouteIdentityError
 
 log = logging.getLogger("tsmis.evidence")
 
@@ -276,6 +277,37 @@ def _unique_dir_sibling(path, tag):
 # --------------------------------------------------------------------------- #
 # generation
 # --------------------------------------------------------------------------- #
+def _locate_tsmis_sources(adapter, need_tsmis, tsmis_pdf_dir, events):
+    """Locate every needed TSMIS row, one parse per route PDF. Returns
+    (tsmis_loc, missing_routes), or None when cancelled.
+
+    CMP-AUD-049 (evidence half): a PDF whose own route claims fail to confirm
+    the expected route (the adapter raises pdf_table_lib.RouteIdentityError)
+    is EXCLUDED — its examples become misses — never captioned as that route;
+    a merely unreadable PDF keeps its separate unreadable path."""
+    tsmis_loc, missing_routes = {}, set()
+    for ri, (route, keys) in enumerate(sorted(need_tsmis.items()), 1):
+        if events.is_cancelled():
+            return None
+        if ri % 10 == 0:
+            events.on_log(f"    …TSMIS PDFs {ri}/{len(need_tsmis)}")
+        p = adapter.tsmis_pdf_path(tsmis_pdf_dir, route)
+        if not p.is_file():
+            missing_routes.add(route)
+            continue
+        try:
+            tsmis_loc[route] = adapter.locate_tsmis(p, keys)
+        except RouteIdentityError as e:
+            log.warning("evidence: %s excluded: %s", p.name, e)
+            events.on_log(f"    ⚠ {e} — excluded from evidence")
+            missing_routes.add(route)
+        except Exception as e:                            # a corrupt route PDF
+            log.warning("evidence: %s unparseable: %s: %s",
+                        p.name, type(e).__name__, e)
+            missing_routes.add(route)
+    return tsmis_loc, missing_routes
+
+
 def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
              events, examples=DEFAULT_EXAMPLES, commit_guard=None):
     """Generate the evidence set for one finished vs-TSN comparison. Returns a
@@ -347,24 +379,12 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
 
     events.on_log(f"  evidence: locating candidates in {len(need_tsmis)} TSMIS "
                   f"PDF(s) and {len(need_tsn_keys)} TSN district print(s)…")
-    tsmis_loc, missing_routes = {}, set()
-    for ri, (route, keys) in enumerate(sorted(need_tsmis.items()), 1):
-        if events.is_cancelled():
-            return _cancelled()
-        if ri % 10 == 0:
-            events.on_log(f"    …TSMIS PDFs {ri}/{len(need_tsmis)}")
-        p = adapter.tsmis_pdf_path(tsmis_pdf_dir, route)
-        if not p.is_file():
-            missing_routes.add(route)
-            continue
-        try:
-            tsmis_loc[route] = adapter.locate_tsmis(p, keys)
-        except Exception as e:                            # a corrupt route PDF
-            log.warning("evidence: %s unparseable: %s: %s",
-                        p.name, type(e).__name__, e)
-            missing_routes.add(route)
+    located = _locate_tsmis_sources(adapter, need_tsmis, tsmis_pdf_dir, events)
+    if located is None:
+        return _cancelled()
+    tsmis_loc, missing_routes = located
     if missing_routes:
-        events.on_log(f"    note: no readable TSMIS PDF for route(s) "
+        events.on_log(f"    note: no readable/confirmable TSMIS PDF for route(s) "
                       f"{', '.join(sorted(missing_routes))} — sampling around them")
     dist_index = adapter.district_index(tsn_dir, events)
     tsn_loc = {}

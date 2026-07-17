@@ -60,6 +60,75 @@ def norm_route(token):
     return f"{int(m.group(1)):03d}{m.group(2).upper()}"
 
 
+class RouteIdentityError(ValueError):
+    """CMP-AUD-049 (evidence half): a per-route PDF's own claims failed to
+    confirm the expected route — the document must not be captioned/verified
+    as that route."""
+
+
+def require_document_route(pdf_name, expected_route, doc_routes, *, claim_desc):
+    """Raise RouteIdentityError unless the document's own claims confirm
+    `expected_route` (the evidence adapters' twin of
+    reconcile_route_identity — same identity rule, exception-shaped for the
+    locate paths, which have no failed-input ledger to write to)."""
+    claims = sorted(set(doc_routes))
+    if expected_route and claims == [expected_route]:
+        return
+    if not claims:
+        raise RouteIdentityError(
+            f"{pdf_name}: the document does not identify its route "
+            f"({claim_desc} was not found), so it cannot verify route "
+            f"{expected_route or '?'} evidence")
+    raise RouteIdentityError(
+        f"{pdf_name}: the document claims route "
+        f"{', '.join(claims)} ({claim_desc}) but route "
+        f"{expected_route or '?'} was expected — was the file renamed or "
+        "mixed up?")
+
+
+def reconcile_route_identity(pdf_name, name_route, doc_routes, events, ctx,
+                             *, claim_desc):
+    """CMP-AUD-049 (converter half): the DOCUMENT's own route claim is the
+    authoritative identity of a per-route PDF; a filename token merely
+    corroborates it. Returns the confirmed normalized route, or None after
+    logging why and naming the file in ctx["failed"] (each report's finalize
+    escalates PARTIAL, so a mis-named or unidentifiable input is never
+    silently absorbed under the wrong route).
+
+    `doc_routes`: every distinct normalized route the document claims for
+    itself — its page banners / cover line / per-record Location cells
+    (`claim_desc` names the family's source). Empty means the document never
+    identified itself; more than one means it contradicts itself; a filename
+    token that disagrees means the file was probably renamed or mixed up.
+    All three refuse loudly rather than guessing.
+    """
+    claims = sorted(set(doc_routes))
+    if not claims:
+        events.on_log(
+            f"  {pdf_name}: the document does not identify its route "
+            f"({claim_desc} was not found) — cannot confirm which route this "
+            "PDF belongs to; skipping. Re-export that route's PDF.")
+        ctx["failed"].append(pdf_name)
+        return None
+    if len(claims) > 1:
+        events.on_log(
+            f"  {pdf_name}: the document claims more than one route for "
+            f"itself ({', '.join(claims)} via {claim_desc}) — skipping. "
+            "Re-export that route's PDF.")
+        ctx["failed"].append(pdf_name)
+        return None
+    doc_route = claims[0]
+    if name_route and name_route != doc_route:
+        events.on_log(
+            f"  {pdf_name}: the filename says route {name_route} but the "
+            f"document says route {doc_route} ({claim_desc}) — the file was "
+            "probably renamed or mixed up; skipping. Re-export that route's "
+            "PDF or restore its original name.")
+        ctx["failed"].append(pdf_name)
+        return None
+    return doc_route
+
+
 def median(values):
     """The parsers' median: upper-middle element (robust to a stray rect)."""
     s = sorted(values)
@@ -225,10 +294,14 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
     producer-owned PARTIAL escalation).
 
     `convert_one(p, prefix, events, ctx)` owns the per-report step: route
-    resolution, parse, its own stats in `ctx`, and its own skip logging (it
-    appends skipped names to ctx["failed"]). It returns ("ok", route, rows),
-    ("skip",), or ("cancelled",). `write_one(rows, out_file)` writes one route
-    workbook. `finalize(result, ctx)` runs only on a successful combine.
+    resolution (CMP-AUD-049: the document's own route claim is authoritative —
+    each family passes its in-document claims through
+    `reconcile_route_identity`, and a missing/conflicting/filename-disagreeing
+    claim is a named FAILED input), parse, its own stats in `ctx`, and its own
+    skip logging (it appends skipped names to ctx["failed"]). It returns
+    ("ok", route, rows), ("skip",), or ("cancelled",). `write_one(rows,
+    out_file)` writes one route workbook. `finalize(result, ctx)` runs only on
+    a successful combine.
     """
     events = events or Events()
 

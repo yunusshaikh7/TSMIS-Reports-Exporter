@@ -50,6 +50,7 @@ import compare_highway_sequence_tsn as chsl
 import consolidate_tsmis_highway_sequence_pdf as chslp
 import consolidate_tsn_highway_sequence as ctnsl
 from compare_core import _xl_trim, compared_cell
+from pdf_table_lib import norm_route, require_document_route
 
 log = logging.getLogger("tsmis.evidence")
 
@@ -210,10 +211,16 @@ def locate_tsmis(pdf_path, needed_keys):
     LOCKSTEP: this walk mirrors consolidate_tsmis_highway_sequence_pdf
     .parse_pdf step for step (per-page header windows, the trailer hard-stop,
     the PM / PM-less data tests, nearest-line fragment attachment, top-order
-    desc assembly) — it only ADDS position capture. A behavior change there
-    must land here too; check_visual_evidence pins the shared pieces so a
-    drift fails the gate."""
+    desc assembly, the CMP-AUD-049 banner-claim capture) — it only ADDS
+    position capture. A behavior change there must land here too;
+    check_visual_evidence pins the shared pieces so a drift fails the gate.
+
+    CMP-AUD-049 (evidence half): raises pdf_table_lib.RouteIdentityError when
+    the document's own page-banner claims don't confirm the route the
+    filename names — a renamed foreign-route PDF must never be captioned as
+    the requested route."""
     found = defaultdict(list)
+    doc_routes = set()                  # the pages' own route claims (049)
     stopped = False
     m = re.search(r"route_([0-9A-Za-z]+)\.pdf$", str(pdf_path))
     file_route = m.group(1) if m else None
@@ -232,6 +239,10 @@ def locate_tsmis(pdf_path, needed_keys):
             frags = []                      # (top, bottom, x0, x1, text)
             for top, line_words in chslp._cluster_lines(words):
                 if top <= hdr_bottom + 2:
+                    bm = chslp.BANNER_ROUTE_RE.search(
+                        " ".join(w["text"] for w in line_words))
+                    if bm:
+                        doc_routes.add(bm.group(1))
                     continue
                 text = " ".join(w["text"] for w in line_words)
                 if text.startswith(chslp.TRAILER_HEADING):
@@ -288,6 +299,10 @@ def locate_tsmis(pdf_path, needed_keys):
             parts = [(d["line_top"], d["text"]) for d in rec["desc"]]
             rec["vals"]["desc"] = chslp.join_desc_parts(
                 [t for _, t in sorted(parts)])
+    require_document_route(
+        Path(pdf_path).name, norm_route(file_route) if file_route else None,
+        [norm_route(t) for t in doc_routes],
+        claim_desc="the page banner's \"Route: NNN\"")
     return found
 
 

@@ -34,6 +34,7 @@ before accepting an example. Console-free; pdfplumber/openpyxl gated by the
 engine.
 """
 import logging
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -48,6 +49,7 @@ import consolidate_tsmis_highway_log_pdf as chlp
 import consolidate_tsn_highway_log as ctnl
 import highway_log_columns as hlc
 from compare_core import _xl_trim, compared_cell
+from pdf_table_lib import require_document_route
 
 log = logging.getLogger("tsmis.evidence")
 
@@ -151,10 +153,18 @@ def locate_tsmis(pdf_path, needed_keys):
     LOCKSTEP: this walk mirrors consolidate_tsmis_highway_log_pdf.parse_pdf
     step for step (per-page zebra-rect windows with carry-forward, the
     header-bottom cutoff, the URL/totals/group-header guards, the col0_right
-    data test, description lines joined with a SPACE) — it only ADDS position
-    capture. A behavior change there must land here too; check_visual_evidence
-    pins the shared pieces so a drift fails the gate."""
+    data test, description lines joined with a SPACE, the CMP-AUD-049 cover
+    "Route NNN" capture) — it only ADDS position capture. A behavior change
+    there must land here too; check_visual_evidence pins the shared pieces so
+    a drift fails the gate.
+
+    CMP-AUD-049 (evidence half): raises pdf_table_lib.RouteIdentityError when
+    the document's own cover claim doesn't confirm the route the filename
+    names."""
     found = defaultdict(list)
+    doc_route = None                   # the cover's own route claim (049)
+    fm = re.search(r"route_([0-9A-Za-z]+)\.pdf$", str(pdf_path))
+    file_route = fm.group(1) if fm else None
     with pdfplumber.open(pdf_path) as pdf:
         page_windows = None
         col0_right = None
@@ -176,6 +186,11 @@ def locate_tsmis(pdf_path, needed_keys):
                     continue
                 if any(chlp.URL_MARK in t for t in texts):
                     continue
+                if doc_route is None and len(texts) == 2:
+                    cm = chlp.ROUTE_HEADER_RE.match(" ".join(texts))
+                    if cm:
+                        doc_route = chlp._norm_route(cm.group(1))
+                        continue
                 if top <= cutoff:
                     continue
                 first_x0 = words[0]["x0"]
@@ -227,6 +242,11 @@ def locate_tsmis(pdf_path, needed_keys):
                             "bottom": max(c["bottom"] for c in line_chars),
                             "x0": first_x0,
                             "x1": max(c["x1"] for c in line_chars)})
+    require_document_route(
+        Path(pdf_path).name,
+        chlp._norm_route(file_route) if file_route else None,
+        [doc_route] if doc_route else [],
+        claim_desc="the cover's \"Route NNN\" line")
     return found
 
 

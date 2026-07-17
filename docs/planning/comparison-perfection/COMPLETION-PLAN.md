@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after the HL 157/045-HL batch — normalizer v5)
+> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 closure — document-authoritative route identity)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -275,34 +275,56 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > — never a complete workbook with a blank Route. NEW
 > `check_pdf_route_universe` (12 pins; 8 pre-fix failures by git-stash).
 >
-> **Do this next: CMP-AUD-049 (filename/document/emitted route agreement in
-> the five PDF converters + direct per-route comparison identity + evidence
-> adapters), then 066 (PDF role provenance — the HL vs-TSN instance already
-> closed by the v5 marker gate), 067 (TSN projections hiding PDF-vs-Excel
-> source differences), then the unowned-findings triage sweep.** HD-Excel
-> county stays vendor-blocked — never infer it.
+> **Do this next: CMP-AUD-066's PDF-role halves** (design censused
+> 2026-07-17: ONE producer marker on PDF-sourced workbooks — the PDF role
+> REQUIRES it, the Excel role REJECTS it, so both confusion directions close
+> while unmarked historical Excel workbooks stay usable; per-route HL
+> converted files need the marker too — the HL flavors accept per-route
+> pairs; refusals carry re-consolidate hints like the TSN v5 gate; expect
+> PDF-side canary re-generation + re-bless in every self-check family),
+> **then 067** (census below — HSL/RD re-verify the finding's exact
+> mutations against the 199/v0.26.0 same-source loaders before
+> dispositioning; HL's roadbed half is correctness-locked — gates first),
+> **then the unowned-findings triage sweep.** HD-Excel county stays
+> vendor-blocked — never infer it.
 >
-> **The 049 census (2026-07-17, partial — bind before implementing):**
-> - Converter half: every convert_one currently computes
->   `route = name_route or pdf_route` with a WARN-only disagreement path
->   ("using the filename") — `consolidate_tsmis_highway_log_pdf.convert_one`
->   is the template (parse_pdf already returns the cover route). The honest
->   rule: the DOCUMENT's route is authoritative; a filename token merely
->   corroborates; disagreement or a missing in-document route = a NAMED
->   failed input (finalize already escalates PARTIAL). Each family's
->   in-document route source: HL cover "Route 006" (parsed today), HD DCR
->   "11 IMP 007", HSL page banners, RD page banners, ID Location field —
->   census which are already parsed vs need extraction before coding.
-> - Direct-compare half: **DONE 2026-07-17** —
->   `compare_tsn_common.require_per_route_identity` wired in
->   `compare_highway_log._load_pair` (all three HL flavors): both per-route
->   filenames must carry a route token and normalize equal; mismatch and
->   token-less both refuse with guidance; consolidated pairs unaffected;
->   Route-1 re-verified 969 under the rule; 3 stash-red failures pinned in
->   check_compare_highway_log.
-> - Evidence half: adapters construct the PDF path from the expected route
->   filename without reconciling the document's own route before captioning
->   (visual_evidence.py:248-286,390-444).
+> **DONE 2026-07-17: CMP-AUD-049 CLOSED — all three halves; the document's
+> own route claim is now the authoritative per-route identity everywhere.**
+> - Direct-compare half (earlier commit `63df86d`):
+>   `compare_tsn_common.require_per_route_identity` in
+>   `compare_highway_log._load_pair` (all three HL flavors) — mismatched or
+>   token-less per-route filenames refuse; Route-1 re-verified 969.
+> - Converter half: `pdf_table_lib.reconcile_route_identity` in all five
+>   convert_ones — missing/conflicting/filename-disagreeing claims are
+>   NAMED FAILED inputs (PARTIAL); a token-less filename converts under the
+>   document's route. In-document sources: HSL/RD per-data-page banners
+>   (captured in the previously-skipped band; `stats["doc_routes"]`), HD's
+>   "Ref Date: … Route NNN Page N" banner on spaceless group text BEFORE
+>   the geometry gate, ID's cover "ROUTE : NNN" REPORT-PARAMETER
+>   (`COVER_ROUTE_RE`; the census PROVED the per-record Location cells
+>   cannot identify the document — 118/217 real prints carry multi-route
+>   Location sets because an intersection with another route prints the
+>   OTHER route's mainline; the first, rows-based census leg caught this
+>   before the wrong rule shipped), HL's cover line now authoritative (the
+>   old WARN-and-use-filename path is gone).
+> - Evidence half: every adapter's locate_tsmis captures the same claims in
+>   LOCKSTEP and raises `pdf_table_lib.RouteIdentityError`
+>   (`require_document_route`) on non-confirmation; the engine's extracted
+>   `visual_evidence._locate_tsmis_sources` excludes such PDFs loudly (⚠ +
+>   misses) — a renamed foreign-route PDF can't be captioned as the
+>   requested route.
+> - Proof: NEW `check_pdf_route_identity` (helper contract + 5-family rule
+>   flows + real-fixture parser/adapter pins + engine exclusion; 34 pins
+>   red pre-fix, adapters "did not raise" pre-fix; gate 125/125).
+>   Statewide census through the PRODUCTION parsers, bound 7.9 sets, ZERO
+>   refusals: RD 126/126 (15,216 rows) · HSL 252/252 (60,493) · HD 252/252
+>   (51,206) · HL 252/252 (51,886) · ID 217/217 cover-based (16,459; 0
+>   record-less — the 35 intersection-less routes have no PDF at all).
+>   Real e2e: RD 004/051/880S convert COMPLETE; a REAL renamed print (880S
+>   content as `…route_002.pdf`) refuses loudly with both routes named; all
+>   five adapters locate real PDFs (incl. 008U/178S/020) with zero
+>   refusals. Ramp Summary needs no change (route already document-parsed;
+>   050 covers its refusals).
 >
 > **The 067 census start (2026-07-17 — bind before implementing):** the
 > PDF-vs-Excel self-check flavors reuse cross-system (vs-TSN) projectors,
