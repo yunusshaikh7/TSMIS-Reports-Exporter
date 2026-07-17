@@ -40,12 +40,14 @@ def check(name, cond):
 
 
 def _write_tsmis(path, rows):
-    """Synthetic CONSOLIDATED Highway Detail: 'Route' + the 34 export columns;
-    the loader reads by POSITION (labels are placeholders)."""
+    """Synthetic CONSOLIDATED Highway Detail: 'Route' + the 34 export columns.
+    The loader reads by POSITION, but CMP-AUD-034 now binds the EXACT header, so
+    the fixture uses the real one (row VALUES are still positional — no assertion
+    changes)."""
     wb = Workbook()
     ws = wb.active
     ws.title = hdt.TSMIS_SHEET
-    ws.append(["Route"] + [f"c{i}" for i in range(1, 35)])
+    ws.append(list(hdt._TSMIS_HEADER))
     for r in rows:
         ws.append(r + [None] * (35 - len(r)))
     wb.save(path)

@@ -80,6 +80,19 @@ REPORT_NAME = "Highway Detail"
 TSMIS_SHEET = "Highway Detail"            # consolidated sheet (Route prepended)
 TSN_SHEET = "Sheet 1"                     # raw statewide DB dump
 NORMALIZED_SHEET = "Highway Detail (TSN)"
+# CMP-AUD-034: the EXACT consolidated-TSMIS header (['Route'] + the export's own
+# 34-column roadbed layout). _tsmis_row reads by position, so this is bound
+# exactly — a shifted/relabelled/wrong-edition header is refused, never mis-mapped.
+# Verified statewide-stable (252/252 routes → 1 header) + data-source/edition-
+# independent (2026-07-17 census); the Highway Detail (PDF) consolidator emits the
+# IDENTICAL 34-column header, so the PDF-vs-Excel self-check that loads side A
+# through this same _load_tsmis stays valid.
+_TSMIS_HEADER = ["Route", "Post Mile", "Length", "Date of Rec", "HG", "AC",
+                 "Acc-Cont Eff", "City", "RU", "RU Eff", "Description", "NA",
+                 "LB Eff", "LB S/T", "LB #Ln", "LB S/F", "LB OT-TO", "LB OT-TR",
+                 "LB Wid", "LB IN-TO", "LB IN-TR", "Med Eff", "Med T", "Med C",
+                 "Med B", "Med V/WDA", "RB Eff", "RB S/T", "RB #Ln", "RB S/F",
+                 "RB IN-TO", "RB IN-TR", "RB Wid", "RB OT-TO", "RB OT-TR"]
 # CMP-AUD-037: the DIRECT-path freshness marker version (the catalog's
 # highway_detail normalization_version MIRRORS this; tsn_load_highway_detail
 # .build_into stamps it, _load_tsn refuses anything older). HD's direct loader
@@ -421,8 +434,10 @@ def _load_tsmis(path):
     return load_consolidated_rows(
         path, TSMIS_SHEET,
         missing_sheet_hint="pick the consolidated TSMIS Highway Detail workbook.",
-        bad_header_msg="isn't a CONSOLIDATED Highway Detail workbook "
-                       "(expected a leading 'Route' column) — consolidate first.",
+        bad_header_msg="isn't a CONSOLIDATED Highway Detail workbook in the current "
+                       "site layout (expected a leading 'Route' column and the exact "
+                       "34-column export header) — consolidate a fresh export first.",
+        header_ok=ctc.exact_consolidated_header_ok(_TSMIS_HEADER),  # CMP-AUD-034
         row_transform=_tsmis_row)
 
 

@@ -51,7 +51,10 @@ def _write_tsmis(path, rows, old_format=False):
     if old_format:
         ws.append(["Route"] + [f"c{i}" for i in range(1, 36)] + ["Xing S"])
     else:
-        ws.append(["Route"] + [f"c{i}" for i in range(1, 35)] + ["Xing Line Lgth"])
+        # CMP-AUD-034: the loader now binds the EXACT consolidated header (it reads
+        # by position, so a synthetic 'c1..c34' middle is refused). Row VALUES are
+        # still placed by position, so the exact header changes no assertion.
+        ws.append(list(idt._TSMIS_HEADER))
     for r in rows:
         ws.append(r + [None] * (36 - len(r)))
     wb.save(path)
@@ -144,8 +147,11 @@ def test_schema():
           idt._TSMIS_POS["Description"] == 21 and idt._TSMIS_POS["Int St Eff-Date"] == 29
           and idt._TSMIS_POS["Intrte PM Suffix"] == 34
           and idt._TSMIS_POS["Xing Line Lgth"] == 35)
-    check("header gate: Route + 35 cols ending 'Xing Line Lgth'",
-          idt._header_ok(["Route"] + ["x"] * 34 + ["Xing Line Lgth"])
+    check("header gate: the EXACT consolidated header (CMP-AUD-034)",
+          idt._header_ok(list(idt._TSMIS_HEADER))                  # exact -> accepted
+          # a junk-relabelled 36-col header ending in 'Xing Line Lgth' — which the
+          # OLD len/last gate accepted — is now REFUSED
+          and not idt._header_ok(["Route"] + ["x"] * 34 + ["Xing Line Lgth"])
           and not idt._header_ok(["Route"] + ["x"] * 36)          # the old 37-col shape
           and not idt._header_ok(["Route"] + ["x"] * 35))
     check("Notes legend_writer set (documents the normalizations)", sc.legend_writer is not None)

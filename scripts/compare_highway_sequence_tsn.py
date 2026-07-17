@@ -45,6 +45,16 @@ from compare_core import CompareSchema, normalize_value
 REPORT_NAME = "Highway Sequence"
 TSMIS_SHEET = "Highway Locations"          # consolidated sheet (Route prepended)
 
+# CMP-AUD-034: the EXACT consolidated-TSMIS header (['Route'] + the export's own
+# layout, its two header-less columns as ''). _tsmis_row reads by position, so this
+# is bound exactly — a shifted/relabelled/wrong-edition header is refused, never
+# mis-mapped. Verified statewide-stable + data-source/env/edition-independent
+# (2026-07-17 census, identical across all six source/env combos); the Highway
+# Sequence (PDF) consolidator emits the IDENTICAL header, so the PDF-vs-TSN /
+# PDF-vs-Excel flavors that also load through _load_tsmis stay valid.
+_TSMIS_HEADER = ["Route", "County", "City", "", "PM", "", "HG", "FT",
+                 "Distance To Next Point", "Description"]
+
 KEY = "PM"
 SHARED_HEADER = ["County", "PM", "City", "HG", "FT",
                  "Distance To Next Point", "Description"]
@@ -211,8 +221,10 @@ def _load_tsmis(path):
     return load_consolidated_rows(
         path, TSMIS_SHEET,
         missing_sheet_hint="pick the consolidated TSMIS Highway Sequence workbook.",
-        bad_header_msg="isn't a CONSOLIDATED Highway Sequence workbook "
-                       "(expected a leading 'Route' column) — consolidate first.",
+        bad_header_msg="isn't a CONSOLIDATED Highway Sequence workbook in the "
+                       "current site layout (expected a leading 'Route' column and "
+                       "the exact export header) — consolidate a fresh export first.",
+        header_ok=ctc.exact_consolidated_header_ok(_TSMIS_HEADER),  # CMP-AUD-034
         row_transform=_tsmis_row)
 
 

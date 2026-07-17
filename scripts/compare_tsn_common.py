@@ -321,6 +321,28 @@ def require_shared_header_prefix(header, expected_prefix, sidecars, name, report
             "normalized workbook.")
 
 
+def exact_consolidated_header_ok(expected):
+    """CMP-AUD-034: build the `header_ok` predicate that binds a CONSOLIDATED
+    TSMIS workbook to its EXACT documented header. The consolidated `_load_tsmis`
+    loaders read every field BY POSITION (the site's export labels are
+    column-shifted against their values), so the previous width/last-label/`PM`-
+    somewhere gates let a shifted, junk-relabelled, or wrong-report header be
+    interpreted as the intended schema — yielding false differences, false
+    one-sided rows, or a false match. `expected` is the full ordered
+    ['Route', ...] signature `load_consolidated_rows` presents (each cell
+    `str(c).strip()`, `""` for None; `header[0]=='Route'` is also checked there).
+    An exact match rejects any insertion, deletion, block shift, or relabel — and
+    a different site edition, which must be re-exported (matching the pre-July-2026
+    Intersection refusal). Every current export passes: the header is
+    data-source/env-independent (one TSMIS page serves all sources), and each
+    report's PDF-consolidated workbook carries the IDENTICAL header to its
+    Excel-consolidated one, so the polymorphic loaders (Highway Sequence/Detail and
+    Intersection Detail load both shapes through one `_load_tsmis`) stay valid."""
+    exp = [("" if c is None else str(c).strip()) for c in expected]
+    return lambda header: [("" if c is None else str(c).strip())
+                           for c in header] == exp
+
+
 def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_msg,
                            header_ok=None, row_transform=list):
     """The consolidated-workbook loader skeleton three vs-TSN comparators wrote

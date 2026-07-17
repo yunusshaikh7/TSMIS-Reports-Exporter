@@ -640,7 +640,7 @@ try:
     cw = Workbook()
     cs = cw.active
     cs.title = cht.TSMIS_SHEET
-    cs.append(["Route"] + [f"c{i}" for i in range(1, 35)])
+    cs.append(list(cht._TSMIS_HEADER))       # CMP-AUD-034 exact consolidated header
     cs.append(["099", "R004.972R", "000.123"] + [""] * 32)
     cw.save(a_cons)
     cw.close()
@@ -803,7 +803,7 @@ try:
     cw2 = Workbook()
     cs2 = cw2.active
     cs2.title = idt.TSMIS_SHEET
-    cs2.append(["Route"] + [f"c{i}" for i in range(1, 35)] + ["Xing Line Lgth"])
+    cs2.append(list(idt._TSMIS_HEADER))      # CMP-AUD-034 exact consolidated header
     _r2 = [None] * 36
     _r2[0], _r2[1], _r2[2], _r2[4] = "004", "R", "000.204", "04 CC. 004"
     cs2.append(_r2)
@@ -1129,7 +1129,7 @@ _wbn.save(_hs_tmp / "tsn.xlsx")
 _r_t, _r_n, _sc3, _note3 = ehsl.load_sides(str(_hs_tmp / "per_route.xlsx"),
                                            str(_hs_tmp / "tsn.xlsx"))
 check("load_sides refuses per-route (route-less) workbooks with a clear note",
-      _sc3 is None and "consolidate first" in (_note3 or ""))
+      _sc3 is None and "consolidate a fresh export" in (_note3 or ""))
 _wbc = Workbook()
 _wsc = _wbc.active
 _wsc.title = chsl_cmp.TSMIS_SHEET

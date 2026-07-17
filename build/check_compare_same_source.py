@@ -34,6 +34,7 @@ import compare_highway_detail_pdf as hdp  # noqa: E402
 import compare_highway_sequence_pdf as hslp  # noqa: E402
 import compare_intersection_detail_pdf as idp  # noqa: E402
 import compare_ramp_detail_pdf as rdp  # noqa: E402
+import compare_ramp_detail_tsn as rd  # noqa: E402
 import consolidate_tsmis_ramp_detail_pdf as rdc  # noqa: E402
 import highway_detail_columns as hdc  # noqa: E402
 import intersection_detail_columns as idc  # noqa: E402
@@ -111,11 +112,15 @@ check("HSL: a lost own-route Description prefix FLAGS (verbatim both sides)",
 # Ramp Detail — verbatim loader, pinned
 # --------------------------------------------------------------------------- #
 print("Ramp Detail (verbatim — pinned):")
-RD_HEADER = ["Route"] + list(rdc.HEADER)
+# The PDF side carries On/Off + Ramp Type (the print-only columns the Excel export
+# drops); the Excel side is the 12-col CMP-AUD-034 exact header. Row VALUES are
+# positional and identical across the two widths.
+RD_PDF_HEADER = ["Route"] + list(rdc.HEADER)      # 14-col
+RD_XLS_HEADER = list(rd._TSMIS_HEADER)            # 12-col (exact Excel consolidated)
 
 
-def rd_row(desc):
-    r = [None] * len(RD_HEADER)
+def rd_row(desc, width):
+    r = [None] * width
     r[0], r[1], r[3], r[4] = "001", "04-CC-001", "000.198", "10/01/1996"
     r[10] = desc
     return r
@@ -123,8 +128,9 @@ def rd_row(desc):
 
 a = tmp / "rd_pdf.xlsx"
 b = tmp / "rd_xls.xlsx"
-write_wb(a, rdc.SHEET_NAME, RD_HEADER, [rd_row("EB ON FR MAIN")], marked=True)
-write_wb(b, rdc.SHEET_NAME, RD_HEADER, [rd_row("EB ON FR OTHER")])
+write_wb(a, rdc.SHEET_NAME, RD_PDF_HEADER, [rd_row("EB ON FR MAIN", len(RD_PDF_HEADER))],
+         marked=True)
+write_wb(b, rdc.SHEET_NAME, RD_XLS_HEADER, [rd_row("EB ON FR OTHER", len(RD_XLS_HEADER))])
 res = run(rdp.TSMIS_PDF_VS_EXCEL, a, b, tmp / "rd_cmp.xlsx")
 check("RD: a Description mutation flags verbatim", summary_says_diff(res),
       f"{res.status}: {(res.summary_lines or [res.message])[0][:160]}")

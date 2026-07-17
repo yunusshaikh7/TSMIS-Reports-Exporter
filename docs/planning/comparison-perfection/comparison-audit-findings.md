@@ -312,7 +312,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-031 | P2 | Remediated 2026-07-17 — the flat XLSX route key is `_norm_route_key`-normalized and the `..._route_<n>` naming contract is required; a non-route file is skipped, never promoted from its stem | Flat report route keys do not normalize `1` and `001` |
 | CMP-AUD-032 | P1 | Verified | Cross-env flat schemas trust the first file, not the report contract |
 | CMP-AUD-033 | P1 | Remediated 2026-07-17 — all four normalized loaders bind the exact ["Route"]+SHARED_HEADER prefix + documented sidecars before reading positionally | Normalized TSN loaders ignore their declared headers |
-| CMP-AUD-034 | P1 | Verified | Consolidated TSMIS loaders accept semantically invalid layouts |
+| CMP-AUD-034 | P1 | Remediated 2026-07-17 — all four consolidated `_load_tsmis` loaders bind their EXACT documented header (the shared `exact_consolidated_header_ok`); relabels/shifts/insertions/deletions/wrong editions are refused | Consolidated TSMIS loaders accept semantically invalid layouts |
 | CMP-AUD-035 | P1 | Partially remediated — type-exactness fixed 2026-07-14; TOCTOU pending | Original raw-admission r7 accepted. Type-exact validation now rejects float/bool aliases of `version`/`member_count`/`byte_length`/`schema_version` in the raw-manifest, normalized-identity, and certificate checks (red→green). Still open: the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
 | CMP-AUD-036 | P1 | Remediated 2026-07-17 — the RD-PDF source gate requires the exact PDF-consolidated width + the trailing On/Off/Ramp Type sentinels | Ramp PDF accepts a truncated four-column workbook |
 | CMP-AUD-037 | P1 | Remediated 2026-07-17 — all five families gate the direct path (HSL v4 + HL v5 markers; RD v5 / ID v5 / HD v3 in-workbook markers + loader gates; marker-only bumps, rows byte-identical on the real corpus) | Direct comparisons trust stale normalized libraries |
@@ -1659,8 +1659,30 @@ per-route headers directly worked, but debug the consolidate seam if the real-co
 consolidates. Then red→green per family (junk-middle / wrong-width / shifted refused —
 proving the old gate accepted them — real header passes) + real-corpus per family.
 Scripts: session scratchpad `capture_034_headers.py` / `stability_034.py` /
-`crosssource_034.py`. Remains open (safe-by-construction; the SAFETY is proven, the
-implementation is pending a careful caller-traced pass).
+`crosssource_034.py`.
+
+**Remediated 2026-07-17.** Shared `compare_tsn_common.exact_consolidated_header_ok(expected)`
+builds the `header_ok` predicate that binds the CONSOLIDATED header EXACTLY (each cell
+`str(c).strip()`, None→`""`, matching how `load_consolidated_rows` presents it). All four
+`_load_tsmis` loaders now use it against a documented `_TSMIS_HEADER` constant, replacing
+the weak gates (RD `PM in h[:5] and len>=11`; ID `len==36 and h[-1]=='Xing Line Lgth'`;
+HSL + HD had none). **Caller-trace completed**: `_load_tsmis` is polymorphic — the
+Highway Sequence PDF-vs-TSN, Highway Detail PDF-vs-Excel, and Intersection Detail
+PDF-vs-Excel flavors load the PDF-consolidated workbook through the SAME `_load_tsmis` —
+and the PDF consolidator's header was verified byte-identical to the Excel one for each
+(`consolidate_tsmis_highway_sequence_pdf.HEADER`, `…_highway_detail_pdf.HD_HEADER`,
+`…_intersection_detail_pdf.INTD_HEADER` all == the Excel per-route header), so one exact
+bind is valid for both shapes; Ramp Detail's `_load_tsmis` is Excel-only (RD-PDF keeps its
+own 14-col `_pdf_header_ok`). Proof: NEW `check_compare_consolidated_layout.py` (the exact
+header + its loader-normalized form accepted; a relabelled middle column, block shift,
+insertion, deletion, and route-only header refused; the OLD ID/RD gates shown accepting
+the junk the exact bind refuses; an end-to-end shifted-workbook refusal per family).
+Real-corpus (no false rejection): consolidating the statewide corpus per family, each
+`_load_tsmis` ACCEPTS — RD 472 / HSL 3,362 / ID 1,670 / HD 2,642 rows — and the ID
+PDF-consolidated workbook is accepted too (1,423 rows, polymorphic path). Five existing
+fixtures that used synthetic `c1..cN` headers (valid only under the old position-only
+gates) were updated to the real header (rows are positional, so no assertion changed).
+Offline gate 126/126.
 
 ### CMP-AUD-035 — raw TSN admission can certify incomplete or ambiguous truth
 

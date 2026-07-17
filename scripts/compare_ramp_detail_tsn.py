@@ -40,6 +40,15 @@ REPORT_NAME = "Ramp Detail"
 TSMIS_SHEET = "TSAR - Ramp Detail"       # the consolidated/per-route TSMIS sheet
 TSN_SHEET = "Sheet 1"                     # the raw TSN statewide sheet
 
+# CMP-AUD-034: the EXACT consolidated-TSMIS header (['Route'] + the export's own
+# column-shifted layout, with its two header-less columns as ''). _load_tsmis reads
+# every field by position, so this is bound exactly — a shifted/relabelled/wrong-
+# edition header is refused instead of mis-mapped. Verified statewide-stable and
+# data-source/edition-independent (2026-07-17 census); the Ramp Detail (PDF)
+# workbook uses its OWN wider gate (On/Off + Ramp Type), so this is Excel-only.
+_TSMIS_HEADER = ["Route", "Location", "", "PM", "Date of Record", "", "HG",
+                 "Area 4", "", "City Code", "R/U", "Description"]
+
 # The shared comparison header (key + fields), in display order. PM is the key.
 # Compared fields assert; CONTEXT_FIELDS are shown but never counted as a diff.
 # District is COMPARED (CMP-AUD-185): every source exposes it (inside Location /
@@ -367,9 +376,10 @@ def _load_tsmis(path):
         bad_header_msg="isn't a CONSOLIDATED Ramp Detail workbook "
                        "(expected a leading 'Route' column) — consolidate the "
                        "per-route exports first.",
-        # The export's header labels are column-shifted (read BY POSITION above),
-        # so the gate checks shape, not exact labels: PM early + the full width.
-        header_ok=lambda h: "PM" in h[:5] and len(h) >= 11,
+        # CMP-AUD-034: bind the CONSOLIDATED header EXACTLY (read BY POSITION
+        # above, so a shifted/relabelled/wrong-edition header must be refused,
+        # not reinterpreted). Replaces the old "PM in first 5 + width >= 11" gate.
+        header_ok=ctc.exact_consolidated_header_ok(_TSMIS_HEADER),
         row_transform=_tsmis_row)
 
 

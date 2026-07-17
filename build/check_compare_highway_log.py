@@ -206,7 +206,7 @@ def test_pdf_flavors():
         wb = Workbook()
         ws = wb.active
         ws.title = idt.TSMIS_SHEET
-        ws.append(["Route"] + [f"c{i}" for i in range(1, 35)] + ["Xing Line Lgth"])
+        ws.append(list(idt._TSMIS_HEADER))       # CMP-AUD-034 exact header
         ws.append(id_row("001", "1.000", d))
         if p is ia:
             # The "TSMIS (PDF)" side must carry the CMP-AUD-066 marker.

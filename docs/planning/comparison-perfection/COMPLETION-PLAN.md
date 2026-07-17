@@ -20,12 +20,12 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | | |
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
-| **Gate** | **125/125 offline** checks (full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
+| **Gate** | **126/126 offline** checks (full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **six safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029.** **070 is now OWNER-GATED** (2026-07-17 census: its prescribed fix would re-group 259 rows + change the suffix on 33 — output-affecting, needs a source-truth ruling on which route is authoritative; NOT autonomous). **Next safe gate: 034** (refuse semantically-invalid CONSOLIDATED layouts — a refusal gate like 036, but validate the column-SHIFTED signature not width); then **063** (PM-token vocabulary → partial; needs a real-corpus token census first, like the 070 census, to avoid false partials); **027** (header-only route — needs empty-route coverage representation) is owner-ish. Then the "— MER 059" census, then buckets B/D/E/G/H/I. 210 DEFERRED (multi-part evidence feature). HD-Excel county vendor-pending |
+| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 is OWNER-GATED** (2026-07-17 census: its prescribed fix would re-group 259 rows + change the suffix on 33 — output-affecting, needs a source-truth ruling on which route is authoritative; NOT autonomous). **Next: 063** (PM-token vocabulary → partial; needs a real-corpus token census first, like the 070 census, to avoid false partials); **027** (header-only route — needs empty-route coverage representation) is owner-ish. Then the "— MER 059" census, then buckets B/D/E/G/H/I. 210 DEFERRED (multi-part evidence feature). HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, then the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029)
+> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, then the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029 + 034)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -34,7 +34,27 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
-> **DONE 2026-07-17 (latest): CMP-AUD-030 + CMP-AUD-031 CLOSED — the cross-env
+> **DONE 2026-07-17 (latest): CMP-AUD-034 CLOSED — the CONSOLIDATED `_load_tsmis`
+> loaders bind their EXACT header.** The four consolidated TSMIS loaders read every
+> field BY POSITION, but their gates established almost no semantics (HSL/HD: only a
+> leading 'Route'; RD: `PM in h[:5] and len>=11`; ID: `len==36 and last=='Xing Line
+> Lgth'`), so a block-shifted / junk-relabelled / wrong-report header was projected
+> as the intended schema. Now the shared `compare_tsn_common.exact_consolidated_header_ok`
+> binds each to its documented `_TSMIS_HEADER` exactly (relabels/shifts/insertions/
+> deletions/wrong-editions refused). **Safety proven first** (statewide single-header
+> per family + RD/HSL byte-identical across all six source/env combos + 7.9 edition).
+> **Caller-trace completed**: `_load_tsmis` is polymorphic (HSL PDF-vs-TSN, HD/ID
+> PDF-vs-Excel load the PDF-consolidated workbook through the SAME `_load_tsmis`), and
+> each PDF consolidator's header was verified byte-identical to the Excel one, so one
+> exact bind serves both shapes; RD's `_load_tsmis` is Excel-only (RD-PDF keeps its own
+> 14-col gate). NEW `check_compare_consolidated_layout.py` (exact accepted; relabel/
+> shift/insert/delete/route-only refused; the OLD gates shown accepting that junk;
+> end-to-end shifted-workbook refusal per family). Real-corpus no-false-rejection: RD
+> 472 / HSL 3,362 / ID 1,670 / HD 2,642 rows accepted + the ID PDF-consolidated
+> workbook accepted (1,423 rows). Five synthetic-`c1..cN` fixtures updated to the real
+> header (rows positional → no assertion moved). Offline gate **126/126**.
+>
+> **DONE 2026-07-17: CMP-AUD-030 + CMP-AUD-031 CLOSED — the cross-env
 > flat XLSX loader's per-route universe is now faithful.** `_load_xlsx_side`
 > (the shared cross-environment / baseline-matrix loader for Ramp Detail /
 > Highway Sequence / Highway Detail / Highway Log) keyed each side off the RAW

@@ -192,15 +192,26 @@ _TSMIS_POS = {
     "Intrte Postmile": 33, "Intrte PM Suffix": 34, "Xing Line Lgth": 35,
 }
 _TSMIS_ROUTE_POS = 4                       # consolidated "Location" column ("12 ORA 001")
-# The July-2026 consolidated shape: Route + the 35 current source columns, ending in
-# the new 'Xing Line Lgth'. A pre-update workbook (37 columns, the duplicated second
-# 'ML Eff-Date') fails this and is REFUSED — reading it by the positions above would
-# silently mis-map every column from Description on.
-_HEADER_LEN = 36
+# CMP-AUD-034: the EXACT July-2026 consolidated header (['Route'] + the 35 current
+# source columns). _tsmis_row reads every field BY POSITION, so this is bound
+# EXACTLY — the old "len==36 and last=='Xing Line Lgth'" gate let a junk-relabelled
+# or block-shifted 36-cell header through and mis-map every field. A pre-update
+# workbook (the 37-column duplicated-'ML Eff-Date' layout) and any other edition are
+# refused. Verified statewide-stable + data-source/edition-independent (2026-07-17
+# census); the Intersection Detail (PDF) consolidator emits the IDENTICAL header,
+# so the PDF-vs-Excel self-check (which shares this _header_ok) stays valid.
+_TSMIS_HEADER = [
+    "Route", "P", "Post Mile", "S", "Location", "Date of Record", "H/G",
+    "City Code", "R/U", "INT Type", "INT Eff-Date", "Ctrl T", "Ctrl Type",
+    "Light Eff-Date", "Light T/Y", "ML Eff-Date", "ML S/M", "ML L/C", "ML R/C",
+    "ML T/P", "ML N/L", "Description", "Main Line Lgth", "Inter Eff-Date",
+    "Inter S", "Inter L", "Inter R", "Inter T", "Inter N", "Int St Eff-Date",
+    "Intrte S", "Intrte Route", "Intrte Post", "Intrte Mile", "Xing P/S",
+    "Xing Line Lgth"]
+_HEADER_LEN = len(_TSMIS_HEADER)           # 36 (kept for any positional references)
 
 
-def _header_ok(header):
-    return len(header) == _HEADER_LEN and header[-1] == "Xing Line Lgth"
+_header_ok = ctc.exact_consolidated_header_ok(_TSMIS_HEADER)
 
 
 # --------------------------------------------------------------------------- #
