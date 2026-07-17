@@ -315,10 +315,10 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-034 | P1 | Verified | Consolidated TSMIS loaders accept semantically invalid layouts |
 | CMP-AUD-035 | P1 | Partially remediated — type-exactness fixed 2026-07-14; TOCTOU pending | Original raw-admission r7 accepted. Type-exact validation now rejects float/bool aliases of `version`/`member_count`/`byte_length`/`schema_version` in the raw-manifest, normalized-identity, and certificate checks (red→green). Still open: the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
 | CMP-AUD-036 | P1 | Verified | Ramp PDF accepts a truncated four-column workbook |
-| CMP-AUD-037 | P1 | Verified | Direct comparisons trust stale normalized libraries |
+| CMP-AUD-037 | P1 | Partially remediated (HSL v4 + HL v5 marker gates close their direct paths; ID/HD/RD direct loaders still ungated — probe-verified 2026-07-17) | Direct comparisons trust stale normalized libraries |
 | CMP-AUD-038 | P2 | Verified | Date normalization masks malformed and impossible dates |
 | CMP-AUD-039 | P1 | Verified | Detail Report View counts contradict the main comparison |
-| CMP-AUD-040 | P1 | Verified | Logically identical inputs can be compared as two sources |
+| CMP-AUD-040 | P1 | Partially remediated 2026-07-17 (the file half via the CMP-AUD-066 role gates — the same file refuses BOTH ways, probe-verified; the folder run-root/subfolder aliasing half remains open) | Logically identical inputs can be compared as two sources |
 | CMP-AUD-041 | P1 | Resolved | Selected or derived outputs can overwrite comparison sources |
 | CMP-AUD-042 | P1 | Verified | Normalized Highway Detail erases every PS equation marker |
 | CMP-AUD-043 | P1 | Verified | Formula Report View stays stale after live recalculation |
@@ -343,7 +343,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-062 | P1 | Verified | Intersection document-median geometry silently drops pages |
 | CMP-AUD-063 | P2 | Verified | Sequence/Ramp PDFs certify invalid post-mile code tokens |
 | CMP-AUD-064 | P2 | Verified | PDF parser anomaly counts masquerade as skipped input counts |
-| CMP-AUD-065 | P1 | Verified | Sequence PDF-vs-Excel suppresses three same-source fields |
+| CMP-AUD-065 | P1 | Remediated 2026-07-16 by CMP-AUD-199 (re-verified 2026-07-17: the same-source schema compares EVERY column — context_fields is empty) | Sequence PDF-vs-Excel suppresses three same-source fields |
 | CMP-AUD-066 | P1 | Remediated 2026-07-17 (HL vs-TSN half via the v5 marker; the PDF-role halves via the PDF-conversion marker; RD structurally protected) | PDF comparison roles are not provenance-validated |
 | CMP-AUD-067 | P1 | Remediated 2026-07-17 (same-source projections in all four families; HSL was fixed by 199/204, RD never had an instance) | TSN projections hide PDF-vs-Excel source differences |
 | CMP-AUD-068 | P2 | Verified | PDF-vs-TSN Detail paths omit Report View |
@@ -748,6 +748,8 @@ then decide the permitted precision and canonical numeric representation without
 binary-float rounding. Test text/numeric zero, leading and trailing zeros, signs,
 prefixes/suffixes, invalid tokens, and the documented pair through both raw and
 normalized-library loaders. Correct the docstring only after that decision.
+
+**Re-verified still OPEN (2026-07-17, the bucket-A sweep).** The exact case reproduces: the production normalizer returns 9.6 for "9.6" and 9.600 for "009.600" (and 0 / 0.000 for the zero variants) — the identity contract is still contradicted. Bound as the next fix batch in the plan (canonical 3.3 zero-pad; the helper is shared with Intersection Detail and the PDF flavors, so the fix carries an RD + ID canary re-bless).
 
 ### CMP-AUD-007 — Settings validation silently omits supported comparisons
 
@@ -1965,6 +1967,8 @@ Correction requirements: make direct compare validate the library sidecar/versio
 fully and idempotently reproject every identity and compared field. Legacy libraries
 must be rebuilt or rejected with an actionable message, never partially repaired.
 
+**Partially remediated (recorded 2026-07-17, the bucket-A sweep).** HSL (v4, 2026-07-16) and Highway Log (v5, 2026-07-17) now refuse pre-current normalized TSN workbooks on the DIRECT path via their in-workbook normalization markers. Probe-verified: ID / HD / RD direct vs-TSN loaders still accept any workbook carrying the normalized sheet (their versions live only in library sidecars the direct path never sees). The remaining fix = in-workbook markers + loader gates for those three families (a version bump + re-bless each).
+
 ### CMP-AUD-038 — date normalization hides malformed input
 
 Priority: P2  
@@ -2046,6 +2050,8 @@ Correction requirements: resolve the effective inputs before launching and rejec
 same-file identities (`samefile`, not just path text), equal effective report roots,
 and overlapping/identical discovered file sets. Keep a deliberate internal self-test
 escape hatch separate from user-facing comparison recipes if one is needed.
+
+**Partially remediated (2026-07-17, the bucket-A sweep).** The FILE half is closed by CMP-AUD-066: the same resolved workbook can no longer satisfy both labels of a PDF-vs-Excel flavor — marked it refuses the Excel role, unmarked it refuses the PDF role (probe: both directions error on the exact original case). The FOLDER half — a run root on one side aliasing its own report subfolder on the other through compare_env — remains open (bucket D/E).
 
 ### CMP-AUD-041 — selected or derived output aliasing can destroy a source
 
@@ -2966,6 +2972,8 @@ context suppression. Mutate each of all seven shared fields independently and re
 the intended field label, one counted difference, and a diff verdict in both output
 modes.
 
+**Remediated 2026-07-16 by CMP-AUD-199 (re-verified 2026-07-17, the bucket-A sweep).** The same-source schema (SS_HEADER/_SS_SCHEMA) compares County, PM, PM Suffix, City, HG, FT, Distance To Next Point, and Description with context_fields EMPTY — the three previously-suppressed fields are ordinary compared cells, and the 2026-07-16 corpus proof asserts every cell (oracle-exact 1,410/3,721).
+
 ### CMP-AUD-066 — PDF comparison roles are not provenance-validated
 
 Priority: P1  
@@ -3236,6 +3244,8 @@ duplicate routes, and reconcile discovered route counts/identities with producer
 metadata before aggregation. Preserve the route universe in structured diagnostics;
 test empty, header-only, duplicate-identical, duplicate-conflicting, padded aliases,
 and partial statewide inputs.
+
+**Re-verified still OPEN (2026-07-17, the bucket-A sweep).** NOT closed by CMP-AUD-050: that remediation fixed the CONSOLIDATION-side collection loop (duplicate/blank route refusals when building the Ramp Summary workbook). This finding is the COMPARATOR side — compare_ramp_summary_tsn accepting a header-only or duplicate-route CONSOLIDATED workbook and summing without route-universe validation. Remains bucket C (loader/validation contracts).
 
 ### CMP-AUD-072 — stale folder discovery can overwrite a newer recipe selection
 

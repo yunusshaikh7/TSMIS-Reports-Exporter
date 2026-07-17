@@ -281,13 +281,19 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > mirror their Resolved records, 098/115 their partials, and the six
 > HSL-batch findings (155/156/158/159/199/204) are Remediated in both the
 > table and the record Status lines. **112 findings remain open**, bucketed:
-> - **A. RE-VERIFY-FIRST shortlist (likely closed by shipped work — check
->   each record's exact case, then flip or reopen):** 006 (RD PM identity
->   vs the 045-RD physical key), 037 (stale-library trust vs the v3/v4/v5
->   marker + D2 gates, per family), 040 (identical-inputs-as-two-sources vs
->   the 066 marker's role split — the same-file alias case may remain), 065
->   (HSL same-source suppressed fields vs 199's all-columns SS_HEADER), 071
->   (Ramp Summary route universe vs 050's refusals).
+> - **A. RE-VERIFIED 2026-07-17 (probes recorded in each finding):** 065
+>   CLOSED by 199 (context_fields empty — all columns compared). 040 file
+>   half CLOSED by 066 (the same file refuses BOTH role gates,
+>   probe-verified); its folder run-root/subfolder aliasing half stays open
+>   (→ D/E). 037 partially closed (HSL v4 + HL v5 direct-path marker gates);
+>   **ID/HD/RD direct vs-TSN loaders still ungated — the fix = in-workbook
+>   markers + gates for those three (version bump + re-bless each)**. 006
+>   still OPEN and real (`_norm_pm("9.6")→"9.6"` vs `"009.600"→"9.600"`) —
+>   **the next fix batch: canonical 3.3 zero-pad in the shared PM helper,
+>   with the RD + ID canary re-blesses** (the helper is shared; expect
+>   ZERO count deltas on the current corpus — both July renders pad — and
+>   prove it). 071 NOT closed by 050 (different surface: the COMPARATOR's
+>   TSMIS loader) — stays bucket C.
 > - **B. PDF-parser robustness (HD/ID):** 051–062 + 044 — a dedicated
 >   parser-hardening wave (spill/orphan/fallback/truncation/vestigial/
 >   cancellation classes).
