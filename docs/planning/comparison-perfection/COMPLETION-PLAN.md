@@ -343,22 +343,36 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   refusals. Ramp Summary needs no change (route already document-parsed;
 >   050 covers its refusals).
 >
-> **The 067 census start (2026-07-17 — bind before implementing):** the
-> PDF-vs-Excel self-check flavors reuse cross-system (vs-TSN) projectors,
-> erasing the render differences they exist to detect. HSL's instance is
-> ALREADY FIXED (CMP-AUD-199's source-faithful `SS_HEADER`/`_SS_SCHEMA` +
-> `_tsmis_row_same_source`, suffix excluded from identity and compared as
-> "PM Suffix") and RD's same-source loader shipped in v0.26.0 — re-verify
-> both against the finding's exact mutation cases before dispositioning.
-> REMAINING: HL (the roadbed-canonical key normalizer infers Excel
-> `000.100` → `000.100R`; roadbed/ditto semantics are correctness-locked —
-> read docs/highway_log/comparison-study.md + the Phase-3 decision gates
-> BEFORE touching; "surface canonical and raw identity separately" is the
-> finding's own escape hatch), HD (`pm_canon` HG-fill + the TSN-only NA
-> crosswalk in the pdf flavor), ID (control-type `J`→`S` fold + the
-> display-rewrite `S ≠ A`). Each family needs a same-source
-> projector/schema, a per-family mutation matrix, and a PDF↔Excel canary
-> re-bless with explained deltas.
+> **The 067 census — PROBED 2026-07-17 (the finding's exact mutations
+> replayed against the CURRENT flavors, fixtures under the 066 marker;
+> scratchpad probe_067_mutations.py / probe_067_b.py, session 119c7c70):**
+> - **HSL: FIXED.** PDF desc "001/JCT 5" vs Excel "JCT 5" FLAGS (1 differing
+>   cell) through CMP-AUD-199/204's same-source loader.
+> - **RD: clean.** No 067 instance (the finding lists none); a Description
+>   spot-mutation flags verbatim ("EB ON FR MAIN ≠ EB ON FR OTHER").
+> - **ID: OPEN, reproduced.** The folded field is "Ctrl Type" (consolidated
+>   index 12; index 11 "Ctrl T" is compared verbatim): PDF `J` vs Excel `S`
+>   → "EVERYTHING MATCHES" (the `_norm_control_type` J→S fold erases it);
+>   PDF `J` vs Excel `A` → flags but DISPLAYS the rewritten "S ≠ A".
+> - **HD: OPEN, both reproduced.** PDF PM "000.100R" vs Excel "000.100"
+>   under HG R → "EVERYTHING MATCHES" (`pm_canon` fills the R/L from HG and
+>   the projected token is ALSO the key, so the lost text can't appear as a
+>   compared cell); PDF NA "" vs Excel NA "A" → "EVERYTHING MATCHES" (the
+>   TSN-only NA crosswalk).
+> - **HL: OPEN (not re-probed — correctness-locked).** The roadbed-canonical
+>   key normalizer infers Excel `000.100` → `000.100R`; read
+>   docs/highway_log/comparison-study.md + the Phase-3 decision gates BEFORE
+>   touching; "surface canonical and raw identity separately" is the
+>   finding's own escape hatch (canonical stays the PAIRING key, the raw
+>   Location becomes a compared cell in the PDF-vs-Excel flavor only —
+>   flavor-scoped CompareSchema opt-in, never a shared-engine edit).
+> Implementation per family (ID → HD → HL): a same-source projection that
+> keeps the 045 physical PAIRING key but projects value cells VERBATIM
+> (same_source_render_rows' OOXML/tab-padding equivalences stay; every OTHER
+> normalization must re-justify as a documented same-source render
+> equivalence or drop), the probe cases as red check pins, and a statewide
+> PDF↔Excel canary re-bless with every delta class adjudicated (ID current
+> reference 16,459/0/0; HD 50,171/50,730 + 1,019 one-sided).
 >
 > **DONE 2026-07-16 (after 047/048): the HD statewide re-measure — EXACT.**
 > The bound 7.7-bundle harness re-run under the post-220 objective
