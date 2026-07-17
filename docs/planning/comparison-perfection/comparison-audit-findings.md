@@ -3298,6 +3298,33 @@ the loader/comparison projection rather than the exporter or consolidator. The e
 source-claim ledger SHA-256 on both TSMIS forms is
 `a7fc8d1617b03d19258ce5455c0b847697c755f5ef911b65e3de9b484a3dcfa8`.
 
+**Census 2026-07-17 — OWNER-GATED: the prescribed fix is output-affecting, NOT
+safe-by-construction.** A read-only agreement census consolidated the real ID corpus
+(`Intersection Detail Bundle 7.8`, 16,459 rows; column semantics
+`['Route','P','Post Mile','S','Location',…]` — explicit Route at col 0, explicit `S`
+at col 3, Location at col 4) and compared the explicit source fields against the
+Location-derived values the comparison currently uses (base-split so `008U`/`010S`
+suffixed routes are correctly excluded):
+- **259 rows** carry a genuine mainline-route-vs-Location-route disagreement — e.g. a
+  `route_009` file row whose Location reads `05 SCR 001` (base `001`). The comparison
+  currently keys these by the Location route (`001`); switching to the authoritative
+  col-0 route (`009`), as the correction requires, would **re-group all 259 rows** and
+  move the pairing, one-sided classification, and the ID canary (21,675/687).
+- The compared **Route Suffix** switch (Location-derived → raw col-3) shows a
+  None-vs-`""` representation gap on all 16,459 rows plus **33 rows** where the raw col-3
+  `S` genuinely differs from the Location-derived suffix — so it too would change output.
+
+Therefore this finding is **not an autonomous safe-by-construction change** under the
+owner directive (changes that "can lead to discrepancies" are not pre-approved). The
+core question — *when the mainline route (col 0) and the Location-embedded route disagree
+on 259 rows, which is authoritative for the comparison key?* — is a source-truth / domain
+ruling that needs the owner and an investigation into what the Location column encodes on
+those rows (a genuine cross-reference vs a data anomaly). The finding's earlier Stage-8
+"zero Route mismatches / zero S mismatches" measured consolidation PRESERVATION of the
+explicit fields, not this col-0-vs-Location relationship. Census script:
+`_scratch`-equivalent `census_070.py` (session scratchpad; results recorded here).
+Remains **open, re-classified from "lighter C-gate" to owner-gated output-affecting.**
+
 ### CMP-AUD-071 — Ramp Summary comparison does not validate its route universe
 
 Priority: P1  
