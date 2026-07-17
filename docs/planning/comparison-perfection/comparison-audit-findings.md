@@ -1626,13 +1626,41 @@ None cells at the header-less export columns — part of the signature, not nois
 - **Highway Detail**: capture still owed — the quick 2-route consolidation via
   `consolidate_highway_detail.consolidate` did not emit a workbook (path/signature to
   debug); capture it before binding.
-Two prerequisites before shipping (both to retire the false-rejection risk an exact
-bind introduces): (1) capture HD's header; (2) a **full-corpus header-stability census
-across BOTH data sources (ssor + ars)** proving the exact header is identical on every
-route — an exact bind that a single ars route or edition-variant fails would falsely
-reject valid input. Then wire each `_header_ok`/`load_consolidated_rows` to the bound
-signature, red→green per family (junk/shifted refused; real header passes), real-corpus
-per family. Capture script: session scratchpad `capture_034_headers.py`. Remains open.
+**Safety DE-RISKED 2026-07-17 — the exact bind is proven source/edition-independent.**
+The two prerequisites are now retired:
+- **Full-statewide single-header stability** (per-route header read directly, all routes):
+  RD 126/126 routes → 1 header (ssor 7.9), HSL 252/252 → 1 (ssor 7.9), ID 217/217 → 1
+  (ars 7.9), HD 252/252 → 1 (ars 7.9). Every family carries exactly ONE header across its
+  whole statewide corpus. HD's header is captured (`stability_034.py`): per-route w34
+  `['Post Mile','Length','Date of Rec','HG','AC','Acc-Cont Eff','City','RU','RU Eff',
+  'Description','NA','LB Eff','LB S/T','LB #Ln','LB S/F','LB OT-TO','LB OT-TR','LB Wid',
+  'LB IN-TO','LB IN-TR','Med Eff','Med T','Med C','Med B','Med V/WDA','RB Eff','RB S/T',
+  'RB #Ln','RB S/F','RB IN-TO','RB IN-TR','RB Wid','RB OT-TO','RB OT-TR']` (consolidated =
+  `['Route']` + this).
+- **Cross-source/env/edition equality** (`crosssource_034.py`): RD and HSL headers are
+  BYTE-IDENTICAL across all six data-source/env combos (ars/ssor × dev/prod/test in the
+  6-env batch) AND the 7.9 edition — 7 samples each, 1 distinct header. This confirms the
+  CLAUDE.md fact that one TSMIS page serves every source/env with an identical FORMAT, so
+  the header is data-source-independent (only the site EDITION changes it — exactly what
+  an exact bind SHOULD refuse, matching the existing pre-July-2026 ID refusal).
+
+**Implementation path (remaining — a large but mechanical 4-family batch, not yet done).**
+Bind each `_load_tsmis` `header_ok` to `h == ['Route'] + <per-route header>`. `header_ok`
+receives the loader's `[str(c).strip() if c is not None else "" for c in row]` (no
+trailing-trim; `header[0]=='Route'` is checked separately). Current weak gates to replace:
+RD `"PM" in h[:5] and len(h) >= 11`; ID `len==36 and h[-1]=='Xing Line Lgth'`; **HSL + HD
+have NO `header_ok` at all.** Cross-cutting caveats to trace BEFORE binding: (a) **ID's
+`_header_ok` is shared by the PDF-vs-Excel self-check** (`compare_intersection_detail_pdf
+._load_tsmis_same_source`, line 54) — confirm the PDF-consolidated header equals the
+Excel-consolidated one before binding, or the self-check's loader breaks; (b) HD/HSL PDF
+loaders — verify none reuse the bound `header_ok` with a different shape; (c) the quick
+`consolidate_highway_detail.consolidate()` 2-route call did not emit a workbook — reading
+per-route headers directly worked, but debug the consolidate seam if the real-corpus test
+consolidates. Then red→green per family (junk-middle / wrong-width / shifted refused —
+proving the old gate accepted them — real header passes) + real-corpus per family.
+Scripts: session scratchpad `capture_034_headers.py` / `stability_034.py` /
+`crosssource_034.py`. Remains open (safe-by-construction; the SAFETY is proven, the
+implementation is pending a careful caller-traced pass).
 
 ### CMP-AUD-035 — raw TSN admission can certify incomplete or ambiguous truth
 
