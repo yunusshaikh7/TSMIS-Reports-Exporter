@@ -32,8 +32,9 @@ import consolidation_meta
 import consolidate_tsn_highway_log as tsn_hl   # marker/version + claims shape
 import highway_log_columns as hlc       # the corrected column labels (one source)
 from compare_core import CompareSchema, normalize_value
-from compare_tsn_common import (make_notes_writer, row_has_data,
-                                run_files_compare, suggest_route_name)
+from compare_tsn_common import (make_notes_writer, require_per_route_identity,
+                                row_has_data, run_files_compare,
+                                suggest_route_name)
 
 REPORT_NAME = "Highway Log"          # registry label (comparison type)
 SHEET_NAME = "Highway Log"           # required sheet in both inputs
@@ -146,6 +147,10 @@ def _load_pair(path_a, path_b):
             f"consolidated workbook (has a Route column) but "
             f"{per.name} is per-route. Pick two per-route files or "
             f"two consolidated files.")
+    if not route_a:
+        # CMP-AUD-049: a per-route pair (no Route column in the content) must
+        # demonstrably describe the SAME route via its filename tokens.
+        require_per_route_identity(path_a, path_b)
     return rows_a, rows_b, None, route_a
 
 

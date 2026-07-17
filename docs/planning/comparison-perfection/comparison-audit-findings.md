@@ -327,7 +327,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-046 | P2 | Verified | Shifted exports report differences under the wrong fields |
 | CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
 | CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
-| CMP-AUD-049 | P1 | Verified | Direct/PDF route provenance is not enforced |
+| CMP-AUD-049 | P1 | Partially remediated (2026-07-17: the direct-compare half; converter + evidence halves open) | Direct/PDF route provenance is not enforced |
 | CMP-AUD-050 | P1 | Remediated (2026-07-17) | PDF routes can overwrite, double-count, or remain blank |
 | CMP-AUD-051 | P1 | Verified | Highway Detail PM spill creates phantom PDF records |
 | CMP-AUD-052 | P1 | Verified | Highway Detail header words swallow real line-two data |
@@ -2549,6 +2549,23 @@ the report carries route provenance. A mismatch must set structured partial/fail
 state rather than merely warn or silently relabel. Test numeric/suffixed padding,
 content mismatch, and distinct per-route selections across every direct and PDF
 report family.
+
+**2026-07-17 partial (the direct-compare half).** Per-route Highway Log pairs —
+the one direct per-route comparison family, all three flavors (vs-TSN and both
+PDF-sourced) — now require a normalized route token in BOTH filenames and exact
+agreement (`compare_tsn_common.require_per_route_identity`, wired in
+`compare_highway_log._load_pair`): "Route 001" vs "Route 002" refuses naming
+both files and routes; a token-less per-route file refuses with rename/
+consolidated guidance (per-route workbooks carry no Route column, so the
+filename is the only verifiable identity; every export and conversion this app
+writes carries the token). Consolidated pairs stay content-keyed and
+unaffected; the Route-1 canary re-verified 299/18/69/221/969 under the rule.
+Red→green pinned in `check_compare_highway_log` (3 pre-fix failures by
+git-stash). REMAINING OPEN: the converter half (the five PDF converters emit
+the FILENAME route on disagreement — only HL even parses its in-document cover
+route today; HD/HSL/RD/ID are filename-only and need banner/DCR/Location
+extraction first) and the evidence-adapter half (route-named PDF paths are not
+reconciled against the document's own route before captioning).
 
 ### CMP-AUD-050 — PDF conversion does not enforce a route universe
 

@@ -124,11 +124,29 @@ def test_hl_compare():
           res4.status == "error"
           and res4.message.startswith("The TSMIS file doesn't exist:"), res4.message)
 
+    # CMP-AUD-049 (direct-compare half): a per-route pair must carry MATCHING
+    # filename route tokens — per-route workbooks have no Route column, so
+    # the filename is the only identity a direct comparison can verify.
+    a2 = tmp / "TSMIS Route 002.xlsx"
+    _write_hl(a2, [_hl_row("1.000", "SAME")])
+    res5 = hl.compare(str(a2), str(b), str(tmp / "out5.xlsx"),
+                      confirm_overwrite=lambda p: True, mode="values")
+    check("per-route pair naming DIFFERENT routes refuses (CMP-AUD-049)",
+          res5.status == "error" and "different routes" in res5.message
+          and "002" in res5.message and "005" in res5.message, res5.message)
+    a3 = tmp / "tsmis export.xlsx"
+    _write_hl(a3, [_hl_row("1.000", "SAME")])
+    res6 = hl.compare(str(a3), str(b), str(tmp / "out6.xlsx"),
+                      confirm_overwrite=lambda p: True, mode="values")
+    check("a per-route file without a route token refuses with guidance",
+          res6.status == "error" and "route token" in res6.message
+          and "consolidated" in res6.message, res6.message)
+
 
 def test_pdf_flavors():
     print("the PDF-sourced flavors ride the same skeleton:")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_hlpdf_"))
-    a, b = tmp / "pdf.xlsx", tmp / "tsn.xlsx"
+    a, b = tmp / "pdf route 7.xlsx", tmp / "tsn route 7.xlsx"
     _write_hl(a, [_hl_row("1.000", "P")])
     _write_hl(b, [_hl_row("1.000", "Q")], marker=True)
     res = hlp.TSMIS_PDF_VS_TSN.compare(str(a), str(b), str(tmp / "o.xlsx"),
@@ -137,7 +155,7 @@ def test_pdf_flavors():
     names = _sheets(res.output_path)
     check("HL PDF side labels reach the data sheets",
           "TSMIS (PDF)" in names and "TSN (PDF)" in names, str(names))
-    b_old = tmp / "tsn_old.xlsx"
+    b_old = tmp / "tsn_old route 7.xlsx"
     _write_hl(b_old, [_hl_row("1.000", "Q")])
     res_gate = hlp.TSMIS_PDF_VS_TSN.compare(str(a), str(b_old),
                                             str(tmp / "og.xlsx"),
@@ -153,6 +171,15 @@ def test_pdf_flavors():
                                             mode="values")
     check("HL PDF-vs-Excel has no TSN side and does NOT gate on the marker",
           res_ex.status == "ok", res_ex.message)
+    b5 = tmp / "excel route 5.xlsx"
+    _write_hl(b5, [_hl_row("1.000", "Q")])
+    res_mm = hlp.TSMIS_PDF_VS_EXCEL.compare(str(a), str(b5),
+                                            str(tmp / "omm.xlsx"),
+                                            confirm_overwrite=lambda p: True,
+                                            mode="values")
+    check("the PDF flavors inherit the per-route identity rule (CMP-AUD-049)",
+          res_mm.status == "error" and "different routes" in res_mm.message,
+          res_mm.message)
     resm = hlp.TSMIS_PDF_VS_EXCEL.compare(str(tmp / "nope.xlsx"), str(b),
                                           str(tmp / "o2.xlsx"))
     check("HL PDF missing-file error names the flavor's OWN side label",

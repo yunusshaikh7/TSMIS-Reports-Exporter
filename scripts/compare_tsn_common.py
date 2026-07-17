@@ -169,6 +169,37 @@ def suggest_route_name(path, fallback_tag, name_tag):
     return f"{name_tag}_{tag}_Comparison {today_str()}.xlsx"
 
 
+def require_per_route_identity(path_a, path_b):
+    """CMP-AUD-049 (direct-compare half): a PER-ROUTE pair must demonstrably
+    describe the SAME route. Per-route workbooks carry no Route column, so
+    the only available identity is the filename's route token (every export
+    and conversion this app writes carries one, e.g. "…route_005S.xlsx");
+    both files must carry one and they must normalize equal. Two identically
+    populated files named Route 001 and Route 002 used to be accepted as one
+    universe and certified as a match. Consolidated pairs are content-keyed
+    by their Route column and never come through here."""
+    from pdf_table_lib import norm_route
+
+    routes = []
+    for path in (path_a, path_b):
+        name = Path(path).name
+        m = _ROUTE_TOKEN_RE.search(Path(path).stem)
+        if not m:
+            raise ValueError(
+                f"{name} doesn't carry a route token in its filename (like "
+                "'route 001'), so a per-route comparison can't verify both "
+                "files describe the same route. Rename the file to include "
+                "its route, or compare two consolidated workbooks.")
+        routes.append(norm_route(m.group(1)))
+    if routes[0] != routes[1]:
+        raise ValueError(
+            f"The two files name different routes: {Path(path_a).name} says "
+            f"route {routes[0]} but {Path(path_b).name} says route "
+            f"{routes[1]} — a per-route comparison must compare the same "
+            "route. Pick matching per-route files, or two consolidated "
+            "workbooks.")
+
+
 def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_msg,
                            header_ok=None, row_transform=list):
     """The consolidated-workbook loader skeleton three vs-TSN comparators wrote

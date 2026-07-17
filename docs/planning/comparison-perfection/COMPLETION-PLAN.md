@@ -293,10 +293,13 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   in-document route source: HL cover "Route 006" (parsed today), HD DCR
 >   "11 IMP 007", HSL page banners, RD page banners, ID Location field —
 >   census which are already parsed vs need extraction before coding.
-> - Direct-compare half: per-route workbooks carry NO Route column, so
->   content-level identity does not exist — the enforceable rule is
->   filename-token agreement between the two picked files (refuse "Route
->   001" vs "Route 002"), with consolidated inputs unaffected.
+> - Direct-compare half: **DONE 2026-07-17** —
+>   `compare_tsn_common.require_per_route_identity` wired in
+>   `compare_highway_log._load_pair` (all three HL flavors): both per-route
+>   filenames must carry a route token and normalize equal; mismatch and
+>   token-less both refuse with guidance; consolidated pairs unaffected;
+>   Route-1 re-verified 969 under the rule; 3 stash-red failures pinned in
+>   check_compare_highway_log.
 > - Evidence half: adapters construct the PDF path from the expected route
 >   filename without reconciling the document's own route before captioning
 >   (visual_evidence.py:248-286,390-444).
