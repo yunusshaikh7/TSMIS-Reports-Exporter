@@ -832,19 +832,24 @@ class EnvCompare:
 
     def _resolve_key_field(self, header):
         """Index of the configured key column in this loaded header, matched on
-        the stripped name; 0 (the first column) when none is configured or the
-        name isn't present (so layout drift degrades to the old behavior rather
-        than crashing)."""
+        the stripped, case-folded name. No configured key (`key_col=None`) means
+        the first column is the legitimate identity (flat route-keyed reports).
+
+        CMP-AUD-028: a CONFIGURED key column that is ABSENT is fail-closed. It
+        used to log and fall back to column 0, so two malformed key-less
+        workbooks paired on their first column and returned a clean MATCH. The
+        raise is normalized to a typed error at the single `_schema` call site."""
         if not self.key_col:
             return 0
         want = self.key_col.strip().casefold()
         for i, name in enumerate(header):
             if name is not None and str(name).strip().casefold() == want:
                 return i
-        log.warning("env compare %s: key column %r not found in header %r; "
-                    "falling back to the first column", self.key, self.key_col,
-                    header)
-        return 0
+        raise ValueError(
+            f"The {self.REPORT_NAME} files have no '{self.key_col}' column — "
+            "that is the row identity this comparison pairs on, so the two "
+            "sides cannot be reliably matched. Re-export them from a supported "
+            "app version.")
 
     def _schema(self, header, la, lb):
         # Force the corrected display header when configured (Highway Log); the
@@ -1067,7 +1072,13 @@ class EnvCompare:
         blocked = alias_error()
         if blocked is not None:
             return blocked
-        sc = self._schema(header, la, lb)
+        try:
+            sc = self._schema(header, la, lb)
+        except ValueError as e:
+            # CMP-AUD-028: a configured identity column is mandatory. _schema
+            # (via _resolve_key_field) refuses a header that lacks it rather
+            # than silently keying on column 0 and certifying a false match.
+            return ConsolidateResult(status="error", message=str(e))
         prov_sides[0]["role"], prov_sides[1]["role"] = la, lb
         prov_display = {"recipe": {"report": self.REPORT_NAME,
                                    "banner": f"{self.REPORT_NAME} Comparison "

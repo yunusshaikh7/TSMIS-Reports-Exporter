@@ -306,7 +306,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-025 | P2 | Resolved | P/V are marked `sides="tsn"` and routed via `categories_for(side)`, so they are `Only in TSN`, not fabricated TSMIS zeros. Real run matches the oracle: 29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical / 24 differing |
 | CMP-AUD-026 | P1 | Resolved | PDF comparison paths discard producer partial outcomes |
 | CMP-AUD-027 | P1 | Verified | Header-only route files disappear from route coverage |
-| CMP-AUD-028 | P1 | Verified | Missing configured key columns silently fall back to column zero |
+| CMP-AUD-028 | P1 | Remediated 2026-07-17 — a configured identity column is mandatory; `_resolve_key_field` fails closed instead of keying on column 0 | Missing configured key columns silently fall back to column zero |
 | CMP-AUD-029 | P2 | Verified | Generic XLSX discovery includes Excel owner-lock files |
 | CMP-AUD-030 | P2 | Verified | Duplicate route files are silently merged |
 | CMP-AUD-031 | P2 | Verified | Flat report route keys do not normalize `1` and `001` |
@@ -1420,6 +1420,8 @@ match. Highway Sequence, Intersection Detail, and Highway Detail share the path.
 Correction requirements: a configured identity column is mandatory. Reject the
 layout or mark it incomplete. Add a fail-closed fixture for every keyed adapter and
 prove case/whitespace-tolerant valid headers still resolve.
+
+**Remediated 2026-07-17.** `_resolve_key_field` no longer falls back to column 0 when a CONFIGURED key column is absent — it raises a user-facing `ValueError` naming the missing column and the report, which the single `_schema` call site in `compare_folders` converts to a typed `ConsolidateResult(status="error")` (the `@comparison_result_boundary` types the return; it does not catch exceptions, so the raise is caught at the call site, matching the sibling layout gates). The legitimate no-key case (`key_col=None` — flat route-keyed reports like Highway Log use column 0) is untouched. All four keyed adapters (Ramp Detail + Highway Sequence + Intersection Detail + Highway Detail share the path) are covered. Proof (`build/check_compare_ramp_detail.py::test_missing_key_column_fails_closed`, red→green by git-stash — pre-fix `_resolve_key_field` returned 0 silently): the unit contract asserts every keyed adapter raises on a key-less header, resolves the key case/whitespace-tolerantly when present, and the unkeyed HIGHWAY_LOG still uses column 0; the end-to-end builds two IDENTICAL malformed Ramp Detail folders missing PM and asserts `compare_folders` returns an error with no workbook written (was a clean match). The downstream `_ramp_detail_env_keys` `key_field == 0` guard is now a redundant backstop. Offline gate 123/123.
 
 ### CMP-AUD-029 — Excel owner-lock files are treated as report inputs
 

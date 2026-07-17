@@ -356,13 +356,14 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > district slot; ONE cell statewide; scan all 252 prints for em-dash
 > lines and classify with evidence BEFORE any rule). **Next actionable
 > batch: the C-bucket refusal-first loader gates** — the same
-> red→green-refusal pattern as 037/050/066, starting with **028** (the cross-env
-> `_resolve_key_field` silently falls back to column 0 when the configured key
-> column is missing → two key-less workbooks returned a false MATCH; make it
-> fail-closed), then **033** (bind the normalized-sheet loaders to an exact
-> versioned shared-header prefix — the direct companion to 037's marker) and
-> **034** (versioned positional-layout contracts for the consolidated TSMIS
-> loaders). **F's 210 is DEFERRED**: it is a multi-part evidence FEATURE (new
+> red→green-refusal pattern as 037/050/066. **028 CLOSED 2026-07-17** (the
+> cross-env `_resolve_key_field` fell back to column 0 when the configured key
+> column was missing → two key-less workbooks returned a false MATCH; now it
+> raises, the `_schema` call site returns a typed error, all four keyed adapters
+> covered + the end-to-end fail-closed fixture). **Next: 033** (bind the
+> normalized-sheet loaders to an exact versioned shared-header prefix — the
+> direct companion to 037's marker), then **034** (versioned positional-layout
+> contracts for the consolidated TSMIS loaders). **F's 210 is DEFERRED**: it is a multi-part evidence FEATURE (new
 > Excel-cell image evidence + a PDF-vs-Excel Matrix hook + UI camera un-gating +
 > the triangle ledger), not a single-batch correctness fix — it needs its own
 > mini-plan and should not be started as a sprawling incomplete change. After

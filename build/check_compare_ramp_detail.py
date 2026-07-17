@@ -145,10 +145,63 @@ def test_end_to_end_values_workbook():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_missing_key_column_fails_closed():
+    """CMP-AUD-028: a CONFIGURED identity column is mandatory. It used to log and
+    fall back to column 0, so two malformed key-less workbooks paired on their
+    first column and returned a clean MATCH. Every keyed adapter now refuses a
+    header that lacks its key column (case/whitespace-tolerant when present); an
+    unkeyed adapter still uses column 0; and the Ramp Detail end-to-end returns a
+    fail-closed error instead of a false match."""
+    # (a) Unit contract for every keyed adapter.
+    keyed = [("RAMP_DETAIL", compare_env.RAMP_DETAIL, "PM"),
+             ("HIGHWAY_SEQUENCE", compare_env.HIGHWAY_SEQUENCE, "PM"),
+             ("INTERSECTION_DETAIL", compare_env.INTERSECTION_DETAIL, "Post Mile"),
+             ("HIGHWAY_DETAIL", compare_env.HIGHWAY_DETAIL, "Post Mile")]
+    for name, adapter, key in keyed:
+        assert adapter.key_col == key, (name, adapter.key_col)
+        assert adapter._resolve_key_field(["County", key, "Desc"]) == 1, (name, "present")
+        # case/whitespace tolerant when present
+        assert adapter._resolve_key_field(["County", f"  {key.upper()} ", "X"]) == 1, \
+            (name, "case/whitespace")
+        # absent -> fail-closed raise (was a silent return 0)
+        try:
+            adapter._resolve_key_field(["County", "Desc"])
+            assert False, (name, "a missing configured key column must raise")
+        except ValueError as e:
+            assert key in str(e) and adapter.REPORT_NAME in str(e), (name, str(e))
+    # An unkeyed adapter (key_col=None) legitimately uses the first column.
+    assert compare_env.HIGHWAY_LOG.key_col is None, compare_env.HIGHWAY_LOG.key_col
+    assert compare_env.HIGHWAY_LOG._resolve_key_field(["A", "B", "C"]) == 0
+
+    # (b) End-to-end: two IDENTICAL malformed Ramp Detail folders whose header
+    #     lacks PM must fail closed (an error), never a clean match.
+    bad_header = [h for h in HEADER if h != "PM"]          # County, Ramp ID, Lighting
+    bad_data = [[r[0]] + r[2:] for r in DATA_A]            # drop the PM cell
+    root = Path(tempfile.mkdtemp())
+    try:
+        sheet = compare_env.RAMP_DETAIL.sheet_name
+        a = root / "2026-06-16 ssor-prod" / "ramp_detail"
+        b = root / "2026-06-16 ssor-test" / "ramp_detail"
+        a.mkdir(parents=True)
+        b.mkdir(parents=True)
+        _write_route_file(a / f"ramp_detail_route_{ROUTE}.xlsx", sheet, bad_header, bad_data)
+        _write_route_file(b / f"ramp_detail_route_{ROUTE}.xlsx", sheet, bad_header, bad_data)
+        out = root / "cmp.xlsx"
+        res = compare_env.RAMP_DETAIL.compare_folders(
+            a.parent, b.parent, out, events=Events(),
+            confirm_overwrite=lambda _p: True, mode="values")
+        assert res.status == "error", ("must fail closed, not match", res.status)
+        assert "PM" in (res.message or ""), ("names the missing key column", res.message)
+        assert not out.exists(), "no workbook may be written on a fail-closed layout"
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     test_config_is_pm_keyed()
     test_pm_key_collapses_coarse_cascade()
     test_end_to_end_values_workbook()
+    test_missing_key_column_fails_closed()
     print("OK  COMPARE-RAMP-DETAIL-PM-KEY: Ramp Detail keys on PM; a mid-route "
           "ramp insert that cascades into 5 spurious diff cells under coarse "
           "keying collapses to ONE one-sided ramp / zero diff cells under PM "
