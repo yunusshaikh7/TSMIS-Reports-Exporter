@@ -124,6 +124,7 @@ _SCHEMA = CompareSchema(
     key_field=KEY_FIELD,
     context_fields=CONTEXT_FIELDS,
     legend_writer=_write_notes_sheet,
+    source_file_a=("tsar_ramp_detail", TSMIS_SHEET, "xlsx"),   # Source Files sheet
 )
 
 _ROUTE_FROM_LOCATION = re.compile(r"^\s*\d{2}-[A-Za-z]{2,3}-(\w+)\s*$")  # "01-DN-101" -> "101"

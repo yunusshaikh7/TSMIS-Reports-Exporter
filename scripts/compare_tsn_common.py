@@ -29,6 +29,7 @@ import json
 import logging
 import os
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import artifact_store
@@ -372,7 +373,12 @@ def source_files_from_consolidated(path, sheet, prefix, ext="xlsx"):
         if sheet not in wb.sheetnames:
             return []
         it = wb[sheet].iter_rows(values_only=True)
-        next(it, None)                                   # header
+        header = list(next(it, []))
+        # Only a CONSOLIDATED workbook (a prepended leading 'Route' column) carries
+        # the per-route file identity in column 0. A bare per-route export doesn't,
+        # so we skip it rather than name a data cell as a route.
+        if not header or str(header[0]).strip() != "Route":
+            return []
         out = []
         for r in it:
             if row_has_data(r):
@@ -397,6 +403,39 @@ def write_source_files_sheet(wb, side_specs, sheet_title="Source Files"):
         for i, (row, fn) in enumerate(zip(rows, files), start=1):
             route = "" if not row or row[0] is None else str(row[0])
             ws.append([side_name, i, route, fn])
+
+
+def with_source_files_sheet(schema, path_a, path_b):
+    """Return `schema` (a copy) whose `extra_sheet_writer` ALSO writes the default
+    "Source Files" companion sheet, driven by the schema's `source_file_a`/`_b`
+    (prefix, sheet, ext) specs and the two input PATHS. Composes with any existing
+    extra_sheet_writer (Report View, the Ramp Summary rollup, …). This is the single
+    place the file-based comparison substrate wires provenance, so every report gets
+    the sheet by default without its own writer. No-op (schema unchanged) when
+    neither side declares a spec (e.g. a report that opts out, or the statewide-TSN
+    side)."""
+    spec_a = getattr(schema, "source_file_a", ())
+    spec_b = getattr(schema, "source_file_b", ())
+    if not spec_a and not spec_b:
+        return schema
+    prev = schema.extra_sheet_writer
+
+    def _writer(wb, ctx):
+        if prev is not None:
+            prev(wb, ctx)
+        specs = []
+        for spec, path, side, rows_key in (
+                (spec_a, path_a, schema.side_a, "rows_a"),
+                (spec_b, path_b, schema.side_b, "rows_b")):
+            if spec:
+                prefix, sheet, ext = spec
+                files = source_files_from_consolidated(str(path), sheet, prefix, ext)
+                if files:
+                    specs.append((side, ctx[rows_key], files))
+        if specs:
+            write_source_files_sheet(wb, specs)
+
+    return replace(schema, extra_sheet_writer=_writer)
 
 
 def load_consolidated_rows(path, sheet_name, *, missing_sheet_hint, bad_header_msg,
@@ -931,6 +970,9 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
                                                  str(schema)),
                                "banner": banner},
                     "inputs": input_provenance}
+    # Default provenance: compose the "Source Files" companion sheet from the
+    # schema's per-side source-file specs (no-op when neither side declares one).
+    schema = with_source_files_sheet(schema, tsmis_path, tsn_path)
     committed = artifact_store.commit_workbook(
         out_path,
         lambda tmp: run_compare(

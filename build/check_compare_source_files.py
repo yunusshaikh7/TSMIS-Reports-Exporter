@@ -45,6 +45,16 @@ def test_source_files_from_consolidated():
     # a missing sheet / unreadable path is a logged no-op, never a crash
     assert ctc.source_files_from_consolidated(str(p), "Nope", "x") == []
     assert ctc.source_files_from_consolidated(str(d / "gone.xlsx"), "Data", "x") == []
+    # a bare per-route workbook (col 0 is NOT a leading 'Route') is skipped — we
+    # never name a data cell as a route
+    pr = d / "perroute.xlsx"
+    w2 = Workbook()
+    s2 = w2.active
+    s2.title = "Data"
+    s2.append(["County", "PM", "Desc"])
+    s2.append(["ORA", "001.0", "x"])
+    w2.save(pr)
+    assert ctc.source_files_from_consolidated(str(pr), "Data", "highway_log") == []
 
 
 def test_write_source_files_sheet_write_only():

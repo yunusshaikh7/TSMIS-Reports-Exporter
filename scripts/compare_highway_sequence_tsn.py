@@ -386,6 +386,7 @@ _SCHEMA = CompareSchema(
     key_field=KEY_FIELD,
     context_fields=CONTEXT_FIELDS,
     legend_writer=_write_notes_sheet,
+    source_file_a=("highway_sequence", TSMIS_SHEET, "xlsx"),   # Source Files sheet
 )
 
 

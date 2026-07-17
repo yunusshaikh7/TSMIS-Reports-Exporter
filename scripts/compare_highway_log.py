@@ -70,6 +70,7 @@ _SCHEMA = CompareSchema(
     ditto_nonasserting=True,             # +/++/+++ = "see paired roadbed" -> never a diff
     ditto_resolver=hlc.display_fills,    # tint + hover the resolved value on each ditto cell
     key_normalizer=hlc.roadbed_canonical_location,  # unify roadbed encoding (TSMIS suffix vs TSN dittoed block)
+    source_file_a=("highway_log", SHEET_NAME, "xlsx"),   # Source Files sheet
 )
 
 

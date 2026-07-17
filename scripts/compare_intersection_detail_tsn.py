@@ -1092,22 +1092,16 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     normalized library) and the locations from the consolidated TSMIS — both read
     lazily inside the writer, so they only open the workbooks when a sheet is actually
     built (after a successful load)."""
-    def _extra(wb, ctx):
-        _write_report_view(
-            wb, ctx, _tsn_onesided(Path(tsn_path)), _tsmis_locations(Path(tsmis_path)))
-        # Provenance (default): which per-route export each TSMIS row came from.
-        # The file route is the consolidated Route column, which can differ from the
-        # compared (Location-derived) route — so a junction/equate row still names
-        # its true export.
-        files = ctc.source_files_from_consolidated(
-            tsmis_path, TSMIS_SHEET, "intersection_detail")
-        if files:
-            ctc.write_source_files_sheet(
-                wb, [(ctx["sc"].side_a, ctx["rows_a"], files)])
-
     schema = dataclasses.replace(
-        _SCHEMA, extra_sheet_writer=_extra,
-        report_view_diff_check=("Report View", "B", 2))
+        _SCHEMA,
+        extra_sheet_writer=lambda wb, ctx: _write_report_view(
+            wb, ctx, _tsn_onesided(Path(tsn_path)), _tsmis_locations(Path(tsmis_path))),
+        report_view_diff_check=("Report View", "B", 2),
+        # Default provenance: the "Source Files" sheet, composed centrally by
+        # run_files_compare. The file route is the consolidated Route column, which
+        # can differ from the compared (Location-derived) route — so a junction/
+        # equate row still names its true per-route export.
+        source_file_a=("intersection_detail", TSMIS_SHEET, "xlsx"))
     return ctc.run_files_compare(
         schema, tsmis_path, tsn_path, out_path,
         banner="Intersection Detail Comparison — TSMIS vs TSN", has_route=True,

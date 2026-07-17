@@ -218,6 +218,16 @@ class CompareSchema:
     # not a value/per-field checksum: a same-count edit can leave it OK, so the
     # formulas Summary also labels Report View as a build-time snapshot.
     report_view_diff_check: tuple = ()
+    # Source-file provenance (default "Source Files" companion sheet): per side, the
+    # (export_prefix, consolidated_sheet, ext) used to name each row's per-route
+    # source `<prefix>_route_<route>.<ext>` from that side's consolidated Route
+    # column. `source_file_a` is the TSMIS/side-A input; `source_file_b` is set only
+    # when side B is ALSO a per-route TSMIS export (the same-source PDF-vs-Excel /
+    # cross-environment flavors). Empty () means that side has no per-route source
+    # (e.g. the statewide TSN side). The run_files_compare / cross-env substrates
+    # read these + compose the companion sheet — no per-report writer needed.
+    source_file_a: tuple = ()
+    source_file_b: tuple = ()
 
     @property
     def n_fields(self):
