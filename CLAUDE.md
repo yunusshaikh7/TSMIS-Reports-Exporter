@@ -143,9 +143,17 @@ with statewide re-verifies: ID 16,459/0/0 + only the real 108/TUO HG cell,
 HD topology exactly the v0.26.0 reference, HL measured
 51,884/51,261/623/624; 045's HD-Excel leg stays blocked on the vendor county
 answer — never infer it), and no product code changed during the bounded
-closeout itself. The 067 sweep surfaced one NEW follow-up: the TSMIS-PDF
-Highway Log parser drops asterisk-leading printed Descriptions (the mirror
-of the TSN v5 star-recovery) — bound in the plan. Exact
+closeout itself. The 067 sweep surfaced one follow-up, now SHIPPED: the
+TSMIS-PDF Highway Log parser dropped asterisk-leading printed Descriptions
+(the mirror of the TSN v5 star-recovery) — the star-guard is positional now
+(left-margin totals stars close the row; description-band stars attach), all
+four real rows recovered, statewide Description class 5→1. The 2026-07-17
+unowned-findings triage then bucketed the 112 remaining findings A–I and
+closed bucket A: CMP-AUD-065 (already fixed by 199), the 040 file half (066),
+and CMP-AUD-006 (the RD physical-identity postmile is Decimal-canonical now —
+`decimal_pm` shared with Intersection Detail; `9.6`/`9.600`/`009.600` are one
+ramp; the statewide coincidence census proved ZERO pairing changes, only
+1,755 canonical-key display texts). Exact
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
 The owner-authorized remediation is live on branch `comparison-perfection`; the single

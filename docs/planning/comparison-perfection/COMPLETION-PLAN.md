@@ -25,7 +25,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
 | **Next action** | **CMP-AUD-220 — owner-APPROVED 2026-07-16** (assignment/verdict split; approval recorded in the D3 gate doc; compare_core batch + all-family re-bless), then **218** (Spot Check independence, brief staged), then the 197 vs-TSN remainder. **DONE 2026-07-16: the same-source render-artifact fix** (owner-reported ID PDF↔Excel false positives; ID/RD/HSL corpus-verified). HL needs its county census first, HD-Excel vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 + 066 + 067 closures)
+> ### ▶ RESUME HERE (2026-07-17, after the CMP-AUD-049 + 066 + 067 + 006 closures)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -288,12 +288,15 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 >   (→ D/E). 037 partially closed (HSL v4 + HL v5 direct-path marker gates);
 >   **ID/HD/RD direct vs-TSN loaders still ungated — the fix = in-workbook
 >   markers + gates for those three (version bump + re-bless each)**. 006
->   still OPEN and real (`_norm_pm("9.6")→"9.6"` vs `"009.600"→"9.600"`) —
->   **the next fix batch: canonical 3.3 zero-pad in the shared PM helper,
->   with the RD + ID canary re-blesses** (the helper is shared; expect
->   ZERO count deltas on the current corpus — both July renders pad — and
->   prove it). 071 NOT closed by 050 (different surface: the COMPARATOR's
->   TSMIS loader) — stays bucket C.
+>   CLOSED the same day: the RD physical identity's postmile component is
+>   DECIMAL-canonical (`compare_tsn_common.decimal_pm`; ID's `_decimal_pm`
+>   delegates), so `9.6`/`9.600`/`009.600` are ONE ramp and the zero
+>   variants ONE zero. Statewide coincidence census (all three real sources,
+>   244 route/county groups): ZERO norm-vs-decimal partition merges —
+>   pairing identical, every count canary holds by construction; the visible
+>   delta is the canonical-key DISPLAY on 1,755 trailing-zero PM texts. Gate
+>   127/127; identity gate back to 11/0. 071 NOT closed by 050 (different
+>   surface: the COMPARATOR's TSMIS loader) — stays bucket C.
 > - **B. PDF-parser robustness (HD/ID):** 051–062 + 044 — a dedicated
 >   parser-hardening wave (spill/orphan/fallback/truncation/vestigial/
 >   cancellation classes).
@@ -316,9 +319,11 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > "— MER 059" line (route 059 p5, x0 354.4 — group-header-SHAPED, dashed
 > district slot; ONE cell statewide; scan all 252 prints for em-dash
 > lines and classify with evidence BEFORE any rule). **Next actionable
-> batch: bucket A's five re-verifies** (each is a bounded record-vs-current-
-> behavior check), then F's 210 (evidence over the same-source schemas).
-> HD-Excel county stays vendor-blocked — never infer it.
+> batch: 037's three family markers** (ID/HD/RD in-workbook normalization
+> markers + direct-loader gates — a version bump + re-bless each), then F's
+> 210 (evidence over the 067 same-source schemas), then the "— MER 059"
+> census, then buckets B–I. (Bucket A is DONE: 065/040-file/006 closed,
+> 037 partial, 071 → C.) HD-Excel county stays vendor-blocked — never infer it.
 >
 > **DONE 2026-07-17 (after 067): the TSMIS-PDF HL star-description
 > recovery — the TSN-v5 mirror.** The star-guard is POSITIONAL now: a

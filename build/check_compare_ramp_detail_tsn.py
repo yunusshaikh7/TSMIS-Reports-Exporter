@@ -100,9 +100,10 @@ def test_schema():
         {"LOCATION": 0, "PR": 1, "PM": 2, "PM_SFX": 3, "DATE_OF_RECORD": 4,
          "HG": 5, "AREA_4": 6, "CITY_CODE": 7, "POP": 8, "DESCRIPTION": 9})
     check("route from TSN LOCATION '01-DN-101' -> '101'", raw_probe[0] == "101")
-    check("the PM key carries the D4 identity (route/county/norm PM)",
+    check("the PM key carries the D4 identity (route/county/DECIMAL-canonical "
+          "PM — CMP-AUD-006: '9.6', '9.600', '009.600' are ONE ramp)",
           dict(raw_probe[1 + rd.KEY_FIELD].physical_identity.canonical_components)
-          == {"route": "101", "county": "DN", "postmile": "1.000"})
+          == {"route": "101", "county": "DN", "postmile": "1"})
     check("District is a compared field filled from LOCATION",
           rd.SHARED_HEADER[2] == "District" and raw_probe[3] == "01")
     check("TSN Description preserved byte-for-byte (its own '9/' prefix survives)",
@@ -165,14 +166,15 @@ def test_end_to_end():
     # display "route / county / postmile" (CMP-AUD-045).
     pm_col = header.index("PM")
     by_pm = {r[pm_col]: r for r in rows}
-    check("5 union rows on the canonical route/county/PM identities",
-          set(by_pm) == {"001 / ORA / 0.606", "001 / ORA / 1.000",
-                         "001 / ORA / 1.500", "001 / ORA / 2.000",
-                         "002 / ORA / 10.000"})
+    check("5 union rows on the canonical route/county/PM identities "
+          "(decimal-canonical postmiles since CMP-AUD-006)",
+          set(by_pm) == {"001 / ORA / 0.606", "001 / ORA / 1",
+                         "001 / ORA / 1.5", "001 / ORA / 2",
+                         "002 / ORA / 10"})
 
     # The COMPARED HG diff at PM 1.000 carries the ≠ marker.
     hg_col = header.index("HG")
-    pm1 = by_pm["001 / ORA / 1.000"]
+    pm1 = by_pm["001 / ORA / 1"]
     check("compared HG difference shows the diff marker", DIFF in pm1[hg_col])
 
     # The CONTEXT 'Ramp Type' column NEVER carries a diff marker, and SHOWS the TSN value.
@@ -180,7 +182,7 @@ def test_end_to_end():
     check("context 'Ramp Type' never shows a diff marker in any row",
           all(DIFF not in r[rt_col] for r in rows))
     check("context 'Ramp Type' coalesces to the TSN value (M)",
-          by_pm["001 / ORA / 2.000"][rt_col] == "M")
+          by_pm["001 / ORA / 2"][rt_col] == "M")
     dist_col = header.index("District")
     check("District compared and equal on the matched rows (no diff marker)",
           all(DIFF not in r[dist_col] for r in rows))
@@ -193,6 +195,36 @@ def test_end_to_end():
     check("zero diff cells fall in the context columns", ctx_diffs == 0)
     check("at least the one compared HG diff is counted", total >= 1)
     print(f"      (union rows={len(rows)}, total diff cells={total}, context diff cells={ctx_diffs})")
+
+
+def test_pm_identity_canon():
+    """CMP-AUD-006: the notes' contract says '9.6' and '009.600' identify the
+    SAME ramp, but the norm_pm identity split them into one-sided rows. The
+    physical identity now hashes the DECIMAL-canonical postmile
+    (compare_tsn_common.decimal_pm) while each side's norm_pm text stays the
+    display payload."""
+    print("CMP-AUD-006 — trailing-zero PM variants are ONE physical identity:")
+    import compare_tsn_common as ctc
+    check("decimal_pm unifies 9.6 / 9.600 / 009.600",
+          ctc.decimal_pm("9.6") == ctc.decimal_pm("9.600")
+          == ctc.decimal_pm("009.600") == "9.6")
+    check("decimal_pm unifies the zero variants to '0' (never blank)",
+          ctc.decimal_pm("0") == ctc.decimal_pm("0.0")
+          == ctc.decimal_pm("000.000") == "0")
+    check("decimal_pm keeps real fractions ('005.870' -> '5.87')",
+          ctc.decimal_pm("005.870") == "5.87")
+    k1 = rd._physical_pm_key("101", "DN", "9.6",
+                             (("postmile", "9.6"),), "probe A")
+    k2 = rd._physical_pm_key("101", "DN", "009.600",
+                             (("postmile", "009.600"),), "probe B")
+    check("the two printed variants build EQUAL physical identities",
+          k1.physical_identity == k2.physical_identity)
+    check("...while each keeps its own normalized display payload",
+          str(k1) == "9.6" and str(k2) == "9.600")
+    k3 = rd._physical_pm_key("101", "DN", "9.61",
+                             (("postmile", "9.61"),), "probe C")
+    check("a genuinely different postmile still differs",
+          k3.physical_identity != k1.physical_identity)
 
 
 def test_two_county_and_v3_refusal():
@@ -219,7 +251,7 @@ def test_two_county_and_v3_refusal():
     pm_col, desc_col = header.index("PM"), header.index("Description")
     by_pm = {r[pm_col]: r for r in rows}
     check("two county-distinct identities, both paired",
-          set(by_pm) == {"101 / DN / 1.000", "101 / LA / 1.000"})
+          set(by_pm) == {"101 / DN / 1", "101 / LA / 1"})
     check("the physical swap surfaces as TWO Description differences",
           all(DIFF in by_pm[k][desc_col] for k in by_pm))
     check("...and exactly two differing cells total",
@@ -248,6 +280,7 @@ def test_two_county_and_v3_refusal():
 def main():
     test_schema()
     test_end_to_end()
+    test_pm_identity_canon()
     test_two_county_and_v3_refusal()
     print()
     if _fail:

@@ -443,6 +443,23 @@ def norm_pm(pm):
     return ("-" + s) if neg else s
 
 
+def decimal_pm(pm):
+    """The Decimal-canonical numeric postmile as text (CMP-AUD-006): leading
+    zeros stripped (norm_pm), then trailing fraction zeros and a bare dot
+    stripped — '9.6', '9.600', and '009.600' all identify the SAME point
+    ('9.6'); '005.870' -> '5.87'; '001.000' -> '1'; '0', '0.0', '000.000' ->
+    '0'. This is the IDENTITY component (what PhysicalIdentity equality
+    hashes); the norm_pm text stays the display payload, so the two renders'
+    printed forms remain visible while physically identical rows align."""
+    s = norm_pm(pm)
+    neg, t = s.startswith("-"), s.lstrip("-")
+    if "." in t:
+        ip, fp = t.split(".", 1)
+        fp = fp.rstrip("0")
+        t = ip + ("." + fp if fp else "")
+    return ("-" + t) if neg and t not in ("", "0") else t
+
+
 def iso_date(d):
     """A Date of Record to YYYY-MM-DD across the formats the two systems print:
     TSMIS 'MM/DD/YYYY', TSN 'YYYY-MM-DD[ HH:MM:SS]', and TSN's 2-digit 'YY-MM-DD'

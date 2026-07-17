@@ -304,13 +304,15 @@ def test_highway_sequence_env_county_and_glued_pm():
 
 
 def test_ramp_env_county_identity():
-    # CMP-AUD-045, GREEN since the RD projector batch. The canonical postmile is
-    # the owner-approved D4 form `norm_pm(PM)` — NOT the glued prefix/PM/suffix
-    # this contract originally expected: the accepted RD-79 oracle keys on
-    # exactly (Route, County, norm_pm(PM)) with PR/PM_SFX as separately
-    # conserved claims, PR differs on zero paired rows corpus-wide, and TSN's
-    # 313 print suffixes have no TSMIS counterpart — gluing either would
-    # fabricate one-sided rows out of physically identical ramps.
+    # CMP-AUD-045, GREEN since the RD projector batch. The canonical postmile
+    # is DECIMAL-canonical since CMP-AUD-006 ('9.6', '9.600', '009.600' are
+    # ONE ramp — trailing-zero variants used to fabricate one-sided rows) —
+    # NOT the glued prefix/PM/suffix this contract originally expected: the
+    # accepted RD-79 oracle keys on exactly (Route, County, PM) with
+    # PR/PM_SFX as separately conserved claims, PR differs on zero paired
+    # rows corpus-wide, and TSN's 313 print suffixes have no TSMIS
+    # counterpart — gluing either would fabricate one-sided rows out of
+    # physically identical ramps.
     header = [
         "Location", "(col B)", "PM", "Date of Record", "(col E)", "HG",
         "Area 4", "(col H)", "City Code", "R/U", "Description",
@@ -325,7 +327,7 @@ def test_ramp_env_county_identity():
         ["101", "07-LA-101", "R", "001.000", "2026-01-01", "E", "D", "Y", "", "A", "U", "DESC-A"],
     ]
     _assert_exact_physical_swap(
-        schema, rows_a, rows_b, 10, "1.000")
+        schema, rows_a, rows_b, 10, "1")
     # The conserved raw claims carry the prefix/suffix facts the key excludes.
     keys = keys_for(rows_a, True, schema.key_field, schema.key_normalizer)
     claims = dict((c.name, c.value)
@@ -409,7 +411,7 @@ def test_ramp_direct_projectors_retain_physical_identity():
     ])
     _assert_identity(
         ramp_tsmis, key_field=rd.KEY_FIELD,
-        route="101", county="DN", postmile="1.000",
+        route="101", county="DN", postmile="1",
         raw_claims=_RD_CLAIMS)
     assert rd.SHARED_HEADER[2] == "District" and ramp_tsmis[3] == "01", ramp_tsmis
 
@@ -424,7 +426,7 @@ def test_ramp_direct_projectors_retain_physical_identity():
     )
     _assert_identity(
         ramp_tsn, key_field=rd.KEY_FIELD,
-        route="101", county="DN", postmile="1.000",
+        route="101", county="DN", postmile="1",
         raw_claims=_RD_CLAIMS)
     # CMP-AUD-135: TSN's own text is authoritative — the leading "12/" survives.
     assert ramp_tsn[1 + rd.SHARED_HEADER.index("Description")] == "12/DESC", ramp_tsn
@@ -435,7 +437,7 @@ def test_ramp_direct_projectors_retain_physical_identity():
     ])
     _assert_identity(
         ramp_pdf, key_field=rd.KEY_FIELD,
-        route="101", county="DN", postmile="1.000",
+        route="101", county="DN", postmile="1",
         raw_claims=_RD_CLAIMS)
     assert ramp_pdf[3] == "01", ramp_pdf
 

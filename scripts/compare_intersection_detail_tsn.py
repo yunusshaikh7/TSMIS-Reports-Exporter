@@ -226,16 +226,11 @@ def _dist_cnty(loc):
 
 
 def _decimal_pm(pm_raw):
-    """The ID-79 oracle's Decimal-canonical numeric postmile as text: leading
-    zeros stripped (norm_pm), then trailing zeros and a bare dot stripped —
-    '005.870' -> '5.87', '001.000' -> '1', '0.000' -> '0'."""
-    s = _norm_pm(pm_raw)
-    neg, t = s.startswith("-"), s.lstrip("-")
-    if "." in t:
-        ip, fp = t.split(".", 1)
-        fp = fp.rstrip("0")
-        t = ip + ("." + fp if fp else "")
-    return ("-" + t) if neg and t not in ("", "0") else t
+    """The ID-79 oracle's Decimal-canonical numeric postmile as text —
+    '005.870' -> '5.87', '001.000' -> '1', '0.000' -> '0'. Homed in
+    compare_tsn_common since CMP-AUD-006 (Ramp Detail's identity now shares
+    it); this name stays for the loaders and the golden canary."""
+    return ctc.decimal_pm(pm_raw)
 
 
 def _raw_text(v):

@@ -284,7 +284,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-003 | P1 | Resolved | Excel error text is literal-safe and counted through typed state |
 | CMP-AUD-004 | P1 | Resolved | Literal ` != ` content is presentation-only, never discrepancy state |
 | CMP-AUD-005 | P1 | Resolved | Opaque helper identities prevent delimiter collisions |
-| CMP-AUD-006 | P1 | Verified | Ramp Detail PM normalization contradicts its identity contract |
+| CMP-AUD-006 | P1 | Remediated 2026-07-17 (the identity component is Decimal-canonical — compare_tsn_common.decimal_pm; zero partition merges statewide, pairing provably unchanged) | Ramp Detail PM normalization contradicts its identity contract |
 | CMP-AUD-007 | P1 | Verified | Settings validation omits five PDF rows and selected TSN files |
 | CMP-AUD-008 | P2 | Resolved | Duplicate pairing is exact in-cap and explicitly partial/capped above it |
 | CMP-AUD-009 | P2 | Verified | Row keys bypass ordinary trim and numeric coercion |
@@ -729,9 +729,9 @@ real differing cell, and all Summary self-checks `OK` after installed Excel
 ### CMP-AUD-006 — Ramp Detail PM canonicalization is incomplete
 
 Priority: P1  
-Status: Verified at the production normalizer boundary  
-Primary code: `scripts/compare_tsn_common.py:90-103`,
-`scripts/compare_ramp_detail_tsn.py:58-60`
+Status: Remediated 2026-07-17 (Decimal-canonical identity component)  
+Primary code: `scripts/compare_tsn_common.py` (`decimal_pm`),
+`scripts/compare_ramp_detail_tsn.py` (`_physical_pm_key`)
 
 The notes explicitly state `9.6` and `009.600` identify the same ramp, but production
 normalization returns `9.6` and `9.600`. Numeric/text zero variants also split: `0`,
@@ -749,7 +749,27 @@ binary-float rounding. Test text/numeric zero, leading and trailing zeros, signs
 prefixes/suffixes, invalid tokens, and the documented pair through both raw and
 normalized-library loaders. Correct the docstring only after that decision.
 
-**Re-verified still OPEN (2026-07-17, the bucket-A sweep).** The exact case reproduces: the production normalizer returns 9.6 for "9.6" and 9.600 for "009.600" (and 0 / 0.000 for the zero variants) — the identity contract is still contradicted. Bound as the next fix batch in the plan (canonical 3.3 zero-pad; the helper is shared with Intersection Detail and the PDF flavors, so the fix carries an RD + ID canary re-bless).
+**Remediation (2026-07-17).** The physical identity's postmile component is
+now DECIMAL-canonical: the new shared `compare_tsn_common.decimal_pm`
+(leading zeros stripped, then trailing fraction zeros and a bare dot —
+`9.6` == `9.600` == `009.600` → `9.6`; `0`/`0.0`/`000.000` → `0`) feeds
+`_physical_pm_key`'s `make_physical_identity`, while the norm_pm text stays
+the display payload, so the two renders' printed forms remain visible where
+physically identical rows now align. Intersection Detail already used this
+canon (its `_decimal_pm` now delegates — byte-identical). Red→green in
+`check_compare_ramp_detail_tsn.test_pm_identity_canon` (unit unification,
+equal identities with distinct payloads, genuinely-different PMs still
+differ) plus the deliberate re-bless of five identity-DISPLAY pins
+(`1.000`-style → the canonical `1`) across that check and the
+physical-identity gate (back to 11 green / 0 known-red). **Statewide
+coincidence census (all three real sources — the 126 ssor-7.9 Excel
+exports 15,216 rows, a fresh production PDF conversion 15,216, the raw TSN
+extract 15,410; 244 route/county groups): ZERO norm-vs-decimal partition
+merges — the pairing partition is IDENTICAL on the bound corpus, so every
+count canary holds by construction; the visible delta is the canonical key
+DISPLAY on 1,755 trailing-zero PM texts (`0.100` → `0.1`), with the PM
+data cells unchanged.** Gate 127/127.
+
 
 ### CMP-AUD-007 — Settings validation silently omits supported comparisons
 

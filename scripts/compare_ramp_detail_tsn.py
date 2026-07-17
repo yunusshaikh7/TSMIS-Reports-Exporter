@@ -119,22 +119,27 @@ def _dist_cnty(loc):
 
 def _physical_pm_key(route, county, pm_raw, claims, source_hint):
     """The D4 PhysicalKey for one Ramp Detail row (CMP-AUD-045): canonical
-    identity is exactly the owner-approved `(Route, County, norm_pm(PM))` tuple
-    (RD-79 accepted oracle) — the PM prefix and suffix stay conserved RAW CLAIMS,
-    never key components (on the bound corpus PR differs on zero paired rows,
-    and TSN's 313 print suffixes have no TSMIS counterpart; gluing either would
-    fabricate one-sided rows out of physically identical ramps). The key's str
-    payload is the normalized PM (what the side sheets display); a row whose
-    county can't be established refuses loudly."""
+    identity is the owner-approved `(Route, County, PM)` tuple (RD-79 accepted
+    oracle), with the PM component DECIMAL-canonical since CMP-AUD-006 — the
+    notes' contract says '9.6' and '009.600' identify the SAME ramp, and the
+    raw norm_pm split them into fabricated one-sided rows (the July corpus
+    pads uniformly, so both canons coincide on every bound row — proven at
+    the re-bless). The PM prefix and suffix stay conserved RAW CLAIMS, never
+    key components (on the bound corpus PR differs on zero paired rows, and
+    TSN's 313 print suffixes have no TSMIS counterpart; gluing either would
+    fabricate one-sided rows out of physically identical ramps). The key's
+    str payload is the normalized PM (what the side sheets display); a row
+    whose county can't be established refuses loudly."""
     pm = _norm_pm(pm_raw)
+    numeric = ctc.decimal_pm(pm_raw)
     if not county:
         raise ValueError(f"Ramp Detail row (route {route}, PM {pm}) has no "
                          f"usable county in {source_hint} — cannot key it to a "
                          "physical location")
     identity = cc.make_physical_identity(
-        route, county, pm,
+        route, county, numeric,
         tuple(cc.RawIdentityClaim(name, value) for name, value in claims),
-        f"{route} / {county} / {pm}")
+        f"{route} / {county} / {numeric}")
     return cc.physical_key(pm, identity)
 
 
