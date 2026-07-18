@@ -137,7 +137,7 @@ def load_results():
 def record_result(date, source, row_key, verdict, diff_cells, one_sided,
                   built_at_mtime, completion=None, input_fingerprint=None,
                   source_identities=None, generation_id=None,
-                  commit_guard=None):
+                  producer_versions=None, commit_guard=None):
     data = load_results()
     data[f"{day_folder_name(date, source)}|{row_key}"] = {
         "verdict": verdict, "diff_cells": diff_cells,
@@ -148,6 +148,9 @@ def record_result(date, source, row_key, verdict, diff_cells, one_sided,
         # reads the cell stale when it differs. Absent on legacy records (mtime only).
         "input_fingerprint": input_fingerprint,
         "source_identities": source_identities or {},
+        # CMP-AUD-084: the semantic producer version — a shipped comparator/parser
+        # change reads the cell stale via the shared matrix._staleness gate.
+        "producer_versions": producer_versions,
     }
     p = _results_path()
     tmp = p.with_name(p.name + ".tmp")
@@ -524,5 +527,6 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
                       source_identities=(
                           {"tsn": tsn_token}),
                       generation_id=published.artifact_generation.generation_id,
+                      producer_versions=matrix.producer_identity(),
                       commit_guard=cache_guard)
     return result

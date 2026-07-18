@@ -232,15 +232,19 @@ def test_canonical_selection_keys():
         {"name": "tsn", "present": True, "mtime": 1.0,
          "identity": {"sha256": "a" * 64}, "identity_required": True},
     ]
+    # Every record carries a CURRENT producer version (CMP-AUD-084) so the sole
+    # differentiator under test is the TSN identity token, not the version gate.
+    _pv = matrix.producer_identity()
     legacy_state = matrix._staleness(
-        10.0, sources, {"built_at_mtime": 10.0, "verdict": "match"}, (), None)
+        10.0, sources,
+        {"built_at_mtime": 10.0, "verdict": "match", "producer_versions": _pv}, (), None)
     matching_state = matrix._staleness(
         10.0, sources,
-        {"built_at_mtime": 10.0, "verdict": "match",
+        {"built_at_mtime": 10.0, "verdict": "match", "producer_versions": _pv,
          "source_identities": {"tsn": {"sha256": "a" * 64}}}, (), None)
     changed_state = matrix._staleness(
         10.0, sources,
-        {"built_at_mtime": 10.0, "verdict": "match",
+        {"built_at_mtime": 10.0, "verdict": "match", "producer_versions": _pv,
          "source_identities": {"tsn": {"sha256": "b" * 64}}}, (), None)
     check("explicit identity gates cached truth (legacy/different stale; matching fresh)",
           legacy_state["stale"] and changed_state["stale"]

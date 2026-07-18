@@ -158,7 +158,8 @@ def _result_key(date, source, row_key, baseline_id):
 
 def record_result(date, source, row_key, baseline_id, verdict, diff_cells,
                   one_sided, built_at_mtime, completion=None,
-                  input_fingerprint=None, generation_id=None):
+                  input_fingerprint=None, generation_id=None,
+                  producer_versions=None):
     data = load_results()
     data[_result_key(date, source, row_key, baseline_id)] = {
         "verdict": verdict, "diff_cells": diff_cells,
@@ -168,6 +169,9 @@ def record_result(date, source, row_key, baseline_id, verdict, diff_cells,
         # Both sides are multi-file folders, so the identity fingerprint covers
         # BOTH (a route deleted on either side hides from the mtime check).
         "input_fingerprint": input_fingerprint,
+        # CMP-AUD-084: the semantic producer version — a shipped comparator/parser
+        # change reads the cell stale via the shared matrix._staleness gate.
+        "producer_versions": producer_versions,
     }
     p = _results_path()
     try:
@@ -437,5 +441,6 @@ def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
                       completion=typed.completion,
                       input_fingerprint=matrix._fingerprint_for_record(
                           fp_before, fp_folders, dest_path.name, events),
-                      generation_id=published.artifact_generation.generation_id)
+                      generation_id=published.artifact_generation.generation_id,
+                      producer_versions=matrix.producer_identity())
     return result

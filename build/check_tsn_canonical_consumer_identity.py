@@ -378,6 +378,8 @@ def test_publication_and_cache_identity():
                 "completion": outcome.COMPLETE,
                 "generation_id": "consumer-identity-fixture",
                 "source_identities": {"tsn": token},
+                # CMP-AUD-084: a current record — isolate the TSN-drift gate under test.
+                "producer_versions": matrix.producer_identity(),
             }
             sources = [
                 {"name": "cell", "present": True, "mtime": 1.0},

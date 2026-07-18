@@ -30,6 +30,7 @@ Robustness:
     conservative sentinel (``read_completion`` falls back to it) so reuse never reads a
     sidecar-less non-complete workbook as green.
 """
+import ast
 import contextlib
 import json
 import hashlib
@@ -423,6 +424,44 @@ def _quarantine(consolidated, commit_guard=None):
         return False
 
 
+def _app_version_from_file():
+    """Read ``__version__`` from ``version.py`` beside ``scripts/`` without executing
+    it — the fallback for isolated check contexts that put only ``scripts/`` on
+    ``sys.path`` (``version.py`` lives one level up at the repo root). Parsed with
+    ``ast`` so nothing in the file runs. ``"unknown"`` on any failure: a STABLE value
+    that both stamps and compares equal (a safe no-op of the version gate), never a
+    false-stale signal."""
+    try:
+        src = (Path(__file__).resolve().parent.parent / "version.py").read_text(
+            encoding="utf-8")
+        for node in ast.parse(src).body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "__version__":
+                        return str(ast.literal_eval(node.value))
+    except (OSError, ValueError, SyntaxError):  # silent-ok: fall through to the stable sentinel
+        pass
+    return "unknown"
+
+
+def producer_app_version():
+    """The app release that built a persistent consolidated workbook (CMP-AUD-084).
+
+    Stamped in every outcome sidecar so a consolidation built by an OLDER parser /
+    consolidator re-parses once after an upgrade — otherwise a corrected comparator
+    would keep reading pre-fix rows from an unchanged-raw-inputs workbook. A shipped
+    parser fix always rides a new release, so the app version is the semantic signal.
+    Also the single ``{"app": ...}`` value the matrix cache records bind (via
+    ``matrix_state.producer_identity``), so the comparison-cache and consolidation
+    freshness gates agree. ``version.py`` is dependency-free; isolated checks that omit
+    the repo root from ``sys.path`` fall back to reading it by path."""
+    try:
+        import version
+        return str(version.__version__)
+    except ModuleNotFoundError:  # silent-ok: scripts-only sys.path -> read version.py by file
+        return _app_version_from_file()
+
+
 def write_outcome(consolidated, result, extra=None, commit_guard=None):
     """Record `result`'s producer completion beside its workbook, ATOMICALLY — the
     boundary every persistent-consolidated writer calls right after a successful write.
@@ -446,6 +485,9 @@ def write_outcome(consolidated, result, extra=None, commit_guard=None):
         "skipped_inputs": int(getattr(result, "skipped_inputs", 0) or 0),
         "failed_inputs": int(getattr(result, "failed_inputs", 0) or 0),
         "built_at_mtime": _safe_mtime(consolidated),
+        # CMP-AUD-084: the semantic producer version; `matrix._consolidated_stale`
+        # rebuilds a workbook stamped by an older parser/consolidator once on upgrade.
+        "producer_app_version": producer_app_version(),
     }
     if extra:
         payload.update(extra)          # additive producer metadata (e.g. the TSN

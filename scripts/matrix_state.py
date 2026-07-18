@@ -28,6 +28,26 @@ _RESULTS_FILE = "_results.json"
 _MTIME_TOL_S = consolidation_meta._MTIME_TOL_S   # single home: the sidecar layer owns the tolerance
 
 
+def producer_identity():
+    """The semantic PRODUCER version a fresh comparison cache record is stamped
+    with — the app's released ``MAJOR.MINOR.PATCH`` (CMP-AUD-084).
+
+    A shipped comparator / parser / normalizer / consolidator fix always rides a
+    new release, so binding every cache record to the app version invalidates any
+    cell built by an OLDER pipeline exactly once on upgrade — a rebuild that
+    recomputes against the current code, never a silent stale verdict — while an
+    unchanged version reads fresh (a no-op within a release). This is the ONGOING
+    semantic gate; the ``cache_envelope`` schema version stays the SEPARATE
+    record-SHAPE migration (the finding's "separate record-shape migration from
+    semantic invalidation"). A dict so a future finer per-producer key is an
+    additive mismatch (stale-once), not a shape migration. Kept in ONE place so the
+    Everything / by-day / baseline caches all agree on what "current" means, and
+    routed through ``consolidation_meta.producer_app_version`` so the comparison-cache
+    and consolidation freshness gates read the SAME value (robust to a scripts-only
+    ``sys.path`` in isolated checks)."""
+    return {"app": consolidation_meta.producer_app_version()}
+
+
 # --------------------------------------------------------------------------- #
 # cell identity
 # --------------------------------------------------------------------------- #
@@ -135,7 +155,8 @@ def _save_results(dest, baseline_key, data, commit_guard=None):
 
 def record_result(dest, baseline_key, row_key, cell_key, verdict,
                   diff_cells, one_sided, built_at_mtime, completion=None,
-                  input_fingerprint=None, generation_id=None, commit_guard=None):
+                  input_fingerprint=None, generation_id=None,
+                  producer_versions=None, commit_guard=None):
     data = load_results(dest, baseline_key)
     data.setdefault(row_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
@@ -146,6 +167,10 @@ def record_result(dest, baseline_key, row_key, cell_key, verdict,
         # the cell STALE when it differs (a route added/removed/resized — invisible to
         # the mtime check). Absent on legacy records -> the mtime check alone applies.
         "input_fingerprint": input_fingerprint,
+        # CMP-AUD-084: the semantic producer version this cell was built by. A later
+        # snapshot reads the cell stale when the running pipeline differs (a shipped
+        # comparator/parser fix); absent on legacy records -> stale once, then rebuilt.
+        "producer_versions": producer_versions,
     }
     _save_results(dest, baseline_key, data, commit_guard=commit_guard)
 
@@ -312,6 +337,15 @@ def _staleness(cmp_m, sources, rec, fp_folders, missing_side,
     if (rec_trusted and comparison_output is not None
             and rec.get("generation_id") != published_generation):
         rec_trusted = False
+    # CMP-AUD-084: a cache stamped by a DIFFERENT semantic producer generation (a
+    # shipped comparator / parser / normalizer fix) can never certify fresh, even
+    # with byte-identical inputs and a matching output generation. The recorded
+    # producer identity must equal the CURRENT one; a legacy record (no field, or a
+    # mismatching map) reads stale and rebuilds ONCE against the running pipeline.
+    producer_stale = bool(rec_trusted
+                          and rec.get("producer_versions") != producer_identity())
+    if producer_stale:
+        rec_trusted = False
     if rec_trusted and comparison_output is None:
         verdict = rec.get("verdict")
         diff_cells = rec.get("diff_cells")
@@ -336,6 +370,9 @@ def _staleness(cmp_m, sources, rec, fp_folders, missing_side,
         stale, reason = True, "missing"
     elif publication_reason is not None:
         stale, reason = True, publication_reason
+    elif producer_stale:
+        # CMP-AUD-084: the record was built by a superseded semantic pipeline.
+        stale, reason = True, "producer_version_changed"
     elif comparison_output is not None and not rec_trusted:
         # The strict sidecar owns output truth, but the per-cell cache owns the
         # source-folder set fingerprint. Losing either half cannot certify fresh.
@@ -675,7 +712,8 @@ def load_tsn_results(dest):
 
 def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided,
                       built_at_mtime, completion=None, input_fingerprint=None,
-                      source_identities=None, generation_id=None, commit_guard=None):
+                      source_identities=None, generation_id=None,
+                      producer_versions=None, commit_guard=None):
     data = load_tsn_results(dest)
     data.setdefault(result_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
@@ -686,6 +724,9 @@ def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided
         # reads the cell stale when it differs. Absent on legacy records (mtime only).
         "input_fingerprint": input_fingerprint,
         "source_identities": source_identities or {},
+        # CMP-AUD-084: the semantic producer version (see record_result) — a shipped
+        # comparator/parser change reads the cell stale even with identical inputs.
+        "producer_versions": producer_versions,
     }
     p = _tsn_results_path(dest)
     tmp = p.with_name(p.name + ".tmp")

@@ -124,7 +124,8 @@ def test_cmp_state_fingerprint(tmp):                          # CT-6b
     cmp_m = out_path.stat().st_mtime
     rec = {"verdict": "diff", "diff_cells": 3, "one_sided": 0, "built_at_mtime": cmp_m,
            "completion": "complete", "input_fingerprint": artifact_store.fingerprint(store),
-           "generation_id": result.artifact_generation.generation_id}
+           "generation_id": result.artifact_generation.generation_id,
+           "producer_versions": matrix.producer_identity()}  # CMP-AUD-084: a current record
     sources = [{"name": "cell", "present": True, "mtime": cmp_m - 100},
                {"name": "tsn", "present": True, "mtime": cmp_m - 100}]
 
@@ -158,7 +159,8 @@ def test_comparison_state_fingerprint(tmp):                   # CT-6c
     results = {"highway_log": {"ars-prod": {
         "verdict": "match", "diff_cells": 0, "one_sided": 0, "built_at_mtime": cmp_m,
         "completion": "complete", "input_fingerprint": fp,
-        "generation_id": result.artifact_generation.generation_id}}}
+        "generation_id": result.artifact_generation.generation_id,
+        "producer_versions": matrix.producer_identity()}}}  # CMP-AUD-084: a current record
     ages = {"ssor-prod": {subdir: {"mtime": cmp_m - 50}},
             "ars-prod": {subdir: {"mtime": cmp_m - 50}}}
 
@@ -210,7 +212,8 @@ def test_midcompare_race(tmp):                                # CT-6d / CMP-AUD-
     rec = {"verdict": "match", "diff_cells": 0, "one_sided": 0,
            "built_at_mtime": cmp_m, "completion": "complete",
            "input_fingerprint": recorded,
-           "generation_id": result.artifact_generation.generation_id}
+           "generation_id": result.artifact_generation.generation_id,
+           "producer_versions": matrix.producer_identity()}  # CMP-AUD-084: a current record
     st = matrix._cmp_state(out_path, sources, rec, fp_folders=(store,))
     check("the raced 0/0 'match' reads STALE (never fresh)",
           st["stale"] is True and st["reason"] == "inputs_changed")

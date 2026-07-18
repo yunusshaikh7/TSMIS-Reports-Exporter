@@ -362,7 +362,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-081 | P1 | Partially remediated | Matrix TSN freshness ignores source identity and library rebuild state |
 | CMP-AUD-082 | P1 | Verified | Matrix formula twins can survive as stale audit artifacts |
 | CMP-AUD-083 | P2 | Resolved | Matrix presence and freshness count arbitrary non-report files |
-| CMP-AUD-084 | P1 | Verified | Matrix caches survive semantic comparator and parser changes |
+| CMP-AUD-084 | P1 | Resolved | Matrix caches survive semantic comparator and parser changes |
 | CMP-AUD-085 | P1 | Partially remediated | Partial-artifact policy conflicts while truth surfaces certify/reuse incomplete work |
 | CMP-AUD-086 | P3 | Resolved | Comparison documentation contradicts the executable capability census |
 | CMP-AUD-087 | P2 | Resolved | “Refresh stale” cannot rebuild cells whose count cache is unavailable |
@@ -4352,7 +4352,9 @@ and PDF rows with empty, lock-only, metadata-only, mixed, and unreadable folders
 ### CMP-AUD-084 — semantic code changes do not invalidate Matrix artifacts
 
 Priority: P1  
-Status: Verified by replacing a live comparator implementation between snapshots  
+Status: REMEDIATED 2026-07-18 — a semantic producer version is persisted in every
+matrix cache record AND consolidation sidecar, and any mismatch reads stale before
+target selection (see Remediation)  
 Primary code: `scripts/cache_envelope.py:29-64`,
 `scripts/matrix_state.py:228-260`, `scripts/matrix_build.py:363-371`,
 `scripts/artifact_store.py:466-481`, `version.py:7`
@@ -4378,6 +4380,41 @@ records, and make any mismatch stale before target selection. Separate record-sh
 migration from semantic invalidation. Add an upgrade test that changes comparator,
 normalizer, and PDF-parser versions with unchanged source files and proves all affected
 cells/consolidations rebuild once.
+
+#### Remediation — 2026-07-18
+
+A semantic producer version now rides both freshness surfaces, keyed on the app's
+released `MAJOR.MINOR.PATCH` (`version.__version__`) — a shipped comparator / parser /
+normalizer / consolidator fix always rides a new release, so the app version is the
+release-granular signal for all of them, auto-bumping (never a forgotten manual
+version) so a cache built by an older pipeline can never survive an upgrade:
+
+* **Comparison cache** — `matrix_state.producer_identity()` (`{"app": …}`, one place
+  the Everything / by-day / baseline caches share) is recorded in every cache record
+  (`record_result` / `record_tsn_result` + the day and baseline `record_result`s) and
+  compared in the shared `matrix_state._staleness`: a record whose `producer_versions`
+  differs from the running pipeline reads stale with reason `producer_version_changed`,
+  even when mtime, input fingerprint, output generation, and TSN identity all still
+  match. A legacy record (no field) reads stale once, then rebuilds.
+* **Persistent consolidation** — `consolidation_meta.write_outcome` stamps
+  `producer_app_version` in every outcome sidecar (uniform across the matrix store
+  consolidation, the Consolidate tab, auto-consolidate, and the TSN builders), and
+  `matrix._consolidated_stale` rebuilds a workbook whose stamp trails the running app —
+  so a corrected parser re-parses instead of feeding pre-fix rows to the fixed
+  comparator. A legacy sidecar (no stamp) rebuilds once.
+* The **TSN normalizer** path stays covered by its existing finer signal: a
+  `normalization_version` bump rebuilds the canonical TSN library (D2) → a new TSN
+  identity token → dependent cells already read stale via `source_identities`.
+* **Separation preserved** — the `cache_envelope` schema version remains the record
+  SHAPE migration; `producer_versions` is the independent ongoing semantic gate. The
+  version accessor resolves `version.py` even under a scripts-only `sys.path` (isolated
+  checks) by reading it via `ast` when the import is unavailable, so freshness never
+  silently degrades.
+
+New `check_matrix_producer_version.py` is the upgrade test: with every other freshness
+signal held equal, a simulated app upgrade reads both a comparison cell and a
+persistent consolidation stale (`producer_version_changed`), a rebuild re-stamps and
+reads fresh exactly once, and a legacy record/sidecar migrates once. Gate 135/135.
 
 ### CMP-AUD-085 — partial-artifact policy conflicts while truth surfaces certify incomplete work
 

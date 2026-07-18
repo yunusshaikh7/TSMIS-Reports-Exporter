@@ -27,8 +27,8 @@ from events import ConsolidateResult
 from matrix_state import (_MTIME_TOL_S, _cell_input_fingerprint, _mode_by_id,
                           _pdf_self_comparator, _row_defs, _row_modes,
                           _safe_mtime, comparison_path, mode_out_path,
-                          record_result, record_tsn_result, tsn_input_root,
-                          tsn_source)
+                          producer_identity, record_result, record_tsn_result,
+                          tsn_input_root, tsn_source)
 
 class _FacadeProxy:
     """Resolves `_m.<name>` through the `matrix` facade AT CALL TIME (a lazy
@@ -558,6 +558,7 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                       input_fingerprint=_fingerprint_for_record(
                           fp_before, fp_folders, out_path.name, events),
                       generation_id=published.artifact_generation.generation_id,
+                      producer_versions=producer_identity(),
                       commit_guard=commit_guard)
     return result
 
@@ -797,6 +798,14 @@ def _consolidated_stale(consolidated, store_dir):
     with no fingerprint sidecar reads stale ONCE, rebuilds, and records the sidecar (the
     one-time migration). Never raises."""
     if not artifact_store.consolidated_fresh(consolidated, store_dir):
+        return True
+    # CMP-AUD-084: a parser / consolidator fix ships in a new app version, so a
+    # workbook built by an OLDER pipeline (with unchanged raw inputs) must re-parse
+    # once — otherwise a corrected comparator keeps reading pre-fix rows. The stamped
+    # producer version must equal the current one; a legacy workbook with no stamp
+    # (read_extra default None) reads stale and rebuilds once, then records the stamp.
+    if (consolidation_meta.read_extra(consolidated, "producer_app_version")
+            != producer_identity().get("app")):
         return True
     record = consolidation_meta.read_outcome(consolidated)
     return bool(record is None or not record.trusted or not record.current
@@ -1272,5 +1281,6 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                               if mode["kind"] == "tsn"
                               else {}),
                           generation_id=published.artifact_generation.generation_id,
+                          producer_versions=producer_identity(),
                           commit_guard=cache_guard)
     return result

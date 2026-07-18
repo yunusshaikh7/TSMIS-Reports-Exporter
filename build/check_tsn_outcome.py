@@ -281,7 +281,7 @@ def test_library_and_matrix_end_to_end():
         def _rec(date, source, row_key, verdict, diff_cells, one_sided, built_at,
                  completion=None, input_fingerprint=None,
                  source_identities=None, generation_id=None,
-                 commit_guard=None):
+                 producer_versions=None, commit_guard=None):
             captured["completion"] = completion
 
         out_file = tmp / "byday_out.xlsx"

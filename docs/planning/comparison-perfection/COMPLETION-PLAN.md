@@ -51,7 +51,32 @@ tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (
 fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
 `evidence_highway_detail.py` doc-median follow-up).
 
-> ### ▶ RESUME HERE (2026-07-18, after 061 → BUCKET B COMPLETE + 055 + 051–053 (HD) + 056–062 (ID) + all prior — buckets E/G/H/I remain)
+> ### ▶ RESUME HERE (2026-07-18, M6 in progress → 084 CLOSED; then 081/080/082/088/089/100)
+>
+> **DONE 2026-07-18 (6th marathon, M6 — matrix identity & freshness): CMP-AUD-084 CLOSED
+> (fix+docs one commit, CI SHA-verified), offline gate 135/135, 193 closed (80%).** The keystone of
+> M6: matrix caches survived comparator/parser/normalizer/consolidator changes because neither a
+> cache record nor a persistent consolidation recorded a semantic producer version. Fix rides the
+> EXISTING extension points (no hardened `commit_workbook`/transaction edits): a
+> `matrix_state.producer_identity()` (`{"app": version.__version__}`, ONE place all three matrices
+> share) is stamped in every cache record (`record_result`/`record_tsn_result` + the day + baseline
+> `record_result`s) and gated in the shared `matrix_state._staleness` (reason
+> `producer_version_changed`); `consolidation_meta.write_outcome` stamps `producer_app_version` in
+> every outcome sidecar and `matrix._consolidated_stale` rebuilds a workbook whose stamp trails the
+> running app (so a corrected parser re-parses, never feeds pre-fix rows to a fixed comparator). The
+> app version auto-bumps on every release (a shipped comparator/parser/normalizer fix always rides
+> one), so an upgrade invalidates every affected cell/consolidation exactly once (rebuild, never a
+> silent stale verdict); a legacy record/sidecar migrates once. The TSN normalizer stays covered by
+> its finer `normalization_version`→identity-token signal (unchanged). The version accessor resolves
+> `version.py` under a scripts-only `sys.path` via `ast` (zero check churn beyond 4 fixture updates
+> that hand-built current records). Record-SHAPE migration stays the SEPARATE `cache_envelope`
+> version. NEW `check_matrix_producer_version.py` (upgrade test: cell + consolidation read stale
+> once after an upgrade with every other signal held equal, rebuild-once, legacy migrates); gate
+> 134→**135**. **NEXT in M6: 081** (TSN library staleness — raw newer than consolidated / would-
+> rebuild — must surface into the snapshot; the 084-coupled remainder), then 080 (source-fingerprint
+> content identity + evidence parse caches), 082 (formula-twin manifest/quarantine), 088 (auth
+> retains offline jobs), 089 (durable last-attempt state), 100 (adversarial cross-matrix cache-swap
+> gate). ⚠ Still owed from bucket B: the 053 HD PDF-vs-Excel/PDF-vs-TSN canary re-measure.
 >
 > **DONE 2026-07-18 (5th marathon — BUCKET B COMPLETE): CMP-AUD-061 CLOSED (`7e16fea`, CI
 > SHA-verified), offline gate 134/134, 192 closed (80%). BUCKET B (PDF-parser robustness) is now
