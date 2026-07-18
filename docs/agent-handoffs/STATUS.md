@@ -46,9 +46,22 @@ _Last updated: 2026-07-17 by Claude._
 [docs/planning/app-consistency-backlog.md](../planning/app-consistency-backlog.md). Most are
 comparison-lane / GUI / cross-cutting **architecture** (Claude), NOT Sol's reliability lane.
 The spine (items 9/10/11/13 = output-model unification) is design-first + coupled to
-comparison-perfection, so it is not concurrent autonomous work. A future **sol-002** can
-implement the export-engine mechanics (item 12 + export side of 9/13) once Claude fixes the
-output-model design. sol-001 is unchanged by this.
+comparison-perfection. **Design spec DONE:**
+[docs/planning/output-model-unification.md](../planning/output-model-unification.md) —
+**sol-002** (export-side conformance: unified run-folder writes, single-pass dual-format,
+date-stamping) is now scoped, with a **hard dependency**: Claude lands the additive `paths.py`
+SoT functions (migration step 1) BEFORE sol-002 starts. The comparison-side (unique names,
+manual-Compare folder) + GUI dropdowns stay Claude's. sol-001 is unchanged by this.
+
+## Fleet scaling (decided 2026-07-17)
+Owner can run 3+ Codex agents (unlimited compute); a dedicated **Orchestrator Claude** (local,
+Windows) is designed to coordinate + run the authoritative gate on Sol branches so the Lead
+(this Claude) stays on comparison-perfection. Orchestrator prompt is authored (in-session);
+deploy it when 2+ Sol agents are live. Decision: run sol-001 now (single agent, Lead
+coordinates lightly); Lead specs the output-model to generate the next clean lane (sol-002);
+stand up the Orchestrator when 2–3 lanes are live. Authority split: Lead owns architecture +
+mission definition + final integration + done; Orchestrator owns fleet monitoring/review/test/
+docs (no product code, no merge into comparison-perfection); Sol executes.
 
 ## Log
 - **2026-07-17** — Baseline established at `a4ccd23`. Handoff structure created. sol-001

@@ -11,6 +11,10 @@ fixed. Sol's current mission (sol-001, reliability engine) does **not** include 
 
 ## The output-model spine (items 9, 10, 11, 13 — design FIRST)
 
+> **DESIGN SPEC WRITTEN:** [output-model-unification.md](output-model-unification.md) — the
+> target model, the invariants comparison-perfection depends on, the Claude/sol-002 split, and
+> the staged migration. That spec supersedes this section for the output-model work.
+
 These four are one architectural theme: **every export / consolidation / comparison should be
 written the same way, in standardized, date-stamped locations, regardless of which surface
 (Export tab, Consolidate tab, manual Compare, a matrix) produced it.** This is foundational —
