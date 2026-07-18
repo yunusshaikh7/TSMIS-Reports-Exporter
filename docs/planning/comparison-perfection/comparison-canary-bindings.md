@@ -1503,6 +1503,23 @@ real comparison partial. Census harness: this session's scratchpad
 `census_027_empty_routes.py`; hermetic lock: `check_compare_env_route_universe.py`
 (`test_027_*`).
 
+## 2026-07-17 — CMP-AUD-018 Intersection Summary partition-gate census
+
+The shared `record_problem` gate (require a Total when there is data + every non-exempt
+section partitions it exactly) wired into the cross-env loader must never false-fire on a
+real export, so it is bound to a read-only sweep of every real IS per-route export.
+
+- **Bound corpus:** `ground-truth/All Reports 7.9/2026-07-09 ssor-prod/intersection_summary/`
+  (217) + `…/2026-07-09 ars-prod/intersection_summary/` (217) = **434 files**.
+- **Census (via the production `parse_route` + `_layout_drift`):** 217 records-with-data per
+  environment; **layout-drift (a non-exempt section ≠ total): 0; data-but-no-Total: 0;** 0
+  parse errors. Every real export has a valid Total with all non-exempt sections partitioning
+  it exactly (Highway Group exempt), so the consolidation + cross-env gate never false-fires
+  — every current statewide IS consolidation/comparison stays COMPLETE. Census harness: this
+  session's scratchpad `census_018_is_drift.py`; hermetic locks:
+  `check_consolidate_intersection.py` (`record_problem` + no-Total) +
+  `check_compare_env_intersection.py` (`test_summary_layout_drift_disclosed`).
+
 ## 2026-07-17 — MER-059 dashed-district group-header census (TSMIS Highway Log PDF)
 
 The dashed-district group-header rule (`GROUP_RE[0]` widened from `^\d{2}$` to

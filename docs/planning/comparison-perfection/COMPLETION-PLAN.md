@@ -20,10 +20,10 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | | |
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
-| **Gate** | **128/128 offline** checks (full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
+| **Gate** | **130/130 offline** checks (128 comparison + Sol's 2 reliability checks after the sol-001 integration; full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 RESOLVED (2026-07-17)**: 063 = both PDF consolidators escalate an unexpected post-mile prefix/suffix token to PARTIAL; 027 = a header-only per-route XLSX is disclosed as incomplete instead of silently vanishing from cross-env coverage; MER-059 = dashed-district HL group headers ("— MER 059") are recognized, not glued onto Descriptions — all census-proven on the bound 7.9 corpus (gate 128/128). **NEXT: the triage buckets B/D/E/G/H/I** (the HL same-source sweep is fully closed). 210 DEFERRED. HD-Excel county vendor-pending |
+| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **NEXT (bucket D): 019 + 046 + 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
 
 > ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029 + 034, then 063 + 027 + the MER-059 census)
 >
@@ -34,7 +34,27 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
-> **DONE 2026-07-17 (latest): the MER-059 census CLOSED — dashed-district HL group
+> **DONE 2026-07-17 (latest): CMP-AUD-018 CLOSED — Intersection Summary cross-env now
+> shares the consolidator's section-partition gate (bucket D opened).** The consolidator
+> FAILs a layout-drifted route (a non-exempt block not summing to the route total — the
+> MASTARM→MASTERARM shape), but the cross-env loader emitted the row WITHOUT that gate, so
+> two identically malformed sides returned match / EVERYTHING MATCHES; a dropped Total also
+> slipped both paths (`_layout_drift` returns None on a falsy total). Fix: one shared
+> `consolidate_intersection_summary.record_problem` (require-Total + partition) called by BOTH
+> the consolidator and `compare_env._load_intersection_summary_side` (a problem → loud skip
+> naming the route, never a silent row); the vs-TSN path reads the consolidated already-gated
+> workbook + shares strict count parsing, so it's protected transitively. **Census:** 434 real
+> IS exports (both envs) — 0 drift, 0 data-without-Total → never false-fires. Red→green
+> (pre-fix the cross-env loader silently includes a drifted/Total-less record; the consolidator
+> accepts a Total-less data route). New coverage in `check_consolidate_intersection` +
+> `check_compare_env_intersection`; the `check_consolidate_toctou` save-gate stub neutralizes
+> the new validator. Also integrated **sol-001 reliability hardening** this session (merge
+> `7a7f0e7`, F-01 closed `99b7ab2` — see STATUS.md). Offline gate **130/130** + ruff clean.
+> **NEXT (bucket D): 019** (Ramp Summary one-field-partial predicate) + **046**
+> (position-shifted header projection) + **022** (duplicate normalized categories); then
+> buckets B/E/G/H/I.
+>
+> **DONE 2026-07-17: the MER-059 census CLOSED — dashed-district HL group
 > headers are recognized, not glued onto Descriptions.** A centered `<district>
 > <county> <route>` group header whose district renders as a long dash ("— MER 059"
 > route 059 p5; "— SBD 058U" 058U p3) failed `GROUP_RE[0]` (`^\d{2}$`), so the

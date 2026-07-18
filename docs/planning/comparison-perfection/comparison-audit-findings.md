@@ -296,7 +296,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-015 | P3 | Verified | Four Intersection comparison labels incorrectly add `TSAR:` |
 | CMP-AUD-016 | P2 | Verified | Classic file/Browse inputs persist and launch across recipe changes |
 | CMP-AUD-017 | P1 | Resolved | Skipped comparison inputs are cached and rendered as complete |
-| CMP-AUD-018 | P1 | Verified | Intersection cross-env bypasses its layout-drift validator |
+| CMP-AUD-018 | P1 | Resolved | Intersection cross-env bypasses its layout-drift validator |
 | CMP-AUD-019 | P1 | Verified | Ramp cross-env accepts a one-field partial parse as complete |
 | CMP-AUD-020 | P1 | Resolved 2026-07-14 (censused per-side partition contract enforced; real-data verified) | Aggregate vs-TSN loaders do not reconcile section totals |
 | CMP-AUD-021 | P1 | Resolved 2026-07-14 (one strict count parser through every aggregate read path) | Aggregate counts silently ignore text and truncate fractions |
@@ -1064,7 +1064,8 @@ Locked by `check_comparison_outcome.py`, `check_comparison_publication.py`,
 ### CMP-AUD-018 — Intersection cross-env bypasses layout-drift validation
 
 Priority: P1  
-Status: Verified with real malformed XLSX fixtures  
+Status: **Resolved 2026-07-17** (census-first; one shared `record_problem`
+validator gates the consolidation + cross-env paths, offline gate 130/130)  
 Primary code: `scripts/consolidate_intersection_summary.py:114-126`, `263-267`,
 `scripts/compare_env.py:290-327`
 
@@ -1080,6 +1081,34 @@ Category data with a missing Total also passes: `record_has_data=True`, while
 Correction requirements: share one strict parser validator across consolidation,
 cross-env, and vs-TSN paths; require Total and all non-exempt partitions. Regressions
 must prove two identically malformed inputs cannot match.
+
+**Remediated 2026-07-17.** One shared validator
+`consolidate_intersection_summary.record_problem(counts, total)` now owns the strict
+parse-integrity rule: a data-bearing record REQUIRES a parsed Total (its absence, e.g. a
+renamed/dropped "Total Intersections =" line, previously disabled `_layout_drift` since it
+returns None on a falsy total) AND every non-exempt section must partition that total
+exactly (Highway Group stays exempt — the site genuinely under-counts it). Both paths call
+it: the **consolidator** replaced its bare `_layout_drift` call (gaining the missing-Total
+case — a Total-less data route now FAILs, was silently included), and the **cross-env**
+loader `_load_intersection_summary_side` now applies it after `record_has_data`, disclosing
+a problem as a LOUD skip naming the route (the incompleteness channel) — so two identically
+malformed sides are flagged incomplete, never a clean match. The **vs-TSN** path reads the
+consolidated (already-gated) workbook and already shares the strict count parsing
+(CMP-AUD-021/022) + route-universe gate (183), so it is protected transitively — no
+per-route totals to re-validate.
+
+- **Census (the false-fire guard):** a read-only sweep of all 434 real IS per-route exports
+  (both environments, 217 each) found **0 layout-drift and 0 data-without-Total** — every
+  real export has a valid Total with all non-exempt sections partitioning it exactly, so the
+  gate never false-fires on real data.
+- **Red→green:** pre-fix the cross-env loader silently INCLUDES a drifted and a Total-less
+  record (would certify a clean match), and the consolidator accepts a Total-less data route;
+  post-fix both disclose them. `check_consolidate_intersection` gains `record_problem` unit
+  coverage + a no-Total end-to-end FAIL; `check_compare_env_intersection` gains a
+  real-loader disclosure test (sound route contributes, drifted + Total-less routes named in
+  `skipped`); the `check_consolidate_toctou` save-gate stub neutralizes the new validator
+  like its sibling predicates (it forces an artificial empty record to isolate the TOCTOU
+  behavior). Offline gate **130/130**; ruff clean.
 
 ### CMP-AUD-019 — Ramp cross-env accepts a one-field partial parse
 
