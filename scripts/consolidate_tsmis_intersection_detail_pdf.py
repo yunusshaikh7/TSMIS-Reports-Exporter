@@ -199,21 +199,6 @@ def _windows_from_bands(bands, n_cols):
     return contiguous_windows(lo, hi)
 
 
-def _shaded_column_windows(pdf, n_cols):
-    """Derive `n_cols` contiguous column windows from the document's zebra-shaded
-    cell rects (rowA bands have 21 cells, rowB bands 18).
-
-    Only the shaded (even-index) records carry rects, but the print layout is ONE
-    table, so its column widths are uniform across every page and row — the median
-    cell edges of the shaded bands therefore give the grid for EVERY line, shaded
-    or not. Returns the (lo, hi) windows, or None if no full band of that shape was
-    found anywhere (an empty / unreadable PDF)."""
-    bands = []
-    for page in pdf.pages:
-        bands.extend(_page_bands(page, n_cols))
-    return _windows_from_bands(bands, n_cols)
-
-
 def _page_geometry_diverges(page, win_a, win_b):
     """True when THIS page's own band grid (either shape) diverges from the
     document-median windows by more than `_PAGE_GEOM_TOL` at any interior
@@ -229,14 +214,27 @@ def _page_geometry_diverges(page, win_a, win_b):
     return False
 
 
-def _doc_windows(pdf):
+def _doc_windows(pdf, events=None):
     """(rowA windows, rowB windows) for the document, or (None, None) when no
     shaded band of either shape exists (an empty / unreadable PDF). rowB's grid
     comes from its OWN 18-cell bands — its merged Description cell (grid columns
     3-6 of rowA) arrives as one window, so WORD_GAP spacing flows continuously
-    across it and a word straddling a rowA-column boundary isn't split."""
-    wa = _shaded_column_windows(pdf, N_COLS_A)
-    wb = _shaded_column_windows(pdf, N_COLS_B)
+    across it and a word straddling a rowA-column boundary isn't split.
+
+    CMP-AUD-061: derives BOTH grids in ONE pass and polls `events.is_cancelled()`
+    between pages, so cancelling during the geometry scan returns promptly instead
+    of scanning every page/rectangle first. Returns (None, None) on cancel too; the
+    caller distinguishes cancelled from no-grid via `events.is_cancelled()`. The
+    collected bands are identical to the previous two-pass derivation (byte-identical
+    output)."""
+    bands_a, bands_b = [], []
+    for page in pdf.pages:
+        if events is not None and events.is_cancelled():
+            return None, None
+        bands_a.extend(_page_bands(page, N_COLS_A))
+        bands_b.extend(_page_bands(page, N_COLS_B))
+    wa = _windows_from_bands(bands_a, N_COLS_A)
+    wb = _windows_from_bands(bands_b, N_COLS_B)
     if wa is None or wb is None:
         return None, None
     return wa, wb
@@ -370,7 +368,9 @@ def parse_pdf(path, events):
                     doc_routes.add(cm.group(1))
             if doc_routes:
                 break
-        win_a, win_b = _doc_windows(pdf)
+        win_a, win_b = _doc_windows(pdf, events)
+        if events.is_cancelled():
+            return None, None            # cancelled during the geometry scan (061)
         if win_a is None:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
                         "leading_orphan_b": 0, "wrapped_rowb": 0,

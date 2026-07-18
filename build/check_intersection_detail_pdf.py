@@ -379,6 +379,47 @@ def test_reconciliation_hardening():
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_061_cancellation():
+    """CMP-AUD-061: cancelling DURING the document geometry scan returns a distinct
+    cancelled outcome (None, None) promptly — polling between pages — instead of
+    scanning every page/rectangle first and then reporting an unreadable/no-grid
+    error."""
+    print("CMP-AUD-061: cancellation during the geometry scan:")
+
+    class _CancelAfter:
+        def __init__(self, n):
+            self.calls = 0
+            self.n = n
+
+        def is_cancelled(self):
+            self.calls += 1
+            return self.calls > self.n
+
+        def on_log(self, *a, **k):
+            pass
+
+    bands = _band(_A_CELLS, 100.0) + _band(_B_CELLS, 112.0)
+    pages = [_page(_rowA_line(100.0) + _rowB_line(112.0), bands) for _ in range(8)]
+    ev = _CancelAfter(2)
+    wa, wb = idpdf._doc_windows(_FakePdf(pages), ev)
+    check(f"_doc_windows returns (None,None) on cancel + stops early (scanned "
+          f"~{ev.calls} of 8 pages, not all)",
+          wa is None and wb is None and ev.calls < 8)
+    # _doc_windows with no events still derives the grid (backward compatible)
+    wa2, wb2 = idpdf._doc_windows(_FakePdf(pages))
+    check("_doc_windows(no events) still derives BOTH grids",
+          wa2 is not None and wb2 is not None)
+    # parse_pdf distinguishes cancelled (None, None) from no-grid ([], {no_grid:True})
+    saved = idpdf.pdfplumber.open
+    try:
+        idpdf.pdfplumber.open = lambda p: _FakePdf(pages)
+        rows, stats = idpdf.parse_pdf("f.pdf", _CancelAfter(3))
+    finally:
+        idpdf.pdfplumber.open = saved
+    check("parse_pdf returns cancelled (None, None), not a no_grid result",
+          rows is None and stats is None)
+
+
 def main():
     test_header()
     test_discriminators()
@@ -387,6 +428,7 @@ def main():
     test_adapters_and_matrix()
     test_matrix_consolidated_filenames()
     test_reconciliation_hardening()
+    test_061_cancellation()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")
