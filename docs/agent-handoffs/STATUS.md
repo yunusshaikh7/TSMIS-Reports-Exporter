@@ -26,12 +26,39 @@ _Last updated: 2026-07-17 by Claude._
 | | Claude (integrator + own workstream) | Sol (sol-001) |
 |---|---|---|
 | **Outcome** | Finish the comparison-perfection project to source-first, byte-proven completion | Harden + offline-test the reliability engine (self-update, export loop, auth/session) |
-| **State** | **Active** | **Planned** (dispatch pending) |
-| **Branch** | `comparison-perfection` | `agent/sol/reliability-hardening` |
+| **State** | **Active** | **Accepted + integrated** (2026-07-17) |
+| **Branch** | `comparison-perfection` | `agent/sol/reliability-hardening` (merged into comparison-perfection @ `7a7f0e7`) |
 | **Owns (modify)** | comparison engine + consolidators + tsn library + matrices + evidence + their checks + the comparison-perfection docs | updater / exporter* / run_report / batch_manifest / export_multi / auth_nav / session / login / browser_channels / edge_device / timeouts / report_library / logging_setup + their checks |
 | **Must avoid** | Sol's engine modules (unless they block comparison — coordinate) | the comparison engine, the GUI (`gui_*`, `ui/`), `report_catalog`/`reports`, `version.py`, build `.ps1` |
 | **Charter** | `docs/planning/comparison-perfection/COMPLETION-PLAN.md` (RESUME block) | `sol-001/CHARTER.md` |
-| **Next** | findings 063 (PM-token→partial) + 027 (header-only route) → MER-059 census → buckets B/D/E/G/H/I | read charter §3, plan, then §5 A→E |
+| **Next** | resume comparison-perfection at buckets B/D/E/G/H/I (063 + 027 + MER-059 DONE) | mission complete — no further sol-001 work |
+
+## sol-001 integration record (2026-07-17)
+
+**Reviewed as an untrusted candidate, ACCEPTED, and merged** (`agent/sol/reliability-hardening`
+`2543a02..8bcd1e1` → merge `7a7f0e7`, CI-green SHA-verified). Review outcome:
+- **Off-limits: clean.** Every touched `scripts/` file is in Sol's owned set (updater, exporter,
+  batch_manifest, login, session, site_target, report_nav, browser_channels, edge_device,
+  timeouts); build changes are its matching + two new checks. NO comparison / GUI /
+  `report_catalog` / `reports` / `version.py` / `.ps1` / `checks.yml` file touched. No
+  shared-infra (`outcome`/`errors`/`events`/`settings`/`paths`) modified — Sol flagged F-01 instead.
+- **Hard rules: clean.** No `print`/`input`/`sys.exit` in core, no `requests`/`certifi`/`verify=False`
+  in the updater (TLS rule intact), only stdlib `secrets` added.
+- **Substantive fixes verified sound:** updater readiness-handshake + rollback-relaunch suppression
+  (F-02/03/07, backward-compatible across all upgrade/revert directions); combined-export retry
+  accounting (F-08); batch-manifest step validation (F-09). Auth changes (F-11–15) verified
+  DIAGNOSTIC-ONLY (added type+first-line logging, byte-identical fallback control flow). No check
+  weakened (the 16 removed check_updater lines were obsolete death-window tests replaced by the new
+  mechanism; the 2 baseline removals are sites Sol actually fixed).
+- **Gate:** full offline **130/130** in the main worktree (was 128 + Sol's 2 new checks);
+  `check_source_zip_smoke` passes here (Sol's lone red F-01 was a linked-worktree `.git`-is-a-file
+  artifact only).
+- **F-01 CLOSED by the integrator** (`99b7ab2`): `check_source_zip_smoke` now resolves the object
+  store via `git rev-parse --git-common-dir`; red→green proven in a real linked worktree.
+- **Open follow-ups:** F-10 (a suspected non-reproducible `check_pdf_role_provenance` flake — monitor;
+  not seen in any integration gate run). **Work-PC-only re-verifies** the owner should exercise when
+  practical: one real frozen update swap/relaunch + Revert (F-02/03/07), headed console sign-in
+  (F-14), managed-Edge policy fallback (F-15) — none verifiable offline.
 
 ## High-conflict shared files (either lane may need them — coordinate before modifying)
 - `.github/workflows/checks.yml` — both lanes append new check names. **Claude resolves
