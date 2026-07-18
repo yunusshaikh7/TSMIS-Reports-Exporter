@@ -9,10 +9,17 @@ _Last updated: 2026-07-17 by Claude._
 ## Shared baseline
 - **Verified integration commit:** `a4ccd23` (branch `comparison-perfection`, CI-green,
   offline gate 127/127). This is the recorded shared starting point.
-- **Sol branch-point commit:** `de54eb4` (adds `docs/agent-handoffs/`; `agent/sol/reliability-hardening` is cut from and pushed at this commit).
-- **Environment:** Claude works in the primary worktree on `comparison-perfection`
-  (Windows). Sol works in a Codex Cloud Linux sandbox on `agent/sol/reliability-hardening`,
-  pushing milestone commits to the GitHub remote. Monitoring = `git fetch` of Sol's branch.
+- **Sol branch-point commit:** `de54eb4`; charter tuned for the local worktree at `2543a02`
+  (`agent/sol/reliability-hardening`, pushed to origin).
+- **Environment (LOCAL worktrees — Codex Cloud was unavailable for Sol):**
+  - Claude (Lead): worktree `C:\Users\Yunus\Projects\TSMIS-Reports-Exporter` on
+    `comparison-perfection` (Windows).
+  - Sol: **separate** worktree `C:\Users\Yunus\Projects\TSMIS-sol-reliability` on
+    `agent/sol/reliability-hardening` (local Codex CLI runs HERE). Shares the same `.git`, so
+    Sol's commits are visible to the Lead immediately via `git log agent/sol/reliability-hardening`
+    (no fetch needed); Sol also pushes to origin for backup. Sol runs the authoritative Windows
+    gate itself (reusing the Lead's `build\.venv` interpreter by absolute path; never pip-installs
+    into it). **Neither agent touches the other's worktree.**
 
 ## Lanes
 
@@ -70,6 +77,11 @@ docs (no product code, no merge into comparison-perfection); Sol executes.
 - **2026-07-17** — Owner supplied a 13-item post-comparison backlog; captured + triaged
   (app-consistency-backlog.md). sol-001 kept focused (not expanded). Output-model unification
   flagged as design-first architecture (Claude), sol-002 candidate for the export mechanics.
+- **2026-07-17** — **Env correction:** Codex Cloud can't run Sol → switched to LOCAL worktrees.
+  Created Sol's worktree `C:\Users\Yunus\Projects\TSMIS-sol-reliability`; charter updated for
+  local-Windows runtime (Sol runs the authoritative gate itself). Recovered the Lead worktree
+  after it was briefly switched to `main`/`de54eb4` during setup — no work lost (all commits
+  safe on `comparison-perfection` @ `9c6db69` + origin). Both worktrees verified isolated.
 
 ## State vocabulary
 Planned · Active · Blocked · Verification · Ready for review · Changes requested ·
