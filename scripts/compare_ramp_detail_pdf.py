@@ -271,6 +271,11 @@ class _RampDetailFileCompare:
                     f"{self.file_b_label}"),
             has_route=True, loader=self._load_pair, deps_ok=_rd._DEPS_OK,
             deps_msg="Required components are missing (openpyxl).",
+            # CMP-AUD-069: forward the flavor's own side labels so a missing input's
+            # existence message + the picker/log roles read "TSMIS (PDF)" / "TSMIS
+            # (Excel)" / "TSN" correctly (the driver otherwise defaults to TSMIS/TSN,
+            # so a missing PDF-vs-Excel second file wrongly said "the TSN file …").
+            side_a=self.file_a_label, side_b=self.file_b_label,
             events=events, confirm_overwrite=confirm_overwrite, mode=mode,
             commit_guard=commit_guard)
 

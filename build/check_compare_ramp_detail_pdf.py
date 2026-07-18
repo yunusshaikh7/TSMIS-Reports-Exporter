@@ -120,9 +120,38 @@ def _refused_prefix(d, valid_h, k):
     return _refused(p) is not None
 
 
+def test_side_labels():
+    """CMP-AUD-069: the missing-input existence message uses the flavor's OWN
+    side labels, not the shared driver's TSMIS/TSN defaults — so a PDF-vs-Excel
+    run with a missing second file says 'TSMIS (Excel)', never 'TSN'."""
+    print("missing-input diagnostics carry the flavor's side labels (CMP-AUD-069):")
+    from events import Events
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        exists = d / "exists.xlsx"
+        exists.write_bytes(b"x")            # existence check only stats the path
+        missing = d / "missing.xlsx"
+        out = d / "out.xlsx"
+
+        def msg(flavor, a, b):
+            r = flavor.compare(str(a), str(b), str(out), events=Events(),
+                               confirm_overwrite=lambda _p: True)
+            return r.status, (r.message or "")
+
+        st, m = msg(rdp.TSMIS_PDF_VS_EXCEL, exists, missing)
+        check("PDF-vs-Excel missing 2nd file names 'TSMIS (Excel)', not 'TSN'",
+              st == "error" and "TSMIS (Excel)" in m and "TSN" not in m)
+        st, m = msg(rdp.TSMIS_PDF_VS_TSN, exists, missing)
+        check("PDF-vs-TSN missing 2nd file names 'TSN'", st == "error" and "TSN" in m)
+        st, m = msg(rdp.TSMIS_PDF_VS_EXCEL, missing, exists)
+        check("missing 1st file names 'TSMIS (PDF)' (not the default 'TSMIS')",
+              st == "error" and "TSMIS (PDF)" in m)
+
+
 def main():
     test_width_mirror()
     test_gate()
+    test_side_labels()
     print()
     if _fail:
         print(f"{len(_fail)} CHECK(S) FAILED:")
