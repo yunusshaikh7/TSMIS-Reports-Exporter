@@ -9,8 +9,7 @@ _Last updated: 2026-07-17 by Claude._
 ## Shared baseline
 - **Verified integration commit:** `a4ccd23` (branch `comparison-perfection`, CI-green,
   offline gate 127/127). This is the recorded shared starting point.
-- **Sol branch-point commit:** the commit that introduces `docs/agent-handoffs/` (recorded
-  below once pushed).
+- **Sol branch-point commit:** `de54eb4` (adds `docs/agent-handoffs/`; `agent/sol/reliability-hardening` is cut from and pushed at this commit).
 - **Environment:** Claude works in the primary worktree on `comparison-perfection`
   (Windows). Sol works in a Codex Cloud Linux sandbox on `agent/sol/reliability-hardening`,
   pushing milestone commits to the GitHub remote. Monitoring = `git fetch` of Sol's branch.
