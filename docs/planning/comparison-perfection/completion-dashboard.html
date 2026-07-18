@@ -167,14 +167,14 @@
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="192 closed, 9 in progress, 40 open of 241 findings">
-          <div class="seg done" style="width:80%">192 closed</div>
+        <div class="bar" role="img" aria-label="193 closed, 8 in progress, 40 open of 241 findings">
+          <div class="seg done" style="width:80%">193 closed</div>
           <div class="seg warn" style="width:4%"></div>
           <div class="seg open" style="width:16%">40 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 192 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
-          <span><i class="dot warn"></i> ~9 in progress</span>
+          <span><i class="dot done"></i> 193 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot warn"></i> ~8 in progress</span>
           <span><i class="dot open"></i> ~40 open</span>
         </div>
       </div>
@@ -249,8 +249,8 @@
       <div class="step now">
         <div class="n">01</div>
         <div class="body">
-          <div class="h">Matrix / GUI lifecycle honesty <span class="tag now">up next</span></div>
-          <div class="m">Bucket E — the largest remaining bucket, mostly <span class="mono">P2</span> state-machine truthfulness in the matrix + GUI, not comparison correctness. Buckets <b>B, C &amp; D complete</b>.</div>
+          <div class="h">Matrix identity &amp; freshness <span class="tag now">in progress</span></div>
+          <div class="m">Bucket E / M6 — the largest remaining bucket, mostly <span class="mono">P2</span> state-machine truthfulness in the matrix + GUI, not comparison correctness. <b>084 closed</b> (semantic producer version invalidates stale caches on upgrade); 081/080/082/088/089/100 next. Buckets <b>B, C &amp; D complete</b>.</div>
         </div>
       </div>
       <div class="step"><div class="n">02</div><div class="body"><div class="h">Source-semantics</div><div class="m">Bucket G — conserve/expose data facts (HD-Excel + HL raw county are vendor-blocked — never inferred).</div></div></div>
@@ -266,6 +266,7 @@
   <section>
     <div class="sec-head"><h2>Shipped this session</h2><span class="kicker">all CI-green</span></div>
     <div class="wins">
+      <div class="win"><div class="id">CMP-AUD-084</div><div class="w">Semantic producer version invalidates stale caches on upgrade</div><div class="c">matrix + consolidation · rebuild-once · upgrade test</div></div>
       <div class="win"><div class="id">CMP-AUD-063</div><div class="w">Invalid post-mile token → PARTIAL</div><div class="c">HSL/RD PDF · census 75,709 rows</div></div>
       <div class="win"><div class="id">CMP-AUD-027</div><div class="w">Header-only routes disclosed, not dropped</div><div class="c">cross-env · census 756 exports</div></div>
       <div class="win"><div class="id">MER-059</div><div class="w">Dashed-district HL headers recognized</div><div class="c">census 252 prints · 1 cell corrected</div></div>
@@ -299,7 +300,7 @@
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>7e16fea</b> · gate <b>134/134</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>b820ff5</b> · gate <b>135/135</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 
