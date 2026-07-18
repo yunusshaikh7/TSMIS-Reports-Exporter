@@ -84,6 +84,23 @@ def unexpected_pm_tokens(prefix, suffix, *, prefix_set, suffix_set=frozenset()):
     return bad
 
 
+# A postmile-shaped token anywhere in a page's text (CMP-AUD-055): the header-free
+# probe for "this headerless page actually carries data rows". Once a document has
+# entered its data section, a page missing its column-header anchors but carrying
+# such a token is a damaged/dropped DATA page, not a cover/legend, so the producer
+# must escalate rather than skip it wholesale. Censused on the 7.9 statewide set:
+# ZERO headerless HSL/RD pages carry a postmile, so a genuine cover/legend never
+# trips this.
+_PM_ON_PAGE_RE = re.compile(r"(?<!\d)\d{3}\.\d{3}(?!\d)")
+
+
+def page_has_postmile(words):
+    """True when a page's extracted `words` contain a postmile-shaped token
+    (CMP-AUD-055) — the header-free data-page probe shared by the header-anchored
+    PDF parsers (Highway Sequence, Ramp Detail)."""
+    return bool(_PM_ON_PAGE_RE.search(" ".join(w["text"] for w in words)))
+
+
 class RouteIdentityError(ValueError):
     """CMP-AUD-049 (evidence half): a per-route PDF's own claims failed to
     confirm the expected route — the document must not be captioned/verified

@@ -281,6 +281,68 @@ def test_line_anomalies_are_not_file_counts():
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _hsl_damaged(rows, route="001"):
+    """A Highway Sequence data page that lost its DESCRIPTION column-header anchor
+    but still carries data rows (a postmile) — the CMP-AUD-055 damaged-header page."""
+    return [r for r in _hsl_page(rows, route) if r[2] != "DESCRIPTION"]
+
+
+def _rd_damaged(rows, route="001"):
+    """A Ramp Detail data page that lost its DESCRIPTION anchor but still carries
+    data rows — the CMP-AUD-055 damaged-header page."""
+    return [r for r in _rd_page(rows, route) if r[2] != "DESCRIPTION"]
+
+
+def test_damaged_header_data_page():
+    """CMP-AUD-055: once a document has entered its data section, a page with
+    data-shaped rows (a postmile) but missing/damaged column-header anchors is
+    flagged (damaged_pages) and escalates the producer to PARTIAL — instead of
+    being skipped wholesale as a cover/legend, silently dropping the data. Censused
+    0-occurrence, so a clean multi-page render stays COMPLETE."""
+    print("damaged-header data page escalates, not skipped (CMP-AUD-055):")
+    for tag, module, clean_fn, dmg_fn, stem in (
+            ("HSL", HSL, _hsl_page, _hsl_damaged, "highway_sequence_route_001.pdf"),
+            ("RD", RD, _rd_page, _rd_damaged, "tsar_ramp_detail_route_001.pdf")):
+        clean = clean_fn([dict(prefix="R", pm="001.000", suffix="E", desc="ALPHA")])
+        damaged = dmg_fn([dict(prefix="", pm="002.000", suffix="", desc="BETA")])
+        tmp = Path(tempfile.mkdtemp(prefix="cmp055_"))
+        try:
+            in_dir = tmp / "in"
+            in_dir.mkdir()
+            # page 1 establishes the data section; page 2 is the damaged data page.
+            make_pdf(in_dir / stem, [clean, damaged])
+            logs = []
+            result = module.consolidate(
+                events=Events(on_log=logs.append), confirm_overwrite=lambda _p: True,
+                input_dir=in_dir, out_path=tmp / "out.xlsx", converted_dir=tmp / "conv")
+            _check(f"{tag} combine ok (status={result.status})", result.status == "ok")
+            _check(f"{tag} damaged-header data page escalates to PARTIAL "
+                   f"(completion={result.completion!r})",
+                   result.completion == outcome.PARTIAL)
+            pe = (result.producer_extra or {}).get("parse_anomalies", {})
+            _check(f"{tag} rides parse_anomalies.damaged_header_pages "
+                   f"(pe={pe}, skipped={result.skipped_inputs})",
+                   pe.get("damaged_header_pages") == 1 and result.skipped_inputs == 0
+                   and result.failed_inputs == 0)
+            _check(f"{tag} summary + log name the CMP-AUD-055 page",
+                   any("no column header" in ln for ln in result.summary_lines
+                       + logs) or any("CMP-AUD-055" in ln for ln in logs))
+
+            # a clean multi-page render (no damaged page) stays COMPLETE.
+            clean_tmp = tmp / "clean"
+            clean_tmp.mkdir()
+            make_pdf(clean_tmp / stem, [clean, clean_fn(
+                [dict(prefix="", pm="003.000", suffix="", desc="GAMMA")])])
+            r2 = module.consolidate(
+                events=Events(), confirm_overwrite=lambda _p: True,
+                input_dir=clean_tmp, out_path=clean_tmp / "out.xlsx",
+                converted_dir=clean_tmp / "conv")
+            _check(f"{tag} clean multi-page render stays COMPLETE "
+                   f"(completion={r2.completion!r})", r2.completion == outcome.COMPLETE)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_clamp_invariant():
     """CMP-AUD-064: the shared _clamp_input_counts caps file-level skipped/failed to
     the discovered input count — a leaked line-anomaly count can never present as an
@@ -305,6 +367,7 @@ def main():
     test_hsl_parse_and_escalation()
     test_rd_parse_and_escalation()
     test_line_anomalies_are_not_file_counts()
+    test_damaged_header_data_page()
     test_clamp_invariant()
     print("OK  post-mile code vocabulary (CMP-AUD-063): the membership rule is "
           "exhaustively locked, and an unexpected prefix/suffix escalates both "

@@ -73,7 +73,7 @@ except ImportError:
     _DEPS_OK = False
 
 import outcome
-from pdf_table_lib import (norm_route, reconcile_route_identity,
+from pdf_table_lib import (norm_route, page_has_postmile, reconcile_route_identity,
                            run_pdf_conversion, unexpected_pm_tokens,
                            write_route_workbook)
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
@@ -282,6 +282,7 @@ def parse_pdf(path, events):
     doc_routes = set()                  # the pages' own route claims (049)
     unclassified = stray_frags = 0
     bad_tokens = 0                      # unexpected PM code tokens (CMP-AUD-063)
+    damaged_pages = 0                  # headerless pages carrying data (CMP-AUD-055)
     data_pages = 0
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
@@ -293,7 +294,17 @@ def parse_pdf(path, events):
             words = page.extract_words()
             b, hdr_bottom = _page_header(words)
             if b is None:
-                continue                    # the parameters cover page
+                # The parameters cover page has no data. CMP-AUD-055: but once the
+                # document has entered its data section, a page that lost/damaged its
+                # column-header anchors yet still carries data rows (a postmile token)
+                # would be skipped WHOLESALE, silently dropping real data. Flag it so
+                # the producer escalates to PARTIAL. Censused: ZERO real headerless
+                # pages carry a postmile, so a genuine cover page never trips this.
+                if data_pages and page_has_postmile(words):
+                    damaged_pages += 1
+                    events.on_log(f"    p{page_no}: data-shaped rows but no column "
+                                  "header — page skipped (CMP-AUD-055).")
+                continue
             data_pages += 1
 
             page_rows = []                  # [top, row-list] — mutable for frags
@@ -344,7 +355,8 @@ def parse_pdf(path, events):
             rows.extend(pr[1] for pr in page_rows)
     return rows, {"emitted": len(rows), "pages": n_pages, "data_pages": data_pages,
                   "unclassified": unclassified, "stray_frags": stray_frags,
-                  "bad_tokens": bad_tokens, "doc_routes": sorted(doc_routes)}
+                  "bad_tokens": bad_tokens, "damaged_pages": damaged_pages,
+                  "doc_routes": sorted(doc_routes)}
 
 
 # =============================================================================
@@ -400,6 +412,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                 ctx["bad_tokens"] = ctx.get("bad_tokens", 0) + bad
                 ev.on_log(f"  WARNING: {bad} unexpected postmile code token(s) in "
                           f"{p.name} — the source may be suspect (see the log).")
+            dmg = pstats.get("damaged_pages", 0)
+            if dmg:
+                ctx["damaged_pages"] = ctx.get("damaged_pages", 0) + dmg
+                ev.on_log(f"  WARNING: {dmg} page(s) in {p.name} carry data rows but "
+                          "no column header — skipped (CMP-AUD-055); see the log.")
         if not rows:
             ev.on_log(f"{prefix} no ramp data found; skipping")
             ctx["failed"].append(p.name)
@@ -415,6 +432,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     def finalize(result, ctx):
         loud = ctx.get("loud", 0)
         bad_tokens = ctx.get("bad_tokens", 0)
+        damaged_pages = ctx.get("damaged_pages", 0)
         notes = []
         if loud:
             notes.append(f"⚠ {loud} unparsed line(s)/fragment(s) — verify (see the log).")
@@ -423,6 +441,9 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                 f"⚠ {bad_tokens} unexpected postmile code token(s) not in the "
                 f"accepted vocabulary (v{PM_VOCAB_VERSION}) — the source may be "
                 "suspect (see the log).")
+        if damaged_pages:
+            notes.append(f"⚠ {damaged_pages} page(s) carry data rows but no column "
+                         "header (CMP-AUD-055) — verify (see the log).")
         result.summary_lines = notes + result.summary_lines
         # A dropped line or a failed PDF is invisible downstream, so ESCALATE to
         # a producer-owned partial — the incomplete output must not be promoted /
@@ -430,18 +451,20 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         if loud or ctx["failed"]:
             result.completion = outcome.PARTIAL
             result.failed_inputs = max(result.failed_inputs, len(ctx["failed"]))
-        # `loud` (unparsed lines/fragments) and an unexpected postmile code token
-        # (CMP-AUD-063) are parse ANOMALIES, not input-file counts, so they escalate
-        # COMPLETION only — never skipped/failed_inputs, which stay the file-level
-        # channels (CMP-AUD-064: a single PDF with three malformed lines is ONE
-        # affected input, not three skips). The line-level counts ride a structured
+        # `loud` (unparsed lines/fragments), an unexpected postmile code token
+        # (CMP-AUD-063), and a damaged-header data page (CMP-AUD-055) are parse
+        # ANOMALIES, not input-file counts, so they escalate COMPLETION only —
+        # never skipped/failed_inputs, which stay the file-level channels
+        # (CMP-AUD-064: a single PDF with three malformed lines is ONE affected
+        # input, not three skips). The line/page counts ride a structured
         # diagnostic instead of the file fields.
-        if bad_tokens:
+        if bad_tokens or damaged_pages:
             result.completion = outcome.PARTIAL
-        if loud or bad_tokens:
+        if loud or bad_tokens or damaged_pages:
             result.producer_extra = {
                 **(result.producer_extra or {}),
-                "parse_anomalies": {"unparsed_lines": loud, "bad_pm_tokens": bad_tokens},
+                "parse_anomalies": {"unparsed_lines": loud, "bad_pm_tokens": bad_tokens,
+                                    "damaged_header_pages": damaged_pages},
             }
 
     return run_pdf_conversion(
