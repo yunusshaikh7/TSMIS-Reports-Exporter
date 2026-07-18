@@ -349,7 +349,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-068 | P2 | Verified | PDF-vs-TSN Detail paths omit Report View |
 | CMP-AUD-069 | P2 | Verified | Ramp PDF comparisons mislabel their file roles in diagnostics |
 | CMP-AUD-070 | P1 | Resolved 2026-07-17 — NOT A DEFECT: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified); the prescribed "use the file route" fix would introduce discrepancies | Intersection loader ignores explicit route and suffix fields |
-| CMP-AUD-071 | P1 | Verified | Ramp Summary comparison does not validate its route universe |
+| CMP-AUD-071 | P1 | Resolved 2026-07-18 (the comparator-side twin of CMP-AUD-050: Intersection Summary's route-universe validator promoted to the shared `compare_tsn_common.validate_route_universe` and wired into BOTH aggregate comparators — require ≥1 valid route, reject blank/duplicate, reconcile against the producer's ordered `route_census`; the Ramp Summary consolidator now records that census in its outcome sidecar so dropped/added/reordered/renamed rows are detectable; real 126-route consolidation records 001..980 and the comparator emits the verified note, total_ramps=15216; red→green route-universe suite: header-only/blank/dup-identical/dup-conflicting/dropped/reordered) | Ramp Summary comparison does not validate its route universe |
 | CMP-AUD-072 | P2 | Verified | Stale folder discovery can overwrite a newer recipe selection |
 | CMP-AUD-073 | P2 | Verified | Classic picker blocks two supported raw-PDF inputs |
 | CMP-AUD-074 | P2 | Verified | Universal file hint promises unsupported per-route inputs |
