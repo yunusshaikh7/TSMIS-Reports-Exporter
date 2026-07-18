@@ -41,10 +41,22 @@ _Last updated: 2026-07-17 by Claude._
 - `report_library.py` is Sol's (export freshness) and is comparison-adjacent only through
   the matrix, which Claude does not touch this pass. Low risk.
 
+## Parked backlog (owner notes 2026-07-17)
+13 owner feature/hardening notes captured + triaged in
+[docs/planning/app-consistency-backlog.md](../planning/app-consistency-backlog.md). Most are
+comparison-lane / GUI / cross-cutting **architecture** (Claude), NOT Sol's reliability lane.
+The spine (items 9/10/11/13 = output-model unification) is design-first + coupled to
+comparison-perfection, so it is not concurrent autonomous work. A future **sol-002** can
+implement the export-engine mechanics (item 12 + export side of 9/13) once Claude fixes the
+output-model design. sol-001 is unchanged by this.
+
 ## Log
 - **2026-07-17** — Baseline established at `a4ccd23`. Handoff structure created. sol-001
   charter authored (reliability engine hardening). Environment: Codex Cloud + branch.
   Next: push Sol's branch, dispatch the mission prompt, then resume comparison finding 063.
+- **2026-07-17** — Owner supplied a 13-item post-comparison backlog; captured + triaged
+  (app-consistency-backlog.md). sol-001 kept focused (not expanded). Output-model unification
+  flagged as design-first architecture (Claude), sol-002 candidate for the export mechanics.
 
 ## State vocabulary
 Planned · Active · Blocked · Verification · Ready for review · Changes requested ·
