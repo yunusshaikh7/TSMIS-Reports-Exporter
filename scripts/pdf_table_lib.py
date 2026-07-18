@@ -559,4 +559,21 @@ def run_pdf_conversion(*, in_dir, out, conv, deps_ok, events, confirm_overwrite,
         # finalize ESCALATES to a producer-owned partial — a lossy output must
         # not be promoted / cached / compared as complete.
         finalize(result, ctx)
+        _clamp_input_counts(result, ctx["pdfs"], events)
     return result
+
+
+def _clamp_input_counts(result, discovered, events):
+    """CMP-AUD-064 invariant: the file-level skipped/failed counts can never exceed
+    the number of discovered input PDFs. A producer that leaks a line-level anomaly
+    count into a file field is clamped and logged here, so no consumer of the
+    structured outcome ever sees an impossible source count (e.g. three skips from
+    one PDF with three malformed lines). Line-level parse anomalies belong in the
+    ⚠ note + producer_extra['parse_anomalies'], never the file channels."""
+    for field_name in ("skipped_inputs", "failed_inputs"):
+        v = getattr(result, field_name)
+        if isinstance(v, int) and v > discovered:
+            events.on_log(f"  NOTE: {field_name}={v} exceeds {discovered} discovered "
+                          f"PDF(s) — clamping to {discovered} (a line-level anomaly "
+                          "count must not fill a file-count field).")
+            setattr(result, field_name, discovered)

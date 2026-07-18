@@ -235,13 +235,81 @@ def test_rd_parse_and_escalation():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _loud_hsl_page():
+    # 1 clean row + 3 lines the parser can't classify (invalid PM + a non-desc
+    # column present) -> emitted 1, unclassified 3 (the finding's exact scenario).
+    return _hsl_page([dict(prefix="R", pm="001.000", suffix="E", desc="GOOD"),
+                      dict(pm="XYZ", desc="BAD1"), dict(pm="QQQ", desc="BAD2"),
+                      dict(pm="ZZZ", desc="BAD3")])
+
+
+def _loud_rd_page():
+    return _rd_page([dict(prefix="R", pm="001.000", desc="GOOD"),
+                     dict(pm="XYZ", desc="BAD1"), dict(pm="QQQ", desc="BAD2"),
+                     dict(pm="ZZZ", desc="BAD3")])
+
+
+def test_line_anomalies_are_not_file_counts():
+    """CMP-AUD-064: unparsed LINE anomalies (unclassified lines / stray fragments)
+    must NOT fill the file-level skipped_inputs — ONE PDF with three malformed lines
+    is ONE affected input, not three skips. They escalate completion, ride a
+    structured parse-anomalies diagnostic, and stay file-bounded."""
+    print("line anomalies stay out of the file-count fields (CMP-AUD-064):")
+    for tag, module, page_fn, stem in (
+            ("HSL", HSL, _loud_hsl_page, "highway_sequence_route_001.pdf"),
+            ("RD", RD, _loud_rd_page, "tsar_ramp_detail_route_001.pdf")):
+        tmp = Path(tempfile.mkdtemp(prefix="cmp064_"))
+        try:
+            result, _logs = _consolidate(module, page_fn(), tmp, stem)
+            _check(f"{tag} combine ok (status={result.status})", result.status == "ok")
+            _check(f"{tag} escalates to PARTIAL (3 unparsed lines)",
+                   result.completion == outcome.PARTIAL)
+            # The one PDF converted cleanly (emitted a row), so ZERO files were
+            # skipped or failed — the 3 unparsed lines must not inflate either field
+            # (before the fix skipped_inputs was 3; the clamp alone would leave 1).
+            _check(f"{tag} skipped_inputs is 0, NOT the 3 unparsed lines "
+                   f"(got {result.skipped_inputs}; 1 clean PDF)",
+                   result.skipped_inputs == 0)
+            _check(f"{tag} failed_inputs is 0 (got {result.failed_inputs})",
+                   result.failed_inputs == 0)
+            pe = (result.producer_extra or {}).get("parse_anomalies", {})
+            _check(f"{tag} the 3 unparsed lines ride the structured diagnostic "
+                   f"(parse_anomalies={pe})", pe.get("unparsed_lines") == 3)
+            _check(f"{tag} summary names the unparsed-line note",
+                   any("unparsed line" in ln for ln in result.summary_lines))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_clamp_invariant():
+    """CMP-AUD-064: the shared _clamp_input_counts caps file-level skipped/failed to
+    the discovered input count — a leaked line-anomaly count can never present as an
+    impossible source count; a legitimate count is left untouched."""
+    print("file-count clamp invariant (CMP-AUD-064):")
+    from events import ConsolidateResult
+    logs = []
+    r = ConsolidateResult(status="ok", skipped_inputs=3, failed_inputs=0)
+    pdf_table_lib._clamp_input_counts(r, 1, Events(on_log=logs.append))
+    _check(f"skipped_inputs=3 with 1 discovered clamps to 1 (got {r.skipped_inputs})",
+           r.skipped_inputs == 1)
+    _check("the clamp logs a NOTE", any("exceeds 1 discovered" in ln for ln in logs))
+    r2 = ConsolidateResult(status="ok", skipped_inputs=1, failed_inputs=1)
+    pdf_table_lib._clamp_input_counts(r2, 5, Events())
+    _check(f"legitimate counts (1,1 of 5) are untouched "
+           f"(got {r2.skipped_inputs},{r2.failed_inputs})",
+           r2.skipped_inputs == 1 and r2.failed_inputs == 1)
+
+
 def main():
     test_helper_vocabulary()
     test_hsl_parse_and_escalation()
     test_rd_parse_and_escalation()
+    test_line_anomalies_are_not_file_counts()
+    test_clamp_invariant()
     print("OK  post-mile code vocabulary (CMP-AUD-063): the membership rule is "
           "exhaustively locked, and an unexpected prefix/suffix escalates both "
-          "PDF consolidators to PARTIAL while a clean render stays COMPLETE.")
+          "PDF consolidators to PARTIAL while a clean render stays COMPLETE. "
+          "CMP-AUD-064: line-level anomalies stay out of the file-count fields.")
 
 
 if __name__ == "__main__":

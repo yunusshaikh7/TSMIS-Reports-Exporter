@@ -429,13 +429,20 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         # cached / compared as complete.
         if loud or ctx["failed"]:
             result.completion = outcome.PARTIAL
-            result.skipped_inputs = max(result.skipped_inputs, loud)
             result.failed_inputs = max(result.failed_inputs, len(ctx["failed"]))
-        # An unexpected postmile code token (CMP-AUD-063) is a parse ANOMALY, not
-        # an input-file count, so it escalates COMPLETION only — never
-        # skipped/failed_inputs (those stay the file-level channels).
+        # `loud` (unparsed lines/fragments) and an unexpected postmile code token
+        # (CMP-AUD-063) are parse ANOMALIES, not input-file counts, so they escalate
+        # COMPLETION only — never skipped/failed_inputs, which stay the file-level
+        # channels (CMP-AUD-064: a single PDF with three malformed lines is ONE
+        # affected input, not three skips). The line-level counts ride a structured
+        # diagnostic instead of the file fields.
         if bad_tokens:
             result.completion = outcome.PARTIAL
+        if loud or bad_tokens:
+            result.producer_extra = {
+                **(result.producer_extra or {}),
+                "parse_anomalies": {"unparsed_lines": loud, "bad_pm_tokens": bad_tokens},
+            }
 
     return run_pdf_conversion(
         in_dir=in_dir, out=out, conv=conv, deps_ok=_DEPS_OK,
