@@ -20,7 +20,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
+import day_matrix
 import matrix
+import matrix_state
 import paths
 import tsn_library
 from openpyxl import Workbook
@@ -400,12 +402,77 @@ def test_build_guards():
         shutil.rmtree(dest, ignore_errors=True)
 
 
+def test_support_derives_from_registry():
+    """CMP-AUD-013: every matrix mode's `supported` DERIVES from the comparison
+    registry — the 'tsn' modes from tsn_comparator_for, the 'self' modes from
+    _pdf_self_comparator — in BOTH matrix_state._row_modes and day_matrix._day_rows.
+    So patching the registry flips the mode + the by-day row. A hand-written True
+    (the pre-fix state, which left Highway Log + all five PDF rows supported even
+    with tsn_supported False) shadows the registry and fails this guard."""
+    print("CMP-AUD-013 support-parity (registry is the single source of truth):")
+    HL, HDP, RDP = "highway_log", "highway_detail_pdf", "ramp_detail_pdf"
+
+    def mode_of(row_key, subdir, kind):
+        for m in matrix._row_modes(row_key, subdir, object()):
+            if m["kind"] == kind:
+                return m
+        return None
+
+    def day_supported(row_key):
+        return {r[0]: r[4] for r in day_matrix._day_rows()}.get(row_key)
+
+    # Baseline (no-op): every tsn + self mode and every by-day row is supported.
+    check("baseline: highway_detail_pdf tsn mode supported",
+          mode_of(HDP, "highway_detail", "tsn")["supported"])
+    check("baseline: ramp_detail_pdf self mode supported",
+          mode_of(RDP, "ramp_detail", "self")["supported"])
+    check("baseline: every by-day row supported",
+          all(r[4] for r in day_matrix._day_rows()))
+
+    # Negative mutation on the TSN registry: the mode + the by-day row must flip,
+    # while an unpatched row stays supported.
+    saved_tsn = matrix_state.tsn_comparator_for
+    try:
+        matrix_state.tsn_comparator_for = lambda rk: None if rk == HDP else saved_tsn(rk)
+        check("patch tsn_comparator_for(highway_detail_pdf)->None flips its tsn mode",
+              mode_of(HDP, "highway_detail", "tsn")["supported"] is False)
+        check("...and flips the by-day highway_detail_pdf row",
+              day_supported(HDP) is False)
+        check("...while highway_log stays supported (mode + by-day row)",
+              mode_of(HL, "highway_log", "tsn")["supported"] and day_supported(HL) is True)
+    finally:
+        matrix_state.tsn_comparator_for = saved_tsn
+
+    # Negative mutation on the self (PDF-vs-Excel) registry: the self mode must flip.
+    saved_self = matrix_state._pdf_self_comparator
+
+    def _stub_self(pdf_subdir):
+        if pdf_subdir == RDP:
+            raise ValueError("stubbed: no self comparator")
+        return saved_self(pdf_subdir)
+
+    try:
+        matrix_state._pdf_self_comparator = _stub_self
+        check("stub _pdf_self_comparator(ramp_detail_pdf)->raise flips its self mode",
+              mode_of(RDP, "ramp_detail", "self")["supported"] is False)
+        check("...while highway_log_pdf self mode stays supported",
+              mode_of("highway_log_pdf", "highway_log_pdf", "self")["supported"])
+    finally:
+        matrix_state._pdf_self_comparator = saved_self
+
+    # Registry fully restored afterward.
+    check("registry restored after mutation",
+          mode_of(HDP, "highway_detail", "tsn")["supported"]
+          and mode_of(RDP, "ramp_detail", "self")["supported"])
+
+
 def main():
     test_paths_and_modes()
     test_source_detection()
     test_canonical_selection_keys()
     test_snapshot_modes()
     test_build_guards()
+    test_support_derives_from_registry()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

@@ -32,8 +32,8 @@ from matrix_state import (                                       # noqa: F401
     comparison_state, comparisons_root, default_env_label, env_keys,
     load_results, load_tsn_results, matrix_snapshot, mode_out_path,
     out_path_for_cell, read_counts, record_result, record_tsn_result,
-    tsn_capable, tsn_comparator_for, tsn_comparisons_root, tsn_input_root,
-    tsn_source, tsn_subdir_for, tsn_supported)
+    self_supported, tsn_capable, tsn_comparator_for, tsn_comparisons_root,
+    tsn_input_root, tsn_source, tsn_subdir_for, tsn_supported)
 from matrix_build import (                                       # noqa: F401
     _FORMULAS_TWIN_MAX_ROWS, _comparison_row_count, _consolidate_store_folder,
     _consolidated_filename, _consolidated_stale, _ensure_consolidated,

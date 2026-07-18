@@ -453,45 +453,62 @@ def tsn_source(dest, subdir, selected_file=None):
 def _row_modes(row_key, subdir, adapter):
     env = {"id": "env", "label": "Cross-environment", "kind": "env",
            "supported": adapter is not None, "env_subdir": subdir}
+    # Every mode's `supported` DERIVES from the comparison registry (CMP-AUD-013):
+    # the 'tsn' modes from tsn_supported(row_key) and the 'self' modes from
+    # self_supported(<pdf subdir>) — patching the registry (tsn_comparator_for /
+    # _pdf_self_comparator) now flips these rows here too, instead of a hand-written
+    # True shadowing it. Production identities are unchanged (all True today).
     if row_key == "highway_log":            # TSMIS Excel
         return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
+                 "supported": tsn_supported(row_key),
                  "env_subdir": "highway_log", "tsn_subdir": "highway_log", "fmt": "excel"},
-                {"id": "vs_pdf", "label": "vs TSMIS PDF", "kind": "self", "supported": True,
+                {"id": "vs_pdf", "label": "vs TSMIS PDF", "kind": "self",
+                 "supported": self_supported("highway_log_pdf"),
                  "env_subdir": "highway_log", "other_subdir": "highway_log_pdf"}]
     if row_key == "highway_log_pdf":        # TSMIS PDF
         return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
+                 "supported": tsn_supported(row_key),
                  "env_subdir": "highway_log_pdf", "tsn_subdir": "highway_log", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
+                 "supported": self_supported("highway_log_pdf"),
                  "env_subdir": "highway_log_pdf", "other_subdir": "highway_log"}]
     if row_key == "intersection_detail_pdf":   # the exact parallel of highway_log_pdf
         return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
+                 "supported": tsn_supported(row_key),
                  "env_subdir": "intersection_detail_pdf",
                  "tsn_subdir": "intersection_detail", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
+                 "supported": self_supported("intersection_detail_pdf"),
                  "env_subdir": "intersection_detail_pdf", "other_subdir": "intersection_detail"}]
     if row_key == "highway_detail_pdf":        # the exact parallel of intersection_detail_pdf
         return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
+                 "supported": tsn_supported(row_key),
                  "env_subdir": "highway_detail_pdf",
                  "tsn_subdir": "highway_detail", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
+                 "supported": self_supported("highway_detail_pdf"),
                  "env_subdir": "highway_detail_pdf", "other_subdir": "highway_detail"}]
     if row_key == "highway_sequence_pdf":      # the exact parallel of highway_detail_pdf
         return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
+                 "supported": tsn_supported(row_key),
                  "env_subdir": "highway_sequence_pdf",
                  "tsn_subdir": "highway_sequence", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
+                 "supported": self_supported("highway_sequence_pdf"),
                  "env_subdir": "highway_sequence_pdf", "other_subdir": "highway_sequence"}]
     if row_key == "ramp_detail_pdf":           # the exact parallel of highway_sequence_pdf
         return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn", "supported": True,
+                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
+                 "supported": tsn_supported(row_key),
                  "env_subdir": "ramp_detail_pdf",
                  "tsn_subdir": "ramp_detail", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self", "supported": True,
+                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
+                 "supported": self_supported("ramp_detail_pdf"),
                  "env_subdir": "ramp_detail_pdf", "other_subdir": "ramp_detail"}]
     return [env,
             {"id": "tsn", "label": "vs TSN", "kind": "tsn",
@@ -571,6 +588,18 @@ def _pdf_self_comparator(pdf_subdir):
         import compare_ramp_detail_pdf as _m
         return _m.TSMIS_PDF_VS_EXCEL
     raise ValueError(f"no PDF-vs-Excel comparator for {pdf_subdir}")
+
+
+def self_supported(pdf_subdir):
+    """True when a PDF report subdir has a coded PDF-vs-Excel self comparator
+    (_pdf_self_comparator). The registry SoT for the matrix 'self' mode, the exact
+    parallel of tsn_supported for the 'tsn' mode — so _row_modes DERIVES a mode's
+    support from the registry instead of hardcoding it (CMP-AUD-013), and a re-
+    hardcoded row that drifts from the registry is caught by the parity guard."""
+    try:
+        return _pdf_self_comparator(pdf_subdir) is not None
+    except ValueError:  # silent-ok: the raise IS the "no self comparator" signal (parallels tsn_supported's `is not None`)
+        return False
 
 
 def tsn_supported(row_key):

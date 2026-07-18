@@ -67,15 +67,20 @@ def _day_rows():
     out = []
     for row_key, label, subdir, _idx, adapter in reports.matrix_rows():
         tsn_subdir = matrix.tsn_subdir_for(row_key, subdir, adapter)
+        # `supported` ALWAYS derives from the single tsn_supported registry
+        # (CMP-AUD-013) — the two Highway Log rows + the five PDF rows differ only
+        # in their explicit fmt, never in whether support is hardcoded. Patching
+        # tsn_comparator_for now flips every row here; no hand-written True shadows
+        # it. Every report has a coded comparator today, so all rows stay live.
         if row_key == "highway_log":
-            out.append((row_key, label, subdir, "excel", True, tsn_subdir))
+            out.append((row_key, label, subdir, "excel",
+                        matrix.tsn_supported(row_key), tsn_subdir))
         elif row_key in ("highway_log_pdf", "intersection_detail_pdf",
                          "highway_detail_pdf", "highway_sequence_pdf",
                          "ramp_detail_pdf"):
-            out.append((row_key, label, subdir, "pdf", True, tsn_subdir))
+            out.append((row_key, label, subdir, "pdf",
+                        matrix.tsn_supported(row_key), tsn_subdir))
         else:
-            # Any report with a coded vs-TSN comparator is live (all of them as of
-            # v0.17.0); `supported` derives from the single tsn_supported registry.
             out.append((row_key, label, subdir, None,
                         matrix.tsn_supported(row_key), tsn_subdir))
     # Reports with no cross-env adapter (absent from matrix_rows) still get a
