@@ -23,10 +23,10 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
 | **Gate** | **130/130 offline** checks (128 comparison + Sol's 2 reliability checks after the sol-001 integration; full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **241 total · ~160 CLOSED (Resolved/Remediated) · ~10 partial · ~70 open** (~66% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · C ✅ (028/029/030/031/033/034/036/063/027 + 070-not-a-defect) · D 🔨 (018 ✅ · 019 ✅; 046/022 left) · B/E/F/G/H/I ⬜ (parser robustness / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
-| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **019 RESOLVED (2026-07-17)**: the Ramp Summary producer now reflects its own audit reds — `record_has_data` requires Total + every section, per-route `reconcile_record` sends unexplained gaps → PARTIAL and the explained P/V residual → a typed note (COMPLETE), matcher unknown/duplicate diagnostics, cross-env shares the gate; census 0 unexplained / 9 routes / 22 P/V ramps, real-data verified. **NEXT (bucket D): 046 + 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
+| **Findings** | **241 total · ~161 CLOSED (Resolved/Remediated) · ~10 partial · ~69 open** (~67% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · **C ✅ COMPLETE** (028/029/030/031/032/033/034/036/063/027 + 070-not-a-defect — 032 was the last, closed 2026-07-18) · D 🔨 (018 ✅ · 019 ✅; 046/022 left) · B/E/F/G/H/I ⬜ (parser robustness / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
+| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **019 RESOLVED (2026-07-17)**: the Ramp Summary producer now reflects its own audit reds — `record_has_data` requires Total + every section, per-route `reconcile_record` sends unexplained gaps → PARTIAL and the explained P/V residual → a typed note (COMPLETE), matcher unknown/duplicate diagnostics, cross-env shares the gate; census 0 unexplained / 9 routes / 22 P/V ramps, real-data verified. **032 RESOLVED (2026-07-18) — BUCKET C COMPLETE**: every flat cross-env family now pins its EXACT export schema via a header_canonicalizer (RD/HSL/HD/ID XLSX + HSL-PDF/RD-PDF), so two malformed/legacy/truncated/reordered sides refuse instead of matching; census-verified on the 7.9 statewide exports + converted headers; new `check_compare_env_flat_schema` + 5 fixtures rebuilt onto real layouts. **NEXT (bucket D): 046 + 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029 + 034, then 063 + 027 + MER-059 + 018 + 019 — bucket D: 046 + 022 left)
+> ### ▶ RESUME HERE (2026-07-18, after the C-bucket gates + 063 + 027 + MER-059 + 018 + 019 + 032 — **BUCKET C COMPLETE**; bucket D: 046 + 022 left)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -35,7 +35,29 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
-> **DONE 2026-07-17 (latest): CMP-AUD-019 CLOSED — the Ramp Summary producer now
+> **DONE 2026-07-18 (latest): CMP-AUD-032 CLOSED — BUCKET C COMPLETE (flat cross-env
+> schema pinning).** The flat cross-env families locked their header from the
+> alphabetically-first readable file, so two identically-malformed or legacy sides
+> compared as a clean MATCH (Highway Detail never called its exact recognizer; ID's
+> canonicalizer returned an unrecognized layout unchanged). Fix: every flat family now
+> pins its EXACT current export schema via a `header_canonicalizer` (the pattern Highway
+> Log already used) — a shared `_flat_header_recognizer` factory over the vs-TSN
+> `_TSMIS_HEADER[1:]` (RD/HSL/ID, unnamed columns included) / `highway_detail_columns.HEADER`
+> (HD), returning None for anything else → an "unrecognized layout" refusal; `_id_canonical_header`
+> refuses non-edition layouts (still bridges current↔legacy). The two PDF-conversion loaders
+> (HSL-PDF reuses the Excel recognizer; RD-PDF pins its own 13-col print header with the
+> On/Off + Ramp Type sentinels) pin the same way via the config path. **Census:** the bound
+> 7.9 statewide exports (126 RD / 252 HSL / 252 HD / 217 ID) + both converted PDF headers —
+> one consistent shape each, none carrying a leading Route, so pinning drops no real file.
+> Two commits (`528e91c` XLSX + `62d1593` PDF). New `check_compare_env_flat_schema` (per-family
+> recognizer matrix + end-to-end refuse/accept + PDF coverage); 5 fixtures
+> (`check_compare_ramp_detail`, `_highway_sequence`, `_env_intersection`, `_baseline_matrix`,
+> `check_matrix`) rebuilt from fake short headers onto real layouts (red→green). Offline gate
+> **131/131** + ruff clean. **NEXT (bucket D): 046** (position-shifted header projection) +
+> **022** (duplicate normalized categories — the `counts_from_rows` double-count; mind the
+> CONTROL-TYPES signal fold, key on (block, pre-fold-code); see the takeover memory's 022 scope).
+>
+> **DONE 2026-07-17: CMP-AUD-019 CLOSED — the Ramp Summary producer now
 > reflects its own audit reds (census-first, 126-route real-data verified).** Four
 > coupled changes: (1) `record_has_data` requires the Total **+** ≥1 category in every
 > printed section, so the `{route, total_ramps}` total-only phantom is rejected (dropped

@@ -162,20 +162,20 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">66<span>%</span></div>
+        <div class="bignum">67<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="160 closed, 10 in progress, 70 open of 241 findings">
-          <div class="seg done" style="width:66%">160 closed</div>
-          <div class="seg warn" style="width:5%"></div>
-          <div class="seg open" style="width:29%">70 open</div>
+        <div class="bar" role="img" aria-label="161 closed, 10 in progress, 69 open of 241 findings">
+          <div class="seg done" style="width:67%">161 closed</div>
+          <div class="seg warn" style="width:4%"></div>
+          <div class="seg open" style="width:29%">69 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 160 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 161 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot warn"></i> ~10 in progress</span>
-          <span><i class="dot open"></i> ~70 open</span>
+          <span><i class="dot open"></i> ~69 open</span>
         </div>
       </div>
     </div>
@@ -209,8 +209,8 @@
         <p class="bk-desc">The bucket that re-confirmed borderline findings — <code>065</code> <code>040</code> <code>006</code> <code>037</code> — all closed.</p>
       </div>
       <div class="bk is-done">
-        <div class="bk-top"><span class="bk-letter">C</span><span class="bk-name">Loader & validation gates</span><span class="pill done">10 of 11</span></div>
-        <p class="bk-desc">The refusal-first wave: 10 gates shipped (<code>028–034</code> <code>036</code> <code>063</code> <code>027</code>) + <code>070</code> ruled not-a-defect. Only <code>032</code> remains.</p>
+        <div class="bk-top"><span class="bk-letter">C</span><span class="bk-name">Loader & validation gates</span><span class="pill done">Complete</span></div>
+        <p class="bk-desc">The refusal-first wave — all 11 gates shipped (<code>028–034</code> <code>036</code> <code>063</code> <code>027</code>) + <code>070</code> ruled not-a-defect. <code>032</code> (flat cross-env schema pinning) closed it out.</p>
       </div>
       <div class="bk is-prog">
         <div class="bk-top"><span class="bk-letter">D</span><span class="bk-name">Cross-environment validation</span><span class="pill prog">In progress</span></div>
@@ -254,10 +254,9 @@
         </div>
       </div>
       <div class="step"><div class="n">02</div><div class="body"><div class="h">PDF-parser robustness wave</div><div class="m">Bucket B — spill/orphan/fallback/truncation hardening for the HD &amp; ID parsers.</div></div></div>
-      <div class="step"><div class="n">03</div><div class="body"><div class="h">Close the loader-gate tail</div><div class="m">Bucket C — the last item, <b class="mono">032</b> (cross-env flat schema contract).</div></div></div>
-      <div class="step"><div class="n">04</div><div class="body"><div class="h">Matrix / GUI lifecycle honesty</div><div class="m">Bucket E — the big one, but P2 state-machine truthfulness, not comparison correctness.</div></div></div>
-      <div class="step"><div class="n">05</div><div class="body"><div class="h">Source-semantics &amp; the evidence arc</div><div class="m">Buckets G &amp; F — conserve/expose data facts; then the evidence-image gate (incl. the deferred 210 feature).</div></div></div>
-      <div class="step"><div class="n">06</div><div class="body"><div class="h">Instrument hardening &amp; the trivia tail</div><div class="m">Buckets H &amp; I — non-product audit-instrument work and the P3 label/doc nits.</div></div></div>
+      <div class="step"><div class="n">03</div><div class="body"><div class="h">Matrix / GUI lifecycle honesty</div><div class="m">Bucket E — the big one, but P2 state-machine truthfulness, not comparison correctness.</div></div></div>
+      <div class="step"><div class="n">04</div><div class="body"><div class="h">Source-semantics &amp; the evidence arc</div><div class="m">Buckets G &amp; F — conserve/expose data facts; then the evidence-image gate (incl. the deferred 210 feature).</div></div></div>
+      <div class="step"><div class="n">05</div><div class="body"><div class="h">Instrument hardening &amp; the trivia tail</div><div class="m">Buckets H &amp; I — non-product audit-instrument work and the P3 label/doc nits.</div></div></div>
     </div>
     <div class="method">
       <span><b>Every fix, every time:</b></span>
@@ -274,11 +273,12 @@
       <div class="win"><div class="id">CMP-AUD-018</div><div class="w">IS cross-env partition gate</div><div class="c">census 434 exports · shared validator</div></div>
       <div class="win"><div class="id">sol-001</div><div class="w">Reliability engine hardening — integrated</div><div class="c">updater · export · auth · reviewed + merged</div></div>
       <div class="win"><div class="id">CMP-AUD-019</div><div class="w">Ramp Summary audit reds reflected in the result</div><div class="c">census 126 routes · 22 P/V ramps · unexplained → PARTIAL</div></div>
+      <div class="win"><div class="id">CMP-AUD-032</div><div class="w">Flat cross-env schemas pinned — bucket C complete</div><div class="c">RD/HSL/HD/ID + 2 PDF paths · census 847 exports · no phantom match</div></div>
     </div>
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>9b04f6d</b> · gate <b>130/130</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>62d1593</b> · gate <b>131/131</b> · CI-green</span>
     <span>Updated <b>2026-07-17</b></span>
   </footer>
 
