@@ -4,15 +4,15 @@
 > update is a checkpoint, not a request for permission — keep working. Commit + push it so
 > Claude can `git fetch` and see progress.
 
-- **State:** In progress
-- **Last meaningful update:** 2026-07-17 — auth/session/browser coverage and bounded silent-failure sweep implemented
-- **Current milestone:** 5 — automated verification and findings ledger (E)
-- **Completed milestones:** 1 baseline review; 2 diagnosis/plan; 3A updater integrity; 3B export reliability; 3C auth/session/browser; 4 bounded silent-failure sweep
-- **Work in progress:** authoritative full gate, regression/ownership review, source-ZIP independent verification, and final report
-- **Next intended work:** run the full gate + compileall + Ruff, commit the auth milestone, then complete the final audit/report
-- **Current test status:** auth milestone full gate 133 passed / 1 known infrastructure red of 134 in 219 s; sole failure F-01 `check_source_zip_smoke`. New auth check, existing focused checks, compileall, repo-wide Ruff, and `git diff --check` are green.
-- **Blockers / uncertainties:** exact in-worktree gate green is blocked by F-01; external push of `b02ff5b` was rejected by the environment reviewer, so both completed checkpoints remain local and product work continues
-- **Latest stable checkpoint commit:** `d1b3502` (`harden export retry accounting`, local; push blocked)
+- **State:** Ready for review
+- **Last meaningful update:** 2026-07-17 — final verification, independent source-ZIP smoke, ownership review, and report complete
+- **Current milestone:** 7 — cleanup and final report complete
+- **Completed milestones:** 1 baseline review; 2 diagnosis/plan; 3A updater integrity; 3B export reliability; 3C auth/session/browser; 4 bounded silent-failure sweep; 5 automated verification/findings; 6 regression/ownership review; 7 cleanup/report
+- **Work in progress:** none
+- **Next intended work:** stop and wait for integrator review
+- **Current test status:** final closeout full gate 133 passed / 1 known infrastructure red of 134 in 130 s; sole failure F-01 `check_source_zip_smoke`. The earlier auth implementation gate had the same 133/1 result in 219 s. New auth check, existing focused checks, compileall, repo-wide Ruff, and `git diff --check` are green.
+- **Blockers / uncertainties:** exact in-worktree gate green is blocked only by F-01; the committed source archive passes supplied-archive smoke. External push was rejected by the environment reviewer, so all checkpoints remain local.
+- **Latest stable checkpoint commit:** `42c25a5` (`harden auth fallback diagnostics`, local; push blocked)
 
 ## Updater milestone evidence
 
