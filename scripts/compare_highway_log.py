@@ -127,7 +127,17 @@ def _load_input(path):
         n = len(header)
         rows = []
         for r in rows_iter:
-            r = list(r)[:n] + [None] * max(0, n - len(r))
+            r = list(r)
+            # CMP-AUD-044: a nonblank cell BEYOND the declared header width is
+            # real data under a trailing blank header; slicing to r[:n] would
+            # silently drop that column from the comparison. Refuse the file
+            # rather than truncate it.
+            if any(v is not None and str(v).strip() != "" for v in r[n:]):
+                raise ValueError(
+                    f"{name} has a row with data beyond its {n}-column Highway "
+                    f"Log header (a trailing blank-header column). Re-create the "
+                    f"workbook with this app so no column is silently dropped.")
+            r = r[:n] + [None] * max(0, n - len(r))
             if row_has_data(r):
                 rows.append([_hl_normalize(v) for v in r])
         return rows, has_route

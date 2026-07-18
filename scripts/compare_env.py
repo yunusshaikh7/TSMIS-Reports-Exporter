@@ -260,14 +260,31 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
                 continue
             seen_routes.add(route)
             n = len(header)
-            count = 0
             norm = value_normalizer if value_normalizer is not None \
                 else normalize_value
+            file_rows = []
+            overflow = False
             for r in rows_iter:
-                r = list(r)[:n] + [None] * max(0, n - len(r))
+                r = list(r)
+                # CMP-AUD-044: a nonblank cell BEYOND the declared width is real
+                # data under a trailing blank header; slicing to r[:n] would
+                # silently drop that column from the comparison. Refuse the file
+                # loudly (an incompleteness skip) instead of truncating it.
+                if any(v is not None and str(v).strip() != "" for v in r[n:]):
+                    overflow = True
+                    break
+                r = r[:n] + [None] * max(0, n - len(r))
                 if row_has_data(r):
-                    rows.append([route] + [norm(v) for v in r])
-                    count += 1
+                    file_rows.append([route] + [norm(v) for v in r])
+            if overflow:
+                events.on_log(f"  [{label}] {p.name}: data beyond the {n}-column "
+                              "header; skipping")
+                skipped.append(f"{label} {p.name}: a row carries data beyond the "
+                               f"{n}-column header (a trailing blank-header column) "
+                               "— re-export so the comparison can't silently drop it")
+                continue
+            rows.extend(file_rows)
+            count = len(file_rows)
             events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
                           f"+{count} rows")
             # CMP-AUD-027: a valid-header file that contributes ZERO data rows

@@ -268,10 +268,37 @@ def test_shared_helpers():
               str(e))
 
 
+def test_044_data_beyond_header():
+    """CMP-AUD-044: a Highway Log workbook with a TRAILING BLANK 32nd header
+    column that still carries data must be REFUSED, not silently sliced to 31
+    columns (dropping that column's data from the comparison)."""
+    print("CMP-AUD-044 Highway Log trailing-blank-header data guard:")
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_hl044_"))
+    p = tmp / "hl.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Highway Log"
+    ws.append(list(hlc.HEADER) + [""])            # 31 real labels + a blank 32nd
+    row = [None] * 31 + ["DROPPED"]               # data under the blank 32nd header
+    row[0], row[1], row[2] = "07-LA-005 12.3", "R1", "DESC"
+    ws.append(row)
+    wb.save(p)
+    wb.close()
+    try:
+        hl._load_input(p)
+    except ValueError as e:
+        check("HL loader refuses data beyond the declared header (not sliced off)",
+              "beyond" in str(e).lower())
+    else:
+        check("HL loader refuses data beyond the declared header (not sliced off)",
+              False)
+
+
 def main():
     test_hl_compare()
     test_pdf_flavors()
     test_shared_helpers()
+    test_044_data_beyond_header()
     if _fail:
         print(f"\n{len(_fail)} check(s) FAILED")
         return 1

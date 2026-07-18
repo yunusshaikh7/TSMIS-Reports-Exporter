@@ -194,6 +194,34 @@ def test_030_031_canonical_side_unchanged():
     assert not skipped, skipped
 
 
+def test_044_data_beyond_header_disclosed():
+    """CMP-AUD-044: a per-route export with a TRAILING BLANK header column that
+    still carries data must not have that column silently sliced off (r[:n]) and
+    dropped from the comparison. The loader refuses the file LOUDLY (an
+    incompleteness skip) naming it, while a clean file beside it contributes."""
+    base = Path(tempfile.mkdtemp())
+    d = base / "highway_sequence"
+    d.mkdir(parents=True)
+    clean = Workbook()
+    ws = clean.active
+    ws.title = _SHEET
+    ws.append(_HEADER)
+    ws.append(["ORA", "", "R", "1.0", "", "CLEAN"])
+    clean.save(d / "hs_route_001.xlsx")
+    bad = Workbook()
+    ws = bad.active
+    ws.title = _SHEET
+    ws.append(_HEADER + [""])                                   # trailing blank header
+    ws.append(["ORA", "", "R", "2.0", "", "DESC", "DROPPED"])   # data beyond the header
+    bad.save(d / "hs_route_002.xlsx")
+    rows, _header, skipped = _load(base)
+    assert {r[0] for r in rows} == {"001"}, (
+        "only the clean route contributes; the overflow file must be refused",
+        [r[0] for r in rows])
+    assert any("002" in s and "beyond" in s.lower() for s in skipped), (
+        "the trailing-blank-header data file must be disclosed as skipped", skipped)
+
+
 def main():
     test_031_route_token_normalized()
     test_031_non_route_name_rejected()
@@ -203,6 +231,7 @@ def main():
     test_027_header_only_sole_file_errors()
     test_027_header_only_end_to_end_incomplete()
     test_030_031_canonical_side_unchanged()
+    test_044_data_beyond_header_disclosed()
     print("OK  cross-env route universe: tokens zero-pad-normalized, the "
           "..._route_<n> naming contract is required (no promoted stems), "
           "duplicate routes are disclosed as incomplete, header-only routes are "
