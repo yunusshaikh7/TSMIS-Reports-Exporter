@@ -162,20 +162,20 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">70<span>%</span></div>
+        <div class="bignum">71<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="169 closed, 10 in progress, 61 open of 241 findings">
-          <div class="seg done" style="width:70%">169 closed</div>
+        <div class="bar" role="img" aria-label="170 closed, 10 in progress, 60 open of 241 findings">
+          <div class="seg done" style="width:71%">170 closed</div>
           <div class="seg warn" style="width:4%"></div>
-          <div class="seg open" style="width:26%">61 open</div>
+          <div class="seg open" style="width:25%">60 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 169 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 170 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot warn"></i> ~10 in progress</span>
-          <span><i class="dot open"></i> ~61 open</span>
+          <span><i class="dot open"></i> ~60 open</span>
         </div>
       </div>
     </div>
@@ -281,11 +281,12 @@
       <div class="win"><div class="id">CMP-AUD-015</div><div class="w">Intersection labels drop the wrong TSAR: prefix</div><div class="c">4 labels + frozen catalog + mock · convention guard added</div></div>
       <div class="win"><div class="id">CMP-AUD-064</div><div class="w">PDF line anomalies no longer masquerade as skipped files</div><div class="c">loud → parse_anomalies + PARTIAL · shared count clamp</div></div>
       <div class="win"><div class="id">CMP-AUD-038</div><div class="w">TSN date normalizer full-matches + calendar-validates</div><div class="c">junk/impossible dates preserved as a visible diff · census no-op on 121,464 real cells</div></div>
+      <div class="win"><div class="id">CMP-AUD-009</div><div class="w">Numeric identity keys align 5.0 with 5</div><div class="c">false one-sided split fixed · whitespace/case stay significant · byte-identical on 128,226 real keys</div></div>
     </div>
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>2507257</b> · gate <b>132/132</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>db38c22</b> · gate <b>132/132</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 

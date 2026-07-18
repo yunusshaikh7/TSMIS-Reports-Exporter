@@ -287,7 +287,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-006 | P1 | Remediated 2026-07-17 (the identity component is Decimal-canonical — compare_tsn_common.decimal_pm; zero partition merges statewide, pairing provably unchanged) | Ramp Detail PM normalization contradicts its identity contract |
 | CMP-AUD-007 | P1 | Verified | Settings validation omits five PDF rows and selected TSN files |
 | CMP-AUD-008 | P2 | Resolved | Duplicate pairing is exact in-cap and explicitly partial/capped above it |
-| CMP-AUD-009 | P2 | Verified | Row keys bypass ordinary trim and numeric coercion |
+| CMP-AUD-009 | P2 | Resolved 2026-07-18 (a numeric identity key now canonicalizes like its compared value — `_key_text` maps an integral float `5.0`→`'5'` so it aligns with its int/text twin instead of splitting into two false one-sided rows; whitespace/case stay significant by design — trim/casefold would merge distinct identities; typed PhysicalKey/roadbed paths untouched; census-proven byte-identical on 128,226 real key cells) | Row keys bypass ordinary trim and numeric coercion |
 | CMP-AUD-010 | P2 | Verified | Matrix Consolidate sends canonical TSN PDFs to a legacy-only path |
 | CMP-AUD-011 | P2 | Resolved | ValidationWorker drops the partial-comparison count |
 | CMP-AUD-012 | P2 | Resolved | Spot Check preserves typed blank/zero and full display parity |
@@ -862,8 +862,8 @@ no trace or workbook and preserves an existing output byte-for-byte. Locked by
 ### CMP-AUD-009 — key identity bypasses comparison normalization
 
 Priority: P2  
-Status: Verified  
-Primary code: `scripts/compare_core.py:220-245`
+Status: Resolved 2026-07-18 — numeric identity parity added; whitespace/case deliberately significant  
+Primary code: `scripts/compare_core.py` (`_key_text`, `keys_for`)
 
 Raw route/key values are stringified without `_xl_trim` or integral-float
 normalization. Verified outcomes:
@@ -879,6 +879,33 @@ None / ""   -> matched
 Correction requirements: define identity normalization separately per domain; do not
 blindly reuse display normalization. Add key tests for text/numeric types, spaces,
 case, blanks, Unicode whitespace, and invalid-key warnings.
+
+#### Remediation — 2026-07-18
+
+The one genuine gap was numeric type parity: the value path already treats `5`, `"5"`,
+and `5.0` as equal (`_xl_trim(5) == _xl_trim(5.0) == "5"`), but `keys_for` keyed on raw
+`str()`, so a float `5.0` alignment key (`"5.0"`) never met its `"5"` twin — one physical
+row split into two false one-sided rows *before* values were compared. New
+`compare_core._key_text` mirrors `_xl_trim`'s numeric/bool canonicalization (integral
+float → int, bool → literal) at the **bare-`str()` key branch only**. Whitespace and case
+stay **significant** by deliberate design — identity must not be display-normalized;
+trimming or case-folding keys would merge genuinely distinct identities, which the
+finding itself cautions against. So `" K "` vs `"K"` and `""` vs `" "` remain distinct
+identities, not merged.
+
+Scope + safety: the typed `PhysicalKey` and roadbed-normalizer paths (RD/ID/HD/HSL/HL
+vs-TSN, and cross-env RD/ID/HSL) never reach the `else` branch, so they are byte-identical;
+the change only touches the flat bare-`str()` families (cross-env HD / HD-PDF / ID-PDF /
+HSL-PDF). **Census (unreachable-on-real-data):** across 128,226 real key cells — HD 51,273
++ ID 16,459 + HSL 60,494 — the Post Mile / PM key columns are uniformly clean text with **0
+numeric-typed and 0 whitespace-variant cells**, because both cross-env sides come from one
+TSMIS export pipeline that formats the key identically. The shipped `_key_text` therefore
+equals the old `str()` on **all 128,226** real key cells (alignment keys byte-identical);
+only a hypothetical future numeric-typed key changes, and there it correctly fixes a
+false-one-sided pairing (a postmile is never two distinct locations `5` and `5.0`).
+Red→green in `check_compare_coercion` (`test_key_identity_numeric_parity`: float/int/text
+parity, bool, whitespace + case stay significant, end-to-end 0 one-sided). Census:
+scratchpad `census_009_keys.py`.
 
 ### CMP-AUD-010 — canonical raw TSN PDFs get a broken Consolidate action
 
