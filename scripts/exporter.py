@@ -1227,7 +1227,9 @@ def _retry_failed_combined(page, base_spec, targets_for, results, events, timeou
     fail set is SHARED across editions), re-running each route combined with a more
     generous timeout. Mirrors _retry_failed_routes: drops the first-pass 'failed'
     bookkeeping before re-running so a now-succeeding route is recorded once.
-    `targets_for(route)` yields the ordered [(spec, out_path)] for a route."""
+    Any route left unprocessed by cancel/recovery-stop is restored as failed in
+    every edition, keeping both run reports total and identical. `targets_for(route)`
+    yields the ordered [(spec, out_path)] for a route."""
     to_retry = list(results[0].failed)          # failed is identical across editions
     if not to_retry:
         return
@@ -1243,9 +1245,21 @@ def _retry_failed_combined(page, base_spec, targets_for, results, events, timeou
         if events.is_cancelled():
             break
         prefix = f"[retry {i:>3}/{total}] Route {route}:"
-        if not _process_route_combined(page, base_spec, route, prefix,
-                                       targets_for(route), events, results, timeout_ms):
+        try:
+            keep_going = _process_route_combined(
+                page, base_spec, route, prefix, targets_for(route), events,
+                results, timeout_ms)
+        except RunCancelled:  # silent-ok: cancel is reconciled below, not an engine error
             break
+        if not keep_going:
+            break
+
+    recorded = {route for route, _status in results[0].per_route}
+    for route in to_retry:
+        if route not in recorded:
+            _tally_all(results, events, route, "failed")
+    log.info("combined retry pass done: still failed=%s",
+             results[0].failed or "none")
 
 
 def _combined_output_dirs(specs, out_dirs, src, env):

@@ -118,6 +118,14 @@ def save(manifest, path=MANIFEST_PATH):
     os.replace(tmp, path)
 
 
+def _valid_step(step):
+    """Whether one persisted environment step is safe for pending/mark_done."""
+    return (isinstance(step, dict)
+            and isinstance(step.get("src"), str) and bool(step["src"].strip())
+            and isinstance(step.get("env"), str) and bool(step["env"].strip())
+            and step.get("status") in ("pending", "done"))
+
+
 def load(path=MANIFEST_PATH):
     """The saved manifest, or None when absent / unreadable / wrong shape (so a
     corrupt file degrades to 'no batch to resume' rather than crashing)."""
@@ -131,7 +139,8 @@ def load(path=MANIFEST_PATH):
         return None
     if (not isinstance(data, dict)
             or data.get("version") not in _SUPPORTED_VERSIONS
-            or not isinstance(data.get("steps"), list)):
+            or not isinstance(data.get("steps"), list)
+            or not all(_valid_step(step) for step in data["steps"])):
         log.warning("batch manifest shape/version unexpected — ignoring")
         return None
     # Normalize the report selection to v2 export-op KEYS in memory, migrating a

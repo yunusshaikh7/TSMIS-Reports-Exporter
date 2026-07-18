@@ -77,6 +77,15 @@ def test_manifest_module():
     check("corrupt file -> None", batch_manifest.load(p) is None)
     p.write_text(json.dumps({"version": 999, "steps": []}), encoding="utf-8")
     check("unsupported version -> None", batch_manifest.load(p) is None)
+    p.write_text(json.dumps({"version": 2, "reports": [],
+                             "steps": ["not-a-step"]}), encoding="utf-8")
+    check("non-object step -> None (never crashes pending())",
+          batch_manifest.load(p) is None)
+    p.write_text(json.dumps({"version": 2, "reports": [],
+                             "steps": [{"src": "ssor", "status": "pending"}]}),
+                 encoding="utf-8")
+    check("step missing env -> None (never crashes pending())",
+          batch_manifest.load(p) is None)
     batch_manifest.clear(p)
     check("clear removes the file", not p.exists())
     check("load when missing -> None", batch_manifest.load(p) is None)
