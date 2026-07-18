@@ -253,8 +253,8 @@ The site added two more TSAR reports, **Highway Detail** and **Highway Summary**
 
 - **Real modules** `export_highway_detail.py` / `export_highway_summary.py` — each a genuine `ReportSpec` modeled on the Excel siblings (`save = save_via_export_button`). Confirmed against the **7.7 dev capture** (`highway_detail.js` live, action bar wires `hd_exportToExcel()` + `hd_printAll()`): empty = `td.hl-empty` / "No results found in this segment.", matched loosely (`td.hl-empty` OR "No … found"). Highway Detail is un-greyed on 7.7; Highway Summary is still `cs-disabled` there, so its export fail-fasts (`ReportUnavailableError`) until the vendor turns it on.
 - **Highway Detail (PDF)** — `export_highway_detail_pdf.py`, `subdir="highway_detail_pdf"`, `data_value="highway_detail"` (same dropdown option), `save=save_highway_detail_pdf` (in `exporter.py`). The twin of `save_highway_log_pdf`: `hd_printAll()` builds the SAME `.hl-print-section` print layout; `window.print` is overridden to raise so the on-screen restore never runs, then `page.pdf()` captures it (Letter, **landscape**, 27 roadbed-grouped columns). Empty backstop counts `.hd-row1` data rows (HD's grouped columns put colspan on real rows, so Highway Log's non-colspan heuristic doesn't apply). **Appended LAST** — stable id **10** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`); `_PICKER_ORDER` places it next to its Excel sibling.
-- **The gate is empty** (`reports.DISABLED_EXPORT_SUBDIRS = set()`): all pickable in the Export picker and ticked in Export Everything. Where the **live site** still `cs-disabled`s a report, `select_report` fails fast instead of stalling.
-- **Highway Detail** consolidates + compares like every other report as of **v0.20.0** (the env matrix is 10 rows); **Highway Summary** has no consolidator / comparator / TSN entry yet (no real export exists to verify a schema against), so it alone stays absent from the matrices, Consolidate, and Compare. Locked by `check_intersection_gate` (empty gate), `check_report_recipe` (HD registered, HS absent), `check_stable_ids` (append-only 8/9/10), and `check_report_catalog`.
+- **The export gate holds only Route History** (`reports.DISABLED_EXPORT_SUBDIRS = {'route_history'}`): the reserved placeholder (stable id 15) has no export flow yet, so it's greyed; every OTHER report is pickable in the Export picker and ticked in Export Everything. Where the **live site** still `cs-disabled`s a report, `select_report` fails fast instead of stalling.
+- **Highway Detail** consolidates + compares like every other report as of **v0.20.0** (the env matrix is 12 rows); **Highway Summary** has no consolidator / comparator / TSN entry yet (no real export exists to verify a schema against), so it alone stays absent from the matrices, Consolidate, and Compare. Locked by `check_intersection_gate` (empty gate), `check_report_recipe` (HD registered, HS absent), `check_stable_ids` (append-only 8/9/10), and `check_report_catalog`.
 
 To integrate Highway Summary later: add its consolidator + comparators + `tsn_library` entry per the same recipe (`build/check_report_recipe.py`), verified against a real statewide export first — exactly how Highway Detail was done (tracked in [roadmap.md](roadmap.md)).
 
@@ -534,7 +534,7 @@ COMPARE_GROUPS = [
 ]
 ```
 - `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, Highway Log, **Intersection Summary/Detail**, **Highway Detail**, and the **PDF editions** — Highway Log (PDF) + Intersection Detail (PDF) + Highway Detail (PDF) + Highway Sequence (PDF) + Ramp Detail (PDF)). Folder-to-folder only.
-- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. COMPLETE for all 10 comparison-integrated export types (Highway Log Excel/PDF, Ramp Detail, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence, Highway Detail Excel/PDF — the last pair v0.20.0). (Highway Summary is export-only — no vs-TSN comparator yet, so it isn't here.)
+- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. 12 of them, COMPLETE for all comparison-integrated editions (Highway Log Excel/PDF, Ramp Detail Excel/PDF, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence Excel/PDF, Highway Detail Excel/PDF — the Highway Detail pair v0.20.0, the Highway Sequence (PDF) v0.25.0, the Ramp Detail (PDF) v0.26.0). (Highway Summary is export-only — no vs-TSN comparator yet, so it isn't here.)
 - `group="self"` -- the five **PDF-vs-Excel** consistency self-checks (Highway Log, Intersection Detail, Highway Detail, Highway Sequence, Ramp Detail): a report's PDF render vs its Excel render, one system in one environment — neither cross-environment nor vs-TSN, so its own sub-tab (CMP-AUD-014, formerly mislabeled under `env`).
 - The GUI also appends a **third** sub-tab on its own, the day-keyed **"vs TSN Matrix"** (group id `tsn_by_day`) — not a registry comparison type.
 
@@ -546,26 +546,43 @@ A new cross-environment comparison is `group="env"`; a new TSMIS-vs-TSN one is `
 
 Current `COMPARE_REPORTS` rows:
 
+This table is DERIVED from `report_catalog.COMPARE` (the labels are verbatim);
+`build/check_docs_capability.py` fails if it drifts from the catalog — edit the
+catalog, then re-run that check to resync. The `env` folder rows drive the
+matrices; the `tsn` file rows are the vs-TSN comparators; the `self` file rows
+are the PDF-vs-Excel self-checks (CMP-AUD-014, moved out of `env`).
+
 | Label | Module / adapter | kind | group |
 |---|---|---|---|
-| TSAR: Ramp Summary -- between environments | `compare_env.RAMP_SUMMARY` | folders | env |
-| TSAR: Ramp Detail -- between environments | `compare_env.RAMP_DETAIL` | folders | env |
-| Highway Sequence Listing -- between environments | `compare_env.HIGHWAY_SEQUENCE` | folders | env |
-| Highway Log -- between environments | `compare_env.HIGHWAY_LOG` | folders | env |
-| Intersection Summary -- between environments (v0.17.0, AGGREGATE per route) | `compare_env.INTERSECTION_SUMMARY` | folders | env |
-| Intersection Detail -- between environments (v0.17.0, flat route+PM) | `compare_env.INTERSECTION_DETAIL` | folders | env |
-| Highway Log (PDF) -- between environments (v0.17.0, flat, both sides PDF-parsed) | `compare_env.HIGHWAY_LOG_PDF` | folders | env |
-| Intersection Detail (PDF) -- between environments (v0.18.0, flat, both sides PDF-parsed) | `compare_env.INTERSECTION_DETAIL_PDF` | folders | env |
-| Highway Log -- TSMIS vs TSN | `compare_highway_log` | files | tsn |
-| Highway Log -- TSMIS (PDF) vs TSN (PDF) | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
-| Highway Log -- TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
-| TSAR: Ramp Detail -- TSMIS vs TSN (v0.17.0) | `compare_ramp_detail_tsn` | files | tsn |
-| TSAR: Ramp Summary -- TSMIS vs TSN (v0.17.0, AGGREGATE) | `compare_ramp_summary_tsn` | files | tsn |
-| Intersection Summary -- TSMIS vs TSN (v0.17.8, AGGREGATE, 66-cat signal fold) | `compare_intersection_summary_tsn` | files | tsn |
-| Intersection Detail -- TSMIS vs TSN (v0.17.8, FLAT, compare-everything + S crosswalk) | `compare_intersection_detail_tsn` | files | tsn |
-| Intersection Detail -- TSMIS (PDF) vs TSN | `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
-| Intersection Detail -- TSMIS (PDF) vs TSMIS (Excel) | `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
-| Highway Sequence Listing -- TSMIS vs TSN (v0.17.0, FLAT, route+**county**+PM) | `compare_highway_sequence_tsn` | files | tsn |
+| TSAR: Ramp Summary — between environments | `compare_env.RAMP_SUMMARY` | folders | env |
+| TSAR: Ramp Detail — between environments | `compare_env.RAMP_DETAIL` | folders | env |
+| Highway Sequence Listing — between environments | `compare_env.HIGHWAY_SEQUENCE` | folders | env |
+| Highway Log — between environments | `compare_env.HIGHWAY_LOG` | folders | env |
+| Intersection Summary — between environments | `compare_env.INTERSECTION_SUMMARY` | folders | env |
+| Intersection Detail — between environments | `compare_env.INTERSECTION_DETAIL` | folders | env |
+| Highway Log (PDF) — between environments | `compare_env.HIGHWAY_LOG_PDF` | folders | env |
+| Intersection Detail (PDF) — between environments | `compare_env.INTERSECTION_DETAIL_PDF` | folders | env |
+| Highway Detail — between environments | `compare_env.HIGHWAY_DETAIL` | folders | env |
+| Highway Detail (PDF) — between environments | `compare_env.HIGHWAY_DETAIL_PDF` | folders | env |
+| Highway Sequence Listing (PDF) — between environments | `compare_env.HIGHWAY_SEQUENCE_PDF` | folders | env |
+| TSAR: Ramp Detail (PDF) — between environments | `compare_env.RAMP_DETAIL_PDF` | folders | env |
+| Highway Log — TSMIS vs TSN | `compare_highway_log` | files | tsn |
+| Highway Log — TSMIS (PDF) vs TSN (PDF) | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| Highway Log — TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
+| TSAR: Ramp Detail — TSMIS vs TSN | `compare_ramp_detail_tsn` | files | tsn |
+| TSAR: Ramp Summary — TSMIS vs TSN | `compare_ramp_summary_tsn` | files | tsn |
+| Intersection Summary — TSMIS vs TSN | `compare_intersection_summary_tsn` | files | tsn |
+| Intersection Detail — TSMIS vs TSN | `compare_intersection_detail_tsn` | files | tsn |
+| Intersection Detail — TSMIS (PDF) vs TSN | `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| Intersection Detail — TSMIS (PDF) vs TSMIS (Excel) | `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
+| Highway Sequence Listing — TSMIS vs TSN | `compare_highway_sequence_tsn` | files | tsn |
+| Highway Detail — TSMIS vs TSN | `compare_highway_detail_tsn` | files | tsn |
+| Highway Detail — TSMIS (PDF) vs TSN | `compare_highway_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| Highway Detail — TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
+| Highway Sequence Listing — TSMIS (PDF) vs TSN | `compare_highway_sequence_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_sequence_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
+| TSAR: Ramp Detail — TSMIS (PDF) vs TSN | `compare_ramp_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
+| TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel) | `compare_ramp_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
 
 **Don't hand-roll workbook output**: build a `CompareSchema` and call `compare_core.run_compare` -- that's the approved workbook style for free, and the core's text/formulas are regression-locked. See [comparison-engine.md](comparison-engine.md) (engine + regression-lock harness) and [highway_log/comparison-study.md](highway_log/comparison-study.md) (the PDF-vs-Excel/TSN findings).
 

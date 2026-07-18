@@ -92,12 +92,14 @@ def _is_sensitive(f, roots):
 
 
 def _report_set():
-    """The export-report families to live-verify on the work PC, derived from the
-    registry (so the set — every export report, incl. the v0.19.1 Highway pair —
-    is automatic, never a hand-maintained list; CR002-RM5)."""
+    """The ENABLED export-report families to live-verify on the work PC, derived
+    from the registry (so the set is automatic, never a hand-maintained list;
+    CR002-RM5). App-wide-disabled reports are excluded — the reserved Route History
+    placeholder has no export flow, so there is nothing to live-verify (CMP-AUD-086;
+    the set is 15 enabled reports, not all 16 registry rows)."""
     try:
         import reports
-        return [label for label, _fmt, _spec in reports.EXPORT_REPORTS]
+        return [label for _i, label, _fmt, _spec in reports.enabled_export_reports()]
     except Exception as e:                       # noqa: BLE001 (diagnostic; never fatal)
         log.warning("evidence: could not read the report registry (%s: %s)",
                     type(e).__name__, e)

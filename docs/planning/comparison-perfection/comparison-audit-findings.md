@@ -4189,10 +4189,30 @@ successful formulas build.
 ### CMP-AUD-083 — Matrix source presence counts arbitrary files
 
 Priority: P2  
-Status: Verified with lock-only and newer-lock folders  
+Status: REMEDIATED 2026-07-18 (`05cd0d8`, CI SHA-verified) — one shared
+accepted-data-file predicate powers presence/mtime/discovery; fingerprint keeps
+its conservative inclusion by design (see below)  
 Primary code: `scripts/report_library.py:64-102`,
 `scripts/artifact_store.py:324-358`, `scripts/day_matrix.py:157-204`,
 `scripts/baseline_matrix.py:187-257`
+
+#### Remediation — 2026-07-18
+
+New `artifact_store.is_report_data_file(name)` (a `.xlsx`/`.pdf` that isn't a
+lock/temp/comparison-payload/publication-lock/sidecar) is the ONE predicate wired
+into all four presence/mtime/discovery scanners: `report_library.newest_mtime` +
+`_newest_in`, and `day_matrix` + `baseline_matrix._folder_newest_mtime` (which
+previously excluded only `~$`). A lock-only / `notes.txt`-only / sidecar-only
+folder no longer reads as an export, and a newer lock/sidecar no longer inflates a
+folder's freshness. **Census** over the real 7.9 corpus (6912 files / 53 folders):
+6897/6897 real report files kept; only `.gitkeep` stubs + our JSON sidecars/markers
+drop (never a real export). **`fingerprint` deliberately KEEPS its conservative
+`_is_excluded` inclusion** — a change-detection hash must count a stray/near-match
+file so nothing hides from freshness (guarded by `check_artifact_store`'s near-match
+`.zlib`); the extension allowlist answers "is this an export?", not "did anything
+change?", so unifying them there would REGRESS that property. New
+`check_matrix_presence_predicate.py` pins the predicate, all four scanners, and that
+deliberate asymmetry (red→green: 6 defect-scenario checks fail without the fix).
 
 `report_library._newest_in` treats every direct child file as report data. A folder
 containing only `~$route.xlsx` therefore appears exported, while a newer lock file can
@@ -4337,7 +4357,8 @@ surface regressions.
 ### CMP-AUD-086 — comparison documentation contradicts current capability
 
 Priority: P3  
-Status: Verified against the executable 12-row/30-placement census  
+Status: REMEDIATED 2026-07-18 — the cited contradictions fixed + a durable
+catalog-derived doc guard added (see Remediation)  
 Primary documentation: `CLAUDE.md:55-65,184-192`,
 `docs/reports.md:32-56,535-566`, `docs/comparison-engine.md:726-745,798-805`,
 `docs/gui.md:146-149,212-218`, `docs/verification-and-testing.md:74-76,104-114`,
@@ -4372,6 +4393,35 @@ keep one canonical canary/version table per report, and add documentation checks
 row count, mode count, self-check count, stable keys, normalizer versions, disabled
 reports, and cross-file canary duplication. Historical planning files should be clearly
 labelled immutable history; current owning docs and `CLAUDE.md` must be updated together.
+
+#### Remediation — 2026-07-18
+
+Re-censused the cited contradictions: most had already been fixed in prior sessions
+(the "3 self-checks" text, comparison-engine §9c's Ramp/Highway-Detail mix-up, the RD
+normalization version, and the obsolete IS one-sided counts are all gone). The ones
+STILL present were fixed and guarded:
+
+* **`docs/reports.md` COMPARE_REPORTS table** — was incomplete (20 of 29 rows) and
+  still labelled the PDF-vs-Excel rows `env` after CMP-AUD-014 moved them to `self`.
+  Regenerated verbatim from `report_catalog.COMPARE` (all 29 rows, correct groups).
+* **The "10"→"12" counts** in reports.md (env-matrix rows; vs-TSN comparators — the
+  list was missing Highway Sequence (PDF) + Ramp Detail (PDF)).
+* **The "disabled export set is empty" drift** — `DISABLED_EXPORT_SUBDIRS` is
+  `{'route_history'}` (the reserved id-15 placeholder), but reports.md:256,
+  architecture.md ×2, and CLAUDE.md still claimed the gate was empty. Corrected all
+  four to name Route History.
+* **The work-PC evidence manifest's live-verify set** (`evidence._report_set`) was
+  built from ALL 16 export rows incl. the disabled Route History; now uses
+  `reports.enabled_export_reports()` (15). Pinned in `check_evidence_bundle`.
+
+New **`check_docs_capability.py`** keeps reports.md from drifting again: it parses the
+COMPARE_REPORTS table and asserts (label, kind, group) == the catalog in order +
+complete, the env/vs-TSN/self prose counts == the catalog tallies, and the disabled-
+export prose == `DISABLED_EXPORT_SUBDIRS` (fail-loud on a false "empty" claim).
+Red→green proven (a self→env row and a false "empty" claim both fail). DEFERRED (P3,
+lower value): an exhaustive cross-file canary-duplication / per-report normalizer-
+version doc checker — the count/group/disabled guards cover the drift classes the
+finding's evidence actually exhibited.
 
 ### CMP-AUD-087 — unavailable count caches cannot be refreshed as stale
 

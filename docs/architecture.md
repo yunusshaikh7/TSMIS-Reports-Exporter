@@ -373,8 +373,9 @@ report + **environment-column** toggles (config zone), TSN drops in
 module `scripts/matrix.py` (console-free engine); freshness via
 `report_library.cell_ages`; intersection reports were **shown greyed/unpickable** at
 this version via one `reports` gate (`DISABLED_EXPORT_SUBDIRS` / `export_reports_status`)
-— **v0.17.0 enabled them** (on the dev site), so `DISABLED_EXPORT_SUBDIRS` is now empty
-and the gate stays as defensive groundwork.
+— **v0.17.0 enabled them** (on the dev site), clearing the intersection reports from
+`DISABLED_EXPORT_SUBDIRS`; the gate stays live as defensive groundwork and now holds only
+the reserved **Route History** placeholder (id 15, v0.25.1 — no export flow yet).
 A light app-wide motion layer (pane/popover/modal enters, button press, a slow theme
 cross-fade) lands with it. Engine internals are owned by
 [comparison-engine.md](comparison-engine.md) §12; the UI + bridge + motion by
@@ -468,7 +469,8 @@ detail lives in [reports.md](reports.md) → *Report grouping & site-menu-safe s
 - **Highway Detail/Summary (export-enabled v0.19.1).** Two append-only catalog entries at stable
   ids **8 / 9** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`) with real
   `export_highway_*` specs (`save_via_export_button`, dual empty-marker detection) modeled on the
-  Excel siblings; `reports.DISABLED_EXPORT_SUBDIRS` is now empty. Highway DETAIL's
+  Excel siblings, clearing the Highway pair from `reports.DISABLED_EXPORT_SUBDIRS` (which
+  now holds only the reserved Route History placeholder, v0.25.1). Highway DETAIL's
   consolidate/compare/matrix integration landed in **v0.20.0** (built via the proven
   `build/check_report_recipe.py` recipe, verified against the statewide dev bundle); Highway
   SUMMARY stays export-only until the site un-greys it and a schema can be verified.

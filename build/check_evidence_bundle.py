@@ -171,8 +171,15 @@ def test_credential_exclusion_and_manifest():
               "DELIBERATELY EXCLUDED" in manifest and _SECRET not in manifest)
         check("user dropped a sensitive file into the evidence folder -> REFUSED",
               any("tsmis_auth.json" in p for p in res.get("skipped_user", [])))
-        # The 8-report live-verify set is registry-derived (incl. Intersection Detail PDF).
-        check("manifest lists the 8-report live-verify set incl. Intersection Detail (PDF)",
+        # CMP-AUD-086: the live-verify set is the ENABLED export reports, registry-
+        # derived — the app-wide-disabled Route History placeholder (no export flow)
+        # is excluded, so the set is 15 rows, not all 16 registry entries.
+        import reports
+        rset = evidence._report_set()
+        enabled_labels = [lbl for _i, lbl, _f, _s in reports.enabled_export_reports()]
+        check("live-verify set == the enabled export reports (Route History excluded)",
+              rset == enabled_labels and "Route History Table" not in rset)
+        check("manifest lists the live-verify set (incl. the PDF editions)",
               "Intersection Detail (PDF)" in manifest and "Highway Log (PDF)" in manifest)
     finally:
         (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,

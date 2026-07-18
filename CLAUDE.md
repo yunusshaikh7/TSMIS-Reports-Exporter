@@ -367,8 +367,9 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   `group`/`short_label` + `_PICKER_ORDER`). Stable IDs are immutable string keys;
   `batch_manifest._V017_EXPORT_ORDER` (== `EXPORT_KEYS`) is **append-only** — positions
   0–7 frozen; v0.18.1 appended Highway Detail/Summary at 8/9 as reserved-DISABLED
-  groundwork, **v0.19.1 enabled their EXPORT** (`DISABLED_EXPORT_SUBDIRS` now empty;
-  real Excel-sibling specs). Highway Detail now consolidates and participates in the
+  groundwork, **v0.19.1 enabled their EXPORT** (cleared the Highway pair from
+  `DISABLED_EXPORT_SUBDIRS`; real Excel-sibling specs — the gate now holds only the
+  reserved Route History placeholder, id 15). Highway Detail now consolidates and participates in the
   Matrix, cross-environment, vs-TSN, and PDF-vs-Excel comparisons; Highway Summary
   remains export-only until a real enabled-site schema can be verified. Add a report by editing the catalog;
   `check_report_catalog` proves the derivation. See [docs/reports.md](docs/reports.md).
