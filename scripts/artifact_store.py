@@ -1099,6 +1099,20 @@ def _is_excluded(name):
     return any(name.endswith(s) for s in _FP_EXCLUDED_SUFFIXES)
 
 
+def is_report_data_file(name):
+    """True iff `name` is a real per-route / consolidated REPORT data file — a
+    ``.xlsx`` or ``.pdf`` (`_REPORT_SUFFIXES`) that is NOT an Excel lock (``~$``),
+    an in-flight temp, a comparison payload, the publication lock, or one of our
+    sidecars (`_is_excluded`).
+
+    The ONE accepted-data-file predicate that Matrix presence, newest-data mtime,
+    fingerprinting, and adapter discovery share (CMP-AUD-083). A folder holding
+    only ``~$route.xlsx``, ``notes.txt``, ``README``, ``.fingerprint.json``, or a
+    newer lock therefore no longer reads as an export / a fresher artifact. Purely
+    name-based; callers still confirm ``is_file()`` for real directory entries."""
+    return name.lower().endswith(_REPORT_SUFFIXES) and not _is_excluded(name)
+
+
 def fingerprint(folder):
     """A stable identity string over the DATA files directly inside `folder`: a hash of
     the sorted ``(name, size, mtime_ns)`` tuples plus the file count. Catches a file
@@ -1115,6 +1129,13 @@ def fingerprint(folder):
         return _UNREADABLE
     parts = []
     for e in entries:
+        # A CHANGE-detection hash is deliberately conservative-INCLUSION: it counts
+        # every file except the strict-format artifacts WE create (locks, temps,
+        # exact-format comparison payloads, sidecars). A near-match `.zlib` or a
+        # stray user file MUST still participate so nothing hides from freshness —
+        # this is a stronger property than `is_report_data_file`'s "is this an
+        # export?" allowlist (which powers presence/mtime/discovery, CMP-AUD-083),
+        # so fingerprint keeps `_is_excluded`, NOT the extension allowlist.
         if _is_excluded(e.name):
             continue
         try:

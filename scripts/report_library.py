@@ -10,6 +10,8 @@ import logging
 import time
 from pathlib import Path
 
+from artifact_store import is_report_data_file   # CMP-AUD-083: the shared data-file predicate
+
 log = logging.getLogger("tsmis.batch")
 
 
@@ -30,7 +32,9 @@ def newest_mtime(dest, subdir):
                 continue
             for f in d.iterdir():
                 try:
-                    if f.is_file():
+                    # CMP-AUD-083: only a real report data file (.xlsx/.pdf, not a
+                    # lock/temp/sidecar) marks a report present / sets its age.
+                    if f.is_file() and is_report_data_file(f.name):
                         m = f.stat().st_mtime
                         if newest is None or m > newest:
                             newest = m
@@ -62,12 +66,13 @@ def report_ages(dest, reports, now=None):
 
 
 def _newest_in(d):
-    """Newest file mtime directly inside one folder, or None. Never raises."""
+    """Newest report-data-file mtime directly inside one folder, or None. Excludes
+    locks/temps/sidecars/unsupported extensions (CMP-AUD-083). Never raises."""
     newest = None
     try:
         for f in Path(d).iterdir():
             try:
-                if f.is_file():
+                if f.is_file() and is_report_data_file(f.name):
                     m = f.stat().st_mtime
                     if newest is None or m > newest:
                         newest = m

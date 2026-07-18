@@ -29,6 +29,7 @@ import os
 import time
 from pathlib import Path
 
+import artifact_store   # CMP-AUD-083: the shared accepted-data-file predicate
 import cache_envelope
 import consolidation_meta
 import matrix
@@ -181,7 +182,9 @@ def record_result(date, source, row_key, verdict, diff_cells, one_sided,
 # filesystem helpers
 # --------------------------------------------------------------------------- #
 def _folder_newest_mtime(p):
-    """Newest non-temp file mtime in a folder, or None when empty/absent."""
+    """Newest report-data-file mtime in a folder, or None when empty/absent.
+    CMP-AUD-083: only a real .xlsx/.pdf export counts — a folder holding only a
+    lock, sidecar, or notes file is NOT an export and never a fresher signal."""
     newest = None
     try:
         entries = list(Path(p).iterdir())
@@ -189,7 +192,7 @@ def _folder_newest_mtime(p):
         return None
     for e in entries:
         try:
-            if e.is_file() and not e.name.startswith("~$"):
+            if e.is_file() and artifact_store.is_report_data_file(e.name):
                 m = e.stat().st_mtime
                 if newest is None or m > newest:
                     newest = m
