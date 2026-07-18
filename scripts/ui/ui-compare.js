@@ -147,9 +147,16 @@ function renderCompareKind() {
     const a = rep.file_a_label || "TSMIS", b = rep.file_b_label || "TSN";
     $("cmpTsmisLabel").textContent = a + " file";
     $("cmpTsnLabel").textContent = b + " file";
-    $("cmpFilesHint").textContent =
-      `Pick the ${a} file and the ${b} file — either two per-route workbooks `
-      + `(one route each) or two consolidated workbooks (all routes).`;
+    // CMP-AUD-074: the per-side shape is registry-owned (report_catalog input
+    // profiles) — only the 3 Highway Log recipes accept a per-route file, and the
+    // 2 Summary-vs-TSN recipes take a raw statewide TSN PDF on the TSN side. Fall
+    // back to the consolidated shape if the payload predates the profile.
+    const consolidated = "a consolidated workbook (all routes)";
+    const shapeA = rep.file_a_shape || consolidated;
+    const shapeB = rep.file_b_shape || consolidated;
+    $("cmpFilesHint").textContent = (shapeA === shapeB)
+      ? `Pick the ${a} file and the ${b} file — each ${shapeA}.`
+      : `Pick the ${a} file: ${shapeA}. And the ${b} file: ${shapeB}.`;
   }
   syncCompareButton();
 }
@@ -177,7 +184,10 @@ function syncCompareButton() {
 }
 
 async function pickCompareFile(side) {
-  const res = await api.pick_compare_file(side.toUpperCase());
+  // CMP-AUD-073: pass the selected recipe key so the native dialog offers the
+  // extensions this recipe/side actually accepts (a raw TSN PDF for the two
+  // Summary-vs-TSN recipes' TSN side; Excel elsewhere).
+  const res = await api.pick_compare_file(side.toUpperCase(), compareChoice());
   if (res && res.path) {
     CMP[side] = res.path;
     renderCompareFiles();

@@ -584,6 +584,95 @@ def compare_keys():
     return tuple(c.key for c in COMPARE)
 
 
+# --------------------------------------------------------------------------- #
+# Comparison-INPUT profiles (CMP-AUD-073/074). The classic Compare-tab file
+# pickers must know, per recipe + side, (a) which native file extensions the
+# comparator's loader actually accepts and (b) a short human "shape" hint. Only
+# the "files"-kind recipes use the file pickers; the "folders" env rows pick run
+# folders instead and carry no profile.
+#
+# Census-confirmed against the real loaders (2026-07-18):
+#   * std          — both sides a consolidated/statewide .xlsx workbook.
+#   * hl           — the 3 Highway Log FILE recipes. compare_highway_log._load_input
+#                    (shared by every HL flavor through _load_pair*) accepts the
+#                    per-route (31-col) OR consolidated ("Route"+31) layout on BOTH
+#                    sides — the ONLY recipes that take a per-route file.
+#   * summary_tsn  — ramp_summary:tsn + intersection_summary:tsn. The TSMIS side is
+#                    a consolidated .xlsx, but _load_tsn dispatches on the ".pdf"
+#                    suffix, so the TSN side accepts the RAW statewide TSN PDF *or*
+#                    the normalized library .xlsx.
+# Guidance only — every comparator still enforces its own loader contract; a wrong
+# pick is refused there, not here.
+# --------------------------------------------------------------------------- #
+_EXT_XLSX = ("Excel workbook (*.xlsx)",)
+# The combined filter is first so it is the dialog default; the single-type
+# entries let the user narrow to just PDFs or just Excel.
+_EXT_TSN = ("TSN file — statewide PDF or normalized Excel (*.pdf;*.xlsx)",
+            "TSN statewide PDF (*.pdf)", "Normalized TSN workbook (*.xlsx)")
+
+_SHAPE_CONSOLIDATED = "a consolidated workbook (all routes)"
+_SHAPE_PER_ROUTE_OR_CONSOLIDATED = (
+    "a per-route workbook (one route) or a consolidated workbook (all routes)")
+_SHAPE_TSN_PDF_OR_XLSX = "the raw statewide TSN PDF, or the normalized TSN workbook"
+
+# name -> (side-A spec, side-B spec); each spec = {"exts": (...), "shape": "..."}.
+_INPUT_PROFILES = {
+    "std": ({"exts": _EXT_XLSX, "shape": _SHAPE_CONSOLIDATED},
+            {"exts": _EXT_XLSX, "shape": _SHAPE_CONSOLIDATED}),
+    "hl": ({"exts": _EXT_XLSX, "shape": _SHAPE_PER_ROUTE_OR_CONSOLIDATED},
+           {"exts": _EXT_XLSX, "shape": _SHAPE_PER_ROUTE_OR_CONSOLIDATED}),
+    "summary_tsn": ({"exts": _EXT_XLSX, "shape": _SHAPE_CONSOLIDATED},
+                    {"exts": _EXT_TSN, "shape": _SHAPE_TSN_PDF_OR_XLSX}),
+}
+# Non-default assignments; every other files recipe is "std".
+_INPUT_PROFILE_BY_KEY = {
+    "cmp:highway_log:tsn": "hl",
+    "cmp:highway_log:pdf_vs_tsn": "hl",
+    "cmp:highway_log:pdf_vs_excel": "hl",
+    "cmp:ramp_summary:tsn": "summary_tsn",
+    "cmp:intersection_summary:tsn": "summary_tsn",
+}
+
+_COMPARE_BY_KEY = {c.key: c for c in COMPARE}
+
+
+def _side_index(side):
+    """0 for the first picker (side A / "tsmis"), 1 for the second (side B /
+    "tsn"). Case-insensitive; accepts "a"/"b" too."""
+    return 1 if str(side).strip().lower() in ("b", "tsn") else 0
+
+
+def compare_input_profile(key):
+    """The (side-A spec, side-B spec) input profile for a "files"-kind compare
+    recipe, or None for a "folders" recipe / unknown key. Each spec is
+    {"exts": (native-dialog filter strings), "shape": "human hint"}.
+    CMP-AUD-073/074 — the classic file pickers' per-role guidance."""
+    entry = _COMPARE_BY_KEY.get(key)
+    if entry is None or entry.kind != "files":
+        return None
+    return _INPUT_PROFILES[_INPUT_PROFILE_BY_KEY.get(key, "std")]
+
+
+def compare_input_extensions(key, side):
+    """The native-dialog file filters for one side ("tsmis"/"tsn", or "a"/"b") of
+    a files recipe. Falls back to Excel-only for a folders/unknown recipe so the
+    picker is always safe."""
+    profile = compare_input_profile(key)
+    if profile is None:
+        return list(_EXT_XLSX)
+    return list(profile[_side_index(side)]["exts"])
+
+
+def compare_input_shapes(key):
+    """(side-A shape, side-B shape) hint strings for a files recipe, or
+    (None, None) for a folders/unknown recipe — the per-side shape the Compare
+    tab renders for the selected recipe (CMP-AUD-074)."""
+    profile = compare_input_profile(key)
+    if profile is None:
+        return (None, None)
+    return (profile[0]["shape"], profile[1]["shape"])
+
+
 def consolidator_by_subdir():
     """`{export subdir: consolidate module}` for the auto-consolidatable reports."""
     return {subdir: module for subdir, module in _AUTO_CONSOLIDATOR}
@@ -628,3 +717,10 @@ assert {s for s, _m in _AUTO_CONSOLIDATOR} <= set(export_keys()), "auto-consolid
 # silently dropped from the Export-tab checklists).
 assert set(_PICKER_ORDER) == set(export_keys()) and len(_PICKER_ORDER) == len(EXPORT), \
     "_PICKER_ORDER must cover every EXPORT key exactly once"
+# CMP-AUD-073/074: every non-default input-profile assignment names a real
+# "files"-kind compare recipe (a typo can't silently point at a folders/absent
+# key), and every profile name it references is defined.
+assert set(_INPUT_PROFILE_BY_KEY) <= {c.key for c in COMPARE if c.kind == "files"}, \
+    "_INPUT_PROFILE_BY_KEY names a non-files or unknown compare key"
+assert set(_INPUT_PROFILE_BY_KEY.values()) <= set(_INPUT_PROFILES), \
+    "_INPUT_PROFILE_BY_KEY references an undefined profile name"

@@ -68,6 +68,13 @@ COMPARE_REPORTS = _catalog.compare_rows()
 # `highway_log_pdf` (its own matrix subdir), so it never collides with highway_log:env.
 COMPARE_KEYS = _catalog.compare_keys()
 
+# CMP-AUD-073/074: the classic Compare-tab file pickers' per-recipe input profiles
+# (accepted native extensions + the per-side shape hint). Guidance only — the
+# comparators still enforce their loader contracts. See report_catalog.
+compare_input_profile = _catalog.compare_input_profile
+compare_input_extensions = _catalog.compare_input_extensions
+compare_input_shapes = _catalog.compare_input_shapes
+
 # B2 (auto-consolidate on export finish): which consolidate module handles each
 # EXPORTABLE report, keyed by the export ReportSpec's output subdir. Every exportable
 # report EXCEPT Highway Log (PDF) (highway_log_pdf) — it needs a scratch

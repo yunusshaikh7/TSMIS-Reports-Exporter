@@ -53,7 +53,8 @@ from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_DISPLAY, COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPORTS,
                      CONSOLIDATE_DISPLAY, CONSOLIDATE_KEYS,
                      CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_REPORTS, PICKER_ORDER,
-                     consolidate_index_for_key, export_reports_status, matrix_rows)
+                     compare_input_shapes, consolidate_index_for_key,
+                     export_reports_status, matrix_rows)
 import outcome
 import consolidation_meta
 from gui_endpoint import _api_method, pick_path   # the shared js_api decorator + dialog unwrap
@@ -163,10 +164,15 @@ def _compare_report_rows():
     out = []
     for key in _order:
         label, mod, kind, group = by_key[key]
+        # CMP-AUD-074: the per-side input SHAPE the file pickers advertise. Only
+        # "files" recipes use the pickers; a "folders" (cross-env) row gets None on
+        # both sides (its hint isn't rendered).
+        shape_a, shape_b = compare_input_shapes(key)
         out.append({"key": key, "label": label, "kind": kind, "group": group,
                     "family_group": meta[key], "subdir": getattr(mod, "subdir", None),
                     "file_a_label": getattr(mod, "file_a_label", "TSMIS"),
-                    "file_b_label": getattr(mod, "file_b_label", "TSN")})
+                    "file_b_label": getattr(mod, "file_b_label", "TSN"),
+                    "file_a_shape": shape_a, "file_b_shape": shape_b})
     return out
 
 

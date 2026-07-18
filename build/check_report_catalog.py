@@ -575,11 +575,16 @@ def test_mock_parity():
     check("mock compare groups (id, label) == bridge", fe_grp == be_grp)
 
     cmp_ = _mock_objs(mockjs, r"compare_reports:\s*\[(.*?)\],")
+    # CMP-AUD-074: file_a_shape/file_b_shape are the per-side input hints; the mock
+    # carries them only on files rows (the parser returns None for an absent quoted
+    # field), matching the bridge which emits None for folders rows.
     fe_cmp = [(o["key"], o["label"], o["kind"], o["group"], o.get("family_group"),
-               o.get("file_a_label", "TSMIS"), o.get("file_b_label", "TSN")) for o in (cmp_ or [])]
+               o.get("file_a_label", "TSMIS"), o.get("file_b_label", "TSN"),
+               o.get("file_a_shape"), o.get("file_b_shape")) for o in (cmp_ or [])]
     be_cmp = [(r["key"], r["label"], r["kind"], r["group"], r["family_group"],
-               r["file_a_label"], r["file_b_label"]) for r in be["compare_reports"]]
-    check("mock compare (key, label, kind, group, family_group, file_a, file_b) == bridge",
+               r["file_a_label"], r["file_b_label"],
+               r.get("file_a_shape"), r.get("file_b_shape")) for r in be["compare_reports"]]
+    check("mock compare (key, label, kind, group, family_group, file_a, file_b, shapes) == bridge",
           fe_cmp == be_cmp)
 
     # The mock's SEPARATE CONS_REPORTS routing list (used by consByKey) must equal the registry.
@@ -597,8 +602,11 @@ def test_mock_parity():
     # NEGATIVES: each compared field actually participates (a mutated copy != the bridge).
     mx = [list(t) for t in fe_export]; mx[0][4] = (not mx[0][4]) if mx[0][4] is not None else True
     check("[neg] a changed export `disabled` is caught", [tuple(x) for x in mx] != be_export)
-    mc = [list(t) for t in fe_cmp]; mc[7][4] = "WRONG"               # a files row's file_a_label
-    check("[neg] a changed compare file_a_label is caught", [tuple(x) for x in mc] != be_cmp)
+    mc = [list(t) for t in fe_cmp]; mc[7][4] = "WRONG"               # a files row's family_group
+    check("[neg] a changed compare family_group is caught", [tuple(x) for x in mc] != be_cmp)
+    si = next(i for i, t in enumerate(fe_cmp) if t[7] is not None)   # a files row (has a shape)
+    ms = [list(t) for t in fe_cmp]; ms[si][7] = "WRONG SHAPE"        # CMP-AUD-074: file_a_shape
+    check("[neg] a changed compare file_a_shape is caught", [tuple(x) for x in ms] != be_cmp)
     check("[neg] a changed CONS_REPORTS label is caught",
           [("cons:ramp_summary", "WRONG")] + fe_routing[1:]
           != [(c.key, c.label) for c in cat.CONSOLIDATE])
@@ -640,12 +648,64 @@ def test_family_prefix_convention():
           not offenders)
 
 
+def test_input_profiles():
+    """CMP-AUD-073/074: the classic file pickers' per-recipe input profiles are
+    registry-owned and match the census of the real loaders — only the 3 Highway
+    Log recipes accept a per-route file, only the 2 Summary-vs-TSN recipes offer a
+    raw TSN PDF, and every folders recipe has no profile / a safe Excel-only
+    fallback."""
+    print("INPUT PROFILES: per-recipe file-picker extensions + shapes (CMP-AUD-073/074):")
+    hl_keys = {"cmp:highway_log:tsn", "cmp:highway_log:pdf_vs_tsn", "cmp:highway_log:pdf_vs_excel"}
+    summary_keys = {"cmp:ramp_summary:tsn", "cmp:intersection_summary:tsn"}
+    per_route = "a per-route workbook (one route) or a consolidated workbook (all routes)"
+    consolidated = "a consolidated workbook (all routes)"
+    tsn_shape = "the raw statewide TSN PDF, or the normalized TSN workbook"
+    xlsx_only = ["Excel workbook (*.xlsx)"]
+    files = [c for c in cat.COMPARE if c.kind == "files"]
+    folders = [c for c in cat.COMPARE if c.kind == "folders"]
+
+    check("every folders recipe has no input profile",
+          all(cat.compare_input_profile(c.key) is None for c in folders))
+    check("every folders recipe reports (None, None) shapes",
+          all(cat.compare_input_shapes(c.key) == (None, None) for c in folders))
+    check("a folders recipe's picker still falls back to Excel-only",
+          all(cat.compare_input_extensions(c.key, "tsn") == xlsx_only for c in folders))
+
+    def _expected(key):
+        if key in hl_keys:
+            return (per_route, per_route)
+        if key in summary_keys:
+            return (consolidated, tsn_shape)
+        return (consolidated, consolidated)
+    check("every files recipe's (A, B) shapes match the loader census",
+          all(cat.compare_input_shapes(c.key) == _expected(c.key) for c in files))
+
+    def _offers_pdf(key, side):
+        return any(".pdf" in e.lower() for e in cat.compare_input_extensions(key, side))
+    pdf_sides = {(c.key, side) for c in files for side in ("tsmis", "tsn") if _offers_pdf(c.key, side)}
+    check("exactly the 2 Summary-vs-TSN recipes' TSN side offers a raw PDF filter",
+          pdf_sides == {(k, "tsn") for k in summary_keys})
+    check("no TSMIS (side-A) picker ever offers a PDF filter",
+          all(not _offers_pdf(c.key, "tsmis") for c in files))
+    # every non-PDF files side is exactly Excel-only.
+    check("every side that isn't the Summary TSN side is Excel-only",
+          all(cat.compare_input_extensions(c.key, s) == xlsx_only
+              for c in files for s in ("tsmis", "tsn")
+              if not (c.key in summary_keys and s == "tsn")))
+
+    # NEGATIVE: an unknown key is a safe Excel-only no-profile (never raises).
+    check("[neg] an unknown compare key has no profile + Excel-only fallback",
+          cat.compare_input_profile("cmp:bogus:xyz") is None
+          and cat.compare_input_extensions("cmp:bogus:xyz", "tsn") == xlsx_only)
+
+
 def main():
     test_reports_derive_from_catalog()
     test_golden_equivalence()
     test_negative_self_tests()
     test_bat_parity()
     test_mock_parity()
+    test_input_profiles()
     test_family_prefix_convention()
     test_no_side_effects()
     print()

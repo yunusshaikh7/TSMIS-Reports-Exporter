@@ -14,7 +14,8 @@ from gui_endpoint import _api_method, pick_path   # + the dialog unwrap
 from gui_worker import ConsolidateWorker
 from paths import OUTPUT_ROOT, list_output_days, list_output_days_for_report
 from reports import (COMPARE_REPORTS, CONSOLIDATE_REPORTS,
-                     compare_index_for_key, consolidate_index_for_key)
+                     compare_index_for_key, compare_input_extensions,
+                     consolidate_index_for_key)
 
 ui_log = logging.getLogger("tsmis.ui")
 
@@ -122,12 +123,15 @@ class GuiCompareMixin:
     # ---- comparisons (TSMIS vs TSN files / env vs env run folders) -----------------
 
     @_api_method
-    def pick_compare_file(self, side):
+    def pick_compare_file(self, side, key=None):
         """Native open dialog for one comparison input. `side` is "TSMIS" or
-        "TSN" (display only). Returns {"path": ...} or {"cancelled": True}."""
-        picked = pick_path(self._window, 
+        "TSN" (also the picker slot). `key` is the selected `cmp:*` recipe key;
+        it selects the native filter so the recipe/side that accepts a raw TSN PDF
+        offers it (CMP-AUD-073). Returns {"path": ...} or {"cancelled": True}."""
+        file_types = tuple(compare_input_extensions(key, side))
+        picked = pick_path(self._window,
             webview.OPEN_DIALOG, allow_multiple=False,
-            file_types=("Excel workbook (*.xlsx)",))
+            file_types=file_types)
         if not picked:
             return {"cancelled": True}
         ui_log.info("compare: %s file picked: %s", side, picked)
