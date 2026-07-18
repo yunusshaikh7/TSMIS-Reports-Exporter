@@ -116,15 +116,35 @@ function fillCompareDirSelect(sel, custom, preferred, days) {
   else if (custom) sel.value = custom;
 }
 
+// CMP-AUD-072: folder discovery is async AND per-recipe. Without sequencing, a
+// slow get_compare_folders response for a since-abandoned recipe arrives last and
+// stomps the current recipe's folder lists (rapid A->B->A), so the wrong day
+// choices can be launched through the newer adapter. Snapshot a generation token
+// AND the recipe key (mirrors refreshConsDest's consDestSeq guard), discard any
+// non-latest / recipe-changed response, and hold Start disabled while a discovery
+// is unresolved so nothing launches against a stale/empty list.
+let compareDirsSeq = 0;
+let compareDirsLoading = false;
+
 async function renderCompareDirs() {
   // A2: only offer run folders that actually contain the chosen report. Python
   // owns the membership test (api.get_compare_folders); fall back to all known
   // folders on any hiccup so the dropdowns are never empty by mistake.
+  const seq = ++compareDirsSeq;
+  const key = compareChoice();          // the recipe THIS discovery is for
+  compareDirsLoading = true;
+  syncCompareButton();                  // Start off while options load
   let days = (S.st && S.st.days) || [];
   try {
-    const res = await api.get_compare_folders(compareChoice());
+    const res = await api.get_compare_folders(key);
+    if (seq !== compareDirsSeq) return;         // a newer discovery superseded this
     if (res && Array.isArray(res.folders)) days = res.folders;
-  } catch (e) { /* keep the unfiltered list */ }
+  } catch (e) {
+    if (seq !== compareDirsSeq) return;         // stale failure — the newer render owns the UI
+    /* keep the unfiltered list */
+  }
+  if (key !== compareChoice()) return;          // recipe changed under us (belt + suspenders)
+  compareDirsLoading = false;
   // sensible defaults: baseline = newest ssor-prod run, other side = the
   // newest folder that differs from the baseline
   const baseline = days.find((d) => /ssor-prod$/.test(d)) || days[0] || "";
@@ -164,8 +184,11 @@ function renderCompareKind() {
 function syncCompareButton() {
   const locked = S.st && S.st.task != null;
   const anyOut = $("cmpWantValues").checked || $("cmpWantFormulas").checked;
+  // CMP-AUD-072: while a folder discovery is unresolved the run-folder options
+  // aren't trustworthy yet, so a folder comparison is NOT ready (Start disabled).
+  const loading = compareKind() === "folders" && compareDirsLoading;
   const ready = compareKind() === "folders"
-    ? ($("cmpDirA").value && $("cmpDirB").value
+    ? (!loading && $("cmpDirA").value && $("cmpDirB").value
        && $("cmpDirA").value !== $("cmpDirB").value)
     : (CMP.tsmis && CMP.tsn);
   $("btnStartCompare").disabled = locked || !ready || !anyOut;
@@ -173,6 +196,7 @@ function syncCompareButton() {
   $("btnStartCompare").title = locked
     ? "Another task is running — it finishes (or you cancel it) first."
     : !anyOut ? "Tick at least one output format above first."
+    : loading ? "Finding the run folders for this report…"
     : !ready ? (compareKind() === "folders"
         ? "Pick two different run folders above first."
         : "Pick both input files above first.")
