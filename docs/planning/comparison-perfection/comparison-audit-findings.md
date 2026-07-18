@@ -3807,7 +3807,8 @@ and partial statewide inputs.
 ### CMP-AUD-072 — stale folder discovery can overwrite a newer recipe selection
 
 Priority: P2  
-Status: Verified with delayed actual-source UI responses  
+Status: REMEDIATED 2026-07-18 (`c244fc4`, CI SHA-verified) — generation token +
+recipe-key snapshot + Start-disabled-while-loading  
 Primary code: `scripts/ui/ui-compare.js:119-142`, `scripts/ui/app.js:755-765`
 
 Each folder-recipe render starts an asynchronous `get_compare_folders` request without
@@ -3822,6 +3823,23 @@ Correction requirements: snapshot the recipe key and request generation, discard
 response that is not still current/latest, and clear/disable Start while options are
 loading. Test both response orders, rejection/fallback, state-push rerenders, custom
 paths, and rapid A→B→A switching.
+
+#### Remediation — 2026-07-18
+
+`renderCompareDirs` now mirrors `refreshConsDest`'s `consDestSeq` guard: it
+increments a `compareDirsSeq` generation token AND snapshots the recipe key before
+awaiting, then discards any response that is not still the latest (`seq !==
+compareDirsSeq`) or whose recipe changed under it (`key !== compareChoice()`) — so a
+slow response for an abandoned recipe can no longer stomp the current folder lists.
+A `compareDirsLoading` flag holds Start disabled (via `syncCompareButton`, with a
+"Finding the run folders…" tooltip) while a discovery is unresolved. New
+`build/check_compare_dirs_race.js` drives the real functions in a `vm` sandbox with
+DEFERRED, out-of-order `get_compare_folders` promises: it proves the A→B→A stale
+response is discarded (B's folders stand), Start is held disabled while loading, a
+clean single discovery applies + enables, and a rejected discovery falls back to the
+seed list. Red→green: the stale-A-wins and Start-not-disabled checks both fail
+without the fix. #mock confirms the normal folders path still populates the dropdowns
+(ssor-prod vs ars-prod defaults) and enables Start.
 
 ### CMP-AUD-073 — the classic picker blocks supported raw-PDF inputs
 
