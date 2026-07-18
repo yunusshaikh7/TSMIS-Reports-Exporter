@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import compare_highway_detail_pdf as cmp_pdf
+import compare_highway_detail_tsn as _hd
 import consolidate_tsmis_highway_detail_pdf as hdpdf
 import matrix
 import matrix_build
@@ -194,6 +195,23 @@ def test_adapters_and_matrix():
     check("PDF-vs-Excel drops the TSN-specific Notes sheet",
           cmp_pdf.TSMIS_PDF_VS_EXCEL._schema.legend_writer is None
           and cmp_pdf.TSMIS_PDF_VS_TSN._schema.legend_writer is not None)
+    # CMP-AUD-068: the vs-TSN flavor builds the two-line 'Report View' replica the
+    # Excel-sourced comparison has (added per-call so its writer can read both input
+    # paths); the same-source PDF-vs-Excel self-check does NOT (TSN-specific soft/
+    # structural date semantics + TSN-only ADT/DCR columns don't apply to two TSMIS
+    # renders). Parity with the Excel-vs-TSN leg (compare_highway_detail_tsn.compare).
+    sc_tsn = cmp_pdf.TSMIS_PDF_VS_TSN._schema_for("a.xlsx", "b.xlsx")
+    check("PDF-vs-TSN builds a Report View (like Excel-vs-TSN)",
+          sc_tsn.extra_sheet_writer is not None
+          and sc_tsn.report_view_diff_check == ("Report View", "B", 2))
+    sc_ex = cmp_pdf.TSMIS_PDF_VS_EXCEL._schema_for("a.xlsx", "b.xlsx")
+    check("PDF-vs-Excel has NO Report View",
+          sc_ex.extra_sheet_writer is None and not sc_ex.report_view_diff_check)
+    # The Excel-sourced compare() routes through the SAME shared helper.
+    _excel_sc = _hd.add_report_view(_hd._SCHEMA, "a.xlsx", "b.xlsx")
+    check("Excel-vs-TSN uses the shared add_report_view helper",
+          _excel_sc.extra_sheet_writer is not None
+          and _excel_sc.report_view_diff_check == ("Report View", "B", 2))
     check("matrix vs-TSN comparator for highway_detail_pdf is the PDF flavor",
           matrix.tsn_comparator_for("highway_detail_pdf") is cmp_pdf.TSMIS_PDF_VS_TSN)
     check("matrix PDF-vs-Excel self comparator resolves",

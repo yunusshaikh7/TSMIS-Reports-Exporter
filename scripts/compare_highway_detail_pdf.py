@@ -78,7 +78,8 @@ class _HighwayDetailFileCompare:
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
                  one_sided_note_extra=None, drop_notes=False,
-                 excel_side_b=False, load_a=None, base_schema=None):
+                 excel_side_b=False, load_a=None, base_schema=None,
+                 report_view=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
@@ -86,6 +87,13 @@ class _HighwayDetailFileCompare:
         self._name_tag = name_tag
         self._load_a = load_a or _hd._load_tsmis
         self._load_b = load_b
+        # CMP-AUD-068: the vs-TSN flavor gets the two-line 'Report View' replica the
+        # Excel-sourced comparison has (added per-call so the writer can read the two
+        # input paths). The same-source PDF-vs-Excel self-check does NOT: the replica's
+        # structural-date "soft" classification and TSN-only ADT/DCR reference columns
+        # are TSN-specific — on two TSMIS renders those must be IDENTICAL, so a "soft"
+        # verdict would understate a real render defect (the CMP-AUD-067 principle).
+        self._report_view = report_view
         # Source Files: side A is the PDF export (.pdf); side B is the Excel export
         # (.xlsx) for the same-source self-check, else the statewide TSN (no source).
         schema = replace(base_schema or _hd._SCHEMA,
@@ -115,10 +123,18 @@ class _HighwayDetailFileCompare:
         rows_b, _ = self._load_b(path_b)
         return rows_a, rows_b, None
 
+    def _schema_for(self, path_a, path_b):
+        """The per-call schema. The vs-TSN flavor adds the 'Report View' replica
+        (needs both paths, so it can't be baked into the __init__ schema); every
+        other flavor uses the static schema as-is."""
+        if self._report_view:
+            return _hd.add_report_view(self._schema, path_a, path_b)
+        return self._schema
+
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
                 mode="formulas", commit_guard=None):
         return run_files_compare(
-            self._schema, path_a, path_b, out_path,
+            self._schema_for(path_a, path_b), path_a, path_b, out_path,
             banner=(f"Highway Detail Comparison — {self.file_a_label} vs "
                     f"{self.file_b_label}"),
             has_route=True, loader=self._load_pair, deps_ok=_hd._DEPS_OK,
@@ -131,7 +147,7 @@ TSMIS_PDF_VS_TSN = _HighwayDetailFileCompare(
     report_name="Highway Detail — TSMIS (PDF) vs TSN",
     side_a="TSMIS (PDF)", side_b="TSN",
     name_tag="TSMIS_PDF_vs_TSN_HighwayDetail",
-    load_b=_hd._load_tsn)
+    load_b=_hd._load_tsn, report_view=True)
 
 TSMIS_PDF_VS_EXCEL = _HighwayDetailFileCompare(
     report_name="Highway Detail — TSMIS PDF vs Excel",

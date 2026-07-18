@@ -913,6 +913,27 @@ def _load_pair(tsmis_path, tsn_path):
     return rows_t, rows_n, None
 
 
+def add_report_view(schema, tsmis_path, tsn_path):
+    """Augment `schema` with the two-line 'Report View' replica — the printed
+    Highway Detail record, comparison-coloured — via the EXISTING
+    extra_sheet_writer opt-in plus its Diffs-column self-check. Shared by BOTH
+    vs-TSN flavors: the Excel-sourced compare() here and the PDF-sourced
+    TSMIS_PDF_VS_TSN in compare_highway_detail_pdf (CMP-AUD-068). The PDF-
+    consolidated workbook shares the Excel export's 34-column layout, so the
+    replica projects identically no matter which TSMIS render fed the comparison.
+    The TSN-only ADT/DCR columns come from the raw TSN file (None for a
+    normalized library), read lazily inside the writer, so the workbook is only
+    opened when the sheet is actually built (after a successful load).
+    `tsmis_path` is accepted for signature parity with the Intersection Detail
+    helper; the Highway Detail Report View reads its locations from the compared
+    rows, so it isn't needed here."""
+    return dataclasses.replace(
+        schema,
+        extra_sheet_writer=lambda wb, ctx: _write_report_view(
+            wb, ctx, _tsn_onesided(Path(tsn_path))),
+        report_view_diff_check=("Report View", "B", 2))
+
+
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
             mode="formulas", commit_guard=None):
     """Build the Highway Detail TSMIS-vs-TSN comparison workbook(s). `tsmis_path`
@@ -923,11 +944,7 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     extra_sheet_writer opt-in (the flat Comparison sheet is untouched;
     compare_core stays unmodified). The TSN-only ADT/DCR columns come from the
     raw TSN file (None for a normalized library), read lazily inside the writer."""
-    schema = dataclasses.replace(
-        _SCHEMA,
-        extra_sheet_writer=lambda wb, ctx: _write_report_view(
-            wb, ctx, _tsn_onesided(Path(tsn_path))),
-        report_view_diff_check=("Report View", "B", 2))
+    schema = add_report_view(_SCHEMA, tsmis_path, tsn_path)
     return ctc.run_files_compare(
         schema, tsmis_path, tsn_path, out_path,
         banner="Highway Detail Comparison — TSMIS vs TSN", has_route=True,
