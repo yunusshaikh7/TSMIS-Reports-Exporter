@@ -1,0 +1,284 @@
+<style>
+  :root{
+    --bg:#f3f6fb; --panel:#ffffff; --panel-2:#eef2f8; --line:#dbe2ee;
+    --ink:#141d2e; --ink-2:#48566d; --ink-3:#75839a;
+    --done:#0f9d63; --done-soft:#d7f0e3;
+    --warn:#c07d12; --warn-soft:#f6e8cd;
+    --open:#7c8aa2; --open-soft:#e5eaf2;
+    --brand:#2f6fd0; --brand-soft:#dbe8fb;
+    --shadow:0 1px 2px rgba(16,28,51,.06),0 8px 24px rgba(16,28,51,.06);
+    --mono:ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0b111d; --panel:#131c2c; --panel-2:#0f1727; --line:#243348;
+      --ink:#e7edf7; --ink-2:#a7b4c9; --ink-3:#75839a;
+      --done:#2bcd86; --done-soft:#123528;
+      --warn:#e7ad4b; --warn-soft:#3a2e12;
+      --open:#8494ad; --open-soft:#1c2637;
+      --brand:#5aa0f2; --brand-soft:#152a45;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f3f6fb; --panel:#ffffff; --panel-2:#eef2f8; --line:#dbe2ee;
+    --ink:#141d2e; --ink-2:#48566d; --ink-3:#75839a;
+    --done:#0f9d63; --done-soft:#d7f0e3; --warn:#c07d12; --warn-soft:#f6e8cd;
+    --open:#7c8aa2; --open-soft:#e5eaf2; --brand:#2f6fd0; --brand-soft:#dbe8fb;
+    --shadow:0 1px 2px rgba(16,28,51,.06),0 8px 24px rgba(16,28,51,.06);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0b111d; --panel:#131c2c; --panel-2:#0f1727; --line:#243348;
+    --ink:#e7edf7; --ink-2:#a7b4c9; --ink-3:#75839a;
+    --done:#2bcd86; --done-soft:#123528; --warn:#e7ad4b; --warn-soft:#3a2e12;
+    --open:#8494ad; --open-soft:#1c2637; --brand:#5aa0f2; --brand-soft:#152a45;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto;padding:clamp(20px,4vw,56px) clamp(16px,4vw,32px) 72px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--brand);font-weight:600;margin:0 0 10px}
+  h1{font-size:clamp(28px,5vw,44px);line-height:1.06;letter-spacing:-.02em;margin:0 0 14px;
+    text-wrap:balance;font-weight:760}
+  h2{font-size:clamp(18px,2.6vw,22px);letter-spacing:-.01em;margin:0;font-weight:700}
+  .lede{font-size:clamp(16px,2.1vw,18px);color:var(--ink-2);max-width:62ch;margin:0}
+  .mono{font-family:var(--mono)}
+  .num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+
+  /* hero */
+  .hero{margin-bottom:30px}
+  .headline-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:20px 40px;
+    margin:22px 0 18px;padding-top:22px;border-top:1px solid var(--line)}
+  .bignum{font-family:var(--mono);font-size:clamp(56px,12vw,104px);line-height:.82;
+    font-weight:680;letter-spacing:-.04em}
+  .bignum span{font-size:.4em;color:var(--ink-3);font-weight:600}
+  .bignum-sub{color:var(--ink-2);font-size:15px;max-width:30ch}
+  .bignum-sub b{color:var(--ink);font-weight:660}
+
+  /* segmented progress bar */
+  .bar{height:26px;border-radius:8px;overflow:hidden;display:flex;background:var(--panel-2);
+    border:1px solid var(--line);box-shadow:inset 0 1px 2px rgba(0,0,0,.05)}
+  .seg{height:100%;display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;white-space:nowrap;
+    transform-origin:left;animation:grow .9s cubic-bezier(.2,.7,.2,1) both}
+  .seg.done{background:linear-gradient(180deg,var(--done),color-mix(in srgb,var(--done) 84%,#000))}
+  .seg.warn{background:linear-gradient(180deg,var(--warn),color-mix(in srgb,var(--warn) 84%,#000));animation-delay:.12s}
+  .seg.open{background:var(--open);color:#fff;animation-delay:.24s}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:12px;font-size:13px;color:var(--ink-2)}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .dot{width:10px;height:10px;border-radius:3px;flex:none}
+  .dot.done{background:var(--done)} .dot.warn{background:var(--warn)} .dot.open{background:var(--open)}
+  @keyframes grow{from{transform:scaleX(.001)}to{transform:scaleX(1)}}
+  @media (prefers-reduced-motion:reduce){.seg{animation:none}}
+
+  section{margin-top:38px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:16px}
+  .sec-head .kicker{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.1em}
+
+  /* foundations — the reassurance grid */
+  .found{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:clamp(18px,3vw,26px);box-shadow:var(--shadow);
+    border-left:4px solid var(--done)}
+  .found .cap{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .badge-ok{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--done);
+    background:var(--done-soft);border-radius:999px;padding:3px 10px;letter-spacing:.04em}
+  .found p.sub{margin:2px 0 18px;color:var(--ink-2);max-width:60ch}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .fitem{background:var(--panel);padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .fitem .chk{color:var(--done);font-family:var(--mono);font-weight:800;flex:none;margin-top:1px}
+  .fitem .t{font-weight:640;font-size:14.5px;letter-spacing:-.005em}
+  .fitem .d{color:var(--ink-3);font-size:12.5px;font-family:var(--mono)}
+
+  /* buckets */
+  .buckets{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+  .bk{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;
+    box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .bk::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--open)}
+  .bk.is-done::before{background:var(--done)} .bk.is-prog::before{background:var(--warn)}
+  .bk-top{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+  .bk-letter{font-family:var(--mono);font-size:15px;font-weight:800;width:28px;height:28px;flex:none;
+    display:grid;place-items:center;border-radius:8px;background:var(--panel-2);color:var(--ink-2)}
+  .bk.is-done .bk-letter{background:var(--done-soft);color:var(--done)}
+  .bk.is-prog .bk-letter{background:var(--warn-soft);color:var(--warn)}
+  .bk-name{font-weight:680;font-size:15px;letter-spacing:-.01em;flex:1}
+  .pill{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;padding:3px 9px;border-radius:999px;white-space:nowrap;flex:none}
+  .pill.done{color:var(--done);background:var(--done-soft)}
+  .pill.prog{color:var(--warn);background:var(--warn-soft)}
+  .pill.open{color:var(--open);background:var(--open-soft)}
+  .bk-desc{color:var(--ink-2);font-size:13.5px;margin:0}
+  .bk-desc code{font-family:var(--mono);font-size:12px;color:var(--ink);
+    background:var(--panel-2);padding:1px 5px;border-radius:5px}
+
+  /* path to done */
+  .path{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    box-shadow:var(--shadow);overflow:hidden}
+  .step{display:flex;gap:16px;padding:15px 20px;border-top:1px solid var(--line);align-items:baseline}
+  .step:first-child{border-top:0}
+  .step .n{font-family:var(--mono);font-size:13px;color:var(--ink-3);width:22px;flex:none;
+    font-variant-numeric:tabular-nums}
+  .step.now{background:var(--brand-soft)}
+  .step.now .n{color:var(--brand);font-weight:800}
+  .step .body{flex:1}
+  .step .h{font-weight:660;letter-spacing:-.005em}
+  .step .h .tag{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.05em;
+    margin-left:9px;padding:2px 8px;border-radius:999px;vertical-align:middle}
+  .tag.now{color:var(--brand);background:var(--brand-soft);border:1px solid color-mix(in srgb,var(--brand) 30%,transparent)}
+  .step .m{color:var(--ink-2);font-size:13.5px;margin-top:2px}
+  .method{font-family:var(--mono);font-size:12.5px;color:var(--ink-2);
+    background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
+    padding:11px 16px;margin-top:14px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+  .method b{color:var(--ink);font-weight:700}
+  .method .arrow{color:var(--brand)}
+
+  /* session wins */
+  .wins{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+  .win{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+    box-shadow:var(--shadow);border-top:3px solid var(--done)}
+  .win .id{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--done);letter-spacing:.03em}
+  .win .w{font-weight:620;font-size:14px;margin:3px 0 0;letter-spacing:-.005em}
+  .win .c{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:6px}
+
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;
+    font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+  footer b{color:var(--ink-2);font-weight:600}
+  @media (max-width:560px){.headline-row{gap:16px}}
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">TSMIS Reports Exporter · comparison-perfection</p>
+    <h1>The hard part is behind us.</h1>
+    <p class="lede">A source-first, evidence-driven remediation of the comparison engine — every
+      fix is census-proven on real statewide data, red→green, and CI-verified. Here's exactly where
+      it stands and the runway to done.</p>
+
+    <div class="headline-row">
+      <div>
+        <div class="bignum">66<span>%</span></div>
+        <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
+          remain are mostly hardening, not correctness.</div>
+      </div>
+      <div style="flex:1;min-width:280px">
+        <div class="bar" role="img" aria-label="159 closed, 10 in progress, 71 open of 241 findings">
+          <div class="seg done" style="width:66%">159 closed</div>
+          <div class="seg warn" style="width:5%"></div>
+          <div class="seg open" style="width:29%">71 open</div>
+        </div>
+        <div class="legend">
+          <span><i class="dot done"></i> 159 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot warn"></i> ~10 in progress</span>
+          <span><i class="dot open"></i> ~71 open</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="found">
+      <div class="cap">
+        <h2>The foundation is locked</h2>
+        <span class="badge-ok">SOLID</span>
+      </div>
+      <p class="sub">This is the reason the remaining work is a downhill grade: every
+        correctness-critical layer is already proven and gated. Nothing below can silently regress —
+        the offline gate is <b class="num">130/130</b>, CI-green.</p>
+      <div class="fgrid">
+        <div class="fitem"><span class="chk">✓</span><div><div class="t">Shared comparison engine</div><div class="d">correctness-locked</div></div></div>
+        <div class="fitem"><span class="chk">✓</span><div><div class="t">12 report families</div><div class="d">consolidate + compare · vs-TSN · PDF · cross-env · baseline</div></div></div>
+        <div class="fitem"><span class="chk">✓</span><div><div class="t">Raw → normalized audits</div><div class="d">Stage&nbsp;6 · 7/7 families</div></div></div>
+        <div class="fitem"><span class="chk">✓</span><div><div class="t">Base TSMIS-vs-TSN oracles</div><div class="d">Stage&nbsp;8 · 7/7 families</div></div></div>
+        <div class="fitem"><span class="chk">✓</span><div><div class="t">Physical-identity gate</div><div class="d">11 green / 0 red</div></div></div>
+        <div class="fitem"><span class="chk">✓</span><div><div class="t">Provenance & projection findings</div><div class="d">all owned items closed</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The nine buckets</h2><span class="kicker">what's done · what's left</span></div>
+    <div class="buckets">
+      <div class="bk is-done">
+        <div class="bk-top"><span class="bk-letter">A</span><span class="bk-name">Re-verification sweep</span><span class="pill done">Done</span></div>
+        <p class="bk-desc">The bucket that re-confirmed borderline findings — <code>065</code> <code>040</code> <code>006</code> <code>037</code> — all closed.</p>
+      </div>
+      <div class="bk is-done">
+        <div class="bk-top"><span class="bk-letter">C</span><span class="bk-name">Loader & validation gates</span><span class="pill done">10 of 11</span></div>
+        <p class="bk-desc">The refusal-first wave: 10 gates shipped (<code>028–034</code> <code>036</code> <code>063</code> <code>027</code>) + <code>070</code> ruled not-a-defect. Only <code>032</code> remains.</p>
+      </div>
+      <div class="bk is-prog">
+        <div class="bk-top"><span class="bk-letter">D</span><span class="bk-name">Cross-environment validation</span><span class="pill prog">In progress</span></div>
+        <p class="bk-desc"><code>018</code> closed (Intersection Summary partition gate). Next: <code>019</code> · <code>046</code> · <code>022</code>.</p>
+      </div>
+      <div class="bk">
+        <div class="bk-top"><span class="bk-letter">B</span><span class="bk-name">PDF-parser robustness</span><span class="pill open">Open</span></div>
+        <p class="bk-desc">A hardening wave for the HD/ID PDF parsers — spill / orphan / fallback / truncation classes (<code>051–062</code>, <code>044</code>).</p>
+      </div>
+      <div class="bk">
+        <div class="bk-top"><span class="bk-letter">E</span><span class="bk-name">Matrix / day / GUI lifecycle</span><span class="pill open">Open</span></div>
+        <p class="bk-desc">The largest bucket — mostly <span class="mono">P2</span> state-machine honesty in the matrix + GUI, not correctness of the comparisons themselves.</p>
+      </div>
+      <div class="bk">
+        <div class="bk-top"><span class="bk-letter">F</span><span class="bk-name">Evidence-gate truth</span><span class="pill open">Open</span></div>
+        <p class="bk-desc">The Stage-10 evidence-image arc. <code>210</code> is a deferred feature (needs its own mini-plan), not a single fix.</p>
+      </div>
+      <div class="bk">
+        <div class="bk-top"><span class="bk-letter">G</span><span class="bk-name">Source-semantics & vendor data</span><span class="pill open">Open</span></div>
+        <p class="bk-desc">Several are data facts to conserve or expose, not code bugs. One item is blocked on a vendor answer (never inferred).</p>
+      </div>
+      <div class="bk">
+        <div class="bk-top"><span class="bk-letter">H</span><span class="bk-name">Stage-8 instrument hardening</span><span class="pill open">Open</span></div>
+        <p class="bk-desc">Non-product work — hardening the audit instruments themselves, not the app's comparison output.</p>
+      </div>
+      <div class="bk">
+        <div class="bk-top"><span class="bk-letter">I</span><span class="bk-name">Labels & docs trivia</span><span class="pill open">Open</span></div>
+        <p class="bk-desc">The <span class="mono">P3</span> tail — wording, labels, and documentation nits.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The runway to done</h2><span class="kicker">ordered by leverage</span></div>
+    <div class="path">
+      <div class="step now">
+        <div class="n">01</div>
+        <div class="body">
+          <div class="h">Finish cross-environment validation <span class="tag now">up next</span></div>
+          <div class="m">Bucket D — <b class="mono">019</b> (Ramp Summary one-field-partial predicate) → <b class="mono">046</b> (position-shifted header projection) → <b class="mono">022</b> (duplicate categories).</div>
+        </div>
+      </div>
+      <div class="step"><div class="n">02</div><div class="body"><div class="h">PDF-parser robustness wave</div><div class="m">Bucket B — spill/orphan/fallback/truncation hardening for the HD &amp; ID parsers.</div></div></div>
+      <div class="step"><div class="n">03</div><div class="body"><div class="h">Close the loader-gate tail</div><div class="m">Bucket C — the last item, <b class="mono">032</b> (cross-env flat schema contract).</div></div></div>
+      <div class="step"><div class="n">04</div><div class="body"><div class="h">Matrix / GUI lifecycle honesty</div><div class="m">Bucket E — the big one, but P2 state-machine truthfulness, not comparison correctness.</div></div></div>
+      <div class="step"><div class="n">05</div><div class="body"><div class="h">Source-semantics &amp; the evidence arc</div><div class="m">Buckets G &amp; F — conserve/expose data facts; then the evidence-image gate (incl. the deferred 210 feature).</div></div></div>
+      <div class="step"><div class="n">06</div><div class="body"><div class="h">Instrument hardening &amp; the trivia tail</div><div class="m">Buckets H &amp; I — non-product audit-instrument work and the P3 label/doc nits.</div></div></div>
+    </div>
+    <div class="method">
+      <span><b>Every fix, every time:</b></span>
+      <span>census the real corpus <span class="arrow">→</span> red→green proof <span class="arrow">→</span> statewide re-verify <span class="arrow">→</span> local gate <span class="arrow">→</span> push <span class="arrow">→</span> SHA-verified CI</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Shipped this session</h2><span class="kicker">all CI-green</span></div>
+    <div class="wins">
+      <div class="win"><div class="id">CMP-AUD-063</div><div class="w">Invalid post-mile token → PARTIAL</div><div class="c">HSL/RD PDF · census 75,709 rows</div></div>
+      <div class="win"><div class="id">CMP-AUD-027</div><div class="w">Header-only routes disclosed, not dropped</div><div class="c">cross-env · census 756 exports</div></div>
+      <div class="win"><div class="id">MER-059</div><div class="w">Dashed-district HL headers recognized</div><div class="c">census 252 prints · 1 cell corrected</div></div>
+      <div class="win"><div class="id">CMP-AUD-018</div><div class="w">IS cross-env partition gate</div><div class="c">census 434 exports · shared validator</div></div>
+      <div class="win"><div class="id">sol-001</div><div class="w">Reliability engine hardening — integrated</div><div class="c">updater · export · auth · reviewed + merged</div></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>0a864cc</b> · gate <b>130/130</b> · CI-green</span>
+    <span>Updated <b>2026-07-17</b></span>
+  </footer>
+
+</div>
