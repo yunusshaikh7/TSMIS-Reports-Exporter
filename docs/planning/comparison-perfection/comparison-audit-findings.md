@@ -975,7 +975,7 @@ OOXML and installed-Excel cached evaluation gates are green.
 ### CMP-AUD-013 — capability support is duplicated outside the registry
 
 Priority: P3  
-Status: Verified by negative mutation  
+Status: Resolved 2026-07-18 (`2b13df7`) — matrix mode + by-day support DERIVES from the registry; negative-mutation parity guard added  
 Primary code: `scripts/day_matrix.py:53-75`,
 `scripts/matrix_state.py:347-474`
 
@@ -991,7 +991,7 @@ add a blocking identity/parity test with negative support mutation.
 ### CMP-AUD-014 — self-consistency checks are grouped as Cross-environment
 
 Priority: P3  
-Status: Verified by executable census  
+Status: Resolved 2026-07-18 (`d592462`) — new `self` (Self-consistency) sub-tab holds the five PDF-vs-Excel self-checks; keys unchanged; #mock-verified  
 Primary code: `scripts/report_catalog.py:222-326`
 
 The `env` group contains 12 folder-to-folder environment comparisons and five
@@ -1005,7 +1005,7 @@ comparison operation keys.
 ### CMP-AUD-015 — Intersection comparison labels add the wrong family prefix
 
 Priority: P3  
-Status: Verified against the export registry/site naming  
+Status: Resolved 2026-07-18 (`af70443`) — dropped the wrong `TSAR:` prefix from the four base Intersection comparison labels; one-directional guard added (status line corrected 2026-07-18)  
 Primary code: `scripts/report_catalog.py:118-130`, `241-254`, `290-301`
 
 Export entries are `Intersection Summary` and `Intersection Detail` with no `TSAR:`

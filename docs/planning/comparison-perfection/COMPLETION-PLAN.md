@@ -23,19 +23,33 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
 | **Gate** | **130/130 offline** checks (128 comparison + Sol's 2 reliability checks after the sol-001 integration; full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **241 total · ~173 CLOSED (Resolved/Remediated) · ~9 partial · ~57 open** (~72% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · **C ✅ COMPLETE** (028/029/030/031/032/033/034/036/063/027 + 070-not-a-defect) · **D ✅ COMPLETE** (018 ✅ · 019 ✅ · 046 ✅ · 022 ✅) · B/E/F/G/H/I 🔨 (071 ✅ route-universe · 068 ✅ HD Report View · 069 ✅ RD PDF roles · 015 ✅ TSAR label fix · 064 ✅ PDF anomaly counts · 038 ✅ date normalizer · 009 ✅ numeric key parity · 039+043 ✅ Summary-by-Category typed flags + snapshot · 044 ✅ trailing-blank-header data guard; parser robustness / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
+| **Findings** | **241 total · ~175 CLOSED (Resolved/Remediated) · ~9 partial · ~57 open** (~73% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · **C ✅ COMPLETE** (028/029/030/031/032/033/034/036/063/027 + 070-not-a-defect) · **D ✅ COMPLETE** (018 ✅ · 019 ✅ · 046 ✅ · 022 ✅) · B/E/F/G/H/I 🔨 (071 ✅ route-universe · 068 ✅ HD Report View · 069 ✅ RD PDF roles · 015 ✅ TSAR label fix · 064 ✅ PDF anomaly counts · 038 ✅ date normalizer · 009 ✅ numeric key parity · 039+043 ✅ Summary-by-Category typed flags + snapshot · 044 ✅ trailing-blank-header data guard · 013 ✅ matrix support parity · 014 ✅ Self-consistency sub-tab; 054 ⏳ HD-PDF fallback recovery in flight; parser robustness / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
 | **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **019 RESOLVED (2026-07-17)**: the Ramp Summary producer now reflects its own audit reds — `record_has_data` requires Total + every section, per-route `reconcile_record` sends unexplained gaps → PARTIAL and the explained P/V residual → a typed note (COMPLETE), matcher unknown/duplicate diagnostics, cross-env shares the gate; census 0 unexplained / 9 routes / 22 P/V ramps, real-data verified. **032 RESOLVED (2026-07-18) — BUCKET C COMPLETE**: every flat cross-env family now pins its EXACT export schema via a header_canonicalizer (RD/HSL/HD/ID XLSX + HSL-PDF/RD-PDF), so two malformed/legacy/truncated/reordered sides refuse instead of matching; census-verified on the 7.9 statewide exports + converted headers; new `check_compare_env_flat_schema` + 5 fixtures rebuilt onto real layouts. **046 RESOLVED (2026-07-18)**: shifted RD/ID exports now show diffs under the right field — RD Excel+PDF pin a position-authoritative `force_header`, ID Excel+PDF realign legacy→current via `_id_canonical_header`; end-to-end proves Description-under-Description / INT-Type-under-INT-Type. **NEXT (bucket D — LAST): 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-18, after 044 + 039+043 + 009 + 038 + 022 (C&D done) + 071 + 068 + 069 + 015 + 064 — buckets B/E/G/H/I)
+> ### ▶ RESUME HERE (2026-07-18, after 013 + 014 + 044 + 039+043 + 009 + 038 + 022 (C&D done) + 071 + 068 + 069 + 015 + 064 — buckets B/E/G/H/I; 054 in flight)
 >
-> **NEXT — the tractable non-UI tier is essentially cleared (038/009/039/043/044 done).** Remaining
-> work is heavier: the **UI-heavy** tier (014/073/074/013 — need the `#mock` preview on 8765 + JS
-> routing + mock.js parity, budget for it) and **heavy-census** bucket **B** (HD/ID PDF-parser
-> robustness 051–062 — spill/orphan/fallback/truncation; each needs a statewide pdfplumber pass,
-> run in background + Monitor) / **G** (source-semantics 133/138/142/144/145/186/192 — **HD-Excel +
-> HL raw county VENDOR-BLOCKED, never infer**). **E** (matrix/day/GUI lifecycle) is the largest
-> state-machine cluster; **F** evidence arc (210 DEFERRED); **H** Stage-8 instruments (non-product).
+> **NEXT — UI tier half-cleared (013 registry parity + 014 Self-consistency sub-tab DONE); 073/074
+> remain (the classic picker's raw-PDF extensions + per-role file hints — registry-owned accepted
+> shapes, `gui_compare_api` + `ui-compare.js`, `#mock` on 8765).** Heavy-census bucket **B** is IN
+> PROGRESS: **054 (the live HD-PDF fallback-grid corruption) census-proven and implemented** — the
+> statewide HD-PDF grid census (252 PDFs / 4,452 pages) showed the line-1 grid is an EXACT merge of
+> the line-2 base edges on all 3,664 both-band pages (0 exceptions), so a band-less-line-1 page
+> recovers its own geometry instead of the corrupting document median; band-less DATA pages (route
+> 014 final unshaded record) escalate to PARTIAL instead of certifying a shifted row. Remaining B:
+> 051/052/053/055 (HD spill/header-swallow/orphan; HSL+RD damaged-header) + 056–062 (ID PDF robustness)
+> — each needs its own statewide pdfplumber census (background + Monitor). **G** (source-semantics
+> — **HD-Excel + HL raw county VENDOR-BLOCKED, never infer**). **E** (matrix/day/GUI lifecycle) is the
+> largest cluster; **F** evidence arc (210 DEFERRED); **H** Stage-8 instruments (non-product).
 > Pick by tractability; census-first on any new gate.
+>
+> **DONE 2026-07-18: CMP-AUD-013 + 014 CLOSED (UI tier).** 013 (`2b13df7`): the matrix's per-row
+> comparison-mode support was hand-written `True` in `matrix_state._row_modes` (tsn + self modes of
+> HL + the 5 PDF rows) and `day_matrix._day_rows`, so patching the registry left every row supported
+> — now DERIVES from `tsn_supported` / new `self_supported` (proven no-op, all True today) + a
+> negative-mutation parity guard. 014 (`d592462`): the 5 PDF-vs-Excel self-checks lived in the
+> "Cross-environment" (`env`) sub-tab; added a third `("self","Self-consistency")` group and moved
+> them (keys unchanged, display-only) + semantic guard + docs; #mock-verified the sub-tab renders
+> the 5 checks and Cross-environment holds none. Both gate 132/132 + ruff, CI-green.
 >
 > **DONE 2026-07-18: CMP-AUD-044 CLOSED (trailing-blank-header data guard).** Both trim-and-slice
 > flat loaders (`compare_env._load_xlsx_side`, `compare_highway_log._load_input`) trimmed trailing
