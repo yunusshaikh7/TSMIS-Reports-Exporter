@@ -26,10 +26,26 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | **241 total · ~176 CLOSED (Resolved/Remediated) · ~9 partial · ~56 open** (~73% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · **C ✅ COMPLETE** (028/029/030/031/032/033/034/036/063/027 + 070-not-a-defect) · **D ✅ COMPLETE** (018 ✅ · 019 ✅ · 046 ✅ · 022 ✅) · B/E/F/G/H/I 🔨 (071 ✅ route-universe · 068 ✅ HD Report View · 069 ✅ RD PDF roles · 015 ✅ TSAR label fix · 064 ✅ PDF anomaly counts · 038 ✅ date normalizer · 009 ✅ numeric key parity · 039+043 ✅ Summary-by-Category typed flags + snapshot · 044 ✅ trailing-blank-header data guard · 013 ✅ matrix support parity · 014 ✅ Self-consistency sub-tab · **054 ✅ HD-PDF fallback recovery (live bug; 15-route PARTIAL owner-flagged)**; parser robustness [B: 051–053/055–062 remain] / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
 | **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **019 RESOLVED (2026-07-17)**: the Ramp Summary producer now reflects its own audit reds — `record_has_data` requires Total + every section, per-route `reconcile_record` sends unexplained gaps → PARTIAL and the explained P/V residual → a typed note (COMPLETE), matcher unknown/duplicate diagnostics, cross-env shares the gate; census 0 unexplained / 9 routes / 22 P/V ramps, real-data verified. **032 RESOLVED (2026-07-18) — BUCKET C COMPLETE**: every flat cross-env family now pins its EXACT export schema via a header_canonicalizer (RD/HSL/HD/ID XLSX + HSL-PDF/RD-PDF), so two malformed/legacy/truncated/reordered sides refuse instead of matching; census-verified on the 7.9 statewide exports + converted headers; new `check_compare_env_flat_schema` + 5 fixtures rebuilt onto real layouts. **046 RESOLVED (2026-07-18)**: shifted RD/ID exports now show diffs under the right field — RD Excel+PDF pin a position-authoritative `force_header`, ID Excel+PDF realign legacy→current via `_id_canonical_header`; end-to-end proves Description-under-Description / INT-Type-under-INT-Type. **NEXT (bucket D — LAST): 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-18, after 055 + 051–053 (HD) + 056–062 (ID) + 073+074 + 083 + 086 + 072 + 013 + 014 + 054 + 044 + 039+043 + 009 + 038 + 022 (C&D done) + 071 + 068 + 069 + 015 + 064 — buckets B/E/G/H/I)
+> ### ▶ RESUME HERE (2026-07-18, after 061 → BUCKET B COMPLETE + 055 + 051–053 (HD) + 056–062 (ID) + all prior — buckets E/G/H/I remain)
+>
+> **DONE 2026-07-18 (5th marathon — BUCKET B COMPLETE): CMP-AUD-061 CLOSED (`7e16fea`, CI
+> SHA-verified), offline gate 134/134, 192 closed (80%). BUCKET B (PDF-parser robustness) is now
+> COMPLETE** (044/054/051–053/055/056–062/061). 061: the ID `_doc_windows` geometry scan now derives
+> both grids in ONE pass, polls `events.is_cancelled()` between pages, and `parse_pdf` returns a
+> distinct cancelled `(None,None)` — byte-identical (16,459 rows, same sha256 `5104861d…`), a pure
+> polling addition (`_shaded_column_windows` removed). Test `test_061_cancellation`. **Bounded
+> follow-up (documented, not required by the correction):** the evidence locators
+> `locate_tsmis`/`locate_tsn` scan one PDF's pages without an internal poll — but `visual_evidence`
+> already polls per-route/per-district before each call, so the uninterruptible window is one PDF;
+> per-page polling in the 5 adapters is a clean future improvement. **NEXT: BUCKET E** (matrix/day/GUI
+> lifecycle — the largest remaining bucket, mostly P2 state-machine honesty: 082 stale formula twins,
+> 084 semantic cache invalidation, 088/089 auth-clears-offline-work, 010/016/079/091–104 …) / **G**
+> (source-semantics; HD-Excel + HL raw county VENDOR-BLOCKED) / **F** (evidence arc; 210 DEFERRED) /
+> **H** (Stage-8 instruments) / **I** (label/doc trivia). ⚠ Also owed from earlier: the 053 HD
+> PDF-vs-Excel/PDF-vs-TSN canary re-measure; the 054 owner decision (accept-amber vs recovery).
 >
 > **DONE 2026-07-18 (5th marathon, bucket B — 055): CMP-AUD-055 CLOSED (`874b8d5`, CI SHA-verified),
-> offline gate 134/134, 191 closed (79%).** The Highway Sequence + Ramp Detail PDF parsers required
+> offline gate 134/134.** The Highway Sequence + Ramp Detail PDF parsers required
 > every data page to repeat all 7 column-header anchors; a page missing one was skipped wholesale as
 > cover/legend, dropping its data. Now, once in the data section, a headerless page carrying a
 > postmile-shaped token is flagged (`damaged_pages`) → PARTIAL + `parse_anomalies` diagnostic (the

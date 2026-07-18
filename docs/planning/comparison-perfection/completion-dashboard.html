@@ -162,20 +162,20 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">79<span>%</span></div>
+        <div class="bignum">80<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="191 closed, 9 in progress, 41 open of 241 findings">
-          <div class="seg done" style="width:79%">191 closed</div>
+        <div class="bar" role="img" aria-label="192 closed, 9 in progress, 40 open of 241 findings">
+          <div class="seg done" style="width:80%">192 closed</div>
           <div class="seg warn" style="width:4%"></div>
-          <div class="seg open" style="width:17%">41 open</div>
+          <div class="seg open" style="width:16%">40 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 191 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 192 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot warn"></i> ~9 in progress</span>
-          <span><i class="dot open"></i> ~41 open</span>
+          <span><i class="dot open"></i> ~40 open</span>
         </div>
       </div>
     </div>
@@ -212,13 +212,13 @@
         <div class="bk-top"><span class="bk-letter">C</span><span class="bk-name">Loader & validation gates</span><span class="pill done">Complete</span></div>
         <p class="bk-desc">The refusal-first wave — all 11 gates shipped (<code>028–034</code> <code>036</code> <code>063</code> <code>027</code>) + <code>070</code> ruled not-a-defect. <code>032</code> (flat cross-env schema pinning) closed it out.</p>
       </div>
-      <div class="bk is-prog">
-        <div class="bk-top"><span class="bk-letter">D</span><span class="bk-name">Cross-environment validation</span><span class="pill prog">In progress</span></div>
-        <p class="bk-desc"><code>018</code> · <code>019</code> · <code>046</code> closed (IS partition gate; Ramp Summary audit-reconciliation; shifted-export field labels). Only <code>022</code> left.</p>
+      <div class="bk is-done">
+        <div class="bk-top"><span class="bk-letter">D</span><span class="bk-name">Cross-environment validation</span><span class="pill done">Complete</span></div>
+        <p class="bk-desc"><code>018</code> · <code>019</code> · <code>046</code> · <code>022</code> closed (IS partition gate; Ramp Summary audit-reconciliation; shifted-export field labels; no double-count in the block-walk).</p>
       </div>
-      <div class="bk">
-        <div class="bk-top"><span class="bk-letter">B</span><span class="bk-name">PDF-parser robustness</span><span class="pill open">Open</span></div>
-        <p class="bk-desc">A hardening wave for the PDF parsers. <code>054</code> (HD fallback-grid) + <code>044</code> + the ID set <code>056–060 · 062</code> + the HD set <code>051–053</code> + <code>055</code> (HSL/RD damaged header) closed — <code>053</code> surfaced a real 054-missed "CONT" line-2 corruption (7 records corrected). Only <code>061</code> (grid-scan cancellation, P2) remains.</p>
+      <div class="bk is-done">
+        <div class="bk-top"><span class="bk-letter">B</span><span class="bk-name">PDF-parser robustness</span><span class="pill done">Complete</span></div>
+        <p class="bk-desc">The full PDF-parser hardening wave — <code>044</code> · <code>054</code> · the ID set <code>056–060 · 062</code> · the HD set <code>051–053</code> · <code>055</code> · <code>061</code> — all closed. <code>053</code> surfaced a real 054-missed "CONT" line-2 corruption (7 records corrected); the rest were census-proven no-ops (detection → PARTIAL).</p>
       </div>
       <div class="bk">
         <div class="bk-top"><span class="bk-letter">E</span><span class="bk-name">Matrix / day / GUI lifecycle</span><span class="pill open">Open</span></div>
@@ -249,11 +249,11 @@
       <div class="step now">
         <div class="n">01</div>
         <div class="body">
-          <div class="h">PDF-parser robustness wave <span class="tag now">up next</span></div>
-          <div class="m">Bucket B nearly done — ID (<b class="mono">056–060 · 062</b>) + HD (<b class="mono">051–053</b>) + <b class="mono">055</b> closed; only <b class="mono">061</b> (grid-scan cancellation, P2) remains. Buckets <b>C &amp; D complete</b>.</div>
+          <div class="h">Matrix / GUI lifecycle honesty <span class="tag now">up next</span></div>
+          <div class="m">Bucket E — the largest remaining bucket, mostly <span class="mono">P2</span> state-machine truthfulness in the matrix + GUI, not comparison correctness. Buckets <b>B, C &amp; D complete</b>.</div>
         </div>
       </div>
-      <div class="step"><div class="n">02</div><div class="body"><div class="h">Matrix / GUI lifecycle honesty</div><div class="m">Bucket E — the big one, but P2 state-machine truthfulness, not comparison correctness.</div></div></div>
+      <div class="step"><div class="n">02</div><div class="body"><div class="h">Source-semantics</div><div class="m">Bucket G — conserve/expose data facts (HD-Excel + HL raw county are vendor-blocked — never inferred).</div></div></div>
       <div class="step"><div class="n">03</div><div class="body"><div class="h">Source-semantics &amp; the evidence arc</div><div class="m">Buckets G &amp; F — conserve/expose data facts; then the evidence-image gate (incl. the deferred 210 feature).</div></div></div>
       <div class="step"><div class="n">04</div><div class="body"><div class="h">Instrument hardening &amp; the trivia tail</div><div class="m">Buckets H &amp; I — non-product audit-instrument work and the P3 label/doc nits.</div></div></div>
     </div>
@@ -294,11 +294,12 @@
       <div class="win"><div class="id">CMP-AUD-056–060 · 062</div><div class="w">Intersection Detail PDF parser reconciles every data shape or escalates</div><div class="c">_is_rowB needs a Description · leading/wrapped rowB, vestigial, mixed-edition, per-page geometry all counted · census 217 PDFs 0-occurrence · byte-identical 16,459/16,459</div></div>
       <div class="win"><div class="id">CMP-AUD-051–053</div><div class="w">Highway Detail PDF: a real "CONT" line-2 corruption corrected + parser hardened</div><div class="c">7 records across 5 routes fixed from garbage "CONT" to the printed Description + roadbed data · header anchored on LEFT/RIGHTROADBED · 2 hard orphans → PARTIAL · count 51,201, only 7 rows moved</div></div>
       <div class="win"><div class="id">CMP-AUD-055</div><div class="w">A damaged-header PDF data page escalates instead of being silently dropped</div><div class="c">HSL + RD · once in the data section, a headerless page with a postmile → PARTIAL · census HSL 252 + RD 126 · 0 real headerless pages carry data (no-op)</div></div>
+      <div class="win"><div class="id">CMP-AUD-061</div><div class="w">Cancellation is honored during the Intersection Detail geometry scan — bucket B complete</div><div class="c">_doc_windows polls between pages + returns a distinct cancelled outcome · byte-identical (same sha256) · one-pass refactor</div></div>
     </div>
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>874b8d5</b> · gate <b>134/134</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>7e16fea</b> · gate <b>134/134</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 

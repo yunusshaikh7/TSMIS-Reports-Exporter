@@ -339,7 +339,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-058 | P1 | Resolved | Intersection numeric furniture can consume a pending record |
 | CMP-AUD-059 | P1 | Resolved | Mixed Intersection PDF editions silently lose legacy rows |
 | CMP-AUD-060 | P1 | Resolved | Intersection vestigial-column drift is discarded as complete |
-| CMP-AUD-061 | P2 | Verified | Intersection grid scanning ignores cancellation |
+| CMP-AUD-061 | P2 | Resolved | Intersection grid scanning ignores cancellation |
 | CMP-AUD-062 | P1 | Resolved | Intersection document-median geometry silently drops pages |
 | CMP-AUD-063 | P2 | Resolved | Sequence/Ramp PDFs certify invalid post-mile code tokens |
 | CMP-AUD-064 | P2 | Resolved 2026-07-18 (the HSL-PDF + RD-PDF consolidators no longer assign their unparsed-line count `loud` to the file-level `skipped_inputs`; like the already-correct `bad_tokens` path it escalates completion to PARTIAL only and now rides a structured `producer_extra['parse_anomalies']` diagnostic; a shared `pdf_table_lib._clamp_input_counts` caps skipped/failed to the discovered input count; real 3-route RD-PDF stays COMPLETE/skipped=0/no-anomalies; red→green in check_pm_code_vocabulary — 1 PDF / 3 bad lines → skipped_inputs 3→0 + unparsed_lines=3) | PDF parser anomaly counts masquerade as skipped input counts |
@@ -3392,13 +3392,22 @@ decision before the new column can be mapped or intentionally ignored.
 ### CMP-AUD-061 — Intersection grid scanning ignores cancellation
 
 Priority: P2  
-Status: Verified by cancellation during the document grid scan  
-Primary code: `scripts/consolidate_tsmis_intersection_detail_pdf.py:159-187,273-279`,
-`scripts/visual_evidence.py:248-286`,
-`scripts/evidence_intersection_detail.py:435-463`,
-`scripts/evidence_ramp_detail.py:409-436`,
-`scripts/evidence_highway_log.py:289-305`,
-`scripts/evidence_highway_sequence.py:314-330`
+Status: **Resolved 2026-07-18** (`7e16fea`) — the correction requirements (cancel
+the document grid scan, poll between pages, propagate a distinct cancelled outcome
+before the no-grid/error handling) are met: `_doc_windows` now derives BOTH grids in
+ONE pass and polls `events.is_cancelled()` between pages, and `parse_pdf`
+distinguishes a cancelled `(None, None)` from a no-grid result. Byte-identical
+(statewide 7.9 ID: 16,459 rows, same sha256 `5104861d…`) — a pure polling addition;
+`_shaded_column_windows` removed. Test in `check_intersection_detail_pdf`
+(`test_061_cancellation`). **Bounded follow-up (not required by the correction, and
+already bounded today):** the evidence locators `locate_tsmis`/`locate_tsn` scan one
+PDF's pages without an internal poll, but `visual_evidence` already polls cancellation
+per-route (`_locate_tsmis_sources`) and per-district before each call, so the
+uninterruptible window is a single PDF; threading per-page polling into the 5
+adapters is a clean future improvement.  
+Primary code: `scripts/consolidate_tsmis_intersection_detail_pdf.py:159-187,273-279`
+(the grid scan); evidence-locator follow-up in `scripts/evidence_*.py`
+(`locate_tsmis`/`locate_tsn`) + `scripts/visual_evidence.py`
 
 Cancellation is checked only after `_doc_windows` has scanned every page and every
 rectangle. Cancelling during a no-grid scan is therefore reported as an unreadable/no-
