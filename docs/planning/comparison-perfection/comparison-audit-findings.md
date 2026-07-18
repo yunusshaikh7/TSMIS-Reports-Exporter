@@ -317,11 +317,11 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-036 | P1 | Remediated 2026-07-17 — the RD-PDF source gate requires the exact PDF-consolidated width + the trailing On/Off/Ramp Type sentinels | Ramp PDF accepts a truncated four-column workbook |
 | CMP-AUD-037 | P1 | Remediated 2026-07-17 — all five families gate the direct path (HSL v4 + HL v5 markers; RD v5 / ID v5 / HD v3 in-workbook markers + loader gates; marker-only bumps, rows byte-identical on the real corpus) | Direct comparisons trust stale normalized libraries |
 | CMP-AUD-038 | P2 | Resolved 2026-07-18 (`iso_date` full-matches each documented form + calendar-validates via `date()`; trailing junk / impossible dates are preserved verbatim as a visible difference instead of truncated or faked; census-proven no-op — shipped == old on all 121,464 distinct real date cells across RD+ID, both editions) | Date normalization masks malformed and impossible dates |
-| CMP-AUD-039 | P1 | Verified | Detail Report View counts contradict the main comparison |
+| CMP-AUD-039 | P1 | Resolved 2026-07-18 (Report View slice remediated 2026-07-12; the last open slice — the shared `summary_layout._render` Summary-by-Category sheet — now flags each category from the SAME `compared_cell` verdict the Comparison sheet uses, never a re-derived numeric delta, so the two can't disagree; identical to the old delta styling for the integer counts CMP-AUD-021 guarantees, red→green on a text-different-numeric-equal fixture) | Detail Report View counts contradict the main comparison |
 | CMP-AUD-040 | P1 | Partially remediated 2026-07-17 (the file half via the CMP-AUD-066 role gates — the same file refuses BOTH ways, probe-verified; the folder run-root/subfolder aliasing half remains open) | Logically identical inputs can be compared as two sources |
 | CMP-AUD-041 | P1 | Resolved | Selected or derived outputs can overwrite comparison sources |
 | CMP-AUD-042 | P1 | Verified | Normalized Highway Detail erases every PS equation marker |
-| CMP-AUD-043 | P1 | Verified | Formula Report View stays stale after live recalculation |
+| CMP-AUD-043 | P1 | Resolved 2026-07-18 (both familiar secondary surfaces take the finding's accepted "unmistakable values-only snapshot label" path: the Report View was labeled a build-time snapshot in the 2026-07-12 remediation, and the shared Summary-by-Category sheet now carries an unmistakable "do NOT recalculate; regenerate after editing a source" disclosure, gated present in both family checks) | Formula Report View stays stale after live recalculation |
 | CMP-AUD-044 | P1 | Verified | Data beneath trailing blank headers is silently discarded |
 | CMP-AUD-045 | P1 | Partially remediated (HL integrated 2026-07-17; only HD-Excel stays vendor-blocked) | Shared typed identity core green; report-family integration remains red |
 | CMP-AUD-046 | P2 | Resolved 2026-07-18 (RD Excel+PDF pin a position-authoritative `force_header`; ID Excel+PDF realign legacy→current via `_id_canonical_header`; census-verified per-position on the 7.9 exports; end-to-end proves a Description change shows under Description not R/U, an INT Type change under INT Type not INT Eff-Date) | Shifted exports report differences under the wrong fields |
@@ -2360,6 +2360,30 @@ checks assert only labels and presence. This remaining secondary surface stays o
 under this finding and Phase 7 V1; it needs typed-state parity fixtures before it can be
 called corrected.
 
+#### Remediation — 2026-07-18 (the Summary-by-Category slice — closes the finding)
+
+`summary_layout._render` now derives each category's flag from `compared_cell` — the
+**same typed verdict** the Comparison sheet builds — instead of an independently
+re-derived numeric delta. A new `typed_differ(key)` looks up the category's paired rows
+and returns `compared_cell(sc, count_field, ra, rb, off).state_code == "D"`; `value_row`
+and the grand-total row style red on that verdict (falling back to the numeric-delta
+heuristic only when a category is one-sided or absent, exactly as before). The displayed
+Δ stays numeric as a reader aid.
+
+Agreement is by construction, not by sampling: `typed_differ` issues the identical
+`compared_cell(sc, count_field, ra, rb, off)` call that `count_diffs` already made on
+those same rows to produce the Comparison verdict — so the familiar sheet's flag *is*
+that verdict, and there is no new failure mode (every such call already succeeded when
+the comparison ran). It is also a no-op on real output: the strict aggregate count parser
+(CMP-AUD-021) guarantees integer counts, for which `compared_cell` returns `D` iff
+`delta != 0`, so the styling is unchanged on every real comparison. The change is proven
+by a discriminating red→green fixture — a count that is text-different but numeric-equal
+(`5` vs `"05"`): the numeric delta says equal while the typed verdict says different, and
+the sheet now follows the verdict — in `check_compare_ramp_summary_tsn`
+(`test_summary_by_category_typed_parity`), with the shared `_render` thereby covering the
+Intersection Summary sheet too. This closes the last open 039 slice; see CMP-AUD-043 for
+the paired staleness disclosure.
+
 ### CMP-AUD-040 — distinct labels can resolve to the same effective input
 
 Priority: P1  
@@ -2498,6 +2522,22 @@ the generic Comparison, Summary, and Spot Check can update while this sheet rema
 its build-time answer. Phase 7 V1 therefore covers every familiar secondary sheet, not
 only sheets literally named `Report View`; each must become live or carry an
 unmistakable values-only generation/snapshot label and an installed-Excel edit gate.
+
+#### Remediation — 2026-07-18
+
+Both familiar secondary surfaces take the finding's accepted second path — "carry an
+unmistakable values-only generation/snapshot label." The Report View was labeled a
+build-time snapshot in the 2026-07-12 remediation (with the live `SUM('Report View'!B:B)
+= 2 * SUM(Comparison!Diffs)` aggregate invariant catching count drift). The shared
+`summary_layout._render` Summary-by-Category sheet now carries an unmistakable disclosure
+line — "These counts are a build-time snapshot and do NOT recalculate; regenerate the
+comparison after editing a source file" — so a reader cannot mistake its literal counts
+for live values after a formulas-mode recalculation. The static edit gate is the
+label-presence assertion in both family checks (`check_compare_ramp_summary_tsn` and
+`check_compare_intersection_summary_tsn`), matching how the Report View slice's gate
+proves its snapshot label / invariant formula is present. The paired CMP-AUD-039
+remediation makes the same sheet's flags consume the typed verdict, so what the snapshot
+shows is exactly the Comparison verdict at build time.
 
 ### CMP-AUD-044 — trailing blank headers truncate real data
 
