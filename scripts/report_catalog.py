@@ -238,9 +238,9 @@ COMPARE = (
                  _cmp_env.HIGHWAY_SEQUENCE, "folders", "env"),
     CompareEntry("cmp:highway_log:env", "Highway Log — between environments",
                  _cmp_env.HIGHWAY_LOG, "folders", "env"),
-    CompareEntry("cmp:intersection_summary:env", "TSAR: Intersection Summary — between environments",
+    CompareEntry("cmp:intersection_summary:env", "Intersection Summary — between environments",
                  _cmp_env.INTERSECTION_SUMMARY, "folders", "env"),
-    CompareEntry("cmp:intersection_detail:env", "TSAR: Intersection Detail — between environments",
+    CompareEntry("cmp:intersection_detail:env", "Intersection Detail — between environments",
                  _cmp_env.INTERSECTION_DETAIL, "folders", "env"),
     # Highway Log (PDF) cross-env — both sides parsed from the app's PDF export. Kept
     # LAST among the env-folders rows so the matrix row order is unchanged; its
@@ -287,9 +287,9 @@ COMPARE = (
                  _cmp_ramp_detail_tsn, "files", "tsn"),
     CompareEntry("cmp:ramp_summary:tsn", "TSAR: Ramp Summary — TSMIS vs TSN",
                  _cmp_ramp_summary_tsn, "files", "tsn"),
-    CompareEntry("cmp:intersection_summary:tsn", "TSAR: Intersection Summary — TSMIS vs TSN",
+    CompareEntry("cmp:intersection_summary:tsn", "Intersection Summary — TSMIS vs TSN",
                  _cmp_int_summary_tsn, "files", "tsn"),
-    CompareEntry("cmp:intersection_detail:tsn", "TSAR: Intersection Detail — TSMIS vs TSN",
+    CompareEntry("cmp:intersection_detail:tsn", "Intersection Detail — TSMIS vs TSN",
                  _cmp_int_detail_tsn, "files", "tsn"),
     # Intersection Detail PDF-sourced comparisons — the exact parallel of the two
     # Highway Log PDF file-rows above. PDF-vs-TSN is a vs-TSN check ("tsn"); PDF-vs-Excel

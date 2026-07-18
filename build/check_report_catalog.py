@@ -150,8 +150,8 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:ramp_detail:env", "TSAR: Ramp Detail — between environments", "folders", "env", _ce.RAMP_DETAIL),
     ("cmp:highway_sequence:env", "Highway Sequence Listing — between environments", "folders", "env", _ce.HIGHWAY_SEQUENCE),
     ("cmp:highway_log:env", "Highway Log — between environments", "folders", "env", _ce.HIGHWAY_LOG),
-    ("cmp:intersection_summary:env", "TSAR: Intersection Summary — between environments", "folders", "env", _ce.INTERSECTION_SUMMARY),
-    ("cmp:intersection_detail:env", "TSAR: Intersection Detail — between environments", "folders", "env", _ce.INTERSECTION_DETAIL),
+    ("cmp:intersection_summary:env", "Intersection Summary — between environments", "folders", "env", _ce.INTERSECTION_SUMMARY),
+    ("cmp:intersection_detail:env", "Intersection Detail — between environments", "folders", "env", _ce.INTERSECTION_DETAIL),
     ("cmp:highway_log_pdf:env", "Highway Log (PDF) — between environments", "folders", "env", _ce.HIGHWAY_LOG_PDF),
     ("cmp:intersection_detail_pdf:env", "Intersection Detail (PDF) — between environments", "folders", "env", _ce.INTERSECTION_DETAIL_PDF),
     # v0.20.0: the Highway Detail env rows, appended after the existing env rows.
@@ -166,8 +166,8 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:highway_log:pdf_vs_excel", "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chlp.TSMIS_PDF_VS_EXCEL),
     ("cmp:ramp_detail:tsn", "TSAR: Ramp Detail — TSMIS vs TSN", "files", "tsn", _crd_tsn),
     ("cmp:ramp_summary:tsn", "TSAR: Ramp Summary — TSMIS vs TSN", "files", "tsn", _crs_tsn),
-    ("cmp:intersection_summary:tsn", "TSAR: Intersection Summary — TSMIS vs TSN", "files", "tsn", _cis_tsn),
-    ("cmp:intersection_detail:tsn", "TSAR: Intersection Detail — TSMIS vs TSN", "files", "tsn", _cid_tsn),
+    ("cmp:intersection_summary:tsn", "Intersection Summary — TSMIS vs TSN", "files", "tsn", _cis_tsn),
+    ("cmp:intersection_detail:tsn", "Intersection Detail — TSMIS vs TSN", "files", "tsn", _cid_tsn),
     ("cmp:intersection_detail:pdf_vs_tsn", "Intersection Detail — TSMIS (PDF) vs TSN", "files", "tsn", _cidp.TSMIS_PDF_VS_TSN),
     ("cmp:intersection_detail:pdf_vs_excel", "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _cidp.TSMIS_PDF_VS_EXCEL),
     ("cmp:highway_sequence:tsn", "Highway Sequence Listing — TSMIS vs TSN", "files", "tsn", _chs_tsn),
@@ -612,12 +612,30 @@ def test_no_side_effects():
     check("the parity payload call never constructs GuiApi", calls["guiapi_init"] == 0)
 
 
+def test_family_prefix_convention():
+    """CMP-AUD-015: the 'TSAR:' family prefix belongs to the Ramp reports ONLY —
+    Intersection, Highway, and Highway Sequence labels must never carry it (their
+    export/consolidate entries never did, so the four base Intersection comparison
+    labels that used to were simply mislabeled). One-directional guard: no non-Ramp
+    entry may start with 'TSAR:', so a label can't drift back to the wrong family."""
+    print("family-prefix convention (TSAR: only on Ramp; CMP-AUD-015):")
+    offenders = []
+    for entries in (cat.EXPORT, cat.CONSOLIDATE, cat.COMPARE):
+        for e in entries:
+            if e.label.startswith("TSAR:") and "ramp" not in e.key.lower():
+                offenders.append(f"{e.key!r}: {e.label!r}")
+    check("no non-Ramp entry carries the 'TSAR:' prefix"
+          + (f" — offenders: {'; '.join(offenders)}" if offenders else ""),
+          not offenders)
+
+
 def main():
     test_reports_derive_from_catalog()
     test_golden_equivalence()
     test_negative_self_tests()
     test_bat_parity()
     test_mock_parity()
+    test_family_prefix_convention()
     test_no_side_effects()
     print()
     if _fail:

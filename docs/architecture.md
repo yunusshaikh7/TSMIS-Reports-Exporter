@@ -157,8 +157,8 @@ the file-based vs-TSN / self rows — `cmp:*` key shown for the stable contract)
 | `TSAR: Ramp Detail — between environments` | `compare_env.RAMP_DETAIL` | folders | env |
 | `Highway Sequence Listing — between environments` | `compare_env.HIGHWAY_SEQUENCE` | folders | env |
 | `Highway Log — between environments` | `compare_env.HIGHWAY_LOG` | folders | env |
-| `TSAR: Intersection Summary — between environments` | `compare_env.INTERSECTION_SUMMARY` | folders | env |
-| `TSAR: Intersection Detail — between environments` | `compare_env.INTERSECTION_DETAIL` | folders | env |
+| `Intersection Summary — between environments` | `compare_env.INTERSECTION_SUMMARY` | folders | env |
+| `Intersection Detail — between environments` | `compare_env.INTERSECTION_DETAIL` | folders | env |
 | `Highway Log (PDF) — between environments` | `compare_env.HIGHWAY_LOG_PDF` | folders | env |
 | `Intersection Detail (PDF) — between environments` | `compare_env.INTERSECTION_DETAIL_PDF` | folders | env |
 | `Highway Log — TSMIS vs TSN` | `compare_highway_log` | files | tsn |
@@ -166,8 +166,8 @@ the file-based vs-TSN / self rows — `cmp:*` key shown for the stable contract)
 | `Highway Log — TSMIS (PDF) vs TSMIS (Excel)` | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
 | `TSAR: Ramp Detail — TSMIS vs TSN` | `compare_ramp_detail_tsn` | files | tsn |
 | `TSAR: Ramp Summary — TSMIS vs TSN` | `compare_ramp_summary_tsn` | files | tsn |
-| `TSAR: Intersection Summary — TSMIS vs TSN` | `compare_intersection_summary_tsn` | files | tsn |
-| `TSAR: Intersection Detail — TSMIS vs TSN` | `compare_intersection_detail_tsn` | files | tsn |
+| `Intersection Summary — TSMIS vs TSN` | `compare_intersection_summary_tsn` | files | tsn |
+| `Intersection Detail — TSMIS vs TSN` | `compare_intersection_detail_tsn` | files | tsn |
 | `Intersection Detail — TSMIS (PDF) vs TSN` | `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
 | `Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)` | `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
 | `Highway Sequence Listing — TSMIS vs TSN` | `compare_highway_sequence_tsn` | files | tsn |

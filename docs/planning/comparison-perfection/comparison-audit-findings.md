@@ -40,8 +40,8 @@ count in an older document—is the audit universe.
 | `cmp:ramp_detail:env` | TSAR: Ramp Detail — between environments | folders |
 | `cmp:highway_sequence:env` | Highway Sequence Listing — between environments | folders |
 | `cmp:highway_log:env` | Highway Log — between environments | folders |
-| `cmp:intersection_summary:env` | TSAR: Intersection Summary — between environments | folders |
-| `cmp:intersection_detail:env` | TSAR: Intersection Detail — between environments | folders |
+| `cmp:intersection_summary:env` | Intersection Summary — between environments | folders |
+| `cmp:intersection_detail:env` | Intersection Detail — between environments | folders |
 | `cmp:highway_log_pdf:env` | Highway Log (PDF) — between environments | folders |
 | `cmp:intersection_detail_pdf:env` | Intersection Detail (PDF) — between environments | folders |
 | `cmp:highway_detail:env` | Highway Detail — between environments | folders |
@@ -53,8 +53,8 @@ count in an older document—is the audit universe.
 | `cmp:highway_log:pdf_vs_excel` | Highway Log — TSMIS (PDF) vs TSMIS (Excel) | files |
 | `cmp:ramp_detail:tsn` | TSAR: Ramp Detail — TSMIS vs TSN | files |
 | `cmp:ramp_summary:tsn` | TSAR: Ramp Summary — TSMIS vs TSN | files |
-| `cmp:intersection_summary:tsn` | TSAR: Intersection Summary — TSMIS vs TSN | files |
-| `cmp:intersection_detail:tsn` | TSAR: Intersection Detail — TSMIS vs TSN | files |
+| `cmp:intersection_summary:tsn` | Intersection Summary — TSMIS vs TSN | files |
+| `cmp:intersection_detail:tsn` | Intersection Detail — TSMIS vs TSN | files |
 | `cmp:intersection_detail:pdf_vs_tsn` | Intersection Detail — TSMIS (PDF) vs TSN | files |
 | `cmp:intersection_detail:pdf_vs_excel` | Intersection Detail — TSMIS (PDF) vs TSMIS (Excel) | files |
 | `cmp:highway_sequence:tsn` | Highway Sequence Listing — TSMIS vs TSN | files |
@@ -293,7 +293,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-012 | P2 | Resolved | Spot Check preserves typed blank/zero and full display parity |
 | CMP-AUD-013 | P3 | Verified | Matrix capability support is duplicated and hardcoded |
 | CMP-AUD-014 | P3 | Verified | PDF-versus-Excel checks are filed under Cross-environment |
-| CMP-AUD-015 | P3 | Verified | Four Intersection comparison labels incorrectly add `TSAR:` |
+| CMP-AUD-015 | P3 | Resolved 2026-07-18 (the four base Intersection comparison labels — summary/detail × env/tsn — dropped the wrong `TSAR:` prefix to match their export/consolidate entries and the already-correct PDF variants; the frozen catalog check + mock.js + architecture/reports docs updated in lockstep; `check_report_catalog` proves the derivation) | Four Intersection comparison labels incorrectly add `TSAR:` |
 | CMP-AUD-016 | P2 | Verified | Classic file/Browse inputs persist and launch across recipe changes |
 | CMP-AUD-017 | P1 | Resolved | Skipped comparison inputs are cached and rendered as complete |
 | CMP-AUD-018 | P1 | Resolved | Intersection cross-env bypasses its layout-drift validator |

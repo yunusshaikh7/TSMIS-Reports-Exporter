@@ -1,4 +1,4 @@
-"""Consolidate TSAR: Intersection Summary per-route XLSX into one workbook.
+"""Consolidate Intersection Summary per-route XLSX into one workbook.
 
 Each per-route export (sheet "Intersection Summary") is a category-count document:
 11 blocks (Highway Group, Rural/Urban, Intersection Type, Lighting, Control Types,
