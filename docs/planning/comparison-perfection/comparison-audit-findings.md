@@ -322,7 +322,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-041 | P1 | Resolved | Selected or derived outputs can overwrite comparison sources |
 | CMP-AUD-042 | P1 | Verified | Normalized Highway Detail erases every PS equation marker |
 | CMP-AUD-043 | P1 | Resolved 2026-07-18 (both familiar secondary surfaces take the finding's accepted "unmistakable values-only snapshot label" path: the Report View was labeled a build-time snapshot in the 2026-07-12 remediation, and the shared Summary-by-Category sheet now carries an unmistakable "do NOT recalculate; regenerate after editing a source" disclosure, gated present in both family checks) | Formula Report View stays stale after live recalculation |
-| CMP-AUD-044 | P1 | Verified | Data beneath trailing blank headers is silently discarded |
+| CMP-AUD-044 | P1 | Resolved 2026-07-18 (both trim-and-slice loaders — `compare_env._load_xlsx_side` and `compare_highway_log._load_input` — now detect a nonblank cell beyond the declared width and refuse the file instead of slicing it off: compare_env skips loudly into the incompleteness channel, HL raises; census-proven no-op — 1,316 real flat exports carry 0 data beyond the trimmed header, confirmed end-to-end on 252 HD exports) | Data beneath trailing blank headers is silently discarded |
 | CMP-AUD-045 | P1 | Partially remediated (HL integrated 2026-07-17; only HD-Excel stays vendor-blocked) | Shared typed identity core green; report-family integration remains red |
 | CMP-AUD-046 | P2 | Resolved 2026-07-18 (RD Excel+PDF pin a position-authoritative `force_header`; ID Excel+PDF realign legacy→current via `_id_canonical_header`; census-verified per-position on the 7.9 exports; end-to-end proves a Description change shows under Description not R/U, an INT Type change under INT Type not INT Eff-Date) | Shifted exports report differences under the wrong fields |
 | CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
@@ -2555,6 +2555,31 @@ comparison. The same shared path serves all flat cross-environment families. Hig
 Log's direct file loader independently repeats the trim-and-slice pattern; a canonical
 31-column header plus a blank 32nd header hid `A-ONLY` versus `B-ONLY` data and also
 returned zero differences.
+
+#### Remediation — 2026-07-18
+
+Both trim-and-slice loaders now reject data outside the declared width instead of
+silently truncating it. In the row loop, before slicing to `r[:n]`, each checks
+`any(v is not None and str(v).strip() != "" for v in r[n:])` — a nonblank cell beyond
+the trimmed header is real data under a trailing blank header. `compare_env
+._load_xlsx_side` refuses the file into the existing incompleteness channel (a loud
+`skipped` entry naming it, exactly like the CMP-AUD-027/030/031 skips, so the whole
+comparison is marked partial rather than certifying a clean match); the file's rows are
+accumulated locally and discarded on overflow so no partial rows leak. `compare_highway
+_log._load_input` raises its user-safe `ValueError` (its raise-on-bad-shape contract).
+The blank-labelled column is not preserved-and-compared (the finding's alternative)
+because no real export uses one — refusing keeps a would-be data-loss loud without
+adding a speculative compared column.
+
+Census-proven no-op on real data: the census computes exactly the fix's trigger — a
+nonblank cell beyond the trimmed header width — across 1,316 real flat exports (HD 252,
+HSL 252, RD 126, HL 252, ID 217×2); every file has a uniform trimmed-header width (HD
+34, HSL 9, RD 11, HL 31, ID 35) and **0** carry any data beyond it, so the new refusal
+branch never fires. Confirmed end-to-end by loading all 252 real HD exports through the
+fixed `_load_xlsx_side` (51,273 rows, 0 skips, 0 overflow refusals). Red→green in
+`check_compare_env_route_universe` (the overflow file is refused while a clean file
+beside it still contributes) and `check_compare_highway_log` (the loader raises
+"beyond … header"). Census: scratchpad `census_044_trailing.py`.
 
 Correction requirements: after binding the canonical schema, reject any nonblank cell
 outside its declared width. If an upstream blank-labelled position is legitimate,
