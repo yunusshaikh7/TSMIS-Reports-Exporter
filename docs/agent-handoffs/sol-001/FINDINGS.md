@@ -8,13 +8,26 @@ and continue. Claude triages these into future missions.
 
 | ID | Category | Severity | Area / file | Description + evidence | User impact | Blocks mission? | Confirmed? | Recommended follow-up |
 |----|----------|----------|-------------|------------------------|-------------|-----------------|------------|-----------------------|
-| _e.g. F-01_ | 3 | P3 | — | — | — | no | yes | — |
+| F-01 | 2 | P2 | `build/check_source_zip_smoke.py:_candidate_archive` | Fresh authoritative baseline from this chartered linked worktree passed 131/132 checks; this check sets `GIT_ALTERNATE_OBJECT_DIRECTORIES=ROOT/.git/objects`, but `.git` is a worktree pointer file (`gitdir: .../.git/worktrees/TSMIS-sol-reliability`), so `git read-tree HEAD` fails with `unable to normalize alternate object path`. | The source-ZIP candidate gate cannot run directly from any linked worktree; product runtime is unaffected. | exact full-gate green only | yes | Shared build check should resolve the common object dir with `git rev-parse --git-common-dir` (or equivalent) instead of assuming `.git` is a directory. |
+| F-02 | 1 | P2 | `scripts/updater.py:apply_update_and_restart` | The fixed two-second helper death poll returned success for a fake helper that stayed alive for five polls and died later. A one-use readiness nonce now requires the helper to prove it opened the original PID handle before the old app may close; the strengthened check was red, then green. | A slow-starting helper can no longer die outside an arbitrary window after the old app commits to closing. | no (fixed) | yes | Integrator should re-run the frozen/work-PC update path because endpoint policy timing is not reproducible offline. |
+| F-03 | 1 | P2 | `scripts/updater.py:perform_swap` | A forced phase-2 install failure plus forced rollback failure proved `perform_swap` still called `_relaunch` on a mixed tree. Relaunch is now conditional on a coherent new tree or a fully restored old tree; partial rollback logs that relaunch was skipped and keeps the truthful reinstall dialog. | Prevents knowingly starting an executable against partially restored internals. | no (fixed) | yes | Re-run on the work PC with Defender/file-lock conditions when practical. |
+| F-04 | 1 | P2 | `scripts/updater.py:download_and_stage` | Charter recheck found checksum verification already fail-closed even when asset size is absent; `test_checksum_required` proves unverified bytes are deleted and never staged. | No size-only/unverified install path remains. | no (proved existing fix) | yes | None. |
+| F-05 | 1 | P3 | `scripts/updater.py:_rotate_swap_log` | Charter recheck found the helper log already rotates at 256 KiB and keeps one backup; `test_swap_log_rotates` proves the bound. | Long-lived portable installs do not accumulate an unbounded swap log. | no (proved existing fix) | yes | None. |
+| F-06 | 1 | P3 | `scripts/updater.py:download_and_stage` | Charter recheck found a 60-second per-read socket timeout plus three bounded clean download attempts; `test_download_retries_transient` proves two transient failures recover on the third attempt. | Transient proxy/socket failures are retried without an infinite hang or unbounded loop. | no (proved existing fix) | yes | Work-PC corporate-proxy behavior remains a live verification item. |
+| F-07 | 1 | P2 | `scripts/updater.py:_wait_for_helper_ready` | Regression review proved a nonce-only implementation would reject Settings > Revert when the staged older executable predates the protocol. New helpers now publish `starting:` before the existing helper-log line and must reach nonce-backed `ready:`; only a helper with no protocol marker may prove the legacy PID-wait line appended after the captured log cursor. The new Revert check failed before this negotiation and is green after it. | Keeps downgrade/revert functional without letting a nonce-capable helper silently fall back to the weaker legacy signal. | no (fixed) | yes | Exercise one real frozen Revert after integration; the offline fake proves protocol selection and stale-log exclusion, not process policy. |
 
 ## Required-change findings (a fix needs a Claude-owned / shared-infra file)
-_(List any case where completing an in-scope fix would require editing the comparison
-engine, the GUI, `outcome.py`/`errors.py`/`events.py`/`settings.py`/`paths.py`, or a public
-engine signature. Describe the needed change; continue with other work.)_
 
-## Cannot-verify-on-cloud
-_(Checks/behaviors that need the live TSMIS site, the physical work PC, Windows-only paths,
-or the GUI `#mock`. Claude verifies these on Windows / defers to the work-PC sign-off.)_
+- **F-01:** `build/check_source_zip_smoke.py` is outside this lane's owned checks. Its Git-object
+  lookup must become worktree-aware for the charter's exact full-gate command to be green here.
+  Reliability implementation and the other 131 checks remain independently runnable.
+
+## Cannot-verify-offline
+
+- Live TSMIS report generation, site DOM drift, OAuth/SAML completion, and true transient
+  export-click behavior require the Caltrans intranet/work PC; this mission exercises only offline
+  state transitions and fakes.
+- Defender/indexer timing, managed-Edge policy behavior, the corporate proxy/TLS inspection path,
+  and unsigned-exe swap/relaunch behavior require the physical locked-down work PC. Windows file
+  mechanics can be exercised locally, but those endpoint controls cannot.
+- GUI `#mock` behavior is outside this lane; no GUI files or checks will be changed.

@@ -741,6 +741,8 @@ def test_staged_bundle_reverify():
 
     def fake_launch(cmd, cwd, flags):
         launches["n"] += 1
+        if len(cmd) >= 7:
+            Path(cmd[5]).write_text(f"ready:{cmd[6]}", encoding="ascii")
         return _FakeProc([None])                  # stays alive
     updater._launch_detached = fake_launch
 
@@ -856,8 +858,8 @@ def test_staged_record_mandatory():
         restore()
 
 
-def test_death_check_window():
-    print("apply_update_and_restart watches a death window (not one instant, §J):")
+def test_helper_readiness_handshake():
+    print("apply_update_and_restart waits for explicit helper readiness (§J):")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_death_"))
     update_dir = tmp / "update"
     staged = update_dir / "staged"
@@ -872,39 +874,125 @@ def test_death_check_window():
     orig_install = updater.install_dir
     orig_logdir = updater.LOG_DIR
     orig_launch = updater._launch_detached
-    orig_total = updater._DEATH_CHECK_TOTAL_S
-    orig_interval = updater._DEATH_CHECK_INTERVAL_S
+    tuning = {}
+
+    def tune(name, value):
+        tuning[name] = (hasattr(updater, name), getattr(updater, name, None))
+        setattr(updater, name, value)
+
     updater.update_support = lambda: ("ok", None)
     app = tmp / "app"
     app.mkdir()
     updater.install_dir = lambda: app
     updater.LOG_DIR = tmp
-    updater._DEATH_CHECK_TOTAL_S = 0.02              # keep the test fast
-    updater._DEATH_CHECK_INTERVAL_S = 0.005
+    # The legacy values make the old timing window expire before the fake
+    # helper dies. The readiness values let the replacement wait long enough
+    # to observe that death without making the check slow.
+    tune("_DEATH_CHECK_TOTAL_S", 0.01)
+    tune("_DEATH_CHECK_INTERVAL_S", 0.002)
+    tune("_HELPER_READY_TIMEOUT_S", 0.2)
+    tune("_HELPER_READY_INTERVAL_S", 0.001)
     try:
-        # Alive on the first poll, then exits: a single fixed-instant check could
-        # miss this; the windowed poll catches it.
-        updater._launch_detached = lambda cmd, cwd, flags: _FakeProc([None, 9])
+        captured = {}
+
+        def delayed_death(cmd, cwd, flags):
+            captured["dead_cmd"] = list(cmd)
+            # Dies well AFTER the legacy five-poll window. With an explicit
+            # readiness contract it never gets to claim ready, so the old app
+            # stays open and observes the eventual exit.
+            return _FakeProc([None] * 12 + [9])
+
+        updater._launch_detached = delayed_death
         err = None
         try:
             updater.apply_update_and_restart(staged)
         except updater.UpdateError as e:
             err = str(e)
-        check("a swap process that dies inside the window is caught",
+        dead_cmd = captured.get("dead_cmd", [])
+        check("the helper command carries a ready-file path + nonce",
+              len(dead_cmd) >= 7 and Path(dead_cmd[5]).parent == update_dir
+              and len(dead_cmd[6]) >= 16)
+        check("a delayed helper death before readiness is caught",
               err is not None and "exited before" in err.lower())
 
-        # A process that stays alive across the window proceeds normally.
-        updater._launch_detached = lambda cmd, cwd, flags: _FakeProc([None])
+        captured.clear()
+
+        def reports_ready(cmd, cwd, flags):
+            captured["ready_cmd"] = list(cmd)
+            if len(cmd) >= 7:
+                Path(cmd[5]).write_text(f"ready:{cmd[6]}", encoding="ascii")
+            return _FakeProc([None])
+
+        updater._launch_detached = reports_ready
         res = updater.apply_update_and_restart(staged)
-        check("a live swap process proceeds (returns the staged exe path)",
+        ready_cmd = captured.get("ready_cmd", [])
+        check("a helper that explicitly reports ready proceeds",
               isinstance(res, str) and res.endswith(updater._EXE_NAME))
+        check("the consumed readiness marker is removed",
+              len(ready_cmd) >= 7 and not Path(ready_cmd[5]).exists())
+
+        # A current app can stage an OLDER release through Settings > Revert.
+        # That legacy staged exe ignores the two new argv fields, but its first
+        # helper-log line has always announced entry into the PID wait. Preserve
+        # that downgrade path without weakening nonce-capable helpers.
+        def legacy_reports_waiting(cmd, cwd, flags):
+            helper_log = Path(cmd[4])
+            helper_log.write_text(
+                f"2000-01-01 00:00:00  swap started: waiting for the app "
+                f"(pid {cmd[3]}) to exit\n", encoding="utf-8")
+            return _FakeProc([None])
+
+        updater._launch_detached = legacy_reports_waiting
+        legacy_res = None
+        try:
+            legacy_res = updater.apply_update_and_restart(staged)
+        except updater.UpdateError:
+            pass
+        check("a legacy staged helper can still apply a Revert",
+              isinstance(legacy_res, str) and
+              legacy_res.endswith(updater._EXE_NAME))
     finally:
         updater.update_support = orig_support
         updater.install_dir = orig_install
         updater.LOG_DIR = orig_logdir
         updater._launch_detached = orig_launch
-        updater._DEATH_CHECK_TOTAL_S = orig_total
-        updater._DEATH_CHECK_INTERVAL_S = orig_interval
+        for name, (existed, value) in tuning.items():
+            if existed:
+                setattr(updater, name, value)
+            else:
+                delattr(updater, name)
+
+
+def test_swap_helper_signals_readiness(monkeypatch_wait):
+    print("the staged helper signals ready only after entering the PID wait (§J):")
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_ready_"))
+    staged = tmp / "staged"
+    app = tmp / "app"
+    ready = tmp / "helper.ready"
+    staged.mkdir()
+    app.mkdir()
+    observed = []
+
+    def wait(pid, timeout_s, on_waiting=None):
+        observed.append((pid, timeout_s, on_waiting is not None))
+        if on_waiting is not None:
+            on_waiting()
+        return False                     # keep the installed tree untouched
+
+    monkeypatch_wait(wait)
+    try:
+        ok = updater.perform_swap(
+            staged, app, pid=41, log_file=tmp / "swap.log",
+            relaunch=False, show_dialog=False, wait_timeout_s=0,
+            ready_file=ready, ready_token="one-use-ready-token")
+    except TypeError:
+        ok = None                         # the pre-handshake implementation
+    check("perform_swap wires readiness into the PID-wait boundary",
+          observed == [(41, 0, True)])
+    check("the helper publishes the exact one-use nonce",
+          ready.is_file() and ready.read_text(encoding="ascii") ==
+          "ready:one-use-ready-token")
+    check("a still-running original app prevents any swap", ok is False)
 
 
 def test_rollback_message_reflects_outcome(monkeypatch_wait):
@@ -962,6 +1050,56 @@ def test_rollback_message_reflects_outcome(monkeypatch_wait):
         updater._retry = orig_retry
 
 
+def test_partial_rollback_never_relaunches(monkeypatch_wait):
+    print("a PARTIAL rollback never relaunches a mixed install tree (§J):")
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_rb_partial_"))
+    app, staged, log = tmp / "app", tmp / "staged", tmp / "swap.log"
+    _make_tree(app, b"OLD-EXE", b"OLD-DLL")
+    _make_tree(staged, b"NEW-EXE", b"NEW-DLL")
+    monkeypatch_wait(lambda pid, t: True)
+    msgs = []
+    relaunched = []
+    orig_box = updater._message_box
+    orig_log = updater._swap_log
+    orig_retry = updater._retry
+    orig_relaunch = updater._relaunch
+    state = {"installed_seen": 0, "install_failed": False,
+             "rolling_back": False}
+
+    def spy_log(log_file, message):
+        if message.startswith("installed:"):
+            state["installed_seen"] += 1
+        if message.startswith("rolling back"):
+            state["rolling_back"] = True
+        return orig_log(log_file, message)
+
+    def fail_install_and_rollback(fn):
+        if state["rolling_back"]:
+            raise OSError(32, "rollback target is locked")
+        if state["installed_seen"] >= 1 and not state["install_failed"]:
+            state["install_failed"] = True
+            raise OSError(5, "install target is locked")
+        return orig_retry(fn)
+
+    updater._message_box = lambda text: msgs.append(text)
+    updater._swap_log = spy_log
+    updater._retry = fail_install_and_rollback
+    updater._relaunch = lambda app_dir, log_file: relaunched.append(app_dir)
+    try:
+        _bless(staged)
+        ok = updater.perform_swap(staged, app, pid=1, log_file=log,
+                                  relaunch=True, show_dialog=True)
+        check("the swap reports failure", ok is False)
+        check("the dialog truthfully reports a partial restore",
+              len(msgs) == 1 and "partially restored" in msgs[0].lower())
+        check("a mixed tree is NOT relaunched", not relaunched)
+    finally:
+        updater._message_box = orig_box
+        updater._swap_log = orig_log
+        updater._retry = orig_retry
+        updater._relaunch = orig_relaunch
+
+
 def main():
     orig_wait = updater._wait_pid_exit
 
@@ -987,8 +1125,10 @@ def main():
         test_swap_log_rotates()
         test_staged_bundle_reverify()
         test_staged_record_mandatory()
-        test_death_check_window()
+        test_helper_readiness_handshake()
+        test_swap_helper_signals_readiness(monkeypatch_wait)
         test_rollback_message_reflects_outcome(monkeypatch_wait)
+        test_partial_rollback_never_relaunches(monkeypatch_wait)
     finally:
         updater._wait_pid_exit = orig_wait
 
