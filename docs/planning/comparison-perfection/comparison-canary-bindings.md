@@ -1185,6 +1185,36 @@ the Stage-8 family acceptance above (direct-source runner, permanent mutations,
 evidence coverage, detached acceptance, and the two byte-identical replays remain
 owner-gated).
 
+**CMP-AUD-054 re-bless (2026-07-18) — HD-PDF fallback-grid recovery.** The Highway
+Detail **PDF** consolidator (`consolidate_tsmis_highway_detail_pdf`) no longer parses
+a band-less-line-1 page on the document median (which shifted every field). Bound to
+`ground-truth/All Reports 7.9/2026-07-09 ars-prod/highway_detail_pdf/` (252 route
+PDFs). Two censuses (`census_054_hd_grids.py` grid, `census_054b_fullparse.py`
+full-parse):
+
+- **Geometry proof:** on all **3,664 pages carrying both bands, the line-1 window
+  set equals the merge of the line-2 base edges at `(0,1,3,5,6,7,9,11,12,14,25)` —
+  0 exceptions.** So a page printing only the 25-cell line-2 band recovers its
+  line-1 grid from its OWN band (`_win1_from_l2_band`), not the median.
+- **17 fallback pages across 13 routes** recover this way (COMPLETE). Route 005's 4
+  (pages 7/66/222/225) parse digit-for-digit as printed: e.g. p7 `005.009 000.083
+  64-01-01 D F 64-01-01 SD U 64-01-01` (the finding's named record) and p225
+  `788.545 000.370 74-08-22 …`. Old-vs-new on route 005: **3,068 → 3,070** — the two
+  removed rows were the median's CORRUPT versions of 005.009/117.649 (blank Length,
+  `Date=000.083`), absent from Excel; the four recovered rows are the faithful parse.
+- **15 routes** (014/074/094/095/120/124/125/127/162/172/190/233/254) each carry ONE
+  final UNSHADED record on a rect-less page — no page-local geometry. Rather than the
+  median's shifted parse, these escalate the producer to PARTIAL and drop the
+  un-parseable row (verified corrupt on 014/074; the finding's "incompatible fallback
+  must be partial rather than converted"). Statewide new total_emitted **51,201**.
+- **The Excel-vs-TSN statewide canary (48,644/2,599/11,439/208,596) is UNAFFECTED** —
+  it consolidates from the Excel export, not the PDF. Only the PDF-sourced legs
+  (PDF-vs-TSN, PDF-vs-Excel) move, by the recoveries + escalation above.
+
+Hermetic guard: `check_highway_detail_pdf.test_fallback_recovery` (monkeypatched
+`pdfplumber.open` — a fallback page recovers a correctly-aligned record the old
+median dropped; a rect-less data page is unresolved/PARTIAL).
+
 **CMP-AUD-218 workbook-shape note (2026-07-16, later).** The comparison
 workbook's Comparison sheet gained one hidden trailing literal column
 (`__CMP_E2_KEY_V1_TOKEN`, both twins) and Spot Check gained the independent

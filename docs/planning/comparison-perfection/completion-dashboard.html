@@ -167,15 +167,15 @@
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="175 closed, 9 in progress, 57 open of 241 findings">
-          <div class="seg done" style="width:73%">175 closed</div>
+        <div class="bar" role="img" aria-label="176 closed, 9 in progress, 56 open of 241 findings">
+          <div class="seg done" style="width:73%">176 closed</div>
           <div class="seg warn" style="width:4%"></div>
-          <div class="seg open" style="width:23%">57 open</div>
+          <div class="seg open" style="width:23%">56 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 175 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 176 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot warn"></i> ~9 in progress</span>
-          <span><i class="dot open"></i> ~57 open</span>
+          <span><i class="dot open"></i> ~56 open</span>
         </div>
       </div>
     </div>
@@ -218,7 +218,7 @@
       </div>
       <div class="bk">
         <div class="bk-top"><span class="bk-letter">B</span><span class="bk-name">PDF-parser robustness</span><span class="pill open">Open</span></div>
-        <p class="bk-desc">A hardening wave for the HD/ID PDF parsers — spill / orphan / fallback / truncation classes (<code>051–062</code>, <code>044</code>).</p>
+        <p class="bk-desc">A hardening wave for the HD/ID PDF parsers — spill / orphan / fallback / truncation classes. <code>054</code> (the live HD-PDF fallback-grid corruption) + <code>044</code> closed; <code>051–053</code> <code>055–062</code> remain.</p>
       </div>
       <div class="bk">
         <div class="bk-top"><span class="bk-letter">E</span><span class="bk-name">Matrix / day / GUI lifecycle</span><span class="pill open">Open</span></div>
@@ -286,11 +286,12 @@
       <div class="win"><div class="id">CMP-AUD-044</div><div class="w">Data beneath a trailing blank header is refused, not dropped</div><div class="c">both trim-and-slice loaders guard the declared width · census no-op on 1,316 real exports</div></div>
       <div class="win"><div class="id">CMP-AUD-013</div><div class="w">Matrix mode support derives from the registry</div><div class="c">tsn + self modes + by-day rows · negative-mutation parity guard · proven no-op</div></div>
       <div class="win"><div class="id">CMP-AUD-014</div><div class="w">PDF-vs-Excel self-checks get their own Self-consistency sub-tab</div><div class="c">5 checks off "Cross-environment" · keys unchanged · #mock-verified</div></div>
+      <div class="win"><div class="id">CMP-AUD-054</div><div class="w">HD-PDF recovers the line-1 grid from its own line-2 band (live 7.9 bug)</div><div class="c">census 3,664/3,664 exact merge · 005.009 + 16 recovered faithfully · 15 band-less finals → PARTIAL (owner-flagged)</div></div>
     </div>
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>d592462</b> · gate <b>132/132</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>d1d5ccc</b> · gate <b>132/132</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 

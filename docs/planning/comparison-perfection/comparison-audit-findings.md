@@ -3148,7 +3148,7 @@ diagnostics.
 ### CMP-AUD-054 — Highway Detail fallback grids can certify corrupted rows
 
 Priority: P1  
-Status: Verified with a shifted fixture and a current 7.9 source occurrence  
+Status: **Resolved 2026-07-18** — a band-less-line-1 page recovers its line-1 grid from its own line-2 band (census: exact merge on 3,664/3,664 both-band pages); rect-less data pages escalate to PARTIAL instead of the corrupting document median. The named 005.009 record + 16 more recover faithfully; 15 routes' final unshaded records now go PARTIAL. **HD-PDF comparison consequence flagged for the owner** (see remediation note)  
 Primary code: `scripts/consolidate_tsmis_highway_detail_pdf.py:363-420,477-506`
 
 When a page lacks a detectable grid, the parser reuses document-median column windows
@@ -3182,6 +3182,37 @@ production parsing emitted Post Mile `005.009`, blank Length, Date of Record
 and RU Eff `U 64-`, then reported no orphan/failure. The rendered page and the
 independent local-grid parser both retain the source columns. This is a product parser
 corruption, not an Excel/PDF source delta and not merely a synthetic hardening case.
+
+**Remediated 2026-07-18.** Census-first on the bound 7.9/ARS set (252 PDFs / 4,452
+pages; `census_054_hd_grids.py` + `census_054b_fullparse.py`). The parser now parses
+data ONLY on source-backed geometry — a page's own shaded band, or (when the line-1
+record is unshaded but the line-2 band is present) its line-1 grid DERIVED from that
+page's own line-2 base edges. Two-line records share one auto-layout table, so the
+10-cell line-1 grid is exactly the 25-cell line-2 grid merged at
+`_L1_FROM_L2_EDGES = (0,1,3,5,6,7,9,11,12,14,25)` — proven EXACT on all **3,664**
+both-band pages statewide, 0 exceptions. So the 17 fallback pages (13 routes) recover
+their records faithfully (the named `005.009` record parses `005.009 / 000.083 /
+64-01-01 / D / F / …` digit-for-digit as printed; the old median gave blank Length /
+`Date=000.083`). The document median is no longer used for data at all; a rect-less
+page carrying data (no derivable geometry — 15 routes' single final UNSHADED record)
+escalates the producer to PARTIAL and drops the un-parseable row rather than emitting
+the median's shifted parse ("incompatible fallback must be partial rather than
+converted"). `fallback_pages` is now a durable summary diagnostic; `unresolved_pages`
+drives the PARTIAL. Hermetic guard: `check_highway_detail_pdf.test_fallback_recovery`.
+Exact re-bless numbers + census bindings: comparison-canary-bindings.md.
+
+> **Owner decision flagged (product-visible consequence).** Because the day's HD-PDF
+> consolidation is ONE workbook for all 252 routes, and 15 routes each carry a
+> band-less final record with no recoverable geometry, the statewide HD-PDF
+> consolidation now reports **PARTIAL** (so its vs-TSN / vs-Excel comparison shows
+> amber, never "green", until those records are recoverable). This is strictly more
+> honest than the prior state (the median silently emitted 15 CORRUPT final records
+> under a COMPLETE result), and it is discrepancy-safe (a dropped record is one-sided/
+> visible, never a wrong value). A future enhancement could recover these single final
+> records by field-type tokenisation (no geometry needed) to restore a green-capable
+> HD-PDF comparison; deferred pending the owner's preference (accept honest amber vs.
+> invest in that recovery). The only25 recovery — the finding's NAMED corruption — is
+> shipped unconditionally.
 
 ### CMP-AUD-055 — Damaged repeated headers silently drop later PDF data pages
 
