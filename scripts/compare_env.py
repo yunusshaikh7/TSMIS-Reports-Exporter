@@ -619,9 +619,9 @@ def _load_highway_sequence_pdf_side(folder, label, events):
     into consolidated-shape 9-column rows: convert them to per-route XLSX with the
     HSL-PDF consolidator's own parser in a temp dir, then read those flat like any
     XLSX side. Returns a LoadedSide. The exact parallel of
-    _load_highway_detail_pdf_side; no expected_header pin — the converted files
-    carry the Excel export's own header (with its two unnamed columns), exactly
-    like the Excel side the HIGHWAY_SEQUENCE row reads."""
+    _load_highway_detail_pdf_side; the converted files carry the Excel export's
+    own header (with its two unnamed columns), which the HIGHWAY_SEQUENCE_PDF
+    config pins via `_highway_sequence_canonical_header` (CMP-AUD-032)."""
     import consolidate_tsmis_highway_sequence_pdf as _hslpdf
     in_dir, pdfs = _find_input_dir(folder, _hslpdf.SUBDIR, "*.pdf")
     if not pdfs:
@@ -656,9 +656,10 @@ def _load_ramp_detail_pdf_side(folder, label, events):
     consolidated-shape rows: convert them to per-route XLSX with the RD-PDF
     consolidator's own parser in a temp dir, then read those flat like any XLSX
     side. Returns a LoadedSide. The exact parallel of
-    _load_highway_sequence_pdf_side above; no expected_header pin — the
-    converted files carry the Excel export's own (column-shifted) header plus
-    the two print-only columns, identical on BOTH sides of a PDF-vs-PDF pair."""
+    _load_highway_sequence_pdf_side above; the converted files carry the Excel
+    export's own (column-shifted) header plus the two print-only columns (On/Off,
+    Ramp Type), which the RAMP_DETAIL_PDF config pins via
+    `_ramp_detail_pdf_canonical_header` (CMP-AUD-032)."""
     import consolidate_tsmis_ramp_detail_pdf as _rdpdf
     in_dir, pdfs = _find_input_dir(folder, _rdpdf.SUBDIR, "*.pdf")
     if not pdfs:
@@ -1544,16 +1545,29 @@ HIGHWAY_DETAIL_PDF = EnvCompare(
 HIGHWAY_SEQUENCE_PDF = EnvCompare(
     "highway_sequence_pdf", "Highway Sequence (PDF)", "highway_sequence_pdf",
     sheet_name="Highway Locations", key_col="PM",
-    flat_pdf_loader=_load_highway_sequence_pdf_side)
+    flat_pdf_loader=_load_highway_sequence_pdf_side,
+    # CMP-AUD-032: the PDF conversion reproduces the Excel export's header
+    # verbatim (censused), so it pins the SAME recognizer as the Excel side.
+    header_canonicalizer=_highway_sequence_canonical_header)
 # Ramp Detail (PDF) cross-env: the same flat per-route shape as the Excel
 # RAMP_DETAIL row (sheet "TSAR - Ramp Detail", keyed on PM) plus the two
 # print-only columns (identical on both sides of a PDF-vs-PDF pair), but BOTH
 # sides are parsed from the app's own PDF export — the exact parallel of
 # HIGHWAY_SEQUENCE_PDF above.
+def _ramp_detail_pdf_canonical_header(header):
+    """CMP-AUD-032: recognize the Ramp Detail PDF-conversion export layout — the
+    Excel columns PLUS the two print-only sentinels (On/Off, Ramp Type) the print
+    carries and the Excel export drops — or refuse. Its own 13-column header, not
+    the Excel `_TSMIS_HEADER`."""
+    import consolidate_tsmis_ramp_detail_pdf as _rdpdf
+    return _flat_header_recognizer(header, list(_rdpdf.HEADER))
+
+
 RAMP_DETAIL_PDF = EnvCompare(
     "ramp_detail_pdf", "Ramp Detail (PDF)", "ramp_detail_pdf",
     sheet_name="TSAR - Ramp Detail", key_col="PM",
-    flat_pdf_loader=_load_ramp_detail_pdf_side)
+    flat_pdf_loader=_load_ramp_detail_pdf_side,
+    header_canonicalizer=_ramp_detail_pdf_canonical_header)
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).

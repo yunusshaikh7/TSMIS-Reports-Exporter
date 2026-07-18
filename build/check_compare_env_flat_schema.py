@@ -86,6 +86,28 @@ def test_recognizers():
                   reordered == loaded or canon(reordered) is None)
 
 
+def test_pdf_conversion_recognizers():
+    print("PDF-conversion recognizers (HSL-PDF reuses the Excel recognizer; RD-PDF pins its own):")
+    import compare_highway_sequence_tsn as hsl
+    import consolidate_tsmis_ramp_detail_pdf as rdpdf
+    # HSL-PDF converts to the Excel header verbatim -> same recognizer.
+    hsl_conv = _relabel(list(hsl._TSMIS_HEADER[1:]))
+    check("Highway Sequence (PDF): converted header recognized",
+          compare_env._highway_sequence_canonical_header(list(hsl_conv)) == hsl_conv)
+    check("Highway Sequence (PDF): config pins the recognizer",
+          compare_env.HIGHWAY_SEQUENCE_PDF.header_canonicalizer is not None)
+    # RD-PDF carries the two print-only sentinels the Excel export drops.
+    rd_conv = _relabel(list(rdpdf.HEADER))
+    check("Ramp Detail (PDF): converted (13-col) header recognized",
+          compare_env._ramp_detail_pdf_canonical_header(list(rd_conv)) == rd_conv)
+    check("Ramp Detail (PDF): the Excel-only 11-col header (no sentinels) is refused",
+          compare_env._ramp_detail_pdf_canonical_header(rd_conv[:-2]) is None)
+    check("Ramp Detail (PDF): a bogus header is refused",
+          compare_env._ramp_detail_pdf_canonical_header(["PM", "Bogus"]) is None)
+    check("Ramp Detail (PDF): config pins the recognizer",
+          compare_env.RAMP_DETAIL_PDF.header_canonicalizer is not None)
+
+
 def _write_flat(folder, sheet, route, header, row):
     folder.mkdir(parents=True, exist_ok=True)
     wb = Workbook()
@@ -155,6 +177,7 @@ def test_end_to_end_current_vs_bogus_refused():
 
 def main():
     test_recognizers()
+    test_pdf_conversion_recognizers()
     test_end_to_end_bogus_refused()
     test_end_to_end_current_ok()
     test_end_to_end_current_vs_bogus_refused()
