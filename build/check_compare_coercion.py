@@ -41,6 +41,33 @@ def test_integer_number_vs_text_matches():
     assert _xl_trim(5) == _xl_trim("5") == _xl_trim(5.0) == "5"
 
 
+def test_key_identity_numeric_parity():
+    # CMP-AUD-009: the KEY-alignment path must canonicalize a numeric key the
+    # same way _xl_trim canonicalizes the compared VALUE, so 5.0 (float) aligns
+    # with 5 (int) / "5" (text) instead of splitting one physical row into two
+    # false one-sided rows (values are never even reached when keys disagree on
+    # type). has_route=False, key_field=0 -> the key is column 0.
+    a = keys_for([[5.0, "x"]], False)      # float key
+    b = keys_for([[5, "x"]], False)        # int key
+    c = keys_for([["5", "x"]], False)      # text key
+    assert a == b == c == [("", "5", 1)], (a, b, c)
+    assert keys_for([[True, "x"]], False) == [("", "TRUE", 1)]
+    # Whitespace and case stay SIGNIFICANT — identity is NOT display-normalized
+    # (trim/casefold would merge distinct keys; the finding warns against it).
+    assert keys_for([[" K ", "x"]], False) == [("", " K ", 1)]
+    assert keys_for([["k", "x"]], False) == [("", "k", 1)]
+    assert keys_for([[None, "x"]], False) == [("", "", 1)]
+    # End-to-end: a float key on one side and its text twin on the other pair as
+    # ONE matched row (0 one-sided), and the shared value column shows no diff.
+    sc = CompareSchema(report_name="K", header=["PM", "V"], side_a="A", side_b="B",
+                       id_noun="row", id_noun_plural="rows")
+    a2, b2 = [[5.0, "same"]], [["5", "same"]]
+    kt, kn = keys_for(a2, False), keys_for(b2, False)
+    u = union_keys(kt, kn)
+    cc = count_diffs(sc, a2, b2, kt, kn, u, False)
+    assert cc["both"] == 1 and cc["t_only"] == 0 and cc["n_only"] == 0, cc
+
+
 def test_real_date_flavor_parity():
     # A datetime present on BOTH sides, plus a date that differs by one day.
     # After loader normalization the engine sees ISO strings; the values-flavor
@@ -72,6 +99,7 @@ def test_real_date_flavor_parity():
 def main():
     test_normalize_value()
     test_integer_number_vs_text_matches()
+    test_key_identity_numeric_parity()
     test_real_date_flavor_parity()
     print("OK  COMPARE-VALUE-COERCION: dates canonicalize to ISO at load (both "
           "flavors agree; equal dates match), integer/number-vs-text compare "

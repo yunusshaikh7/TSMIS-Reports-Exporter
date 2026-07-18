@@ -271,6 +271,27 @@ def _sref(name):
 # Keys + union (document-order diff merge)
 # =============================================================================
 
+def _key_text(v):
+    """Identity text for a raw key cell (CMP-AUD-009).
+
+    Canonicalize a numeric key the SAME way `_xl_trim` canonicalizes the
+    compared value — an integral float is its integer (`5.0` -> `'5'`), a bool
+    its literal — so a numeric-typed key aligns with its text twin (`5` / `"5"`)
+    instead of splitting one physical row into two false one-sided rows. This is
+    the alignment mirror of the value coercion `_xl_trim(5) == _xl_trim(5.0) ==
+    "5"`, which rows never reached when their keys disagreed on type.
+
+    Whitespace and case stay SIGNIFICANT: key IDENTITY must not be display-
+    normalized (trim / collapse / casefold) the way values are — that would
+    merge genuinely distinct keys. `' K '` and `'K'`, `''` and `' '` therefore
+    remain distinct identities by design."""
+    if type(v) is bool:
+        return "TRUE" if v else "FALSE"
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
+
+
 def keys_for(rows, has_route, key_field=0, key_normalizer=None,
              is_cancelled=None):
     """[(route, key, occurrence), ...] in file order.
@@ -306,7 +327,7 @@ def keys_for(rows, has_route, key_field=0, key_normalizer=None,
         elif key_normalizer is not None:
             loc = key_normalizer(r, off, key_field)
         else:
-            loc = "" if r[koff] is None else str(r[koff])
+            loc = "" if r[koff] is None else _key_text(r[koff])
         if physical_identity is None and isinstance(loc, PhysicalKey):
             physical_identity = loc.physical_identity
         if physical_identity is not None:
