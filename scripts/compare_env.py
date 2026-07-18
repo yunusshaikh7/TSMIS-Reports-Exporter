@@ -1370,10 +1370,40 @@ def _intersection_detail_env_keys(header, key_field):
     return normalizer
 
 
+def _id_canonical_header(header):
+    """Map either supported Intersection Detail site edition — the current
+    (2026-07-17) labels or the 7.8/7.9 legacy labels, with or without a leading
+    Route — to ONE canonical header, so a new-vs-old (pre/post July-2026)
+    cross-env / baseline comparison aligns BY POSITION instead of refusing on the
+    LABEL-ONLY change. The July-2026 update relabeled only ('P'->'PP', 'S'->'PS',
+    the INT Type / INT Eff-Date labels realigned over their own values,
+    'Ctrl T'->'Ctrl T Eff-Date', 'Xing P/S'->'Int PS'); every VALUE stayed in an
+    identical column position (proven cell-for-cell), so position alignment is
+    exact and any real data change (the Int St Eff-Date refresh, HG, the Location
+    suffix) still surfaces as a genuine diff.
+
+    Any OTHER header is returned UNCHANGED — the existing strict same-layout
+    equality is preserved for every non-edition case (two identical custom
+    headers still compare; two genuinely different layouts still refuse), so this
+    only ADDS the cross-edition bridge and changes nothing else. Unlike Highway
+    Log's `_hl_canonical_header` (CMP-AUD-048), it must not refuse an
+    unrecognized layout: Intersection Detail carries no `force_header`, so its
+    non-edition inputs are compared as-is."""
+    import compare_intersection_detail_tsn as _idt
+    h = [("" if c is None else str(c)).strip() for c in header]
+    has_route = bool(h) and h[0] == "Route"
+    body = h[1:] if has_route else h
+    current, legacy = _idt._TSMIS_HEADER[1:], _idt._TSMIS_HEADER_LEGACY[1:]
+    if body == list(current) or body == list(legacy):
+        return (["Route"] + list(current)) if has_route else list(current)
+    return list(header)
+
+
 INTERSECTION_DETAIL = EnvCompare(
     "intersection_detail", "Intersection Detail", "intersection_detail",
     sheet_name="Intersection Detail", key_col="Post Mile",
     physical_key_builder=_intersection_detail_env_keys,
+    header_canonicalizer=_id_canonical_header,
     base_schema=CompareSchema(
         report_name="Intersection Detail", header=["Post Mile"],
         id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"))

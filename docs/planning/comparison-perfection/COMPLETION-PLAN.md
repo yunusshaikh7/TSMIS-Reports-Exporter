@@ -34,7 +34,34 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
-> **DONE 2026-07-17 (latest): CMP-AUD-034 CLOSED — the CONSOLIDATED `_load_tsmis`
+> **DONE 2026-07-17 (latest): the owner-run Intersection Detail comparison test —
+> all 5 ID comparisons run statewide on the 2026-07-17 export; 3 fixes shipped, the
+> two vs-TSN legs now agree.**
+> - **(A) Excel-vs-TSN** — 5,092 diff cells (the reference canary; UNCHANGED by the fixes).
+> - **(B) PDF-vs-TSN** — gained the two-line **Report View** the Excel leg already had
+>   (**CMP-AUD-239**: shared `add_report_view` helper wired into `TSMIS_PDF_VS_TSN`;
+>   NOT the same-source PDF-vs-Excel, whose TSN-specific soft/structural date
+>   classification doesn't apply to two TSMIS renders), and dropped 5,100->5,092 after
+>   **CMP-AUD-241** (owner-directed — "two identical descriptions shown as a mismatch is
+>   not proper comparison, fix it"): 8 trailing-tab-only Description false positives (TSN
+>   field-padding tabs the PDF print can't render) removed by `_norm_text`, which maps
+>   tab/CR/LF whitespace to spaces on BOTH vs-TSN sides. Report-specific (the shared
+>   engine's `_xl_trim` treats tabs as data by policy — untouched), re-applied on read by
+>   `_normalized_row` so cached libraries need no rebuild, and interior content untouched
+>   so genuine edits incl. the KER 046 `''F''` vs `"F"` quote still flag. **A and B are
+>   now EQUAL: 5,092 / Description 4** (the 4 are real street differences + the quote edit).
+> - **(C) PDF-vs-Excel (same-source)** — 0 diff cells / 0 one-sided. Perfect; Description
+>   render normalization already correct.
+> - **(D/E) new-vs-old cross-env** — was BLOCKED on the July-2026 LABEL-ONLY edition change
+>   (`P`->`PP`, `S`->`PS`, INT Type/Eff-Date labels realigned, `Xing P/S`->`Int PS`).
+>   **CMP-AUD-240** added `_id_canonical_header` to `compare_env.INTERSECTION_DETAIL` (the
+>   Highway Log CMP-AUD-048 pattern; returns identity for a non-edition header so strict
+>   same-layout equality + genuine-column-move refusal are preserved). Excel now aligns
+>   16,459 intersections; PDF (native canonical header) matches EXACTLY — both 17,562 diff
+>   cells / 0 one-sided, the expected data refresh (Int St Eff-Date 16,307 + H/G 682 +
+>   suffix/Location). Offline gate **127/127** + ruff clean.
+>
+> **DONE 2026-07-17: CMP-AUD-034 CLOSED — the CONSOLIDATED `_load_tsmis`
 > loaders bind their EXACT header.** The four consolidated TSMIS loaders read every
 > field BY POSITION, but their gates established almost no semantics (HSL/HD: only a
 > leading 'Route'; RD: `PM in h[:5] and len>=11`; ID: `len==36 and last=='Xing Line

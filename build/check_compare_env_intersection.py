@@ -192,10 +192,75 @@ def test_detail_flat_compare():
           and "1 discovered source file(s)" in flatp)
 
 
+def _id_full_row(**over):
+    """A full 35-column per-route Intersection Detail row (current site layout),
+    defaulted so the pairing key resolves, with named overrides by column label."""
+    import compare_intersection_detail_tsn as _idt
+    body = list(_idt._TSMIS_HEADER[1:])          # 35 site columns
+    row = [""] * len(body)
+    base = {"PP": "R", "Post Mile": "1.000", "PS": "", "Location": "12 ORA 001",
+            "Description": "MAIN ST"}
+    for k, v in {**base, **over}.items():
+        row[body.index(k)] = v
+    return row
+
+
+def _write_id_route_hdr(folder, route, header, rows):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Intersection Detail"
+    ws.append(list(header))
+    for r in rows:
+        ws.append(r)
+    wb.save(folder / f"intersection_detail_route_{route}.xlsx")
+    wb.close()
+
+
+def test_detail_edition_boundary():
+    """CMP-AUD (2026-07-17): the cross-env Intersection Detail comparison bridges
+    the July-2026 LABEL-ONLY edition change — a current-labelled export compares
+    against a legacy-labelled one by POSITION (values proven identical in place),
+    instead of refusing with 'different column layouts'."""
+    print("Detail edition boundary (current vs legacy labels align by position):")
+    import compare_intersection_detail_tsn as _idt
+    canon = compare_env._id_canonical_header
+    cur, leg = list(_idt._TSMIS_HEADER[1:]), list(_idt._TSMIS_HEADER_LEGACY[1:])
+    check("both editions canonicalize to the SAME header", canon(cur) == canon(leg))
+    check("the canonical header is the current labels", canon(leg) == cur)
+    check("a leading-Route consolidated header canonicalizes too",
+          canon(["Route"] + leg) == ["Route"] + cur)
+    check("an unrecognized header is returned UNCHANGED (identity, not refused)",
+          canon(["P", "Post Mile", "S"]) == ["P", "Post Mile", "S"])
+
+    root = Path(tempfile.mkdtemp(prefix="idedition_"))
+    a = root / "2026-07-17 ssor-prod" / "intersection_detail"     # current edition
+    b = root / "2026-07-08 ssor-prod" / "intersection_detail"     # legacy edition
+    a.mkdir(parents=True); b.mkdir(parents=True)
+    # Same physical intersection on both sides; Description differs (an aligned diff).
+    _write_id_route_hdr(a, "001", cur, [_id_full_row(Description="MAIN ST")])
+    _write_id_route_hdr(b, "001", leg, [_id_full_row(Description="OTHER ST")])
+    out = root / "cmp.xlsx"
+    res = compare_env.INTERSECTION_DETAIL.compare_folders(
+        str(a.parent), str(b.parent), str(out), events=Events(),
+        confirm_overwrite=lambda _p: True, mode="values",
+        labels=("2026-07-17 new", "7.8 old"))
+    check("cross-edition compare ok (no layout refusal)", res.status == "ok")
+    if res.status == "ok":
+        header, rows = _comparison_rows(out)
+        di = header.index("Description")
+        check("the position-aligned Description diff is flagged (MAIN ST vs OTHER ST)",
+              any(DIFF in r[di] and "MAIN ST" in r[di] and "OTHER ST" in r[di]
+                  for r in rows))
+        check("exactly one differing cell (only Description changed)",
+              res.comparison_outcome is not None
+              and res.comparison_outcome.counts.differing_cells == 1)
+
+
 def main():
     test_wiring()
     test_summary_aggregate_compare()
     test_detail_flat_compare()
+    test_detail_edition_boundary()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

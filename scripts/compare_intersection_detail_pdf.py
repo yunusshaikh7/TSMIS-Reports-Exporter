@@ -71,7 +71,7 @@ class _IntDetailFileCompare:
 
     def __init__(self, report_name, side_a, side_b, name_tag, load_b,
                  one_sided_note_extra=None, drop_notes=False, same_source=False,
-                 excel_side_b=False, load_a=None):
+                 excel_side_b=False, load_a=None, report_view=False):
         self.REPORT_NAME = report_name
         self.file_a_label = side_a          # the GUI's first / second file-picker
         self.file_b_label = side_b          # labels (also the workbook side names)
@@ -80,6 +80,13 @@ class _IntDetailFileCompare:
         self._load_b = load_b
         self._same_source = same_source
         self._excel_side_b = excel_side_b   # CMP-AUD-066 role enforcement
+        # The vs-TSN flavor gets the two-line 'Report View' replica the Excel-sourced
+        # comparison has (added per-call so the writer can read the two input paths).
+        # The same-source PDF-vs-Excel self-check does NOT: the replica's structural-
+        # date "soft" classification (Int St / ML / CS Eff-Date) and TSN-only reference
+        # columns are TSN-specific — on two TSMIS renders those dates must be IDENTICAL,
+        # so treating a disagreement as "soft" would understate a real render defect.
+        self._report_view = report_view
         # Source Files provenance: side A is always the PDF export (.pdf); side B is
         # the Excel export (.xlsx) for the same-source self-check, and the statewide
         # TSN (no per-route source) otherwise.
@@ -113,10 +120,18 @@ class _IntDetailFileCompare:
             rows_b = same_source_render_rows(rows_b)
         return rows_a, rows_b, None
 
+    def _schema_for(self, path_a, path_b):
+        """The per-call schema. The vs-TSN flavor adds the 'Report View' replica
+        (needs both paths, so it can't be baked into the __init__ schema); every
+        other flavor uses the static schema as-is."""
+        if self._report_view:
+            return _id.add_report_view(self._schema, path_a, path_b)
+        return self._schema
+
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
                 mode="formulas", commit_guard=None):
         return run_files_compare(
-            self._schema, path_a, path_b, out_path,
+            self._schema_for(path_a, path_b), path_a, path_b, out_path,
             banner=(f"Intersection Detail Comparison — {self.file_a_label} vs "
                     f"{self.file_b_label}"),
             has_route=True, loader=self._load_pair, deps_ok=_id._DEPS_OK,
@@ -129,7 +144,7 @@ TSMIS_PDF_VS_TSN = _IntDetailFileCompare(
     report_name="Intersection Detail — TSMIS (PDF) vs TSN",
     side_a="TSMIS (PDF)", side_b="TSN",
     name_tag="TSMIS_PDF_vs_TSN_IntersectionDetail",
-    load_b=_id._load_tsn)
+    load_b=_id._load_tsn, report_view=True)
 
 TSMIS_PDF_VS_EXCEL = _IntDetailFileCompare(
     report_name="Intersection Detail — TSMIS PDF vs Excel",

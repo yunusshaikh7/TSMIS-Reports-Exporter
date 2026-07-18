@@ -118,6 +118,17 @@ def test_adapters_and_matrix():
           and cmp_pdf.TSMIS_PDF_VS_EXCEL.file_b_label == "TSMIS (Excel)")
     check("PDF-vs-Excel drops the TSN Notes sheet",
           cmp_pdf.TSMIS_PDF_VS_EXCEL._schema.legend_writer is None)
+    # The vs-TSN flavor builds the two-line 'Report View' replica the Excel-sourced
+    # comparison has (added per-call so its writer can read the two input paths); the
+    # same-source PDF-vs-Excel self-check does not (TSN-specific soft/structural
+    # semantics don't apply to two TSMIS renders).
+    sc_tsn = cmp_pdf.TSMIS_PDF_VS_TSN._schema_for("a.xlsx", "b.xlsx")
+    check("PDF-vs-TSN builds a Report View (like Excel-vs-TSN)",
+          sc_tsn.extra_sheet_writer is not None
+          and sc_tsn.report_view_diff_check == ("Report View", "B", 2))
+    sc_ex = cmp_pdf.TSMIS_PDF_VS_EXCEL._schema_for("a.xlsx", "b.xlsx")
+    check("PDF-vs-Excel has NO Report View",
+          sc_ex.extra_sheet_writer is None and not sc_ex.report_view_diff_check)
     check("matrix tsn comparator -> PDF-vs-TSN",
           matrix.tsn_comparator_for("intersection_detail_pdf") is cmp_pdf.TSMIS_PDF_VS_TSN)
     check("intersection_detail_pdf is a matrix row",

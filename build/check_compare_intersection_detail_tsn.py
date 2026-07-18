@@ -584,6 +584,34 @@ def test_added_columns():
           DIFF in row[header.index("Xing Line Lgth")])
 
 
+def test_whitespace_normalization():
+    """CMP-AUD-241: the TSN extract pads some text fields (notably Description)
+    with TABS the printed report cannot render; comparing the PDF's clean render
+    against them flagged 8 statewide false 'two identical descriptions don't
+    match'. `_norm_text` maps tab/CR/LF whitespace to spaces (compare_core's TRIM
+    twin then collapses + edge-strips) on BOTH sides, so the padding no longer
+    reads as a difference while genuine wording still does."""
+    print("whitespace normalization (edge/embedded tabs are not a difference):")
+    from compare_core import _xl_trim
+
+    def eq(x, y):
+        return _xl_trim(idt._norm_text(x)) == _xl_trim(idt._norm_text(y))
+    check("trailing tabs vs clean render compare EQUAL (HILLCREST RD)",
+          eq("HILLCREST RD\t\t", "HILLCREST RD"))
+    check("a space-then-tabs pad compares EQUAL (HARRIS ROAD)",
+          eq("HARRIS ROAD \t\t", "HARRIS ROAD"))
+    check("an embedded tab folds to a space (MAIN<TAB>ST == MAIN ST)",
+          eq("MAIN\tST", "MAIN ST"))
+    check("a GENUINE wording difference still flags",
+          not eq("A LEASE CANYON RD", "SAN MIGUELITO RD-RT"))
+    check("the KER 046 quote edit still flags (interior content untouched)",
+          not eq("''F'' ST", '"F" ST'))
+    check("_norm_text leaves a value with no tab padding unchanged",
+          idt._norm_text("MAIN ST") == "MAIN ST")
+    check("_norm_text passes a non-string (numeric) cell through",
+          idt._norm_text(5) == 5)
+
+
 def main():
     test_schema()
     test_report_view_typed_truth()
@@ -592,6 +620,7 @@ def main():
     test_route_suffix_match()
     test_normalized_path_crosswalk()
     test_added_columns()
+    test_whitespace_normalization()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

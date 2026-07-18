@@ -346,6 +346,34 @@ def _v(x):
     return normalize_value(x)
 
 
+_WS_RUN = re.compile(r"[\t\r\n\f\v]")
+
+
+def _norm_text(raw):
+    """A verbatim text cell with the TSN extract's field-padding whitespace — the
+    TABS / CR / LF the printed report physically cannot render — mapped to spaces
+    and the edges trimmed, so two renders of the SAME text compare EQUAL. Example:
+    TSN 'HILLCREST RD\\t\\t' and the TSMIS PDF's clean 'HILLCREST RD' are the same
+    street; without this the PDF-vs-TSN Description flags a false 'these two
+    identical descriptions don't match' (the Excel export keeps the tabs, so
+    Excel-vs-TSN already matched — proper comparison must too). CMP-AUD-241,
+    owner-directed: the data must be PROPERLY compared, and trailing/embedded tab
+    padding is not part of a street name.
+
+    Non-whitespace content is untouched, so genuine edits still flag — including
+    the doubled-apostrophe vs quotation-mark distinction (KER 046 ''F'' vs "F").
+    This mirrors the whitespace half of
+    `compare_tsn_common.same_source_render_text` but NOT its OOXML decode (raw TSN
+    carries no OOXML escapes; the vs-TSN legs stay byte-exact on real content).
+    Applied to BOTH sides via `_project`, and re-applied on read by
+    `_normalized_row`, so a cached TSN library needs no rebuild. Non-strings
+    (typed PhysicalKey cells, numbers) pass through untouched."""
+    v = _v(raw)
+    if type(v) is not str:
+        return v
+    return _WS_RUN.sub(" ", v).strip(" ")
+
+
 def _project(field, raw):
     """Normalize one raw cell for `field` into the shared, comparable form."""
     if field in BOOLEAN_FIELDS:
@@ -358,7 +386,7 @@ def _project(field, raw):
         return _iso_date(raw)
     if field in NUMERIC_FIELDS:
         return _norm_num(raw)
-    return _v(raw)
+    return _norm_text(raw)
 
 
 # --------------------------------------------------------------------------- #
@@ -574,6 +602,12 @@ def _write_notes_sheet(wb):
     note("• Numeric zero-padding — Main Line Length ('58' ≡ '058'), the intersecting-route "
          "number and postmile ('9.560' ≡ '9.56'), and Xing Line Lgth (TSN's "
          "X_CROSS_OVERRIDE) canonicalize before comparing.")
+    note("• Whitespace — the TSN extract pads some text fields (notably Description) with "
+         "TABS the printed report physically cannot render; those tabs (and any CR/LF) are "
+         "treated as spaces and the edges trimmed, so a tab-padded 'HILLCREST RD' matches "
+         "the print's clean 'HILLCREST RD'. Interior wording is untouched, so a genuine "
+         "text difference still flags — this only stops a same-text row reading as a "
+         "difference (it is why the PDF and Excel comparisons now agree here).")
     note("• Quote characters are NOT normalized — they compare literally. Both systems "
          "write quoted street letters as a doubled apostrophe (''F'' ST) on almost every "
          "such row; where one side instead stores a real quotation mark (\"F\" ST) the "
@@ -1072,6 +1106,26 @@ def suggest_name(tsmis_path):
                               "TSMIS_vs_TSN_IntersectionDetail")
 
 
+def add_report_view(schema, tsmis_path, tsn_path):
+    """Augment `schema` with the two-line 'Report View' replica — the printed
+    Intersection Detail record, comparison-coloured — via the EXISTING
+    extra_sheet_writer opt-in plus its Diffs-column self-check. Shared by BOTH
+    vs-TSN flavors: the Excel-sourced compare() here and the PDF-sourced
+    TSMIS_PDF_VS_TSN in compare_intersection_detail_pdf. Both project the TSMIS
+    side onto SHARED_HEADER and read the SAME TSN one-sided columns + TSMIS
+    Location (the PDF-consolidated workbook shares the Excel export's 36-column
+    layout, Location at position 4), so the replica is identical no matter which
+    TSMIS render fed the comparison. The TSN-only columns come from the raw TSN
+    file (None for a normalized library) and the locations from the consolidated
+    TSMIS — both read lazily inside the writer, so the workbooks are only opened
+    when the sheet is actually built (after a successful load)."""
+    return dataclasses.replace(
+        schema,
+        extra_sheet_writer=lambda wb, ctx: _write_report_view(
+            wb, ctx, _tsn_onesided(Path(tsn_path)), _tsmis_locations(Path(tsmis_path))),
+        report_view_diff_check=("Report View", "B", 2))
+
+
 def _load_pair(tsmis_path, tsn_path):
     """(rows_t, rows_n, warnings) for the shared driver — no input warnings on this
     FLAT detail pair, so run_compare uses its () default."""
@@ -1086,22 +1140,17 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     is the consolidated TSMIS Intersection Detail workbook; `tsn_path` the TSN
     statewide (raw or normalized) workbook.
 
-    A per-call schema adds the two-line 'Report View' replica via the EXISTING
-    extra_sheet_writer opt-in (the flat Comparison sheet is untouched; compare_core
-    stays unmodified). The TSN-only columns come from the raw TSN file (None for a
-    normalized library) and the locations from the consolidated TSMIS — both read
-    lazily inside the writer, so they only open the workbooks when a sheet is actually
-    built (after a successful load)."""
-    schema = dataclasses.replace(
-        _SCHEMA,
-        extra_sheet_writer=lambda wb, ctx: _write_report_view(
-            wb, ctx, _tsn_onesided(Path(tsn_path)), _tsmis_locations(Path(tsmis_path))),
-        report_view_diff_check=("Report View", "B", 2),
+    A per-call schema adds the two-line 'Report View' replica via `add_report_view`
+    (the shared extra_sheet_writer opt-in; the flat Comparison sheet is untouched and
+    compare_core stays unmodified)."""
+    schema = add_report_view(
         # Default provenance: the "Source Files" sheet, composed centrally by
         # run_files_compare. The file route is the consolidated Route column, which
         # can differ from the compared (Location-derived) route — so a junction/
         # equate row still names its true per-route export.
-        source_file_a=("intersection_detail", TSMIS_SHEET, "xlsx"))
+        dataclasses.replace(
+            _SCHEMA, source_file_a=("intersection_detail", TSMIS_SHEET, "xlsx")),
+        tsmis_path, tsn_path)
     return ctc.run_files_compare(
         schema, tsmis_path, tsn_path, out_path,
         banner="Intersection Detail Comparison — TSMIS vs TSN", has_route=True,

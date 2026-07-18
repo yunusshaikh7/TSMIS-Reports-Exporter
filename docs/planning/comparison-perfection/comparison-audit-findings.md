@@ -16,7 +16,7 @@ is complete; Stage 6 conservation and the Stage 8 base audit are complete at 7/7
 Product perfection, companion/historical coverage, and end-to-end evidence remain red
 and are deferred under the current product-code freeze. Live status and the handoff are
 owned by `comparison-perfection-project.md`  
-Finding ledger: continuous and authoritative through `CMP-AUD-237`  
+Finding ledger: continuous and authoritative through `CMP-AUD-241`  
 Authoritative capability baseline: 29 classic comparison recipes, 12 matrix rows,
 30 matrix row-mode placements, 7 canonical TSN datasets
 
@@ -517,6 +517,9 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-236 | P2 | Remediated; the interrupted attempt was rejected and a clean r2 completed | An external 20-minute audit wrapper interrupted Highway Log Excel publication and left incomplete temporary residue |
 | CMP-AUD-237 | P2 | Remediated and verified by producer-format controls and two final-gate replays | The Highway Log audit consumer imposed a newline/canonical-format convention that identity-bound producer JSON did not promise |
 | CMP-AUD-238 | P2 | Resolved | Decoder rejects `NaN`/`Infinity`, duplicate keys, and unknown envelope fields; the five frozen contract mappings are wrapped in an immutable `FrozenMap` (`dict` subclass — `asdict`/`json`/deepcopy safe) so validated invariants cannot be mutated away. Red→green in `check_comparison_contract`; suite 121/121, ruff clean |
+| CMP-AUD-239 | P2 | Resolved | The Intersection Detail **TSMIS (PDF) vs TSN** comparison built no "Report View" replica though the Excel-vs-TSN one did — only the Excel `compare()` attached the Report-View `extra_sheet_writer`; the PDF flavors built a plain schema. Extracted a shared `add_report_view` helper (both vs-TSN legs project onto `SHARED_HEADER` + read the same TSN one-sided columns / TSMIS Location, so the replica is identical) and wired it into `TSMIS_PDF_VS_TSN` — NOT the same-source PDF-vs-Excel (its TSN-specific soft/structural date classification doesn't apply to two TSMIS renders). Statewide: the PDF-vs-TSN Report View renders identically (16,886 records). `check_intersection_detail_pdf` locks both (PDF-vs-TSN has it; PDF-vs-Excel does not) |
+| CMP-AUD-240 | P2 | Resolved | Cross-env / baseline **Intersection Detail** refused to compare a current (2026-07-17) export against a pre-July-2026 one: the LABEL-ONLY edition change (`P`->`PP`, `S`->`PS`, INT Type/INT Eff-Date labels realigned, `Xing P/S`->`Int PS`) tripped the "different column layouts" guard even though every value stayed in an identical column position (proven cell-for-cell). Added `_id_canonical_header` to `compare_env.INTERSECTION_DETAIL` (the Highway Log CMP-AUD-048 pattern) mapping both editions to one canonical header; any OTHER header is returned UNCHANGED, so strict same-layout equality + genuine-column-move refusal are preserved (no `force_header`). Real-corpus: new-vs-old now aligns 16,459 intersections / 217 routes. Red→green in `check_compare_env_intersection` |
+| CMP-AUD-241 | P2 | Resolved | The **TSMIS (PDF) vs TSN** Intersection Detail Description showed 8 trailing-tab-only false positives statewide (e.g. TSN `HILLCREST RD\t\t` vs PDF `HILLCREST RD`) that the Excel-vs-TSN leg did NOT — the TSN extract carries field-padding tabs the Excel export preserves (so Excel-vs-TSN matched) but the PDF print cannot render. Owner ruling (2026-07-17): showing two identical descriptions as a mismatch is NOT proper comparison — fix it. `_norm_text` now maps the extract's tab/CR/LF whitespace to spaces (compare_core's TRIM twin then collapses + edge-strips) on BOTH sides of the vs-TSN projection; interior content is untouched so genuine edits (incl. the KER 046 `''F''` vs `"F"` quote edit) still flag. Report-specific (NOT the shared engine, whose `_xl_trim` treats tabs as data by policy), and re-applied on read by `_normalized_row` so cached libraries need no rebuild. Real-corpus: PDF-vs-TSN Description 12->4 and total 5,100->5,092, now EQUAL to Excel-vs-TSN (unchanged 5,092/4). Red→green in `check_compare_intersection_detail_tsn` (`test_whitespace_normalization`) |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -9877,6 +9880,96 @@ keep working, and a custom `__deepcopy__` keeps `copy.deepcopy` from hitting the
 `ArtifactGeneration.content_digests`/`producer_versions`). Round-trips are byte-identical;
 `check_comparison_contract` gained mutation-rejection assertions (red on the pre-wrap
 engine, green after); full suite 121/121, ruff clean.
+
+### CMP-AUD-239 — Intersection Detail PDF-vs-TSN had no Report View
+
+Reported by the owner while reviewing the two Intersection Detail vs-TSN comparisons
+(2026-07-17): the **TSMIS (Excel) vs TSN** workbook carries the two-line "Report View"
+replica, but **TSMIS (PDF) vs TSN** did not. Cause: the Report View is attached by a
+per-call schema in `compare_intersection_detail_tsn.compare()` (it needs both input
+paths to read the TSN one-sided columns + TSMIS Location), and the PDF flavors in
+`compare_intersection_detail_pdf` built their schema with a plain
+`replace(_id._SCHEMA, …)` that never set `extra_sheet_writer` /
+`report_view_diff_check`.
+
+**Remediation — 2026-07-17 (Resolved).** Extracted the schema augmentation into a shared
+`add_report_view(schema, tsmis_path, tsn_path)` helper in
+`compare_intersection_detail_tsn`; `compare()` now uses it, and `TSMIS_PDF_VS_TSN`
+(`_IntDetailFileCompare(report_view=True)`) builds its per-call schema through the same
+helper via `_schema_for(path_a, path_b)`. Both vs-TSN legs project the TSMIS side onto
+`SHARED_HEADER` and read the identical TSN one-sided columns + TSMIS Location (the
+PDF-consolidated workbook shares the Excel export's 36-column layout, Location at
+position 4), so the replica is byte-for-byte the same regardless of which render fed it.
+The same-source **PDF-vs-Excel** self-check deliberately does NOT get a Report View: its
+"soft/structural" date classification (Int St / ML / CS Eff-Date) and TSN-only reference
+columns are TSN-specific — on two TSMIS renders a date disagreement is a real defect, so
+"soft" would understate it. Statewide proof: the PDF-vs-TSN Report View renders
+identically to the Excel one (16,886 records, two physical rows each, diff markers +
+Major/Diffs counts live). `check_intersection_detail_pdf` locks that PDF-vs-TSN builds a
+Report View (`extra_sheet_writer` set + `report_view_diff_check == ("Report View","B",2)`)
+while PDF-vs-Excel does not; `check_compare_intersection_detail_tsn` stays green (the
+Excel-vs-TSN path is behavior-neutral after the refactor).
+
+### CMP-AUD-240 — cross-env Intersection Detail refused across the July-2026 edition
+
+Found while running the owner's 2026-07-17 "compare against the previous version, for
+both PDF and Excel" test: `compare_env.INTERSECTION_DETAIL.compare_folders(new, old)`
+returned "The two folders' Intersection Detail files have different column layouts —
+compare exports made by the same app version." The new (2026-07-17) and old (7.8) per-route
+Excel exports carry the July LABEL-ONLY header change (`P`->`PP`, `S`->`PS`, the INT
+Type / INT Eff-Date labels realigned over their own values, `Ctrl T`->`Ctrl T Eff-Date`,
+`Xing P/S`->`Int PS`), and the flat cross-env path compares headers by exact equality, so
+it refused — even though every VALUE stayed in an identical column position (proven
+cell-for-cell; the vs-TSN comparators already read both editions by position). The PDF
+cross-env row is unaffected: its parser emits a fixed canonical header for both sides.
+
+**Remediation — 2026-07-17 (Resolved).** Added `_id_canonical_header` to
+`compare_env.INTERSECTION_DETAIL` (`header_canonicalizer=`), mirroring Highway Log's
+`_hl_canonical_header` (CMP-AUD-048): it maps either supported edition (current or
+legacy labels, optional leading Route) to ONE canonical header so a new-vs-old / pre-post
+comparison aligns by position, while any OTHER header is returned UNCHANGED — Intersection
+Detail carries no `force_header`, so the existing strict same-layout equality (and its
+refusal of a genuine column move where the two sides differ) is preserved for every
+non-edition case; the change only ADDS the cross-edition bridge. Real-corpus:
+new-vs-old now aligns 16,459 intersections across 217 routes (was: hard refusal). The
+delta it surfaces is the expected data refresh (Int St Eff-Date bulk stamp + HG + the
+Location suffix). Red→green in `check_compare_env_intersection`
+(`test_detail_edition_boundary`: both editions canonicalize to one header, an
+unrecognized header is identity, and a cross-edition position-aligned Description diff is
+flagged); the pre-existing detail/summary env tests stay green (their custom headers hit
+the identity branch).
+
+### CMP-AUD-241 — Intersection Detail PDF-vs-TSN Description: 8 trailing-tab false positives (OPEN)
+
+Confirming an owner observation ("the PDF vs TSN for Intersection Detail had some false
+positives for Description"): the statewide **TSMIS (PDF) vs TSN** comparison shows 12
+Description diffs where **TSMIS (Excel) vs TSN** shows 4. The 8 extras are ALL
+trailing-tab-only, e.g. TSN `HILLCREST RD\t\t` / `HARRIS ROAD \t\t` / `BELMONT AVE\t`
+vs the PDF's clean `HILLCREST RD` / `HARRIS ROAD` / `BELMONT AVE` (the 8: HILLCREST RD,
+BELMONT AVE, HARRIS ROAD, KEYSTONE ROAD, SCHARTZ ROAD, WILDCAT ROAD, ROCKER BOX RD,
+GLENNISON GAP RD/JENNINGS RT). The TSN extract carries the edge tabs; the TSMIS Excel
+export preserves them (so Excel-vs-TSN matches — Excel `HILLCREST RD\t\t` == TSN
+`HILLCREST RD\t\t`); the TSMIS PDF print physically cannot render trailing tabs, so
+PDF-vs-TSN flags them. The 4 genuine Description diffs (real street differences + the
+documented KER 046 `''F''` vs `"F"` quote edit) are present identically in BOTH legs.
+
+The same-source `compare_tsn_common.same_source_render_text` already rules this exact
+edge-tab class a render artifact for every PDF-vs-Excel flavor (the same-source ID
+PDF-vs-Excel is 0/0 statewide). But the owner deliberately scoped that normalization
+"never the vs-TSN legs" — the vs-TSN comparison is byte-exact so real data edits (the
+quote character) surface.
+
+**Recommendation (needs owner greenlight):** apply an edge-tab-only trim (map leading/
+trailing `\t\r\n\f\v` away, NOT the OOXML-decode half of `same_source_render_text`, and
+NOT interior text) to the Description on BOTH sides of the vs-TSN comparison. It is
+provably non-semantic — trailing field padding is never part of a street name, the PDF
+medium cannot carry it, and a value differing only in trailing tabs represents the same
+street — so it cannot hide a real difference: it leaves the Excel-vs-TSN 4 unchanged and
+drops PDF-vs-TSN from 12 to 4, making the two legs agree. Deferred to the owner because it
+moves the deliberately-drawn vs-TSN byte-exact line (CLAUDE.md / the visual-evidence memo
+state edge-tab normalization is "never the vs-TSN legs"). Evidence: scratchpad
+`id_task/cmp_A_excel_vs_tsn.xlsx` (Description 4) vs `cmp_B_pdf_vs_tsn.xlsx`
+(Description 12), both statewide on the 2026-07-17 export.
 
 ### Note — ACL "lease-leak" hypothesis disproved (2026-07-14)
 
