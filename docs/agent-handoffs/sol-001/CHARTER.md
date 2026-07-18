@@ -23,12 +23,19 @@ change product behavior beyond the low-risk fixes your new tests justify.
 
 - **Repo:** TSMIS Reports Exporter. **Verified baseline commit:** `a4ccd23`
   (branch `comparison-perfection`, CI-green, offline gate 127/127).
-- **Your branch:** `agent/sol/reliability-hardening`, cut from the commit that adds this
-  charter (its SHA is recorded in `../STATUS.md`). Do all work there.
-- **Runtime:** Codex Cloud Linux sandbox. Some checks/tooling are Windows-only (the
-  frozen `build.ps1 -SelfTest`, Edge/CDP paths, `os.replace` swap timing). Run what you
-  can; where a check cannot run on Linux, note it in `FINDINGS.md` — **Claude runs the
-  authoritative full Windows gate at integration.**
+- **Your worktree:** `C:\Users\Yunus\Projects\TSMIS-sol-reliability` — a dedicated local git
+  worktree on branch `agent/sol/reliability-hardening` (branch-point `de54eb4`, recorded in
+  `../STATUS.md`). Do ALL work here. **NEVER touch the Lead's worktree
+  `C:\Users\Yunus\Projects\TSMIS-Reports-Exporter`** (that is Claude's `comparison-perfection`
+  checkout) — do not cd into it, read/run from it, or `git checkout` its branch.
+- **Runtime:** LOCAL Windows (not cloud). You therefore CAN and MUST run the authoritative full
+  gate yourself. Reuse the Lead's already-built build venv interpreter by absolute path (it has
+  the pinned deps) against THIS worktree's checks:
+  `C:\Users\Yunus\Projects\TSMIS-Reports-Exporter\build\.venv\Scripts\python.exe build\run_checks.py -j 4 -k`
+  (run from your worktree root). **Do NOT `pip install` anything into that venv** — a lock guard
+  fails the build if its contents change; you only USE the interpreter, never modify it. Only the
+  LIVE TSMIS site (needs the Caltrans intranet, unreachable from this machine) and the physical
+  locked-down work PC are unverifiable here — note those as findings.
 
 ## 3. Required context to read first (do not skip)
 
@@ -132,14 +139,16 @@ severity, affected area, and whether it blocks the mission.
 
 ## 6. Required verification (before every milestone commit + at completion)
 
-- `build/.venv/Scripts/python.exe build/run_checks.py -j 4 -k --skip-js` — all green
-  (on Linux, use a venv from `requirements*.txt`; if a check can't run on Linux, note it
-  and ensure it is not one you broke — Claude confirms on Windows).
-- `python -m compileall -q scripts build version.py` — clean.
+Run from your worktree root with the Lead's venv interpreter (absolute path):
+- `C:\Users\Yunus\Projects\TSMIS-Reports-Exporter\build\.venv\Scripts\python.exe build\run_checks.py -j 4 -k`
+  — the FULL authoritative gate, all green (add `--skip-js` only if `node` isn't installed).
+  You are on Windows, so this is authoritative — the Lead re-runs it at integration as a
+  double-check, but you are expected to land it green yourself.
+- `…\python.exe -m compileall -q scripts build version.py` — clean.
 - `uvx ruff check scripts` (or the repo ruff invocation) — clean.
-- New checks are `check_*.py` (NOT `check_phase*`), **offline + cross-platform** (no live
-  site, no Windows-only assumption unless `sys.platform`-gated), and registered in
-  `.github/workflows/checks.yml`.
+- New checks are `check_*.py` (NOT `check_phase*` — that prefix is excluded from the gate),
+  **offline** (no live site), `sys.platform`-gate anything OS-specific, and registered in
+  `.github/workflows/checks.yml` (guarded by `check_ci_manifest.py`).
 
 ## 7. Scope-expansion rules (hard)
 

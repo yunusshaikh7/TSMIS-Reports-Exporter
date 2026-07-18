@@ -44,7 +44,9 @@ def new_authed_browser(p, parallel=False):
         require_valid_auth()
         state = str(AUTH)
     except AuthError as e:
-        log.info("auth: no usable saved session (%s)", e)
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.info("auth: no usable saved session (%s: %s)",
+                 type(e).__name__, reason)
         state = None
 
     if state is None:

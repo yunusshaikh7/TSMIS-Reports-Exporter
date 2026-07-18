@@ -218,6 +218,65 @@ def test_combined_output_dirs():
                     == [store, run_root / "highway_log_pdf"])
 
 
+def _failed_results(routes):
+    results = [RunResult(), RunResult()]
+    for result in results:
+        result.failed = list(routes)
+        result.per_route = [(route, "failed") for route in routes]
+    return results
+
+
+def test_combined_retry_reconciles_unprocessed_routes():
+    print("combined retry preserves every route across stop/cancel exits:")
+    excel = _spec("highway_log", save_via_export_button)
+    pdf = _spec("highway_log_pdf", save_highway_log_pdf)
+    routes = ["001", "002", "003"]
+    results = _failed_results(routes)
+    ev = _Ev()
+
+    def retry_until_stop(_page, _base, route, _prefix, _targets,
+                         events, edition_results, _timeout):
+        if route == "001":
+            exporter._tally_all(edition_results, events, route, "saved")
+            return True
+        return False                     # recovery failed before route 002 recorded
+
+    targets = lambda route: [(excel, Path(f"{route}.xlsx")),
+                             (pdf, Path(f"{route}.pdf"))]
+    with patch(exporter, "_wait_while_paused", lambda _events: None), \
+         patch(exporter, "_process_route_combined", retry_until_stop):
+        exporter._retry_failed_combined(
+            object(), excel, targets, results, ev, timeout_ms=900_000)
+
+    expected_rows = [("001", "saved"), ("002", "failed"), ("003", "failed")]
+    c.check("a successful retry replaces its first-pass failure once",
+            all(r.saved == 1 and "001" not in r.failed for r in results))
+    c.check("the stopped + untouched routes are restored as failed",
+            all(r.failed == ["002", "003"] for r in results),
+            f"failed={[r.failed for r in results]}")
+    c.check("both edition run reports remain total and identical",
+            all(r.per_route == expected_rows for r in results),
+            f"rows={[r.per_route for r in results]}")
+
+    cancelled_results = _failed_results(["010", "011"])
+    cancelled = _Ev()
+    cancelled.cancelled = True
+
+    def should_not_run(*_args, **_kwargs):
+        raise AssertionError("cancelled retry processed a route")
+
+    with patch(exporter, "_wait_while_paused", lambda _events: None), \
+         patch(exporter, "_process_route_combined", should_not_run):
+        exporter._retry_failed_combined(
+            object(), excel, targets, cancelled_results, cancelled,
+            timeout_ms=900_000)
+    cancelled_rows = [("010", "failed"), ("011", "failed")]
+    c.check("cancel-at-start restores every removed failure",
+            all(r.failed == ["010", "011"] and r.per_route == cancelled_rows
+                for r in cancelled_results),
+            f"results={[(r.failed, r.per_route) for r in cancelled_results]}")
+
+
 def _raises(fn):
     try:
         fn()
@@ -236,4 +295,5 @@ if __name__ == "__main__":
     test_empty_and_error()
     test_guards()
     test_combined_output_dirs()
+    test_combined_retry_reconciles_unprocessed_routes()
     raise SystemExit(c.summary())

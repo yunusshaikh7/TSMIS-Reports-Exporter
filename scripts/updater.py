@@ -48,6 +48,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import ssl
 import subprocess
@@ -608,8 +609,8 @@ SWAP_FLAG = "--apply-update"
 _SWAP_TIMEOUT_S = 120        # max wait for the old app's PID to exit
 _RETRY_ATTEMPTS = 12         # Defender / slow handle release after exit
 _RETRY_DELAY_S = 0.5
-_DEATH_CHECK_TOTAL_S = 2.0       # watch a freshly-launched swap process this long for an immediate death
-_DEATH_CHECK_INTERVAL_S = 0.25   # poll cadence within that window
+_HELPER_READY_TIMEOUT_S = 15.0   # staged exe must enter the PID wait before the old app may close
+_HELPER_READY_INTERVAL_S = 0.05
 
 
 def _staged_hash(staged):
@@ -630,6 +631,132 @@ def _launch_detached(cmd, cwd, flags):
         cmd, creationflags=flags, close_fds=True, cwd=str(cwd),
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL)
+
+
+def _write_helper_ready(ready_file, token, state):
+    """Atomically publish one state of the nonce readiness protocol."""
+    temp = ready_file.with_name(ready_file.name + ".tmp")
+    temp.write_text(f"{state}:{token}", encoding="ascii")
+    os.replace(temp, ready_file)
+
+
+def _helper_log_cursor(log_file):
+    """Byte offset separating prior helper history from this launch."""
+    try:
+        return log_file.stat().st_size
+    except FileNotFoundError:  # silent-ok: no helper log is normal on the first update
+        return 0
+    except OSError as e:
+        log.warning("swap helper log cursor unavailable: %s: %s",
+                    type(e).__name__, str(e).partition("\n")[0])
+        return None
+
+
+def _legacy_helper_is_waiting(log_file, cursor, pid):
+    """True when a pre-handshake staged helper appended its PID-wait line."""
+    if cursor is None:
+        return False
+    try:
+        payload = log_file.read_bytes()
+    except FileNotFoundError:  # silent-ok: legacy helper has not reached its first log yet
+        return False
+    start = cursor if len(payload) >= cursor else 0  # rotation starts a fresh log
+    expected = f"swap started: waiting for the app (pid {pid}) to exit".encode("utf-8")
+    return expected in payload[start:]
+
+
+def _stop_unready_helper(proc):
+    """Prevent a helper that missed the readiness deadline from applying later."""
+    terminate = getattr(proc, "terminate", None)
+    if not callable(terminate) or proc.poll() is not None:
+        return
+    try:
+        terminate()
+        log.warning("swap process terminated after readiness failed")
+    except OSError as e:
+        log.warning("swap process could not be terminated after readiness failed: %s: %s",
+                    type(e).__name__, str(e).partition("\n")[0])
+
+
+def _wait_for_helper_ready(proc, ready_file, token, helper_log, log_cursor, pid):
+    """Wait until the staged helper proves it has entered the original-PID wait.
+
+    A fixed post-launch sleep can only catch crashes inside that arbitrary
+    window. The one-use marker instead comes from `_wait_pid_exit` after the
+    helper has opened a handle to this still-running process. Until that proof
+    arrives the caller keeps the old app open, so a slow startup or delayed
+    policy failure cannot strand the user with no running app and no swap.
+    """
+    deadline = time.monotonic() + _HELPER_READY_TIMEOUT_S
+    protocol_seen = False
+    confirmed = False
+    legacy_log_readable = True
+    try:
+        while True:
+            try:
+                observed = ready_file.read_text(encoding="ascii")
+            except FileNotFoundError:  # silent-ok: marker absence is the expected startup state
+                observed = ""
+            except OSError as e:
+                log.warning("swap readiness marker could not be read: %s: %s",
+                            type(e).__name__, str(e).partition("\n")[0])
+                raise UpdateError("the update process could not confirm it was ready "
+                                  "— install the new version manually from the "
+                                  "releases page") from e
+
+            if secrets.compare_digest(observed, f"starting:{token}"):
+                protocol_seen = True
+            elif secrets.compare_digest(observed, f"ready:{token}"):
+                protocol_seen = True
+                confirmed = True
+            elif observed:
+                log.warning("swap process published an invalid readiness marker")
+                raise UpdateError("the update process could not confirm it was ready "
+                                  "— install the new version manually from the "
+                                  "releases page")
+
+            rc = proc.poll()
+            if rc is not None:
+                where = "while reporting ready" if confirmed else "before readiness"
+                log.warning("swap process exited %s (code %s)", where, rc)
+                raise UpdateError("the update process exited before it could start "
+                                  "— install the new version manually from the "
+                                  "releases page")
+            if confirmed:
+                return
+
+            # Revert can stage a release from before this nonce protocol. Such
+            # helpers ignore the extra argv fields, but all supported versions
+            # append this exact first line immediately before `_wait_pid_exit`.
+            # A nonce-capable helper writes `starting:` BEFORE that line, so it
+            # can never silently fall back to the weaker legacy contract.
+            if not protocol_seen and legacy_log_readable:
+                try:
+                    legacy_waiting = _legacy_helper_is_waiting(
+                        helper_log, log_cursor, pid)
+                except OSError as e:
+                    legacy_log_readable = False
+                    log.warning("swap helper log could not be read: %s: %s",
+                                type(e).__name__, str(e).partition("\n")[0])
+                else:
+                    if legacy_waiting:
+                        confirmed = True
+                        log.info("legacy swap helper reached its PID wait")
+                        return
+            if time.monotonic() >= deadline:
+                log.warning("swap process did not report readiness within %.1fs",
+                            _HELPER_READY_TIMEOUT_S)
+                raise UpdateError("the update process did not become ready — install "
+                                  "the new version manually from the releases page")
+            time.sleep(_HELPER_READY_INTERVAL_S)
+    finally:
+        try:
+            ready_file.unlink(missing_ok=True)
+        except OSError as e:
+            log.warning("swap readiness marker was not removed: %s: %s",
+                        type(e).__name__, str(e).partition("\n")[0])
+        if not confirmed:
+            _stop_unready_helper(proc)
 
 
 def apply_update_and_restart(staged_dir):
@@ -670,35 +797,23 @@ def apply_update_and_restart(staged_dir):
     log.info("update: staged bundle re-verified before swap (%s)", actual[:12])
 
     helper_log = LOG_DIR / "update_helper.log"
+    ready_token = secrets.token_hex(24)
+    ready_file = staged.parent / f"swap-ready-{os.getpid()}-{ready_token[:12]}.txt"
+    helper_log_cursor = _helper_log_cursor(helper_log)
     flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
     try:
         proc = _launch_detached(
             [str(new_exe), SWAP_FLAG, str(install_dir()), str(os.getpid()),
-             str(helper_log)],
+             str(helper_log), str(ready_file), ready_token],
             staged, flags)
     except OSError as e:
         log.warning("swap process failed to start: %s: %s", type(e).__name__, e)
         raise UpdateError("the update process could not be started — "
                           "install the new version manually from the "
                           "releases page") from e
-    # A blocked/broken exe dies within moments; watch for that across a short
-    # WINDOW (not a single instant) while the app is still open, so a death at any
-    # point in the window is caught instead of closing into a swap that never
-    # happens (the silent-failure mode the PowerShell helper had). Still fail-safe:
-    # only a process OBSERVED dead raises; a live one proceeds.
-    polls = max(1, int(_DEATH_CHECK_TOTAL_S / _DEATH_CHECK_INTERVAL_S))
-    rc = None
-    for _ in range(polls):
-        time.sleep(_DEATH_CHECK_INTERVAL_S)
-        rc = proc.poll()
-        if rc is not None:
-            break
-    if rc is not None:
-        log.warning("swap process exited immediately (code %s)", rc)
-        raise UpdateError("the update process exited before it could start "
-                          "— install the new version manually from the "
-                          "releases page")
-    log.info("swap process launched: %s (waits for pid %d, installs into %s)",
+    _wait_for_helper_ready(
+        proc, ready_file, ready_token, helper_log, helper_log_cursor, os.getpid())
+    log.info("swap process ready: %s (holds pid %d, installs into %s)",
              new_exe, os.getpid(), install_dir())
     return str(new_exe)
 
@@ -706,7 +821,8 @@ def apply_update_and_restart(staged_dir):
 # ---- swap mode (runs inside the STAGED exe; never returns) -----------------
 
 def run_swap_mode(argv):
-    """Entry for `TSMIS Exporter.exe --apply-update <app_dir> <pid> <log>`.
+    """Entry for `TSMIS Exporter.exe --apply-update <app_dir> <pid> <log>
+    [<ready_file> <ready_token>]`.
 
     Called by gui_main BEFORE logging/paths/CLR setup: this process runs from
     the staged tree under the install's data\\update\\, so paths.py-derived
@@ -719,8 +835,20 @@ def run_swap_mode(argv):
         log_file = Path(argv[i + 3])
     except (ValueError, IndexError):
         os._exit(2)
+    tail = argv[i + 4:]
+    if not tail:
+        # Backward compatibility: an older installed app can launch a newer
+        # staged helper using the pre-handshake argv contract.
+        ready_file = None
+        ready_token = None
+    elif len(tail) == 2 and len(tail[1]) >= 16:
+        ready_file = Path(tail[0])
+        ready_token = tail[1]
+    else:
+        os._exit(2)
     staged = Path(sys.executable).resolve().parent
-    ok = perform_swap(staged, app_dir, pid, log_file)
+    ok = perform_swap(staged, app_dir, pid, log_file,
+                      ready_file=ready_file, ready_token=ready_token)
     os._exit(0 if ok else 1)
 
 
@@ -753,7 +881,7 @@ def _swap_log(log_file, message):
         pass
 
 
-def _wait_pid_exit(pid, timeout_s):
+def _wait_pid_exit(pid, timeout_s, on_waiting=None):
     """True once `pid` has exited (or never existed); False on timeout.
     ctypes only — no psutil in the bundle.
 
@@ -774,8 +902,15 @@ def _wait_pid_exit(pid, timeout_s):
     kernel32 = ctypes.windll.kernel32
     handle = kernel32.OpenProcess(SYNCHRONIZE, False, int(pid))
     if not handle:
+        if on_waiting is not None:
+            # A handshake launch happens while the original process is still
+            # executing apply_update_and_restart, so failure to acquire its
+            # handle cannot certify readiness.
+            raise OSError("could not open the original app process")
         return True                      # already gone (or pid was recycled)
     try:
+        if on_waiting is not None:
+            on_waiting()
         WAIT_TIMEOUT = 0x00000102
         rc = kernel32.WaitForSingleObject(handle, int(timeout_s * 1000))
         return rc != WAIT_TIMEOUT
@@ -927,7 +1062,8 @@ def _recover_interrupted_swap(journal=None):
 
 
 def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
-                 wait_timeout_s=_SWAP_TIMEOUT_S, show_dialog=True):
+                 wait_timeout_s=_SWAP_TIMEOUT_S, show_dialog=True,
+                 ready_file=None, ready_token=None):
     """The swap itself (separated from run_swap_mode so a sandbox test can
     drive it against fake trees). Waits for `pid` to exit, then installs in
     TWO PHASES so a half-installed (mixed-version) tree is impossible:
@@ -948,8 +1084,38 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
     never touched. Leftover `.old`/`.new` pieces are removed by
     cleanup_leftovers() on the next launch. Returns True when the new
     version is in place."""
+    if ready_file is None and ready_token is None:
+        handshake = False
+    elif ready_file is not None and ready_token:
+        handshake = True
+        ready_file = Path(ready_file)
+        try:
+            _write_helper_ready(ready_file, ready_token, "starting")
+        except OSError as e:
+            error_line = str(e).partition("\n")[0]
+            _swap_log(log_file, "readiness handshake FAILED: "
+                                f"{type(e).__name__}: {error_line} - "
+                                "update NOT applied")
+            return False
+    else:
+        _swap_log(log_file, "invalid readiness handshake - update NOT applied")
+        return False
+
     _swap_log(log_file, f"swap started: waiting for the app (pid {pid}) to exit")
-    if not _wait_pid_exit(pid, wait_timeout_s):
+    try:
+        if not handshake:
+            exited = _wait_pid_exit(pid, wait_timeout_s)
+        else:
+            exited = _wait_pid_exit(
+                pid, wait_timeout_s,
+                lambda: _write_helper_ready(ready_file, ready_token, "ready"))
+    except OSError as e:
+        error_line = str(e).partition("\n")[0]
+        _swap_log(log_file, "readiness handshake FAILED: "
+                            f"{type(e).__name__}: {error_line} - "
+                            "update NOT applied")
+        return False
+    if not exited:
         _swap_log(log_file, f"app still running after {wait_timeout_s}s - "
                             "update NOT applied")
         return False
@@ -1037,6 +1203,7 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
             _swap_log(log_file, f"swap FAILED on {failed}")
             break
 
+    tree_coherent = True
     if failed:
         # Undo with renames only: each installed piece goes back to .new,
         # its .old back into place. No deletes of fresh trees involved.
@@ -1055,11 +1222,15 @@ def perform_swap(staged, app_dir, pid, log_file, *, relaunch=True,
         _swap_log(log_file, "previous version restored" if restored else
                             "previous version PARTIALLY restored - reinstall "
                             "the app from the releases page")
+        tree_coherent = restored
         if show_dialog:
             _message_box(_rollback_dialog_text(restored, log_file))
 
-    if relaunch:
+    if relaunch and tree_coherent:
         _relaunch(app_dir, log_file)
+    elif relaunch:
+        _swap_log(log_file, "relaunch SKIPPED because rollback left a partial "
+                            "install - reinstall from the releases page")
 
     # Leftover *.old/*.new pieces and the staged tree THIS process runs from
     # are removed by cleanup_leftovers() at the relaunched app's next startup
