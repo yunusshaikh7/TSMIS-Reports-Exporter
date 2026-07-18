@@ -324,7 +324,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-043 | P1 | Verified | Formula Report View stays stale after live recalculation |
 | CMP-AUD-044 | P1 | Verified | Data beneath trailing blank headers is silently discarded |
 | CMP-AUD-045 | P1 | Partially remediated (HL integrated 2026-07-17; only HD-Excel stays vendor-blocked) | Shared typed identity core green; report-family integration remains red |
-| CMP-AUD-046 | P2 | Verified | Shifted exports report differences under the wrong fields |
+| CMP-AUD-046 | P2 | Resolved 2026-07-18 (RD Excel+PDF pin a position-authoritative `force_header`; ID Excel+PDF realign legacy→current via `_id_canonical_header`; census-verified per-position on the 7.9 exports; end-to-end proves a Description change shows under Description not R/U, an INT Type change under INT Type not INT Eff-Date) | Shifted exports report differences under the wrong fields |
 | CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
 | CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
 | CMP-AUD-049 | P1 | Remediated 2026-07-17 (direct-compare, converter, and evidence halves) | Direct/PDF route provenance is not enforced |
@@ -2743,6 +2743,29 @@ Correction requirements: project values onto one position-authoritative semantic
 header before comparison. Plant a unique change in every physical position and assert
 the displayed field name, per-field count, and source-cell link for Excel and PDF
 variants.
+
+**Remediation (2026-07-18).** Per-position census of the real 7.9 exports (RD Excel +
+converted PDF, ID Excel + converted PDF) pinned the exact shift and the corrected label
+for every value position:
+
+- **Ramp Detail (Excel + PDF)** now carries a position-authoritative `force_header`
+  (`compare_env._RD_ENV_HEADER = ["Location","PR","PM","Date of Record","PM Suffix","HG",
+  "Area 4","City Code","R/U","Description","(unused)"]`, + `On/Off`/`Ramp Type` for the
+  PDF's two print-only columns), applied exactly like Highway Log's corrected labels —
+  the export's labels shift right of their values from City Code onward (value pos8=R/U
+  under "City Code", pos9=Description under "R/U"), and force_header relabels each
+  position to its true field. The PDF conversion carries the identical shift, censused.
+- **Intersection Detail** — the current site edition realigned its labels over their
+  values (the INT Type / INT Eff-Date swap, etc.); the Excel cross-env was already fixed
+  by CMP-AUD-032/048's `_id_canonical_header` (legacy→current), and the **PDF** variant,
+  which had no canonicalizer and displayed the shifted legacy labels, now pins the same
+  `_id_canonical_header`.
+
+Values are compared BY POSITION, so no difference COUNT changes — display only. New
+`build/check_compare_env_field_labels.py` proves it end-to-end: a planted Ramp
+Description change is shown under **Description** (not R/U), a planted Intersection INT
+Type change under **INT Type** (not INT Eff-Date), for the pinned families; plus the
+force_header / canonicalizer wiring per variant. Offline gate 132/132; ruff clean.
 
 ### CMP-AUD-047 — Highway Log environment comparison skips normalization
 

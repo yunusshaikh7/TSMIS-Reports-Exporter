@@ -1312,10 +1312,23 @@ def _ramp_detail_canonical_header(header):
     return _flat_header_recognizer(header, list(_rd._TSMIS_HEADER[1:]))
 
 
+# CMP-AUD-046: the Ramp Detail export's header LABELS shift right of their values
+# from City Code onward (pos7 value=City Code under a blank label, pos8 value=R/U
+# under "City Code", pos9 value=Description under "R/U", pos10 empty under
+# "Description"), so a real Description change was reported under R/U. This is the
+# position-authoritative display header — one corrected label per VALUE position
+# (censused against the 7.9 statewide export + the vs-TSN _tsmis_row mapping),
+# applied via force_header exactly like Highway Log's corrected labels. Display
+# only: values are already compared by position, so no difference count changes.
+_RD_ENV_HEADER = ["Location", "PR", "PM", "Date of Record", "PM Suffix", "HG",
+                  "Area 4", "City Code", "R/U", "Description", "(unused)"]
+
+
 RAMP_DETAIL = EnvCompare(
     "ramp_detail", "Ramp Detail", "ramp_detail", sheet_name="TSAR - Ramp Detail",
     key_col="PM", physical_key_builder=_ramp_detail_env_keys,
-    header_canonicalizer=_ramp_detail_canonical_header)
+    header_canonicalizer=_ramp_detail_canonical_header,
+    force_header=_RD_ENV_HEADER)
 
 
 def _hsl_unnamed_col(label):
@@ -1509,7 +1522,13 @@ INTERSECTION_DETAIL_PDF = EnvCompare(
     base_schema=CompareSchema(
         report_name="Intersection Detail (PDF)", header=["Post Mile"],
         id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"),
-    flat_pdf_loader=_load_intersection_detail_pdf_side)
+    flat_pdf_loader=_load_intersection_detail_pdf_side,
+    # CMP-AUD-046: the PDF conversion carries the legacy export labels (INT
+    # Type/INT Eff-Date swapped over their values, etc.); the same canonicalizer
+    # the Excel side uses realigns them to the current, position-authoritative
+    # labels so a diff is shown under the right field (the Excel side got this via
+    # CMP-AUD-032/048; the PDF side had no canonicalizer).
+    header_canonicalizer=_id_canonical_header)
 # Highway Detail: a flat per-route XLSX (sheet "Highway Detail", 34 correct labels),
 # keyed on the glued Post Mile — both env sides share the identical TSMIS encoding
 # (prefix/roadbed/equation glued the same way), so the standard flat path applies and
@@ -1567,7 +1586,10 @@ RAMP_DETAIL_PDF = EnvCompare(
     "ramp_detail_pdf", "Ramp Detail (PDF)", "ramp_detail_pdf",
     sheet_name="TSAR - Ramp Detail", key_col="PM",
     flat_pdf_loader=_load_ramp_detail_pdf_side,
-    header_canonicalizer=_ramp_detail_pdf_canonical_header)
+    header_canonicalizer=_ramp_detail_pdf_canonical_header,
+    # CMP-AUD-046: the same corrected labels as the Excel side + the two
+    # print-only columns the PDF carries, which are already correctly positioned.
+    force_header=_RD_ENV_HEADER + ["On/Off", "Ramp Type"])
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).
