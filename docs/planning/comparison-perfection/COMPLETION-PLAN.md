@@ -36,9 +36,21 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > green-capable HD-PDF comparison would need a future field-type-tokenisation recovery of those 15
 > single records — **deferred pending your preference (accept honest amber vs. invest in recovery).**
 >
-> **NEXT — UI tier half-cleared (013 + 014 DONE); 073/074 remain** (the classic picker's raw-PDF
-> extensions + per-role file hints — registry-owned accepted shapes, `gui_compare_api` +
-> `ui-compare.js`, `#mock` on 8765). Heavy-census bucket **B**: **054 DONE** (the live bug); remaining
+> **NEXT — UI tier half-cleared (013 + 014 DONE); 073/074 remain.** Both need ONE thing: a
+> registry of per-recipe-role input specs (accepted extensions + shape hint). **Design (mapped, not
+> yet built):** 3 profiles keyed by recipe — `std` (both sides a consolidated `.xlsx`, the default),
+> `hl` (the 3 Highway Log FILE recipes — `_load_input` accepts per-route OR consolidated `.xlsx`),
+> `summary_tsn` (`ramp_summary:tsn` + `intersection_summary:tsn` — TSMIS side consolidated `.xlsx`,
+> TSN side a raw statewide `.pdf` via `parse_tsn_pdf` OR a normalized `.xlsx`). **073:** `pick_compare_file`
+> (gui_compare_api.py:124) hardcodes `file_types=("Excel workbook (*.xlsx)",)` + receives only `side`
+> — thread the recipe KEY + side in from `ui-compare.js:179` `pickCompareFile`, look up the profile's
+> per-side extensions, set the native filter (so the Summary TSN side offers `.pdf`). **074:**
+> `ui-compare.js:150` hint is hardcoded "per-route OR consolidated" for EVERY recipe — render the
+> selected recipe's per-side shape from the profile instead. Verify profiles vs the real loaders
+> (HL `_load_input`, the 2 Summary `parse_tsn_pdf`), mirror the payload field(s) in `mock.js`
+> compare_reports (the tedious part — 26 rows; watch the BOM/cache traps), + a `check_report_catalog`
+> semantic guard, + `#mock` DOM verify. Zero comparison-VALUE risk (guidance only; comparators still
+> enforce). Heavy-census bucket **B**: **054 DONE** (the live bug); remaining
 > 051/052/053/055 (HD spill/header-swallow/orphan; HSL+RD damaged-header) + 056–062 (ID PDF
 > robustness) — each needs its own statewide pdfplumber census (background + Monitor), and the parser
 > fixes carry real DISCREPANCY RISK (a too-strict gate false-rejects a legit page) so census
