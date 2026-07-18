@@ -114,6 +114,34 @@ def test_summary_aggregate_compare():
           "SSOR-PROD" in sheets and "ARS-PROD" in sheets and "Comparison" in sheets)
 
 
+def test_summary_layout_drift_disclosed():
+    """CMP-AUD-018: the cross-env loader must apply the SAME strict validator the
+    consolidator does (`record_problem`) — a layout-drifted or Total-less IS record
+    is disclosed as an incomplete input (skipped, naming the route), never a
+    silently-compared row, so two identically malformed sides can't certify a clean
+    match. Drives the REAL `_load_intersection_summary_side` (the stub in
+    test_summary_aggregate_compare bypasses it)."""
+    print("Summary cross-env layout-drift disclosure (real loader):")
+    sys.path.insert(0, os.path.dirname(__file__))
+    from check_consolidate_intersection import _write_is_route, _full_blocks
+
+    base = Path(tempfile.mkdtemp(prefix="is018_"))
+    d = base / "intersection_summary"
+    d.mkdir(parents=True)
+    _write_is_route(d / "intersection_summary_route_001.xlsx", "001", 5,
+                    _full_blocks(3, 2, 4, 1, 5))                 # sound
+    broken = [b for b in _full_blocks(5, 0, 5, 0, 5) if b[0] != "MAINLINE MASTARM"]
+    _write_is_route(d / "intersection_summary_route_002.xlsx", "002", 5, broken)  # drift
+    _write_is_route(d / "intersection_summary_route_003.xlsx", "003", None,
+                    _full_blocks(5, 0, 5, 0, 5))                 # data, no Total
+    rows, skipped = compare_env._load_intersection_summary_side(base, "X", Events())
+    check("only the SOUND route contributes a row", {r[0] for r in rows} == {"001"})
+    check("the drifted route is disclosed (incomplete), naming it",
+          any("002" in s and "block sums" in s for s in skipped))
+    check("the Total-less route is disclosed (incomplete), naming it",
+          any("003" in s and "Total" in s for s in skipped))
+
+
 def _write_id_route(folder, route, rows):
     wb = Workbook()
     ws = wb.active
@@ -259,6 +287,7 @@ def test_detail_edition_boundary():
 def main():
     test_wiring()
     test_summary_aggregate_compare()
+    test_summary_layout_drift_disclosed()
     test_detail_flat_compare()
     test_detail_edition_boundary()
     print()

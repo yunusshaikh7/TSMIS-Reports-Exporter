@@ -57,13 +57,16 @@ _IS_KEY = {c.slug: c.key for sec in sl.INTERSECTION_SUMMARY_SPEC.sections for c 
 
 
 def _write_is_route(path, route, total, blocks):
-    """A synthetic per-route Intersection Summary sheet (block-count layout)."""
+    """A synthetic per-route Intersection Summary sheet (block-count layout).
+    `total=None` omits the 'Total Intersections =' line (the CMP-AUD-018
+    total-line-dropped case)."""
     wb = Workbook()
     ws = wb.active
     ws.title = cis.SHEET_NAME
     ws.append(["TSAR - Intersection Summary"])
     ws.append([f"Route: {route}"])
-    ws.append([f"Total Intersections = {total}"])
+    if total is not None:
+        ws.append([f"Total Intersections = {total}"])
     ws.append([])
     for hdr, rows in blocks:
         ws.append([hdr])
@@ -159,6 +162,33 @@ def test_summary():
     broken_counts = {k: (0 if "mastarm" in k else v) for k, v in good.items()}
     check("the drift names the offending block",
           "MAINLINE MASTARM" in (cis._layout_drift(broken_counts, 5) or ""))
+
+    # CMP-AUD-018: record_problem is the ONE strict validator the consolidation AND
+    # the cross-env loader share (compare_env._load_intersection_summary_side calls
+    # it too). It adds the case _layout_drift alone left open: a data record with NO
+    # parsed Total disables the partition check, so it must be a problem too.
+    check("record_problem: a sound record is None", cis.record_problem(good, 5) is None)
+    check("record_problem: layout drift is reported",
+          "MAINLINE MASTARM" in (cis.record_problem(broken_counts, 5) or ""))
+    check("record_problem: data with NO total is a problem (was silently accepted)",
+          "Total" in (cis.record_problem(good, None) or ""))
+    check("record_problem: an empty record (no data) needs no total",
+          cis.record_problem({}, None) is None)
+
+    # End to end: a data-bearing route whose 'Total Intersections' line is missing
+    # (the total-line renamed/dropped) now FAILS like a drift — before, total=None
+    # disabled the partition gate and the route was silently included.
+    in_nt = tmp / "in_nt"
+    in_nt.mkdir()
+    _write_is_route(in_nt / "intersection_summary_route_001.xlsx", "001", 5,
+                    _full_blocks(3, 2, 4, 1, 5))
+    _write_is_route(in_nt / "intersection_summary_route_002.xlsx", "002", None,
+                    _full_blocks(5, 0, 5, 0, 5))
+    res_nt = cis.consolidate(events=Events(), confirm_overwrite=lambda _p: True,
+                             input_dir=in_nt, out_path=tmp / "out_nt.xlsx")
+    check("a Total-less data route FAILS and the result is PARTIAL",
+          res_nt.status == "ok" and res_nt.completion == outcome.PARTIAL
+          and res_nt.failed_inputs == 1)
 
     # CMP-AUD-183: the ordered route census rides the result for the outcome
     # sidecar, and duplicate route claims are excluded LOUDLY (both files

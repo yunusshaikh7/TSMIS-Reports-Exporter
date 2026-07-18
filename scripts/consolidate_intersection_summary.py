@@ -132,6 +132,25 @@ def _layout_drift(counts, total):
     return None
 
 
+def record_problem(counts, total):
+    """The strict parser-integrity problem for one parsed route record, or None
+    when it looks structurally sound. Shared by the consolidation AND the
+    cross-environment loader (CMP-AUD-018) so a layout-drifted or Total-less data
+    record can't slip through one path while the other gates it — two identically
+    malformed sides must never certify a clean match. A data-bearing record
+    REQUIRES a parsed Total (its absence means the 'Total Intersections =' line
+    was renamed or dropped — a layout change that also disables `_layout_drift`)
+    AND every non-exempt section must partition that total exactly. The statewide
+    censuses (6.19 + 7.9, both environments) carry no drifted and no Total-less
+    data record, so this never false-fires on a real export."""
+    if record_has_data({"counts": counts}) and not total:
+        return ("no 'Total Intersections' total was parsed although the export "
+                "carries category data — the export layout may have changed (the "
+                "total line was renamed or moved); if this export is fresh, the "
+                "app needs an update for it")
+    return _layout_drift(counts, total)
+
+
 # --------------------------------------------------------------------------- #
 # records -> workbook
 # --------------------------------------------------------------------------- #
@@ -277,9 +296,9 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             failed.append(p.name)
             continue
         rec = {"route": route, "counts": counts, "total": total, "file": p.name}
-        drift = _layout_drift(counts, total)
-        if drift:
-            events.on_log(f"{prefix} FAILED (layout drift): {drift}")
+        problem = record_problem(counts, total)
+        if problem:
+            events.on_log(f"{prefix} FAILED (parse integrity): {problem}")
             failed.append(p.name)
         elif record_has_data(rec):
             records.append(rec)

@@ -262,15 +262,19 @@ def intersection_summary_late_save():
         _write_valid_xlsx(in_dir / "i1.xlsx")
         out_path = tmp / "int.xlsx"
         calls = []
-        saved = (M.parse_route, M.record_has_data)
+        saved = (M.parse_route, M.record_has_data, M.record_problem)
         M.parse_route = lambda _p: ("001", {}, 0)
         M.record_has_data = lambda _rec: True
+        # Isolate the TOCTOU SAVE gate from record validation: this artificial
+        # stub record (empty counts / total 0) would trip the CMP-AUD-018
+        # parse-integrity gate, so neutralize it here like the other predicates.
+        M.record_problem = lambda _c, _t: None
         try:
             res = _run_with_late_save_appearance(out_path, lambda: M.consolidate(
                 events=Events(), confirm_overwrite=lambda _p: calls.append(_p) or False,
                 input_dir=in_dir, out_path=out_path))
         finally:
-            M.parse_route, M.record_has_data = saved
+            M.parse_route, M.record_has_data, M.record_problem = saved
         _assert_late_save("intersection_summary", calls, res, out_path)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

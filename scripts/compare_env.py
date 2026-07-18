@@ -389,6 +389,16 @@ def _load_intersection_summary_side(folder, label, events):
             events.on_log(f"  [{label}] {p.name}: no intersection data; skipping")
             skipped.append(f"{label} {p.name}: no intersection data")
             continue
+        # CMP-AUD-018: the consolidator FAILS a layout-drifted or Total-less data
+        # record; the cross-env loader must apply the SAME strict validator
+        # (`record_problem`) so two identically malformed sides can't certify a
+        # clean match. A problem is a loud skip (incompleteness), naming the route,
+        # never a silently-compared row.
+        problem = _is.record_problem(counts, total)
+        if problem:
+            events.on_log(f"  [{label}] {p.name}: {problem}; skipping")
+            skipped.append(f"{label} {p.name}: route {route} — {problem}")
+            continue
         rkey = _norm_route_key(route)
         rows.append([rkey, total] + [counts.get(slug, 0) for slug, _k in _IS_FIELDS])
         events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} (route {rkey})")
