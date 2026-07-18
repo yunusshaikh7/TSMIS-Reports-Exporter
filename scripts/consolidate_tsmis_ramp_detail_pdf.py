@@ -74,7 +74,8 @@ except ImportError:
 
 import outcome
 from pdf_table_lib import (norm_route, reconcile_route_identity,
-                           run_pdf_conversion, write_route_workbook)
+                           run_pdf_conversion, unexpected_pm_tokens,
+                           write_route_workbook)
 from paths import (OUTPUT_ROOT, latest_output_day, output_day_dir,
                    stamped_consolidated_filename)
 
@@ -135,8 +136,15 @@ LINE_TOL = 2.0        # words within this top-delta form one text line
 FRAG_MAX_DIST = 13.0
 
 PM_RE = re.compile(r"^\d{3}\.\d{3}$")
-# The legend's postmile-prefix codes (shared with Highway Sequence); the 7.9
-# census saw C,L,M,R,S,T — anything else in the prefix window is loud.
+# The accepted, versioned post-mile PREFIX vocabulary (CMP-AUD-063), the
+# legend's realignment codes (shared with Highway Sequence; the 7.9 census saw
+# C,L,M,R,S,T of these). Ramp Detail has NO suffix column, so any prefix-window
+# text outside this set alters the canonical postmile key: the parser counts it
+# as a `bad_token` and the producer escalates to PARTIAL (never silently
+# complete). Bump PM_VOCAB_VERSION when the site's legend adds a code (a
+# deliberate, censused change). The 7.9 statewide census (126 RD PDFs) saw ONLY
+# these tokens.
+PM_VOCAB_VERSION = 1
 PREFIX_SET = frozenset("CDGHLMNRST")
 # The seven multi-letter column-header words every data page repeats. The three
 # single-letter header columns (the prefix "E"; the On/Off "F" and Type "Y"
@@ -273,6 +281,7 @@ def parse_pdf(path, events):
     rows = []
     doc_routes = set()                  # the pages' own route claims (049)
     unclassified = stray_frags = 0
+    bad_tokens = 0                      # unexpected PM code tokens (CMP-AUD-063)
     data_pages = 0
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
@@ -298,9 +307,14 @@ def parse_pdf(path, events):
                     continue                # the route banner / header band
                 vals = _classify_words(line_words, b)
                 if PM_RE.fullmatch(vals["pm"]):
-                    if vals["pr"] and vals["pr"] not in PREFIX_SET:
-                        events.on_log(f"    p{page_no}: unexpected postmile prefix "
-                                      f"{vals['pr']!r} at {vals['pm']!r} (kept)")
+                    # Ramp Detail has no suffix column, so only the prefix window
+                    # carries a PM code token (CMP-AUD-063).
+                    for kind, tok in unexpected_pm_tokens(
+                            vals["pr"], "", prefix_set=PREFIX_SET):
+                        bad_tokens += 1
+                        events.on_log(
+                            f"    p{page_no}: unexpected postmile {kind} {tok!r} "
+                            f"at {vals['pm']!r} (kept; vocab v{PM_VOCAB_VERSION})")
                     page_rows.append(
                         [top, ["" if k is None else vals[k] for k in _ROW_KEYS]])
                 elif vals["desc"] and not any(
@@ -330,7 +344,7 @@ def parse_pdf(path, events):
             rows.extend(pr[1] for pr in page_rows)
     return rows, {"emitted": len(rows), "pages": n_pages, "data_pages": data_pages,
                   "unclassified": unclassified, "stray_frags": stray_frags,
-                  "doc_routes": sorted(doc_routes)}
+                  "bad_tokens": bad_tokens, "doc_routes": sorted(doc_routes)}
 
 
 # =============================================================================
@@ -381,6 +395,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                 ctx["loud"] = ctx.get("loud", 0) + loud
                 ev.on_log(f"  WARNING: {loud} line(s)/fragment(s) in {p.name} "
                           "didn't parse cleanly — see the log.")
+            bad = pstats["bad_tokens"]
+            if bad:
+                ctx["bad_tokens"] = ctx.get("bad_tokens", 0) + bad
+                ev.on_log(f"  WARNING: {bad} unexpected postmile code token(s) in "
+                          f"{p.name} — the source may be suspect (see the log).")
         if not rows:
             ev.on_log(f"{prefix} no ramp data found; skipping")
             ctx["failed"].append(p.name)
@@ -395,9 +414,15 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     def finalize(result, ctx):
         loud = ctx.get("loud", 0)
+        bad_tokens = ctx.get("bad_tokens", 0)
         notes = []
         if loud:
             notes.append(f"⚠ {loud} unparsed line(s)/fragment(s) — verify (see the log).")
+        if bad_tokens:
+            notes.append(
+                f"⚠ {bad_tokens} unexpected postmile code token(s) not in the "
+                f"accepted vocabulary (v{PM_VOCAB_VERSION}) — the source may be "
+                "suspect (see the log).")
         result.summary_lines = notes + result.summary_lines
         # A dropped line or a failed PDF is invisible downstream, so ESCALATE to
         # a producer-owned partial — the incomplete output must not be promoted /
@@ -406,6 +431,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             result.completion = outcome.PARTIAL
             result.skipped_inputs = max(result.skipped_inputs, loud)
             result.failed_inputs = max(result.failed_inputs, len(ctx["failed"]))
+        # An unexpected postmile code token (CMP-AUD-063) is a parse ANOMALY, not
+        # an input-file count, so it escalates COMPLETION only — never
+        # skipped/failed_inputs (those stay the file-level channels).
+        if bad_tokens:
+            result.completion = outcome.PARTIAL
 
     return run_pdf_conversion(
         in_dir=in_dir, out=out, conv=conv, deps_ok=_DEPS_OK,

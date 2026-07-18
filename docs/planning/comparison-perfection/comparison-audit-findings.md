@@ -341,7 +341,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-060 | P1 | Verified | Intersection vestigial-column drift is discarded as complete |
 | CMP-AUD-061 | P2 | Verified | Intersection grid scanning ignores cancellation |
 | CMP-AUD-062 | P1 | Verified | Intersection document-median geometry silently drops pages |
-| CMP-AUD-063 | P2 | Verified | Sequence/Ramp PDFs certify invalid post-mile code tokens |
+| CMP-AUD-063 | P2 | Resolved | Sequence/Ramp PDFs certify invalid post-mile code tokens |
 | CMP-AUD-064 | P2 | Verified | PDF parser anomaly counts masquerade as skipped input counts |
 | CMP-AUD-065 | P1 | Remediated 2026-07-16 by CMP-AUD-199 (re-verified 2026-07-17: the same-source schema compares EVERY column — context_fields is empty) | Sequence PDF-vs-Excel suppresses three same-source fields |
 | CMP-AUD-066 | P1 | Remediated 2026-07-17 (HL vs-TSN half via the v5 marker; the PDF-role halves via the PDF-conversion marker; RD structurally protected) | PDF comparison roles are not provenance-validated |
@@ -3077,7 +3077,8 @@ page orders.
 ### CMP-AUD-063 — Sequence and Ramp PDFs certify invalid post-mile code tokens
 
 Priority: P2  
-Status: Verified with real Highway Sequence and Ramp Detail PDFs  
+Status: **Resolved 2026-07-17** (census-first; both consolidators escalate an
+unexpected token to PARTIAL, offline gate 128/128)  
 Primary code: `scripts/consolidate_tsmis_highway_sequence_pdf.py:276-280`,
 `scripts/consolidate_tsmis_ramp_detail_pdf.py:287-292`
 
@@ -3110,6 +3111,42 @@ statewide consolidation must stay COMPLETE). The census is a SLOW, RAM-heavy pdf
 sweep — serialize it (the memory lesson: 3 concurrent statewide pdfplumber jobs starved
 RAM). If any unknown token appears on real data, it becomes a data question, not an
 autonomous escalation. Remains open.
+
+**Remediated 2026-07-17.** Census-first, exactly as scoped. A shared
+`pdf_table_lib.unexpected_pm_tokens(prefix, suffix, *, prefix_set, suffix_set)`
+owns the membership rule (a non-empty window that is not an EXACT member of its
+accepted set is unexpected — lowercase, joined, multi-char, and unknown tokens
+all qualify; a blank window never does); the two parsers own their censused,
+VERSIONED vocabularies (`PREFIX_SET = frozenset("CDGHLMNRST")` both;
+`SUFFIX_SET = frozenset("E")` for Highway Sequence, which has the suffix window;
+Ramp Detail has no suffix column; `PM_VOCAB_VERSION = 1` each). Each `parse_pdf`
+now counts every unexpected prefix/suffix into a structured `stats["bad_tokens"]`
+diagnostic and logs it (naming the window + `vocab v1`); `convert_one`
+accumulates `ctx["bad_tokens"]`; `finalize` escalates `result.completion` to
+PARTIAL and adds a ⚠ note. Highway Sequence now validates the suffix it never
+checked (a stray `Z` escalates). `bad_tokens` drives COMPLETION only — never
+`skipped_inputs`/`failed_inputs` (those stay the file-level channels; the
+separate CMP-AUD-064 defect is untouched).
+
+- **Census (the hard requirement — the escalation must never false-fire on real
+  data).** A read-only serialized pdfplumber sweep of the bound 7.9 ssor-prod
+  corpus (`ground-truth/All Reports 7.9/2026-07-09 ssor-prod/`): Highway
+  Sequence 252 PDFs → 60,493 rows, prefixes `{C,D,G,H,L,M,N,R,S,T}` (all ten
+  codes appear), suffixes `{E: 1132}`; Ramp Detail 126 PDFs → 15,216 rows,
+  prefixes `{C,L,M,R,S,T}`; both 0 unclassified / 0 stray. Every token ⊆ the
+  accepted vocabulary, so **both statewide consolidations stay COMPLETE** — the
+  escalation adds no false PARTIAL. (Numbers bound in the canary-bindings doc.)
+- **Red→green on the SAME defect input**: a bad HSL fixture (unexpected `Q`
+  prefix + `Z` suffix) and a bad RD fixture (unexpected `Q` prefix) through the
+  real consolidators returned `('ok', 'complete')` PRE-fix (the defect), `('ok',
+  'partial')` POST-fix. NEW `build/check_pm_code_vocabulary.py` (30+ pins):
+  the membership rule exhaustively (every known code, blank, lowercase, joined,
+  multi-char, unknown, both PM sides, the RD no-suffix case), and hermetic
+  positioned-Helvetica fixture PDFs driving BOTH consolidators end to end — an
+  unexpected token escalates to PARTIAL with the note, and a clean render stays
+  COMPLETE (the census invariant in miniature). The `check_pdf_route_identity`
+  parse-stub base dicts gained `bad_tokens: 0` to match the widened contract.
+- Offline gate **128/128**; `ruff check scripts` clean.
 
 ### CMP-AUD-064 — PDF parser anomaly counts masquerade as skipped input counts
 

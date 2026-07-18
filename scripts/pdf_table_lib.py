@@ -60,6 +60,30 @@ def norm_route(token):
     return f"{int(m.group(1)):03d}{m.group(2).upper()}"
 
 
+def unexpected_pm_tokens(prefix, suffix, *, prefix_set, suffix_set=frozenset()):
+    """CMP-AUD-063: the post-mile CODE tokens outside the accepted, versioned
+    vocabulary, as a list of ``(window, token)`` pairs — e.g. ``[("prefix",
+    "Q")]``. A window's text is UNEXPECTED when it is non-empty and not an EXACT
+    member of its accepted set, so a lowercase ``'c'``, a joined ``'CE'``, a
+    multi-letter ``'QQ'``, or an unknown ``'Q'`` each qualify, while a blank
+    window (the common case) and an exact legend code never do. ``suffix`` /
+    ``suffix_set`` default to ``""`` / the empty set for a report with no suffix
+    column (Ramp Detail), so any suffix text there is unexpected by construction.
+
+    The comparison is deliberately exact — no normalization — because the
+    accepted vocabulary IS the source of truth: anything else alters the
+    canonical post-mile key and marks the source as suspect, so the producer
+    escalates to at least PARTIAL rather than certifying it complete. The two
+    parsers own their censused `PREFIX_SET`/`SUFFIX_SET` + `PM_VOCAB_VERSION`;
+    this shared helper owns only the membership rule."""
+    bad = []
+    if prefix and prefix not in prefix_set:
+        bad.append(("prefix", prefix))
+    if suffix and suffix not in suffix_set:
+        bad.append(("suffix", suffix))
+    return bad
+
+
 class RouteIdentityError(ValueError):
     """CMP-AUD-049 (evidence half): a per-route PDF's own claims failed to
     confirm the expected route — the document must not be captioned/verified

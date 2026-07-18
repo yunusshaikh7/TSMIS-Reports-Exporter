@@ -20,12 +20,12 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | | |
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
-| **Gate** | **126/126 offline** checks (full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
+| **Gate** | **128/128 offline** checks (full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. Owner-requested audit found no other report has the trap live (RD is code-asymmetric but benign — 0/15,216; HD/HSL/HL clean). **NEXT (owner-requested feature): a per-row "source file" provenance column on every TSMIS-only comparison tab, all reports** — surfaces which per-route export each row came from (would have made 070 obvious). Then **063** (PM-token → partial, census-first) and **027** (header-only route). 210 DEFERRED. HD-Excel county vendor-pending |
+| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 RESOLVED (2026-07-17)**: both PDF consolidators escalate an unexpected post-mile prefix/suffix token to PARTIAL, census-proven no-false-fire on the bound 7.9 corpus (gate 128/128). **NEXT: 027** (header-only routes silently disappear from cross-env coverage), then MER-059 census → buckets B/D/E/G/H/I. 210 DEFERRED. HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, then the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029 + 034)
+> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029 + 034, then 063)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -33,6 +33,30 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that provably move comparisons toward source truth are pre-approved; anything
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
+>
+> **DONE 2026-07-17 (latest): CMP-AUD-063 CLOSED — the Sequence/Ramp PDF
+> consolidators escalate an invalid post-mile code token to PARTIAL (census-first).**
+> An unexpected post-mile PREFIX was logged but KEPT under a COMPLETE outcome, and
+> Highway Sequence never validated its equate SUFFIX at all (a stray `Z` was
+> silently accepted) — either alters the canonical PM key and can turn a schema
+> anomaly into ordinary one-sided rows with no durable "source suspect" signal.
+> Now a shared `pdf_table_lib.unexpected_pm_tokens` owns the membership rule (exact
+> match against each parser's censused, VERSIONED `PREFIX_SET`/`SUFFIX_SET` +
+> `PM_VOCAB_VERSION`; lowercase/joined/multi-char/unknown all count), each
+> `parse_pdf` counts them into `stats["bad_tokens"]`, and `finalize` escalates
+> `completion` to PARTIAL with a ⚠ note. `bad_tokens` drives COMPLETION only —
+> never `skipped/failed_inputs` (the separate CMP-AUD-064 defect is untouched).
+> **Census (the false-fire guard)**: a serialized read-only sweep of the bound 7.9
+> ssor-prod corpus — HSL 252 PDFs / 60,493 rows / prefixes `{C,D,G,H,L,M,N,R,S,T}`
+> / suffix `{E}`; RD 126 PDFs / 15,216 rows / prefixes `{C,L,M,R,S,T}`; both 0
+> unclassified/stray — proves every real token ⊆ the accepted vocabulary, so both
+> statewide consolidations STAY COMPLETE (no false PARTIAL). Red→green on the same
+> defect input: pre-fix `('ok','complete')`, post-fix `('ok','partial')`. NEW
+> `check_pm_code_vocabulary.py` (exhaustive membership matrix + hermetic fixture
+> PDFs driving both consolidators end to end; clean render stays COMPLETE);
+> `check_pdf_route_identity` stub base dicts gained `bad_tokens: 0`. Offline gate
+> **128/128** + ruff clean. **NEXT: CMP-AUD-027** (header-only routes silently
+> disappear from cross-env coverage), then MER-059 census → buckets B/D/E/G/H/I.
 >
 > **DONE 2026-07-17 (latest): the owner-run Intersection Detail comparison test —
 > all 5 ID comparisons run statewide on the 2026-07-17 export; 3 fixes shipped, the

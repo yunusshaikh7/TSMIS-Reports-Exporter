@@ -1456,3 +1456,29 @@ invisible, canary 21,675) is retired. Hermetic locks:
 known-red), `check_compare_intersection_detail_tsn` (canonical displays, PP
 identity probe, pre-v4 refusal), `check_visual_evidence` (county-aware ID
 adapter, 34 FIELDS).
+
+## 2026-07-17 — CMP-AUD-063 post-mile code vocabulary census (HSL-PDF + RD-PDF)
+
+The unexpected-token → PARTIAL escalation must never false-fire on real data, so
+it is bound to a read-only, serialized statewide census proving the current
+corpora carry ONLY the accepted, versioned vocabulary (`PREFIX_SET =
+frozenset("CDGHLMNRST")`; Highway Sequence equate `SUFFIX_SET = frozenset("E")`;
+Ramp Detail has no suffix column; `PM_VOCAB_VERSION = 1`).
+
+- **Bound corpus:** `ground-truth/All Reports 7.9/2026-07-09 ssor-prod/` —
+  `highway_sequence_pdf/` (252 route PDFs) and `ramp_detail_pdf/` (126 route
+  PDFs); the same 7.9 ssor-prod set the HSL Stage-8 / CMP-AUD-220 bindings use.
+  ars-prod carries no PDF exports in this bundle.
+- **Census result (via the production `parse_pdf`):**
+
+| Report | PDFs | Rows | Prefix tokens seen | Suffix tokens | Unclassified / stray |
+|---|---:|---:|---|---|---:|
+| Highway Sequence (PDF) | 252 | 60,493 | C D G H L M N R S T | E (1,132) | 0 / 0 |
+| Ramp Detail (PDF) | 126 | 15,216 | C L M R S T | (no column) | 0 / 0 |
+
+  Every token ⊆ the accepted set, so both statewide consolidations STAY COMPLETE
+  under the new gate (no false PARTIAL). Row counts are canary-exact (HSL 60,493,
+  RD 15,216). If any future pull surfaces a token outside the set, it is a DATA
+  question (disposition + a deliberate `PM_VOCAB_VERSION` bump), never a silent
+  escalation. Census harness: this session's scratchpad
+  `census_063_pm_tokens.py`; hermetic lock: `check_pm_code_vocabulary.py`.

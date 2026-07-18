@@ -113,10 +113,10 @@ FAMILIES = [
     # (key, module, filename prefix, row width, base stats, claim transport)
     ("highway_sequence", hsl, "highway_sequence_route_", 9,
      {"emitted": 1, "pages": 1, "data_pages": 1,
-      "unclassified": 0, "stray_frags": 0}, "stats"),
+      "unclassified": 0, "stray_frags": 0, "bad_tokens": 0}, "stats"),
     ("ramp_detail", rd, "tsar_ramp_detail_route_", 13,
      {"emitted": 1, "pages": 1, "data_pages": 1,
-      "unclassified": 0, "stray_frags": 0}, "stats"),
+      "unclassified": 0, "stray_frags": 0, "bad_tokens": 0}, "stats"),
     ("highway_detail", hd, "highway_detail_route_", 34,
      {"emitted": 1, "pages": 1, "orphans": 0, "single_line": 0,
       "fallback_pages": []}, "stats"),
