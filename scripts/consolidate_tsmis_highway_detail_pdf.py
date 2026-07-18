@@ -148,10 +148,22 @@ DATE_TOKEN_RE = re.compile(r"(?<!\d)\d{2}-\d{2}-\d{2}(?!\d)")
 # real descriptions (CITY, RECORD, LENGTH alone) are deliberately absent —
 # a false furniture match only orphans loudly, but a THEAD swallowed as data
 # would corrupt silently, so the distinctive multi-token strings below are
-# each unique to the header.
-THEAD_RE = re.compile(r"POSTMILE|DESCRIPTION|EFF-|ACC-|ROADBED|MEDIAN|DATEOF|"
-                      r"T-W|WDA|S#S")
+# each unique to the header. CMP-AUD-052: the bare `ROADBED`/`MEDIAN` words could
+# match a real Description ("OLD ROADBED", "BEGIN MEDIAN"), so the roadbed header
+# is anchored on the header-only `LEFTROADBED`/`RIGHTROADBED` compounds instead —
+# censused present on every one of the 516 statewide roadbed-header lines, and
+# absent from every real description, so a date-less "BEGIN MEDIAN" now parses as
+# data instead of being swallowed (proven byte-identical on the 51,201-row corpus).
+THEAD_RE = re.compile(r"POSTMILE|DESCRIPTION|EFF-|ACC-|LEFTROADBED|RIGHTROADBED|"
+                      r"DATEOF|T-W|WDA|S#S")
 DCR_ROW_RE = re.compile(r"^\d{2}[A-Z]{2,4}\.?\d{1,3}[A-Z]?$")
+# A reprinted-header wrap fragment + a dashed-district group header (CMP-AUD-053):
+# the "Acc-Cont Eff" column label wraps as "ACC-" then a bare "CONT" line, and a
+# group header's district can render as a leading long dash ("— MER 059" /
+# "— SBD 058U" — the MER-059 shape). Both are page furniture, never record data;
+# recognizing them keeps them out of the leading-orphan count.
+CONT_FRAG = "CONT"
+DASHED_DCR_RE = re.compile(r"^[—–−]\d{0,2}[A-Z]{2,4}\d{0,3}[A-Z]?$")
 PAGE_FURNITURE_RE = re.compile(r"RefDate:|Page\d+$")
 # The document's own route claim: the data pages' header banner ("Ref Date:
 # 2026-07-10 Route 004 Page 44" — matched on the SPACELESS group text like the
@@ -352,6 +364,22 @@ def _make_row(a, b):
     return a[0:9] + b[0:25]
 
 
+def _is_header_residue(raw, in_thead):
+    """A date-less group that is header / group-row / page furniture but NOT a
+    multi-anchor THEAD line (the caller tests THEAD_RE separately for its
+    in_thead side effect): the one-letter THEAD N/A residue, the "ACC-CONT" wrap
+    fragment (CMP-AUD-053), the page header/footer, a DCR group row, or a
+    dashed-district group header (CMP-AUD-053). Call only on a date-less raw — a
+    dated group is always record data."""
+    if in_thead and len(raw) <= 2 and raw.isalpha():
+        return True                            # the THEAD's one-letter N/A residue
+    if raw == CONT_FRAG:
+        return True                            # the "Acc-Cont" header wrap
+    if PAGE_FURNITURE_RE.search(raw) or DCR_ROW_RE.match(raw):
+        return True
+    return bool(DASHED_DCR_RE.match(raw))      # a dashed-district group header
+
+
 def parse_pdf(path, events):
     """Parse one TSMIS Highway Detail PDF into 34-column TSMIS-format rows.
 
@@ -385,6 +413,8 @@ def parse_pdf(path, events):
     doc_routes = set()                 # the pages' own route claims (049)
     orphans = 0
     single_line = 0
+    leading_orphans = 0                # data-shaped groups with no line 1 (053)
+    orphan_samples = []                # (page, text) for the durable diagnostic
     fallback_pages = []                # data pages recovered via line-2 geometry
     unresolved_pages = []              # data pages with NO recoverable grid (054)
     pending_1 = None                   # carries across pages (mid-record splits)
@@ -451,41 +481,52 @@ def parse_pdf(path, events):
                     _flush_pending()   # the previous record had no line 2
                     pending_1 = vals1
                     in_thead = False
-                elif pending_1 is not None:
-                    # A record's line 2 is WHATEVER follows its line 1 except
-                    # the censused furniture: the reprinted THEAD (+ its bare
-                    # N/A residue line), DCR group rows, and the page
-                    # header/footer. A TASAS date anywhere in the RAW text is
-                    # the fast accept (a mis-aligned window grid can split a
-                    # date, so the merged values can't carry this test); a
-                    # date-LESS group is accepted too once the furniture tests
-                    # pass — the sparse rows (roadbed codes but no effective
-                    # dates) the old always-has-a-date assumption dropped.
-                    raw = _group_text(group)
-                    if not DATE_TOKEN_RE.search(raw):
-                        if THEAD_RE.search(raw):
-                            in_thead = True
-                            continue
-                        if in_thead and len(raw) <= 2 and raw.isalpha():
-                            continue   # the THEAD's own N/A column residue
-                        if (PAGE_FURNITURE_RE.search(raw)
-                                or DCR_ROW_RE.match(raw)):
-                            continue
+                    continue
+                # A record's line 2 is WHATEVER follows its line 1 except the
+                # censused furniture: the reprinted THEAD (+ its bare N/A residue
+                # line, the "ACC-CONT" wrap, a dashed-district group header), the
+                # DCR group rows, and the page header/footer. A TASAS date
+                # anywhere in the RAW text is the fast accept (a mis-aligned
+                # window grid can split a date, so the merged values can't carry
+                # this test); a date-LESS group is data too once the furniture
+                # tests pass — the sparse rows (roadbed codes but no effective
+                # dates) the old always-has-a-date assumption dropped.
+                raw = _group_text(group)
+                dated = bool(DATE_TOKEN_RE.search(raw))
+                if not dated and THEAD_RE.search(raw):
+                    in_thead = True
+                    continue
+                if not dated and _is_header_residue(raw, in_thead):
+                    continue
+                if pending_1 is not None:
                     in_thead = False
                     vals2 = _group_values(group, win2)
                     rows.append(_make_row(pending_1, vals2))
                     pending_1 = None
                     page_rows += 1
+                elif len(raw) > 2:
+                    # CMP-AUD-053: a data-shaped group that reconciles to NO line 1
+                    # (a page-split / equate line-2 whose line 1 was already
+                    # consumed or is absent). Never silently ignored — counted so
+                    # the producer escalates to PARTIAL and the count rides a
+                    # durable diagnostic. NOT emitted: with no line 1 to pair it,
+                    # a speculative row could carry the wrong postmile/identity.
+                    in_thead = False
+                    leading_orphans += 1
+                    if len(orphan_samples) < 20:
+                        orphan_samples.append((page_no, raw[:80]))
             if used_fallback and page_rows:
                 fallback_pages.append(page_no)
         _flush_pending()               # a line 1 dangling at the document end
         if not any_grid and not rows:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
-                        "single_line": 0, "fallback_pages": [],
+                        "single_line": 0, "leading_orphans": 0,
+                        "orphan_samples": [], "fallback_pages": [],
                         "unresolved_pages": unresolved_pages, "no_grid": True,
                         "doc_routes": sorted(doc_routes)}
     return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
-                  "single_line": single_line, "fallback_pages": fallback_pages,
+                  "single_line": single_line, "leading_orphans": leading_orphans,
+                  "orphan_samples": orphan_samples, "fallback_pages": fallback_pages,
                   "unresolved_pages": unresolved_pages,
                   "doc_routes": sorted(doc_routes)}
 
@@ -541,6 +582,14 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             unresolved = pstats.get("unresolved_pages") or []
             if unresolved:
                 ctx["unresolved"] = ctx.get("unresolved", 0) + len(unresolved)
+            if pstats.get("leading_orphans"):
+                ctx["leading_orphans"] = (ctx.get("leading_orphans", 0)
+                                          + pstats["leading_orphans"])
+                ctx.setdefault("orphan_samples", []).extend(
+                    pstats.get("orphan_samples", []))
+                ev.on_log(f"  WARNING: {pstats['leading_orphans']} data line(s) in "
+                          f"{p.name} reconcile to no record (a page-split/equate "
+                          "line-2 with no line-1) — see the log (CMP-AUD-053).")
             if pstats["orphans"]:
                 ev.on_log(f"  WARNING: {pstats['orphans']} unpaired row(s) in {p.name} "
                           "(a record's two lines didn't pair) — see the log.")
@@ -596,6 +645,10 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             # 3,664 both-band pages) — but recorded for the PDF↔Excel check.
             notes.append(f"{ctx['fallback']} page(s) recovered a line-1 record "
                          "from the line-2 grid (CMP-AUD-054).")
+        leading_orphans = ctx.get("leading_orphans", 0)
+        if leading_orphans:
+            notes.append(f"⚠ {leading_orphans} data line(s) reconcile to no record "
+                         "(CMP-AUD-053) — verify (see the log).")
         result.summary_lines = notes + result.summary_lines
         # An unpaired record, a data page with no recoverable grid, or a failed PDF
         # is invisible to / misrepresents the XLSX consolidator, so ESCALATE to a
@@ -606,6 +659,21 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             result.completion = outcome.PARTIAL
             result.skipped_inputs = max(result.skipped_inputs, orphans)
             result.failed_inputs = max(result.failed_inputs, len(ctx["failed"]))
+        # CMP-AUD-053: unreconciled data-shaped leading orphans escalate COMPLETION
+        # only and ride a structured diagnostic, never the file-count fields
+        # (CMP-AUD-064). They are not emitted (no line-1 to pair), so the output is
+        # byte-identical — the escalation only makes the previously-silent payload
+        # visible for verification.
+        if leading_orphans:
+            result.completion = outcome.PARTIAL
+            result.producer_extra = {
+                **(result.producer_extra or {}),
+                "parse_anomalies": {
+                    **((result.producer_extra or {}).get("parse_anomalies", {})),
+                    "leading_orphan_lines": leading_orphans,
+                    "leading_orphan_samples": (ctx.get("orphan_samples", []))[:15],
+                },
+            }
 
     return run_pdf_conversion(
         in_dir=in_dir, out=out, conv=conv, deps_ok=_DEPS_OK,

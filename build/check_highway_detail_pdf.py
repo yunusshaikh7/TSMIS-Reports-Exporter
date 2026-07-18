@@ -84,9 +84,13 @@ def test_line1_classifier():
     # with a PM-shaped token — but its text runs on as WORDS (not the Length
     # cell), and on the ordinary grid it spills into window 1 too. Treating it
     # as a line 1 orphaned the real record AND minted a phantom one.
+    # CMP-AUD-051: the statewide 7.9 census found exactly 3 equate-spill shapes;
+    # all 3 are rejected (0 residual phantoms) — the two 101 forms above and the
+    # unprefixed 280 form here ('14.752 LT EQU 14.760 RT').
     check("rejects an outdented equate DESCRIPTION that starts PM-shaped",
           not hdpdf._is_line1(["R42.401 LT EQ 43.185 , PM R42401BK=43185E AH"])
-          and not hdpdf._is_line1(["R42.401 LT EQ 43.1", "85 , PM"]))
+          and not hdpdf._is_line1(["R42.401 LT EQ 43.1", "85 , PM"])
+          and not hdpdf._is_line1(["14.752 LT EQU 14.760 RT"]))
     check("a merged 'PM LEN' with window-1 spill is NOT a line 1 (desc overflow)",
           not hdpdf._is_line1(["000.000L 000.000", "overflow text"]))
 
@@ -105,6 +109,25 @@ def test_line2_furniture():
              "ACC-")
     check("every censused THEAD line matches THEAD_RE",
           all(hdpdf.THEAD_RE.search(t) for t in thead))
+    # CMP-AUD-052: the roadbed header is anchored on the LEFTROADBED/RIGHTROADBED
+    # compounds (unique to the header), NOT the bare ROADBED/MEDIAN words — so a
+    # real date-less description carrying those words parses as data, not furniture.
+    check("the roadbed THEAD line matches via LEFT/RIGHT-ROADBED (not bare words)",
+          hdpdf.THEAD_RE.search("DESCRIPTIONALEFTROADBEDMEDIANRIGHTROADBED"))
+    check("bare 'MEDIAN'/'ROADBED' no longer trigger furniture (real descriptions "
+          "'BEGIN MEDIAN' / 'OLD ROADBED' parse as data)",
+          not hdpdf.THEAD_RE.search("BEGINMEDIAN")
+          and not hdpdf.THEAD_RE.search("OLDROADBEDREMOVED")
+          and not hdpdf._is_header_residue("BEGINMEDIAN", False))
+    # CMP-AUD-053: the "Acc-Cont" header wrap fragment (a bare "CONT" line) and a
+    # dashed-district group header ("— MER 059") are furniture; a real roadbed /
+    # description line is NOT (it becomes a paired line-2 or a counted orphan).
+    check("_is_header_residue: 'CONT' wrap + dashed-district headers are furniture",
+          hdpdf._is_header_residue("CONT", False)
+          and hdpdf._is_header_residue("—MER059", False)
+          and hdpdf._is_header_residue("—SBD058U", False)
+          and not hdpdf._is_header_residue("FIGUEROASTOFFRAMP", False)
+          and not hdpdf._is_header_residue("44THSTREET", False))
     sparse = ("Z07Z", "Z1010050207Z", "SMAINSTOCBR8-112Z07Z", "B080807Z",
               "NZ080807Z", "07", "OLDUS101UC4-21607", "N.W.P.R.R.07",
               "ACIDCANALZ07Z")
@@ -312,6 +335,106 @@ def test_fallback_recovery():
               SimpleNamespace(width=800.0, rects=[], chars=_chars(90.0, "LEGEND", 44.0))))
 
 
+def test_053_leading_orphans():
+    """CMP-AUD-053: a data-shaped group that reconciles to NO line-1 (a page-split /
+    equate line-2 whose line-1 was already consumed or absent) is now COUNTED and
+    escalates the producer to PARTIAL — never silently ignored — while the "ACC-CONT"
+    header wrap and a dashed-district group header stay furniture. Not emitted, so
+    the output is byte-identical (proven on the 51,201-row corpus off-CI)."""
+    print("CMP-AUD-053: unreconciled leading orphans counted + escalate:")
+    from types import SimpleNamespace
+
+    import events as _E
+    import outcome
+    ev = _E.Events(on_log=lambda *a: None, is_cancelled=lambda: False)
+    L1 = [40, 90, 130, 165, 195, 225, 265, 305, 345, 385, 520]        # 10 windows
+    L2 = [40, 68, 108, 148, 173, 198, 228, 253, 288, 318, 348, 378, 408, 438,
+          468, 498, 523, 553, 583, 608, 638, 668, 698, 728, 758, 788]  # 25 windows
+
+    def c(top, text, x0, cw=2.5):
+        out, x = [], x0
+        for ch in text:
+            if ch.strip():
+                out.append({"text": ch, "x0": x, "x1": x + cw, "top": top})
+            x += cw
+        return out
+
+    def band(edges, top, h=6.0):
+        return [{"x0": edges[i], "x1": edges[i + 1] - 1, "top": top,
+                 "bottom": top + h} for i in range(len(edges) - 1)]
+
+    def w0(edges):
+        return (edges[0] + edges[1]) / 2
+
+    def page(chars, rects):
+        return SimpleNamespace(width=800.0, chars=chars, rects=rects)
+
+    class FakePdf:
+        def __init__(self, pages):
+            self.pages = pages
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def parse(pages):
+        saved = hdpdf.pdfplumber.open
+        try:
+            hdpdf.pdfplumber.open = lambda p: FakePdf(pages)
+            return hdpdf.parse_pdf("f.pdf", ev)
+        finally:
+            hdpdf.pdfplumber.open = saved
+
+    bands = band(L1, 90.0) + band(L2, 103.0)
+    banner = c(60.0, "RefDate: 2026-07-10 Route 001 Page 1", 40.0)
+    rec = (c(100.0, "S000.100", w0(L1) - 10) + c(112.0, "TDESC", w0(L2) - 6)
+           + c(112.0, "64-01-01", 200.0))
+    rows, st = parse([page(banner + rec, bands)])
+    check("clean record pairs; no leading orphan",
+          rows is not None and len(rows) == 1 and st["leading_orphans"] == 0)
+
+    orphan = c(130.0, "44THSTREET", w0(L1) - 12) + c(130.0, "64-01-01", 200.0)
+    rows, st = parse([page(banner + rec + orphan, bands)])
+    check("a dated data line with no line-1 is a COUNTED orphan (not emitted)",
+          len(rows) == 1 and st["leading_orphans"] == 1
+          and st["orphan_samples"] and st["orphan_samples"][0][0] == 1)
+
+    furn = c(130.0, "CONT", w0(L1) - 5) + c(140.0, "—MER059", w0(L1) - 8)
+    rows, st = parse([page(banner + rec + furn, bands)])
+    check("'CONT' wrap + dashed-district header are furniture, not orphans",
+          st["leading_orphans"] == 0)
+
+    # e2e: the orphan escalates the producer to PARTIAL with a structured
+    # parse-anomalies diagnostic, and NOT the file-count fields (CMP-AUD-064).
+    import shutil
+    import tempfile
+    tmp = Path(tempfile.mkdtemp(prefix="cmp053_"))
+    try:
+        in_dir = tmp / "in"
+        in_dir.mkdir()
+        (in_dir / "highway_detail_route_001.pdf").write_bytes(b"%PDF-1.4\n%stub\n")
+        saved = hdpdf.pdfplumber.open
+        try:
+            hdpdf.pdfplumber.open = lambda p: FakePdf([page(banner + rec + orphan, bands)])
+            result = hdpdf.consolidate(
+                events=_E.Events(on_log=lambda *a: None),
+                confirm_overwrite=lambda _p: True,
+                input_dir=in_dir, out_path=tmp / "out.xlsx", converted_dir=tmp / "conv")
+        finally:
+            hdpdf.pdfplumber.open = saved
+        check(f"e2e: leading orphan escalates to PARTIAL (completion={result.completion!r})",
+              result.completion == outcome.PARTIAL)
+        pe = (result.producer_extra or {}).get("parse_anomalies", {})
+        check(f"e2e: rides parse_anomalies, NOT the file counts (pe={pe}, "
+              f"skipped={result.skipped_inputs}, failed={result.failed_inputs})",
+              pe.get("leading_orphan_lines") == 1 and result.skipped_inputs == 0
+              and result.failed_inputs == 0)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     test_header()
     test_make_row_mapping()
@@ -320,6 +443,7 @@ def main():
     test_wrap_machinery()
     test_adapters_and_matrix()
     test_fallback_recovery()
+    test_053_leading_orphans()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")
