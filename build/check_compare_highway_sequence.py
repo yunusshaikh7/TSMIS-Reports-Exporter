@@ -59,6 +59,31 @@ DATA_B = [
 ROWS_A = [[ROUTE] + r for r in DATA_A]
 ROWS_B = [[ROUTE] + r for r in DATA_B]
 
+# The REAL 9-column Highway Sequence export header (CMP-AUD-032 pins the cross-env
+# schema, so the compare_folders end-to-end must use the true site layout; the
+# key_field unit test above stays on the toy header — it drives _schema directly).
+# The two unnamed columns (idx 2 / idx 4, "(col C)" / "(col E)") flank PM and are
+# GLUED INTO the physical key (CMP-AUD-045), so a planted diff must live in a
+# NAMED compared column (Description); the unnamed flanks stay constant.
+import compare_highway_sequence_tsn as _hsl     # noqa: E402
+HSL_HEADER = list(_hsl._TSMIS_HEADER[1:])
+
+
+def _hsl_row(pm, desc):
+    row = [""] * len(HSL_HEADER)
+    row[0] = "LA"                                # County (coarse, repeats)
+    row[HSL_HEADER.index("City")] = "ANYTOWN"
+    row[HSL_HEADER.index("PM")] = pm             # idx 3; idx 2/4 stay blank (constant)
+    row[HSL_HEADER.index("Description")] = desc
+    return row
+
+
+HSL_DATA_A = [_hsl_row("1.000", "ALPHA"), _hsl_row("2.000", "BETA"),
+              _hsl_row("3.000", "GAMMA")]
+HSL_DATA_B = [_hsl_row("1.000", "ALPHA"), _hsl_row("2.000", "BETA2"),  # Description diff
+              _hsl_row("2.500", "NEW"),          # inserted mid-route
+              _hsl_row("3.000", "GAMMA")]
+
 
 def test_config_is_pm_keyed():
     hs = compare_env.HIGHWAY_SEQUENCE
@@ -119,9 +144,9 @@ def test_end_to_end_values_workbook():
         a.mkdir(parents=True)
         b.mkdir(parents=True)
         _write_route_file(a / f"highway_sequence_route_{ROUTE}.xlsx", sheet,
-                          HEADER_RAW, DATA_A)
+                          HSL_HEADER, HSL_DATA_A)
         _write_route_file(b / f"highway_sequence_route_{ROUTE}.xlsx", sheet,
-                          HEADER_RAW, DATA_B)
+                          HSL_HEADER, HSL_DATA_B)
 
         out = root / "cmp.xlsx"
         res = compare_env.HIGHWAY_SEQUENCE.compare_folders(
@@ -136,7 +161,7 @@ def test_end_to_end_values_workbook():
         header = list(cmp_rows[0])
         body = cmp_rows[1:]
         wb.close()
-        # The unnamed internal column shows as a labeled field, not a blank.
+        # The unnamed internal columns show as labeled fields, not blanks.
         assert "(col C)" in header, ("unnamed column must be labeled (col X)", header)
         # has_route layout: A=Route B=PM C=# D=A Row E=B Row F=Status G=Diffs H..
         statuses = [r[5] for r in body]
@@ -146,7 +171,7 @@ def test_end_to_end_values_workbook():
         assert len(one_sided) == 1 and one_sided[0].endswith("only"), one_sided
         neq = sum(1 for r in body for v in r
                   if isinstance(v, str) and _DIFF_MARK in v)
-        assert neq == 1, ("exactly the one unnamed-column change differs", neq)
+        assert neq == 1, ("exactly the one Description change differs", neq)
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

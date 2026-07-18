@@ -143,10 +143,14 @@ def test_summary_layout_drift_disclosed():
 
 
 def _write_id_route(folder, route, rows):
+    """Write a per-route Intersection Detail export with the REAL current
+    35-column layout. CMP-AUD-032 pins the cross-env schema, so a fake short
+    header is now refused — the fixture must use the true site header."""
+    import compare_intersection_detail_tsn as _idt
     wb = Workbook()
     ws = wb.active
     ws.title = "Intersection Detail"
-    ws.append(["P", "Post Mile", "S", "Location", "Ctrl Type", "Description"])
+    ws.append(list(_idt._TSMIS_HEADER[1:]))
     for r in rows:
         ws.append(r)
     wb.save(folder / f"intersection_detail_route_{route}.xlsx")
@@ -159,10 +163,11 @@ def test_detail_flat_compare():
     a = root / "2026-06-19 ssor-prod" / "intersection_detail"
     b = root / "2026-06-19 ars-prod" / "intersection_detail"
     a.mkdir(parents=True); b.mkdir(parents=True)
-    rows_a = [["R", "0.204", None, "12 ORA 001", "S", "JCT 5"],
-              ["R", "1.000", None, "12 ORA 001", "S", "PT A"]]
-    rows_b = [["R", "0.204", None, "12 ORA 001", "S", "JCT 5"],
-              ["R", "1.000", None, "12 ORA 001", "F", "PT A"]]   # Ctrl Type S->F at PM 1.000
+    # Full 35-column rows (CMP-AUD-032); the diff is Ctrl Type S->F at PM 1.000.
+    rows_a = [_id_full_row(**{"Post Mile": "0.204", "Description": "JCT 5", "Ctrl Type": "S"}),
+              _id_full_row(**{"Post Mile": "1.000", "Description": "PT A", "Ctrl Type": "S"})]
+    rows_b = [_id_full_row(**{"Post Mile": "0.204", "Description": "JCT 5", "Ctrl Type": "S"}),
+              _id_full_row(**{"Post Mile": "1.000", "Description": "PT A", "Ctrl Type": "F"})]
     _write_id_route(a, "001", rows_a)
     _write_id_route(b, "001", rows_b)
     out = root / "cmp.xlsx"
@@ -257,8 +262,10 @@ def test_detail_edition_boundary():
     check("the canonical header is the current labels", canon(leg) == cur)
     check("a leading-Route consolidated header canonicalizes too",
           canon(["Route"] + leg) == ["Route"] + cur)
-    check("an unrecognized header is returned UNCHANGED (identity, not refused)",
-          canon(["P", "Post Mile", "S"]) == ["P", "Post Mile", "S"])
+    # CMP-AUD-032: an unrecognized layout is now REFUSED (None), so two
+    # identically-malformed sides can't pair on a trusted-first-file header.
+    check("an unrecognized header is refused (None), not trusted positionally",
+          canon(["P", "Post Mile", "S"]) is None)
 
     root = Path(tempfile.mkdtemp(prefix="idedition_"))
     a = root / "2026-07-17 ssor-prod" / "intersection_detail"     # current edition

@@ -221,11 +221,24 @@ def test_orchestration_and_cache():
     print("build_cell_comparison drives compare_env + caches counts:")
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mxo_"))
     try:
-        HEADER = ["County", "PM", "Ramp ID", "Lighting"]
-        BASE = [["LA", "1.000", "ON-A", "Yes"], ["LA", "2.000", "OFF-B", "No"]]
+        # The REAL 11-column Ramp Detail layout (CMP-AUD-032 pins the cross-env
+        # schema). The planted diff lives in the compared Description column; PM
+        # 2.500 is the inserted one-sided ramp.
+        import compare_ramp_detail_tsn as _rd
+        HEADER = list(_rd._TSMIS_HEADER[1:])
+
+        def rd_row(pm, desc):
+            row = [""] * len(HEADER)
+            row[0] = "12-ORA-001"                # Location: district-county-route
+            row[1] = "R"                         # unnamed col B: postmile prefix
+            row[HEADER.index("PM")] = pm
+            row[HEADER.index("Description")] = desc
+            return row
+
+        BASE = [rd_row("1.000", "ON-A"), rd_row("2.000", "OFF-B")]
         # ars-prod: one field changed (1 diff cell) + one extra ramp (1 one-sided).
-        CELL = [["LA", "1.000", "ON-A", "Yes"], ["LA", "2.000", "OFF-B", "YES"],
-                ["LA", "2.500", "ON-NEW", "Yes"]]
+        CELL = [rd_row("1.000", "ON-A"), rd_row("2.000", "OFF-B2"),
+                rd_row("2.500", "ON-NEW")]
         _write_route(dest / "ssor-prod" / "ramp_detail" / "tsar_ramp_detail_route_001.xlsx",
                      HEADER, BASE)
         _write_route(dest / "ars-prod" / "ramp_detail" / "tsar_ramp_detail_route_001.xlsx",

@@ -1280,9 +1280,41 @@ def _ramp_detail_env_keys(header, key_field):
     return normalizer
 
 
+def _flat_header_recognizer(header, *raw_layouts):
+    """Pin a flat family to its EXACT current export schema (CMP-AUD-032). Each
+    `raw_layout` is the on-disk per-route header WITHOUT the leading Route column
+    (an "" / None entry is an unnamed column, which `_load_xlsx_side` relabels
+    "(col X)" by position). Returns the matched canonical header, or None when
+    `header` is not a recognized layout — so two identically-malformed or legacy
+    sides refuse (via the header_canonicalizer None-branch) instead of pairing on
+    a trusted-first-readable header. Mirrors `_hl_canonical_header` for the
+    families that carry no vendor relabel; the cell normalization (strip named
+    cells, relabel a blank to its positional "(col X)") matches both
+    `_load_xlsx_side` and `compare_tsn_common.exact_consolidated_header_ok`."""
+    def norm(layout):
+        return [str(c).strip() if (c is not None and str(c).strip())
+                else f"(col {get_column_letter(i + 1)})"
+                for i, c in enumerate(layout)]
+    loaded = norm(header)
+    for layout in raw_layouts:
+        canonical = norm(layout)
+        if loaded == canonical:
+            return canonical
+    return None
+
+
+def _ramp_detail_canonical_header(header):
+    """CMP-AUD-032: recognize the current Ramp Detail export layout (the vs-TSN
+    comparator's _TSMIS_HEADER minus its leading Route — the two/three unnamed
+    columns included) or refuse an unrecognized/legacy layout."""
+    import compare_ramp_detail_tsn as _rd
+    return _flat_header_recognizer(header, list(_rd._TSMIS_HEADER[1:]))
+
+
 RAMP_DETAIL = EnvCompare(
     "ramp_detail", "Ramp Detail", "ramp_detail", sheet_name="TSAR - Ramp Detail",
-    key_col="PM", physical_key_builder=_ramp_detail_env_keys)
+    key_col="PM", physical_key_builder=_ramp_detail_env_keys,
+    header_canonicalizer=_ramp_detail_canonical_header)
 
 
 def _hsl_unnamed_col(label):
@@ -1338,10 +1370,19 @@ def _highway_sequence_env_keys(header, key_field):
     return normalizer
 
 
+def _highway_sequence_canonical_header(header):
+    """CMP-AUD-032: recognize the current Highway Sequence export layout (the
+    vs-TSN comparator's _TSMIS_HEADER minus its leading Route, its two unnamed
+    prefix/suffix columns flanking PM included) or refuse."""
+    import compare_highway_sequence_tsn as _hsl
+    return _flat_header_recognizer(header, list(_hsl._TSMIS_HEADER[1:]))
+
+
 HIGHWAY_SEQUENCE = EnvCompare(
     "highway_sequence", "Highway Sequence", "highway_sequence",
     sheet_name="Highway Locations", key_col="PM",
-    physical_key_builder=_highway_sequence_env_keys)
+    physical_key_builder=_highway_sequence_env_keys,
+    header_canonicalizer=_highway_sequence_canonical_header)
 def _hl_canonical_header(header):
     """Either supported Highway Log edition (canonical or vendor labels, with
     or without a leading Route) -> the canonical corrected header for layout
@@ -1423,13 +1464,13 @@ def _id_canonical_header(header):
     exact and any real data change (the Int St Eff-Date refresh, HG, the Location
     suffix) still surfaces as a genuine diff.
 
-    Any OTHER header is returned UNCHANGED — the existing strict same-layout
-    equality is preserved for every non-edition case (two identical custom
-    headers still compare; two genuinely different layouts still refuse), so this
-    only ADDS the cross-edition bridge and changes nothing else. Unlike Highway
-    Log's `_hl_canonical_header` (CMP-AUD-048), it must not refuse an
-    unrecognized layout: Intersection Detail carries no `force_header`, so its
-    non-edition inputs are compared as-is."""
+    Any OTHER header is REFUSED (returns None → the header_canonicalizer
+    None-branch reports an unrecognized layout), so two identically-malformed or
+    obsolete Intersection Detail sides can no longer pair on a trusted-first-file
+    header (CMP-AUD-032). Previously such a header was returned unchanged and two
+    identical bogus/legacy-non-edition sides compared as valid; pinning to the
+    recognized current/legacy editions closes that. (The two RECOGNIZED editions
+    still align by position for a genuine new-vs-old baseline compare.)"""
     import compare_intersection_detail_tsn as _idt
     h = [("" if c is None else str(c)).strip() for c in header]
     has_route = bool(h) and h[0] == "Route"
@@ -1437,7 +1478,7 @@ def _id_canonical_header(header):
     current, legacy = _idt._TSMIS_HEADER[1:], _idt._TSMIS_HEADER_LEGACY[1:]
     if body == list(current) or body == list(legacy):
         return (["Route"] + list(current)) if has_route else list(current)
-    return list(header)
+    return None
 
 
 INTERSECTION_DETAIL = EnvCompare(
@@ -1472,9 +1513,18 @@ INTERSECTION_DETAIL_PDF = EnvCompare(
 # keyed on the glued Post Mile — both env sides share the identical TSMIS encoding
 # (prefix/roadbed/equation glued the same way), so the standard flat path applies and
 # no roadbed canonicalization is needed (that is a TSMIS-vs-TSN tool).
+def _highway_detail_canonical_header(header):
+    """CMP-AUD-032: recognize the current Highway Detail export layout
+    (`highway_detail_columns.HEADER`, the 34 labels) or refuse — the audit noted
+    Highway Detail 'never calls its existing exact header recognizer'."""
+    import highway_detail_columns as hdc
+    return _flat_header_recognizer(header, list(hdc.HEADER))
+
+
 HIGHWAY_DETAIL = EnvCompare(
     "highway_detail", "Highway Detail", "highway_detail",
     sheet_name="Highway Detail", key_col="Post Mile",
+    header_canonicalizer=_highway_detail_canonical_header,
     base_schema=CompareSchema(
         report_name="Highway Detail", header=["Post Mile"],
         id_noun="location", id_noun_plural="locations", pair_noun="postmile"))

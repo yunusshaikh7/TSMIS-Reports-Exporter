@@ -51,13 +51,20 @@ def _touch(p, data=b"PK"):
 
 
 def _rd_route_file(p, desc):
-    """A minimal per-route Ramp Detail export: the real sheet name + a PM-keyed
-    row, enough for the flat cross-env loader (header locked from the files)."""
+    """A per-route Ramp Detail export with the REAL 11-column layout + a PM-keyed
+    row. CMP-AUD-032 pins the cross-env schema, so a short fake header is now
+    refused — the fixture must carry the true site header."""
+    import compare_ramp_detail_tsn as _rd
     wb = Workbook()
     ws = wb.active
     ws.title = "TSAR - Ramp Detail"
-    ws.append(["Location", "PM", "Description"])
-    ws.append(["01-DN-101", "1.000", desc])
+    hdr = list(_rd._TSMIS_HEADER[1:])
+    ws.append(hdr)
+    row = [""] * len(hdr)
+    row[0] = "01-DN-101"                      # Location
+    row[hdr.index("PM")] = "1.000"
+    row[hdr.index("Description")] = desc
+    ws.append(row)
     p.parent.mkdir(parents=True, exist_ok=True)
     wb.save(p)
 

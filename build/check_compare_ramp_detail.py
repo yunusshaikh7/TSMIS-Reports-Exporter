@@ -57,6 +57,29 @@ DATA_B = [
 ROWS_A = [[ROUTE] + r for r in DATA_A]
 ROWS_B = [[ROUTE] + r for r in DATA_B]
 
+# The REAL 11-column Ramp Detail export header (CMP-AUD-032 pins the cross-env
+# schema, so the compare_folders end-to-end must use the true site layout; the
+# key_field unit test above stays on the toy header — it drives _schema directly,
+# not the header recognizer). Location is coarse; PM is the granular key.
+import compare_ramp_detail_tsn as _rd          # noqa: E402
+RD_HEADER = list(_rd._TSMIS_HEADER[1:])
+
+
+def _rd_row(pm, desc):
+    row = [""] * len(RD_HEADER)
+    row[0] = "12-ORA-001"                       # Location: district-county-route
+    row[1] = "R"                                # unnamed col B: postmile prefix
+    row[RD_HEADER.index("PM")] = pm
+    row[RD_HEADER.index("Description")] = desc
+    return row
+
+
+RD_DATA_A = [_rd_row("1.000", "ON-A"), _rd_row("2.000", "OFF-B"),
+             _rd_row("3.000", "ON-C"), _rd_row("4.000", "OFF-D")]
+RD_DATA_B = [_rd_row("1.000", "ON-A"), _rd_row("2.000", "OFF-B"),
+             _rd_row("2.500", "ON-NEW"),        # inserted mid-route
+             _rd_row("3.000", "ON-C"), _rd_row("4.000", "OFF-D")]
+
 
 def test_config_is_pm_keyed():
     """The audit-validated wiring: Ramp Detail keys on PM and reads the per-route
@@ -118,8 +141,8 @@ def test_end_to_end_values_workbook():
         b = root / "2026-06-16 ssor-test" / "ramp_detail"
         a.mkdir(parents=True)
         b.mkdir(parents=True)
-        _write_route_file(a / f"ramp_detail_route_{ROUTE}.xlsx", sheet, HEADER, DATA_A)
-        _write_route_file(b / f"ramp_detail_route_{ROUTE}.xlsx", sheet, HEADER, DATA_B)
+        _write_route_file(a / f"ramp_detail_route_{ROUTE}.xlsx", sheet, RD_HEADER, RD_DATA_A)
+        _write_route_file(b / f"ramp_detail_route_{ROUTE}.xlsx", sheet, RD_HEADER, RD_DATA_B)
 
         out = root / "cmp.xlsx"
         res = compare_env.RAMP_DETAIL.compare_folders(
@@ -174,7 +197,10 @@ def test_missing_key_column_fails_closed():
     assert compare_env.HIGHWAY_LOG._resolve_key_field(["A", "B", "C"]) == 0
 
     # (b) End-to-end: two IDENTICAL malformed Ramp Detail folders whose header
-    #     lacks PM must fail closed (an error), never a clean match.
+    #     lacks PM must fail closed (an error), never a clean match. Since
+    #     CMP-AUD-032 pins the schema, a PM-less header is now refused as an
+    #     UNRECOGNIZED layout (which runs before the key-column check) — a
+    #     stricter fail-closed, still no false match and no workbook written.
     bad_header = [h for h in HEADER if h != "PM"]          # County, Ramp ID, Lighting
     bad_data = [[r[0]] + r[2:] for r in DATA_A]            # drop the PM cell
     root = Path(tempfile.mkdtemp())
@@ -191,7 +217,9 @@ def test_missing_key_column_fails_closed():
             a.parent, b.parent, out, events=Events(),
             confirm_overwrite=lambda _p: True, mode="values")
         assert res.status == "error", ("must fail closed, not match", res.status)
-        assert "PM" in (res.message or ""), ("names the missing key column", res.message)
+        # Refused either as an unrecognized layout (032) or a missing key (028).
+        msg = (res.message or "").lower()
+        assert "recognized" in msg or "pm" in msg, ("names the refusal", res.message)
         assert not out.exists(), "no workbook may be written on a fail-closed layout"
     finally:
         shutil.rmtree(root, ignore_errors=True)

@@ -310,7 +310,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-029 | P2 | Remediated 2026-07-17 — `_find_input_dir` excludes `~$` owner-lock stubs, so the generic cross-env XLSX path matches every other loader | Generic XLSX discovery includes Excel owner-lock files |
 | CMP-AUD-030 | P2 | Remediated 2026-07-17 — `_load_xlsx_side` keeps a per-side seen-route set; a duplicate route is skipped into the incompleteness channel, never concatenated | Duplicate route files are silently merged |
 | CMP-AUD-031 | P2 | Remediated 2026-07-17 — the flat XLSX route key is `_norm_route_key`-normalized and the `..._route_<n>` naming contract is required; a non-route file is skipped, never promoted from its stem | Flat report route keys do not normalize `1` and `001` |
-| CMP-AUD-032 | P1 | Verified | Cross-env flat schemas trust the first file, not the report contract |
+| CMP-AUD-032 | P1 | Partially remediated 2026-07-18 (XLSX cross-env DONE — RD/HSL/HD pin an exact-header recognizer, ID's canonicalizer refuses unrecognized; census-verified on the 7.9 statewide exports; PDF-conversion pins HSL-PDF/RD-PDF next) | Cross-env flat schemas trust the first file, not the report contract |
 | CMP-AUD-033 | P1 | Remediated 2026-07-17 — all four normalized loaders bind the exact ["Route"]+SHARED_HEADER prefix + documented sidecars before reading positionally | Normalized TSN loaders ignore their declared headers |
 | CMP-AUD-034 | P1 | Remediated 2026-07-17 — all four consolidated `_load_tsmis` loaders bind their EXACT documented header (the shared `exact_consolidated_header_ok`); relabels/shifts/insertions/deletions/wrong editions are refused | Consolidated TSMIS loaders accept semantically invalid layouts |
 | CMP-AUD-035 | P1 | Partially remediated — type-exactness fixed 2026-07-14; TOCTOU pending | Original raw-admission r7 accepted. Type-exact validation now rejects float/bool aliases of `version`/`member_count`/`byte_length`/`schema_version` in the raw-manifest, normalized-identity, and certificate checks (red→green). Still open: the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
@@ -1645,6 +1645,30 @@ must not change schema selection; two identically malformed or legacy inputs mus
 and stray same-sheet workbooks must be ignored or make the side explicitly invalid.
 Test current/current, legacy/legacy, current/legacy, missing/extra columns, and missing
 keys for each family and its PDF conversion path.
+
+**Remediation — XLSX cross-env (2026-07-18).** The naming-contract half was already
+closed by CMP-AUD-031 (`_load_xlsx_side` requires `..._route_<n>.xlsx`, so a stray
+`anything.xlsx` is skipped). The residual header-trust half is now pinned for all four
+unprotected flat families via a `header_canonicalizer` (the pattern Highway Log already
+used): a new shared `_flat_header_recognizer` factory recognizes a family's EXACT current
+export header (the vs-TSN comparator's `_TSMIS_HEADER[1:]` for Ramp Detail / Highway
+Sequence / Intersection Detail — unnamed columns included — and `highway_detail_columns
+.HEADER` for Highway Detail) and returns None for anything else, which the config
+composition turns into an "unrecognized column layout" refusal; Intersection Detail's
+`_id_canonical_header` now refuses a non-edition layout instead of returning it unchanged
+(it still bridges the current↔legacy label editions). So two identically-malformed,
+truncated, reordered, or legacy-non-edition sides refuse instead of pairing on a
+trusted-first-readable header. **Census** (bound 7.9 statewide exports: 126 RD / 252 HSL /
+252 HD / 217 ID) proved each family has ONE consistent header shape, none carrying a
+leading Route — so pinning drops no real file. Controls: new
+`build/check_compare_env_flat_schema.py` (the per-family recognizer matrix +
+current/current OK, bogus/bogus refuse, current/bogus refuse end-to-end); five existing
+fixtures (`check_compare_ramp_detail`, `check_compare_highway_sequence`,
+`check_compare_env_intersection`, `check_baseline_matrix`, `check_matrix`) rebuilt from
+fake short headers onto the real layouts (red→green). Offline gate 131/131; ruff clean.
+**Remaining:** the two PDF-conversion loaders (HSL-PDF, RD-PDF) still carry no header pin
+(the other three PDF loaders do) — the same recognizer wiring on their configs, with
+RD-PDF's own 13-column print header (the On/Off + Ramp Type sentinels).
 
 ### CMP-AUD-033 — normalized TSN headers are skipped, not validated
 
