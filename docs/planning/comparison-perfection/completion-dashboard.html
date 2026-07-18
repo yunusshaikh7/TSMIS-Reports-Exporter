@@ -167,15 +167,15 @@
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="161 closed, 10 in progress, 69 open of 241 findings">
-          <div class="seg done" style="width:67%">161 closed</div>
+        <div class="bar" role="img" aria-label="162 closed, 10 in progress, 68 open of 241 findings">
+          <div class="seg done" style="width:67%">162 closed</div>
           <div class="seg warn" style="width:4%"></div>
-          <div class="seg open" style="width:29%">69 open</div>
+          <div class="seg open" style="width:29%">68 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 161 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 162 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot warn"></i> ~10 in progress</span>
-          <span><i class="dot open"></i> ~69 open</span>
+          <span><i class="dot open"></i> ~68 open</span>
         </div>
       </div>
     </div>
@@ -214,7 +214,7 @@
       </div>
       <div class="bk is-prog">
         <div class="bk-top"><span class="bk-letter">D</span><span class="bk-name">Cross-environment validation</span><span class="pill prog">In progress</span></div>
-        <p class="bk-desc"><code>018</code> · <code>019</code> closed (IS partition gate; Ramp Summary audit-reconciliation). Next: <code>046</code> · <code>022</code>.</p>
+        <p class="bk-desc"><code>018</code> · <code>019</code> · <code>046</code> closed (IS partition gate; Ramp Summary audit-reconciliation; shifted-export field labels). Only <code>022</code> left.</p>
       </div>
       <div class="bk">
         <div class="bk-top"><span class="bk-letter">B</span><span class="bk-name">PDF-parser robustness</span><span class="pill open">Open</span></div>
@@ -250,7 +250,7 @@
         <div class="n">01</div>
         <div class="body">
           <div class="h">Finish cross-environment validation <span class="tag now">up next</span></div>
-          <div class="m">Bucket D — <b class="mono">046</b> (position-shifted header projection) → <b class="mono">022</b> (duplicate categories). <b class="mono">018</b> + <b class="mono">019</b> done.</div>
+          <div class="m">Bucket D — only <b class="mono">022</b> left (duplicate normalized categories). <b class="mono">018</b> + <b class="mono">019</b> + <b class="mono">046</b> done.</div>
         </div>
       </div>
       <div class="step"><div class="n">02</div><div class="body"><div class="h">PDF-parser robustness wave</div><div class="m">Bucket B — spill/orphan/fallback/truncation hardening for the HD &amp; ID parsers.</div></div></div>
@@ -274,11 +274,12 @@
       <div class="win"><div class="id">sol-001</div><div class="w">Reliability engine hardening — integrated</div><div class="c">updater · export · auth · reviewed + merged</div></div>
       <div class="win"><div class="id">CMP-AUD-019</div><div class="w">Ramp Summary audit reds reflected in the result</div><div class="c">census 126 routes · 22 P/V ramps · unexplained → PARTIAL</div></div>
       <div class="win"><div class="id">CMP-AUD-032</div><div class="w">Flat cross-env schemas pinned — bucket C complete</div><div class="c">RD/HSL/HD/ID + 2 PDF paths · census 847 exports · no phantom match</div></div>
+      <div class="win"><div class="id">CMP-AUD-046</div><div class="w">Shifted exports show diffs under the right field</div><div class="c">RD force_header + ID realign · Description not R/U · display-only</div></div>
     </div>
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>62d1593</b> · gate <b>131/131</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>1edca5f</b> · gate <b>132/132</b> · CI-green</span>
     <span>Updated <b>2026-07-17</b></span>
   </footer>
 
