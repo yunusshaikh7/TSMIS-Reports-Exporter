@@ -162,20 +162,20 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">68<span>%</span></div>
+        <div class="bignum">69<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="164 closed, 10 in progress, 66 open of 241 findings">
-          <div class="seg done" style="width:68%">164 closed</div>
+        <div class="bar" role="img" aria-label="166 closed, 10 in progress, 64 open of 241 findings">
+          <div class="seg done" style="width:69%">166 closed</div>
           <div class="seg warn" style="width:4%"></div>
-          <div class="seg open" style="width:28%">66 open</div>
+          <div class="seg open" style="width:27%">64 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 164 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 166 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot warn"></i> ~10 in progress</span>
-          <span><i class="dot open"></i> ~66 open</span>
+          <span><i class="dot open"></i> ~64 open</span>
         </div>
       </div>
     </div>
@@ -276,11 +276,13 @@
       <div class="win"><div class="id">CMP-AUD-046</div><div class="w">Shifted exports show diffs under the right field</div><div class="c">RD force_header + ID realign · Description not R/U · display-only</div></div>
       <div class="win"><div class="id">CMP-AUD-022</div><div class="w">No silent double-count in the raw summary block-walk — bucket D complete</div><div class="c">counts_from_rows · census 437 calls · (block, pre-fold code) guard</div></div>
       <div class="win"><div class="id">CMP-AUD-071</div><div class="w">Ramp Summary comparison validates its route universe</div><div class="c">shared validator + producer census · census 126 routes 001–980</div></div>
+      <div class="win"><div class="id">CMP-AUD-068</div><div class="w">Highway Detail PDF-vs-TSN gains its Report View</div><div class="c">shared add_report_view · real-corpus 120,384 rows · parity with Excel</div></div>
+      <div class="win"><div class="id">CMP-AUD-069</div><div class="w">Ramp Detail PDF diagnostics use the right file roles</div><div class="c">forwards side labels · "TSMIS (Excel)" not "TSN"</div></div>
     </div>
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>cc8e840</b> · gate <b>132/132</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>782b203</b> · gate <b>132/132</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 
