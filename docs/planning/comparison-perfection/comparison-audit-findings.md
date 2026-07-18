@@ -332,7 +332,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-051 | P1 | Resolved | Highway Detail PM spill creates phantom PDF records |
 | CMP-AUD-052 | P1 | Resolved | Highway Detail header words swallow real line-two data |
 | CMP-AUD-053 | P1 | Resolved | Highway Detail orphan reconciliation never fires |
-| CMP-AUD-054 | P1 | Verified on current 7.9 | Highway Detail fallback grids corrupt real rows as complete |
+| CMP-AUD-054 | P1 | Resolved | Highway Detail fallback grids corrupt real rows as complete |
 | CMP-AUD-055 | P1 | Resolved | Damaged repeated headers silently drop later PDF data pages |
 | CMP-AUD-056 | P1 | Resolved | Intersection wrapped rowB text is truncated as complete |
 | CMP-AUD-057 | P1 | Resolved | Intersection orphan rowB lines are never counted |
