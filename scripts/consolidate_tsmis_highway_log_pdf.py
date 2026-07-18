@@ -138,8 +138,18 @@ URL_MARK = "tsmis.dot.ca.gov"   # the page-footer URL line (never report data)
 # the TSN log does.
 LOCATION_RE = re.compile(r"^[A-Z]?\d{3}\.\d{3}[A-Z]?$")
 # Centered "<district> <county> <route>" group header, e.g. "09 INY 006" or the
-# period-bearing county codes "07 LA. 005S" / "11 SD. 905".
-GROUP_RE = (re.compile(r"^\d{2}$"), re.compile(r"^[A-Z]{2,4}\.?$"),
+# period-bearing county codes "07 LA. 005S" / "11 SD. 905". The DISTRICT slot is
+# normally two digits, but the print renders a blank/absent district as a long
+# DASH — "— MER 059" (route 059 p5) and "— SBD 058U" (route 058U p3) are the two
+# such section markers statewide. The MER-059 census (all 252 HL prints) proved
+# those are the ONLY long-dash (en/em/minus) lines in the corpus, every other
+# group-header slot exact — so accepting a dashed district recognizes the marker
+# as a group header (section reset) instead of gluing "— MER 059" onto the prior
+# row's Description (the last same-source PDF-vs-Excel Description false diff).
+# Shared by the parser AND its evidence-adapter twin (evidence_highway_log reads
+# chlp.GROUP_RE), so the two stay in lockstep by construction.
+GROUP_RE = (re.compile(r"^(?:\d{2}|[–—−]+)$"),
+            re.compile(r"^[A-Z]{2,4}\.?$"),
             re.compile(r"^\d{1,3}[A-Z]?$"))
 # Route token out of "highway_log_route_<ROUTE>.pdf".
 ROUTE_FROM_NAME = re.compile(r"route[_ -]*([0-9]+[A-Za-z]?)", re.IGNORECASE)

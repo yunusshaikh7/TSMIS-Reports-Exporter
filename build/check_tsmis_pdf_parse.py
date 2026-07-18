@@ -217,6 +217,51 @@ def check_star_descriptions():
     shutil.rmtree(tmp, ignore_errors=True)
 
 
+def check_dashed_district_group_header():
+    """MER-059: a centered "<district> <county> <route>" group header whose
+    DISTRICT prints as a long dash ("— MER 059", route 059 p5; "— SBD 058U",
+    058U p3 — the ONLY long-dash lines in all 252 prints per the statewide
+    census) must be recognized as a group header (section reset), NOT glued onto
+    the prior row's Description. Two-digit districts still work; a plain hyphen is
+    NOT a district (so a real hyphenated token can't masquerade as a header)."""
+    d0 = M.GROUP_RE[0]
+    assert d0.match("10") and d0.match("09"), "two-digit district must still match"
+    assert d0.match("—") and d0.match("–") and d0.match("−"), "long dashes match"
+    assert not d0.match("-"), "a plain hyphen is NOT a dashed district"
+    assert not d0.match("1") and not d0.match("MER"), "single digit / letters don't"
+
+    import tempfile
+    from pathlib import Path
+
+    sys.path.insert(0, os.path.dirname(__file__))
+    from _hl_fixture_pdf import make_pdf
+    from events import Events
+
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_hl_dash_"))
+    p = tmp / "highway_log_route_059.pdf"
+    rects = ([(30, 200, 40, 12)]
+             + [(72 + i * 16, 200, 15, 12) for i in range(M.N_PDF_COLS - 1)])
+    # A described data row, then the dashed-district group header (centered,
+    # x0 well past 30% of the 612-pt page), then the next section's data row.
+    make_pdf(p, [[
+        (100, 100, "Route 059"),
+        (31, 202, "001.000"),
+        (156, 215, "SOME DESCRIPTION"),
+        (354, 230, "— MER 059"),                 # dashed-district group header
+        (31, 245, "002.000"),
+    ]], rects_per_page=[rects], win_ansi=True)     # WinAnsi so the em-dash survives
+
+    route, rows, stats = M.parse_pdf(str(p), Events())
+    assert route == "059", route
+    assert len(rows) == 2, [r[0] for r in rows]
+    # The header must NOT have attached to the prior row's Description (pre-fix it
+    # fell through GROUP_RE and glued " — MER 059" onto it).
+    assert rows[0][M._DESC_IDX] == "SOME DESCRIPTION", repr(rows[0][M._DESC_IDX])
+
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     check_layout_guard()
     check_norm_route()
@@ -226,10 +271,12 @@ def main():
     check_carried_line_crossings()
     check_header_bottom()
     check_star_descriptions()
+    check_dashed_district_group_header()
     print("OK  TSMIS Highway Log (PDF) parse: 30->31 column mapping, conserving "
           "character assignment, Location normalization, route padding, "
-          "carried-geometry validation, content-based header detection, and "
-          "description-band star conservation all locked.")
+          "carried-geometry validation, content-based header detection, "
+          "description-band star conservation, and dashed-district group-header "
+          "recognition all locked.")
 
 
 if __name__ == "__main__":

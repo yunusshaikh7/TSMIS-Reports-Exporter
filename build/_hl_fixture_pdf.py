@@ -16,7 +16,7 @@ def _esc(text):
     return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
 
 
-def _page_stream(runs, rects=()):
+def _page_stream(runs, rects=(), encoding="latin-1"):
     parts = []
     for x, top, w, h in rects:
         # A filled light-grey cell rect (pdfplumber reads it from the `re` op)
@@ -29,20 +29,28 @@ def _page_stream(runs, rects=()):
         y = PAGE_H - top - FONT_SIZE
         parts.append(f"1 0 0 1 {x:.2f} {y:.2f} Tm ({_esc(text)}) Tj")
     parts.append("ET")
-    return "\n".join(parts).encode("latin-1")
+    return "\n".join(parts).encode(encoding)
 
 
-def make_pdf(path, pages, rects_per_page=None):
+def make_pdf(path, pages, rects_per_page=None, win_ansi=False):
     """pages: list of [(x, top, text)] run-lists -> a minimal valid PDF.
     `rects_per_page` (optional): a parallel list of [(x, top, w, h)] filled
-    cell rects per page (for parsers that window on shaded bands)."""
+    cell rects per page (for parsers that window on shaded bands).
+    `win_ansi` (opt-in): declare WinAnsiEncoding and encode the content stream as
+    cp1252, so a fixture can carry the print's en/em dashes (bytes 0x96/0x97 that
+    latin-1 can't hold) — pdfplumber then reads them back as U+2013/U+2014. Off by
+    default, so every existing ASCII caller is byte-for-byte unchanged."""
+    encoding = "cp1252" if win_ansi else "latin-1"
+    font = (b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
+            b"/Encoding /WinAnsiEncoding >>" if win_ansi
+            else b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
     objs = []
     kids = []
     for i, runs in enumerate(pages):
         content_num = 4 + i * 2
         page_num = content_num + 1
         rects = () if rects_per_page is None else rects_per_page[i]
-        stream = _page_stream(runs, rects)
+        stream = _page_stream(runs, rects, encoding)
         objs.append((content_num,
                      b"<< /Length %d >>\nstream\n%s\nendstream"
                      % (len(stream), stream)))
@@ -55,7 +63,7 @@ def make_pdf(path, pages, rects_per_page=None):
         (1, b"<< /Type /Catalog /Pages 2 0 R >>"),
         (2, ("<< /Type /Pages /Kids [%s] /Count %d >>"
              % (" ".join(kids), len(pages))).encode("latin-1")),
-        (3, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+        (3, font),
     ]
     out = bytearray(b"%PDF-1.4\n")
     offsets = {}
