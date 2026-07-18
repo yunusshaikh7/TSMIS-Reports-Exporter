@@ -517,11 +517,60 @@ def test_corrupt_pdf_is_valueerror():
         check(f"corrupt PDF -> ValueError, not {type(e).__name__}", False)
 
 
+def test_summary_by_category_typed_parity():
+    """CMP-AUD-039 / 043: the familiar 'Summary by Category' sheet must flag a
+    row from the SAME typed comparison the Comparison sheet uses (compared_cell),
+    never an independently re-derived numeric delta — and it must disclose that
+    it is a build-time snapshot. The discriminating fixture is a count that is
+    text-different but numeric-equal (5 vs '05'): the numeric delta says EQUAL
+    while compared_cell says DIFFERENT, so a delta-driven sheet would silently
+    disagree with the verdict."""
+    print("CMP-AUD-039/043 familiar-sheet typed-state parity + snapshot label:")
+    from compare_core import compared_cell
+    spec = summary_layout.RAMP_SUMMARY_SPEC
+    sc = cmp._SCHEMA
+    cats = [c for sec in spec.sections for c in sec.cats][:3]
+    if len(cats) < 3:
+        check("spec exposes >=3 compared categories for the fixture", False)
+        return
+    eq_cat, diff_cat, div_cat = cats
+    rows_a = [[eq_cat.key, 7], [diff_cat.key, 3], [div_cat.key, 5]]
+    rows_b = [[eq_cat.key, 7], [diff_cat.key, 9], [div_cat.key, "05"]]
+    check("fixture discriminates: compared_cell says DIFFERENT while the numeric "
+          "delta says equal (5 vs '05')",
+          compared_cell(sc, 1, [div_cat.key, 5], [div_cat.key, "05"], 0).state_code
+          == "D" and (5 - 5) == 0)
+    wb = Workbook(write_only=True)
+    ctx = {"sc": sc, "rows_a": rows_a, "rows_b": rows_b, "has_route": False,
+           "side_a": "tsmis.xlsx", "side_b": "tsn.xlsx"}
+    summary_layout.make_extra_sheet_writer(spec)(wb, ctx)
+    out = Path(tempfile.mkdtemp(prefix="tsmis_rs_parity_")) / "s.xlsx"
+    wb.save(out)
+    ws = load_workbook(out)[spec.sheet_name]
+    red, snap = {}, False
+    for r in ws.iter_rows():
+        label = r[0].value
+        if not (label and isinstance(label, str)):
+            continue
+        if "snapshot" in label.lower():
+            snap = True
+        for c in (eq_cat, diff_cat, div_cat):
+            if label == c.label:
+                col = r[1].font.color
+                red[c.key] = bool(col) and str(getattr(col, "rgb", "") or "").endswith("C00000")
+    check("equal category (7 vs 7) is NOT flagged", red.get(eq_cat.key) is False)
+    check("differing category (3 vs 9) IS flagged", red.get(diff_cat.key) is True)
+    check("divergent category follows the typed verdict (flagged), not the "
+          "numeric delta", red.get(div_cat.key) is True)
+    check("CMP-AUD-043 build-time snapshot label present on the familiar sheet", snap)
+
+
 def main():
     test_schema_and_categories()
     test_tsmis_loader_sums()
     test_route_universe()
     test_end_to_end()
+    test_summary_by_category_typed_parity()
     test_validation_refusals()
     test_provenance_sidecar()
     test_corrupt_pdf_is_valueerror()

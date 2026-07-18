@@ -285,6 +285,9 @@ def test_end_to_end():
           and not any("show 0 on that side" in c for c in flat))
     check("familiar note no longer cites Ramp P/V on the Intersection sheet",
           not any("ramp types P / V" in c for c in flat))
+    # CMP-AUD-043: the shared familiar sheet discloses it is a build-time snapshot.
+    check("CMP-AUD-043 build-time snapshot label present on the familiar sheet",
+          any("snapshot" in c.lower() and "recalculate" in c.lower() for c in flat))
     print(f"      (both={both}, only-TSMIS={tonly}, only-TSN={nonly})")
 
 

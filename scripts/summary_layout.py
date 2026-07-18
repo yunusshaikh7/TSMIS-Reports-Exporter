@@ -584,6 +584,27 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     va = {r[0]: _as_int(r[1]) for r in ctx["rows_a"]}
     vb = {r[0]: _as_int(r[1]) for r in ctx["rows_b"]}
 
+    # CMP-AUD-039: the diff STYLING must come from the SAME typed comparison the
+    # Comparison sheet uses (compared_cell), never an independently re-derived
+    # numeric delta — so this familiar sheet can never disagree with the verdict
+    # (whose equality is Excel-TRIM, and which owns any future normalization).
+    # The displayed Δ stays numeric (a reader aid). One field is compared (the
+    # count); has_route=False for the aggregate, so off=0.
+    from compare_core import compared_cell
+    rows_a_by = {r[0]: r for r in ctx["rows_a"]}
+    rows_b_by = {r[0]: r for r in ctx["rows_b"]}
+    _count_field = sc.field_indices[0] if sc.field_indices else 1
+    _off = 1 if ctx.get("has_route") else 0
+
+    def typed_differ(key):
+        """The typed comparison verdict for this category's count: True/False on
+        a both-sides category, None when it's one-sided (shown blank on the
+        absent side, deliberately) or absent from the compared universe."""
+        ra, rb = rows_a_by.get(key), rows_b_by.get(key)
+        if ra is None or rb is None:
+            return None
+        return compared_cell(sc, _count_field, ra, rb, _off).state_code == "D"
+
     ws = wb.create_sheet(spec.sheet_name)
     ws.sheet_properties.tabColor = _TAB_COLOR
     write_only = getattr(wb, "write_only", False)
@@ -618,11 +639,17 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     # a structurally one-sided category stays BLANK on the absent side (blank ≠
     # an explicit source 0) — and must not cite another family's categories;
     # the family-specific detail rides spec.notes.
-    ws.append([cell(f"Counts per category. Δ = {side_b} − {side_a}; a non-zero Δ is "
-                    "flagged. A category one system doesn't classify stays BLANK "
-                    "on that side (no Δ) and is listed under 'Only in …' in the "
-                    "Comparison sheet; an explicit 0 is a real source zero.",
-                    note_font)])
+    ws.append([cell(f"Counts per category. Δ = {side_b} − {side_a}; a flagged row "
+                    "is one the Comparison sheet judges different. A category one "
+                    "system doesn't classify stays BLANK on that side (no Δ) and "
+                    "is listed under 'Only in …' in the Comparison sheet; an "
+                    "explicit 0 is a real source zero.", note_font)])
+    # CMP-AUD-043: this familiar sheet is a build-time SNAPSHOT — its counts and
+    # flags do not recalculate. After editing a source, the live Comparison sheet
+    # can move while these stay put; regenerate the comparison to refresh them.
+    ws.append([cell("These counts are a build-time snapshot and do NOT "
+                    "recalculate; regenerate the comparison after editing a "
+                    "source file.", note_font)])
     if file_a or file_b:
         ws.append([cell(f"{side_a} = {file_a}    {side_b} = {file_b}", note_font)])
     for n in spec.notes:
@@ -636,7 +663,8 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     def value_row(label, key):
         a, b = va.get(key), vb.get(key)
         delta = (b - a) if (a is not None and b is not None) else None
-        differ = delta is not None and delta != 0
+        typed = typed_differ(key)
+        differ = typed if typed is not None else (delta is not None and delta != 0)
         f = diff_font if differ else body
         return [cell(label, body, align=left),
                 cell(a, f, align=right), cell(b, f, align=right),
@@ -653,7 +681,9 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
         ws.append([])
         a, b = va.get(spec.total.key), vb.get(spec.total.key)
         delta = (b - a) if (a is not None and b is not None) else None
-        f = diff_font if (delta is not None and delta != 0) else head_font
+        typed = typed_differ(spec.total.key)
+        tdiff = typed if typed is not None else (delta is not None and delta != 0)
+        f = diff_font if tdiff else head_font
         ws.append([cell(spec.total.label, head_font, align=left),
                    cell(a, f, align=right), cell(b, f, align=right),
                    cell(delta if delta is not None else "", f, align=right)])
