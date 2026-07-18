@@ -163,24 +163,24 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:ramp_detail_pdf:env", "TSAR: Ramp Detail (PDF) — between environments", "folders", "env", _ce.RAMP_DETAIL_PDF),
     ("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN", "files", "tsn", _chl),
     ("cmp:highway_log:pdf_vs_tsn", "Highway Log — TSMIS (PDF) vs TSN (PDF)", "files", "tsn", _chlp.TSMIS_PDF_VS_TSN),
-    ("cmp:highway_log:pdf_vs_excel", "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chlp.TSMIS_PDF_VS_EXCEL),
+    ("cmp:highway_log:pdf_vs_excel", "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _chlp.TSMIS_PDF_VS_EXCEL),
     ("cmp:ramp_detail:tsn", "TSAR: Ramp Detail — TSMIS vs TSN", "files", "tsn", _crd_tsn),
     ("cmp:ramp_summary:tsn", "TSAR: Ramp Summary — TSMIS vs TSN", "files", "tsn", _crs_tsn),
     ("cmp:intersection_summary:tsn", "Intersection Summary — TSMIS vs TSN", "files", "tsn", _cis_tsn),
     ("cmp:intersection_detail:tsn", "Intersection Detail — TSMIS vs TSN", "files", "tsn", _cid_tsn),
     ("cmp:intersection_detail:pdf_vs_tsn", "Intersection Detail — TSMIS (PDF) vs TSN", "files", "tsn", _cidp.TSMIS_PDF_VS_TSN),
-    ("cmp:intersection_detail:pdf_vs_excel", "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _cidp.TSMIS_PDF_VS_EXCEL),
+    ("cmp:intersection_detail:pdf_vs_excel", "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _cidp.TSMIS_PDF_VS_EXCEL),
     ("cmp:highway_sequence:tsn", "Highway Sequence Listing — TSMIS vs TSN", "files", "tsn", _chs_tsn),
     # v0.20.0: the Highway Detail file comparisons (vs-TSN + the two PDF flavors).
     ("cmp:highway_detail:tsn", "Highway Detail — TSMIS vs TSN", "files", "tsn", _chd_tsn),
     ("cmp:highway_detail:pdf_vs_tsn", "Highway Detail — TSMIS (PDF) vs TSN", "files", "tsn", _chdp.TSMIS_PDF_VS_TSN),
-    ("cmp:highway_detail:pdf_vs_excel", "Highway Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chdp.TSMIS_PDF_VS_EXCEL),
+    ("cmp:highway_detail:pdf_vs_excel", "Highway Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _chdp.TSMIS_PDF_VS_EXCEL),
     # v0.25.0: the Highway Sequence PDF file comparisons, the HD parallel.
     ("cmp:highway_sequence:pdf_vs_tsn", "Highway Sequence Listing — TSMIS (PDF) vs TSN", "files", "tsn", _chslp.TSMIS_PDF_VS_TSN),
-    ("cmp:highway_sequence:pdf_vs_excel", "Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _chslp.TSMIS_PDF_VS_EXCEL),
+    ("cmp:highway_sequence:pdf_vs_excel", "Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _chslp.TSMIS_PDF_VS_EXCEL),
     # v0.26.0: the Ramp Detail PDF file comparisons, the HSL parallel.
     ("cmp:ramp_detail:pdf_vs_tsn", "TSAR: Ramp Detail — TSMIS (PDF) vs TSN", "files", "tsn", _crdp.TSMIS_PDF_VS_TSN),
-    ("cmp:ramp_detail:pdf_vs_excel", "TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "env", _crdp.TSMIS_PDF_VS_EXCEL),
+    ("cmp:ramp_detail:pdf_vs_excel", "TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _crdp.TSMIS_PDF_VS_EXCEL),
 ]
 _AUTO_CONS = {
     "ramp_summary": _con_ramp_summary, "ramp_detail": _con_ramp_detail,
@@ -305,6 +305,17 @@ def test_golden_equivalence():
     check("COMPARE (key, label, kind, group) == baseline",
           [(c.key, c.label, c.kind, c.group) for c in cat.COMPARE]
           == [(k, l, ki, g) for k, l, ki, g, _a in _COMPARE])
+    # CMP-AUD-014: the PDF-vs-Excel self-checks live in their own "self" sub-tab,
+    # not "env". Assert the group semantically (beyond the positional baseline): the
+    # "self" group is declared, and its members are EXACTLY the pdf_vs_excel keys —
+    # a self-check parked back in "env", or an env/tsn row leaking into "self",
+    # fails here.
+    group_ids = {gid for gid, _label in cat.compare_groups()}
+    check("'self' (Self-consistency) is a declared compare group", "self" in group_ids)
+    self_keys = {c.key for c in cat.COMPARE if c.group == "self"}
+    pdf_vs_excel_keys = {c.key for c in cat.COMPARE if c.key.endswith(":pdf_vs_excel")}
+    check("every :pdf_vs_excel comparison is in the 'self' group (none left in env/tsn)",
+          self_keys == pdf_vs_excel_keys and len(self_keys) == 5)
     check("TSN descriptors == baseline",
           [(t.subdir, t.label, t.raw_glob, t.raw_kind, t.consolidated_name, t.builder)
            for t in cat.TSN] == _TSN)

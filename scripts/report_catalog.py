@@ -216,12 +216,16 @@ CONSOLIDATE = (
                      _c_tsmis_highway_detail_pdf),
 )
 
-# Compare tab SUB-TABS (the FIRST is the default). "env" = cross-environment,
-# "tsn" = file-based TSMIS-vs-TSN. A third "vs TSN Matrix" sub-tab is appended by
-# the GUI itself (not a registry comparison type).
+# Compare tab SUB-TABS (the FIRST is the default). "env" = cross-environment
+# (two environments of the same report), "tsn" = file-based TSMIS-vs-TSN, "self" =
+# same-environment self-consistency (a report's PDF render vs its Excel render — one
+# system checked against itself, neither cross-environment nor vs-TSN; CMP-AUD-014).
+# The GUI appends two more manual day-picking sub-tabs ("vs TSN Matrix" + "vs
+# Baseline Matrix"), which are not registry comparison types.
 COMPARE_GROUPS = (
     ("env", "Cross-environment"),
     ("tsn", "vs TSN"),
+    ("self", "Self-consistency"),
 )
 
 # Compare registry. `kind` is "files" (two workbooks) or "folders" (two export run
@@ -279,9 +283,10 @@ COMPARE = (
     CompareEntry("cmp:highway_log:pdf_vs_tsn", "Highway Log — TSMIS (PDF) vs TSN (PDF)",
                  _cmp_highway_log_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
     # TSMIS (PDF) vs TSMIS (Excel) is an internal consistency check (one system, one
-    # environment), NOT a TSN comparison — so it lives under "env", not "tsn".
+    # environment) — neither a cross-environment nor a TSN comparison, so it lives in
+    # its own "self" (Self-consistency) sub-tab (CMP-AUD-014), not "env".
     CompareEntry("cmp:highway_log:pdf_vs_excel", "Highway Log — TSMIS (PDF) vs TSMIS (Excel)",
-                 _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
+                 _cmp_highway_log_pdf.TSMIS_PDF_VS_EXCEL, "files", "self"),
     # v0.17.0 vs-TSN comparators (the reference recipe), appended at the END.
     CompareEntry("cmp:ramp_detail:tsn", "TSAR: Ramp Detail — TSMIS vs TSN",
                  _cmp_ramp_detail_tsn, "files", "tsn"),
@@ -297,33 +302,33 @@ COMPARE = (
     CompareEntry("cmp:intersection_detail:pdf_vs_tsn", "Intersection Detail — TSMIS (PDF) vs TSN",
                  _cmp_int_detail_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
     CompareEntry("cmp:intersection_detail:pdf_vs_excel", "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)",
-                 _cmp_int_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
+                 _cmp_int_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "self"),
     CompareEntry("cmp:highway_sequence:tsn", "Highway Sequence Listing — TSMIS vs TSN",
                  _cmp_highway_seq_tsn, "files", "tsn"),
     # Highway Detail file comparisons (v0.20.0) — the FLAT vs-TSN comparator plus
     # the two PDF-sourced flavors, the exact parallel of the Intersection Detail
-    # trio. PDF-vs-Excel is an internal one-system consistency check ("env").
+    # trio. PDF-vs-Excel is an internal one-system consistency check ("self").
     CompareEntry("cmp:highway_detail:tsn", "Highway Detail — TSMIS vs TSN",
                  _cmp_highway_detail_tsn, "files", "tsn"),
     CompareEntry("cmp:highway_detail:pdf_vs_tsn", "Highway Detail — TSMIS (PDF) vs TSN",
                  _cmp_highway_detail_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
     CompareEntry("cmp:highway_detail:pdf_vs_excel", "Highway Detail — TSMIS (PDF) vs TSMIS (Excel)",
-                 _cmp_highway_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
+                 _cmp_highway_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "self"),
     # Highway Sequence PDF-sourced file comparisons (v0.25.0) — the exact parallel
     # of the Highway Detail pair above. PDF-vs-Excel is an internal one-system
-    # consistency check ("env").
+    # consistency check ("self").
     CompareEntry("cmp:highway_sequence:pdf_vs_tsn", "Highway Sequence Listing — TSMIS (PDF) vs TSN",
                  _cmp_highway_seq_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
     CompareEntry("cmp:highway_sequence:pdf_vs_excel", "Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel)",
-                 _cmp_highway_seq_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
+                 _cmp_highway_seq_pdf.TSMIS_PDF_VS_EXCEL, "files", "self"),
     # Ramp Detail PDF-sourced file comparisons (v0.26.0) — the exact parallel of
     # the Highway Sequence pair above. The PDF side carries the print-only
     # On/Off + Ramp Type columns (COMPARED vs TSN, context vs Excel).
-    # PDF-vs-Excel is an internal one-system consistency check ("env").
+    # PDF-vs-Excel is an internal one-system consistency check ("self").
     CompareEntry("cmp:ramp_detail:pdf_vs_tsn", "TSAR: Ramp Detail — TSMIS (PDF) vs TSN",
                  _cmp_ramp_detail_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
     CompareEntry("cmp:ramp_detail:pdf_vs_excel", "TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel)",
-                 _cmp_ramp_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "env"),
+                 _cmp_ramp_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "self"),
 )
 
 # B2 auto-consolidate: which consolidate module handles each EXPORTABLE report,

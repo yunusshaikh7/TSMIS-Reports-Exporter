@@ -524,16 +524,18 @@ See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for
 
 Add one `CompareEntry` to `report_catalog.py` (the metadata SoT, P4 — its stable `cmp:*` key + label + adapter + `kind` + `group`); `reports.py` derives `COMPARE_REPORTS`/`COMPARE_KEYS` from it, an import-time assert enforces 1:1 keys, and you also update the frozen baseline in `build/check_report_catalog.py` and add the module to `APP_MODULES` in `build/app.spec`. The GUI's per-sub-tab type lists are generated from the derived rows `(label, module_or_adapter, kind, group)`; as of P3 (v0.18.0) **selection travels by each row's stable `cmp:*` key**, so the row order is only the UI-radio display order and never mis-resolves a `start_compare*` call.
 
-**`group`** is one of `COMPARE_GROUPS`' ids. The Compare pane renders one **sub-tab per group** (first = default), and a row shows only under its group's sub-tab. As of v0.16.1 the two registry sub-tabs are:
+**`group`** is one of `COMPARE_GROUPS`' ids. The Compare pane renders one **sub-tab per group** (first = default), and a row shows only under its group's sub-tab. The three registry sub-tabs are (the `self` group added by CMP-AUD-014):
 
 ```python
 COMPARE_GROUPS = [
     ("env", "Cross-environment"),
     ("tsn", "vs TSN"),
+    ("self", "Self-consistency"),
 ]
 ```
-- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, Highway Log, **Intersection Summary/Detail**, **Highway Detail**, and the three **PDF editions** — Highway Log (PDF) + Intersection Detail (PDF) + Highway Detail (PDF)), plus the three **PDF-vs-Excel** consistency self-checks (Highway Log, Intersection Detail, Highway Detail) which also live in `env`.
-- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. COMPLETE for all 10 comparison-integrated export types (Highway Log Excel/PDF, Ramp Detail, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence, Highway Detail Excel/PDF — the last pair v0.20.0). The PDF editions' PDF-vs-Excel self-checks live under `env`, not `tsn`. (Highway Summary is export-only — no vs-TSN comparator yet, so it isn't here.)
+- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, Highway Log, **Intersection Summary/Detail**, **Highway Detail**, and the **PDF editions** — Highway Log (PDF) + Intersection Detail (PDF) + Highway Detail (PDF) + Highway Sequence (PDF) + Ramp Detail (PDF)). Folder-to-folder only.
+- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. COMPLETE for all 10 comparison-integrated export types (Highway Log Excel/PDF, Ramp Detail, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence, Highway Detail Excel/PDF — the last pair v0.20.0). (Highway Summary is export-only — no vs-TSN comparator yet, so it isn't here.)
+- `group="self"` -- the five **PDF-vs-Excel** consistency self-checks (Highway Log, Intersection Detail, Highway Detail, Highway Sequence, Ramp Detail): a report's PDF render vs its Excel render, one system in one environment — neither cross-environment nor vs-TSN, so its own sub-tab (CMP-AUD-014, formerly mislabeled under `env`).
 - The GUI also appends a **third** sub-tab on its own, the day-keyed **"vs TSN Matrix"** (group id `tsn_by_day`) — not a registry comparison type.
 
 A new cross-environment comparison is `group="env"`; a new TSMIS-vs-TSN one is `group="tsn"`; a brand-new family can add its own sub-tab by appending to `COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input plumbing is untouched. (v0.16.1 staging moved HL's cross-env row from the old `highway_log` group to `env` and renamed that sub-tab to `tsn`.)

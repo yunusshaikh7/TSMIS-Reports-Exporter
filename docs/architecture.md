@@ -134,13 +134,15 @@ Highway Log consolidators are TSMIS-before-TSN with source-explicit labels:
 See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for the
 PDF parsers.
 
-**`COMPARE_GROUPS`** — the Compare-pane sub-tabs, in order (first = default). As of
-v0.16.1: `("env", "Cross-environment")` and `("tsn", "vs TSN")` (the GUI appends two
-more — the "vs TSN Matrix", and since v0.26.0 the "vs Baseline Matrix", the day-vs-
-baseline matrix over `baseline_matrix.py`). Cross-env compares sit in `env`; the
-file-based TSMIS-vs-TSN compares sit in `tsn`; the two PDF-vs-Excel self-checks (one
-system, one environment) sit in `env`, not `tsn`. Every report is wired as of
-v0.17.0/v0.18.0.
+**`COMPARE_GROUPS`** — the Compare-pane sub-tabs, in order (first = default):
+`("env", "Cross-environment")`, `("tsn", "vs TSN")`, and (CMP-AUD-014)
+`("self", "Self-consistency")` (the GUI appends two more — the "vs TSN Matrix",
+and since v0.26.0 the "vs Baseline Matrix", the day-vs-baseline matrix over
+`baseline_matrix.py`). Cross-env folder compares sit in `env`; the file-based
+TSMIS-vs-TSN compares sit in `tsn`; the five PDF-vs-Excel self-checks (a report's
+PDF render vs its Excel render — one system, one environment, neither
+cross-environment nor vs-TSN) sit in their own `self` group. Every report is wired
+as of v0.17.0/v0.18.0.
 
 **`COMPARE_REPORTS`** — `(menu label, module/adapter, input kind, group)`. `kind` is
 `"files"` (two workbooks) or `"folders"` (two export run folders); `group` is one of
@@ -163,13 +165,13 @@ the file-based vs-TSN / self rows — `cmp:*` key shown for the stable contract)
 | `Intersection Detail (PDF) — between environments` | `compare_env.INTERSECTION_DETAIL_PDF` | folders | env |
 | `Highway Log — TSMIS vs TSN` | `compare_highway_log` | files | tsn |
 | `Highway Log — TSMIS (PDF) vs TSN (PDF)` | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
-| `Highway Log — TSMIS (PDF) vs TSMIS (Excel)` | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
+| `Highway Log — TSMIS (PDF) vs TSMIS (Excel)` | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
 | `TSAR: Ramp Detail — TSMIS vs TSN` | `compare_ramp_detail_tsn` | files | tsn |
 | `TSAR: Ramp Summary — TSMIS vs TSN` | `compare_ramp_summary_tsn` | files | tsn |
 | `Intersection Summary — TSMIS vs TSN` | `compare_intersection_summary_tsn` | files | tsn |
 | `Intersection Detail — TSMIS vs TSN` | `compare_intersection_detail_tsn` | files | tsn |
 | `Intersection Detail — TSMIS (PDF) vs TSN` | `compare_intersection_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
-| `Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)` | `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | env |
+| `Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)` | `compare_intersection_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
 | `Highway Sequence Listing — TSMIS vs TSN` | `compare_highway_sequence_tsn` | files | tsn |
 
 The comparison engine itself is owned by
@@ -339,8 +341,8 @@ structural level:
   the manifest so it's correct across a resume).
 - **Completion notification** (default on) — taskbar flash via
   `gui_api._flash_taskbar` (`FlashWindowEx`); toggled by `notify_on_finish`.
-- **Compare sub-tabs** — regrouped to two (`COMPARE_GROUPS`): Cross-environment
-  (default) and Highway Log (every HL comparison gathered in one place).
+- **Compare sub-tabs** (`COMPARE_GROUPS`): Cross-environment (default), vs TSN,
+  and Self-consistency (the five PDF-vs-Excel self-checks; CMP-AUD-014).
 - **Revert to the previous version** (Settings ▸ Debugging) — reinstalls the newest
   full release strictly older than this build through the same SHA-verified
   download→stage→swap pipeline. Owned by
