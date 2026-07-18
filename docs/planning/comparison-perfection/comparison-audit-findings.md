@@ -333,7 +333,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-052 | P1 | Resolved | Highway Detail header words swallow real line-two data |
 | CMP-AUD-053 | P1 | Resolved | Highway Detail orphan reconciliation never fires |
 | CMP-AUD-054 | P1 | Verified on current 7.9 | Highway Detail fallback grids corrupt real rows as complete |
-| CMP-AUD-055 | P1 | Verified | Damaged repeated headers silently drop later PDF data pages |
+| CMP-AUD-055 | P1 | Resolved | Damaged repeated headers silently drop later PDF data pages |
 | CMP-AUD-056 | P1 | Resolved | Intersection wrapped rowB text is truncated as complete |
 | CMP-AUD-057 | P1 | Resolved | Intersection orphan rowB lines are never counted |
 | CMP-AUD-058 | P1 | Resolved | Intersection numeric furniture can consume a pending record |
@@ -3246,7 +3246,18 @@ Exact re-bless numbers + census bindings: comparison-canary-bindings.md.
 ### CMP-AUD-055 — Damaged repeated headers silently drop later PDF data pages
 
 Priority: P1  
-Status: Verified in Highway Sequence and Ramp Detail with rendered multi-page PDFs  
+Status: **Resolved 2026-07-18** (census-first, `874b8d5`) — once a document has
+entered its data section, a headerless page (missing/damaged column-header anchors)
+that still carries a postmile-shaped data token is flagged (`damaged_pages`) and
+escalates the producer to PARTIAL with a structured `parse_anomalies` diagnostic
+(the finding's "rejected as partial" path), instead of being skipped wholesale as a
+cover/legend and silently dropping its data. **Census (statewide 7.9, HSL 252 + RD
+126 PDFs): every real headerless page is a genuine cover/legend/trailer page
+carrying 0-1 anchor words and ZERO postmile tokens** — so the detection is a no-op
+on real data (a clean render stays COMPLETE) and never trips on a legitimate cover.
+Shared `pdf_table_lib.page_has_postmile`; anomalies escalate completion only, never
+the file-count fields (CMP-AUD-064). Red→green + clean multi-page no-op in
+`check_pm_code_vocabulary.test_damaged_header_data_page`.  
 Primary code: `scripts/consolidate_tsmis_highway_sequence_pdf.py:142-149,258-262`,
 `scripts/consolidate_tsmis_ramp_detail_pdf.py:149-170,275-279`
 
