@@ -1,9 +1,17 @@
 # Comparison-perfection
 
-Last updated: 2026-07-14
+Last updated: 2026-07-17
 
 The dedicated planning + evidence folder for the comparison-perfection project. It is
 organized so you can see **where the project is** without reading days of audit history.
+
+**Current position (2026-07-17):** the owner-authorized remediation is live on branch
+`comparison-perfection` (offline gate 130/130, CI-green). ~159 of 241 findings closed
+(Resolved/Remediated), ~10 partial, ~71 open — the correctness-critical core (shared
+engine, the 12 comparison families, Stage-8 base audits 7/7, identity gate 11/0, all owned
+provenance/projection findings, the C-bucket loader gates) is done; the open tail is
+hardening + non-product instrument work. Sol-001 reliability hardening was integrated this
+session. See **[COMPLETION-PLAN.md](COMPLETION-PLAN.md)** "YOU ARE HERE" for the live detail.
 
 ## ▶ Start here
 
@@ -24,7 +32,7 @@ archive/             ← retired status/handoff/reconciliation history (point-in
 
 | Document | Role |
 |---|---|
-| [comparison-audit-findings.md](comparison-audit-findings.md) | The authoritative 237-finding ledger |
+| [comparison-audit-findings.md](comparison-audit-findings.md) | The authoritative 241-finding ledger (~159 closed / ~10 partial / ~71 open) |
 | [comparison-canary-bindings.md](comparison-canary-bindings.md) | Exact sources, counts, result/acceptance hashes |
 | [comparison-phase4-tsn-source-rebaseline.md](comparison-phase4-tsn-source-rebaseline.md) | Raw TSN roles, manifests, source facts |
 | [comparison-phase3-decision-gates.md](comparison-phase3-decision-gates.md) | Approved comparison-engine semantics (D1–D7) |

@@ -171,11 +171,12 @@ Flow:
 2. Verify `staged/_EXE_NAME` still on disk → else `UpdateError("no longer on disk — download it again")`.
 3. Build the command line:
    ```python
-   [str(new_exe), SWAP_FLAG, str(install_dir()), str(os.getpid()), str(helper_log)]
+   [str(new_exe), SWAP_FLAG, str(install_dir()), str(os.getpid()), str(helper_log),
+    str(ready_file), ready_token]     # ready_file/ready_token: sol-001 handshake
    ```
    `helper_log = LOG_DIR/update_helper.log`. `new_exe` is the **staged** exe (a complete copy of the new app) — it applies itself.
 4. `subprocess.Popen(..., creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP, close_fds=True, cwd=staged, stdin/out/err=DEVNULL)`. Detached, no console window. `OSError` (a policy blocks running it) → `UpdateError("the update process could not be started — install manually")`.
-5. **The ~2.0 s windowed death check (P10)** — polls `proc.poll()` every `_DEATH_CHECK_INTERVAL_S = 0.25 s` across `_DEATH_CHECK_TOTAL_S = 2.0 s` (hardened from a single `sleep(1.5); poll()`). If the swap process exits anywhere in that window, raise `UpdateError("exited before it could start — install manually")`. **This is the key fix for the old silent-failure mode:** a blocked/broken exe is caught *while the app is still open on the old version* instead of closing the app into a swap that never happens.
+5. **The readiness handshake (sol-001, F-02/F-07 — replaced the old fixed ~2 s death poll,** which could only catch a crash inside an arbitrary window). `apply_update_and_restart` generates a one-use nonce (`secrets.token_hex(24)`) + a `ready_file`, passes both as the extra argv above, and calls `_wait_for_helper_ready(...)` (up to `_HELPER_READY_TIMEOUT_S = 15 s`, polling every 50 ms). The staged helper must publish `ready:<nonce>` — which it does **only after it has opened a handle to the still-running original PID** (the proof it truly entered the wait: `_wait_pid_exit`'s new `on_waiting` callback) — before the old app is allowed to close. If the helper dies before readiness, publishes a bad marker, or times out → `UpdateError("… install manually")` and the unready helper is terminated. **Backward-compatible both directions:** a Revert that stages a PRE-handshake helper is accepted via its legacy `swap started: waiting…` log line (read only in the freshly-appended region, and only when no nonce marker appeared — so a nonce-capable helper can never silently downgrade to the weaker signal); an OLD app launching a NEW helper omits the argv tail and the helper falls back to the plain wait. **This closes the old silent-failure mode for good:** a blocked/broken/slow exe can no longer strand the user with no running app *and* no swap.
 
 After this returns, `GuiApi.update_apply` spawns `_close_for_update` (`gui_api.py:979`): `sleep(1.2)` to flush the goodbye log line, then `self._window.destroy()` (returns from `webview.start()`, process exits) — falling back to `os._exit(0)` if destroy throws, so the helper can always proceed.
 
@@ -204,19 +205,23 @@ if updater.SWAP_FLAG in sys.argv:
 
 ## 6. `perform_swap()` — the two-phase install
 
-`updater.py:576`. Signature: `perform_swap(staged, app_dir, pid, log_file, *, relaunch=True, wait_timeout_s=_SWAP_TIMEOUT_S, show_dialog=True)`. The keyword args let `check_updater.py` drive it against fake trees with `relaunch=False, show_dialog=False`. Returns `True` only when the new version is in place.
+`updater.py:576`. Signature: `perform_swap(staged, app_dir, pid, log_file, *, relaunch=True, wait_timeout_s=_SWAP_TIMEOUT_S, show_dialog=True, ready_file=None, ready_token=None)` (the `ready_*` pair is the sol-001 handshake; absent → the legacy plain-wait path). The keyword args let `check_updater.py` drive it against fake trees with `relaunch=False, show_dialog=False`. Returns `True` only when the new version is in place.
 
 Top-level sequence:
 
 ```
-1. _swap_log "waiting for pid …"
-2. _wait_pid_exit(pid, wait_timeout_s)        # False on timeout -> "update NOT applied", return False
-3. sleep(0.6)                                  # let handles settle
-4. assert staged/_EXE_NAME exists              # else "staged update incomplete", return False
-5. PHASE 1: copy each allowlisted item -> <name>.new        (old app untouched)
-6. PHASE 2: rename live->.old, .new->live, per item         (rollback = renames)
-7. if relaunch: _relaunch(app_dir, log_file)
-8. _swap_log "swap done"/"swap failed"; return (failed is None)
+1. handshake? -> write ready_file "starting:<nonce>"        (sol-001; else skip)
+2. _swap_log "waiting for pid …"
+3. _wait_pid_exit(pid, wait_timeout_s, on_waiting)          # on_waiting writes "ready:<nonce>" AFTER OpenProcess
+                                                            # False on timeout -> "update NOT applied", return False
+4. sleep(0.6)                                  # let handles settle
+5. assert staged/_EXE_NAME exists              # else "staged update incomplete", return False
+6. PHASE 1: copy each allowlisted item -> <name>.new        (old app untouched)
+7. PHASE 2: rename live->.old, .new->live, per item         (rollback = renames; sets tree_coherent)
+8. if relaunch AND tree_coherent: _relaunch(app_dir, log_file)   # sol-001 F-03: a PARTIAL rollback
+                                                            # (tree_coherent False) SKIPS relaunch + logs it,
+                                                            # so a mixed-version tree is never started
+9. _swap_log "swap done"/"swap failed"; return (failed is None)
 ```
 
 ### 6.1 `_wait_pid_exit` — PID-recycle safety

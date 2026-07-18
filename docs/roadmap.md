@@ -260,10 +260,17 @@ the field bug + P1s first.
   unauthenticated CDP port on `127.0.0.1` for the whole live SSO session. Open it only when CDP
   recapture is needed; close on capture.
 - [ ] **P2 `auth-file-plaintext-no-acl-dpapi`** — re-confirms the auth-at-rest item (Standing §).
-- [ ] **P2 updater integrity** (`size-and-checksum-guards-both-skippable`,
-  `immediate-death-check-narrow-window`, `no-rollback-when-relaunch-launches-partial-tree`) — size +
-  checksum guards can both be off; the 1.5 s death-check misses a later swap crash; a partial
-  rollback still relaunches and the message box claims the old version was kept. Harden each.
+- [x] **P2 updater integrity** (`size-and-checksum-guards-both-skippable`,
+  `immediate-death-check-narrow-window`, `no-rollback-when-relaunch-launches-partial-tree`,
+  `swap-log-grows-unbounded`, `dl-socket-timeout-may-fail-slow-large-downloads`)
+  ✅ **Done (sol-001, integrated 2026-07-17 @ merge `7a7f0e7`).** Checksum verification is
+  fail-closed even when size is absent (proved); the 1.5 s death poll → a **nonce readiness
+  handshake** (the staged helper must prove it opened the original PID handle before the old app
+  closes — no arbitrary window); a partial rollback now **suppresses relaunch** (never starts a
+  mixed tree) and the dialog stays truthful; the helper log rotates at 256 KiB; the download has a
+  60 s socket timeout + bounded retry. Red→green in `check_updater`; backward-compatible across all
+  upgrade/revert directions. Work-PC re-verify (frozen swap/relaunch + Revert) owed. See
+  [docs/agent-handoffs/STATUS.md](agent-handoffs/STATUS.md) "sol-001 integration record".
 - [ ] **P2 `select-report-substring-match-no-exact-guard`** — `select_report` uses `has_text` +
   `.first` (substring) while the env-scan uses exact-first; a future superstring option could
   silently mis-export. Match exactly.

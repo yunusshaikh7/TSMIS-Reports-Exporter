@@ -287,12 +287,14 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   work, read and honor the approved policy/oracle gates in
   [docs/planning/comparison-perfection/comparison-phase3-decision-gates.md](docs/planning/comparison-perfection/comparison-phase3-decision-gates.md).
 - **Comparison perfection is source-first and end to end.** Before changing any
-  comparison family, read
-  [docs/planning/comparison-perfection/archive/comparison-perfection-project.md](docs/planning/comparison-perfection/archive/comparison-perfection-project.md).
-  Its at-a-glance table is the owner-facing progress surface; update it whenever a
-  comparison stage changes, a blocker is added/removed, or the next promotion proof
-  changes. Keep detailed bugs/hashes in the linked finding/source/canary ledgers rather
-  than duplicating them into new planning files.
+  comparison family, read the CURRENT surface:
+  [docs/planning/comparison-perfection/COMPLETION-PLAN.md](docs/planning/comparison-perfection/COMPLETION-PLAN.md).
+  Its "YOU ARE HERE / RESUME HERE" block is the owner-facing progress surface; update it
+  whenever a finding closes, a blocker is added/removed, or the next proof changes (start
+  new reviewers at [README.md](docs/planning/comparison-perfection/README.md)). The
+  [archived project doc](docs/planning/comparison-perfection/archive/comparison-perfection-project.md)
+  holds the point-in-time Stage-8 audit history only. Keep detailed bugs/hashes in the
+  linked finding/source/canary ledgers rather than duplicating them into new planning files.
   Raw TSN is the starting truth; rebuild normalized inputs in isolation, prove
   raw-to-normalized record/field conservation, re-prove comparison cells independently,
   and require all supported evidence to agree with both PDFs and the Comparison sheet.
