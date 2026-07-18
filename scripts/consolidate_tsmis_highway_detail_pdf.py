@@ -253,12 +253,51 @@ def _page_windows(page):
 
 
 def _document_windows(pdf, n_cols):
-    """Document-median windows across every page's bands — ONLY the fallback
-    for a data page with no shaded band of its own (see _page_windows)."""
+    """Document-median windows across every page's bands. Retained for the evidence
+    adapter (evidence_highway_detail); the consolidator no longer parses data on it
+    (CMP-AUD-054 — it shifted every field on a band-less page; superseded by the
+    page-local line-2->line-1 derivation below)."""
     bands = []
     for page in pdf.pages:
         bands.extend(_page_bands(page).get(n_cols, []))
     return _windows_from_bands(bands, n_cols)
+
+
+# Line 1's 10 columns are a fixed MERGE of line 2's 25-cell base edges: the two
+# print lines share ONE auto-layout table, so a page's 10-cell line-1 grid is
+# exactly its 25-cell line-2 grid collapsed at these base-edge indices (11 edges ->
+# 10 windows). Censused on the statewide 7.9/ARS Highway Detail set: on all 3,664
+# pages that carry BOTH bands the derived line-1 grid equals the page's own 10-cell
+# band, 0 exceptions. So a page that prints ONLY the 25-cell band (a mid-record
+# continuation — 17 pages across 13 routes statewide) recovers its line-1 geometry
+# from its OWN line-2 band, instead of the unrelated document median that shifted
+# every field (CMP-AUD-054; route 005 physical page 7: PM 005.009 Length 000.083
+# Date 64-01-01 parsed correct vs the median's blank-Length / Date=000.083 shift).
+_L1_FROM_L2_EDGES = (0, 1, 3, 5, 6, 7, 9, 11, 12, 14, 25)
+# A postmile-shaped token at the START of a group's spaceless text — the grid-free
+# probe for "this page carries data records" (_has_data_rows). Prefix, not the
+# anchored PM_TOKEN_RE: on a data line the postmile is glued to the length/date.
+_PM_PREFIX_RE = re.compile(r"^[A-Z]{0,2}\d{1,3}\.\d{3}")
+
+
+def _win1_from_l2_band(win2):
+    """Derive a page's 10 line-1 windows from its own 25-cell line-2 windows by
+    merging the base edges at _L1_FROM_L2_EDGES. None unless win2 is the full
+    25-window shape (so a partial/absent line-2 band never fabricates a grid)."""
+    if not win2 or len(win2) != N_COLS_L2:
+        return None
+    edges = [w[0] for w in win2] + [win2[-1][1]]
+    return [(edges[_L1_FROM_L2_EDGES[j]], edges[_L1_FROM_L2_EDGES[j + 1]])
+            for j in range(len(_L1_FROM_L2_EDGES) - 1)]
+
+
+def _has_data_rows(page):
+    """True if any row group's spaceless text STARTS with a postmile-shaped token —
+    i.e. the page carries data records. A grid-free probe: a page with no derivable
+    window grid AND real data is an incompatible fallback (CMP-AUD-054 -> escalate
+    the producer to partial), while a data-less cover/legend/front-matter page is
+    skipped exactly as before."""
+    return any(_PM_PREFIX_RE.match(_group_text(g)) for g in _row_groups(page))
 
 
 def _assign(chars, windows):
@@ -346,8 +385,8 @@ def parse_pdf(path, events):
     doc_routes = set()                 # the pages' own route claims (049)
     orphans = 0
     single_line = 0
-    fallback_pages = []
-    doc_win = {}                       # lazy document-median fallback per shape
+    fallback_pages = []                # data pages recovered via line-2 geometry
+    unresolved_pages = []              # data pages with NO recoverable grid (054)
     pending_1 = None                   # carries across pages (mid-record splits)
 
     def _flush_pending():
@@ -381,21 +420,28 @@ def parse_pdf(path, events):
                 if bm:
                     doc_routes.add(bm.group(1))
             win1, win2 = _page_windows(page)
+            used_fallback = False
+            if win1 is None and win2 is not None:
+                # A page that prints only the 25-cell line-2 band (a mid-record
+                # continuation — its line-1 record is unshaded, so no 10-cell
+                # band). Recover the line-1 grid from THIS page's own line-2 band
+                # (_win1_from_l2_band — source-backed local geometry, censused
+                # exact on 3,664 both-band pages), which parses the record
+                # correctly where the document median shifted every field
+                # (CMP-AUD-054). Recorded as a validated fallback below.
+                win1 = _win1_from_l2_band(win2)
+                used_fallback = win1 is not None
             if win1 is None or win2 is None:
-                # No shaded band on this page: the cover/legend pages (no data
-                # lines either — harmless), or a page whose only record(s) are
-                # unshaded. Try the document-median fallback so those records
-                # aren't silently dropped; record which pages needed it.
-                if "w1" not in doc_win:
-                    doc_win["w1"] = _document_windows(pdf, N_COLS_L1)
-                    doc_win["w2"] = _document_windows(pdf, N_COLS_L2)
-                win1 = win1 or doc_win["w1"]
-                win2 = win2 or doc_win["w2"]
-                if win1 is None or win2 is None:
-                    continue           # nothing derivable anywhere yet
-                used_fallback = True
-            else:
-                used_fallback = False
+                # No page-local geometry to derive the missing band. Do NOT parse
+                # on the unrelated document median (the CMP-AUD-054 corruption): a
+                # page carrying real data records here is an incompatible fallback
+                # — record it so finalize escalates the producer to PARTIAL rather
+                # than certifying a shifted parse; a data-less cover/legend/front-
+                # matter page is skipped exactly as before (harmless).
+                if _has_data_rows(page):
+                    unresolved_pages.append(page_no)
+                continue
+            if not used_fallback:
                 any_grid = True
             page_rows = 0
             in_thead = False           # inside a (reprinted) table header run
@@ -435,10 +481,12 @@ def parse_pdf(path, events):
         _flush_pending()               # a line 1 dangling at the document end
         if not any_grid and not rows:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
-                        "single_line": 0, "fallback_pages": [], "no_grid": True,
+                        "single_line": 0, "fallback_pages": [],
+                        "unresolved_pages": unresolved_pages, "no_grid": True,
                         "doc_routes": sorted(doc_routes)}
     return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
                   "single_line": single_line, "fallback_pages": fallback_pages,
+                  "unresolved_pages": unresolved_pages,
                   "doc_routes": sorted(doc_routes)}
 
 
@@ -488,6 +536,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             ctx["orphans"] = ctx.get("orphans", 0) + pstats["orphans"]
             ctx["single_line"] = (ctx.get("single_line", 0)
                                   + pstats.get("single_line", 0))
+            ctx["fallback"] = (ctx.get("fallback", 0)
+                               + len(pstats.get("fallback_pages") or []))
+            unresolved = pstats.get("unresolved_pages") or []
+            if unresolved:
+                ctx["unresolved"] = ctx.get("unresolved", 0) + len(unresolved)
             if pstats["orphans"]:
                 ev.on_log(f"  WARNING: {pstats['orphans']} unpaired row(s) in {p.name} "
                           "(a record's two lines didn't pair) — see the log.")
@@ -496,10 +549,17 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                           "printed no attribute line — kept with blank attribute "
                           "columns.")
             if pstats.get("fallback_pages"):
-                # A data page with no shaded band of its own parsed on the
-                # document-median grid — worth eyeballing in the PDF↔Excel check.
+                # A page whose line-1 record was unshaded (no 10-cell band): its
+                # line-1 grid was recovered from the page's OWN line-2 band (source
+                # -backed local geometry, CMP-AUD-054) — worth eyeballing in the
+                # PDF↔Excel check, but the record is correctly aligned, not shifted.
                 ev.on_log(f"  note: page(s) {pstats['fallback_pages']} of {p.name} "
-                          "parsed on the fallback column grid (no shaded band).")
+                          "recovered a line-1 record from the line-2 grid.")
+            if unresolved:
+                # A data page with NO recoverable grid — not parsed on the unrelated
+                # document median (that shifted every field). Escalated to partial.
+                ev.on_log(f"  WARNING: page(s) {unresolved} of {p.name} carry data "
+                          "but no recoverable column grid — marked partial (CMP-AUD-054).")
         if not rows:
             ev.on_log(f"{prefix} no highway data found; skipping")
             ctx["failed"].append(p.name)
@@ -514,20 +574,35 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     def finalize(result, ctx):
         orphans = ctx.get("orphans", 0)
+        unresolved = ctx.get("unresolved", 0)
         notes = []
         if orphans:
             notes.append(f"⚠ {orphans} unpaired row line(s) — verify (see the log).")
+        if unresolved:
+            # An incompatible fallback: a data page with no recoverable column grid
+            # (CMP-AUD-054). Named durably so the partial result explains itself.
+            notes.append(f"⚠ {unresolved} page(s) carry data with no recoverable "
+                         "column grid — verify (see the log).")
         if ctx.get("single_line"):
             # An FYI, not an escalation: a record whose print carries no second
             # line is emitted with a blank attribute tail; the PDF↔Excel check
             # is the arbiter of whether that matches the Excel export.
             notes.append(f"{ctx['single_line']} record(s) printed no attribute "
                          "line (kept with blank attribute columns).")
+        if ctx.get("fallback"):
+            # A DURABLE diagnostic (not just the live log): N page(s) had an
+            # unshaded line-1 record recovered from the page's own line-2 geometry.
+            # Stays COMPLETE — the geometry is source-backed (censused exact on
+            # 3,664 both-band pages) — but recorded for the PDF↔Excel check.
+            notes.append(f"{ctx['fallback']} page(s) recovered a line-1 record "
+                         "from the line-2 grid (CMP-AUD-054).")
         result.summary_lines = notes + result.summary_lines
-        # An unpaired record or a failed PDF is invisible to the XLSX
-        # consolidator, so ESCALATE to a producer-owned partial — the incomplete
-        # output must not be promoted / cached / compared as complete.
-        if orphans or ctx["failed"]:
+        # An unpaired record, a data page with no recoverable grid, or a failed PDF
+        # is invisible to / misrepresents the XLSX consolidator, so ESCALATE to a
+        # producer-owned partial — the incomplete output must not be promoted /
+        # cached / compared as complete. (unresolved is a PAGE count kept out of the
+        # file-scoped skipped/failed_inputs — CMP-AUD-064.)
+        if orphans or unresolved or ctx["failed"]:
             result.completion = outcome.PARTIAL
             result.skipped_inputs = max(result.skipped_inputs, orphans)
             result.failed_inputs = max(result.failed_inputs, len(ctx["failed"]))

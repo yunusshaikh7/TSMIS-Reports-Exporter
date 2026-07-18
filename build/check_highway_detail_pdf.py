@@ -228,6 +228,90 @@ def test_adapters_and_matrix():
           and modes["vs_excel"]["other_subdir"] == "highway_detail")
 
 
+def test_fallback_recovery():
+    """CMP-AUD-054: a page that prints ONLY the 25-cell line-2 band (its line-1
+    record is unshaded) recovers its line-1 grid from that page's OWN line-2 band —
+    source-backed local geometry that aligns the record correctly, where the old
+    document-median fallback shifted every field (and, with no other 10-cell band in
+    the document, silently DROPPED the record). A data page with no recoverable grid
+    at all now escalates to partial instead of being converted on the median."""
+    print("CMP-AUD-054 fallback-grid recovery + escalation:")
+    if not hasattr(hdpdf, "_win1_from_l2_band"):
+        check("CMP-AUD-054 fix present (_win1_from_l2_band recovers line-1 from line-2)", False)
+        return
+    from types import SimpleNamespace
+
+    import events as _E
+    ev = _E.Events(on_log=lambda *a: None, is_cancelled=lambda: False)
+
+    def _chars(top, text, x0, cw=2.5):
+        out, x = [], x0
+        for ch in text:
+            out.append({"text": ch, "x0": x, "x1": x + cw, "top": top})
+            x += cw
+        return out
+
+    def _rect(x0, x1, top, h=6.0):
+        return {"x0": x0, "x1": x1, "top": top, "bottom": top + h}
+
+    class _FakePdf:
+        def __init__(self, pages):
+            self.pages = pages
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    # unit: the line-2 -> line-1 base-edge merge (pins the _L1_FROM_L2_EDGES indices)
+    win2u = [(float(i * 10), float(i * 10 + 10)) for i in range(hdpdf.N_COLS_L2)]
+    check("_win1_from_l2_band merges the 25 line-2 base edges into 10 line-1 windows",
+          hdpdf._win1_from_l2_band(win2u)
+          == [(0., 10.), (10., 30.), (30., 50.), (50., 60.), (60., 70.),
+              (70., 90.), (90., 110.), (110., 120.), (120., 140.), (140., 250.)])
+    check("_win1_from_l2_band rejects a non-25-window band (never fabricates a grid)",
+          hdpdf._win1_from_l2_band(win2u[:20]) is None
+          and hdpdf._win1_from_l2_band([]) is None)
+
+    # e2e: a page with ONLY a 25-cell line-2 band recovers a correctly-aligned record
+    edges = [40, 68, 108, 148, 173, 198, 228, 253, 288, 318, 348, 378, 408, 438, 468,
+             498, 523, 553, 583, 608, 638, 668, 698, 728, 758, 788]
+    band25 = [_rect(edges[i], edges[i + 1], 100.0) for i in range(25)]
+    fb_page = SimpleNamespace(
+        width=800.0, rects=band25,
+        chars=(_chars(90.0, "S005.009", 44.0) + _chars(90.0, "000.083", 72.0)
+               + _chars(90.0, "64-01-01", 152.0)
+               + _chars(112.0, "TESTDESC", 44.0) + _chars(112.0, "64-01-01", 205.0)))
+    saved_open = hdpdf.pdfplumber.open
+    try:
+        hdpdf.pdfplumber.open = lambda path: _FakePdf([fb_page])
+        rows, st = hdpdf.parse_pdf("fake.pdf", ev)
+    finally:
+        hdpdf.pdfplumber.open = saved_open
+    check("recovers exactly one record from the only-line-2-band page (old code dropped it)",
+          rows is not None and len(rows) == 1 and st["emitted"] == 1)
+    check("...PM / Length / Date of Record / Description correctly aligned (not shifted)",
+          bool(rows) and (rows[0][0] or "") == "S005.009" and (rows[0][1] or "") == "000.083"
+          and (rows[0][2] or "") == "64-01-01" and (rows[0][9] or "") == "TESTDESC")
+    check("...recorded as a validated fallback page; nothing unresolved",
+          st["fallback_pages"] == [1] and st["unresolved_pages"] == [])
+
+    # e2e: a data page with NO band escalates (unresolved), never converts on the median
+    bandless = SimpleNamespace(width=800.0, rects=[], chars=_chars(90.0, "S007.123", 44.0))
+    try:
+        hdpdf.pdfplumber.open = lambda path: _FakePdf([bandless])
+        _rows2, st2 = hdpdf.parse_pdf("fake2.pdf", ev)
+    finally:
+        hdpdf.pdfplumber.open = saved_open
+    check("a data page with no recoverable grid is unresolved (escalates), not silently converted",
+          st2["unresolved_pages"] == [1] and st2["emitted"] == 0)
+    check("_has_data_rows: a PM-shaped leading token is data; cover/legend text is not",
+          hdpdf._has_data_rows(bandless)
+          and not hdpdf._has_data_rows(
+              SimpleNamespace(width=800.0, rects=[], chars=_chars(90.0, "LEGEND", 44.0))))
+
+
 def main():
     test_header()
     test_make_row_mapping()
@@ -235,6 +319,7 @@ def main():
     test_line2_furniture()
     test_wrap_machinery()
     test_adapters_and_matrix()
+    test_fallback_recovery()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")
