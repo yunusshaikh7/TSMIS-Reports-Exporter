@@ -316,7 +316,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-035 | P1 | Partially remediated — type-exactness fixed 2026-07-14; TOCTOU pending | Original raw-admission r7 accepted. Type-exact validation now rejects float/bool aliases of `version`/`member_count`/`byte_length`/`schema_version` in the raw-manifest, normalized-identity, and certificate checks (red→green). Still open: the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
 | CMP-AUD-036 | P1 | Remediated 2026-07-17 — the RD-PDF source gate requires the exact PDF-consolidated width + the trailing On/Off/Ramp Type sentinels | Ramp PDF accepts a truncated four-column workbook |
 | CMP-AUD-037 | P1 | Remediated 2026-07-17 — all five families gate the direct path (HSL v4 + HL v5 markers; RD v5 / ID v5 / HD v3 in-workbook markers + loader gates; marker-only bumps, rows byte-identical on the real corpus) | Direct comparisons trust stale normalized libraries |
-| CMP-AUD-038 | P2 | Verified | Date normalization masks malformed and impossible dates |
+| CMP-AUD-038 | P2 | Resolved 2026-07-18 (`iso_date` full-matches each documented form + calendar-validates via `date()`; trailing junk / impossible dates are preserved verbatim as a visible difference instead of truncated or faked; census-proven no-op — shipped == old on all 121,464 distinct real date cells across RD+ID, both editions) | Date normalization masks malformed and impossible dates |
 | CMP-AUD-039 | P1 | Verified | Detail Report View counts contradict the main comparison |
 | CMP-AUD-040 | P1 | Partially remediated 2026-07-17 (the file half via the CMP-AUD-066 role gates — the same file refuses BOTH ways, probe-verified; the folder run-root/subfolder aliasing half remains open) | Logically identical inputs can be compared as two sources |
 | CMP-AUD-041 | P1 | Resolved | Selected or derived outputs can overwrite comparison sources |
@@ -2252,8 +2252,8 @@ Proof: red→green by git-stash (all three loaders ACCEPT a marker-less normaliz
 ### CMP-AUD-038 — date normalization hides malformed input
 
 Priority: P2  
-Status: Verified at the shared normalizer boundary  
-Primary code: `scripts/compare_tsn_common.py:106-124`
+Status: Resolved 2026-07-18 — full-match + calendar-aware, invalid text preserved  
+Primary code: `scripts/compare_tsn_common.py` (`iso_date`, `_valid_ymd`)
 
 The shared Ramp/Intersection date normalizer uses prefix `re.match` and constructs a
 date string without calendar validation. `02/25/1976 junk` becomes the same
@@ -2265,6 +2265,29 @@ Correction requirements: full-match only the documented date/time forms, parse w
 calendar-aware date construction, and reject or explicitly preserve invalid source
 text as a difference. Cover leap days, impossible months/days, trailing text, typed
 Excel dates, timestamps, and the documented two-digit-year window.
+
+#### Remediation — 2026-07-18
+
+`iso_date` now `re.fullmatch`-es each documented form — TSMIS `MM/DD/YYYY`, TSN
+`YYYY-MM-DD` with an optional ` HH:MM:SS[.f]` time, TSN 2-digit `YY-MM-DD` — and
+constructs the ISO result only when the shared `_valid_ymd` helper (a `datetime.date`
+calendar probe) confirms the date is real. Trailing corruption (`02/25/1976 junk`),
+impossible dates (`02/31/1976`, `13/01/2000`), and non-leap Feb-29 (`02/29/1900`) are
+returned **verbatim**, so they surface as a visible difference against a clean value
+rather than being silently truncated to a plausible date or faked into an ISO string.
+
+Discrepancy-safe by construction and by census: the strict full-match set is a strict
+subset of the old prefix-match set (a `fullmatch` implies the old `match`), so no value
+the old code left alone can newly normalize; and the **shipped** `iso_date` equals the
+old behavior on **all 121,464 distinct date-shaped cells** harvested from the real RD +
+ID corpora (TSMIS Excel exports + raw TSN extracts, both the 7.9 and 2026-07-17 ID
+editions) — 0 changed normalizations, 0 valid dates moved. The only inputs whose result
+changes are the trailing-junk/impossible forms, which do not occur in the corpus, so the
+fix moves no real diff count. Red→green in `check_compare_tsn_common` covers leap days,
+impossible months/days, trailing text on both date shapes, timestamps, the impossible
+2-digit-year and impossible-ISO-timestamp cases, and the two-digit window. The
+`except ValueError` in `_valid_ymd` is the sanctioned validity probe (in-place
+`# silent-ok`). Census: scratchpad `census_038_dates.py` / `census_038_reverify.py`.
 
 ### CMP-AUD-039 — Report View uses a second equality model
 
