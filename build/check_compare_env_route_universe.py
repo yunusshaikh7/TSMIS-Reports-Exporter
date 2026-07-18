@@ -1,9 +1,18 @@
 """Golden checks for the cross-environment loader's per-route universe integrity
-(CMP-AUD-030 + CMP-AUD-031 in scripts/compare_env.py::_load_xlsx_side).
+(CMP-AUD-027 + CMP-AUD-030 + CMP-AUD-031 in scripts/compare_env.py::_load_xlsx_side).
 
 The flat per-route XLSX loader keys every side by the route pulled from each
-"<report>_route_<token>.xlsx" export name. Two silent-corruption holes lived in
+"<report>_route_<token>.xlsx" export name. Three silent-corruption holes lived in
 that mapping:
+
+  CMP-AUD-027  a valid-header file contributing ZERO data rows appended no
+               [route, …] row, so its route silently VANISHED from coverage —
+               the comparison could then certify a clean match while a whole
+               route present on one side was invisible. The statewide census
+               (756 real per-route exports; min 1 data row) found NO header-only
+               file, so a data-less export is anomalous: it is now disclosed
+               LOUDLY as an incomplete input naming the route, never dropped.
+
 
   CMP-AUD-031  the route token was used RAW (the uppercased capture, or an
                arbitrary file stem when no "_route_" pattern matched), never run
@@ -118,6 +127,58 @@ def test_029_owner_lock_ignored():
         "the owner-lock stub must be ignored, not skipped as incomplete", skipped)
 
 
+def test_027_header_only_route_disclosed():
+    """A valid-header file with ZERO data rows must not silently vanish: its
+    route is disclosed in the incompleteness channel (naming it), while a real
+    per-route file beside it still contributes its row."""
+    base = _make_side([
+        ("hs_route_001.xlsx", [["ORA", "", "R", "1.0", "", "REAL"]]),
+        ("hs_route_002.xlsx", []),                      # header only — no data rows
+    ])
+    rows, _header, skipped = _load(base)
+    routes = {r[0] for r in rows}
+    assert routes == {"001"}, ("only the route with data contributes a row", routes)
+    assert any("002" in s and "no data rows" in s for s in skipped), (
+        "the header-only route must be disclosed as incomplete, not dropped", skipped)
+
+
+def test_027_header_only_sole_file_errors():
+    """A side whose ONLY file is header-only has no data to compare: it errors
+    LOUDLY (the existing whole-empty-side guard) — never a silent clean side."""
+    base = _make_side([("hs_route_002.xlsx", [])])
+    try:
+        _load(base)
+    except ValueError as e:
+        assert "No readable" in str(e), str(e)
+    else:
+        raise AssertionError("a sole header-only file must raise, not return empty")
+
+
+def test_027_header_only_end_to_end_incomplete():
+    """The finding's fixture end to end: side A = route 001 (real) + route 002
+    (header-only); side B = route 001 only. Pre-fix the comparison certified a
+    clean match with route 002 erased; now it is flagged INCOMPLETE and route
+    002 is named, even though the shared route 001 matches."""
+    a = _make_side([
+        ("hs_route_001.xlsx", [["ORA", "", "R", "1.0", "", "SAME"]]),
+        ("hs_route_002.xlsx", []),                      # header only
+    ])
+    b = _make_side([("hs_route_001.xlsx", [["ORA", "", "R", "1.0", "", "SAME"]])])
+    adapter = env.EnvCompare("hs_test", "Highway Sequence", "highway_sequence",
+                             sheet_name=_SHEET, key_col="PM")
+    out = Path(tempfile.mkdtemp()) / "cmp.xlsx"
+    result = adapter.compare_folders(a, b, out, events=Events(),
+                                     confirm_overwrite=lambda _p: True,
+                                     mode="formulas")
+    assert result.status == "ok", (result.status, result.message)
+    assert result.completion == "partial", (
+        "a header-only route on a side must make the comparison INCOMPLETE, "
+        "not a clean match", result.completion)
+    warns = " ".join(result.comparison_outcome.warnings)
+    assert "002" in warns and "no data rows" in warns, (
+        "route 002's absence-of-data must be named in the coverage warnings", warns)
+
+
 def test_030_031_canonical_side_unchanged():
     """Positive control: distinct canonical routes — including 005 vs 005S,
     which must stay SEPARATE — all contribute with zero skips."""
@@ -138,11 +199,15 @@ def main():
     test_031_non_route_name_rejected()
     test_030_duplicate_route_flagged()
     test_029_owner_lock_ignored()
+    test_027_header_only_route_disclosed()
+    test_027_header_only_sole_file_errors()
+    test_027_header_only_end_to_end_incomplete()
     test_030_031_canonical_side_unchanged()
     print("OK  cross-env route universe: tokens zero-pad-normalized, the "
           "..._route_<n> naming contract is required (no promoted stems), "
-          "duplicate routes are disclosed as incomplete, and distinct "
-          "canonical routes (005 vs 005S) are unaffected.")
+          "duplicate routes are disclosed as incomplete, header-only routes are "
+          "disclosed (never silently dropped), and distinct canonical routes "
+          "(005 vs 005S) are unaffected.")
 
 
 if __name__ == "__main__":

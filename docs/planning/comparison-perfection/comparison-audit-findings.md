@@ -305,7 +305,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-024 | P1 | Resolved | The `Ramp Points w/out linework` footnote is now display-only (out-of-band to the familiar sheet), never a compared row. Real 7.9 SSOR-prod run matches the oracle: 0 TSMIS-only |
 | CMP-AUD-025 | P2 | Resolved | P/V are marked `sides="tsn"` and routed via `categories_for(side)`, so they are `Only in TSN`, not fabricated TSMIS zeros. Real run matches the oracle: 29 shared / 2 TSN-only / 0 TSMIS-only / 5 identical / 24 differing |
 | CMP-AUD-026 | P1 | Resolved | PDF comparison paths discard producer partial outcomes |
-| CMP-AUD-027 | P1 | Verified | Header-only route files disappear from route coverage |
+| CMP-AUD-027 | P1 | Resolved | Header-only route files disappear from route coverage |
 | CMP-AUD-028 | P1 | Remediated 2026-07-17 — a configured identity column is mandatory; `_resolve_key_field` fails closed instead of keying on column 0 | Missing configured key columns silently fall back to column zero |
 | CMP-AUD-029 | P2 | Remediated 2026-07-17 — `_find_input_dir` excludes `~$` owner-lock stubs, so the generic cross-env XLSX path matches every other loader | Generic XLSX discovery includes Excel owner-lock files |
 | CMP-AUD-030 | P2 | Remediated 2026-07-17 — `_load_xlsx_side` keeps a per-side seen-route set; a duplicate route is skipped into the incompleteness channel, never concatenated | Duplicate route files are silently merged |
@@ -1395,7 +1395,8 @@ symmetric-partial, and asymmetric-partial fixtures. Locked by
 ### CMP-AUD-027 — header-only routes silently disappear
 
 Priority: P1  
-Status: Verified with disposable cross-environment workbooks  
+Status: **Resolved 2026-07-17** (census-first; a header-only per-route file is
+disclosed as an incomplete input, offline gate 128/128)  
 Primary code: `scripts/compare_env.py:152-224`
 
 A valid-header workbook contributing zero data rows is neither represented as an
@@ -1408,6 +1409,27 @@ and reported no route present only on A. Route 002 was erased from coverage.
 Correction requirements: represent explicit empty-route presence or mark the file
 incomplete; never silently discard its route identity. Test header-only on A, B, both,
 and the only file on a side.
+
+**Remediated 2026-07-17.** Census-first (the decision gate: is a data-less route
+legitimate, or anomalous?). A read-only openpyxl sweep of every per-route XLSX export in
+the bound 7.9 corpora — Ramp Detail 126, Highway Sequence 252, Highway Log 252 (ssor-prod),
+Highway Detail 252 (ars-prod) = **756 real per-route exports; minimum data-row count
+1/5/2/2; ZERO header-only files** — proves a header-only export is anomalous (likely a
+truncated/interrupted export), so it must be surfaced, never silently accepted as
+data-less-and-fine. Fix: in `_load_xlsx_side`, after the data-row loop, a file whose
+`count == 0` appends a LOUD skip naming the route ("route NNN has a valid header but no
+data rows (the export may be truncated)") into the same `skipped` incompleteness channel
+the CMP-AUD-030/031 skips use — `_coerce_loaded_side` turns any non-empty `skipped` into
+`completion="partial"`, so the comparison is flagged INCOMPLETE and the route is named,
+never erased. The whole-empty-side case still raises loudly (unchanged); a route already
+in `seen_routes` keeps a following real file for it an honest disclosed duplicate. Because
+no real export is header-only, the disclosure never false-fires (every real comparison
+stays complete). Proof: three tests in `check_compare_env_route_universe.py` — a
+header-only file beside a real file is disclosed (real route still contributes; red→green:
+pre-fix `skipped == []`), a sole header-only file errors loudly, and the finding's exact
+end-to-end fixture (route 001 + header-only 002 vs route 001) now returns
+`completion="partial"` with route 002 named, even though shared route 001 matches. Offline
+gate 128/128; ruff clean.
 
 ### CMP-AUD-028 — missing identity columns fall back silently
 

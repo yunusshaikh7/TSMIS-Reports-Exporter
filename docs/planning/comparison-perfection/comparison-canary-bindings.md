@@ -1482,3 +1482,23 @@ Ramp Detail has no suffix column; `PM_VOCAB_VERSION = 1`).
   question (disposition + a deliberate `PM_VOCAB_VERSION` bump), never a silent
   escalation. Census harness: this session's scratchpad
   `census_063_pm_tokens.py`; hermetic lock: `check_pm_code_vocabulary.py`.
+
+## 2026-07-17 — CMP-AUD-027 header-only-route census (cross-env XLSX families)
+
+The header-only-route → incomplete disclosure must never false-fire on a legitimately
+data-less export, so it is bound to a read-only census proving no REAL per-route XLSX
+export is header-only. Sweep of every per-route XLSX (the four flat cross-env families,
+the same `row_has_data` contract `_load_xlsx_side` uses) in the bound 7.9 corpora:
+
+| Report | Env / subdir | Files | Data rows | Min rows in any file | Header-only |
+|---|---|---:|---:|---:|---:|
+| Ramp Detail | ssor-prod / `ramp_detail` | 126 | 15,216 | 1 | 0 |
+| Highway Sequence | ssor-prod / `highway_sequence` | 252 | 60,494 | 5 | 0 |
+| Highway Log | ssor-prod / `highway_log` | 252 | 51,884 | 2 | 0 |
+| Highway Detail | ars-prod / `highway_detail` | 252 | 51,273 | 2 | 0 |
+
+**756 real per-route exports, ZERO header-only** → a data-less per-route file is anomalous
+(a truncated/interrupted export), so disclosing it as an incomplete input never turns a
+real comparison partial. Census harness: this session's scratchpad
+`census_027_empty_routes.py`; hermetic lock: `check_compare_env_route_universe.py`
+(`test_027_*`).

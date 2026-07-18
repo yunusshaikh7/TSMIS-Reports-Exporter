@@ -270,6 +270,22 @@ def _load_xlsx_side(folder, label, subdir, sheet_name, report_name, events,
                     count += 1
             events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
                           f"+{count} rows")
+            # CMP-AUD-027: a valid-header file that contributes ZERO data rows
+            # adds no [route, …] row, so the route would silently VANISH from
+            # coverage — the comparison could then certify a clean match while a
+            # whole route present on one side is invisible. The statewide census
+            # (756 real per-route exports across the four flat families; min 1
+            # data row) found NO header-only file, so a data-less per-route
+            # export is anomalous. Disclose it LOUDLY as an incomplete input,
+            # naming the route, so its identity is never discarded (the sibling
+            # of the CMP-AUD-030/031 skips). A route already in `seen_routes`
+            # keeps the export honest if a real file for it follows.
+            if count == 0:
+                events.on_log(f"  [{label}] {p.name}: valid header but no data "
+                              f"rows (route {route}); flagging incomplete")
+                skipped.append(f"{label} {p.name}: route {route} has a valid "
+                               "header but no data rows (the export may be "
+                               "truncated)")
         finally:
             wb.close()
     if not rows:
