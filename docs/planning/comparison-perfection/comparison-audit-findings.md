@@ -3230,18 +3230,21 @@ converted"). `fallback_pages` is now a durable summary diagnostic; `unresolved_p
 drives the PARTIAL. Hermetic guard: `check_highway_detail_pdf.test_fallback_recovery`.
 Exact re-bless numbers + census bindings: comparison-canary-bindings.md.
 
-> **Owner decision flagged (product-visible consequence).** Because the day's HD-PDF
-> consolidation is ONE workbook for all 252 routes, and 15 routes each carry a
-> band-less final record with no recoverable geometry, the statewide HD-PDF
-> consolidation now reports **PARTIAL** (so its vs-TSN / vs-Excel comparison shows
-> amber, never "green", until those records are recoverable). This is strictly more
-> honest than the prior state (the median silently emitted 15 CORRUPT final records
-> under a COMPLETE result), and it is discrepancy-safe (a dropped record is one-sided/
-> visible, never a wrong value). A future enhancement could recover these single final
-> records by field-type tokenisation (no geometry needed) to restore a green-capable
-> HD-PDF comparison; deferred pending the owner's preference (accept honest amber vs.
-> invest in that recovery). The only25 recovery — the finding's NAMED corruption — is
-> shipped unconditionally.
+> **Owner decision — ACCEPT HONEST AMBER (2026-07-18; SUBJECT TO CHANGE).** Because the
+> day's HD-PDF consolidation is ONE workbook for all 252 routes, and 15 routes each
+> carry a band-less final record with no recoverable geometry, the statewide HD-PDF
+> consolidation reports **PARTIAL** (its vs-TSN / vs-Excel comparison shows amber,
+> never "green"). This is strictly more honest than the prior state (the median
+> silently emitted 15 CORRUPT final records under a COMPLETE result) and is
+> discrepancy-safe (a dropped record is one-sided/visible, never a wrong value). **The
+> owner ACCEPTS the amber** rather than investing now in a field-type-tokenisation
+> recovery of those 15 records. **⚠ EXPLICITLY SUBJECT TO CHANGE:** Highway Detail is
+> **not yet vendor-approved**, and the owner will eventually supply a NEW statewide
+> batch; if the band-less-final-record problem still occurs on that batch it will be
+> re-evaluated then (recover vs. keep amber). Everything in this project is subject to
+> revision on new source data, but this decision especially — do not treat the accepted
+> amber as permanent. The named 005.009-class recovery (the finding's core corruption)
+> is shipped unconditionally.
 
 ### CMP-AUD-055 — Damaged repeated headers silently drop later PDF data pages
 

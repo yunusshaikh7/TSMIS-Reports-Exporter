@@ -42,7 +42,8 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > 084 semantic cache invalidation, 088/089 auth-clears-offline-work, 010/016/079/091–104 …) / **G**
 > (source-semantics; HD-Excel + HL raw county VENDOR-BLOCKED) / **F** (evidence arc; 210 DEFERRED) /
 > **H** (Stage-8 instruments) / **I** (label/doc trivia). ⚠ Also owed from earlier: the 053 HD
-> PDF-vs-Excel/PDF-vs-TSN canary re-measure; the 054 owner decision (accept-amber vs recovery).
+> PDF-vs-Excel/PDF-vs-TSN canary re-measure. **054 owner decision RESOLVED 2026-07-18 — ACCEPT AMBER
+> (subject to change on the next statewide batch; HD not yet vendor-approved).**
 >
 > **DONE 2026-07-18 (5th marathon, bucket B — 055): CMP-AUD-055 CLOSED (`874b8d5`, CI SHA-verified),
 > offline gate 134/134.** The Highway Sequence + Ramp Detail PDF parsers required
@@ -121,13 +122,15 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > ---
 > ### ▶ (prior resume, pre-073/074/083/086)
 >
-> **⚠ OWNER: 054 shipped a product-visible consequence — the statewide HD-PDF consolidation now
-> reports PARTIAL** (15 routes each print a single final UNSHADED record with no recoverable
-> geometry; they escalate rather than certify the document median's corrupt parse). Its comparison
-> surfaces amber, never green, until those records are recoverable. Strictly more honest than the
-> prior silent corruption + discrepancy-safe (dropped row is one-sided, never wrong), but a
-> green-capable HD-PDF comparison would need a future field-type-tokenisation recovery of those 15
-> single records — **deferred pending your preference (accept honest amber vs. invest in recovery).**
+> **✅ OWNER DECISION RESOLVED 2026-07-18 — ACCEPT AMBER (subject to change).** 054's product-visible
+> consequence: the statewide HD-PDF consolidation reports PARTIAL (15 routes each print a single
+> final UNSHADED record with no recoverable geometry; they escalate rather than certify the document
+> median's corrupt parse), so its comparison surfaces amber, never green. Strictly more honest than
+> the prior silent corruption + discrepancy-safe (dropped row is one-sided, never wrong). **The owner
+> ACCEPTS the amber** rather than building a field-type-tokenisation recovery now. **⚠ SUBJECT TO
+> CHANGE: HD is not yet vendor-approved; the owner will supply a new statewide batch, and if the
+> problem persists on it the decision is re-evaluated then. Treat this as provisional — everything is
+> subject to change on new source data, this especially.**
 >
 > **NEXT — UI tier half-cleared (013 + 014 DONE); 073/074 remain.** Both need ONE thing: a
 > registry of per-recipe-role input specs (accepted extensions + shape hint). **Design (mapped, not
