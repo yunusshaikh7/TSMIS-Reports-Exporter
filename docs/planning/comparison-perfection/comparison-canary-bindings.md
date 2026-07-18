@@ -1502,3 +1502,25 @@ the same `row_has_data` contract `_load_xlsx_side` uses) in the bound 7.9 corpor
 real comparison partial. Census harness: this session's scratchpad
 `census_027_empty_routes.py`; hermetic lock: `check_compare_env_route_universe.py`
 (`test_027_*`).
+
+## 2026-07-17 — MER-059 dashed-district group-header census (TSMIS Highway Log PDF)
+
+The dashed-district group-header rule (`GROUP_RE[0]` widened from `^\d{2}$` to
+`^(?:\d{2}|[–—−]+)$`) must capture ONLY real section markers, so it is bound to a
+statewide long-dash census of the TSMIS Highway Log (PDF) export.
+
+- **Bound corpus:** `ground-truth/All Reports 7.9/2026-07-09 ssor-prod/highway_log_pdf/`
+  (252 route PDFs) — the same set the HL same-source (PDF-vs-Excel) sweep uses.
+- **Census (en/em/minus = U+2013/2014/2212):** across all 252 prints, exactly **2**
+  long-dash lines, both dashed-district group headers followed by that section's data —
+  `— MER 059` (route 059 p5, x0 354.4) and `— SBD 058U` (route 058U p3, x0 350.4). Class
+  B (centered long-dash, not header-shaped) = **0**; class C (long-dash elsewhere) = **0**.
+  So the widened rule captures only real headers; nothing else in the corpus can match.
+- **Output effect (one cell statewide):** route 059 row 39's Description drops the
+  "— MER 059" tail — `'BEGIN RT ALIGN,VIA 14TH / BEGIN RT INDEP ALIGN — MER 059'` →
+  `'BEGIN RT ALIGN,VIA 14TH / BEGIN RT INDEP ALIGN'`, which is byte-exact the vendor Excel
+  row (the Excel carries no "MER 059" text anywhere). Emitted count unchanged (162);
+  route 058U byte-identical (its header sat in a non-attaching position); all 250 other
+  routes untouched. Census/probe harnesses: this session's scratchpad
+  `census_mer059_dashes.py` / `probe_059_mer.py` / `dump_hl_058U_059.py`; hermetic lock:
+  `check_tsmis_pdf_parse.check_dashed_district_group_header`.

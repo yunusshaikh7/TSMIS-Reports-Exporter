@@ -23,9 +23,9 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Gate** | **128/128 offline** checks (full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
 | **Findings** | 238 total · **Resolved this takeover: 238, 024/025, 020–023, 184, 183, 144–146, 076, 135, 185, 155/156/158/159, 199, 204**; 045 RD+ID+HSL integrated & corpus-verified (HL/HD blocked); 098 pipeline half; 133/115/035 partial |
-| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 RESOLVED (2026-07-17)**: 063 = both PDF consolidators escalate an unexpected post-mile prefix/suffix token to PARTIAL; 027 = a header-only per-route XLSX is disclosed as incomplete instead of silently vanishing from cross-env coverage — both census-proven no-false-fire on the bound 7.9 corpus (gate 128/128). **NEXT: MER-059 census** (route-059 em-dash HL line), then buckets B/D/E/G/H/I. 210 DEFERRED. HD-Excel county vendor-pending |
+| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 RESOLVED (2026-07-17)**: 063 = both PDF consolidators escalate an unexpected post-mile prefix/suffix token to PARTIAL; 027 = a header-only per-route XLSX is disclosed as incomplete instead of silently vanishing from cross-env coverage; MER-059 = dashed-district HL group headers ("— MER 059") are recognized, not glued onto Descriptions — all census-proven on the bound 7.9 corpus (gate 128/128). **NEXT: the triage buckets B/D/E/G/H/I** (the HL same-source sweep is fully closed). 210 DEFERRED. HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029 + 034, then 063 + 027)
+> ### ▶ RESUME HERE (2026-07-17, after 049 + 066 + 067 + 006 + 037, the C-bucket gates 028 + 033 + 036 + 030 + 031 + 029 + 034, then 063 + 027 + the MER-059 census)
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it
@@ -34,6 +34,25 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > that could introduce a discrepancy is not. Every change still carries exact
 > red→green + real-corpus + oracle evidence.
 >
+> **DONE 2026-07-17 (latest): the MER-059 census CLOSED — dashed-district HL group
+> headers are recognized, not glued onto Descriptions.** A centered `<district>
+> <county> <route>` group header whose district renders as a long dash ("— MER 059"
+> route 059 p5; "— SBD 058U" 058U p3) failed `GROUP_RE[0]` (`^\d{2}$`), so the
+> TSMIS Highway Log (PDF) parser fell it through to the description branch and glued
+> "— MER 059" onto the prior row's Description — the last same-source PDF-vs-Excel
+> Description false diff. **Census** (all 252 HL prints): those two are the ONLY
+> long-dash lines in the corpus (0 other centered long-dash, 0 long-dash anywhere
+> else), so widening the district slot to a long dash (`^(?:\d{2}|[–—−]+)$`) captures
+> only real headers. `GROUP_RE` is shared by the parser AND its evidence-adapter twin
+> (`evidence_highway_log` reads `chlp.GROUP_RE`) → lockstep by construction. **Proof:
+> one cell statewide** — route 059 row 39's Description drops the "— MER 059" tail to
+> match the vendor Excel exactly (which carries no "MER 059" text); emitted count
+> unchanged (162); 058U byte-identical; 250 others untouched. Red→green
+> (`check_tsmis_pdf_parse.check_dashed_district_group_header` — `GROUP_RE` boundary +
+> a WinAnsi em-dash fixture PDF through the real parser; the shared `_hl_fixture_pdf`
+> gained an opt-in `win_ansi` mode). Offline gate **128/128** + ruff clean. **NEXT:
+> the remaining triage buckets B/D/E/G/H/I** (the HL same-source sweep is fully
+> closed; no more one-off census items pending).
 > **DONE 2026-07-17 (latest): CMP-AUD-027 CLOSED — header-only routes no longer
 > vanish from cross-env coverage (census-first).** A valid-header per-route XLSX with
 > ZERO data rows appended no `[route, …]` row, so its route silently disappeared and the
@@ -498,10 +517,11 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > - **H. Stage-8 instrument hardening (non-product):** 187/206/211/212/
 >   213/215/216/217/219/221–237.
 > - **I. Labels/docs trivia:** 014/015/086 + the P3 tail.
-> Plus the ONE remaining census from the HL same-source sweep: the
-> "— MER 059" line (route 059 p5, x0 354.4 — group-header-SHAPED, dashed
-> district slot; ONE cell statewide; scan all 252 prints for em-dash
-> lines and classify with evidence BEFORE any rule). **Next actionable
+> The ONE remaining census from the HL same-source sweep — the "— MER 059"
+> dashed-district group header — is **CLOSED 2026-07-17** (census-proven the only
+> two long-dash lines statewide are real group headers; `GROUP_RE` widened to accept
+> a dashed district; one cell corrected on route 059, matching the Excel; see the
+> latest DONE block above). **Next actionable
 > batch: the C-bucket refusal-first loader gates** — the same
 > red→green-refusal pattern as 037/050/066. **028 CLOSED 2026-07-17** (the
 > cross-env `_resolve_key_field` fell back to column 0 when the configured key
@@ -527,9 +547,9 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 > Excel-cell image evidence + a PDF-vs-Excel Matrix hook + UI camera un-gating +
 > the triangle ledger), not a single-batch correctness fix — it needs its own
 > mini-plan and should not be started as a sprawling incomplete change. After
-> the C gates: 210's feature, the "— MER 059" census, then buckets B/D/E/G/H/I.
-> (Bucket A is DONE: 065/040-file/006/037 closed, 071 → C.) HD-Excel county
-> stays vendor-blocked — never infer it.
+> the C gates + the MER-059 census (all DONE): 210's feature, then buckets
+> B/D/E/G/H/I. (Bucket A is DONE: 065/040-file/006/037 closed, 071 → C.) HD-Excel
+> county stays vendor-blocked — never infer it.
 >
 > **DONE 2026-07-17 (after 067): the TSMIS-PDF HL star-description
 > recovery — the TSN-v5 mirror.** The star-guard is POSITIONAL now: a
