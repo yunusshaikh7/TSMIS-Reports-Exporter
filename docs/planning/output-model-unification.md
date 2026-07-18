@@ -15,6 +15,15 @@ migration must not break without a coordinated re-bless.
 
 ## 1. Current model (from `paths.py` + the surfaces)
 
+> **⚠ VERIFY-FIRST (owner note 2026-07-17).** This current-state map mixes confirmed code facts
+> (the `paths.py` helpers — dated run folders, `stamped_consolidated_filename`, the Everything
+> store, `list_output_days_for_report`) with **owner OBSERVATIONS that are not yet fully
+> code-traced** — especially the 9/10 "export-tab vs matrix don't share plumbing" split and the
+> 6/8 day-picker behavior. **Step 1 of any implementation is to confirm each claim against the
+> actual code + a real run** (which reports, which surfaces, exact paths). The design below is
+> only valid if this map is accurate, so a wrong assumption here invalidates the corresponding
+> fix — trace before building.
+
 - **Dated run folders (the good model):** `output/<YYYY-MM-DD src-env>/<report>/…route_<n>.<ext>`
   via `output_run_dir(src, env, day)`. Self-labeling; cross-env parses `<day src-env>`.
 - **Consolidated:** `output/<day>/consolidated/<name> <day>.xlsx` (`stamped_consolidated_filename`).

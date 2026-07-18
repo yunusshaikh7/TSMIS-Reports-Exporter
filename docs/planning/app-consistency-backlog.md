@@ -4,6 +4,16 @@ Owner-supplied feature/hardening notes for *after* (or alongside) the comparison
 project. Captured verbatim-in-intent + triaged by **lane**, **risk**, and **sequencing**.
 This is the backlog; detail/decisions land in the owning docs as each is picked up.
 
+> **⚠ These are OWNER OBSERVATIONS, not verified defects. Step 0 for every item is a
+> code-verification pass — confirm what the app ACTUALLY does today before scoping any fix.**
+> The owner flagged (2026-07-17) that these were noticed in use, not traced in code, and some may
+> be wrong: already-correct, partially correct, or different than described. Example: exports
+> from the main Export tab *sometimes* land in the expected place but some reports were seen in a
+> different folder — the real pattern (which reports, which surfaces, why) must be traced before
+> assuming "all export-tab exports save differently." Treat every "currently does X" below as
+> *owner-observed, unconfirmed* until a code audit + a real-run check confirm it. Same rigor as
+> the comparison-perfection census-first rule: never build on an unverified assumption.
+
 **Lanes:** `CMP` = comparison engine (Claude, the comparison-perfection lane) · `ARCH` =
 cross-cutting architecture (Claude owns the design) · `GUI` = front-end / matrix UX (Claude;
 needs `#mock` verification) · `SOL` = safe for a future Codex mission *after* the design is
@@ -24,7 +34,7 @@ a concurrent autonomous free-for-all. `paths.py` is the SoT to unify around.
 
 | # | Note | Lane | Risk | Sequencing |
 |---|------|------|------|-----------|
-| 9 | Export-tab exports should go in a **date-specific run folder** like the vs-TSN matrix exports (they currently save differently). | ARCH/SOL | High — everything downstream parses export folders | Part of the output-model design; export-engine mechanics can be SOL after design |
+| 9 | Export-tab exports should go in a **date-specific run folder** like the vs-TSN matrix exports. *(Owner observed some export-tab reports in a different folder than the run-folder convention — **Step 0: trace where each export type actually writes**: which reports, which surfaces, the exact current paths. The inconsistency may be partial, not uniform.)* | ARCH/SOL | High — everything downstream parses export folders | Verify the real current layout FIRST; then the output-model design; export-engine mechanics can be SOL after design |
 | 10 | **Overall export consistency** — all exports done basically the same regardless of surface (except the Everything matrix's own store, which is intentional). Matrices should be a *front-end* over the same comparisons done manually. Owner nuance: today the matrix's comparisons are **split from the manual ones** (it does export + comparison + consolidation on one page, into matrix-owned folders) — both already ride the same `compare_env`/`compare_core` engine, so unify the **output location/naming/discoverability**, not a second implementation, so a matrix cell and a manual compare of the same day/report yield the SAME artifact in the SAME place. | ARCH | High — cross-cutting | Design decision (Claude); the unifying principle for 9/11. See [output-model-unification.md](output-model-unification.md) §2 principle 4. |
 | 11 | **Output-folder standardization** — comparisons, consolidations, exports all in sensible, standardized locations so every feature can consume them. | ARCH | Highest — touches `paths.py` + all consumers | Design FIRST (Claude); the foundation for 7/9/12 |
 | 13 | Put the **export date onto all exported reports** (already used as an Int Eff-Date identity column in Intersection Detail); integrate properly everywhere. | ARCH/CMP | Med — couples to comparison parsing (filenames/columns) | Design where the date lives (name vs content) before implementing; comparison side is Claude |
