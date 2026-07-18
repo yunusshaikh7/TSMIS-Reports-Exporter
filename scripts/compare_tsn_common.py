@@ -31,6 +31,7 @@ import os
 import re
 from collections import Counter
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import artifact_store
@@ -728,24 +729,47 @@ def decimal_pm(pm):
     return ("-" + t) if neg and t not in ("", "0") else t
 
 
+def _valid_ymd(yyyy, mm, dd):
+    """True iff (yyyy, mm, dd) is a real calendar date (leap-day aware)."""
+    try:
+        date(yyyy, mm, dd)
+        return True
+    except ValueError:                    # silent-ok: date() IS the calendar-validity probe; invalid -> not a real date
+        return False
+
+
 def iso_date(d):
     """A Date of Record to YYYY-MM-DD across the formats the two systems print:
     TSMIS 'MM/DD/YYYY', TSN 'YYYY-MM-DD[ HH:MM:SS]', and TSN's 2-digit 'YY-MM-DD'
-    (windowed at 30: >=30 -> 19xx, else 20xx)."""
+    (windowed at 30: >=30 -> 19xx, else 20xx).
+
+    CMP-AUD-038: match the documented forms in FULL and construct the result only
+    when the calendar date is real. Trailing corruption ('02/25/1976 junk') and
+    impossible dates ('02/31/1976', non-leap '02/29/1900') are PRESERVED verbatim
+    so they surface as a visible difference — never silently truncated to a clean
+    date nor faked into a plausible-looking ISO string."""
     s = ("" if d is None else str(d)).strip()
     if not s:
         return ""
-    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+    m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)      # TSMIS 'MM/DD/YYYY'
     if m:
-        return f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
-    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
+        mm, dd, yyyy = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if _valid_ymd(yyyy, mm, dd):
+            return f"{yyyy:04d}-{mm:02d}-{dd:02d}"
+        return s
+    m = re.fullmatch(                                        # TSN 'YYYY-MM-DD[ time]'
+        r"(\d{4})-(\d{2})-(\d{2})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?)?", s)
     if m:
-        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
-    m = re.match(r"(\d{2})-(\d{2})-(\d{2})$", s)             # TSN '73-10-19' (YY-MM-DD)
+        if _valid_ymd(int(m.group(1)), int(m.group(2)), int(m.group(3))):
+            return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        return s
+    m = re.fullmatch(r"(\d{2})-(\d{2})-(\d{2})", s)          # TSN '73-10-19' (YY-MM-DD)
     if m:
         yy = int(m.group(1))
         cc = 1900 if yy >= 30 else 2000                     # 2-digit-year window
-        return f"{cc + yy}-{m.group(2)}-{m.group(3)}"
+        if _valid_ymd(cc + yy, int(m.group(2)), int(m.group(3))):
+            return f"{cc + yy}-{m.group(2)}-{m.group(3)}"
+        return s
     return s
 
 

@@ -92,6 +92,28 @@ def test_normalizers():
           ctc.iso_date("73-10-19") == "1973-10-19" and ctc.iso_date("29-01-02") == "2029-01-02")
     check("iso_date passthrough on unrecognized + empty",
           ctc.iso_date("n/a") == "n/a" and ctc.iso_date(None) == "")
+    # CMP-AUD-038: full-match + calendar-aware. Trailing corruption and
+    # calendar-impossible dates are PRESERVED as a visible difference, never
+    # silently erased or faked into a plausible ISO string. Valid forms (incl.
+    # leap days, timestamps, the 2-digit window) keep normalizing unchanged.
+    check("iso_date valid leap day 02/29/2000 -> ISO",
+          ctc.iso_date("02/29/2000") == "2000-02-29")
+    check("iso_date valid ISO timestamp with leap day -> date",
+          ctc.iso_date("2000-02-29 12:34:56") == "2000-02-29")
+    check("iso_date trailing junk on MM/DD/YYYY preserved (not erased)",
+          ctc.iso_date("02/25/1976 junk") == "02/25/1976 junk")
+    check("iso_date impossible day 02/31/1976 preserved (not faked)",
+          ctc.iso_date("02/31/1976") == "02/31/1976")
+    check("iso_date impossible month 13/01/2000 preserved",
+          ctc.iso_date("13/01/2000") == "13/01/2000")
+    check("iso_date non-leap 02/29/1900 preserved (1900 is not a leap year)",
+          ctc.iso_date("02/29/1900") == "02/29/1900")
+    check("iso_date trailing junk on ISO date preserved",
+          ctc.iso_date("1976-02-25 garbage") == "1976-02-25 garbage")
+    check("iso_date impossible 2-digit-year date preserved",
+          ctc.iso_date("73-13-45") == "73-13-45")
+    check("iso_date impossible ISO timestamp date preserved (not cleaned)",
+          ctc.iso_date("1976-02-31 00:00:00") == "1976-02-31 00:00:00")
 
 
 def test_notes_writer():
