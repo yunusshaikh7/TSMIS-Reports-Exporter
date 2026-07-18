@@ -313,7 +313,12 @@ def maybe_screenshot(page, events, note=""):
     try:
         if not events.screenshot_wanted(events.worker_no):
             return
-    except Exception:
+    except Exception as e:
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.info(
+            "preview request poll failed for browser %d (%s: %s)",
+            events.worker_no, type(e).__name__, reason,
+        )
         return
     url = page_url_for_display(page)
     try:

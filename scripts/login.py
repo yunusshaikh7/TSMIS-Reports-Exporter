@@ -123,7 +123,9 @@ def _run_login():
                 browser = p.chromium.launch(headless=False, channel=ch,
                                             args=LOGIN_BROWSER_ARGS)
             except Exception as e:
-                log.info("login: %s launch failed (%s)", ch, type(e).__name__)
+                reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+                log.info("login: %s launch failed (%s: %s)",
+                         ch, type(e).__name__, reason)
                 continue
             _login_with_browser(browser, CHANNEL_LABELS[ch])
             return
@@ -164,7 +166,9 @@ def _try_edge_persistent_login(p):
     try:
         ctx, cdp_url = launch_edge_login_context(p)
     except Exception as e:
-        log.info("login: experimental Edge launch unavailable (%s)", type(e).__name__)
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.info("login: experimental Edge launch unavailable (%s: %s)",
+                 type(e).__name__, reason)
         print()
         print(f"Experimental Edge sign-in could not open ({type(e).__name__}).")
         return None
@@ -182,7 +186,9 @@ def _try_edge_persistent_login(p):
             _safe_close_context(ctx)
             return state
     except Exception as e:
-        log.info("login: live Edge context capture failed (%s)", type(e).__name__)
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.info("login: live Edge context capture failed (%s: %s)",
+                 type(e).__name__, reason)
 
     print("Edge did not expose a live session; trying CDP/profile recapture...")
     state = capture_edge_login_state_over_cdp(p, cdp_url)

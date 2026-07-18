@@ -108,7 +108,13 @@ def get_url():
     try:
         import settings
         override = settings.get_site_url(src, env)
-    except Exception:                    # settings must never stop a run
+    except Exception as e:               # settings must never stop a run
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.warning(
+            "site: custom URL settings unavailable (%s: %s); "
+            "using built-in URL",
+            type(e).__name__, reason,
+        )
         override = None
     if override:
         log.info("site: using custom URL for %s-%s: %s", src, env, override)

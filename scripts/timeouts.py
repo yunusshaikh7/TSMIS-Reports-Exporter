@@ -70,8 +70,9 @@ def _settings_ms(key, default_ms, unit_ms):
         import settings
         return settings.get(key) * unit_ms
     except Exception as e:                       # settings must never stop a run
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
         log.warning("settings read failed for %s (%s: %s); using default",
-                    key, type(e).__name__, e)
+                    key, type(e).__name__, reason)
         return default_ms
 
 

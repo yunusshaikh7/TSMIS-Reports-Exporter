@@ -100,7 +100,6 @@ report_library.py:newest_mtime:2
 report_library.py:newest_mtime:3
 report_nav.py:_find_exact_option:1
 report_nav.py:_reveal_submenu_if_leaf:1
-report_nav.py:maybe_screenshot:1
 report_nav.py:wait_with_skip_option:1
 reports.py:_index_of:1
 safe_delete.py:_unlink_reparse_point:1
@@ -111,7 +110,6 @@ settings.py:_clamp:1
 settings.py:_override_problem:1
 settings.py:all_site_urls:1
 settings.py:reset:1
-site_target.py:get_url:1
 summary_layout.py:_as_int:1
 updater.py:_bundle_digest:1
 updater.py:_bundle_digest:2

@@ -5,14 +5,14 @@
 > Claude can `git fetch` and see progress.
 
 - **State:** In progress
-- **Last meaningful update:** 2026-07-17 — export/reliability milestone implemented and full gate confirmed
-- **Current milestone:** 3 — core implementation, auth/session/browser coverage (C)
-- **Completed milestones:** 1 baseline review; 2 diagnosis/plan; 3A updater integrity; 3B export reliability
-- **Work in progress:** offline auth/session/browser state transitions, fallbacks, timeout accessors, and error classification
-- **Next intended work:** add focused auth/browser fallback tests, then perform the bounded silent-failure sweep (D)
-- **Current test status:** post-export full gate 132 passed / 1 known infrastructure red of 133 in 126 s; sole failure F-01 `check_source_zip_smoke`. Focused export suite, `check_silent_swallows`, compileall, diff check, and repo-wide Ruff are green.
-- **Blockers / uncertainties:** exact gate green is blocked by F-01; external push of `b02ff5b` was rejected by the environment reviewer, so the checkpoint is local and product work continues
-- **Latest stable checkpoint commit:** `b02ff5b` (`harden updater swap readiness`, local; push blocked)
+- **Last meaningful update:** 2026-07-17 — auth/session/browser coverage and bounded silent-failure sweep implemented
+- **Current milestone:** 5 — automated verification and findings ledger (E)
+- **Completed milestones:** 1 baseline review; 2 diagnosis/plan; 3A updater integrity; 3B export reliability; 3C auth/session/browser; 4 bounded silent-failure sweep
+- **Work in progress:** authoritative full gate, regression/ownership review, source-ZIP independent verification, and final report
+- **Next intended work:** run the full gate + compileall + Ruff, commit the auth milestone, then complete the final audit/report
+- **Current test status:** auth milestone full gate 133 passed / 1 known infrastructure red of 134 in 219 s; sole failure F-01 `check_source_zip_smoke`. New auth check, existing focused checks, compileall, repo-wide Ruff, and `git diff --check` are green.
+- **Blockers / uncertainties:** exact in-worktree gate green is blocked by F-01; external push of `b02ff5b` was rejected by the environment reviewer, so both completed checkpoints remain local and product work continues
+- **Latest stable checkpoint commit:** `d1b3502` (`harden export retry accounting`, local; push blocked)
 
 ## Updater milestone evidence
 
@@ -47,6 +47,25 @@
 - One off-limits `check_pdf_role_provenance` process exited once with no output under `-j 4`; its
   immediate isolated run passed every assertion and the confirming full run passed it. Classified
   suspected/non-blocking as F-10 rather than changing comparison-owned code.
+
+## Auth/session/browser + silent-failure milestone evidence
+
+- Added auto-discovered `check_auth_reliability.py`, using fakes only. It covers saved-session vs
+  device-mode selection, browser ordering/cache/re-resolution, optional-permission fallbacks,
+  console Chrome-to-Chromium and Edge recapture fallback sequencing, dynamic timeout accessors,
+  site target fallback, navigation cancellation, unreachable-site classification, and preview
+  request polling. No browser process, auth file, network call, or live TSMIS page is used.
+- Red-to-green logging contracts closed meaningful fallback gaps in `browser_channels`,
+  `edge_device`, `login`, `session`, `site_target`, `timeouts`, and `report_nav`. Each preserved
+  existing behavior while adding exception type + first-line reason; multiline reasons cannot
+  split one decision across log lines.
+- The bounded AST sweep reports 0 new silent swallows. Two stale exemptions for handlers fixed in
+  this lane were removed; three unrelated pre-existing stale entries were deliberately preserved
+  to avoid off-lane baseline cleanup. The scanner reports 117 active grandfathered handlers and
+  accepts no new waiver.
+- Repository evidence supersedes the charter's request to enumerate new checks in CI YAML:
+  `checks.yml` deliberately runs the globbing `run_checks.py`, and `check_ci_manifest.py` guards
+  that auto-discovery contract. No workflow edit is needed; recorded as F-16.
 
 ## Internal plan
 

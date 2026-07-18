@@ -161,7 +161,13 @@ def launch_edge_login_context(p, *, enable_cdp=False):
             args=args,
             permissions=["local-network-access"],
         )
-    except Exception:
+    except Exception as e:
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.info(
+            "auth: Edge login local-network permission unavailable (%s: %s); "
+            "retrying without it",
+            type(e).__name__, reason,
+        )
         ctx = p.chromium.launch_persistent_context(
             str(EDGE_LOGIN_PROFILE_DIR),
             channel="msedge",
@@ -305,7 +311,13 @@ def open_edge_device_context(p, *, headless=True):
                     permissions=["local-network-access"],
                     **launch_kwargs,
                 )
-            except Exception:
+            except Exception as e:
+                reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+                log.info(
+                    "auth: device sign-in: local-network permission unavailable "
+                    "for Edge profile %r (%s: %s); retrying without it",
+                    profile_name, type(e).__name__, reason,
+                )
                 ctx = p.chromium.launch_persistent_context(
                     str(EDGE_LOGIN_PROFILE_DIR), **launch_kwargs,
                 )

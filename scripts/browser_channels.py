@@ -356,7 +356,13 @@ def _new_app_context(browser, storage_state=None):
         kwargs["storage_state"] = storage_state
     try:
         return browser.new_context(permissions=["local-network-access"], **kwargs)
-    except Exception:
+    except Exception as e:
+        reason = str(e).splitlines()[0] if str(e) else type(e).__name__
+        log.info(
+            "browser: local-network permission unavailable (%s: %s); "
+            "retrying without it",
+            type(e).__name__, reason,
+        )
         return browser.new_context(**kwargs)
 
 
