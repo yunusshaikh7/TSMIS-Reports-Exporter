@@ -291,8 +291,8 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-010 | P2 | Verified | Matrix Consolidate sends canonical TSN PDFs to a legacy-only path |
 | CMP-AUD-011 | P2 | Resolved | ValidationWorker drops the partial-comparison count |
 | CMP-AUD-012 | P2 | Resolved | Spot Check preserves typed blank/zero and full display parity |
-| CMP-AUD-013 | P3 | Verified | Matrix capability support is duplicated and hardcoded |
-| CMP-AUD-014 | P3 | Verified | PDF-versus-Excel checks are filed under Cross-environment |
+| CMP-AUD-013 | P3 | Resolved | Matrix capability support is duplicated and hardcoded |
+| CMP-AUD-014 | P3 | Resolved | PDF-versus-Excel checks are filed under Cross-environment |
 | CMP-AUD-015 | P3 | Resolved 2026-07-18 (the four base Intersection comparison labels — summary/detail × env/tsn — dropped the wrong `TSAR:` prefix to match their export/consolidate entries and the already-correct PDF variants; the frozen catalog check + mock.js + architecture/reports docs updated in lockstep; `check_report_catalog` proves the derivation) | Four Intersection comparison labels incorrectly add `TSAR:` |
 | CMP-AUD-016 | P2 | Verified | Classic file/Browse inputs persist and launch across recipe changes |
 | CMP-AUD-017 | P1 | Resolved | Skipped comparison inputs are cached and rendered as complete |
@@ -350,9 +350,9 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-069 | P2 | Resolved 2026-07-18 (the Ramp Detail PDF wrapper now forwards its own `side_a`/`side_b` labels to `run_files_compare`, like the ID/HD wrappers — a missing PDF-vs-Excel second file names "TSMIS (Excel)" not the default "TSN", and a missing first file names "TSMIS (PDF)"; red→green existence-message test in check_compare_ramp_detail_pdf) | Ramp PDF comparisons mislabel their file roles in diagnostics |
 | CMP-AUD-070 | P1 | Resolved 2026-07-17 — NOT A DEFECT: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified); the prescribed "use the file route" fix would introduce discrepancies | Intersection loader ignores explicit route and suffix fields |
 | CMP-AUD-071 | P1 | Resolved 2026-07-18 (the comparator-side twin of CMP-AUD-050: Intersection Summary's route-universe validator promoted to the shared `compare_tsn_common.validate_route_universe` and wired into BOTH aggregate comparators — require ≥1 valid route, reject blank/duplicate, reconcile against the producer's ordered `route_census`; the Ramp Summary consolidator now records that census in its outcome sidecar so dropped/added/reordered/renamed rows are detectable; real 126-route consolidation records 001..980 and the comparator emits the verified note, total_ramps=15216; red→green route-universe suite: header-only/blank/dup-identical/dup-conflicting/dropped/reordered) | Ramp Summary comparison does not validate its route universe |
-| CMP-AUD-072 | P2 | Verified | Stale folder discovery can overwrite a newer recipe selection |
-| CMP-AUD-073 | P2 | Verified | Classic picker blocks two supported raw-PDF inputs |
-| CMP-AUD-074 | P2 | Verified | Universal file hint promises unsupported per-route inputs |
+| CMP-AUD-072 | P2 | Resolved | Stale folder discovery can overwrite a newer recipe selection |
+| CMP-AUD-073 | P2 | Resolved | Classic picker blocks two supported raw-PDF inputs |
+| CMP-AUD-074 | P2 | Resolved | Universal file hint promises unsupported per-route inputs |
 | CMP-AUD-075 | P1 | Partially remediated | Both-mode completion is persisted for only one output |
 | CMP-AUD-076 | P2 | Resolved 2026-07-14 (durable provenance sidecar + in-workbook sheet; only the strict schema-v4 fold-in remains, Phase-5) | Saved comparisons lack durable source provenance |
 | CMP-AUD-077 | P2 | Resolved | Comparison results discard their structured discrepancy counts |
@@ -361,10 +361,10 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-080 | P1 | Partially remediated | Matrix artifact identity can miss changed source and output content |
 | CMP-AUD-081 | P1 | Partially remediated | Matrix TSN freshness ignores source identity and library rebuild state |
 | CMP-AUD-082 | P1 | Verified | Matrix formula twins can survive as stale audit artifacts |
-| CMP-AUD-083 | P2 | Verified | Matrix presence and freshness count arbitrary non-report files |
+| CMP-AUD-083 | P2 | Resolved | Matrix presence and freshness count arbitrary non-report files |
 | CMP-AUD-084 | P1 | Verified | Matrix caches survive semantic comparator and parser changes |
 | CMP-AUD-085 | P1 | Partially remediated | Partial-artifact policy conflicts while truth surfaces certify/reuse incomplete work |
-| CMP-AUD-086 | P3 | Verified | Comparison documentation contradicts the executable capability census |
+| CMP-AUD-086 | P3 | Resolved | Comparison documentation contradicts the executable capability census |
 | CMP-AUD-087 | P2 | Resolved | “Refresh stale” cannot rebuild cells whose count cache is unavailable |
 | CMP-AUD-088 | P2 | Verified | An authentication failure deletes queued offline comparisons |
 | CMP-AUD-089 | P2 | Verified | Failed and cancelled rebuild attempts disappear behind prior results |
