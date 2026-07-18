@@ -45,9 +45,17 @@ migration must not break without a coordinated re-bless.
 3. **Self-identifying filenames.** A file lifted out of its folder still says what it is
    (report + kind + sides + day/src-env). Preserve the `…_route_<token>.<ext>` **suffix
    anchor** the consolidators glob on (see §3).
-4. **Matrices are a front-end, not a separate storage model** (item 10). A matrix cell's
-   export/consolidate/compare must land in the SAME place the manual surface would, so the
-   two are interchangeable and mutually consumable.
+4. **Matrices are a front-end, not a separate storage model OR a separate comparison path**
+   (item 10). A matrix cell's export/consolidate/compare must land in the SAME place the manual
+   surface would, so the two are interchangeable and mutually consumable. The owner's deeper
+   point: today the matrix's comparisons are effectively **split from the manual ones** (the
+   matrix does export + comparison + consolidation on one page and writes into matrix-owned
+   folders, while manual Compare is a separate flow). Both already ride the same
+   `compare_env`/`compare_core` engine, so the unification is about **output location + naming +
+   discoverability**, not a second comparison implementation — the goal is that a matrix cell and
+   a manual comparison of the same day/report produce the SAME artifact in the SAME place,
+   differing only in which button launched them. The Everything-matrix store
+   (`All Reports (current)/…`) is the ONE intentional exception (a live per-report dashboard).
 5. **Backward-compatible + staged.** New readers accept old layouts; migration is per-surface,
    each with a re-bless of the affected comparison canaries.
 

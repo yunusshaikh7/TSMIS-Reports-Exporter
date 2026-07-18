@@ -4,6 +4,18 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
+> **▶ Owner app-consistency & output-model backlog (13 notes, 2026-07-17) — IN SCOPE, tracked.**
+> A 13-item owner list (comparison logging, an Excel-vs-PDF matrix, the new/edited-report
+> workflow, matrix date-rearrange, unique comparison names, present-only day pickers, manual-Compare
+> autosave + dropdown, unified date-stamped export folders, cross-surface export consistency,
+> output-folder standardization, single-pass dual-format export, date-on-every-export) is captured +
+> triaged by lane/risk/sequencing in
+> **[docs/planning/app-consistency-backlog.md](planning/app-consistency-backlog.md)**. The
+> output-model spine (items 9/10/11/13 + 5/6/7/8/12) has a design spec:
+> **[docs/planning/output-model-unification.md](planning/output-model-unification.md)**. Priority:
+> comparison-perfection first; items 1 (comparison logging) + 5 (unique names) fold in alongside;
+> the rest are design-first (Claude) then a future sol-002 for the export mechanics.
+
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published
 > the 3 zips + `.sha256`). **(A)** report-dropdown selection by stable **`data-value`** + reveal the nested
