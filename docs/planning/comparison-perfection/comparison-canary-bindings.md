@@ -1240,6 +1240,39 @@ output-safety proof (`verify_id_safety.py`, old-vs-new via `git stash`):
   `pdfplumber.open`; red→green — the OLD code lacks `_is_rowB`; clean-render no-op +
   e2e COMPLETE→PARTIAL escalation with the structured `parse_anomalies` diagnostic).
 
+**CMP-AUD-051/052/053 re-bless (2026-07-18) — HD PDF parser: a "CONT" line-2
+correction + header/orphan hardening.** Bound to `ground-truth/All Reports 7.9/
+2026-07-09 ars-prod/highway_detail_pdf/` (252 route PDFs). Census
+(`census_hd_bucketB.py`) + full old-vs-new row proof (`hd_per_route.py` old/new +
+`diff_hd_json.py`, via `git stash`):
+
+- **053 is a CORRECTNESS FIX (a 054-missed corruption), not a no-op.** The reprinted
+  "Acc-Cont Eff" header wraps as "ACC-" then a bare "CONT" line; the parser consumed
+  that "CONT" as a record's line-2, emitting a garbage record (cols 16/17 = "C"/"ONT",
+  Description + all roadbed attributes BLANK) while the record's REAL line-2 was
+  orphaned. Recognizing "CONT" (+ a dashed-district group header) as furniture makes
+  each line-1 pair with its real line-2. **Exactly 7 records across 5 routes corrected**
+  (route 018 ×1 "44TH STREET"; 101 ×3 incl. "WESTLAKE VILLAGE SCL"; 110 ×1 "FIGUEROA
+  ST OFF RAMP , UC 53-533"; 152 ×1 "RT ON LAKE FROM LINCOLN"; 395 ×1 "BEGIN R
+  REALIGNMENT") — each corrected row's Description + roadbed cells match the printed
+  page. **Count unchanged (51,201); the ONLY content delta is those 7 records**
+  (statewide rows SHA-256 **83fd8fb7…→f8cf36d0…**). The 2 remaining genuinely-
+  unreconcilable leading orphans (route 395 alignment/wrap fragments) escalate the
+  producer to PARTIAL (`leading_orphans`), never emitted.
+- **052 is byte-identical** (0 rows moved): the `THEAD_RE` swap of bare
+  `ROADBED`/`MEDIAN` for the header-only `LEFTROADBED`/`RIGHTROADBED` compounds keeps
+  every one of the 516 statewide roadbed-header lines recognized while letting a real
+  "BEGIN MEDIAN" description parse as data. 051 is closed by the 054 `_is_line1`
+  hardening (0 residual phantoms on the 3 censused equate-spill shapes).
+- **Downstream comparison consequence (to re-measure):** the HD-PDF workbook now
+  carries the 7 corrected records, so the **PDF-vs-Excel and PDF-vs-TSN** legs lose up
+  to 7 previously-differing (garbage-"CONT" vs real-data) records — a strict reduction
+  in false diffs. The Excel-vs-TSN statewide canary (48,644/…) is UNAFFECTED (Excel
+  path). The exact PDF-sourced-leg counts should be re-measured on the next full HD
+  comparison pass; the parser correction itself is independently proven cell-for-cell
+  above. Hermetic guard: `check_highway_detail_pdf.test_053_leading_orphans` +
+  `test_line1_classifier` + `test_line2_furniture`.
+
 **CMP-AUD-218 workbook-shape note (2026-07-16, later).** The comparison
 workbook's Comparison sheet gained one hidden trailing literal column
 (`__CMP_E2_KEY_V1_TOKEN`, both twins) and Spot Check gained the independent

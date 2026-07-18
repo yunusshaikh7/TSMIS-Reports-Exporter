@@ -329,9 +329,9 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
 | CMP-AUD-049 | P1 | Remediated 2026-07-17 (direct-compare, converter, and evidence halves) | Direct/PDF route provenance is not enforced |
 | CMP-AUD-050 | P1 | Remediated (2026-07-17) | PDF routes can overwrite, double-count, or remain blank |
-| CMP-AUD-051 | P1 | Verified | Highway Detail PM spill creates phantom PDF records |
-| CMP-AUD-052 | P1 | Verified | Highway Detail header words swallow real line-two data |
-| CMP-AUD-053 | P1 | Verified | Highway Detail orphan reconciliation never fires |
+| CMP-AUD-051 | P1 | Resolved | Highway Detail PM spill creates phantom PDF records |
+| CMP-AUD-052 | P1 | Resolved | Highway Detail header words swallow real line-two data |
+| CMP-AUD-053 | P1 | Resolved | Highway Detail orphan reconciliation never fires |
 | CMP-AUD-054 | P1 | Verified on current 7.9 | Highway Detail fallback grids corrupt real rows as complete |
 | CMP-AUD-055 | P1 | Verified | Damaged repeated headers silently drop later PDF data pages |
 | CMP-AUD-056 | P1 | Resolved | Intersection wrapped rowB text is truncated as complete |
@@ -3091,7 +3091,14 @@ adapters) closed the same day — see that finding's record.
 ### CMP-AUD-051 — Highway Detail line-one spill creates phantom records
 
 Priority: P1  
-Status: Verified with synthetic parser pages and the real consolidator  
+Status: **Resolved 2026-07-18** (census-first, `ab8d103`) — already closed by the
+054 `_is_line1` hardening: the statewide 7.9 census found exactly 3 equate-spill
+shapes (`R42.401 LT EQ …` on 101 ×2, `14.752 LT EQU 14.760 RT` on 280), and
+`_is_line1` correctly rejects ALL 3 (**0 residual phantoms** — it requires the
+post-mile ALONE, or post-mile+Length with window 1 empty; an equate description's
+text runs on as words). Each rejected spill is then attached to its pending record
+as the line-2 (the finding's required behavior), never a phantom row. The 3 shapes
+are pinned in `check_highway_detail_pdf.test_line1_classifier`.  
 Primary code: `scripts/consolidate_tsmis_highway_detail_pdf.py:271-291,310-420`
 
 The parser accepts an exact-looking post mile in the first grid window as a new
@@ -3111,7 +3118,14 @@ wrapped descriptions and post-mile-shaped text.
 ### CMP-AUD-052 — Highway Detail header words swallow real line-two data
 
 Priority: P1  
-Status: Verified with synthetic parser pages and the real consolidator  
+Status: **Resolved 2026-07-18** (census-first, `ab8d103`) — the reprinted-header
+detector no longer keys on the bare words `ROADBED`/`MEDIAN` (which a real date-less
+Description like "OLD ROADBED" / "BEGIN MEDIAN" could carry). `THEAD_RE` now anchors
+the roadbed header on the header-ONLY `LEFTROADBED`/`RIGHTROADBED` compounds —
+censused present on every one of the 516 statewide roadbed-header lines, so all
+headers are still recognized, and byte-identical on the corpus (0 rows moved). A
+date-less "BEGIN MEDIAN" description now parses as data instead of being swallowed.
+Pinned in `check_highway_detail_pdf.test_line2_furniture`.  
 Primary code: `scripts/consolidate_tsmis_highway_detail_pdf.py:152-155,388-410`
 
 The table-furniture detector treats any line containing a bare header word such as
@@ -3129,7 +3143,22 @@ whose line two has no date.
 ### CMP-AUD-053 — Highway Detail orphan reconciliation never fires
 
 Priority: P1  
-Status: Verified with leading-orphan and truncated-pair fixtures  
+Status: **Resolved 2026-07-18** (census-first, **a real correctness fix**, `ab8d103`)
+— the investigation surfaced a 054-missed CORRUPTION: the reprinted "Acc-Cont Eff"
+header wraps as "ACC-" then a bare "CONT" line, which the parser consumed as a
+record's line-2, emitting a garbage record ("C"/"ONT" in the roadbed columns, NO
+Description/attributes) while the record's REAL line-2 was ORPHANED. "CONT" (and a
+dashed-district group header) are now recognized as furniture (`_is_header_residue`),
+so each line-1 pairs with its real line-2: **7 records across 5 routes
+(018/101/110/152/395) corrected** from garbage to the printed Description + roadbed
+data (cell-for-cell verified — "44TH STREET", "FIGUEROA ST OFF RAMP , UC 53-533",
+"RT ON LAKE FROM LINCOLN", "WESTLAKE VILLAGE SCL", "BEGIN R REALIGNMENT"). The 2
+genuinely-unreconcilable leading orphans (route 395 alignment/wrap fragments) are now
+COUNTED (`leading_orphans`) and escalate the producer to PARTIAL with a structured
+`parse_anomalies` diagnostic, never silently ignored. Old-vs-new (git-stash, 252
+PDFs): count unchanged (51,201); the ONLY content delta is the 7 corrections (rows
+sha256 83fd8fb7→f8cf36d0). Red→green + e2e escalation in
+`check_highway_detail_pdf.test_053_leading_orphans`.  
 Primary code: `scripts/consolidate_tsmis_highway_detail_pdf.py:336-353,382-420,488-506`
 
 The `orphans` statistic is initialized but never incremented, even though it is one of
