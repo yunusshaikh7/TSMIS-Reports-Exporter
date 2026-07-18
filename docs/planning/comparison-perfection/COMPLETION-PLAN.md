@@ -23,10 +23,32 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
 | **Gate** | **130/130 offline** checks (128 comparison + Sol's 2 reliability checks after the sol-001 integration; full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **241 total · ~162 CLOSED (Resolved/Remediated) · ~10 partial · ~68 open** (~67% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · **C ✅ COMPLETE** (028/029/030/031/032/033/034/036/063/027 + 070-not-a-defect) · D 🔨 (018 ✅ · 019 ✅ · 046 ✅; **only 022 left**) · B/E/F/G/H/I ⬜ (parser robustness / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
+| **Findings** | **241 total · ~163 CLOSED (Resolved/Remediated) · ~10 partial · ~67 open** (~68% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · **C ✅ COMPLETE** (028/029/030/031/032/033/034/036/063/027 + 070-not-a-defect) · **D ✅ COMPLETE** (018 ✅ · 019 ✅ · 046 ✅ · 022 ✅) · B/E/F/G/H/I ⬜ (parser robustness / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
 | **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **019 RESOLVED (2026-07-17)**: the Ramp Summary producer now reflects its own audit reds — `record_has_data` requires Total + every section, per-route `reconcile_record` sends unexplained gaps → PARTIAL and the explained P/V residual → a typed note (COMPLETE), matcher unknown/duplicate diagnostics, cross-env shares the gate; census 0 unexplained / 9 routes / 22 P/V ramps, real-data verified. **032 RESOLVED (2026-07-18) — BUCKET C COMPLETE**: every flat cross-env family now pins its EXACT export schema via a header_canonicalizer (RD/HSL/HD/ID XLSX + HSL-PDF/RD-PDF), so two malformed/legacy/truncated/reordered sides refuse instead of matching; census-verified on the 7.9 statewide exports + converted headers; new `check_compare_env_flat_schema` + 5 fixtures rebuilt onto real layouts. **046 RESOLVED (2026-07-18)**: shifted RD/ID exports now show diffs under the right field — RD Excel+PDF pin a position-authoritative `force_header`, ID Excel+PDF realign legacy→current via `_id_canonical_header`; end-to-end proves Description-under-Description / INT-Type-under-INT-Type. **NEXT (bucket D — LAST): 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-18, after the C-bucket gates + 063 + 027 + MER-059 + 018 + 019 + 032 + 046 — **BUCKET C COMPLETE**; bucket D: only 022 left)
+> ### ▶ RESUME HERE (2026-07-18, after the C-bucket gates + 018 + 019 + 032 + 046 + 022 — **BUCKETS C & D COMPLETE**; next = buckets B/E/G/H/I)
+>
+> **DONE 2026-07-18 (latest): CMP-AUD-022 CLOSED — BUCKET D COMPLETE (no silent
+> double-count in the raw summary block-walk).** `summary_layout.counts_from_rows` — the
+> raw parse shared by BOTH `compare_intersection_summary_tsn.parse_tsn_pdf` (per column band)
+> and `consolidate_intersection_summary.parse_route` (per TSMIS route) — accumulated
+> `out[slug] += count`, so a repeated `(block, code)` in one parse silently summed. The
+> existing 022 guards only covered the NORMALIZED (`_load_tsn`, exact-key repeat) and
+> CONSOLIDATED (`_load_tsmis`, duplicate-column) read paths; the raw block-walk had none.
+> Fix: each matched category is now keyed by `(block, PRE-FOLD code)` and a repeat refuses —
+> DISTINCT pre-fold codes may still share a slug (J–P legitimately fold into Signalized), but
+> the SAME pre-fold code twice is a duplicate/reshaped table. **The trap** (CONTROL TYPES has
+> a standalone `S` category AND the J–P→S fold) was settled by census: the bound corpus's 437
+> real calls (3 TSN bands + 434 TSMIS routes across both envs) carry **0** repeated
+> `(block, pre-fold code)` and **0** calls mixing a standalone `S` with any J–P — so pre-fold
+> keying never false-fires, and the TSN print (`+,A–I,J,K,L,M,N,P,Z`, each once, no standalone
+> `S`) confirms J–P are the only signal rows on that side. Red→green in
+> `check_compare_intersection_summary_tsn::test_block_walk` (repeat refuses; a repeated J
+> sub-type refuses before folding; distinct S+J+P still sums to 11). Offline gate **132/132** +
+> ruff clean. **NEXT: buckets B/E/G/H/I** — B (HD/ID PDF-parser robustness 051–062+044),
+> E (matrix/day/GUI lifecycle), G (source-semantics/vendor; HD-Excel county vendor-blocked),
+> H (Stage-8 instrument hardening, non-product), I (labels/docs trivia). 210 DEFERRED.
+>
 >
 > **STANDING OWNER DIRECTIVE (2026-07-16, verbatim policy):** *"Do what you think
 > will get us to perfect reports; if it leads to perfection it's approved, if it

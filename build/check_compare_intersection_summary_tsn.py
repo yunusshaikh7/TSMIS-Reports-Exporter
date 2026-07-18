@@ -114,6 +114,34 @@ def test_block_walk():
     except ValueError as e:
         check("fractional count in the block-walk refuses", "fractional" in str(e))
 
+    # CMP-AUD-022: a REPEATED (block, pre-fold code) in one parse is a duplicate/
+    # reshaped table — refuse it instead of silently summing 7+8=15 into one slug.
+    try:
+        sl.counts_from_rows(SPEC, [(None, "CONTROL TYPES"),
+                                   (7, "A-NO CONTROL"), (8, "A-NO CONTROL")])
+        check("a repeated category code in one parse refuses (no double-count)", False)
+    except ValueError as e:
+        check("a repeated category code in one parse refuses (no double-count)",
+              "twice" in str(e) and "double-count" in str(e))
+    # …but DISTINCT signal sub-types folding into Signalized still accumulate, and a
+    # standalone S beside them is fine (distinct pre-fold codes S/J/P) — the census
+    # proved the real corpus never repeats a pre-fold code.
+    c = sl.counts_from_rows(SPEC, [(None, "CONTROL TYPES"), (6, "S-SIGNALIZED"),
+                                   (2, "J-SIGNAL PRETIMED (2-PHASE)"),
+                                   (3, "P-SIGNALS FULL-ACTUATED (MULTI-PHASE)")])
+    check("distinct pre-fold signal codes still fold into S (6+2+3=11)",
+          c["is_control_types_s"] == 11)
+    # A repeat of the SAME signal sub-type (two J rows) is the folded-slug double-count
+    # the raw-parse path must also refuse (the _load_tsn key-guard's raw-side twin).
+    try:
+        sl.counts_from_rows(SPEC, [(None, "CONTROL TYPES"),
+                                   (2, "J-SIGNAL PRETIMED (2-PHASE)"),
+                                   (5, "J-SIGNAL PRETIMED (2-PHASE)")])
+        check("a repeated signal sub-type refuses before folding into S", False)
+    except ValueError as e:
+        check("a repeated signal sub-type refuses before folding into S",
+              "'J'" in str(e) and "twice" in str(e))
+
 
 def _write_tsmis(path, cols, route_rows):
     wb = Workbook()

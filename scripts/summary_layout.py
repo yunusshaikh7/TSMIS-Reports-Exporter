@@ -480,7 +480,7 @@ def counts_from_rows(spec, rows, *, source="source rows"):
         for alias in s.aliases:
             headers[_norm_header(alias)] = s
     by_block = {s.name: {c.code: c for c in s.cats} for s in spec.sections}
-    out, cur, ru_parent = {}, None, None
+    out, cur, ru_parent, seen = {}, None, None, set()
     for count, text in rows:
         t = str(text or "").strip()
         h = _norm_header(t)
@@ -509,14 +509,27 @@ def counts_from_rows(spec, rows, *, source="source rows"):
                 code = "+"
             else:
                 code = None
+            raw_code = code                      # Rural/Urban has no fold
         else:
             code = _plain_code(t)
+            raw_code = code                       # the printed within-block code, pre-fold
             if cur.name == _IS_CONTROL_TYPES and code in _CONTROL_SIGNAL_FOLD:
                 code = "S"                       # fold TSN signal sub-types J–P -> S
         if count is None:
             continue
         cat = by_block[cur.name].get(code) if code is not None else None
         if cat is not None:
+            # CMP-AUD-022: a matched category identity is (block, pre-fold code).
+            # DISTINCT pre-fold codes may share a slug — J–P legitimately fold into
+            # Signalized — but the SAME (block, pre-fold code) twice in one parse is a
+            # duplicate/reshaped table; refuse it rather than silently double-count.
+            ident = (cur.name, raw_code)
+            if ident in seen:
+                raise ValueError(
+                    f"{source}: the {cur.name} category code {raw_code!r} appears "
+                    "twice in one parse — refusing to silently double-count an "
+                    "ambiguous summary table")
+            seen.add(ident)
             out[cat.slug] = out.get(cat.slug, 0) + parse_count(
                 count, source=source, category=f"{cur.name}: {t}")
     return out
