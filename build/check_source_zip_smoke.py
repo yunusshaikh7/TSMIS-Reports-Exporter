@@ -115,11 +115,22 @@ def _candidate_archive(dest_zip):
     # desktop sandbox intentionally exposes repository metadata read-only).
     tmp_objects = dest_zip.parent / "candidate-objects"
     tmp_objects.mkdir()
+    # Resolve the REAL (possibly shared) object store. In a linked git worktree
+    # ``ROOT/.git`` is a POINTER FILE, not a directory, so ``.git/objects`` does
+    # not exist and seeding the temp index fails ("unable to normalize alternate
+    # object path"). ``git rev-parse --git-common-dir`` returns the common
+    # repository dir whose ``objects`` is the actual store — ``.git`` in the main
+    # worktree (identical to the old behavior), the shared repo dir in a linked
+    # worktree (sol-001 F-01).
+    common_dir = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=str(ROOT), capture_output=True, text=True, check=True).stdout.strip()
+    common_root = Path(common_dir) if os.path.isabs(common_dir) else ROOT / common_dir
     env = dict(
         os.environ,
         GIT_INDEX_FILE=str(tmp_index),
         GIT_OBJECT_DIRECTORY=str(tmp_objects),
-        GIT_ALTERNATE_OBJECT_DIRECTORIES=str(ROOT / ".git" / "objects"),
+        GIT_ALTERNATE_OBJECT_DIRECTORIES=str(common_root / "objects"),
     )
 
     def g(*args, **kw):
