@@ -297,7 +297,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-016 | P2 | Verified | Classic file/Browse inputs persist and launch across recipe changes |
 | CMP-AUD-017 | P1 | Resolved | Skipped comparison inputs are cached and rendered as complete |
 | CMP-AUD-018 | P1 | Resolved | Intersection cross-env bypasses its layout-drift validator |
-| CMP-AUD-019 | P1 | Verified | Ramp cross-env accepts a one-field partial parse as complete |
+| CMP-AUD-019 | P1 | Resolved 2026-07-17 (record_has_data requires Total + every printed section; per-route audit reconciliation connected to the producer outcome — unexplained → PARTIAL, explained P/V residual → typed note; matcher unknown/duplicate diagnostics; cross-env applies the same gate; 126-route real-data verified) | Ramp cross-env accepts a one-field partial parse as complete |
 | CMP-AUD-020 | P1 | Resolved 2026-07-14 (censused per-side partition contract enforced; real-data verified) | Aggregate vs-TSN loaders do not reconcile section totals |
 | CMP-AUD-021 | P1 | Resolved 2026-07-14 (one strict count parser through every aggregate read path) | Aggregate counts silently ignore text and truncate fractions |
 | CMP-AUD-022 | P1 | Verified | Duplicate normalized categories overwrite or double-count silently |
@@ -1113,9 +1113,45 @@ per-route totals to re-validate.
 ### CMP-AUD-019 — Ramp cross-env accepts a one-field partial parse
 
 Priority: P1  
-Status: Verified with stubbed parser records and matcher probes  
-Primary code: `scripts/consolidate_ramp_summary.py:260-295`,
-`scripts/compare_env.py:236-281`
+Status: **Resolved 2026-07-17** — census-first, red→green, 126-route real-data verified  
+Primary code: `scripts/consolidate_ramp_summary.py`, `scripts/compare_env.py`
+
+**Remediation (2026-07-17).** Four coupled changes, all census-grounded on the
+bound 126-route 7.9 ssor-prod corpus (0 unexplained, 0 unknown, 0 duplicate, 9
+routes / 22 P/V-residual ramps = P2+V20 — matching the same-pull Detail evidence):
+
+- `record_has_data` now requires the **Total Number of Ramps AND ≥1 populated
+  category in every printed section** (Highway / On-Off / Population / printed
+  Ramp Types). The `{route, total_ramps}` total-only phantom is rejected; none of
+  the 126 real routes is dropped.
+- New `reconcile_record` classifies each written route against the censused
+  `_TSMIS_RULES` partition contract (mirrors `compare_ramp_summary_tsn`): the
+  three exact blocks must sum to the route's own Total; Ramp Types is bounded. An
+  **unexplained** gap (an exact block off, a Ramp-Types block over the total, or
+  an unknown/duplicate matcher row) escalates the run to **PARTIAL** and names the
+  route — the red in-workbook `Audit OK` cell is no longer disconnected from the
+  producer result. The **explained** Ramp-Types shortfall (the TSN-only P/V dummy
+  classes the Summary form never prints) is surfaced as a **typed structural-
+  omission note** and stays COMPLETE. Real-corpus run: `complete`, 0 skipped/
+  failed, note = "9 route(s) carry 22 ramp(s) in the TSN-only P/V dummy classes…".
+- New `schema_diagnostics` surfaces the ordered, case-sensitive matcher's blind
+  spots — a renamed/new label (`unknown`) or a second row for a filled category
+  (`duplicate`, first-wins) — stored on internal keys and read by
+  `reconcile_record`, so a silent drop can't hide behind an otherwise-reconciling
+  table. `match_schema` is unchanged (still shared with the TSN parser).
+- The cross-env `_load_ramp_summary_side` applies the SAME strengthened
+  `record_has_data` + `reconcile_problem` gate (the sibling of the Intersection
+  Summary CMP-AUD-018 gate), so two identically-malformed sides can't certify a
+  clean match.
+
+Controls (`build/check_ramp_summary_partial.py`, extended): total-only rejection,
+renamed/duplicate/unknown category, explained P/V residual → COMPLETE + note,
+unexplained exact-block → PARTIAL, plus `schema_diagnostics` unit coverage.
+`check_compare_ramp_summary` + `check_pdf_route_universe` fixtures rebuilt to
+fully-reconciling records (planted diff moved into a bounded Ramp-Types cell so
+both sides still reconcile). Offline gate 130/130; ruff clean.
+
+--- original finding ---
 
 `record_has_data` accepts a Ramp Summary record when any one non-route value exists.
 Two sides containing only `{route: 1, total_ramps: 10}`—one populated field out of 32

@@ -13,6 +13,7 @@ change in one report cannot break another.
 """
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 # pdfplumber wraps pdfminer.six, which logs a "Could not get FontBBox from
@@ -283,17 +284,136 @@ def match_schema(rows, schema, used_indices=None):
     return result
 
 
-def record_has_data(record):
-    """True if a parsed Ramp Summary record carries real ramp figures — not just
-    a route read off page 1. A one-page / truncated PDF yields a route-only
-    record (the figures live on page 2); such records must not be written as
-    blank rows, nor counted as a successful parse."""
-    for col_name, value in record.items():
-        if col_name in ("source_file", "route") or col_name.startswith("_"):
+def schema_diagnostics(rows, used_indices, schema):
+    """Numbered category rows the ordered, case-sensitive matcher didn't place
+    (CMP-AUD-019). Returns (unknown, duplicate): `unknown` = a numbered,
+    category-shaped row (is_new_label) fullmatching NO schema pattern — a
+    renamed / new source category whose count is going uncounted; `duplicate` =
+    a numbered, unconsumed row that DOES fullmatch a schema pattern already
+    filled by an earlier row (match_schema is first-wins, so the later count is
+    silently dropped). Both surface a source label the matcher would otherwise
+    discard without a trace, feeding reconcile_record's integrity check.
+    (Censused: 0 of each across the 126-route 7.9 ssor-prod corpus.)"""
+    patterns = [re.compile(pat) for _col, pat in schema]
+    unknown, duplicate = [], []
+    for i, (num, label) in enumerate(rows):
+        if i in used_indices or num is None:
             continue
-        if value is not None:
-            return True
-    return False
+        norm = re.sub(r"\s+", " ", label).strip()
+        if not is_new_label(norm):
+            continue
+        (duplicate if any(p.fullmatch(norm) for p in patterns)
+         else unknown).append(norm)
+    return unknown, duplicate
+
+
+# The four printed sections every real per-route PDF populates. P/V are TSN-only
+# dummy classes the Summary form never prints (see RAMP_TYPES), so they're
+# EXCLUDED from the printed Ramp-Types coverage set. Bound to the schema lists so
+# a schema edit can't silently desync the predicate below.
+_PV_SLUGS = frozenset({"ramp_P_dummy_paired", "ramp_V_dummy_volume"})
+_NOLW_SLUG = "ramp_points_no_linework"
+_PRINTED_SECTIONS = (
+    ("Highway Groups",    tuple(c for c, _ in HIGHWAY_GROUPS)),
+    ("On/Off Indicator",  tuple(c for c, _ in ONOFF)),
+    ("Population Groups", tuple(c for c, _ in POP_GROUPS)),
+    ("Ramp Types",        tuple(c for c, _ in RAMP_TYPES if c not in _PV_SLUGS)),
+)
+
+
+def record_has_data(record):
+    """True only for a REAL page-2 parse: the Total Number of Ramps AND at least
+    one populated category in EVERY printed section (Highway Groups, On/Off,
+    Population, printed Ramp Types). A one-page / truncated PDF yields a route-
+    only record (page 2 holds the figures). A TOTAL-ONLY record — {route,
+    total_ramps} with every section blank — used to pass on that single populated
+    field and let two such sides compare as a phantom match (CMP-AUD-019);
+    requiring Total plus coverage of every section rejects it too. (Verified on
+    the 126-route 7.9 ssor-prod corpus: every real route carries Total and all
+    four printed sections, so none is dropped.)"""
+    if record.get("total_ramps") is None:
+        return False
+    for _name, cols in _PRINTED_SECTIONS:
+        if all(record.get(c) is None for c in cols):
+            return False
+    return True
+
+
+# --- per-route audit reconciliation (CMP-AUD-019/020) ----------------------
+AUDIT_OK = "ok"
+AUDIT_PV_RESIDUAL = "pv_residual"     # explained: TSN-only P/V not printed here
+AUDIT_UNEXPLAINED = "unexplained"     # an integrity gap the producer can't green
+
+
+@dataclass(frozen=True)
+class RecordAudit:
+    """One route's internal-integrity verdict. `gap` is the explained P/V
+    Ramp-Types shortfall (pv_residual only); `detail` is a UI-neutral string
+    naming the problem (unexplained) or the residual size."""
+    status: str
+    gap: int
+    detail: str
+
+
+def _section_sum(record, cols):
+    """Sum a section's parsed counts, treating an absent (None) category as 0 —
+    a printed zero and an omitted zero-category row are the same for the total."""
+    return sum(record.get(c) or 0 for c in cols)
+
+
+def reconcile_record(record):
+    """Classify one written record against the censused Ramp Summary partition
+    contract (CMP-AUD-019/020 — mirrors compare_ramp_summary_tsn._TSMIS_RULES).
+    Every ramp has a highway group, an on/off indicator (the no-linework points
+    included), and a population group, so those three blocks must sum EXACTLY to
+    the route's own Total Number of Ramps. The Ramp-Types block is BOUNDED: the
+    TSMIS summary form doesn't tabulate the TSN-only P/V dummy classes, so its
+    printed subtotal (+ no-linework) may fall BELOW the total by exactly the
+    route's P/V ramp count — an explained structural residual, never a fault.
+
+    Returns a RecordAudit. AUDIT_UNEXPLAINED = a missing Total, an exact block
+    that doesn't reconcile, a Ramp-Types block OVER the total, or an unknown /
+    duplicate matcher row (a category the schema couldn't place) — the red the
+    in-workbook Audit column shows, now connected to the producer outcome.
+    AUDIT_PV_RESIDUAL = the explained Ramp-Types shortfall (gap > 0)."""
+    total = record.get("total_ramps")
+    if total is None:
+        return RecordAudit(AUDIT_UNEXPLAINED, 0, "no Total Number of Ramps parsed")
+    nolw = record.get(_NOLW_SLUG) or 0
+    hwy = _section_sum(record, [c for c, _ in HIGHWAY_GROUPS])
+    onoff = _section_sum(record, [c for c, _ in ONOFF]) + nolw
+    pop = _section_sum(record, [c for c, _ in POP_GROUPS])
+    ramp = _section_sum(record, [c for c, _ in RAMP_TYPES]) + nolw
+    problems = []
+    if hwy != total:
+        problems.append(f"Highway Groups sum {hwy} ≠ Total {total}")
+    if onoff != total:
+        problems.append(f"On/Off + no-linework sum {onoff} ≠ Total {total}")
+    if pop != total:
+        problems.append(f"Population Groups sum {pop} ≠ Total {total}")
+    if ramp > total:
+        problems.append(f"Ramp Types + no-linework sum {ramp} > Total {total}")
+    unknown = record.get("_unknown_rows") or []
+    duplicate = record.get("_duplicate_rows") or []
+    if unknown:
+        problems.append("unrecognized category row(s): " + ", ".join(unknown[:4]))
+    if duplicate:
+        problems.append("duplicate category row(s): " + ", ".join(duplicate[:4]))
+    if problems:
+        return RecordAudit(AUDIT_UNEXPLAINED, 0, "; ".join(problems))
+    if ramp < total:
+        return RecordAudit(AUDIT_PV_RESIDUAL, total - ramp, "")
+    return RecordAudit(AUDIT_OK, 0, "")
+
+
+def reconcile_problem(record):
+    """The strict-consumer view (the cross-env loader): the detail string for an
+    UNEXPLAINED record so two identically-malformed sides can't certify a clean
+    match (CMP-AUD-019, sibling of the Intersection Summary CMP-AUD-018 gate),
+    else None. The explained P/V residual and a clean record are both
+    compareable, so they return None."""
+    audit = reconcile_record(record)
+    return audit.detail if audit.status == AUDIT_UNEXPLAINED else None
 
 
 def parse_pdf(path):
@@ -323,7 +443,20 @@ def parse_pdf(path):
         record.update(match_schema(left_rows, POP_GROUPS, used_left))
 
         # Right column: Ramp Types
-        record.update(match_schema(right_rows, RAMP_TYPES))
+        used_right = set()
+        record.update(match_schema(right_rows, RAMP_TYPES, used_right))
+
+        # CMP-AUD-019 matcher diagnostics: numbered category rows the ordered,
+        # case-sensitive matcher couldn't place (a renamed/new label = unknown;
+        # a second row for a filled category = duplicate). Stored on internal
+        # ('_'-prefixed) keys so they never become workbook columns or count as
+        # data, and read by reconcile_record so a silent drop can't hide behind
+        # an otherwise-reconciling table.
+        u_left, d_left = schema_diagnostics(
+            left_rows, used_left, HIGHWAY_GROUPS + ONOFF + POP_GROUPS)
+        u_right, d_right = schema_diagnostics(right_rows, used_right, RAMP_TYPES)
+        record["_unknown_rows"] = u_left + u_right
+        record["_duplicate_rows"] = d_left + d_right
 
         # Totals are in the page footer, not in either column
         full_text = page.extract_text() or ""
@@ -910,15 +1043,47 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     if not committed:
         return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
 
-    # Loud incomplete banner when anything was left out, so a partial result is
-    # never mistaken for a full one.
-    incomplete = bool(failed or blank)
+    # CMP-AUD-019: connect each written route's audit reconciliation to the
+    # returned producer outcome — a red in-workbook Audit cell must never be
+    # silently disconnected from the result. An UNEXPLAINED integrity gap (an
+    # exact block that doesn't sum to the route's own Total, a Ramp-Types block
+    # over the total, or a category the matcher couldn't place) makes the run
+    # PARTIAL; the EXPLAINED Ramp-Types shortfall (the TSN-only P/V dummy classes
+    # the Summary form doesn't print) is surfaced as a typed structural-omission
+    # note, NOT a fault. (Censused on the 126-route 7.9 ssor-prod pull: 0
+    # unexplained, 9 routes / 22 ramps of P/V residual — the run stays COMPLETE.)
+    unexplained = []
+    pv_routes, pv_ramps = [], 0
+    for rec in records:
+        audit = reconcile_record(rec)
+        if audit.status == AUDIT_UNEXPLAINED:
+            unexplained.append((rec.get("route"), audit.detail))
+        elif audit.status == AUDIT_PV_RESIDUAL:
+            pv_routes.append(rec.get("route"))
+            pv_ramps += audit.gap
+
+    # Loud incomplete banner when anything was left out or a route doesn't
+    # reconcile, so a partial result is never mistaken for a full one.
+    incomplete = bool(failed or blank or unexplained)
     summary_lines = []
-    if incomplete:
+    if failed or blank:
         summary_lines.append(
             f"⚠ INCOMPLETE — {len(failed) + len(blank)} PDF(s) left OUT "
             f"({len(failed)} failed, {len(blank)} had no data); the workbook "
             f"does NOT contain their routes. Re-export them before relying on it.")
+    if unexplained:
+        named = ", ".join(str(r) for r, _ in unexplained[:10])
+        summary_lines.append(
+            f"⚠ {len(unexplained)} route(s) don't reconcile — their own section "
+            f"subtotals don't add up to their stated Total (check the source PDF; "
+            f"this is not a parsing error). Routes: {named}"
+            + ("…" if len(unexplained) > 10 else ""))
+    if pv_routes:
+        summary_lines.append(
+            f"Note: {len(pv_routes)} route(s) carry {pv_ramps} ramp(s) in the "
+            "TSN-only P/V dummy classes the Summary form doesn't tabulate, so "
+            "their Ramp-Types subtotal is short by that much — expected, not a "
+            "fault; cross-check the Ramp Detail report.")
     summary_lines += [
         f"Parsed:      {len(records)}",
         f"Failed:      {len(failed)} {failed if failed else ''}",

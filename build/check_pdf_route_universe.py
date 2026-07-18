@@ -116,9 +116,19 @@ def rs_run(records_by_pdf, folder):
                               input_dir=folder, out_path=out_path), out_path
 
 
+def _rs_rec(route, name, total):
+    """A fully-reconciling Ramp Summary record (every block sums to `total`) so
+    it passes the CMP-AUD-019 record_has_data + audit gate and reaches the
+    route-universe checks under test (a total-only record would be dropped as a
+    phantom before them)."""
+    return {"route": route, "source_file": name, "total_ramps": total,
+            "ramp_points_no_linework": 0, "hwy_right": total, "onoff_on": total,
+            "pop_rural_inside": total, "ramp_A_frontage": total}
+
+
 res, out_path = rs_run(
-    {"r1.pdf": {"route": "001", "source_file": "r1.pdf", "total_ramps": 5},
-     "r2.pdf": {"route": "001", "source_file": "r2.pdf", "total_ramps": 7}},
+    {"r1.pdf": _rs_rec("001", "r1.pdf", 5),
+     "r2.pdf": _rs_rec("001", "r2.pdf", 7)},
     tmp / "rs-dup")
 check("RS: two PDFs claiming one route refuse and name both",
       res.status == "error" and "r1.pdf" in res.message
@@ -126,8 +136,8 @@ check("RS: two PDFs claiming one route refuse and name both",
 check("...nothing was written", not out_path.exists())
 
 res, out_path = rs_run(
-    {"r1.pdf": {"route": "001", "source_file": "r1.pdf", "total_ramps": 5},
-     "r2.pdf": {"route": None, "source_file": "r2.pdf", "total_ramps": 7}},
+    {"r1.pdf": _rs_rec("001", "r1.pdf", 5),
+     "r2.pdf": _rs_rec(None, "r2.pdf", 7)},
     tmp / "rs-blank")
 check("RS: a populated record with no route is a named FAILED input "
       "(PARTIAL, loud banner)",
@@ -138,8 +148,8 @@ check("...the workbook published without the blank-route row",
       out_path.exists())
 
 res, out_path = rs_run(
-    {"r1.pdf": {"route": "001", "source_file": "r1.pdf", "total_ramps": 5},
-     "r2.pdf": {"route": "002", "source_file": "r2.pdf", "total_ramps": 7}},
+    {"r1.pdf": _rs_rec("001", "r1.pdf", 5),
+     "r2.pdf": _rs_rec("002", "r2.pdf", 7)},
     tmp / "rs-ok")
 check("RS: distinct routes publish COMPLETE",
       res.status == "ok" and res.completion == outcome.COMPLETE, res.message)

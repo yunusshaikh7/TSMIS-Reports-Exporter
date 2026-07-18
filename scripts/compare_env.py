@@ -334,14 +334,29 @@ def _load_ramp_summary_side(folder, label, events):
                            f"({type(e).__name__})")
             continue
         if not _rs.record_has_data(record):
-            # One-page / truncated PDF: a route but no ramp figures. Skip it
-            # (an all-blank route would otherwise compare as a phantom match).
+            # One-page / truncated PDF, or a total-only phantom (CMP-AUD-019):
+            # a route with no real per-section figures. Skip it (it would
+            # otherwise compare as a phantom match).
             events.on_log(f"  [{label}] {p.name}: no ramp data "
                           "(one-page / truncated PDF?); skipping")
             skipped.append(f"{label} {p.name}: no ramp data "
                            "(one-page / truncated PDF?)")
             continue
         route = _norm_route_key(record.get("route") or _route_from_name(p))
+        # CMP-AUD-019: the consolidator flags a route whose own section subtotals
+        # don't reconcile to its stated Total (or whose matcher hit an unknown /
+        # duplicate category); apply the SAME check here so two identically
+        # malformed sides can't certify a clean match (the sibling of the
+        # Intersection Summary CMP-AUD-018 gate). The explained P/V residual
+        # reconciles and is compared normally. A problem is a loud skip naming
+        # the route, never a silently-compared row.
+        problem = _rs.reconcile_problem(record)
+        if problem:
+            events.on_log(f"  [{label}] {p.name}: route {route} doesn't "
+                          f"reconcile ({problem}); flagging incomplete")
+            skipped.append(f"{label} {p.name}: route {route} doesn't reconcile "
+                           f"({problem})")
+            continue
         rows.append([route] + [record.get(col) for col, _disp in _RS_FIELDS])
         events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} "
                       f"(route {route})")

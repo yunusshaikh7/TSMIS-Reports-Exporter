@@ -578,8 +578,10 @@ Production's source-backed projection is exact, including all 3,780 consolidatio
 values and familiar-sheet numbers. Its current generic comparison is not semantically
 accepted: it emits 31 shared + one TSMIS-only row, 26 differing + five identical,
 zero-fills P/V on TSMIS, and injects the 59-point no-linework display metric into the
-verdict. The exact three semantic gaps are bound to CMP-AUD-024/025; route/completeness
-and provenance requirements remain under CMP-AUD-019/020/071/076/146.
+verdict. The exact three semantic gaps are bound to CMP-AUD-024/025; provenance
+requirements remain under CMP-AUD-071/076/146. (CMP-AUD-019 and 020 — the
+producer-side completeness + per-side partition gates — are resolved; see the
+findings ledger. Neither touched this vs-TSN oracle's counts.)
 
 The oracle ran production twice per execution using stable XLSX member and workbook-
 semantic digests that exclude only timestamp-bearing `docProps/core.xml`; every other

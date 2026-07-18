@@ -36,20 +36,33 @@ from compare_core import _DIFF_MARK
 from events import Events
 from openpyxl import load_workbook
 
-# (side, filename-route-token) -> the record parse_pdf would return. total_ramps
-# is set everywhere so record_has_data() is True (a real parse); only route 008
-# differs across sides (10 vs 11) — exactly one planted differing cell. Route 5
-# is written unpadded on PROD and zero-padded on TEST to exercise the route-key
-# normalizer; both must normalize to "005" and pair.
+# (side, filename-route-token) -> the record parse_pdf would return. Since
+# CMP-AUD-019, record_has_data() + the cross-env reconcile gate require a REAL
+# parse: the Total AND every section reconciling to it, so each record is fully
+# populated (each block sums to the route's Total). The single planted diff lives
+# in a Ramp-Types cell (a BOUNDED block): TEST route 008 reports one fewer
+# frontage ramp, which reconciles as an explained P/V-style residual on that
+# side while every exact block still balances — exactly one differing cell,
+# neither side skipped. Route 5 is written unpadded on PROD and zero-padded on
+# TEST to exercise the route-key normalizer; both must normalize to "005".
+def _rec(route, total, **over):
+    """A fully-reconciling per-route record (every block sums to `total`)."""
+    r = {"route": route, "total_ramps": total, "ramp_points_no_linework": 0,
+         "hwy_right": total, "onoff_on": total, "pop_rural_inside": total,
+         "ramp_A_frontage": total}
+    r.update(over)
+    return r
+
+
 RECORDS = {
-    ("prod", "5"):   {"route": "5",   "total_ramps": 20},
-    ("prod", "8"):   {"route": "8",   "total_ramps": 10},
-    ("prod", "10"):  {"route": "10",  "total_ramps": 15},
-    ("prod", "99"):  {"route": "99",  "total_ramps": 5},
-    ("test", "005"): {"route": "005", "total_ramps": 20},   # pairs with PROD "5"
-    ("test", "8"):   {"route": "8",   "total_ramps": 11},   # planted 1-cell diff
-    ("test", "10"):  {"route": "10",  "total_ramps": 15},
-    ("test", "110"): {"route": "110", "total_ramps": 7},
+    ("prod", "5"):   _rec("5", 20),
+    ("prod", "8"):   _rec("8", 10),
+    ("prod", "10"):  _rec("10", 15),
+    ("prod", "99"):  _rec("99", 5),
+    ("test", "005"): _rec("005", 20),                  # pairs with PROD "5"
+    ("test", "8"):   _rec("8", 10, ramp_A_frontage=9),  # planted 1-cell diff
+    ("test", "10"):  _rec("10", 15),
+    ("test", "110"): _rec("110", 7),
 }
 PROD_TOKENS = ["5", "8", "10", "99"]
 TEST_TOKENS = ["005", "8", "10", "110"]
@@ -114,10 +127,11 @@ def test_planted_diff_and_one_sided_routes():
         i005 = routes.index("005")
         assert statuses[i005] == "Both", ("the normalized route matches", statuses[i005])
 
-        # Exactly one planted differing cell (Total Ramps on route 008).
+        # Exactly one planted differing cell (A-Frontage ramps on route 008;
+        # TEST is short one, an explained bounded residual — both sides reconcile).
         neq = sum(1 for r in body for v in r
                   if isinstance(v, str) and _DIFF_MARK in v)
-        assert neq == 1, ("one planted Total Ramps difference on route 008", neq)
+        assert neq == 1, ("one planted A-Frontage difference on route 008", neq)
     finally:
         rs.parse_pdf, rs._DEPS_OK = saved
         shutil.rmtree(root, ignore_errors=True)
