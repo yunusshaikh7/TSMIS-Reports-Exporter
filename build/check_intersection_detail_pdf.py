@@ -168,6 +168,217 @@ def test_matrix_consolidated_filenames():
           == idpdf.FILENAME)
 
 
+# --------------------------------------------------------------------------- #
+# CMP-AUD-056..062 — parse-loop reconciliation hardening. Driven by precise
+# synthetic pages (exact char/rect coordinates, monkeypatched pdfplumber.open) so
+# the parser's real classification runs without font-metric ambiguity. Every
+# defect scenario is 0-occurrence on the statewide 7.9 corpus (16,459/16,459 rows,
+# byte-identical fixed vs unfixed), so each fix is a detection->PARTIAL escalation
+# that is a no-op on real data — these tests pin the escalation + the clean-render
+# no-op.
+# --------------------------------------------------------------------------- #
+def _cells(widths, x0=20.0, gap=2.0):
+    cells, x = [], x0
+    for w in widths:
+        cells.append((x, x + w))
+        x += w + gap
+    return cells
+
+
+# Non-uniform cells so the Post Mile / Location / Description columns are wide
+# enough for their tokens (the real print sizes them to content).
+_A_CELLS = _cells([10, 42, 10, 64] + [16] * 17)          # 21 rowA cells
+_B_CELLS = _cells([10, 34, 10, 90] + [16] * 14)          # 18 rowB cells
+
+
+def _ac(i):
+    return (_A_CELLS[i][0] + _A_CELLS[i][1]) / 2
+
+
+def _bc(i):
+    return (_B_CELLS[i][0] + _B_CELLS[i][1]) / 2
+
+
+def _band(cells, top, dx=0.0, h=7.0):
+    return [{"x0": c[0] + dx, "x1": c[1] + dx, "top": top, "bottom": top + h}
+            for c in cells]
+
+
+def _line(top, items, cw=2.5):
+    """Chars for one text line: each (center, text) placed centered at `center`;
+    spaces advance x but aren't emitted (they're gaps, like real extraction)."""
+    out = []
+    for center, text in items:
+        x = center - (len(text) * cw) / 2
+        for ch in text:
+            if ch.strip():
+                out.append({"text": ch, "x0": x, "x1": x + cw, "top": top})
+            x += cw
+    return out
+
+
+class _FakePdf:
+    def __init__(self, pages):
+        self.pages = pages
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _page(chars, rects, width=612.0):
+    from types import SimpleNamespace
+    return SimpleNamespace(width=width, chars=chars, rects=rects)
+
+
+def _rowA_line(top, pm="000.204", loc="12 ORA 001", vestigial=None):
+    items = [(_ac(1), pm), (_ac(3), loc)]
+    if vestigial is not None:
+        items.append((_ac(20), vestigial))
+    return _line(top, items)
+
+
+def _rowB_line(top, num="11050", desc="MAIN ST"):
+    items = [(_bc(1), num)]
+    if desc:
+        items.append((_bc(3), desc))
+    return _line(top, items)
+
+
+def _cover_page(route="001"):
+    """A cover page carrying the document's own ROUTE parameter (CMP-AUD-049), so
+    reconcile_route_identity can confirm the route in the consolidate() e2e."""
+    return _page(_line(60.0, [(120.0, f"ROUTE : {route}")]), [])
+
+
+def _parse(pages):
+    """Run the REAL parse_pdf against synthetic pages."""
+    import events as _E
+    saved = idpdf.pdfplumber.open
+    try:
+        idpdf.pdfplumber.open = lambda path: _FakePdf(pages)
+        return idpdf.parse_pdf("fake.pdf", _E.Events(on_log=lambda *a: None,
+                                                     is_cancelled=lambda: False))
+    finally:
+        idpdf.pdfplumber.open = saved
+
+
+def test_reconciliation_hardening():
+    print("CMP-AUD-056..062: parse-loop reconciliation counters + escalation:")
+
+    # unit: _is_rowB requires BOTH the integer AND a Description (058)
+    b_ok = ["", "11050", "", "MAIN ST"] + [""] * 14
+    b_bare = ["", "2026", "", ""] + [""] * 14                # numeric furniture
+    check("058: rowB needs integer AND description (bare integer rejected)",
+          idpdf._is_rowB(b_ok) and not idpdf._is_rowB(b_bare))
+
+    # a shaded record (rowA 21-band + rowB 18-band) establishes both grids; the
+    # record's two text lines pair into one row.
+    clean = _page(_rowA_line(100.0) + _rowB_line(112.0),
+                  _band(_A_CELLS, 100.0) + _band(_B_CELLS, 112.0))
+    rows, st = _parse([clean])
+    check("clean rowA+rowB pairs into exactly one record (grids derive)",
+          rows is not None and len(rows) == 1 and st["emitted"] == 1)
+    check("clean render: every reconciliation counter is 0 (no false escalation)",
+          st["orphans"] == 0 and st["leading_orphan_b"] == 0
+          and st["wrapped_rowb"] == 0 and st["vestigial"] == 0
+          and st["old_pm_hits"] == 0 and st["geom_divergent_pages"] == 0)
+
+    # 058 e2e: a numeric-furniture line (integer in win1, NO description) between a
+    # rowA and its real rowB must NOT be consumed as the rowB — the REAL record
+    # (with its description) is emitted, not a blank one.
+    p058 = _page(_rowA_line(100.0)
+                 + _rowB_line(112.0, num="2026", desc="")     # furniture
+                 + _rowB_line(124.0, num="11050", desc="REAL ST"),
+                 _band(_A_CELLS, 100.0) + _band(_B_CELLS, 112.0))
+    rows, st = _parse([p058])
+    check("058: numeric furniture doesn't hijack the record — the REAL rowB pairs",
+          rows is not None and len(rows) == 1 and rows[0][20] == "REAL ST")
+
+    # 057: a complete rowB with no rowA pending is a leading orphan (was silently
+    # treated as furniture)
+    p057 = _page(_rowB_line(100.0) + _rowA_line(120.0) + _rowB_line(132.0),
+                 _band(_A_CELLS, 120.0) + _band(_B_CELLS, 132.0))
+    rows, st = _parse([p057])
+    check("057: a leading rowB with no rowA is counted (leading_orphan_b>=1)",
+          st["leading_orphan_b"] >= 1)
+
+    # 060: rowA data in the dropped 21st column escalates (was warned, stayed complete)
+    p060 = _page(_rowA_line(100.0, vestigial="DRIFT") + _rowB_line(112.0),
+                 _band(_A_CELLS, 100.0) + _band(_B_CELLS, 112.0))
+    rows, st = _parse([p060])
+    check("060: a value in the vestigial 21st rowA column is counted + kept in "
+          "diagnostics", st["vestigial"] == 1 and st["vestigial_cells"] == [(1, "DRIFT")])
+
+    # 059: a PRE-update unpadded postmile alongside current rows (mixed edition)
+    p059 = _page(_line(140.0, [(_ac(1), "0.204"), (_ac(3), "12 ORA 001")])
+                 + _rowA_line(100.0) + _rowB_line(112.0),
+                 _band(_A_CELLS, 100.0) + _band(_B_CELLS, 112.0))
+    rows, st = _parse([p059])
+    check("059: a legacy unpadded-postmile row alongside current rows is counted "
+          "(old_pm_hits>=1, rows>0)", st["old_pm_hits"] >= 1 and len(rows) >= 1)
+
+    # 056: a Description continuation baseline right below a rowB (a wrap) is counted
+    p056 = _page(_rowA_line(100.0) + _rowB_line(112.0)
+                 + _line(118.0, [(_bc(3), "WRAPPED CONT")]),   # desc-only, +6pt
+                 _band(_A_CELLS, 100.0) + _band(_B_CELLS, 112.0))
+    rows, st = _parse([p056])
+    check("056: a desc-only continuation just below a rowB is counted (wrapped_rowb>=1)",
+          st["wrapped_rowb"] >= 1)
+
+    # 062: a second page whose own band grid is shifted past the tolerance is flagged
+    pg1 = _page(_rowA_line(100.0) + _rowB_line(112.0),
+                _band(_A_CELLS, 100.0) + _band(_B_CELLS, 112.0))
+    pg2 = _page(_rowA_line(100.0, pm="000.500", loc="12 ORA 001") + _rowB_line(112.0),
+                _band(_A_CELLS, 100.0, dx=60.0) + _band(_B_CELLS, 112.0, dx=60.0))
+    rows, st = _parse([pg1, pg2])
+    check("062: a page whose column grid diverges from the doc median is flagged "
+          f"(geom_divergent_pages>=1, got {st['geom_divergent_pages']})",
+          st["geom_divergent_pages"] >= 1)
+
+    # e2e escalation: a clean render stays COMPLETE; an anomaly escalates the
+    # producer to PARTIAL with the structured parse-anomalies diagnostic (never the
+    # file-count fields — CMP-AUD-064).
+    import outcome
+    import shutil
+    import tempfile
+    import events as _E
+    for tag, pages, expect_complete in (
+            ("clean", [clean], True),
+            ("vestigial", [p060], False)):
+        tmp = Path(tempfile.mkdtemp(prefix="cmp_id_"))
+        try:
+            in_dir = tmp / "in"
+            in_dir.mkdir()
+            stub = in_dir / "intersection_detail_route_001.pdf"
+            stub.write_bytes(b"%PDF-1.4\n%stub\n")
+            saved = idpdf.pdfplumber.open
+            try:
+                idpdf.pdfplumber.open = lambda path: _FakePdf([_cover_page()] + pages)
+                result = idpdf.consolidate(
+                    events=_E.Events(on_log=lambda *a: None),
+                    confirm_overwrite=lambda _p: True,
+                    input_dir=in_dir, out_path=tmp / "out.xlsx",
+                    converted_dir=tmp / "conv")
+            finally:
+                idpdf.pdfplumber.open = saved
+            if expect_complete:
+                check(f"e2e {tag}: stays COMPLETE (completion={result.completion!r})",
+                      result.completion == outcome.COMPLETE)
+            else:
+                check(f"e2e {tag}: escalates to PARTIAL (completion={result.completion!r})",
+                      result.completion == outcome.PARTIAL)
+                pe = (result.producer_extra or {}).get("parse_anomalies", {})
+                check(f"e2e {tag}: rides parse_anomalies, NOT the file counts "
+                      f"(pe={pe}, skipped={result.skipped_inputs})",
+                      pe.get("vestigial_cells") == 1 and result.skipped_inputs == 0
+                      and result.failed_inputs == 0)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     test_header()
     test_discriminators()
@@ -175,6 +386,7 @@ def main():
     test_grid_shapes()
     test_adapters_and_matrix()
     test_matrix_consolidated_filenames()
+    test_reconciliation_hardening()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

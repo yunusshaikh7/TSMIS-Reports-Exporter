@@ -166,6 +166,39 @@ def _cluster_lines(page):
     return cluster_by_top((c for c in page.chars if c["text"].strip()), Y_TOLERANCE)
 
 
+# A page's OWN band grid may not diverge from the document median by more than
+# this (CMP-AUD-062). The print layout is one table, so the columns are uniform
+# across pages — the statewide 7.9 census measured 0.000pt divergence on every
+# page carrying a band. A page that shifts past this (a mixed-paper / re-laid-out
+# build) would silently stop classifying on the document median, so it escalates
+# the producer to PARTIAL instead of being dropped.
+_PAGE_GEOM_TOL = 6.0
+
+
+def _page_bands(page, n_cols):
+    """This page's zebra-shaded cell bands of exactly `n_cols` cells (x0-sorted)."""
+    by_top = defaultdict(list)
+    for r in page.rects:
+        w = r["x1"] - r["x0"]
+        h = r["bottom"] - r["top"]
+        if CELL_MIN_W < w < page.width - 10 and CELL_MIN_H < h < CELL_MAX_H:
+            by_top[round(r["top"])].append(r)
+    return [sorted(cells, key=lambda r: r["x0"])
+            for cells in by_top.values() if len(cells) == n_cols]
+
+
+def _windows_from_bands(bands, n_cols):
+    """Contiguous column windows from the median cell edges of `bands` (each a
+    band of exactly `n_cols` x0-sorted rects), or None when empty. CONTIGUOUS
+    (each boundary the midpoint between adjacent cells; ends to ±infinity) so no
+    character falls between two columns and is dropped."""
+    if not bands:
+        return None
+    lo = [median([b[i]["x0"] for b in bands]) for i in range(n_cols)]
+    hi = [median([b[i]["x1"] for b in bands]) for i in range(n_cols)]
+    return contiguous_windows(lo, hi)
+
+
 def _shaded_column_windows(pdf, n_cols):
     """Derive `n_cols` contiguous column windows from the document's zebra-shaded
     cell rects (rowA bands have 21 cells, rowB bands 18).
@@ -173,27 +206,27 @@ def _shaded_column_windows(pdf, n_cols):
     Only the shaded (even-index) records carry rects, but the print layout is ONE
     table, so its column widths are uniform across every page and row — the median
     cell edges of the shaded bands therefore give the grid for EVERY line, shaded
-    or not. The windows are made CONTIGUOUS (each boundary is the midpoint between
-    adjacent cells; the ends extend to ±infinity) so no character can fall between
-    two columns and be dropped. Returns the (lo, hi) windows, or None if no full
-    band of that shape was found anywhere (an empty / unreadable PDF)."""
+    or not. Returns the (lo, hi) windows, or None if no full band of that shape was
+    found anywhere (an empty / unreadable PDF)."""
     bands = []
     for page in pdf.pages:
-        by_top = defaultdict(list)
-        for r in page.rects:
-            w = r["x1"] - r["x0"]
-            h = r["bottom"] - r["top"]
-            if CELL_MIN_W < w < page.width - 10 and CELL_MIN_H < h < CELL_MAX_H:
-                by_top[round(r["top"])].append(r)
-        for cells in by_top.values():
-            if len(cells) == n_cols:
-                bands.append(sorted(cells, key=lambda r: r["x0"]))
-    if not bands:
-        return None
+        bands.extend(_page_bands(page, n_cols))
+    return _windows_from_bands(bands, n_cols)
 
-    lo = [median([b[i]["x0"] for b in bands]) for i in range(n_cols)]
-    hi = [median([b[i]["x1"] for b in bands]) for i in range(n_cols)]
-    return contiguous_windows(lo, hi)
+
+def _page_geometry_diverges(page, win_a, win_b):
+    """True when THIS page's own band grid (either shape) diverges from the
+    document-median windows by more than `_PAGE_GEOM_TOL` at any interior
+    boundary (CMP-AUD-062). A page with no full band of a shape can't diverge on
+    that shape (nothing to compare) — it parses on the document median as before."""
+    for own_windows, doc_windows, n in ((_windows_from_bands(_page_bands(page, N_COLS_A), N_COLS_A), win_a, N_COLS_A),
+                                        (_windows_from_bands(_page_bands(page, N_COLS_B), N_COLS_B), win_b, N_COLS_B)):
+        if own_windows is None or doc_windows is None:
+            continue
+        for own, doc in zip(own_windows[1:], doc_windows[1:]):   # interior edges
+            if abs(own[0] - doc[0]) > _PAGE_GEOM_TOL:
+                return True
+    return False
 
 
 def _doc_windows(pdf):
@@ -220,6 +253,28 @@ def _is_rowA(vals):
     real Location in column 3. Header furniture ("POST MILE", …) fails the PM
     shape; a rowB fails it too (its column 1 is the integer intersection number)."""
     return bool(PM_ROWA_RE.match(vals[1]) and LOCATION_RE.search(vals[3] or ""))
+
+
+# rowB's merged Description window (grid columns 3-6 of rowA), used to validate the
+# COMPLETE rowB shape below (CMP-AUD-058) — see _make_row's b[3] -> col 20.
+_ROWB_DESC_WIN = 3
+# A wrapped Description continuation sits within this top-delta of its rowB (the ID
+# print line height is ~9.7pt; a wrapped fragment ~5-6pt), so a desc-only baseline
+# this close below a rowB is a wrap the line-by-line parser can't rejoin
+# (CMP-AUD-056). The statewide 7.9 census found ZERO — this is the loud safety net.
+_ROWB_WRAP_GAP = 7.5
+
+
+def _is_rowB(vals_b):
+    """A record's SECOND line: the plain-integer intersection number in window 1
+    AND a populated Description window (CMP-AUD-058). The integer ALONE is not
+    enough — a numeric furniture line (a page number, a year like '2026') printed
+    with a rowA pending would otherwise be consumed as a mostly-blank rowB, emit a
+    corrupt record, and orphan the real rowB. The statewide 7.9 census confirmed
+    every one of the 16,459 real rowB records carries a Description, so requiring
+    it rejects the numeric furniture without dropping a single real record."""
+    return bool(INT_ROWB_RE.match(vals_b[1] or "")
+                and (vals_b[_ROWB_DESC_WIN] or "").strip())
 
 
 def _make_row(a, b):
@@ -262,27 +317,47 @@ def parse_pdf(path, events):
     """Parse one TSMIS Intersection Detail PDF into 35-column TSMIS-format rows.
 
     Returns (rows, stats): `rows` a list of 35-column row lists in document order,
-    `stats` a reconciliation dict (emitted, pages, orphans = a rowA whose rowB
-    never arrived — should be 0; `no_grid` when the column geometry couldn't be
-    derived; `old_layout` when the file matches the PRE-July-2026 print instead —
-    unpadded postmiles, no rowB intersection numbers; `vestigial` counts rowA
-    values in the dropped 21st column, a layout-drift canary that should be 0;
-    `doc_routes` = the cover's own ROUTE-parameter claim, CMP-AUD-049 —
-    captured before the geometry gate, so a record-less or grid-less document
-    still identifies itself). Returns (None, None) if cancelled.
+    `stats` a reconciliation dict. The reconciliation counters (all `should be 0`
+    on the current statewide corpus — each drives a producer PARTIAL escalation so
+    the anomaly can never certify a clean-looking match):
+      * `orphans`          a rowA whose rowB never arrived (existing);
+      * `leading_orphan_b` a complete rowB with no rowA pending (CMP-AUD-057) —
+                           a rowB-shaped line is now classified independent of the
+                           pending state, never silently treated as furniture;
+      * `wrapped_rowb`     a Description continuation baseline the line-by-line
+                           parser cannot rejoin (CMP-AUD-056);
+      * `vestigial`        rowA values in the dropped 21st column, a layout-drift
+                           canary (CMP-AUD-060 — now escalates, not just warned);
+      * `old_pm_hits`      PRE-July-2026 unpadded-postmile rowAs (CMP-AUD-059 — a
+                           legacy hit escalates even when current rows also exist,
+                           so a mixed/transitional file can't drop its legacy rows
+                           silently); `old_layout` stays the homogeneous-old flag;
+      * `geom_divergent_pages` pages whose OWN band grid diverges from the
+                           document median past `_PAGE_GEOM_TOL` (CMP-AUD-062 — the
+                           finding's shifted page would silently stop classifying).
+    Plus `no_grid` when the geometry couldn't be derived and `doc_routes` (the
+    cover's own ROUTE claim, CMP-AUD-049 — captured before the geometry gate so a
+    record-less or grid-less document still identifies itself). Returns
+    (None, None) if cancelled.
 
     A line whose Post Mile column holds a zero-padded postmile is a rowA; its rowB
-    is the NEXT line whose column 1 holds the plain-integer intersection number —
-    page furniture between them (the table header repeated on every page, the
-    cover pages) matches neither shape and is skipped, so a record split across a
-    page boundary still pairs. A second rowA arriving before any rowB surfaces as
-    an orphan, never a silent drop."""
+    is the NEXT line that carries BOTH the plain-integer intersection number AND a
+    Description (CMP-AUD-058 — the integer alone let a numeric furniture line
+    hijack a pending record). Page furniture between them (the table header
+    repeated on every page, the cover pages) matches neither shape and is skipped,
+    so a record split across a page boundary still pairs. Every unreconciled data
+    shape surfaces in the counters above, never a silent drop."""
     rows = []
     doc_routes = set()          # the cover's own ROUTE parameter (049)
     pending_a = None            # a rowA (21 grid vals) awaiting its rowB
+    last_rowb_top = None        # top of the last rowB — for the wrap check (056)
     orphans = 0
+    leading_orphan_b = 0        # a rowB with no rowA pending (057)
+    wrapped_rowb = 0            # a Description continuation we can't rejoin (056)
     old_pm_hits = 0
     vestigial = 0
+    vestigial_cells = []        # (page, value) for the durable diagnostic (060)
+    geom_divergent_pages = 0    # pages off the document median (062)
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
         # The cover's ROUTE parameter is captured BEFORE the geometry gate so
@@ -298,36 +373,60 @@ def parse_pdf(path, events):
         win_a, win_b = _doc_windows(pdf)
         if win_a is None:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
-                        "no_grid": True, "old_layout": False, "vestigial": 0,
-                        "doc_routes": sorted(doc_routes)}
+                        "leading_orphan_b": 0, "wrapped_rowb": 0,
+                        "geom_divergent_pages": 0, "no_grid": True,
+                        "old_layout": False, "old_pm_hits": 0, "vestigial": 0,
+                        "vestigial_cells": [], "doc_routes": sorted(doc_routes)}
         for page_no, page in enumerate(pdf.pages, 1):
             if events.is_cancelled():
                 return None, None
             if page_no % 25 == 0:
                 events.on_log(f"    …page {page_no}/{n_pages}")
-            for _top, chars in _cluster_lines(page):
+            if _page_geometry_diverges(page, win_a, win_b):
+                # This page's own columns don't match the document median: parsing
+                # it on the median would silently drop its rows (CMP-AUD-062).
+                geom_divergent_pages += 1
+            for top, chars in _cluster_lines(page):
                 vals = _assign_columns(chars, win_a)
                 if _is_rowA(vals):
                     if pending_a is not None:
                         orphans += 1        # previous rowA never got its rowB
                     pending_a = vals
+                    last_rowb_top = None    # a new record — no wrap can precede it
                     if vals[20]:
                         vestigial += 1      # the dropped column grew data back?!
+                        vestigial_cells.append((page_no, vals[20]))
                     continue
                 if OLD_PM_RE.match(vals[1]) and LOCATION_RE.search(vals[3] or ""):
                     old_pm_hits += 1        # a PRE-update rowA (unpadded postmile)
                     continue
-                if pending_a is not None:
-                    vals_b = _assign_columns(chars, win_b)
-                    if INT_ROWB_RE.match(vals_b[1] or ""):
+                vals_b = _assign_columns(chars, win_b)
+                if _is_rowB(vals_b):
+                    if pending_a is not None:
                         rows.append(_make_row(pending_a, vals_b))
                         pending_a = None
-                    # else: furniture between a rowA and its rowB — skip
+                    else:
+                        leading_orphan_b += 1   # a rowB with no rowA (057)
+                    last_rowb_top = top
+                    continue
+                # Neither rowA / legacy-rowA / rowB. A Description continuation of
+                # the just-emitted rowB (within a wrap gap, text only in the desc
+                # window, no intersection number) is a wrapped rowB the line-by-line
+                # parser can't rejoin (CMP-AUD-056); anything else is page furniture.
+                if (last_rowb_top is not None
+                        and 0 < top - last_rowb_top <= _ROWB_WRAP_GAP
+                        and (vals_b[_ROWB_DESC_WIN] or "").strip()
+                        and not (vals_b[1] or "").strip()):
+                    wrapped_rowb += 1
     if pending_a is not None:
         orphans += 1
     return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
-                  "no_grid": False, "old_layout": not rows and old_pm_hits > 0,
-                  "vestigial": vestigial, "doc_routes": sorted(doc_routes)}
+                  "leading_orphan_b": leading_orphan_b, "wrapped_rowb": wrapped_rowb,
+                  "geom_divergent_pages": geom_divergent_pages, "no_grid": False,
+                  "old_layout": not rows and old_pm_hits > 0,
+                  "old_pm_hits": old_pm_hits, "vestigial": vestigial,
+                  "vestigial_cells": vestigial_cells,
+                  "doc_routes": sorted(doc_routes)}
 
 
 # =============================================================================
@@ -377,11 +476,33 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             if pstats["orphans"]:
                 ev.on_log(f"  WARNING: {pstats['orphans']} unpaired row(s) in {p.name} "
                           "(a record's two lines didn't pair) — see the log.")
+            # Line/page reconciliation anomalies (CMP-AUD-056/057/062) — each a
+            # data shape the parser can't reconcile; counted, never silently dropped.
+            for key, what in (
+                    ("leading_orphan_b", "complete rowB line(s) with no record to pair"),
+                    ("wrapped_rowb",
+                     "wrapped Description continuation(s) that couldn't be rejoined"),
+                    ("geom_divergent_pages",
+                     "page(s) whose column grid diverged from the document median")):
+                n = pstats.get(key, 0)
+                if n:
+                    ctx[key] = ctx.get(key, 0) + n
+                    ev.on_log(f"  WARNING: {n} {what} in {p.name} — see the log.")
             if pstats["vestigial"]:
                 ctx["vestigial"] = ctx.get("vestigial", 0) + pstats["vestigial"]
+                ctx.setdefault("vestigial_cells", []).extend(
+                    pstats.get("vestigial_cells", []))
                 ev.on_log(f"  WARNING: {pstats['vestigial']} value(s) in the dropped "
                           f"21st rowA column of {p.name} — the print layout may have "
                           "changed again; verify before relying on this output.")
+            if pstats.get("old_pm_hits") and rows:
+                # CMP-AUD-059: a mixed / transitional file — PRE-July-2026 unpadded
+                # postmiles alongside current rows. The legacy rows are NOT parsed
+                # by the current layout, so they'd drop silently; escalate loudly.
+                ctx["mixed_edition"] = ctx.get("mixed_edition", 0) + pstats["old_pm_hits"]
+                ev.on_log(f"  WARNING: {pstats['old_pm_hits']} PRE-July-2026 unpadded "
+                          f"postmile row(s) in {p.name} alongside current rows — "
+                          "legacy rows are not parsed by this layout; see the log.")
             if pstats["old_layout"]:
                 ev.on_log(f"{prefix} uses the PRE-July-2026 print layout (unpadded "
                           "postmiles) — this version parses the current layout only. "
@@ -402,12 +523,29 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     def finalize(result, ctx):
         orphans = ctx.get("orphans", 0)
+        leading_orphan_b = ctx.get("leading_orphan_b", 0)
+        wrapped_rowb = ctx.get("wrapped_rowb", 0)
+        geom_div = ctx.get("geom_divergent_pages", 0)
+        vestigial = ctx.get("vestigial", 0)
+        mixed = ctx.get("mixed_edition", 0)
         notes = []
         if orphans:
             notes.append(f"⚠ {orphans} unpaired row line(s) — verify (see the log).")
-        if ctx.get("vestigial"):
-            notes.append(f"⚠ {ctx['vestigial']} value(s) in the dropped 21st rowA "
+        if leading_orphan_b:
+            notes.append(f"⚠ {leading_orphan_b} rowB line(s) with no record to pair "
+                         "— verify (see the log).")
+        if wrapped_rowb:
+            notes.append(f"⚠ {wrapped_rowb} wrapped Description continuation(s) not "
+                         "rejoined — verify (see the log).")
+        if vestigial:
+            notes.append(f"⚠ {vestigial} value(s) in the dropped 21st rowA "
                          "column — the print layout may have changed; verify.")
+        if mixed:
+            notes.append(f"⚠ {mixed} PRE-July-2026 unpadded-postmile row(s) alongside "
+                         "current rows — legacy rows not parsed; verify (see the log).")
+        if geom_div:
+            notes.append(f"⚠ {geom_div} page(s) whose column grid diverged from the "
+                         "document median — verify (see the log).")
         result.summary_lines = notes + result.summary_lines
         # RR2-B1 / D18 parity with the HL-PDF consolidator: an unpaired record or
         # a failed PDF is invisible to the XLSX consolidator, so ESCALATE to a
@@ -417,6 +555,25 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             result.completion = outcome.PARTIAL
             result.skipped_inputs = max(result.skipped_inputs, orphans)
             result.failed_inputs = max(result.failed_inputs, len(ctx["failed"]))
+        # CMP-AUD-056/057/059/060/062: line/page reconciliation anomalies are parse
+        # ANOMALIES, not input-file counts (CMP-AUD-064) — they escalate COMPLETION
+        # only and ride a structured parse-anomalies diagnostic, leaving
+        # skipped/failed_inputs the file-level channels. All are 0 on the current
+        # statewide corpus, so a clean run stays COMPLETE.
+        anomalies = leading_orphan_b + wrapped_rowb + vestigial + mixed + geom_div
+        if anomalies:
+            result.completion = outcome.PARTIAL
+            result.producer_extra = {
+                **(result.producer_extra or {}),
+                "parse_anomalies": {
+                    "leading_orphan_rowb": leading_orphan_b,
+                    "wrapped_rowb": wrapped_rowb,
+                    "vestigial_cells": vestigial,
+                    "legacy_layout_rows": mixed,
+                    "geom_divergent_pages": geom_div,
+                    "vestigial_samples": ctx.get("vestigial_cells", [])[:10],
+                },
+            }
 
     return run_pdf_conversion(
         in_dir=in_dir, out=out, conv=conv, deps_ok=_DEPS_OK,
