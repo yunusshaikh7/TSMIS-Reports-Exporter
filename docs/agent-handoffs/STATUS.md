@@ -26,8 +26,8 @@ _Last updated: 2026-07-17 by Claude._
 | | Claude (integrator + own workstream) | Sol (sol-001) |
 |---|---|---|
 | **Outcome** | Finish the comparison-perfection project to source-first, byte-proven completion | Harden + offline-test the reliability engine (self-update, export loop, auth/session) |
-| **State** | **Active** | **Accepted + integrated** (2026-07-17) |
-| **Branch** | `comparison-perfection` | `agent/sol/reliability-hardening` (merged into comparison-perfection @ `7a7f0e7`) |
+| **State** | **Active** | **Accepted, integrated + CLEARED** (2026-07-17) |
+| **Branch** | `comparison-perfection` | ~~`agent/sol/reliability-hardening`~~ merged @ `7a7f0e7`, then worktree + branch (local + origin) removed — all work is on comparison-perfection |
 | **Owns (modify)** | comparison engine + consolidators + tsn library + matrices + evidence + their checks + the comparison-perfection docs | updater / exporter* / run_report / batch_manifest / export_multi / auth_nav / session / login / browser_channels / edge_device / timeouts / report_library / logging_setup + their checks |
 | **Must avoid** | Sol's engine modules (unless they block comparison — coordinate) | the comparison engine, the GUI (`gui_*`, `ui/`), `report_catalog`/`reports`, `version.py`, build `.ps1` |
 | **Charter** | `docs/planning/comparison-perfection/COMPLETION-PLAN.md` (RESUME block) | `sol-001/CHARTER.md` |
@@ -55,10 +55,22 @@ _Last updated: 2026-07-17 by Claude._
   artifact only).
 - **F-01 CLOSED by the integrator** (`99b7ab2`): `check_source_zip_smoke` now resolves the object
   store via `git rev-parse --git-common-dir`; red→green proven in a real linked worktree.
-- **Open follow-ups:** F-10 (a suspected non-reproducible `check_pdf_role_provenance` flake — monitor;
-  not seen in any integration gate run). **Work-PC-only re-verifies** the owner should exercise when
-  practical: one real frozen update swap/relaunch + Revert (F-02/03/07), headed console sign-in
-  (F-14), managed-Edge policy fallback (F-15) — none verifiable offline.
+- **All 16 findings reconciled.** F-01–09, F-11–15 are the merged fixes/proofs. F-16 (CI YAML
+  auto-glob) is a non-issue — Sol correctly left `checks.yml` alone. **F-10 RECONCILED — not a
+  defect** (2026-07-17): the suspected `check_pdf_role_provenance` flake did not reproduce in
+  **15 runs** (8 standalone + 7 parallel `-j 4` full gates, all green); Sol's single observed
+  failure was a nonzero PROCESS exit with no output under heavy parallel pdfplumber load — an
+  environmental resource transient (the known RAM-contention lesson), not a logic error. Monitor
+  only.
+- **Work-PC-only re-verifies for the OWNER** (not verifiable offline — the only remaining Sol
+  items): one real frozen update swap/relaunch + Revert (F-02/03/07), headed console sign-in
+  (F-14), managed-Edge policy fallback (F-15).
+- **CLEARED 2026-07-17** (owner-authorized): everything integrated + reconciled, so Sol's worktree
+  `C:\Users\Yunus\Projects\TSMIS-sol-reliability` and the branch `agent/sol/reliability-hardening`
+  (local + origin) were removed. Its only untracked file was `AGENTS.md` (a 36 KB local copy of
+  `CLAUDE.md` for Codex — regenerate with `cp CLAUDE.md AGENTS.md` for a future sol-002 worktree).
+  The sol-001 docs (this record + `sol-001/CHARTER/FINDINGS/FINAL_REPORT/SOL_STATUS`) are KEPT on
+  comparison-perfection as the mission record.
 
 ## High-conflict shared files (either lane may need them — coordinate before modifying)
 - `.github/workflows/checks.yml` — both lanes append new check names. **Claude resolves
