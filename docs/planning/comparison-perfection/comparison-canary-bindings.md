@@ -1215,6 +1215,31 @@ Hermetic guard: `check_highway_detail_pdf.test_fallback_recovery` (monkeypatched
 `pdfplumber.open` — a fallback page recovers a correctly-aligned record the old
 median dropped; a rect-less data page is unresolved/PARTIAL).
 
+**CMP-AUD-056/057/058/059/060/062 no-op proof (2026-07-18) — ID PDF parser
+reconciliation hardening.** The Intersection Detail **PDF** consolidator
+(`consolidate_tsmis_intersection_detail_pdf`) now reconciles every data shape or
+escalates the producer to PARTIAL (a strict `_is_rowB` requiring a Description; the
+leading-orphan-rowB, wrapped-rowB, vestigial, mixed-edition, and per-page-geometry
+counters). Bound to `ground-truth/All Reports 7.9/2026-07-09 ars-prod/
+intersection_detail_pdf/` (217 route PDFs). Census (`census_id_bucketB.py`) +
+output-safety proof (`verify_id_safety.py`, old-vs-new via `git stash`):
+
+- **Every defect scenario is 0-occurrence statewide:** 062 max per-page boundary
+  delta **0.000 pt** on BOTH the 21-cell and 18-cell grids, 0 classification / 0
+  value divergences (the ID print grid is genuinely uniform — no per-page recovery
+  needed, unlike HD-054); 060 vestigial 0; 059 mixed-edition files 0; 057 leading
+  orphan rowB 0; 056 wrapped rowB 0; 058 rowB accepted without a Description **0 of
+  16,459** (every real rowB carries one, so requiring it false-rejects nothing).
+- **Byte-identical output old-vs-new:** 217 files, **16,459 emitted rows**, rows
+  SHA-256 `5104861dcd19b68696d4a4ef495de58d3a0f91350383cc03220fa5df40d6fee4`
+  IDENTICAL before and after the change; all six counters 0; 0 files would
+  escalate. A discrepancy-safe no-op on the current corpus.
+- The Excel-vs-TSN and other legs are untouched (this is the PDF consolidator's
+  parse path only). Hermetic guard: `check_intersection_detail_pdf
+  .test_reconciliation_hardening` (precise synthetic pages via monkeypatched
+  `pdfplumber.open`; red→green — the OLD code lacks `_is_rowB`; clean-render no-op +
+  e2e COMPLETE→PARTIAL escalation with the structured `parse_anomalies` diagnostic).
+
 **CMP-AUD-218 workbook-shape note (2026-07-16, later).** The comparison
 workbook's Comparison sheet gained one hidden trailing literal column
 (`__CMP_E2_KEY_V1_TOKEN`, both twins) and Spot Check gained the independent

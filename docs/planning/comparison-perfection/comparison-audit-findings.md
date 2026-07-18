@@ -334,13 +334,13 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-053 | P1 | Verified | Highway Detail orphan reconciliation never fires |
 | CMP-AUD-054 | P1 | Verified on current 7.9 | Highway Detail fallback grids corrupt real rows as complete |
 | CMP-AUD-055 | P1 | Verified | Damaged repeated headers silently drop later PDF data pages |
-| CMP-AUD-056 | P1 | Verified | Intersection wrapped rowB text is truncated as complete |
-| CMP-AUD-057 | P1 | Verified | Intersection orphan rowB lines are never counted |
-| CMP-AUD-058 | P1 | Verified | Intersection numeric furniture can consume a pending record |
-| CMP-AUD-059 | P1 | Verified | Mixed Intersection PDF editions silently lose legacy rows |
-| CMP-AUD-060 | P1 | Verified | Intersection vestigial-column drift is discarded as complete |
+| CMP-AUD-056 | P1 | Resolved | Intersection wrapped rowB text is truncated as complete |
+| CMP-AUD-057 | P1 | Resolved | Intersection orphan rowB lines are never counted |
+| CMP-AUD-058 | P1 | Resolved | Intersection numeric furniture can consume a pending record |
+| CMP-AUD-059 | P1 | Resolved | Mixed Intersection PDF editions silently lose legacy rows |
+| CMP-AUD-060 | P1 | Resolved | Intersection vestigial-column drift is discarded as complete |
 | CMP-AUD-061 | P2 | Verified | Intersection grid scanning ignores cancellation |
-| CMP-AUD-062 | P1 | Verified | Intersection document-median geometry silently drops pages |
+| CMP-AUD-062 | P1 | Resolved | Intersection document-median geometry silently drops pages |
 | CMP-AUD-063 | P2 | Resolved | Sequence/Ramp PDFs certify invalid post-mile code tokens |
 | CMP-AUD-064 | P2 | Resolved 2026-07-18 (the HSL-PDF + RD-PDF consolidators no longer assign their unparsed-line count `loud` to the file-level `skipped_inputs`; like the already-correct `bad_tokens` path it escalates completion to PARTIAL only and now rides a structured `producer_extra['parse_anomalies']` diagnostic; a shared `pdf_table_lib._clamp_input_counts` caps skipped/failed to the discovered input count; real 3-route RD-PDF stays COMPLETE/skipped=0/no-anomalies; red→green in check_pm_code_vocabulary — 1 PDF / 3 bad lines → skipped_inputs 3→0 + unparsed_lines=3) | PDF parser anomaly counts masquerade as skipped input counts |
 | CMP-AUD-065 | P1 | Remediated 2026-07-16 by CMP-AUD-199 (re-verified 2026-07-17: the same-source schema compares EVERY column — context_fields is empty) | Sequence PDF-vs-Excel suppresses three same-source fields |
@@ -3238,7 +3238,14 @@ middle, and final data pages.
 ### CMP-AUD-056 — Intersection wrapped rowB text is truncated as complete
 
 Priority: P1  
-Status: Verified with a real 39-rectangle PDF and the consolidator  
+Status: **Resolved 2026-07-18** (census-first, `c6f72a6`) — a Description
+continuation baseline within a wrap gap below a rowB (desc-window text, no
+intersection number) is now counted (`wrapped_rowb`) and escalates the producer to
+PARTIAL rather than being silently truncated. Census (217 statewide 7.9 PDFs): 0
+wrapped rowBs; the hardened parser emits byte-identical rows (16,459/16,459, sha256
+unchanged) — a discrepancy-safe no-op. A full row-grouping recovery is unneeded at
+0 occurrence; the escalation is the honest signal. Red→green + clean no-op in
+`check_intersection_detail_pdf`.  
 Primary code: `scripts/consolidate_tsmis_intersection_detail_pdf.py:279-300`
 
 Intersection Detail treats each physical baseline as a complete logical line. A rowB
@@ -3255,7 +3262,12 @@ page-boundary wrapping, and continuation text that resembles a header or post mi
 ### CMP-AUD-057 — Intersection orphan rowB lines are never counted
 
 Priority: P1  
-Status: Verified with a leading complete rowB fixture  
+Status: **Resolved 2026-07-18** (census-first, `c6f72a6`) — a complete rowB
+(`_is_rowB`: integer intersection number AND Description) is now classified
+INDEPENDENT of the pending state; one arriving with no rowA pending is counted
+(`leading_orphan_b`) and escalates to PARTIAL, never silently treated as furniture.
+Census: 0 leading orphans statewide (byte-identical 16,459/16,459) — no-op on real
+data. Red→green in `check_intersection_detail_pdf`.  
 Primary code: `scripts/consolidate_tsmis_intersection_detail_pdf.py:279-305`
 
 The parser attempts rowB classification only while a rowA is pending. A complete
@@ -3270,7 +3282,14 @@ record, an explicit furniture category, or a structured partial/failure diagnost
 ### CMP-AUD-058 — Intersection numeric furniture can consume a pending record
 
 Priority: P1  
-Status: Verified with integer page furniture between rowA and rowB  
+Status: **Resolved 2026-07-18** (census-first, `c6f72a6`) — rowB acceptance now
+requires the integer intersection number AND a populated Description window
+(`_is_rowB`), so a numeric-furniture line (a page number, a year like `2026`) can
+no longer be consumed as a mostly-blank rowB and orphan the real one. Census: every
+one of the 16,459 statewide rowB records carries a Description, so the tightening
+rejects 0 real records (byte-identical output) while rejecting bare-integer
+furniture. Red→green (the real rowB pairs instead of a blank record) in
+`check_intersection_detail_pdf`.  
 Primary code: `scripts/consolidate_tsmis_intersection_detail_pdf.py:296-300`
 
 With a rowA pending, the only rowB discriminator is an integer in window one. A
@@ -3287,7 +3306,13 @@ numbers, and intersection labels in every window.
 ### CMP-AUD-059 — Mixed Intersection PDF editions silently lose legacy rows
 
 Priority: P1  
-Status: Verified with current and pre-July-2026 rows in one real PDF  
+Status: **Resolved 2026-07-18** (census-first, `c6f72a6`) — a PRE-July-2026
+unpadded-postmile hit (`old_pm_hits`) now escalates the producer to PARTIAL
+whenever current rows also exist (a mixed/transitional/page-drifted file), not only
+in the homogeneous-old case (which still fails outright). The legacy rows are named
+in the log and can no longer drop silently under a COMPLETE result. Census: 0 mixed
+files statewide (byte-identical 16,459/16,459) — no-op on real data. Red→green in
+`check_intersection_detail_pdf`.  
 Primary code: `scripts/consolidate_tsmis_intersection_detail_pdf.py:293-305`
 
 The parser counts legacy unpadded post miles, but declares `old_layout` only when no
@@ -3304,7 +3329,14 @@ within pages.
 ### CMP-AUD-060 — Intersection vestigial-column drift is discarded as complete
 
 Priority: P1  
-Status: Verified with a populated dropped-column fixture  
+Status: **Resolved 2026-07-18** (census-first, `c6f72a6`) — detected data in the
+dropped 21st rowA column now BLOCKS complete status (escalates to PARTIAL, was
+warn-only), and the raw value + source page ride the structured
+`parse_anomalies.vestigial_samples` diagnostic. The affected row is neither mapped
+nor silently emitted with the value discarded; a schema decision is required before
+the column can be used. Census: 0 vestigial hits statewide (byte-identical
+16,459/16,459) — no-op on real data. Red→green e2e (COMPLETE→PARTIAL) in
+`check_intersection_detail_pdf`.  
 Primary code: `scripts/consolidate_tsmis_intersection_detail_pdf.py:290-291,356-389`
 
 The parser correctly detects data in rowA's supposedly vestigial 21st column, then
@@ -3347,7 +3379,17 @@ before workbook emission.
 ### CMP-AUD-062 — Intersection document-median geometry silently drops pages
 
 Priority: P1  
-Status: Verified with a real two-page, two-geometry PDF  
+Status: **Resolved 2026-07-18** (census-first, `c6f72a6`) — the parser still
+derives one document-median grid (census proves it is correct — see below), but
+each page whose OWN band grid diverges from that median past `_PAGE_GEOM_TOL`
+(6pt) is now flagged (`geom_divergent_pages`) and escalates the producer to
+PARTIAL, so a shifted page can no longer silently stop classifying. **Census (217
+statewide 7.9 PDFs): max per-page boundary delta 0.000pt on BOTH grids, 0
+classification/value divergences** — the ID print layout is genuinely uniform
+across every page, so per-page recovery (the HD-054 approach) is unneeded here and
+the detection is a no-op on real data (byte-identical 16,459/16,459). A future
+mixed-paper build escalates to amber instead of dropping pages. Red→green
+(shifted-page fixture flagged) in `check_intersection_detail_pdf`.  
 Primary code: `scripts/consolidate_tsmis_intersection_detail_pdf.py:159-204,273-300`
 
 The parser derives one document-wide median grid for all pages. In a two-page fixture

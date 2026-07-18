@@ -26,10 +26,25 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Findings** | **241 total · ~176 CLOSED (Resolved/Remediated) · ~9 partial · ~56 open** (~73% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · **C ✅ COMPLETE** (028/029/030/031/032/033/034/036/063/027 + 070-not-a-defect) · **D ✅ COMPLETE** (018 ✅ · 019 ✅ · 046 ✅ · 022 ✅) · B/E/F/G/H/I 🔨 (071 ✅ route-universe · 068 ✅ HD Report View · 069 ✅ RD PDF roles · 015 ✅ TSAR label fix · 064 ✅ PDF anomaly counts · 038 ✅ date normalizer · 009 ✅ numeric key parity · 039+043 ✅ Summary-by-Category typed flags + snapshot · 044 ✅ trailing-blank-header data guard · 013 ✅ matrix support parity · 014 ✅ Self-consistency sub-tab · **054 ✅ HD-PDF fallback recovery (live bug; 15-route PARTIAL owner-flagged)**; parser robustness [B: 051–053/055–062 remain] / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
 | **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **019 RESOLVED (2026-07-17)**: the Ramp Summary producer now reflects its own audit reds — `record_has_data` requires Total + every section, per-route `reconcile_record` sends unexplained gaps → PARTIAL and the explained P/V residual → a typed note (COMPLETE), matcher unknown/duplicate diagnostics, cross-env shares the gate; census 0 unexplained / 9 routes / 22 P/V ramps, real-data verified. **032 RESOLVED (2026-07-18) — BUCKET C COMPLETE**: every flat cross-env family now pins its EXACT export schema via a header_canonicalizer (RD/HSL/HD/ID XLSX + HSL-PDF/RD-PDF), so two malformed/legacy/truncated/reordered sides refuse instead of matching; census-verified on the 7.9 statewide exports + converted headers; new `check_compare_env_flat_schema` + 5 fixtures rebuilt onto real layouts. **046 RESOLVED (2026-07-18)**: shifted RD/ID exports now show diffs under the right field — RD Excel+PDF pin a position-authoritative `force_header`, ID Excel+PDF realign legacy→current via `_id_canonical_header`; end-to-end proves Description-under-Description / INT-Type-under-INT-Type. **NEXT (bucket D — LAST): 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
 
-> ### ▶ RESUME HERE (2026-07-18, after 073+074 + 083 + 086 + 072 + 013 + 014 + 054 + 044 + 039+043 + 009 + 038 + 022 (C&D done) + 071 + 068 + 069 + 015 + 064 — buckets B/E/G/H/I)
+> ### ▶ RESUME HERE (2026-07-18, after 056–062 (ID PDF) + 073+074 + 083 + 086 + 072 + 013 + 014 + 054 + 044 + 039+043 + 009 + 038 + 022 (C&D done) + 071 + 068 + 069 + 015 + 064 — buckets B/E/G/H/I)
 >
-> **DONE 2026-07-18 (this session): 073+074 (`d140cfc`) → 083 (`05cd0d8`) → 086 (`373203c`) → 072
-> (`c244fc4`), all CI-green, offline gate 134/134, 181 closed (75%).**
+> **DONE 2026-07-18 (5th marathon, bucket B ID): CMP-AUD-056/057/058/059/060/062 CLOSED in one
+> commit (`c6f72a6`, CI SHA-verified success), offline gate 134/134, 187 closed (78%).** The
+> Intersection Detail PDF parser now reconciles every data shape or escalates to PARTIAL —
+> `_is_rowB` requires the integer AND a Description (058: numeric furniture can't hijack a record);
+> a leading rowB is counted (057); a wrapped Description continuation is counted (056); vestigial
+> 21st-column data escalates + is kept in diagnostics (060); a legacy postmile alongside current
+> rows escalates (059); and a page whose own band grid diverges from the document median past
+> `_PAGE_GEOM_TOL` is flagged (062). **Census-first (217 statewide 7.9 PDFs): every scenario is
+> 0-occurrence; byte-identical rows old-vs-new (16,459/16,459, sha256 `5104861d…`), all counters 0
+> — a discrepancy-safe no-op** (the ID grid is genuinely uniform: 0.000pt max per-page delta, so
+> unlike HD-054 no per-page recovery is needed). Anomalies escalate completion only, never the
+> file-count fields (CMP-AUD-064). Red→green + clean-render no-op + e2e escalation in
+> `check_intersection_detail_pdf`. **NEXT in bucket B: 051/052/053 (HD parser — census running) +
+> 055 (HSL/RD damaged header) + 061 (ID grid-scan cancellation).**
+>
+> **DONE 2026-07-18 (4th marathon): 073+074 (`d140cfc`) → 083 (`05cd0d8`) → 086 (`373203c`) → 072
+> (`c244fc4`), all CI-green, offline gate 134/134.**
 > - **072** (bucket E): `renderCompareDirs` fired `get_compare_folders` with no sequencing → a slow
 >   response for an abandoned recipe stomped the current one (A→B→A). Added a `compareDirsSeq`
 >   generation token + recipe-key snapshot (mirrors `refreshConsDest`'s `consDestSeq`) + a
