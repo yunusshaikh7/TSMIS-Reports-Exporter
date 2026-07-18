@@ -162,20 +162,20 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">67<span>%</span></div>
+        <div class="bignum">68<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="162 closed, 10 in progress, 68 open of 241 findings">
-          <div class="seg done" style="width:67%">162 closed</div>
+        <div class="bar" role="img" aria-label="163 closed, 10 in progress, 67 open of 241 findings">
+          <div class="seg done" style="width:68%">163 closed</div>
           <div class="seg warn" style="width:4%"></div>
-          <div class="seg open" style="width:29%">68 open</div>
+          <div class="seg open" style="width:28%">67 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 162 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 163 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot warn"></i> ~10 in progress</span>
-          <span><i class="dot open"></i> ~68 open</span>
+          <span><i class="dot open"></i> ~67 open</span>
         </div>
       </div>
     </div>
@@ -249,14 +249,13 @@
       <div class="step now">
         <div class="n">01</div>
         <div class="body">
-          <div class="h">Finish cross-environment validation <span class="tag now">up next</span></div>
-          <div class="m">Bucket D — only <b class="mono">022</b> left (duplicate normalized categories). <b class="mono">018</b> + <b class="mono">019</b> + <b class="mono">046</b> done.</div>
+          <div class="h">PDF-parser robustness wave <span class="tag now">up next</span></div>
+          <div class="m">Bucket B — spill/orphan/fallback/truncation hardening for the HD &amp; ID parsers (<b class="mono">051–062</b> + <b class="mono">044</b>). Buckets <b>C &amp; D complete</b>.</div>
         </div>
       </div>
-      <div class="step"><div class="n">02</div><div class="body"><div class="h">PDF-parser robustness wave</div><div class="m">Bucket B — spill/orphan/fallback/truncation hardening for the HD &amp; ID parsers.</div></div></div>
-      <div class="step"><div class="n">03</div><div class="body"><div class="h">Matrix / GUI lifecycle honesty</div><div class="m">Bucket E — the big one, but P2 state-machine truthfulness, not comparison correctness.</div></div></div>
-      <div class="step"><div class="n">04</div><div class="body"><div class="h">Source-semantics &amp; the evidence arc</div><div class="m">Buckets G &amp; F — conserve/expose data facts; then the evidence-image gate (incl. the deferred 210 feature).</div></div></div>
-      <div class="step"><div class="n">05</div><div class="body"><div class="h">Instrument hardening &amp; the trivia tail</div><div class="m">Buckets H &amp; I — non-product audit-instrument work and the P3 label/doc nits.</div></div></div>
+      <div class="step"><div class="n">02</div><div class="body"><div class="h">Matrix / GUI lifecycle honesty</div><div class="m">Bucket E — the big one, but P2 state-machine truthfulness, not comparison correctness.</div></div></div>
+      <div class="step"><div class="n">03</div><div class="body"><div class="h">Source-semantics &amp; the evidence arc</div><div class="m">Buckets G &amp; F — conserve/expose data facts; then the evidence-image gate (incl. the deferred 210 feature).</div></div></div>
+      <div class="step"><div class="n">04</div><div class="body"><div class="h">Instrument hardening &amp; the trivia tail</div><div class="m">Buckets H &amp; I — non-product audit-instrument work and the P3 label/doc nits.</div></div></div>
     </div>
     <div class="method">
       <span><b>Every fix, every time:</b></span>
@@ -275,12 +274,13 @@
       <div class="win"><div class="id">CMP-AUD-019</div><div class="w">Ramp Summary audit reds reflected in the result</div><div class="c">census 126 routes · 22 P/V ramps · unexplained → PARTIAL</div></div>
       <div class="win"><div class="id">CMP-AUD-032</div><div class="w">Flat cross-env schemas pinned — bucket C complete</div><div class="c">RD/HSL/HD/ID + 2 PDF paths · census 847 exports · no phantom match</div></div>
       <div class="win"><div class="id">CMP-AUD-046</div><div class="w">Shifted exports show diffs under the right field</div><div class="c">RD force_header + ID realign · Description not R/U · display-only</div></div>
+      <div class="win"><div class="id">CMP-AUD-022</div><div class="w">No silent double-count in the raw summary block-walk — bucket D complete</div><div class="c">counts_from_rows · census 437 calls · (block, pre-fold code) guard</div></div>
     </div>
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>1edca5f</b> · gate <b>132/132</b> · CI-green</span>
-    <span>Updated <b>2026-07-17</b></span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>3aeef44</b> · gate <b>132/132</b> · CI-green</span>
+    <span>Updated <b>2026-07-18</b></span>
   </footer>
 
 </div>
