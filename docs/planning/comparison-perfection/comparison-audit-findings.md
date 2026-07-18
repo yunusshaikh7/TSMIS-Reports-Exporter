@@ -342,7 +342,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-061 | P2 | Verified | Intersection grid scanning ignores cancellation |
 | CMP-AUD-062 | P1 | Verified | Intersection document-median geometry silently drops pages |
 | CMP-AUD-063 | P2 | Resolved | Sequence/Ramp PDFs certify invalid post-mile code tokens |
-| CMP-AUD-064 | P2 | Verified | PDF parser anomaly counts masquerade as skipped input counts |
+| CMP-AUD-064 | P2 | Resolved 2026-07-18 (the HSL-PDF + RD-PDF consolidators no longer assign their unparsed-line count `loud` to the file-level `skipped_inputs`; like the already-correct `bad_tokens` path it escalates completion to PARTIAL only and now rides a structured `producer_extra['parse_anomalies']` diagnostic; a shared `pdf_table_lib._clamp_input_counts` caps skipped/failed to the discovered input count; real 3-route RD-PDF stays COMPLETE/skipped=0/no-anomalies; red→green in check_pm_code_vocabulary — 1 PDF / 3 bad lines → skipped_inputs 3→0 + unparsed_lines=3) | PDF parser anomaly counts masquerade as skipped input counts |
 | CMP-AUD-065 | P1 | Remediated 2026-07-16 by CMP-AUD-199 (re-verified 2026-07-17: the same-source schema compares EVERY column — context_fields is empty) | Sequence PDF-vs-Excel suppresses three same-source fields |
 | CMP-AUD-066 | P1 | Remediated 2026-07-17 (HL vs-TSN half via the v5 marker; the PDF-role halves via the PDF-conversion marker; RD structurally protected) | PDF comparison roles are not provenance-validated |
 | CMP-AUD-067 | P1 | Remediated 2026-07-17 (same-source projections in all four families; HSL was fixed by 199/204, RD never had an instance) | TSN projections hide PDF-vs-Excel source differences |
