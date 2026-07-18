@@ -192,6 +192,85 @@ def test_tsmis_loader_sums():
         check("duplicated category column refuses", "duplicated" in str(e))
 
 
+def _stamp_census(path, routes):
+    """Write a producer outcome sidecar carrying `route_census` beside `path`,
+    the way the drivers do (write_outcome extra=result.producer_extra)."""
+    import consolidation_meta
+    import outcome as oc
+    from events import ConsolidateResult
+    res = ConsolidateResult(status="ok", output_path=str(path),
+                            completion=oc.COMPLETE)
+    assert consolidation_meta.write_outcome(path, res,
+                                            extra={"route_census": routes})
+
+
+def _three_rs_routes():
+    """Three arithmetically consistent per-route rows (001, 008U, 010)."""
+    return [_route_row(r, 10, right=10, nolw=0, diamond=10)
+            for r in ("001", "008U", "010")]
+
+
+def test_route_universe():
+    """CMP-AUD-071: the aggregated route universe is validated before summing —
+    a header-only workbook, blank/malformed identities, and duplicate route rows
+    always refuse; with the producer's route census beside the workbook, a
+    dropped/extra/reordered row refuses too; a census-less workbook gets an
+    explicit no-census diagnostic (the mirror of Intersection Summary's 183)."""
+    print("route-universe validation (CMP-AUD-071):")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_rs_071_"))
+    census = ["001", "008U", "010"]
+
+    def loads(label, rows, stamp=None, *needles):
+        p = root / f"{label.replace(' ', '_')[:24]}.xlsx"
+        _write_tsmis(p, _ALL_DISPLAYS, rows)
+        if stamp is not None:
+            _stamp_census(p, stamp)
+        notes = []
+        try:
+            cmp._load_tsmis(p, note_sink=notes)
+            check(label, not needles)
+            return notes
+        except ValueError as e:
+            check(label, bool(needles) and all(n in str(e) for n in needles))
+            return notes
+
+    # Clean + census -> loads with a census-verified note.
+    notes = loads("census match loads and is verified", _three_rs_routes(), census)
+    check("...census-verified note (3 routes)",
+          any("verified against the producer census" in n and "3 routes" in n
+              for n in notes))
+    # Clean, NO census -> loads with the explicit no-census diagnostic.
+    notes = loads("census-less workbook loads with internal checks", _three_rs_routes())
+    check("...explicit no-census diagnostic note",
+          any("no producer route census" in n for n in notes))
+
+    # Header-only workbook (no data rows) -> refuses (was a phantom zero universe).
+    loads("header-only workbook refuses (no route rows)", [], None,
+          "no route rows")
+    # Duplicate route rows refuse whether identical or conflicting (the 5+5=10 bug).
+    dup = _three_rs_routes()
+    dup.append(dict(dup[0]))
+    loads("duplicate route row refuses (identical copy)", dup, None,
+          "more than one row")
+    conflict = _three_rs_routes()
+    other = dict(conflict[0])
+    other[_D["hwy_right"]] = 4
+    conflict.append(other)
+    loads("duplicate route row refuses (conflicting copy)", conflict, None,
+          "more than one row")
+    # Blank / malformed route identity refuses.
+    blank = _three_rs_routes()
+    blank[1]["Route"] = "  "
+    loads("blank route identity refuses", blank, None, "no usable route identity")
+
+    # With a census: a dropped or reordered route refuses.
+    dropped = _three_rs_routes()[:2]                        # 001, 008U (010 gone)
+    loads("dropped route vs census refuses", dropped, census, "do not match",
+          "census")
+    reordered = [_three_rs_routes()[i] for i in (1, 0, 2)]  # 008U, 001, 010
+    loads("reordered routes vs census refuses", reordered, census, "do not match")
+
+
 def test_end_to_end():
     print("end-to-end VALUES workbook (aggregate compare + familiar sheet):")
     root = Path(tempfile.mkdtemp(prefix="tsmis_rs_tsn_"))
@@ -441,6 +520,7 @@ def test_corrupt_pdf_is_valueerror():
 def main():
     test_schema_and_categories()
     test_tsmis_loader_sums()
+    test_route_universe()
     test_end_to_end()
     test_validation_refusals()
     test_provenance_sidecar()

@@ -29,6 +29,7 @@ import json
 import logging
 import os
 import re
+from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
@@ -199,6 +200,58 @@ def require_per_route_identity(path_a, path_b):
             f"{routes[1]} — a per-route comparison must compare the same "
             "route. Pick matching per-route files, or two consolidated "
             "workbooks.")
+
+
+def validate_route_universe(routes, name, workbook_path, note_sink=None):
+    """CMP-AUD-183/071: an aggregated TSMIS summary's route universe must be
+    sound before its category cells are summed — every data row carries a usable
+    route identity and no route appears twice — and, when the producer recorded
+    its ordered `route_census` in the outcome sidecar, must match that census
+    EXACTLY (a dropped, added, renamed, reordered, or suffix-collapsed row
+    refuses). A census-less workbook (older consolidation, or a copy without its
+    sidecar) keeps the internal checks and gets an explicit no-census diagnostic
+    instead of a silent pass. Shared by the Intersection Summary and Ramp Summary
+    aggregate comparators (identical California route-id shape). `routes` is the
+    [(row_no, cell_value)] the loader collected from the Route column."""
+    cleaned = []
+    for row_no, rv in routes:
+        s = ("" if rv is None else str(rv)).strip()
+        if isinstance(rv, bool) or not s or not s.isalnum() or len(s) > 8:
+            raise ValueError(f"{name}: sheet row {row_no} has no usable route "
+                             f"identity ({rv!r}) — its counts cannot be attributed")
+        cleaned.append(s)
+    if not cleaned:
+        raise ValueError(f"{name} has no route rows — nothing to aggregate")
+    dupes = sorted(r for r, n in Counter(cleaned).items() if n > 1)
+    if dupes:
+        raise ValueError(f"{name}: route(s) {', '.join(dupes[:6])} appear on more "
+                         "than one row — refusing to aggregate an ambiguous "
+                         "route universe")
+    census = consolidation_meta.read_extra(workbook_path, "route_census")
+    if census is None:
+        note = (f"TSMIS route universe: {len(cleaned)} routes; no producer route "
+                "census recorded (older consolidation) — internal checks only.")
+    elif (not isinstance(census, list)
+          or not all(isinstance(r, str) and r for r in census)):
+        raise ValueError(f"{name}: the producer route census beside the workbook "
+                         "is malformed — re-consolidate before comparing")
+    elif census != cleaned:
+        detail = (f"workbook has {len(cleaned)} route rows, the census records "
+                  f"{len(census)}")
+        for i, (want, got) in enumerate(zip(census, cleaned)):
+            if want != got:
+                detail = (f"first divergence at row {i + 2}: census {want!r} vs "
+                          f"workbook {got!r}")
+                break
+        raise ValueError(f"{name}: the aggregated routes do not match the "
+                         f"producer's route census ({detail}) — a route was "
+                         "dropped, added, renamed, or reordered after "
+                         "consolidation; re-consolidate before comparing")
+    else:
+        note = (f"TSMIS route universe verified against the producer census: "
+                f"{len(cleaned)} routes ({cleaned[0]}–{cleaned[-1]}).")
+    if note_sink is not None:
+        note_sink.append(note)
 
 
 def require_pdf_source(path, side_label, report_noun):

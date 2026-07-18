@@ -211,7 +211,7 @@ def _load_tsn(path):
 # --------------------------------------------------------------------------- #
 # TSMIS side: SUM the consolidated workbook's per-route sheet -> {slug: count}
 # --------------------------------------------------------------------------- #
-def _load_tsmis(path):
+def _load_tsmis(path, note_sink=None):
     """TSMIS side -> {slug: count}. Sums each category column of the consolidated
     Ramp Summary workbook's per-route 'TSAR Ramps Summary' sheet (== its Combined
     sheet's live totals). Strict (CMP-AUD-021/022): count cells must be whole
@@ -219,7 +219,11 @@ def _load_tsmis(path):
     refuse), a duplicated category column refuses, and a column the workbook
     lacks stays ABSENT — never a fabricated zero (reconcile_counts decides
     whether it was required). Blank cells (the never-tabulated P/V columns)
-    contribute nothing."""
+    contribute nothing. The route universe is validated before summing
+    (CMP-AUD-071 — the mirror of Intersection Summary's CMP-AUD-183): a
+    header-only or duplicate-route workbook refuses instead of certifying a
+    phantom zero/double-counted universe, and the census status line lands in
+    `note_sink`."""
     name = Path(path).name
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
@@ -237,6 +241,7 @@ def _load_tsmis(path):
             raise ValueError(f"{name} isn't a consolidated Ramp Summary workbook "
                              "(no 'Route' column) — consolidate the per-route "
                              "exports first.")
+        route_col = names.index("Route")
         display_to_slug = {disp: slug for slug, disp in _SLUG_TO_DISPLAY.items()}
         col_slug, seen = {}, set()
         for i, h in enumerate(names):
@@ -249,15 +254,18 @@ def _load_tsmis(path):
             seen.add(slug)
             col_slug[i] = (slug, h)
         sums = {slug: 0 for slug, _h in col_slug.values()}
-        for row in it:
+        routes = []                                       # (row_no, Route cell)
+        for row_no, row in enumerate(it, start=3):        # data starts at row 3
             if not row or all(c is None for c in row):
                 continue
+            routes.append((row_no, row[route_col] if route_col < len(row) else None))
             for i, (slug, disp) in col_slug.items():
                 v = row[i] if i < len(row) else None
                 if v is None or (isinstance(v, str) and not v.strip()):
                     continue                             # blank cell (e.g. P/V)
                 sums[slug] += summary_layout.parse_count(v, source=name,
                                                          category=disp)
+        ctc.validate_route_universe(routes, name, path, note_sink)
         return sums
     finally:
         wb.close()
@@ -318,7 +326,8 @@ def _load_pair(tsmis_path, tsn_path, footnote_sink=None, note_sink=None,
     familiar sheet + the log — never fabricated into a category, and never a
     warning (warnings mean unreadable inputs). Display-only footnote values ride
     `footnote_sink` (CMP-AUD-024) — never the compared rows."""
-    tsmis_counts = _load_tsmis(tsmis_path)
+    route_notes = []                                    # CMP-AUD-071 census line
+    tsmis_counts = _load_tsmis(tsmis_path, note_sink=route_notes)
     tsn_counts = _load_tsn(tsn_path)
     tsmis_name, tsn_name = Path(tsmis_path).name, Path(tsn_path).name
     for slug, label in (("ramp_P_dummy_paired", "P - Dummy Paired"),
@@ -337,6 +346,7 @@ def _load_pair(tsmis_path, tsn_path, footnote_sink=None, note_sink=None,
     else:
         claims = consolidation_meta.read_extra(tsn_path, "tsn_source_claims")
     notes = claims_notes(claims)
+    notes += route_notes                                # CMP-AUD-071 route universe
     notes += summary_layout.reconcile_counts(
         _SPEC, tsmis_counts, "tsmis", _TSMIS_RULES,
         source=tsmis_name, side_label="TSMIS")

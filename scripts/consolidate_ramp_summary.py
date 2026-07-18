@@ -1090,10 +1090,19 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         f"No data:     {len(blank)} {blank if blank else ''}",
         f"Output file: {out_path}",
     ]
+    # CMP-AUD-071: persist the ordered route identities the workbook was built
+    # from (stripped to match how the comparison loader reads the Route cell), so
+    # the vs-TSN aggregate loader can reconcile its route universe against the
+    # producer's own census — a dropped/extra/reordered/renamed row after
+    # consolidation becomes detectable. Rides the outcome sidecar via the drivers'
+    # write_outcome(extra=result.producer_extra), mirroring Intersection Summary.
     return ConsolidateResult(status="ok", output_path=str(out_path),
                              summary_lines=summary_lines,
                              completion=outcome.PARTIAL if incomplete else outcome.COMPLETE,
-                             skipped_inputs=len(blank), failed_inputs=len(failed))
+                             skipped_inputs=len(blank), failed_inputs=len(failed),
+                             producer_extra={
+                                 "route_census": [str(rec["route"]).strip()
+                                                  for rec in records]})
 
 
 if __name__ == "__main__":
