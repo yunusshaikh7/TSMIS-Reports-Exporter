@@ -51,7 +51,30 @@ tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (
 fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
 `evidence_highway_detail.py` doc-median follow-up).
 
-> ### ▶ RESUME HERE (2026-07-18, M6 in progress → 084 + 081 + 082 CLOSED; then 080/088/089/100)
+> ### ▶ RESUME HERE (2026-07-18, M6 → 084 + 081 + 082 + 088 CLOSED; 080 DEFERRED; then 089/100)
+>
+> **DONE 2026-07-18 (6th marathon, M6): CMP-AUD-088 CLOSED (`5e168b6`, CI SHA-verified), gate
+> 135/135, 196 closed (81%).** An auth/browser failure cleared the WHOLE shared matrix queue —
+> deleting queued day-vs-TSN + baseline comparisons that run OFFLINE. The queue holds four kinds and
+> only `export` re-authenticates/launches a browser; `compare` (Everything/day/baseline), `evidence`,
+> `tsn_consolidate` are local. Fix: a classifier `_matrix_job_needs_auth` (frozen
+> `_AUTH_DEPENDENT_MATRIX_KINDS={"export"}`) + a new `TaskCoordinator.drop_matching(predicate)` →
+> `_on_error` drops ONLY the export jobs (fail-safe: an unclassifiable job is kept), the local jobs
+> are retained in FIFO order and `_end_task`'s existing auto-advance continues them; returns
+> `(removed, retained)` so the user is told what to re-queue AND what continues. Export-only queue
+> still fully clears. `check_matrix_bridge` gains the mixed-queue coverage (drop_matching removes
+> exactly the exports; the e2e `_on_error` on running-export + queued-compare keeps the compare) + a
+> RED leg (classifier→all-kinds reddens 4 checks), git-stash confirmed. **⚠ 080 DEFERRED (Phase-5-
+> hard): its output half is fixed (SHA sidecars); the two remaining halves are (1) the source-folder
+> fingerprint (`artifact_store.fingerprint`) is metadata-only + called PER-CELL PER-SNAPSHOT →
+> content-hashing it there is the exact perf-vs-correctness tension the finding's OWN note defers to a
+> "Phase-5 performance cache (trustworthy file-ID/change token; a stat cache was tested + rejected)";
+> (2) evidence PDF parse caches keyed by `(size,mtime_ns)` — cheaper but doesn't close 080 alone.
+> Forcing (1) risks a snapshot perf regression on statewide stores. Left as the documented Phase-5
+> remainder rather than a partial/risky close.** **NEXT in M6: 089** (durable per-cell last-attempt
+> state — a failed/cancelled rebuild returns to the old match cell; cancelled increments `done`),
+> then 100 (adversarial cross-matrix cache-swap gate). ⚠ Still owed from bucket B: the 053 HD
+> PDF-vs-Excel/PDF-vs-TSN canary re-measure.
 >
 > **DONE 2026-07-18 (6th marathon, M6): CMP-AUD-082 CLOSED (`442b19b`, CI SHA-verified), gate
 > 135/135, 195 closed (81%).** The values workbook is canonical but the optional live-formulas twin
