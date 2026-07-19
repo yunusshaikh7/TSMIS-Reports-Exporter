@@ -162,19 +162,19 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">80<span>%</span></div>
+        <div class="bignum">81<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="194 closed, 7 in progress, 40 open of 241 findings">
-          <div class="seg done" style="width:80%">194 closed</div>
-          <div class="seg warn" style="width:4%"></div>
+        <div class="bar" role="img" aria-label="195 closed, 6 in progress, 40 open of 241 findings">
+          <div class="seg done" style="width:81%">195 closed</div>
+          <div class="seg warn" style="width:3%"></div>
           <div class="seg open" style="width:16%">40 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 194 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
-          <span><i class="dot warn"></i> ~7 in progress</span>
+          <span><i class="dot done"></i> 195 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot warn"></i> ~6 in progress</span>
           <span><i class="dot open"></i> ~40 open</span>
         </div>
       </div>
@@ -250,7 +250,7 @@
         <div class="n">01</div>
         <div class="body">
           <div class="h">Matrix identity &amp; freshness <span class="tag now">in progress</span></div>
-          <div class="m">Bucket E / M6 — the largest remaining bucket, mostly <span class="mono">P2</span> state-machine truthfulness in the matrix + GUI, not comparison correctness. <b>084 + 081 closed</b> (semantic producer version invalidates stale caches on upgrade; a stale canonical TSN library nulls its token so cells read stale); 080/082/088/089/100 next. Buckets <b>B, C &amp; D complete</b>.</div>
+          <div class="m">Bucket E / M6 — the largest remaining bucket, mostly <span class="mono">P2</span> state-machine truthfulness in the matrix + GUI, not comparison correctness. <b>084 + 081 + 082 closed</b> (producer-version cache invalidation; stale TSN library nulls its token; a stale live-formulas twin is now cleared, never masquerades as current); 080/088/089/100 next. Buckets <b>B, C &amp; D complete</b>.</div>
         </div>
       </div>
       <div class="step"><div class="n">02</div><div class="body"><div class="h">Source-semantics</div><div class="m">Bucket G — conserve/expose data facts (HD-Excel + HL raw county are vendor-blocked — never inferred).</div></div></div>
@@ -266,6 +266,7 @@
   <section>
     <div class="sec-head"><h2>Shipped this session</h2><span class="kicker">all CI-green</span></div>
     <div class="wins">
+      <div class="win"><div class="id">CMP-AUD-082</div><div class="w">Stale live-formulas twin cleared, never masquerades as current</div><div class="c">refresh-or-clear on every values commit · red-tested</div></div>
       <div class="win"><div class="id">CMP-AUD-081</div><div class="w">Stale canonical TSN library reads dependent cells stale</div><div class="c">token nulled when not-current · verified + pinned</div></div>
       <div class="win"><div class="id">CMP-AUD-084</div><div class="w">Semantic producer version invalidates stale caches on upgrade</div><div class="c">matrix + consolidation · rebuild-once · upgrade test</div></div>
       <div class="win"><div class="id">CMP-AUD-063</div><div class="w">Invalid post-mile token → PARTIAL</div><div class="c">HSL/RD PDF · census 75,709 rows</div></div>
@@ -301,7 +302,7 @@
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>3d77f4f</b> · gate <b>135/135</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>442b19b</b> · gate <b>135/135</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 

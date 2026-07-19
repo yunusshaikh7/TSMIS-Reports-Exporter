@@ -51,7 +51,28 @@ tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (
 fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
 `evidence_highway_detail.py` doc-median follow-up).
 
-> ### ▶ RESUME HERE (2026-07-18, M6 in progress → 084 + 081 CLOSED; then 080/082/088/089/100)
+> ### ▶ RESUME HERE (2026-07-18, M6 in progress → 084 + 081 + 082 CLOSED; then 080/088/089/100)
+>
+> **DONE 2026-07-18 (6th marathon, M6): CMP-AUD-082 CLOSED (`442b19b`, CI SHA-verified), gate
+> 135/135, 195 closed (81%).** The values workbook is canonical but the optional live-formulas twin
+> had no freshness state, so a values-only refresh / inputs-changed skip / row-cap skip / failed
+> formulas commit left an audit-looking `(formulas)` sibling from an OLDER generation looking current
+> beside the newer values copy. Fix: every matrix comparator settles the twin on each successful
+> values commit through one shared `matrix_build._settle_formulas_twin(compare_call, out_path,
+> do_write, …)` — refresh it when `do_write` (toggle on + inputs unchanged + under the row cap), else
+> clear any prior sibling (the safe "remove" resolution — the values workbook holds every value, a
+> real live-formulas copy is one explicit rebuild away). `_try_formulas` now RETURNS whether it
+> committed a fresh twin, so an over-limit skip or a failed commit also falls through to the clear;
+> the clear is ownership/alias-guarded + best-effort (a locked twin is announced). Covers cross-env /
+> TSN / self / baseline (by-day rides the shared TSN path). `check_formulas_twin_guard` gains the 082
+> matrix (each not-refreshed path clears a seeded twin, a successful refresh keeps the fresh one) + a
+> RED leg (bare `_try_formulas` over-limit leaves the stale twin), git-stash confirmed. Zero churn.
+> The multi-artifact manifest + a UI durable-stale marker are the heavier Phase-5 option NOT taken
+> (removal fully closes the masquerading-stale defect). **NEXT in M6: 080** (source-fingerprint
+> content identity — a same-size/mtime tamper of a matrix SOURCE folder passes `artifact_store
+> .fingerprint`; + the evidence PDF parse caches keyed by `(size, mtime_ns)`), then 088 (auth retains
+> offline jobs), 089 (durable last-attempt state), 100 (adversarial cross-matrix cache-swap gate). ⚠
+> Still owed from bucket B: the 053 HD PDF-vs-Excel/PDF-vs-TSN canary re-measure.
 >
 > **DONE 2026-07-18 (6th marathon, M6): CMP-AUD-081 CLOSED (`3d77f4f`, CI SHA-verified), gate
 > 135/135, 194 closed (80%).** The canonical-library residual (the part the finding coupled to 084)
