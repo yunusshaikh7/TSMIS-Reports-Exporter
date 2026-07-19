@@ -3,6 +3,116 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.27.0 — 2026-07-19
+
+Evidence images become configurable, and the comparison engine lands the first
+large batch of the source-first correctness audit — 219 of 241 findings closed
+across the comparison, matrix, TSN-normalization and PDF-identity paths. **Several
+comparisons now report different — more correct — numbers than v0.26.2**, and the
+TSN libraries rebuild once on first use. Read "After updating" at the end of this
+section before reconciling anything against an older run.
+
+### Added
+- **Pick the evidence image layout.** The evidence controls on both comparison
+  matrices (vs TSN and by-day) carry a layout dropdown beside the "generate
+  images" toggle: **side by side** (the default), **stacked**, or **both**. Only
+  the layout(s) you pick are rendered — choosing one instead of both roughly
+  halves the image count and the render time for a large evidence set. The choice
+  persists across runs and is captured when a job is queued, so changing it
+  mid-queue can't retarget work already in flight.
+- **The evidence workbook splits its examples by comparison column.** Instead of
+  one combined sheet of every sampled difference, the workbook now opens one tab
+  **per comparison column** (Description, Length, ADT…), each holding just that
+  column's examples. Sheet names are de-duplicated and legal, and the Summary tab
+  lists which layouts were rendered.
+
+### Changed — comparison results change
+These are corrections, not regressions: each was proved cell-for-cell against an
+independent oracle and both workbook flavors on the real statewide corpus. Counts
+that differ from a v0.26.2 run differ because the old number was wrong.
+- **Highway Sequence pairs on physical identity, and "PM Suffix" is a compared
+  column.** PDF↔Excel rows now pair on route/county/prefix/base postmile with the
+  suffix asserted rather than folded, making the statewide corpus exact:
+  60,493 paired / 0 PDF-only / 1 Excel-only.
+- **Highway Sequence Descriptions compare verbatim.** The old symmetric strip rule
+  removed text the TSN extract genuinely carries (including its 154 numeric
+  prefixes); TSMIS strips only its own-route label. Both sides are now compared as
+  printed.
+- **Duplicate rows are assigned by a typed, auditable objective.** When a key
+  matches several rows, occurrences are paired by minimizing an approved
+  source-identity tuple (compared-field differences, then character edit distance,
+  then position gap) instead of file order — context and ditto cells decide *which*
+  occurrences correspond, while verdicts and counts stay assertion-only. Above the
+  100,000-cell cap the output is explicitly partial diagnosis and can never read
+  green.
+- **The TSN Highway Log and Highway Sequence normalizers were rebuilt from raw
+  source.** Highway Log v5 keys detached suffixed-route group headers ("07 LA 005 S")
+  as the suffixed route — 317 statewide rows are no longer misattributed — and
+  conserves asterisk-leading printed Descriptions (four statewide rows that were
+  each a manufactured false difference). Highway Sequence v4 is source-exact at
+  69,804 rows including the 46 blank-county equates and 565 pointer tokens.
+- **A PDF's own route claim is authoritative.** All five PDF converters and the
+  evidence adapters read identity from the document itself (page banners, the
+  Intersection Detail cover parameter, the Highway Log cover line) instead of
+  inferring it from the filename, and refuse duplicate or blank route claims by
+  naming both source PDFs. Verified refusal-free across all 1,099 statewide
+  per-route documents.
+- **PDF-vs-Excel self-checks project both sides verbatim.** The same-source flavors
+  no longer rewrite values for display — Highway Detail surfaces "PM (raw)" and
+  verbatim NA, Highway Log surfaces "Location (raw)", and Intersection Detail's
+  J→S fold is gone — so a self-check reports what the two files actually say.
+- **Ramp Detail postmiles are canonical.** `9.6`, `9.600` and `009.600` are one
+  ramp for physical identity (statewide census: zero pairing changes, 1,755
+  display texts canonicalized), and the vs-TSN loader decodes the Excel export's
+  OOXML escapes so encoding artifacts stop reading as data differences.
+
+### Fixed
+- **Evidence images no longer invent differences.** Every adapter now enumerates
+  differences through the comparison's own `compared_cell` decision, so
+  Excel-trimmed whitespace, Med-Wid equivalents and context/ditto cells can't be
+  sampled as diffs.
+- **Evidence is bound to the exact PDFs it was rendered from.** Candidate PDFs are
+  digested before parsing and re-verified before publishing, so a same-size,
+  same-timestamp file swap mid-render aborts instead of shipping mismatched images.
+- **A clean rebuild retires its stale evidence.** When a rebuilt comparison has no
+  differing columns, the previous run's red evidence workbook and image folder are
+  removed instead of being left behind to look current.
+- **The evidence workbook and its images publish as one set.** If the workbook is
+  locked (open in Excel), the images divert alongside it, so you can never end up
+  with a new workbook pointing at old images or the reverse.
+- **Matrix and by-day cells report honestly.** Real day-folder identity and source
+  reconciliation, a locked running-day removal, an accurate consolidation badge,
+  correctly scoped rebuilds, a both-missing state, and the captured run date
+  threaded end to end. Caches invalidate on a semantic producer version, and
+  formula twins are bound to the generation that produced them.
+- **Compare-tab dispatch matches what the buttons promise.** One shared
+  buildability predicate behind the bulk selector, the explicit Build button and
+  the queue; canonical TSN consolidate routing by origin; a Cancel lock on the
+  Compare sub-tab; a queue-capable day export; and classic comparison inputs bound
+  to their recipe with a preflight.
+- **An auth or browser failure keeps runnable offline jobs** in the queue instead
+  of clearing them.
+- **A folder comparison refuses a run-root vs its own report-subfolder alias**
+  (statewide census: zero false rejections).
+- **The Highway Log PDF parser recovers asterisk-leading Descriptions** — the
+  mirror of the TSN fix — dropping the statewide Description difference class from
+  5 to 1.
+- **Spot Check matches rows independently.** It key-token-matches both source rows
+  itself and flags any disagreement with the Comparison sheet's stored links or
+  status, so a forged row link reads CHECK.
+
+### After updating
+- **The TSN libraries rebuild once** on first use (Highway Sequence v4, Highway Log
+  v5, Ramp Detail v5, Intersection Detail v5, Highway Detail v3). The vs-TSN
+  comparisons refuse a pre-current library with a rebuild hint rather than
+  comparing against stale normalization.
+- **PDF-sourced workbooks made before this version re-consolidate once** — every
+  PDF-sourced workbook now carries a conversion marker that the TSMIS (PDF)
+  comparison role requires and the TSMIS (Excel) role rejects.
+- **Don't reconcile this version's comparison counts against a v0.26.2 run.**
+  Re-run both sides on this version first; the differences listed above are
+  intentional corrections.
+
 ## v0.26.2 — 2026-07-10
 
 ### Fixed
