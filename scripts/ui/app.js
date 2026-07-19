@@ -462,6 +462,15 @@ function renderState() {
     $(id).querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
   });
   $("btnCancelCompare").disabled = st.task !== "compare";
+  // CMP-AUD-079: keep the running comparison's Cancel reachable — lock the Compare
+  // sub-tab strip while a Compare-tab comparison is live, so the user can't
+  // navigate away from the section that owns its Cancel control.
+  const subtabsLocked = compareSubtabsShouldLock(st);
+  document.querySelectorAll("#compareSubtabs .subtab").forEach((b) => {
+    b.disabled = subtabsLocked;
+    b.title = subtabsLocked
+      ? "Finish or cancel the running comparison before switching sub-tabs" : "";
+  });
   syncCompareButton();
 
   $("btnCheckEnvsCancel").classList.toggle("hidden", st.task !== "envscan");

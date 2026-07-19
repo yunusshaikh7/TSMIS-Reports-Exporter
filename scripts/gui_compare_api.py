@@ -14,7 +14,8 @@ from gui_endpoint import _api_method, pick_path   # + the dialog unwrap
 from gui_worker import ConsolidateWorker
 from paths import OUTPUT_ROOT, list_output_days, list_output_days_for_report
 from reports import (COMPARE_REPORTS, CONSOLIDATE_REPORTS,
-                     compare_index_for_key, compare_input_extensions,
+                     compare_index_for_key, compare_input_accepts_suffix,
+                     compare_input_extensions,
                      consolidate_index_for_key)
 
 ui_log = logging.getLogger("tsmis.ui")
@@ -344,6 +345,19 @@ class GuiCompareMixin:
             return {"error": "This comparison type takes folders, not files."}
         if not tsmis_path or not tsn_path:
             return {"error": "Pick both files first (a TSMIS and a TSN workbook)."}
+        # CMP-AUD-016: preflight existence + type/role for the recipe BEFORE the task
+        # is claimed and the Save dialog opens — a stale (deleted/moved) or wrong-type
+        # selection carried over from another recipe is refused here with a clear
+        # message, not deep in the adapter after the run already owns the gate. (The
+        # comparator still enforces its own loader contract on top of this.)
+        for role, side, p in (("TSMIS", "tsmis", tsmis_path), ("TSN", "tsn", tsn_path)):
+            fp = Path(p)
+            if not fp.is_file():
+                return {"error": f"The selected {role} file no longer exists — "
+                                 "pick it again (it may have moved or been deleted)."}
+            if not compare_input_accepts_suffix(report_key, side, fp.suffix):
+                return {"error": f"The selected {role} file isn't a supported type "
+                                 "for this comparison — pick the right file."}
         mode = self._compare_mode(want_formulas, want_values)
         if mode is None:
             return {"error": "Tick at least one output (values and/or live formulas)."}

@@ -33,6 +33,21 @@ function applyMatrixWide() {
   document.body.classList.toggle("mw-bl", bl);
 }
 
+// CMP-AUD-079: true when a COMPARE-TAB comparison is live, so the sub-tab strip
+// must lock. Switching sub-tabs hides the section that owns the run's Cancel — the
+// classic view holds the only btnCancelCompare, and the day/baseline grids show
+// their Cancel only for task==="matrix" — so navigating away would strand a live
+// run with NO visible Cancel. Locks for a classic compare AND for a day/baseline
+// matrix comparison (which ∈ {day, baseline}); an Everything-tab matrix run
+// (which==="env") is a DIFFERENT tab and never locks this strip. Pure predicate so
+// it is unit-testable in isolation.
+function compareSubtabsShouldLock(st) {
+  if (!st) return false;
+  if (st.task === "compare") return true;
+  const cur = st.matrix_current;
+  return st.task === "matrix" && !!cur && (cur.which === "day" || cur.which === "baseline");
+}
+
 function selectCompareGroup(groupId) {
   S.compareGroup = groupId;
   document.querySelectorAll("#compareSubtabs .subtab").forEach((b) => {
@@ -85,6 +100,22 @@ function renderCompareFiles() {
 // Folder dropdowns: the known run folders (newest first) plus any custom
 // path picked via Browse… (kept as an extra option per side).
 const CMP_DIRS = { a: null, b: null };   // custom absolute paths from Browse…
+
+// CMP-AUD-016: the file (CMP) and custom Browse folder (CMP_DIRS) selections are
+// GLOBAL, so switching recipes used to carry a stale Ramp workbook — or a custom
+// report subfolder — into an incompatible recipe with Start still enabled (only
+// the deep adapter later rejected it). Bind the selections to the recipe they were
+// picked under: whenever the recipe changes, drop BOTH the file paths and the
+// custom folders so nothing stale can launch under a recipe that never accepted it.
+let compareInputsRecipe = null;
+function syncCompareInputsToRecipe() {
+  const key = compareChoice();
+  if (key === compareInputsRecipe) return false;   // same recipe -> keep selections
+  compareInputsRecipe = key;
+  CMP.tsmis = CMP.tsn = null;
+  CMP_DIRS.a = CMP_DIRS.b = null;
+  return true;
+}
 
 function fillCompareDirSelect(sel, custom, preferred, days) {
   days = days || [];
@@ -155,12 +186,15 @@ async function renderCompareDirs() {
 }
 
 function renderCompareKind() {
+  // CMP-AUD-016: drop stale file/Browse selections the moment the recipe changes.
+  syncCompareInputsToRecipe();
   const folders = compareKind() === "folders";
   $("cmpFilesSection").classList.toggle("hidden", folders);
   $("cmpFoldersSection").classList.toggle("hidden", !folders);
   if (folders) {
     renderCompareDirs();
   } else {
+    renderCompareFiles();     // reflect the current (possibly cleared) file paths
     // Label the two file pickers from the selected comparison so a
     // PDF-vs-Excel comparison doesn't say "TSN" for a TSMIS Excel file.
     const rep = currentCompareRep();

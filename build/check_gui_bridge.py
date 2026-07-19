@@ -163,10 +163,47 @@ def test_compare_dialog_error_releases():
         raise RuntimeError("dialog blew up")
 
     a._save_dialog_for_compare = _boom        # claim happens, then the dialog throws
-    res = a.start_compare(files_key, "a.xlsx", "b.xlsx", True, False)
+    # CMP-AUD-016: the endpoint now preflights existence + type, so the dialog-error
+    # path needs REAL .xlsx inputs (otherwise the preflight rejects before the claim).
+    with tempfile.TemporaryDirectory(prefix="tsmis_cmp_dlgerr_") as td:
+        pa = Path(td) / "a.xlsx"; pa.write_bytes(b"a")
+        pb = Path(td) / "b.xlsx"; pb.write_bytes(b"b")
+        res = a.start_compare(files_key, str(pa), str(pb), True, False)
     check("error surfaced to the caller", isinstance(res, dict) and res.get("error"))
     check("task slot released after a dialog error", a._try_claim_task("x") is True)
     a._release_task()
+
+
+def test_016_input_preflight():
+    """CMP-AUD-016: start_compare refuses a stale (missing) or wrong-type file
+    BEFORE claiming the task/opening the Save dialog — a leftover selection from
+    another recipe can't launch and wedge the gate."""
+    print("CMP-AUD-016: start_compare preflights existence + type before the claim:")
+    import reports
+    a = gui_api.GuiApi()
+    files_key = next((reports.COMPARE_KEYS[i]
+                      for i, r in enumerate(reports.COMPARE_REPORTS)
+                      if r[2] == "files"), None)
+    if files_key is None:
+        check("a files-kind comparison exists", False)
+        return
+    dialog_calls = []
+    a._save_dialog_for_compare = lambda *_a, **_k: dialog_calls.append(1)
+    with tempfile.TemporaryDirectory(prefix="tsmis_cmp_pf_") as td:
+        good = Path(td) / "ok.xlsx"; good.write_bytes(b"x")
+        wrong = Path(td) / "note.txt"; wrong.write_bytes(b"x")
+        missing = str(Path(td) / "gone.xlsx")
+        # a MISSING file is refused, task NOT claimed, dialog NEVER opened
+        r1 = a.start_compare(files_key, missing, str(good), True, False)
+        check("a missing input is rejected before the claim",
+              bool(r1.get("error")) and a._try_claim_task("x") is True)
+        a._release_task()
+        # a WRONG-TYPE file is refused too
+        r2 = a.start_compare(files_key, str(wrong), str(good), True, False)
+        check("a wrong-type input (.txt) is rejected before the claim",
+              bool(r2.get("error")) and a._try_claim_task("y") is True)
+        a._release_task()
+        check("the Save dialog never opened for a rejected preflight", not dialog_calls)
 
 
 def test_compare_derived_overwrite_token():
@@ -562,6 +599,7 @@ def main():
     test_reset_token()
     test_consolidate_index_before_claim()
     test_compare_dialog_error_releases()
+    test_016_input_preflight()
     test_compare_derived_overwrite_token()
     test_tsn_library_panel()
     test_export_browser()

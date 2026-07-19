@@ -610,6 +610,12 @@ _EXT_XLSX = ("Excel workbook (*.xlsx)",)
 _EXT_TSN = ("TSN file — statewide PDF or normalized Excel (*.pdf;*.xlsx)",
             "TSN statewide PDF (*.pdf)", "Normalized TSN workbook (*.xlsx)")
 
+# The accepted file SUFFIXES per profile side — the machine-checkable form of the
+# dialog filters above, used by the CMP-AUD-016 endpoint preflight (existence + type)
+# so a stale/wrong-type pick is refused before the task is claimed.
+_ACCEPT_XLSX = frozenset({".xlsx"})
+_ACCEPT_TSN = frozenset({".pdf", ".xlsx"})
+
 _SHAPE_CONSOLIDATED = "a consolidated workbook (all routes)"
 _SHAPE_PER_ROUTE_OR_CONSOLIDATED = (
     "a per-route workbook (one route) or a consolidated workbook (all routes)")
@@ -617,12 +623,12 @@ _SHAPE_TSN_PDF_OR_XLSX = "the raw statewide TSN PDF, or the normalized TSN workb
 
 # name -> (side-A spec, side-B spec); each spec = {"exts": (...), "shape": "..."}.
 _INPUT_PROFILES = {
-    "std": ({"exts": _EXT_XLSX, "shape": _SHAPE_CONSOLIDATED},
-            {"exts": _EXT_XLSX, "shape": _SHAPE_CONSOLIDATED}),
-    "hl": ({"exts": _EXT_XLSX, "shape": _SHAPE_PER_ROUTE_OR_CONSOLIDATED},
-           {"exts": _EXT_XLSX, "shape": _SHAPE_PER_ROUTE_OR_CONSOLIDATED}),
-    "summary_tsn": ({"exts": _EXT_XLSX, "shape": _SHAPE_CONSOLIDATED},
-                    {"exts": _EXT_TSN, "shape": _SHAPE_TSN_PDF_OR_XLSX}),
+    "std": ({"exts": _EXT_XLSX, "accept": _ACCEPT_XLSX, "shape": _SHAPE_CONSOLIDATED},
+            {"exts": _EXT_XLSX, "accept": _ACCEPT_XLSX, "shape": _SHAPE_CONSOLIDATED}),
+    "hl": ({"exts": _EXT_XLSX, "accept": _ACCEPT_XLSX, "shape": _SHAPE_PER_ROUTE_OR_CONSOLIDATED},
+           {"exts": _EXT_XLSX, "accept": _ACCEPT_XLSX, "shape": _SHAPE_PER_ROUTE_OR_CONSOLIDATED}),
+    "summary_tsn": ({"exts": _EXT_XLSX, "accept": _ACCEPT_XLSX, "shape": _SHAPE_CONSOLIDATED},
+                    {"exts": _EXT_TSN, "accept": _ACCEPT_TSN, "shape": _SHAPE_TSN_PDF_OR_XLSX}),
 }
 # Non-default assignments; every other files recipe is "std".
 _INPUT_PROFILE_BY_KEY = {
@@ -661,6 +667,19 @@ def compare_input_extensions(key, side):
     if profile is None:
         return list(_EXT_XLSX)
     return list(profile[_side_index(side)]["exts"])
+
+
+def compare_input_accepts_suffix(key, side, suffix):
+    """True when `suffix` (a file extension like '.xlsx' / '.pdf', any case) is an
+    accepted type for one side ("tsmis"/"tsn", or "a"/"b") of a files recipe —
+    the machine-checkable form of the picker's dialog filter (CMP-AUD-016 endpoint
+    preflight). A folders/unknown recipe falls back to Excel-only, the same safe
+    default as the picker. Guidance only: the comparator still enforces its loader
+    contract, but this refuses an obviously-wrong pick before the task is claimed."""
+    profile = compare_input_profile(key)
+    accept = (_ACCEPT_XLSX if profile is None
+              else profile[_side_index(side)]["accept"])
+    return str(suffix).lower() in accept
 
 
 def compare_input_shapes(key):

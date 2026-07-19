@@ -73,6 +73,7 @@ COMPARE_KEYS = _catalog.compare_keys()
 # comparators still enforce their loader contracts. See report_catalog.
 compare_input_profile = _catalog.compare_input_profile
 compare_input_extensions = _catalog.compare_input_extensions
+compare_input_accepts_suffix = _catalog.compare_input_accepts_suffix
 compare_input_shapes = _catalog.compare_input_shapes
 
 # B2 (auto-consolidate on export finish): which consolidate module handles each

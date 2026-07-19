@@ -1153,7 +1153,12 @@ function updateDayMatrixProgress() {
   if (addSel) addSel.disabled = locked || noAvail;
   if (addBtn) addBtn.disabled = locked || noAvail;
   const exportBtn = $("btnDayExportToday");
-  if (exportBtn) exportBtn.disabled = locked;   // action stays queue-able? no — export claims a run
+  // CMP-AUD-104: export_day_column ENQUEUES onto the shared matrix queue (a 2nd
+  // click queues behind the running job), exactly like the per-cell/row export
+  // actions that stay live and the by-day Build/Rebuild-all footer buttons — so it
+  // must NOT be lock-disabled while busy, or one queue-capable action would
+  // uniquely refuse work its equivalents accept.
+  if (exportBtn) exportBtn.disabled = false;
   const cancel = $("btnDayCancel");
   if (cancel) {
     const running = !!(S.st && S.st.task === "matrix");

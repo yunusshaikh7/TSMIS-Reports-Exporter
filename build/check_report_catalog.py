@@ -698,6 +698,22 @@ def test_input_profiles():
           cat.compare_input_profile("cmp:bogus:xyz") is None
           and cat.compare_input_extensions("cmp:bogus:xyz", "tsn") == xlsx_only)
 
+    # CMP-AUD-016: the machine-checkable accept-suffix predicate the endpoint
+    # preflight uses must agree with the picker's per-side filters (above).
+    acc = cat.compare_input_accepts_suffix
+    check("every files side accepts .xlsx (case-insensitive)",
+          all(acc(c.key, s, ".xlsx") and acc(c.key, s, ".XLSX")
+              for c in files for s in ("tsmis", "tsn")))
+    check("exactly the 2 Summary-vs-TSN recipes' TSN side accepts .pdf",
+          {(c.key, s) for c in files for s in ("tsmis", "tsn")
+           if acc(c.key, s, ".pdf")} == {(k, "tsn") for k in summary_keys})
+    check("no files side accepts an unrelated type (.txt)",
+          all(not acc(c.key, s, ".txt") for c in files for s in ("tsmis", "tsn")))
+    check("[neg] a folders/unknown key accepts .xlsx but not .pdf (safe default)",
+          acc("cmp:bogus:xyz", "tsn", ".xlsx")
+          and not acc("cmp:bogus:xyz", "tsn", ".pdf")
+          and all(not acc(c.key, "tsn", ".pdf") for c in folders))
+
 
 def main():
     test_reports_derive_from_catalog()
