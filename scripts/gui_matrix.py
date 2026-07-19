@@ -1073,9 +1073,27 @@ class GuiMatrixMixin:
         self._push_state()
         return {"ok": True, "days": settings.get_day_matrix_days()}
 
+    def _day_job_active_or_queued(self, date):
+        """True iff a by-day matrix job (an export or its chained comparison) for
+        `date` is running or waiting in the shared queue — for day jobs `env`
+        carries the date. CMP-AUD-094: removing such a day would strand the
+        automatic comparison (its completion lookup finds no column and spawns
+        nothing)."""
+        def _targets(job):
+            return (isinstance(job, dict) and job.get("which") == "day"
+                    and job.get("env") == date)
+        with self._lock:                 # snapshot current + queued atomically
+            return (_targets(self._coord.current_job)
+                    or any(_targets(j) for j in self._coord.queue))
+
     @_api_method
     def remove_day_matrix_day(self, date):
-        """Remove a day column."""
+        """Remove a day column. CMP-AUD-094: refuse while that day's export or its
+        chained comparison is running/queued — removing it would silently discard
+        the automatic comparison half of the export-and-compare workflow."""
+        if self._day_job_active_or_queued(date):
+            return {"error": "That day's export/comparison is still running — wait "
+                             "for it to finish (or cancel it) before removing it."}
         settings.set_day_matrix_days(
             [d for d in settings.get_day_matrix_days() if d != date])
         self._push_state()
@@ -1222,8 +1240,16 @@ class GuiMatrixMixin:
         job_scope = "row" if row else "column" if date else scope
         with self._lock:
             idle = not self._task and not self._queue
-        if idle and not force:
-            cells = day_matrix.cells_to_rebuild(snap, scope=scope, row=row, date=date)
+        if idle:
+            # CMP-AUD-093: force short-circuits on zero targets too. With no
+            # comparable cell (e.g. an export but no TSN) there is nothing to
+            # (re)consolidate either — the persistent consolidated is built per
+            # comparable cell — so enqueuing a forced job would resolve zero cells
+            # and drain silently. Force probes ALL cells (it rebuilds even fresh
+            # ones); a plain refresh probes only the requested (stale) scope.
+            probe_scope = "all" if force else scope
+            cells = day_matrix.cells_to_rebuild(snap, scope=probe_scope,
+                                                row=row, date=date)
             if not cells:
                 return {"ok": True, "nothing": True}
         job = self._make_job("compare", job_scope,

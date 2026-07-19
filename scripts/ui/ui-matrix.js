@@ -947,7 +947,7 @@ async function renderDayMatrix() {
     h.className = "mx-cell mx-colhead";
     const lab = document.createElement("div"); lab.textContent = d;
     h.appendChild(lab);
-    h.appendChild(dmConsolidatedBadge(d, dayCons[d] || { exists: false, fresh: false }));
+    h.appendChild(dmConsolidatedBadge(d, dayCons[d] || { exists: false, fresh: false, actionable: false }));
     const btns = document.createElement("span"); btns.className = "mxch-btns";
     // Export is offered ONLY for today's column — past days are the immutable
     // record you pulled (re-exporting them would overwrite with today's data).
@@ -1072,10 +1072,21 @@ async function renderDayMatrix() {
 // badge shows whether a fresh consolidated exists, and clicking it force-rebuilds
 // it (e.g. after the consolidation mechanism changes).
 function dmConsolidatedBadge(date, state) {
-  const cls = !state.exists ? "dm-cons-none" : state.fresh ? "dm-cons-fresh" : "dm-cons-stale";
   const b = document.createElement("button");
-  b.className = "dm-cons " + cls;
   b.appendChild(icon("i-layers"));
+  // CMP-AUD-093: when the refresh-consolidated action has no target this day (no
+  // visible, TSN-ready, exported cell), the badge is informational only — a click
+  // would resolve zero targets and drain. Show a disabled "not applicable" state
+  // rather than inviting a no-op.
+  if (state.actionable === false) {
+    b.className = "dm-cons dm-cons-none";
+    b.disabled = true;
+    b.title = `No vs-TSN consolidation for ${date} — add a TSN file and an export for a report first.`;
+    b.setAttribute("aria-label", b.title);
+    return b;
+  }
+  const cls = !state.exists ? "dm-cons-none" : state.fresh ? "dm-cons-fresh" : "dm-cons-stale";
+  b.className = "dm-cons " + cls;
   b.title = !state.exists
     ? `No consolidated workbook for ${date} yet — built on first compare. Click to (re)consolidate now.`
     : state.fresh

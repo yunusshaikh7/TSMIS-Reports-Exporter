@@ -125,9 +125,38 @@ def test_092_folder_identity_and_calendar():
         shutil.rmtree(out, ignore_errors=True)
 
 
+def test_093_badge_actionable():
+    print("CMP-AUD-093: day-consolidation badge is actionable only when the refresh can act:")
+    out = Path(tempfile.mkdtemp(prefix="tsmis_day093_out_"))
+    dest = Path(tempfile.mkdtemp(prefix="tsmis_day093_dest_"))
+    saved = (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT)
+    paths.OUTPUT_ROOT = day_matrix.OUTPUT_ROOT = out
+    paths.TSN_LIBRARY_ROOT = out / "_lib"        # hermetic: no real library leaks in
+    try:
+        # A day whose only export is a report with NO ready TSN dataset — the forced
+        # rebuild would select zero cells, so the badge must not offer the action.
+        _touch(out / "2026-05-01 ssor-prod" / "ramp_detail" / "r.xlsx")
+        dc1 = day_matrix.day_matrix_snapshot(
+            "ssor-prod", ["2026-05-01"], dest=str(dest))["day_consolidated"]["2026-05-01"]
+        check("no ready TSN -> badge NOT actionable (the action would no-op)",
+              dc1.get("actionable") is False)
+        # Give highway_log a TSN dataset + an export -> the badge becomes actionable.
+        _touch(matrix.tsn_input_root(dest, "highway_log") / "tsn.xlsx")
+        _touch(out / "2026-05-02 ssor-prod" / "highway_log" / "r.xlsx")
+        dc2 = day_matrix.day_matrix_snapshot(
+            "ssor-prod", ["2026-05-02"], dest=str(dest))["day_consolidated"]["2026-05-02"]
+        check("a TSN-ready export makes the badge actionable",
+              dc2.get("actionable") is True)
+    finally:
+        paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT = saved
+        shutil.rmtree(out, ignore_errors=True)
+        shutil.rmtree(dest, ignore_errors=True)
+
+
 def main():
     test_newest_mtime_survives_a_bad_entry()
     test_092_folder_identity_and_calendar()
+    test_093_badge_actionable()
     out = Path(tempfile.mkdtemp(prefix="tsmis_day_out_"))
     dest = Path(tempfile.mkdtemp(prefix="tsmis_day_dest_"))
     cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_day_cfg_"))
@@ -334,6 +363,18 @@ def main():
               "2026-06-17" in settings.get_day_matrix_days())
         a.set_day_matrix_source("ssor-prod")             # restore for downstream
         settings.set_day_matrix_days(["2026-06-17", "2026-06-18"])
+        # CMP-AUD-094: a day with a live export/compare can't be removed (removal
+        # would strand the chained comparison — for day jobs `env` holds the date).
+        a._coord.current_job = a._make_job("export", "column", "x",
+                                           env="2026-06-17", which="day")
+        check("remove refuses a day with a running by-day job",
+              bool(a.remove_day_matrix_day("2026-06-17").get("error"))
+              and "2026-06-17" in settings.get_day_matrix_days())
+        check("remove of a different, idle day still works",
+              a.remove_day_matrix_day("2026-06-18").get("ok")
+              and "2026-06-18" not in settings.get_day_matrix_days())
+        a._coord.current_job = None                      # clear the seeded job
+        settings.set_day_matrix_days(["2026-06-17", "2026-06-18"])   # restore
         check("hide unknown report rejected",
               bool(a.set_day_matrix_report("nope", False).get("error")))
         check("hide a report row ok",
@@ -374,6 +415,14 @@ def main():
         check("rebuild_day_matrix rejects an impossible date (CMP-AUD-096)",
               bool(a.rebuild_day_matrix("all", date="2026-99-99").get("error")))
         check("rebuild_day_matrix stays idle after a rejected scope", a._task is None)
+        # CMP-AUD-093: a FORCED consolidate with zero comparable cells (no TSN)
+        # short-circuits to 'nothing' instead of enqueuing a job that drains
+        # silently. Remove the only TSN dataset to make every cell non-comparable.
+        (matrix.tsn_input_root(dest, "highway_log") / "tsn.xlsx").unlink()
+        check("forced re-consolidate with no comparable cell -> nothing, not a silent no-op",
+              a.rebuild_day_matrix("all", None, "2026-06-17", True).get("nothing") is True
+              and a._task is None)
+        _touch(matrix.tsn_input_root(dest, "highway_log") / "tsn.xlsx")   # restore
 
         print("gui_api bridge — by-day EXPORT (today only) + export->compare chain:")
         today = paths.today_str()

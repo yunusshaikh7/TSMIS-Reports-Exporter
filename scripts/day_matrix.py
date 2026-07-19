@@ -334,15 +334,22 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
         cells[row_key] = per
 
     # Per-day "consolidated" indicator: does a reusable consolidated workbook exist
-    # for the day's Highway Log export(s), and is it still fresh? Summarised across
-    # the supported subdirs that actually have an export that day, so the day-column
-    # header can show a badge + offer a 'refresh consolidated'.
+    # for the day's export(s), and is it still fresh? The header shows a badge +
+    # offers 'refresh consolidated'.
+    # CMP-AUD-093: describe EXACTLY the universe that action can act on. The forced
+    # rebuild selects only VISIBLE, TSN-comparable cells, so counting hidden rows or
+    # rows with no TSN made the badge promise a fix the action silently no-ops (a
+    # zero-target request drained as "success" while the badge stayed stale). Iterate
+    # the visible `rows` and require a ready TSN dataset — the same gate cells_to_rebuild
+    # applies (a missing-TSN cell has missing_side="tsn" and is never a target).
     day_consolidated = {}
     for date in days:
         subs = {}
-        for _k, _label, subdir, fmt, supported, _tsn_subdir in all_rows:
+        for _k, _label, subdir, fmt, supported, _tsn_subdir in rows:
             if not supported:
                 continue
+            if _tsn_for(_tsn_subdir).get("kind") not in ("file", "consolidated"):
+                continue                         # no TSN -> the action can't target it
             tdir = tsmis_dir(date, source, subdir)
             if _folder_newest_mtime(tdir) is None:
                 continue                         # no export -> nothing to consolidate
@@ -351,9 +358,14 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
         # missing consolidation for any of them means the day is NOT fully consolidated.
         # The old `all(... if s["exists"])` skipped the missing ones, so a day with one
         # consolidated report read 'fresh' while another's consolidation was absent.
+        # `actionable`: the refresh-consolidated action has at least one target this
+        # day (a visible, TSN-ready, exported cell). When false the UI must NOT offer
+        # the action — clicking it would resolve zero targets and silently drain.
+        actionable = bool(subs)
         exists = any(s["exists"] for s in subs.values())
-        fresh = bool(subs) and all(s["exists"] and s["fresh"] for s in subs.values())
-        day_consolidated[date] = {"exists": exists, "fresh": fresh}
+        fresh = actionable and all(s["exists"] and s["fresh"] for s in subs.values())
+        day_consolidated[date] = {"exists": exists, "fresh": fresh,
+                                  "actionable": actionable}
 
     return {
         "source": source,

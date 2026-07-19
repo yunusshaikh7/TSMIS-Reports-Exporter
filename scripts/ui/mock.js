@@ -460,7 +460,7 @@ function makeMockApi() {
              row_supported: rowSupported, all_rows: allRows, hidden,
              tsn_meta: tsnMeta, cells,
              day_consolidated: Object.fromEntries(days.map((d, i) =>
-               [d, { exists: i % 3 !== 0, fresh: i % 2 === 0 }])),
+               [d, { exists: i % 3 !== 0, fresh: i % 2 === 0, actionable: i % 4 !== 0 }])),
              available_days: MOCK_DAY_AVAIL[source] || [] };
   }
   // v0.26.0 "vs Baseline" matrix mock — day columns within one source, each cell
