@@ -51,7 +51,31 @@ tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (
 fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
 `evidence_highway_detail.py` doc-median follow-up).
 
-> ### ▶ RESUME HERE (2026-07-18, M6 in progress → 084 CLOSED; then 081/080/082/088/089/100)
+> ### ▶ RESUME HERE (2026-07-18, M6 in progress → 084 + 081 CLOSED; then 080/082/088/089/100)
+>
+> **DONE 2026-07-18 (6th marathon, M6): CMP-AUD-081 CLOSED (`3d77f4f`, CI SHA-verified), gate
+> 135/135, 194 closed (80%).** The canonical-library residual (the part the finding coupled to 084)
+> was RE-EXAMINED and found ALREADY CLOSED by CMP-AUD-105 — verified + pinned, not re-fixed (the
+> YAGNI call: a first `needs_rebuild` flag was written, then reverted once the census showed the
+> existing gate already covers it). Mechanism: when consolidated TSN resolution gained an identity
+> token (105), it inherited `tsn_library.status`'s deliberate contract `identity_token if current
+> else None` — so a library `ensure_current` WOULD rebuild (raw newer than its consolidated, a
+> `normalization_version` bump, or a manifest/bytes mismatch) resolves `current=False` → `resolve()`
+> hands the snapshot `identity=None` → a cell built against the prior current token reads stale via
+> the existing identity gate (`source_identity_changed`), even though the consolidated bytes/mtime
+> are unchanged (the finding's exact "resolve returns the consolidated mtime and reports fresh"
+> case). The single token comparison subsumes the raw-input + normalizer-version signals (all drive
+> `current=False`); a comparison can't even be built against a stale library (`tsn_identity_check_for`
+> raises), so a cell's recorded token is always a valid current one. PINNED: `check_tsn_freshness`
+> drifts the raw newer, proves status flips not-current + resolve nulls the token (bytes/mtime
+> unchanged) + the cell reads stale, with a RED leg (retained token → fresh) AND a git-stash confirm
+> (neutralizing the nulling collapses the coverage). Script edits are comment-only (documenting the
+> mechanism, no behavior change); the by-day matrix inherits it via `matrix._cmp_state`. **NEXT in
+> M6: 082** (formula-twin manifest/quarantine — a values-only refresh / failed formulas refresh /
+> over-limit skip leaves a stale `(formulas)` sibling looking current), then 080 (source-fingerprint
+> content identity + evidence parse caches), 088 (auth retains offline jobs), 089 (durable
+> last-attempt state), 100 (adversarial cross-matrix cache-swap gate). ⚠ Still owed from bucket B:
+> the 053 HD PDF-vs-Excel/PDF-vs-TSN canary re-measure.
 >
 > **DONE 2026-07-18 (6th marathon, M6 — matrix identity & freshness): CMP-AUD-084 CLOSED
 > (fix+docs one commit, CI SHA-verified), offline gate 135/135, 193 closed (80%).** The keystone of
