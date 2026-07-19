@@ -16,6 +16,12 @@ of the limit:
   * CMP-AUD-082: `_settle_formulas_twin` refreshes the twin OR clears a stale
     prior one so a values-only refresh, over-limit skip, or failed refresh can
     never leave an audit-looking `(formulas)` sibling from an older generation.
+    This ALSO closes CMP-AUD-075's matrix residual: the Everything/day/baseline
+    `also_formulas` twins run as a second comparator call, so they aren't one
+    generation, but they can no longer present STALE formula evidence — a later
+    values-only or failed formula refresh clears/refreshes the twin (proved
+    below). The remaining "one generation id for both members" is the deferred
+    Phase-5 multi-artifact manifest, tracked with 082, not a truth defect.
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_formulas_twin_guard.py
@@ -143,11 +149,13 @@ def main():
             assert sib.exists(), "seed twin was not written"
             return sib
 
-        # (a) a values-only refresh (do_write False) clears the prior twin.
+        # (a) a values-only refresh (do_write False) clears the prior twin. This is
+        # exactly CMP-AUD-075's matrix residual — a later values-only formula refresh
+        # can no longer leave stale formula evidence beside the newer values copy.
         va = tmp / "va.xlsx"; _values_workbook(va, rows=3); sib_a = _seed_twin(va)
         matrix._settle_formulas_twin(_fake_compare_call_factory([]), va, False,
                                      events=events)
-        check("082: a values-only refresh clears the stale (formulas) twin",
+        check("082/075: a values-only refresh clears the stale (formulas) twin",
               not sib_a.exists())
 
         # (b) an over-limit skip clears the prior twin and never writes a new one.
