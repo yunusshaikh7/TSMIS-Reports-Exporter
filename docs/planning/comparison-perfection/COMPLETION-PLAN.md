@@ -51,7 +51,22 @@ tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (
 fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
 `evidence_highway_detail.py` doc-median follow-up).
 
-> ### ▶ RESUME HERE (2026-07-18, M6 → 084/081/082/088/100 CLOSED; 080 DEFERRED; 089 is the last)
+> ### ▶ RESUME HERE (2026-07-18 — 6th marathon COMPLETE: M6 → 084/081/082/088/100 CLOSED; 080 + 089 Phase-5/7-DEFERRED)
+>
+> **6TH MARATHON WRAP-UP (M6 — matrix identity & freshness): 5 CLOSED + 2 Phase-5/7-DEFERRED, all
+> CI-verified, gate 136/136, 197 closed (82%).** Closed 084 (`b820ff5`) / 081 (`3d77f4f`) / 082
+> (`442b19b`) / 088 (`5e168b6`) / 100 (`ae45581`). **DEFERRED (both genuinely Phase-5/7-scoped, NOT
+> forced): 080** (source-folder `fingerprint` content-identity — metadata-only + called per-cell
+> per-snapshot → content-hashing is the finding's-own-note Phase-5 perf-cache challenge; a stat cache
+> was tested + rejected; forcing risks a snapshot perf regression on statewide stores) and **089**
+> (its core "persist a per-cell last-attempt record separate from the last-good cache" IS a *durable
+> attempt overlay*, which CLAUDE.md conventions explicitly assign to Phase-5/7 — "durable attempt
+> overlays/provenance remain their assigned Phase-5/7 work"; full-stack worker+bridge+new-persistence
+> +`ui-matrix.js`; the counting half alone can't close it while the primary defect — a crashed
+> rebuild silently reverting to the old ✓ match — needs the overlay). **089 belongs with 085** (same
+> durable-attempt-overlay Phase-5/7 family) — do them together in a Phase-5/7 session. **NEXT
+> MARATHON: M7** (day/matrix state machine 091–099) per the M6–M13 roadmap, OR M8 (`#mock` GUI-dispatch
+> fast wins). ⚠ Still owed from bucket B: the 053 HD PDF-vs-Excel/PDF-vs-TSN canary re-measure.
 >
 > **DONE 2026-07-18 (6th marathon, M6): CMP-AUD-100 CLOSED (`ae45581`, CI SHA-verified), gate 135→
 > 136, 197 closed (82%).** The Everything/day/baseline cache loaders were already corrected to
