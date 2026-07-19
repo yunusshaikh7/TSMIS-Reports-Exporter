@@ -385,7 +385,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-104 | P3 | Resolved 2026-07-18 | One queue-capable day export action is uniquely disabled while busy |
 | CMP-AUD-105 | P1 | Resolved | A missing explicit TSN source silently falls back to another dataset |
 | CMP-AUD-106 | P1 | Verified | Old red evidence survives beside a newly clean comparison |
-| CMP-AUD-107 | P1 | Verified | Highway Detail evidence invents differences the comparison treats as equal |
+| CMP-AUD-107 | P1 | Resolved 2026-07-18 | Highway Detail evidence invents differences the comparison treats as equal |
 | CMP-AUD-108 | P2 | Verified | Duplicate-only differences disappear from evidence accounting |
 | CMP-AUD-109 | P1 | Verified | Evidence workbook and images are not one truthful transaction |
 | CMP-AUD-110 | P2 | Verified | Queued evidence actions silently retarget to current settings |
@@ -5383,6 +5383,29 @@ Correction requirements: every evidence adapter must consume the exact shared pa
 and `compared_cell` verdict used by its comparison flavor. Add negative equality cases
 for whitespace, Med V/WDA, dates, context/non-asserting fields, ditto, casing, numeric
 coercion, and every PDF/Excel row-specific schema.
+
+#### Remediation — 2026-07-18
+
+All five evidence adapters now enumerate through the engine's OWN
+`compare_core.compared_cell` verdict (`verdict is False`), matching the Highway
+Log / Highway Sequence adapters that already did. Highway Detail was the verified
+defect — raw `cht._s` compare, no Excel TRIM, no Med V/WDA fold, no context/ditto
+suppression; its `enumerate_diffs` now calls `compared_cell(cht._SCHEMA, i, ra, rb, 1)`
+and `project()` applies `_xl_trim` so a verified PDF value still round-trips against the
+compared_cell display. Intersection Detail (already `_xl_trim`, empty context, no
+Med-Wid) is folded on byte-identically. Ramp Detail's parallel `_ALWAYS_CONTEXT`/
+`_EXCEL_ROW_SKIPS` lists are replaced by the live per-flavor schema (`_schema_for` —
+Excel keeps the print-only On/Off + Ramp Type context, the PDF flavor promotes them),
+derived from the base schema so the two can't drift from the comparators.
+
+Real-corpus census (252-route 7.9 ars-prod Highway Detail, 198,752 diff cells): the
+`compared_cell` set is a provable strict subset of the raw-compare set
+(`_s(a)==_s(b) ⟹ _xl_trim(a)==_xl_trim(b)`, and Med-Wid/context only add equalities),
+so the fix can never introduce a diff. NEW == OLD == 198,752 on this data (the loader
+pre-projects, so the bug is latent here); the shipped adapter reproduces 198,752 exactly.
+`check_visual_evidence`: the finding's HG-whitespace and Med V/WDA cases now do NOT
+enumerate (red on the reverted adapter, green on the fix), the projection-TRIM round-trip
+is pinned, and `_schema_for` is bound to the live RD comparator context sets. Gate 136/136.
 
 ### CMP-AUD-108 — duplicate-only differences vanish from evidence accounting
 
