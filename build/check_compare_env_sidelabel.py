@@ -203,6 +203,52 @@ def test_direct_folder_driver_output_alias():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_040_folder_root_subfolder_alias():
+    """CMP-AUD-040: a run ROOT on one side and that run's <report> SUBFOLDER on the
+    other resolve to the SAME effective report directory (and file set), so the
+    comparison must refuse them BEFORE loading — the plain selected-root equality
+    guard misses it because the two SELECTED paths differ. A legitimate pair (two
+    different run folders) must NOT be false-rejected."""
+    print("compare_folders refuses a run-root vs its own report-subfolder alias:")
+    import shutil
+    import tempfile
+    from events import ConsolidateResult
+    from openpyxl import Workbook
+    root = Path(tempfile.mkdtemp(prefix="tsmis_env_040_"))
+    ran = [0]
+    adapter = compare_env.EnvCompare(
+        "alias_probe", "Alias Probe", "alias_probe",
+        side_loader=lambda _folder, _label, _events: ([["001", "x"]], []),
+        agg_header=["Route", "Value"])
+
+    def fake_run(_sc, _ra, _rb, _hr, temp, **_kw):
+        ran[0] += 1
+        wb = Workbook(); wb.active.title = "Comparison"; wb.save(temp); wb.close()
+        return ConsolidateResult(status="ok", output_path=str(temp))
+
+    original = compare_env.run_compare
+    compare_env.run_compare = fake_run
+    try:
+        run = root / "2026-07-09 ssor-prod"
+        sub = run / "alias_probe"; sub.mkdir(parents=True)
+        (sub / "route_001.xlsx").write_bytes(b"PK\x03\x04")
+        # Side A = the run ROOT; side B = its alias_probe SUBFOLDER -> same files.
+        res = adapter.compare_folders(run, sub, root / "out.xlsx", mode="values")
+        check("run-root vs report-subfolder alias is rejected before loading",
+              res.status == "error" and ran[0] == 0
+              and "resolve to the same" in (res.message or ""))
+        # A LEGITIMATE pair — two DIFFERENT run folders — must proceed normally.
+        run2 = root / "2026-07-09 ars-prod"
+        sub2 = run2 / "alias_probe"; sub2.mkdir(parents=True)
+        (sub2 / "route_001.xlsx").write_bytes(b"PK\x03\x04")
+        ok = adapter.compare_folders(run, run2, root / "out2.xlsx", mode="values")
+        check("two DIFFERENT run folders are NOT rejected (no false alias)",
+              ok.status == "ok" and ran[0] == 1)
+    finally:
+        compare_env.run_compare = original
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def test_folder_driver_target_guard():
     print("compare_folders forwards an exact target-aware commit guard:")
     import tempfile
@@ -269,6 +315,7 @@ def main():
     test_side_labels_integration()
     test_labels_override()
     test_direct_folder_driver_output_alias()
+    test_040_folder_root_subfolder_alias()
     test_folder_driver_target_guard()
     print()
     if _failures:

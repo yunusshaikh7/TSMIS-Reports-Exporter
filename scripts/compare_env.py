@@ -1010,11 +1010,24 @@ class EnvCompare:
         so the alias guard sees the real input objects without stat-walking
         unrelated report trees in a Matrix environment folder.
         """
+        _input_dir, files = _find_input_dir(
+            folder, self.subdir, self._discovery_pattern())
+        return tuple(files)
+
+    def _discovery_pattern(self):
         use_pdf = (self.flat_pdf_loader is not None
                    or (self.sheet_name is None and self.side_loader is None))
-        _input_dir, files = _find_input_dir(
-            folder, self.subdir, "*.pdf" if use_pdf else "*.xlsx")
-        return tuple(files)
+        return "*.pdf" if use_pdf else "*.xlsx"
+
+    def _effective_input_dir(self, folder):
+        """The RESOLVED directory this adapter actually loads from for one side —
+        <folder>/<subdir> when that holds the files, else <folder> (see
+        _find_input_dir). CMP-AUD-040: comparing effective dirs (not the selected
+        roots) catches a run-ROOT on one side aliasing that run's <report>
+        SUBFOLDER on the other — both resolve to the same place, which the plain
+        root-equality guard misses."""
+        in_dir, _files = _find_input_dir(folder, self.subdir, self._discovery_pattern())
+        return in_dir.resolve(strict=False)
 
     @comparison_result_boundary
     def compare_folders(self, dir_a, dir_b, out_path, events=None,
@@ -1051,6 +1064,21 @@ class EnvCompare:
         destinations = artifact_store.comparison_output_paths(out_path, mode)
         files_a = self._effective_source_files(dir_a)
         files_b = self._effective_source_files(dir_b)
+        # CMP-AUD-040: two DIFFERENT selected roots can still resolve to the SAME
+        # effective report directory (a run root vs that run's <report> subfolder),
+        # or — via a junction/hardlinked tree — to identical discovered file sets.
+        # Either aliases one dataset onto both sides and returns a phantom clean
+        # match, so reject before loading (the plain root-equality guard above only
+        # catches literally-equal selections).
+        ids_a = artifact_store.canonical_path_identities(files_a)
+        ids_b = artifact_store.canonical_path_identities(files_b)
+        if (self._effective_input_dir(dir_a) == self._effective_input_dir(dir_b)
+                or (files_a and ids_a == ids_b)):
+            return ConsolidateResult(
+                status="error",
+                message="Pick two DIFFERENT report folders — both sides resolve to "
+                        f"the same {self.REPORT_NAME} files:\n"
+                        f"{self._effective_input_dir(dir_a)}")
         discovered_paths = (*files_a, *files_b)
         discovered_set = artifact_store.canonical_path_identities(discovered_paths)
         source_paths = (dir_a, dir_b, *discovered_paths)
