@@ -229,15 +229,19 @@ def test_midcompare_race(tmp):                                # CT-6d / CMP-AUD-
 def test_day_consolidated_gap(tmp):                           # CT-7
     print("CT-7 day_matrix — a missing day consolidation reads NOT fresh:")
     out = tmp / "out"; out.mkdir()
-    saved = (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT)
+    dest = tmp / "dest"; dest.mkdir()
+    saved = (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT)
     paths.OUTPUT_ROOT = out
     day_matrix.OUTPUT_ROOT = out
+    paths.TSN_LIBRARY_ROOT = tmp / "_lib"        # hermetic: no real library leaks in
     try:
         date, source = "2026-06-20", "ssor-prod"
-        # Two supported vs-TSN reports both EXPORTED that day.
+        # Two supported vs-TSN reports both EXPORTED that day, each with a ready TSN
+        # dataset (CMP-AUD-093: the day-consolidation badge tracks only cells the
+        # forced rebuild can act on — visible, TSN-ready, exported).
         for subdir in ("highway_log", "ramp_summary"):
-            tdir = day_matrix.tsmis_dir(date, source, subdir)
-            _xlsx(tdir / "r1.xlsx")
+            _xlsx(day_matrix.tsmis_dir(date, source, subdir) / "r1.xlsx")
+            _xlsx(matrix.tsn_input_root(dest, subdir) / "tsn.xlsx")
         # Consolidate ONLY highway_log (record its fingerprint); ramp_summary stays
         # exported-but-not-consolidated.
         hl_dir = day_matrix.tsmis_dir(date, source, "highway_log")
@@ -246,7 +250,7 @@ def test_day_consolidated_gap(tmp):                           # CT-7
         artifact_store.write_consolidated_fingerprint(hl_cons, hl_dir)
         _complete_consolidation(hl_cons)
 
-        snap = day_matrix.day_matrix_snapshot(source, [date], dest=str(tmp / "nodest"))
+        snap = day_matrix.day_matrix_snapshot(source, [date], dest=str(dest))
         dc = snap["day_consolidated"][date]
         check("a consolidated workbook EXISTS for the day", dc["exists"] is True)
         check("...but the day is NOT fresh (ramp_summary export has no consolidation)",
@@ -258,11 +262,11 @@ def test_day_consolidated_gap(tmp):                           # CT-7
         _xlsx(rs_cons)
         artifact_store.write_consolidated_fingerprint(rs_cons, rs_dir)
         _complete_consolidation(rs_cons)
-        snap2 = day_matrix.day_matrix_snapshot(source, [date], dest=str(tmp / "nodest"))
+        snap2 = day_matrix.day_matrix_snapshot(source, [date], dest=str(dest))
         check("with every exported report consolidated, the day reads fresh",
               snap2["day_consolidated"][date]["fresh"] is True)
     finally:
-        paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT = saved
+        paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT = saved
 
 
 def main():

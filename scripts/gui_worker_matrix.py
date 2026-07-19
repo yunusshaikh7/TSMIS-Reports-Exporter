@@ -21,7 +21,7 @@ from gui_worker_export import ExportWorker
 log = logging.getLogger("tsmis.gui")
 
 def _run_matrix_export_step(spec, src, env, dest, queue, cancel, skip, pause,
-                            workers, on_worker=None, dated=False):
+                            workers, on_worker=None, dated=False, day=None):
     """Export ONE report for ONE environment, WITHOUT a manifest (so a matrix
     refresh can never clobber a paused Export-Everything batch — BatchWorker alone
     persists batch_job.json). Runs the SAME per-environment body BatchWorker uses
@@ -40,7 +40,8 @@ def _run_matrix_export_step(spec, src, env, dest, queue, cancel, skip, pause,
     set_site(src, env)
     out_base = None if dated else Path(dest) / f"{src}-{env}"
     ew = ExportWorker([spec], queue, cancel, skip, workers=workers, routes=None,
-                      pause_event=pause, auto_consolidate=False, out_base=out_base)
+                      pause_event=pause, auto_consolidate=False, out_base=out_base,
+                      day=day)          # CMP-AUD-091: captured run date for dated writes
     if on_worker:
         on_worker(ew)
     results = []
@@ -72,7 +73,7 @@ class MatrixBatchExportWorker(threading.Thread):
     restored at the end."""
 
     def __init__(self, steps, dest, queue, cancel_event, skip_event, pause_event,
-                 workers=1, on_worker=None, dated=False):
+                 workers=1, on_worker=None, dated=False, day=None):
         super().__init__(daemon=True, name="matrix-batch-export")
         self.steps = list(steps)               # [(spec, src, env), ...]
         self.dest = dest
@@ -83,8 +84,12 @@ class MatrixBatchExportWorker(threading.Thread):
         self.workers = workers
         self.on_worker = on_worker             # exposes the live ExportWorker for preview
         # dated=True -> the Compare by-day matrix: write DATED run folders
-        # (output/<today> <src-env>/) instead of the always-current Everything store.
+        # (output/<day> <src-env>/) instead of the always-current Everything store.
+        # CMP-AUD-091: `day` is the run date captured at dispatch — every step writes
+        # that day's folder rather than re-resolving "today", so a midnight crossing
+        # can't split the export or mismatch the chained comparison.
         self.dated = bool(dated)
+        self.day = day or None
 
     def run(self):
         original = get_site()
@@ -102,7 +107,7 @@ class MatrixBatchExportWorker(threading.Thread):
                     if _run_matrix_export_step(spec, src, env, self.dest, self.q,
                                                self.cancel, self.skip, self.pause,
                                                self.workers, on_worker=self.on_worker,
-                                               dated=self.dated):
+                                               dated=self.dated, day=self.day):
                         ok += 1                  # complete only (§C.1), not "didn't raise"
                 except (AuthError, BrowserNotFoundError) as e:
                     log.warning("matrix export %s-%s stopped: %s: %s",

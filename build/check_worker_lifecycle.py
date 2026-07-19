@@ -721,7 +721,48 @@ def test_cancel_never_leaks_to_next_queued_job():
 
 
 
+def test_091_run_date_threading():
+    """CMP-AUD-091: the by-day export binds its captured RUN DATE end to end, so a
+    midnight crossing can't split the export or mismatch the chained comparison."""
+    import paths
+    # (a) MatrixBatchExportWorker threads its `day` to every export step.
+    seen = {}
+    spec = types.SimpleNamespace(label="Ramp Summary")
+    w = gw.MatrixBatchExportWorker([(spec, "ssor", "prod")], None, _Q(),
+                                   threading.Event(), threading.Event(),
+                                   threading.Event(), dated=True, day="2026-06-11")
+
+    def _step(*_a, **kw):
+        seen["day"] = kw.get("day")
+        return None
+    with _patched((gwmx, "_run_matrix_export_step", _step),
+                  (gwmx, "set_site", lambda *_a: None),
+                  (gwmx, "get_site", lambda: ("ssor", "prod"))):
+        w.run()
+    check("MatrixBatchExportWorker passes the captured day to each step",
+          seen.get("day") == "2026-06-11")
+
+    # (b) ExportWorker._prep_edition names the dated folder for the captured day
+    # (not today), staging ONLY for the store (out_base).
+    _spec = types.SimpleNamespace(subdir="ramp_summary", filename=lambda r: f"r{r}.xlsx")
+    want = paths.output_run_dir("ssor", "prod", "2026-06-11") / "ramp_summary"
+    with _patched((gwx, "get_site", lambda: ("ssor", "prod"))):
+        ew = gw.ExportWorker([_spec], _Q(), threading.Event(), threading.Event(),
+                             out_base=None, day="2026-06-11")
+        out_dir, stage_dir, _rs, run_dir = ew._prep_edition(_spec)
+        check("captured-day export writes THAT day's dated folder (not today)",
+              out_dir == want and run_dir == want)
+        check("a dated captured-day export does NOT stage (store-only feature)",
+              stage_dir is None)
+        ew0 = gw.ExportWorker([_spec], _Q(), threading.Event(), threading.Event(),
+                              out_base=None, day=None)
+        out0, stage0, _r0, run0 = ew0._prep_edition(_spec)
+        check("no captured day -> out_dir deferred to run_export (today), no stage",
+              out0 is None and run0 is None and stage0 is None)
+
+
 def main():
+    test_091_run_date_threading()
     test_validate_terminal_frees_gate()
     test_active_check_soft_busy()
     test_cancel_never_leaks_to_next_queued_job()

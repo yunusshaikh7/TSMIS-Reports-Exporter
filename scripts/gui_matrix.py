@@ -516,6 +516,10 @@ class GuiMatrixMixin:
         MatrixBatchExportWorker(steps, settings.get_batch_dest(), self._gated_queue(),
                                 self.cancel_event, self.skip_event, self.pause_event,
                                 workers=n_workers, dated=True,
+                                # CMP-AUD-091: bind the run date captured at dispatch
+                                # (job["env"], the day column) so the export writes
+                                # that exact folder and the chained compare matches it.
+                                day=job.get("env"),
                                 on_worker=self._set_matrix_export_worker).start()
         return True
 

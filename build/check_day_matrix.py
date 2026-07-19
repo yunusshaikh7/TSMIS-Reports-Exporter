@@ -441,6 +441,8 @@ def main():
                   and a._current_job["kind"] == "export" and a._current_job["which"] == "day"
                   and isinstance(_FakeWorker.last, tuple)
                   and _FakeWorker.last[1].get("dated") is True)
+            check("CMP-AUD-091: the captured run date is bound to the export worker",
+                  _FakeWorker.last[1].get("day") == today)
             check("today auto-added as a column", today in settings.get_day_matrix_days())
             # one (spec, src, env) step per visible supported report
             steps = a._resolve_day_export_steps(a._current_job)

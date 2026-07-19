@@ -23,7 +23,7 @@ from common import (ROUTES, AuthError, BrowserNotFoundError, PreflightError,
                     ENVIRONMENT_LABELS, get_site, set_site)
 from events import Events
 from exporter import run_export, run_export_combined, _wait_while_paused
-from paths import env_tagged_filename
+from paths import env_tagged_filename, output_run_dir
 
 log = logging.getLogger("tsmis.gui")
 
@@ -79,7 +79,7 @@ class ExportWorker(threading.Thread):
     when all selected reports finish (the list is partial if cancelled)."""
 
     def __init__(self, specs, queue, cancel_event, skip_event, workers=1, routes=None,
-                 pause_event=None, auto_consolidate=False, out_base=None):
+                 pause_event=None, auto_consolidate=False, out_base=None, day=None):
         super().__init__(daemon=True, name="export")
         # Accept a single spec or a list, so callers can't trip on the shape.
         self.specs = list(specs) if isinstance(specs, (list, tuple)) else [specs]
@@ -89,6 +89,12 @@ class ExportWorker(threading.Thread):
         self.pause = pause_event or threading.Event()    # B1: between-route hold
         self.auto_consolidate = bool(auto_consolidate)   # B2: combine after each
         self.out_base = Path(out_base) if out_base else None   # B3: always-current dest base
+        # CMP-AUD-091: the by-day matrix captures its RUN DATE at dispatch and passes
+        # it here, so every step (and any coalesced editions) writes into THAT day's
+        # dated run folder rather than each independently re-resolving "today" — a
+        # midnight crossing can no longer split the export or mismatch the chained
+        # comparison. None = the normal "name the folder for today" behavior.
+        self.day = day or None
         self._owned_root_lease = None
         # Absolute stage spelling -> stable directory identity.  A predictable
         # `.staging` pathname is never authority by itself.
@@ -368,9 +374,20 @@ class ExportWorker(threading.Thread):
         says which environment it came from). Returns (out_dir, stage_dir, run_spec,
         run_dir). Factored out so a coalesced group preps every edition the same way
         the single path did."""
-        out_dir = (self.out_base / spec.subdir) if self.out_base else None
+        if self.out_base is not None:
+            out_dir = self.out_base / spec.subdir
+        elif self.day:
+            # CMP-AUD-091: the captured run date names the dated folder for every
+            # step (via get_site() — set once for this run), so the export can't
+            # drift onto a different day than the one the auto-compare targets.
+            out_dir = output_run_dir(*get_site(), self.day) / spec.subdir
+        else:
+            out_dir = None                     # normal export: run_export names today
+        # Stage-and-swap is a STORE feature (out_base); a dated run folder — today's
+        # or CMP-AUD-091's captured day — writes directly, so gate on out_base, not
+        # on out_dir (which is now also set for the dated captured-day case).
         stage_dir = None
-        if out_dir is not None:
+        if self.out_base is not None:
             self._require_store_lease("staging directory creation")
             stage_dir = out_dir.with_name(out_dir.name + ".staging")
             self._owned_root_lease.require_safe_descendant(
