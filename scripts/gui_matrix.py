@@ -180,14 +180,16 @@ class GuiMatrixMixin:
         return f"{verb} all comparisons"
 
     def _make_job(self, kind, scope, label, row=None, env=None, subdir=None,
-                  fast=False, which="env", force=False):
+                  fast=False, which="env", force=False, origin=None):
         # `which` ("env" = Everything matrix, "day" = Compare by-day matrix) lets
         # ONE queue serve both matrices; for day jobs `env` carries the date.
         # `force` rebuilds the persistent consolidated even when it looks fresh.
+        # `origin` ("canonical"/"legacy") routes a tsn_consolidate job (CMP-AUD-010).
         jid = self._coord.next_seq()
         return {"id": jid, "kind": kind, "scope": scope, "label": label,
                 "row": row, "env": env, "subdir": subdir, "fast": bool(fast),
-                "which": which, "force": bool(force), "status": "queued"}
+                "which": which, "force": bool(force), "origin": origin,
+                "status": "queued"}
 
     def _enqueue_matrix_job(self, job):
         """Append a Job and try to start it (or leave it queued behind the
@@ -273,6 +275,12 @@ class GuiMatrixMixin:
             mode = settings.get_matrix_row_modes().get(row, "env")
             if mode == "env" and env == base:
                 return []
+            # CMP-AUD-103: a queued explicit cell whose input side went missing
+            # after enqueue resolves to NO work (the shared buildability predicate),
+            # so queue accounting can't dispatch a doomed compare.
+            cmp = self._matrix_snapshot(base)["cells"].get(row, {}).get(env, {}).get("cmp")
+            if not matrix.cell_buildable(cmp):
+                return []
             return [(row, env, mode)]
         rebuild_scope = "stale" if scope == "stale" else "all"
         return matrix.cells_to_rebuild(self._matrix_snapshot(base),
@@ -288,6 +296,9 @@ class GuiMatrixMixin:
             row, date = job["row"], job["env"]
             if not snap.get("row_supported", {}).get(row) or date not in snap["days"]:
                 return []
+            cmp = snap["cells"].get(row, {}).get(date, {}).get("cmp")   # CMP-AUD-103
+            if not matrix.cell_buildable(cmp):
+                return []
             return [(date, row)]
         rebuild_scope = "stale" if scope == "stale" else "all"
         return day_matrix.cells_to_rebuild(snap, scope=rebuild_scope,
@@ -301,6 +312,9 @@ class GuiMatrixMixin:
         if scope == "cell":
             row, date = job["row"], job["env"]
             if not snap.get("row_supported", {}).get(row) or date not in snap["days"]:
+                return []
+            cmp = snap["cells"].get(row, {}).get(date, {}).get("cmp")   # CMP-AUD-103
+            if not matrix.cell_buildable(cmp):
                 return []
             return [(date, row)]
         rebuild_scope = "stale" if scope == "stale" else "all"
@@ -552,12 +566,13 @@ class GuiMatrixMixin:
 
     def _dispatch_tsn_consolidate_job(self, job):
         dest = settings.get_batch_dest()
-        self._emit_log("Consolidating the dropped TSN Highway Log PDFs…")
+        origin = job.get("origin") or "legacy"
+        self._emit_log(f"Consolidating the {job['subdir']} TSN PDFs…")
         self._set_dot("busy", "Consolidating TSN…")
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": "Consolidating TSN…", "workers": 1})
         MatrixTsnConsolidateWorker(dest, job["subdir"], self._gated_queue(),
-                                   self.cancel_event).start()
+                                   self.cancel_event, origin=origin).start()
         return True
 
     # ----- matrix entry methods (enqueue onto the job queue) ------------------
@@ -607,6 +622,13 @@ class GuiMatrixMixin:
         mode = settings.get_matrix_row_modes().get(row_key, "env")
         if mode == "env" and env_key == base:
             return {"error": "The baseline column has nothing to compare against."}
+        # CMP-AUD-103: refuse a cell whose input side is already known missing, up
+        # front — the same buildability predicate the bulk selector uses — instead
+        # of claiming the queue only to skip it silently (or fail deep in the worker).
+        cmp = self._matrix_snapshot(base)["cells"].get(row_key, {}).get(env_key, {}).get("cmp")
+        reason = matrix.cell_unbuildable_reason(cmp)
+        if reason:
+            return {"error": reason}
         job = self._make_job("compare", "cell",
                              self._job_label("compare", "cell", row_key, env_key),
                              row=row_key, env=env_key)
@@ -725,8 +747,11 @@ class GuiMatrixMixin:
         (the two universal axes; per-row PDF/Excel flavors stay row-local)."""
         if mode_id not in ("env", "tsn"):
             return {"error": "Pick Cross-environment or vs TSN."}
-        snap = self._matrix_snapshot(self._current_baseline())
-        for row_key, modes in snap.get("row_modes", {}).items():
+        # CMP-AUD-102: apply over the AUTHORITATIVE row catalog (every row, hidden
+        # or not), never the visibility-filtered snapshot — otherwise a hidden row
+        # keeps a latent disagreeing mode that surfaces the moment it's unhidden,
+        # so "all" quietly meant "the visible subset".
+        for row_key, modes in matrix.all_row_modes().items():
             avail = {m["id"]: m for m in modes}
             if mode_id == "env":
                 settings.set_matrix_row_mode(row_key, "env")
@@ -790,13 +815,33 @@ class GuiMatrixMixin:
 
     @_api_method
     def consolidate_matrix_tsn(self, subdir):
-        """Queue building the consolidated TSN workbook from the district PDFs the
-        user dropped in _tsn_input/<subdir>/ (the 'consolidate these PDFs?' prompt
-        path). Offline (pdfplumber)."""
-        if subdir != "highway_log":
-            return {"error": "TSN consolidation is only available for Highway Log."}
+        """Queue building the consolidated TSN workbook for a report from its raw
+        TSN PDFs. CMP-AUD-010: routes by SOURCE ORIGIN — a canonical library source
+        (raw PDFs imported into the library) builds through the registered TSN
+        builder reading the library raw/ folder (so EVERY PDF-backed family works,
+        not just Highway Log); a legacy <dest>/_tsn_input/ drop keeps the
+        back-compat Highway-Log consolidator. Only a report whose resolved source is
+        unconsolidated raw PDFs is accepted (offline; pdfplumber)."""
+        import tsn_library
+        tsn_key = tsn_library.canonical_dataset_key(subdir)
+        if tsn_key not in self._valid_tsn_dataset_keys():
+            return {"error": "Unknown report subdir."}
+        dest = settings.get_batch_dest()
+        selected = self._matrix_tsn_selections().get(tsn_key)
+        src = matrix.tsn_source(dest, tsn_key, selected)
+        if src.get("kind") not in ("pdfs", "raw"):
+            return {"error": "There are no unconsolidated TSN PDFs to build for "
+                             "this report — import raw TSN files first."}
+        legacy = bool(src.get("legacy"))
+        if legacy and tsn_key != "highway_log":
+            # The legacy _tsn_input consolidator only knows Highway Log; a canonical
+            # source would have routed to build_consolidated instead.
+            return {"error": "Legacy TSN consolidation is only available for Highway Log."}
+        label = (tsn_library.get(tsn_key).label
+                 if tsn_library.is_registered(tsn_key) else tsn_key)
         job = self._make_job("tsn_consolidate", "consolidate",
-                             "Consolidate TSN Highway Log PDFs", subdir=subdir)
+                             f"Consolidate TSN {label} PDFs", subdir=tsn_key,
+                             origin=("legacy" if legacy else "canonical"))
         return self._enqueue_matrix_job(job)
 
     # ----- canonical TSN library (Settings ▸ TSN reports panel, v0.17.0) ------
@@ -1005,10 +1050,13 @@ class GuiMatrixMixin:
 
     @_api_method
     def open_comparisons_folder(self):
-        """Open the folder holding every comparison workbook for the current
-        baseline (<dest>/comparisons/<baseline>/)."""
+        """Open the folder holding EVERY comparison workbook — the common
+        <dest>/comparisons/ root, so both the cross-env <baseline>/ tree AND the
+        TSN / PDF-vs-Excel self-check tree (comparisons/tsn/) are reachable.
+        CMP-AUD-101: the old per-baseline root hid a row's active TSN/self
+        artifact, sending the user to an unrelated tree."""
         dest = settings.get_batch_dest()
-        self._open_folder(matrix.comparisons_root(dest, self._current_baseline()))
+        self._open_folder(matrix.comparisons_common_root(dest))
         return {"ok": True}
 
     # ----- Compare-tab "TSN by day" matrix -----------------------------------
@@ -1199,6 +1247,12 @@ class GuiMatrixMixin:
             return {"error": "That comparison isn't available yet for this report."}
         if date not in snap["days"]:
             return {"error": "Add that day first."}
+        # CMP-AUD-103: refuse a known-missing input up front (the export or the TSN
+        # dataset), naming the absent role — never dispatch a doomed compare.
+        cmp = snap["cells"].get(row_key, {}).get(date, {}).get("cmp")
+        reason = matrix.cell_unbuildable_reason(cmp)
+        if reason:
+            return {"error": reason}
         job = self._make_job("compare", "cell",
                              self._day_job_label("cell", row_key, date),
                              row=row_key, env=date, which="day")
@@ -1442,6 +1496,12 @@ class GuiMatrixMixin:
             return {"error": "Pick a baseline first."}
         if snap["baseline"]["date"] == date:
             return {"error": "That day IS the baseline — nothing to compare."}
+        # CMP-AUD-103: refuse a known-missing input up front (this day's export or
+        # the baseline's), naming the absent role — never dispatch a doomed compare.
+        cmp = snap["cells"].get(row_key, {}).get(date, {}).get("cmp")
+        reason = matrix.cell_unbuildable_reason(cmp)
+        if reason:
+            return {"error": reason}
         job = self._make_job("compare", "cell",
                              self._baseline_job_label("cell", row_key, date),
                              row=row_key, env=date, which="baseline")

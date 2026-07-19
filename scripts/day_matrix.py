@@ -302,7 +302,9 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
             "selected_path": src.get("selected_path"),
             "selection_missing": src.get("kind") == "missing_explicit",
             "selection_reason": src.get("selection_reason"),
-            "input_dir": (str(matrix.tsn_input_root(dest, tsn_subdir))
+            # CMP-AUD-010: the REAL raw-PDF folder + origin (library vs legacy drop).
+            "source_legacy": bool(src.get("legacy")),
+            "input_dir": (matrix.tsn_input_dir_for(dest, tsn_key, src)
                           if dest else None)}
 
     cells = {}
@@ -399,7 +401,7 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
             if date and d != date:
                 continue
             cmp = snapshot["cells"][row_key][d]["cmp"]
-            if not cmp.get("supported") or cmp.get("missing_side"):
+            if not matrix.cell_buildable(cmp):    # CMP-AUD-103: shared predicate
                 continue
             if scope == "all" or cmp.get("stale"):
                 todo.append((d, row_key))

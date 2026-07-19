@@ -26,9 +26,9 @@ import artifact_store
 from events import ConsolidateResult
 from matrix_state import (_MTIME_TOL_S, _cell_input_fingerprint, _mode_by_id,
                           _pdf_self_comparator, _row_defs, _row_modes,
-                          _safe_mtime, comparison_path, mode_out_path,
-                          producer_identity, record_result, record_tsn_result,
-                          tsn_input_root, tsn_source)
+                          _safe_mtime, cell_buildable, comparison_path,
+                          mode_out_path, producer_identity, record_result,
+                          record_tsn_result, tsn_input_root, tsn_source)
 
 class _FacadeProxy:
     """Resolves `_m.<name>` through the `matrix` facade AT CALL TIME (a lazy
@@ -649,7 +649,7 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, env=None):
             cmp = snapshot["cells"][row_key][ev].get("cmp")
             if cmp is None:                      # env-mode baseline column
                 continue
-            if not cmp.get("supported") or cmp.get("missing_side"):
+            if not cell_buildable(cmp):          # CMP-AUD-103: shared predicate
                 continue
             if scope == "all" or cmp.get("stale"):
                 todo.append((row_key, ev, mode_id))

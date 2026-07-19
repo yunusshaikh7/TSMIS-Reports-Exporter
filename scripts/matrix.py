@@ -28,13 +28,15 @@ from matrix_state import (                                       # noqa: F401
     _cell_input_fingerprint, _cmp_state, _inputs_changed, _mode_by_id,
     _published_comparison_result,
     _pdf_self_comparator, _results_path, _row_defs, _row_modes, _safe_mtime,
-    _staleness, _tsn_results_path, apply_order, comparison_path,
-    comparison_state, comparisons_root, default_env_label, env_keys,
+    _staleness, _tsn_results_path, all_row_modes, apply_order,
+    cell_buildable, cell_unbuildable_reason, comparison_path,
+    comparison_state, comparisons_common_root, comparisons_root,
+    default_env_label, env_keys,
     load_results, load_tsn_results, matrix_snapshot, mode_out_path,
     out_path_for_cell, producer_identity, read_counts, record_result,
     record_tsn_result, self_supported, tsn_capable, tsn_comparator_for,
-    tsn_comparisons_root, tsn_input_root, tsn_source, tsn_subdir_for,
-    tsn_supported)
+    tsn_comparisons_root, tsn_input_dir_for, tsn_input_root, tsn_source,
+    tsn_subdir_for, tsn_supported)
 from matrix_build import (                                       # noqa: F401
     _FORMULAS_TWIN_MAX_ROWS, _comparison_row_count, _consolidate_store_folder,
     _consolidated_filename, _consolidated_stale, _ensure_consolidated,

@@ -364,8 +364,8 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
             if date and d != date:
                 continue
             cmp = snapshot["cells"][row_key][d]["cmp"]
-            if (not cmp.get("supported") or cmp.get("is_baseline")
-                    or cmp.get("missing_side")):
+            # CMP-AUD-103: shared buildability predicate (+ the baseline's own column).
+            if cmp.get("is_baseline") or not matrix.cell_buildable(cmp):
                 continue
             if scope == "all" or cmp.get("stale"):
                 todo.append((d, row_key))

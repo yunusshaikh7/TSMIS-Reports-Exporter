@@ -447,25 +447,39 @@ class MatrixEvidenceWorker(threading.Thread):
 
 
 class MatrixTsnConsolidateWorker(threading.Thread):
-    """Consolidate the district TSN PDFs the user dropped in _tsn_input/<subdir>/
-    into one TSN workbook (the 'consolidate these PDFs?' prompt path), so the TSN
-    comparison can run. Offline (pdfplumber); posts ('matrix_done', …) so the
-    bridge clears the task and refreshes the grid."""
+    """Consolidate a report's raw TSN PDFs into one normalized TSN workbook (the
+    'consolidate these PDFs?' prompt path), so the TSN comparison can run.
+    CMP-AUD-010: routes by `origin` — a `canonical` source builds through the
+    registered TSN builder (tsn_library.build_consolidated, reading the library
+    raw/ folder — works for every PDF-backed family), while a `legacy` source uses
+    the back-compat <dest>/_tsn_input/ Highway-Log consolidator. Offline
+    (pdfplumber); posts ('matrix_done', …) so the bridge clears the task and
+    refreshes the grid."""
 
-    def __init__(self, dest, subdir, queue, cancel_event):
+    def __init__(self, dest, subdir, queue, cancel_event, origin="legacy"):
         super().__init__(daemon=True, name="matrix-tsn-consolidate")
         self.dest = dest
         self.subdir = subdir
         self.q = queue
         self.cancel = cancel_event
+        self.origin = origin
 
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
                         on_log=lambda m: self.q.put(("log", m)))
         errors = 0
         try:
-            res = matrix.consolidate_tsn_pdfs(self.dest, self.subdir, events=events)
-            self.q.put(("log", f"TSN workbook ready: {res}"))
+            if self.origin == "canonical":
+                import tsn_library                    # lazy: pulls pdfplumber
+                res = tsn_library.build_consolidated(
+                    self.subdir, events=events, force=True)
+                if getattr(res, "status", None) != "ok":
+                    raise ValueError(getattr(res, "message", None)
+                                     or f"the {self.subdir} TSN consolidation failed")
+                ready = getattr(res, "output_path", None) or self.subdir
+            else:
+                ready = matrix.consolidate_tsn_pdfs(self.dest, self.subdir, events=events)
+            self.q.put(("log", f"TSN workbook ready: {ready}"))
         except Exception as e:                       # noqa: BLE001
             errors = 1
             log.exception("matrix TSN consolidate (%s) crashed", self.subdir)

@@ -26,6 +26,8 @@ import batch_manifest
 import gui_api
 import gui_matrix
 import matrix
+import paths
+import reports
 import settings
 from openpyxl import Workbook
 
@@ -60,13 +62,17 @@ def main():
     # mixin dispatch resolves them; clear_auth stays in gui_api.
     saved = (gui_matrix.MatrixCompareWorker, gui_matrix.MatrixBatchExportWorker,
              gui_matrix.MatrixTsnConsolidateWorker, gui_api.clear_auth,
-             settings.get_batch_dest, settings.CONFIG_FILE)
+             settings.get_batch_dest, settings.CONFIG_FILE, paths.TSN_LIBRARY_ROOT)
     gui_matrix.MatrixCompareWorker = _FakeWorker
     gui_matrix.MatrixBatchExportWorker = _FakeWorker
     gui_matrix.MatrixTsnConsolidateWorker = _FakeWorker
     gui_api.clear_auth = lambda: None     # no auth-file side effects in the test
     settings.get_batch_dest = lambda: str(dest)
     settings.CONFIG_FILE = cfgdir / "config.json"
+    # CMP-AUD-010: consolidate_matrix_tsn now RESOLVES the source origin, so the
+    # library must be sandboxed (empty here) — otherwise the dev machine's real TSN
+    # library would decide the routing non-deterministically.
+    paths.TSN_LIBRARY_ROOT = dest / "_lib"
     settings._cache = settings._cache_mtime = None
     mpath = cfgdir / "batch_job.json"     # explicit test manifest — never the real one
     try:
@@ -153,6 +159,17 @@ def main():
             matrix.cells_to_rebuild = _orig_ctr
             a.set_matrix_baseline("ssor-prod")        # back to default for the rest
 
+        print("recompute_matrix over an EMPTY store -> nothing to do:")
+        check("empty store -> nothing to do",
+              a.recompute_matrix("all").get("nothing") is True)
+        check("no task claimed when nothing to do", a._task is None)
+
+        # CMP-AUD-103: plant BOTH sides so the explicit cell compares below are
+        # BUILDABLE — a missing-input cell is now refused up front (tested next),
+        # so a launch primitive needs real inputs. (ssor-prod is the baseline.)
+        for _env in ("ssor-prod", "ars-prod", "ars-dev", "ars-test"):
+            _touch(dest / _env / "ramp_detail" / "r1.xlsx")
+
         print("refresh_cell_comparison enqueue + validation:")
         check("unknown row rejected",
               bool(a.refresh_cell_comparison("nope", "ars-prod").get("error")))
@@ -176,13 +193,21 @@ def main():
         a._end_task()
         check("queue fully drained -> idle", a._task is None)
 
-        print("recompute_matrix scope:")
-        check("empty store -> nothing to do",
-              a.recompute_matrix("all").get("nothing") is True)
-        check("no task claimed when nothing to do", a._task is None)
-        # Two sides present for ramp_detail -> one stale cell to rebuild.
-        _touch(dest / "ssor-prod" / "ramp_detail" / "r1.xlsx")
-        _touch(dest / "ars-prod" / "ramp_detail" / "r1.xlsx")
+        print("CMP-AUD-103: an explicit cell Build refuses a known-missing input side:")
+        # highway_log (env mode) has NO store exports on either side -> missing_side.
+        # The bulk selector already skips it; the explicit endpoint must too, with a
+        # role-named message, instead of claiming the queue (the finding's defect).
+        mr = a.refresh_cell_comparison("highway_log", "ars-prod")
+        check("explicit cell compare with a missing side is rejected", bool(mr.get("error")))
+        check("...and no task was claimed", a._task is None)
+        # A queued cell whose side is missing resolves to no work (queue accounting).
+        cmp_hl = (a._matrix_snapshot("ssor-prod")["cells"]
+                  .get("highway_log", {}).get("ars-prod", {}).get("cmp"))
+        check("the shared predicate calls that cell unbuildable",
+              matrix.cell_buildable(cmp_hl) is False
+              and bool(matrix.cell_unbuildable_reason(cmp_hl)))
+
+        print("recompute_matrix scope (both ramp_detail sides present):")
         rc = a.recompute_matrix("all")
         check("stale cells -> launched", rc.get("ok") and a._task == "matrix")
         check("matrix progress state set",
@@ -225,8 +250,14 @@ def main():
               opened and opened[-1] == cpath)
         fr = a.open_comparisons_folder()
         check("open comparisons folder ok", fr.get("ok") is True)
-        check("the baseline comparisons root was opened",
-              opened[-1] == matrix.comparisons_root(str(dest), "ssor-prod"))
+        # CMP-AUD-101: the COMMON comparisons root (parent of both the <baseline>/
+        # cross-env tree and the tsn/ self/TSN tree), so a non-env-mode row's
+        # artifact is reachable — not the per-baseline root that hid it.
+        check("the common comparisons root was opened (reaches tsn/ too)",
+              opened[-1] == matrix.comparisons_common_root(str(dest)))
+        check("the common root is the parent of the per-baseline root",
+              matrix.comparisons_root(str(dest), "ssor-prod").parent
+              == matrix.comparisons_common_root(str(dest)))
 
         print("env-column toggle + per-row modes + global set-all:")
         eh = a.set_matrix_env("ars-dev", False)
@@ -265,6 +296,21 @@ def main():
         check("set-all env clears every row to cross-env",
               all(v == "env" for v in a.matrix_info()["modes"].values()))
 
+        print("CMP-AUD-102: 'set all' spans the AUTHORITATIVE catalog, not the visible subset:")
+        # Hide a tsn-capable row, THEN bulk-set every row to vs TSN. The hidden row
+        # must still receive the mode (pre-fix it was skipped because the snapshot
+        # had already dropped it), so unhiding it reveals 'tsn', not a stale 'env'.
+        a.set_all_matrix_modes("env")
+        a.set_matrix_report("intersection_detail", False)      # hide a tsn-capable row
+        a.set_all_matrix_modes("tsn")
+        a.set_matrix_report("intersection_detail", True)       # unhide it
+        check("a row hidden during 'set all tsn' still got the mode (no latent disagreement)",
+              a.matrix_info()["modes"].get("intersection_detail") == "tsn")
+        check("all_row_modes covers every matrix row, hidden or not",
+              set(matrix.all_row_modes().keys())
+              == {r[0] for r in reports.matrix_rows()})
+        a.set_all_matrix_modes("env")
+
         print("drag-to-reorder bridge (rows + env columns; v0.17.0 Phase 4b):")
         natural = a.matrix_info()["rows"]
         r = a.set_matrix_row_order([natural[-1], "zz-bogus"])   # unknown dropped
@@ -302,12 +348,37 @@ def main():
         rcol = a.recompute_matrix("all", env="ars-prod")
         check("per-column refresh launched", rcol.get("ok") and a._task == "matrix")
         a._end_task()
-        check("consolidate TSN rejects non-Highway-Log",
+        # CMP-AUD-010: routes by SOURCE ORIGIN. With an empty library + no drop, a
+        # report has no raw PDFs to build -> rejected (never a legacy-only gate).
+        check("consolidate TSN rejects a report with no unconsolidated PDFs",
               bool(a.consolidate_matrix_tsn("ramp_detail").get("error")))
+        # A LEGACY <dest>/_tsn_input/highway_log/ drop -> the back-compat HL path.
+        _touch(dest / "_tsn_input" / "highway_log" / "d01.pdf")
         ct = a.consolidate_matrix_tsn("highway_log")
-        check("consolidate TSN launched + task claimed",
+        check("legacy HL drop consolidate launched + task claimed",
               ct.get("ok") is True and a._task == "matrix")
+        check("the legacy source routes the worker with origin='legacy'",
+              _FakeWorker.last[1].get("origin") == "legacy")
         a._end_task()
+        # A CANONICAL library source (raw PDFs imported into the library) -> the
+        # registered builder, for a PDF-backed family the legacy gate used to reject.
+        (paths.TSN_LIBRARY_ROOT / "highway_sequence" / "raw").mkdir(parents=True, exist_ok=True)
+        _touch(paths.TSN_LIBRARY_ROOT / "highway_sequence" / "raw" / "d01.pdf")
+        cc = a.consolidate_matrix_tsn("highway_sequence")
+        check("canonical PDF-backed family (Highway Sequence) now consolidates",
+              cc.get("ok") is True and a._task == "matrix")
+        check("the canonical source routes the worker with origin='canonical'",
+              _FakeWorker.last[1].get("origin") == "canonical")
+        a._end_task()
+        # tsn_meta advertises the REAL raw folder + origin for a canonical source
+        # (the Everything matrix builds tsn_meta only for a row in vs-TSN mode).
+        a.set_matrix_row_mode("highway_sequence", "tsn")
+        info_hs = a.matrix_info()
+        tm_hs = info_hs.get("tsn_meta", {}).get("highway_sequence", {})
+        check("tsn_meta points Consolidate at the library raw/ folder, not _tsn_input",
+              tm_hs.get("source_legacy") is False
+              and "_tsn_input" not in (tm_hs.get("input_dir") or "")
+              and "highway_sequence" in (tm_hs.get("input_dir") or ""))
 
         print("matrix job queue — fast toggle, row/column export, edit, drain:")
         check("fast mode off by default", settings.get_matrix_fast() is False)
@@ -457,7 +528,7 @@ def main():
     finally:
         (gui_matrix.MatrixCompareWorker, gui_matrix.MatrixBatchExportWorker,
          gui_matrix.MatrixTsnConsolidateWorker, gui_api.clear_auth,
-         settings.get_batch_dest, settings.CONFIG_FILE) = saved
+         settings.get_batch_dest, settings.CONFIG_FILE, paths.TSN_LIBRARY_ROOT) = saved
         settings._cache = settings._cache_mtime = None
         shutil.rmtree(dest, ignore_errors=True)
         shutil.rmtree(cfgdir, ignore_errors=True)

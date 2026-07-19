@@ -82,6 +82,15 @@ def comparisons_root(dest, baseline_key):
     return Path(dest) / COMPARISONS_DIRNAME / baseline_key
 
 
+def comparisons_common_root(dest):
+    """The parent of BOTH comparison trees — <dest>/comparisons/ — holding the
+    per-baseline cross-env folder(s) AND the shared tsn/ folder (TSN + PDF-vs-Excel
+    self-checks). CMP-AUD-101: the generic 'Open comparisons folder' opens THIS, so
+    a row in a non-env (TSN / self) mode still lands where its artifact actually
+    lives (comparisons/tsn/), not the unrelated <baseline>/ tree."""
+    return Path(dest) / COMPARISONS_DIRNAME
+
+
 def comparison_path(dest, baseline_key, row_key, cell_key):
     """The comparison workbook for (row, cell-env) under one baseline.
 
@@ -472,6 +481,18 @@ def tsn_comparisons_root(dest):
     return Path(dest) / COMPARISONS_DIRNAME / TSN_COMPARE_DIRNAME
 
 
+def tsn_input_dir_for(dest, subdir, src):
+    """The folder the Consolidate action reads for `subdir`'s raw TSN PDFs.
+    CMP-AUD-010: a canonical library source's PDFs live in the library `raw/`
+    folder, NOT the legacy <dest>/_tsn_input/<subdir>/ drop — advertise the REAL
+    path so the button (and its confirm prompt) point where the files actually
+    are. Only a back-compat `legacy` source uses the dest-scoped drop."""
+    import tsn_library                              # lazy: no import cycle
+    if not src.get("legacy") and tsn_library.is_registered(subdir):
+        return str(tsn_library.raw_dir(subdir))
+    return str(tsn_input_root(dest, subdir))
+
+
 def tsn_source(dest, subdir, selected_file=None):
     """Resolve the TSN dataset for a report `subdir`, returning {kind:
     file|consolidated|pdfs|raw|missing_explicit|none, path?, mtime?, pdf_count?,
@@ -564,6 +585,18 @@ def _mode_by_id(modes, mode_id):
         if m["id"] == mode_id:
             return m
     return modes[0]                          # default to env
+
+
+def all_row_modes():
+    """{row_key: [mode dict, …]} for EVERY matrix row, visibility-independent.
+    CMP-AUD-102: the 'set all comparisons to…' bulk action applies over THIS
+    authoritative catalog rather than a snapshot whose hidden rows were already
+    dropped — so hiding a row can no longer silently exclude it from the global
+    mode (leaving it in a latent disagreeing mode when it is unhidden)."""
+    out = {}
+    for row_key, _label, subdir, _idx, adapter in reports.matrix_rows():
+        out[row_key] = _row_modes(row_key, subdir, adapter)
+    return out
 
 
 def tsn_comparator_for(row_key):
@@ -757,6 +790,44 @@ def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided
 
 
 # --- unified per-cell comparison state ------------------------------------- #
+# --------------------------------------------------------------------------- #
+# CMP-AUD-103: the ONE buildability predicate — a cell can be (re)built iff it is a
+# supported comparison mode with BOTH input sides present. The bulk rebuild
+# selectors (cells_to_rebuild in matrix_build / day_matrix / baseline_matrix), the
+# explicit per-cell Build endpoints, and queue accounting all judge buildability
+# THROUGH this, so an explicit Build can never dispatch a cell the bulk selector
+# correctly skips (a known-missing TSN/export/baseline side).
+# --------------------------------------------------------------------------- #
+_MISSING_SIDE_REASON = {
+    "cell": "this report hasn't been exported for that column yet",
+    "export": "this report hasn't been exported for that column yet",
+    "tsn": "this report's TSN dataset isn't in place yet",
+    "baseline": "the baseline column hasn't been exported yet",
+    "both": "neither side of this comparison has been exported yet",
+}
+
+
+def cell_buildable(cmp):
+    """True when a comparison cell can be (re)built: a supported mode with no
+    missing input side. `cmp` is a cell's snapshot state; None (the env-mode
+    baseline column, or a row absent from a snapshot) is NOT buildable here — the
+    bulk selectors already skip None separately."""
+    return bool(cmp) and bool(cmp.get("supported")) and not cmp.get("missing_side")
+
+
+def cell_unbuildable_reason(cmp):
+    """A user-facing reason an explicit Build must refuse this cell (which input is
+    absent / mode unsupported), or None when it IS buildable OR cannot be judged
+    from the snapshot (cmp is None — the baseline column the caller already handled,
+    or a hidden row the deeper worker still guards). CMP-AUD-103."""
+    if cmp is None or cell_buildable(cmp):
+        return None
+    if not cmp.get("supported"):
+        return "That comparison isn't available yet for this report."
+    return _MISSING_SIDE_REASON.get(
+        cmp.get("missing_side"), "an input for this comparison is missing")
+
+
 def _cmp_state(out_path, sources, rec, fp_folders=()):
     """{supported, built, mtime, stale, reason, missing_side, verdict, diff_cells,
     one_sided} for one comparison cell. `sources` is the input sides
@@ -856,7 +927,10 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                                  "selected_path": src.get("selected_path"),
                                  "selection_missing": src.get("kind") == "missing_explicit",
                                  "selection_reason": src.get("selection_reason"),
-                                 "input_dir": str(tsn_input_root(dest, tsn_key))}
+                                 # CMP-AUD-010: the REAL raw-PDF folder + its origin
+                                 # (library vs legacy drop), so Consolidate routes right.
+                                 "source_legacy": bool(src.get("legacy")),
+                                 "input_dir": tsn_input_dir_for(dest, tsn_key, src)}
         per = {}
         for env in envs:
             export = ages.get(env, {}).get(env_subdir, _absent)
