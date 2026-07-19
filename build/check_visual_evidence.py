@@ -470,6 +470,71 @@ try:
           _gone_rejected)
 finally:
     shutil.rmtree(_alias_tmp, ignore_errors=True)
+
+# CMP-AUD-106: a rebuilt comparison that is now CLEAN (no differing columns)
+# must not leave prior red evidence surviving at its canonical name.
+print("CMP-AUD-106: a clean comparison retires stale prior evidence")
+_r6 = Path(tempfile.mkdtemp(prefix="evidence_106_"))
+try:
+    _cmp6 = _r6 / "hd vs tsn.xlsx"
+    _cmp6.write_bytes(b"comparison")
+    _wb6, _img6 = ve.sibling_paths(_cmp6)
+    _wb6.write_bytes(b"OLD RED evidence workbook")
+    _img6.mkdir()
+    (_img6 / "old.png").write_bytes(b"old image")
+    _note6 = ve._retire_stale_evidence(_wb6, _img6, (), (), None, None)
+    check("_retire_stale_evidence removes the stale workbook + image folder",
+          not _wb6.exists() and not _img6.exists()
+          and "retired" in (_note6 or ""))
+    # a source-aliased artifact is refused (left in place, noted) not force-removed
+    _wb6.write_bytes(b"aliased")
+    _note6b = ve._retire_stale_evidence(
+        _wb6, _r6 / "absent-images", (_wb6,),
+        ve.artifact_store.capture_source_identities((_wb6,)), None, None)
+    check("a source-aliased evidence workbook is NOT force-removed",
+          _wb6.exists() and "could not remove" in (_note6b or ""))
+    _wb6.unlink()
+
+    # generate() on a clean comparison retires the planted prior red evidence.
+    # Independent paths from the unit case above so a neutralized retire still
+    # reaches these checks (rather than crashing on a lingering folder).
+    _cmp6b = _r6 / "day2 vs tsn.xlsx"
+    _cmp6b.write_bytes(b"comparison 2")
+    _wb6b, _img6b = ve.sibling_paths(_cmp6b)
+    _cons6 = _r6 / "cons.xlsx"; _cons6.write_bytes(b"consolidated")
+    _tsn6 = _r6 / "tsn.xlsx"; _tsn6.write_bytes(b"tsn")
+    _tdir6 = _r6 / "tsmis_pdf"; _tdir6.mkdir()
+    (_tdir6 / "highway_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
+    _ndir6 = _r6 / "tsn_pdf"; _ndir6.mkdir()
+    (_ndir6 / "d01.pdf").write_bytes(b"%PDF tsn")
+    _wb6b.write_bytes(b"PRIOR red evidence workbook")
+    _img6b.mkdir()
+    (_img6b / "prior.png").write_bytes(b"prior image")
+
+    class _Ev106:
+        def is_cancelled(self):
+            return False
+
+        def on_log(self, _m):
+            pass
+
+    _saved106 = (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir)
+    ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
+    ehd.enumerate_diffs = lambda _a, _b, _s: {}          # a CLEAN comparison
+    ve.tsn_pdf_dir = lambda _rk: _ndir6
+    try:
+        _res6 = ve.generate("highway_detail", _cons6, _tsn6, _cmp6b, _tdir6,
+                            _Ev106())
+    finally:
+        ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir = _saved106
+    check("generate() on a clean comparison reports no differing columns",
+          "no differing columns" in _res6["note"] and _res6["workbook"] is None)
+    check("...and the prior red evidence no longer survives at its canonical name",
+          not _wb6b.exists() and not _img6b.exists()
+          and "retired" in _res6["note"])
+finally:
+    shutil.rmtree(_r6, ignore_errors=True)
+
 # The strip crop is a FULL-WIDTH page band stretched over the cell box
 # (v0.26.0): the adapters' xspan covers only the record's own words, so a crop
 # keyed to it clipped a blank cell's red box (drawn where the value WOULD

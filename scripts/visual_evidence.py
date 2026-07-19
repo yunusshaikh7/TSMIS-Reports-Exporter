@@ -345,6 +345,50 @@ def _unique_dir_sibling(path, tag):
         f"Could not allocate a collision-free evidence {tag} directory beside {path}.")
 
 
+def _retire_stale_evidence(wb_path, img_dir, source_paths, captured_sources,
+                           source_set_check, commit_guard):
+    """Remove a now-stale prior evidence set (workbook + image folder) so it
+    can't survive at its canonical name beside a comparison it no longer
+    describes (CMP-AUD-106 — the clean-comparison path: the rebuilt comparison
+    has no differing columns, so any prior red evidence is bound to a previous
+    generation). Guarded like every other evidence mutation and quarantined
+    (atomic move) before delete; a locked/foreign/aliased artifact is left in
+    place with a logged note rather than force-removed. Returns a short note
+    naming what was retired (or couldn't be), or None when nothing existed."""
+    retired, failed = [], []
+    for path, is_dir, label in ((wb_path, False, "workbook"),
+                                (img_dir, True, "image folder")):
+        if not os.path.lexists(path):
+            continue
+        try:
+            if source_set_check is not None:
+                source_set_check()
+            artifact_store.ensure_outputs_do_not_alias_sources(
+                (path,), source_paths,
+                directory_destinations=(path,) if is_dir else (),
+                captured_sources=captured_sources, require_sources_current=True)
+            _require_output_guard(
+                commit_guard, path, f"stale evidence {label} retirement")
+            quarantine = _unique_dir_sibling(path, "retired")
+            os.replace(path, quarantine)          # atomic move out of the way
+            if is_dir:
+                shutil.rmtree(quarantine, ignore_errors=True)
+            else:
+                Path(quarantine).unlink(missing_ok=True)
+            retired.append(label)
+        except (OSError, ValueError, owned_dir.OwnershipError) as e:
+            log.warning("evidence: could not retire stale %s %s: %s: %s",
+                        label, path, type(e).__name__, e)
+            failed.append(label)
+    parts = []
+    if retired:
+        parts.append("retired the now-stale evidence " + " + ".join(retired))
+    if failed:
+        parts.append("could not remove the stale evidence "
+                     + " + ".join(failed) + " (locked open?)")
+    return "; ".join(parts) if parts else None
+
+
 # --------------------------------------------------------------------------- #
 # generation
 # --------------------------------------------------------------------------- #
@@ -434,8 +478,17 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     diffs = adapter.enumerate_diffs(tsmis_rows, tsn_rows, sidecar)
     fields_with_diffs = [f for f in adapter.FIELDS if diffs.get(f)]
     if not fields_with_diffs:
-        return {"note": "evidence: the comparison has no differing columns to "
-                        "illustrate", "rendered": 0, "fields_ok": 0,
+        # CMP-AUD-106: the rebuilt comparison is clean — retire any prior red
+        # evidence so it can't survive beside it looking current.
+        retire_note = _retire_stale_evidence(
+            wb_path, img_dir, source_paths, captured_sources,
+            source_set_check, commit_guard)
+        note = ("evidence: the comparison has no differing columns to "
+                "illustrate")
+        if retire_note:
+            note += f" — {retire_note}"
+        events.on_log("  " + note)
+        return {"note": note, "rendered": 0, "fields_ok": 0,
                 "fields_with_diffs": 0, "misses": {}, "workbook": None,
                 "folder": None}
 
