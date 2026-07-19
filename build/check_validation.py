@@ -527,6 +527,84 @@ def test_missing_explicit_tsn_is_not_substituted():
     check("validation never builds against the available fallback", not built)
 
 
+def test_007_full_capability_coverage():
+    """CMP-AUD-007: validation must cover EVERY comparable row (incl. the five PDF
+    rows through their BASE-family TSN dataset), pass the selected TSN files into
+    build_comparison, and count blocked capabilities separately — never present
+    'ok of ran' while a capability was silently omitted. Positive-path pin
+    (the base-family mapping for the blocked case is pinned by
+    test_missing_explicit_tsn_is_not_substituted)."""
+    print("CMP-AUD-007: every capability covered + selected TSN files passed through:")
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_val007_"))
+    dest = tmp / "store"
+    # A PDF row with store data (2 envs), a base row with data (1 env), and a row
+    # with NO store data (must be BLOCKED, never silently dropped from the count).
+    _store(dest, {"ssor-prod": ["highway_log_pdf", "highway_detail"],
+                  "ars-prod": ["highway_log_pdf"]})
+    rows = [
+        ("highway_log_pdf", "Highway Log (PDF)", "highway_log_pdf", 0, object()),
+        ("highway_detail", "Highway Detail", "highway_detail", 0, object()),
+        ("ramp_summary", "Ramp Summary", "ramp_summary", 0, object()),   # no data
+    ]
+    # A user-selected TSN workbook keyed by the PDF row's BASE family (highway_log).
+    selection = {"version": 1, "path": str(tmp / "picked-hl.xlsx"),
+                 "identity": {"sha256": "0" * 64, "size": 1,
+                              "mtime_ns": 1, "file_id": "1:1"}}
+    selections = {"highway_log": selection}
+
+    build_calls = []
+    resolved_subdirs = []
+    # Only the BASE families are TSN-registered (PDF subdirs never are) — so the
+    # PDF row runs ONLY when readiness is resolved through its canonical base key.
+    # This makes the mapping the difference between run and blocked (red→green).
+    registered = {"highway_log", "highway_detail", "ramp_summary"}
+
+    def fake_build(dest_, row, env, mode, baseline, events, **kw):
+        build_calls.append((row, env, mode, kw.get("tsn_files")))
+        return ConsolidateResult(status="ok", completion=outcome.COMPLETE,
+                                 output_path=str(dest / "cmp.xlsx"))
+
+    def fake_resolve(report, selected_file=None):
+        resolved_subdirs.append(report)
+        return {"kind": "consolidated", "path": str(tmp / "canonical.xlsx")}
+
+    import matrix as _matrix
+    import settings as _settings
+    import tsn_library as _tsn
+    import reports as _reports
+    with _Patch(_settings, "get_batch_dest", lambda: str(dest)), \
+         _Patch(_settings, "get_matrix_baseline", lambda: "ssor-prod"), \
+         _Patch(_settings, "get_matrix_tsn_selections", lambda: selections), \
+         _Patch(_settings, "set_matrix_tsn_selections", lambda v: None), \
+         _Patch(_matrix, "build_comparison", fake_build), \
+         _Patch(validation.consolidation_meta, "require_published_comparison",
+                lambda p, r: _published(diff_cells=0)), \
+         _Patch(_reports, "matrix_rows", lambda: rows), \
+         _Patch(_tsn, "is_registered", lambda r: r in registered), \
+         _Patch(_tsn, "resolve", fake_resolve), \
+         _Patch(_tsn, "canonicalize_selections", lambda s: (s, False)), \
+         _Patch(_tsn, "reports", lambda: []):
+        man = validation.run_validation(events=Events())
+
+    cells = man["comparisons"]["cells"]
+    ran = [c for c in cells if "status" in c]
+    blocked = [c for c in cells if "skipped" in c]
+    run_rows = {c["row"] for c in ran}
+    check("the PDF row RUNS a comparison (mapped to its base family), never omitted",
+          "highway_log_pdf" in run_rows and "highway_detail" in run_rows)
+    check("TSN readiness resolved through the PDF row's BASE family key (not the PDF subdir)",
+          "highway_log" in resolved_subdirs and "highway_log_pdf" not in resolved_subdirs)
+    check("the selected TSN files were passed into every build_comparison call",
+          bool(build_calls) and all(bc[3] and "highway_log" in bc[3] for bc in build_calls))
+    check("a capability with no store data is BLOCKED, not silently dropped",
+          any(c["row"] == "ramp_summary" and "skipped" in c for c in cells))
+    check("the denominator counts every capability (expected = run + blocked, both shown)",
+          man["totals"]["comparisons_expected"] == len(cells)
+          and man["totals"]["comparisons_run"] == len(ran)
+          and man["totals"]["comparisons_blocked"] == len(blocked)
+          and len(blocked) >= 1 and len(ran) >= 2)
+
+
 def test_worker_always_posts_terminal():
     """The ValidationWorker MUST post exactly one validate_done no matter what
     fails — an un-posted terminal wedges the single-task gate. Drive it with an
@@ -584,6 +662,7 @@ if __name__ == "__main__":
     test_tsn_state_truth_table()
     test_ensure_tsn_ready_first_build()
     test_missing_explicit_tsn_is_not_substituted()
+    test_007_full_capability_coverage()
     test_worker_always_posts_terminal()
     if _fail:
         print(f"\n{len(_fail)} check(s) FAILED")
