@@ -431,6 +431,43 @@ try:
         _pdf_add_rejected = True
     check("a PDF added after evidence discovery fails the set-equality tripwire",
           _pdf_add_rejected)
+
+    # CMP-AUD-112: a source PDF whose BYTES change between parse-back
+    # verification and rasterization must abort the publish — even a
+    # metadata-preserving swap the (dev, inode, size, mtime) set-identity
+    # tripwire can't see. Parse the byte baseline, then swap same-length bytes
+    # and restore the mtime.
+    _cpdf = _alias_tmp / "content.pdf"
+    _cpdf.write_bytes(b"%PDF-1.4 original bytes")
+    _c_mtime = _cpdf.stat().st_mtime_ns
+    _c_ids_before = ve.artifact_store.canonical_path_identities((_cpdf,))
+    _c_baseline = ve._pdf_content_digests([_cpdf])
+    check("content baseline digests the existing PDF",
+          _c_baseline.get(str(_cpdf.resolve())) is not None)
+    ve._ensure_pdf_content_unchanged(_c_baseline)          # unchanged -> no raise
+    _cpdf.write_bytes(b"%PDF-1.4 SWAPPED! bytes")           # same length (23)
+    os.utime(_cpdf, ns=(_c_mtime, _c_mtime))               # restore the mtime
+    check("the metadata tripwire alone MISSES a same-size same-mtime swap",
+          ve.artifact_store.canonical_path_identities((_cpdf,)) == _c_ids_before)
+    check("...but the content digest changes",
+          ve._pdf_content_digests([_cpdf])[str(_cpdf.resolve())]
+          != _c_baseline[str(_cpdf.resolve())])
+    try:
+        ve._ensure_pdf_content_unchanged(_c_baseline)
+        _content_rejected = False
+    except ValueError:
+        _content_rejected = True
+    check("a metadata-preserving content change aborts the evidence publish",
+          _content_rejected)
+    # a deleted/unreadable candidate also aborts (bytes no longer verifiable)
+    _cpdf.unlink()
+    try:
+        ve._ensure_pdf_content_unchanged(_c_baseline)
+        _gone_rejected = False
+    except ValueError:
+        _gone_rejected = True
+    check("a candidate PDF that vanished before publish also aborts",
+          _gone_rejected)
 finally:
     shutil.rmtree(_alias_tmp, ignore_errors=True)
 # The strip crop is a FULL-WIDTH page band stretched over the cell box

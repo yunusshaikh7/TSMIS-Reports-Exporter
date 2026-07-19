@@ -30,6 +30,7 @@ the statewide TSN print; each covers its report's Excel + PDF rows). Engine is
 console-free (Events sink, cancellation honored between steps) and never
 affects the comparison result it decorates.
 """
+import hashlib
 import logging
 import os
 import random
@@ -235,6 +236,47 @@ def _ensure_pdf_source_set(tsmis_pdf_dir, tsn_dir, expected):
             "folders are stable.")
 
 
+_DIGEST_CHUNK = 1 << 20
+
+
+def _pdf_content_digests(paths):
+    """{resolved_path: sha256} for the existing PDFs among `paths` — the
+    parse-time BYTE baseline for CMP-AUD-112. Captured before the adapters parse
+    the candidate PDFs, so a later same-size/same-mtime swap the (dev, inode,
+    size, mtime) set-identity tripwire can't see still changes the digest."""
+    out = {}
+    for p in paths:
+        p = Path(p)
+        try:
+            if not p.is_file():
+                continue
+            h = hashlib.sha256()
+            with open(p, "rb") as f:
+                for chunk in iter(lambda: f.read(_DIGEST_CHUNK), b""):
+                    h.update(chunk)
+            out[str(p.resolve())] = h.hexdigest()
+        except OSError:              # unreadable now -> treat as changed at check
+            out[str(p.resolve())] = None
+    return out
+
+
+def _ensure_pdf_content_unchanged(baseline):
+    """Fail closed when any candidate evidence PDF's BYTES differ from the parse
+    baseline (CMP-AUD-112). Every rendered image was parse-back verified against
+    those exact bytes; if the file changed since — even under a metadata-
+    preserving swap — the caption/values and the rasterized page could disagree,
+    so publish nothing. Called once after rendering, before the commit: an
+    unchanged file start→commit means parse-bytes == render-bytes."""
+    current = _pdf_content_digests(baseline.keys())
+    for path, digest in baseline.items():
+        if current.get(path) != digest or digest is None:
+            raise ValueError(
+                "Refusing to publish evidence: a source PDF's contents changed "
+                "while evidence was rendering (the verified values and the "
+                "rendered image could disagree). Re-run after the PDFs are "
+                "stable.")
+
+
 def _safe_sibling_paths(comparison_path, source_paths, captured_sources=(),
                         source_set_check=None, commit_guard=None):
     """Return evidence siblings only after guarding every derived write path.
@@ -410,6 +452,15 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
             need_tsn_keys.setdefault(ex["dist"], set()).add(
                 (ex["cnty"], ex["route"], ex["key"]))
 
+    # CMP-AUD-112: digest the candidate PDFs' bytes NOW, before the adapters
+    # parse them — the parse-time baseline. Every example is verified against
+    # these bytes; a change before the images are published means the caption
+    # and the raster could disagree, so we abort. Only the sampled TSMIS routes
+    # plus the (small) TSN district-print set can be rendered.
+    pdf_content_baseline = _pdf_content_digests(
+        [adapter.tsmis_pdf_path(tsmis_pdf_dir, r) for r in need_tsmis]
+        + list(tsn_pdf_files))
+
     events.on_log(f"  evidence: locating candidates in {len(need_tsmis)} TSMIS "
                   f"PDF(s) and {len(need_tsn_keys)} TSN district print(s)…")
     located = _locate_tsmis_sources(adapter, need_tsmis, tsmis_pdf_dir, events)
@@ -496,6 +547,11 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                             "(see the log)", "rendered": 0, "fields_ok": 0,
                     "fields_with_diffs": len(fields_with_diffs),
                     "misses": misses, "workbook": None, "folder": None}
+        # CMP-AUD-112: every image is now rendered into tmp_dir. Confirm no
+        # candidate PDF's BYTES changed since the parse baseline — if one did,
+        # a verified value and its rasterized page could disagree, so publish
+        # nothing (the existing set-identity tripwire guards the commits too).
+        _ensure_pdf_content_unchanged(pdf_content_baseline)
         wb_note = _write_workbook(wb_path, tmp_dir, entries, misses, dict(
             comparison=Path(comparison_path).name, report=adapter.REPORT_LABEL,
             seed=f"{seed:08x}", examples=examples,
