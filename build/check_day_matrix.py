@@ -85,8 +85,49 @@ def test_newest_mtime_survives_a_bad_entry():
           got == good.stat().st_mtime)
 
 
+def test_092_folder_identity_and_calendar():
+    print("CMP-AUD-092: calendar-valid dates + real (legacy-aware) folder identity:")
+    check("valid_calendar_date rejects impossible month/day",
+          not paths.valid_calendar_date("2026-99-99")
+          and not paths.valid_calendar_date("2026-02-31"))
+    check("valid_calendar_date accepts a real date, rejects non-canonical spelling",
+          paths.valid_calendar_date("2026-07-09")
+          and not paths.valid_calendar_date("2026-7-9"))
+    check("parse_run_folder rejects an impossible-date run folder",
+          paths.parse_run_folder("2026-99-99 ssor-prod") is None
+          and paths.parse_run_folder("2026-07-09 ars-prod") == ("2026-07-09", "ars", "prod"))
+    out = Path(tempfile.mkdtemp(prefix="tsmis_day092_"))
+    saved = (paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT)
+    paths.OUTPUT_ROOT = day_matrix.OUTPUT_ROOT = out
+    try:
+        # A LEGACY pre-v0.10 bare-date export (no '<src>-<env>' suffix, meant ssor-prod).
+        _touch(out / "2025-12-31" / "highway_log" / "r1.xlsx")
+        check("legacy bare-date export is discovered as an available day",
+              "2025-12-31" in day_matrix.available_days("ssor-prod"))
+        check("day_source_dir resolves the legacy bare folder, not '<date> ssor-prod'",
+              day_matrix.tsmis_dir("2025-12-31", "ssor-prod", "highway_log")
+              == out / "2025-12-31" / "highway_log")
+        check("...so the legacy day's export reads PRESENT (not 0/N)",
+              day_matrix._folder_newest_mtime(
+                  day_matrix.tsmis_dir("2025-12-31", "ssor-prod", "highway_log")) is not None)
+        # A suffixed folder WINS deterministically when both share a date.
+        _touch(out / "2025-12-30 ssor-prod" / "highway_log" / "s.xlsx")
+        _touch(out / "2025-12-30" / "highway_log" / "legacy.xlsx")
+        check("suffixed folder wins when a legacy + suffixed share a date",
+              day_matrix.tsmis_dir("2025-12-30", "ssor-prod", "highway_log")
+              == out / "2025-12-30 ssor-prod" / "highway_log")
+        # An impossible-date folder on disk is never offered.
+        _touch(out / "2026-99-99 ssor-prod" / "highway_log" / "x.xlsx")
+        check("an impossible-date folder is not offered as an available day",
+              "2026-99-99" not in day_matrix.available_days("ssor-prod"))
+    finally:
+        paths.OUTPUT_ROOT, day_matrix.OUTPUT_ROOT = saved
+        shutil.rmtree(out, ignore_errors=True)
+
+
 def main():
     test_newest_mtime_survives_a_bad_entry()
+    test_092_folder_identity_and_calendar()
     out = Path(tempfile.mkdtemp(prefix="tsmis_day_out_"))
     dest = Path(tempfile.mkdtemp(prefix="tsmis_day_dest_"))
     cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_day_cfg_"))
@@ -284,6 +325,15 @@ def main():
         check("add a real day", a.add_day_matrix_day("2026-06-17").get("ok")
               and "2026-06-17" in settings.get_day_matrix_days())
         a.add_day_matrix_day("2026-06-18")
+        # CMP-AUD-095: switching source reconciles retained day columns to the NEW
+        # source (ars-prod has 2026-06-17 but not 2026-06-18).
+        a.set_day_matrix_source("ars-prod")
+        check("source switch drops a day absent under the new source",
+              "2026-06-18" not in settings.get_day_matrix_days())
+        check("source switch keeps a day present under the new source",
+              "2026-06-17" in settings.get_day_matrix_days())
+        a.set_day_matrix_source("ssor-prod")             # restore for downstream
+        settings.set_day_matrix_days(["2026-06-17", "2026-06-18"])
         check("hide unknown report rejected",
               bool(a.set_day_matrix_report("nope", False).get("error")))
         check("hide a report row ok",

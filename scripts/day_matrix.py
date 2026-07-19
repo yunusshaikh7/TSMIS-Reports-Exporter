@@ -34,7 +34,8 @@ import cache_envelope
 import consolidation_meta
 import matrix
 import reports
-from paths import OUTPUT_ROOT, list_output_days, parse_run_folder, today_str
+from paths import (OUTPUT_ROOT, day_source_dir, list_output_days,
+                   parse_run_folder, today_str)
 
 log = logging.getLogger("tsmis.day_matrix")
 
@@ -205,8 +206,10 @@ def _folder_newest_mtime(p):
 
 
 def tsmis_dir(date, source, subdir):
-    """output/<date source>/<subdir>/ — the per-route export the cell compares."""
-    return OUTPUT_ROOT / day_folder_name(date, source) / subdir
+    """The per-route export the cell compares, resolved to the REAL run folder
+    (CMP-AUD-092: a pre-v0.10 legacy bare-date folder is found instead of a
+    reconstructed '<date> <source>' that never existed)."""
+    return day_source_dir(date, source) / subdir
 
 
 def available_days(source):

@@ -31,7 +31,8 @@ import artifact_store   # CMP-AUD-083: the shared accepted-data-file predicate
 import cache_envelope
 import matrix
 import reports
-from paths import OUTPUT_ROOT, list_output_days, parse_run_folder
+from paths import (OUTPUT_ROOT, day_source_dir, list_output_days,
+                   parse_run_folder)
 
 log = logging.getLogger("tsmis.baseline_matrix")
 
@@ -97,7 +98,7 @@ def baseline_dir(source, baseline_id, dest):
         return Path(dest) / source if dest else None
     if not parse_run_folder(day_folder_name(date, source)):
         return None
-    return OUTPUT_ROOT / day_folder_name(date, source)
+    return day_source_dir(date, source)      # CMP-AUD-092: real folder (legacy incl.)
 
 
 def baseline_label(source, baseline_id):
@@ -212,8 +213,9 @@ def _folder_newest_mtime(p):
 
 
 def tsmis_dir(date, source, subdir):
-    """output/<date source>/<subdir>/ — the per-route export the cell compares."""
-    return OUTPUT_ROOT / day_folder_name(date, source) / subdir
+    """The per-route export the cell compares, resolved to the REAL run folder
+    (CMP-AUD-092: a pre-v0.10 legacy bare-date folder included)."""
+    return day_source_dir(date, source) / subdir
 
 
 def available_days(source):
@@ -259,7 +261,7 @@ def baseline_options(source, dest):
         opts.append({"id": STORE_BASELINE, "label": "All Reports store",
                      "present": store_n, "total": total})
     for date in available_days(source):
-        n = _present_count(OUTPUT_ROOT / day_folder_name(date, source), rows)
+        n = _present_count(day_source_dir(date, source), rows)
         opts.append({"id": f"{_DAY_PREFIX}{date}", "label": date,
                      "present": n, "total": total})
     return opts
@@ -400,7 +402,7 @@ def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
         raise ValueError("that day IS the baseline — nothing to compare")
     adapter = {r[0]: r[4] for r in reports.matrix_rows()}[row_key]
 
-    dir_a = OUTPUT_ROOT / day_folder_name(date, source)
+    dir_a = day_source_dir(date, source)     # CMP-AUD-092: real folder (legacy incl.)
     dest_path = out_path(date, source, row_key, baseline_id)
     labels = (f"{source.upper()} {date}", baseline_label(source, baseline_id))
     source_paths = (dir_a, bdir)

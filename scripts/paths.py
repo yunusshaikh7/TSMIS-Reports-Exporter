@@ -95,9 +95,47 @@ def today_str():
     return date.today().isoformat()
 
 
+def valid_calendar_date(s):
+    """True iff `s` is a REAL canonical YYYY-MM-DD calendar date. CMP-AUD-092: a
+    run-folder date is BOTH a display label AND a durable folder identity, so an
+    impossible token like '2026-99-99' (or '2026-02-31') must never be offered by
+    the picker, persisted by the API, or dispatched by the day core. The round-trip
+    equality also rejects any non-canonical spelling `date.fromisoformat` may accept
+    on newer Pythons (the run-folder regex already fixes the digit layout)."""
+    try:
+        return date.fromisoformat(s).isoformat() == s
+    except (ValueError, TypeError):  # silent-ok: an unparseable/impossible date IS "not valid"
+        return False
+
+
+# Pre-v0.10 bare-date run folders ("2026-06-11", no suffix) always meant the old
+# defaults; parse_run_folder reads them as this source (see day_source_dir).
+_LEGACY_DEFAULT_SOURCE = "ssor-prod"
+
+
 def run_folder_name(src, env, day=None):
     """The run-folder name for one (data source, environment) on one day."""
     return f"{day or today_str()} {src}-{env}"
+
+
+def day_source_dir(date_token, source):
+    """The ACTUAL on-disk export run folder for (date, source), resolving the
+    pre-v0.10 LEGACY bare-date layout instead of blindly reconstructing a label.
+    CMP-AUD-092: current exports are '<date> <src>-<env>'; a pre-v0.10 export is a
+    bare '<date>' that meant the ssor-prod defaults, so reconstructing
+    '<date> ssor-prod' pointed at a folder that never existed (the day read 0/N
+    present). Prefer the suffixed folder; fall back to the bare-date folder only
+    when it exists AND `source` is that legacy default. Deterministic when both
+    exist (suffixed wins), so a real — always suffixed — export is never
+    mis-resolved."""
+    suffixed = OUTPUT_ROOT / f"{date_token} {source}"
+    if suffixed.is_dir():
+        return suffixed
+    if source == _LEGACY_DEFAULT_SOURCE and valid_calendar_date(date_token):
+        bare = OUTPUT_ROOT / date_token
+        if bare.is_dir():
+            return bare
+    return suffixed          # canonical target (may be absent -> reads as missing)
 
 
 def output_run_dir(src, env, day=None):
@@ -113,6 +151,8 @@ def parse_run_folder(name):
     if not m:
         return None
     day, src, env = m.groups()
+    if not valid_calendar_date(day):     # CMP-AUD-092: reject impossible-date tokens
+        return None
     return (day, src or "ssor", env or "prod")
 
 

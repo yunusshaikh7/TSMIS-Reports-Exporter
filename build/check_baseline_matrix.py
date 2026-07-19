@@ -257,6 +257,17 @@ def main():
         check("add a real day", a.add_baseline_matrix_day("2026-06-18").get("ok")
               and "2026-06-18" in settings.get_baseline_matrix_days())
         a.add_baseline_matrix_day("2026-06-11")
+        # CMP-AUD-095: switching source reconciles BOTH the retained day columns and
+        # the baseline id — ars-prod has no exports here, so both must clear rather
+        # than aim a build at folders that don't exist for the new source.
+        a.set_baseline_matrix_source("ars-prod")
+        check("source switch clears source-scoped day columns",
+              settings.get_baseline_matrix_days() == [])
+        check("source switch clears a baseline invalid for the new source",
+              settings.get_baseline_matrix_baseline() == "")
+        a.set_baseline_matrix_source("ssor-prod")        # restore for downstream
+        settings.set_baseline_matrix_days(["2026-06-18", "2026-06-11"])
+        settings.set_baseline_matrix_baseline("day:2026-06-11")
         check("hide unknown report rejected",
               bool(a.set_baseline_matrix_report("nope", False).get("error")))
         check("build on the baseline's own day rejected",

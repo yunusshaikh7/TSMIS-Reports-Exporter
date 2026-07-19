@@ -1048,9 +1048,17 @@ class GuiMatrixMixin:
         if source not in day_matrix.sources():
             return {"error": "Unknown data source."}
         settings.set_day_matrix_source(source)
+        # CMP-AUD-095: the source switch changes which run folders exist, so a day
+        # column retained from the old source can point at a folder that doesn't
+        # exist under the new one. Keep only the validated intersection — days that
+        # actually have an export for the new source.
+        avail = set(day_matrix.available_days(source))
+        kept = [d for d in settings.get_day_matrix_days() if d in avail]
+        if kept != settings.get_day_matrix_days():
+            settings.set_day_matrix_days(kept)
         self._emit_log(f"By-day matrix source set to {matrix.default_env_label(source)}.")
         self._push_state()
-        return {"ok": True, "source": source}
+        return {"ok": True, "source": source, "days": kept}
 
     @_api_method
     def add_day_matrix_day(self, date):
@@ -1296,6 +1304,18 @@ class GuiMatrixMixin:
         if source not in baseline_matrix.sources():
             return {"error": "Unknown data source."}
         settings.set_baseline_matrix_source(source)
+        # CMP-AUD-095: reconcile the source-scoped day columns AND the baseline id
+        # against the new source — a switch can otherwise leave either pointing at
+        # folders that don't exist for it (a later build then aims at nothing). Keep
+        # only the days that have an export for the new source, and clear the baseline
+        # unless it's still a valid option there.
+        avail = set(baseline_matrix.available_days(source))
+        settings.set_baseline_matrix_days(
+            [d for d in settings.get_baseline_matrix_days() if d in avail])
+        valid_ids = {o["id"] for o in baseline_matrix.baseline_options(
+            source, settings.get_batch_dest())}
+        if settings.get_baseline_matrix_baseline() not in valid_ids:
+            settings.set_baseline_matrix_baseline("")
         self._emit_log("vs-Baseline matrix source set to "
                        f"{matrix.default_env_label(source)}.")
         self._push_state()
