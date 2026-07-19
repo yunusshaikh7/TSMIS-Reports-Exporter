@@ -419,10 +419,13 @@ def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
     if (also_formulas and result.status == "ok"
             and matrix._twin_inputs_unchanged(fp_before, fp_folders,
                                               dest_path.name, events)):
-        matrix._try_formulas(lambda fp: adapter.compare_folders(
+        matrix._settle_formulas_twin(lambda fp: adapter.compare_folders(
             dir_a, bdir, fp, events=events,
             confirm_overwrite=lambda _p: True, mode="formulas", labels=labels),
-            dest_path, events, source_paths=source_paths)
+            dest_path, True, events, source_paths=source_paths)
+    elif result.status == "ok":
+        # CMP-AUD-082: values-only / inputs-changed refresh -> clear a stale twin.
+        matrix._clear_stale_formulas_twin(dest_path, events, source_paths=source_paths)
 
     if result.status == "ok" and dest_path.exists():
         published = matrix._published_comparison_result(dest_path, result)

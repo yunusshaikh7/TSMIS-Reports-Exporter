@@ -423,10 +423,11 @@ def _try_formulas(compare_call, out_path, events=None, source_paths=(),
     is LOGGED (P2-A03: a validation/finalization failure RETURNS status='error' rather than
     raising, so the returned result is inspected, not just exceptions).
 
-    Skipped for very large comparisons (`_FORMULAS_TWIN_MAX_ROWS`): there the twin is
-    millions of formulas and minutes of work, and the values workbook — already committed —
-    holds every value. The skip is announced (events + log) so the absent twin is never a
-    silent surprise."""
+    Returns True iff a FRESH twin was committed (CMP-AUD-082 — the caller clears a
+    stale prior twin when this is False). Skipped for very large comparisons
+    (`_FORMULAS_TWIN_MAX_ROWS`): there the twin is millions of formulas and minutes of
+    work, and the values workbook — already committed — holds every value. The skip is
+    announced (events + log) so the absent twin is never a silent surprise."""
     rows = _comparison_row_count(out_path)
     # read the limit through the facade — it's a TUNABLE the twin-guard check
     # (and a hotfix) can set as matrix._FORMULAS_TWIN_MAX_ROWS
@@ -438,7 +439,7 @@ def _try_formulas(compare_call, out_path, events=None, source_paths=(),
         if events is not None:
             events.on_log(msg)
         log.info("matrix: %s", msg)
-        return
+        return False
     try:
         formulas_path = _formulas_sibling(out_path)
         _require_commit_guard(commit_guard, "live-formulas write", formulas_path)
@@ -448,9 +449,75 @@ def _try_formulas(compare_call, out_path, events=None, source_paths=(),
         if getattr(res, "status", None) != "ok":
             log.warning("matrix: live-formulas workbook for %s not refreshed (%s)",
                         Path(out_path).name, getattr(res, "message", "") or "commit failed")
+            return False
+        return True
     except Exception as e:                       # noqa: BLE001
         log.warning("matrix: live-formulas workbook for %s not written (%s: %s)",
                     Path(out_path).name, type(e).__name__, e)
+        return False
+
+
+def _clear_stale_formulas_twin(out_path, events=None, commit_guard=None,
+                               source_paths=()):
+    """Remove a `(formulas)` sibling that is NOT being refreshed beside a just-committed
+    values workbook (CMP-AUD-082).
+
+    The values workbook is canonical and the optional live-formulas twin has no manifest
+    or freshness state, so a values-only refresh, an inputs-changed skip, an over-limit
+    skip, or a failed formulas commit would otherwise leave an ordinary audit-looking
+    `(formulas)` file from an OLDER generation looking current beside the newer values
+    comparison. Removing it is the safe resolution (the values workbook holds every
+    value; a genuine live-formulas copy is one explicit rebuild away). Best-effort +
+    ownership/alias-guarded: a twin still open in Excel (locked) can't be removed, so it
+    is announced instead of silently trusted. No-op when no prior twin exists (the common
+    first-build case)."""
+    formulas_path = _formulas_sibling(out_path)
+    try:
+        if not formulas_path.exists():
+            return
+    except OSError:  # silent-ok: an unstattable path is treated as absent
+        return
+    if not _guard_allows(commit_guard, formulas_path):
+        log.warning("matrix: a stale live-formulas twin %s was left (destination "
+                    "ownership changed); it does not match the current values workbook",
+                    formulas_path.name)
+        return
+    try:
+        # Never delete a selected comparison source that shares the twin's name.
+        artifact_store.ensure_outputs_do_not_alias_sources(
+            (formulas_path,), source_paths)
+    except ValueError:
+        log.warning("matrix: retained a live-formulas twin %s that aliases a source",
+                    formulas_path.name)
+        return
+    try:
+        formulas_path.unlink()
+    except FileNotFoundError:  # silent-ok: concurrent absence is the goal
+        return
+    except OSError as e:  # locked (open in Excel) or unremovable — announce, keep going
+        log.warning("matrix: could not remove the stale live-formulas twin %s (%s: %s; "
+                    "open in Excel?); it does not match the current values workbook",
+                    formulas_path.name, type(e).__name__, e)
+        return
+    msg = (f"Removed the prior live-formulas copy of {Path(out_path).name} — it was not "
+           "refreshed and no longer matches the values comparison.")
+    if events is not None:
+        events.on_log(msg)
+    log.info("matrix: %s", msg)
+
+
+def _settle_formulas_twin(compare_call, out_path, do_write, events=None,
+                          source_paths=(), commit_guard=None):
+    """Refresh the live-formulas twin when `do_write`, else clear a stale prior one
+    (CMP-AUD-082). Called after EVERY successful values commit so a `(formulas)` sibling
+    can never outlive the generation it was built for: a values-only refresh, an
+    over-limit skip, an inputs-changed skip, or a failed formulas commit all clear it."""
+    wrote = False
+    if do_write:
+        wrote = _try_formulas(compare_call, out_path, events,
+                              source_paths=source_paths, commit_guard=commit_guard)
+    if not wrote:
+        _clear_stale_formulas_twin(out_path, events, commit_guard, source_paths)
 
 
 # --------------------------------------------------------------------------- #
@@ -525,13 +592,14 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
         dest / cell_key, dest / baseline_key, out_path, events=events,
         confirm_overwrite=confirm_overwrite or (lambda _p: True), mode="values",
         commit_guard=commit_guard)
-    if (also_formulas and result.status == "ok"
-            and _twin_inputs_unchanged(fp_before, fp_folders, out_path.name,
-                                       events)):
-        _try_formulas(lambda fp: adapter.compare_folders(
+    if result.status == "ok":
+        # CMP-AUD-082: refresh the live-formulas twin, or clear a stale prior one.
+        do_write = also_formulas and _twin_inputs_unchanged(
+            fp_before, fp_folders, out_path.name, events)
+        _settle_formulas_twin(lambda fp: adapter.compare_folders(
             dest / cell_key, dest / baseline_key, fp, events=events,
             confirm_overwrite=lambda _p: True, mode="formulas",
-            commit_guard=commit_guard), out_path, events,
+            commit_guard=commit_guard), out_path, do_write, events,
             source_paths=source_paths, commit_guard=commit_guard)
 
     if result.status == "ok" and out_path.exists():
@@ -1062,9 +1130,11 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
     # The direct comparator performs its own source-alias checks and atomic commit.
     result = _compare_checked(
         out_path, "values", confirm_overwrite or (lambda _p: True))
-    if also_formulas and result.status == "ok":
-        _try_formulas(lambda fp: _compare_checked(fp, "formulas"), out_path, events,
-            source_paths=source_paths, commit_guard=comparison_guard)
+    if result.status == "ok":
+        # CMP-AUD-082: refresh the live-formulas twin, or clear a stale prior one.
+        _settle_formulas_twin(lambda fp: _compare_checked(fp, "formulas"), out_path,
+            also_formulas, events, source_paths=source_paths,
+            commit_guard=comparison_guard)
     # P1-R01: a PARTIAL TSMIS consolidation (inputs left out) still compares, but the
     # diff is over INCOMPLETE inputs — flag the comparison so the caller records the
     # cell as partial. `cres` is set only when we (re)consolidated THIS call; when the
@@ -1238,11 +1308,12 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
             pdf_c, excel_c, out_path, events=events,
             confirm_overwrite=confirm_overwrite or (lambda _p: True),
             mode="values", commit_guard=commit_guard)
-        if also_formulas and result.status == "ok":
-            _try_formulas(lambda fp: _self_cmp.compare(
+        if result.status == "ok":
+            # CMP-AUD-082: refresh the live-formulas twin, or clear a stale prior one.
+            _settle_formulas_twin(lambda fp: _self_cmp.compare(
                 pdf_c, excel_c, fp, events=events,
                 confirm_overwrite=lambda _p: True, mode="formulas",
-                commit_guard=commit_guard), out_path, events,
+                commit_guard=commit_guard), out_path, also_formulas, events,
                 source_paths=source_paths, commit_guard=commit_guard)
         # P1-R01: a PARTIAL side means the self comparison diffed INCOMPLETE inputs —
         # propagate it (either side partial -> the cell records partial) so a self

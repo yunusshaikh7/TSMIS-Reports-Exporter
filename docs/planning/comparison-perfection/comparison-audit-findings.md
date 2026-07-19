@@ -360,7 +360,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-079 | P2 | Verified | Compare sub-tab switching can hide every Cancel control |
 | CMP-AUD-080 | P1 | Partially remediated | Matrix artifact identity can miss changed source and output content |
 | CMP-AUD-081 | P1 | Resolved | Matrix TSN freshness ignores source identity and library rebuild state |
-| CMP-AUD-082 | P1 | Verified | Matrix formula twins can survive as stale audit artifacts |
+| CMP-AUD-082 | P1 | Resolved | Matrix formula twins can survive as stale audit artifacts |
 | CMP-AUD-083 | P2 | Resolved | Matrix presence and freshness count arbitrary non-report files |
 | CMP-AUD-084 | P1 | Resolved | Matrix caches survive semantic comparator and parser changes |
 | CMP-AUD-085 | P1 | Partially remediated | Partial-artifact policy conflicts while truth surfaces certify/reuse incomplete work |
@@ -4302,7 +4302,9 @@ existing check).
 ### CMP-AUD-082 — Matrix formula twins can remain stale
 
 Priority: P1  
-Status: Verified through all three non-refresh paths  
+Status: REMEDIATED 2026-07-18 — every values commit now refreshes the twin or clears
+a stale prior one; a `(formulas)` sibling can no longer outlive its generation (see
+Remediation)  
 Primary code: `scripts/matrix_build.py:42-121,149-162,512-521,645-655`,
 `scripts/ui/index.html:971-978`
 
@@ -4328,6 +4330,34 @@ quarantine the prior sibling, or mark it durably stale in both filename/metadata
 Expose the large-report skip before execution and test toggle-off reruns, row-cap skips,
 commit/validation failures, cancellation, locked twins, and recovery after a later
 successful formulas build.
+
+#### Remediation — 2026-07-18
+
+Took the "remove the prior sibling" resolution (the safest of the offered options — the
+values workbook is canonical and holds every value, so a genuine live-formulas copy is
+one explicit rebuild away; a stale one that misrepresents the current comparison is
+worse than none). Every matrix comparator now settles the twin on EVERY successful
+values commit through one shared `matrix_build._settle_formulas_twin(compare_call,
+out_path, do_write, …)`: when `do_write` (the toggle is on AND the inputs are
+unchanged AND it is under the row cap) it refreshes the twin; otherwise it clears any
+prior `(formulas)` sibling. `_try_formulas` now RETURNS whether it committed a fresh
+twin, so an over-limit skip or a failed/validation-error formulas commit also falls
+through to the clear. The clear (`_clear_stale_formulas_twin`) is
+ownership/alias-guarded and best-effort: a twin still open in Excel (locked) is
+announced, not silently trusted. All four not-refreshed paths are covered — the
+toggle-off (values-only) refresh, the inputs-changed skip, the row-cap skip, and the
+failed formulas commit — across the cross-environment, TSN, self (PDF-vs-Excel), and
+baseline builders (the by-day matrix rides the shared TSN path). A later successful
+formulas build re-commits the fresh twin. The row-cap skip stays announced (events +
+log) at decision time.
+
+`check_formulas_twin_guard` gains the CMP-AUD-082 matrix: each not-refreshed path clears
+a seeded prior twin, a successful refresh keeps the fresh one, clearing is a no-op when
+none exists, and a RED leg proves the bare `_try_formulas` path leaves the stale twin
+(git-stash confirmed: neutralizing the clear reddens the three clearing legs). The
+multi-artifact manifest and a UI-level durable-stale marker remain the heavier Phase-5
+option not taken; removal fully closes the "stale file masquerading as current"
+defect. Gate 135/135.
 
 ### CMP-AUD-083 — Matrix source presence counts arbitrary files
 

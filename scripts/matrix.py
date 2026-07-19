@@ -40,6 +40,7 @@ from matrix_build import (                                       # noqa: F401
     _consolidated_filename, _consolidated_stale, _ensure_consolidated,
     _fingerprint_for_record, _twin_inputs_unchanged,
     _formulas_sibling, _pdf_store_consolidator, _try_formulas,
+    _clear_stale_formulas_twin, _settle_formulas_twin,
     _compose_source_guard, _require_source_identity,
     build_cell_comparison, build_comparison, cells_to_rebuild,
     captured_tsn_workbook,

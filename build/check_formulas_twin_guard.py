@@ -12,7 +12,10 @@ of the limit:
     (and None for an unreadable path — the fail-open contract);
   * over the row limit `_try_formulas` SKIPS: announces it via events + log,
     never invokes the compare callable, writes no sibling;
-  * at/under the limit it RUNS the callable and commits the formulas sibling.
+  * at/under the limit it RUNS the callable and commits the formulas sibling;
+  * CMP-AUD-082: `_settle_formulas_twin` refreshes the twin OR clears a stale
+    prior one so a values-only refresh, over-limit skip, or failed refresh can
+    never leave an audit-looking `(formulas)` sibling from an older generation.
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_formulas_twin_guard.py
@@ -120,6 +123,70 @@ def main():
               calls3 == [], f"invoked with {calls3}")
         check("the aliased formulas source is preserved byte-for-byte",
               formulas_source.read_bytes() == formulas_prior)
+
+        # --- CMP-AUD-082: a stale (formulas) twin must never outlive its values ---
+        # generation. _try_formulas now returns whether a fresh twin was committed,
+        # and _settle_formulas_twin refreshes it OR clears a stale prior one so a
+        # values-only refresh / over-limit skip / failed refresh can't leave an
+        # audit-looking sibling from an older generation beside the newer values copy.
+        check("_try_formulas returns True when it commits a fresh twin",
+              matrix._try_formulas(_fake_compare_call_factory([]),
+                                   tmp / "small.xlsx", events=events) is True)
+        check("_try_formulas returns False when it skips over the limit",
+              matrix._try_formulas(_fake_compare_call_factory([]), values,
+                                   events=events) is False)
+
+        def _seed_twin(vpath):
+            matrix._settle_formulas_twin(_fake_compare_call_factory([]), vpath,
+                                         True, events=events)
+            sib = matrix._formulas_sibling(vpath)
+            assert sib.exists(), "seed twin was not written"
+            return sib
+
+        # (a) a values-only refresh (do_write False) clears the prior twin.
+        va = tmp / "va.xlsx"; _values_workbook(va, rows=3); sib_a = _seed_twin(va)
+        matrix._settle_formulas_twin(_fake_compare_call_factory([]), va, False,
+                                     events=events)
+        check("082: a values-only refresh clears the stale (formulas) twin",
+              not sib_a.exists())
+
+        # (b) an over-limit skip clears the prior twin and never writes a new one.
+        vb = tmp / "vb.xlsx"; _values_workbook(vb, rows=3); sib_b = _seed_twin(vb)
+        _values_workbook(vb, rows=10)                 # now OVER the limit (3)
+        callsb = []
+        matrix._settle_formulas_twin(_fake_compare_call_factory(callsb), vb, True,
+                                     events=events)
+        check("082: an over-limit skip clears the stale twin (and wrote nothing)",
+              not sib_b.exists() and callsb == [], f"calls={callsb}")
+
+        # (c) a FAILED formulas refresh clears the prior twin (commit kept it).
+        vc = tmp / "vc.xlsx"; _values_workbook(vc, rows=3); sib_c = _seed_twin(vc)
+        matrix._settle_formulas_twin(
+            lambda _p: ConsolidateResult(status="error", message="boom"), vc, True,
+            events=events)
+        check("082: a failed formulas refresh clears the stale twin",
+              not sib_c.exists())
+
+        # (d) clearing is a no-op when no prior twin exists (the common first build).
+        vd = tmp / "vd.xlsx"; _values_workbook(vd, rows=3)
+        matrix._clear_stale_formulas_twin(vd, events=events)
+        check("082: clearing is a no-op when no prior twin exists",
+              not matrix._formulas_sibling(vd).exists())
+
+        # (e) a SUCCESSFUL refresh leaves the FRESH twin in place.
+        ve = tmp / "ve.xlsx"; _values_workbook(ve, rows=3)
+        matrix._settle_formulas_twin(_fake_compare_call_factory([]), ve, True,
+                                     events=events)
+        check("082: a successful refresh leaves the fresh twin in place",
+              matrix._formulas_sibling(ve).exists())
+
+        # RED: the bare _try_formulas path (the pre-fix behavior) LEAVES the stale
+        # twin on an over-limit skip — the finding's exact defect.
+        vr = tmp / "vr.xlsx"; _values_workbook(vr, rows=3); sib_r = _seed_twin(vr)
+        _values_workbook(vr, rows=10)
+        wrote = matrix._try_formulas(_fake_compare_call_factory([]), vr, events=events)
+        check("082 (red): bare _try_formulas over-limit leaves the stale twin",
+              wrote is False and sib_r.exists())
     finally:
         matrix._FORMULAS_TWIN_MAX_ROWS = orig_limit
 
