@@ -378,7 +378,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-097 | P2 | Verified | Unified matrix state cannot report that both inputs are missing |
 | CMP-AUD-098 | P1 | Partially remediated 2026-07-14 (the comparison-pipeline half; the evidence-gate half remains Stage-10 work) | Inputs changed during comparison can be certified as the fresh sources |
 | CMP-AUD-099 | P2 | Verified | Baseline switching rebuilds baseline-independent Matrix modes |
-| CMP-AUD-100 | P2 | Partially remediated | Matrix cache identity and nested record schemas are not validated |
+| CMP-AUD-100 | P2 | Resolved | Matrix cache identity and nested record schemas are not validated |
 | CMP-AUD-101 | P2 | Verified | Open Comparisons opens the wrong tree for non-environment modes |
 | CMP-AUD-102 | P2 | Verified | “Show comparison for all” silently excludes hidden rows |
 | CMP-AUD-103 | P2 | Verified | Cell Build actions dispatch despite a known missing TSN input |
@@ -5093,7 +5093,8 @@ same-directory aliases across environments.
 ### CMP-AUD-100 — Matrix cache envelopes and records are accepted under false identities
 
 Priority: P2  
-Status: Partially remediated — loaders corrected; full adversarial cache-swap gate pending  
+Status: REMEDIATED 2026-07-18 — the dedicated cross-matrix swap + adversarial
+nested-record gate now pins the corrected loaders (see Remediation — 2026-07-18)  
 Primary code: `scripts/day_matrix.py:116-148`,
 `scripts/baseline_matrix.py:140-178`, `scripts/matrix_state.py:83-108,228-260,525-558`,
 `scripts/cache_envelope.py:36-64`
@@ -5125,6 +5126,33 @@ strict published generation. Those states degrade to stale instead of crashing o
 rendering foreign counts. The finding remains open until a dedicated persisted fixture
 swaps envelopes among all three matrices and exhausts adversarial nested JSON types;
 current focused checks cover the corrected branches but not that complete cross-product.
+
+#### Remediation — 2026-07-18
+
+The dedicated gate the finding asked for is now `check_matrix_cache_adversarial.py`,
+which exercises the complete cross-product against the real loaders (no product code
+changed — the loaders were already corrected; this pins that correctness so a regression
+reddens):
+
+* **Cross-matrix identity** — the full 4×4 over the distinct output identities
+  (`baseline_key` / `"tsn"` / `"tsn-by-day"` / `"baseline-by-day"`): an envelope is
+  accepted ONLY by its own identity and reads empty under every other. Plus the
+  END-TO-END persisted swap: a foreign envelope planted at each loader's real results
+  path (the finding's exact `baseline-by-day`-at-the-by-day-path case, and three more)
+  reads empty via `load_results`, while the matching identity is accepted — so a
+  mislabelled cache can never render a fresh foreign 777-difference result.
+* **Adversarial nested records** — nine malformed shapes fed through the production
+  reader `_cmp_state` (list / string / int record, empty dict, non-numeric / list /
+  bool `built_at_mtime`, a partial record, a wrong-generation record): each reads stale
+  with NO trusted verdict and never crashes. `_nested_record` likewise returns `None`
+  for a list outer, a list inner, and a missing key.
+* **Whole-snapshot survival** — a current-version by-day envelope whose cell record is a
+  LIST (the exact `AttributeError` that crashed the entire day snapshot) now renders the
+  snapshot without crashing, with that cell stale rather than a trusted count.
+
+Red→green confirmed by git-stash: neutralizing the `_staleness` record-type guard
+(`rec_is_mapping = isinstance(rec, dict)`) crashes the adversarial records AND the day
+snapshot with the finding's exact `AttributeError`. Gate 135 → **136**.
 
 ### CMP-AUD-101 — Open Comparisons points away from active non-environment artifacts
 
