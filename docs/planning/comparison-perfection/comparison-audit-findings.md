@@ -387,7 +387,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-106 | P1 | Partially remediated 2026-07-18 | Old red evidence survives beside a newly clean comparison |
 | CMP-AUD-107 | P1 | Resolved 2026-07-18 | Highway Detail evidence invents differences the comparison treats as equal |
 | CMP-AUD-108 | P2 | Verified | Duplicate-only differences disappear from evidence accounting |
-| CMP-AUD-109 | P1 | Verified | Evidence workbook and images are not one truthful transaction |
+| CMP-AUD-109 | P1 | Partially remediated 2026-07-19 | Evidence workbook and images are not one truthful transaction |
 | CMP-AUD-110 | P2 | Resolved 2026-07-18 | Queued evidence actions silently retarget to current settings |
 | CMP-AUD-111 | P1 | Resolved | Evidence summaries execute source values as Excel formulas |
 | CMP-AUD-112 | P1 | Resolved 2026-07-18 | Evidence can verify old PDF records but rasterize replacement bytes |
@@ -5483,6 +5483,28 @@ before commit, then publish or preserve the whole set. Return structured
 promoted/diverted/preserved/failed paths and surface them durably. Test every failure
 and process-crash boundary, locked workbook/folder combinations, disk-full, and retry.
 
+#### Partial remediation — 2026-07-19
+
+`_publish_evidence_set` coordinates the workbook + image commits through the existing
+(individually correct, well-tested) `_write_workbook` / `_swap_dir` primitives. The
+workbook commits first; if it can't reach its canonical name — the COMMON case, the user
+reading the previous evidence in Excel — `_divert_images` sends the new images to a .new
+sibling too, so BOTH old artifacts stay at canonical and BOTH new ones divert (never a
+new-workbook / old-images mix). `generate()` rechecks cancellation (and the CMP-AUD-112
+PDF byte baseline) immediately before this commit boundary, and returns the ACTUAL
+committed canonical paths (`None` when diverted) plus a `status` (promoted/diverted)
+instead of an unconditional success claim. `check_visual_evidence.CMP-AUD-109`: no lock →
+both promoted; workbook locked → the set diverts, status honest, OLD images stay at
+canonical, new set in .new — red on the neutralized coordination, green on the fix.
+
+**Closed:** the workbook-locked inconsistency (the common case), the honest-status claim
+(harm 2), and cancellation-at-the-commit-boundary (harm 3). **Still open:** if the
+workbook DOES commit but the image folder is separately locked, the images still divert
+(new workbook beside old images — honestly reported, but on-disk inconsistent). Fully
+closing that rarer case needs a quarantine-based TWO-PHASE commit of both artifacts (the
+workbook commit is not yet rollback-able), plus the manifested-generation identity + the
+process-crash-boundary / disk-full matrix.
+
 ### CMP-AUD-110 — queued evidence actions can change their target identity
 
 Priority: P2  
@@ -8796,6 +8818,28 @@ source indices/roles, and raw-source provenance. An independent reader must reco
 that cell from immutable sources, require the caption/highlight/image to agree, and fail
 if either twin or its payload changes. Re-running the product loader is diagnostic only,
 not independent verification.
+
+#### Disposition — 2026-07-19 (the CMP-AUD-108 / 208 / 209 Stage-10 cluster)
+
+CMP-AUD-108 (duplicate-only differences vanish), 208 (evidence never reads the published
+Comparison cells), and 209 (whole discrepancy classes excluded before sampling) are ONE
+coupled effort, and they are the CLAUDE.md-flagged "Highway Sequence imagery is not yet an
+end-to-end comparison verifier" gap. All three require the same spine: drive evidence from
+the PUBLISHED comparison (its per-cell E/D/N/U state masks, the persisted pairing trace,
+and the per-column counts) rather than re-executing `adapter.load_sides` /
+`enumerate_diffs`. Investigation (2026-07-19) confirmed the discrepancy truth is persisted
+as Excel FORMULAS / computed-value caches + a `pairing_trace` (compare_core), so consuming
+it needs a state-mask/pairing-trace decoder, AND the acceptance bar explicitly requires an
+INDEPENDENT raw-source oracle ("recompute that cell from immutable sources") — the Stage-9/
+10 work the project is building toward, not a single-marathon slice. Deliberately NOT
+sliced: a partial published-cell reader in this most-uncertain area would risk a false
+"evidence reads the cells now" impression. **108 note:** its false-zero (a comparison whose
+only differences live in duplicate groups reports "no differing columns") now also lets the
+CMP-AUD-106 clean-comparison retirement fire — the retirement of the stale prior set is
+still correct, but the "no differing columns" note is wrong; both are subsumed by this
+cluster's published-count reconciliation. **210** (no source-faithful Excel / PDF-vs-Excel
+evidence path) rides the same spine plus new source-role/mode routes — a deferred multi-part
+feature with its own mini-plan.
 
 ### CMP-AUD-209 — Highway Sequence evidence excludes whole discrepancy classes before sampling
 
