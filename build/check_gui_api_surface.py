@@ -76,7 +76,7 @@ FROZEN_API = {
     "revert_to_previous", "run_validation", "save_run_report", "save_support_bundle", "set_all_matrix_modes",
     "set_day_matrix_formulas", "set_day_matrix_report",
     "set_day_matrix_row_order", "set_day_matrix_source", "set_evidence_examples",
-    "set_evidence_images", "set_export_browser",
+    "set_evidence_images", "set_evidence_layout", "set_export_browser",
     "set_matrix_baseline", "set_matrix_env", "set_matrix_env_order", "set_matrix_fast",
     "set_matrix_formulas", "set_matrix_report", "set_matrix_row_mode", "set_matrix_row_order",
     "set_matrix_tsn_file", "set_setting", "set_site", "set_site_url", "skip_route",

@@ -15,12 +15,14 @@ disagreeing at that cell, a TSN reference-date skew, a duplicated key) are
 skipped with a recorded reason, never shown.
 
 Outputs, next to the comparison workbook (the "(formulas).xlsx" sibling
-convention): `<comparison> (evidence).xlsx` — a Summary sheet + BOTH image
-layouts embedded, each on its own tab — and `<comparison> (evidence images)/`
-holding the same examples as loose files in both layouts (stacked for reading,
-side-by-side for pasting into docs). Both writes are keep-last-good: a
-failed/cancelled run leaves the previous set untouched; files locked open in
-Excel divert to an unpredictable ".new-<token>" sibling with a note.
+convention): `<comparison> (evidence).xlsx` — a Summary sheet + one tab PER
+COMPARISON COLUMN for the chosen layout — and `<comparison> (evidence images)/`
+holding the same examples as loose files. The user picks the layout in Settings
+(side-by-side for pasting into docs, stacked for reading, or both — 'both' gives
+each column two tabs and writes both PNGs); only the selected layout(s) are
+rendered. Both writes are keep-last-good: a failed/cancelled run leaves the
+previous set untouched; files locked open in Excel divert to an unpredictable
+".new-<token>" sibling with a note.
 
 Report-agnostic: everything report-specific comes from an adapter module
 (evidence_highway_detail — district TSN prints; evidence_intersection_detail —
@@ -121,6 +123,33 @@ _PAGE_CACHE_MAX = 16
 _EMBED_W = 1500                # embedded stacked-image display width in the workbook
 _EMBED_W_PAIR = 2000           # side-by-side embeds are twice as wide — give them more
 _PX_PER_ROW = 20               # Excel's default row height in pixels
+
+# The workbook image layout the user picks (Settings): 'pair' (side-by-side, the
+# default), 'stacked', or 'both'. Only the selected layout(s) are rendered — the
+# workbook tabs AND the loose PNGs — so "side-by-side only" leaves no stacked
+# clutter. Each selected layout becomes one tab PER COMPARISON COLUMN.
+LAYOUTS = ("pair", "stacked", "both")
+DEFAULT_LAYOUT = "pair"
+# img_key -> (embedded display width, human label, per-column-tab suffix used
+# ONLY when both layouts are present, so the two tabs for a column stay distinct).
+_LAYOUT_SPEC = {"stacked": (_EMBED_W, "stacked", " (stacked)"),
+                "pair": (_EMBED_W_PAIR, "side-by-side", " (side-by-side)")}
+
+
+def normalize_layout(layout):
+    """The chosen workbook image layout, defaulting anything unknown to 'pair'."""
+    return layout if layout in LAYOUTS else DEFAULT_LAYOUT
+
+
+def _layout_keys(layout):
+    """The img_key(s) to render/embed for `layout`, in reading order (stacked
+    before side-by-side when both are selected)."""
+    layout = normalize_layout(layout)
+    if layout == "stacked":
+        return ("stacked",)
+    if layout == "both":
+        return ("stacked", "pair")
+    return ("pair",)
 
 
 def capable(row_key):
@@ -309,18 +338,22 @@ def _locate_tsmis_sources(adapter, need_tsmis, tsmis_pdf_dir, events):
 
 
 def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
-             events, examples=DEFAULT_EXAMPLES, commit_guard=None):
+             events, examples=DEFAULT_EXAMPLES, layout=DEFAULT_LAYOUT,
+             commit_guard=None):
     """Generate the evidence set for one finished vs-TSN comparison. Returns a
     result dict {note, rendered, fields_ok, fields_with_diffs, misses,
-    workbook, folder} — `note` is the one summary line for the run log. Raises
-    ValueError for a not-runnable setup (missing deps/PDFs); the caller treats
-    any failure as a skipped decoration, never a failed comparison."""
+    workbook, folder} — `note` is the one summary line for the run log. `layout`
+    selects which image layout(s) to render (Settings: 'pair'/'stacked'/'both').
+    Raises ValueError for a not-runnable setup (missing deps/PDFs); the caller
+    treats any failure as a skipped decoration, never a failed comparison."""
     if not _DEPS_OK:
         raise ValueError(DEPS_MSG)
     if not capable(row_key):
         raise ValueError(f"no visual-evidence support for {row_key}")
     adapter = adapter_for(row_key)
     examples = clamp_examples(examples)
+    layout = normalize_layout(layout)
+    render_keys = _layout_keys(layout)
     tsmis_pdf_dir = Path(tsmis_pdf_dir)
     tsn_dir = tsn_pdf_dir(row_key)
     tsmis_pdf_files, tsn_pdf_files = _pdf_source_files(tsmis_pdf_dir, tsn_dir)
@@ -346,8 +379,8 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
 
     seed = int.from_bytes(os.urandom(4), "big")
     rng = random.Random(seed)
-    log.info("evidence: %s seed=%08x examples=%d tsmis=%s tsn=%s",
-             row_key, seed, examples, tsmis_pdf_dir, tsn_dir)
+    log.info("evidence: %s seed=%08x examples=%d layout=%s tsmis=%s tsn=%s",
+             row_key, seed, examples, layout, tsmis_pdf_dir, tsn_dir)
     events.on_log(f"  evidence: sampling up to {examples} example(s) per column "
                   f"(seed {seed:08x})…")
 
@@ -440,7 +473,7 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                     directory_identity=tmp_dir_fs_identity)
                 ok, reason = _try_example(adapter, ex, f, tsmis_loc, tsn_loc,
                                           dist_index, tsmis_pdf_dir, tmp_dir,
-                                          got + 1, page_cache,
+                                          got + 1, page_cache, render_keys,
                                           commit_guard=commit_guard,
                                           out_dir_identity=tmp_dir_fs_identity)
                 if ok:
@@ -467,6 +500,7 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
             comparison=Path(comparison_path).name, report=adapter.REPORT_LABEL,
             seed=f"{seed:08x}", examples=examples,
             tsmis_dir=str(tsmis_pdf_dir), tsn_dir=str(tsn_dir)),
+            layout=layout,
             source_paths=source_paths, captured_sources=captured_sources,
             source_set_check=source_set_check, commit_guard=commit_guard)
         dir_note = _swap_dir(
@@ -547,9 +581,11 @@ def _quote_note(va, vb):
 
 
 def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
-                 tsmis_pdf_dir, out_dir, k, page_cache, commit_guard=None,
+                 tsmis_pdf_dir, out_dir, k, page_cache,
+                 render_keys=("stacked", "pair"), commit_guard=None,
                  out_dir_identity=None):
-    """Verify one candidate end-to-end and render both layouts. Returns
+    """Verify one candidate end-to-end and render the selected layout(s).
+    `render_keys` is the subset of ('stacked', 'pair') the user chose. Returns
     (entry_dict, None) on success, (None, reason) otherwise."""
     trecs = tsmis_loc.get(ex["route"], {}).get(ex["key"], [])
     if len(trecs) != 1:
@@ -595,24 +631,32 @@ def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
     n_label = (f"TSN  —  {n_pdf.name} · page {npage} · "
                f"{(cnty + '-') if cnty else ''}{ex['route']}")
     safe = re.sub(r"[^A-Za-z0-9]+", "_", field).strip("_")
-    stacked = out_dir / f"{safe}_{k}_stacked.png"
-    pair = out_dir / f"{safe}_{k}_pair.png"
     guard_kwargs = ({"anchor_path": out_dir,
                      "anchor_identity": out_dir_identity}
                     if out_dir_identity is not None else {})
-    _require_output_guard(commit_guard, stacked, "stacked evidence-image write",
-                          **guard_kwargs)
-    _compose_stacked(title, sub, t_label, t_img, n_label, n_img, stacked, note=note)
-    _require_output_guard(commit_guard, pair, "paired evidence-image write",
-                          **guard_kwargs)
-    _compose_pair(title, sub, t_label, t_img, n_label, n_img, pair, note=note)
-    _require_output_guard(commit_guard, stacked, "evidence image verification",
-                          **guard_kwargs)
-    _require_output_guard(commit_guard, pair, "evidence image verification",
-                          **guard_kwargs)
-    return {"field": field, "route": ex["route"], "key": ex["key"],
-            "va": ex["va"], "vb": ex["vb"], "note": note,
-            "stacked": stacked.name, "pair": pair.name}, None
+    entry = {"field": field, "route": ex["route"], "key": ex["key"],
+             "va": ex["va"], "vb": ex["vb"], "note": note}
+    # Render ONLY the layout(s) the user chose (Settings). The costly page
+    # strips above are shared; only the compose+save differ per layout.
+    if "stacked" in render_keys:
+        stacked = out_dir / f"{safe}_{k}_stacked.png"
+        _require_output_guard(commit_guard, stacked,
+                              "stacked evidence-image write", **guard_kwargs)
+        _compose_stacked(title, sub, t_label, t_img, n_label, n_img, stacked,
+                         note=note)
+        _require_output_guard(commit_guard, stacked,
+                              "evidence image verification", **guard_kwargs)
+        entry["stacked"] = stacked.name
+    if "pair" in render_keys:
+        pair = out_dir / f"{safe}_{k}_pair.png"
+        _require_output_guard(commit_guard, pair,
+                              "paired evidence-image write", **guard_kwargs)
+        _compose_pair(title, sub, t_label, t_img, n_label, n_img, pair,
+                      note=note)
+        _require_output_guard(commit_guard, pair,
+                              "evidence image verification", **guard_kwargs)
+        entry["pair"] = pair.name
+    return entry, None
 
 
 # --------------------------------------------------------------------------- #
@@ -744,41 +788,83 @@ def _safe_cell(ws, row, column, value, font=None):
     return cell
 
 
-def _image_sheet(wb, sheet_title, entries, img_dir, img_key, embed_w, fonts):
-    """One image tab: the caption line + every example's `img_key` layout
-    embedded, scaled to `embed_w` display pixels."""
+_ILLEGAL_SHEET_RE = re.compile(r"[\[\]:*?/\\]")
+
+
+def _sheet_name(base, used, suffix=""):
+    """A legal (<=31 chars; no []:*?/\\), unique Excel sheet name for `base`,
+    reserving room for `suffix` (the layout tag, present only when both layouts
+    show). Collisions after truncation take a numeric disambiguator."""
+    base = _ILLEGAL_SHEET_RE.sub("-", str(base)).strip() or "Column"
+    room = max(1, 31 - len(suffix))
+    name = base[:room] + suffix
+    if name not in used:
+        used.add(name)
+        return name
+    for i in range(2, 1000):
+        tag = f" ({i}){suffix}"
+        cand = base[:max(1, 31 - len(tag))] + tag
+        if cand not in used:
+            used.add(cand)
+            return cand
+    cand = (base[:20] + secrets.token_hex(4))[:31]
+    used.add(cand)
+    return cand
+
+
+def _column_image_sheets(wb, entries, img_dir, img_key, embed_w, label,
+                         fonts, used, suffix=""):
+    """Per-COMPARISON-COLUMN tabs of ONE layout: each differing column gets its
+    own sheet (named for the field, tagged with the layout `suffix` only when
+    both layouts show), holding that column's captioned example images scaled
+    to `embed_w`. Columns with no rendered example in this layout are skipped —
+    the Summary lists those as misses. Returns [(field, sheet_name)]."""
     bold, small = fonts
-    ev = wb.create_sheet(sheet_title)
-    ev.sheet_properties.tabColor = "C00000"
-    _safe_cell(ev, 1, 1,
-               "Red box = the compared cell in each source PDF; gray box = the "
-               "record (its printed lines). Values shown are the compared "
-               "(normalized) forms.", small)
-    r = 3
+    by_field = {}
     for e in entries:
-        note = e.get("note") or ""
-        _safe_cell(ev, r, 1, (
-            f"{e['field']}   —   route {e['route']} @ {e['key']}   —   "
-            f"TSMIS '{e['va']}' vs TSN '{e['vb']}'"
-            + (f"   —   {note}" if note else "")), bold)
-        img = XLImage(str(img_dir / e[img_key]))
-        scale = min(1.0, embed_w / img.width)
-        img.width, img.height = int(img.width * scale), int(img.height * scale)
-        ev.add_image(img, f"A{r + 1}")
-        r += 1 + max(1, round(img.height / _PX_PER_ROW)) + 2
+        if e.get(img_key):
+            by_field.setdefault(e["field"], []).append(e)
+    made = []
+    for field, group in by_field.items():
+        name = _sheet_name(field, used, suffix)
+        made.append((field, name))
+        ev = wb.create_sheet(name)
+        ev.sheet_properties.tabColor = "C00000"
+        _safe_cell(ev, 1, 1,
+                   f"{field} — {label} evidence   ·   {len(group)} example(s)",
+                   bold)
+        _safe_cell(ev, 2, 1,
+                   "Red box = the compared cell in each source PDF; gray box = "
+                   "the record (its printed lines). Values shown are the "
+                   "compared (normalized) forms.", small)
+        r = 4
+        for e in group:
+            note = e.get("note") or ""
+            _safe_cell(ev, r, 1, (
+                f"route {e['route']} @ {e['key']}   —   "
+                f"TSMIS '{e['va']}' vs TSN '{e['vb']}'"
+                + (f"   —   {note}" if note else "")), bold)
+            img = XLImage(str(img_dir / e[img_key]))
+            scale = min(1.0, embed_w / img.width)
+            img.width, img.height = int(img.width * scale), int(img.height * scale)
+            ev.add_image(img, f"A{r + 1}")
+            r += 1 + max(1, round(img.height / _PX_PER_ROW)) + 2
+    return made
 
 
-def _write_workbook(wb_path, img_dir, entries, misses, info, source_paths=(),
+def _write_workbook(wb_path, img_dir, entries, misses, info,
+                    layout=DEFAULT_LAYOUT, source_paths=(),
                     captured_sources=(), source_set_check=None,
                     commit_guard=None):
-    """Write '<comparison> (evidence).xlsx' — a Summary sheet + BOTH image
-    layouts embedded, each on its own tab (stacked for reading, side-by-side
-    for pasting) — via a temp file + os.replace. Returns a short note when
-    the previous workbook was locked open and the new one diverted to an
-    exclusively reserved, unpredictable .new-<token> sibling."""
+    """Write '<comparison> (evidence).xlsx' — a Summary sheet + one tab PER
+    COMPARISON COLUMN for the chosen `layout` (side-by-side / stacked / both;
+    'both' gives each column two tabs) — via a temp file + os.replace. Returns
+    a short note when the previous workbook was locked open and the new one
+    diverted to an exclusively reserved, unpredictable .new-<token> sibling."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Summary"
+    keys = _layout_keys(layout)                # the rendered layout(s), in order
     title = Font(name="Arial", size=14, bold=True)
     bold = Font(name="Arial", size=10, bold=True)
     body = Font(name="Arial", size=10)
@@ -799,7 +885,8 @@ def _write_workbook(wb_path, img_dir, entries, misses, info, source_paths=(),
         _safe_cell(ws, r, 2, f"{e['route']} @ {e['key']}", body)
         _safe_cell(ws, r, 3, e["va"], body)
         _safe_cell(ws, r, 4, e["vb"], body)
-        _safe_cell(ws, r, 5, f"{e['stacked']}  /  {e['pair']}", body)
+        _safe_cell(ws, r, 5,
+                   "  /  ".join(e[k] for k in keys if e.get(k)), body)
         r += 1
     for f, why in misses.items():
         _safe_cell(ws, r, 1, f, body)
@@ -808,10 +895,12 @@ def _write_workbook(wb_path, img_dir, entries, misses, info, source_paths=(),
     for col, width in (("A", 14), ("B", 24), ("C", 26), ("D", 26), ("E", 46)):
         ws.column_dimensions[col].width = width
 
-    _image_sheet(wb, "Evidence (stacked)", entries, img_dir, "stacked",
-                 _EMBED_W, (bold, small))
-    _image_sheet(wb, "Evidence (side-by-side)", entries, img_dir, "pair",
-                 _EMBED_W_PAIR, (bold, small))
+    used_sheet_names = {"Summary"}
+    for img_key in keys:
+        embed_w, label, layout_suffix = _LAYOUT_SPEC[img_key]
+        _column_image_sheets(wb, entries, img_dir, img_key, embed_w, label,
+                             (bold, small), used_sheet_names,
+                             suffix=layout_suffix if len(keys) > 1 else "")
 
     tmp = None
     tmp_identity = ()

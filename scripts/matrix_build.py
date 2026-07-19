@@ -892,11 +892,13 @@ def evidence_opts_for(evidence, row_key, dir_for_subdir):
     if not visual_evidence.capable(row_key):
         return None
     return {"tsmis_pdf_dir": dir_for_subdir(visual_evidence.pdf_subdir_for(row_key)),
-            "examples": visual_evidence.clamp_examples(evidence.get("examples"))}
+            "examples": visual_evidence.clamp_examples(evidence.get("examples")),
+            "layout": visual_evidence.normalize_layout(evidence.get("layout"))}
 
 
 def run_evidence_only(row_key, store_dir, subdir, tsn_path, comparison_path,
-                      tsmis_pdf_dir, events, examples=None, commit_guard=None,
+                      tsmis_pdf_dir, events, examples=None, layout=None,
+                      commit_guard=None,
                       source_identity_check=None, expected_generation_id=None,
                       source_workbook_identity=None, live_tsn_path=None,
                       _captured_tsn=False):
@@ -926,7 +928,7 @@ def run_evidence_only(row_key, store_dir, subdir, tsn_path, comparison_path,
         with captured_tsn_workbook(tsn_path, source_workbook_identity) as captured:
             return run_evidence_only(
                 row_key, store_dir, subdir, captured, comparison_path,
-                tsmis_pdf_dir, events, examples=examples,
+                tsmis_pdf_dir, events, examples=examples, layout=layout,
                 commit_guard=commit_guard,
                 source_identity_check=source_identity_check,
                 expected_generation_id=expected_generation_id,
@@ -977,6 +979,7 @@ def run_evidence_only(row_key, store_dir, subdir, tsn_path, comparison_path,
     ev = visual_evidence.generate(
         row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir, events,
         examples=visual_evidence.clamp_examples(examples),
+        layout=visual_evidence.normalize_layout(layout),
         commit_guard=evidence_guard)
     _require_source_identity(source_identity_check, "publishing evidence")
     after_record = consolidation_meta.read_comparison_outcome(comparison_path)
@@ -991,7 +994,8 @@ def run_evidence_only(row_key, store_dir, subdir, tsn_path, comparison_path,
 
 
 def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
-                      tsn_files=None, examples=None, commit_guard=None):
+                      tsn_files=None, examples=None, layout=None,
+                      commit_guard=None):
     """On-demand evidence for one Everything-matrix cell's EXISTING vs-TSN
     comparison. Resolves the same paths build_comparison's tsn branch uses —
     but consolidates nothing, compares nothing, and does NOT heal the TSN
@@ -1026,7 +1030,7 @@ def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
         row_key, dest / cell_key / mode["env_subdir"], mode["env_subdir"],
         src["path"], mode_out_path(dest, baseline_key, row_key, cell_key, mode),
         dest / cell_key / visual_evidence.pdf_subdir_for(row_key),
-        events, examples=examples, commit_guard=commit_guard,
+        events, examples=examples, layout=layout, commit_guard=commit_guard,
         source_identity_check=source_identity_check,
         expected_generation_id=expected_generation_id,
         source_workbook_identity=source_workbook_identity,
@@ -1164,6 +1168,7 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
                 row_key, consolidated, tsn_path, out_path,
                 evidence_opts["tsmis_pdf_dir"], events,
                 examples=evidence_opts.get("examples"),
+                layout=evidence_opts.get("layout"),
                 commit_guard=comparison_guard)
             if explicit_selection:
                 tsn_library.require_explicit_selection(explicit_selection)

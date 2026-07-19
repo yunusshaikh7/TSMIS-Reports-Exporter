@@ -138,7 +138,7 @@ function makeMockApi() {
       // v0.24.0 Highway Log (raw-sourced prints) + the named unsupported rows;
       // v0.25.0 Highway Sequence (raw-sourced like Highway Log);
       // v0.26.0 Ramp Detail (statewide print like Intersection Detail)
-      on: false, examples: 2, ready: true, deps_ok: true, tsn_pdfs: 38,
+      on: false, examples: 2, layout: "pair", ready: true, deps_ok: true, tsn_pdfs: 38,
       rows: ["highway_detail", "highway_detail_pdf",
              "highway_log", "highway_log_pdf",
              "highway_sequence", "highway_sequence_pdf",
@@ -1270,6 +1270,14 @@ function makeMockApi() {
       push({ t: "log", text: `Evidence images: ${v} example(s) per column.` });
       pushState();
       return { ok: true, examples: v };
+    },
+    set_evidence_layout: async (layout) => {
+      const v = ["pair", "stacked", "both"].includes(layout) ? layout : "pair";
+      st.evidence = { ...st.evidence, layout: v };
+      const label = { pair: "side-by-side", stacked: "stacked", both: "both layouts" }[v];
+      push({ t: "log", text: `Evidence images: ${label}.` });
+      pushState();
+      return { ok: true, layout: v };
     },
     refresh_cell_export: async (rk, env) =>
       mockEnqueue("export", "cell", `Re-export ${rk} — ${env}`, { fast: st.matrix_fast.on }),

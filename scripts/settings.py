@@ -736,6 +736,27 @@ def set_evidence_examples(n):
     return n
 
 
+def get_evidence_layout():
+    """The evidence-workbook image layout: 'pair' (side-by-side, the default),
+    'stacked', or 'both'. Import-light for the state snapshot — the literal set
+    mirrors visual_evidence.LAYOUTS (pinned by check_visual_evidence)."""
+    raw = _read_file().get("evidence_layout")
+    return raw if raw in ("pair", "stacked", "both") else "pair"
+
+
+def set_evidence_layout(layout):
+    """Persist the evidence image layout ('pair'/'stacked'/'both'); the default
+    'pair' clears the key. Returns the new effective value."""
+    data = dict(_read_file())
+    if layout in ("stacked", "both"):
+        data["evidence_layout"] = layout
+    else:
+        data.pop("evidence_layout", None)
+    _atomic_write(data)
+    log.info("settings: evidence_layout -> %s", get_evidence_layout())
+    return get_evidence_layout()
+
+
 def get_day_matrix_formulas():
     """Whether the by-day matrix ALSO writes a live-formulas workbook (its own
     toggle, independent of the Everything matrix's; default off)."""

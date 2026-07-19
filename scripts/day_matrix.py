@@ -409,7 +409,7 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
 
 
 def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
-                          examples=None, commit_guard=None):
+                          examples=None, layout=None, commit_guard=None):
     """On-demand evidence for one by-day cell's EXISTING vs-TSN comparison.
     Resolves the same paths build_day_cell uses — but consolidates nothing,
     compares nothing, and does NOT heal the TSN library (a heal would rebuild
@@ -444,7 +444,7 @@ def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
         row_key, tsmis_dir(date, source, subdir), subdir, src_tsn["path"],
         day_out_path(date, source, row_key),
         tsmis_dir(date, source, visual_evidence.pdf_subdir_for(row_key)),
-        events, examples=examples, commit_guard=commit_guard,
+        events, examples=examples, layout=layout, commit_guard=commit_guard,
         source_identity_check=source_identity_check,
         expected_generation_id=expected_generation_id,
         source_workbook_identity=source_workbook_identity,

@@ -176,7 +176,7 @@ function syncDayMatrixFormulas() {
 // isn't, and one line naming the reports with no evidence support at all — so
 // the toggle is never a mystery switch. The toggle greys out only when NO
 // report is ready.
-function syncEvidenceControls(cbId, countRowId, countId, hintId) {
+function syncEvidenceControls(cbId, countRowId, countId, hintId, layoutId) {
   const ev = (S.st && S.st.evidence) || {};
   const cb = $(cbId);
   if (cb) {
@@ -187,6 +187,9 @@ function syncEvidenceControls(cbId, countRowId, countId, hintId) {
   if (row) row.style.display = ev.on && ev.ready ? "" : "none";
   const count = $(countId);
   if (count && document.activeElement !== count) count.value = ev.examples || 2;
+  const layoutSel = layoutId && $(layoutId);
+  if (layoutSel && document.activeElement !== layoutSel)
+    layoutSel.value = ev.layout || "pair";
   const hint = $(hintId);
   if (!hint) return;
   hint.hidden = false;
@@ -227,11 +230,11 @@ function syncEvidenceControls(cbId, countRowId, countId, hintId) {
 }
 function syncMatrixEvidence() {
   syncEvidenceControls("matrixEvidence", "matrixEvidenceCountRow",
-    "matrixEvidenceCount", "matrixEvidenceHint");
+    "matrixEvidenceCount", "matrixEvidenceHint", "matrixEvidenceLayout");
 }
 function syncDayMatrixEvidence() {
   syncEvidenceControls("dayMatrixEvidence", "dayMatrixEvidenceCountRow",
-    "dayMatrixEvidenceCount", "dayMatrixEvidenceHint");
+    "dayMatrixEvidenceCount", "dayMatrixEvidenceHint", "dayMatrixEvidenceLayout");
 }
 
 // Whether a row can run the ON-DEMAND per-cell evidence action right now:

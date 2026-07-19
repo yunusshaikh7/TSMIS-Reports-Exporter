@@ -396,7 +396,8 @@ class GuiMatrixMixin:
         (like the formulas toggles). The engine ignores it for rows without
         evidence support; the count is engine-clamped downstream."""
         return {"enabled": settings.get_evidence_images(),
-                "examples": settings.get_evidence_examples()}
+                "examples": settings.get_evidence_examples(),
+                "layout": settings.get_evidence_layout()}
 
     def _dispatch_evidence_job(self, job):
         """Start the on-demand evidence worker for ONE cell's EXISTING vs-TSN
@@ -406,6 +407,7 @@ class GuiMatrixMixin:
         dest = settings.get_batch_dest()
         tsn_files = self._matrix_tsn_selections()
         examples = settings.get_evidence_examples()
+        layout = settings.get_evidence_layout()
         row, cell = job["row"], job["env"]
         comparisons_dest = None
         if job.get("which") == "day":
@@ -413,14 +415,14 @@ class GuiMatrixMixin:
             run_fn = (lambda events, commit_guard=None:
                       day_matrix.evidence_for_day_cell(
                 source, cell, row, dest, events, tsn_files=tsn_files,
-                examples=examples, commit_guard=commit_guard))
+                examples=examples, layout=layout, commit_guard=commit_guard))
         else:
             base = self._current_baseline()
             comparisons_dest = dest
             run_fn = (lambda events, commit_guard=None:
                       matrix.evidence_for_cell(
                 dest, row, cell, base, events, tsn_files=tsn_files,
-                examples=examples, commit_guard=commit_guard))
+                examples=examples, layout=layout, commit_guard=commit_guard))
         with self._lock:
             self._matrix = {"phase": "comparing", "row": row, "cell": cell,
                             "done": 0, "total": 1}
@@ -981,6 +983,18 @@ class GuiMatrixMixin:
         self._emit_log(f"Evidence images: {val} example(s) per column.")
         self._push_state()
         return {"ok": True, "examples": val}
+
+    @_api_method
+    def set_evidence_layout(self, layout):
+        """Persist the evidence-workbook image layout ('pair' = side-by-side,
+        'stacked', or 'both'). Only the selected layout(s) render; each becomes
+        a tab per comparison column."""
+        val = settings.set_evidence_layout(layout)
+        label = {"pair": "side-by-side", "stacked": "stacked",
+                 "both": "both layouts"}.get(val, val)
+        self._emit_log(f"Evidence images: {label}.")
+        self._push_state()
+        return {"ok": True, "layout": val}
 
     @_api_method
     def matrix_queue_remove(self, job_id):

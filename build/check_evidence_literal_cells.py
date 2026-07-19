@@ -65,6 +65,7 @@ def test_evidence_workbook_literals():
                 "tsmis_dir": "+tsmis path",
                 "tsn_dir": "=tsn path",
             },
+            layout="both",           # exercise BOTH per-column tab writers
         )
         assert note is None, note
 
@@ -84,22 +85,29 @@ def test_evidence_workbook_literals():
         _assert_text(summary.cell(miss_row, 1), "=missing field",
                      "summary missing-field caption")
 
-        for sheet_name in ("Evidence (stacked)", "Evidence (side-by-side)"):
-            captions = [
-                cell
-                for (cell,) in wb[sheet_name].iter_rows(min_row=3, min_col=1,
-                                                        max_col=1)
-                if cell.value is not None
-            ]
-            assert len(captions) == len(UNSAFE_LITERALS), (
-                sheet_name, len(captions), len(UNSAFE_LITERALS),
-            )
-            for cell, value in zip(captions, UNSAFE_LITERALS):
-                expected = (
-                    f"{value}   —   route {value} @ K   —   "
-                    f"TSMIS '{value}' vs TSN '{value}'   —   {value}"
-                )
-                _assert_text(cell, expected, f"{sheet_name} caption")
+        # 'both' layout -> one tab PER COMPARISON COLUMN for each of the two
+        # layouts. Each entry has a distinct formula-leading `field`, so every
+        # field becomes its own (sanitized) tab: header row 1 leads with the
+        # source `field` (formula-leading), captions start at row 4. EVERY
+        # source-derived col-1 cell must remain a literal string.
+        image_sheets = [s for s in wb.sheetnames if s != "Summary"]
+        assert len(image_sheets) == 2 * len(UNSAFE_LITERALS), (
+            len(image_sheets), 2 * len(UNSAFE_LITERALS))
+        headers, captions = [], []
+        for name in image_sheets:
+            ws = wb[name]
+            for (cell,) in ws.iter_rows(min_row=1, min_col=1, max_col=1):
+                if cell.value is not None:            # legend row 2 is fixed text
+                    assert cell.data_type == "s", (
+                        name, cell.coordinate, cell.value, cell.data_type)
+            headers.append(ws.cell(1, 1).value)
+            captions.append(ws.cell(4, 1).value)
+        for value in UNSAFE_LITERALS:
+            caption = (f"route {value} @ K   —   TSMIS '{value}' vs "
+                       f"TSN '{value}'   —   {value}")
+            assert captions.count(caption) == 2, (value, captions.count(caption))
+            assert sum(1 for h in headers if h.startswith(f"{value} — ")) == 2, (
+                value, [h for h in headers if h.startswith(str(value))])
         wb.close()
 
 

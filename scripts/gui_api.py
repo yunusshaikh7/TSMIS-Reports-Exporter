@@ -375,7 +375,8 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
             avail = {"rows": [], "tsn_pdfs": 0, "ready": False, "dir": "",
                      "reports": [], "deps_ok": False, "unsupported": []}
         return {"on": settings.get_evidence_images(),
-                "examples": settings.get_evidence_examples(), **avail}
+                "examples": settings.get_evidence_examples(),
+                "layout": settings.get_evidence_layout(), **avail}
 
     def _state_snapshot(self):
         # PRF-02 (v0.19.0): every filesystem read (the output-days listing, the

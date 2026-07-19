@@ -493,9 +493,94 @@ check("unsupported row -> None",
 opts = matrix_build.evidence_opts_for({"enabled": True, "examples": 99},
                                       "highway_detail",
                                       lambda s: Path("cell") / s)
-check("supported row -> resolved PDF dir + clamped examples",
+check("supported row -> resolved PDF dir + clamped examples + default layout",
       opts == {"tsmis_pdf_dir": Path("cell") / "highway_detail_pdf",
-               "examples": 10})
+               "examples": 10, "layout": "pair"})
+check("evidence_opts_for carries the chosen layout (unknown -> the 'pair' default)",
+      matrix_build.evidence_opts_for(
+          {"enabled": True, "layout": "both"}, "highway_detail",
+          lambda s: s)["layout"] == "both"
+      and matrix_build.evidence_opts_for(
+          {"enabled": True, "layout": "nonsense"}, "highway_detail",
+          lambda s: s)["layout"] == "pair")
+
+# --------------------------------------------------------------------------- #
+print("layout choice + per-column tabs (the workbook structure)")
+check("LAYOUTS + default mirror settings.get_evidence_layout",
+      ve.LAYOUTS == ("pair", "stacked", "both") and ve.DEFAULT_LAYOUT == "pair")
+check("normalize_layout: known pass-through, unknown/None -> pair",
+      (ve.normalize_layout("pair"), ve.normalize_layout("stacked"),
+       ve.normalize_layout("both"), ve.normalize_layout(None),
+       ve.normalize_layout("x")) == ("pair", "stacked", "both", "pair", "pair"))
+check("_layout_keys: pair->(pair,), stacked->(stacked,), both->(stacked,pair)",
+      ve._layout_keys("pair") == ("pair",)
+      and ve._layout_keys("stacked") == ("stacked",)
+      and ve._layout_keys("both") == ("stacked", "pair"))
+_used = {"Summary"}
+_n1 = ve._sheet_name("Med V/WDA", _used)            # '/' is illegal in a name
+_n2 = ve._sheet_name("Med V/WDA", _used)            # collision -> disambiguated
+_n3 = ve._sheet_name("Distance To Next Point", _used, " (side-by-side)")
+check("sheet names are legal (no []:*?/\\), <=31, unique, suffix-reserved",
+      not (set(_n1) & set("[]:*?/\\")) and _n1 != _n2
+      and len(_n3) <= 31 and _n3.endswith(" (side-by-side)")
+      and _n1 in _used and _n2 in _used)
+
+_wbtmp = Path(tempfile.mkdtemp(prefix="evidence_layout_"))
+try:
+    from PIL import Image as _PILImage
+    _imgs = _wbtmp / "imgs"
+    _imgs.mkdir()
+
+    def _png(name):
+        _PILImage.new("RGB", (40, 20), (255, 255, 255)).save(_imgs / name)
+        return name
+
+    def _entry(field, route, va, vb):
+        return {"field": field, "route": route, "key": f"{route}.0",
+                "va": va, "vb": vb, "note": "",
+                "stacked": _png(f"{field}_{route}_s.png"),
+                "pair": _png(f"{field}_{route}_p.png")}
+
+    _entries = [_entry("Description", "001", "A", "B"),
+                _entry("Description", "002", "C", "D"),
+                _entry("FT", "003", "1", "2")]
+    _info = {"report": "Probe", "comparison": "c.xlsx", "examples": 2,
+             "seed": "00000000", "tsmis_dir": "A", "tsn_dir": "B"}
+
+    _wb_pair = _wbtmp / "p (evidence).xlsx"
+    ve._write_workbook(_wb_pair, _imgs, _entries,
+                       {"HG": "no verifiable example — ambiguous"}, _info,
+                       layout="pair")
+    _pw = load_workbook(_wb_pair)
+    check("pair layout -> Summary + ONE tab per differing column, no suffix",
+          _pw.sheetnames == ["Summary", "Description", "FT"])
+    check("Summary lists only the rendered (side-by-side) image per row",
+          _pw["Summary"]["E6"].value and ".png" in _pw["Summary"]["E6"].value
+          and "  /  " not in _pw["Summary"]["E6"].value)
+    _pw.close()
+
+    _wb_stacked = _wbtmp / "s (evidence).xlsx"
+    ve._write_workbook(_wb_stacked, _imgs, _entries, {}, _info, layout="stacked")
+    check("stacked layout -> per-column tabs, no suffix",
+          load_workbook(_wb_stacked).sheetnames == ["Summary", "Description", "FT"])
+
+    _wb_both = _wbtmp / "b (evidence).xlsx"
+    ve._write_workbook(_wb_both, _imgs, _entries, {}, _info, layout="both")
+    check("both layout -> a stacked AND a side-by-side tab per column",
+          load_workbook(_wb_both).sheetnames
+          == ["Summary", "Description (stacked)", "FT (stacked)",
+              "Description (side-by-side)", "FT (side-by-side)"])
+
+    # A pair-only entry (as generate() produces for layout='pair') has no
+    # 'stacked' key; a stacked tab request must simply skip it.
+    _pair_only = [{"field": "HG", "route": "009", "key": "9.0", "va": "X",
+                   "vb": "Y", "note": "", "pair": _png("HG_009_p.png")}]
+    _wb_po = _wbtmp / "po (evidence).xlsx"
+    ve._write_workbook(_wb_po, _imgs, _pair_only, {}, _info, layout="stacked")
+    check("a layout with no rendered image for a column makes no empty tab",
+          load_workbook(_wb_po).sheetnames == ["Summary"])
+finally:
+    shutil.rmtree(_wbtmp, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #
 print("adapter LOCKSTEP pins vs the PDF consolidator")
