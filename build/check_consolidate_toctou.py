@@ -316,6 +316,75 @@ def tsn_highway_sequence_late_save():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def tsn_highway_sequence_post_replace_source_change():
+    """CMP-AUD-035: the DIRECT TSN Highway Sequence builder re-verifies the raw
+    source AFTER the os.replace. may_publish() checks source_current() just BEFORE
+    the replace; a change in the window between that check and the replace would
+    otherwise publish stale-source bytes and return success. Here the source PDF is
+    mutated right AFTER the real replace, and the post-replace recheck must turn the
+    result into an error (never a success-shaped path)."""
+    print("consolidate_tsn_highway_sequence (035: post-replace source recheck):")
+    M = consolidate_tsn_highway_sequence
+    tmp = _tmp("tsmis_035_seq_")
+    try:
+        in_dir = tmp / "in"; in_dir.mkdir()
+        src = in_dir / "d1.pdf"; src.write_bytes(b"%PDF-1.4")
+        out_path = tmp / "seq.xlsx"
+        saved = M.parse_pdf
+        saved_universe = M.tdc.require_exact_universe
+        _row = {"county": "04", "pm": "0.000", "city": "", "hg": "", "ft": "",
+                "dist": "", "description": ""}
+        _claims = {"member": "d1.pdf", "district": "01",
+                   "report_id": "OTM22025", "report_title": "Highway Locations",
+                   "report_date": "15-SEP-25", "reference_date": "15 SEP 2025",
+                   "cover_reference_date": "15-SEP-25",
+                   "generation_time": "01:05 PM", "pages": 2,
+                   "policy_sha256": "0" * 64,
+                   "policy_text": "* * * N O T E * * * boilerplate",
+                   "directions": {"001": "S-N"}}
+        M.parse_pdf = lambda _p, _e, pdf_name="": ("01", {"001": [_row]}, _claims)
+        M.tdc.require_exact_universe = lambda claimed: tuple(claimed)
+        # Let the pre-replace gate PASS (source unchanged at that instant), let the
+        # real os.replace happen, THEN mutate the source — so only the post-replace
+        # recheck can catch it. This is the exact TOCTOU window 035 closes.
+        real_asi = artifact_store.atomic_save_if
+
+        def inject(wb, out, proceed):
+            committed = real_asi(wb, out, proceed)          # gate passes -> replace
+            src.write_bytes(b"%PDF-1.4 CHANGED DURING COMMIT")   # source changes now
+            return committed
+
+        artifact_store.atomic_save_if = inject
+        try:
+            res = M.consolidate(events=Events(), confirm_overwrite=lambda _p: True,
+                                input_dir=in_dir, out_path=out_path)
+        finally:
+            artifact_store.atomic_save_if = real_asi
+            M.parse_pdf = saved
+            M.tdc.require_exact_universe = saved_universe
+        check("035: a source change during the final commit returns error, not success",
+              res.status == "error"
+              and "changed during the final commit" in (res.message or ""))
+        # Sanity: with NO post-replace mutation the same setup commits OK (proves the
+        # error above is the recheck firing, not an unrelated failure).
+        tmp2 = _tmp("tsmis_035_ok_")
+        try:
+            in2 = tmp2 / "in"; in2.mkdir()
+            (in2 / "d1.pdf").write_bytes(b"%PDF-1.4")
+            M.parse_pdf = lambda _p, _e, pdf_name="": ("01", {"001": [_row]}, _claims)
+            M.tdc.require_exact_universe = lambda claimed: tuple(claimed)
+            ok = M.consolidate(events=Events(), confirm_overwrite=lambda _p: True,
+                               input_dir=in2, out_path=tmp2 / "seq.xlsx")
+            check("035: an unchanged source still commits OK (recheck is a no-op)",
+                  ok.status == "ok")
+        finally:
+            M.parse_pdf = saved
+            M.tdc.require_exact_universe = saved_universe
+            shutil.rmtree(tmp2, ignore_errors=True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def converter_late_save():
     print("consolidate_tsmis_highway_log_pdf (per-route converter, gate at the combine):")
     M = consolidate_tsmis_highway_log_pdf
@@ -352,6 +421,7 @@ def main():
     ramp_summary_late_save()
     intersection_summary_late_save()
     tsn_highway_sequence_late_save()
+    tsn_highway_sequence_post_replace_source_change()
     converter_late_save()
     print()
     if _fail:

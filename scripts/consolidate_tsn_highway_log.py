@@ -1176,6 +1176,14 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         if source_problem[0] and result.status != "ok":
             return source_changed()
         if result.status == "ok":
+            # CMP-AUD-035: re-verify the raw source AFTER the os.replace. The
+            # publish_guard checks source_current() AT the replace boundary, but a
+            # change in the window between that check and the replace would still
+            # publish stale-source bytes as success. The canonical build_consolidated
+            # wrapper rehashes post-builder; this DIRECT/CLI path needs its own
+            # post-replace recheck so it never returns success for a changed source.
+            if not source_current():
+                return source_changed()
             result.tsn_raw_manifest = source_manifest
             n_suffixed = len(source_claims["suffixed_route_sections"])
             result.summary_lines = [

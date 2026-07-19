@@ -648,6 +648,19 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         return ConsolidateResult(status="cancelled",
                                  message="Cancelled. Existing file kept.")
 
+    # CMP-AUD-035: re-verify the raw source AFTER the os.replace. may_publish()
+    # checks source_current() just BEFORE the replace, but a change in that window
+    # would still publish bytes built from the now-stale source and return success.
+    # The canonical build_consolidated wrapper rehashes post-builder; this
+    # DIRECT/CLI path needs its own post-replace recheck so it never returns a
+    # success-shaped result for a source that changed during the final commit.
+    if not source_current():
+        return ConsolidateResult(
+            status="error",
+            message=("The TSN Highway Sequence raw source changed during the final "
+                     f"commit ({source_problem[0] or 'raw member names or bytes changed'})"
+                     "; re-run to normalize the current source."))
+
     summary_lines = []
     summary_lines += [
         f"District PDFs:  {len(pdfs)} parsed; exact D01-D12",
