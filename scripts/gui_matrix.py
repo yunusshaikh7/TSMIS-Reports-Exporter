@@ -399,25 +399,48 @@ class GuiMatrixMixin:
                 "examples": settings.get_evidence_examples(),
                 "layout": settings.get_evidence_layout()}
 
+    def _capture_evidence_identity(self, which):
+        """Freeze the settings that decide WHICH comparison an on-demand evidence
+        job targets, at ENQUEUE time (CMP-AUD-110). A queued camera click must
+        illustrate the comparison the user clicked — a later baseline, day-source,
+        destination, TSN-selection, example, or layout change must not silently
+        retarget it. `_dispatch_evidence_job` uses this frozen identity, never the
+        live settings."""
+        ident = {"dest": settings.get_batch_dest(),
+                 "tsn_files": self._matrix_tsn_selections(),
+                 "examples": settings.get_evidence_examples(),
+                 "layout": settings.get_evidence_layout()}
+        if which == "day":
+            ident["source"] = settings.get_day_matrix_source()
+        else:
+            ident["baseline"] = self._current_baseline()
+        return ident
+
     def _dispatch_evidence_job(self, job):
         """Start the on-demand evidence worker for ONE cell's EXISTING vs-TSN
         comparison (either matrix). Runs regardless of the evidence toggle —
         that's the point of the action; the matrix/day resolvers gate on
-        comparison freshness and raise actionable errors."""
-        dest = settings.get_batch_dest()
-        tsn_files = self._matrix_tsn_selections()
-        examples = settings.get_evidence_examples()
-        layout = settings.get_evidence_layout()
+        comparison freshness and raise actionable errors. Targeting is bound to
+        the job's ENQUEUE-time identity (CMP-AUD-110), NOT the live settings, so a
+        later baseline/source/destination/TSN/example/layout change can't
+        silently retarget a queued click (the pre-CMP-AUD-110 jobs, if any, fall
+        back to the live settings)."""
+        ident = job.get("evidence") or {}
+        dest = ident.get("dest") or settings.get_batch_dest()
+        tsn_files = (ident["tsn_files"] if "tsn_files" in ident
+                     else self._matrix_tsn_selections())
+        examples = ident.get("examples", settings.get_evidence_examples())
+        layout = ident.get("layout") or settings.get_evidence_layout()
         row, cell = job["row"], job["env"]
         comparisons_dest = None
         if job.get("which") == "day":
-            source = settings.get_day_matrix_source()
+            source = ident.get("source") or settings.get_day_matrix_source()
             run_fn = (lambda events, commit_guard=None:
                       day_matrix.evidence_for_day_cell(
                 source, cell, row, dest, events, tsn_files=tsn_files,
                 examples=examples, layout=layout, commit_guard=commit_guard))
         else:
-            base = self._current_baseline()
+            base = ident.get("baseline") or self._current_baseline()
             comparisons_dest = dest
             run_fn = (lambda events, commit_guard=None:
                       matrix.evidence_for_cell(
@@ -652,6 +675,7 @@ class GuiMatrixMixin:
         job = self._make_job("evidence", "cell",
                              self._job_label("evidence", "cell", row_key, env_key),
                              row=row_key, env=env_key)
+        job["evidence"] = self._capture_evidence_identity("env")
         return self._enqueue_matrix_job(job)
 
     @_api_method
@@ -1291,6 +1315,7 @@ class GuiMatrixMixin:
             "evidence", "cell",
             f"Evidence images {self._matrix_row_label(row_key)} — {date}",
             row=row_key, env=date, which="day")
+        job["evidence"] = self._capture_evidence_identity("day")
         return self._enqueue_matrix_job(job)
 
     @_api_method

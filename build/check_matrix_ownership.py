@@ -14,9 +14,13 @@ import tempfile
 import threading
 from pathlib import Path
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+sys.path[:0] = [os.path.join(os.path.dirname(__file__), "..", "scripts"),
+                os.path.join(os.path.dirname(__file__), "..")]  # scripts + repo root (version.py)
 
 import consolidation_meta
+import day_matrix
+import gui_api
+import gui_matrix
 import gui_worker_matrix
 import matrix
 import matrix_build
@@ -24,6 +28,7 @@ import matrix_state
 import outcome
 import owned_dir
 import reports
+import settings
 from events import ConsolidateResult, Events
 
 
@@ -390,12 +395,102 @@ def evidence_worker_checks(root):
           day_called == [True])
 
 
+def evidence_identity_checks(root):
+    """CMP-AUD-110: a queued on-demand evidence job is bound to the settings
+    that were live when the user clicked the camera — a later baseline / day
+    source / destination / TSN-selection / example / layout change must NOT
+    retarget it at dispatch."""
+    print("On-demand evidence targeting identity (CMP-AUD-110):")
+    (root / "destA").mkdir(exist_ok=True)
+    (root / "destB").mkdir(exist_ok=True)
+    a = gui_api.GuiApi()
+    live = {"dest": str(root / "destA"), "baseline": "ssor-prod",
+            "source": "ssor-prod", "examples": 2, "layout": "pair",
+            "tsn": {"highway_log": {"kind": "auto"}}}
+    saved = {n: getattr(settings, n) for n in
+             ("get_batch_dest", "get_evidence_examples", "get_evidence_layout",
+              "get_day_matrix_source")}
+    settings.get_batch_dest = lambda: live["dest"]
+    settings.get_evidence_examples = lambda: live["examples"]
+    settings.get_evidence_layout = lambda: live["layout"]
+    settings.get_day_matrix_source = lambda: live["source"]
+    a._current_baseline = lambda: live["baseline"]
+    a._matrix_tsn_selections = lambda: dict(live["tsn"])
+
+    rec = {}
+
+    def fake_efc(dest, row, cell, base, events, tsn_files=None, examples=None,
+                 layout=None, commit_guard=None):
+        rec.update(dest=str(dest), base=base, tsn=tsn_files, examples=examples,
+                   layout=layout)
+        return _ok_result()
+
+    def fake_efd(source, date, row, dest, events, tsn_files=None, examples=None,
+                 layout=None, commit_guard=None):
+        rec.update(source=source, dest=str(dest), tsn=tsn_files,
+                   examples=examples, layout=layout)
+        return _ok_result()
+
+    captured = {}
+
+    class FakeWorker:
+        def __init__(self, run_fn, *_a, **_k):
+            captured["fn"] = run_fn
+
+        def start(self):
+            pass
+
+    saved_efc, saved_efd = matrix.evidence_for_cell, day_matrix.evidence_for_day_cell
+    saved_worker = gui_matrix.MatrixEvidenceWorker
+    matrix.evidence_for_cell = fake_efc
+    day_matrix.evidence_for_day_cell = fake_efd
+    gui_matrix.MatrixEvidenceWorker = FakeWorker
+    try:
+        # ENV cell: freeze under A, change everything to B, dispatch, run.
+        job = a._make_job("evidence", "cell", "ev", row="highway_log",
+                          env="ars-test")
+        job["evidence"] = a._capture_evidence_identity("env")
+        check("enqueue freezes the env identity (baseline/dest/examples/tsn)",
+              job["evidence"]["baseline"] == "ssor-prod"
+              and job["evidence"]["dest"] == str(root / "destA")
+              and job["evidence"]["examples"] == 2
+              and job["evidence"]["tsn_files"] == {"highway_log": {"kind": "auto"}})
+        live.update(dest=str(root / "destB"), baseline="ars-test", examples=7,
+                    layout="both", tsn={"highway_log": {"kind": "explicit"}})
+        a._dispatch_evidence_job(job)
+        captured["fn"](None)
+        check("env dispatch uses the FROZEN baseline/dest/examples/layout/tsn, "
+              "not the live ones",
+              rec["base"] == "ssor-prod" and rec["dest"] == str(root / "destA")
+              and rec["examples"] == 2 and rec["layout"] == "pair"
+              and rec["tsn"] == {"highway_log": {"kind": "auto"}})
+
+        # DAY cell: freeze the source under A, change to B, dispatch, run.
+        rec.clear()
+        live.update(source="ssor-prod", examples=3)
+        jd = a._make_job("evidence", "cell", "ev", row="highway_log",
+                         env="2026-07-11", which="day")
+        jd["evidence"] = a._capture_evidence_identity("day")
+        live.update(source="ars-test", examples=9)
+        a._dispatch_evidence_job(jd)
+        captured["fn"](None)
+        check("day dispatch uses the FROZEN source/examples, not the live ones",
+              rec["source"] == "ssor-prod" and rec["examples"] == 3)
+    finally:
+        matrix.evidence_for_cell = saved_efc
+        day_matrix.evidence_for_day_cell = saved_efd
+        gui_matrix.MatrixEvidenceWorker = saved_worker
+        for n, fn in saved.items():
+            setattr(settings, n, fn)
+
+
 def main():
     root = Path(tempfile.mkdtemp(prefix="tsmis_matrix_ownership_"))
     try:
         worker_routing_checks(root)
         lazy_store_and_replacement_checks(root)
         evidence_worker_checks(root)
+        evidence_identity_checks(root)
     finally:
         # Link fixtures are explicitly removed in their test before recursive cleanup.
         shutil.rmtree(root, ignore_errors=True)
