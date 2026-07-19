@@ -1518,6 +1518,9 @@ def _resolve_source(report, selected_file=None, legacy_dest=None):
                     # identity token. Canonical library artifacts now expose the
                     # same content-bound surface as explicit picks, without making
                     # consumers reconstruct TSN provenance from loose fields.
+                    # CMP-AUD-081: this is None whenever the library is not current
+                    # (status: `identity_token if current else None`), so a
+                    # would-rebuild library reads dependent Matrix cells stale.
                     "identity_token": certified.get("identity_token")}
         raws = _raw_files(report)
         if raws:

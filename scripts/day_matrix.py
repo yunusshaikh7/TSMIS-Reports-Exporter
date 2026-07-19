@@ -318,6 +318,8 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                 rec = results.get(f"{day_folder_name(date, source)}|{row_key}")
                 srcs = [{"name": "cell", "present": exp_m is not None, "mtime": exp_m},
                         {"name": "tsn", "present": tsn_ready,
+                         # CMP-AUD-081: a stale canonical library resolves this to
+                         # None (status nulls the token when not current) -> stale.
                          "mtime": src_tsn.get("mtime"),
                          "identity": src_tsn.get("identity_token"),
                          "identity_required": True}]

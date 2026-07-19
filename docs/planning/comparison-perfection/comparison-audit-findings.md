@@ -359,7 +359,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-078 | P3 | Resolved | Comparison failures are titled as consolidation failures |
 | CMP-AUD-079 | P2 | Verified | Compare sub-tab switching can hide every Cancel control |
 | CMP-AUD-080 | P1 | Partially remediated | Matrix artifact identity can miss changed source and output content |
-| CMP-AUD-081 | P1 | Partially remediated | Matrix TSN freshness ignores source identity and library rebuild state |
+| CMP-AUD-081 | P1 | Resolved | Matrix TSN freshness ignores source identity and library rebuild state |
 | CMP-AUD-082 | P1 | Verified | Matrix formula twins can survive as stale audit artifacts |
 | CMP-AUD-083 | P2 | Resolved | Matrix presence and freshness count arbitrary non-report files |
 | CMP-AUD-084 | P1 | Resolved | Matrix caches survive semantic comparator and parser changes |
@@ -4226,7 +4226,9 @@ manifest; stat-only memoization is prohibited.
 ### CMP-AUD-081 — Matrix TSN freshness ignores the effective source identity
 
 Priority: P1  
-Status: Partially remediated — explicit selections are identity-bound; canonical-library generation remains open  
+Status: REMEDIATED 2026-07-18 — the canonical-library residual is closed by the
+consumer identity token being nulled whenever the library is not current; pinned by a
+regression test (see Remediation — 2026-07-18)  
 Primary code: `scripts/tsn_library.py:593-631`,
 `scripts/matrix_state.py:641-669`, `scripts/matrix_build.py:603-631,672-680`,
 `scripts/gui_matrix.py:689-719`
@@ -4267,6 +4269,35 @@ or invalidates dependent cells instead of falling through. Canonical consolidate
 resolution still lacks a comparable identity token/raw-input/normalizer generation in
 the cell record, so stale-library and semantic-version parts of this finding remain
 open with CMP-AUD-084.
+
+#### Remediation — 2026-07-18
+
+The canonical-library residual was re-examined and found already closed by the
+CMP-AUD-105 work — verified and pinned rather than re-fixed. When consolidated TSN
+resolution gained an identity token (CMP-AUD-105), it inherited `tsn_library.status`'s
+deliberate contract: `"identity_token": expected_identity_token if current else None`.
+So a canonical library that `ensure_current` WOULD rebuild — raw newer than its
+consolidated, a `normalization_version` bump, or any raw-manifest / normalized-bytes
+mismatch — resolves `current=False`, and `resolve()` hands the matrix snapshot
+`identity=None`. A cell built against the prior *current* token then reads stale through
+the existing identity gate (`source_identity_changed`) even though the consolidated
+bytes and mtime are unchanged — which is exactly the finding's "resolve returns the
+consolidated mtime and the snapshot reports fresh" case, now closed. This single token
+comparison subsumes the raw-input and normalization-version signals the finding lists
+separately (all three drive `current=False` → a nulled token). A comparison can never be
+built against a stale library in the first place (`tsn_identity_check_for` raises on a
+non-current consolidated), so a cell's recorded token is always a valid current one.
+
+Because this is an incidental consequence of a deliberate contract, it is now PINNED:
+`check_tsn_freshness` builds a current library, drifts the raw newer than the
+consolidated, and proves `status().current` flips false, `resolve()` nulls the consumer
+token (consolidated bytes/mtime unchanged), and the dependent cell reads stale — with a
+RED leg showing that a RETAINED token would read fresh (the defect) and a git-stash
+confirmation that neutralizing the nulling collapses the coverage. The `_staleness`
+identity branch, the two snapshot TSN-source builders, and `resolve()` carry
+CMP-AUD-081 comments documenting the mechanism (no behavior change). The `by-day` matrix
+inherits it through the shared `matrix._cmp_state`. Gate 135/135 (the new leg rides the
+existing check).
 
 ### CMP-AUD-082 — Matrix formula twins can remain stale
 

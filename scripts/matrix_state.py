@@ -378,6 +378,12 @@ def _staleness(cmp_m, sources, rec, fp_folders, missing_side,
         # source-folder set fingerprint. Losing either half cannot certify fresh.
         stale, reason = True, "cache_missing_or_mismatched"
     elif identity_changed:
+        # CMP-AUD-081: a canonical TSN library that ensure_current WOULD rebuild
+        # (raw newer than its consolidated, a normalizer-version bump, or a
+        # manifest/bytes mismatch) resolves its CONSUMER identity token to None
+        # (tsn_library.status: `identity_token if current else None`), so a cell
+        # built against the prior current token reads stale here — the snapshot
+        # never certifies a comparison the build path would heal first.
         stale, reason = True, "source_identity_changed"
     else:
         newer = [s["name"] for s in sources
@@ -863,6 +869,9 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                            {"name": "tsn",
                             "present": src.get("kind") in ("file", "consolidated"),
                             "mtime": src.get("mtime"),
+                            # CMP-AUD-081: a stale canonical library resolves this to
+                            # None (status nulls the consumer token when not current)
+                            # -> the identity gate reads the cell stale.
                             "identity": src.get("identity_token"),
                             "identity_required": True}]
                 # F5/P2: the TSMIS store folder is the multi-file side where a deleted

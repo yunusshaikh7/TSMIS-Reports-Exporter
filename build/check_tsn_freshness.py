@@ -121,6 +121,62 @@ def main():
         check("...ensure_current no-ops once current",
               tsn_library.ensure_current(REPORT) is None and len(builds) == 1)
 
+        # CMP-AUD-081: a canonical library that ensure_current WOULD rebuild must
+        # read the dependent Matrix cell STALE in the snapshot — not only heal at
+        # build time. The mechanism is deliberate: status() nulls the CONSUMER
+        # identity token when the library is not current (`identity_token if current
+        # else None`), so resolve() hands the snapshot identity=None and a cell built
+        # against the prior current token reads stale via the identity gate — even
+        # though the consolidated BYTES/mtime are unchanged. This closes the finding's
+        # exact "resolve returns the consolidated mtime and the snapshot reports
+        # fresh" case, now that consolidated resolution carries an identity token
+        # (CMP-AUD-105). The normalizer-version cause reaches the SAME
+        # current=False -> None-token path (the wrong-version stamp above already
+        # proves a version bump reads not-current).
+        cons_m = cons.stat().st_mtime
+        src_ok = tsn_library.resolve(REPORT)
+        token = src_ok.get("identity_token")
+        check("resolve() on a CURRENT library returns a bound (non-null) identity token",
+              token is not None)
+
+        def _tsn_sources(src):
+            return [{"name": "cell", "present": True, "mtime": cons_m - 50},
+                    {"name": "tsn",
+                     "present": src.get("kind") in ("file", "consolidated"),
+                     "mtime": src.get("mtime"),
+                     "identity": src.get("identity_token"),
+                     "identity_required": True}]
+
+        # A cell built against the current library records that exact token.
+        rec = {"verdict": "match", "diff_cells": 0, "one_sided": 0,
+               "built_at_mtime": cons_m, "completion": "complete",
+               "producer_versions": matrix.producer_identity(),
+               "source_identities": {"tsn": token}}
+        check("a current library reads the cell fresh",
+              matrix._staleness(cons_m, _tsn_sources(src_ok), rec, (), None)["stale"]
+              is False)
+
+        # Drift: make the RAW newer than the consolidated -> the library is stale
+        # (ensure_current would rebuild), but the consolidated bytes/mtime are
+        # untouched.
+        os.utime(raw, (cons_m + 200, cons_m + 200))
+        src_stale = tsn_library.resolve(REPORT)
+        check("a would-rebuild library reads not-current + nulls the consumer token"
+              " (bytes/mtime unchanged)",
+              tsn_library.status(REPORT)["current"] is False
+              and src_stale.get("identity_token") is None
+              and src_stale.get("mtime") == src_ok.get("mtime"))
+        st_stale = matrix._staleness(cons_m, _tsn_sources(src_stale), rec, (), None)
+        check("...so the dependent cell reads STALE (source_identity_changed)",
+              st_stale["stale"] is True
+              and st_stale["reason"] == "source_identity_changed", st_stale["reason"])
+        # RED: were the token RETAINED despite the stale library (no nulling), every
+        # signal would match and the cell would read FRESH — the finding's defect.
+        red = matrix._staleness(
+            cons_m, _tsn_sources(dict(src_stale, identity_token=token)), rec, (), None)
+        check("...(red) a retained token would have read FRESH", red["stale"] is False)
+        os.utime(raw, (cons_m - 100, cons_m - 100))   # restore -> library current again
+
         raw_bytes = raw.read_bytes()
 
         # A deleted raw source invalidates even a previously current workbook.
