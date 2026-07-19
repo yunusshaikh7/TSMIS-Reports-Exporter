@@ -535,6 +535,71 @@ try:
 finally:
     shutil.rmtree(_r6, ignore_errors=True)
 
+# CMP-AUD-109: the workbook + images publish as ONE set. When the workbook can't
+# reach its canonical name (locked open in Excel), the images are diverted too,
+# so the canonical pair is never a NEW workbook beside OLD images.
+print("CMP-AUD-109: workbook + images publish as one set")
+_r9 = Path(tempfile.mkdtemp(prefix="evidence_109_"))
+try:
+    from PIL import Image as _PILImage9
+
+    def _publish_case(name, lock_workbook):
+        cmp9 = _r9 / f"{name}.xlsx"
+        cmp9.write_bytes(b"comparison")
+        wb9, img9 = ve.sibling_paths(cmp9)
+        wb9.write_bytes(b"OLD workbook")
+        img9.mkdir()
+        (img9 / "old.png").write_bytes(b"old image")
+        tmp9 = _r9 / f"{name}.rendered"
+        tmp9.mkdir()
+        _PILImage9.new("RGB", (30, 15), "white").save(tmp9 / "Description_1_pair.png")
+        entries = [{"field": "Description", "route": "001", "key": "1.0",
+                    "va": "A", "vb": "B", "note": "",
+                    "pair": "Description_1_pair.png"}]
+        info = {"report": "HD", "comparison": cmp9.name, "examples": 1,
+                "seed": "00000000", "tsmis_dir": "A", "tsn_dir": "B"}
+        captured = ve.artifact_store.capture_source_identities((cmp9,))
+        real_replace = ve.os.replace
+        state = {"n": 0}
+
+        def replace(src, dst):
+            if lock_workbook and Path(dst) == wb9 and state["n"] == 0:
+                state["n"] += 1
+                raise PermissionError("simulated workbook open in Excel")
+            return real_replace(src, dst)
+
+        ve.os.replace = replace
+        try:
+            res = ve._publish_evidence_set(
+                wb9, img9, tmp9, entries, {}, info, "pair", (cmp9,),
+                captured, None, None, ve.owned_dir.directory_identity(tmp9))
+        finally:
+            ve.os.replace = real_replace
+        return wb9, img9, res
+
+    _wb9, _img9, _res9 = _publish_case("happy", lock_workbook=False)
+    check("no lock -> both promoted to canonical",
+          _res9["status"] == "promoted"
+          and _res9["workbook"] == str(_wb9) and _res9["folder"] == str(_img9)
+          and _wb9.read_bytes() != b"OLD workbook"          # workbook replaced
+          and not (_img9 / "old.png").exists())             # images replaced
+
+    _wb9b, _img9b, _res9b = _publish_case("locked", lock_workbook=True)
+    check("workbook locked -> the SET diverts, status honest (not success)",
+          _res9b["status"] == "diverted"
+          and _res9b["workbook"] is None and _res9b["folder"] is None)
+    check("...the OLD workbook stays at canonical (not overwritten)",
+          _wb9b.read_bytes() == b"OLD workbook")
+    check("...and the OLD images STAY at canonical (never a new-wb / old-images mix)",
+          (_img9b / "old.png").exists()
+          and (_img9b / "old.png").read_bytes() == b"old image")
+    check("...the new set lands in .new siblings",
+          any(p.name.startswith(_wb9b.stem + ".new-")
+              for p in _r9.glob(_wb9b.stem + ".new-*.xlsx"))
+          and any(p.is_dir() for p in _r9.glob(_img9b.name + ".new-*")))
+finally:
+    shutil.rmtree(_r9, ignore_errors=True)
+
 # The strip crop is a FULL-WIDTH page band stretched over the cell box
 # (v0.26.0): the adapters' xspan covers only the record's own words, so a crop
 # keyed to it clipped a blank cell's red box (drawn where the value WOULD

@@ -600,23 +600,22 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                             "(see the log)", "rendered": 0, "fields_ok": 0,
                     "fields_with_diffs": len(fields_with_diffs),
                     "misses": misses, "workbook": None, "folder": None}
-        # CMP-AUD-112: every image is now rendered into tmp_dir. Confirm no
-        # candidate PDF's BYTES changed since the parse baseline — if one did,
-        # a verified value and its rasterized page could disagree, so publish
-        # nothing (the existing set-identity tripwire guards the commits too).
+        # CMP-AUD-109 + 112: recheck at the commit boundary — cancellation and
+        # the PDF byte baseline — immediately before publishing the SET. A late
+        # cancel leaves the previous evidence untouched (keep-last-good); a
+        # changed candidate PDF (even a metadata-preserving swap) aborts, so a
+        # verified value and its rasterized page can never disagree.
+        if events.is_cancelled():
+            return _cancelled()
         _ensure_pdf_content_unchanged(pdf_content_baseline)
-        wb_note = _write_workbook(wb_path, tmp_dir, entries, misses, dict(
-            comparison=Path(comparison_path).name, report=adapter.REPORT_LABEL,
-            seed=f"{seed:08x}", examples=examples,
-            tsmis_dir=str(tsmis_pdf_dir), tsn_dir=str(tsn_dir)),
-            layout=layout,
-            source_paths=source_paths, captured_sources=captured_sources,
-            source_set_check=source_set_check, commit_guard=commit_guard)
-        dir_note = _swap_dir(
-            tmp_dir, img_dir, source_paths=source_paths,
-            captured_sources=captured_sources,
-            source_set_check=source_set_check, commit_guard=commit_guard,
-            tmp_directory_identity=tmp_dir_fs_identity)
+        publication = _publish_evidence_set(
+            wb_path, img_dir, tmp_dir, entries, misses, dict(
+                comparison=Path(comparison_path).name,
+                report=adapter.REPORT_LABEL, seed=f"{seed:08x}",
+                examples=examples, tsmis_dir=str(tsmis_pdf_dir),
+                tsn_dir=str(tsn_dir)),
+            layout, source_paths, captured_sources, source_set_check,
+            commit_guard, tmp_dir_fs_identity)
     finally:
         if os.path.lexists(tmp_dir):
             try:
@@ -635,18 +634,23 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                 shutil.rmtree(tmp_dir, ignore_errors=True)
 
     fields_ok = len({e["field"] for e in entries})
+    promoted = publication["status"] == "promoted"
     note = (f"evidence: {rendered} example(s) across {fields_ok}/"
-            f"{len(fields_with_diffs)} differing column(s) → {wb_path.name}")
+            f"{len(fields_with_diffs)} differing column(s)"
+            + (f" → {wb_path.name}" if promoted else ""))
     if misses:
         note += (f" — {len(misses)} column(s) had no verifiable example "
                  "(reasons in the workbook)")
-    for extra in (wb_note, dir_note):
-        if extra:
-            note += f"; {extra}"
+    if publication.get("note"):
+        note += f"; {publication['note']}"
     events.on_log("  " + note)
+    # CMP-AUD-109: the returned workbook/folder are the ACTUAL committed
+    # canonical paths (None when the set diverted to .new), not an unconditional
+    # success claim; `status` names promoted vs diverted.
     return {"note": note, "rendered": rendered, "fields_ok": fields_ok,
             "fields_with_diffs": len(fields_with_diffs), "misses": misses,
-            "workbook": str(wb_path), "folder": str(img_dir)}
+            "workbook": publication["workbook"], "folder": publication["folder"],
+            "status": publication["status"]}
 
 
 def _cancelled():
@@ -1280,3 +1284,78 @@ def _swap_dir(tmp_dir, target, source_paths=(), captured_sources=(),
         # same rollback for any unexpected guard exception.
         restore_old()
         raise
+
+
+def _divert_images(tmp_dir, target, source_paths, captured_sources,
+                   source_set_check, commit_guard, tmp_dir_fs_identity):
+    """Move the freshly rendered images to an unpredictable .new-<token> sibling
+    of `target` WITHOUT touching the canonical folder — used when the workbook
+    could not reach its canonical name, so the OLD images stay in place and the
+    workbook/images can't disagree (CMP-AUD-109). Returns the alt folder name,
+    or None when even that could not be reserved (images dropped, keep-last-good;
+    the temp is then cleaned by the caller)."""
+    try:
+        alt = _unique_dir_sibling(target, "new")
+        if source_set_check is not None:
+            source_set_check()
+        artifact_store.ensure_outputs_do_not_alias_sources(
+            (tmp_dir, alt), source_paths,
+            directory_destinations=(tmp_dir, alt),
+            captured_sources=captured_sources, require_sources_current=True)
+        _require_output_guard(commit_guard, tmp_dir,
+                              "temporary evidence-folder divert",
+                              directory_identity=tmp_dir_fs_identity)
+        _require_output_guard(commit_guard, alt,
+                              "diverted evidence-folder publication")
+        if os.path.lexists(alt):
+            raise FileExistsError(f"Evidence divert path appeared before use: {alt}")
+        os.replace(tmp_dir, alt)
+        return alt.name
+    except (OSError, ValueError, owned_dir.OwnershipError) as e:
+        log.warning("evidence: could not divert images alongside the diverted "
+                    "workbook: %s: %s", type(e).__name__, e)
+        return None
+
+
+def _publish_evidence_set(wb_path, img_dir, tmp_dir, entries, misses, info,
+                          layout, source_paths, captured_sources,
+                          source_set_check, commit_guard, tmp_dir_fs_identity):
+    """Publish the workbook + image folder as ONE set (CMP-AUD-109). The workbook
+    commits first; if it can't reach its canonical name (locked open — the common
+    case, the user reading the previous evidence in Excel), the images are
+    diverted too, so BOTH old artifacts stay at canonical and BOTH new ones land
+    in .new siblings — never a new-workbook / old-images mix. Returns
+    {status, workbook, folder, note}: 'promoted' (both at canonical) or 'diverted'
+    (see note). `workbook`/`folder` are the ACTUAL committed canonical paths, or
+    None when nothing reached canonical — the caller reports them honestly instead
+    of always claiming success at the canonical names.
+
+    Residual: if the workbook DOES commit but the image folder is separately
+    locked, the images still divert (new workbook beside old images); the result
+    then honestly reports 'diverted' with an out-of-sync note. Fully closing that
+    rarer case needs a quarantine-based two-phase commit of both artifacts (the
+    workbook commit is not yet rollback-able) — tracked in the ledger."""
+    wb_note = _write_workbook(
+        wb_path, tmp_dir, entries, misses, info, layout=layout,
+        source_paths=source_paths, captured_sources=captured_sources,
+        source_set_check=source_set_check, commit_guard=commit_guard)
+    if wb_note is not None:
+        # The workbook could not reach canonical — keep the OLD images at
+        # canonical too by diverting the new set, so the two never disagree.
+        dir_alt = _divert_images(tmp_dir, img_dir, source_paths,
+                                 captured_sources, source_set_check,
+                                 commit_guard, tmp_dir_fs_identity)
+        note = wb_note + (f"; new images saved to {dir_alt}" if dir_alt
+                          else "; new images not saved")
+        return {"status": "diverted", "workbook": None, "folder": None,
+                "note": note}
+    dir_note = _swap_dir(
+        tmp_dir, img_dir, source_paths=source_paths,
+        captured_sources=captured_sources, source_set_check=source_set_check,
+        commit_guard=commit_guard, tmp_directory_identity=tmp_dir_fs_identity)
+    if dir_note is None:
+        return {"status": "promoted", "workbook": str(wb_path),
+                "folder": str(img_dir), "note": None}
+    return {"status": "diverted", "workbook": str(wb_path), "folder": None,
+            "note": "the workbook updated but " + dir_note
+                    + " — close the images and re-run to resync"}
