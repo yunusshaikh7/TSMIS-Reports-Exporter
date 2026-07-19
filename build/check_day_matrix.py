@@ -316,6 +316,14 @@ def main():
         rb = a.rebuild_day_matrix("all")
         check("rebuild-all over real days -> launched", rb.get("ok") and a._task == "matrix")
         a._end_task()
+        # CMP-AUD-096: a supplied-but-invalid row/date is REJECTED, never silently
+        # normalized to None (which the endpoint reads as "no filter" -> a
+        # whole-matrix rebuild). Days 2026-06-17/18 are the only valid columns.
+        check("rebuild_day_matrix rejects a supplied-but-invalid row (CMP-AUD-096)",
+              bool(a.rebuild_day_matrix("all", row="nope").get("error")))
+        check("rebuild_day_matrix rejects an impossible date (CMP-AUD-096)",
+              bool(a.rebuild_day_matrix("all", date="2026-99-99").get("error")))
+        check("rebuild_day_matrix stays idle after a rejected scope", a._task is None)
 
         print("gui_api bridge — by-day EXPORT (today only) + export->compare chain:")
         today = paths.today_str()

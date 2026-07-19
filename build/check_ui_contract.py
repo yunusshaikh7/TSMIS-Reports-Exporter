@@ -77,10 +77,24 @@ def test_ui_script_references_exist():
         check(f"referenced ui asset exists (no 404): {f}", (UI / f).exists())
 
 
+def test_baseline_switch_uses_stale_scope():
+    """CMP-AUD-099: switching the matrix baseline recomputes ONLY the stale
+    (cross-environment) cells — never `all` (which would needlessly rebuild
+    baseline-independent vs-TSN / self-check comparisons). The per-row/per-column
+    rebuild buttons legitimately keep `all`; only the baseline `onchange` differs."""
+    print("CMP-AUD-099: baseline switch recomputes 'stale', not 'all':")
+    js = (UI / "ui-matrix.js").read_text(encoding="utf-8")
+    m = re.search(r"set_matrix_baseline\(nb\).*?recompute_matrix\((\"|')(\w+)\1",
+                  js, re.S)
+    check("baseline-switch handler calls recompute_matrix('stale')",
+          bool(m) and m.group(2) == "stale")
+
+
 def main():
     test_contract_enum_parity()
     test_mock_carries_contract()
     test_ui_script_references_exist()
+    test_baseline_switch_uses_stale_scope()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

@@ -764,7 +764,12 @@ def _cmp_state(out_path, sources, rec, fp_folders=()):
     newer than it, OR the inputs' IDENTITY changed (`fp_folders` — the TSMIS store
     folder(s); a route added/removed/resized that the mtime check misses — F5/P2)."""
     missing = [s["name"] for s in sources if not s.get("present")]
-    missing_side = missing[0] if missing else None
+    # CMP-AUD-097: when MORE THAN ONE side is absent, report the canonical "both"
+    # (the taxonomy `comparison_state` already emits + the renderer's `both`
+    # branch), not just the first missing name — a baseline/day cell with neither
+    # its export nor its reference present must not hide that the reference is also
+    # missing (which read as a plain "not exported").
+    missing_side = "both" if len(missing) > 1 else (missing[0] if missing else None)
     return _staleness(_safe_mtime(out_path), sources, rec, fp_folders, missing_side,
                       comparison_output=out_path)
 

@@ -281,6 +281,12 @@ def main():
         check("rebuild-all launches over the comparable cells",
               rb.get("ok") and a._task == "matrix")
         a._end_task()
+        # CMP-AUD-096: a supplied-but-invalid row/date is REJECTED, not widened to all.
+        check("rebuild_baseline_matrix rejects a supplied-but-invalid row (CMP-AUD-096)",
+              bool(a.rebuild_baseline_matrix("all", row="nope").get("error")))
+        check("rebuild_baseline_matrix rejects an impossible date (CMP-AUD-096)",
+              bool(a.rebuild_baseline_matrix("all", date="2026-99-99").get("error")))
+        check("rebuild_baseline_matrix stays idle after a rejected scope", a._task is None)
         check("state carries the baseline formulas toggle",
               a._state_snapshot().get("baseline_matrix_formulas") is False
               and a.set_baseline_matrix_formulas(True).get("on") is True

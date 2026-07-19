@@ -126,14 +126,19 @@ class GuiMatrixMixin:
     @_api_method
     def set_matrix_baseline(self, baseline):
         """Persist the matrix baseline. Returns the new baseline and how many
-        cells a full recompute against it would (re)build (the UI confirms before
-        calling recompute_matrix('all'))."""
+        cells the recompute against it would (re)build (the UI confirms before
+        calling recompute_matrix('stale')). CMP-AUD-099: a baseline switch only
+        moves the CROSS-ENVIRONMENT cells' reference side; vs-TSN and self-check
+        cells are baseline-independent, so only the now-STALE (env) cells rebuild —
+        `scope='stale'` counts exactly those, never the fresh baseline-agnostic
+        modes."""
         base = self._valid_baseline(baseline)
         if not base:
             return {"error": "Unknown baseline environment."}
         settings.set_matrix_baseline(base)
         self._emit_log(f"Matrix baseline set to {matrix.default_env_label(base)}.")
-        pending = len(matrix.cells_to_rebuild(self._matrix_snapshot(base), scope="all"))
+        pending = len(matrix.cells_to_rebuild(self._matrix_snapshot(base),
+                                              scope="stale"))
         self._push_state()
         return {"baseline": base, "recompute_pending": pending}
 
@@ -633,8 +638,15 @@ class GuiMatrixMixin:
         job actually runs)."""
         base = self._current_baseline()
         scope = scope if scope in ("stale", "all") else "stale"
-        row = row if (row and row in {r[0] for r in matrix_rows()}) else None
-        env = env if (env and self._parse_env_keys([env])) else None
+        # CMP-AUD-096: a SUPPLIED-but-invalid scope filter is REJECTED, never
+        # silently normalized to None (which the endpoint reads as "no filter" ->
+        # a whole-matrix rebuild). An absent (falsy) filter still means everything.
+        if row and row not in {r[0] for r in matrix_rows()}:
+            return {"error": "Unknown report row for the rebuild."}
+        if env and not self._parse_env_keys([env]):
+            return {"error": "Unknown environment for the rebuild."}
+        row = row or None
+        env = env or None
         job_scope = "row" if row else "column" if env else scope
         with self._lock:
             idle = not self._task and not self._queue
@@ -1191,8 +1203,14 @@ class GuiMatrixMixin:
         only when idle, not forced, and there's nothing to do."""
         snap = self._day_matrix_snapshot()
         scope = scope if scope in ("stale", "all") else "stale"
-        row = row if (row and row in {r["key"] for r in snap["all_rows"]}) else None
-        date = date if (date and date in snap["days"]) else None
+        # CMP-AUD-096: reject a supplied-but-invalid row/day rather than widening
+        # the request to the whole matrix (an absent filter still means everything).
+        if row and row not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report row for the rebuild."}
+        if date and date not in snap["days"]:
+            return {"error": "Unknown day for the rebuild."}
+        row = row or None
+        date = date or None
         job_scope = "row" if row else "column" if date else scope
         with self._lock:
             idle = not self._task and not self._queue
@@ -1388,8 +1406,14 @@ class GuiMatrixMixin:
         if not snap["baseline"]["id"]:
             return {"error": "Pick a baseline first."}
         scope = scope if scope in ("stale", "all") else "stale"
-        row = row if (row and row in {r["key"] for r in snap["all_rows"]}) else None
-        date = date if (date and date in snap["days"]) else None
+        # CMP-AUD-096: reject a supplied-but-invalid row/day rather than widening
+        # the request to the whole matrix (an absent filter still means everything).
+        if row and row not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report row for the rebuild."}
+        if date and date not in snap["days"]:
+            return {"error": "Unknown day for the rebuild."}
+        row = row or None
+        date = date or None
         job_scope = "row" if row else "column" if date else scope
         with self._lock:
             idle = not self._task and not self._queue

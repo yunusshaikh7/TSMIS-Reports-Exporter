@@ -807,7 +807,10 @@ async function renderMatrix() {
       const r = await api.set_matrix_baseline(nb);
       if (r && r.error) { showMessage("error", "Can't switch", r.error); sel.value = snap.baseline; return; }
       await renderMatrix();
-      await api.recompute_matrix("all");
+      // CMP-AUD-099: only the cross-environment cells changed their reference side;
+      // "stale" scope rebuilds exactly those and leaves fresh vs-TSN / self-check
+      // cells (baseline-independent) alone — "all" would needlessly rebuild them.
+      await api.recompute_matrix("stale");
     };
   }
   const btn = $("btnMatrixRefreshAll");

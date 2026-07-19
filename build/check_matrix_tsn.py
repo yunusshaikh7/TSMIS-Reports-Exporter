@@ -357,6 +357,27 @@ def test_snapshot_modes():
         shutil.rmtree(dest, ignore_errors=True)
 
 
+def test_missing_side_both():
+    print("CMP-AUD-097: a comparison cell with >1 absent side reports 'both':")
+    NO = "/no/such/comparison.xlsx"
+    both = matrix._cmp_state(
+        NO, [{"name": "cell", "present": False, "mtime": None},
+             {"name": "baseline", "present": False, "mtime": None}], None)
+    check("neither side present -> missing_side 'both' (reaches the UI 'both' branch)",
+          both.get("missing_side") == "both")
+    one = matrix._cmp_state(
+        NO, [{"name": "cell", "present": True, "mtime": 1.0},
+             {"name": "baseline", "present": False, "mtime": None}], None)
+    check("exactly one absent side -> that side's own name (unchanged)",
+          one.get("missing_side") == "baseline")
+    # the actionable single-missing TSN token is preserved (renderer shows 'needs TSN')
+    tsn = matrix._cmp_state(
+        NO, [{"name": "cell", "present": True, "mtime": 1.0},
+             {"name": "tsn", "present": False, "mtime": None}], None)
+    check("single missing tsn side keeps its 'tsn' token",
+          tsn.get("missing_side") == "tsn")
+
+
 def test_build_guards():
     print("build_comparison guard paths:")
     dest = Path(tempfile.mkdtemp(prefix="tsmis_tsnbuild_"))
@@ -475,6 +496,7 @@ def main():
     test_source_detection()
     test_canonical_selection_keys()
     test_snapshot_modes()
+    test_missing_side_both()
     test_build_guards()
     test_support_derives_from_registry()
     print()

@@ -25,6 +25,7 @@ sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 import batch_manifest
 import gui_api
 import gui_matrix
+import matrix
 import settings
 from openpyxl import Workbook
 
@@ -128,6 +129,30 @@ def main():
         check("recompute_pending present", "recompute_pending" in res)
         a.set_matrix_baseline("ssor-prod")            # back to default for the rest
 
+        print("CMP-AUD-096: an invalid recompute scope is rejected, not widened to all:")
+        check("recompute_matrix rejects a supplied-but-invalid row",
+              bool(a.recompute_matrix("all", row="nope").get("error")))
+        check("recompute_matrix rejects a supplied-but-invalid env",
+              bool(a.recompute_matrix("all", env="nope-env").get("error")))
+        check("recompute_matrix stays idle after a rejected scope", a._task is None)
+
+        print("CMP-AUD-099: a baseline switch sizes/recomputes only the STALE (env) cells:")
+        _seen099 = {}
+        _orig_ctr = matrix.cells_to_rebuild
+
+        def _capture099(snap, scope="stale", **kw):
+            _seen099["scope"] = scope
+            return _orig_ctr(snap, scope=scope, **kw)
+
+        matrix.cells_to_rebuild = _capture099
+        try:
+            a.set_matrix_baseline("ars-prod")
+            check("set_matrix_baseline sizes the recompute with 'stale' scope, not 'all'",
+                  _seen099.get("scope") == "stale")
+        finally:
+            matrix.cells_to_rebuild = _orig_ctr
+            a.set_matrix_baseline("ssor-prod")        # back to default for the rest
+
         print("refresh_cell_comparison enqueue + validation:")
         check("unknown row rejected",
               bool(a.refresh_cell_comparison("nope", "ars-prod").get("error")))
@@ -192,7 +217,6 @@ def main():
               bool(a.open_cell_comparison("ramp_detail", "ars-prod").get("error")))
         check("nothing was opened for the missing file", not opened)
         # Plant a comparison workbook where the matrix expects it, then open it.
-        import matrix
         cpath = matrix.comparison_path(str(dest), "ssor-prod", "ramp_detail", "ars-prod")
         _touch(cpath)
         r = a.open_cell_comparison("ramp_detail", "ars-prod")
