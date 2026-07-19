@@ -41,31 +41,33 @@ its findings back-to-back, then update this roadmap.
 | ~~**M7**~~ ✅ | Day / matrix state machine (bucket E) | ~~091 092 093 094 095 096 097 099~~ | **DONE 2026-07-18 — all 8 closed** (91eaee1 / 1400516 / b0add06 / b107c32). Day discovery / date-crossing / source-scoping / rebuild-filter honesty. |
 | ~~**M8**~~ ✅ | Compare / matrix GUI dispatch (bucket E) | ~~007 010 016 079 101 102 103 104~~ | **DONE 2026-07-18 — all 8 closed** (ac63f10 / 2b1e516 / 86c8e76), CI-green. Open-comparisons common root, set-all authoritative catalog, shared buildability predicate, canonical TSN consolidate routing, Cancel visibility, queue-capable day export, recipe-bound classic inputs, validation coverage pin. |
 | **M9** ◑ | Completion / partial-artifact policy + transaction (bucket E) | ~~035 040 075~~ · 085 098 115 | **PARTIAL 2026-07-18 — 3 closed (035 040 075), 3 DEFERRED.** 035 direct-builder post-`os.replace` recheck; 040 folder run-root/subfolder aliasing; 075 closed-by-082. **DEFERRED:** 115 (deep commit-schema gate on the correctness-locked path — read half already fixed; needs exhaustive per-comparator census), 098 (evidence-gate half = Stage-10), 085 (owner-gated last-complete/latest-attempt policy + Phase-5/7 durable overlay — with 089). |
-| **BIG-1** (M10+M11) | **Evidence arc — bucket F (107/110/112 ✅, 106/109 partial, + layout feature); 108/208/209/210 = Stage-10 published-cell cluster** | ~~106~~ ~~107~~ 108 ~~109~~ ~~110~~ ~~112~~ · 208 209 210 | Evidence workbook + images must be ONE truthful transaction: stale red evidence beside a clean compare (106), invented HD diffs (107), duplicate-only accounting lost (108), not-one-transaction (109), queued evidence retargets to current settings (110), verify-old-but-rasterize-new bytes (112). Then the **CLAUDE.md-flagged gap** — HSL evidence recomputes instead of READING the published Comparison cells, excludes whole discrepancy classes, and has no source-faithful PDF-vs-Excel path (208/209); **210 is a deferred multi-part feature — own mini-plan.** Touches `visual_evidence.py` + `evidence_*.py` adapters + the matrix evidence gate; needs real district-PDF fixtures. **Biggest coherent product-correctness cluster left.** |
-| **BIG-2** (M12+M13) | **Source normalization fidelity — bucket G, 8 findings** | HD: 042 133 138 142 186 · IS/HSL: 144 145 193 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). |
-| **BIG-3** | **Phase-5/7 cluster — the HARDEST, 5 findings** | 080 085 089 098(evidence) 115 | The deferred durable-attempt-overlay / policy / commit-schema family. **085 needs an OWNER DECISION** (canonical artifact = *last-complete* or *latest-attempt*?) **+** a durable attempt overlay (Phase-5/7); **089** is that overlay (a crashed rebuild silently reverts to the old ✓); **080** source-fingerprint content identity (per-cell-per-snapshot perf-cache); **098** evidence read-set snapshotting (Stage-10); **115** the commit-boundary schema gate + its exhaustive per-comparator census. **Read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes FIRST; surface the 085 policy decision.** All the "correct today, hardening tomorrow" work — no false-green exists now; this is durability + defense-in-depth. |
+| ~~**BIG-1**~~ ◑ | **Evidence arc — bucket F. DONE to the tractable line: 107/110/112 ✅ + 106/109 partial + the layout feature (2026-07-18/19).** The remainder is EV-10 below. | ~~106~~ ~~107~~ ~~109~~ ~~110~~ ~~112~~ + 108 · 208 209 210 · 098 | 107 (compared_cell equality), 110 (queued-evidence identity), 112 (parse↔render byte digest) CLOSED; 106 (retire-stale-on-clean) + 109 (workbook+images one set) PARTIAL. What's left is the Stage-10 published-cell spine → **EV-10**. |
+| **EV-10** | **Evidence — Stage-10 published-cell rebuild + transaction completion (7)** | 108 · 208 209 210 · 098 · 106↺ 109↺ | The coherent evidence remainder. **ONE spine:** drive evidence from the PUBLISHED comparison — its per-cell E/D/N/U state masks + the persisted `pairing_trace` + per-column counts — instead of re-executing `adapter.load_sides`/`enumerate_diffs` (**208**), so duplicate-only diffs stop vanishing (**108**) and no discrepancy class is excluded before sampling (**209**); each item names flavor/sheet/row/cell/state/source-indices/provenance and an INDEPENDENT raw-source oracle recomputes it (the acceptance bar). Then the source-faithful Excel / PDF-vs-Excel routes (**210**, own mini-plan) + the durable per-comparison generation MANIFEST that finishes **106** (no-example/toggle-off/restart) + the evidence-gate read-set snapshot (**098**). The **109** two-phase residual (a quarantine-based two-artifact atomic commit so the images-locked case rolls both back) rides here too. **The CLAUDE.md-flagged "HSL not yet an end-to-end verifier" gap.** Investigation (2026-07-19): the truth is persisted as Excel formulas/value caches → needs a state-mask/pairing-trace decoder + the raw-source oracle = **Stage-9/10, a dedicated multi-session effort, NOT a marathon slice.** Detail: the `#### Disposition — 2026-07-19` note at CMP-AUD-208. |
+| **NORM** | **Source normalization fidelity — bucket G (8)** | HD: 042 133 138 142 186 · IS/HSL: 144 145 193 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
+| **DUR** | **Phase-5/7 durability & policy — the OWNER-GATED cluster (4)** | 080 085 089 115 | The deferred durable-attempt-overlay / policy / commit-schema family. **085 needs an OWNER DECISION** (canonical artifact = *last-complete* or *latest-attempt*?) **+** a durable attempt overlay (Phase-5/7); **089** is that overlay (a crashed rebuild silently reverts to the old ✓); **080** source-fingerprint content identity (per-cell-per-snapshot perf-cache); **115** the commit-boundary schema gate + its exhaustive per-comparator census. **Read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes FIRST; surface the 085 policy decision.** "Correct today, hardening tomorrow" — no live false-green; durability + defense-in-depth. |
 
-**Vendor-blocked / next-statewide-batch — NOT a marathon.** Deferred to the owner's next HD batch,
-tied to the [054 accept-amber decision](#): **045** (HD-Excel county — the report-family
-integration leg still red), **192** (HD route-005 stale 7.7 Excel beside a newer PDF). Plus **HL
-raw county**. **Never infer these** — they need the vendor/site answer or a fresh source pull; fold
-them into the next-batch re-verify (with the `evidence_highway_detail.py` doc-median follow-up).
+**Vendor-blocked / next-statewide-batch — NOT a marathon.** **045** (HD-Excel county — the
+report-family integration leg still red), **192** (HD route-005 stale 7.7 Excel beside a newer PDF),
+plus **HL raw county**. **Never infer these** — they need the vendor/site answer or a fresh source
+pull; fold them into the next-batch re-verify (with the `evidence_highway_detail.py` doc-median
+follow-up). (**054** accept-amber is RESOLVED 2026-07-18 — owner accepts the HD-PDF PARTIAL; still
+re-check on the next statewide HD batch.)
 
-**Not a marathon — misc / low-priority / owed (do anytime, ~1 finding + small owed items).**
+**Not a marathon — misc / owed (do anytime).**
 - **187** — the independent oracle builds statewide key order quadratically (bucket H, **non-product
-  audit instrument**, perf only). No product impact; do whenever.
-- **Owed small items** (from earlier marathons): **061** evidence-locator per-page polling (the 5
-  adapters scan one PDF without an internal poll — bounded by the per-route/district poll today);
-  **054** line-2-band recovery for `evidence_highway_detail.py` (17 fallback pages share the old
-  doc-median → mis-aligned images); **054** ACCEPT-AMBER provisional — re-check on the next
-  statewide HD batch.
+  audit instrument**, perf only). No product impact.
+- **Owed small:** **061** evidence-locator per-page polling; **054** line-2-band recovery for
+  `evidence_highway_detail.py` (17 fallback pages share the old doc-median → mis-aligned images).
 
-**REMAINING WORK TOTAL: 25 findings** — BIG-1 (9, evidence) · BIG-2 (8, normalization) · BIG-3 (5,
-Phase-5/7) · 187 + 045/192/HL-county (3, non-marathon/vendor-blocked). The **correctness-critical
-core is done** (216/241, 90%); every remaining item is hardening, the evidence arc, deep-normalizer
-fidelity (provisional on HD's vendor approval), or the owner-gated Phase-5/7 durability cluster —
-**none is a live false-green today.** Suggested order: **BIG-1** (highest product value, self-contained)
-→ **BIG-2** (deep, source-first, HD provisional) → **BIG-3** (needs the owner policy decision first).
+**REMAINING WORK TOTAL: 22 findings** (219/241 closed, 91%) — **EV-10** (7, evidence Stage-10) ·
+**NORM** (8, source normalization) · **DUR** (4, Phase-5/7) · 187 + 045/192 (3, non-marathon/
+vendor-blocked). The correctness-critical core AND the tractable evidence findings are done; every
+remaining item is the Stage-10 published-cell rebuild, deep-normalizer fidelity (HD provisional on
+vendor approval), or the owner-gated Phase-5/7 cluster — **none is a live false-green today.**
+**Suggested order: NORM** (most tractable, source-first, highest product-correctness value) →
+**DUR** (needs the 085 owner decision — surface it first) → **EV-10** (the deepest; Stage-9/10, a
+dedicated effort, do LAST despite being "BIG-1 leftover"). Each is a multi-session chunk, not a
+single marathon.
 
 > ### ▶ RESUME HERE (2026-07-19 — BIG-1: 107/110/112 CLOSED + 106/109 PARTIAL; 108/208/209/210 = Stage-10)
 >
@@ -79,15 +81,23 @@ fidelity (provisional on HD's vendor approval), or the owner-gated Phase-5/7 dur
 >   the images-locked-but-not-wb case still diverts images (honestly reported) — full close needs a
 >   quarantine-based TWO-PHASE commit (the workbook commit isn't rollback-able yet) + manifested-gen id.
 >
-> **REMAINING in BIG-1 — the Stage-10 published-cell/raw-source-oracle cluster (NOT a marathon slice):**
-> **108 + 208 + 209** are ONE coupled effort = drive evidence from the PUBLISHED comparison (its per-cell
-> E/D/N/U state masks + the persisted `pairing_trace` + per-column counts) instead of re-executing the
-> loaders. Investigation (2026-07-19): the discrepancy truth is persisted as Excel FORMULAS / computed-
-> value caches, so consuming it needs a state-mask/pairing-trace decoder, AND 208's acceptance bar
-> requires an INDEPENDENT raw-source oracle ("recompute from immutable sources") — the Stage-9/10 work.
-> Deliberately NOT sliced (a partial published-cell reader here risks a false "evidence reads the cells"
-> impression). **210** rides the same spine + new source-role/mode routes — deferred multi-part feature.
-> Detail: the `#### Disposition — 2026-07-19` note at CMP-AUD-208 in the findings ledger.
+> **REMAINING WORK — re-carved into 3 chunks (see the roadmap table below; 22 open, 219/241 closed):**
+> - **NORM (8) — source normalization fidelity, bucket G — DO FIRST** (most tractable; the source-
+>   conservation proof pattern is well-trodden from ID-056). HD 042/133/138/142/186 + IS/HSL 144/145/193:
+>   the normalizer drops/rounds authoritative source data. Source-first; prove raw→normalized
+>   conservation, re-prove cells, re-bless. HD provisional on the vendor county answer.
+> - **DUR (4) — Phase-5/7 durability & policy — needs the OWNER DECISION on 085 first** (canonical
+>   artifact = last-complete or latest-attempt?). 080/085/089/115; read `comparison-phase3-decision-
+>   gates.md` first. No live false-green — durability + defense-in-depth.
+> - **EV-10 (7) — evidence Stage-10 published-cell rebuild — the DEEPEST, do LAST.** 108/208/209/210 +
+>   the 098/106/109 residuals. Drive evidence from the PUBLISHED comparison (per-cell E/D/N/U state
+>   masks + `pairing_trace` + counts) instead of re-executing the loaders, with an INDEPENDENT
+>   raw-source oracle. The truth is persisted as Excel formulas/value caches → a state-mask/pairing-
+>   trace decoder + the oracle = Stage-9/10, a dedicated multi-session effort, NOT a marathon slice.
+>   Deliberately un-sliced (a partial reader risks a false "evidence reads the cells now" impression).
+>   Detail: the `#### Disposition — 2026-07-19` note at CMP-AUD-208.
+> - **Not a chunk:** 187 (non-product audit instrument, perf), 045/192 + HL-county (vendor-blocked —
+>   NEVER infer), owed-small 061/054.
 >
 > ### ▶ (2026-07-18 — BIG-1 evidence arc: layout feature + 107 + 110 + 112 + 106(partial))
 >
