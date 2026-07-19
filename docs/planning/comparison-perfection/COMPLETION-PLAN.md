@@ -41,16 +41,31 @@ its findings back-to-back, then update this roadmap.
 | ~~**M7**~~ ✅ | Day / matrix state machine (bucket E) | ~~091 092 093 094 095 096 097 099~~ | **DONE 2026-07-18 — all 8 closed** (91eaee1 / 1400516 / b0add06 / b107c32). Day discovery / date-crossing / source-scoping / rebuild-filter honesty. |
 | ~~**M8**~~ ✅ | Compare / matrix GUI dispatch (bucket E) | ~~007 010 016 079 101 102 103 104~~ | **DONE 2026-07-18 — all 8 closed** (ac63f10 / 2b1e516 / 86c8e76), CI-green. Open-comparisons common root, set-all authoritative catalog, shared buildability predicate, canonical TSN consolidate routing, Cancel visibility, queue-capable day export, recipe-bound classic inputs, validation coverage pin. |
 | **M9** ◑ | Completion / partial-artifact policy + transaction (bucket E) | ~~035 040 075~~ · 085 098 115 | **PARTIAL 2026-07-18 — 3 closed (035 040 075), 3 DEFERRED.** 035 direct-builder post-`os.replace` recheck; 040 folder run-root/subfolder aliasing; 075 closed-by-082. **DEFERRED:** 115 (deep commit-schema gate on the correctness-locked path — read half already fixed; needs exhaustive per-comparator census), 098 (evidence-gate half = Stage-10), 085 (owner-gated last-complete/latest-attempt policy + Phase-5/7 durable overlay — with 089). |
-| **M10** | Evidence transaction & correctness (bucket F) | 106 107 108 109 110 112 | Evidence workbook + images must be ONE truthful transaction; stale red evidence, invented HD diffs, duplicate-only accounting, verify-old-but-rasterize-new. |
-| **M11** | HSL evidence as an e2e verifier (bucket F) | 208 209 210 | The **CLAUDE.md-flagged gap**: evidence recomputes instead of reading the published Comparison cells, excludes whole discrepancy classes, and has no source-faithful PDF-vs-Excel path. **210 is a deferred multi-part feature — own mini-plan.** |
-| **M12** | HD normalization fidelity (bucket G) | 042 133 138 142 186 | PS equation markers, exact-decimal Length (binary64 rounding), PDF snapshot dates, and **186 = multi-baseline line-two truncation — the HD analogue of the ID-056 fix just shipped.** Source-first: prove raw→normalized record/field conservation. |
-| **M13** | IS control categories + HSL parity + instrument | 144 145 193 187 | Intersection Summary control-category folding + erroneous CONTROL F label; HSL cross-bundle residual; + the oracle's quadratic key order (bucket H, non-product). |
+| **BIG-1** (M10+M11) | **Evidence arc — bucket F, 9 findings** | 106 107 108 109 110 112 · 208 209 210 | Evidence workbook + images must be ONE truthful transaction: stale red evidence beside a clean compare (106), invented HD diffs (107), duplicate-only accounting lost (108), not-one-transaction (109), queued evidence retargets to current settings (110), verify-old-but-rasterize-new bytes (112). Then the **CLAUDE.md-flagged gap** — HSL evidence recomputes instead of READING the published Comparison cells, excludes whole discrepancy classes, and has no source-faithful PDF-vs-Excel path (208/209); **210 is a deferred multi-part feature — own mini-plan.** Touches `visual_evidence.py` + `evidence_*.py` adapters + the matrix evidence gate; needs real district-PDF fixtures. **Biggest coherent product-correctness cluster left.** |
+| **BIG-2** (M12+M13) | **Source normalization fidelity — bucket G, 8 findings** | HD: 042 133 138 142 186 · IS/HSL: 144 145 193 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). |
+| **BIG-3** | **Phase-5/7 cluster — the HARDEST, 5 findings** | 080 085 089 098(evidence) 115 | The deferred durable-attempt-overlay / policy / commit-schema family. **085 needs an OWNER DECISION** (canonical artifact = *last-complete* or *latest-attempt*?) **+** a durable attempt overlay (Phase-5/7); **089** is that overlay (a crashed rebuild silently reverts to the old ✓); **080** source-fingerprint content identity (per-cell-per-snapshot perf-cache); **098** evidence read-set snapshotting (Stage-10); **115** the commit-boundary schema gate + its exhaustive per-comparator census. **Read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes FIRST; surface the 085 policy decision.** All the "correct today, hardening tomorrow" work — no false-green exists now; this is durability + defense-in-depth. |
 
 **Vendor-blocked / next-statewide-batch — NOT a marathon.** Deferred to the owner's next HD batch,
-tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (HD route-005 stale
-7.7 Excel). Plus **HL raw county**. **Never infer these** — they need the vendor/site answer or a
-fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
-`evidence_highway_detail.py` doc-median follow-up).
+tied to the [054 accept-amber decision](#): **045** (HD-Excel county — the report-family
+integration leg still red), **192** (HD route-005 stale 7.7 Excel beside a newer PDF). Plus **HL
+raw county**. **Never infer these** — they need the vendor/site answer or a fresh source pull; fold
+them into the next-batch re-verify (with the `evidence_highway_detail.py` doc-median follow-up).
+
+**Not a marathon — misc / low-priority / owed (do anytime, ~1 finding + small owed items).**
+- **187** — the independent oracle builds statewide key order quadratically (bucket H, **non-product
+  audit instrument**, perf only). No product impact; do whenever.
+- **Owed small items** (from earlier marathons): **061** evidence-locator per-page polling (the 5
+  adapters scan one PDF without an internal poll — bounded by the per-route/district poll today);
+  **054** line-2-band recovery for `evidence_highway_detail.py` (17 fallback pages share the old
+  doc-median → mis-aligned images); **054** ACCEPT-AMBER provisional — re-check on the next
+  statewide HD batch.
+
+**REMAINING WORK TOTAL: 25 findings** — BIG-1 (9, evidence) · BIG-2 (8, normalization) · BIG-3 (5,
+Phase-5/7) · 187 + 045/192/HL-county (3, non-marathon/vendor-blocked). The **correctness-critical
+core is done** (216/241, 90%); every remaining item is hardening, the evidence arc, deep-normalizer
+fidelity (provisional on HD's vendor approval), or the owner-gated Phase-5/7 durability cluster —
+**none is a live false-green today.** Suggested order: **BIG-1** (highest product value, self-contained)
+→ **BIG-2** (deep, source-first, HD provisional) → **BIG-3** (needs the owner policy decision first).
 
 > ### ▶ RESUME HERE (2026-07-18 — 8th + 9th marathons: M8 COMPLETE (8/8) · M9 PARTIAL (3 closed, 3 deferred))
 >
