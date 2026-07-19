@@ -384,13 +384,13 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-103 | P2 | Resolved 2026-07-18 | Cell Build actions dispatch despite a known missing TSN input |
 | CMP-AUD-104 | P3 | Resolved 2026-07-18 | One queue-capable day export action is uniquely disabled while busy |
 | CMP-AUD-105 | P1 | Resolved | A missing explicit TSN source silently falls back to another dataset |
-| CMP-AUD-106 | P1 | Verified | Old red evidence survives beside a newly clean comparison |
+| CMP-AUD-106 | P1 | Partially remediated 2026-07-18 | Old red evidence survives beside a newly clean comparison |
 | CMP-AUD-107 | P1 | Resolved 2026-07-18 | Highway Detail evidence invents differences the comparison treats as equal |
 | CMP-AUD-108 | P2 | Verified | Duplicate-only differences disappear from evidence accounting |
 | CMP-AUD-109 | P1 | Verified | Evidence workbook and images are not one truthful transaction |
-| CMP-AUD-110 | P2 | Verified | Queued evidence actions silently retarget to current settings |
+| CMP-AUD-110 | P2 | Resolved 2026-07-18 | Queued evidence actions silently retarget to current settings |
 | CMP-AUD-111 | P1 | Resolved | Evidence summaries execute source values as Excel formulas |
-| CMP-AUD-112 | P1 | Verified | Evidence can verify old PDF records but rasterize replacement bytes |
+| CMP-AUD-112 | P1 | Resolved 2026-07-18 | Evidence can verify old PDF records but rasterize replacement bytes |
 | CMP-AUD-113 | P3 | Resolved | Evidence bundle member counts omit validation files |
 | CMP-AUD-114 | P1 | Resolved | Unreadable comparison results are counted and shown as fully OK |
 | CMP-AUD-115 | P1 | Partially remediated 2026-07-14 (typed-contract count/verdict invariants) | Comparison artifact validation accepts semantically empty workbooks |
@@ -5353,6 +5353,21 @@ evidence state—including an explicit current “no differences/no examples” 
 quarantine/retire the prior set. Test diff→match, match→diff, partial, disabled toggle,
 zero verifiable candidates, exception, cancellation, locked artifacts, and restart.
 
+#### Partial remediation — 2026-07-18
+
+The finding's PRIMARY repro (the clean-comparison path) is closed. When a rebuilt
+comparison has no differing columns, `generate` now calls `_retire_stale_evidence`
+before its early return: guarded like every other evidence mutation (source-set +
+alias + ownership checks), it quarantines (atomic move) then deletes the stale
+workbook and image folder; a locked/foreign/source-aliased artifact is left in place
+with a logged note rather than force-removed. A clean comparison is a definitive signal
+that any prior evidence belongs to a previous generation. `check_visual_evidence`:
+`_retire_stale_evidence` removes the canonical set and refuses a source-aliased
+artifact, and a real `generate()` call on a clean comparison (planted prior evidence)
+leaves nothing surviving at the canonical name — red on the neutralized retire, green
+on the fix. **Still open:** the no-verifiable-example / disabled-toggle / restart paths
+and the durable per-comparison evidence generation manifest (coupled with CMP-AUD-109).
+
 ### CMP-AUD-107 — Highway Detail evidence uses a different equality engine
 
 Priority: P1  
@@ -5492,6 +5507,18 @@ in the job. Dispatch must use that immutable identity or reject it as changed. T
 all setting changes, file replacement, destination moves, row-mode changes, and queue
 reordering while evidence waits.
 
+#### Remediation — 2026-07-18
+
+`_capture_evidence_identity(which)` freezes the settings that decide WHICH comparison an
+on-demand evidence job targets — batch destination, TSN selections, example count,
+layout, and the baseline (Everything) or day source (by-day) — into the job at ENQUEUE
+(`matrix_evidence_cell` / `day_matrix_evidence_cell`). `_dispatch_evidence_job` targets
+that frozen identity, never the live settings (a pre-110 job without it falls back to
+live). The comparison-freshness gate in `run_evidence_only` still validates the frozen
+target is current. `check_matrix_ownership.evidence_identity_checks`: freeze under
+settings A, change everything to B, dispatch, and assert the run targets A — red on the
+reverted live-settings dispatch, green on the fix, for both the env and day paths.
+
 ### CMP-AUD-111 — evidence summaries execute source values as formulas
 
 Priority: P1  
@@ -5548,6 +5575,20 @@ Correction requirements: parse and render immutable content snapshots or shared 
 handles and bind every PDF to a pre/post digest in the generation manifest. Abort and
 publish nothing on any change. Test replacement, truncation, page reorder, same-
 metadata bytes, symlink/junction retarget, and mutation during rasterization.
+
+#### Remediation — 2026-07-18
+
+`generate()` digests the candidate PDFs' bytes (`_pdf_content_digests` — the sampled
+TSMIS routes + the TSN district-print set) BEFORE the adapters parse them: the
+parse-time baseline. `_ensure_pdf_content_unchanged` re-verifies those exact bytes once
+after ALL rendering, before the commit — an unchanged file start→commit means
+parse-bytes == render-bytes, so a rendered image can't come from a file never parsed for
+it. Any change (or a vanished/unreadable candidate) aborts the publish. This catches a
+same-size, same-mtime swap the existing `(dev, inode, size, mtime)` set-identity
+tripwire cannot see; only the small sampled subset is digested, so the cost tracks what
+is rendered, not the whole statewide corpus. `check_visual_evidence`: a metadata-
+preserving swap is proven invisible to the tripwire but changes the sha256 and raises; a
+vanished candidate also aborts — red on the neutralized guard, green on the fix.
 
 ### CMP-AUD-113 — evidence bundle counts omit validation members
 
