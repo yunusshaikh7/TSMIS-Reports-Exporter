@@ -1264,14 +1264,28 @@ correction + header/orphan hardening.** Bound to `ground-truth/All Reports 7.9/
   every one of the 516 statewide roadbed-header lines recognized while letting a real
   "BEGIN MEDIAN" description parse as data. 051 is closed by the 054 `_is_line1`
   hardening (0 residual phantoms on the 3 censused equate-spill shapes).
-- **Downstream comparison consequence (to re-measure):** the HD-PDF workbook now
-  carries the 7 corrected records, so the **PDF-vs-Excel and PDF-vs-TSN** legs lose up
-  to 7 previously-differing (garbage-"CONT" vs real-data) records — a strict reduction
-  in false diffs. The Excel-vs-TSN statewide canary (48,644/…) is UNAFFECTED (Excel
-  path). The exact PDF-sourced-leg counts should be re-measured on the next full HD
-  comparison pass; the parser correction itself is independently proven cell-for-cell
-  above. Hermetic guard: `check_highway_detail_pdf.test_053_leading_orphans` +
-  `test_line1_classifier` + `test_line2_furniture`.
+- **Downstream comparison consequence — RE-MEASURED 2026-07-18** (owed item closed).
+  The HD-PDF workbook now carries the 7 corrected records, so the PDF-sourced legs
+  lose their previously-differing garbage-"CONT" records. Re-measured statewide on
+  the same `ground-truth/All Reports 7.9/2026-07-09 ars-prod/` HD corpus (252 PDF +
+  252 Excel consolidated at code tip `b0add06`; normalized 7.7 TSN library, 60,083
+  rows / 273 routes), values mode:
+  - **PDF-vs-Excel: 50,724 both / 477 PDF-only / 549 Excel-only / 1,219 differing
+    cells on 537 matched rows** (Length 362 / LB S/T 134 / LB Eff 133 / LB Wid 133 /
+    LB #Ln 132 dominate). Row accounting reconciles: 50,724 + 477 = 51,201 PDF rows;
+    + 549 = 51,273 Excel rows (the 15 CMP-AUD-054 band-less + 2 CMP-AUD-053
+    leading-orphan escalations are the PDF-side drops). The corrected records now
+    MATCH Excel — e.g. route 018 "44TH STREET" @ 007.796 reads status **Both**.
+  - **PDF-vs-TSN: 48,173 both / 3,028 PDF-only / 11,910 TSN-only / 204,240 differing
+    cells on 48,023 matched rows** (21 TSN-only routes = the unconstructed routes
+    TSMIS doesn't export; RU Eff 47,740 / RB Eff 15,857 / Med Eff 15,737 dominate, the
+    expected structural date-provenance classes).
+  - The **Excel-vs-TSN** statewide canary (48,644 / 2,599 / 11,439 / 208,596, RU Eff
+    48,211) is UNAFFECTED — it consolidates from the Excel export, not the PDF.
+  Both PDF-sourced legs carry ≤7 fewer false diffs than the pre-053 garbage-"CONT"
+  state (the 7-record correction is proven cell-for-cell above). Hermetic guard:
+  `check_highway_detail_pdf.test_053_leading_orphans` + `test_line1_classifier` +
+  `test_line2_furniture`.
 
 **CMP-AUD-218 workbook-shape note (2026-07-16, later).** The comparison
 workbook's Comparison sheet gained one hidden trailing literal column
