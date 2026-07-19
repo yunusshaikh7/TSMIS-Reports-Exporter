@@ -285,16 +285,16 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-004 | P1 | Resolved | Literal ` != ` content is presentation-only, never discrepancy state |
 | CMP-AUD-005 | P1 | Resolved | Opaque helper identities prevent delimiter collisions |
 | CMP-AUD-006 | P1 | Remediated 2026-07-17 (the identity component is Decimal-canonical — compare_tsn_common.decimal_pm; zero partition merges statewide, pairing provably unchanged) | Ramp Detail PM normalization contradicts its identity contract |
-| CMP-AUD-007 | P1 | Verified | Settings validation omits five PDF rows and selected TSN files |
+| CMP-AUD-007 | P1 | Resolved 2026-07-18 (verify+pin) | Settings validation omits five PDF rows and selected TSN files |
 | CMP-AUD-008 | P2 | Resolved | Duplicate pairing is exact in-cap and explicitly partial/capped above it |
 | CMP-AUD-009 | P2 | Resolved 2026-07-18 (a numeric identity key now canonicalizes like its compared value — `_key_text` maps an integral float `5.0`→`'5'` so it aligns with its int/text twin instead of splitting into two false one-sided rows; whitespace/case stay significant by design — trim/casefold would merge distinct identities; typed PhysicalKey/roadbed paths untouched; census-proven byte-identical on 128,226 real key cells) | Row keys bypass ordinary trim and numeric coercion |
-| CMP-AUD-010 | P2 | Verified | Matrix Consolidate sends canonical TSN PDFs to a legacy-only path |
+| CMP-AUD-010 | P2 | Resolved 2026-07-18 | Matrix Consolidate sends canonical TSN PDFs to a legacy-only path |
 | CMP-AUD-011 | P2 | Resolved | ValidationWorker drops the partial-comparison count |
 | CMP-AUD-012 | P2 | Resolved | Spot Check preserves typed blank/zero and full display parity |
 | CMP-AUD-013 | P3 | Resolved | Matrix capability support is duplicated and hardcoded |
 | CMP-AUD-014 | P3 | Resolved | PDF-versus-Excel checks are filed under Cross-environment |
 | CMP-AUD-015 | P3 | Resolved 2026-07-18 (the four base Intersection comparison labels — summary/detail × env/tsn — dropped the wrong `TSAR:` prefix to match their export/consolidate entries and the already-correct PDF variants; the frozen catalog check + mock.js + architecture/reports docs updated in lockstep; `check_report_catalog` proves the derivation) | Four Intersection comparison labels incorrectly add `TSAR:` |
-| CMP-AUD-016 | P2 | Verified | Classic file/Browse inputs persist and launch across recipe changes |
+| CMP-AUD-016 | P2 | Resolved 2026-07-18 | Classic file/Browse inputs persist and launch across recipe changes |
 | CMP-AUD-017 | P1 | Resolved | Skipped comparison inputs are cached and rendered as complete |
 | CMP-AUD-018 | P1 | Resolved | Intersection cross-env bypasses its layout-drift validator |
 | CMP-AUD-019 | P1 | Resolved 2026-07-17 (record_has_data requires Total + every printed section; per-route audit reconciliation connected to the producer outcome — unexplained → PARTIAL, explained P/V residual → typed note; matcher unknown/duplicate diagnostics; cross-env applies the same gate; 126-route real-data verified) | Ramp cross-env accepts a one-field partial parse as complete |
@@ -313,12 +313,12 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-032 | P1 | Resolved 2026-07-18 (every flat cross-env family pins its EXACT export schema via a header_canonicalizer — RD/HSL/HD/ID XLSX + HSL-PDF/RD-PDF; census-verified on the 7.9 statewide exports + converted headers; two malformed/legacy/truncated/reordered sides refuse instead of matching) | Cross-env flat schemas trust the first file, not the report contract |
 | CMP-AUD-033 | P1 | Remediated 2026-07-17 — all four normalized loaders bind the exact ["Route"]+SHARED_HEADER prefix + documented sidecars before reading positionally | Normalized TSN loaders ignore their declared headers |
 | CMP-AUD-034 | P1 | Remediated 2026-07-17 — all four consolidated `_load_tsmis` loaders bind their EXACT documented header (the shared `exact_consolidated_header_ok`); relabels/shifts/insertions/deletions/wrong editions are refused | Consolidated TSMIS loaders accept semantically invalid layouts |
-| CMP-AUD-035 | P1 | Partially remediated — type-exactness fixed 2026-07-14; TOCTOU pending | Original raw-admission r7 accepted. Type-exact validation now rejects float/bool aliases of `version`/`member_count`/`byte_length`/`schema_version` in the raw-manifest, normalized-identity, and certificate checks (red→green). Still open: the direct HSL/HL builders lack a post-`os.replace` raw-source recheck |
+| CMP-AUD-035 | P1 | Resolved 2026-07-18 | Original raw-admission r7 accepted. Type-exact validation rejects float/bool aliases (2026-07-14). 2026-07-18: the direct HSL/HL builders now re-verify the raw source AFTER the os.replace (a change in the pre-replace-gate→replace window can no longer return success for stale bytes); HSL red→green in check_consolidate_toctou, HL symmetric |
 | CMP-AUD-036 | P1 | Remediated 2026-07-17 — the RD-PDF source gate requires the exact PDF-consolidated width + the trailing On/Off/Ramp Type sentinels | Ramp PDF accepts a truncated four-column workbook |
 | CMP-AUD-037 | P1 | Remediated 2026-07-17 — all five families gate the direct path (HSL v4 + HL v5 markers; RD v5 / ID v5 / HD v3 in-workbook markers + loader gates; marker-only bumps, rows byte-identical on the real corpus) | Direct comparisons trust stale normalized libraries |
 | CMP-AUD-038 | P2 | Resolved 2026-07-18 (`iso_date` full-matches each documented form + calendar-validates via `date()`; trailing junk / impossible dates are preserved verbatim as a visible difference instead of truncated or faked; census-proven no-op — shipped == old on all 121,464 distinct real date cells across RD+ID, both editions) | Date normalization masks malformed and impossible dates |
 | CMP-AUD-039 | P1 | Resolved 2026-07-18 (Report View slice remediated 2026-07-12; the last open slice — the shared `summary_layout._render` Summary-by-Category sheet — now flags each category from the SAME `compared_cell` verdict the Comparison sheet uses, never a re-derived numeric delta, so the two can't disagree; identical to the old delta styling for the integer counts CMP-AUD-021 guarantees, red→green on a text-different-numeric-equal fixture) | Detail Report View counts contradict the main comparison |
-| CMP-AUD-040 | P1 | Partially remediated 2026-07-17 (the file half via the CMP-AUD-066 role gates — the same file refuses BOTH ways, probe-verified; the folder run-root/subfolder aliasing half remains open) | Logically identical inputs can be compared as two sources |
+| CMP-AUD-040 | P1 | Resolved 2026-07-18 | File half closed by CMP-AUD-066 (2026-07-17). 2026-07-18: the FOLDER half — a run ROOT vs that run's `<report>` SUBFOLDER (or a junction/hardlinked tree) resolving to the same effective report dir / file set — now refuses before loading; census 0 false-rejections on the real 7.9 cross-env pairs, alias caught for every report with files |
 | CMP-AUD-041 | P1 | Resolved | Selected or derived outputs can overwrite comparison sources |
 | CMP-AUD-042 | P1 | Verified | Normalized Highway Detail erases every PS equation marker |
 | CMP-AUD-043 | P1 | Resolved 2026-07-18 (both familiar secondary surfaces take the finding's accepted "unmistakable values-only snapshot label" path: the Report View was labeled a build-time snapshot in the 2026-07-12 remediation, and the shared Summary-by-Category sheet now carries an unmistakable "do NOT recalculate; regenerate after editing a source" disclosure, gated present in both family checks) | Formula Report View stays stale after live recalculation |
@@ -353,11 +353,11 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-072 | P2 | Resolved | Stale folder discovery can overwrite a newer recipe selection |
 | CMP-AUD-073 | P2 | Resolved | Classic picker blocks two supported raw-PDF inputs |
 | CMP-AUD-074 | P2 | Resolved | Universal file hint promises unsupported per-route inputs |
-| CMP-AUD-075 | P1 | Partially remediated | Both-mode completion is persisted for only one output |
+| CMP-AUD-075 | P1 | Resolved 2026-07-18 (closed by CMP-AUD-082) | Both-mode completion is persisted for only one output. Central path fixed 2026-07-11; the matrix twin residual (a values-only/failed formula refresh leaving STALE formula evidence) is closed by 082's `_settle_formulas_twin` (clears/refreshes the twin per values commit — all four matrix comparators). The "one generation id for both members" remainder is the deferred Phase-5 multi-artifact manifest (with 082), not a truth defect |
 | CMP-AUD-076 | P2 | Resolved 2026-07-14 (durable provenance sidecar + in-workbook sheet; only the strict schema-v4 fold-in remains, Phase-5) | Saved comparisons lack durable source provenance |
 | CMP-AUD-077 | P2 | Resolved | Comparison results discard their structured discrepancy counts |
 | CMP-AUD-078 | P3 | Resolved | Comparison failures are titled as consolidation failures |
-| CMP-AUD-079 | P2 | Verified | Compare sub-tab switching can hide every Cancel control |
+| CMP-AUD-079 | P2 | Resolved 2026-07-18 | Compare sub-tab switching can hide every Cancel control |
 | CMP-AUD-080 | P1 | Partially remediated | Matrix artifact identity can miss changed source and output content |
 | CMP-AUD-081 | P1 | Resolved | Matrix TSN freshness ignores source identity and library rebuild state |
 | CMP-AUD-082 | P1 | Resolved | Matrix formula twins can survive as stale audit artifacts |
@@ -379,10 +379,10 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-098 | P1 | Partially remediated 2026-07-14 (the comparison-pipeline half; the evidence-gate half remains Stage-10 work) | Inputs changed during comparison can be certified as the fresh sources |
 | CMP-AUD-099 | P2 | Resolved 2026-07-18 | Baseline switching rebuilds baseline-independent Matrix modes |
 | CMP-AUD-100 | P2 | Resolved | Matrix cache identity and nested record schemas are not validated |
-| CMP-AUD-101 | P2 | Verified | Open Comparisons opens the wrong tree for non-environment modes |
-| CMP-AUD-102 | P2 | Verified | “Show comparison for all” silently excludes hidden rows |
-| CMP-AUD-103 | P2 | Verified | Cell Build actions dispatch despite a known missing TSN input |
-| CMP-AUD-104 | P3 | Verified | One queue-capable day export action is uniquely disabled while busy |
+| CMP-AUD-101 | P2 | Resolved 2026-07-18 | Open Comparisons opens the wrong tree for non-environment modes |
+| CMP-AUD-102 | P2 | Resolved 2026-07-18 | “Show comparison for all” silently excludes hidden rows |
+| CMP-AUD-103 | P2 | Resolved 2026-07-18 | Cell Build actions dispatch despite a known missing TSN input |
+| CMP-AUD-104 | P3 | Resolved 2026-07-18 | One queue-capable day export action is uniquely disabled while busy |
 | CMP-AUD-105 | P1 | Resolved | A missing explicit TSN source silently falls back to another dataset |
 | CMP-AUD-106 | P1 | Verified | Old red evidence survives beside a newly clean comparison |
 | CMP-AUD-107 | P1 | Verified | Highway Detail evidence invents differences the comparison treats as equal |
@@ -1861,6 +1861,20 @@ remediation stands, but two related defects in the same TSN-admission domain are
 
 Both are scheduled in Wave 1 (contract & validation hardening).
 
+**Resolved (2026-07-18) — the post-`os.replace` recheck.** Both direct builders now
+re-verify the raw source AFTER the commit: `consolidate_tsn_highway_sequence.consolidate`
+re-checks `source_current()` after `_write_workbook` returns committed, and
+`consolidate_tsn_highway_log.consolidate` re-checks after `consolidate_xlsx` returns
+`ok` — a change in the window between the pre-replace gate (`may_publish` /
+`publish_guard`) and the actual `os.replace` now turns the result into an error, so the
+direct/CLI path can never return a success-shaped result for a source that changed
+during the final commit (mirroring the canonical wrapper's post-builder rehash).
+Red→green in `check_consolidate_toctou.tsn_highway_sequence_post_replace_source_change`
+(the source PDF is mutated right after the real replace via a patched `atomic_save_if`;
+the recheck returns error, and an unchanged source still commits OK — the recheck is a
+no-op on the happy path). HL is the symmetric application, gate-covered. Files:
+`consolidate_tsn_highway_sequence.py`, `consolidate_tsn_highway_log.py`, that check.
+
 
 Primary code: `scripts/compare_ramp_detail_tsn.py:136-149`,
 `scripts/compare_intersection_detail_tsn.py:281-295`,
@@ -2406,6 +2420,8 @@ and overlapping/identical discovered file sets. Keep a deliberate internal self-
 escape hatch separate from user-facing comparison recipes if one is needed.
 
 **Partially remediated (2026-07-17, the bucket-A sweep).** The FILE half is closed by CMP-AUD-066: the same resolved workbook can no longer satisfy both labels of a PDF-vs-Excel flavor — marked it refuses the Excel role, unmarked it refuses the PDF role (probe: both directions error on the exact original case). The FOLDER half — a run root on one side aliasing its own report subfolder on the other through compare_env — remains open (bucket D/E).
+
+**Resolved — folder half (2026-07-18).** `compare_env.EnvCompare.compare_folders` now compares the two sides' EFFECTIVE report directories (and discovered file sets), not just the selected roots. New `_effective_input_dir(folder)` resolves `<folder>/<subdir>` when that holds the files else `<folder>` (via `_find_input_dir`, `.resolve()`-canonical). The guard refuses when the two effective dirs are equal OR (with files present) the two canonical file sets are identical — catching a run ROOT vs that run's `<report>` SUBFOLDER, and a junction/hardlinked tree aliasing the same files, both of which the plain selected-root equality missed. **Census** (real 7.9 `ssor-prod`/`ars-prod` cross-env, HD/RD/ID/HSL): 0 false-rejections — every legitimate pair resolves to different effective dirs — and the root-vs-subfolder alias is caught for every report that has files (HD 252 / ID 217 on ars, RD 126 / HSL 252 on ssor). Red→green in `check_compare_env_sidelabel.test_040_folder_root_subfolder_alias` (alias rejected before loading; two different run folders proceed). Files: `compare_env.py`, that check.
 
 ### CMP-AUD-041 — selected or derived output aliasing can destroy a source
 
@@ -4564,6 +4580,22 @@ still replace the canonical artifact, and evidence is not yet a member of one ex
 generation transaction. Those are Phase-5/7 closure requirements, not Phase-2 truth-
 surface regressions.
 
+**M9 assessment (2026-07-18) — DEFERRED (owner-gated policy + Phase-5/7 overlay).**
+Closing 085 needs BOTH: (a) an OWNER DECISION on the arbitrated policy — does the
+canonical consolidation / comparison cache represent the *last complete* generation or
+the *latest attempted* one (the two decision-gates in "Contract arbitration" above; the
+current `CLAUDE.md`/`docs/engine-and-reliability.md` state "keeps last-good" but history
+and code cannot establish whether that is intentional policy or drift) — AND (b) a
+DURABLE ATTEMPT OVERLAY that persists the useful partial attempt under a distinct
+unpromoted identity without clobbering the last-complete canonical bytes, which
+`CLAUDE.md` conventions explicitly assign to Phase-5/7 ("durable attempt overlays/
+provenance remain their assigned Phase-5/7 work"). The unconditional cross-surface truth
+defects are already corrected (Phase-2); the remainder is a decision + a full-stack
+persistence change, so it is deferred to a Phase-5/7 session ALONGSIDE CMP-AUD-089/085
+(same durable-attempt-overlay family). The owner decision is surfaced in the session
+summary; note the decision ALONE does not unblock the finding — the overlay work is
+required under either policy.
+
 ### CMP-AUD-086 — comparison documentation contradicts current capability
 
 Priority: P3  
@@ -5061,6 +5093,14 @@ attempt storage (preserving basenames for adapter lookup), make all locate/rende
 use those captures, retain original semantic provenance/current checks, and bind a
 path/size/SHA-256 manifest to the evidence generation. Added/removed/renamed/mutated PDF
 fixtures must fail or prove the capture stayed on A; no live-path restoration can bless B.
+
+**M9 assessment (2026-07-18) — the remaining half stays Stage-10 (as scoped).** The
+comparison-pipeline half is closed (a mid-comparison source mutation reads immediately
+stale). The open half is the on-demand EVIDENCE gate's mid-generation mutation window +
+the PDF read-set snapshotting, which the remediation note above already assigns to Stage
+10 (evidence oracles) — it needs identity-bound attempt storage for the discovered PDF
+read set, not a comparison-pipeline change. Deferred with Stage 10, unchanged this
+marathon (grouped with the CMP-AUD-106–112/208–210 evidence arc, M10/M11).
 
 ### CMP-AUD-099 — baseline switching rebuilds modes that do not use it
 
@@ -5609,6 +5649,25 @@ so a population bound would be incorrect; per-side uniqueness across traces is a
 enforced. **Still open (the core of this finding):** the workbook-artifact schema
 enforcement above — required sheets/headers, valid row-status/universe, source/generation
 identity, and cross-sheet agreement — is unchanged.
+
+**M9 assessment (2026-07-18) — DEFERRED (Phase-5-scoped, not forced).** Two of the
+finding's three concern-areas are already closed elsewhere: (a) the READ path no longer
+"falls back to hardcoded positions" — `matrix_state.read_counts` locates Status/Diffs by
+UNIQUE HEADER LABEL and returns `(None, None)` on missing/duplicate labels or an invalid
+row status (never a positional guess); and (b) the empty-universe truth is governed by
+the route-universe gates (CMP-AUD-019/071/183) plus the typed-contract count/verdict
+invariants above — so a header-only workbook cannot certify a green result, because the
+Matrix/classic/validation truth is the strict TYPED comparison generation, never the
+scraped workbook (CLAUDE.md: "Workbook scraping must never certify a green UI result").
+What remains is a defense-in-depth SCHEMA GATE at `artifact_store.commit_workbook` —
+requiring the Comparison sheet's labeled columns / valid row statuses / cross-sheet
+agreement at commit. That gate sits on the CORRECTNESS-LOCKED transactional commit path
+SHARED by every comparator AND every consolidation, so adding it safely needs an
+exhaustive per-comparator census proving no legitimate workbook is false-rejected (a
+false rejection would BLOCK a valid report — a discrepancy the standing directive
+forbids without full proof). Because the truth-critical halves are already closed and
+the remainder is a risky defense-in-depth gate, it is deferred to a focused Phase-5
+artifact-epoch session (the same disposition as CMP-AUD-080/089), not forced here.
 
 ### CMP-AUD-116 — failed validation records default to complete
 

@@ -21,15 +21,15 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
-| **Gate** | **130/130 offline** checks (128 comparison + Sol's 2 reliability checks after the sol-001 integration; full CI adds the 5 JS checks) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
+| **Gate** | **136/136 offline** checks + **8 JS checks** in full CI (added `check_compare_cancel_visibility.js` + `check_compare_input_recipe_binding.js` this session) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **241 total · ~176 CLOSED (Resolved/Remediated) · ~9 partial · ~56 open** (~73% closed by count; the correctness-critical core is done, the open tail is hardening + non-product instrument work). **Buckets:** A ✅ · **C ✅ COMPLETE** (028/029/030/031/032/033/034/036/063/027 + 070-not-a-defect) · **D ✅ COMPLETE** (018 ✅ · 019 ✅ · 046 ✅ · 022 ✅) · B/E/F/G/H/I 🔨 (071 ✅ route-universe · 068 ✅ HD Report View · 069 ✅ RD PDF roles · 015 ✅ TSAR label fix · 064 ✅ PDF anomaly counts · 038 ✅ date normalizer · 009 ✅ numeric key parity · 039+043 ✅ Summary-by-Category typed flags + snapshot · 044 ✅ trailing-blank-header data guard · 013 ✅ matrix support parity · 014 ✅ Self-consistency sub-tab · **054 ✅ HD-PDF fallback recovery (live bug; 15-route PARTIAL owner-flagged)**; parser robustness [B: 051–053/055–062 remain] / matrix-GUI lifecycle / evidence arc / source-semantics / instrument hardening / trivia) |
+| **Findings** | **241 total · ~216 CLOSED (Resolved/Remediated) · ~25 open** (~90% closed by count; the correctness-critical core is done, the open tail is Phase-5/7 hardening + the evidence arc + non-product instrument work). **Buckets:** A ✅ · **B ✅** · **C ✅** · **D ✅** · **E ✅ (matrix/GUI lifecycle) — M6+M7+M8 COMPLETE, M9 3/6** (035/040/075 ✅; 085/098/115 Phase-5/Stage-10/owner-deferred) · **F/G/H/I** remaining (evidence arc M10/M11, HD normalization M12, IS/HSL M13, instruments). Vendor-blocked (never infer): 045/192/HL-county. |
 | **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **019 RESOLVED (2026-07-17)**: the Ramp Summary producer now reflects its own audit reds — `record_has_data` requires Total + every section, per-route `reconcile_record` sends unexplained gaps → PARTIAL and the explained P/V residual → a typed note (COMPLETE), matcher unknown/duplicate diagnostics, cross-env shares the gate; census 0 unexplained / 9 routes / 22 P/V ramps, real-data verified. **032 RESOLVED (2026-07-18) — BUCKET C COMPLETE**: every flat cross-env family now pins its EXACT export schema via a header_canonicalizer (RD/HSL/HD/ID XLSX + HSL-PDF/RD-PDF), so two malformed/legacy/truncated/reordered sides refuse instead of matching; census-verified on the 7.9 statewide exports + converted headers; new `check_compare_env_flat_schema` + 5 fixtures rebuilt onto real layouts. **046 RESOLVED (2026-07-18)**: shifted RD/ID exports now show diffs under the right field — RD Excel+PDF pin a position-authoritative `force_header`, ID Excel+PDF realign legacy→current via `_id_canonical_header`; end-to-end proves Description-under-Description / INT-Type-under-INT-Type. **NEXT (bucket D — LAST): 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
 
 ## Marathon roadmap to completion (2026-07-18)
 
-Buckets **A · B · C · D are COMPLETE; M6 and M7 (bucket E) are COMPLETE** (13 closed + 080/089
-Phase-5/7-deferred). The remaining open findings carve into these
+Buckets **A · B · C · D are COMPLETE; M6, M7 and M8 (bucket E) are COMPLETE; M9 is PARTIAL**
+(035/040/075 closed, 085/098/115 deferred). The remaining open findings carve into these
 marathon-sized chunks (M6–M13). Confirm each finding's detail + tractability at the marathon's
 start; **census-first + full old-vs-new proof on anything that touches real matrix/comparison
 data** (the HD-053 lesson: identical counts can still hide moved content). Pick a marathon, close
@@ -39,8 +39,8 @@ its findings back-to-back, then update this roadmap.
 |---|---|---|---|
 | ~~**M6**~~ ✅ | Matrix artifact identity & freshness (bucket E) | ~~081 082 084 088 100~~ (080 089 Phase-5/7-deferred) | **DONE 2026-07-18 — 5 closed + 2 deferred.** Matrix cache miss changed source/output, stale formula twins, auth drops queued work. |
 | ~~**M7**~~ ✅ | Day / matrix state machine (bucket E) | ~~091 092 093 094 095 096 097 099~~ | **DONE 2026-07-18 — all 8 closed** (91eaee1 / 1400516 / b0add06 / b107c32). Day discovery / date-crossing / source-scoping / rebuild-filter honesty. |
-| **M8** | Compare / matrix GUI dispatch (bucket E) | 007 010 016 079 101 102 103 104 | UI routing / validation / dispatch — **`#mock`-testable like 072/073/074, ~zero comparison-value risk.** Good "fast win" marathon. |
-| **M9** | Completion / partial-artifact policy + transaction (bucket E) | 075 085 098 115 035 040 | The **Phase-5 partial-artifact policy** (known-deferred correctness core) + TOCTOU / input-aliasing. **HARDEST E chunk** — read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes first. All P1 (100 is P2). |
+| ~~**M8**~~ ✅ | Compare / matrix GUI dispatch (bucket E) | ~~007 010 016 079 101 102 103 104~~ | **DONE 2026-07-18 — all 8 closed** (ac63f10 / 2b1e516 / 86c8e76), CI-green. Open-comparisons common root, set-all authoritative catalog, shared buildability predicate, canonical TSN consolidate routing, Cancel visibility, queue-capable day export, recipe-bound classic inputs, validation coverage pin. |
+| **M9** ◑ | Completion / partial-artifact policy + transaction (bucket E) | ~~035 040 075~~ · 085 098 115 | **PARTIAL 2026-07-18 — 3 closed (035 040 075), 3 DEFERRED.** 035 direct-builder post-`os.replace` recheck; 040 folder run-root/subfolder aliasing; 075 closed-by-082. **DEFERRED:** 115 (deep commit-schema gate on the correctness-locked path — read half already fixed; needs exhaustive per-comparator census), 098 (evidence-gate half = Stage-10), 085 (owner-gated last-complete/latest-attempt policy + Phase-5/7 durable overlay — with 089). |
 | **M10** | Evidence transaction & correctness (bucket F) | 106 107 108 109 110 112 | Evidence workbook + images must be ONE truthful transaction; stale red evidence, invented HD diffs, duplicate-only accounting, verify-old-but-rasterize-new. |
 | **M11** | HSL evidence as an e2e verifier (bucket F) | 208 209 210 | The **CLAUDE.md-flagged gap**: evidence recomputes instead of reading the published Comparison cells, excludes whole discrepancy classes, and has no source-faithful PDF-vs-Excel path. **210 is a deferred multi-part feature — own mini-plan.** |
 | **M12** | HD normalization fidelity (bucket G) | 042 133 138 142 186 | PS equation markers, exact-decimal Length (binary64 rounding), PDF snapshot dates, and **186 = multi-baseline line-two truncation — the HD analogue of the ID-056 fix just shipped.** Source-first: prove raw→normalized record/field conservation. |
@@ -52,9 +52,49 @@ tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (
 fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
 `evidence_highway_detail.py` doc-median follow-up).
 
-> ### ▶ RESUME HERE (2026-07-18 — 7th marathon COMPLETE: M7 → 091/092/093/094/095/096/097/099 ALL CLOSED + the owed CMP-AUD-053 re-measure)
+> ### ▶ RESUME HERE (2026-07-18 — 8th + 9th marathons: M8 COMPLETE (8/8) · M9 PARTIAL (3 closed, 3 deferred))
 >
-> **7TH MARATHON COMPLETE (M7 — day/matrix state machine): ALL 8 findings CLOSED (091–097, 099),
+> **8TH MARATHON COMPLETE (M8 — Compare/matrix GUI dispatch): ALL 8 CLOSED (007/010/016/079/101/102/103/104),
+> CI-verified (sha 86c8e76 = success), gate 136/136 + 8 JS checks, ~216 closed (~90%).** Commits:
+> 101/102/103/010 (`ac63f10`) · 079/104/016 (`2b1e516`) · 007 (`86c8e76`). Per finding: **101** Open
+> comparisons opens the COMMON `comparisons/` root (reaches `tsn/` too); **102** "set all" spans
+> `matrix.all_row_modes` (authoritative catalog, not the hidden-filtered snapshot); **103** ONE shared
+> `matrix.cell_buildable`/`cell_unbuildable_reason` gates the bulk selectors AND the explicit per-cell
+> Build endpoints + queue accounting (refuses a known-missing TSN/export/baseline side); **010**
+> `consolidate_matrix_tsn` routes by source ORIGIN — a canonical library source builds via the
+> registered TSN builder from the library `raw/` (every PDF-backed family), a legacy `_tsn_input` drop
+> keeps the back-compat path; tsn_meta advertises the real raw folder + `source_legacy`; **079** locks
+> the Compare sub-tab strip while a Compare-tab comparison is live (`compareSubtabsShouldLock`); **104**
+> the by-day "Export today" button is queue-based, no longer uniquely lock-disabled; **016** binds the
+> classic file/Browse selections to the recipe (clear on change) + preflights existence/type in
+> `start_compare`; **007** verify+pin (already drives every row via base-family TSN + passes selected
+> files; positive-path pin added). Two new JS checks (cancel-visibility, input-recipe-binding).
+>
+> **9TH MARATHON PARTIAL (M9 — completion/partial-artifact + transaction): 3 CLOSED, 3 DEFERRED,
+> gate 136/136.** Closed **035** (`b8f70df` — direct HSL/HL builders re-verify the raw source AFTER the
+> os.replace; HSL red→green in check_consolidate_toctou; HL symmetric), **040** (`ddf2b57` — the FOLDER
+> half: compare_env refuses a run-ROOT vs its own `<report>` SUBFOLDER / identical file-set alias;
+> census 0 false-rejections on the real 7.9 pairs), **075** (`857b218` — verify+pin: the matrix twin
+> residual is closed by 082's `_settle_formulas_twin`). **DEFERRED (documented in the ledger):** **115**
+> — the deep comparison-workbook SCHEMA gate at the correctness-locked `commit_workbook` boundary; the
+> read-path half (`read_counts` header-label lookup) is already fixed and the truth is the typed
+> generation, so no false-green today, but adding the commit gate safely needs an exhaustive
+> per-comparator census (a false rejection would BLOCK a valid report) — Phase-5 artifact epoch, with
+> 080/089. **098** — the evidence-gate mid-generation mutation half is explicitly Stage-10 (evidence
+> oracles), grouped with the M10/M11 evidence arc. **085** — owner-gated (last-complete vs
+> latest-attempt policy) + a durable attempt overlay (`CLAUDE.md` assigns to Phase-5/7), with 089.
+> **KEY LESSONS: (a) the M8 buildability predicate + the 016 recipe-binding are the "one predicate,
+> many call-sites" DRY pattern (bulk selector = explicit endpoint); (b) 007/075 were verify+pins
+> (already-closed by a later remediation — census before writing code, the 081 lesson); (c) a
+> full-gate flake (check_day_matrix under -j4 contention with the 113s sidecar-scale check) is NOT a
+> real failure — standalone 3/3 + a clean re-run confirm before diagnosing; (d) M9's deferrals are
+> honest correctness calls: don't force a commit-boundary schema gate or an owner policy without the
+> full proof/decision — the directive forbids a change that "can lead to discrepancies".** **NEXT
+> MARATHON: M10** (evidence transaction & correctness 106–112) or M12 (HD normalization fidelity
+> 042/133/138/142/186) or M13 (IS categories + HSL parity). The Phase-5/7 cluster (080/085/089/098-evidence/115)
+> wants its own focused session (read the Phase-3/5 decision gates + surface the 085 policy decision first).
+>
+> **(prior) 7TH MARATHON COMPLETE (M7 — day/matrix state machine): ALL 8 findings CLOSED (091–097, 099),
 > CI-verified, gate 136/136, 205 closed (85%).** Plus the owed **CMP-AUD-053** HD PDF-leg
 > re-measure (statewide 7.9 ars-prod: PDF-vs-Excel **50,724 / 477 / 549 / 1,219**; PDF-vs-TSN
 > **48,173 / 3,028 / 11,910 / 204,240**; Excel-vs-TSN 48,644/… UNAFFECTED — recorded in the

@@ -162,20 +162,18 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">85<span>%</span></div>
+        <div class="bignum">90<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
-          remain are mostly hardening, not correctness.</div>
+          remain are Phase-5/7 hardening + the evidence arc, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="205 closed, 2 in progress, 36 open of 241 findings">
-          <div class="seg done" style="width:85%">205 closed</div>
-          <div class="seg warn" style="width:1%"></div>
-          <div class="seg open" style="width:14%">36 open</div>
+        <div class="bar" role="img" aria-label="216 closed, 25 open of 241 findings">
+          <div class="seg done" style="width:90%">216 closed</div>
+          <div class="seg open" style="width:10%">25 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 205 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
-          <span><i class="dot warn"></i> ~4 in progress</span>
-          <span><i class="dot open"></i> ~40 open</span>
+          <span><i class="dot done"></i> 216 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot open"></i> ~25 open <span class="num" style="color:var(--ink-3)">(Phase-5/7 + evidence + instruments)</span></span>
         </div>
       </div>
     </div>
@@ -189,7 +187,7 @@
       </div>
       <p class="sub">This is the reason the remaining work is a downhill grade: every
         correctness-critical layer is already proven and gated. Nothing below can silently regress —
-        the offline gate is <b class="num">136/136</b>, CI-green.</p>
+        the offline gate is <b class="num">136/136</b> (+8 JS), CI-green.</p>
       <div class="fgrid">
         <div class="fitem"><span class="chk">✓</span><div><div class="t">Shared comparison engine</div><div class="d">correctness-locked</div></div></div>
         <div class="fitem"><span class="chk">✓</span><div><div class="t">12 report families</div><div class="d">consolidate + compare · vs-TSN · PDF · cross-env · baseline</div></div></div>
@@ -222,7 +220,7 @@
       </div>
       <div class="bk">
         <div class="bk-top"><span class="bk-letter">E</span><span class="bk-name">Matrix / day / GUI lifecycle</span><span class="pill warn">In progress</span></div>
-        <p class="bk-desc">The largest bucket — mostly <span class="mono">P2</span> state-machine honesty in the matrix + GUI. <b>M6 (identity &amp; freshness) and M7 (day/matrix state machine) COMPLETE</b> — 13 closed; the GUI-dispatch (M8) + partial-artifact policy (M9) remain.</p>
+        <p class="bk-desc">The largest bucket — mostly <span class="mono">P2</span> state-machine honesty in the matrix + GUI. <b>M6 (identity &amp; freshness), M7 (day/matrix state machine) and M8 (GUI dispatch) COMPLETE</b> — 21 closed; <b>M9 (partial-artifact + transaction) 3/6</b> — 035/040/075 closed, 085/098/115 Phase-5/Stage-10/owner-deferred.</p>
       </div>
       <div class="bk">
         <div class="bk-top"><span class="bk-letter">F</span><span class="bk-name">Evidence-gate truth</span><span class="pill open">Open</span></div>
@@ -249,13 +247,13 @@
       <div class="step now">
         <div class="n">01</div>
         <div class="body">
-          <div class="h">Day / matrix state machine — M7 <span class="tag done">8 closed</span></div>
-          <div class="m">Bucket E / M7 — <b>091 · 092 · 093 · 094 · 095 · 096 · 097 · 099 all closed</b> (by-day export binds its captured run date end to end; calendar-valid dates + real legacy folder identity; the day-consolidation badge = its actionable universe; running-day removal locked; source-switch reconciliation; invalid rebuild scopes rejected; canonical <span class="mono">both</span> missing-side; baseline switch recomputes stale-only) — plus the owed <b>CMP-AUD-053</b> HD PDF-leg re-measure (PDF-vs-Excel 50,724/477/549/1,219; PDF-vs-TSN 48,173/3,028/11,910/204,240). Prior: M6 identity &amp; freshness (5 closed + 080/089 Phase-5/7-deferred); buckets <b>B, C &amp; D complete</b>.</div>
+          <div class="h">GUI dispatch (M8) + partial-artifact/transaction (M9) <span class="tag done">11 closed</span></div>
+          <div class="m">Bucket E / M8 — <b>007 · 010 · 016 · 079 · 101 · 102 · 103 · 104 all closed</b> (Open-comparisons common root; "set all" over the authoritative catalog; ONE shared cell-buildability predicate gating bulk selectors + explicit Build + queue; canonical TSN consolidate routing; Cancel visibility; queue-capable day export; recipe-bound classic inputs; validation coverage pin). M9 — <b>035 · 040 · 075 closed</b> (direct-builder post-<span class="mono">os.replace</span> raw recheck; folder run-root/subfolder aliasing; twin residual closed-by-082); <b>085 · 098 · 115 deferred</b> (owner-gated policy + Phase-5/7 durable overlay · Stage-10 evidence · the deep commit-schema census).</div>
         </div>
       </div>
-      <div class="step"><div class="n">02</div><div class="body"><div class="h">Source-semantics</div><div class="m">Bucket G — conserve/expose data facts (HD-Excel + HL raw county are vendor-blocked — never inferred).</div></div></div>
-      <div class="step"><div class="n">03</div><div class="body"><div class="h">Source-semantics &amp; the evidence arc</div><div class="m">Buckets G &amp; F — conserve/expose data facts; then the evidence-image gate (incl. the deferred 210 feature).</div></div></div>
-      <div class="step"><div class="n">04</div><div class="body"><div class="h">Instrument hardening &amp; the trivia tail</div><div class="m">Buckets H &amp; I — non-product audit-instrument work and the P3 label/doc nits.</div></div></div>
+      <div class="step"><div class="n">02</div><div class="body"><div class="h">The evidence arc — M10 / M11</div><div class="m">Bucket F — evidence workbook + images as ONE truthful transaction (106–112), then HSL evidence as an e2e verifier (208–210, 210 deferred).</div></div></div>
+      <div class="step"><div class="n">03</div><div class="body"><div class="h">Source-semantics &amp; normalization — M12 / M13</div><div class="m">Buckets G (HD normalization fidelity 042/133/138/142/186; HD-Excel + HL raw county vendor-blocked — never inferred) &amp; the IS categories + HSL parity (144/145/193/187).</div></div></div>
+      <div class="step"><div class="n">04</div><div class="body"><div class="h">Phase-5/7 cluster + instruments &amp; trivia</div><div class="m">The deferred durable-attempt-overlay / commit-schema family (080/085/089/098-evidence/115) in a focused session; then buckets H &amp; I (non-product instruments + P3 nits).</div></div></div>
     </div>
     <div class="method">
       <span><b>Every fix, every time:</b></span>
@@ -266,16 +264,16 @@
   <section>
     <div class="sec-head"><h2>Shipped this session</h2><span class="kicker">all CI-green</span></div>
     <div class="wins">
-      <div class="win"><div class="id">CMP-AUD-100</div><div class="w">Foreign / malformed matrix cache never trusted or crashes</div><div class="c">4×4 identity swap · 9 adversarial records · red-tested</div></div>
-      <div class="win"><div class="id">CMP-AUD-088</div><div class="w">Auth failure keeps local comparison/evidence jobs</div><div class="c">only exports need sign-in · shared queue · red-tested</div></div>
-      <div class="win"><div class="id">CMP-AUD-082</div><div class="w">Stale live-formulas twin cleared, never masquerades as current</div><div class="c">refresh-or-clear on every values commit · red-tested</div></div>
-      <div class="win"><div class="id">CMP-AUD-081</div><div class="w">Stale canonical TSN library reads dependent cells stale</div><div class="c">token nulled when not-current · verified + pinned</div></div>
-      <div class="win"><div class="id">CMP-AUD-084</div><div class="w">Semantic producer version invalidates stale caches on upgrade</div><div class="c">matrix + consolidation · rebuild-once · upgrade test</div></div>
-      <div class="win"><div class="id">CMP-AUD-063</div><div class="w">Invalid post-mile token → PARTIAL</div><div class="c">HSL/RD PDF · census 75,709 rows</div></div>
-      <div class="win"><div class="id">CMP-AUD-027</div><div class="w">Header-only routes disclosed, not dropped</div><div class="c">cross-env · census 756 exports</div></div>
-      <div class="win"><div class="id">MER-059</div><div class="w">Dashed-district HL headers recognized</div><div class="c">census 252 prints · 1 cell corrected</div></div>
-      <div class="win"><div class="id">CMP-AUD-018</div><div class="w">IS cross-env partition gate</div><div class="c">census 434 exports · shared validator</div></div>
-      <div class="win"><div class="id">sol-001</div><div class="w">Reliability engine hardening — integrated</div><div class="c">updater · export · auth · reviewed + merged</div></div>
+      <div class="win"><div class="id">CMP-AUD-103</div><div class="w">One buildability predicate — explicit Build can't dispatch a missing side</div><div class="c">bulk selector = explicit endpoint = queue · M8 · red-tested</div></div>
+      <div class="win"><div class="id">CMP-AUD-010</div><div class="w">Canonical TSN PDFs consolidate via the registered builder</div><div class="c">every PDF-backed family, not just Highway Log · M8</div></div>
+      <div class="win"><div class="id">CMP-AUD-016</div><div class="w">Classic file/Browse inputs bound to the recipe + preflighted</div><div class="c">cleared on recipe change · existence/type gate · M8</div></div>
+      <div class="win"><div class="id">CMP-AUD-102</div><div class="w">"Set all" spans the authoritative catalog, not the visible subset</div><div class="c">a hidden row can't hide a latent mode · M8</div></div>
+      <div class="win"><div class="id">CMP-AUD-079</div><div class="w">The running comparison's Cancel always stays reachable</div><div class="c">sub-tab strip locks while a Compare-tab run is live · M8</div></div>
+      <div class="win"><div class="id">CMP-AUD-040</div><div class="w">Folder run-root vs its own report-subfolder alias refused</div><div class="c">effective dir/file-set · census 0 false-rej · M9</div></div>
+      <div class="win"><div class="id">CMP-AUD-035</div><div class="w">Direct TSN builders re-verify the raw source after os.replace</div><div class="c">no success for stale bytes · HSL red→green · M9</div></div>
+      <div class="win"><div class="id">CMP-AUD-101</div><div class="w">Open comparisons reaches the active TSN/self artifact</div><div class="c">common comparisons/ root · M8</div></div>
+      <div class="win"><div class="id">CMP-AUD-104</div><div class="w">Queue-capable day export no longer uniquely lock-disabled</div><div class="c">matches its equivalents · M8</div></div>
+      <div class="win"><div class="id">CMP-AUD-007 · 075</div><div class="w">Verify+pins — validation coverage · formula-twin residual (082)</div><div class="c">already-closed, census-confirmed + pinned · M8/M9</div></div>
       <div class="win"><div class="id">CMP-AUD-019</div><div class="w">Ramp Summary audit reds reflected in the result</div><div class="c">census 126 routes · 22 P/V ramps · unexplained → PARTIAL</div></div>
       <div class="win"><div class="id">CMP-AUD-032</div><div class="w">Flat cross-env schemas pinned — bucket C complete</div><div class="c">RD/HSL/HD/ID + 2 PDF paths · census 847 exports · no phantom match</div></div>
       <div class="win"><div class="id">CMP-AUD-046</div><div class="w">Shifted exports show diffs under the right field</div><div class="c">RD force_header + ID realign · Description not R/U · display-only</div></div>
@@ -304,7 +302,7 @@
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>b107c32</b> · gate <b>136/136</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · code tip <b>857b218</b> · gate <b>136/136</b> + 8 JS · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 
