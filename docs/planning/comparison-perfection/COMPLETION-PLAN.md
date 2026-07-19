@@ -28,7 +28,8 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 
 ## Marathon roadmap to completion (2026-07-18)
 
-Buckets **A · B · C · D are COMPLETE.** The remaining **49 open findings** carve into these
+Buckets **A · B · C · D are COMPLETE; M6 and M7 (bucket E) are COMPLETE** (13 closed + 080/089
+Phase-5/7-deferred). The remaining open findings carve into these
 marathon-sized chunks (M6–M13). Confirm each finding's detail + tractability at the marathon's
 start; **census-first + full old-vs-new proof on anything that touches real matrix/comparison
 data** (the HD-053 lesson: identical counts can still hide moved content). Pick a marathon, close
@@ -36,8 +37,8 @@ its findings back-to-back, then update this roadmap.
 
 | Marathon | Theme | Findings | Notes |
 |---|---|---|---|
-| **M6** | Matrix artifact identity & freshness (bucket E) | 080 081 082 084 088 089 100 | The matrix cache can miss changed source/output, survive comparator/parser changes, keep stale formula twins; an auth failure drops queued work. **Census-gated like 083** — a matrix-scanner change touches real data; prove no false freshness. Mostly P1. |
-| **M7** | Day / matrix state machine (bucket E) | 091 092 093 094 095 096 097 099 | Day discovery / date-crossing / source-scoping / rebuild-filter honesty. Mostly P2 state-machine truth; `#mock`-testable. |
+| ~~**M6**~~ ✅ | Matrix artifact identity & freshness (bucket E) | ~~081 082 084 088 100~~ (080 089 Phase-5/7-deferred) | **DONE 2026-07-18 — 5 closed + 2 deferred.** Matrix cache miss changed source/output, stale formula twins, auth drops queued work. |
+| ~~**M7**~~ ✅ | Day / matrix state machine (bucket E) | ~~091 092 093 094 095 096 097 099~~ | **DONE 2026-07-18 — all 8 closed** (91eaee1 / 1400516 / b0add06 / b107c32). Day discovery / date-crossing / source-scoping / rebuild-filter honesty. |
 | **M8** | Compare / matrix GUI dispatch (bucket E) | 007 010 016 079 101 102 103 104 | UI routing / validation / dispatch — **`#mock`-testable like 072/073/074, ~zero comparison-value risk.** Good "fast win" marathon. |
 | **M9** | Completion / partial-artifact policy + transaction (bucket E) | 075 085 098 115 035 040 | The **Phase-5 partial-artifact policy** (known-deferred correctness core) + TOCTOU / input-aliasing. **HARDEST E chunk** — read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes first. All P1 (100 is P2). |
 | **M10** | Evidence transaction & correctness (bucket F) | 106 107 108 109 110 112 | Evidence workbook + images must be ONE truthful transaction; stale red evidence, invented HD diffs, duplicate-only accounting, verify-old-but-rasterize-new. |
@@ -51,9 +52,30 @@ tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (
 fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
 `evidence_highway_detail.py` doc-median follow-up).
 
-> ### ▶ RESUME HERE (2026-07-18 — 6th marathon COMPLETE: M6 → 084/081/082/088/100 CLOSED; 080 + 089 Phase-5/7-DEFERRED)
+> ### ▶ RESUME HERE (2026-07-18 — 7th marathon COMPLETE: M7 → 091/092/093/094/095/096/097/099 ALL CLOSED + the owed CMP-AUD-053 re-measure)
 >
-> **6TH MARATHON WRAP-UP (M6 — matrix identity & freshness): 5 CLOSED + 2 Phase-5/7-DEFERRED, all
+> **7TH MARATHON COMPLETE (M7 — day/matrix state machine): ALL 8 findings CLOSED (091–097, 099),
+> CI-verified, gate 136/136, 205 closed (85%).** Plus the owed **CMP-AUD-053** HD PDF-leg
+> re-measure (statewide 7.9 ars-prod: PDF-vs-Excel **50,724 / 477 / 549 / 1,219**; PDF-vs-TSN
+> **48,173 / 3,028 / 11,910 / 204,240**; Excel-vs-TSN 48,644/… UNAFFECTED — recorded in the
+> canary bindings). Commits: 096/097/099 (`91eaee1`) · 092+095 (`1400516`) · 094+093 (`b0add06`)
+> · 091 (`b107c32`, also repairs the b0add06 `check_p2_freshness` badge-fixture regression). Per
+> finding: **091** by-day export binds its captured run date end to end (additive `day` param
+> through the worker → `output_run_dir(src,env,day)`; normal exports byte-identical); **092**
+> calendar-valid dates + real legacy folder identity (`paths.valid_calendar_date`/`day_source_dir`);
+> **093** badge = actionable (visible+TSN-ready) universe + force short-circuits on zero targets;
+> **094** lock running-day removal; **095** source-switch reconciliation; **096** reject invalid
+> rebuild scopes; **097** canonical `both` missing-side; **099** baseline switch recomputes
+> stale-only. **KEY LESSONS: (a) changing the day-consolidation badge (`day_consolidated`) must
+> re-run `check_p2_freshness` — the lighter-check path skipped it and b0add06/c6596e6 CI went RED
+> until 091's fixup; (b) ALWAYS read the CI run's real `conclusion` (`gh run list … conclusion`),
+> never a `|| echo FAILED`-masked watch echo (a false "success" hid two red commits); (c) an
+> additive `param=None` threaded through the export engine is discrepancy-safe by construction —
+> the default preserves today's behavior byte-for-byte, only the captured value overrides.** **NEXT
+> MARATHON: M8** (`#mock` GUI-dispatch fast wins 007/010/016/079/101–104 — ~zero comparison-value
+> risk) OR M9 (Phase-5 partial-artifact policy, HARDEST — read the Phase-3/5 decision gates first).
+>
+> **(prior) 6TH MARATHON WRAP-UP (M6 — matrix identity & freshness): 5 CLOSED + 2 Phase-5/7-DEFERRED, all
 > CI-verified, gate 136/136, 197 closed (82%).** Closed 084 (`b820ff5`) / 081 (`3d77f4f`) / 082
 > (`442b19b`) / 088 (`5e168b6`) / 100 (`ae45581`). **DEFERRED (both genuinely Phase-5/7-scoped, NOT
 > forced): 080** (source-folder `fingerprint` content-identity — metadata-only + called per-cell

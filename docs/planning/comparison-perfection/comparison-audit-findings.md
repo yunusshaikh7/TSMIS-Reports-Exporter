@@ -369,15 +369,15 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-088 | P2 | Resolved | An authentication failure deletes queued offline comparisons |
 | CMP-AUD-089 | P2 | Verified | Failed and cancelled rebuild attempts disappear behind prior results |
 | CMP-AUD-090 | P1 | Resolved | Workers can mark pre-existing foreign folders as app-owned and deletable |
-| CMP-AUD-091 | P1 | Verified | Day exports and their chained comparisons can cross into different dates |
-| CMP-AUD-092 | P2 | Verified | Day discovery loses legacy folder identity and accepts impossible dates |
-| CMP-AUD-093 | P2 | Verified | Day consolidation status and refresh use incompatible target universes |
-| CMP-AUD-094 | P2 | Verified | Removing a running export day deletes its automatic comparison target |
-| CMP-AUD-095 | P2 | Verified | Source switches retain invalid source-scoped days and baselines |
-| CMP-AUD-096 | P2 | Verified | Invalid scoped rebuild filters silently broaden to the whole matrix |
-| CMP-AUD-097 | P2 | Verified | Unified matrix state cannot report that both inputs are missing |
+| CMP-AUD-091 | P1 | Resolved 2026-07-18 | Day exports and their chained comparisons can cross into different dates |
+| CMP-AUD-092 | P2 | Resolved 2026-07-18 | Day discovery loses legacy folder identity and accepts impossible dates |
+| CMP-AUD-093 | P2 | Resolved 2026-07-18 | Day consolidation status and refresh use incompatible target universes |
+| CMP-AUD-094 | P2 | Resolved 2026-07-18 | Removing a running export day deletes its automatic comparison target |
+| CMP-AUD-095 | P2 | Resolved 2026-07-18 | Source switches retain invalid source-scoped days and baselines |
+| CMP-AUD-096 | P2 | Resolved 2026-07-18 | Invalid scoped rebuild filters silently broaden to the whole matrix |
+| CMP-AUD-097 | P2 | Resolved 2026-07-18 | Unified matrix state cannot report that both inputs are missing |
 | CMP-AUD-098 | P1 | Partially remediated 2026-07-14 (the comparison-pipeline half; the evidence-gate half remains Stage-10 work) | Inputs changed during comparison can be certified as the fresh sources |
-| CMP-AUD-099 | P2 | Verified | Baseline switching rebuilds baseline-independent Matrix modes |
+| CMP-AUD-099 | P2 | Resolved 2026-07-18 | Baseline switching rebuilds baseline-independent Matrix modes |
 | CMP-AUD-100 | P2 | Resolved | Matrix cache identity and nested record schemas are not validated |
 | CMP-AUD-101 | P2 | Verified | Open Comparisons opens the wrong tree for non-environment modes |
 | CMP-AUD-102 | P2 | Verified | “Show comparison for all” silently excludes hidden rows |
@@ -4814,7 +4814,7 @@ surrounding boundary.
 ### CMP-AUD-091 — one day export job can write and compare different dates
 
 Priority: P1  
-Status: Verified with a clock-rollover orchestration harness  
+Status: RESOLVED 2026-07-18 (`b107c32`) — the by-day export binds its captured run date (`job["env"]`) end to end: `MatrixBatchExportWorker.day` -> `_run_matrix_export_step(day=)` -> `ExportWorker.day`; `_prep_edition` names `output_run_dir(src, env, day)/subdir` for the captured day (single/fast/coalesced). Additive `day=None` keeps store + normal dated exports byte-identical; the auto-compare already targets that date. Red->green in `check_worker_lifecycle` + `check_day_matrix`.
 Primary code: `scripts/gui_matrix.py:426-480,1044-1055,1400-1433`,
 `scripts/gui_worker_matrix.py:23-43,74-128`, `scripts/paths.py:98-106`,
 `scripts/exporter.py:992-1000`
@@ -4841,7 +4841,7 @@ on a later date.
 ### CMP-AUD-092 — day discovery reconstructs the wrong folder and accepts fake dates
 
 Priority: P2  
-Status: Verified through day and baseline discovery, snapshot, and dispatch  
+Status: RESOLVED 2026-07-18 (`1400516`) — `paths.valid_calendar_date` gates `parse_run_folder` (impossible tokens like `2026-99-99` rejected at discovery) and `paths.day_source_dir` resolves the REAL run folder (pre-v0.10 legacy bare-date included; suffixed wins deterministically), wired through `day_matrix`/`baseline_matrix`. Census: 0 real corpus folders newly rejected. Red->green in `check_day_matrix`.
 Primary code: `scripts/paths.py:91,109-116`,
 `scripts/day_matrix.py:175-204,269-284,388-410`,
 `scripts/baseline_matrix.py:89-101,205-255`, `scripts/gui_matrix.py:990-1000`
@@ -4870,7 +4870,7 @@ folders, and source names containing date-like text.
 ### CMP-AUD-093 — day consolidation status cannot be repaired by its advertised action
 
 Priority: P2  
-Status: Verified through snapshot, forced-refresh routing, and queue drain  
+Status: RESOLVED 2026-07-18 (`b0add06`) — the day-consolidation badge now describes exactly the refresh action's universe (visible + TSN-ready + exported) and carries an `actionable` flag the UI honors (disabled, no no-op click); `rebuild_day_matrix` short-circuits to `nothing` on zero targets even under `force`. Red->green in `check_day_matrix` (+ `check_p2_freshness` fixture updated for the TSN-scoped badge).
 Primary code: `scripts/day_matrix.py:288-308,329-346`,
 `scripts/gui_matrix.py:248-260,325-343,1133-1152`,
 `scripts/ui/ui-matrix.js:1049-1069`
@@ -4898,7 +4898,7 @@ Test no TSN, hidden rows, mixed fresh/missing/partial rows, and concurrent queue
 ### CMP-AUD-094 — removing a running day discards its automatic comparison
 
 Priority: P2  
-Status: Verified through the real bridge during an active export  
+Status: RESOLVED 2026-07-18 (`b0add06`) — `remove_day_matrix_day` refuses while a by-day export/compare for that date is running or queued (`which=="day"` + `env==date`), so the export-and-compare workflow can't lose its chained comparison. Red->green in `check_day_matrix`.
 Primary code: `scripts/ui/ui-matrix.js:319-327,941-949,1104-1124`,
 `scripts/gui_matrix.py:1002-1008,1400-1433`
 
@@ -4919,7 +4919,7 @@ cancelled, and automatic-comparison phases.
 ### CMP-AUD-095 — source switching retains impossible day and baseline selections
 
 Priority: P2  
-Status: Verified through real settings, snapshots, picker state, and explicit build  
+Status: RESOLVED 2026-07-18 (`1400516`) — `set_day_matrix_source` / `set_baseline_matrix_source` reconcile the retained source-scoped day columns (and, for baseline, the baseline id) to the NEW source's exports, dropping any that can't target a real folder. Red->green in `check_day_matrix` + `check_baseline_matrix`.
 Primary code: `scripts/gui_matrix.py:980-1000,1184-1194,1222-1249,1310-1326`,
 `scripts/settings.py:699-737,759-816`, `scripts/ui/mock.js:1323-1325,1385-1388`,
 `scripts/ui/ui-matrix.js:834-848,1180-1220`
@@ -4950,7 +4950,7 @@ between source switching and queued jobs.
 ### CMP-AUD-096 — invalid scoped filters become full-matrix rebuilds
 
 Priority: P2  
-Status: Verified through real rebuild endpoints and target capture  
+Status: RESOLVED 2026-07-18 (`91eaee1`) — `recompute_matrix` / `rebuild_day_matrix` / `rebuild_baseline_matrix` REJECT a supplied-but-invalid row/env/date instead of normalizing it to None and rebuilding the whole matrix; an absent filter still means everything. Red->green in `check_matrix_bridge` / `check_day_matrix` / `check_baseline_matrix`.
 Primary code: `scripts/gui_matrix.py:591-615,1133-1152,1329-1350`
 
 Scoped rebuild endpoints normalize an invalid supplied row/date/environment to
@@ -4971,7 +4971,7 @@ no invalid narrow request may broaden its write set.
 ### CMP-AUD-097 — unified state drops one side when both inputs are missing
 
 Priority: P2  
-Status: Verified through baseline snapshot and UI rendering  
+Status: RESOLVED 2026-07-18 (`91eaee1`) — `_cmp_state` emits the canonical `both` when >1 side is absent (matching `comparison_state` + the renderer's `both` branch); a single missing side keeps its own actionable name (incl. `tsn`). Red->green in `check_matrix_tsn`.
 Primary code: `scripts/matrix_state.py:565-573`,
 `scripts/baseline_matrix.py:307-315`, `scripts/ui/ui-matrix.js:272-281`
 
@@ -5065,7 +5065,7 @@ fixtures must fail or prove the capture stayed on A; no live-path restoration ca
 ### CMP-AUD-099 — baseline switching rebuilds modes that do not use it
 
 Priority: P2  
-Status: Verified through UI call routing and executable target selection  
+Status: RESOLVED 2026-07-18 (`91eaee1`) — a baseline switch recomputes with `scope="stale"` (only the now-stale cross-env cells, whose baseline-scoped path is missing), never `"all"` (which rebuilt fresh baseline-independent vs-TSN/self cells); `set_matrix_baseline` sizes the pending count the same. Per-row/column rebuild buttons keep `all`. Red->green in `check_matrix_bridge` + `check_ui_contract` (UI source guard).
 Primary code: `scripts/ui/ui-matrix.js:770-793`,
 `scripts/gui_matrix.py:110-122`, `scripts/matrix_build.py:183-205`
 

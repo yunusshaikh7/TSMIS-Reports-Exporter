@@ -162,18 +162,18 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">82<span>%</span></div>
+        <div class="bignum">85<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="197 closed, 4 in progress, 40 open of 241 findings">
-          <div class="seg done" style="width:82%">197 closed</div>
-          <div class="seg warn" style="width:2%"></div>
-          <div class="seg open" style="width:16%">40 open</div>
+        <div class="bar" role="img" aria-label="205 closed, 2 in progress, 36 open of 241 findings">
+          <div class="seg done" style="width:85%">205 closed</div>
+          <div class="seg warn" style="width:1%"></div>
+          <div class="seg open" style="width:14%">36 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 197 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 205 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot warn"></i> ~4 in progress</span>
           <span><i class="dot open"></i> ~40 open</span>
         </div>
@@ -189,7 +189,7 @@
       </div>
       <p class="sub">This is the reason the remaining work is a downhill grade: every
         correctness-critical layer is already proven and gated. Nothing below can silently regress —
-        the offline gate is <b class="num">130/130</b>, CI-green.</p>
+        the offline gate is <b class="num">136/136</b>, CI-green.</p>
       <div class="fgrid">
         <div class="fitem"><span class="chk">✓</span><div><div class="t">Shared comparison engine</div><div class="d">correctness-locked</div></div></div>
         <div class="fitem"><span class="chk">✓</span><div><div class="t">12 report families</div><div class="d">consolidate + compare · vs-TSN · PDF · cross-env · baseline</div></div></div>
@@ -221,8 +221,8 @@
         <p class="bk-desc">The full PDF-parser hardening wave — <code>044</code> · <code>054</code> · the ID set <code>056–060 · 062</code> · the HD set <code>051–053</code> · <code>055</code> · <code>061</code> — all closed. <code>053</code> surfaced a real 054-missed "CONT" line-2 corruption (7 records corrected); the rest were census-proven no-ops (detection → PARTIAL).</p>
       </div>
       <div class="bk">
-        <div class="bk-top"><span class="bk-letter">E</span><span class="bk-name">Matrix / day / GUI lifecycle</span><span class="pill open">Open</span></div>
-        <p class="bk-desc">The largest bucket — mostly <span class="mono">P2</span> state-machine honesty in the matrix + GUI, not correctness of the comparisons themselves.</p>
+        <div class="bk-top"><span class="bk-letter">E</span><span class="bk-name">Matrix / day / GUI lifecycle</span><span class="pill warn">In progress</span></div>
+        <p class="bk-desc">The largest bucket — mostly <span class="mono">P2</span> state-machine honesty in the matrix + GUI. <b>M6 (identity &amp; freshness) and M7 (day/matrix state machine) COMPLETE</b> — 13 closed; the GUI-dispatch (M8) + partial-artifact policy (M9) remain.</p>
       </div>
       <div class="bk">
         <div class="bk-top"><span class="bk-letter">F</span><span class="bk-name">Evidence-gate truth</span><span class="pill open">Open</span></div>
@@ -249,8 +249,8 @@
       <div class="step now">
         <div class="n">01</div>
         <div class="body">
-          <div class="h">Matrix identity &amp; freshness <span class="tag done">5 closed</span></div>
-          <div class="m">Bucket E / M6 — <b>084 + 081 + 082 + 088 + 100 closed</b> (producer-version cache invalidation; stale TSN library nulls its token; stale live-formulas twin cleared; auth failure keeps local jobs; adversarial cache-swap + nested-record gate). <b>080 + 089 deferred</b> as genuine Phase-5/7 work (a source-fingerprint perf-cache; a durable per-cell attempt overlay — its convention-assigned home). Buckets <b>B, C &amp; D complete</b>.</div>
+          <div class="h">Day / matrix state machine — M7 <span class="tag done">8 closed</span></div>
+          <div class="m">Bucket E / M7 — <b>091 · 092 · 093 · 094 · 095 · 096 · 097 · 099 all closed</b> (by-day export binds its captured run date end to end; calendar-valid dates + real legacy folder identity; the day-consolidation badge = its actionable universe; running-day removal locked; source-switch reconciliation; invalid rebuild scopes rejected; canonical <span class="mono">both</span> missing-side; baseline switch recomputes stale-only) — plus the owed <b>CMP-AUD-053</b> HD PDF-leg re-measure (PDF-vs-Excel 50,724/477/549/1,219; PDF-vs-TSN 48,173/3,028/11,910/204,240). Prior: M6 identity &amp; freshness (5 closed + 080/089 Phase-5/7-deferred); buckets <b>B, C &amp; D complete</b>.</div>
         </div>
       </div>
       <div class="step"><div class="n">02</div><div class="body"><div class="h">Source-semantics</div><div class="m">Bucket G — conserve/expose data facts (HD-Excel + HL raw county are vendor-blocked — never inferred).</div></div></div>
@@ -304,7 +304,7 @@
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>ae45581</b> · gate <b>136/136</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>b107c32</b> · gate <b>136/136</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 
