@@ -366,7 +366,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-085 | P1 | Partially remediated | Partial-artifact policy conflicts while truth surfaces certify/reuse incomplete work |
 | CMP-AUD-086 | P3 | Resolved | Comparison documentation contradicts the executable capability census |
 | CMP-AUD-087 | P2 | Resolved | “Refresh stale” cannot rebuild cells whose count cache is unavailable |
-| CMP-AUD-088 | P2 | Verified | An authentication failure deletes queued offline comparisons |
+| CMP-AUD-088 | P2 | Resolved | An authentication failure deletes queued offline comparisons |
 | CMP-AUD-089 | P2 | Verified | Failed and cancelled rebuild attempts disappear behind prior results |
 | CMP-AUD-090 | P1 | Resolved | Workers can mark pre-existing foreign folders as app-owned and deletable |
 | CMP-AUD-091 | P1 | Verified | Day exports and their chained comparisons can cross into different dates |
@@ -4674,7 +4674,9 @@ generation, mtime, fingerprint, and strict sidecar truth must all agree. Locked 
 ### CMP-AUD-088 — authentication failure clears offline comparison work
 
 Priority: P2  
-Status: Verified through the real shared queue/error handler  
+Status: REMEDIATED 2026-07-18 — an auth/browser failure now drops only the
+auth-dependent export jobs; local comparison/evidence jobs on the shared queue
+survive and continue (see Remediation)  
 Primary code: `scripts/gui_api.py:1122-1144`,
 `scripts/gui_matrix.py:276-343`, `build/check_matrix_bridge.py:351-358`
 
@@ -4697,6 +4699,28 @@ failure, retain and continue runnable local comparison/evidence jobs; suspend or
 only jobs requiring the failed prerequisite, with an explicit recoverable state. Test
 every ordering of export, consolidation, evidence, Everything comparison, day comparison,
 and baseline comparison around auth and browser-not-found failures.
+
+#### Remediation — 2026-07-18
+
+The matrix queue holds four job kinds and only the **export** re-authenticates and
+launches a browser; **compare** (Everything / day / baseline), **evidence**, and
+**tsn_consolidate** are local workbook/PDF operations that never authenticate. A single
+classifier `_matrix_job_needs_auth` (over the frozen
+`_AUTH_DEPENDENT_MATRIX_KINDS = {"export"}`) captures that, and `_on_error` now calls
+`TaskCoordinator.drop_matching(self._matrix_job_needs_auth)` instead of
+`self._queue.clear()`: only the export jobs (which would hit the same failure) are
+removed, the local jobs are retained in FIFO order, and `_end_task`'s existing
+auto-advance then continues them — an auth failure no longer erases queued offline
+comparison/evidence work. `drop_matching` is fail-safe (an unclassifiable job is kept,
+never dropped) and returns `(removed, retained)` so the handler tells the user both what
+was cleared (re-queue after sign-in) and what continues. An export-only queue still
+fully clears (unchanged). The golden `check_matrix_bridge` fixture — which previously
+queued only an export behind an export and normalized the broad clear — gains the mixed
+queue: `drop_matching` removes exactly the export jobs and keeps compare/evidence/
+tsn_consolidate in order, `_matrix_job_needs_auth` classifies each kind, and the
+end-to-end `_on_error` on a running-export + queued-compare keeps the compare and frees
+the gate (RED: the pre-fix `_queue.clear()` empties it, the finding's exact defect).
+Gate 135/135.
 
 ### CMP-AUD-089 — failed rebuild attempts are not durable cell state
 

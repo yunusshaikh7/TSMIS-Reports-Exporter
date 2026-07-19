@@ -363,6 +363,51 @@ def main():
         check("stop-all on an empty/idle queue is a no-op",
               a.matrix_stop_all().get("cleared") == 0)
 
+        print("CMP-AUD-088: an auth/browser failure keeps LOCAL matrix jobs:")
+        # The matrix queue is SHARED: only export jobs need auth/browser; compare /
+        # evidence / tsn_consolidate run offline. drop_matching removes ONLY the
+        # auth-dependent ones (fail-safe: an unclassifiable job is kept).
+        a._coord.task = None; a._coord.current_job = None
+        a._coord.queue.clear()
+        a._coord.queue.extend([
+            {"id": 91, "kind": "export"}, {"id": 92, "kind": "compare"},
+            {"id": 93, "kind": "evidence"}, {"id": 94, "kind": "tsn_consolidate"},
+            {"id": 95, "kind": "export"}])
+        removed, retained = a._coord.drop_matching(a._matrix_job_needs_auth)
+        check("drop_matching removes exactly the two export jobs",
+              removed == 2 and retained == 3)
+        check("...and keeps compare/evidence/tsn_consolidate in FIFO order",
+              [j["id"] for j in a._coord.queue] == [92, 93, 94])
+        check("_matrix_job_needs_auth: only export needs the prerequisite",
+              a._matrix_job_needs_auth({"kind": "export"}) is True
+              and not any(a._matrix_job_needs_auth({"kind": k})
+                          for k in ("compare", "evidence", "tsn_consolidate")))
+
+        # _on_error end-to-end on a MIXED queue: a running export fails auth; a queued
+        # local compare survives and the queued export is dropped. Stub the auto-advance
+        # so the queue reflects only the auth handler's selective drop (RED: the pre-fix
+        # _queue.clear() would empty it, dropping the local job — the finding's defect).
+        saved_advance = a._try_start_next_matrix_job
+        a._try_start_next_matrix_job = lambda: None
+        try:
+            a._coord.task = "matrix"
+            a._coord.current_job = a._make_job(
+                "export", "cell", "re-export", row="ramp_detail", env="ssor-prod")
+            a._coord.queue.clear()
+            a._coord.queue.append(a._make_job(
+                "compare", "cell", "vs TSN", row="ramp_detail", env="ars-prod"))
+            a._coord.queue.append(a._make_job(
+                "export", "cell", "re-export 2", row="ramp_detail", env="ars-prod"))
+            a._on_error(("auth", "session expired"))
+            check("a mixed-queue auth failure keeps the local compare, drops the export",
+                  [j["kind"] for j in a._coord.queue] == ["compare"])
+            check("...and frees the gate so the retained job can run",
+                  a._task is None)
+        finally:
+            a._try_start_next_matrix_job = saved_advance
+        # Leave a clean coordinator for the tests below (this block seeded the queue).
+        a._coord.task = None; a._coord.current_job = None; a._coord.queue.clear()
+
         print("no-work drop pushes fresh state (queue-phantom regression, v0.18.1):")
         # The phantom: a job popped then DROPPED (no-work / dispatch error) mutated
         # the queue but didn't push, so the frontend kept rendering the drained

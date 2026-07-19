@@ -114,6 +114,24 @@ class TaskCoordinator:
         with self._lock:
             return len(self.queue)
 
+    def drop_matching(self, predicate):
+        """Remove queued jobs for which ``predicate(job)`` is True, keeping the rest in
+        FIFO order; return ``(removed, retained)``. The auth/browser error handler uses
+        this to drop ONLY the jobs that need the failed prerequisite (exports), so local
+        comparison/evidence jobs on the SHARED queue survive (CMP-AUD-088). A predicate
+        that raises is treated as non-matching (the job is kept — fail safe: never drop
+        a job we cannot classify)."""
+        with self._lock:
+            def _drop(job):
+                try:
+                    return bool(predicate(job))
+                except Exception:  # silent-ok: an unclassifiable job is KEPT (never dropped) — fail safe
+                    return False
+            kept = deque(job for job in self.queue if not _drop(job))
+            removed = len(self.queue) - len(kept)
+            self.queue = kept
+            return removed, len(kept)
+
     def take_next(self):
         """If the gate is free and the queue is non-empty, ATOMICALLY pop the next
         job, claim the gate as 'matrix', set it as the running job, mark it running,

@@ -1164,26 +1164,30 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
     def _on_error(self, payload):
         kind, message = payload
         self._emit_log(f"ERROR: {message}")
-        # An error that ENDS A MATRIX JOB (only auth / browser-not-found reach
-        # here from the matrix workers — both unrecoverable this session) would
-        # hit every queued matrix job the same way. Drop the pending queue so it
-        # can't cascade into a modal storm; the user fixes the cause + re-queues.
+        # An error that ENDS A MATRIX JOB (only auth / browser-not-found reach here
+        # from the matrix workers — both unrecoverable this session) would hit every
+        # queued EXPORT the same way. CMP-AUD-088: the matrix queue is SHARED, though —
+        # compare / evidence / tsn_consolidate jobs are LOCAL workbook/PDF operations
+        # that never authenticate, so they must survive an auth/browser failure. Drop
+        # ONLY the auth-dependent exports (so they can't cascade into a modal storm);
+        # _end_task then continues the retained local jobs. The user fixes the cause +
+        # re-queues the exports.
         with self._lock:
             if kind == "auth":
                 self._authed = False
-            # Clear the pending queue only when the error ended a MATRIX job —
-            # those remaining jobs would hit the same failure. A non-matrix auth
-            # failure (e.g. a login) leaves queued matrix jobs alone; the first one
-            # to run then self-clears the rest if the problem persists.
             was_matrix = self._current_job is not None
-            cleared = len(self._queue) if was_matrix else 0
+            cleared = retained = 0
             if was_matrix:
-                self._queue.clear()
+                cleared, retained = self._coord.drop_matching(
+                    self._matrix_job_needs_auth)
         if kind == "auth":
             clear_auth()
         if cleared:
-            self._emit_log(f"Cleared {cleared} queued matrix job(s) — fix the "
-                           "problem above, then re-queue them.")
+            self._emit_log(f"Cleared {cleared} queued re-export job(s) that need sign-in "
+                           "— fix the problem above, then re-queue them.")
+        if retained:
+            self._emit_log(f"Kept {retained} queued local comparison/evidence job(s) — "
+                           "they don't need sign-in and will continue.")
         if kind == "auth":
             self._set_dot("bad", "No saved login — click Log in")
             self._emit_modal("warning", "Login needed",

@@ -245,6 +245,19 @@ class GuiMatrixMixin:
             return self._dispatch_tsn_consolidate_job(job)
         return False
 
+    # CMP-AUD-088: only an EXPORT re-authenticates + launches a browser. compare /
+    # evidence / tsn_consolidate jobs are LOCAL workbook/PDF operations that never
+    # authenticate, so an auth or browser-not-found failure must not drop them from the
+    # SHARED matrix queue — only the auth-dependent exports are removed, the rest run on.
+    _AUTH_DEPENDENT_MATRIX_KINDS = frozenset({"export"})
+
+    def _matrix_job_needs_auth(self, job):
+        """True iff a queued matrix job needs the auth/browser prerequisite (an export).
+        The shared-queue error handler drops only these on an auth/browser failure; the
+        local comparison / evidence / TSN-consolidate jobs survive and continue."""
+        return (isinstance(job, dict)
+                and job.get("kind") in self._AUTH_DEPENDENT_MATRIX_KINDS)
+
     def _resolve_compare_cells(self, job, base):
         """[(row, cell, mode)] for a compare job. A 'cell' job is the one explicit
         cell (always run); row/column/all/stale defer to the staleness-aware
