@@ -36,6 +36,7 @@ pdfplumber/openpyxl gated by the engine.
 import logging
 import re
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 
 try:
@@ -48,7 +49,7 @@ except ImportError:
 import compare_ramp_detail_pdf as rdp
 import compare_ramp_detail_tsn as rd
 import consolidate_tsmis_ramp_detail_pdf as rdpdf
-from compare_core import _xl_trim
+from compare_core import _xl_trim, compared_cell
 from pdf_table_lib import cluster_by_top, norm_route, require_document_route
 from tsn_load_ramp_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
 
@@ -66,6 +67,19 @@ FIELDS = [f for f in rd.SHARED_HEADER
 _EXCEL_ROW_SKIPS = ("On/Off", "Ramp Type")
 
 _KEY_I = 1 + rd.KEY_FIELD             # PM's index in a loader row ([route, *header])
+
+
+def _schema_for(pdf_sourced):
+    """The comparison schema for this row's flavor. The Excel-vs-TSN flavor keeps
+    the print-only On/Off + Ramp Type columns CONTEXT (the export drops them); the
+    PDF-vs-TSN flavor PROMOTES them to asserting (compare_ramp_detail_pdf). Derived
+    from the base schema by removing exactly the print-only columns from its
+    context set, so the two flavors can't drift from the comparators."""
+    if not pdf_sourced:
+        return rd._SCHEMA
+    return replace(rd._SCHEMA,
+                   context_fields=tuple(f for f in rd._SCHEMA.context_fields
+                                        if f not in _EXCEL_ROW_SKIPS))
 
 
 def _S(v):
@@ -145,12 +159,14 @@ def _load_tsn_with_sidecar(path):
 
 def enumerate_diffs(tsmis_rows, tsn_rows, meta):
     """{field: [example]} over (route, PM) keys UNIQUE per route on BOTH sides —
-    each example a cell the ROW'S OWN comparison flags (the Excel row's flavor
-    never compares the print-only columns, so they never enumerate there).
-    Equality mirrors compare_core's cell compare (loader projections + the
-    Excel TRIM), so inequality here == a red cell there."""
+    each example a cell the ROW'S OWN comparison flavor COUNTS. Equality is the
+    engine's OWN compared_cell verdict under the per-flavor schema: the Excel
+    export DROPS the print-only On/Off + Ramp Type columns (context, never
+    counted), while the PDF flavor asserts them — so the print-only columns
+    enumerate on the PDF row only, exactly like the comparison (CMP-AUD-107 —
+    the shared engine)."""
     sidecar, pdf_sourced = meta["dc"], meta["pdf"]
-    skips = () if pdf_sourced else _EXCEL_ROW_SKIPS
+    sc = _schema_for(pdf_sourced)
     a_route, b_route = defaultdict(list), defaultdict(list)
     for r in tsmis_rows:
         a_route[r[0]].append(r)
@@ -168,10 +184,10 @@ def enumerate_diffs(tsmis_rows, tsn_rows, meta):
         for key in set(a_by) & set(b_by):
             ra, rb = a_by[key], b_by[key]
             for i, f in enumerate(rd.SHARED_HEADER):
-                if f == rd.KEY or f in _ALWAYS_CONTEXT or f in skips:
+                if i == rd.KEY_FIELD:
                     continue
-                va, vb = _xl_trim(ra[1 + i]), _xl_trim(rb[1 + i])
-                if va != vb:
+                va, vb, verdict = compared_cell(sc, i, ra, rb, 1)
+                if verdict is False:
                     dist, cnty = (sidecar.get((route, key)) or [("", "")])[0]
                     # The engine's locators key on the plain normalized-PM text
                     # (+ county for TSN); the D4 PhysicalKey's str payload IS

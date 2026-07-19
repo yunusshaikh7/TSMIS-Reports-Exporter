@@ -39,6 +39,7 @@ except ImportError:
 import compare_highway_detail_tsn as cht
 import consolidate_tsmis_highway_detail_pdf as chd
 import highway_detail_columns as hdc
+from compare_core import _xl_trim, compared_cell
 from pdf_table_lib import (cluster_by_top, median, norm_route,
                            require_document_route)
 from tsn_load_highway_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
@@ -156,8 +157,12 @@ def _load_tsn_with_sidecar(path):
 
 def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
     """{field: [example]} over keys UNIQUE per route on BOTH sides — each
-    example a cell the comparison flags (values already normalized by the
-    loaders, so inequality here == a red cell there)."""
+    example a cell the comparison COUNTS. Equality is the engine's OWN
+    compared_cell verdict (Excel TRIM + the Med V/WDA fold + non-asserting
+    context/ditto), so inequality here == a red cell there and a whitespace-,
+    Med-Wid-, or context-only non-difference can never leak in (CMP-AUD-107 —
+    the shared engine, matching the Highway Log / Highway Sequence adapters)."""
+    sc = cht._SCHEMA
     a_route, b_route = defaultdict(list), defaultdict(list)
     for r in tsmis_rows:
         a_route[r[0]].append(r)
@@ -175,10 +180,10 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
         for key in set(a_by) & set(b_by):
             ra, rb = a_by[key], b_by[key]
             for i, f in enumerate(cht.SHARED_HEADER):
-                if f == cht.KEY:
+                if i == cht.KEY_FIELD:
                     continue
-                va, vb = _S(ra[1 + i]), _S(rb[1 + i])
-                if va != vb:
+                va, vb, verdict = compared_cell(sc, i, ra, rb, 1)
+                if verdict is False:
                     dist, cnty = (sidecar.get((route, key)) or [("", "")])[0]
                     diffs[f].append(dict(route=route, key=key, field=f,
                                          va=va, vb=vb, dist=dist, cnty=cnty))
@@ -190,10 +195,12 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
 # --------------------------------------------------------------------------- #
 def project(field, raw):
     """A raw PDF cell value -> the compared form, via the comparator's own
-    per-field projection (PS is key-derived, not a plain column)."""
+    per-field projection (PS is key-derived, not a plain column) then the
+    engine's Excel TRIM — so a verified value matches compared_cell's display
+    and an example round-trips exactly (CMP-AUD-107)."""
     if field == "PS":
         return "E" if "E" in _S(raw).upper() else ""
-    return cht._project(field, raw)
+    return _xl_trim(cht._project(field, raw))
 
 
 # --------------------------------------------------------------------------- #

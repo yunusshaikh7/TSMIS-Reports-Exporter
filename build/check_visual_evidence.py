@@ -679,6 +679,27 @@ check("only the unique-key LB Wid diff is enumerated, with its district",
       and (diffs["LB Wid"][0]["dist"], diffs["LB Wid"][0]["cnty"]) == ("06", "TUL")
       and (diffs["LB Wid"][0]["va"], diffs["LB Wid"][0]["vb"]) == ("24", "26"))
 
+# CMP-AUD-107: HD evidence now judges each cell with the comparison's OWN
+# compared_cell verdict (Excel TRIM + the Med V/WDA fold), so a non-difference
+# the workbook does NOT count can never be enumerated. Raw string compare
+# invented both of these before.
+_ws_a = [_row("002", "010.000", **{"HG": "A  B", "Med V/WDA": "06V", "AC": "F"})]
+_ws_b = [_row("002", "010.000", **{"HG": "A B", "Med V/WDA": "6V", "AC": "G"})]
+_ws_diffs = ehd.enumerate_diffs(_ws_a, _ws_b, {("002", "010.000"): [("06", "TUL")]})
+check("HG internal-whitespace-only difference is NOT enumerated (Excel TRIM)",
+      "HG" not in _ws_diffs)
+check("Med V/WDA leading-zero-only difference is NOT enumerated (Med-Wid fold)",
+      "Med V/WDA" not in _ws_diffs
+      and cht._SCHEMA.is_medwid(cht.SHARED_HEADER.index("Med V/WDA")))
+check("a genuinely different asserting cell (AC) IS still enumerated, TRIM display",
+      list(_ws_diffs) == ["AC"]
+      and (_ws_diffs["AC"][0]["va"], _ws_diffs["AC"][0]["vb"]) == ("F", "G"))
+# the projection is TRIM-aligned so a real diff still round-trips against the
+# compared_cell display (the verification consistency half of CMP-AUD-107)
+check("HD project() applies the Excel TRIM so a verified value matches the display",
+      ehd.project("Description", "A  B") == "A B"
+      and ehd.project("Med V/WDA", "8V") == "08V" and ehd.project("PS", "E") == "E")
+
 # --------------------------------------------------------------------------- #
 print("TSN loader sidecar contract")
 tmp = Path(tempfile.mkdtemp())
@@ -1296,6 +1317,10 @@ check("enumerate_diffs judges through the LIVE schemas (context sets)",
       == {"Ramp Name", "On/Off", "Ramp Type", "ADT"}
       and set(crdp.TSMIS_PDF_VS_TSN._schema.context_fields)
       == {"Ramp Name", "ADT"})
+check("_schema_for binds each flavor to the live comparator context (CMP-AUD-107)",
+      erd._schema_for(False) is crd_cmp._SCHEMA
+      and set(erd._schema_for(True).context_fields)
+      == set(crdp.TSMIS_PDF_VS_TSN._schema.context_fields))
 # LOCKSTEP pins vs the PDF consolidator: the wrap join, the PM test, the prefix
 # legend, and the null-render tokens the projections must keep matching.
 check("join_desc_parts: bare after a hyphen, one space otherwise, empties skipped",

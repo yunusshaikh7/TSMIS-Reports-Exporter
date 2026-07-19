@@ -42,7 +42,7 @@ except ImportError:
 
 import compare_intersection_detail_tsn as idt
 import consolidate_tsmis_intersection_detail_pdf as idpdf
-from compare_core import _xl_trim
+from compare_core import _xl_trim, compared_cell
 from pdf_table_lib import cluster_by_top, median, require_document_route
 from tsn_load_intersection_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
 
@@ -109,9 +109,10 @@ def _load_tsn_with_sidecar(path):
 
 def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
     """{field: [example]} over (route, PM) keys UNIQUE per route on BOTH sides —
-    each example a cell the comparison flags. Equality mirrors compare_core's
-    cell compare (loader projections + the Excel TRIM), so inequality here ==
-    a red cell there."""
+    each example a cell the comparison COUNTS. Equality is the engine's OWN
+    compared_cell verdict (loader projections + the Excel TRIM), so inequality
+    here == a red cell there (CMP-AUD-107 — the shared engine)."""
+    sc = idt._SCHEMA
     a_route, b_route = defaultdict(list), defaultdict(list)
     for r in tsmis_rows:
         a_route[r[0]].append(r)
@@ -131,8 +132,8 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
             for i, f in enumerate(idt.SHARED_HEADER):
                 if f == idt.KEY:
                     continue
-                va, vb = _xl_trim(ra[1 + i]), _xl_trim(rb[1 + i])
-                if va != vb:
+                va, vb, verdict = compared_cell(sc, i, ra, rb, 1)
+                if verdict is False:
                     dist, cnty = (sidecar.get((route, key)) or [("", "")])[0]
                     # The engine's locators key on the plain normalized-PM text
                     # (+ county for TSN); the ID-79 PhysicalKey's str payload IS
