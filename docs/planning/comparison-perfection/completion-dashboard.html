@@ -162,19 +162,19 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">81<span>%</span></div>
+        <div class="bignum">82<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>241 findings</b> closed — and the ones that
           remain are mostly hardening, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="196 closed, 5 in progress, 40 open of 241 findings">
-          <div class="seg done" style="width:81%">196 closed</div>
-          <div class="seg warn" style="width:3%"></div>
+        <div class="bar" role="img" aria-label="197 closed, 4 in progress, 40 open of 241 findings">
+          <div class="seg done" style="width:82%">197 closed</div>
+          <div class="seg warn" style="width:2%"></div>
           <div class="seg open" style="width:16%">40 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 196 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
-          <span><i class="dot warn"></i> ~5 in progress</span>
+          <span><i class="dot done"></i> 197 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot warn"></i> ~4 in progress</span>
           <span><i class="dot open"></i> ~40 open</span>
         </div>
       </div>
@@ -250,7 +250,7 @@
         <div class="n">01</div>
         <div class="body">
           <div class="h">Matrix identity &amp; freshness <span class="tag now">in progress</span></div>
-          <div class="m">Bucket E / M6 — the largest remaining bucket, mostly <span class="mono">P2</span> state-machine truthfulness in the matrix + GUI, not comparison correctness. <b>084 + 081 + 082 + 088 closed</b> (producer-version cache invalidation; stale TSN library nulls its token; stale live-formulas twin cleared; an auth failure now keeps local comparison jobs). <b>080 deferred</b> (Phase-5 perf-vs-correctness). 089/100 next. Buckets <b>B, C &amp; D complete</b>.</div>
+          <div class="m">Bucket E / M6 — the largest remaining bucket, mostly <span class="mono">P2</span> state-machine truthfulness in the matrix + GUI, not comparison correctness. <b>084 + 081 + 082 + 088 + 100 closed</b> (producer-version cache invalidation; stale TSN library nulls its token; stale live-formulas twin cleared; auth failure keeps local jobs; adversarial cache-swap + nested-record gate). <b>080 deferred</b> (Phase-5 perf-vs-correctness); <b>089</b> is the last M6 finding. Buckets <b>B, C &amp; D complete</b>.</div>
         </div>
       </div>
       <div class="step"><div class="n">02</div><div class="body"><div class="h">Source-semantics</div><div class="m">Bucket G — conserve/expose data facts (HD-Excel + HL raw county are vendor-blocked — never inferred).</div></div></div>
@@ -266,6 +266,7 @@
   <section>
     <div class="sec-head"><h2>Shipped this session</h2><span class="kicker">all CI-green</span></div>
     <div class="wins">
+      <div class="win"><div class="id">CMP-AUD-100</div><div class="w">Foreign / malformed matrix cache never trusted or crashes</div><div class="c">4×4 identity swap · 9 adversarial records · red-tested</div></div>
       <div class="win"><div class="id">CMP-AUD-088</div><div class="w">Auth failure keeps local comparison/evidence jobs</div><div class="c">only exports need sign-in · shared queue · red-tested</div></div>
       <div class="win"><div class="id">CMP-AUD-082</div><div class="w">Stale live-formulas twin cleared, never masquerades as current</div><div class="c">refresh-or-clear on every values commit · red-tested</div></div>
       <div class="win"><div class="id">CMP-AUD-081</div><div class="w">Stale canonical TSN library reads dependent cells stale</div><div class="c">token nulled when not-current · verified + pinned</div></div>
@@ -303,7 +304,7 @@
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · HEAD <b>5e168b6</b> · gate <b>135/135</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · HEAD <b>ae45581</b> · gate <b>136/136</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 

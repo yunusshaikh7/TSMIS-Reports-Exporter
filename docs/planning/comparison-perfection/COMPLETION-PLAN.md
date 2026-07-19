@@ -51,7 +51,24 @@ tied to the [054 accept-amber decision](#): **045** (HD-Excel county), **192** (
 fresh source pull; fold them into the next-batch re-verify (with the 053 canary re-measure + the
 `evidence_highway_detail.py` doc-median follow-up).
 
-> ### ▶ RESUME HERE (2026-07-18, M6 → 084 + 081 + 082 + 088 CLOSED; 080 DEFERRED; then 089/100)
+> ### ▶ RESUME HERE (2026-07-18, M6 → 084/081/082/088/100 CLOSED; 080 DEFERRED; 089 is the last)
+>
+> **DONE 2026-07-18 (6th marathon, M6): CMP-AUD-100 CLOSED (`ae45581`, CI SHA-verified), gate 135→
+> 136, 197 closed (82%).** The Everything/day/baseline cache loaders were already corrected to
+> require their exact output identity + isolate malformed nested records; the finding stayed open for
+> lack of the dedicated cross-product fixture. NEW `check_matrix_cache_adversarial.py` provides it (no
+> product code changed): the 4×4 cross-matrix identity (`baseline_key`/`tsn`/`tsn-by-day`/
+> `baseline-by-day` — accepted only by its own) + an END-TO-END persisted swap at each loader's real
+> path (the finding's `baseline-by-day`-at-the-by-day-path case); nine adversarial nested-record
+> shapes through `_cmp_state` read stale with no trusted verdict + never crash; `_nested_record`
+> returns None for foreign containers; and a LIST cell record renders the day snapshot without the
+> finding's `AttributeError`. Red→green: neutralizing the `_staleness` record-type guard crashes the
+> adversarial records + the day snapshot. **NEXT: 089** (the LAST M6 finding — durable per-cell
+> last-attempt state: a failed/cancelled rebuild returns to the old ✓ match cell with no indication
+> the verification failed; workers increment `done` for a cancelled result. FULL-STACK: worker +
+> bridge + persistence + `ui-matrix.js` — budget for the `#mock` preview). After 089, M6 is complete
+> bar the 080 Phase-5 deferral. ⚠ Still owed from bucket B: the 053 HD PDF-vs-Excel/PDF-vs-TSN canary
+> re-measure.
 >
 > **DONE 2026-07-18 (6th marathon, M6): CMP-AUD-088 CLOSED (`5e168b6`, CI SHA-verified), gate
 > 135/135, 196 closed (81%).** An auth/browser failure cleared the WHOLE shared matrix queue —
