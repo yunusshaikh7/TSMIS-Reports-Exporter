@@ -918,6 +918,16 @@ def test_fingerprint(tmp):                                    # CT-6 (unit) / R1
         ".cmpv3-" + "a" * 64 + "-000000-" + "b" * 64
         + "-f-07.comparison-payload.zlib")
     (store / slot_payload_name).write_bytes(b"strict bounded-slot comparison metadata")
+    # CMP-AUD-242: current builds write the SHORT 16-hex shape — it must be
+    # excluded from fingerprints exactly like the legacy full-hex names above.
+    short_payload_name = (
+        ".cmpv3-" + "a" * 16 + "-000000-" + "b" * 16
+        + ".comparison-payload.zlib")
+    (store / short_payload_name).write_bytes(b"strict short comparison metadata")
+    short_slot_name = (
+        ".cmpv3-" + "a" * 16 + "-000000-" + "b" * 16
+        + "-f-00.comparison-payload.zlib")
+    (store / short_slot_name).write_bytes(b"strict short-slot comparison metadata")
     publication_lock = store / a._COMPARISON_PUBLICATION_LOCK_NAME
     publication_lock.write_bytes(b"")
     check("excludes lock/outcome/fingerprint and exact primary/legacy/slot v3 metadata",

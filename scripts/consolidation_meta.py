@@ -86,8 +86,14 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _COMPARISON_PUBLICATION_LOCK_NAME = ".tsmis-comparison-publication.lock"
 _COMPARISON_PUBLICATION_LOCK_TIMEOUT_S = 60.0
 _PAYLOAD_FALLBACK_SLOT_COUNT = 8
+# CMP-AUD-242: chunk names carry 16-hex ABBREVIATIONS of the two digests so the
+# deepest published path fits classic MAX_PATH at the real deployment depth (a
+# managed work PC has LongPathsEnabled=0 and cannot change it). The manifest
+# still records and verifies the FULL digests; legacy 64-hex names written by
+# earlier builds stay readable, so both shapes are accepted everywhere below.
+_PAYLOAD_NAME_HEX_CHARS = 16
 _PAYLOAD_BASENAME_RE = re.compile(
-    r"^\.cmpv3-[0-9a-f]{64}-[0-9]{6}-[0-9a-f]{64}"
+    r"^\.cmpv3-(?:[0-9a-f]{16}|[0-9a-f]{64})-[0-9]{6}-(?:[0-9a-f]{16}|[0-9a-f]{64})"
     r"(?:-f-(?:0[0-7]|[0-9a-f]{64}-[0-9a-f]{16}))?"
     r"\.comparison-payload\.zlib$")
 _PAYLOAD_FALLBACK_NONCE_RE = re.compile(r"^[0-9a-f]{16}$")
@@ -168,28 +174,52 @@ assert (_windows_utf16_units(_comparison_metadata_temp_basename(
         <= _WINDOWS_COMPONENT_MAX_UTF16_UNITS - 64)
 
 
+def _payload_name_hex(sha):
+    """The 16-hex name abbreviation of a full digest (CMP-AUD-242)."""
+    if not isinstance(sha, str) or _SHA256_RE.fullmatch(sha) is None:
+        raise ValueError("payload basename requires a full sha256 hex digest")
+    return sha[:_PAYLOAD_NAME_HEX_CHARS]
+
+
 def _payload_primary_basename(decoded_sha, index, digest):
-    """Exact schema-v3 content-addressed primary basename."""
+    """Exact schema-v3 content-addressed primary basename (short form).
+
+    Abbreviated name, full-strength verification: the manifest carries the
+    complete digests and every read re-hashes chunk content against them.
+    """
+    return (f".cmpv3-{_payload_name_hex(decoded_sha)}-{index:06d}-"
+            f"{_payload_name_hex(digest)}{_COMPARISON_PAYLOAD_SUFFIX}")
+
+
+def _legacy_payload_primary_basename(decoded_sha, index, digest):
+    """The pre-CMP-AUD-242 full-hex primary basename — read-compatible only."""
     return (f".cmpv3-{decoded_sha}-{index:06d}-{digest}"
             f"{_COMPARISON_PAYLOAD_SUFFIX}")
 
 
 def _payload_slot_basename(decoded_sha, index, digest, slot):
     """Exact bounded deterministic conflict-slot basename newly written by v3."""
-    return (f".cmpv3-{decoded_sha}-{index:06d}-{digest}-f-{slot:02d}"
-            f"{_COMPARISON_PAYLOAD_SUFFIX}")
+    return (f".cmpv3-{_payload_name_hex(decoded_sha)}-{index:06d}-"
+            f"{_payload_name_hex(digest)}-f-{slot:02d}{_COMPARISON_PAYLOAD_SUFFIX}")
 
 
-# New names retain substantial headroom (the legacy binding+nonce read shape is
-# intentionally longer).  Runtime generation and manifest parsing validate each
-# actual component as well, so this cannot be bypassed under ``python -O``.
+# New names must fit classic MAX_PATH at the measured field deployment depth (a
+# 97-character comparisons parent on a LongPathsEnabled=0 managed PC) — the
+# CMP-AUD-242 budget — as well as the per-component ceiling. Runtime generation
+# and manifest parsing validate each actual component as well, so this cannot
+# be bypassed under ``python -O``.
 _NEW_PAYLOAD_PRIMARY_MAX_NAME = _payload_primary_basename(
     "0" * 64, 999999, "0" * 64)
 _NEW_PAYLOAD_SLOT_MAX_NAME = _payload_slot_basename(
     "0" * 64, 999999, "0" * 64, _PAYLOAD_FALLBACK_SLOT_COUNT - 1)
+_FIELD_COMPARISON_PARENT_LEN = 97
 assert max(_windows_utf16_units(_NEW_PAYLOAD_PRIMARY_MAX_NAME),
            _windows_utf16_units(_NEW_PAYLOAD_SLOT_MAX_NAME)) \
        <= _WINDOWS_COMPONENT_MAX_UTF16_UNITS - 64
+assert (_FIELD_COMPARISON_PARENT_LEN + 1
+        + max(_windows_utf16_units(_NEW_PAYLOAD_PRIMARY_MAX_NAME),
+              _windows_utf16_units(_NEW_PAYLOAD_SLOT_MAX_NAME))) \
+       < _WINDOWS_MAX_PATH
 
 
 def meta_path(consolidated):
@@ -1297,24 +1327,41 @@ def _strict_payload_manifest(value):
         if (not _is_nonnegative_int(chunk_decoded) or chunk_decoded <= 0
                 or chunk_decoded > _COMPARISON_PAYLOAD_DECODED_CHUNK_BYTES):
             raise ValueError("comparison payload chunk decoded_size is invalid")
+        # CMP-AUD-242: accept the short (written) and legacy full-hex (read-
+        # compatible) shapes. Every field the name abbreviates is still bound
+        # here in full and re-verified against chunk content on read.
         primary_relative = _payload_primary_basename(
             decoded_sha, index, digest)
-        fallback_prefix = (
-            f".cmpv3-{decoded_sha}-{index:06d}-{digest}-f-")
-        if relative != primary_relative:
-            if (not relative.startswith(fallback_prefix)
+        legacy_primary = _legacy_payload_primary_basename(
+            decoded_sha, index, digest)
+        if relative not in (primary_relative, legacy_primary):
+            short_prefix = (
+                f".cmpv3-{_payload_name_hex(decoded_sha)}-{index:06d}-"
+                f"{_payload_name_hex(digest)}-f-")
+            legacy_fallback_prefix = (
+                f".cmpv3-{decoded_sha}-{index:06d}-{digest}-f-")
+            if relative.startswith(short_prefix):
+                used_prefix, legacy_shape = short_prefix, False
+            elif relative.startswith(legacy_fallback_prefix):
+                used_prefix, legacy_shape = legacy_fallback_prefix, True
+            else:
+                used_prefix = None
+            if (used_prefix is None
                     or not relative.endswith(_COMPARISON_PAYLOAD_SUFFIX)):
                 raise ValueError(
                     "comparison payload chunks are reordered or misnamed")
             fallback_key = relative[
-                len(fallback_prefix):-len(_COMPARISON_PAYLOAD_SUFFIX)]
+                len(used_prefix):-len(_COMPARISON_PAYLOAD_SUFFIX)]
             slot_names = {f"{slot:02d}"
                           for slot in range(_PAYLOAD_FALLBACK_SLOT_COUNT)}
-            legacy_prefix = f"{binding_sha}-"
-            legacy_nonce = (fallback_key[len(legacy_prefix):]
-                            if fallback_key.startswith(legacy_prefix) else "")
-            if (fallback_key not in slot_names
-                    and _PAYLOAD_FALLBACK_NONCE_RE.fullmatch(legacy_nonce) is None):
+            key_ok = fallback_key in slot_names
+            if not key_ok and legacy_shape:
+                legacy_prefix = f"{binding_sha}-"
+                legacy_nonce = (fallback_key[len(legacy_prefix):]
+                                if fallback_key.startswith(legacy_prefix) else "")
+                key_ok = (
+                    _PAYLOAD_FALLBACK_NONCE_RE.fullmatch(legacy_nonce) is not None)
+            if not key_ok:
                 raise ValueError(
                     "comparison payload fallback slot/name is malformed")
         name_key = os.path.normcase(relative)
@@ -1847,8 +1894,10 @@ def _safe_unlink_sidecar(path, commit_guard=None):
 
 
 _PAYLOAD_COLLECT_GRACE_SECONDS = 15 * 60
+# Both name shapes (CMP-AUD-242): a legacy name embeds the full chunk digest, a
+# short name its 16-hex abbreviation — the consumer compares accordingly.
 _PAYLOAD_CHUNK_SHA_RE = re.compile(
-    r"^\.cmpv3-[0-9a-f]{64}-[0-9]{6}-([0-9a-f]{64})")
+    r"^\.cmpv3-(?:[0-9a-f]{16}|[0-9a-f]{64})-[0-9]{6}-([0-9a-f]{16}|[0-9a-f]{64})")
 
 
 def _live_payload_chunk_references(parent):
@@ -1932,8 +1981,17 @@ def _collect_superseded_payload_chunks(parent, lease, commit_guard=None):
             except ValueError:  # silent-ok: an over-limit candidate is retained evidence
                 retained += 1
                 continue
-            if (raw is _ABSENT or digest is None
-                    or hashlib.sha256(raw).hexdigest() != digest.group(1)):
+            if raw is _ABSENT or digest is None:
+                retained += 1     # mismatched chunk: retained as evidence
+                continue
+            named = digest.group(1)
+            actual = hashlib.sha256(raw).hexdigest()
+            # A legacy name carries the full digest; a short name its 16-hex
+            # abbreviation (CMP-AUD-242). Either way the content must match
+            # what its own name claims before it may be reclaimed.
+            matches_name = (actual == named if len(named) == 64
+                            else actual.startswith(named))
+            if not matches_name:
                 retained += 1     # mismatched chunk: retained as evidence
                 continue
             if (not _publication_lease_current(lease, commit_guard)

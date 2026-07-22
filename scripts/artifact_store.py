@@ -54,8 +54,11 @@ _UNREADABLE = "unreadable"
 _FP_EXCLUDED_SUFFIXES = (_FP_SUFFIX, ".outcome.json", ".provenance.json",
                          ".staging")
 _COMPARISON_PUBLICATION_LOCK_NAME = ".tsmis-comparison-publication.lock"
+# Both chunk-name shapes (CMP-AUD-242): the short 16-hex form current builds
+# write, and the legacy full-hex form earlier builds left behind. Keep in sync
+# with consolidation_meta._PAYLOAD_BASENAME_RE.
 _COMPARISON_PAYLOAD_RE = re.compile(
-    r"^\.cmpv3-[0-9a-f]{64}-[0-9]{6}-[0-9a-f]{64}"
+    r"^\.cmpv3-(?:[0-9a-f]{16}|[0-9a-f]{64})-[0-9]{6}-(?:[0-9a-f]{16}|[0-9a-f]{64})"
     r"(?:-f-(?:0[0-7]|[0-9a-f]{64}-[0-9a-f]{16}))?"
     r"\.comparison-payload\.zlib$")
 # The per-route export artifacts a store legitimately contains (P2-R01: staging must hold

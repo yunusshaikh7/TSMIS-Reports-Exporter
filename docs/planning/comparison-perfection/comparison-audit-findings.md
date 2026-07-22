@@ -522,7 +522,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-239 | P2 | Resolved | The Intersection Detail **TSMIS (PDF) vs TSN** comparison built no "Report View" replica though the Excel-vs-TSN one did — only the Excel `compare()` attached the Report-View `extra_sheet_writer`; the PDF flavors built a plain schema. Extracted a shared `add_report_view` helper (both vs-TSN legs project onto `SHARED_HEADER` + read the same TSN one-sided columns / TSMIS Location, so the replica is identical) and wired it into `TSMIS_PDF_VS_TSN` — NOT the same-source PDF-vs-Excel (its TSN-specific soft/structural date classification doesn't apply to two TSMIS renders). Statewide: the PDF-vs-TSN Report View renders identically (16,886 records). `check_intersection_detail_pdf` locks both (PDF-vs-TSN has it; PDF-vs-Excel does not) |
 | CMP-AUD-240 | P2 | Resolved | Cross-env / baseline **Intersection Detail** refused to compare a current (2026-07-17) export against a pre-July-2026 one: the LABEL-ONLY edition change (`P`->`PP`, `S`->`PS`, INT Type/INT Eff-Date labels realigned, `Xing P/S`->`Int PS`) tripped the "different column layouts" guard even though every value stayed in an identical column position (proven cell-for-cell). Added `_id_canonical_header` to `compare_env.INTERSECTION_DETAIL` (the Highway Log CMP-AUD-048 pattern) mapping both editions to one canonical header; any OTHER header is returned UNCHANGED, so strict same-layout equality + genuine-column-move refusal are preserved (no `force_header`). Real-corpus: new-vs-old now aligns 16,459 intersections / 217 routes. Red→green in `check_compare_env_intersection` |
 | CMP-AUD-241 | P2 | Resolved | The **TSMIS (PDF) vs TSN** Intersection Detail Description showed 8 trailing-tab-only false positives statewide (e.g. TSN `HILLCREST RD\t\t` vs PDF `HILLCREST RD`) that the Excel-vs-TSN leg did NOT — the TSN extract carries field-padding tabs the Excel export preserves (so Excel-vs-TSN matched) but the PDF print cannot render. Owner ruling (2026-07-17): showing two identical descriptions as a mismatch is NOT proper comparison — fix it. `_norm_text` now maps the extract's tab/CR/LF whitespace to spaces (compare_core's TRIM twin then collapses + edge-strips) on BOTH sides of the vs-TSN projection; interior content is untouched so genuine edits (incl. the KER 046 `''F''` vs `"F"` quote edit) still flag. Report-specific (NOT the shared engine, whose `_xl_trim` treats tabs as data by policy), and re-applied on read by `_normalized_row` so cached libraries need no rebuild. Real-corpus: PDF-vs-TSN Description 12->4 and total 5,100->5,092, now EQUAL to Excel-vs-TSN (unchanged 5,092/4). Red→green in `check_compare_intersection_detail_tsn` (`test_whitespace_normalization`) |
-| CMP-AUD-242 | P1 | OPEN — MUST SHIP (owner-directed; v0.27.1 shipped diagnostics only, the basename shortening is owed and completion-blocking) | Payload chunk basename (~148 chars) overruns Windows MAX_PATH at the field install depth; on `LongPathsEnabled=0` machines publication fails and the matrix hides correctly-built comparisons |
+| CMP-AUD-242 | P1 | Resolved 2026-07-22 (chunk names 167→71 chars, legacy names read-compatible, two unconditional field-depth gates red→green, RD real-corpus canary-exact; rides the completion release per the owner's no-interim-release policy) | Payload chunk basename (167 chars) overran Windows MAX_PATH at the field install depth; on `LongPathsEnabled=0` machines publication failed and the matrix hid correctly-built comparisons |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -10855,10 +10855,50 @@ state edge-tab normalization is "never the vs-TSN legs"). Evidence: scratchpad
 `id_task/cmp_A_excel_vs_tsn.xlsx` (Description 4) vs `cmp_B_pdf_vs_tsn.xlsx`
 (Description 12), both statewide on the 2026-07-17 export.
 
-### CMP-AUD-242 — payload chunk basename overruns Windows MAX_PATH on the deployment target (OPEN — MUST SHIP)
+### CMP-AUD-242 — payload chunk basename overruns Windows MAX_PATH on the deployment target (RESOLVED — rides the completion release)
 
 Priority: P1  
-Status: OPEN — v0.27.1 shipped diagnostics only; the basename shortening is owed, owner-directed, and completion-blocking
+Status: **RESOLVED 2026-07-22** — chunk basenames shortened 167→71 chars (16-hex name
+abbreviations; the manifest still records and verifies the FULL digests); legacy
+full-hex names stay readable everywhere; two new UNCONDITIONAL gates in
+`check_comparison_path_limits` were red on the old code for exactly the field's
+failure. Per the owner's 2026-07-22 release policy the fix ships with the
+comparison-perfection completion release (CHANGELOG "Unreleased" section).
+
+**Remediation (2026-07-22).** `consolidation_meta._payload_primary_basename` /
+`_payload_slot_basename` now emit `.cmpv3-{16hex}-{index:06d}-{16hex}[-f-NN]
+.comparison-payload.zlib` (71/76 UTF-16 units; worst case at the field's measured
+97-char parent = 174 < 260, pinned by a module-level assert). Acceptance of BOTH
+shapes: `_strict_payload_manifest` (exact short/legacy primary, then shape-matched
+fallback prefix — legacy binding+nonce keys only on the legacy shape; a short-name
+nonce hybrid REFUSES), `_PAYLOAD_BASENAME_RE` + `artifact_store._COMPARISON_PAYLOAD_RE`
+(fingerprint exclusion), and the reclamation `_PAYLOAD_CHUNK_SHA_RE` (full-digest
+equality for legacy names, 16-hex prefix for short ones, atop the live-reference/
+lease/grace gates). Census: every `cmpv3` site repo-wide — the two product files,
+three live checks updated to derive names via the product helpers
+(`check_comparison_sidecars`, `check_artifact_store` incl. new short-shape
+fingerprint fixtures, `check_comparison_path_limits`), `check_comparison_payload_
+resources` retained as a de-facto legacy-shape consumer, and the frozen
+`check_phase*` audit instruments untouched (excluded from the gate by
+`run_checks.AUDIT_PREFIX`; they authenticate legacy-named frozen artifacts).
+
+**Red→green.** The two new gates, both RED on the old code: (1) unconditional
+field-depth arithmetic — 97 + 1 + 172 = 270 > 260; (2) a REAL
+`artifact_store.commit_workbook` publication at a parent padded to exactly 97 chars
+with `os.open/os.replace/os.rename` shimmed to refuse ≥260 (`LongPathsEnabled=0`
+semantics) — failed with the field's exact signature (chunk refused → publication
+False → untrusted). Green after the change; neither can be skipped by a
+long-path-aware dev box. Full gate 144/144.
+
+**Real-corpus proof (2026-07-22).**
+- *Legacy read:* a real HSL vs-TSN publication written under the OLD code (167-char
+  chunk name) reads back **trusted** under the new code with typed counts intact
+  (5,589 diff cells / 16,154 one-sided — the bound canary).
+- *Short-name publication:* the SHIPPED path (ConsolidateWorker TSN build →
+  MatrixCompareWorker) over the real 126-route `All Reports 7.9` Ramp Detail corpus
+  publishes 71-char chunk names, reads back trusted, and the recorded counts equal
+  the bound RD-79 canary EXACTLY (843 differing cells / 202 one-sided) — the naming
+  change moved nothing semantically. Deepest chunk path at the field parent: 169.
 
 **Field-confirmed on the work PC, v0.27.0, 8/8 comparison runs.** Every by-day
 vs-TSN comparison built its workbook correctly and then vanished from the matrix.

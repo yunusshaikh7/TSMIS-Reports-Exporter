@@ -3,6 +3,28 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## Unreleased — ships with the comparison-perfection completion release
+
+### Fixed
+- **Comparisons now publish from any install folder — the 260-character Windows
+  path limit no longer hides them.** The v0.27.0 field failure (every by-day
+  comparison built its workbook and then vanished from the matrix) came down to
+  one filename: each comparison stores its trust metadata in a content-addressed
+  sidecar whose name was ~167 characters, so at a normal install depth the full
+  path passed 260 characters. A managed work PC cannot lift that limit, the
+  metadata write was refused, and the matrix — correctly — declined to show a
+  comparison it could not certify. The workaround was moving the whole app to a
+  short path like `C:\TSMIS`. The sidecar names now carry 16-character
+  abbreviations of their two digests instead of the full 64 (the full digests
+  are still recorded and verified inside the metadata itself, so nothing about
+  integrity checking changed), which keeps the deepest published path well under
+  the limit at the real install depth. Existing comparisons written under the
+  old long names remain fully readable; the next rebuild of a comparison simply
+  publishes under the short names. The moved-to-`C:\TSMIS` workaround is no
+  longer necessary, and the release gate now proves the fix unconditionally —
+  including on machines where long paths are allowed and the old test could
+  never fail.
+
 ## v0.27.4 — 2026-07-21
 
 ### Fixed

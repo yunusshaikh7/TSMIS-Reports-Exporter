@@ -124,7 +124,7 @@ spike/
 # derived from the LOCAL-ONLY Caltrans corpus -- so like output/ and
 # tsn_library/ they must never be committed. They also break tooling that
 # stages the whole worktree: check_source_zip_smoke does `git add -A`, and the
-# generated `.cmpv3-<sha>-<n>-<sha>.comparison-payload.zlib` sidecar names
-# exceed the legacy path limit. Audit instruments live in build/ (phase*.py);
-# only their OUTPUT lands here.
+# generated `.cmpv3-…comparison-payload.zlib` sidecar names made deep paths
+# exceed the legacy path limit before CMP-AUD-242 shortened them. Audit
+# instruments live in build/ (phase*.py); only their OUTPUT lands here.
 /tmp/

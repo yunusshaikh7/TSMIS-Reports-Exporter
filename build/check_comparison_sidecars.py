@@ -164,9 +164,8 @@ def _mutated_chunk_manifest(path, compressed, index=0):
     digest = hashlib.sha256(compressed).hexdigest()
     descriptor["size"] = len(compressed)
     descriptor["sha256"] = digest
-    descriptor["relative_path"] = (
-        f".cmpv3-{manifest['decoded_sha256']}-{index:06d}-{digest}"
-        f"{cm._COMPARISON_PAYLOAD_SUFFIX}")
+    descriptor["relative_path"] = cm._payload_primary_basename(
+        manifest["decoded_sha256"], index, digest)
     chunk_path = Path(path).parent / descriptor["relative_path"]
     chunk_path.write_bytes(compressed)
     return manifest, chunk_path
@@ -714,8 +713,9 @@ def main():
         fallback_relative = fallback_manifest["chunks"][0]["relative_path"]
         fallback_path = root / fallback_relative
         fallback_prefix = (
-            f".cmpv3-{fallback_manifest['decoded_sha256']}-000000-"
-            f"{fallback_manifest['chunks'][0]['sha256']}-f-")
+            f".cmpv3-{cm._payload_name_hex(fallback_manifest['decoded_sha256'])}"
+            f"-000000-"
+            f"{cm._payload_name_hex(fallback_manifest['chunks'][0]['sha256'])}-f-")
         check("fallback is a strict bounded slot and never clobbers the conflicting primary",
               blocked_chunk.read_bytes() == foreign_bytes
               and fallback_relative == fallback_prefix + "00" + cm._COMPARISON_PAYLOAD_SUFFIX
@@ -735,11 +735,15 @@ def main():
                   fallback_prefix + "*" + cm._COMPARISON_PAYLOAD_SUFFIX))) == 1)
 
         # Existing schema-v3 records may already name the older binding+nonce
-        # fallback. Readers retain compatibility even though writers no longer
-        # create a fresh nonce on every retry.
+        # fallback — always in the LEGACY full-hex shape (CMP-AUD-242 shortened
+        # only newly written names). Readers retain compatibility even though
+        # writers no longer create a fresh nonce on every retry.
+        legacy_fallback_prefix = (
+            f".cmpv3-{fallback_manifest['decoded_sha256']}-000000-"
+            f"{fallback_manifest['chunks'][0]['sha256']}-f-")
         legacy_relative = (
-            fallback_prefix + fallback_manifest["binding_sha256"] + "-" + "d" * 16
-            + cm._COMPARISON_PAYLOAD_SUFFIX)
+            legacy_fallback_prefix + fallback_manifest["binding_sha256"]
+            + "-" + "d" * 16 + cm._COMPARISON_PAYLOAD_SUFFIX)
         (root / legacy_relative).write_bytes(fallback_path.read_bytes())
         legacy_raw = _raw_sidecar(blocked)
         legacy_raw["comparison_payload"]["chunks"][0]["relative_path"] = legacy_relative
@@ -766,8 +770,9 @@ def main():
         exhausted_primary.write_bytes(b"foreign-primary")
         exhausted_slots = []
         exhausted_base = (
-            f".cmpv3-{exhausted_prepared['payload_manifest']['decoded_sha256']}-000000-"
-            f"{exhausted_descriptor['sha256']}-f-")
+            f".cmpv3-"
+            f"{cm._payload_name_hex(exhausted_prepared['payload_manifest']['decoded_sha256'])}"
+            f"-000000-{cm._payload_name_hex(exhausted_descriptor['sha256'])}-f-")
         for slot in range(cm._PAYLOAD_FALLBACK_SLOT_COUNT):
             slot_path = root / (
                 exhausted_base + f"{slot:02d}" + cm._COMPARISON_PAYLOAD_SUFFIX)

@@ -46,7 +46,7 @@ its findings back-to-back, then update this roadmap.
 | **NORM** ◑ | **Source normalization fidelity — bucket G — 1 actionable, 3 DEFERRED** | HD (⛔ pre-release, deferred): ~~042~~ 133◑ ~~138~~ 142 186 · IS/HSL: ~~144~~ ~~145~~ **193 ← the only actionable one** | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
 | **DUR** | **Phase-5/7 durability & policy — the OWNER-GATED cluster (4)** | 080 085 089 115 | The deferred durable-attempt-overlay / policy / commit-schema family. **085 DECIDED 2026-07-21 — LAST-COMPLETE** (a partial refresh KEEPS LAST-GOOD: reported and retryable, never overwriting verified bytes, never promoted to canonical; the docs were the intended policy and the shipped replace-and-flag is the drift). DUR is unblocked. Its policy-independent false-green defects — a partial caching `partial` while its own Summary says `✓ EVERYTHING MATCHES`, a partial zero-diff cell rendering primary `✓ match`, no first-class retry state, evidence rendering off a partial with no warning — are wrong under EITHER policy and must be fixed regardless **+** a durable attempt overlay (Phase-5/7); **089** is that overlay (a crashed rebuild silently reverts to the old ✓); **080** source-fingerprint content identity (per-cell-per-snapshot perf-cache); **115** the commit-boundary schema gate + its exhaustive per-comparator census. **Read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes FIRST; surface the 085 policy decision.** "Correct today, hardening tomorrow" — no live false-green; durability + defense-in-depth. |
 
-| **PATH** ⛔ | **MAX_PATH — MUST SHIP BEFORE "DONE" (1)** | **242** | **Field-confirmed on the work PC (v0.27.0, 8/8 runs): every by-day comparison built and then vanished from the matrix.** The schema-v3 payload chunk basename is ~148 chars, so at the real install depth the published path is **265 > 260**; the dev box has `LongPathsEnabled=1`, **a managed Caltrans PC has 0 and cannot change it** — that is the whole dev-vs-field difference. The workbook commits; only the trust metadata fails, so the matrix correctly hides an uncertifiable comparison. v0.27.1 (`f55d946`) shipped **diagnosis only** (every gate names itself; the path-limit refusal names the remedy). **The fix — shorten the basename (each hex → 16, ≈52 chars) — is a persisted-format change** pinned by three `{64}`-hex regexes + the chunk-reclamation capture + the fallback-prefix parse; needs its own census + red→green + real-corpus re-verify and must keep reading existing v3 payloads (manifest-driven reads already do). **`check_comparison_path_limits.py` tests >260 only "when the runtime/Windows policy permits", so it can never catch this — it must gain an UNCONDITIONAL deep-parent budget assertion.** Owner workaround meanwhile: install to a short path. **Blocks completion: the deployment target is a locked-down PC (CLAUDE.md), so a comparison that cannot publish there is not "perfect".** Call sites + repro: CMP-AUD-242. |
+| ~~**PATH**~~ ✅ | **MAX_PATH — RESOLVED 2026-07-22 (rides the completion release)** | ~~242~~ | **Chunk basenames 167→71 chars** (16-hex name abbreviations; manifests keep + verify the FULL digests); legacy full-hex names stay readable in manifest validation, fingerprint exclusion, and reclamation. **Two UNCONDITIONAL gates** now in `check_comparison_path_limits` — field-depth arithmetic (was 270>260, now 174) and a real publication with the OS shimmed to refuse ≥260 — both red on the old code for exactly the field failure, green now; neither can be skipped by a long-path-aware dev box. Real-corpus: a legacy-named real HSL publication reads trusted under the new code (5,589/16,154 intact), and the shipped path over the real 126-route RD corpus publishes 71-char names canary-EXACT (843/202). Per the owner's 2026-07-22 policy the fix ships with the completion release (no interim tags); CHANGELOG section sits under "Unreleased". Full detail: CMP-AUD-242. |
 
 > **⚠ THE LEDGER'S PER-ENTRY `Status:` LINE IS THE SOURCE OF TRUTH — not this table, and not
 > even the ledger's own index table.** 144, 145, 241 and 061 were listed here as open long after
@@ -114,6 +114,50 @@ only when the owner delivers the official Highway Detail exports.
 > and diffed against the ledger index table and this plan. The index table itself had drifted
 > (042/138/144/145 stale-"Verified", 242 missing) — fixed; the drift warning above now covers it.
 > The verified open set is exactly the 19 listed in the warning box above.
+>
+> **⛔ RELEASE POLICY (owner, 2026-07-22): NO release until comparison perfection is DONE.**
+> The next release IS the completion release — it carries the CMP-AUD-242 basename fix
+> (already implemented + red→green; its CHANGELOG section sits under "Unreleased") plus
+> everything below. Do not cut interim tags; version.py stays 0.27.4 until then.
+>
+> **MARATHON SPLIT TO DONE (owner-requested sizing, 2026-07-22).** Sessions after the
+> current one (each ≈ one long autonomous run):
+> - **S0 (current)** — finish 193 (replay running) + 242 (real-corpus republication +
+>   full gate) + commit both. Remaining: ~1–2h active after ~1h background compute.
+> - **S1 · DUR-1** — **085-core + 089** together (they share the attempt-record design):
+>   last-complete/keep-last-good publication (divert-then-promote in
+>   `_consolidate_store_folder`; partial never overwrites a complete canonical) + the
+>   last-complete comparison-cache rule + the durable per-cell last-attempt overlay +
+>   honest attempted/succeeded/failed/cancelled counts + UI overlay. The four
+>   "false-green under either policy" defects are ALREADY fixed (verified in code
+>   2026-07-22: Summary flips to ✗ on partial, mx-partial primary, partial⇒stale⇒
+>   refresh-included, evidence refuses non-certifying) — S1 is the publication core.
+> - **S2 · DUR-2** — **080**: durable content identity for sources + cached outputs
+>   (change-token-validated manifest; stat-only memoization prohibited), evidence PDF
+>   parse-cache keys, one-time migration of metadata-only records to stale, perf proof
+>   on a real statewide store.
+> - **S3 · DUR-3** — **115**: the commit-boundary versioned artifact-schema gate +
+>   the exhaustive per-comparator census (all 29 recipes on the real corpus). Fold in
+>   **187** (oracle key-order perf — small) at the tail.
+> - **S4 · EV-1** — **208 spine**: the published-comparison decoder (E/D/N/U state
+>   masks + `pairing_trace` + typed counts from the persisted generation — never a
+>   re-execution), HSL first.
+> - **S5 · EV-2** — **108 + 209** on the spine across all five evidence families +
+>   the independent raw-source oracle agreeing statewide (the acceptance bar).
+> - **S6 · EV-3** — **210** source-faithful Excel + PDF-vs-Excel evidence routes (has
+>   a possible scope question for the owner — ask when concrete) + **106** durable
+>   per-comparison evidence MANIFEST (no-example/toggle-off/restart).
+> - **S7 · EV-4** — **109** two-phase workbook+images transaction (quarantine
+>   rollback) + **098** evidence read-set snapshot gate + full statewide evidence
+>   re-verify.
+> - **S8 · Closeout** — final ledger/plan/docs/dashboard reconciliation, the
+>   completion RELEASE (full gate + frozen self-test + notes + tag + CI), and the
+>   owner's work-PC acceptance checklist.
+>
+> EV-1..4 may compress to three sessions if the spine lands cleanly; 210's scope
+> answer is the main stretch risk. OUTSIDE the count (owner-gated, not blockers to
+> "done"): the work-PC acceptance run itself (~1–2h owner time), and the ⛔ HD-deferred
+> block (133/142/186/192 + 045-HD) which reopens only on the official HD delivery.
 >
 > **ACTIVE ORDER (owner, 2026-07-22): 193 → 242 → then as much of DUR as possible.**
 > - **193 (NORM/HSL)** — its Status: "Current source correction proved; product publication,
