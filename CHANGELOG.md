@@ -3,7 +3,11 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
-## Unreleased
+## v0.28.1 — 2026-07-22
+
+A diagnostics release, cut so the work-PC acceptance run on v0.28.0 produces a
+bundle that can actually explain a problem. Nothing in the export, consolidation
+or comparison engines changed — comparison output is identical to v0.28.0.
 
 ### Changed
 - **The evidence bundle now answers a support question on its own.** "Collect
