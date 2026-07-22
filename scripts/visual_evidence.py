@@ -533,6 +533,20 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
             continue
         cand[f] = rng.sample(pool, min(len(pool),
                                        max(examples * 4, examples + 6)))
+    if not cand:
+        # Every differing column is unrenderable (CMP-AUD-108's duplicate-only
+        # shape, or the published cells refused every proposal). Report the
+        # published differences and their reasons WITHOUT parsing a single PDF
+        # — there is nothing left to locate.
+        note = (f"evidence: {ledger.difference_cells:,} published "
+                f"difference(s) across {len(fields_with_diffs)} column(s), "
+                "none of them with a row that can be illustrated on its own "
+                "(reasons in the log)")
+        events.on_log("  " + note)
+        return {"note": note, "rendered": 0, "fields_ok": 0,
+                "fields_with_diffs": len(fields_with_diffs),
+                "misses": misses, "workbook": None, "folder": None,
+                "ledger": ledger, "ledger_digest": ledger_digest}
     need_tsmis = {}
     need_tsn_routes, need_tsn_keys = {}, {}
     for f in cand:

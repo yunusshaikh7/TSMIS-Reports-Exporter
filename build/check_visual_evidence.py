@@ -542,6 +542,60 @@ try:
 finally:
     shutil.rmtree(_r6, ignore_errors=True)
 
+# CMP-AUD-108: a comparison whose ONLY differences live inside a repeated-key
+# group must report those columns and say why no image exists — the published
+# counts decide, not the adapter's (correctly) empty candidate list. Driven
+# through the shipped generate(), and it must not touch a PDF to find out.
+print("CMP-AUD-108: duplicate-only differences are reported, never zeroed")
+_r8 = Path(tempfile.mkdtemp(prefix="evidence_108_"))
+try:
+    _cmp8 = _r8 / "dup only vs tsn.xlsx"
+    _base8 = ["001"] + ["0.100"] + ["x"] * (len(cht.SHARED_HEADER) - 1)
+    _desc8 = 1 + cht.SHARED_HEADER.index("Description")
+
+    def _dup_row(desc):
+        row = list(_base8)
+        row[_desc8] = desc
+        return row
+
+    _checklib.build_published_comparison(
+        _cmp8, cht._SCHEMA,
+        [_dup_row("A1"), _dup_row("A2")], [_dup_row("B1"), _dup_row("B2")])
+    _cons8 = _r8 / "cons.xlsx"; _cons8.write_bytes(b"consolidated")
+    _tsn8 = _r8 / "tsn.xlsx"; _tsn8.write_bytes(b"tsn")
+    _tdir8 = _r8 / "tsmis_pdf"; _tdir8.mkdir()
+    (_tdir8 / "highway_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
+    _ndir8 = _r8 / "tsn_pdf"; _ndir8.mkdir()
+    (_ndir8 / "d01.pdf").write_bytes(b"%PDF tsn")
+    _parsed8 = []
+    _saved8 = (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
+               ve._locate_tsmis_sources)
+    ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
+    # The real adapter drops duplicate keys, so it proposes nothing here.
+    ehd.enumerate_diffs = lambda _a, _b, _s: {}
+    ve.tsn_pdf_dir = lambda _rk: _ndir8
+    ve._locate_tsmis_sources = lambda *a, **k: _parsed8.append(1) or ({}, set())
+    try:
+        _res8 = ve.generate("highway_detail", _cons8, _tsn8, _cmp8, _tdir8,
+                            _Ev106())
+    finally:
+        (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
+         ve._locate_tsmis_sources) = _saved8
+    check("the published difference count is reported, not zero",
+          _res8["fields_with_diffs"] == 1 and "2 published difference"
+          in _res8["note"])
+    check("...and it never claims there are no differing columns",
+          "no differing columns" not in _res8["note"])
+    check("the unrenderable column is NAMED with its reason",
+          "repeated-key groups" in (_res8["misses"].get("Description") or ""))
+    check("no PDF was parsed to discover that", not _parsed8)
+    check("the ledger comes back with the result",
+          _res8["ledger"].difference_cells == 2
+          and _res8["ledger"].duplicate_groups == 1
+          and len(_res8["ledger_digest"]) == 64)
+finally:
+    shutil.rmtree(_r8, ignore_errors=True)
+
 # CMP-AUD-109: the workbook + images publish as ONE set. When the workbook can't
 # reach its canonical name (locked open in Excel), the images are diverted too,
 # so the canonical pair is never a NEW workbook beside OLD images.
