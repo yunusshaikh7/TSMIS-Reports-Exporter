@@ -4553,6 +4553,21 @@ unconditionally condemned:
 2. whether the comparison cache represents the latest attempted result or only the
    last complete result.
 
+#### OWNER DECISION — 2026-07-21: **LAST-COMPLETE**
+
+Both gates resolve the same way. The canonical consolidation and the comparison cache
+represent the **last COMPLETE** generation. A partial refresh must **keep last-good**: it is
+reported and retryable, but it never overwrites verified bytes and is never promoted to
+canonical. This matches `CLAUDE.md` and `docs/engine-and-reliability.md` — those words were the
+intended policy, and the shipped replace-and-flag behavior is the drift. Losing a verified
+two-route workbook to one broken export is unacceptable for comparison ground truth.
+
+The defects listed below are **independent of this decision** and are wrong under either
+policy — a partial run caching `partial` while its own Summary certifies `✓ EVERYTHING
+MATCHES`, a partial zero-difference cell rendering primary `✓ match`, partials having no
+first-class retry state, and evidence rendering off a partial run with no warning. Fix those
+as false-green regardless.
+
 #### Defects under either policy
 
 - Partial completion is applied only after the comparison workbook is committed. A
@@ -10799,7 +10814,13 @@ unrecognized header is identity, and a cross-edition position-aligned Descriptio
 flagged); the pre-existing detail/summary env tests stay green (their custom headers hit
 the identity branch).
 
-### CMP-AUD-241 — Intersection Detail PDF-vs-TSN Description: 8 trailing-tab false positives (OPEN)
+### CMP-AUD-241 — Intersection Detail PDF-vs-TSN Description: 8 trailing-tab false positives
+
+**Status: RESOLVED 2026-07-17 (owner ruling) — shipped in `a4ccd23`.** This heading read
+"(OPEN)" and the recommendation below still said "needs owner greenlight" long after the
+summary table recorded it Resolved; the stale text caused the owner to be asked to re-decide a
+settled question on 2026-07-21. Real-corpus result: PDF-vs-TSN Description 12→4 and total
+5,100→5,092, now EQUAL to Excel-vs-TSN (unchanged 5,092/4). See the summary-table row.
 
 Confirming an owner observation ("the PDF vs TSN for Intersection Detail had some false
 positives for Description"): the statewide **TSMIS (PDF) vs TSN** comparison shows 12
@@ -10819,7 +10840,7 @@ PDF-vs-Excel is 0/0 statewide). But the owner deliberately scoped that normaliza
 "never the vs-TSN legs" — the vs-TSN comparison is byte-exact so real data edits (the
 quote character) surface.
 
-**Recommendation (needs owner greenlight):** apply an edge-tab-only trim (map leading/
+**Recommendation — ACCEPTED and SHIPPED 2026-07-17:** apply an edge-tab-only trim (map leading/
 trailing `\t\r\n\f\v` away, NOT the OOXML-decode half of `same_source_render_text`, and
 NOT interior text) to the Description on BOTH sides of the vs-TSN comparison. It is
 provably non-semantic — trailing field padding is never part of a street name, the PDF

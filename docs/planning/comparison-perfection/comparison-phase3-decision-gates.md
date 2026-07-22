@@ -63,6 +63,30 @@ choices:
    batch runs the focused adversarial fixtures, full offline gate, bound real-data
    canaries, and installed-Excel `CalculateFullRebuild` parity before the next batch.
 
+## D0 — the governing criterion for "is this a difference?"
+
+**Status: OWNER RULING, 2026-07-21. Applies to every equality question below and to
+every future one.**
+
+> **Could we put this in front of the vendor and call it a discrepancy?**
+
+If the answer is no, it is not a difference and must not be reported as one. If the
+answer is yes, it stays — even when the two values print almost identically.
+
+Worked both ways, on the same report:
+
+- **Trailing tab padding** (`HILLCREST RD\t\t` vs `HILLCREST RD`, CMP-AUD-241) — you
+  cannot show a vendor two identical street names and call it a discrepancy. The TSN
+  extract pads the field; the print physically cannot render tabs. **Folded.**
+- **Quote characters** (`''F'' ST` vs `"F" ST`, KER 046 @ 50.904) — the two systems
+  genuinely store different characters. That is showable and explainable, so it must
+  keep flagging even though it prints near-identically. **Kept**, and the evidence
+  images label it explicitly because the difference is invisible on paper.
+
+This is the tie-breaker when "byte-exact" and "properly compared" pull apart. It does
+NOT license broad normalization: fold only what is provably non-semantic and demonstrably
+unshowable, per-report rather than in the shared engine, and never interior content.
+
 ## D2 — recommended canonical equality choices
 
 **Status: APPROVED 2026-07-12.**
