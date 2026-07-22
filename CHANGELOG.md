@@ -3,18 +3,13 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
-## Unreleased — ships with the comparison-perfection completion release
+## v0.28.0 — 2026-07-22
 
-### Changed
-- **Evidence images now come with a complete difference ledger.** The evidence
-  workbook has a new **Ledger** sheet listing, for every compared column, how
-  many differences the comparison counted, how many of those sit on a row that
-  can be photographed on its own, how many sit inside a repeated postmile, plus
-  the context, identical and one-sided cell counts and the whole row universe.
-  The pictures illustrate that record — they no longer stand in for it. Each
-  example also names the exact Comparison row, occurrence and state it came
-  from, and the two source rows behind it, so a reviewer can jump straight from
-  an image to the cell it proves.
+The comparison-perfection release. Every finding this project owns is closed;
+comparison counts and evidence output intentionally differ from earlier
+versions, so re-run both sides rather than reconciling a new run against an old
+one. After updating, the TSN libraries rebuild once and PDF-sourced
+consolidated workbooks re-consolidate once.
 
 ### Added
 - **Evidence for the PDF-vs-Excel self check.** Comparing a report's two TSMIS
@@ -37,6 +32,15 @@ release shows only its own section (see `build/gen_release_notes.py`).
   the source files the pictures were taken from, and every image it published.
   If you rebuild a comparison without regenerating the images, the leftover set
   is recognisable as belonging to the previous one instead of looking current.
+- **Evidence images now come with a complete difference ledger.** The evidence
+  workbook has a new **Ledger** sheet listing, for every compared column, how
+  many differences the comparison counted, how many of those sit on a row that
+  can be photographed on its own, how many sit inside a repeated postmile, plus
+  the context, identical and one-sided cell counts and the whole row universe.
+  The pictures illustrate that record — they no longer stand in for it. Each
+  example also names the exact Comparison row, occurrence and state it came
+  from, and the two source rows behind it, so a reviewer can jump straight from
+  an image to the cell it proves.
 
 ### Fixed
 - **Evidence images and their workbook can no longer disagree.** If the images
