@@ -8,7 +8,7 @@ the living data ledgers are listed under [Reference](#reference) below.
 
 ## 1. YOU ARE HERE
 
-_Updated 2026-07-17._
+_Updated 2026-07-22._
 
 ```
 Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 8 ── 9 ── 10
@@ -21,10 +21,10 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
-| **Gate** | **136/136 offline** checks + **8 JS checks** in full CI (added `check_compare_cancel_visibility.js` + `check_compare_input_recipe_binding.js` this session) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
+| **Gate** | **144/144** full-suite checks (Python + JS) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **241 total · ~219 CLOSED (Resolved/Remediated) · ~22 open** (~91% closed by count; the correctness-critical core is done, the open tail is Phase-5/7 hardening + the evidence arc + non-product instrument work). **Buckets:** A ✅ · **B ✅** · **C ✅** · **D ✅** · **E ✅ (matrix/GUI lifecycle) — M6+M7+M8 COMPLETE, M9 3/6** (035/040/075 ✅; 085/098/115 Phase-5/Stage-10/owner-deferred) · **F (BIG-1 evidence arc) — 107/110/112 ✅, 106/109 partial** (+ the owner layout feature); **108/208/209/210 = the Stage-10 published-cell / raw-source-oracle cluster** (drive evidence from the published comparison's state masks + pairing trace, not a re-execution — a dedicated multi-session effort, not a marathon slice; see the CMP-AUD-208 disposition note). **G/H/I** remaining (HD normalization M12, IS/HSL M13, instruments). Vendor-blocked (never infer): 045/192/HL-county. |
-| **Next action** | See the **RESUME HERE** block below. All owned provenance/projection findings are closed; bucket A of the unowned triage is done; **seven safe-by-construction C-bucket refusal gates shipped CI-green this session — 028 + 033 + 036 + 030 + 031 + 029 + 034.** **070 RESOLVED (2026-07-17) — NOT A DEFECT**: the loader correctly keys by the physical (Location) route, which TSN uses too (259/259 verified — they are route-origin/junction "equate" rows); the prescribed fix would introduce discrepancies. **063 + 027 + MER-059 + 018 RESOLVED + sol-001 integrated (2026-07-17)**: 063/027/MER-059 (see the DONE blocks); **018** = Intersection Summary cross-env now shares the consolidator's section-partition + require-Total gate (census: 434 real exports, 0 drift/0 no-Total). **sol-001 reliability hardening reviewed + merged** (`7a7f0e7`; updater readiness/rollback, export retry accounting, manifest validation, diagnostic logging; F-01 closed `99b7ab2`). **019 RESOLVED (2026-07-17)**: the Ramp Summary producer now reflects its own audit reds — `record_has_data` requires Total + every section, per-route `reconcile_record` sends unexplained gaps → PARTIAL and the explained P/V residual → a typed note (COMPLETE), matcher unknown/duplicate diagnostics, cross-env shares the gate; census 0 unexplained / 9 routes / 22 P/V ramps, real-data verified. **032 RESOLVED (2026-07-18) — BUCKET C COMPLETE**: every flat cross-env family now pins its EXACT export schema via a header_canonicalizer (RD/HSL/HD/ID XLSX + HSL-PDF/RD-PDF), so two malformed/legacy/truncated/reordered sides refuse instead of matching; census-verified on the 7.9 statewide exports + converted headers; new `check_compare_env_flat_schema` + 5 fixtures rebuilt onto real layouts. **046 RESOLVED (2026-07-18)**: shifted RD/ID exports now show diffs under the right field — RD Excel+PDF pin a position-authoritative `force_header`, ID Excel+PDF realign legacy→current via `_id_canonical_header`; end-to-end proves Description-under-Description / INT-Type-under-INT-Type. **NEXT (bucket D — LAST): 022, then buckets B/E/G/H/I.** 210 DEFERRED. HD-Excel county vendor-pending |
+| **Findings** | **242 total · 223 CLOSED (Resolved/Remediated) · 19 open** (92% closed; verified against every per-entry `Status:` line 2026-07-22). The 19: **193** (NORM, the only actionable normalization finding) · **242** (PATH ⛔ must-ship) · **80 85 89 115** (DUR — 085 decided LAST-COMPLETE) · **98 106 108 109 208 209 210** (EV-10, Stage-10 published-cell rebuild) · **187** (audit instrument, perf only) · **133 142 186 192 + 045-HD** (⛔ HD pre-release — deferred to the owner's official HD delivery; never infer). ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
+| **Next action** | **See the ▶ RESUME HERE block below — it is the ONLY live next-action surface.** (The dated per-batch resolution notes that used to live in this cell are recorded where they belong: each finding's ledger entry, the dated resume blocks below, and git history. Keeping a second prose copy here is what caused the stale-directive incidents.) |
 
 ## Marathon roadmap to completion (2026-07-18)
 
@@ -48,11 +48,14 @@ its findings back-to-back, then update this roadmap.
 
 | **PATH** ⛔ | **MAX_PATH — MUST SHIP BEFORE "DONE" (1)** | **242** | **Field-confirmed on the work PC (v0.27.0, 8/8 runs): every by-day comparison built and then vanished from the matrix.** The schema-v3 payload chunk basename is ~148 chars, so at the real install depth the published path is **265 > 260**; the dev box has `LongPathsEnabled=1`, **a managed Caltrans PC has 0 and cannot change it** — that is the whole dev-vs-field difference. The workbook commits; only the trust metadata fails, so the matrix correctly hides an uncertifiable comparison. v0.27.1 (`f55d946`) shipped **diagnosis only** (every gate names itself; the path-limit refusal names the remedy). **The fix — shorten the basename (each hex → 16, ≈52 chars) — is a persisted-format change** pinned by three `{64}`-hex regexes + the chunk-reclamation capture + the fallback-prefix parse; needs its own census + red→green + real-corpus re-verify and must keep reading existing v3 payloads (manifest-driven reads already do). **`check_comparison_path_limits.py` tests >260 only "when the runtime/Windows policy permits", so it can never catch this — it must gain an UNCONDITIONAL deep-parent budget assertion.** Owner workaround meanwhile: install to a short path. **Blocks completion: the deployment target is a locked-down PC (CLAUDE.md), so a comparison that cannot publish there is not "perfect".** Call sites + repro: CMP-AUD-242. |
 
-> **⚠ LEDGER IS THE SOURCE OF TRUTH, NOT THIS TABLE.** Re-check each finding's `Status:` line in
-> the ledger before planning or reporting: 144, 145, 241 and 061 were all listed here as open long
-> after they were resolved (2026-07-14/17/18), and the stale text caused the owner to be asked to
-> re-decide a settled question and to be handed a wrong remaining-work list twice. Verified count
-> 2026-07-21: **19 open** — NORM 4 · DUR 4 · EV-10 7 · PATH 1 · 187 · vendor-blocked 045/192.
+> **⚠ THE LEDGER'S PER-ENTRY `Status:` LINE IS THE SOURCE OF TRUTH — not this table, and not
+> even the ledger's own index table.** 144, 145, 241 and 061 were listed here as open long after
+> they were resolved (2026-07-14/17/18); on 2026-07-22 the ledger's INDEX table itself was caught
+> stale (042/138/144/145 still "Verified" after their entries said Resolved; 242 missing) and was
+> reconciled. When a finding closes, update its entry Status line AND its index-table row AND this
+> roadmap together. Full-parse-verified count 2026-07-22: **19 open** — NORM 1 actionable (193) ·
+> PATH 1 (242) · DUR 4 (080/085/089/115) · EV-10 7 (098/106/108/109/208/209/210) · 187 ·
+> HD-pre-release-deferred 133/142/186/192 + 045-HD.
 
 > ### ⛔ HIGHWAY DETAIL IS PRE-RELEASE — OWNER, 2026-07-21
 >
@@ -96,17 +99,39 @@ re-check on the next statewide HD batch.)
 - **Owed small:** **061** evidence-locator per-page polling; **054** line-2-band recovery for
   `evidence_highway_detail.py` (17 fallback pages share the old doc-median → mis-aligned images).
 
-**REMAINING WORK TOTAL: 22 findings** (219/241 closed, 91%) — **EV-10** (7, evidence Stage-10) ·
-**NORM** (8, source normalization) · **DUR** (4, Phase-5/7) · 187 + 045/192 (3, non-marathon/
-vendor-blocked). The correctness-critical core AND the tractable evidence findings are done; every
-remaining item is the Stage-10 published-cell rebuild, deep-normalizer fidelity (HD provisional on
-vendor approval), or the owner-gated Phase-5/7 cluster — **none is a live false-green today.**
-**Suggested order: NORM** (most tractable, source-first, highest product-correctness value) →
-**DUR** (needs the 085 owner decision — surface it first) → **EV-10** (the deepest; Stage-9/10, a
-dedicated effort, do LAST despite being "BIG-1 leftover"). Each is a multi-session chunk, not a
-single marathon.
+**REMAINING WORK TOTAL: 19 findings** (223/242 closed, 92%) — **193** (NORM's one actionable) ·
+**242** (PATH ⛔) · **DUR** (4) · **EV-10** (7) · 187 · HD-pre-release-deferred 133/142/186/192 +
+045-HD. The correctness-critical core AND the tractable evidence findings are done; nothing open
+is a live false-green today. **ACTIVE ORDER (owner, 2026-07-22): 193 → 242 → as much of DUR as
+possible**, then EV-10 (the deepest; Stage-9/10, a dedicated effort, LAST). The HD block resumes
+only when the owner delivers the official Highway Detail exports.
 
-> ### ▶ RESUME HERE (2026-07-21 — NORM 2/8; field batch shipped through v0.27.4)
+> ### ▶ RESUME HERE (2026-07-22 — ledger reconciled; ACTIVE ORDER: 193 → 242 → DUR)
+>
+> **Gate 144/144 · released v0.27.4 · 223 closed / 19 open of 242 (full-parse-verified).**
+>
+> **RECONCILIATION PASS DONE (owner-directed).** All 242 per-entry `Status:` lines were parsed
+> and diffed against the ledger index table and this plan. The index table itself had drifted
+> (042/138/144/145 stale-"Verified", 242 missing) — fixed; the drift warning above now covers it.
+> The verified open set is exactly the 19 listed in the warning box above.
+>
+> **ACTIVE ORDER (owner, 2026-07-22): 193 → 242 → then as much of DUR as possible.**
+> - **193 (NORM/HSL)** — its Status: "Current source correction proved; product publication,
+>   permanent gate, and final replay pending." Read the full ledger entry FIRST; the owed halves
+>   are product-side. Census against the real HSL corpus; drive the shipped comparison path.
+> - **242 (PATH ⛔)** — shorten the payload chunk basename (persisted-format change; census the
+>   pinned `{64}`-hex regexes; keep reading existing v3 payloads) + the UNCONDITIONAL deep-parent
+>   budget assertion in `check_comparison_path_limits.py`. Do NOT close as "diagnosed".
+> - **DUR** — 085 is DECIDED (LAST-COMPLETE). Fix the four policy-independent false-greens, then
+>   089 durable attempt overlay, 080 source-fingerprint identity, 115 commit-schema census.
+>
+> Method stands: census-first (reconcile the count against corpus size) → red→green → real-corpus
+> → full gate + ruff → push → SHA-verified CI → dashboard-in-place → ledger entry AND index table
+> AND this block AND memory.
+>
+> ---
+>
+> ### Prior resume (2026-07-21 — NORM 2/8; field batch shipped through v0.27.4)
 >
 > **Gate 144/144 · code tip `4258416` · released v0.27.4 · ~221 closed + 21 open of 242.**
 >
@@ -148,7 +173,9 @@ single marathon.
 > - Neither needed a `normalization_version` bump: both normalize at COMPARISON time, so the
 >   cached library content is untouched and no user rebuild is required.
 >
-> **NEXT: CMP-AUD-186** — but note it is a **parser rewrite, not a quick fix**: a continuation
+> ~~**NEXT: CMP-AUD-186**~~ **(SUPERSEDED same-day by the ⛔ HD pre-release ruling — 186/133/142
+> deferred to the official HD delivery; see the current RESUME block.)** The rewrite notes below
+> stay valid for when it resumes — it is a **parser rewrite, not a quick fix**: a continuation
 > ledger held until the next proved line one / DCR boundary / document end, geometry-and-reading-order
 > merging of every continuation baseline, description-overflow vs attribute-wrap discrimination,
 > exactly-once word reconciliation, cross-page continuation, and partial/failed on any unexplained
