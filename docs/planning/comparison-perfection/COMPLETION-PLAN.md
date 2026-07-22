@@ -19,7 +19,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 
 | | |
 |---|---|
-| **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
+| **Branch** | `comparison-perfection` — **MERGED INTO `main` 2026-07-22** (fast-forward; main had zero unique commits, so `main` now IS the completion state and the `v0.28.0` tag is reachable from it). The project is CLOSED OUT; future work branches from `main`. |
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
 | **Gate** | **152/152** full-suite checks (Python + JS) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
@@ -109,7 +109,7 @@ today, and **no marathon remains**: what is left is the COMPLETION RELEASE and t
 owner's work-PC acceptance run. The HD block resumes only when the owner delivers the
 official Highway Detail exports.
 
-> ### ▶ RESUME HERE (2026-07-22 — ALL FOUR MARATHONS CLOSED **AND v0.28.0 IS CUT**)
+> ### ▶ RESUME HERE (2026-07-22 — ALL FOUR MARATHONS CLOSED, **v0.28.0 IS CUT, AND THE BRANCH IS MERGED TO `main`** — the project is CLOSED OUT)
 >
 > **Every owned finding is closed. 237 of 242 (98%).** The 5 still open are ALL the
 > ⛔ HD pre-release block (133 · 142 · 186 · 192 + 045-HD) and they reopen only when
