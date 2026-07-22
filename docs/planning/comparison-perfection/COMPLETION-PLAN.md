@@ -109,7 +109,7 @@ today, and **no marathon remains**: what is left is the COMPLETION RELEASE and t
 owner's work-PC acceptance run. The HD block resumes only when the owner delivers the
 official Highway Detail exports.
 
-> ### ▶ RESUME HERE (2026-07-22 — ALL FOUR MARATHONS CLOSED; WHAT REMAINS IS THE COMPLETION RELEASE)
+> ### ▶ RESUME HERE (2026-07-22 — ALL FOUR MARATHONS CLOSED **AND v0.28.0 IS CUT**)
 >
 > **Every owned finding is closed. 237 of 242 (98%).** The 5 still open are ALL the
 > ⛔ HD pre-release block (133 · 142 · 186 · 192 + 045-HD) and they reopen only when
@@ -146,16 +146,26 @@ official Highway Detail exports.
 > HL vs TSN **30/30** columns · HSL Excel vs TSN **2/2** · HSL PDF vs Excel **3/3**,
 > **0 misses** on all three, ledger digests `53f37bdd` / `e95d3718` unchanged from M-B.
 >
-> **NEXT: THE COMPLETION RELEASE.** No marathon remains. The steps, in order:
-> 1. Version bump in `version.py` (0.27.4 → the completion version) + the CHANGELOG
->    section currently sitting under "Unreleased".
-> 2. Full release gate: `python build/run_checks.py -j 4 -k` (152/152) + byte-compile +
->    ruff(scripts) + a LOCAL `build.ps1 -SelfTest`, then the release-notes dry run.
-> 3. Tag on the branch (NOT main — main is far behind and has no v0.27.x), push the tag
->    explicitly: `git push origin refs/tags/<tag>`; confirm CI + all 6 assets.
-> 4. Hand the owner the work-PC checklist: the TSN libraries rebuild once, pre-marker
->    PDF-sourced workbooks re-consolidate once, and comparison counts intentionally
->    change vs v0.26.2 — never reconcile a new run against an old one.
+> **THE COMPLETION RELEASE IS CUT: `v0.28.0`, tagged on `40e3835` on THIS branch**
+> (owner-chosen version; `main` is far behind and has no v0.27.x/v0.28.x). Release gate
+> run pre-tag: **152/152** checks, ruff(scripts) clean, byte-compile clean, and a LOCAL
+> `build.ps1 -SelfTest` PASSED on the exact shipped exe — including the evidence render
+> stack and every new module.
+>
+> **NEXT: the owner's WORK-PC acceptance run.** Nothing in this repo can substitute for
+> it — the dev box cannot reach the TSMIS intranet, and the field has disagreed with a
+> green suite before. What to tell them, and what to expect:
+> - **Comparison counts and evidence output intentionally CHANGE vs v0.26.2/v0.27.x.**
+>   Re-run both sides; never reconcile a new run against an old one.
+> - **One-time migrations on first launch:** the TSN libraries rebuild once, and
+>   PDF-sourced consolidated workbooks re-consolidate once (the CMP-AUD-066 marker).
+> - **CMP-AUD-242 ships here**, so the short-path install workaround
+>   (`C:\TSMIS\…`) is no longer needed — a normal install depth now fits MAX_PATH.
+> - Force a re-consolidate of any amber Highway Log (PDF) day column after updating.
+>
+> **Still owed, and only the owner can unblock it:** the official Highway Detail exports.
+> All 5 open findings (133 · 142 · 186 · 192 + 045-HD) wait on that delivery, and until
+> it lands **no HD artifact on disk is ground truth** — never infer an HD answer.
 >
 > **Left open by design, and worth saying plainly:** the per-cell on-demand camera stays
 > TSN-only — a self comparison gets its evidence when it is built with the Evidence-images
