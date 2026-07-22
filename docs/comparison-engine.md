@@ -1274,6 +1274,43 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   - **Not claimed:** the loaders' per-field projections against the raw PDFs. That is the
     separately-tracked direct-source acceptance. The verified layer is comparison + publication
     (keying, pairing, equality, context, counting, classification, accounting).
+- **Each side is drawn from the source THAT SIDE was read from** (CMP-AUD-210, 2026-07-22).
+  `visual_evidence.tsmis_source_role(row_key)` is `pdf` for a `…_pdf` row and `excel` for the
+  other. An **Excel** row is illustrated from the consolidated workbook it was compared from —
+  `_excel_rows_at` addresses the row, the compared column is found by LABEL in the export's own
+  header, and `_excel_strip` renders a boxed cell strip labelled `TSMIS (Excel) — <workbook> ·
+  <sheet>!<cell>`. The cell renders only once its own workbook value, through the adapter's
+  `project`, equals the compared value: the Excel counterpart of the PDF side's parse-back
+  check. Before this, BOTH rows were drawn from the PDF edition and a candidate was dropped
+  whenever that print disagreed — so a value the Excel export holds and the print does not
+  could never be shown. `generate(flavor=…)` also serves the **PDF-vs-Excel self check**
+  (`FLAVOR_SELF`): side A the print, side B the Excel cell, loaded through each adapter's
+  `load_sides_self`, which delegates to the SELF comparator's own loader pair and schema.
+  `enumerate_diffs` walks the SCHEMA's header, never a hardcoded copy — a self schema can carry
+  a column the vs-TSN header lacks (Highway Sequence's `PM Suffix`) and a parallel list shifted
+  every later field index. *Convenience gap:* the per-cell on-demand camera stays TSN-only; a
+  self comparison gets evidence when it is built with the toggle on.
+- **The set is ONE published generation** (CMP-AUD-098/106/109). `scripts/evidence_manifest.py`
+  writes `<comparison> (evidence).json` — deliberately the same length as the `.xlsx` sibling,
+  because the field install is already at the MAX_PATH budget. It records the comparison's
+  CONTENT digest + the published ledger digest, the **read set** (path/size/SHA-256), and a
+  digest per published member. `describe()` returns
+  absent / current / stale / incomplete / unreadable holding no in-memory state.
+  - **Read-set snapshot:** the candidate PDFs and any compared workbook are COPIED into a
+    private directory and the COPIES digested; every locate and render reads that copy. A
+    start/end digest of a live file cannot see an A→B→A swap (digest A, parse B, restore A,
+    check passes); reading a private copy means the swap never reaches the render. The
+    commit-boundary check keeps the narrower job of proving the live sources still equal what
+    was copied.
+  - **Two-phase publication:** every canonical member is quarantined before anything replaces
+    it, which makes the workbook commit undoable. If the image folder is separately locked the
+    workbook is withdrawn to a `.new` sibling and the prior generation — workbook, images AND
+    manifest — is restored whole, so the canonical set is never a new workbook beside old
+    images and the restored manifest still describes the restored set exactly.
+  - **No-artifact states are states:** `no_differences` and `no_examples` retire the prior set
+    and record what the run found, so a restart, a rebuild with the toggle off, a torn set and
+    "evidence never ran" are all distinguishable.
+  - Gate: `build/check_evidence_manifest.py` + `build/check_evidence_source_role.py`.
 - **Sources:** TSMIS side = the per-route **(PDF)-edition** export of the report (the Everything
   matrix resolves the row's cell store, the by-day matrix that day's `*_pdf/` run folder);
   TSN side = the prints in the report's `tsn_library/<report>/pdf/` folder — Highway Detail

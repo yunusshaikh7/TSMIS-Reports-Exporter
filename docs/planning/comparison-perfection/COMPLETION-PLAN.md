@@ -21,9 +21,9 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 |---|---|
 | **Branch** | `comparison-perfection` — pushed to origin, **CI green** |
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
-| **Gate** | **144/144** full-suite checks (Python + JS) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
+| **Gate** | **152/152** full-suite checks (Python + JS) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **242 total · 233 CLOSED (Resolved/Remediated) · 9 open** (96% closed; verified against every per-entry `Status:` line 2026-07-22; S0 closed 193 + 242, **M-A closed the whole DUR cluster 80 · 85 · 89 · 115 · 187**, **M-B closed the evidence spine 108 · 208 · 209**). The 9: **98 106 109 210** (EV-10's completion half) · **133 142 186 192 + 045-HD** (⛔ HD pre-release — deferred to the owner's official HD delivery; never infer). ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
+| **Findings** | **242 total · 237 CLOSED (Resolved/Remediated) · 5 open** (98% closed; verified against every per-entry `Status:` line 2026-07-22; S0 closed 193 + 242, **M-A closed the whole DUR cluster 80 · 85 · 89 · 115 · 187**, **M-B closed the evidence spine 108 · 208 · 209**, **M-C closed the evidence completion batch 98 · 106 · 109 · 210**). The 5 remaining are ALL the ⛔ HD pre-release block: **133 142 186 192 + 045-HD** — deferred to the owner's official HD delivery; never infer. ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
 | **Next action** | **See the ▶ RESUME HERE block below — it is the ONLY live next-action surface.** (The dated per-batch resolution notes that used to live in this cell are recorded where they belong: each finding's ledger entry, the dated resume blocks below, and git history. Keeping a second prose copy here is what caused the stale-directive incidents.) |
 
 ## Marathon roadmap to completion (2026-07-18)
@@ -43,7 +43,7 @@ its findings back-to-back, then update this roadmap.
 | ~~**M8**~~ ✅ | Compare / matrix GUI dispatch (bucket E) | ~~007 010 016 079 101 102 103 104~~ | **DONE 2026-07-18 — all 8 closed** (ac63f10 / 2b1e516 / 86c8e76), CI-green. Open-comparisons common root, set-all authoritative catalog, shared buildability predicate, canonical TSN consolidate routing, Cancel visibility, queue-capable day export, recipe-bound classic inputs, validation coverage pin. |
 | **M9** ◑ | Completion / partial-artifact policy + transaction (bucket E) | ~~035 040 075~~ · 085 098 115 | **PARTIAL 2026-07-18 — 3 closed (035 040 075), 3 DEFERRED.** 035 direct-builder post-`os.replace` recheck; 040 folder run-root/subfolder aliasing; 075 closed-by-082. **DEFERRED:** 115 (deep commit-schema gate on the correctness-locked path — read half already fixed; needs exhaustive per-comparator census), 098 (evidence-gate half = Stage-10), 085 (owner-gated last-complete/latest-attempt policy + Phase-5/7 durable overlay — with 089). |
 | ~~**BIG-1**~~ ◑ | **Evidence arc — bucket F. DONE to the tractable line: 107/110/112 ✅ + 106/109 partial + the layout feature (2026-07-18/19).** The remainder is EV-10 below. | ~~106~~ ~~107~~ ~~109~~ ~~110~~ ~~112~~ + 108 · 208 209 210 · 098 | 107 (compared_cell equality), 110 (queued-evidence identity), 112 (parse↔render byte digest) CLOSED; 106 (retire-stale-on-clean) + 109 (workbook+images one set) PARTIAL. What's left is the Stage-10 published-cell spine → **EV-10**. |
-| **EV-10** ◑ | **Evidence — Stage-10 published-cell rebuild + transaction completion** | ~~108~~ ~~208~~ ~~209~~ · 210 · 098 · 106↺ 109↺ | **SPINE DONE 2026-07-22 (marathon M-B, `1cf791b` + `fe25f4e`, CI-green, gate 150/150).** Evidence now drives off the PUBLISHED comparison — `published_comparison.py` decodes and authenticates the committed workbook's own per-cell E/D/N/U masks, anchored Status/Diffs, and opaque row tokens; `enumerate_diffs` is demoted to a PROPOSER and the published cell decides whether an image may be rendered (**208**); an exhaustive hash-bound ledger ships as a **Ledger** sheet before any sample is drawn (**209**); duplicate-only differences are a named per-column miss, never a false zero (**108**). Acceptance: the independent stdlib oracle agrees cell-for-cell at gate scale over every class, and statewide HSL recomputation gave 342,432 cell states / 0 disagreements with all 439,356 cells classified. **Still open here:** the source-faithful Excel / PDF-vs-Excel routes (**210**, own mini-plan), the durable per-comparison generation MANIFEST finishing **106**, the **109** two-phase quarantine-rollback transaction, and the evidence-gate read-set snapshot (**098**) — all M-C. NOT claimed by M-B: the loaders' per-field projections vs the raw PDFs (the separately-tracked direct-source acceptance).
+| ~~**EV-10**~~ ✅ | **Evidence — Stage-10 published-cell rebuild + transaction completion — COMPLETE** | ~~108~~ ~~208~~ ~~209~~ ~~210~~ ~~098~~ ~~106~~ ~~109~~ | **SPINE DONE 2026-07-22 (M-B, `1cf791b` + `fe25f4e`)**: evidence drives off the PUBLISHED comparison — `published_comparison.py` decodes and authenticates the committed workbook's own per-cell E/D/N/U masks, anchored Status/Diffs and opaque row tokens; `enumerate_diffs` is demoted to a PROPOSER and the published cell decides whether an image may be rendered (**208**); an exhaustive hash-bound **Ledger** sheet ships before any sample is drawn (**209**); duplicate-only differences are a named per-column miss, never a false zero (**108**). **COMPLETED 2026-07-22 (M-C, `d124a50` + `e1f4a8e` + `1aa6c9b`)**: `evidence_manifest.py` records every terminal state including the no-artifact ones and reads back with no in-memory state (**106**); publication is two-phase quarantine-and-promote, so a committed workbook is withdrawable and the canonical pair is never a new workbook beside old images (**109**); the candidate sources are copied into a private snapshot and the COPIES digested, closing the A→B→A window a start/end digest cannot see (**098**); each side is evidenced from the source that side was read from, and the PDF-vs-Excel self check is illustrated (**210**). Acceptance: the independent stdlib oracle agrees cell-for-cell at gate scale; statewide HSL recomputation gave 342,432 cell states / 0 disagreements; and three real-corpus legs ran through the shipped `generate()` with 0 misses (HL 30/30 columns, HSL-Excel 2/2, HSL PDF-vs-Excel 3/3), the vs-TSN ledger digests unchanged. **Left open by design:** the per-cell on-demand camera stays TSN-only (a convenience gap — a self comparison gets evidence when built with the toggle on). NOT claimed: the loaders' per-field projections vs the raw PDFs (the separately-tracked direct-source acceptance).
 | ~~**NORM**~~ ✅ | **Source normalization fidelity — bucket G — ACTIONABLE SIDE COMPLETE 2026-07-22** | ~~042~~ ~~138~~ ~~144~~ ~~145~~ ~~193~~ · HD-deferred (⛔ pre-release): 133◑ 142 186 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
 | ~~**DUR**~~ ✅ | **Phase-5/7 durability & policy — CLOSED 2026-07-22 by marathon M-A** (`233e294` + `671dfaf`, both CI-green) | ~~080 085 089 115 187~~ | **DONE — all five.** 085 last-complete publication (divert-then-promote; a partial refresh keeps last-good, publishes an unpromoted attempt beside it, and REFUSES so the stale complete generation is never diffed against current inputs) + 089 durable per-cell attempt overlay with honest attempted/succeeded/failed/cancelled/partial counts and a grid marker that never erases the prior result + 080 v2 CONTENT fingerprint with a Windows-ChangeTime-validated digest memo (statewide: cold 1.53 s, warm 0.27 s — parity with the v1 stat walk, plus a racy-window rule so a same-clock-tick rewrite can never hide) and content-keyed evidence parse caches + 115 the versioned comparison-artifact schema at the commit boundary, whose rejection domain is provably a subset of the already-unreadable domain (census: 119 real production comparison commits accepted, 0 false rejections) + 187 indexed oracle grouping proved equivalent over every fixture class (40,000 rows in 0.34 s). Four new gate checks: `check_last_complete`, `check_content_identity`, `check_comparison_artifact_schema`, `check_oracle_grouping`. Gate **148/148**. |
 
@@ -54,9 +54,10 @@ its findings back-to-back, then update this roadmap.
 > they were resolved (2026-07-14/17/18); on 2026-07-22 the ledger's INDEX table itself was caught
 > stale (042/138/144/145 still "Verified" after their entries said Resolved; 242 missing) and was
 > reconciled. When a finding closes, update its entry Status line AND its index-table row AND this
-> roadmap together. Full-parse-verified count 2026-07-22 (post-S0, post-M-A, post-M-B): **9 open**
-> — EV-10 4 (098/106/109/210) · HD-pre-release-deferred 133/142/186/192 +
-> 045-HD. ~~193~~ and ~~242~~ closed in S0; ~~080/085/089/115/187~~ in M-A; ~~108/208/209~~ in M-B.
+> roadmap together. Full-parse-verified count 2026-07-22 (post-S0, post-M-A, post-M-B, post-M-C):
+> **5 open** — ALL of them HD-pre-release-deferred: 133/142/186/192 + 045-HD.
+> ~~193~~ and ~~242~~ closed in S0; ~~080/085/089/115/187~~ in M-A; ~~108/208/209~~ in M-B;
+> ~~098/106/109/210~~ in M-C.
 
 > ### ⛔ HIGHWAY DETAIL IS PRE-RELEASE — OWNER, 2026-07-21
 >
@@ -100,13 +101,70 @@ re-check on the next statewide HD batch.)
 - **Owed small:** **061** evidence-locator per-page polling; **054** line-2-band recovery for
   `evidence_highway_detail.py` (17 fallback pages share the old doc-median → mis-aligned images).
 
-**REMAINING WORK TOTAL: 9 findings** (233/242 closed, 96%) — **EV-10** (4) ·
-HD-pre-release-deferred 133/142/186/192 + 045-HD. S0 (193 + 242), M-A (080/085/089/115/187,
-the whole DUR cluster) and M-B (108/208/209, the evidence spine) are CLOSED. Nothing open is a live false-green today. **ACTIVE ORDER: ONE marathon
-remains — M-C (210/106/109/098 + closeout + the completion release).** The HD block resumes only when the owner delivers the official
-Highway Detail exports.
+**REMAINING WORK TOTAL: 5 findings** (237/242 closed, 98%) — and every one of them is
+HD-pre-release-deferred (133/142/186/192 + 045-HD). S0 (193 + 242), M-A (the whole DUR
+cluster 080/085/089/115/187), M-B (the evidence spine 108/208/209) and M-C (the evidence
+completion batch 098/106/109/210) are all CLOSED. Nothing open is a live false-green
+today, and **no marathon remains**: what is left is the COMPLETION RELEASE and the
+owner's work-PC acceptance run. The HD block resumes only when the owner delivers the
+official Highway Detail exports.
 
-> ### ▶ RESUME HERE (2026-07-22 — S0 + M-A + M-B CLOSED; ONLY M-C REMAINS, AND IT STARTS ON THE OWNER'S GO)
+> ### ▶ RESUME HERE (2026-07-22 — ALL FOUR MARATHONS CLOSED; WHAT REMAINS IS THE COMPLETION RELEASE)
+>
+> **Every owned finding is closed. 237 of 242 (98%).** The 5 still open are ALL the
+> ⛔ HD pre-release block (133 · 142 · 186 · 192 + 045-HD) and they reopen only when
+> the owner delivers the official Highway Detail exports. **Never infer an HD answer.**
+>
+> **M-C IS DONE (2026-07-22)** — the evidence completion batch, three commits, all
+> CI-green, gate **152/152**, ruff clean. Four findings, two defects:
+> - **098 · 106 · 109 — the evidence set is now ONE generation, recorded durably.**
+>   `scripts/evidence_manifest.py` binds the comparison generation (the workbook's
+>   CONTENT digest + the published ledger digest), the exact READ SET, and a digest for
+>   every published member. **109**: every canonical member is quarantined before
+>   anything replaces it, so the workbook commit is undoable — when the image folder
+>   turns out to be separately locked the workbook is withdrawn and the prior generation
+>   is restored whole, and the canonical pair can never be a new workbook beside old
+>   images. **106**: a run that publishes nothing still records a state
+>   (`no_differences` / `no_examples`), so a restart, a toggled-off rebuild (stale by
+>   content, never mtime), a torn set and "evidence never ran" are all distinguishable.
+>   **098**: the candidate sources are copied into a private snapshot and the COPIES
+>   digested, closing the A→B→A window a start/end digest of a live file cannot see.
+> - **210 — each side is evidenced from the source THAT SIDE was read from.** An
+>   Excel-compared row is drawn from the workbook it was compared from (sheet, cell
+>   address, neighbouring values, labelled `TSMIS (Excel)`), so a value the companion
+>   print never carried is finally evidenceable instead of silently dropped. The
+>   PDF-vs-Excel self check is illustrated too, through the SELF comparator's own
+>   loader pair and schema.
+>
+> **One latent defect surfaced and was fixed**: `enumerate_diffs` walked a HARDCODED
+> copy of the vs-TSN header, so under a schema carrying an extra column every field
+> index past it shifted and the engine judged the wrong column. Nothing wrong was ever
+> published — M-B's published-cell check refused all 766 candidates — and the vs-TSN
+> ledger digests are identical before and after. Pinned red→green in the gate.
+>
+> Real-corpus acceptance through the SHIPPED `generate()` (2026-07-09 ssor-prod):
+> HL vs TSN **30/30** columns · HSL Excel vs TSN **2/2** · HSL PDF vs Excel **3/3**,
+> **0 misses** on all three, ledger digests `53f37bdd` / `e95d3718` unchanged from M-B.
+>
+> **NEXT: THE COMPLETION RELEASE.** No marathon remains. The steps, in order:
+> 1. Version bump in `version.py` (0.27.4 → the completion version) + the CHANGELOG
+>    section currently sitting under "Unreleased".
+> 2. Full release gate: `python build/run_checks.py -j 4 -k` (152/152) + byte-compile +
+>    ruff(scripts) + a LOCAL `build.ps1 -SelfTest`, then the release-notes dry run.
+> 3. Tag on the branch (NOT main — main is far behind and has no v0.27.x), push the tag
+>    explicitly: `git push origin refs/tags/<tag>`; confirm CI + all 6 assets.
+> 4. Hand the owner the work-PC checklist: the TSN libraries rebuild once, pre-marker
+>    PDF-sourced workbooks re-consolidate once, and comparison counts intentionally
+>    change vs v0.26.2 — never reconcile a new run against an old one.
+>
+> **Left open by design, and worth saying plainly:** the per-cell on-demand camera stays
+> TSN-only — a self comparison gets its evidence when it is built with the Evidence-images
+> toggle on, but its matrix cell offers no camera button. That is a convenience gap, not a
+> correctness one. **Not claimed by any of this:** the loaders' per-field projections
+> against the raw PDFs — that is the separately-tracked direct-source acceptance.
+>
+
+> ### Prior status (2026-07-22 — M-B closed the evidence spine; M-C was next)
 >
 > **⚠ MARATHON START GATE (owner, 2026-07-22): do NOT begin a marathon unprompted — the
 > owner starts each one explicitly.**

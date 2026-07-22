@@ -235,8 +235,22 @@ workbook's **Ledger** sheet BEFORE any sample is drawn, so a duplicate-only diff
 named miss instead of a false "no differing columns". Acceptance is the independent stdlib
 oracle (`build/check_evidence_oracle.py`) agreeing cell-for-cell, plus a statewide HSL
 recomputation (342,432 cell states, 0 disagreements; 439,356 cells all classified).
-**Still open (CMP-AUD-210):** Excel comparisons route their imagery through a companion TSMIS
-PDF, and there is no source-faithful PDF-vs-Excel mode. **Not claimed:** the loaders' per-field
+**Each side is evidenced from the source THAT SIDE was read from since 2026-07-22**
+(CMP-AUD-210). An Excel-compared row is drawn from the workbook it was compared from — sheet,
+cell address and the row's own neighbouring values, boxed like a PDF crop and labelled
+`TSMIS (Excel)` — so a value the companion print never carried (Highway Sequence route 037's
+Description) is evidenceable instead of dropped for "disagreeing" with a print that took no
+part in the comparison. The **PDF-vs-Excel self check** is illustrated too, side A from the
+per-route print and side B from the Excel cell, through the SELF comparator's own loader pair
+and schema. The evidence set is also ONE published generation (CMP-AUD-098/106/109):
+`evidence_manifest.py` binds the comparison's CONTENT digest, the published ledger digest, the
+exact READ SET (path/size/SHA-256 of a PRIVATE snapshot every locate and render reads — an
+A→B→A swap of a live source can no longer reach an image), and a digest per published member;
+publication is two-phase quarantine-and-promote, so the canonical set is never a new workbook
+beside old images; and a run that publishes nothing still records `no_differences` /
+`no_examples`, which `describe()` reads back with no in-memory state. Remaining convenience
+gap: the per-cell on-demand camera stays TSN-only — a self comparison gets its evidence when
+it is built with the toggle on. **Not claimed:** the loaders' per-field
 projections against the raw PDFs — that is the separately-tracked direct-source acceptance.
 (Spot Check's row-matching half of the original warning was remediated 2026-07-16 —
 CMP-AUD-218.) The live source-first status and exact findings are in

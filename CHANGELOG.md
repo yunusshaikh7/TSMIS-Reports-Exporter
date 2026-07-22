@@ -16,7 +16,39 @@ release shows only its own section (see `build/gen_release_notes.py`).
   from, and the two source rows behind it, so a reviewer can jump straight from
   an image to the cell it proves.
 
+### Added
+- **Evidence for the PDF-vs-Excel self check.** Comparing a report's two TSMIS
+  editions against each other can now produce images like every other
+  comparison: the PDF side as a highlighted page snippet, the Excel side as its
+  own workbook cell. Turn Evidence images on and build the comparison.
+
+### Changed
+- **Excel comparisons are illustrated from the Excel export.** Evidence used to
+  draw the TSMIS side of every comparison from the printable PDF edition, even
+  when the comparison had read the Excel export — and it silently skipped any
+  value where the two editions disagreed. So the differences most worth seeing,
+  the ones the print doesn't carry at all, were exactly the ones that never got
+  a picture. An Excel comparison now shows the workbook cell it actually
+  compared, named down to the sheet and cell reference so you can open it and
+  look. Excel-side runs are also much faster: they no longer open all 252
+  companion PDFs to illustrate a workbook.
+- **Every evidence set now says which comparison it belongs to.** A small
+  `(evidence).json` record beside the comparison names the exact comparison,
+  the source files the pictures were taken from, and every image it published.
+  If you rebuild a comparison without regenerating the images, the leftover set
+  is recognisable as belonging to the previous one instead of looking current.
+
 ### Fixed
+- **Evidence images and their workbook can no longer disagree.** If the images
+  folder was open when a refresh finished, you could end up with a new evidence
+  workbook sitting beside the previous run's pictures. Both now publish
+  together or neither does: the previous set stays exactly as it was and the
+  new one is saved alongside with a note.
+- **A run that finds nothing to illustrate now records that.** Previously, when
+  a rebuilt comparison had nothing photographable, the old images were simply
+  left where they were. The prior set is now retired and the run records what
+  it found, so "nothing to illustrate" and "images were never generated" are
+  no longer indistinguishable.
 - **Evidence no longer says "no differing columns" when there are some.** When
   every difference in a column happened to sit at a postmile that repeats, the
   images step reported nothing to illustrate — which read as "the two systems

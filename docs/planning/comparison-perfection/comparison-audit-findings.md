@@ -378,7 +378,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-095 | P2 | Resolved 2026-07-18 | Source switches retain invalid source-scoped days and baselines |
 | CMP-AUD-096 | P2 | Resolved 2026-07-18 | Invalid scoped rebuild filters silently broaden to the whole matrix |
 | CMP-AUD-097 | P2 | Resolved 2026-07-18 | Unified matrix state cannot report that both inputs are missing |
-| CMP-AUD-098 | P1 | Partially remediated 2026-07-14 (the comparison-pipeline half; the evidence-gate half remains Stage-10 work) | Inputs changed during comparison can be certified as the fresh sources |
+| CMP-AUD-098 | P1 | **Resolved 2026-07-22** | Inputs changed during comparison can be certified as the fresh sources |
 | CMP-AUD-099 | P2 | Resolved 2026-07-18 | Baseline switching rebuilds baseline-independent Matrix modes |
 | CMP-AUD-100 | P2 | Resolved | Matrix cache identity and nested record schemas are not validated |
 | CMP-AUD-101 | P2 | Resolved 2026-07-18 | Open Comparisons opens the wrong tree for non-environment modes |
@@ -386,10 +386,10 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-103 | P2 | Resolved 2026-07-18 | Cell Build actions dispatch despite a known missing TSN input |
 | CMP-AUD-104 | P3 | Resolved 2026-07-18 | One queue-capable day export action is uniquely disabled while busy |
 | CMP-AUD-105 | P1 | Resolved | A missing explicit TSN source silently falls back to another dataset |
-| CMP-AUD-106 | P1 | Partially remediated 2026-07-18 | Old red evidence survives beside a newly clean comparison |
+| CMP-AUD-106 | P1 | **Resolved 2026-07-22** | Old red evidence survives beside a newly clean comparison |
 | CMP-AUD-107 | P1 | Resolved 2026-07-18 | Highway Detail evidence invents differences the comparison treats as equal |
 | CMP-AUD-108 | P2 | **Resolved 2026-07-22** | Duplicate-only differences disappear from evidence accounting |
-| CMP-AUD-109 | P1 | Partially remediated 2026-07-19 | Evidence workbook and images are not one truthful transaction |
+| CMP-AUD-109 | P1 | **Resolved 2026-07-22** | Evidence workbook and images are not one truthful transaction |
 | CMP-AUD-110 | P2 | Resolved 2026-07-18 | Queued evidence actions silently retarget to current settings |
 | CMP-AUD-111 | P1 | Resolved | Evidence summaries execute source values as Excel formulas |
 | CMP-AUD-112 | P1 | Resolved 2026-07-18 | Evidence can verify old PDF records but rasterize replacement bytes |
@@ -490,7 +490,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-207 | P2 | Remediated in corrected draft and direct-source r2 checkpoint; final acceptance replay pending | Highway Sequence duplicate-cost projection recognizes only current TSMIS source names and treats historical Excel as TSN |
 | CMP-AUD-208 | P1 | **Resolved 2026-07-22** | Visual evidence never reads the Comparison cells it claims to verify |
 | CMP-AUD-209 | P1 | **Resolved 2026-07-22** | Highway Sequence evidence excludes whole discrepancy classes before sampling |
-| CMP-AUD-210 | P1 | Verified in Highway Sequence source routing, Matrix wiring, and current same-source truth | Highway Sequence Excel and PDF-vs-Excel comparisons have no source-faithful evidence path |
+| CMP-AUD-210 | P1 | **Resolved 2026-07-22** | Highway Sequence Excel and PDF-vs-Excel comparisons have no source-faithful evidence path |
 | CMP-AUD-211 | P2 | Remediated and independently verified in the raw-product development witness | Raw-product witness hashes a payload chunk and then separately reads different bytes for decompression |
 | CMP-AUD-212 | P2 | Remediated and independently verified in the raw-product development witness | Raw-product witness accepts well-named comparison payload chunks that no sidecar references |
 | CMP-AUD-213 | P2 | Remediated and verified in the five-leg development semantic oracle; direct-source permanent gate pending | Highway Sequence audit checks Summary and Spot Check formula quantity but not their cell semantics |
@@ -5222,7 +5222,7 @@ for environment, day-TSN, baseline-day, PDF-vs-Excel, and hidden/unsupported cel
 ### CMP-AUD-098 — a mid-comparison source mutation can be recorded as fresh
 
 Priority: P1  
-Status: Partially remediated 2026-07-14 — the comparison-pipeline half is fixed (pre-comparison capture recorded; raced results auto-invalidate); the evidence-gate half remains Stage-10 work  
+Status: **RESOLVED 2026-07-22** (M-C) — both halves. The comparison pipeline was fixed 2026-07-14 (pre-comparison capture recorded; raced results auto-invalidate); the evidence-gate half is closed by the READ-SET SNAPSHOT below.  
 Primary code: `scripts/matrix_build.py:127-179,662-680`,
 `scripts/baseline_matrix.py:399-425`, `scripts/day_matrix.py:419-433`,
 `scripts/matrix_state.py:205-260`, `scripts/matrix_build.py:389-431`
@@ -5299,6 +5299,10 @@ the PDF read-set snapshotting, which the remediation note above already assigns 
 10 (evidence oracles) — it needs identity-bound attempt storage for the discovered PDF
 read set, not a comparison-pipeline change. Deferred with Stage 10, unchanged this
 marathon (grouped with the CMP-AUD-106–112/208–210 evidence arc, M10/M11).
+
+#### Remediation — 2026-07-22 (M-C)
+
+Closed alongside CMP-AUD-210 in one batch; the shared remediation block lives under **CMP-AUD-210**. They are one contract: an evidence set is a workbook, an image folder and a manifest that describe the SAME generation, published together or not at all.
 
 ### CMP-AUD-099 — baseline switching rebuilds modes that do not use it
 
@@ -5525,7 +5529,7 @@ by the later validated-loader phases.
 ### CMP-AUD-106 — stale evidence survives a clean comparison generation
 
 Priority: P1  
-Status: Verified through the real evidence engine's zero-difference path  
+Status: **RESOLVED 2026-07-22** (M-C) — the durable generation manifest records every terminal state, including the no-artifact ones  
 Primary code: `scripts/visual_evidence.py:220-231,287-347`,
 `scripts/matrix_build.py:374-386,533-552`
 
@@ -5565,6 +5569,10 @@ artifact, and a real `generate()` call on a clean comparison (planted prior evid
 leaves nothing surviving at the canonical name — red on the neutralized retire, green
 on the fix. **Still open:** the no-verifiable-example / disabled-toggle / restart paths
 and the durable per-comparison evidence generation manifest (coupled with CMP-AUD-109).
+
+#### Remediation — 2026-07-22 (M-C)
+
+Closed alongside CMP-AUD-210 in one batch; the shared remediation block lives under **CMP-AUD-210**. They are one contract: an evidence set is a workbook, an image folder and a manifest that describe the SAME generation, published together or not at all.
 
 ### CMP-AUD-107 — Highway Detail evidence uses a different equality engine
 
@@ -5655,7 +5663,7 @@ duplicates.
 ### CMP-AUD-109 — evidence workbook and images are not one transaction
 
 Priority: P1  
-Status: Verified with locked, failed, and cancellation publication harnesses  
+Status: **RESOLVED 2026-07-22** (M-C) — two-phase quarantine-and-promote; a committed workbook is now withdrawable  
 Primary code: `scripts/visual_evidence.py:287-347,592-676`,
 `scripts/matrix_build.py:389-433`, `scripts/gui_worker_matrix.py:342-365`
 
@@ -5704,6 +5712,10 @@ workbook DOES commit but the image folder is separately locked, the images still
 closing that rarer case needs a quarantine-based TWO-PHASE commit of both artifacts (the
 workbook commit is not yet rollback-able), plus the manifested-generation identity + the
 process-crash-boundary / disk-full matrix.
+
+#### Remediation — 2026-07-22 (M-C)
+
+Closed alongside CMP-AUD-210 in one batch; the shared remediation block lives under **CMP-AUD-210**. They are one contract: an evidence set is a workbook, an image folder and a manifest that describe the SAME generation, published together or not at all.
 
 ### CMP-AUD-110 — queued evidence actions can change their target identity
 
@@ -9396,7 +9408,7 @@ resolve source rows for the rendered items (one workbook open for both sides, do
 ### CMP-AUD-210 — Highway Sequence Excel and PDF-vs-Excel comparisons have no source-faithful evidence path
 
 Priority: P1  
-Status: Verified in source routing, Matrix wiring, UI gating, and current same-source truth  
+Status: **RESOLVED 2026-07-22** (M-C) — each side is evidenced from the source that side was read from; the self check is illustrated  
 Primary code: `scripts/visual_evidence.py`, `scripts/matrix_build.py`,
 `ui/ui-matrix.js`, and Highway Sequence evidence adapter
 
@@ -9427,6 +9439,102 @@ classified as a defect for this flat report: Stage 10 must either certify the ge
 Comparison/source sheets as its complete flat view after raw prefix/base/suffix/
 occurrence claims are visible, or add a typed equate-event view. It may not claim that a
 Highway Sequence Report View already exists.
+
+#### Remediation — 2026-07-22 (M-C: the evidence completion batch, 098 · 106 · 109 · 210)
+
+Four findings, two commits, because they are two defects. `d124a50` closed the
+durability trio; `e1f4a8e` + `1aa6c9b` closed the source-faithfulness pair.
+
+**The set is now one generation (106 · 109), recorded durably (098).**
+`scripts/evidence_manifest.py` is the per-comparison generation record: which
+comparison generation the evidence describes (the comparison workbook's CONTENT
+digest plus the published ledger digest read out of that workbook's own cells,
+never an mtime), the exact PDF/workbook READ SET the images were rendered from
+(path, size, SHA-256), and a digest for every published member.
+
+- **109's residual half.** Every canonical member is QUARANTINED before anything
+  replaces it, which is what makes the workbook commit undoable. When the image
+  folder turns out to be separately locked — the case the old divert-both path
+  could not reach, because a committed workbook could not be taken back — the
+  workbook is withdrawn to a `.new` sibling and the prior generation is restored
+  whole. The canonical pair can no longer be a new workbook beside old images.
+  A rollback restores the prior manifest too, so the diverted state stays
+  internally consistent: the restored manifest still describes the restored
+  workbook and images exactly.
+- **106's residual half.** A run that publishes no images still records a state.
+  `no_differences` and `no_examples` are current claims about the current
+  comparison, not the absence of one, and the prior set is retired in both
+  cases. `evidence_manifest.describe()` reads them back holding no in-memory
+  state, so a RESTART, a rebuild with the evidence toggle OFF (the comparison's
+  bytes changed → `stale`), a torn set (`incomplete`), and "evidence never ran"
+  (`absent`) are all distinguishable.
+- **098's evidence half.** Digesting a live file before parsing and again at the
+  commit boundary cannot see an A→B→A swap: digest A, parse B, restore A, and
+  the check passes on bytes nobody rendered from. The candidate sources are now
+  COPIED into a private snapshot and the COPIES are digested; every locate and
+  render reads that snapshot, so correctness stops depending on what the live
+  path does next. The commit-boundary check keeps a narrower, honest job —
+  prove the live sources still equal what was copied, so the manifest describes
+  files the user actually has.
+
+**Each side is evidenced from the source that side was read from (210).**
+The code's own comment used to say it plainly: "the Excel row's images render
+from the PDF-edition export". A candidate was then DROPPED whenever that print
+disagreed with the compared value, so anything the Excel export holds and the
+print does not — Highway Sequence route 037's Description is the censused case
+— could never be illustrated, and Excel-only truth was indistinguishable from
+"no verifiable example".
+
+- An Excel-compared row is evidenced from the workbook it was compared from:
+  sheet name, cell address and the row's own neighbouring values, boxed the way
+  a PDF crop is and labelled `TSMIS (Excel)` so it never poses as a print. The
+  cell renders only once its own workbook value, through the adapter's
+  projection, equals the value the comparison compared — the Excel counterpart
+  of the PDF side's parse-back check. The column is located by LABEL in the
+  export's own header, never by a position a schema change could shift.
+- The **PDF-vs-Excel self check** is illustrated too, side A from the per-route
+  print and side B from the Excel workbook's own cell. Every adapter exposes
+  `load_sides_self`, which goes through the SELF comparator's OWN loader pair
+  and schema rather than a second copy of either (CMP-AUD-107).
+
+**A latent defect surfaced while proving the self flavor, and is fixed.**
+`enumerate_diffs` walked a HARDCODED copy of the vs-TSN header. The
+PDF-vs-Excel schema carries a column the vs-TSN one does not (Highway
+Sequence's `PM Suffix`), so every field index past it shifted by one and the
+engine judged the wrong column — reporting FT's difference from HG's cell.
+Nothing wrong was published: the CMP-AUD-208 published-cell check refused all
+766 candidates because the text disagreed, which is that guard doing exactly
+its job. All five adapters now walk the schema's own header. The vs-TSN path
+is unmoved — same ledger digest before and after.
+
+**Real-corpus acceptance** (2026-07-09 ssor-prod, 242 routes, through the
+SHIPPED `generate()`):
+
+| leg | result |
+|---|---|
+| Highway Log vs TSN | 30 examples across **30/30** differing columns, 0 misses; ledger 63,616 rows / 140,643 differences / 15,265 one-sided / 1,099 repeated-key groups, digest `53f37bdd` — **identical to M-B's** |
+| Highway Sequence Excel vs TSN | 4 examples across **2/2**, 0 misses; 73,226 rows / 5,589 / 16,154 / 4,618, digest `e95d3718` — identical before and after the header fix |
+| Highway Sequence PDF vs Excel | 6 examples across **3/3**, 0 misses; 60,494 rows / **3,721** differences — the same same-source total M-B measured |
+
+The manifest was verified against the artifacts that actually landed: mutating
+one published image makes `describe()` report `incomplete` and name the image;
+restoring it returns `current`. The Excel-vs-TSN run also stops parsing all 252
+companion PDFs, because they are not a source of that comparison.
+
+New gate checks: `build/check_evidence_manifest.py` (the manifest as data, the
+`describe` matrix, the publication matrix, the end-to-end terminal states) and
+`build/check_evidence_source_role.py` (which source each row was compared from,
+the workbook addressing, the cell strip, the self flavor, the schema-header
+defect). Every fix was neutralized in turn and the gate went red for each.
+Gate 152/152, ruff clean.
+
+**Not included, and not claimed.** The per-cell on-demand camera stays
+TSN-only: a self comparison gets its evidence when it is built with the
+Evidence-images toggle on, but the matrix cell offers no camera button for it.
+That is a convenience gap, not a correctness one, and it is the only part of
+210's surface left. Separately, and unchanged by this batch: the loaders'
+per-field projections against the raw PDFs remain the separately-tracked
+direct-source acceptance.
 
 ### CMP-AUD-211 — raw-product witness can hash and decompress different payload bytes
 
