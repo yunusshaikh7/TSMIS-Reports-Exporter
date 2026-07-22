@@ -286,6 +286,60 @@ numbers are preserved (local-only) in the 7.8 bundle's `_verification-scripts/`.
 
 ---
 
+## 14. A green suite that never runs the failing path is not information
+
+The v0.27.0 field failure was a path 265 characters long — a *name* too long, at an
+install depth the dev box never had, on a managed PC whose `LongPathsEnabled` is 0 and
+cannot be changed. Every check passed throughout, because the only check that could
+have caught it tested long paths **"when policy permits"** — and on the dev box policy
+always permitted. The machine that runs the tests silently satisfied the precondition
+the field violates.
+
+**The rule:** when a check is conditional on an environment property, the condition is
+part of the test's coverage, not a detail. Either make the gate unconditional (compute
+the failure arithmetically, or shim the OS to refuse), or state plainly that the
+property is untested. Both gates are unconditional now, and both were red on the old
+code for exactly the field failure.
+
+**The corollary, which cost three field bugs in one day:** drive the SHIPPED entry
+point, assert the FILE, reproduce at the real environment's shape, prefer
+rebuild-over-existing to first-build. When the field disagrees with the suite, the
+suite is wrong.
+
+→ CMP-AUD-242 in the finding ledger; `check_comparison_path_limits`. The work-PC
+evidence bundle now reports the long-path policy and a full path-length census, so the
+next instance of this class is one file away instead of one field report away.
+
+---
+
+## 15. Build guards, not more careful code — they catch what you write next
+
+Two findings, one week apart, made the same argument from opposite ends.
+
+**Evidence was grading its own homework.** The feature that renders "proof" images for
+a comparison worked by re-running the loaders and re-deriving the differences. A
+reading mistake therefore appeared identically in the comparison and in its evidence,
+and the two agreed — which looked like corroboration and was actually the same
+computation twice. Measured statewide on Highway Sequence, that path had been silently
+dropping **1,169 of 5,589 real differences (20.9%)**, all at repeated postmiles: an
+entire class invisible precisely because it was the class hardest to photograph. The
+fix made the published comparison the authority — evidence decodes and authenticates
+the workbook's own per-cell state masks, and the loaders only *propose* a row.
+
+**Then that guard caught the next bug.** While proving a later feature, the engine
+reported one column's difference from a neighbouring column's cell — a hardcoded copy
+of a header shifting every field index under a wider schema. Nothing wrong was
+published: the published-cell check refused all 766 candidates because the text
+disagreed. A guard written in one marathon caught a defect written in the next.
+
+**The rule:** when two things must agree, do not compute them the same way twice —
+make one authoritative and have the other prove itself against it. And treat "0 results"
+from a verification path as a question, not a pass; that refusal WAS the bug report.
+
+→ CMP-AUD-208/209/108 and the M-C batch in the finding ledger;
+[comparison-engine.md](comparison-engine.md) §13.
+
+
 ### Quick index of the lessons
 
 | # | Lesson | Owns the detail |
@@ -303,3 +357,5 @@ numbers are preserved (local-only) in the 7.8 bundle's `_verification-scripts/`.
 | 11 | Read a form's state by its stable id, never its visible label | engine-and-reliability |
 | 12 | Invisible bytes break real gates — keep the toolchain ASCII-safe | build-and-release + tools/screenshots.py |
 | 13 | Upstream format change: census first, then refuse the old format | tsn-parsers + comparison-engine §9f/§13 |
+| 14 | A green suite that never runs the failing path is not information | it-and-security + build-and-release |
+| 15 | Build guards, not more careful code — they catch what you write next | comparison-engine §13 |

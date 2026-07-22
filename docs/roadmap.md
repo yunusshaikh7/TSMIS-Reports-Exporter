@@ -4,6 +4,31 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
+> ### ▶ WHERE THINGS STAND (2026-07-22)
+>
+> **The comparison-perfection project is DONE — shipped as v0.28.0, merged to `main`.**
+> 237 of 242 findings closed. `main` is the completion state; branch new work from it.
+> The 5 open findings are ALL the ⛔ Highway Detail pre-release block (133 · 142 · 186 ·
+> 192 + 045-HD): the vendor accidentally enabled HD's exports, they are greyed out
+> again, and every HD artifact on disk came from that window. **Never infer an HD
+> answer** — those findings reopen on the owner's official HD delivery, which is also
+> the trigger to re-verify the HD schema.
+>
+> **Owed by the owner, blocking nothing else:** the **work-PC acceptance run** on
+> v0.28.0. The dev box cannot reach the TSMIS intranet, so this is the only way the
+> release gets field-confirmed. Expect comparison counts AND evidence output to change
+> vs v0.26.2/v0.27.x (re-run both sides; never reconcile a new run against an old one),
+> the TSN libraries to rebuild once, PDF-sourced workbooks to re-consolidate once, and
+> the short-path install workaround to be unnecessary now.
+>
+> **Unreleased on `main`:** the work-PC evidence collector now bundles `environment.txt`
+> (long-path policy + a 260-char path census), `inventory.txt` (names/sizes/dates only)
+> and the `state/` JSON sidecars. It rides the next tag.
+>
+> **What's actually next**, in the order the backlog implies: the owner's 13-item
+> app-consistency list (verify-first — see below), the output-model spine, and Highway
+> Summary whenever the site un-greys it.
+
 > **▶ Owner app-consistency & output-model backlog (13 notes, 2026-07-17) — captured + tracked;
 > VERIFY-FIRST.** A 13-item owner list (comparison logging, an Excel-vs-PDF matrix, the
 > new/edited-report workflow, matrix date-rearrange, unique comparison names, present-only day
@@ -15,9 +40,10 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > already be correct or only partially true).** The output-model spine (items 9/10/11/13 +
 > 5/6/7/8/12) has a design spec:
 > **[docs/planning/output-model-unification.md](planning/output-model-unification.md)** (its
-> current-state map is verify-first too). Priority: comparison-perfection first; items 1
-> (comparison logging) + 5 (unique names) fold in alongside; the rest are design-first (Claude)
-> then a future sol-002 for the export mechanics.
+> current-state map is verify-first too). **Priority: this list is now the FRONT of the queue —
+> comparison-perfection closed in v0.28.0.** Items 1 (comparison logging) + 5 (unique names) are
+> the natural first pair; the rest are design-first (Claude) then a future sol-002 for the export
+> mechanics.
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published

@@ -1406,11 +1406,15 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   the TSN library — a heal would rebuild it newer than the comparison and the gate below would
   then rightly refuse). Before rendering, the gate requires a trusted, complete published
   comparison generation and current consolidated/TSN freshness. After rendering it re-reads the
-  comparison and requires the same generation ID, refusing success if it changed. This blocks
-  known-stale inputs and comparison replacement during the render, but it does not yet bind every
-  source/PDF byte or publish workbook+images+retirement as one immutable transaction
-  (CMP-AUD-106/109/112 remain Phase 7). The JS side hides the camera on stale cells and on rows
-  whose report has no TSN prints (`evidenceActionInfo`).
+  comparison and requires the same generation ID, refusing success if it changed.
+  **Since v0.28.0 it also binds every source byte and publishes as one set**: the
+  candidate sources are copied into a private snapshot whose COPIES are digested
+  (CMP-AUD-098), the workbook + images + manifest promote or roll back together
+  (CMP-AUD-109), and a run that publishes nothing still records its state so a stale
+  set can't look current (CMP-AUD-106). The JS side hides the camera on stale cells and
+  on rows whose report has no TSN prints (`evidenceActionInfo`) — and the per-cell
+  camera is still TSN-only, so a PDF-vs-Excel self check gets its evidence when it is
+  BUILT with the toggle on rather than on demand.
 - **Publication safety:** evidence source/caption cells use `set_safe_literal_cell`, including
   formula leads and every Excel error token. Workbook/image sets use unpredictable identity-bound
   temps, quarantines, and fallbacks; source aliases and target-aware Everything leases are checked

@@ -68,6 +68,8 @@ that rewrote the design.
 | `v0.26.0` | Jul 10 | **Ramp Detail (PDF) fully integrated + the "vs Baseline Matrix" + evidence/HD-print fixes + website-source capture** — the last export-only print edition graduates off the first real work-PC pair (`All Reports 7.9`): parse-back 15,216/15,216 vs the same-day Excel, PDF↔Excel 15,212 identical / 0 one-sided, and the PDF↔TSN flavor COMPARES the two print-only columns the Excel export drops (On/Off, Ramp Type — +151 verified cells). A third Compare matrix diffs any exported day of a report against an EARLIER pull (a prior day or the Everything store — same report, same format); evidence snippets render as full-width page bands (a blank cell's red box no longer clips off the edge); the HD-PDF parser absorbs the July prints' three uncensused record shapes (254 orphans → 0); and Settings gains a one-click website-source capture (the maintainer's manual devtools walk, local-only) |
 | `v0.26.1` | Jul 10 | **Hotfix** (coworker field report, same day) — an Intersection Detail Description evidence pair looked like two IDENTICAL values flagged as different. Byte truth: TSMIS stores `''F'' ST` (doubled apostrophes) where TSN stores `"F" ST` — the ONLY quotation-mark character in the entire TSN extract, a genuine one-cell data edit (censused statewide: both systems otherwise share all three quote styles character-for-character, so no normalization — folding would hide a real difference). The evidence header (all 5 evidence reports) now carries a dark-red line naming both sides' quote characters whenever a sampled pair differs only in them; the workbook captions repeat it and the ID Notes sheet documents that quotes compare literally |
 | `v0.26.2` | Jul 10 | **Hotfix** (work-PC field report, same day) — every Highway Log (PDF) matrix day read amber "inputs incomplete" although nothing was missing: since v0.19.0 any print page parsed with carried-forward column geometry (the routine zebra-parity case — a page whose only data rows are unshaded has no cell-rect band; ~280 pages per statewide set) blanket-escalated the consolidation to partial. The carry is now VALIDATED per page (`_carried_line_misfits`: no printed token split across column windows + the Location cell still a clean postmile token); validated pages are ordinary output, and only a genuinely unfit page — a changed table layout — keeps the ⚠ + partial. Closes the v0.18.1 "stale-geometry emit" roadmap item. Statewide proof on two full sets: 551 carried pages all validated, emitted rows byte-identical to the old parser on all 111 affected routes, both end-to-end consolidations COMPLETE; drift/foreign-layout negative controls fire the validator, with the honest sensitivity bounds recorded in the bundle README |
+| `v0.27.0`–`v0.27.4` | Jul 19–21 | **The audit batch, then three field hotfixes** — 219 findings' worth of comparison/matrix/TSN-normalization/PDF-identity corrections ship, followed by the v0.27.0 field report whose root cause was **Windows MAX_PATH**: a content-addressed payload sidecar with a ~148-character basename made a 265-character path at the real install depth. The dev box had `LongPathsEnabled=1`; a managed work PC has 0 and cannot change it — that single registry value WAS the dev-vs-field difference, and it is why a green suite had nothing to say about a real failure |
+| `v0.28.0` | Jul 22 | **The comparison-perfection completion release** — 237 of 242 findings closed, the branch merged to `main`. Four marathons in one day: the durability cluster (last-complete publication, the attempt overlay, content identity, the schema gate), the **evidence spine** (evidence stopped grading its own homework — it now decodes and authenticates the published comparison's own per-cell state masks, and ships an exhaustive hash-bound ledger BEFORE any sample is drawn), and the **evidence completion batch** (one published generation bound by a durable manifest; two-phase quarantine-and-promote; a private read-set snapshot closing the A→B→A window; and each side evidenced from the source THAT SIDE was read from). The 5 findings left open are all vendor-blocked on Highway Detail |
 
 ---
 
@@ -463,6 +465,46 @@ end-to-end audit of the comparison itself. The TSN library learned to record eac
 and the bundle finally ships Pillow + pypdfium2 — reversing a two-era-old size optimization whose
 premise ("the app never renders") stopped being true, with the frozen self-test flipped from
 proving the imports absent to proving the render path works.
+
+---
+
+## Chapter 15 — Proving it, not asserting it (July 14 → 22) · `v0.27.x` → `v0.28.0`
+
+The app worked. The question the comparison-perfection project asked was harder:
+*how do you know?* Two hundred and forty-two findings, audited source-first, on the
+principle that a historical count never overrides a source fact and a missing source
+fact is a hard stop rather than permission to infer one.
+
+Three moments are worth remembering.
+
+**The dev box was lying by omission.** The v0.27.0 field failure was a path 265
+characters long. Not a logic bug — a *name* too long, at an install depth the
+developer's machine never had, on a PC whose `LongPathsEnabled` is 0 and cannot be
+changed. The suite was green throughout, because the only check that could have
+caught it tested long paths "when policy permits," and on the dev box policy always
+permitted. The fix made two gates unconditional. The lesson outlived the fix: a green
+suite that never runs the failing path is not information.
+
+**Evidence was grading its own homework.** The feature that renders "proof" images
+for a comparison worked by re-running the loaders and re-deriving the differences —
+so a reading mistake appeared identically in the comparison and in its evidence, and
+agreed with itself. Evidence now decodes the published comparison's own per-cell state
+masks and asks *that* whether an image may be taken. Measured on the statewide Highway
+Sequence corpus, the old path had been silently dropping 1,169 of 5,589 real
+differences — 20.9%, all of them at repeated postmiles, a whole class invisible
+precisely because it was the class hardest to photograph.
+
+**Then the new guard caught the new code.** While proving the last feature, the
+engine reported one column's difference from a neighbouring column's cell — a
+hardcoded copy of a header shifting every field index under a wider schema. Nothing
+wrong was ever published: the published-cell check refused all 766 candidates because
+the text disagreed. The guard built one marathon earlier caught a bug written in the
+next. That is the whole argument for building guards instead of writing more careful
+code.
+
+The release shipped 237 of 242 closed. The 5 left are vendor-blocked on a report the
+vendor un-shipped mid-audit — and the honest thing was to defer them, not to infer
+answers from artifacts that were never ground truth.
 
 ---
 

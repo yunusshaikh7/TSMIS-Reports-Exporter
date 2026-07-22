@@ -1,17 +1,29 @@
 # Comparison-perfection
 
-Last updated: 2026-07-17
+Last updated: 2026-07-22
+
+> ## ✅ COMPLETE — shipped as v0.28.0, merged to `main` (2026-07-22)
+>
+> **237 of 242 findings closed (98%).** The branch fast-forwarded into `main`, so `main`
+> is the completion state and new work branches from it. Offline gate **152/152**, ruff
+> clean, frozen self-test PASSED on the exact shipped exe, CI green.
+>
+> **The 5 still open are ALL the ⛔ Highway Detail pre-release block** (133 · 142 · 186 ·
+> 192 + 045-HD). The vendor accidentally enabled HD's exports mid-audit and then greyed
+> them out again, so every HD artifact on disk is a snapshot of an unfinished report.
+> **Never infer an HD answer** — these reopen on the owner's official HD delivery, which
+> is also the trigger to re-verify the HD schema.
+>
+> **Owed, and only the owner can do it:** the work-PC acceptance run on v0.28.0.
+>
+> **This folder is now the PROJECT RECORD, not a worklist.** Read it to learn why a
+> comparison behaves the way it does. If you reopen a finding or open a new one, update
+> its entry `Status:` line AND the ledger index table AND the plan together — index
+> tables drifting behind entries caused repeated stale-directive incidents.
 
 The dedicated planning + evidence folder for the comparison-perfection project. It is
-organized so you can see **where the project is** without reading days of audit history.
-
-**Current position (2026-07-17):** the owner-authorized remediation is live on branch
-`comparison-perfection` (offline gate 130/130, CI-green). ~159 of 241 findings closed
-(Resolved/Remediated), ~10 partial, ~71 open — the correctness-critical core (shared
-engine, the 12 comparison families, Stage-8 base audits 7/7, identity gate 11/0, all owned
-provenance/projection findings, the C-bucket loader gates) is done; the open tail is
-hardening + non-product instrument work. Sol-001 reliability hardening was integrated this
-session. See **[COMPLETION-PLAN.md](COMPLETION-PLAN.md)** "YOU ARE HERE" for the live detail.
+organized so you can see **where the project ended up** without reading days of audit
+history. See **[COMPLETION-PLAN.md](COMPLETION-PLAN.md)** for the full record.
 
 ## ▶ Start here
 

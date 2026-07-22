@@ -170,14 +170,20 @@ RD v5 / ID v5 / HD v3, HD's loader had none before; the shared
 real statewide corpus). Exact
 counts and hashes live in
 [docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
-The owner-authorized remediation is live on branch `comparison-perfection`; the single
-resume surface is the "RESUME HERE" block in
-[docs/planning/comparison-perfection/COMPLETION-PLAN.md](docs/planning/comparison-perfection/COMPLETION-PLAN.md)
-(the archived implementation handoff is historical).
-New reviewers start at
-[docs/planning/comparison-perfection/README.md](docs/planning/comparison-perfection/README.md)
-and use the linked reconciliation prompt before deciding whether to finish Stages 9–10
-or propose implementation.
+**The comparison-perfection project is COMPLETE (2026-07-22, shipped as v0.28.0).**
+237 of 242 findings are closed; the branch fast-forwarded into `main`, so **`main` is
+the completion state** and new work branches from it. The 5 still open are ALL the ⛔
+Highway Detail pre-release block (133 · 142 · 186 · 192 + 045-HD) and they reopen only
+when the vendor delivers official HD exports — never infer an HD answer.
+[COMPLETION-PLAN.md](docs/planning/comparison-perfection/COMPLETION-PLAN.md) and the
+finding ledger are now the PROJECT RECORD rather than a live worklist; read them for
+why a comparison behaves as it does, and start at
+[README.md](docs/planning/comparison-perfection/README.md).
+**Owed, and only the owner can do it: the work-PC acceptance run on v0.28.0** — the
+dev box cannot reach the TSMIS intranet, comparison and evidence output intentionally
+differ from v0.26.2/v0.27.x (re-run both sides, never reconcile old against new), the
+TSN libraries rebuild once, PDF-sourced workbooks re-consolidate once, and the
+short-path install workaround is no longer needed.
 **Ramp Detail (PDF) was
 blessed the same way in v0.26.0 on the `All Reports 7.9` pair** (15,216/15,216 rows parse
 back vs the same-day Excel; PDF↔Excel now identical 15,216/15,216 — the 4 `_x000d_`
@@ -317,16 +323,18 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   [docs/comparison-engine.md](docs/comparison-engine.md). Before Phase-3 equality/pairing
   work, read and honor the approved policy/oracle gates in
   [docs/planning/comparison-perfection/comparison-phase3-decision-gates.md](docs/planning/comparison-perfection/comparison-phase3-decision-gates.md).
-- **Comparison perfection is source-first and end to end.** Before changing any
-  comparison family, read the CURRENT surface:
-  [docs/planning/comparison-perfection/COMPLETION-PLAN.md](docs/planning/comparison-perfection/COMPLETION-PLAN.md).
-  Its "YOU ARE HERE / RESUME HERE" block is the owner-facing progress surface; update it
-  whenever a finding closes, a blocker is added/removed, or the next proof changes (start
-  new reviewers at [README.md](docs/planning/comparison-perfection/README.md)). The
+- **Comparison work stays source-first and end to end.** The project that established
+  this closed in v0.28.0, but the DISCIPLINE is permanent, not a phase. Before changing
+  any comparison family, read
+  [docs/planning/comparison-perfection/COMPLETION-PLAN.md](docs/planning/comparison-perfection/COMPLETION-PLAN.md)
+  and the finding ledger — now the PROJECT RECORD of why each behavior is what it is
+  (start new reviewers at [README.md](docs/planning/comparison-perfection/README.md); the
   [archived project doc](docs/planning/comparison-perfection/archive/comparison-perfection-project.md)
-  holds the point-in-time Stage-8 audit history only. Keep detailed bugs/hashes in the
-  linked finding/source/canary ledgers rather than duplicating them into new planning files.
-  Raw TSN is the starting truth; rebuild normalized inputs in isolation, prove
+  holds the point-in-time Stage-8 audit history). If you reopen a finding or open a new
+  one, update its entry Status line AND the ledger index table AND the plan together —
+  index tables drifting behind entries caused repeated stale-directive incidents. Keep
+  detailed bugs/hashes in the linked finding/source/canary ledgers, not in new planning
+  files. Raw TSN is the starting truth; rebuild normalized inputs in isolation, prove
   raw-to-normalized record/field conservation, re-prove comparison cells independently,
   and require all supported evidence to agree with both PDFs and the Comparison sheet.
   Historical outputs/counts never override source facts, and a missing source fact is a
@@ -497,7 +505,8 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   site_capture.py            the Settings website-source capture (v0.26.0, local-only)
   baseline_matrix.py         the Compare-tab "vs Baseline" day-vs-baseline matrix (v0.26.0)
   ui/                        index.html app.css app.js + ui-export/-batch/-compare/-matrix/-settings/-dom.js + mock.js + contract.js
-  self_test.py evidence.py pdf_row_oracle.py owned_dir.py safe_delete.py   self-test / evidence / safety
+  published_comparison.py evidence_ledger.py evidence_manifest.py   the evidence TRUTH layer: decode+authenticate the published comparison / the exhaustive ledger / the durable generation record
+  self_test.py evidence.py pdf_row_oracle.py owned_dir.py safe_delete.py   self-test / the work-PC diagnostic bundle (--collect-evidence) / safety
   updater.py login.py logging_setup.py batch_manifest.py report_library.py
 build/                       build.ps1, app.spec, prune_bundle.ps1, full_smoke.py, check_*.py
   gen_release_notes.py release_notes_header.md backfill_release_notes.ps1   per-version release notes

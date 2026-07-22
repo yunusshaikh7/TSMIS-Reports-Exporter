@@ -185,7 +185,18 @@ run, what's been independently audited as sound, and what's still open.
 | Admin rights | None | Yes |
 | TSMIS intranet | **Reachable** (live exports happen here) | **Not reachable** — cannot hit the report site at all |
 | Managed-PC controls (Defender / DLP / corporate proxy / managed Edge) | Present and active | **Absent** |
+| **Long paths** (`LongPathsEnabled`) | **0 — off, and the user cannot change it.** A path at or past 260 chars simply fails | Commonly **1** (on), so 260+ paths work silently |
 | Proven capability | "Unsigned exes run from user-writable folders" (the app itself proves this) | Everything |
+
+> **The long-path row cost a field release (v0.27.0, 2026-07-21).** A content-addressed
+> sidecar with a ~148-character basename made a 265-character path at the real install
+> depth. Comparisons built, then vanished from the Matrix, because only the trust
+> metadata failed to write. The dev box had long paths ON, so nothing local could
+> reproduce it — and the one check that might have has since been made unconditional.
+> **Any new persisted filename is a path-budget decision.** `--collect-evidence` now
+> reports this registry value and a full path-length census, so the next instance is one
+> bundle away instead of one field report away (lesson 14 in
+> [lessons.md](lessons.md)).
 
 **Hard rule for any work-PC feature.** Anything that must run *on the work PC*
 (updates, helpers, "scheduled anything") must work as a plain `.exe` invocation from

@@ -97,8 +97,10 @@ Strict artifact consumers continue to require a real committed generation and ma
 member metadata. These checks do not close the deferred Phase-5 Matrix formula-twin/provenance/
 attempt-overlay work or the Phase-7 exact-generation evidence transaction.
 
-Phase-2 current gate (2026-07-11): discovery is 100 Python checks + 5 Node checks +
-`compileall` = 106 runner entries; `build/run_checks.py -j 4 -k` passed 106/106.
+**Current gate (2026-07-22, v0.28.0): `build/run_checks.py -j 4 -k` passes 152/152.**
+Discovery globs `build/check_*.py` plus the Node checks and `compileall`, so a new
+`check_*.py` auto-registers — adding one is how you extend the gate.
+(Historical: the Phase-2 gate on 2026-07-11 was 106 runner entries, 106/106.)
 On local Windows shells, set `$env:PYTHONUTF8='1'` before the command so diagnostic
 symbols cannot be rejected by a cp1252 console.
 
