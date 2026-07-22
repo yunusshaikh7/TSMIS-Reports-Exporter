@@ -292,6 +292,22 @@ def _key_text(v):
     return str(v)
 
 
+def _row_key_token(r, off, key_field, key_normalizer):
+    """One row's identity token, exactly as ``keys_for`` derives it.
+
+    A typed PhysicalKey stays intact (its identity, not its str payload, owns
+    equality); otherwise an opt-in schema normalizer supplies the canonical
+    token; otherwise the raw key text. Shared so `published_key_text` can
+    address a published row through the same derivation the workbook used.
+    """
+    koff = off + key_field
+    if physical_identity_from_key(r, off, key_field) is not None:
+        return r[koff]
+    if key_normalizer is not None:
+        return key_normalizer(r, off, key_field)
+    return "" if r[koff] is None else _key_text(r[koff])
+
+
 def keys_for(rows, has_route, key_field=0, key_normalizer=None,
              is_cancelled=None):
     """[(route, key, occurrence), ...] in file order.
@@ -313,21 +329,13 @@ def keys_for(rows, has_route, key_field=0, key_normalizer=None,
     seen = {}
     out = []
     off = 1 if has_route else 0
-    koff = off + key_field
     for row_no, r in enumerate(rows):
         if row_no % _PROGRESS_EVERY == 0:
             _raise_if_cancelled(is_cancelled)
         raw_route = r[0] if has_route else None
         route = "" if not has_route or raw_route is None else str(raw_route)
         physical_identity = physical_identity_from_key(r, off, key_field)
-        if physical_identity is not None:
-            # Keep the typed key object intact: its PhysicalIdentity, not its
-            # source-visible str payload, owns equality and hashing.
-            loc = r[koff]
-        elif key_normalizer is not None:
-            loc = key_normalizer(r, off, key_field)
-        else:
-            loc = "" if r[koff] is None else _key_text(r[koff])
+        loc = _row_key_token(r, off, key_field, key_normalizer)
         if physical_identity is None and isinstance(loc, PhysicalKey):
             physical_identity = loc.physical_identity
         if physical_identity is not None:
@@ -390,9 +398,12 @@ def published_key_text(sc, row, off=1):
     An evidence adapter addresses a published row by asking the engine for the
     same presentation the engine wrote, rather than re-flattening key text of
     its own — so a caption, a highlight, and the published cell can never be
-    about different rows.
+    about different rows. Derived through ``keys_for``'s own single-row
+    derivation, so a schema's key normalizer (the Highway Log roadbed key)
+    cannot make the two disagree.
     """
-    return _visible_key(row[off + sc.key_field])
+    return _visible_key(_row_key_token(row, off, sc.key_field,
+                                       sc.key_normalizer))
 
 
 def _pairing_key_components(group, has_route):

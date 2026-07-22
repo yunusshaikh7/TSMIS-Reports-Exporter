@@ -265,6 +265,37 @@ check("a renderable column with candidates has no pre-render miss",
 print("published-key addressing uses the engine's own identity")
 check("published_key_text reproduces the published key cell",
       published_key_text(SCHEMA, ROWS_A[1]) == differing.key)
+
+# The addressing must agree with the workbook's own key derivation for EVERY
+# comparison that carries evidence — including the Highway Log's roadbed key
+# normalizer and the typed PhysicalKey families. keys_for() is that derivation;
+# published_key_text must never be a second, drifting copy of it.
+import compare_core as _cc                                       # noqa: E402
+import compare_highway_detail_tsn as _cht                        # noqa: E402
+import compare_highway_log as _chl                               # noqa: E402
+import compare_highway_sequence_tsn as _chsl                     # noqa: E402
+import compare_intersection_detail_tsn as _cid                   # noqa: E402
+import compare_ramp_detail_tsn as _crd                           # noqa: E402
+
+_EVIDENCE_SCHEMAS = (
+    ("Highway Detail", _cht._SCHEMA),
+    ("Highway Log", _chl._SCHEMA),
+    ("Highway Sequence", _chsl._SCHEMA),
+    ("Intersection Detail", _cid._SCHEMA),
+    ("Ramp Detail", _crd._SCHEMA),
+)
+for _label, _sc in _EVIDENCE_SCHEMAS:
+    sample = ["001"] + ["v"] * len(_sc.header)
+    sample[1 + _sc.key_field] = "12.345"
+    derived = _cc.keys_for([sample], True, _sc.key_field, _sc.key_normalizer)
+    check(f"{_label}: published_key_text == the workbook's own key derivation",
+          published_key_text(_sc, sample) == _cc._visible_key(derived[0][1]))
+check("a schema with a key normalizer routes through it, not the raw cell",
+      _chl._SCHEMA.key_normalizer is not None
+      and published_key_text(_chl._SCHEMA, ["001"] + ["v"] * len(
+          _chl._SCHEMA.header)) == _cc._visible_key(_cc.keys_for(
+              [["001"] + ["v"] * len(_chl._SCHEMA.header)], True,
+              _chl._SCHEMA.key_field, _chl._SCHEMA.key_normalizer)[0][1]))
 check("the ledger rows carry every displayed column",
       [r[0] for r in ve._ledger_rows(ledger, FIELDS, Counter())] == FIELDS)
 check("the ledger rows report the sampled count per column",

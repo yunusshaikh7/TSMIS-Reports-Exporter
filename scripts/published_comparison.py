@@ -285,10 +285,14 @@ class PublishedComparison:
         if not wanted:
             return {}
         found = defaultdict(dict)
-        for side in self.side_labels:
-            for token, row_number in _scan_helper_tokens(
-                    self.path, side, wanted).items():
-                found[token][side] = row_number
+        workbook = _open(self.path)
+        try:
+            for side in self.side_labels:
+                for token, row_number in _scan_helper_tokens(
+                        workbook, side, wanted).items():
+                    found[token][side] = row_number
+        finally:
+            _close(workbook)
         return dict(found)
 
 
@@ -307,6 +311,13 @@ def _open(path):
         raise PublishedComparisonError(
             f"the published comparison could not be opened "
             f"({type(e).__name__}: {e})") from e
+
+
+def _close(workbook):
+    try:
+        workbook.close()
+    except Exception:  # noqa: BLE001  # silent-ok: a read-only handle close cannot affect the decoded result
+        pass
 
 
 def _unique_column(header, label):
@@ -504,39 +515,29 @@ def read(path, *, expect_fields=None, is_cancelled=None):
         return PublishedComparison(path, fields, rows, lay["has_route"],
                                    state_version, token_version, lay["sides"])
     finally:
-        try:
-            workbook.close()
-        except Exception:  # noqa: BLE001  # silent-ok: a read-only handle close cannot affect the decoded result
-            pass
+        _close(workbook)
 
 
-def _scan_helper_tokens(path, side, wanted):
+def _scan_helper_tokens(workbook, side, wanted):
     """``{token: row}`` for the wanted tokens on one side's data sheet."""
-    workbook = _open(path)
+    if side not in workbook.sheetnames:
+        return {}
+    sheet = workbook[side]
+    stream = sheet.iter_rows(values_only=True)
+    header = list(next(stream, ()) or ())
     try:
-        if side not in workbook.sheetnames:
-            return {}
-        sheet = workbook[side]
-        stream = sheet.iter_rows(values_only=True)
-        header = list(next(stream, ()) or ())
-        try:
-            column = _unique_column(header, _KEY_HELPER_HEADER)
-        except PublishedComparisonError:
-            log.debug("published: %s has no unique %r column", side,
-                      _KEY_HELPER_HEADER)
-            return {}
-        out = {}
-        for row_number, raw in enumerate(stream, start=2):
-            if raw is None or column >= len(raw):
-                continue
-            token = raw[column]
-            if isinstance(token, str) and token in wanted:
-                out[token] = row_number
-                if len(out) == len(wanted):
-                    break
-        return out
-    finally:
-        try:
-            workbook.close()
-        except Exception:  # noqa: BLE001  # silent-ok: a read-only handle close cannot affect the decoded result
-            pass
+        column = _unique_column(header, _KEY_HELPER_HEADER)
+    except PublishedComparisonError:
+        log.debug("published: %s has no unique %r column", side,
+                  _KEY_HELPER_HEADER)
+        return {}
+    out = {}
+    for row_number, raw in enumerate(stream, start=2):
+        if raw is None or column >= len(raw):
+            continue
+        token = raw[column]
+        if isinstance(token, str) and token in wanted:
+            out[token] = row_number
+            if len(out) == len(wanted):
+                break
+    return out
