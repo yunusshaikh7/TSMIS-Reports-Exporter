@@ -6554,10 +6554,41 @@ Stage-6 XLSX family oracles after the correction.
 ### CMP-AUD-138 — Highway Detail converts exact decimal Length through binary64 and rounds one source row downward
 
 Priority: P1  
-Status: Verified by the independent full-corpus Stage-6 projection and exact D01 TSN PDF  
+Status: **Resolved 2026-07-21 (`d553fbd`)** — `_norm_len` quantizes the exact Decimal with
+`ROUND_HALF_UP`, never through binary64.  
 Primary code: `scripts/compare_highway_detail_tsn.py:_norm_len`,
 `scripts/compare_highway_detail_tsn.py:_tsn_row`,
 `scripts/tsn_load_highway_detail.py`
+
+#### Remediation — 2026-07-21
+
+Census on the raw TSN workbook reading the **exact OOXML lexicals** (not floats):
+**60,083 LENGTH values** examined — matching the corpus row count exactly — and the
+binary64 path is wrong on **exactly one**, worksheet row 32565 (`THY_ID=77645219`,
+lexical `1.35E-2`), `000.013` → `000.014`. Half-up and half-even **agree on all
+60,083 values**, so the rounding-mode reconciliation the finding required is
+satisfied: no corpus row can discriminate the two, and both agree with the D01
+print on the only affected row. Half-up was chosen to match the report's own
+round-half-away-from-zero rendering and is documented as non-load-bearing.
+
+The other accepted allowlist row (32564, `7.4999999999999997E-3` → `000.007`) does
+**not** move, confirming the finding's claim that it is a separate raw-XLSX-to-PDF
+question; it is pinned as such.
+
+Normalization is applied at COMPARISON time — `tsn_load_highway_detail` explicitly
+delegates length to `compare_highway_detail_tsn` — so the cached TSN library content
+is unchanged and **no `normalization_version` bump or user rebuild is required**.
+
+Red→green: with the change reverted the new pins fail and `000.013` returns. Pins in
+`check_compare_highway_detail_tsn` cover the tie from both the exact lexical and the
+float form, the untouched neighbour row, tie neighbours, the negative tie, both carry
+boundaries, and blank/non-numeric/non-finite passthrough. Suite 144/144.
+
+**Method note:** the first census was WRONG — a cell regex that mishandled
+self-closing `<c/>` elements mis-attributed columns and reported 1,177 values and
+zero changes. It was caught only because 1,177 was implausible against 60,083 and
+the finding's named row was absent. Check a census count against the known corpus
+size before trusting a "nothing changes" result.
 
 The authoritative Highway Detail XLSX stores raw OOXML `LENGTH` as exact Decimal
 `0.0135` on worksheet row 32565 (`THY_ID=77645219`, DCR `01-HUM-096`, postmile

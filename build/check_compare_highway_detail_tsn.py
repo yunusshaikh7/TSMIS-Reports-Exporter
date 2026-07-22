@@ -135,6 +135,29 @@ def test_schema():
     check("PS: explicit E_IND / a glued trailing E both read 'E'",
           hdt.pm_suffix("000.000", "E") == "E" and hdt.pm_suffix("000.000E") == "E"
           and hdt.pm_suffix("000.080R") == "")
+
+    # CMP-AUD-042: _normalized_row re-projects an ALREADY-projected library row,
+    # so every field must be idempotent. PS was not: it re-ran pm_suffix() over
+    # the stored marker, parsed 'E' as a glued postmile token, found no trailing
+    # letters and returned '' — erasing a real difference into a clean match.
+    def _reproject(post_mile, ps, hg):
+        vals = [""] * (len(hdt.SHARED_HEADER) + 1)
+        vals[0] = "key"
+        vals[1 + hdt.SHARED_HEADER.index("Post Mile")] = post_mile
+        vals[1 + hdt.SHARED_HEADER.index("PS")] = ps
+        vals[1 + hdt.SHARED_HEADER.index("HG")] = hg
+        out = hdt._normalized_row(vals)
+        return (out[1 + hdt.SHARED_HEADER.index("Post Mile")],
+                out[1 + hdt.SHARED_HEADER.index("PS")])
+
+    check("PS: a stored 'E' survives re-projection (never silently erased)",
+          _reproject("044.236", "E", "")[1] == "E")
+    check("PS/Post Mile: re-projection is idempotent across blank/E x roadbed",
+          all(_reproject(pm, ps, hg) == (pm, ps) for pm, ps, hg in (
+              ("044.236", "E", ""), ("044.236", "", ""),
+              ("R044.236R", "E", "R"), ("R044.236L", "", "L"),
+              ("044.236R", "E", "R"), ("012.500R", "", "R"),
+              ("L012.500", "E", ""))))
     # Normalizations.
     check("NA: TSN 'A' folds to blank; 'N' stays",
           hdt._norm_na("A") == "" and hdt._norm_na("N") == "N" and hdt._norm_na(None) == "")

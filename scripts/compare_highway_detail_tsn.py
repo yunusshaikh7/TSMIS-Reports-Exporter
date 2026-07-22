@@ -375,7 +375,15 @@ def _normalized_row(r):
         if f == "Post Mile":
             out.append(pm_canon(raw, hg))
         elif f == "PS":
-            out.append(pm_suffix(raw))
+            # The library already stores the PROJECTED marker ('' or 'E'), so
+            # reprojection must be IDEMPOTENT and consume it directly. Re-running
+            # pm_suffix() here parsed 'E' as a glued postmile token, found no
+            # trailing letters, and returned '' — silently erasing the marker, so
+            # a row that genuinely differed from TSMIS reported a clean
+            # zero-difference match on Comparison, Summary and Report View
+            # (CMP-AUD-042). Only the RAW paths, which see a real postmile token
+            # plus E_IND, may call pm_suffix.
+            out.append(_project(f, raw))
         else:
             out.append(_project(f, raw))
     return out
