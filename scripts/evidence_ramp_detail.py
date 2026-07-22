@@ -50,7 +50,7 @@ import artifact_store
 import compare_ramp_detail_pdf as rdp
 import compare_ramp_detail_tsn as rd
 import consolidate_tsmis_ramp_detail_pdf as rdpdf
-from compare_core import _xl_trim, compared_cell
+from compare_core import _xl_trim, compared_cell, published_key_text
 from pdf_table_lib import cluster_by_top, norm_route, require_document_route
 from tsn_load_ramp_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
 
@@ -184,17 +184,21 @@ def enumerate_diffs(tsmis_rows, tsn_rows, meta):
         b_by = {r[_KEY_I]: r for r in b_route[route] if b_ct[r[_KEY_I]] == 1}
         for key in set(a_by) & set(b_by):
             ra, rb = a_by[key], b_by[key]
+            pub_key = published_key_text(sc, ra)
             for i, f in enumerate(rd.SHARED_HEADER):
                 if i == rd.KEY_FIELD:
                     continue
-                va, vb, verdict = compared_cell(sc, i, ra, rb, 1)
-                if verdict is False:
+                cell = compared_cell(sc, i, ra, rb, 1)
+                if cell.verdict is False:
                     dist, cnty = (sidecar.get((route, key)) or [("", "")])[0]
                     # The engine's locators key on the plain normalized-PM text
                     # (+ county for TSN); the D4 PhysicalKey's str payload IS
                     # that text (CMP-AUD-045).
-                    diffs[f].append(dict(route=route, key=str(key), field=f,
-                                         va=va, vb=vb, dist=dist, cnty=cnty))
+                    diffs[f].append(dict(
+                        route=route, key=str(key), field=f,
+                        va=cell.display_a, vb=cell.display_b,
+                        dist=dist, cnty=cnty,
+                        pub_key=pub_key, display=cell.display))
     return diffs
 
 

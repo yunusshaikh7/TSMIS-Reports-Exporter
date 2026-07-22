@@ -39,7 +39,7 @@ except ImportError:
 import compare_highway_detail_tsn as cht
 import consolidate_tsmis_highway_detail_pdf as chd
 import highway_detail_columns as hdc
-from compare_core import _xl_trim, compared_cell
+from compare_core import _xl_trim, compared_cell, published_key_text
 from pdf_table_lib import (cluster_by_top, median, norm_route,
                            require_document_route)
 from tsn_load_highway_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
@@ -179,14 +179,18 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
         b_by = {r[1]: r for r in b_route[route] if b_ct[r[1]] == 1}
         for key in set(a_by) & set(b_by):
             ra, rb = a_by[key], b_by[key]
+            pub_key = published_key_text(sc, ra)
             for i, f in enumerate(cht.SHARED_HEADER):
                 if i == cht.KEY_FIELD:
                     continue
-                va, vb, verdict = compared_cell(sc, i, ra, rb, 1)
-                if verdict is False:
+                cell = compared_cell(sc, i, ra, rb, 1)
+                if cell.verdict is False:
                     dist, cnty = (sidecar.get((route, key)) or [("", "")])[0]
-                    diffs[f].append(dict(route=route, key=key, field=f,
-                                         va=va, vb=vb, dist=dist, cnty=cnty))
+                    diffs[f].append(dict(
+                        route=route, key=key, field=f,
+                        va=cell.display_a, vb=cell.display_b,
+                        dist=dist, cnty=cnty,
+                        pub_key=pub_key, display=cell.display))
     return diffs
 
 

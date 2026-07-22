@@ -43,7 +43,7 @@ except ImportError:
 import artifact_store
 import compare_intersection_detail_tsn as idt
 import consolidate_tsmis_intersection_detail_pdf as idpdf
-from compare_core import _xl_trim, compared_cell
+from compare_core import _xl_trim, compared_cell, published_key_text
 from pdf_table_lib import cluster_by_top, median, require_document_route
 from tsn_load_intersection_detail import SIDECAR_HEADER, tsn_rows_with_dcr  # noqa: F401
 
@@ -130,17 +130,21 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
         b_by = {r[_KEY_I]: r for r in b_route[route] if b_ct[r[_KEY_I]] == 1}
         for key in set(a_by) & set(b_by):
             ra, rb = a_by[key], b_by[key]
+            pub_key = published_key_text(sc, ra)
             for i, f in enumerate(idt.SHARED_HEADER):
                 if f == idt.KEY:
                     continue
-                va, vb, verdict = compared_cell(sc, i, ra, rb, 1)
-                if verdict is False:
+                cell = compared_cell(sc, i, ra, rb, 1)
+                if cell.verdict is False:
                     dist, cnty = (sidecar.get((route, key)) or [("", "")])[0]
                     # The engine's locators key on the plain normalized-PM text
                     # (+ county for TSN); the ID-79 PhysicalKey's str payload IS
                     # that text (CMP-AUD-045).
-                    diffs[f].append(dict(route=route, key=str(key), field=f,
-                                         va=va, vb=vb, dist=dist, cnty=cnty))
+                    diffs[f].append(dict(
+                        route=route, key=str(key), field=f,
+                        va=cell.display_a, vb=cell.display_b,
+                        dist=dist, cnty=cnty,
+                        pub_key=pub_key, display=cell.display))
     return diffs
 
 

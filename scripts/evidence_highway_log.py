@@ -48,7 +48,7 @@ import compare_highway_log as chl
 import consolidate_tsmis_highway_log_pdf as chlp
 import consolidate_tsn_highway_log as ctnl
 import highway_log_columns as hlc
-from compare_core import _xl_trim, compared_cell
+from compare_core import _xl_trim, compared_cell, published_key_text
 from pdf_table_lib import require_document_route
 
 log = logging.getLogger("tsmis.evidence")
@@ -116,13 +116,17 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
             if a_ct[key] != 1 or b_ct[key] != 1:
                 continue                       # duplicates -> the pairing's job
             ra, rb = a_by[key], b_by[key]
+            pub_key = published_key_text(sc, ra)
             for f_idx, field in enumerate(hlc.HEADER):
                 if f_idx == 0:                 # the key column itself
                     continue
-                va, vb, verdict = compared_cell(sc, f_idx, ra, rb, 1)
-                if verdict is False:
-                    diffs[field].append(dict(route=route, key=key, field=field,
-                                             va=va, vb=vb, dist="", cnty=""))
+                cell = compared_cell(sc, f_idx, ra, rb, 1)
+                if cell.verdict is False:
+                    diffs[field].append(dict(
+                        route=route, key=key, field=field,
+                        va=cell.display_a, vb=cell.display_b,
+                        dist="", cnty="",
+                        pub_key=pub_key, display=cell.display))
     return diffs
 
 

@@ -38,6 +38,7 @@ import re
 import secrets
 import shutil
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 try:
@@ -53,6 +54,7 @@ except ImportError:
 import artifact_store
 import owned_dir
 import paths
+import published_comparison
 from compare_core import set_safe_literal_cell
 from pdf_table_lib import RouteIdentityError
 
@@ -470,21 +472,32 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     events.on_log(f"  evidence: sampling up to {examples} example(s) per column "
                   f"(seed {seed:08x})…")
 
-    tsmis_rows, tsn_rows, sidecar, note = adapter.load_sides(consolidated, tsn_path)
-    if sidecar is None:
-        raise ValueError(note or "the TSN workbook carries no district info")
-    if events.is_cancelled():
-        return _cancelled()
-    diffs = adapter.enumerate_diffs(tsmis_rows, tsn_rows, sidecar)
-    fields_with_diffs = [f for f in adapter.FIELDS if diffs.get(f)]
+    # CMP-AUD-208: the DIFFERENCES come from the comparison that was
+    # PUBLISHED — its per-cell state masks and anchored counts — not from a
+    # second execution of the loaders that produced it.
+    published = published_comparison.read(comparison_path,
+                                          is_cancelled=events.is_cancelled)
+    published.require_fields(adapter.FIELDS)
+    # CMP-AUD-209: the exhaustive ledger is complete and hash-bound BEFORE any
+    # sample is drawn, so a chosen example can never narrow the accounting.
+    ledger = published.ledger()
+    ledger_digest = ledger.digest()
+    events.on_log(
+        f"  evidence: published comparison — {ledger.difference_cells:,} "
+        f"counted difference(s) across {len(ledger.fields_with_differences())} "
+        f"column(s), {ledger.one_sided_rows:,} one-sided row(s), "
+        f"{ledger.duplicate_groups:,} repeated-key group(s)")
+    # CMP-AUD-108: a column whose differences all live in duplicate groups is
+    # still a differing column; only the published counts decide that.
+    fields_with_diffs = [f for f in adapter.FIELDS if ledger.differences(f)]
     if not fields_with_diffs:
         # CMP-AUD-106: the rebuilt comparison is clean — retire any prior red
         # evidence so it can't survive beside it looking current.
         retire_note = _retire_stale_evidence(
             wb_path, img_dir, source_paths, captured_sources,
             source_set_check, commit_guard)
-        note = ("evidence: the comparison has no differing columns to "
-                "illustrate")
+        note = ("evidence: the published comparison counts no differing "
+                "columns to illustrate")
         if retire_note:
             note += f" — {retire_note}"
         events.on_log("  " + note)
@@ -492,13 +505,37 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                 "fields_with_diffs": 0, "misses": {}, "workbook": None,
                 "folder": None}
 
+    tsmis_rows, tsn_rows, sidecar, note = adapter.load_sides(consolidated, tsn_path)
+    if sidecar is None:
+        raise ValueError(note or "the TSN workbook carries no district info")
+    if events.is_cancelled():
+        return _cancelled()
+    # The adapter PROPOSES rows that can be photographed; every one of them is
+    # then checked against the published cell it claims to illustrate.
+    proposed = adapter.enumerate_diffs(tsmis_rows, tsn_rows, sidecar)
+    renderable, rejected = _reconcile(published, proposed)
+    refused = sum(sum(why.values()) for why in rejected.values())
+    if refused:
+        events.on_log(f"  evidence: {refused:,} proposed example(s) did not "
+                      "match the published cell and were not rendered")
+
     # pick candidates, then group the lookups by source file so each PDF is
     # parsed exactly once
-    cand = {f: rng.sample(diffs[f], min(len(diffs[f]), max(examples * 4, examples + 6)))
-            for f in fields_with_diffs}
+    cand = {}
+    misses = {}
+    for f in fields_with_diffs:
+        pool = renderable.get(f) or []
+        if not pool:
+            why = _unrenderable_reason(ledger.for_field(f), rejected.get(f))
+            if why:
+                misses[f] = why
+                log.info("evidence: %s — %s", f, why)
+            continue
+        cand[f] = rng.sample(pool, min(len(pool),
+                                       max(examples * 4, examples + 6)))
     need_tsmis = {}
     need_tsn_routes, need_tsn_keys = {}, {}
-    for f in fields_with_diffs:
+    for f in cand:
         for ex in cand[f]:
             need_tsmis.setdefault(ex["route"], set()).add(ex["key"])
             need_tsn_routes.setdefault(ex["dist"], set()).add(ex["route"])
@@ -562,10 +599,10 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         commit_guard, tmp_dir, "temporary evidence-folder creation",
         directory_identity=tmp_dir_fs_identity)
     page_cache = {}
-    entries, misses = [], {}
+    entries = []
     rendered = 0
     try:
-        for fi, f in enumerate(fields_with_diffs, 1):
+        for fi, f in enumerate(cand, 1):
             if events.is_cancelled():
                 return _cancelled()
             got, reasons = 0, []
@@ -591,15 +628,21 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                 log.info("evidence: %s — no verifiable example (%s)",
                          f, misses[f])
             if fi % 8 == 0:
-                events.on_log(f"  evidence: {fi}/{len(fields_with_diffs)} "
-                              "columns done…")
+                events.on_log(f"  evidence: {fi}/{len(cand)} columns done…")
         if events.is_cancelled():
             return _cancelled()
         if not rendered:
-            return {"note": "evidence: no verifiable examples could be rendered "
-                            "(see the log)", "rendered": 0, "fields_ok": 0,
+            # CMP-AUD-108: the published differences are still REPORTED — the
+            # columns and their reasons, never a silent zero.
+            note = (f"evidence: {ledger.difference_cells:,} published "
+                    f"difference(s) across {len(fields_with_diffs)} column(s), "
+                    "none of them with a verifiable example to render "
+                    "(reasons in the log)")
+            events.on_log("  " + note)
+            return {"note": note, "rendered": 0, "fields_ok": 0,
                     "fields_with_diffs": len(fields_with_diffs),
-                    "misses": misses, "workbook": None, "folder": None}
+                    "misses": misses, "workbook": None, "folder": None,
+                    "ledger": ledger, "ledger_digest": ledger_digest}
         # CMP-AUD-109 + 112: recheck at the commit boundary — cancellation and
         # the PDF byte baseline — immediately before publishing the SET. A late
         # cancel leaves the previous evidence untouched (keep-last-good); a
@@ -608,12 +651,21 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         if events.is_cancelled():
             return _cancelled()
         _ensure_pdf_content_unchanged(pdf_content_baseline)
+        # CMP-AUD-208: every published item names the two SOURCE rows it was
+        # taken from, resolved through the comparison's own opaque row token.
+        _attach_source_rows(published, entries)
+        sampled = Counter(e["field"] for e in entries)
         publication = _publish_evidence_set(
             wb_path, img_dir, tmp_dir, entries, misses, dict(
                 comparison=Path(comparison_path).name,
                 report=adapter.REPORT_LABEL, seed=f"{seed:08x}",
                 examples=examples, tsmis_dir=str(tsmis_pdf_dir),
-                tsn_dir=str(tsn_dir)),
+                tsn_dir=str(tsn_dir),
+                sides=published.side_labels,
+                reader_version=published_comparison.READER_VERSION,
+                ledger_digest=ledger_digest,
+                ledger=_ledger_rows(ledger, adapter.FIELDS, sampled),
+                ledger_totals=ledger),
             layout, source_paths, captured_sources, source_set_check,
             commit_guard, tmp_dir_fs_identity)
     finally:
@@ -650,13 +702,114 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     return {"note": note, "rendered": rendered, "fields_ok": fields_ok,
             "fields_with_diffs": len(fields_with_diffs), "misses": misses,
             "workbook": publication["workbook"], "folder": publication["folder"],
-            "status": publication["status"]}
+            "status": publication["status"],
+            "ledger": ledger, "ledger_digest": ledger_digest}
 
 
 def _cancelled():
     return {"note": "evidence: cancelled — previous evidence files left as-is",
             "rendered": 0, "fields_ok": 0, "fields_with_diffs": 0,
             "misses": {}, "workbook": None, "folder": None}
+
+
+# --------------------------------------------------------------------------- #
+# the published-comparison spine (CMP-AUD-208 / 209 / 108)
+# --------------------------------------------------------------------------- #
+_REJECT_NO_ROW = "no published row carries that identity"
+_REJECT_NOT_SOLO = "the published row shares its key with another row"
+_REJECT_NOT_COUNTED = "the published cell is not a counted difference"
+_REJECT_TEXT = "the re-parsed value disagrees with the published cell"
+
+
+def _reconcile(published, diffs):
+    """Bind every proposed candidate to the cell the comparison PUBLISHED.
+
+    A second execution of the product loaders is no longer evidence on its own
+    (CMP-AUD-208): it may only PROPOSE a row to photograph. The published
+    generation decides whether that photograph may be taken — one row at that
+    identity, state ``D`` at that column, and published text equal to the
+    engine's own composition of the two values. Returns
+    ``({field: [candidate]}, {field: Counter(reason)})``.
+    """
+    kept, rejects = {}, {}
+    for field, examples in diffs.items():
+        try:
+            position = published.position_of(field)
+        except published_comparison.PublishedComparisonError:
+            rejects[field] = Counter({_REJECT_NO_ROW: len(examples)})
+            continue
+        good, why = [], Counter()
+        for ex in examples:
+            row = published.row_at(ex["route"], ex.get("pub_key"), 1)
+            if row is None:
+                why[_REJECT_NO_ROW] += 1
+            elif not published.is_solo(row):
+                why[_REJECT_NOT_SOLO] += 1
+            elif row.state(position) != published_comparison.STATE_DIFFERENT:
+                why[_REJECT_NOT_COUNTED] += 1
+            elif row.value(position) != ex.get("display"):
+                why[_REJECT_TEXT] += 1
+            else:
+                good.append({**ex, "published_row": row.excel_row,
+                             "published_occurrence": row.occurrence,
+                             "published_state": row.state(position),
+                             "published_token": row.token})
+        if good:
+            kept[field] = good
+        if why:
+            rejects[field] = why
+    return kept, rejects
+
+
+def _unrenderable_reason(entry, rejected):
+    """Why a column with published differences has NO candidate to sample.
+
+    CMP-AUD-108: a difference that exists only inside a duplicate group is a
+    NAMED per-column miss, never a silent zero.
+    """
+    if entry is not None and entry.differences and not entry.solo_differences:
+        return (f"all {entry.differences:,} published difference(s) sit in "
+                "repeated-key groups — the comparison pairs them by identity, "
+                "but no single row can be photographed unambiguously")
+    if rejected:
+        detail = ", ".join(f"{why} ({n:,})"
+                           for why, n in rejected.most_common(3))
+        return f"the published comparison refused every candidate — {detail}"
+    return None
+
+
+def _attach_source_rows(published, entries):
+    """Name each rendered item's two PERSISTED source rows (CMP-AUD-208).
+
+    Resolved through the comparison's own opaque row token, the same handle
+    Spot Check MATCHes into each side's literal key-helper column — never
+    Comparison's hyperlinks, which carry no cached value in a values workbook.
+    """
+    tokens = [e.get("published_token") for e in entries]
+    try:
+        resolved = published.source_rows(tokens)
+    except published_comparison.PublishedComparisonError as e:
+        log.warning("evidence: source rows unresolved (%s: %s)",
+                    type(e).__name__, e)
+        return
+    for entry in entries:
+        found = resolved.get(entry.get("published_token")) or {}
+        entry["source_rows"] = tuple(
+            (side, found.get(side)) for side in published.side_labels)
+
+
+def _ledger_rows(ledger, adapter_fields, sampled):
+    """The exhaustive per-column accounting written beside the images."""
+    rows = []
+    for name in adapter_fields:
+        entry = ledger.for_field(name)
+        if entry is None:
+            continue
+        rows.append((name, entry.differences, entry.solo_differences,
+                     entry.duplicate_differences, entry.context_cells,
+                     entry.equal_cells, entry.one_sided_cells,
+                     sampled.get(name, 0)))
+    return rows
 
 
 def _summarize_reasons(reasons):
@@ -749,6 +902,12 @@ def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
                     if out_dir_identity is not None else {})
     entry = {"field": field, "route": ex["route"], "key": ex["key"],
              "va": ex["va"], "vb": ex["vb"], "note": note}
+    # CMP-AUD-208: carry the published coordinates this image illustrates, so
+    # the workbook can name the exact cell instead of just the values.
+    for name in ("published_row", "published_occurrence", "published_state",
+                 "published_token"):
+        if name in ex:
+            entry[name] = ex[name]
     # Render ONLY the layout(s) the user chose (Settings). The costly page
     # strips above are shared; only the compose+save differ per layout.
     if "stacked" in render_keys:
@@ -965,6 +1124,72 @@ def _column_image_sheets(wb, entries, img_dir, img_key, embed_w, label,
     return made
 
 
+def _published_cell_text(entry):
+    """"Comparison!<row> · occurrence N · state D" for one rendered item."""
+    row = entry.get("published_row")
+    if not row:
+        return ""
+    return (f"Comparison!{row} · occurrence "
+            f"{entry.get('published_occurrence', 1)} · state "
+            f"{entry.get('published_state', '')}")
+
+
+def _source_rows_text(entry):
+    pairs = entry.get("source_rows") or ()
+    return "  ·  ".join(f"{side}!{row}" for side, row in pairs if row)
+
+
+_LEDGER_HEADERS = ("Column", "Counted differences", "With a unique row",
+                   "Inside repeated-key groups", "Context cells",
+                   "Identical cells", "One-sided cells", "Examples rendered",
+                   "Why no example")
+
+
+def _write_ledger_sheet(wb, info, misses, fonts):
+    """The EXHAUSTIVE published accounting (CMP-AUD-209).
+
+    Written from the ledger that was built and hash-bound BEFORE any sample was
+    drawn, so the images are a presentation of this record and never a
+    substitute for it. Absent when the caller supplied no ledger (an older
+    caller); the sheet is the completeness record, not a decoration.
+    """
+    rows = info.get("ledger")
+    totals = info.get("ledger_totals")
+    if not rows or totals is None:
+        return
+    bold, body, small = fonts
+    ws = wb.create_sheet("Ledger")
+    _safe_cell(ws, 1, 1, "Every difference the published comparison counts",
+               bold)
+    _safe_cell(ws, 2, 1,
+               f"{totals.data_rows:,} compared row(s) · "
+               f"{totals.matched_rows:,} matched · "
+               f"{totals.one_sided_rows:,} one-sided · "
+               f"{totals.duplicate_groups:,} repeated-key group(s) covering "
+               f"{totals.duplicate_member_rows:,} row(s)", small)
+    _safe_cell(ws, 3, 1,
+               f"Ledger digest {info.get('ledger_digest', '')} · reader v"
+               f"{info.get('reader_version', '')} — this accounting is complete "
+               "before any example is chosen; the images below illustrate it.",
+               small)
+    for col, label in enumerate(_LEDGER_HEADERS, start=1):
+        _safe_cell(ws, 5, col, label, bold)
+    r = 6
+    for row in rows:
+        for col, value in enumerate(row, start=1):
+            _safe_cell(ws, r, col, value, body)
+        _safe_cell(ws, r, len(_LEDGER_HEADERS), misses.get(row[0], ""), small)
+        r += 1
+    _safe_cell(ws, r + 1, 1, "Totals", bold)
+    _safe_cell(ws, r + 1, 2, totals.difference_cells, bold)
+    _safe_cell(ws, r + 1, 5, totals.context_cells, body)
+    _safe_cell(ws, r + 1, 6, totals.equal_cells, body)
+    _safe_cell(ws, r + 1, 7, totals.one_sided_cells, body)
+    for col, width in (("A", 26), ("B", 20), ("C", 18), ("D", 26), ("E", 14),
+                       ("F", 15), ("G", 15), ("H", 18), ("I", 70)):
+        ws.column_dimensions[col].width = width
+
+
 def _write_workbook(wb_path, img_dir, entries, misses, info,
                     layout=DEFAULT_LAYOUT, source_paths=(),
                     captured_sources=(), source_set_check=None,
@@ -990,7 +1215,8 @@ def _write_workbook(wb_path, img_dir, entries, misses, info,
                f"TSMIS PDFs: {info['tsmis_dir']}   ·   TSN PDFs: {info['tsn_dir']}",
                small)
     for col, value in enumerate(
-            ("Column", "Route @ Post Mile", "TSMIS", "TSN", "Images"), start=1):
+            ("Column", "Route @ Post Mile", "TSMIS", "TSN", "Images",
+             "Published cell", "Source rows"), start=1):
         _safe_cell(ws, 5, col, value, bold)
     r = 6
     for e in entries:
@@ -1000,15 +1226,21 @@ def _write_workbook(wb_path, img_dir, entries, misses, info,
         _safe_cell(ws, r, 4, e["vb"], body)
         _safe_cell(ws, r, 5,
                    "  /  ".join(e[k] for k in keys if e.get(k)), body)
+        # CMP-AUD-208: the published coordinates this image illustrates.
+        _safe_cell(ws, r, 6, _published_cell_text(e), small)
+        _safe_cell(ws, r, 7, _source_rows_text(e), small)
         r += 1
     for f, why in misses.items():
         _safe_cell(ws, r, 1, f, body)
         _safe_cell(ws, r, 2, f"no verifiable example — {why}", small)
         r += 1
-    for col, width in (("A", 14), ("B", 24), ("C", 26), ("D", 26), ("E", 46)):
+    for col, width in (("A", 14), ("B", 24), ("C", 26), ("D", 26), ("E", 46),
+                       ("F", 34), ("G", 26)):
         ws.column_dimensions[col].width = width
 
     used_sheet_names = {"Summary"}
+    _write_ledger_sheet(wb, info, misses, (bold, body, small))
+    used_sheet_names.add("Ledger")
     for img_key in keys:
         embed_w, label, layout_suffix = _LAYOUT_SPEC[img_key]
         _column_image_sheets(wb, entries, img_dir, img_key, embed_w, label,

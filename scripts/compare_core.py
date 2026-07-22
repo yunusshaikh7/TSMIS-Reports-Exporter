@@ -384,6 +384,17 @@ def _visible_key(value):
     return identity.display if identity is not None else value
 
 
+def published_key_text(sc, row, off=1):
+    """The Comparison sheet's key cell for one LOADED row (CMP-AUD-208).
+
+    An evidence adapter addresses a published row by asking the engine for the
+    same presentation the engine wrote, rather than re-flattening key text of
+    its own — so a caption, a highlight, and the published cell can never be
+    about different rows.
+    """
+    return _visible_key(row[off + sc.key_field])
+
+
 def _pairing_key_components(group, has_route):
     """Canonical trace components, preserving the legacy scalar trace shape."""
     identity = _physical_identity(group[1])

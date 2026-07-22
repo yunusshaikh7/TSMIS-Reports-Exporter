@@ -86,6 +86,7 @@ APP_MODULES = [
     "highway_detail_columns",                                # Highway Detail labels + legend (v0.20.0)
     "pdf_row_oracle",
     "pdf_table_lib",
+    "published_comparison",                                  # the published-cell decoder (CMP-AUD-208)
     "gui_update",
     "gui_export_api",
     "gui_auth_api",

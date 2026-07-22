@@ -106,3 +106,20 @@ def write_comparison_stub(path, rows=1, diffs=0, sheet="Comparison"):
     wb.save(str(path))
     wb.close()
     return path
+
+
+def build_published_comparison(path, schema, rows_a, rows_b, has_route=True):
+    """Publish a REAL values comparison workbook for a fixture (CMP-AUD-208).
+
+    Visual evidence now reads the cells a comparison PUBLISHED — its hidden
+    state masks and anchored counts — so a fixture can no longer fake a clean
+    or a differing comparison by stubbing a loader. Anything that drives
+    `visual_evidence.generate` has to hand it bytes the engine actually wrote.
+    """
+    from compare_core import run_compare
+    result = run_compare(schema, rows_a, rows_b, has_route, path,
+                         mode="values", confirm_overwrite=lambda _p: True)
+    if result.status != "ok":
+        raise AssertionError(
+            f"fixture comparison did not publish: {result.message}")
+    return path

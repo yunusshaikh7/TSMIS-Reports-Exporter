@@ -27,8 +27,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
+import _checklib
 import compare_highway_detail_tsn as cht
 import compare_highway_log as chl_cmp
 import compare_highway_sequence_tsn as chsl_cmp
@@ -498,8 +500,13 @@ try:
     # generate() on a clean comparison retires the planted prior red evidence.
     # Independent paths from the unit case above so a neutralized retire still
     # reaches these checks (rather than crashing on a lingering folder).
+    # CMP-AUD-208: generate() now reads the cells the comparison PUBLISHED, so
+    # "clean" has to be a REAL comparison with no counted differences — a
+    # stubbed enumerate_diffs can no longer manufacture it.
     _cmp6b = _r6 / "day2 vs tsn.xlsx"
-    _cmp6b.write_bytes(b"comparison 2")
+    _hd_row = ["001"] + ["0.100"] + ["x"] * (len(cht.SHARED_HEADER) - 1)
+    _checklib.build_published_comparison(
+        _cmp6b, cht._SCHEMA, [list(_hd_row)], [list(_hd_row)])
     _wb6b, _img6b = ve.sibling_paths(_cmp6b)
     _cons6 = _r6 / "cons.xlsx"; _cons6.write_bytes(b"consolidated")
     _tsn6 = _r6 / "tsn.xlsx"; _tsn6.write_bytes(b"tsn")
