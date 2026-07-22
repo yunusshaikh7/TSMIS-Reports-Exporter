@@ -32,8 +32,9 @@ release shows only its own section (see `build/gen_release_notes.py`).
   with different content of the same length and its timestamp put back looked
   untouched and the old "match / 0 differences" stayed green. Freshness now
   reads the files' actual content, with a per-file cache validated against a
-  Windows change signal that a restored timestamp cannot fake — measured on a
-  full statewide export folder, this is *faster* than the old check once warm.
+  Windows change signal that a restored timestamp cannot fake, and which is not
+  trusted for a file that changed in the last second — measured on a full
+  statewide export folder, this costs about as much as the old check once warm.
   The same fix applies to the cached TSN print used for evidence images. The
   first refresh after updating re-checks every report once.
 - **A comparison workbook that could not be read is now refused instead of

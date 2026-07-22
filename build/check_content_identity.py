@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -78,14 +79,49 @@ def main() -> None:
     _tamper_in_place(probe, b"Q")
     check("the memo does NOT serve a stale digest after a same-metadata rewrite",
           a.content_digest(probe) != d0)
+    # A change token is only as fine as the clock that stamps it, so back-to-back
+    # rewrites CAN share a ChangeTime (a CI runner produced exactly that). The
+    # guarantee is therefore asserted directly — a same-metadata rewrite is never
+    # served from the memo, whichever way the stamp fell — and the racy-window
+    # rule that makes it hold is asserted on its own below.
+    for i, filler in enumerate((b"R", b"S", b"T", b"U", b"V")):
+        expected = a.content_digest(probe)
+        identical = _tamper_in_place(probe, filler)
+        check(f"same-tick rewrite #{i + 1}: the memo still cannot serve it stale",
+              identical and a.content_digest(probe) != expected)
     if os.name == "nt":
         st = os.stat(probe)
+        token = a._change_token(probe, st)
         check("a Windows change token is available for memo validation",
-              a._change_token(probe, st) is not None)
-        check("the change token moves when the bytes change under the same stat",
-              (lambda t0: (_tamper_in_place(probe, b"R")
-                           and a._change_token(probe, os.stat(probe)) != t0))(
-                  a._change_token(probe, st)))
+              token is not None)
+        check("a just-changed file is NOT memoizable (the racy window)",
+              a._memoizable(token) is False, repr(token))
+        # ChangeTime cannot be backdated through any ordinary API (setting times
+        # IS a change), so the window's far side is asserted on the pure
+        # predicate, with a synthetic stamp one hour in the past.
+        hour_ago = a._FILETIME_EPOCH_TICKS + (time.time_ns() // 100) - 36_000_000_000
+        check("a file whose change stamp is an hour old IS memoizable",
+              a._memoizable(token[:-1] + (hour_ago,)) is True)
+        check("a token with no change stamp is never memoizable",
+              a._memoizable(None) is False)
+
+    print("the memo really is consulted once a file settles:")
+    settled = tmp / "settled.bin"
+    settled.write_bytes(b"S" * 4096)
+    time.sleep(1.1)                       # past _RACY_WINDOW_NS — the one real wait
+    first = a.content_digest(settled)
+    key = os.path.normcase(str(settled))
+    check("a settled file's digest is stored in the memo", key in a._DIGEST_MEMO,
+          f"memo keys: {len(a._DIGEST_MEMO)}")
+    if key in a._DIGEST_MEMO:
+        token, _value = a._DIGEST_MEMO[key]
+        a._DIGEST_MEMO[key] = (token, "sentinel-not-a-real-digest")
+        check("a matching token short-circuits the re-read (the memo is live)",
+              a.content_digest(settled) == "sentinel-not-a-real-digest")
+        a._DIGEST_MEMO[key] = (token, first)
+        _tamper_in_place(settled, b"Z")
+        check("...and the tampered file still bypasses that memo entry",
+              a.content_digest(settled) != first)
 
     print("matrix freshness reads the tamper as STALE:")
     fp_before = matrix_state._cell_input_fingerprint(store)

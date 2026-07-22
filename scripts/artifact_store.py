@@ -33,6 +33,7 @@ import logging
 import os
 import re
 import stat as statmod
+import time
 import uuid
 import zipfile
 from dataclasses import dataclass, replace
@@ -1269,6 +1270,16 @@ def is_report_data_file(name):
 _HASH_BLOCK = 1 << 20
 _DIGEST_MEMO = {}
 _DIGEST_MEMO_MAX = 50_000          # ~6 statewide environments' worth of routes
+# FILETIME (100 ns ticks since 1601-01-01) -> unix nanoseconds.
+_FILETIME_EPOCH_TICKS = 116_444_736_000_000_000
+# A change token can only be as fine as the system clock that stamps it: two
+# writes inside one tick get the SAME ChangeTime (measured ~10 ms here, coarser
+# on some virtualized hosts — a CI runner produced an unmoved token). So a digest
+# is memoized only once its file's change stamp is comfortably in the PAST: a
+# file changed within this window is re-hashed next time instead of trusted.
+# (The same "racily clean" rule Git applies to its stat cache.) One second is far
+# above any plausible tick, and the cost is only re-hashing a just-written file.
+_RACY_WINDOW_NS = 1_000_000_000
 
 
 def _change_token(path, st):
@@ -1346,14 +1357,32 @@ def _windows_change_time(path):
         k32.CloseHandle(handle)
 
 
-def content_digest(path, st=None):
+def _memoizable(token):
+    """True when `token`'s change stamp is old enough to be trusted (see
+    ``_RACY_WINDOW_NS``). A token with no change stamp is never memoizable."""
+    if token is None:
+        return False
+    changed_ns = (token[-1] - _FILETIME_EPOCH_TICKS) * 100
+    return (time.time_ns() - changed_ns) > _RACY_WINDOW_NS
+
+
+def content_digest(path):
     """The SHA-256 of `path`'s bytes, memoized against its change token.
+
+    The memo is written only when the token is BOTH unchanged across the read
+    (so a file edited mid-hash is never cached) and old enough to be outside the
+    clock's own granularity (so a same-tick rewrite can never hide behind it).
+    Everything else re-hashes.
+
+    The token is always taken from ``os.stat``: a ``DirEntry.stat()`` from a
+    directory walk reports ``st_dev``/``st_ino`` as 0 on Windows, so a token
+    built from one could never compare equal to a token built from the other —
+    the file identity has to come from the same source on both sides.
 
     Raises OSError when the file cannot be read — callers turn that into the
     ``_UNREADABLE`` fingerprint rather than a silent match."""
     path = Path(path)
-    st = path.stat() if st is None else st
-    token = _change_token(path, st)
+    token = _change_token(path, path.stat())
     key = os.path.normcase(str(path))
     if token is not None:
         cached = _DIGEST_MEMO.get(key)
@@ -1367,10 +1396,15 @@ def content_digest(path, st=None):
                 break
             digest.update(block)
     value = digest.hexdigest()
-    if token is not None:
-        if len(_DIGEST_MEMO) >= _DIGEST_MEMO_MAX:
-            _DIGEST_MEMO.clear()   # bounded: a cleared memo only costs a re-hash
-        _DIGEST_MEMO[key] = (token, value)
+    if token is not None and _memoizable(token):
+        try:
+            after = _change_token(path, path.stat())
+        except OSError:  # silent-ok: an unstattable file is simply not memoized
+            after = None
+        if after == token:
+            if len(_DIGEST_MEMO) >= _DIGEST_MEMO_MAX:
+                _DIGEST_MEMO.clear()   # bounded: a cleared memo only costs a re-hash
+            _DIGEST_MEMO[key] = (token, value)
     return value
 
 
@@ -1392,8 +1426,10 @@ def fingerprint(folder):
     migration)."""
     folder = Path(folder)
     try:
-        # scandir (not iterdir) so each entry's stat comes from the directory read
-        # already performed — the digest memo then validates without a second one.
+        # scandir (not iterdir): the name filter and is_file() test come from
+        # the directory read already performed. The digest's own change token is
+        # taken from os.stat inside content_digest — a DirEntry stat has no file
+        # identity on Windows, so it cannot serve as one side of that comparison.
         with os.scandir(folder) as it:
             entries = sorted(it, key=lambda e: e.name)
     except OSError:
@@ -1412,7 +1448,7 @@ def fingerprint(folder):
         try:
             if not e.is_file():
                 continue
-            parts.append(f"{e.name}\0{content_digest(e.path, st=e.stat())}")
+            parts.append(f"{e.name}\0{content_digest(e.path)}")
         except OSError:
             return _UNREADABLE
     digest = hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:32]

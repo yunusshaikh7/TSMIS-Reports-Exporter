@@ -4291,11 +4291,16 @@ file id as well. Where no change token can be obtained (a non-Windows filesystem
 unreadable handle) the memo is REFUSED and the file re-hashed — fail-safe.
 
 **Measured cost on the real statewide store** (`All Reports 7.9/2026-07-09 ssor-prod`,
-9 folders / 1,729 files / 199 MB): **cold 1.39 s, warm 0.16 s**, against the v1
-stat-only walk's 0.24 s. The warm path is *faster than the metadata-only fingerprint it
-replaces* because `fingerprint` now enumerates with `os.scandir` and validates the memo
-from the stat the directory read already produced. Content hashing runs at ~162 MB/s
-here, so a fully cold statewide store costs ~1.4 s once per change.
+9 folders / 1,729 files / 199 MB): **cold 1.53 s, warm 0.27 s**, against the v1
+stat-only walk's 0.24 s — parity on the warm path (one `os.stat` + one metadata handle
+per file, both measured cheaper than the hash they replace), and ~1.5 s once per change
+on the cold path at ~162 MB/s. Two corrections found while measuring, both now pinned by
+the check: (1) a change token is only as fine as the clock that stamps it, so two writes
+inside one tick share a ChangeTime — a CI runner produced exactly that — and the memo
+therefore refuses to store a digest whose file changed within `_RACY_WINDOW_NS` (1 s),
+the same "racily clean" rule Git applies to its stat cache; (2) the token must come from
+`os.stat` on both sides, because `DirEntry.stat()` reports `st_dev`/`st_ino` as 0 on
+Windows and a token built from one source can never equal one built from the other.
 
 **The evidence parse caches follow.** `evidence_intersection_detail._print_index` and
 `evidence_ramp_detail._print_index` keyed their statewide TSN print index on
