@@ -396,11 +396,35 @@ def _layout(header):
                 key=key_col, occ=occ_col, sides=tuple(labels))
 
 
+def _resolve_header(header, expect_fields=None):
+    """Locate every structural column and the displayed field list, or refuse.
+
+    Returned as ``(layout, plan)`` so :func:`read` stays a decode loop: the
+    layout positions the identity block, the plan carries the state chunks, the
+    row token, and the display columns the mask positions map onto.
+    """
+    lay = _layout(header)
+    state_cols, state_version, n_fields = _state_columns(header)
+    token_col, token_version = _token_column(header)
+    fields = [_cell_text(v) for v in header[lay["diffs"] + 1:state_cols[0]]]
+    if len(fields) != n_fields:
+        raise PublishedComparisonError(
+            f"the Comparison sheet shows {len(fields)} field column(s) but its "
+            f"state mask covers {n_fields}")
+    if expect_fields is not None and list(expect_fields) != fields:
+        raise PublishedComparisonError(
+            "the published comparison's columns are not the ones this report "
+            "compares; refresh the comparison")
+    return lay, dict(state_cols=state_cols, state_version=state_version,
+                     token_col=token_col, token_version=token_version,
+                     fields=fields)
+
+
 def _cell_text(value):
     return "" if value is None else str(value)
 
 
-def _decode_row(excel_row, raw, lay, state_cols, token_col, n_fields):
+def _decode_mask(excel_row, raw, state_cols, n_fields):
     mask = "".join(_cell_text(raw[c]) if c < len(raw) else ""
                    for c in state_cols)
     if len(mask) != n_fields:
@@ -411,27 +435,12 @@ def _decode_row(excel_row, raw, lay, state_cols, token_col, n_fields):
     if bad:
         raise PublishedComparisonError(
             f"Comparison row {excel_row} has unknown state code(s) {bad}")
-    status = raw[lay["status"]]
-    if not isinstance(status, str) or not status:
-        raise PublishedComparisonError(
-            f"Comparison row {excel_row} has no Status")
-    diffs = raw[lay["diffs"]]
-    if status == STATUS_BOTH:
-        if (isinstance(diffs, bool) or not isinstance(diffs, (int, float))
-                or not float(diffs).is_integer() or diffs < 0):
-            raise PublishedComparisonError(
-                f"Comparison row {excel_row} has an invalid Diffs value "
-                f"{diffs!r}")
-        diffs = int(diffs)
-        if diffs != mask.count(STATE_DIFFERENT):
-            raise PublishedComparisonError(
-                f"Comparison row {excel_row} claims {diffs} difference(s) but "
-                f"its state mask holds {mask.count(STATE_DIFFERENT)}")
-        if STATE_ONE_SIDED in mask:
-            raise PublishedComparisonError(
-                f"Comparison row {excel_row} is matched but carries one-sided "
-                "state codes")
-    else:
+    return mask
+
+
+def _authenticated_diffs(excel_row, status, diffs, mask):
+    """The row's own Diffs, checked against its own state mask."""
+    if status != STATUS_BOTH:
         if diffs not in (None, ""):
             raise PublishedComparisonError(
                 f"Comparison row {excel_row} is one-sided but carries "
@@ -440,7 +449,29 @@ def _decode_row(excel_row, raw, lay, state_cols, token_col, n_fields):
             raise PublishedComparisonError(
                 f"Comparison row {excel_row} is one-sided but its state mask "
                 "is not entirely one-sided")
-        diffs = 0
+        return 0
+    if (isinstance(diffs, bool) or not isinstance(diffs, (int, float))
+            or not float(diffs).is_integer() or diffs < 0):
+        raise PublishedComparisonError(
+            f"Comparison row {excel_row} has an invalid Diffs value {diffs!r}")
+    if int(diffs) != mask.count(STATE_DIFFERENT):
+        raise PublishedComparisonError(
+            f"Comparison row {excel_row} claims {int(diffs)} difference(s) but "
+            f"its state mask holds {mask.count(STATE_DIFFERENT)}")
+    if STATE_ONE_SIDED in mask:
+        raise PublishedComparisonError(
+            f"Comparison row {excel_row} is matched but carries one-sided "
+            "state codes")
+    return int(diffs)
+
+
+def _decode_row(excel_row, raw, lay, state_cols, token_col, n_fields):
+    mask = _decode_mask(excel_row, raw, state_cols, n_fields)
+    status = raw[lay["status"]]
+    if not isinstance(status, str) or not status:
+        raise PublishedComparisonError(
+            f"Comparison row {excel_row} has no Status")
+    diffs = _authenticated_diffs(excel_row, status, raw[lay["diffs"]], mask)
     occurrence = raw[lay["occ"]]
     if isinstance(occurrence, float) and occurrence.is_integer():
         occurrence = int(occurrence)
@@ -480,18 +511,11 @@ def read(path, *, expect_fields=None, is_cancelled=None):
         header = list(next(stream, ()) or ())
         if not header:
             raise PublishedComparisonError("the Comparison sheet is empty")
-        lay = _layout(header)
-        state_cols, state_version, n_fields = _state_columns(header)
-        token_col, token_version = _token_column(header)
-        fields = [_cell_text(v) for v in header[lay["diffs"] + 1:state_cols[0]]]
-        if len(fields) != n_fields:
-            raise PublishedComparisonError(
-                f"the Comparison sheet shows {len(fields)} field column(s) but "
-                f"its state mask covers {n_fields}")
-        if expect_fields is not None and list(expect_fields) != fields:
-            raise PublishedComparisonError(
-                "the published comparison's columns are not the ones this "
-                "report compares; refresh the comparison")
+        lay, plan = _resolve_header(header, expect_fields)
+        state_cols = plan["state_cols"]
+        token_col = plan["token_col"]
+        fields = plan["fields"]
+        n_fields = len(fields)
         rows = []
         tokens = set()
         for excel_row, raw in enumerate(stream, start=2):
@@ -513,7 +537,8 @@ def read(path, *, expect_fields=None, is_cancelled=None):
             raise PublishedComparisonError(
                 "the published comparison holds no rows")
         return PublishedComparison(path, fields, rows, lay["has_route"],
-                                   state_version, token_version, lay["sides"])
+                                   plan["state_version"],
+                                   plan["token_version"], lay["sides"])
     finally:
         _close(workbook)
 

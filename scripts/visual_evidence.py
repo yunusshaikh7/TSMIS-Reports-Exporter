@@ -30,6 +30,7 @@ the statewide TSN print; each covers its report's Excel + PDF rows). Engine is
 console-free (Events sink, cancellation honored between steps) and never
 affects the comparison result it decorates.
 """
+import collections
 import hashlib
 import logging
 import os
@@ -38,7 +39,6 @@ import re
 import secrets
 import shutil
 import tempfile
-from collections import Counter
 from pathlib import Path
 
 try:
@@ -52,9 +52,9 @@ except ImportError:
     _DEPS_OK = False
 
 import artifact_store
+import evidence_ledger
 import owned_dir
 import paths
-import published_comparison
 from compare_core import set_safe_literal_cell
 from pdf_table_lib import RouteIdentityError
 
@@ -472,24 +472,8 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     events.on_log(f"  evidence: sampling up to {examples} example(s) per column "
                   f"(seed {seed:08x})…")
 
-    # CMP-AUD-208: the DIFFERENCES come from the comparison that was
-    # PUBLISHED — its per-cell state masks and anchored counts — not from a
-    # second execution of the loaders that produced it.
-    published = published_comparison.read(comparison_path,
-                                          is_cancelled=events.is_cancelled)
-    published.require_fields(adapter.FIELDS)
-    # CMP-AUD-209: the exhaustive ledger is complete and hash-bound BEFORE any
-    # sample is drawn, so a chosen example can never narrow the accounting.
-    ledger = published.ledger()
-    ledger_digest = ledger.digest()
-    events.on_log(
-        f"  evidence: published comparison — {ledger.difference_cells:,} "
-        f"counted difference(s) across {len(ledger.fields_with_differences())} "
-        f"column(s), {ledger.one_sided_rows:,} one-sided row(s), "
-        f"{ledger.duplicate_groups:,} repeated-key group(s)")
-    # CMP-AUD-108: a column whose differences all live in duplicate groups is
-    # still a differing column; only the published counts decide that.
-    fields_with_diffs = [f for f in adapter.FIELDS if ledger.differences(f)]
+    published, ledger, ledger_digest, fields_with_diffs = (
+        evidence_ledger.published_universe(comparison_path, adapter, events))
     if not fields_with_diffs:
         # CMP-AUD-106: the rebuilt comparison is clean — retire any prior red
         # evidence so it can't survive beside it looking current.
@@ -513,7 +497,7 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     # The adapter PROPOSES rows that can be photographed; every one of them is
     # then checked against the published cell it claims to illustrate.
     proposed = adapter.enumerate_diffs(tsmis_rows, tsn_rows, sidecar)
-    renderable, rejected = _reconcile(published, proposed)
+    renderable, rejected = evidence_ledger.reconcile(published, proposed)
     refused = sum(sum(why.values()) for why in rejected.values())
     if refused:
         events.on_log(f"  evidence: {refused:,} proposed example(s) did not "
@@ -526,7 +510,7 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     for f in fields_with_diffs:
         pool = renderable.get(f) or []
         if not pool:
-            why = _unrenderable_reason(ledger.for_field(f), rejected.get(f))
+            why = evidence_ledger.unrenderable_reason(ledger.for_field(f), rejected.get(f))
             if why:
                 misses[f] = why
                 log.info("evidence: %s — %s", f, why)
@@ -667,8 +651,8 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         _ensure_pdf_content_unchanged(pdf_content_baseline)
         # CMP-AUD-208: every published item names the two SOURCE rows it was
         # taken from, resolved through the comparison's own opaque row token.
-        _attach_source_rows(published, entries)
-        sampled = Counter(e["field"] for e in entries)
+        evidence_ledger.attach_source_rows(published, entries)
+        sampled = collections.Counter(e["field"] for e in entries)
         publication = _publish_evidence_set(
             wb_path, img_dir, tmp_dir, entries, misses, dict(
                 comparison=Path(comparison_path).name,
@@ -676,9 +660,9 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                 examples=examples, tsmis_dir=str(tsmis_pdf_dir),
                 tsn_dir=str(tsn_dir),
                 sides=published.side_labels,
-                reader_version=published_comparison.READER_VERSION,
+                reader_version=ledger.reader_version,
                 ledger_digest=ledger_digest,
-                ledger=_ledger_rows(ledger, adapter.FIELDS, sampled),
+                ledger=evidence_ledger.ledger_rows(ledger, adapter.FIELDS, sampled),
                 ledger_totals=ledger),
             layout, source_paths, captured_sources, source_set_check,
             commit_guard, tmp_dir_fs_identity)
@@ -726,104 +710,6 @@ def _cancelled():
             "misses": {}, "workbook": None, "folder": None}
 
 
-# --------------------------------------------------------------------------- #
-# the published-comparison spine (CMP-AUD-208 / 209 / 108)
-# --------------------------------------------------------------------------- #
-_REJECT_NO_ROW = "no published row carries that identity"
-_REJECT_NOT_SOLO = "the published row shares its key with another row"
-_REJECT_NOT_COUNTED = "the published cell is not a counted difference"
-_REJECT_TEXT = "the re-parsed value disagrees with the published cell"
-
-
-def _reconcile(published, diffs):
-    """Bind every proposed candidate to the cell the comparison PUBLISHED.
-
-    A second execution of the product loaders is no longer evidence on its own
-    (CMP-AUD-208): it may only PROPOSE a row to photograph. The published
-    generation decides whether that photograph may be taken — one row at that
-    identity, state ``D`` at that column, and published text equal to the
-    engine's own composition of the two values. Returns
-    ``({field: [candidate]}, {field: Counter(reason)})``.
-    """
-    kept, rejects = {}, {}
-    for field, examples in diffs.items():
-        try:
-            position = published.position_of(field)
-        except published_comparison.PublishedComparisonError:
-            rejects[field] = Counter({_REJECT_NO_ROW: len(examples)})
-            continue
-        good, why = [], Counter()
-        for ex in examples:
-            row = published.row_at(ex["route"], ex.get("pub_key"), 1)
-            if row is None:
-                why[_REJECT_NO_ROW] += 1
-            elif not published.is_solo(row):
-                why[_REJECT_NOT_SOLO] += 1
-            elif row.state(position) != published_comparison.STATE_DIFFERENT:
-                why[_REJECT_NOT_COUNTED] += 1
-            elif row.value(position) != ex.get("display"):
-                why[_REJECT_TEXT] += 1
-            else:
-                good.append({**ex, "published_row": row.excel_row,
-                             "published_occurrence": row.occurrence,
-                             "published_state": row.state(position),
-                             "published_token": row.token})
-        if good:
-            kept[field] = good
-        if why:
-            rejects[field] = why
-    return kept, rejects
-
-
-def _unrenderable_reason(entry, rejected):
-    """Why a column with published differences has NO candidate to sample.
-
-    CMP-AUD-108: a difference that exists only inside a duplicate group is a
-    NAMED per-column miss, never a silent zero.
-    """
-    if entry is not None and entry.differences and not entry.solo_differences:
-        return (f"all {entry.differences:,} published difference(s) sit in "
-                "repeated-key groups — the comparison pairs them by identity, "
-                "but no single row can be photographed unambiguously")
-    if rejected:
-        detail = ", ".join(f"{why} ({n:,})"
-                           for why, n in rejected.most_common(3))
-        return f"the published comparison refused every candidate — {detail}"
-    return None
-
-
-def _attach_source_rows(published, entries):
-    """Name each rendered item's two PERSISTED source rows (CMP-AUD-208).
-
-    Resolved through the comparison's own opaque row token, the same handle
-    Spot Check MATCHes into each side's literal key-helper column — never
-    Comparison's hyperlinks, which carry no cached value in a values workbook.
-    """
-    tokens = [e.get("published_token") for e in entries]
-    try:
-        resolved = published.source_rows(tokens)
-    except published_comparison.PublishedComparisonError as e:
-        log.warning("evidence: source rows unresolved (%s: %s)",
-                    type(e).__name__, e)
-        return
-    for entry in entries:
-        found = resolved.get(entry.get("published_token")) or {}
-        entry["source_rows"] = tuple(
-            (side, found.get(side)) for side in published.side_labels)
-
-
-def _ledger_rows(ledger, adapter_fields, sampled):
-    """The exhaustive per-column accounting written beside the images."""
-    rows = []
-    for name in adapter_fields:
-        entry = ledger.for_field(name)
-        if entry is None:
-            continue
-        rows.append((name, entry.differences, entry.solo_differences,
-                     entry.duplicate_differences, entry.context_cells,
-                     entry.equal_cells, entry.one_sided_cells,
-                     sampled.get(name, 0)))
-    return rows
 
 
 def _summarize_reasons(reasons):

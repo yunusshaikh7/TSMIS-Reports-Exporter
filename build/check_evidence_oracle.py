@@ -28,9 +28,9 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
+import evidence_ledger as el
 import phase3_independent_oracle as oracle
 import published_comparison as pc
-import visual_evidence as ve
 from compare_core import CompareSchema, published_key_text, run_compare
 from openpyxl import load_workbook
 
@@ -222,7 +222,7 @@ for address in sorted(solo_addresses):
             va=cell.normalized_a.text, vb=cell.normalized_b.text,
             dist="", cnty="", pub_key=address[1],
             display=row.value(position)))
-kept, rejected = ve._reconcile(published, candidates)
+kept, rejected = el.reconcile(published, candidates)
 check("every oracle-derived renderable cell reconciles to its published cell",
       not rejected
       and {name: len(items) for name, items in kept.items()}

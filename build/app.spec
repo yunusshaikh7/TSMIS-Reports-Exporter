@@ -87,6 +87,7 @@ APP_MODULES = [
     "pdf_row_oracle",
     "pdf_table_lib",
     "published_comparison",                                  # the published-cell decoder (CMP-AUD-208)
+    "evidence_ledger",                                       # the published-universe accounting (CMP-AUD-209)
     "gui_update",
     "gui_export_api",
     "gui_auth_api",

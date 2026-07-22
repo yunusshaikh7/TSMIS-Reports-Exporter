@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
+import evidence_ledger as el
 import published_comparison as pc
 import visual_evidence as ve
 from compare_core import CompareSchema, published_key_text, run_compare
@@ -202,7 +203,7 @@ def candidate(**over):
     return base
 
 
-kept, rejected = ve._reconcile(published, {"Description": [candidate()]})
+kept, rejected = el.reconcile(published, {"Description": [candidate()]})
 check("a candidate that matches the published cell is kept",
       len(kept.get("Description", [])) == 1 and not rejected)
 entry = kept["Description"][0]
@@ -212,30 +213,30 @@ check("the kept candidate names its published row/occurrence/state",
       and entry["published_state"] == "D"
       and entry["published_token"] == differing.token)
 
-_, rejected = ve._reconcile(
+_, rejected = el.reconcile(
     published, {"Description": [candidate(pub_key="nonexistent")]})
 check("a candidate with no published row is refused",
-      rejected["Description"][ve._REJECT_NO_ROW] == 1)
-_, rejected = ve._reconcile(
+      rejected["Description"][el.REJECT_NO_ROW] == 1)
+_, rejected = el.reconcile(
     published, {"Description": [candidate(display="SOMETHING ELSE")]})
 check("a candidate whose text disagrees with the published cell is refused",
-      rejected["Description"][ve._REJECT_TEXT] == 1)
-_, rejected = ve._reconcile(
+      rejected["Description"][el.REJECT_TEXT] == 1)
+_, rejected = el.reconcile(
     published, {"County": [candidate(field="County",
                                      display=identical.value(0))]})
 check("a candidate on a cell the comparison did not count is refused",
-      rejected["County"][ve._REJECT_NOT_COUNTED] == 1)
+      rejected["County"][el.REJECT_NOT_COUNTED] == 1)
 dup = [r for r in dup_rows if r.occurrence == 1][0]
-_, rejected = ve._reconcile(
+_, rejected = el.reconcile(
     published, {"Description": [candidate(route="002", pub_key=dup.key,
                                           display=dup.value(
                                               published.position_of(
                                                   "Description")))]})
 check("a candidate inside a repeated-key group is refused as ambiguous",
-      rejected["Description"][ve._REJECT_NOT_SOLO] == 1)
-_, rejected = ve._reconcile(published, {"Nope": [candidate(field="Nope")]})
+      rejected["Description"][el.REJECT_NOT_SOLO] == 1)
+_, rejected = el.reconcile(published, {"Nope": [candidate(field="Nope")]})
 check("a candidate on an unpublished column is refused, not raised",
-      rejected["Nope"][ve._REJECT_NO_ROW] == 1)
+      rejected["Nope"][el.REJECT_NO_ROW] == 1)
 
 # --------------------------------------------------------------------------- #
 print("duplicate-only differences are NAMED, never a false zero (CMP-AUD-108)")
@@ -246,18 +247,18 @@ dup_only = pc.ComparisonLedger(
     duplicate_groups=1, duplicate_member_rows=2, difference_cells=2,
     context_cells=0, equal_cells=0, one_sided_cells=0,
     _by_field={})
-reason = ve._unrenderable_reason(dup_only.fields[0], None)
+reason = el.unrenderable_reason(dup_only.fields[0], None)
 check("a duplicate-only column reports a named miss",
       reason is not None and "repeated-key" in reason and "2" in reason)
 check("the named miss never claims there is no difference",
       "no differing" not in (reason or "").lower())
 check("a column refused by the published cells names that instead",
-      "refused" in (ve._unrenderable_reason(
+      "refused" in (el.unrenderable_reason(
           pc.FieldLedger(field="FT", position=2, differences=1,
                          solo_differences=1),
-          Counter({ve._REJECT_TEXT: 4})) or ""))
+          Counter({el.REJECT_TEXT: 4})) or ""))
 check("a renderable column with candidates has no pre-render miss",
-      ve._unrenderable_reason(
+      el.unrenderable_reason(
           pc.FieldLedger(field="FT", position=2, differences=1,
                          solo_differences=1), None) is None)
 
@@ -297,9 +298,9 @@ check("a schema with a key normalizer routes through it, not the raw cell",
               [["001"] + ["v"] * len(_chl._SCHEMA.header)], True,
               _chl._SCHEMA.key_field, _chl._SCHEMA.key_normalizer)[0][1]))
 check("the ledger rows carry every displayed column",
-      [r[0] for r in ve._ledger_rows(ledger, FIELDS, Counter())] == FIELDS)
+      [r[0] for r in el.ledger_rows(ledger, FIELDS, Counter())] == FIELDS)
 check("the ledger rows report the sampled count per column",
-      dict((r[0], r[7]) for r in ve._ledger_rows(
+      dict((r[0], r[7]) for r in el.ledger_rows(
           ledger, FIELDS, Counter({"Description": 2})))["Description"] == 2)
 
 
@@ -309,7 +310,7 @@ from openpyxl import Workbook                                    # noqa: E402
 from openpyxl.styles import Font                                 # noqa: E402
 
 _fonts = (Font(bold=True), Font(), Font(size=9))
-_info = dict(ledger=ve._ledger_rows(ledger, FIELDS,
+_info = dict(ledger=el.ledger_rows(ledger, FIELDS,
                                     Counter({"Description": 1})),
              ledger_totals=ledger, ledger_digest=digest, reader_version=1)
 _wb = Workbook()
