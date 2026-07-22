@@ -62,7 +62,15 @@ by-day matrices (see
 [docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md)
 for the per-report schema + locked canaries; Highway Detail's schema was verified against
 the full statewide bundle — 252 routes vs the 60k-row TSN extract — and its comparison
-carries an Intersection-Detail-style **Report View** replica). Report **8 (Highway
+carries an Intersection-Detail-style **Report View** replica). **⛔ Highway Detail (7/7b) is PRE-RELEASE (owner, 2026-07-21): the vendor ACCIDENTALLY
+enabled its exports, they are GREYED OUT again, and the report is in ACTIVE DEVELOPMENT.**
+Every HD artifact on disk came from that accidental window — treat none of it as ground
+truth, do not re-bless HD canaries as stable, and do NOT fix the HD parser/normalizer
+against it (CMP-AUD-133/142/186 are deferred). 045's HD-Excel county cannot be answered
+yet — the report is unfinished; never infer it. The owner will supply NEW HD exports on
+official integration; that delivery is the trigger to re-verify the schema and resume.
+
+Report **8 (Highway
 Summary)** is **export-only** (export-enabled app-side but still site-greyed); its
 integration waits for a verifiable schema. **Intersection Detail follows the site's
 July-2026 report overhaul since v0.22.0** (35-column export, re-verified statewide on the
