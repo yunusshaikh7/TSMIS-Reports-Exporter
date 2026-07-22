@@ -308,6 +308,7 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                           if dest else None)}
 
     cells = {}
+    attempts = matrix.load_attempts(byday_root())
     for row_key, _label, subdir, fmt, supported, tsn_subdir in rows:
         per = {}
         for date in days:
@@ -332,6 +333,13 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                 # the cell stale (the TSN side is a file, captured by mtime).
                 cmp = matrix._cmp_state(day_out_path(date, source, row_key), srcs, rec,
                                         fp_folders=(tdir,))
+                # CMP-AUD-089: the same durable last-attempt overlay the Everything
+                # matrix renders — a failed/stopped/incomplete rebuild marks the cell
+                # here too instead of vanishing behind the previous result.
+                attempt = matrix._last_attempt_for(
+                    attempts, f"{row_key}|{source}", date, cmp)
+                if attempt is not None:
+                    cmp["last_attempt"] = attempt
             per[date] = {"export": export, "cmp": cmp}
         cells[row_key] = per
 

@@ -738,11 +738,16 @@ def _promote_or_keep_last_good(subdir, out_path, attempt, res, commit_guard=None
             commit_guard=commit_guard)
         why = (getattr(res, "message", "") or "").splitlines()
         detail = f" ({why[0]})" if why and why[0] else ""
-        kept = f'; the attempt was saved beside it as "{attempt.name}"' \
-               if attempt.exists() else ""
+        if attempt.exists():
+            outcome_text = f"came back {completion}{detail}"
+            kept = f'; the attempt was saved beside it as "{attempt.name}"'
+        else:
+            # The backstop: a producer that returned without writing anything.
+            outcome_text = f"produced no workbook{detail}"
+            kept = ""
         raise ValueError(
-            f"the {subdir} consolidation came back {completion}{detail}. The previous "
-            f"complete workbook was kept and nothing was compared against it{kept}. "
+            f"the {subdir} consolidation {outcome_text}. The previous complete "
+            f"workbook was kept and nothing was compared against it{kept}. "
             "Fix the flagged exports and rebuild.")
     _require_commit_guard(commit_guard, "consolidation promotion", attempt)
     _require_commit_guard(commit_guard, "consolidation promotion", out_path)

@@ -299,6 +299,7 @@ def baseline_matrix_snapshot(source, days, baseline_id, hidden=None, dest=None,
         bl_rows[row_key] = {"present": m is not None, "mtime": m}
 
     cells = {}
+    attempts = matrix.load_attempts(byday_root())
     for row_key, _label, subdir, supported in rows:
         per = {}
         for date in days:
@@ -324,6 +325,11 @@ def baseline_matrix_snapshot(source, days, baseline_id, hidden=None, dest=None,
                     out_path(date, source, row_key, baseline_id) if parsed else "",
                     srcs, rec,
                     fp_folders=(tdir, bdir / subdir) if bdir else (tdir,))
+                # CMP-AUD-089: render the durable last-attempt overlay here too.
+                attempt = matrix._last_attempt_for(
+                    attempts, f"{row_key}|{source}|{baseline_id}", date, cmp)
+                if attempt is not None:
+                    cmp["last_attempt"] = attempt
             per[date] = {"export": export, "cmp": cmp}
         cells[row_key] = per
 

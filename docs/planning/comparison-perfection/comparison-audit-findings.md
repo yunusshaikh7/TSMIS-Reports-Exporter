@@ -4302,6 +4302,12 @@ the same "racily clean" rule Git applies to its stat cache; (2) the token must c
 `os.stat` on both sides, because `DirEntry.stat()` reports `st_dev`/`st_ino` as 0 on
 Windows and a token built from one source can never equal one built from the other.
 
+**One behavioral consequence, in the fail-safe direction.** Freshness now READS every
+source file rather than only stat-ing it, so a file that cannot be opened makes its
+folder fingerprint `_UNREADABLE` and the cell reads STALE where v1 would have called it
+fresh. That is the safe direction (never a false green), and it is the same read the
+consolidators and validators already perform on these files.
+
 **The evidence parse caches follow.** `evidence_intersection_detail._print_index` and
 `evidence_ramp_detail._print_index` keyed their statewide TSN print index on
 `(size, mtime_ns)` and would return the previous parsed object for a same-metadata
@@ -4944,10 +4950,13 @@ rather than persisted as an uninterpretable badge. Every write is best-effort by
 contract — an overlay that cannot be persisted is logged, never a reason to fail a run
 whose artifact published correctly.
 
-**Rendered without erasing the prior result.** `matrix_snapshot` reads the overlay once
-and merges it per cell as `cmp.last_attempt`; `_last_attempt_for` drops an attempt older
-than the comparison workbook itself (the artifact was refreshed after that failure by
-another path). In the grid, `mxAttemptNote` keeps the previous result's own class and
+**Rendered without erasing the prior result, in all three grids.**
+`matrix_snapshot`, `day_matrix.day_matrix_snapshot` and
+`baseline_matrix.baseline_matrix_snapshot` each read their root's overlay once and merge
+it per cell as `cmp.last_attempt`; `_last_attempt_for` drops an attempt older than the
+comparison workbook itself (the artifact was refreshed after that failure by another
+path). All three grids render through the same `mxCellContent`, so one renderer change
+covers the Everything matrix, the by-day matrix and the vs-Baseline matrix. In the grid, `mxAttemptNote` keeps the previous result's own class and
 number and adds the `mx-attempt` marker class plus a trailing "last refresh failed /
 stopped / incomplete" note (`app.css` gives it a destructive-tinted left edge). A green
 `✓ match` cell can therefore never quietly stand in for the rebuild that did not land.

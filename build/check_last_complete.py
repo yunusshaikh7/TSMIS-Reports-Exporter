@@ -421,6 +421,27 @@ def _main_body(tmp: Path, stub) -> None:
                    "partial_cells")),
               repr(payload))
 
+    # ---- 089: the by-day and vs-Baseline grids render the overlay too ---------- #
+    print("089 the overlay reaches all three rendered grids:")
+    import baseline_matrix
+    import day_matrix
+    for label, mod, key, cell_id in (
+            ("by-day", day_matrix, "highway_sequence|ssor-prod", "2026-07-09"),
+            ("vs-baseline", baseline_matrix,
+             "highway_sequence|ssor-prod|base", "2026-07-09")):
+        root = mod.byday_root()
+        matrix_state.record_attempt(root, key, cell_id, "error",
+                                    reason="injected for the render check")
+        shown = matrix_state._last_attempt_for(
+            matrix_state.load_attempts(root), key, cell_id, {"mtime": None})
+        check(f"089: the {label} grid resolves a durable attempt for its cell",
+              shown is not None and shown.get("status") == "error", repr(shown))
+        matrix_state.record_attempt(root, key, cell_id, matrix_state.ATTEMPT_OK)
+        cleared = matrix_state._last_attempt_for(
+            matrix_state.load_attempts(root), key, cell_id, {"mtime": None})
+        check(f"089: a succeeded {label} rebuild clears it", cleared is None,
+              repr(cleared))
+
     # ---- 089: a newer artifact supersedes an older failed attempt --------------- #
     root = matrix_state.comparisons_common_root(dest)
     matrix_state.record_attempt(root, "highway_sequence|tsn", cell, "error",
