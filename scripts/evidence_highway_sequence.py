@@ -46,6 +46,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import compare_highway_sequence_pdf as chslpdf
 import compare_highway_sequence_tsn as chsl
 import consolidate_tsmis_highway_sequence_pdf as chslp
 import consolidate_tsn_highway_sequence as ctnsl
@@ -109,7 +110,21 @@ def load_sides(consolidated_path, tsn_path):
     return tsmis_rows, tsn_rows, {"routing": "per-print"}, None
 
 
-def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
+def load_sides_self(pdf_path, excel_path):
+    """(pdf_rows, excel_rows, meta, note) for the PDF-vs-Excel self check —
+    through the SELF comparator's OWN loader pair and schema, so evidence and
+    comparison can never diverge (CMP-AUD-107/210). `meta['schema']` is the
+    schema that comparison actually used."""
+    self_cmp = chslpdf.TSMIS_PDF_VS_EXCEL
+    try:
+        rows_a, rows_b, _ = self_cmp._load_pair(pdf_path, excel_path)
+    except ValueError as e:
+        return None, None, None, str(e)
+    return rows_a, rows_b, {"routing": "per-print",
+                            "schema": self_cmp._schema_for(excel_path)}, None
+
+
+def enumerate_diffs(tsmis_rows, tsn_rows, sidecar, schema=None):
     """{field: [example]} over composite keys UNIQUE per route on BOTH sides —
     each example a cell the comparison counts. Judged by compare_core's own
     compared_cell (the comparison's TRIM + context-field semantics), so
@@ -117,15 +132,19 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
     columns are non-asserting and can never enumerate. District/county are the
     sentinel '' — locate_tsn resolves prints itself."""
     del sidecar
-    sc = chsl._SCHEMA
-    key_field = chsl.KEY_FIELD
+    sc = schema or chsl._SCHEMA
+    # Iterate the SCHEMA's own header, never a hardcoded copy: the PDF-vs-Excel
+    # schema carries a column ("PM Suffix") the vs-TSN header does not, so a
+    # parallel list would shift every field index past it.
+    key_field = sc.key_field
     a_route, b_route = defaultdict(list), defaultdict(list)
-    # The A-side row's position rides along so the engine can address the exact
-    # CONSOLIDATED-workbook cell an Excel-compared value came from (CMP-AUD-210).
+    # Each side's row position rides along so the engine can address the exact
+    # CONSOLIDATED-workbook cell a value came from when that side was compared
+    # from a workbook rather than a print (CMP-AUD-210).
     for i, r in enumerate(tsmis_rows):
         a_route[r[0]].append((i, r))
-    for r in tsn_rows:
-        b_route[r[0]].append(r)
+    for i, r in enumerate(tsn_rows):
+        b_route[r[0]].append((i, r))
     diffs = defaultdict(list)
     for route in sorted(set(a_route) & set(b_route)):
         a_ct, b_ct = defaultdict(int), defaultdict(int)
@@ -134,16 +153,16 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
             k = _row_key(r)
             a_ct[k] += 1
             a_by[k] = (i, r)
-        for r in b_route[route]:
+        for i, r in b_route[route]:
             k = _row_key(r)
             b_ct[k] += 1
-            b_by[k] = r
+            b_by[k] = (i, r)
         for key in set(a_by) & set(b_by):
             if a_ct[key] != 1 or b_ct[key] != 1:
                 continue                       # duplicates -> the pairing's job
-            (ia, ra), rb = a_by[key], b_by[key]
+            (ia, ra), (ib, rb) = a_by[key], b_by[key]
             pub_key = published_key_text(sc, ra)
-            for f_idx, field in enumerate(chsl.SHARED_HEADER):
+            for f_idx, field in enumerate(sc.header):
                 if f_idx == key_field:         # the key column itself
                     continue
                 cell = compared_cell(sc, f_idx, ra, rb, 1)
@@ -151,7 +170,7 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
                     diffs[field].append(dict(
                         route=route, key=key, field=field,
                         va=cell.display_a, vb=cell.display_b,
-                        dist="", cnty="", row_index=ia,
+                        dist="", cnty="", row_index=ia, row_index_b=ib,
                         pub_key=pub_key, display=cell.display))
     return diffs
 

@@ -44,11 +44,13 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import compare_highway_log_pdf as chlpdf
 import compare_highway_log as chl
 import consolidate_tsmis_highway_log_pdf as chlp
 import consolidate_tsn_highway_log as ctnl
 import highway_log_columns as hlc
 from compare_core import _xl_trim, compared_cell, published_key_text
+from compare_tsn_common import reject_pdf_source, require_pdf_source
 from pdf_table_lib import require_document_route
 
 log = logging.getLogger("tsmis.evidence")
@@ -87,22 +89,43 @@ def load_sides(consolidated_path, tsn_path):
     return tsmis_rows, tsn_rows, {"routing": "per-print"}, None
 
 
-def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
+def load_sides_self(pdf_path, excel_path):
+    """(pdf_rows, excel_rows, meta, note) for the PDF-vs-Excel self check —
+    through the SELF comparator's OWN loader pair and schema, so evidence and
+    comparison can never diverge (CMP-AUD-107/210). `meta['schema']` is the
+    schema that comparison actually used."""
+    self_cmp = chlpdf.TSMIS_PDF_VS_EXCEL
+    try:
+        # The Highway Log self check builds its loader inside compare(); the
+        # same-source pair (with the "Location (raw)" column) plus the
+        # CMP-AUD-066 source-marker gates are reproduced here so evidence sees
+        # exactly the rows the comparison saw.
+        require_pdf_source(pdf_path, self_cmp.file_a_label, "Highway Log")
+        reject_pdf_source(excel_path, self_cmp.file_b_label, "Highway Log")
+        rows_a, rows_b, _extra, _has_route = chlpdf._load_pair_same_source(
+            pdf_path, excel_path)
+    except ValueError as e:
+        return None, None, None, str(e)
+    return rows_a, rows_b, {"routing": "per-print",
+                            "schema": self_cmp._schema}, None
+
+
+def enumerate_diffs(tsmis_rows, tsn_rows, sidecar, schema=None):
     """{field: [example]} over canonical keys UNIQUE per route on BOTH sides —
     each example a cell the comparison flags. Judged by compare_core's own
     compared_cell (the comparison's TRIM / Med Wid / non-asserting-ditto
     semantics), so inequality here == a red cell there. District/county are the
     sentinel '' — locate_tsn resolves prints itself."""
     del sidecar
-    sc = chl._SCHEMA
+    sc = schema or chl._SCHEMA
     a_route, b_route = defaultdict(list), defaultdict(list)
-    # The A-side row's position is carried through so the engine can address the
-    # exact CONSOLIDATED-workbook cell an Excel-compared value came from
-    # (CMP-AUD-210); the TSN side is always evidenced from its print.
+    # Each side's row position rides along so the engine can address the exact
+    # CONSOLIDATED-workbook cell a value came from when that side was compared
+    # from a workbook rather than a print (CMP-AUD-210).
     for i, r in enumerate(tsmis_rows):
         a_route[r[0]].append((i, r))
-    for r in tsn_rows:
-        b_route[r[0]].append(r)
+    for i, r in enumerate(tsn_rows):
+        b_route[r[0]].append((i, r))
     diffs = defaultdict(list)
     for route in sorted(set(a_route) & set(b_route)):
         a_ct, b_ct = defaultdict(int), defaultdict(int)
@@ -111,24 +134,27 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
             k = _canon(r, off=1)
             a_ct[k] += 1
             a_by[k] = (i, r)
-        for r in b_route[route]:
+        for i, r in b_route[route]:
             k = _canon(r, off=1)
             b_ct[k] += 1
-            b_by[k] = r
+            b_by[k] = (i, r)
         for key in set(a_by) & set(b_by):
             if a_ct[key] != 1 or b_ct[key] != 1:
                 continue                       # duplicates -> the pairing's job
-            (ia, ra), rb = a_by[key], b_by[key]
+            (ia, ra), (ib, rb) = a_by[key], b_by[key]
             pub_key = published_key_text(sc, ra)
-            for f_idx, field in enumerate(hlc.HEADER):
-                if f_idx == 0:                 # the key column itself
+            # The SCHEMA's own header, never a hardcoded copy: a
+            # self-check schema can carry columns the vs-TSN header
+            # lacks, which would shift every later field index.
+            for f_idx, field in enumerate(sc.header):
+                if f_idx == sc.key_field:      # the key column itself
                     continue
                 cell = compared_cell(sc, f_idx, ra, rb, 1)
                 if cell.verdict is False:
                     diffs[field].append(dict(
                         route=route, key=key, field=field,
                         va=cell.display_a, vb=cell.display_b,
-                        dist="", cnty="", row_index=ia,
+                        dist="", cnty="", row_index=ia, row_index_b=ib,
                         pub_key=pub_key, display=cell.display))
     return diffs
 

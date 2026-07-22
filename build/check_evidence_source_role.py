@@ -134,13 +134,56 @@ finally:
     shutil.rmtree(_r, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #
-print("every adapter carries the row position its Excel address needs")
-for _name in ("evidence_highway_detail", "evidence_highway_log",
-              "evidence_highway_sequence", "evidence_intersection_detail",
-              "evidence_ramp_detail"):
+print("every adapter carries the row position each side's Excel address needs")
+_ADAPTERS = ("evidence_highway_detail", "evidence_highway_log",
+             "evidence_highway_sequence", "evidence_intersection_detail",
+             "evidence_ramp_detail")
+for _name in _ADAPTERS:
     _src = Path(__file__).resolve().parent.parent / "scripts" / f"{_name}.py"
     _text = _src.read_text(encoding="utf-8")
-    check(f"{_name}.enumerate_diffs emits row_index", "row_index=ia" in _text)
+    check(f"{_name}.enumerate_diffs emits both row positions",
+          "row_index=ia" in _text and "row_index_b=ib" in _text)
+
+# --------------------------------------------------------------------------- #
+print("the PDF-vs-Excel self check can be illustrated")
+check("generate() knows both flavors and refuses anything else",
+      ve.FLAVORS == (ve.FLAVOR_TSN, ve.FLAVOR_SELF))
+for _name in _ADAPTERS:
+    _mod = __import__(_name)
+    check(f"{_name} exposes the SELF comparator's loader pair",
+          callable(getattr(_mod, "load_sides_self", None)))
+check("every evidence row can illustrate its self check",
+      all(ve.self_capable(rk) for rk in ve.rows()))
+
+# The censused defect: enumerate_diffs used to walk a HARDCODED copy of the
+# vs-TSN header. The PDF-vs-Excel schema carries a column the vs-TSN one does
+# not ("PM Suffix" on Highway Sequence), so every field index past it shifted
+# and the engine judged the wrong column — caught only because the published
+# cell disagreed. The field loop must walk the SCHEMA's own header.
+import compare_highway_sequence_tsn as chsl
+import evidence_highway_sequence as ehsl
+from compare_core import CompareSchema
+
+_SELF_HEADER = ["County", "PM", "PM Suffix", "City", "HG", "FT",
+                "Distance To Next Point", "Description"]
+_WIDE = CompareSchema(report_name="HSL self", header=_SELF_HEADER, key_field=1)
+
+
+def _wide_row(ft):
+    row = ["001", "MON", "028.013", "", "", "", ft, "", ""]
+    return row
+
+
+_diffs = ehsl.enumerate_diffs([_wide_row("U")], [_wide_row("H")], {},
+                              schema=_WIDE)
+check("a schema with an extra column reports the RIGHT field name",
+      list(_diffs) == ["FT"])
+check("...and the values are that column's, not a neighbour's",
+      _diffs["FT"][0]["va"] == "U" and _diffs["FT"][0]["vb"] == "H")
+check("...with both sides' row positions carried",
+      _diffs["FT"][0]["row_index"] == 0 and _diffs["FT"][0]["row_index_b"] == 0)
+check("the narrow vs-TSN header still walks its own columns unchanged",
+      len(chsl._SCHEMA.header) + 1 == len(_SELF_HEADER))
 
 print()
 if _fail:

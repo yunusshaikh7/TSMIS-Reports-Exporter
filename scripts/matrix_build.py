@@ -1301,6 +1301,45 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
     return result
 
 
+def _run_self_evidence(row_key, pdf_consolidated, excel_consolidated, out_path,
+                       tsmis_pdf_dir, evidence_opts, events, result,
+                       commit_guard):
+    """Illustrate a finished PDF-vs-Excel self check (CMP-AUD-210).
+
+    Same decoration contract as the vs-TSN path: it never changes the
+    comparison's status, completion or counts, and any failure only logs and
+    notes. Both compared sides are TSMIS here, so there is no TSN library to
+    certify — the published comparison must still be COMPLETE before anything
+    is drawn from it."""
+    if not evidence_opts:
+        return
+    try:
+        import visual_evidence                          # lazy: pulls PIL/pdfium
+        if not visual_evidence.self_capable(row_key):
+            return
+        _require_commit_guard(comparison_guard := commit_guard,
+                              "visual-evidence write")
+        published = consolidation_meta.require_published_comparison(
+            out_path, result)
+        if published.comparison_outcome.completion != outcome.COMPLETE:
+            raise ValueError(_partial_comparison_reason(
+                published.comparison_outcome))
+        ev = visual_evidence.generate(
+            row_key, pdf_consolidated, excel_consolidated, out_path,
+            tsmis_pdf_dir, events, examples=evidence_opts.get("examples"),
+            layout=evidence_opts.get("layout"),
+            commit_guard=comparison_guard,
+            flavor=visual_evidence.FLAVOR_SELF)
+        if ev.get("note"):
+            result.summary_lines = list(result.summary_lines) + [ev["note"]]
+    except Exception as e:                               # noqa: BLE001
+        log.warning("self-check evidence for %s skipped", row_key, exc_info=True)
+        msg = str(e).splitlines()[0] if str(e) else type(e).__name__
+        events.on_log(f"  evidence images skipped — {msg}")
+        result.summary_lines = list(result.summary_lines) + [
+            f"evidence images skipped — {msg}"]
+
+
 def _ensure_consolidated(store_dir, subdir, events, force,
                          commit_guard=None):
     """Return (persistent consolidated workbook path, its producer completion) for a
@@ -1437,6 +1476,14 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                 confirm_overwrite=lambda _p: True, mode="formulas",
                 commit_guard=commit_guard), out_path, also_formulas, events,
                 source_paths=source_paths, commit_guard=commit_guard)
+            # CMP-AUD-210: the self check can be illustrated too — side A from
+            # the per-route print, side B from the Excel workbook's own cell.
+            _run_self_evidence(
+                row_key, pdf_c, excel_c, out_path,
+                dest / cell_key / pdf_subdir,
+                evidence_opts_for(evidence, row_key,
+                                  lambda sub: dest / cell_key / sub),
+                events, result, commit_guard)
         # P1-R01: a PARTIAL side means the self comparison diffed INCOMPLETE inputs —
         # propagate it (either side partial -> the cell records partial) so a self
         # comparison can't hide that one side was built from incomplete inputs.

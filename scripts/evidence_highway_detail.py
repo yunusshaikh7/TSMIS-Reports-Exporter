@@ -36,6 +36,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import compare_highway_detail_pdf as chdpdf
 import compare_highway_detail_tsn as cht
 import consolidate_tsmis_highway_detail_pdf as chd
 import highway_detail_columns as hdc
@@ -155,35 +156,53 @@ def _load_tsn_with_sidecar(path):
     return rows, sidecar, None
 
 
-def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
+def load_sides_self(pdf_path, excel_path):
+    """(pdf_rows, excel_rows, meta, note) for the PDF-vs-Excel self check —
+    through the SELF comparator's OWN loader pair and schema, so evidence and
+    comparison can never diverge (CMP-AUD-107/210). `meta['schema']` is the
+    schema that comparison actually used."""
+    self_cmp = chdpdf.TSMIS_PDF_VS_EXCEL
+    try:
+        rows_a, rows_b, _ = self_cmp._load_pair(pdf_path, excel_path)
+    except ValueError as e:
+        return None, None, None, str(e)
+    meta = {}
+    meta["schema"] = self_cmp._schema_for(pdf_path, excel_path)
+    return rows_a, rows_b, meta, None
+
+
+def enumerate_diffs(tsmis_rows, tsn_rows, sidecar, schema=None):
     """{field: [example]} over keys UNIQUE per route on BOTH sides — each
     example a cell the comparison COUNTS. Equality is the engine's OWN
     compared_cell verdict (Excel TRIM + the Med V/WDA fold + non-asserting
     context/ditto), so inequality here == a red cell there and a whitespace-,
     Med-Wid-, or context-only non-difference can never leak in (CMP-AUD-107 —
     the shared engine, matching the Highway Log / Highway Sequence adapters)."""
-    sc = cht._SCHEMA
+    sc = schema or cht._SCHEMA
     a_route, b_route = defaultdict(list), defaultdict(list)
     # The A-side row's position rides along so the engine can address the exact
     # CONSOLIDATED-workbook cell an Excel-compared value came from (CMP-AUD-210).
     for i, r in enumerate(tsmis_rows):
         a_route[r[0]].append((i, r))
-    for r in tsn_rows:
-        b_route[r[0]].append(r)
+    for i, r in enumerate(tsn_rows):
+        b_route[r[0]].append((i, r))
     diffs = defaultdict(list)
     for route in sorted(set(a_route) & set(b_route)):
         a_ct, b_ct = defaultdict(int), defaultdict(int)
         for _i, r in a_route[route]:
             a_ct[r[1]] += 1
-        for r in b_route[route]:
+        for _i, r in b_route[route]:
             b_ct[r[1]] += 1
         a_by = {r[1]: (i, r) for i, r in a_route[route] if a_ct[r[1]] == 1}
-        b_by = {r[1]: r for r in b_route[route] if b_ct[r[1]] == 1}
+        b_by = {r[1]: (i, r) for i, r in b_route[route] if b_ct[r[1]] == 1}
         for key in set(a_by) & set(b_by):
-            (ia, ra), rb = a_by[key], b_by[key]
+            (ia, ra), (ib, rb) = a_by[key], b_by[key]
             pub_key = published_key_text(sc, ra)
-            for i, f in enumerate(cht.SHARED_HEADER):
-                if i == cht.KEY_FIELD:
+            # The SCHEMA's own header, never a hardcoded copy: a
+            # self-check schema can carry columns the vs-TSN header
+            # lacks, which would shift every later field index.
+            for i, f in enumerate(sc.header):
+                if i == sc.key_field:
                     continue
                 cell = compared_cell(sc, i, ra, rb, 1)
                 if cell.verdict is False:
@@ -191,7 +210,7 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
                     diffs[f].append(dict(
                         route=route, key=key, field=f,
                         va=cell.display_a, vb=cell.display_b,
-                        dist=dist, cnty=cnty, row_index=ia,
+                        dist=dist, cnty=cnty, row_index=ia, row_index_b=ib,
                         pub_key=pub_key, display=cell.display))
     return diffs
 
