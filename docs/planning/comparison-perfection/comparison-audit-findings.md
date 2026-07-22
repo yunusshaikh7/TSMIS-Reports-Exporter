@@ -9371,6 +9371,18 @@ Detail is pre-release (⛔ never re-bless it against the accidental-window artif
 share ID/RD's typed-PhysicalKey mechanism, which IS measured; both are pinned structurally
 against `keys_for`. Fold the two real-data measurements into the next statewide batch.
 
+**Second family, end to end, on the real corpus.** Highway Log (the roadbed
+key-normalizer family, with per-print TSN fan-out rather than a district index) ran the
+whole spine through the shipped `generate()` against the 2026-07-09 ssor-prod statewide
+export: the decoder read 63,616 published rows / **140,643 counted differences across 30
+columns** / 15,265 one-sided rows / 1,099 repeated-key groups, the ledger classified all
+**1,908,480** cells with none left over, and **30 examples rendered across 30/30 differing
+columns with zero misses and zero published-cell refusals** — every reconciliation passed.
+Each example names its published cell and both source rows (e.g. Cnty Odom 101 @ 011.408 →
+`Comparison!39253 · occurrence 1 · state D`, `TSMIS!32732 · TSN!19074`). HL's own
+duplicate-invisible slice was 4,040 cells (2.87%) — smaller than HSL's 20.92%, which is
+exactly why a single family could never have sized this class.
+
 **One behavior improvement fell out.** When no column has a photographable row (the
 duplicate-only shape, or the published cells refuse every proposal), the run reports the
 published counts and reasons without opening a single PDF — twelve district prints of
