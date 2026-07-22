@@ -9364,7 +9364,12 @@ addressing is pinned for all five against `keys_for`'s own derivation, and measu
 real data for all three key mechanisms — typed PhysicalKey (HSL 49,874 addresses, RD
 15,211), the roadbed key normalizer (HL 47,161), every one with **0 misses**, plus
 180,000/180,000 (HL) and 72,000/72,000 (RD) state-and-display agreements against the
-published cells; RD's 843/202 canary is intact.
+published cells; RD's 843/202 canary is intact. **Intersection Detail and Highway Detail
+were NOT measured on real data here, and for pre-existing reasons, not for lack of
+support:** this box has no ssor-prod 7.9 Intersection Detail consolidation, and Highway
+Detail is pre-release (⛔ never re-bless it against the accidental-window artifacts). Both
+share ID/RD's typed-PhysicalKey mechanism, which IS measured; both are pinned structurally
+against `keys_for`. Fold the two real-data measurements into the next statewide batch.
 
 **One behavior improvement fell out.** When no column has a photographable row (the
 duplicate-only shape, or the published cells refuse every proposal), the run reports the
