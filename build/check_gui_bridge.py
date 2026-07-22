@@ -443,8 +443,10 @@ def test_tsn_library_panel():
                 "producer_complete": True, "normalization_current": True,
                 "raw_manifest_current": True, "normalized_workbook_current": True,
                 "identity_token_current": True}
+        base["stored_normalization_version"] = 3
+        base["expected_normalization_version"] = 5
         cases = {
-            "normalization_current": "older normalizer",
+            "normalization_current": "version 3, this app expects 5",
             "raw_manifest_current": "raw TSN files changed",
             "producer_complete": "skipped or failed inputs",
             "metadata_current": "does not match the workbook",
@@ -458,6 +460,16 @@ def test_tsn_library_panel():
                   expect in reason)
         check("each failing condition yields a DISTINCT reason",
               len(distinct) == len(cases))
+        # The "older normalizer" verdict must carry its two numbers: a rebuild that
+        # has just run and still reads stale is otherwise unactionable.
+        check("a missing normalizer stamp is distinguished from a stale one",
+              "carries no normalizer version" in _reason(
+                  {**base, "normalization_current": False,
+                   "stored_normalization_version": None}))
+        check("an unusable normalizer stamp is distinguished from a stale one",
+              "unusable" in _reason(
+                  {**base, "normalization_current": False,
+                   "stored_normalization_version": "5"}))
         check("a current report reports no stale reason",
               _reason({**base, "current": True}) == "")
         check("tsn_library_status() wraps the rows",

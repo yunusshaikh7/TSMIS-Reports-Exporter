@@ -855,6 +855,12 @@ def status(report):
         "certificate_error": certificate_error,
         "producer_complete": producer_complete,
         "normalization_current": norm_current,
+        # The two numbers the "older normalizer" verdict is made of. Reported so a
+        # field log distinguishes a genuinely stale stamp (3 vs 5) from a missing
+        # key or a wrong type — "rebuild it" is useless advice when a rebuild has
+        # just run and the report still reads stale.
+        "stored_normalization_version": stored_version,
+        "expected_normalization_version": spec.normalization_version,
         "raw_manifest_current": raw_manifest_current,
         "raw_manifest_sha256": (current_manifest or {}).get("sha256"),
         "normalized_workbook_current": normalized_workbook_current,

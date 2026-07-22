@@ -944,7 +944,16 @@ class GuiMatrixMixin:
         if not s.get("producer_complete"):
             return "the last build reported skipped or failed inputs — rebuild it"
         if not s.get("normalization_current"):
-            return "built by an older normalizer — rebuild it (expected once after an app update)"
+            stored = s.get("stored_normalization_version")
+            expected = s.get("expected_normalization_version")
+            if stored is None:
+                return (f"its build record carries no normalizer version "
+                        f"(this app expects {expected}) — rebuild it")
+            if not isinstance(stored, int) or isinstance(stored, bool):
+                return (f"its build record's normalizer version is unusable "
+                        f"({stored!r}; this app expects {expected}) — rebuild it")
+            return (f"built by normalizer version {stored}, this app expects "
+                    f"{expected} — rebuild it (expected once after an app update)")
         if not s.get("raw_manifest_current"):
             return "the raw TSN files changed since it was built — rebuild it"
         if not s.get("normalized_workbook_current"):
