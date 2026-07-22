@@ -10776,6 +10776,63 @@ state edge-tab normalization is "never the vs-TSN legs"). Evidence: scratchpad
 `id_task/cmp_A_excel_vs_tsn.xlsx` (Description 4) vs `cmp_B_pdf_vs_tsn.xlsx`
 (Description 12), both statewide on the 2026-07-17 export.
 
+### CMP-AUD-242 — payload chunk basename overruns Windows MAX_PATH on the deployment target (OPEN — MUST SHIP)
+
+**Field-confirmed on the work PC, v0.27.0, 8/8 comparison runs.** Every by-day
+vs-TSN comparison built its workbook correctly and then vanished from the matrix.
+
+Root cause: the schema-v3 payload chunk basename is **~148 characters** —
+`.cmpv3-{64 hex}-{index:06d}-{64 hex}.comparison-payload.zlib`
+(`consolidation_meta._payload_primary_basename` / `_payload_slot_basename`). At the
+field install depth
+`C:\Users\<user>\Downloads\Apps\TSMIS Exporter\output\comparisons\tsn-by-day\<day>\`
+(parent = 97 chars) the published path is **265 characters**, over the classic
+260 limit. A process is exempt only when the OS policy `LongPathsEnabled=1`; the
+dev machine has 1, **a managed Caltrans PC has the default 0 and cannot change it
+without an administrator**. `os.open` refuses → `_publish_payload_chunk_with_fallback`
+returns `None` → `write_comparison_outcomes` returns `False` →
+`artifact_store._publish_artifact_generation` flips ok→error and marks the members
+untrusted → the matrix correctly refuses to display an uncertifiable comparison.
+The workbook itself is committed and valid.
+
+This is a **deployment-target defect, not a logic defect**: CLAUDE.md requires the
+app to run as a plain unsigned exe from a user-writable folder on a locked-down PC.
+`check_comparison_path_limits.py` exercises a real >260 publication only "when the
+development runtime/Windows policy permits it", so it passes on a long-path-aware
+dev box and is **structurally incapable of catching this** — that conditional is
+part of the finding.
+
+**Reproduced** (2026-07-21) by running a real Highway Log vs TSN comparison into a
+tree padded to the field's exact 97-char parent with `os.open`/`os.replace` refusing
+`>=260`: the field message appears verbatim, `published=False`, `workbook=True`.
+
+**Shipped so far (v0.27.1, `f55d946`) — diagnosis only, NOT the fix.** Every
+fail-closed publication gate now names itself; the chunk gate prints the full path
+and its length and, when over the limit, names the remedy; the user-facing message
+says the same in UI-neutral terms. Behavior unchanged.
+
+**The fix that MUST ship before comparison-perfection is called done:** shorten the
+chunk basename. Truncating each hex to 16 (`.cmpv3-{16}-{6}-{16}…` ≈ 52 chars) cuts
+~96 characters and is safe on integrity grounds — reads resolve the chunk via
+`descriptor["relative_path"]` from the manifest and verify the **full** sha256 and
+size, so the NAME is an addressing convenience, not the integrity claim. It is a
+**persisted-format change**, so it needs its own census + red→green + real-corpus
+re-verify, and must keep reading existing v3 payloads (manifest-driven reads already
+do). Call sites that pin the current shape:
+
+- `scripts/consolidation_meta.py:86` — `^\.cmpv3-[0-9a-f]{64}-[0-9]{6}-[0-9a-f]{64}`
+- `scripts/consolidation_meta.py:1847` — same shape, **captures** the digest (chunk reclamation)
+- `scripts/artifact_store.py:58` — same shape
+- `scripts/consolidation_meta.py:167` / `:173` — the two basename builders
+- `scripts/consolidation_meta.py:1296` / `:1299` / `:1306` — primary + fallback-prefix build and parse
+- `_NEW_PAYLOAD_PRIMARY_MAX_NAME` / `_NEW_PAYLOAD_SLOT_MAX_NAME` (`:182`/`:184`) — derived budgets
+- `build/check_comparison_path_limits.py` — must gain an UNCONDITIONAL total-path
+  budget assertion against a realistic deep install parent, independent of the
+  runtime's long-path policy
+
+**Owner workaround until it ships:** move the app to a short folder path
+(e.g. `C:\TSMIS\TSMIS Exporter\`); this works on an existing install with no rebuild.
+
 ### Note — ACL "lease-leak" hypothesis disproved (2026-07-14)
 
 The reconciliation flagged that three audit directories were ACL-locked against the

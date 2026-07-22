@@ -46,6 +46,8 @@ its findings back-to-back, then update this roadmap.
 | **NORM** | **Source normalization fidelity — bucket G (8)** | HD: 042 133 138 142 186 · IS/HSL: 144 145 193 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
 | **DUR** | **Phase-5/7 durability & policy — the OWNER-GATED cluster (4)** | 080 085 089 115 | The deferred durable-attempt-overlay / policy / commit-schema family. **085 needs an OWNER DECISION** (canonical artifact = *last-complete* or *latest-attempt*?) **+** a durable attempt overlay (Phase-5/7); **089** is that overlay (a crashed rebuild silently reverts to the old ✓); **080** source-fingerprint content identity (per-cell-per-snapshot perf-cache); **115** the commit-boundary schema gate + its exhaustive per-comparator census. **Read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes FIRST; surface the 085 policy decision.** "Correct today, hardening tomorrow" — no live false-green; durability + defense-in-depth. |
 
+| **PATH** ⛔ | **MAX_PATH — MUST SHIP BEFORE "DONE" (1)** | **242** | **Field-confirmed on the work PC (v0.27.0, 8/8 runs): every by-day comparison built and then vanished from the matrix.** The schema-v3 payload chunk basename is ~148 chars, so at the real install depth the published path is **265 > 260**; the dev box has `LongPathsEnabled=1`, **a managed Caltrans PC has 0 and cannot change it** — that is the whole dev-vs-field difference. The workbook commits; only the trust metadata fails, so the matrix correctly hides an uncertifiable comparison. v0.27.1 (`f55d946`) shipped **diagnosis only** (every gate names itself; the path-limit refusal names the remedy). **The fix — shorten the basename (each hex → 16, ≈52 chars) — is a persisted-format change** pinned by three `{64}`-hex regexes + the chunk-reclamation capture + the fallback-prefix parse; needs its own census + red→green + real-corpus re-verify and must keep reading existing v3 payloads (manifest-driven reads already do). **`check_comparison_path_limits.py` tests >260 only "when the runtime/Windows policy permits", so it can never catch this — it must gain an UNCONDITIONAL deep-parent budget assertion.** Owner workaround meanwhile: install to a short path. **Blocks completion: the deployment target is a locked-down PC (CLAUDE.md), so a comparison that cannot publish there is not "perfect".** Call sites + repro: CMP-AUD-242. |
+
 **Vendor-blocked / next-statewide-batch — NOT a marathon.** **045** (HD-Excel county — the
 report-family integration leg still red), **192** (HD route-005 stale 7.7 Excel beside a newer PDF),
 plus **HL raw county**. **Never infer these** — they need the vendor/site answer or a fresh source
@@ -69,7 +71,32 @@ vendor approval), or the owner-gated Phase-5/7 cluster — **none is a live fals
 dedicated effort, do LAST despite being "BIG-1 leftover"). Each is a multi-session chunk, not a
 single marathon.
 
-> ### ▶ RESUME HERE (2026-07-19 — BIG-1: 107/110/112 CLOSED + 106/109 PARTIAL; 108/208/209/210 = Stage-10)
+> ### ▶ RESUME HERE (2026-07-21 — NORM is next; CMP-AUD-242 MUST SHIP before "done")
+>
+> **Gate 144/144 · code tip `f55d946` (= v0.27.1) · ~219 closed (~91%) + 242 open.**
+>
+> **NEXT MARATHON: NORM** (bucket G, 8 findings — HD 042/133/138/142/186 + IS/HSL 144/145/193).
+> Owner-directed 2026-07-21. Source-first: prove raw→normalized record/field conservation, re-prove
+> comparison cells, re-bless with exact evidence. The source-conservation pattern is well-trodden from
+> the shipped ID-056; HD stays provisional on the vendor county answer.
+>
+> **⛔ CMP-AUD-242 (MAX_PATH) MUST SHIP BEFORE COMPARISON-PERFECTION IS CALLED DONE** — owner-directed
+> 2026-07-21. v0.27.1 shipped the diagnosis only; the basename shortening is still owed. It is a
+> persisted-format change (three `{64}`-hex regexes + the reclamation capture + the fallback-prefix
+> parse) and `check_comparison_path_limits.py` must gain an UNCONDITIONAL deep-parent budget assertion,
+> because its current >260 test is skipped on any long-path-aware dev box. **Do NOT let this close as
+> "diagnosed".** Full repro + call sites: CMP-AUD-242. Owner workaround meanwhile: short install path.
+>
+> **v0.27.1 field batch (2026-07-21, all CI-green):** `556090c` every fail-closed publication gate names
+> itself + leaf OSError/path-length logging · `eddda72` TSN "Rebuild all out of date" (first-failure
+> honest) + the startup sign-in check announces itself · `b4de00f` TSN panel reports evidence prints
+> (4 states) + panel refresh keys off the consolidate task ENDING, not off who started it (it only
+> refreshed for the Settings button, so matrix-triggered rebuilds read STALE until restart) ·
+> `f55d946` the MAX_PATH diagnosis + v0.27.1.
+>
+> ---
+>
+> ### Prior resume (2026-07-19 — BIG-1: 107/110/112 CLOSED + 106/109 PARTIAL; 108/208/209/210 = Stage-10)
 >
 > **Gate 136/136 + 8 JS · code tip `49e42f8` · ~219 closed (~91%).** BIG-1 is as far as it goes without
 > the Stage-10 published-cell rebuild. This session's evidence work — all CI-verified:
@@ -1762,6 +1789,7 @@ These gate completion and are **not** in the implementer's control:
 1. **Missing source files (Stage 9 / Phase 4).** Companion-format and historical-edition oracles need source pulls that may not all be on disk. Rule: *if a required source role is absent, stop and request the file* — never infer it.
 2. **Highway Detail is vendor-provisional.** Its TSMIS layout is not vendor-finalized; it fail-closes on drift and may not reach "perfect-green" until Caltrans finalizes the format. External dependency, not a bug to code around.
 3. **Work-PC-only acceptance (Phase 10 Tier 4/5).** Installed-Excel COM recalc, real-source canaries, and work-PC acceptance can only run on the locked-down Caltrans PC. The dev machine cannot self-certify these.
+4. **The dev machine's OS policy is not the target's.** CMP-AUD-242 proved a class of defect the dev box structurally cannot see: `LongPathsEnabled=1` here vs the managed default `0` there made a 265-character publication path succeed locally and fail 100% in the field, and the existing path-limit gate skips its >260 case exactly when the runtime is long-path aware. **A gate that is conditional on dev-machine policy proves nothing about the deployment target** — assert the target's budget unconditionally, and measure the real install depth rather than a short temp directory.
 
 ---
 
