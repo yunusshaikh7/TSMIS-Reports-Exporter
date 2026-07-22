@@ -167,12 +167,12 @@
           remain are Phase-5/7 hardening + the evidence arc, not correctness.</div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="219 closed, 23 open of 242 findings">
-          <div class="seg done" style="width:91%">219 closed</div>
+        <div class="bar" role="img" aria-label="221 closed, 21 open of 242 findings">
+          <div class="seg done" style="width:91%">221 closed</div>
           <div class="seg open" style="width:10%">25 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 219 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot done"></i> 221 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
           <span><i class="dot open"></i> ~25 open <span class="num" style="color:var(--ink-3)">(Phase-5/7 + evidence + instruments)</span></span>
         </div>
       </div>
@@ -252,7 +252,7 @@
         </div>
       </div>
       <div class="step now"><div class="n">00</div><div class="body"><div class="h">PATH — MAX_PATH: must ship before “done” <span class="tag">1 · field-confirmed</span></div><div class="m"><b>CMP-AUD-242.</b> The v3 payload sidecar basename (~148 chars) makes a <b>265-character</b> path at the real install depth — past Windows’ 260. The dev box has <span class="mono">LongPathsEnabled=1</span>; a managed Caltrans PC has <span class="mono">0</span> and cannot change it, so every by-day comparison built and then vanished from the matrix (8/8 runs, v0.27.0). The workbook commits — only the trust metadata fails, so the matrix correctly hides an uncertifiable result. <b>v0.27.1 shipped the diagnosis only</b>; shortening the basename is a persisted-format change and is still owed. The existing path gate skips its &gt;260 case on any long-path-aware dev box, so it must gain an <b>unconditional</b> deep-parent budget assertion. Workaround meanwhile: install to a short path.</div></div></div>
-      <div class="step"><div class="n">01</div><div class="body"><div class="h">NORM — source normalization fidelity <span class="tag">8 · next</span></div><div class="m">Bucket G. The normalizer drops/rounds authoritative source data: HD 042/133/138/142/186 + IS/HSL 144/145/193. Source-first — prove raw→normalized conservation, re-prove cells, re-bless. Most tractable (the ID-056 pattern); HD provisional on the vendor county answer.</div></div></div>
+      <div class="step"><div class="n">01</div><div class="body"><div class="h">NORM — source normalization fidelity <span class="tag">2 of 8 done</span></div><div class="m"><b>138 ✅</b> Length quantized from the exact decimal — census of the raw workbook's OOXML lexicals: 60,083 values, the binary64 path wrong on exactly one, and half-up/half-even agree on all of them. <b>042 ✅</b> the PS marker was erased on re-projection, turning a real difference into a clean match — an <i>invented match</i>, now idempotent across every blank/E × roadbed case. Remaining: HD 133 · 142 · <b>186</b> (a parser rewrite — continuation ledger, cross-page merging, exactly-once word reconciliation; give it its own session), IS 144 · 145, HSL 193.</div></div></div>
       <div class="step"><div class="n">02</div><div class="body"><div class="h">DUR — Phase-5/7 durability &amp; policy <span class="tag">4 · owner-gated</span></div><div class="m">080/085/089/115. <b>085 needs the OWNER DECISION</b> (canonical artifact = last-complete or latest-attempt?) + a durable attempt overlay (089). Read <span class="mono">comparison-phase3-decision-gates.md</span> first. No live false-green — durability + defense-in-depth.</div></div></div>
       <div class="step"><div class="n">03</div><div class="body"><div class="h">EV-10 — evidence Stage-10 published-cell rebuild <span class="tag">7 · deepest, last</span></div><div class="m">108/208/209/210 + the 098/106/109 residuals. Drive evidence from the PUBLISHED comparison (per-cell state masks + <span class="mono">pairing_trace</span> + counts) with an INDEPENDENT raw-source oracle — Stage-9/10, a dedicated effort, not a marathon slice. 187 (instrument) + 045/192 (vendor-blocked) sit outside the chunks.</div></div></div>
     </div>
@@ -309,7 +309,7 @@
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · code tip <b>f55d946</b> (v0.27.1) · gate <b>144/144</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · code tip <b>06f2d85</b> (v0.27.2 released) · gate <b>144/144</b> · CI-green</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 

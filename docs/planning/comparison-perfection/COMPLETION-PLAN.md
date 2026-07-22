@@ -43,7 +43,7 @@ its findings back-to-back, then update this roadmap.
 | **M9** ◑ | Completion / partial-artifact policy + transaction (bucket E) | ~~035 040 075~~ · 085 098 115 | **PARTIAL 2026-07-18 — 3 closed (035 040 075), 3 DEFERRED.** 035 direct-builder post-`os.replace` recheck; 040 folder run-root/subfolder aliasing; 075 closed-by-082. **DEFERRED:** 115 (deep commit-schema gate on the correctness-locked path — read half already fixed; needs exhaustive per-comparator census), 098 (evidence-gate half = Stage-10), 085 (owner-gated last-complete/latest-attempt policy + Phase-5/7 durable overlay — with 089). |
 | ~~**BIG-1**~~ ◑ | **Evidence arc — bucket F. DONE to the tractable line: 107/110/112 ✅ + 106/109 partial + the layout feature (2026-07-18/19).** The remainder is EV-10 below. | ~~106~~ ~~107~~ ~~109~~ ~~110~~ ~~112~~ + 108 · 208 209 210 · 098 | 107 (compared_cell equality), 110 (queued-evidence identity), 112 (parse↔render byte digest) CLOSED; 106 (retire-stale-on-clean) + 109 (workbook+images one set) PARTIAL. What's left is the Stage-10 published-cell spine → **EV-10**. |
 | **EV-10** | **Evidence — Stage-10 published-cell rebuild + transaction completion (7)** | 108 · 208 209 210 · 098 · 106↺ 109↺ | The coherent evidence remainder. **ONE spine:** drive evidence from the PUBLISHED comparison — its per-cell E/D/N/U state masks + the persisted `pairing_trace` + per-column counts — instead of re-executing `adapter.load_sides`/`enumerate_diffs` (**208**), so duplicate-only diffs stop vanishing (**108**) and no discrepancy class is excluded before sampling (**209**); each item names flavor/sheet/row/cell/state/source-indices/provenance and an INDEPENDENT raw-source oracle recomputes it (the acceptance bar). Then the source-faithful Excel / PDF-vs-Excel routes (**210**, own mini-plan) + the durable per-comparison generation MANIFEST that finishes **106** (no-example/toggle-off/restart) + the evidence-gate read-set snapshot (**098**). The **109** two-phase residual (a quarantine-based two-artifact atomic commit so the images-locked case rolls both back) rides here too. **The CLAUDE.md-flagged "HSL not yet an end-to-end verifier" gap.** Investigation (2026-07-19): the truth is persisted as Excel formulas/value caches → needs a state-mask/pairing-trace decoder + the raw-source oracle = **Stage-9/10, a dedicated multi-session effort, NOT a marathon slice.** Detail: the `#### Disposition — 2026-07-19` note at CMP-AUD-208. |
-| **NORM** | **Source normalization fidelity — bucket G (8)** | HD: 042 133 138 142 186 · IS/HSL: 144 145 193 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
+| **NORM** ◑ | **Source normalization fidelity — bucket G (8) — 2 CLOSED 2026-07-21** | HD: ~~042~~ 133 ~~138~~ 142 186 · IS/HSL: 144 145 193 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
 | **DUR** | **Phase-5/7 durability & policy — the OWNER-GATED cluster (4)** | 080 085 089 115 | The deferred durable-attempt-overlay / policy / commit-schema family. **085 needs an OWNER DECISION** (canonical artifact = *last-complete* or *latest-attempt*?) **+** a durable attempt overlay (Phase-5/7); **089** is that overlay (a crashed rebuild silently reverts to the old ✓); **080** source-fingerprint content identity (per-cell-per-snapshot perf-cache); **115** the commit-boundary schema gate + its exhaustive per-comparator census. **Read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes FIRST; surface the 085 policy decision.** "Correct today, hardening tomorrow" — no live false-green; durability + defense-in-depth. |
 
 | **PATH** ⛔ | **MAX_PATH — MUST SHIP BEFORE "DONE" (1)** | **242** | **Field-confirmed on the work PC (v0.27.0, 8/8 runs): every by-day comparison built and then vanished from the matrix.** The schema-v3 payload chunk basename is ~148 chars, so at the real install depth the published path is **265 > 260**; the dev box has `LongPathsEnabled=1`, **a managed Caltrans PC has 0 and cannot change it** — that is the whole dev-vs-field difference. The workbook commits; only the trust metadata fails, so the matrix correctly hides an uncertifiable comparison. v0.27.1 (`f55d946`) shipped **diagnosis only** (every gate names itself; the path-limit refusal names the remedy). **The fix — shorten the basename (each hex → 16, ≈52 chars) — is a persisted-format change** pinned by three `{64}`-hex regexes + the chunk-reclamation capture + the fallback-prefix parse; needs its own census + red→green + real-corpus re-verify and must keep reading existing v3 payloads (manifest-driven reads already do). **`check_comparison_path_limits.py` tests >260 only "when the runtime/Windows policy permits", so it can never catch this — it must gain an UNCONDITIONAL deep-parent budget assertion.** Owner workaround meanwhile: install to a short path. **Blocks completion: the deployment target is a locked-down PC (CLAUDE.md), so a comparison that cannot publish there is not "perfect".** Call sites + repro: CMP-AUD-242. |
@@ -71,14 +71,36 @@ vendor approval), or the owner-gated Phase-5/7 cluster — **none is a live fals
 dedicated effort, do LAST despite being "BIG-1 leftover"). Each is a multi-session chunk, not a
 single marathon.
 
-> ### ▶ RESUME HERE (2026-07-21 — NORM is next; CMP-AUD-242 MUST SHIP before "done")
+> ### ▶ RESUME HERE (2026-07-21 — NORM 2/8 done; next = 186, then 133/142/144/145/193)
 >
-> **Gate 144/144 · code tip `f55d946` (= v0.27.1) · ~219 closed (~91%) + 242 open.**
+> **Gate 144/144 · code tip `06f2d85` · released v0.27.2 · ~221 closed + 242 open.**
 >
-> **NEXT MARATHON: NORM** (bucket G, 8 findings — HD 042/133/138/142/186 + IS/HSL 144/145/193).
-> Owner-directed 2026-07-21. Source-first: prove raw→normalized record/field conservation, re-prove
-> comparison cells, re-bless with exact evidence. The source-conservation pattern is well-trodden from
-> the shipped ID-056; HD stays provisional on the vendor county answer.
+> **NORM IN PROGRESS (bucket G) — 2 of 8 closed, both CI-green:**
+> - **CMP-AUD-138 ✅ (`d553fbd`)** — Length quantized from the EXACT decimal, never binary64.
+>   Census read the raw workbook's OOXML lexicals: 60,083 LENGTH values (= corpus row count),
+>   the float path wrong on exactly ONE (row 32565, `1.35E-2`, `000.013`→`000.014`), and
+>   half-up/half-even agree on all 60,083 — so the mode is documented, not load-bearing.
+> - **CMP-AUD-042 ✅ (`06f2d85`)** — `_normalized_row` re-ran `pm_suffix()` over the STORED PS
+>   marker, parsed `E` as a postmile token and erased it → an **invented match**. Now consumes
+>   the stored value; proven idempotent across every blank/E × roadbed combination.
+> - Neither needed a `normalization_version` bump: both normalize at COMPARISON time, so the
+>   cached library content is untouched and no user rebuild is required.
+>
+> **NEXT: CMP-AUD-186** — but note it is a **parser rewrite, not a quick fix**: a continuation
+> ledger held until the next proved line one / DCR boundary / document end, geometry-and-reading-order
+> merging of every continuation baseline, description-overflow vs attribute-wrap discrimination,
+> exactly-once word reconciliation, cross-page continuation, and partial/failed on any unexplained
+> fragment — bound to the real `highway_detail_route_395.pdf` (page 4, `08 SIE 395 / R000.000E`)
+> plus synthetic wraps in every line-two cell. **Give it a fresh session.** After it: 133, 142
+> (these two DO touch the library → D2 `normalization_version` bump + re-bless), then IS 144/145,
+> HSL 193.
+>
+> **METHOD WARNING (learned the hard way, 2026-07-21):** a census that reports "nothing changes"
+> is the most dangerous artifact in this project. The first CMP-AUD-138 census read 1,177 values
+> and reported ZERO changes because its cell regex mishandled self-closing `<c/>` elements and
+> mis-attributed columns. It was caught only because 1,177 was implausible against a 60,083-row
+> corpus and the finding's named row was absent. **Always reconcile a census count against the
+> known corpus size before trusting a null result.**
 >
 > **⛔ CMP-AUD-242 (MAX_PATH) MUST SHIP BEFORE COMPARISON-PERFECTION IS CALLED DONE** — owner-directed
 > 2026-07-21. v0.27.1 shipped the diagnosis only; the basename shortening is still owed. It is a

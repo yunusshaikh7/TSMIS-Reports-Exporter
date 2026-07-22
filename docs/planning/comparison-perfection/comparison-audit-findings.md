@@ -2491,9 +2491,33 @@ rechecked and transactional.
 ### CMP-AUD-042 — normalized Highway Detail erases the PS marker
 
 Priority: P1  
-Status: Verified raw-versus-normalized through all output surfaces  
+Status: **Resolved 2026-07-21 (`06f2d85`)** — `_normalized_row` consumes the stored PS
+value; only the RAW paths call `pm_suffix`.  
 Primary code: `scripts/compare_highway_detail_tsn.py:176-182,321-332`,
 `scripts/tsn_load_highway_detail.py:34-68,81-94`
+
+#### Remediation — 2026-07-21
+
+`_normalized_row` re-projects an already-projected library row and its docstring
+promises every projection is idempotent on already-normalized values. PS was the
+exception: it re-ran `pm_suffix()` over the STORED marker, which parsed `E` as a
+glued postmile token, found no trailing letters, and returned `""`. A row whose PS
+genuinely differed from TSMIS therefore reported a clean zero-difference match on
+Comparison, Summary and Report View — an invented match, the worst failure class in
+this engine. Highway Detail PDF-vs-TSN inherited the same loader.
+
+The stored value is now consumed directly (`_project`), which is idempotent by
+construction. `pm_suffix` remains correct and unchanged on the RAW paths, which see
+a real postmile token plus `E_IND`.
+
+Proved idempotent — raw → normalized → re-projected is stable for BOTH PS and the
+roadbed-aware Post Mile key — across every blank/E × roadbed/equation combination the
+finding required: `044.236`/E, `044.236`/blank, `R044.236R`/E, `R044.236L`/blank,
+`044.236R`/E, `012.500R`/blank, `L012.500`/E. Red→green: with the change reverted a
+stored `E` re-projects to `''` and both new pins fail. Suite 144/144.
+
+No `normalization_version` bump or user rebuild: the library CONTENT is unchanged —
+only its re-projection at comparison time was wrong.
 
 The current library builder stores the already-projected `PS` cell as blank or `E`.
 The normalized-library reader incorrectly treats that cell as a glued postmile token
