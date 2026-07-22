@@ -875,8 +875,22 @@ class GuiMatrixMixin:
         """Per-report status rows for the Settings TSN-reports panel. Floats
         (mtimes) are dropped — the panel only needs the booleans/counts/label."""
         import tsn_library                              # lazy import (tsn_library pulls pdfplumber via report_catalog)
+        # A TSN report can need TWO distinct assets and the panel used to show only
+        # the first: the raw the normalized library is BUILT from (district PDFs or
+        # a statewide workbook), and the TSN PRINTS the evidence images are cropped
+        # from. Reporting only the build source made "everything green" mean nothing
+        # about whether evidence could render. Both are reported per report now.
+        prints = {}
+        try:
+            import visual_evidence                      # lazy (pulls pdfplumber)
+            for r in visual_evidence.availability().get("reports", []):
+                prints[r["key"]] = r
+        except Exception as e:                           # noqa: BLE001
+            log.warning("tsn panel: evidence-print probe unavailable (%s): %s",
+                        type(e).__name__, e)
         rows = []
         for s in tsn_library.all_status():
+            ev = prints.get(s["report"])
             rows.append({
                 "report": s["report"], "label": s["label"],
                 "raw_kind": s["raw_kind"], "raw_present": s["raw_present"],
@@ -884,6 +898,13 @@ class GuiMatrixMixin:
                 "consolidated_present": s["consolidated_present"],
                 "current": s["current"],
                 "raw_dir": str(tsn_library.raw_dir(s["report"])),  # where its files live
+                # Evidence prints: None when this report has no evidence support at
+                # all (a missing print is then not a gap). "in_raw" reports reuse the
+                # SAME district prints they build from — never a second drop.
+                "evidence_supported": ev is not None,
+                "evidence_pdfs": (ev or {}).get("tsn_pdfs", 0),
+                "evidence_dir": (ev or {}).get("dir", ""),
+                "evidence_in_raw": (ev or {}).get("source") == "raw",
             })
         return rows
 

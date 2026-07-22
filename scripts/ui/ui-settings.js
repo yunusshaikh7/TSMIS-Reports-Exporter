@@ -235,6 +235,33 @@ function renderTsnLibrary(reports) {
       status.textContent = `${raw} · ${cons}`;
     }
 
+    // Second asset: the TSN prints the evidence images crop from. Reports that
+    // build from the SAME district prints need no separate drop, so they are
+    // reported as covered by the raw rather than as a second requirement.
+    const eviState = !r.evidence_supported ? "none"
+      : r.evidence_pdfs ? "ok" : "warn";
+    if (r.evidence_supported) {
+      const evi = document.createElement("span");
+      evi.className = "tsn-evidence muted " + eviState;
+      if (r.evidence_in_raw) {
+        evi.textContent = r.evidence_pdfs
+          ? `evidence prints: ${r.evidence_pdfs} (same as raw)`
+          : "evidence prints: none (uses this report's raw)";
+      } else {
+        evi.textContent = r.evidence_pdfs
+          ? `evidence prints: ${r.evidence_pdfs}`
+          : "evidence prints: MISSING";
+      }
+      evi.title = r.evidence_in_raw
+        ? "Evidence images crop from the same raw TSN prints this report builds "
+          + "from — no separate drop needed.\n" + (r.evidence_dir || "")
+        : (r.evidence_pdfs
+            ? "Evidence images can render for this report.\nPrints: " + (r.evidence_dir || "")
+            : "No TSN prints for this report yet — evidence images cannot render "
+              + "until they are dropped in:\n" + (r.evidence_dir || ""));
+      status.append(document.createElement("br"), evi);
+    }
+
     const actions = document.createElement("span");
     actions.className = "tsn-actions";
     const imp = document.createElement("button");

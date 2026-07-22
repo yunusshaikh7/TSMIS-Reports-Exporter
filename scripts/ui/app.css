@@ -1403,6 +1403,10 @@ body.matrix-wide.mw-bl #baselineMatrixConfig { display: flex; }
 .tsn-dot.none { background: color-mix(in oklab, var(--muted-foreground) 50%, transparent); }
 .tsn-name { font-size: 13px; font-weight: 600; min-width: 168px; }
 .tsn-status { font-size: 12px; }
+/* The second TSN asset (evidence prints). Missing prints are a real gap — the
+   images cannot render — so they read in the warning colour rather than muted. */
+.tsn-evidence { font-size: 11px; }
+.tsn-evidence.warn { color: var(--warning); }
 .tsn-actions { margin-left: auto; display: flex; gap: 6px; }
 
 /* Drag-to-reorder grips + drop indicators (matrix rows/columns, v0.17.0 Phase 4b) */

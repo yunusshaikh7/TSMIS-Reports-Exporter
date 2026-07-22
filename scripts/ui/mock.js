@@ -194,13 +194,30 @@ function makeMockApi() {
     highway_log:         { label: "TSN Highway Log", raw_kind: "district_pdfs", raw_count: 0, present: false, cons: false, current: false },          // no raw
   };
   const MOCK_TSN_ROOT = "C:\\Tools\\TSMIS Exporter\\data\\tsn_library";
+  // Evidence prints are the SECOND TSN asset (the images crop from them). Mixed
+  // states again so every panel case is reachable in #mock: prints present, prints
+  // MISSING, prints covered by the report's own raw, and no evidence support.
+  const mockTsnEvidence = {
+    ramp_detail:         { pdfs: 1, in_raw: false },
+    intersection_detail: { pdfs: 0, in_raw: false },   // MISSING -> evidence can't render
+    highway_sequence:    { pdfs: 12, in_raw: true },   // same district prints as raw
+    highway_log:         { pdfs: 0, in_raw: true },    // no raw yet, so no prints either
+  };
   function mockTsnLibraryRows() {
-    return Object.entries(mockTsnLib).map(([report, m]) => ({
-      report, label: m.label, raw_kind: m.raw_kind,
-      raw_present: m.present, raw_count: m.raw_count,
-      consolidated_present: m.cons, current: m.current,
-      raw_dir: `${MOCK_TSN_ROOT}\\${report}\\raw`,
-    }));
+    return Object.entries(mockTsnLib).map(([report, m]) => {
+      const ev = mockTsnEvidence[report];
+      return {
+        report, label: m.label, raw_kind: m.raw_kind,
+        raw_present: m.present, raw_count: m.raw_count,
+        consolidated_present: m.cons, current: m.current,
+        raw_dir: `${MOCK_TSN_ROOT}\\${report}\\raw`,
+        evidence_supported: !!ev,
+        evidence_pdfs: ev ? ev.pdfs : 0,
+        evidence_dir: ev
+          ? `${MOCK_TSN_ROOT}\\${report}\\${ev.in_raw ? "raw" : "pdf"}` : "",
+        evidence_in_raw: !!(ev && ev.in_raw),
+      };
+    });
   }
   function mockSiteUrlRows() {
     const rows = [];

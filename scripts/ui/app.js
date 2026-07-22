@@ -996,8 +996,17 @@ function dispatch(events) {
           if ((S.tab === "everything" && S.everySub === "matrix")
               || (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP)) applyMatrixEnvFlags();
           // A TSN-library rebuild finished (task slot freed) → refresh its panel.
-          if (S._tsnRebuildPending && (!S.st || S.st.task !== "consolidate")) {
-            S._tsnRebuildPending = false; refreshTsnLibrary();
+          // Keyed off the consolidate task ENDING, not off who started it: the
+          // Settings button is only one entry point — the matrix rebuilds a stale
+          // TSN dataset on its own before comparing, and that path never set the
+          // pending flag, so the panel kept reading STALE until the next app start.
+          {
+            const wasConsolidating = S._lastTask === "consolidate";
+            S._lastTask = S.st ? S.st.task : null;
+            if ((S._tsnRebuildPending || wasConsolidating)
+                && (!S.st || S.st.task !== "consolidate")) {
+              S._tsnRebuildPending = false; refreshTsnLibrary();
+            }
           }
           break;
         case "settings":

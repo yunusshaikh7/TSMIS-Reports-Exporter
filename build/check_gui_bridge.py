@@ -413,8 +413,13 @@ def test_tsn_library_panel():
         reg = {r.subdir for r in tsn_library.reports()}
         check("status lists every registered TSN report",
               {r["report"] for r in rows} == reg)
+        # The panel reports BOTH TSN assets per report: the raw the normalized
+        # library is built from, and the TSN prints the evidence images crop from
+        # (evidence_* — absent support is reported, not inferred from a zero count).
         fields = {"report", "label", "raw_kind", "raw_present", "raw_count",
-                  "consolidated_present", "current", "raw_dir"}
+                  "consolidated_present", "current", "raw_dir",
+                  "evidence_supported", "evidence_pdfs", "evidence_dir",
+                  "evidence_in_raw"}
         check("status rows carry exactly the panel fields",
               all(set(r) == fields for r in rows))
         check("tsn_library_status() wraps the rows",
