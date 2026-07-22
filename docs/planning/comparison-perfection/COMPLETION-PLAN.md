@@ -23,7 +23,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
 | **Gate** | **144/144** full-suite checks (Python + JS) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **242 total · 225 CLOSED (Resolved/Remediated) · 17 open** (93% closed; verified against every per-entry `Status:` line 2026-07-22; S0 closed 193 + 242). The 17: **80 85 89 115** (DUR — 085 decided LAST-COMPLETE) · **98 106 108 109 208 209 210** (EV-10, Stage-10 published-cell rebuild) · **187** (audit instrument, perf only) · **133 142 186 192 + 045-HD** (⛔ HD pre-release — deferred to the owner's official HD delivery; never infer). ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
+| **Findings** | **242 total · 230 CLOSED (Resolved/Remediated) · 12 open** (95% closed; verified against every per-entry `Status:` line 2026-07-22; S0 closed 193 + 242, **M-A closed the whole DUR cluster 80 · 85 · 89 · 115 · 187**). The 12: **98 106 108 109 208 209 210** (EV-10, Stage-10 published-cell rebuild) · **133 142 186 192 + 045-HD** (⛔ HD pre-release — deferred to the owner's official HD delivery; never infer). ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
 | **Next action** | **See the ▶ RESUME HERE block below — it is the ONLY live next-action surface.** (The dated per-batch resolution notes that used to live in this cell are recorded where they belong: each finding's ledger entry, the dated resume blocks below, and git history. Keeping a second prose copy here is what caused the stale-directive incidents.) |
 
 ## Marathon roadmap to completion (2026-07-18)
@@ -44,7 +44,7 @@ its findings back-to-back, then update this roadmap.
 | ~~**BIG-1**~~ ◑ | **Evidence arc — bucket F. DONE to the tractable line: 107/110/112 ✅ + 106/109 partial + the layout feature (2026-07-18/19).** The remainder is EV-10 below. | ~~106~~ ~~107~~ ~~109~~ ~~110~~ ~~112~~ + 108 · 208 209 210 · 098 | 107 (compared_cell equality), 110 (queued-evidence identity), 112 (parse↔render byte digest) CLOSED; 106 (retire-stale-on-clean) + 109 (workbook+images one set) PARTIAL. What's left is the Stage-10 published-cell spine → **EV-10**. |
 | **EV-10** | **Evidence — Stage-10 published-cell rebuild + transaction completion (7)** | 108 · 208 209 210 · 098 · 106↺ 109↺ | The coherent evidence remainder. **ONE spine:** drive evidence from the PUBLISHED comparison — its per-cell E/D/N/U state masks + the persisted `pairing_trace` + per-column counts — instead of re-executing `adapter.load_sides`/`enumerate_diffs` (**208**), so duplicate-only diffs stop vanishing (**108**) and no discrepancy class is excluded before sampling (**209**); each item names flavor/sheet/row/cell/state/source-indices/provenance and an INDEPENDENT raw-source oracle recomputes it (the acceptance bar). Then the source-faithful Excel / PDF-vs-Excel routes (**210**, own mini-plan) + the durable per-comparison generation MANIFEST that finishes **106** (no-example/toggle-off/restart) + the evidence-gate read-set snapshot (**098**). The **109** two-phase residual (a quarantine-based two-artifact atomic commit so the images-locked case rolls both back) rides here too. **The CLAUDE.md-flagged "HSL not yet an end-to-end verifier" gap.** Investigation (2026-07-19): the truth is persisted as Excel formulas/value caches → needs a state-mask/pairing-trace decoder + the raw-source oracle = **Stage-9/10, a dedicated multi-session effort, NOT a marathon slice.** Detail: the `#### Disposition — 2026-07-19` note at CMP-AUD-208. |
 | ~~**NORM**~~ ✅ | **Source normalization fidelity — bucket G — ACTIONABLE SIDE COMPLETE 2026-07-22** | ~~042~~ ~~138~~ ~~144~~ ~~145~~ ~~193~~ · HD-deferred (⛔ pre-release): 133◑ 142 186 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
-| **DUR** | **Phase-5/7 durability & policy — the OWNER-GATED cluster (4)** | 080 085 089 115 | The deferred durable-attempt-overlay / policy / commit-schema family. **085 DECIDED 2026-07-21 — LAST-COMPLETE** (a partial refresh KEEPS LAST-GOOD: reported and retryable, never overwriting verified bytes, never promoted to canonical; the docs were the intended policy and the shipped replace-and-flag is the drift). DUR is unblocked. Its policy-independent false-green defects — a partial caching `partial` while its own Summary says `✓ EVERYTHING MATCHES`, a partial zero-diff cell rendering primary `✓ match`, no first-class retry state, evidence rendering off a partial with no warning — are wrong under EITHER policy and must be fixed regardless **+** a durable attempt overlay (Phase-5/7); **089** is that overlay (a crashed rebuild silently reverts to the old ✓); **080** source-fingerprint content identity (per-cell-per-snapshot perf-cache); **115** the commit-boundary schema gate + its exhaustive per-comparator census. **Read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes FIRST; surface the 085 policy decision.** "Correct today, hardening tomorrow" — no live false-green; durability + defense-in-depth. |
+| ~~**DUR**~~ ✅ | **Phase-5/7 durability & policy — CLOSED 2026-07-22 by marathon M-A** (`233e294` + `671dfaf`, both CI-green) | ~~080 085 089 115 187~~ | **DONE — all five.** 085 last-complete publication (divert-then-promote; a partial refresh keeps last-good, publishes an unpromoted attempt beside it, and REFUSES so the stale complete generation is never diffed against current inputs) + 089 durable per-cell attempt overlay with honest attempted/succeeded/failed/cancelled/partial counts and a grid marker that never erases the prior result + 080 v2 CONTENT fingerprint with a Windows-ChangeTime-validated digest memo (statewide: cold 1.39 s, warm 0.16 s — faster than the v1 stat walk) and content-keyed evidence parse caches + 115 the versioned comparison-artifact schema at the commit boundary, whose rejection domain is provably a subset of the already-unreadable domain (census: 119 real production comparison commits accepted, 0 false rejections) + 187 indexed oracle grouping proved equivalent over every fixture class (40,000 rows in 0.34 s). Four new gate checks: `check_last_complete`, `check_content_identity`, `check_comparison_artifact_schema`, `check_oracle_grouping`. Gate **148/148**. |
 
 | ~~**PATH**~~ ✅ | **MAX_PATH — RESOLVED 2026-07-22 (rides the completion release)** | ~~242~~ | **Chunk basenames 167→71 chars** (16-hex name abbreviations; manifests keep + verify the FULL digests); legacy full-hex names stay readable in manifest validation, fingerprint exclusion, and reclamation. **Two UNCONDITIONAL gates** now in `check_comparison_path_limits` — field-depth arithmetic (was 270>260, now 174) and a real publication with the OS shimmed to refuse ≥260 — both red on the old code for exactly the field failure, green now; neither can be skipped by a long-path-aware dev box. Real-corpus: a legacy-named real HSL publication reads trusted under the new code (5,589/16,154 intact), and the shipped path over the real 126-route RD corpus publishes 71-char names canary-EXACT (843/202). Per the owner's 2026-07-22 policy the fix ships with the completion release (no interim tags); CHANGELOG section sits under "Unreleased". Full detail: CMP-AUD-242. |
 
@@ -53,9 +53,9 @@ its findings back-to-back, then update this roadmap.
 > they were resolved (2026-07-14/17/18); on 2026-07-22 the ledger's INDEX table itself was caught
 > stale (042/138/144/145 still "Verified" after their entries said Resolved; 242 missing) and was
 > reconciled. When a finding closes, update its entry Status line AND its index-table row AND this
-> roadmap together. Full-parse-verified count 2026-07-22 (post-S0): **17 open** —
-> DUR 4 (080/085/089/115) · EV-10 7 (098/106/108/109/208/209/210) · 187 ·
-> HD-pre-release-deferred 133/142/186/192 + 045-HD. ~~193~~ and ~~242~~ closed in S0.
+> roadmap together. Full-parse-verified count 2026-07-22 (post-S0, post-M-A): **12 open** —
+> EV-10 7 (098/106/108/109/208/209/210) · HD-pre-release-deferred 133/142/186/192 +
+> 045-HD. ~~193~~ and ~~242~~ closed in S0; ~~080/085/089/115/187~~ closed in M-A.
 
 > ### ⛔ HIGHWAY DETAIL IS PRE-RELEASE — OWNER, 2026-07-21
 >
@@ -99,48 +99,54 @@ re-check on the next statewide HD batch.)
 - **Owed small:** **061** evidence-locator per-page polling; **054** line-2-band recovery for
   `evidence_highway_detail.py` (17 fallback pages share the old doc-median → mis-aligned images).
 
-**REMAINING WORK TOTAL: 17 findings** (225/242 closed, 93%) — **DUR** (4) · **EV-10** (7) ·
-187 · HD-pre-release-deferred 133/142/186/192 + 045-HD. S0 (193 + 242) is CLOSED. Nothing open
-is a live false-green today. **ACTIVE ORDER: the three compressed marathons — M-A (all of DUR
-+ 187) → M-B (evidence spine 208/108/209) → M-C (210/106/109/098 + closeout + the completion
-release).** The HD block resumes only when the owner delivers the official Highway Detail
-exports.
+**REMAINING WORK TOTAL: 12 findings** (230/242 closed, 95%) — **EV-10** (7) ·
+HD-pre-release-deferred 133/142/186/192 + 045-HD. S0 (193 + 242) and M-A (080/085/089/115/187,
+the whole DUR cluster) are CLOSED. Nothing open is a live false-green today. **ACTIVE ORDER:
+two marathons remain — M-B (evidence spine 208/108/209) → M-C (210/106/109/098 + closeout +
+the completion release).** The HD block resumes only when the owner delivers the official
+Highway Detail exports.
 
-> ### ▶ RESUME HERE (2026-07-22 — S0 CLOSED; marathons M-A → M-B → M-C remain, EACH STARTS ON THE OWNER'S GO)
+> ### ▶ RESUME HERE (2026-07-22 — S0 + M-A CLOSED; M-B then M-C remain, EACH STARTS ON THE OWNER'S GO)
 >
 > **⚠ MARATHON START GATE (owner, 2026-07-22): do NOT begin a marathon unprompted — the
-> owner starts each one explicitly (M-A was begun early once and stopped).** Everything a
-> fresh context needs to run M-A immediately on "go":
-> - **The 085/089 RED BASELINE IS ALREADY WRITTEN AND CONFIRMED** — parked UNTRACKED at
->   `build/_wip_check_last_complete_085_089.py` (underscore-named so the run_checks glob
->   and CI ignore it while red). On current code it fails 10 checks reproducing the
->   findings exactly: the complete 2-route canonical IS overwritten by a 1-route partial
->   (5230→5165 bytes), its sidecar flips to partial, the comparator runs over partial
->   bytes, the worker reports errors:0 for it, and no durable attempt state exists; the
->   three must-stay behaviors (first-build partial flagged amber · repaired rebuild
->   replaces · crash keeps prior cache) are already green. **When M-A lands, rename it to
->   `build/check_last_complete.py` so it joins the gate.**
-> - **The M-A implementation design (settled, recon done):** (1) divert-then-promote in
->   `matrix_build._consolidate_store_folder` — when a trusted COMPLETE canonical exists,
->   the producer builds an attempt SIBLING; only status=ok+COMPLETE promotes via
->   os.replace, anything else discards the attempt and raises the actionable
->   keep-last-good message (prior bytes + complete sidecar untouched; first-build-partial
->   keeps today's flagged behavior); (2) the last-complete CACHE rule at
->   `build_comparison`'s record step (+ the env-mode mirror): a non-complete result never
->   replaces a COMPLETE cache record — it writes an attempt instead; (3) NEW
->   `matrix_state.record_attempt/load_attempts` (ONE `comparisons/_attempts.json` per
->   dest via cache_envelope, keyed `row|mode_id` → cell), written by all three matrix
->   workers' terminals AND the record step (status ok supersedes); merged into `_cmp_state`
->   as `last_attempt` for the UI overlay; (4) honest worker counts — matrix_done gains
->   attempted/succeeded/failed/cancelled_cells (additive; an exception with cancel set
->   counts cancelled, not failed); (5) ui-matrix.js overlay + mock parity + the
->   check_gui_bridge pin updates that follow. Useful facts: the comparator seam is
->   `matrix.tsn_comparator_for` (call-time facade); `consolidated_store_path` takes the
->   SUBDIR store folder (`dest/cell/<subdir>`); read-only openpyxl max_row can be None.
-> - After 085/089: **080** (content identity; change-token manifest, stat-only
->   memoization prohibited; evidence parse-cache keys; metadata-only→stale migration;
->   statewide perf proof) → **115** (commit-boundary versioned artifact-schema gate +
->   the 29-recipe census on the real corpus) → **187** (instrument perf) closes M-A.
+> owner starts each one explicitly.**
+>
+> **M-A IS DONE (2026-07-22).** The whole DUR cluster closed in one run — `233e294`
+> (085 + 089) and `671dfaf` (080 + 115 + 187), both CI-green, gate **148/148**, ruff
+> clean. What shipped, in one line each:
+> - **085** — `_consolidate_store_folder` diverts to an unpromoted attempt sibling
+>   whenever the canonical holds a trusted COMPLETE generation; only status=ok+COMPLETE
+>   promotes (os.replace), anything else keeps last-good, publishes the attempt beside it
+>   with its own PARTIAL sidecar, and RAISES — so the stale complete generation is never
+>   diffed against current inputs. First-build partial behavior is unchanged.
+> - **089** — `matrix_state.record_attempt/load_attempts` persist one versioned
+>   `comparisons/_attempts.json` per root (`row|mode` → cell); all three compare workers
+>   write their terminals, `ok` clears; the snapshot merges `cmp.last_attempt` and the
+>   grid adds `mx-attempt` + "last refresh failed/stopped/incomplete" WITHOUT erasing the
+>   prior result; `_AttemptTally` gives honest attempted/succeeded/failed/cancelled/partial.
+> - **080** — `artifact_store.fingerprint` is v2 CONTENT; `content_digest` memoizes
+>   against a change token carrying Windows `FILE_BASIC_INFO.ChangeTime` (proven to move
+>   under a same-size, mtime-restored rewrite); statewide cold 1.39 s / warm 0.16 s;
+>   evidence parse caches re-keyed; the v1→v2 bump IS the one-time migration.
+> - **115** — `COMPARISON_ARTIFACT_SCHEMA = 1` at `commit_workbook` for a typed
+>   comparison's VALUES artifact; the reader is shared with `read_counts`, so the
+>   rejection domain is a subset of the already-unreadable domain (cannot block a valid
+>   report). Census: 119 real production commits accepted, 0 false rejections.
+> - **187** — indexed first-seen membership in the independent oracle, proved equivalent
+>   to the list scan over every fixture class; 40,000 rows in 0.34 s.
+>
+> New gate checks: `check_last_complete`, `check_content_identity`,
+> `check_comparison_artifact_schema`, `check_oracle_grouping` (+ the shared
+> `_checklib.write_comparison_stub` every comparator stub now uses).
+>
+> **NEXT ON "GO": M-B — the evidence spine (208 · 108 · 209).** Drive evidence from the
+> PUBLISHED comparison (per-cell E/D/N/U state masks + the persisted `pairing_trace` +
+> typed counts) instead of re-executing `adapter.load_sides`/`enumerate_diffs`, so
+> duplicate-only diffs stop vanishing (108) and no discrepancy class is excluded before
+> sampling (209). Prove on HSL first, then roll to all five evidence families, with an
+> INDEPENDENT raw-source oracle agreeing statewide as the acceptance bar. Start from the
+> `#### Disposition — 2026-07-19` note at CMP-AUD-208. Then **M-C** (210 · 106 · 109 ·
+> 098 + closeout + the completion release).
 >
 > ### Prior status (2026-07-22 — S0 CLOSED: 193 + 242 done)
 >
@@ -170,7 +176,7 @@ exports.
 > done by tomorrow"): THREE autonomous marathons after S0, each as long as it takes.**
 > - ~~**S0**~~ ✅ **CLOSED 2026-07-22** — 193 (all three legs per-column canary-exact
 >   through the shipped path) + 242 (`a0c53fb`, CI green, live-store coexistence proven).
-> - **M-A · THE DUR MARATHON — all of Phase-5/7 in one run: 085 + 089 + 080 + 115 + 187.**
+> - ~~**M-A · THE DUR MARATHON**~~ ✅ **CLOSED 2026-07-22** (`233e294` + `671dfaf`, both CI-green, gate 148/148). Original scope, all met: 085 + 089 + 080 + 115 + 187.
 >   085-core last-complete/keep-last-good publication (divert-then-promote in
 >   `_consolidate_store_folder`; a partial NEVER overwrites a complete canonical) +
 >   the last-complete comparison-cache rule + 089's durable per-cell last-attempt

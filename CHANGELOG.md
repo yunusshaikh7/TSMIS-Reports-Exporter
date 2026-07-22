@@ -6,6 +6,42 @@ release shows only its own section (see `build/gen_release_notes.py`).
 ## Unreleased — ships with the comparison-perfection completion release
 
 ### Fixed
+- **A broken export can no longer destroy a good consolidated workbook.** If a
+  report had been consolidated successfully and you then re-ran it with one
+  route's export damaged, the partial rebuild replaced the good workbook — the
+  routes that had been in it were simply gone, and the comparison that followed
+  diffed the reduced file. The consolidated workbook is now the last COMPLETE
+  one: a rebuild that comes back incomplete keeps the good file untouched, saves
+  what it managed to build beside it as a clearly-named `(attempt)` copy you can
+  open, and tells you which exports to fix. Nothing is compared until the
+  rebuild completes, so a stale-but-complete workbook is never quietly diffed
+  against today's exports either. The first time you consolidate a report there
+  is nothing to protect, so a partial first build still lands and is still
+  flagged amber.
+- **A rebuild that failed or was stopped no longer disappears from the grid.**
+  Refreshing a comparison that then crashed, or that you cancelled, left the
+  previous green cell exactly as it was the moment the grid redrew — the failure
+  survived only as a line in the log. Each cell now remembers its last refresh
+  attempt across restarts: the previous result stays visible and unchanged (it
+  is still the last good answer), with a marked edge and a "last refresh failed
+  / stopped / incomplete" note until a successful rebuild replaces it. The
+  end-of-run message counts what actually happened — attempted, succeeded,
+  failed, cancelled, incomplete — instead of reporting a cancelled cell as done.
+- **Changed source files can no longer hide behind an unchanged timestamp.**
+  Freshness compared file names, sizes and timestamps, so a route file replaced
+  with different content of the same length and its timestamp put back looked
+  untouched and the old "match / 0 differences" stayed green. Freshness now
+  reads the files' actual content, with a per-file cache validated against a
+  Windows change signal that a restored timestamp cannot fake — measured on a
+  full statewide export folder, this is *faster* than the old check once warm.
+  The same fix applies to the cached TSN print used for evidence images. The
+  first refresh after updating re-checks every report once.
+- **A comparison workbook that could not be read is now refused instead of
+  saved.** A comparison whose sheet was missing its `Status`/`Diffs` columns —
+  or had no rows at all while reporting rows — could still replace a good
+  workbook and then read as an empty, unusable result in the matrix. Such a
+  workbook is now rejected at save time with a clear message, and the previous
+  file is kept.
 - **Comparisons now publish from any install folder — the 260-character Windows
   path limit no longer hides them.** The v0.27.0 field failure (every by-day
   comparison built its workbook and then vanished from the matrix) came down to

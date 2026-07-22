@@ -332,9 +332,10 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   artifact ∈ promoted/new_unpromoted/previous_preserved/none), while
   `comparison_contract.py` owns typed comparison truth. Canonical report/store
   promotion still requires a complete result. A comparison's observed partial
-  generation may currently be committed and cached so it can be shown amber and
-  retried, but it may never be called fresh, green, or a match. The Phase-5
-  last-complete/unpromoted-partial policy remains open. See
+  generation may be committed and cached so it can be shown amber and retried, but it
+  may never be called fresh, green, or a match. **The last-complete/unpromoted-partial
+  policy is DECIDED and SHIPPED** (2026-07-22, CMP-AUD-085 — see the last-complete
+  convention below). See
   [docs/engine-and-reliability.md](docs/engine-and-reliability.md).
 - **Every returned public comparison terminal is typed, even without an artifact.**
   `comparison_result_boundary` covers file and folder adapters, normalizing missing
@@ -363,9 +364,31 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   outcome/generation/member exactly equals its own attempt. Peers are validated before the payload is decoded
   once; over-limit or high-expansion payloads fail closed. No-artifact terminal results
   are not sent through this committed-generation reducer. `cache_envelope.py` versions
-  the matrix/by-day caches. Matrix
-  formula-twin unification, durable attempt overlays/provenance, and exact-generation
-  evidence remain their assigned Phase-5/7 work.
+  the matrix/by-day caches — including the per-cell **attempt overlay**
+  (`comparisons/_attempts.json`, CMP-AUD-089): every compare worker persists each
+  touched cell's terminal state there, `ok` clears it, and the snapshot merges it as
+  `cmp.last_attempt` so a failed/stopped/incomplete refresh marks the cell WITHOUT
+  erasing the last-good result it did not replace. Matrix formula-twin unification and
+  exact-generation evidence remain their assigned Phase-5/7 work.
+- **The canonical persistent consolidation is the LAST COMPLETE generation** (owner
+  decision 2026-07-21; CMP-AUD-085). When a trusted COMPLETE canonical exists, a refresh
+  builds into an unpromoted attempt sibling and only a `status=ok` + COMPLETE result is
+  promoted over it; anything else KEEPS LAST-GOOD — the verified bytes and sidecar are
+  untouched, the attempt is published beside them carrying its own PARTIAL sidecar, and
+  the caller is REFUSED so no comparison ever diffs the stale complete generation
+  against current inputs. A first build with no complete predecessor still persists the
+  flagged partial (amber, retryable). Never restore replace-and-flag.
+- **Source and cached-output identity is CONTENT, not metadata** (CMP-AUD-080).
+  `artifact_store.fingerprint` is the v2 content fingerprint; per-file digests may be
+  memoized ONLY against a change token that a same-size, timestamp-restored rewrite
+  cannot forge (on Windows `FILE_BASIC_INFO.ChangeTime` beside size/mtime/file id) —
+  stat-only memoization is prohibited, and a file with no obtainable token is re-hashed.
+  A typed comparison's VALUES artifact must also satisfy the versioned
+  `COMPARISON_ARTIFACT_SCHEMA` at the commit boundary (CMP-AUD-115): uniquely labelled
+  `Status`/`Diffs`, a valid status on every row, and rows present when the typed outcome
+  claims rows. That gate shares its reader with `read_counts`, so what it refuses was
+  already unreadable — keep it that way; a gate that could refuse a workbook the Matrix
+  can read would block a valid report.
 - **Workbook count scraping is diagnostic/migration-only.** `read_counts` locates
   Status/Diffs by HEADER LABEL (never hard-coded position), but Matrix, classic UI,
   and validation truth comes from the strict typed comparison generation. Workbook

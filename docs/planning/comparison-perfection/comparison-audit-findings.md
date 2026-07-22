@@ -360,16 +360,16 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-077 | P2 | Resolved | Comparison results discard their structured discrepancy counts |
 | CMP-AUD-078 | P3 | Resolved | Comparison failures are titled as consolidation failures |
 | CMP-AUD-079 | P2 | Resolved 2026-07-18 | Compare sub-tab switching can hide every Cancel control |
-| CMP-AUD-080 | P1 | Partially remediated | Matrix artifact identity can miss changed source and output content |
+| CMP-AUD-080 | P1 | Resolved 2026-07-22 | Matrix artifact identity can miss changed source and output content |
 | CMP-AUD-081 | P1 | Resolved | Matrix TSN freshness ignores source identity and library rebuild state |
 | CMP-AUD-082 | P1 | Resolved | Matrix formula twins can survive as stale audit artifacts |
 | CMP-AUD-083 | P2 | Resolved | Matrix presence and freshness count arbitrary non-report files |
 | CMP-AUD-084 | P1 | Resolved | Matrix caches survive semantic comparator and parser changes |
-| CMP-AUD-085 | P1 | Partially remediated | Partial-artifact policy conflicts while truth surfaces certify/reuse incomplete work |
+| CMP-AUD-085 | P1 | Resolved 2026-07-22 | Partial-artifact policy conflicts while truth surfaces certify/reuse incomplete work |
 | CMP-AUD-086 | P3 | Resolved | Comparison documentation contradicts the executable capability census |
 | CMP-AUD-087 | P2 | Resolved | “Refresh stale” cannot rebuild cells whose count cache is unavailable |
 | CMP-AUD-088 | P2 | Resolved | An authentication failure deletes queued offline comparisons |
-| CMP-AUD-089 | P2 | Verified | Failed and cancelled rebuild attempts disappear behind prior results |
+| CMP-AUD-089 | P2 | Resolved 2026-07-22 | Failed and cancelled rebuild attempts disappear behind prior results |
 | CMP-AUD-090 | P1 | Resolved | Workers can mark pre-existing foreign folders as app-owned and deletable |
 | CMP-AUD-091 | P1 | Resolved 2026-07-18 | Day exports and their chained comparisons can cross into different dates |
 | CMP-AUD-092 | P2 | Resolved 2026-07-18 | Day discovery loses legacy folder identity and accepts impossible dates |
@@ -395,7 +395,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-112 | P1 | Resolved 2026-07-18 | Evidence can verify old PDF records but rasterize replacement bytes |
 | CMP-AUD-113 | P3 | Resolved | Evidence bundle member counts omit validation files |
 | CMP-AUD-114 | P1 | Resolved | Unreadable comparison results are counted and shown as fully OK |
-| CMP-AUD-115 | P1 | Partially remediated 2026-07-14 (typed-contract count/verdict invariants) | Comparison artifact validation accepts semantically empty workbooks |
+| CMP-AUD-115 | P1 | Resolved 2026-07-22 | Comparison artifact validation accepts semantically empty workbooks |
 | CMP-AUD-116 | P1 | Resolved | Failed validation records default to complete |
 | CMP-AUD-117 | P1 | Resolved | Bearer credentials survive redaction into the evidence ZIP |
 | CMP-AUD-118 | P2 | Remediated: _ensure_tsn_ready first-builds raw-only libraries (ensure_current None -> build_consolidated); raw-awaiting-build is a blocked capability in the digest | Validation skips imported raw-only TSN data instead of building it |
@@ -467,7 +467,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-184 | P2 | Resolved 2026-07-14 (the shared note states the blank/one-sided truth) | Intersection Summary's familiar view note contradicts its structural-absence cells and cites Ramp categories |
 | CMP-AUD-185 | P1 | Resolved 2026-07-14 (District compared on every RD leg; the 005/SD/72.366 disagreement surfaces; re-blessed) | Ramp Detail omits District and hides a real District disagreement as identical |
 | CMP-AUD-186 | P1 | DEFERRED — HD is pre-release (owner 2026-07-21), resumes on the official HD delivery; parser rewrite, needs its own session | Highway Detail truncates multi-baseline line-two records and erases their attributes as complete |
-| CMP-AUD-187 | P2 | Verified in audit harness | Independent oracle builds statewide key order quadratically |
+| CMP-AUD-187 | P2 | Resolved 2026-07-22 | Independent oracle builds statewide key order quadratically |
 | CMP-AUD-188 | P2 | Remediated in accepted audit artifact | Highway Detail product witness loses all returned evidence when its monolithic run exceeds the execution wrapper |
 | CMP-AUD-189 | P2 | Remediated in accepted audit artifact | Highway Detail publication gate compares different duplicate-trace wire schemas byte-for-byte |
 | CMP-AUD-190 | P2 | Remediated in accepted audit artifact | Highway Detail formula/value gate requires source-sheet counts both different and equal |
@@ -4215,7 +4215,8 @@ enabled, and bound to the live task without affecting later runs.
 ### CMP-AUD-080 — Matrix artifact identity can miss changed content
 
 Priority: P1  
-Status: Partially remediated — output generation identity fixed; source identity and performance remain open  
+Status: **RESOLVED 2026-07-22** — v2 CONTENT fingerprint with a change-token-validated
+digest memo (`671dfaf`); see "Remediation — 2026-07-22"  
 Primary code: `scripts/artifact_store.py:324-358`,
 `scripts/matrix_state.py:205-260`, `scripts/matrix_build.py:389-431`,
 `scripts/visual_evidence.py:190-225`
@@ -4265,6 +4266,51 @@ correctness. A process-local stat cache was tested and rejected because Windows 
 provide a reliable change signal for the planted same-size/same-mtime tamper. Any Phase-5
 performance cache must use a trustworthy file-ID/change token or equivalent validated
 manifest; stat-only memoization is prohibited.
+
+#### Remediation — 2026-07-22 (M-A): content identity for sources, caches and evidence
+
+Shipped in `671dfaf` (gate 148/148, ruff clean).
+
+**The folder fingerprint is now CONTENT.** `artifact_store.fingerprint` hashes the sorted
+`(name, sha256-of-bytes)` pairs plus the file count (`_FP_SCHEMA = 2`). The audit's exact
+tamper — replace a file with different same-length bytes, restore its timestamps — now
+changes the fingerprint. Because `_FP_SCHEMA` also stamps the freshness sidecar, every
+`v1` record compares unequal and each cell / consolidated workbook reads stale exactly
+ONCE and rebuilds against content identity: the required metadata-only migration, with no
+separate migration code.
+
+**The performance cache is change-token validated, which is what the 2026-07-11 note
+required and stat-only memoization could not give.** `content_digest` memoizes each
+file's SHA-256 against a token of `(size, mtime_ns, st_dev, st_ino, ChangeTime)`, where
+`ChangeTime` is `FILE_BASIC_INFO.ChangeTime` read through
+`GetFileInformationByHandleEx` — the filesystem's own change counter, which the OS
+advances on any write and which `SetFileTime`/`os.utime` cannot restore. Measured on this
+box: an in-place same-size rewrite with the mtime put back leaves size, `mtime_ns` and
+the file id byte-identical while **ChangeTime moves**; a whole-file replacement moves the
+file id as well. Where no change token can be obtained (a non-Windows filesystem, an
+unreadable handle) the memo is REFUSED and the file re-hashed — fail-safe.
+
+**Measured cost on the real statewide store** (`All Reports 7.9/2026-07-09 ssor-prod`,
+9 folders / 1,729 files / 199 MB): **cold 1.39 s, warm 0.16 s**, against the v1
+stat-only walk's 0.24 s. The warm path is *faster than the metadata-only fingerprint it
+replaces* because `fingerprint` now enumerates with `os.scandir` and validates the memo
+from the stat the directory read already produced. Content hashing runs at ~162 MB/s
+here, so a fully cold statewide store costs ~1.4 s once per change.
+
+**The evidence parse caches follow.** `evidence_intersection_detail._print_index` and
+`evidence_ramp_detail._print_index` keyed their statewide TSN print index on
+`(size, mtime_ns)` and would return the previous parsed object for a same-metadata
+replacement without reopening the file; both are re-keyed on
+`artifact_store.content_digest`.
+
+**Evidence — `build/check_content_identity.py` (20 checks).** The audit tamper is
+reproduced and asserted stat-identical before each assertion, then: the fingerprint
+changes, an untouched folder does not (no false staleness), the memo does not serve a
+stale digest, the Windows change token exists and moves, `matrix_state._inputs_changed`
+reports the cell's inputs changed, `consolidated_fresh` goes stale, a `v1` sidecar reads
+stale once and its rebuild writes `v2`, and each evidence index refuses to serve a
+same-metadata replacement from cache. On the pre-fix code the check fails at the v2
+schema and the tamper assertions and then errors out (`content_digest` does not exist).
 
 ### CMP-AUD-081 — Matrix TSN freshness ignores the effective source identity
 
@@ -4523,7 +4569,8 @@ reads fresh exactly once, and a legacy record/sidecar migrates once. Gate 135/13
 ### CMP-AUD-085 — partial-artifact policy conflicts while truth surfaces certify incomplete work
 
 Priority: P1  
-Status: Partially remediated — policy recorded and truth surfaces fixed; last-good publication remains open  
+Status: **RESOLVED 2026-07-22** — last-complete publication shipped (`233e294`); see
+"Remediation — 2026-07-22" below  
 Primary code: `scripts/matrix_build.py:238-290,500-532,662-680`,
 `scripts/artifact_store.py:397-481`, `scripts/matrix_state.py:228-260`,
 `scripts/matrix_build.py:183-205`, `scripts/day_matrix.py:288-308,329-346`,
@@ -4637,6 +4684,59 @@ persistence change, so it is deferred to a Phase-5/7 session ALONGSIDE CMP-AUD-0
 (same durable-attempt-overlay family). The owner decision is surfaced in the session
 summary; note the decision ALONE does not unblock the finding — the overlay work is
 required under either policy.
+
+#### Remediation — 2026-07-22 (M-A): LAST-COMPLETE publication + the durable attempt overlay
+
+Shipped in `233e294` (gate 145/145, ruff clean, CI green). The owner's LAST-COMPLETE
+decision is now the code's behavior, and the finding's own scenario is a permanent gate
+check.
+
+**Divert-then-promote in `matrix_build._consolidate_store_folder`.** When the canonical
+persistent consolidation already holds a *trusted, current, COMPLETE* generation
+(`_has_last_complete`), the producer no longer writes to it. It builds into an
+unpromoted attempt sibling (`_attempt_sibling`, `<stem> (attempt).xlsx`), and only a
+`status=ok` + COMPLETE result is promoted over the canonical file through `os.replace`
+(the same `outcome.promotable` gate the export store uses). Anything else keeps
+last-good: the verified bytes and their outcome sidecar are untouched, the attempt is
+published beside them carrying its own PARTIAL sidecar so the retained file
+self-describes, and the caller is refused with an actionable message naming the retained
+attempt. **Refusing rather than continuing is what closes the finding's other half** —
+"comparisons must not silently substitute the stale complete generation for current
+inputs": the comparison never runs, so the stale complete workbook is never diffed
+against changed inputs. Promotion clears any earlier attempt file and sidecar. The PDF
+conversion scratch directory is named from the CANONICAL stem so a diverted attempt
+cannot lengthen that path (CMP-AUD-242's MAX_PATH lesson).
+
+**A first build with no complete predecessor is deliberately unchanged** — it persists
+the flagged partial, which the matrix already renders amber and retryable (the Phase-2
+truth-surface work). Keep-last-good only ever protects bytes that were verified.
+
+**The comparison-cache gate needs no separate write rule.** Because the consolidation
+refuses before the comparator runs, `build_comparison`'s record step is never reached
+with a partial built off a diverted attempt, so the cache still holds the last COMPLETE
+record with its original `generation_id` — asserted directly in the check. (Where a
+comparison is *itself* non-complete over inputs that read complete — `compare_core`'s own
+`input_incomplete` from row-level read warnings, or `pairing_quality="capped"` — the
+published workbook is a genuine PARTIAL generation and `_staleness` already returns
+`stale/"partial"` from the strict sidecar, never a green. The comparison workbook cannot
+be diverted-then-promoted the way a consolidation can: its published generation binds the
+workbook's own basename (`self_member["relative_path"] != Path(workbook).name`), so a
+post-commit rename would invalidate its trust chain, and completeness is only knowable
+after the comparison has run. That boundary is deliberate and stated here rather than
+implied.)
+
+**Evidence — `build/check_last_complete.py` (26 checks).** It drives the finding's exact
+scenario through the SHIPPED layers: a real two-route Highway Sequence store, the real
+consolidator, and the real `MatrixCompareWorker` → `matrix.build_comparison`
+orchestration (only the comparison adapter is stubbed, at the sanctioned
+`matrix.tsn_comparator_for` facade seam, and it publishes a real workbook + typed
+generation through `artifact_store.commit_workbook`). On the pre-fix code **10 checks
+failed**, reproducing the finding exactly: the complete two-route canonical was
+overwritten by the one-route partial (5,230 → 5,166 bytes), its sidecar flipped to
+`partial`, the comparator ran over the partial bytes, the worker reported `errors: 0`,
+and no durable attempt state existed. All 10 are green; the three must-stay behaviors
+(first-build partial stays flagged, a repaired COMPLETE rebuild replaces the canonical
+with both routes, a crashed rebuild keeps the prior cache) stayed green throughout.
 
 ### CMP-AUD-086 — comparison documentation contradicts current capability
 
@@ -4799,7 +4899,8 @@ Gate 135/135.
 ### CMP-AUD-089 — failed rebuild attempts are not durable cell state
 
 Priority: P2  
-Status: Verified with comparator failure and cancellation workers  
+Status: **RESOLVED 2026-07-22** — durable per-cell attempt overlay + independent
+attempted/succeeded/failed/cancelled counts (`233e294`); see "Remediation — 2026-07-22"  
 Primary code: `scripts/gui_worker_matrix.py:156-195,221-260,285-322`,
 `scripts/gui_matrix.py:1373-1398`, `scripts/ui/ui-matrix.js:268-305`
 
@@ -4823,6 +4924,47 @@ last-good artifact/cache, render failed/cancelled refreshes without erasing the 
 result, and count attempted/succeeded/failed/cancelled independently. Test exceptions,
 error results, cancellation before/during/after a cell, partial results, app restart,
 and successful recovery across all three matrices.
+
+#### Remediation — 2026-07-22 (M-A): the durable last-attempt overlay
+
+Shipped in `233e294`, alongside CMP-AUD-085 (they share the attempt-record design).
+
+**Durable per-cell state, separate from the last-good artifact.**
+`matrix_state.record_attempt` / `load_attempts` persist ONE versioned
+`comparisons/_attempts.json` per comparisons root (a `cache_envelope` envelope with
+`output_identity="attempts"`), keyed `"<row>|<mode>"` → cell. All three compare workers
+write the terminal state of every cell they touched; `status=ok` CLEARS the entry, so a
+succeeded rebuild supersedes whatever failed before it, and an unknown state is refused
+rather than persisted as an uninterpretable badge. Every write is best-effort by
+contract — an overlay that cannot be persisted is logged, never a reason to fail a run
+whose artifact published correctly.
+
+**Rendered without erasing the prior result.** `matrix_snapshot` reads the overlay once
+and merges it per cell as `cmp.last_attempt`; `_last_attempt_for` drops an attempt older
+than the comparison workbook itself (the artifact was refreshed after that failure by
+another path). In the grid, `mxAttemptNote` keeps the previous result's own class and
+number and adds the `mx-attempt` marker class plus a trailing "last refresh failed /
+stopped / incomplete" note (`app.css` gives it a destructive-tinted left edge). A green
+`✓ match` cell can therefore never quietly stand in for the rebuild that did not land.
+
+**Counts no longer collapse.** `_AttemptTally` gives every compare worker independent
+`attempted` / `succeeded` / `failed` / `cancelled_cells` / `partial_cells` beside the
+legacy `done`/`errors`, and a cell that raised *because the run was stopped* is counted
+CANCELLED, not failed — the exact case the finding measured ("`status=cancelled`,
+`errors=1`, '1 of 1 done'"). An ok-but-incomplete result is its own `partial` bucket
+rather than a success. `gui_matrix._on_matrix_done` names each non-zero bucket
+("2 of 3 attempted: 1 succeeded, 1 failed"), falling back to the old line when a worker
+reports no counts.
+
+**Evidence** — in `build/check_last_complete.py`: the overlay exists after a failed
+refresh and after a comparator crash, says `cancelled` (not `error`) for a cancelled
+cell, is cleared by the successful rebuild, is a versioned envelope ON DISK (so it
+survives a restart), reaches the rendered snapshot as `cmp.last_attempt` without erasing
+the prior result, refuses an unknown state, and stops being shown once the artifact is
+newer. All three compare workers are driven to their terminals and asserted to emit the
+five count keys. `build/check_mx_partial_render.js` pins the renderer: a failed refresh
+keeps `mx-match`/`✓ match` and adds `mx-attempt` + the note; stopped and incomplete read
+differently; a cell with no attempt carries no marker at all.
 
 ### CMP-AUD-090 — workers can claim and expose foreign folders to Reset
 
@@ -5734,7 +5876,8 @@ fully OK.
 ### CMP-AUD-115 — comparison artifact validation accepts empty semantics
 
 Priority: P1  
-Status: Verified with header-only and malformed Comparison workbooks  
+Status: **RESOLVED 2026-07-22** — versioned comparison-artifact schema enforced at the
+commit boundary, with the recipe census (`671dfaf`); see "Remediation — 2026-07-22"  
 Primary code: `scripts/artifact_store.py:127-152,221-245`,
 `scripts/matrix_state.py:133-193`, `scripts/compare_core.py:1554-1592`
 
@@ -5796,6 +5939,50 @@ false rejection would BLOCK a valid report — a discrepancy the standing direct
 forbids without full proof). Because the truth-critical halves are already closed and
 the remainder is a risky defense-in-depth gate, it is deferred to a focused Phase-5
 artifact-epoch session (the same disposition as CMP-AUD-080/089), not forced here.
+
+#### Remediation — 2026-07-22 (M-A): the commit-boundary schema gate + its census
+
+Shipped in `671dfaf` (gate 148/148, ruff clean).
+
+**The gate.** `artifact_store.COMPARISON_ARTIFACT_SCHEMA = 1`. A typed comparison's
+VALUES artifact must, before it can replace a good file, carry a `Comparison` sheet with
+UNIQUELY LABELLED `Status` and `Diffs` columns, a valid status on every data row (a
+`Both` row carries a non-negative integer `Diffs`; a one-sided row carries none), and at
+least one data row whenever the producer's typed outcome claims paired or one-sided rows.
+A refusal keeps the previous file and returns a named error result
+(`comparison_artifact_problem`, surfaced through `commit_workbook`'s `schema_block`).
+
+**Why this cannot false-reject a valid report — the property that unblocked the finding.**
+The gate's reader IS the Matrix's reader: `comparison_counts` moved into
+`artifact_store` and `matrix_state.read_counts` now delegates to it. So the gate's
+rejection domain is a strict SUBSET of the domain the Matrix already could not read —
+anything refused here would have read `(None, None)` and rendered "re-run" anyway. The
+gate converts a silently unreadable artifact into a loud, keeps-last-good commit failure;
+it cannot block a report that would otherwise have worked. The check asserts that subset
+relation directly, case by case. Two flavors are out of scope BY CONSTRUCTION: the
+live-formulas twin (its cells are formulas, not cached values, so a values reader must
+never judge it) and ordinary consolidations (no typed comparison outcome, no Comparison
+sheet).
+
+**The census.** The full suite now commits under the live gate, and a non-invasive
+`sitecustomize` wrapper recorded every typed comparison commit it made: **174 typed
+comparison commits across 35 checks**, of which **119 came through the real production
+entry points — `compare_env.compare_folders` (81) and `compare_tsn_common
+.run_files_compare` (38), the two functions every one of the 30 supported matrix recipes
+routes through — and every one was ACCEPTED**. All 21 refusals are deliberate negative
+fixtures. Suite stubs that stood in for comparators previously wrote `A1='x'` under a
+typed outcome claiming rows; they now write the minimal real schema through the new
+shared `_checklib.write_comparison_stub` (and `check_artifact_store._xlsx` emits it for
+any `sheet="Comparison"` fixture), which also makes those fixtures more faithful.
+
+**Evidence — `build/check_comparison_artifact_schema.py` (22 checks).** Accepts a real
+artifact; REFUSES each of the finding's own cases (header-only under a typed row claim,
+neither Status nor Diffs labels, bare `A1='x'`, duplicate `Status` labels, a non-string
+row status, a one-sided row carrying `Diffs`, a matched row with a non-integer `Diffs`)
+with the prior file byte-preserved; asserts the subset relation for every case; proves
+the formulas and consolidation paths are ungated; proves `mode="both"` gates the VALUES
+twin and refuses a label-less one; and pins that one reader serves both the gate and
+`read_counts`.
 
 ### CMP-AUD-116 — failed validation records default to complete
 
@@ -7985,7 +8172,8 @@ equal both the visible PDF and the same-pull Excel row cell-for-cell.
 ### CMP-AUD-187 — independent oracle builds statewide key order quadratically
 
 Priority: P2  
-Status: Verified in the audit harness before correction  
+Status: **RESOLVED 2026-07-22** — indexed first-seen membership, proved equivalent
+(`671dfaf`); see "Remediation — 2026-07-22"  
 Primary code: `build/phase3_independent_oracle.py::compare_rows`
 
 `compare_rows` stores first-seen canonical keys in a list and tests every new row with
@@ -8004,6 +8192,32 @@ duplicates, one-sided groups, reordered groups, typed keys, and capped assignmen
 keep prior accepted artifacts bound to their original code identities rather than
 silently pretending the dependency did not change. Stage 8 may use a local equivalent
 indexed implementation until shared-oracle promotion is deliberately revalidated.
+
+#### Remediation — 2026-07-22 (M-A): indexed first-seen membership
+
+Shipped in `671dfaf`. `compare_rows` keeps `order` as the deterministic ENCOUNTER-order
+list and adds a `seen` set that answers first-seen membership in O(1). Canonical keys,
+row order, duplicate minimum-cost assignment, caps, counts and diagnostics are untouched.
+
+The original test was `key not in groups_a and key not in groups_b and key not in order`,
+and its three parts are provably equivalent: a key enters `order` only in the iteration
+that also files it into one of the group dicts, so at the top of every iteration
+`set(order) == set(groups_a) | set(groups_b) == seen`. The list scan was therefore pure
+cost.
+
+**Evidence — `build/check_oracle_grouping.py` (24 checks).** The ORIGINAL grouping is
+reconstructed verbatim in the check and both paths are run over every fixture class the
+finding names — unique keys, duplicates on both sides, one-sided groups, reordered groups
+(so encounter order is proved to survive), typed/med-wid keys that normalize together, an
+empty side, and a 400×400 group that really trips the pair cap (asserted
+`pairing_quality == "capped"` with diagnostics) — and compared exactly, groups and order
+alike; the full `compare_rows` outcome is asserted deterministic for each. Perf:
+**40,000 rows group in 0.34 s**; on an identical 3,000-row sample the original takes
+0.217 s against the indexed path's 0.020 s.
+
+**Artifact binding.** Prior accepted Stage-8 witnesses were produced by the LIST-scan
+oracle and remain bound to that code identity; this change is not retroactively claimed
+for them. Any future re-run under the indexed oracle records the new identity.
 
 ### CMP-AUD-188 — Highway Detail product witness was not resumable at committed-leg boundaries
 
