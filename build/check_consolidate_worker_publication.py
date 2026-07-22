@@ -112,10 +112,70 @@ def test_ordinary_publication_failure_stays_degraded():
           messages == [("error", expected)])
 
 
+def test_producer_certificate_survives_on_disk():
+    """END TO END, no patching: run the REAL worker with the REAL writer and then
+    READ THE FILE.
+
+    Every other test here patches write_outcome, so they assert a decision (was
+    the writer called?) rather than an outcome (did the record survive?). That
+    gap is exactly how the field bug shipped: the worker's second generic write
+    landed on the same path and silently dropped the TSN library's binding facts,
+    and no check noticed because none of them looked at the resulting bytes.
+    """
+    import json
+    import tempfile
+
+    import consolidation_meta as cm
+
+    print("producer certificate survives the real worker (on-disk):")
+    tsn_keys = ("tsn_normalization_version", "tsn_raw_manifest",
+                "tsn_normalized_workbook_identity", "tsn_artifact_identity_token")
+
+    def build_library_certificate(workbook):
+        """What tsn_library.build_consolidated publishes before returning."""
+        produced = ConsolidateResult(status="ok", output_path=str(workbook),
+                                     completion="complete")
+        assert cm.write_outcome(workbook, produced, extra={
+            "tsn_normalization_version": 5,
+            "tsn_raw_manifest": None,
+            "tsn_normalized_workbook_identity": None,
+            "tsn_artifact_identity_token": None})
+
+    def stamp_after_worker(*, sidecar_published):
+        with tempfile.TemporaryDirectory(prefix="tsmis_cert_") as raw:
+            workbook = Path(raw) / "tsn_highway_log_consolidated.xlsx"
+            workbook.write_bytes(b"PK-normalized-workbook")
+            build_library_certificate(workbook)
+            result = ConsolidateResult(status="ok", output_path=str(workbook),
+                                       completion="complete")
+            result.sidecar_published = sidecar_published
+            # The REAL worker, the REAL consolidation_meta.write_outcome.
+            messages = queue.Queue()
+            gwe.ConsolidateWorker(lambda **_k: result, messages,
+                                  threading.Event(), lambda _p: True,
+                                  day="2026-07-11").run()
+            payload = json.loads(cm.meta_path(workbook).read_text(encoding="utf-8"))
+            return {k: payload.get(k, "<MISSING>") for k in tsn_keys}
+
+    kept = stamp_after_worker(sidecar_published=True)
+    check("a producer-published certificate keeps its normalizer version on disk",
+          kept["tsn_normalization_version"] == 5)
+    check("a producer-published certificate keeps every TSN binding fact",
+          all(kept[k] != "<MISSING>" for k in tsn_keys))
+
+    # Teeth: without the producer claim the generic write MUST destroy it. If this
+    # ever stops failing, the test above has stopped proving anything.
+    lost = stamp_after_worker(sidecar_published=False)
+    check("without the producer claim the generic write still destroys it "
+          "(proves this test has teeth)",
+          lost["tsn_normalization_version"] == "<MISSING>")
+
+
 if __name__ == "__main__":
     test_central_comparison_publication_is_not_overwritten()
     test_ordinary_consolidation_still_publishes()
     test_ordinary_publication_failure_stays_degraded()
+    test_producer_certificate_survives_on_disk()
     print()
     if failures:
         print(f"FAILED: {len(failures)} check(s): {failures}")
