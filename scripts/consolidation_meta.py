@@ -1959,18 +1959,46 @@ def _validate_published_finals(prepared):
     return True
 
 
+def _publication_stopped(stage, detail=""):
+    """Name the one fail-closed publication gate that fired, then report failure.
+
+    Every gate below is deliberately conservative: it refuses rather than
+    publishing a generation it cannot prove. That is correct, but a bare
+    ``return False`` leaves the user with "could not be safely published" and
+    leaves the log with nothing — the failure becomes undiagnosable from a log
+    upload, which the log-every-decision rule exists to prevent. Naming the gate
+    changes no control flow; it only makes the refusal answerable.
+    """
+    log.error("comparison publication stopped at %s%s", stage,
+              f": {detail}" if detail else "")
+    return False
+
+
 def _prepared_publication_current(prepared, lease, commit_guard=None):
     """Revalidate the lease and every committed workbook after lock waiting."""
     if (lease.parent != Path(prepared["payload_parent"])
             or not _publication_lease_current(lease, commit_guard)):
-        return False
+        return _publication_stopped(
+            "revalidation", "the publication lease is no longer current")
     for member, workbook, _facts in prepared["members"]:
         actual = _bound_file_digest(workbook)
-        if (actual is None or actual["sha256"] != member["sha256"]
+        if actual is None:
+            return _publication_stopped(
+                "revalidation",
+                f"committed member could not be re-read ({member['relative_path']})")
+        if (actual["sha256"] != member["sha256"]
                 or actual["size"] != member["size"]
                 or actual["mtime_ns"] != member["mtime_ns"]):
-            return False
-    return _publication_lease_current(lease, commit_guard)
+            return _publication_stopped(
+                "revalidation",
+                f"committed member changed after commit ({member['relative_path']}; "
+                f"sha256 {member['sha256'][:12]}->{actual['sha256'][:12]}, "
+                f"size {member['size']}->{actual['size']}, "
+                f"mtime_ns {member['mtime_ns']}->{actual['mtime_ns']})")
+    if not _publication_lease_current(lease, commit_guard):
+        return _publication_stopped(
+            "revalidation", "the publication lease expired during revalidation")
+    return True
 
 
 def write_comparison_outcomes(result, commit_guard=None):
@@ -2016,7 +2044,9 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
                     _comparison_sentinel_payload(prepared, _member, facts),
                     commit_guard)):
             _protect_comparison_members(prepared, commit_guard)
-            return False
+            return _publication_stopped(
+                "phase 1 (sentinel write)",
+                f"could not establish the sentinel beside {_member['relative_path']}")
     for member, workbook, _facts in prepared["members"]:
         try:
             sentinel_raw = _read_strict_json(_sentinel_path(workbook))
@@ -2026,7 +2056,10 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
                 or sentinel_raw
                     != _comparison_sentinel_payload(prepared, member, _facts)):
             _protect_comparison_members(prepared, commit_guard)
-            return False
+            return _publication_stopped(
+                "phase 1 (sentinel readback)",
+                f"the sentinel beside {member['relative_path']} did not read back "
+                f"exactly (present={sentinel_raw is not None})")
 
     # Phase 2: publish the one shared, content-addressed canonical outcome payload.
     # The stable primary preserves normal cross-generation deduplication. A
@@ -2036,35 +2069,48 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
     descriptors = prepared["payload_manifest"]["chunks"]
     payloads = prepared["payload_chunks"]
     if len(descriptors) != len(payloads):
-        return False
+        return _publication_stopped(
+            "phase 2 (payload manifest)",
+            f"{len(descriptors)} chunk descriptors vs {len(payloads)} chunks")
     published_descriptors = []
     for index, (descriptor, (relative, raw)) in enumerate(
             zip(descriptors, payloads)):
         if (not _publication_lease_current(lease, commit_guard)
                 or relative != descriptor["relative_path"]):
-            return False                       # all sentinels intentionally retained
+            # all sentinels intentionally retained
+            return _publication_stopped(
+                "phase 2 (chunk order)",
+                f"chunk {index} path/lease mismatch ({relative!r})")
         published = _publish_payload_chunk_with_fallback(
             prepared["payload_parent"], raw, descriptor, index,
             prepared["payload_manifest"]["decoded_sha256"],
             commit_guard)
         if published is None:
-            return False                       # all sentinels intentionally retained
+            # all sentinels intentionally retained
+            return _publication_stopped(
+                "phase 2 (chunk publish)",
+                f"chunk {index} could not be published ({relative!r})")
         published_descriptors.append(published)
     published_manifest = dict(prepared["payload_manifest"])
     published_manifest["chunks"] = published_descriptors
     if not _publication_lease_current(lease, commit_guard):
-        return False
+        return _publication_stopped(
+            "phase 2 (post-chunk lease)", "the publication lease expired")
     try:
         prepared["payload_manifest"] = _strict_payload_manifest(published_manifest)
-    except (TypeError, ValueError):  # silent-ok: no malformed path may enter a final envelope
-        return False
+    except (TypeError, ValueError) as e:  # no malformed path may enter a final envelope
+        return _publication_stopped(
+            "phase 2 (manifest validation)", f"{type(e).__name__}: {e}")
     try:
         persisted_outcome = _read_comparison_payload(
             prepared["payload_manifest"], prepared["payload_parent"])
-    except (TypeError, ValueError, OSError):  # silent-ok: persisted payload must validate exactly
-        return False
+    except (TypeError, ValueError, OSError) as e:  # persisted payload must validate exactly
+        return _publication_stopped(
+            "phase 2 (payload readback)", f"{type(e).__name__}: {e}")
     if persisted_outcome != prepared["outcome"]:
-        return False
+        return _publication_stopped(
+            "phase 2 (payload equality)",
+            "the persisted outcome did not equal the prepared outcome")
     del persisted_outcome
 
     # Phase 3: sequential final publication is safe because every fixed sentinel
@@ -2076,21 +2122,40 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
                     meta_path(workbook),
                     _comparison_final_payload(prepared, member, facts),
                     commit_guard)):
-            return False                       # all sentinels intentionally retained
-    if (not _publication_lease_current(lease, commit_guard)
-            or not _validate_published_finals(prepared)):
-        return False                           # all sentinels intentionally retained
+            # all sentinels intentionally retained
+            return _publication_stopped(
+                "phase 3 (final sidecar write)",
+                f"could not write the final record beside {member['relative_path']}")
+    if not _publication_lease_current(lease, commit_guard):
+        return _publication_stopped(
+            "phase 3 (final lease)", "the publication lease expired")
+    if not _validate_published_finals(prepared):
+        # all sentinels intentionally retained
+        return _publication_stopped(
+            "phase 3 (final validation)",
+            "the published final records did not validate as a peer set")
 
     # Phase 4: re-hash immediately before releasing the conservative sentinels: publishing
     # metadata must never mutate or accidentally replace a comparison workbook.
     for member, workbook, _before in prepared["members"]:
         if not _publication_lease_current(lease, commit_guard):
-            return False
+            return _publication_stopped(
+                "phase 4 (re-hash lease)", "the publication lease expired")
         now = _bound_file_digest(workbook)
-        if (now is None or now["sha256"] != member["sha256"]
+        if now is None:
+            return _publication_stopped(
+                "phase 4 (re-hash)",
+                f"committed member could not be re-read ({member['relative_path']})")
+        if (now["sha256"] != member["sha256"]
                 or now["size"] != member["size"]
                 or now["mtime_ns"] != member["mtime_ns"]):
-            return False
+            return _publication_stopped(
+                "phase 4 (re-hash)",
+                f"the workbook changed while metadata published "
+                f"({member['relative_path']}; "
+                f"sha256 {member['sha256'][:12]}->{now['sha256'][:12]}, "
+                f"size {member['size']}->{now['size']}, "
+                f"mtime_ns {member['mtime_ns']}->{now['mtime_ns']})")
 
     # Removing one sentinel may fail after earlier removals. That remains safe:
     # strict peer validation observes any surviving sentinel and marks every member
@@ -2102,13 +2167,17 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
                     _sentinel_path(workbook), commit_guard)):
             all_removed = False
     if not all_removed:
-        return False
+        return _publication_stopped(
+            "phase 5 (sentinel removal)",
+            "a conservative sentinel could not be removed; the members stay untrusted")
 
     exact_records = True
     trusted_winner = None
+    failed_member = None
     for member, workbook, _facts in prepared["members"]:
         if not _publication_lease_current(lease, commit_guard):
-            return False
+            return _publication_stopped(
+                "phase 5 (readback lease)", "the publication lease expired")
         record = read_comparison_outcome(workbook)
         own = (
             record is not None and record.trusted and record.current
@@ -2120,6 +2189,12 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
         )
         if not own:
             exact_records = False
+            failed_member = (
+                f"{member['relative_path']} (record={'absent' if record is None else 'present'}"
+                + ("" if record is None else
+                   f", trusted={record.trusted}, current={record.current}, "
+                   f"source={record.source!r}")
+                + ")")
             if (record is not None and record.trusted and record.current
                     and record.source == "sidecar"
                     and record.artifact_generation is not None):
@@ -2147,7 +2222,10 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
                                _comparison_sentinel_payload(prepared, m2, f2),
                                commit_guard)
         _protect_comparison_members(prepared, commit_guard)
-    return False
+    return _publication_stopped(
+        "phase 5 (final readback)",
+        "a published record did not read back as this generation's own trusted "
+        f"sidecar: {failed_member or 'unknown member'}")
 
 
 def _comparison_untrusted(diagnostic, source="sidecar", self_member=None):
