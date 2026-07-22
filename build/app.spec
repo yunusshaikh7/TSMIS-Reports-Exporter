@@ -82,8 +82,13 @@ APP_MODULES = [
     "export_ramp_summary_excel", "export_intersection_summary_pdf",  # the last editions, v0.25.1
     "export_route_history",              # reserved-DISABLED SSRS placeholder, v0.25.1
     "export_clean_road",                 # reserved-DISABLED Clean Road group, 2026-07-22
-    "tsn_load_clean_road",               # its staged TSN library slots (no normalizer yet)
+    "tsn_load_clean_road",               # the Clean Road TSN library slots (Highway live, v0.29.0)
     "arcgis_layers",                     # the manually-stocked ArcGIS layer drop-zone
+    "clean_road_layers",                 # the per-layer library substrate (v0.29.0)
+    "clean_highway_columns",             # the 74-col THY contract + provenance tiers
+    "consolidate_clean_highway",         # the ArcGIS CA HIGHWAYS overlay build
+    "compare_clean_highway_tsn",         # the ArcGIS-vs-TSN clean-road comparison
+    "gui_arcgis_api",                    # the ArcGIS tab endpoints
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
     "highway_detail_columns",                                # Highway Detail labels + legend (v0.20.0)

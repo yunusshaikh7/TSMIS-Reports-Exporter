@@ -202,9 +202,10 @@ function makeMockApi() {
   // The manually-stocked ArcGIS layer drop-zone (staged only — nothing reads it yet).
   const MOCK_ARCGIS = {
     root: "C:\\Tools\\TSMIS Exporter\\data\\arcgis_layers",
-    count: 2,
-    files: [{ name: "IMLayers.xlsx", size: 111634434 },
-            { name: "Layers7.20.xlsx", size: 355772572 }],
+    count: 41,
+    files: [{ name: "00_INDEX.xlsx", size: 7420 },
+            { name: "01_Traffic Volume Ramps.xlsx", size: 10574848 },
+            { name: "02_SHS Route Break.xlsx", size: 117760 }],
   };
   // Evidence prints are the SECOND TSN asset (the images crop from them). Mixed
   // states again so every panel case is reachable in #mock: prints present, prints
@@ -271,6 +272,7 @@ function makeMockApi() {
   }
   let timer = null;
   let mockCompareOverwrite = null;
+  let mockAgBuilt = false;       // the ArcGIS tab's built-workbook state
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
 
@@ -1718,6 +1720,62 @@ function makeMockApi() {
     save_run_report: async () => {
       push({ t: "log", text: "Run report saved: C:\\Users\\you\\Desktop\\run_report.csv" });
       return { saved: true };
+    },
+    // ---- the ArcGIS clean-road tab (v0.29.0) ----
+    arcgis_status: async () => ({
+      root: "C:\\Tools\\TSMIS Exporter\\data\\arcgis_layers",
+      expected: 40, staged: mockAgBuilt ? 40 : 40,
+      missing: [], unknown: ["99_Scratch Export.xlsx"],
+      index_present: true,
+      highway: {
+        layers_ok: true, missing: [],
+        built: mockAgBuilt
+          ? { exists: true, asof: "2025-09-08", build_version: 1,
+              completion: "complete",
+              path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" }
+          : { exists: false,
+              path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" },
+        tsn_raw: true, default_asof: "2025-09-08",
+      },
+    }),
+    open_arcgis_layers_folder: async () => push({ t: "log", text: "(mock) would open the ArcGIS layers folder" }),
+    open_arcgis_output_folder: async () => push({ t: "log", text: "(mock) would open the arcgis_cleanroad output folder" }),
+    start_arcgis_build: async (asof) => {
+      st.task = "consolidate";
+      st.auth_dot = "busy"; st.auth_text = "Building from ArcGIS layers…";
+      pushState();
+      push({ t: "log", text: "Starting ArcGIS build: Clean Road Highway (ArcGIS)" + (asof ? `   ·   as of ${asof}` : "") },
+           { t: "run_started", mode: "consolidate", label: "Building Clean Road Highway from the ArcGIS layers…" });
+      setTimeout(() => push({ t: "log", text: "  SHS Highway Group: 7,050 as-of spans (214 cross-county)" }), 700);
+      setTimeout(() => push({ t: "log", text: "  Traffic Volume Segments: 25,742 as-of spans" }), 1400);
+      setTimeout(() => push({ t: "log", text: "  built 252/252 routes (60,102 rows)" }), 2200);
+      setTimeout(() => {
+        mockAgBuilt = true;
+        push({ t: "log", text: "Built 60,102 clean-road highway rows (252 routes) as of 2025-09-08." },
+             { t: "run_ended" });
+        st.task = null;
+        st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 2900);
+      return { ok: true };
+    },
+    start_arcgis_compare: async (wantFormulas, wantValues) => {
+      if (!mockAgBuilt) return { error: "Build the Clean Road Highway workbook first — the comparison reads it as the ArcGIS side." };
+      if (!wantFormulas && !wantValues) return { error: "Tick at least one output (values and/or live formulas)." };
+      st.task = "compare";
+      st.auth_dot = "busy"; st.auth_text = "Comparing…";
+      pushState();
+      push({ t: "log", text: "Starting comparison: Clean Road Highway — ArcGIS vs TSN" },
+           { t: "run_started", mode: "consolidate", label: "Comparing — Clean Road Highway…" });
+      setTimeout(() => push({ t: "log", text: "TSN consolidated workbook is already current; reused." }), 800);
+      setTimeout(() => {
+        push({ t: "log", text: "Comparison written: ArcGIS_vs_TSN_CleanRoadHighway_Comparison.xlsx (values + live formulas)" },
+             { t: "run_ended" });
+        st.task = null;
+        st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 3200);
+      return { ok: true };
     },
     open_output_folder: async () => push({ t: "log", text: "(mock) would open the output folder" }),
     open_logs_folder: async () => push({ t: "log", text: "(mock) would open the logs folder" }),

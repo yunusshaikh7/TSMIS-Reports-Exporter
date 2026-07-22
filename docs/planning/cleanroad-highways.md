@@ -224,21 +224,64 @@ IM Filter Points (never exported), IM Intersection Manager Metadata (2 rows),
 MS2 Traffic Station, Posted Speed Limit, the HPMS family, and the 8
 empty-in-export SHS layers.
 
-## App integration sketch (later; owner-approved direction)
+## App integration — SHIPPED v0.29.0 (the ArcGIS tab)
 
-One workbook per layer (or one bundle with an INDEX sheet) lands in
-`arcgis_layers/` (shipped 2026-07-22: `paths.ARCGIS_LAYERS_ROOT` +
-`scripts/arcgis_layers.py`, README + Settings path). The consolidator reads ONLY
-the minimal list above (audit provenance: **each output column records its
-source layer + column** — the INDEX sheet's `Data Source` FeatureServer URL +
-layer id is the provenance record; sheet names are 31-char-truncated so the
-INDEX, never the sheet name, is the identity), selects slices as-of a chosen
-date, overlays county+PM spans, and emits a THY-shaped workbook into the
-`clean_highway` pipeline (`tsn_library` slot staged 2026-07-22, normalizer
-deliberately empty until this lands). The comparison then rides
-`compare_tsn_common` like every other family. Unused layers are rejected by
-name at load — the drop-zone must not accumulate dead weight.
+The sketch above became the product on 2026-07-22: `clean_road_layers.py` (the
+library substrate: INDEX manifest + dialects + LRS/PM algebra + the overlay),
+`clean_highway_columns.py` (the 74-column contract + per-column PROVENANCE
+tiers), `consolidate_clean_highway.py` (the build), a live
+`tsn_load_clean_road.build_into_highway` (verbatim normalization, marker v1),
+`compare_clean_highway_tsn.py` (both flavors via `compare_tsn_common`,
+role-gated by the `ArcGIS Build` marker, the no-source/TSN-internal columns as
+CONTEXT), and the **ArcGIS tab** (`gui_arcgis_api.py` + `ui-arcgis.js`:
+library status vs the 40-layer manifest, Build with an as-of default from the
+TSN extract, Compare with formulas+values). `build/check_clean_road.py` pins
+all of it on a synthetic library.
 
-Acceptance when built: a same-dated TSN extract, row-universe equality
-(breakpoint union vs THY's 60,083), then cell-level agreement per column —
-the route-001 numbers above are the template, statewide.
+**Build-time rules SETTLED against the real 40-layer drop + THY (route 001,
+five probe rounds — these supersede the open items above):**
+
+- **Coded attribute domains arrive as `CODE- Label`** ("J- Unpaved Median",
+  "N - Non-Add", bare "Z") — `clean_road_layers.code_of` extracts the code.
+  Toll/Forest are presence flags ("Toll Roads" / "Yes"); Route Break carries
+  "Route Break"/"Route Resume" (+step-down variants) → R-BR/U-BR.
+- **THY_DISTRICT_CODE paints from every covering span's own District column**
+  (the labels dialect carries it everywhere); the SHS District layer's own
+  route-length spans lose middle counties to any two-ended split.
+- **Cross-county spans**: end PM < begin PM is their NORMAL shape (the end
+  lives in the next county's PM space — never a degenerate row). The split
+  walks the county CHAIN: first county to its extent end, odometer-covered
+  middle counties WHOLLY, the continuation county from 0 (measured: MON
+  101.178 → SCR 0.043 covers SCR from 0.000). Odometers order and apportion,
+  never join.
+- **The ADT family**: reduce the Traffic Volume spans to the WINNING vintage
+  (latest AADT_YEAR, then newest slice) BEFORE the overlay — every vintage's
+  edges would otherwise fabricate cuts. The value at a span's BEGIN is its
+  **AADT_AHEAD** count (AADT itself is the station's midpoint — anchoring on
+  it shifted every row by a constant); slope = (BACK − AHEAD)/length; P marks
+  a station row only on a CONTIGUOUS stretch (a span re-entering across a PM
+  gap is S — ORA 17.461).
+- **No X rows are fabricated.** The HG layer never says X, and TSN skips the
+  unconstructed PM ranges entirely (ORA 001 14.057–17.461 has NO row). TSN's
+  340 statewide HG=X inventory rows have no layer counterpart and surface
+  one-sided in the comparison, by design.
+- **Offsets are PM-continued per county**: BEGIN_OFFSET = the row's own begin
+  PM plus the prior counties' cumulative largest end PMs (measured: every
+  first-county offset IS the begin PM, gaps and prefix handoffs included).
+- **City cuts, never values**: the City layer (SHS rows only) contributes row
+  BREAKS at city limits; its City_Code carries city NAMES, not TASAS city
+  letter codes, so THY_CITY_CODE stays a noted no-source column (ask the
+  owner for a TASAS city-code table to upgrade it).
+- **Point layers may carry no lifecycle** (Equation Points ships blank
+  LRSFromDates) — an undated point is always live; equate points cut rows and
+  flag THY_EQUATE_CODE=E; a break/resume point that coincides with an equate
+  reads as the equate.
+- **Block effective dates**: the OLDEST member layer's InventoryItemStartDate
+  is the closest simple composite (~70%; the exact TSN rule remains an open
+  question — the comparison surfaces the residual honestly).
+
+Statewide acceptance numbers (the first full build + comparison) live in the
+canary bindings doc once blessed; the residual known-diff classes are the
+0.001-mi boundary slivers, the eff-date composites, TSN's X rows, and the
+±5–10% attribute-coverage holes on multi-county spans whose odometers are
+blank (chain-walk needs them).

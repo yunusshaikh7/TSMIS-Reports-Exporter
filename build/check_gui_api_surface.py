@@ -84,6 +84,9 @@ FROZEN_API = {
     "start_batch_export", "start_checks", "start_compare", "start_compare_env",
     "start_consolidate", "start_export", "start_login", "start_reset", "tsn_library_status",
     "ui_event", "ui_ready", "update_apply", "update_start", "verify_environment",
+    # v0.29.0 — the ArcGIS clean-road tab (gui_arcgis_api).
+    "arcgis_status", "open_arcgis_layers_folder", "open_arcgis_output_folder",
+    "start_arcgis_build", "start_arcgis_compare",
 }
 
 

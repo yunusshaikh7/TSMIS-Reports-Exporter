@@ -176,6 +176,9 @@
           <button class="tab" id="tabEverything" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-zap"/></svg>Everything
           </button>
+          <button class="tab" id="tabArcgis" role="tab" aria-selected="false">
+            <svg class="ic"><use href="#i-layers"/></svg>ArcGIS
+          </button>
           <button class="tab tab-icon" id="tabSettings" role="tab" aria-selected="false" aria-label="Settings" title="Settings">
             <svg class="ic"><use href="#i-settings"/></svg>
           </button>
@@ -647,6 +650,66 @@
               <svg class="ic"><use href="#i-x"/></svg>Cancel
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- ArcGIS clean-road pane: the manually-stocked layer library, the
+           CA HIGHWAYS overlay build, and the ArcGIS-vs-TSN comparison.
+           Intersections/Ramps show as staged skeletons until integrated. -->
+      <div class="card pane hidden" id="paneArcgis">
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">ArcGIS layer library</span>
+            <span class="section-meta" id="agLibMeta">—</span>
+          </div>
+          <p class="hint" id="agLibHint">Checking the layer library…</p>
+          <div id="agLibIssues"></div>
+          <div class="actions-row">
+            <button class="btn btn-standard btn-small" id="btnAgOpenLayers">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open layers folder
+            </button>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">CA Highways — build &amp; compare</span>
+            <span class="section-meta" id="agHwyMeta">—</span>
+          </div>
+          <p class="hint" id="agHwyBuilt">—</p>
+          <div class="routes-row">
+            <label class="set-row" style="flex:1 1 auto">As-of date
+              <span class="set-input"><input type="text" class="input" id="agAsof" data-lock-when-busy
+                     autocomplete="off" spellcheck="false" placeholder="from the TSN extract"></span>
+            </label>
+            <button class="btn btn-accent" id="btnAgBuild" data-lock-when-busy>
+              <svg class="ic"><use href="#i-play"/></svg>Build from layers
+            </button>
+          </div>
+          <p class="hint" id="agAsofHint">Leave blank to match the staged TSN extract's own date.</p>
+          <div class="actions-row">
+            <label class="fast-toggle"><input type="checkbox" id="agWantFormulas" checked>
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="fast-label">Live formulas</span></label>
+            <label class="fast-toggle"><input type="checkbox" id="agWantValues" checked>
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="fast-label">Values</span></label>
+            <button class="btn btn-standard" id="btnAgCompare" data-lock-when-busy>
+              <svg class="ic"><use href="#i-compare"/></svg>Compare vs TSN…
+            </button>
+            <span class="spacer"></span>
+            <button class="btn btn-subtle btn-small" id="btnAgOpenOut">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open output folder
+            </button>
+          </div>
+          <p class="hint" id="agCompareHint"></p>
+        </div>
+
+        <div class="card-section">
+          <div class="section-head"><span class="section-label">Staged for later</span></div>
+          <p class="hint">CA Intersections and CA Ramps follow the same pattern once their
+            builds and comparisons are integrated — Highway went first. Their TSN extracts
+            and layers stay staged in the libraries.</p>
         </div>
       </div>
 
@@ -1181,6 +1244,7 @@
 <script src="ui-batch.js"></script>
 <script src="ui-compare.js"></script>
 <script src="ui-matrix.js"></script>
+<script src="ui-arcgis.js"></script>
 <script src="ui-settings.js"></script>
 <script src="app.js"></script>
 <script>

@@ -100,23 +100,27 @@ Plus one **consolidate-only source** (not an export type): **TSN Highway Log (PD
    for the engine to drive. It shows greyed in the picker
    (`reports.DISABLED_EXPORT_SUBDIRS`); if the site later gives it an export flow,
    enabling it = write the real save + drop its subdir from the gate.
-7. **The Clean Road Files group is wired-but-DISABLED groundwork** (stable ids
-   16/17/18, 2026-07-22 — the same reserved pattern): the dev site 7.21 capture
-   adds a `cs-header` "Clean Road Files" followed by three `cs-option cs-sub
-   cs-disabled` entries (`clean_highway` / `clean_intersection` / `clean_ramp`).
-   The capture ships **no `clean_*.js` report module** and nothing in the site's JS
-   references those values, so there is no Generate→Export flow and no export/print
-   function name to bind to — exactly where Highway Detail/Summary sat on the 6.26
-   capture. All three show greyed in the picker
+7. **The Clean Road Files group is wired-but-DISABLED as a SITE export** (stable
+   ids 16/17/18, 2026-07-22 — the same reserved pattern): the dev site 7.21
+   capture adds a `cs-header` "Clean Road Files" followed by three `cs-option
+   cs-sub cs-disabled` entries (`clean_highway` / `clean_intersection` /
+   `clean_ramp`). The capture ships **no `clean_*.js` report module**, so there
+   is no Generate→Export flow to bind to — exactly where Highway Detail/Summary
+   sat on the 6.26 capture. All three show greyed in the picker
    (`reports.DISABLED_EXPORT_SUBDIRS`); each `save` in `export_clean_road.py`
-   refuses loudly if ever reached. Their **TSN sources are already staged** —
-   `report_catalog.TSN` carries `clean_highway` / `clean_intersection` /
-   `clean_ramp` library slots for the CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS
-   extracts, with `tsn_load_clean_road` deliberately holding NO normalizer (see
-   [comparison-engine.md](comparison-engine.md) and the module docstring).
-   Enabling one = write its real save off a fresh capture, write its TSN
-   projection, bump that slot's `normalization_version`, and drop its subdir from
-   the gate.
+   refuses loudly if ever reached. **Since v0.29.0 the HIGHWAY file has a
+   different, live path that doesn't need the site at all — the ArcGIS tab**:
+   the owner's per-layer ArcGIS exports in `arcgis_layers/` build OUR own
+   74-column CA HIGHWAYS table (`consolidate_clean_highway`), the staged TSN
+   `CA HIGHWAYS` extract normalizes through the live
+   `tsn_load_clean_road.build_into_highway` (marker v1), and
+   `compare_clean_highway_tsn` diffs the two in both flavors with every column
+   indexed back to its source layer (the built workbook's `Provenance` sheet +
+   the comparison Notes). Intersection/Ramp stay refusing skeletons — their
+   builds follow the same pattern (design + censused mappings in
+   [planning/cleanroad-highways.md](planning/cleanroad-highways.md)).
+   Enabling a SITE export later = write its real save off a fresh capture and
+   drop its subdir from the gate, as before.
 
 **Cross-cutting engine capabilities** (all reports, unless noted): resume + retry +
 skip/cancel + fast-fail per route; **fast mode** (6 parallel browsers; no coalescing);

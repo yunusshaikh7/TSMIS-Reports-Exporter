@@ -897,6 +897,43 @@ dropdowns list run folders (baseline defaults to newest ssor-prod) + Browse; sav
 `output/comparisons/` (`DEFAULT_OUT_DIR`). The v0.12.0 A2 filter lists only folders that actually
 contain the chosen report — see [gui.md](gui.md).
 
+### 9j. Clean Road Highway — ArcGIS build vs TSN (`compare_clean_highway_tsn.py`, v0.29.0)
+
+The first comparison whose "TSMIS side" is not a site export at all: side A is OUR
+CA HIGHWAYS table, built from the owner's per-layer ArcGIS exports by
+`consolidate_clean_highway` (the county+PM overlay — the model, measured rules, and
+per-column provenance tiers live in
+[planning/cleanroad-highways.md](planning/cleanroad-highways.md)); side B is the
+vendor's TSN `CA HIGHWAYS` extract (raw `Sheet 1`, or the library's verbatim
+normalized copy — `tsn_load_clean_road.build_into_highway`, marker v1). It lives on
+the **ArcGIS tab**, not in `COMPARE_REPORTS` or the matrices.
+
+Both sides carry the same 74 `THY_*` columns, so ONE projection (`_thy_row`) loads
+either. Row identity is the roadbed-aware physical span key — route (name+suffix) ·
+county · PM prefix · decimal-canonical BEGIN PM · roadbed (the R/L/X PM suffix) —
+carried as the typed PhysicalKey in the `THY_BEGIN_PM_AMT` cell; the END PM is
+deliberately NOT key material (a differently-cut stretch pairs on its begin and
+shows the end as a field diff, instead of two one-sided rows). Role gates keep the
+sides honest (the CMP-AUD-066 pattern): the ArcGIS side REQUIRES the very
+`ArcGIS Build` marker sheet the consolidator writes; the TSN side REJECTS it.
+
+`_SCHEMA`: `side_a="ArcGIS"`, `side_b="TSN"`, `key_field=14`, date fields
+ISO-normalized, amount columns decimal-canonical, and **28 CONTEXT columns** — the
+TSN bookkeeping (id/element/lifecycle/create/update), the TASAS change-tracking
+flags, the no-TSMIS-source columns (maintenance level, federal-aid trio, national
+lands, scenic freeway, city code), `THY_EXTRACT_DATE`, the two SYNTHESIZED offset
+columns (our PM-continued cumulative diverges from TSN's own line at every
+segmentation sliver — the sliver already shows once on END PM/LENGTH), and the ADT
+profile trio (right layer, but TSN's per-row interpolation model — cross-county
+profile continuations, the overlap vintage rule — is not yet pinned; a tracked
+follow-up upgrades them to compared) — all PRESENT with both sides' values shown
+and never counted (owner decision 2026-07-22). 46 columns are compared and counted.
+The Notes sheet lists the full 74-line column→layer audit
+(`clean_highway_columns.PROVENANCE`); the built workbook's `Provenance` sheet adds
+each layer's FeatureServer `Data Source` from the library's `00_INDEX.xlsx`.
+Pinned by `build/check_clean_road.py` (synthetic library end-to-end: role gates,
+both flavors, context-never-counts).
+
 ---
 
 ## 10. Internal mechanics (quick reference)

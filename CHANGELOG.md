@@ -3,6 +3,58 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.29.0 — 2026-07-22
+
+### Added
+- **The ArcGIS tab — build your own CA HIGHWAYS clean-road file and compare it
+  against TSN.** Drop your per-layer ArcGIS exports (the agreed 40-layer
+  library, one .xlsx per layer plus the export's own `00_INDEX.xlsx`) into
+  `arcgis_layers/`, and the new tab shows exactly what's staged, what's
+  missing, and anything it doesn't recognize. **Build from layers** rebuilds
+  the vendor's 74-column CA HIGHWAYS table independently from those layers —
+  slices selected as of the TSN extract's own date, keyed on county + postmile
+  (never the odometers), with the independent-alignment R/L rows, the ADT
+  profile interpolation, tolls/forest coding, landmarks, equates and route
+  breaks all derived the way the extract carries them. **Compare vs TSN** then
+  diffs the two cell-for-cell, in the same discrepancy-workbook format as
+  every other comparison — live-formulas and values editions both.
+- **Every column is indexed back to its source layer.** The built workbook
+  carries a `Provenance` sheet naming, for each of the 74 columns, the layer
+  and column it was painted from — including the FeatureServer source recorded
+  by the export's own INDEX — and the comparison's Notes sheet repeats the
+  full audit list. Columns with no TSMIS source (the federal-aid trio,
+  maintenance service level, national lands, scenic freeway, the TASAS
+  change-tracking flags, city code — the City layer carries names, not TASAS
+  city codes) stay PRESENT in the comparison, shown with TSN's value beside
+  our empty cell and never counted as a difference, exactly as decided. The
+  synthesized offset pair and the ADT profile trio are painted and shown the
+  same way — visible on both sides, not counted — until TSN's own per-row
+  arithmetic for them (profiles that continue across county lines, the
+  vintage choice where several are live) is pinned; the Notes say so in
+  plain words.
+- **The library gates itself.** The build refuses when a required layer is
+  missing (naming it), when a file holds fewer rows than the export's own
+  INDEX claims (a truncated export), or when a file matches no manifest layer
+  — the drop-zone can't accumulate dead weight. A small measured tolerance
+  accepts ArcGIS's own count/export race on healthy exports.
+- **The TSN Clean Road Highway library slot is live.** The staged
+  `CA HIGHWAYS` extract now normalizes (verbatim, with the freshness marker)
+  so comparisons reuse it like every other TSN library report. Intersections
+  and Ramps stay staged skeletons — Highway went first, and their builds
+  follow the same pattern later.
+
+### Fixed
+- **Builder refusals keep their own words.** A TSN library slot that refuses
+  to build (for example the staged Clean Road Intersection/Ramp slots) now
+  reports its own message instead of a generic certificate error, and
+  declining an overwrite reads as cancelled rather than an error.
+- **A stale TSN pick from a previous install heals itself.** When an
+  explicitly selected TSN workbook points at an app-owned path from an older
+  install (`_tsn_input\…` or an old library path) and the file is gone, the
+  matrix now falls back to the canonical library automatically and marks the
+  cell "(old pick ignored)" — instead of blocking the comparison until the
+  selection was cleared by hand. Every other selection stays strict.
+
 ## v0.28.2 — 2026-07-22
 
 ### Fixed

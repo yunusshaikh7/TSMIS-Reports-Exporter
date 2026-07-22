@@ -251,12 +251,18 @@ here). Two MANUALLY-STOCKED libraries sit beside them, both git-ignored and neve
 written by an export run: `TSN_LIBRARY_ROOT = DATA_ROOT/tsn_library` (the
 report-shaped TSN ground truth — §v0.17.0 below) and `ARCGIS_LAYERS_ROOT =
 DATA_ROOT/arcgis_layers` (`scripts/arcgis_layers.py`, 2026-07-22 — the owner's own
-exports of the TSMIS ArcGIS layers, which is what every TSMIS report is ultimately
-made of; one workbook per drop, each typically carrying an `INDEX` sheet mapping
-worksheet → ArcGIS layer + FeatureServer source, because Excel truncates sheet
-names at 31 chars). The ArcGIS library is **staging only** — `ensure_layout()`
-creates the folder + README at startup and `status()` reports what is there for the
-Settings panel; nothing parses the layers yet. App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
+per-layer exports of the TSMIS ArcGIS layers, which is what every TSMIS report is
+ultimately made of; since v0.29.0 the agreed shape is ONE `.xlsx` per layer named
+`NN_<Layer Name>.xlsx` beside the export's own `00_INDEX.xlsx` manifest — the
+filename is the identity because Excel truncates sheet names at 31 chars, and the
+INDEX carries each layer's row/field counts + FeatureServer source for audit).
+Since **v0.29.0 the ArcGIS TAB consumes it**: `clean_road_layers.py` verifies the
+drop against the 40-layer manifest + the INDEX row counts,
+`consolidate_clean_highway.py` builds OUR own 74-column CA HIGHWAYS clean-road
+table from the layers (county+PM overlay, as-of the TSN extract's date) into
+`output/arcgis_cleanroad/`, and `compare_clean_highway_tsn.py` diffs it against
+the TSN extract — see [comparison-engine.md](comparison-engine.md) §9j and
+[planning/cleanroad-highways.md](planning/cleanroad-highways.md). App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
 `AUTH`, `LOG_DIR`, `FAILURES_DIR`, `CONFIG_FILE`, `UPDATE_DIR`,
 `EDGE_LOGIN_PROFILE_DIR`, `WEBVIEW_PROFILE_DIR`, `DOWNLOADED_BROWSERS_DIR`. The
 frozen auth file is `data/tsmis_auth.json`; the dev auth file is

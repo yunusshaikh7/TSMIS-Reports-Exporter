@@ -60,9 +60,17 @@ them (`export_clean_road.py`; every `save` refuses loudly). Their **TSN sources 
 staged** as library slots for the CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS
 clean-road extracts — the underlying tables, not the TSAR projections (CA HIGHWAYS
 carries the SAME 60,083 records as the Highway Detail extract but 74 columns instead
-of 56) — with `tsn_load_clean_road` deliberately holding **no normalizer**: the
-target shape is decided by the comparison they will feed, and inventing one now would
-bake in a guess. v0.17.0 brought
+of 56). **Since v0.29.0 the HIGHWAY clean-road file is LIVE without the site — the
+ArcGIS tab** builds OUR own 74-column CA HIGHWAYS table from the owner's per-layer
+ArcGIS exports in `arcgis_layers/` (the agreed 40-layer library; county+PM overlay
+as-of the TSN extract's own date) and compares it vs the TSN extract in BOTH flavors
+with every column indexed back to its source layer (`consolidate_clean_highway` /
+`compare_clean_highway_tsn`; the measured build rules + provenance tiers live in
+[docs/planning/cleanroad-highways.md](docs/planning/cleanroad-highways.md), the
+family in [docs/comparison-engine.md](docs/comparison-engine.md) §9j).
+`tsn_load_clean_road` normalizes CA HIGHWAYS verbatim (marker v1); the
+Intersection/Ramp slots stay deliberately normalizer-less until their builds land
+on the same pattern. v0.17.0 brought
 reports 1–6b to parity, **v0.20.0 added Highway Detail (7/7b)**, **v0.25.0 added
 Highway Sequence (PDF) (3b)**, and **v0.26.0 added Ramp Detail (PDF) (2b)**: the
 **12 fully-integrated export types consolidate AND

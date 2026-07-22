@@ -478,6 +478,10 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
 
 ## Pending for the next release (fixed on main, unreleased — 2026-07-22)
 
+> **Both items below SHIPPED in v0.29.0** (with the ArcGIS clean-road tab) — kept
+> here until the release notes land on GitHub, then this section collapses into
+> the changelog as usual.
+
 - **Stale explicit TSN selection self-heals after an install move** (work-PC field report,
   2026-07-22): the matrix blocked a row with "The explicitly selected TSN workbook is
   unavailable" pointing at the PREVIOUS install's `…\output\…\_tsn_input\highway_log\
@@ -519,27 +523,34 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   `tsn_load_highway_detail` pattern), bump that slot's `normalization_version`, add the
   comparator + matrix rows, and drop its subdir from the gate. See
   [reports.md](reports.md) footnote 7.
-- [ ] **ArcGIS layer processing → build our own Clean Road CA HIGHWAYS** [L] — **COVERAGE
-  ASSESSMENT DONE 2026-07-22; the build is FEASIBLE and value-proven on route 001.** See
-  [docs/planning/cleanroad-highways.md](planning/cleanroad-highways.md) (the column map, the
-  minimal 24-layer export list, the gaps) — the plan: consolidate the owner's ArcGIS layer
-  exports (county+PM overlay of as-of LRS slices) into a THY-shaped CA HIGHWAYS workbook, then
-  compare it against the TSN clean-road extract like any other family. Proof numbers: 12
-  attribute checks 100.0% (502/502) on route 001, surface types 501/502 (one 0.001-mi boundary
-  sliver), `Total_Num_Lanes` is THY's lanes column, layer L/R == THY LT/RT, TOLL_FOREST mux
-  settled (1=toll / 2=forest, verified geographically). Hard-won traps: join on county+PM (THY
-  offsets are PM-continued; the layers' ODMeasure/ARMeasure are DIFFERENT calibrations — matching
-  on them silently scrambles fine-grained attributes), `LRSToDate` empty = current,
-  `InventoryItemStartDate` = domain eff date, `.` = none sentinel, City/County-Code layers are
-  all-roads (filter `RouteID LIKE 'SHS_%'`). **Blocked on the owner for:** a Traffic Volume
-  Segments export (the ADT gap), the MAINT_SVC_LVL / federal-aid / national-lands /
-  scenic-freeway questions (no TSMIS layer found — likely TSN-legacy), and a same-dated
-  TSN-extract + layer-export pair for acceptance. The app SPACE shipped earlier the same day:
-  `arcgis_layers/` beside `tsn_library/` (`paths.ARCGIS_LAYERS_ROOT`, `scripts/arcgis_layers.py`
-  — git-ignored, manually stocked, README at startup, path + count in Settings, excluded from
-  support bundles). **Read the INDEX sheet, never the worksheet name** — Excel truncates sheet
-  names at 31 characters, and the INDEX's FeatureServer URL + layer id is the audit-provenance
-  record the consolidator will stamp per column.
+- [x] **ArcGIS layer processing → build our own Clean Road CA HIGHWAYS** [L] — **SHIPPED
+  v0.29.0 (2026-07-22), same-day from the owner's full 40-layer per-layer drop.** The ArcGIS
+  tab: library status vs the agreed 40-layer manifest (`clean_road_layers.py` — INDEX-verified,
+  dialect-normalized), the CA HIGHWAYS overlay build (`consolidate_clean_highway.py` — THY-shaped
+  74 columns, per-column `Provenance` sheet with FeatureServer sources, as-of the TSN extract's
+  date), the live TSN normalizer (`tsn_load_clean_road.build_into_highway`, marker v1), and the
+  ArcGIS-vs-TSN comparison (`compare_clean_highway_tsn.py`, both flavors, 23 context columns
+  present-but-never-counted per the owner's decision, the full column→layer audit in the Notes).
+  Measured build rules + the five probe rounds' findings: the SHIPPED section of
+  [planning/cleanroad-highways.md](planning/cleanroad-highways.md). Pinned by
+  `build/check_clean_road.py`. **Follow-ups (small, tracked):**
+  - [ ] a **sliver policy** for the 0.001-mi boundary-calibration class (rows keyed 9.256 vs
+    9.257 pair one-sided today; ~a few hundred statewide);
+  - [ ] **upgrade the ADT profile trio + the offset pair from context to compared**: TSN's exact
+    per-row ADT model is not yet pinned (measured on 001: profiles CONTINUE ACROSS county lines —
+    THY's LA-0.0 line fits endpoints at ORA 32.953 → LA 1.2035 — and the winning-vintage rule at
+    overlaps isn't latest-year), and the synthesized PM-continued offsets diverge from TSN's own
+    line at every segmentation sliver. Both families are painted and SHOWN as context with Notes;
+    fitting the profile-continuation + vintage rule statewide (and choosing an offset policy)
+    upgrades them to counted;
+  - [ ] the exact TSN **block effective-date composite** rule (oldest-member ≈ 70%; the residual
+    shows honestly in the comparison);
+  - [ ] a **TASAS city-code table** from the owner would upgrade THY_CITY_CODE from
+    noted-no-source to compared (the City layer carries names, not codes);
+  - [ ] attribute holes on multi-county spans whose ODOMETERS are blank (the chain walk needs
+    them) — re-export or accept;
+  - [ ] **CA INTERSECTIONS / CA RAMPS builds** on the same pattern (mappings censused in the
+    planning doc; the tab shows them as staged).
 
 - [x] **Ramp Summary vs TSN (AGGREGATE)** [M] — **DONE (v0.17.0).** The first AGGREGATE comparator
   + the shared `summary_layout.py` familiar-layout renderer. `consolidate_ramp_summary` completed to
