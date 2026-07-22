@@ -216,6 +216,13 @@ function makeMockApi() {
         evidence_dir: ev
           ? `${MOCK_TSN_ROOT}\\${report}\\${ev.in_raw ? "raw" : "pdf"}` : "",
         evidence_in_raw: !!(ev && ev.in_raw),
+        // Mirrors the bridge's first-failing-condition reason so the panel's
+        // "why is it stale" line is verifiable in #mock.
+        stale_reason: m.current ? ""
+          : !m.present ? "no raw TSN files imported yet"
+          : !m.cons ? "not built yet — rebuild it"
+          : (m.stale_reason
+             || "built by an older normalizer — rebuild it (expected once after an app update)"),
       };
     });
   }

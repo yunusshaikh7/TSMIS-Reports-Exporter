@@ -214,8 +214,9 @@ function renderTsnLibrary(reports) {
     // Green = consolidated current; amber = missing/stale OR raw not imported.
     dot.className = "tsn-dot " + (r.current ? "ok" : (r.raw_present ? "warn" : "none"));
     dot.title = r.current ? "Consolidated workbook is current"
-      : r.raw_present ? "Consolidated workbook is missing or older than the raw — rebuild it"
-      : "No raw TSN file imported yet";
+      : (r.stale_reason || (r.raw_present
+          ? "Consolidated workbook is missing or older than the raw — rebuild it"
+          : "No raw TSN file imported yet"));
 
     const name = document.createElement("span");
     name.className = "tsn-name";
@@ -233,6 +234,14 @@ function renderTsnLibrary(reports) {
         ? (r.current ? "consolidated current" : "consolidated STALE")
         : "not yet built";
       status.textContent = `${raw} · ${cons}`;
+      // A bare "STALE" is not actionable — a rebuild can succeed and the library
+      // still read stale for any of eight independent reasons. Say which.
+      if (!r.current && r.stale_reason) {
+        const why = document.createElement("span");
+        why.className = "tsn-why";
+        why.textContent = r.stale_reason;
+        status.append(document.createElement("br"), why);
+      }
     }
 
     // Second asset: the TSN prints the evidence images crop from. Reports that

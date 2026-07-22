@@ -891,6 +891,13 @@ class GuiMatrixMixin:
         rows = []
         for s in tsn_library.all_status():
             ev = prints.get(s["report"])
+            reason = self._tsn_stale_reason(s)
+            if reason and s["raw_present"]:
+                # "STALE" alone sent the owner back to us twice: a rebuild can
+                # succeed and the library still read stale for one of eight
+                # independent reasons. status() already decides which; it was
+                # simply discarded here.
+                log.info("tsn panel: %s reads stale — %s", s["report"], reason)
             rows.append({
                 "report": s["report"], "label": s["label"],
                 "raw_kind": s["raw_kind"], "raw_present": s["raw_present"],
@@ -905,8 +912,49 @@ class GuiMatrixMixin:
                 "evidence_pdfs": (ev or {}).get("tsn_pdfs", 0),
                 "evidence_dir": (ev or {}).get("dir", ""),
                 "evidence_in_raw": (ev or {}).get("source") == "raw",
+                "stale_reason": reason,
             })
         return rows
+
+    @staticmethod
+    def _tsn_stale_reason(s):
+        """Why this TSN report is not current — the FIRST failing condition.
+
+        `status()` already decides every one of these independently and returns
+        them; the panel used to keep only the collapsed `current` flag, so a
+        rebuild that succeeded and a library that was never built looked
+        identical ("STALE") and neither said what to do about it.
+
+        Ordered outermost-first: a raw-source problem explains everything after
+        it, so report that rather than the derived mismatch it causes.
+        """
+        if s.get("current"):
+            return ""
+        if not s.get("raw_present"):
+            return "no raw TSN files imported yet"
+        if not s.get("raw_admissible"):
+            return s.get("raw_admission_error") or "the raw source set is not admissible"
+        if not s.get("consolidated_present"):
+            return "not built yet — rebuild it"
+        if s.get("certificate_error"):
+            return f"its build record could not be read ({s['certificate_error']})"
+        if not s.get("metadata_current"):
+            return ("its build record does not match the workbook on disk "
+                    "(rebuilt outside the app, or the file changed after it was built)")
+        if not s.get("producer_complete"):
+            return "the last build reported skipped or failed inputs — rebuild it"
+        if not s.get("normalization_current"):
+            return "built by an older normalizer — rebuild it (expected once after an app update)"
+        if not s.get("raw_manifest_current"):
+            return "the raw TSN files changed since it was built — rebuild it"
+        if not s.get("normalized_workbook_current"):
+            return (s.get("workbook_identity_error")
+                    or "the consolidated workbook changed after it was built")
+        if not s.get("identity_token_current"):
+            return "its identity stamp does not match its own inputs — rebuild it"
+        if s.get("coherence_error"):
+            return f"its files changed while being checked ({s['coherence_error']})"
+        return "it did not pass the freshness check"
 
     @_api_method
     def tsn_library_status(self):

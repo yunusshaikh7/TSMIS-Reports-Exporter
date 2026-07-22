@@ -1405,6 +1405,8 @@ body.matrix-wide.mw-bl #baselineMatrixConfig { display: flex; }
 .tsn-status { font-size: 12px; }
 /* The second TSN asset (evidence prints). Missing prints are a real gap — the
    images cannot render — so they read in the warning colour rather than muted. */
+/* Why a report is not current — actionable, so it reads as guidance not noise. */
+.tsn-why { font-size: 11px; color: var(--warning); }
 .tsn-evidence { font-size: 11px; }
 .tsn-evidence.warn { color: var(--warning); }
 .tsn-actions { margin-left: auto; display: flex; gap: 6px; }

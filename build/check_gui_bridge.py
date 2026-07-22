@@ -419,9 +419,47 @@ def test_tsn_library_panel():
         fields = {"report", "label", "raw_kind", "raw_present", "raw_count",
                   "consolidated_present", "current", "raw_dir",
                   "evidence_supported", "evidence_pdfs", "evidence_dir",
-                  "evidence_in_raw"}
+                  "evidence_in_raw",
+                  # Why a report is not current — the first failing condition,
+                  # so "STALE" is actionable instead of one opaque word.
+                  "stale_reason"}
         check("status rows carry exactly the panel fields",
               all(set(r) == fields for r in rows))
+
+        # The stale reason must NAME the cause. With an empty library root every
+        # report has no raw at all, so that is the reason each must give — and a
+        # current report must give none.
+        check("a not-current report says WHY it is not current",
+              all(r["stale_reason"] for r in rows if not r["current"]))
+        check("no-raw reports name the missing raw, not a generic 'stale'",
+              all(r["stale_reason"] == "no raw TSN files imported yet"
+                  for r in rows if not r["raw_present"]))
+        # Each distinct failing condition maps to its OWN message: a rebuilt-but-
+        # stale library must never read the same as a never-built one (the field
+        # report this was written for).
+        _reason = gui_api.GuiApi._tsn_stale_reason
+        base = {"current": False, "raw_present": True, "raw_admissible": True,
+                "consolidated_present": True, "metadata_current": True,
+                "producer_complete": True, "normalization_current": True,
+                "raw_manifest_current": True, "normalized_workbook_current": True,
+                "identity_token_current": True}
+        cases = {
+            "normalization_current": "older normalizer",
+            "raw_manifest_current": "raw TSN files changed",
+            "producer_complete": "skipped or failed inputs",
+            "metadata_current": "does not match the workbook",
+            "identity_token_current": "identity stamp",
+        }
+        distinct = set()
+        for field, expect in cases.items():
+            reason = _reason({**base, field: False})
+            distinct.add(reason)
+            check(f"stale reason for {field} names its own cause ({reason!r})",
+                  expect in reason)
+        check("each failing condition yields a DISTINCT reason",
+              len(distinct) == len(cases))
+        check("a current report reports no stale reason",
+              _reason({**base, "current": True}) == "")
         check("tsn_library_status() wraps the rows",
               {x["report"] for x in a.tsn_library_status()["reports"]} == reg)
         check("import_tsn_raw rejects an unknown report",
