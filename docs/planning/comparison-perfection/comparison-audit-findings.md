@@ -5980,6 +5980,20 @@ typed outcome claiming rows; they now write the minimal real schema through the 
 shared `_checklib.write_comparison_stub` (and `check_artifact_store._xlsx` emits it for
 any `sheet="Comparison"` fixture), which also makes those fixtures more faithful.
 
+**Real-corpus leg (confirmatory).** The suite census above is the load-bearing evidence,
+because both production entry points are exercised there many times over. A statewide run
+against `All Reports 7.9` on the dev box could only complete ONE recipe — cross-environment
+**Intersection Summary, ssor-prod vs ars-prod, 217 routes: schema-ACCEPTED**
+(0 diffs / 0 one-sided / 217 rows) — and it is worth recording exactly why the other four
+attempted recipes produced no workbook, since none of them is a schema refusal or a
+regression: Intersection Detail (Excel and PDF) has **no ssor-prod exports in the 7.9
+bundle** (the comparator returns its clean "not exported on that side" error); the
+Highway Sequence PDF-vs-Excel self-check refuses the archived consolidated PDF workbook
+because it **predates the CMP-AUD-066 `TSMIS PDF Conversion` marker**; and Ramp Detail
+vs TSN refuses the on-disk normalized library because its **column layout is from an
+older normalizer version** (the D2 rebuild-once gate). All three are pre-existing, loud,
+correct input gates, and each names its own remedy.
+
 **Evidence — `build/check_comparison_artifact_schema.py` (22 checks).** Accepts a real
 artifact; REFUSES each of the finding's own cases (header-only under a typed row claim,
 neither Status nor Diffs labels, bare `A1='x'`, duplicate `Status` labels, a non-string
