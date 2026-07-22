@@ -88,6 +88,7 @@ APP_MODULES = [
     "pdf_table_lib",
     "published_comparison",                                  # the published-cell decoder (CMP-AUD-208)
     "evidence_ledger",                                       # the published-universe accounting (CMP-AUD-209)
+    "evidence_manifest",                                     # the durable evidence generation record (CMP-AUD-106/109)
     "gui_update",
     "gui_export_api",
     "gui_auth_api",

@@ -53,6 +53,7 @@ except ImportError:
 
 import artifact_store
 import evidence_ledger
+import evidence_manifest
 import owned_dir
 import paths
 from compare_core import set_safe_literal_cell
@@ -242,10 +243,7 @@ _DIGEST_CHUNK = 1 << 20
 
 
 def _pdf_content_digests(paths):
-    """{resolved_path: sha256} for the existing PDFs among `paths` — the
-    parse-time BYTE baseline for CMP-AUD-112. Captured before the adapters parse
-    the candidate PDFs, so a later same-size/same-mtime swap the (dev, inode,
-    size, mtime) set-identity tripwire can't see still changes the digest."""
+    """{resolved_path: sha256} for the existing PDFs among `paths`."""
     out = {}
     for p in paths:
         p = Path(p)
@@ -262,21 +260,94 @@ def _pdf_content_digests(paths):
     return out
 
 
-def _ensure_pdf_content_unchanged(baseline):
-    """Fail closed when any candidate evidence PDF's BYTES differ from the parse
-    baseline (CMP-AUD-112). Every rendered image was parse-back verified against
-    those exact bytes; if the file changed since — even under a metadata-
-    preserving swap — the caption/values and the rasterized page could disagree,
-    so publish nothing. Called once after rendering, before the commit: an
-    unchanged file start→commit means parse-bytes == render-bytes."""
-    current = _pdf_content_digests(baseline.keys())
-    for path, digest in baseline.items():
-        if current.get(path) != digest or digest is None:
-            raise ValueError(
-                "Refusing to publish evidence: a source PDF's contents changed "
-                "while evidence was rendering (the verified values and the "
-                "rendered image could disagree). Re-run after the PDFs are "
-                "stable.")
+class _ReadSet:
+    """The private copy of every PDF one evidence generation will read.
+
+    CMP-AUD-098: digesting the live file before parsing and again at the commit
+    boundary cannot see an A→B→A swap — digest A, parse B, restore A, and the
+    check passes on bytes nobody rendered from. So the bytes are copied ONCE into
+    a directory only this run knows about, the COPIES are digested, and every
+    later locate/render call reads the copy. Correctness stops depending on what
+    the live path does next.
+
+    The commit-boundary check keeps a narrower, honest job: prove the live
+    sources still equal what we copied, so the published manifest describes the
+    files the user actually has (a source that changed mid-run makes the evidence
+    a picture of superseded bytes, which is a refusal, not a render fault).
+
+    Basenames are preserved — the adapters look their PDFs up by name.
+    """
+
+    def __init__(self, root, tsmis_dir, tsn_dir, digests, members, identity,
+                 fs_identity):
+        self.root = root
+        self.tsmis_dir = tsmis_dir
+        self.tsn_dir = tsn_dir
+        self.digests = digests          # {resolved ORIGINAL path: sha256 of copy}
+        self.members = members          # manifest read set, stable order
+        self._identity = identity
+        self._fs_identity = fs_identity
+
+    def ensure_sources_unchanged(self):
+        """Refuse when a live source no longer matches the bytes we copied."""
+        current = _pdf_content_digests(self.digests.keys())
+        for path, digest in self.digests.items():
+            if digest is None or current.get(path) != digest:
+                raise ValueError(
+                    "Refusing to publish evidence: a source PDF's contents "
+                    "changed while evidence was rendering (the images would "
+                    "illustrate superseded bytes). Re-run after the PDFs are "
+                    "stable.")
+
+    def discard(self):
+        """Remove the private copy, never a path that replaced it."""
+        if not os.path.lexists(self.root):
+            return
+        try:
+            _ensure_captured_current(self._identity)
+            if not owned_dir.is_plain_directory_tree(self.root, self._fs_identity):
+                raise ValueError("the evidence read-set snapshot was replaced")
+        except (ValueError, owned_dir.OwnershipError) as e:
+            log.error("evidence: retained replaced read-set snapshot %s (%s: %s)",
+                      self.root, type(e).__name__, e)
+            return
+        shutil.rmtree(self.root, ignore_errors=True)
+
+
+def _snapshot_read_set(tsmis_paths, tsn_paths):
+    """Copy the PDFs this generation will read into a private snapshot and
+    digest the COPIES (CMP-AUD-098). Returns a `_ReadSet`; the caller must
+    `discard()` it. A missing source is simply absent from the snapshot — the
+    locate step already treats an unreadable route PDF as a miss."""
+    root = Path(tempfile.mkdtemp(prefix=".tsmis-evidence-readset-"))
+    fs_identity = owned_dir.directory_identity(root)
+    if fs_identity is None:
+        shutil.rmtree(root, ignore_errors=True)
+        raise owned_dir.OwnershipError(
+            "The evidence read-set snapshot has no stable local identity; it "
+            "was not used.")
+    identity = artifact_store.capture_source_identities((root,))
+    digests, members = {}, []
+    try:
+        for label, sources in (("tsmis", tsmis_paths), ("tsn", tsn_paths)):
+            side = root / label
+            side.mkdir()
+            for src in sources:
+                src = Path(src)
+                if not src.is_file():
+                    continue
+                copy = side / src.name
+                shutil.copyfile(src, copy)
+                digest = artifact_store.content_digest(copy)
+                digests[str(src.resolve())] = digest
+                members.append(evidence_manifest.Member(
+                    name=str(src), size=copy.stat().st_size, sha256=digest))
+    except BaseException:
+        shutil.rmtree(root, ignore_errors=True)
+        raise
+    members.sort(key=lambda m: m.name)
+    return _ReadSet(root, root / "tsmis", root / "tsn", digests,
+                    tuple(members), identity, fs_identity)
 
 
 def _safe_sibling_paths(comparison_path, source_paths, captured_sources=(),
@@ -289,13 +360,15 @@ def _safe_sibling_paths(comparison_path, source_paths, captured_sources=(),
     if source_set_check is not None:
         source_set_check()
     wb_path, img_dir = sibling_paths(comparison_path)
+    man_path = evidence_manifest.manifest_path(comparison_path)
     _require_output_guard(commit_guard, wb_path, "evidence workbook selection")
     _require_output_guard(commit_guard, img_dir, "evidence image-folder selection")
+    _require_output_guard(commit_guard, man_path, "evidence manifest selection")
     artifact_store.ensure_outputs_do_not_alias_sources(
-        (wb_path, img_dir), source_paths,
+        (wb_path, img_dir, man_path), source_paths,
         directory_destinations=(img_dir,),
         captured_sources=captured_sources, require_sources_current=True)
-    return wb_path, img_dir
+    return wb_path, img_dir, man_path
 
 
 def _ensure_captured_current(captured):
@@ -335,12 +408,16 @@ def _require_output_guard(commit_guard, path=None, action="evidence write", **kw
             "The current path was left untouched; retry the comparison.")
 
 
-def _unique_dir_sibling(path, tag):
-    """Choose an unpredictable, currently absent sibling; never delete a collision."""
+def _unique_dir_sibling(path, tag, keep_suffix=False):
+    """Choose an unpredictable, currently absent sibling; never delete a collision.
+
+    `keep_suffix` puts the token before a file's extension so a diverted or
+    quarantined workbook still opens by double-click.
+    """
     path = Path(path)
+    stem, suffix = (path.stem, path.suffix) if keep_suffix else (path.name, "")
     for _ in range(32):
-        candidate = path.with_name(
-            f"{path.name}.{tag}-{secrets.token_hex(8)}")
+        candidate = path.with_name(f"{stem}.{tag}-{secrets.token_hex(8)}{suffix}")
         if not os.path.lexists(candidate):
             return candidate
     raise FileExistsError(
@@ -348,18 +425,20 @@ def _unique_dir_sibling(path, tag):
 
 
 def _retire_stale_evidence(wb_path, img_dir, source_paths, captured_sources,
-                           source_set_check, commit_guard):
-    """Remove a now-stale prior evidence set (workbook + image folder) so it
-    can't survive at its canonical name beside a comparison it no longer
-    describes (CMP-AUD-106 — the clean-comparison path: the rebuilt comparison
-    has no differing columns, so any prior red evidence is bound to a previous
-    generation). Guarded like every other evidence mutation and quarantined
-    (atomic move) before delete; a locked/foreign/aliased artifact is left in
-    place with a logged note rather than force-removed. Returns a short note
-    naming what was retired (or couldn't be), or None when nothing existed."""
+                           source_set_check, commit_guard, man_path=None):
+    """Remove a now-stale prior evidence set (workbook + image folder + manifest)
+    so it can't survive at its canonical name beside a comparison it no longer
+    describes (CMP-AUD-106: this generation produced no artifacts, so any prior
+    red evidence belongs to a previous one). Guarded like every other evidence
+    mutation and quarantined (atomic move) before delete; a locked/foreign/
+    aliased artifact is left in place with a logged note rather than
+    force-removed. Returns a short note naming what was retired (or couldn't
+    be), or None when nothing existed."""
     retired, failed = [], []
-    for path, is_dir, label in ((wb_path, False, "workbook"),
-                                (img_dir, True, "image folder")):
+    members = [(wb_path, False, "workbook"), (img_dir, True, "image folder")]
+    if man_path is not None:
+        members.append((man_path, False, "manifest"))
+    for path, is_dir, label in members:
         if not os.path.lexists(path):
             continue
         try:
@@ -454,7 +533,7 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         _ensure_pdf_source_set(tsmis_pdf_dir, tsn_dir, initial_pdf_set)
 
     captured_sources = artifact_store.capture_source_identities(source_paths)
-    wb_path, img_dir = _safe_sibling_paths(
+    wb_path, img_dir, man_path = _safe_sibling_paths(
         comparison_path, source_paths, captured_sources, source_set_check,
         commit_guard=commit_guard)
     n_tsmis = len(tsmis_pdf_files)
@@ -474,20 +553,42 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
 
     published, ledger, ledger_digest, fields_with_diffs = (
         evidence_ledger.published_universe(comparison_path, adapter, events))
-    if not fields_with_diffs:
-        # CMP-AUD-106: the rebuilt comparison is clean — retire any prior red
-        # evidence so it can't survive beside it looking current.
+
+    def record_no_artifacts(state, note, misses=None):
+        """CMP-AUD-106: a generation that publishes no images is still a CURRENT
+        state. Retire the prior set so it can't survive looking current, then
+        record what this generation found — so a reader, a restart, or a later
+        run with the evidence toggle OFF can tell 'nothing to illustrate' apart
+        from 'evidence never ran'."""
         retire_note = _retire_stale_evidence(
             wb_path, img_dir, source_paths, captured_sources,
-            source_set_check, commit_guard)
-        note = ("evidence: the published comparison counts no differing "
-                "columns to illustrate")
+            source_set_check, commit_guard, man_path)
         if retire_note:
             note += f" — {retire_note}"
+        manifest_note = _commit_manifest(
+            man_path, evidence_manifest.build(
+                state=state, report=adapter.REPORT_LABEL,
+                comparison_path=comparison_path, ledger_digest=ledger_digest,
+                reader_version=ledger.reader_version,
+                difference_cells=ledger.difference_cells,
+                differing_columns=len(fields_with_diffs),
+                seed=f"{seed:08x}", layout=layout, examples=examples,
+                note=note),
+            source_paths, captured_sources, source_set_check, commit_guard)
+        if manifest_note:
+            note += f"; {manifest_note}"
         events.on_log("  " + note)
         return {"note": note, "rendered": 0, "fields_ok": 0,
-                "fields_with_diffs": 0, "misses": {}, "workbook": None,
-                "folder": None}
+                "fields_with_diffs": len(fields_with_diffs),
+                "misses": misses or {}, "workbook": None, "folder": None,
+                "manifest_state": state, "ledger": ledger,
+                "ledger_digest": ledger_digest}
+
+    if not fields_with_diffs:
+        return record_no_artifacts(
+            evidence_manifest.STATE_NO_DIFFERENCES,
+            "evidence: the published comparison counts no differing columns "
+            "to illustrate")
 
     tsmis_rows, tsn_rows, sidecar, note = adapter.load_sides(consolidated, tsn_path)
     if sidecar is None:
@@ -522,15 +623,12 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         # shape, or the published cells refused every proposal). Report the
         # published differences and their reasons WITHOUT parsing a single PDF
         # — there is nothing left to locate.
-        note = (f"evidence: {ledger.difference_cells:,} published "
-                f"difference(s) across {len(fields_with_diffs)} column(s), "
-                "none of them with a row that can be illustrated on its own "
-                "(reasons in the log)")
-        events.on_log("  " + note)
-        return {"note": note, "rendered": 0, "fields_ok": 0,
-                "fields_with_diffs": len(fields_with_diffs),
-                "misses": misses, "workbook": None, "folder": None,
-                "ledger": ledger, "ledger_digest": ledger_digest}
+        return record_no_artifacts(
+            evidence_manifest.STATE_NO_EXAMPLES,
+            f"evidence: {ledger.difference_cells:,} published difference(s) "
+            f"across {len(fields_with_diffs)} column(s), none of them with a "
+            "row that can be illustrated on its own (reasons in the log)",
+            misses)
     need_tsmis = {}
     need_tsn_routes, need_tsn_keys = {}, {}
     for f in cand:
@@ -540,168 +638,194 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
             need_tsn_keys.setdefault(ex["dist"], set()).add(
                 (ex["cnty"], ex["route"], ex["key"]))
 
-    # CMP-AUD-112: digest the candidate PDFs' bytes NOW, before the adapters
-    # parse them — the parse-time baseline. Every example is verified against
-    # these bytes; a change before the images are published means the caption
-    # and the raster could disagree, so we abort. Only the sampled TSMIS routes
-    # plus the (small) TSN district-print set can be rendered.
-    pdf_content_baseline = _pdf_content_digests(
-        [adapter.tsmis_pdf_path(tsmis_pdf_dir, r) for r in need_tsmis]
-        + list(tsn_pdf_files))
-
-    events.on_log(f"  evidence: locating candidates in {len(need_tsmis)} TSMIS "
-                  f"PDF(s) and {len(need_tsn_keys)} TSN district print(s)…")
-    located = _locate_tsmis_sources(adapter, need_tsmis, tsmis_pdf_dir, events)
-    if located is None:
-        return _cancelled()
-    tsmis_loc, missing_routes = located
-    if missing_routes:
-        events.on_log(f"    note: no readable/confirmable TSMIS PDF for route(s) "
-                      f"{', '.join(sorted(missing_routes))} — sampling around them")
-    dist_index = adapter.district_index(tsn_dir, events)
-    tsn_loc = {}
-    # The district prints are the slow half (word extraction on every page), so
-    # narrate each one — a stalled run must name where it stalled.
-    for di, dist in enumerate(sorted(need_tsn_keys), 1):
-        if events.is_cancelled():
-            return _cancelled()
-        p = dist_index.get(dist)
-        if p is None:
-            continue
-        try:
-            tsn_loc[dist] = adapter.locate_tsn(p, need_tsn_routes[dist],
-                                               need_tsn_keys[dist])
-            events.on_log(f"    …TSN district {dist}: "
-                          f"{sum(len(v) for v in tsn_loc[dist].values())} "
-                          f"candidate row(s) ({di}/{len(need_tsn_keys)})")
-        except Exception as e:
-            log.warning("evidence: %s unparseable: %s: %s",
-                        p.name, type(e).__name__, e)
-
-    # render into a temp folder; swap in only on success (keep-last-good)
-    source_set_check()
-    _require_output_guard(commit_guard, img_dir.parent,
-                          "evidence output-folder creation")
-    img_dir.parent.mkdir(parents=True, exist_ok=True)
-    _require_output_guard(commit_guard, img_dir.parent,
-                          "evidence output-folder creation")
-    tmp_dir = Path(tempfile.mkdtemp(
-        prefix=f".{img_dir.name}.tmp-", dir=img_dir.parent))
-    tmp_dir_fs_identity = owned_dir.directory_identity(tmp_dir)
-    if tmp_dir_fs_identity is None:
-        raise owned_dir.OwnershipError(
-            "The temporary evidence image folder has no stable local identity; "
-            "it was not used.")
-    tmp_dir_identity = artifact_store.capture_source_identities((tmp_dir,))
-    _require_output_guard(
-        commit_guard, tmp_dir, "temporary evidence-folder creation",
-        directory_identity=tmp_dir_fs_identity)
-    page_cache = {}
-    entries = []
-    rendered = 0
+    # CMP-AUD-098/112: copy the candidate PDFs into a private snapshot NOW and
+    # digest the COPIES. Every locate and render below reads that snapshot, so
+    # what the images illustrate cannot be changed by anything that happens to
+    # the live files afterwards. Only the sampled TSMIS routes plus the (small)
+    # TSN district-print set can be rendered, so only those are copied.
+    read_set = _snapshot_read_set(
+        [adapter.tsmis_pdf_path(tsmis_pdf_dir, r) for r in need_tsmis],
+        tsn_pdf_files)
     try:
-        for fi, f in enumerate(cand, 1):
+        events.on_log(f"  evidence: locating candidates in {len(need_tsmis)} TSMIS "
+                      f"PDF(s) and {len(need_tsn_keys)} TSN district print(s)…")
+        located = _locate_tsmis_sources(adapter, need_tsmis, read_set.tsmis_dir,
+                                        events)
+        if located is None:
+            return _cancelled()
+        tsmis_loc, missing_routes = located
+        if missing_routes:
+            events.on_log(f"    note: no readable/confirmable TSMIS PDF for route(s) "
+                          f"{', '.join(sorted(missing_routes))} — sampling around them")
+        dist_index = adapter.district_index(read_set.tsn_dir, events)
+        tsn_loc = {}
+        # The district prints are the slow half (word extraction on every page), so
+        # narrate each one — a stalled run must name where it stalled.
+        for di, dist in enumerate(sorted(need_tsn_keys), 1):
             if events.is_cancelled():
                 return _cancelled()
-            got, reasons = 0, []
-            for ex in cand[f]:
-                if got >= examples:
-                    break
-                _require_output_guard(
-                    commit_guard, tmp_dir, "evidence image write",
-                    directory_identity=tmp_dir_fs_identity)
-                ok, reason = _try_example(adapter, ex, f, tsmis_loc, tsn_loc,
-                                          dist_index, tsmis_pdf_dir, tmp_dir,
-                                          got + 1, page_cache, render_keys,
-                                          commit_guard=commit_guard,
-                                          out_dir_identity=tmp_dir_fs_identity)
-                if ok:
-                    got += 1
-                    rendered += 1
-                    entries.append(ok)
-                else:
-                    reasons.append(reason)
-            if not got:
-                misses[f] = _summarize_reasons(reasons)
-                log.info("evidence: %s — no verifiable example (%s)",
-                         f, misses[f])
-            if fi % 8 == 0:
-                events.on_log(f"  evidence: {fi}/{len(cand)} columns done…")
-        if events.is_cancelled():
-            return _cancelled()
-        if not rendered:
-            # CMP-AUD-108: the published differences are still REPORTED — the
-            # columns and their reasons, never a silent zero.
-            note = (f"evidence: {ledger.difference_cells:,} published "
+            p = dist_index.get(dist)
+            if p is None:
+                continue
+            try:
+                tsn_loc[dist] = adapter.locate_tsn(p, need_tsn_routes[dist],
+                                                   need_tsn_keys[dist])
+                events.on_log(f"    …TSN district {dist}: "
+                              f"{sum(len(v) for v in tsn_loc[dist].values())} "
+                              f"candidate row(s) ({di}/{len(need_tsn_keys)})")
+            except Exception as e:
+                log.warning("evidence: %s unparseable: %s: %s",
+                            p.name, type(e).__name__, e)
+
+        # render into a temp folder; swap in only on success (keep-last-good)
+        source_set_check()
+        _require_output_guard(commit_guard, img_dir.parent,
+                              "evidence output-folder creation")
+        img_dir.parent.mkdir(parents=True, exist_ok=True)
+        _require_output_guard(commit_guard, img_dir.parent,
+                              "evidence output-folder creation")
+        tmp_dir = Path(tempfile.mkdtemp(
+            prefix=f".{img_dir.name}.tmp-", dir=img_dir.parent))
+        tmp_dir_fs_identity = owned_dir.directory_identity(tmp_dir)
+        if tmp_dir_fs_identity is None:
+            raise owned_dir.OwnershipError(
+                "The temporary evidence image folder has no stable local identity; "
+                "it was not used.")
+        tmp_dir_identity = artifact_store.capture_source_identities((tmp_dir,))
+        _require_output_guard(
+            commit_guard, tmp_dir, "temporary evidence-folder creation",
+            directory_identity=tmp_dir_fs_identity)
+        page_cache = {}
+        entries = []
+        rendered = 0
+        try:
+            for fi, f in enumerate(cand, 1):
+                if events.is_cancelled():
+                    return _cancelled()
+                got, reasons = 0, []
+                for ex in cand[f]:
+                    if got >= examples:
+                        break
+                    _require_output_guard(
+                        commit_guard, tmp_dir, "evidence image write",
+                        directory_identity=tmp_dir_fs_identity)
+                    ok, reason = _try_example(adapter, ex, f, tsmis_loc, tsn_loc,
+                                              dist_index, read_set.tsmis_dir,
+                                              tmp_dir, got + 1, page_cache,
+                                              render_keys,
+                                              commit_guard=commit_guard,
+                                              out_dir_identity=tmp_dir_fs_identity)
+                    if ok:
+                        got += 1
+                        rendered += 1
+                        entries.append(ok)
+                    else:
+                        reasons.append(reason)
+                if not got:
+                    misses[f] = _summarize_reasons(reasons)
+                    log.info("evidence: %s — no verifiable example (%s)",
+                             f, misses[f])
+                if fi % 8 == 0:
+                    events.on_log(f"  evidence: {fi}/{len(cand)} columns done…")
+            if events.is_cancelled():
+                return _cancelled()
+            if not rendered:
+                # CMP-AUD-108: the published differences are still REPORTED — the
+                # columns and their reasons, never a silent zero. CMP-AUD-106: and
+                # the prior set is retired, with the state recorded.
+                return record_no_artifacts(
+                    evidence_manifest.STATE_NO_EXAMPLES,
+                    f"evidence: {ledger.difference_cells:,} published "
                     f"difference(s) across {len(fields_with_diffs)} column(s), "
                     "none of them with a verifiable example to render "
-                    "(reasons in the log)")
-            events.on_log("  " + note)
-            return {"note": note, "rendered": 0, "fields_ok": 0,
-                    "fields_with_diffs": len(fields_with_diffs),
-                    "misses": misses, "workbook": None, "folder": None,
-                    "ledger": ledger, "ledger_digest": ledger_digest}
-        # CMP-AUD-109 + 112: recheck at the commit boundary — cancellation and
-        # the PDF byte baseline — immediately before publishing the SET. A late
-        # cancel leaves the previous evidence untouched (keep-last-good); a
-        # changed candidate PDF (even a metadata-preserving swap) aborts, so a
-        # verified value and its rasterized page can never disagree.
-        if events.is_cancelled():
-            return _cancelled()
-        _ensure_pdf_content_unchanged(pdf_content_baseline)
-        # CMP-AUD-208: every published item names the two SOURCE rows it was
-        # taken from, resolved through the comparison's own opaque row token.
-        evidence_ledger.attach_source_rows(published, entries)
-        sampled = collections.Counter(e["field"] for e in entries)
-        publication = _publish_evidence_set(
-            wb_path, img_dir, tmp_dir, entries, misses, dict(
-                comparison=Path(comparison_path).name,
-                report=adapter.REPORT_LABEL, seed=f"{seed:08x}",
-                examples=examples, tsmis_dir=str(tsmis_pdf_dir),
-                tsn_dir=str(tsn_dir),
-                sides=published.side_labels,
-                reader_version=ledger.reader_version,
-                ledger_digest=ledger_digest,
-                ledger=evidence_ledger.ledger_rows(ledger, adapter.FIELDS, sampled),
-                ledger_totals=ledger),
-            layout, source_paths, captured_sources, source_set_check,
-            commit_guard, tmp_dir_fs_identity)
-    finally:
-        if os.path.lexists(tmp_dir):
-            try:
-                _ensure_captured_current(tmp_dir_identity)
-                artifact_store.ensure_outputs_do_not_alias_sources(
-                    (tmp_dir,), source_paths, directory_destinations=(tmp_dir,),
-                    captured_sources=captured_sources,
-                    require_sources_current=True)
-                _require_output_guard(
-                    commit_guard, tmp_dir, "temporary evidence-folder cleanup",
-                    directory_identity=tmp_dir_fs_identity)
-            except (ValueError, owned_dir.OwnershipError):
-                log.error("evidence: retained replaced/unsafe temp path instead of "
-                          "deleting foreign or source content: %s", tmp_dir)
-            else:
-                shutil.rmtree(tmp_dir, ignore_errors=True)
+                    "(reasons in the log)", misses)
+            # CMP-AUD-109 + 112: recheck at the commit boundary — cancellation and
+            # the source PDFs — immediately before publishing the SET. A late
+            # cancel leaves the previous evidence untouched (keep-last-good); a
+            # source that no longer matches the snapshot the images were rendered
+            # from aborts, so evidence never illustrates superseded bytes.
+            if events.is_cancelled():
+                return _cancelled()
+            read_set.ensure_sources_unchanged()
+            # CMP-AUD-208: every published item names the two SOURCE rows it was
+            # taken from, resolved through the comparison's own opaque row token.
+            evidence_ledger.attach_source_rows(published, entries)
+            sampled = collections.Counter(e["field"] for e in entries)
 
-    fields_ok = len({e["field"] for e in entries})
-    promoted = publication["status"] == "promoted"
-    note = (f"evidence: {rendered} example(s) across {fields_ok}/"
-            f"{len(fields_with_diffs)} differing column(s)"
-            + (f" → {wb_path.name}" if promoted else ""))
-    if misses:
-        note += (f" — {len(misses)} column(s) had no verifiable example "
-                 "(reasons in the workbook)")
-    if publication.get("note"):
-        note += f"; {publication['note']}"
-    events.on_log("  " + note)
-    # CMP-AUD-109: the returned workbook/folder are the ACTUAL committed
-    # canonical paths (None when the set diverted to .new), not an unconditional
-    # success claim; `status` names promoted vs diverted.
-    return {"note": note, "rendered": rendered, "fields_ok": fields_ok,
-            "fields_with_diffs": len(fields_with_diffs), "misses": misses,
-            "workbook": publication["workbook"], "folder": publication["folder"],
-            "status": publication["status"],
-            "ledger": ledger, "ledger_digest": ledger_digest}
+            def manifest_for(published_wb, published_images):
+                """Measure what actually landed at the canonical names — the
+                manifest vouches for the committed bytes, not for the staged
+                ones it hoped to commit."""
+                return evidence_manifest.build(
+                    state=evidence_manifest.STATE_RENDERED,
+                    report=adapter.REPORT_LABEL,
+                    comparison_path=comparison_path,
+                    ledger_digest=ledger_digest,
+                    reader_version=ledger.reader_version,
+                    difference_cells=ledger.difference_cells,
+                    differing_columns=len(fields_with_diffs),
+                    read_set=read_set.members, workbook=published_wb,
+                    images=tuple(sorted(
+                        (evidence_manifest.member_for(p)
+                         for p in Path(published_images).iterdir() if p.is_file()),
+                        key=lambda m: m.name)),
+                    seed=f"{seed:08x}", layout=layout, examples=examples)
+
+            publication = _publish_evidence_set(
+                wb_path, img_dir, tmp_dir, entries, misses, dict(
+                    comparison=Path(comparison_path).name,
+                    report=adapter.REPORT_LABEL, seed=f"{seed:08x}",
+                    examples=examples, tsmis_dir=str(tsmis_pdf_dir),
+                    tsn_dir=str(tsn_dir),
+                    sides=published.side_labels,
+                    reader_version=ledger.reader_version,
+                    ledger_digest=ledger_digest,
+                    ledger=evidence_ledger.ledger_rows(ledger, adapter.FIELDS, sampled),
+                    ledger_totals=ledger),
+                layout, source_paths, captured_sources, source_set_check,
+                commit_guard, tmp_dir_fs_identity, man_path, manifest_for)
+        finally:
+            if os.path.lexists(tmp_dir):
+                try:
+                    _ensure_captured_current(tmp_dir_identity)
+                    artifact_store.ensure_outputs_do_not_alias_sources(
+                        (tmp_dir,), source_paths, directory_destinations=(tmp_dir,),
+                        captured_sources=captured_sources,
+                        require_sources_current=True)
+                    _require_output_guard(
+                        commit_guard, tmp_dir, "temporary evidence-folder cleanup",
+                        directory_identity=tmp_dir_fs_identity)
+                except (ValueError, owned_dir.OwnershipError):
+                    log.error("evidence: retained replaced/unsafe temp path instead of "
+                              "deleting foreign or source content: %s", tmp_dir)
+                else:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        fields_ok = len({e["field"] for e in entries})
+        promoted = publication["status"] == "promoted"
+        note = (f"evidence: {rendered} example(s) across {fields_ok}/"
+                f"{len(fields_with_diffs)} differing column(s)"
+                + (f" → {wb_path.name}" if promoted else ""))
+        if misses:
+            note += (f" — {len(misses)} column(s) had no verifiable example "
+                     "(reasons in the workbook)")
+        if publication.get("note"):
+            note += f"; {publication['note']}"
+        events.on_log("  " + note)
+        # CMP-AUD-109: the returned workbook/folder are the ACTUAL committed
+        # canonical paths (None when the set diverted to .new), not an unconditional
+        # success claim; `status` names promoted vs diverted.
+        return {"note": note, "rendered": rendered, "fields_ok": fields_ok,
+                "fields_with_diffs": len(fields_with_diffs), "misses": misses,
+                "workbook": publication["workbook"], "folder": publication["folder"],
+                "status": publication["status"],
+                "manifest_state": (evidence_manifest.STATE_RENDERED if promoted
+                                   else evidence_manifest.STATE_DIVERTED),
+                "ledger": ledger, "ledger_digest": ledger_digest}
+    finally:
+        read_set.discard()
+
+
 
 
 def _cancelled():
@@ -1450,45 +1574,196 @@ def _divert_images(tmp_dir, target, source_paths, captured_sources,
         return None
 
 
+def _quarantine_member(target, label, is_dir, source_paths, captured_sources,
+                       source_set_check, commit_guard):
+    """Move an existing canonical member out of the way under an unpredictable
+    name, leaving its slot EMPTY so whatever replaces it stays undoable.
+
+    Returns the quarantine path, or None when there was nothing there. Raises
+    OSError when the member is locked open — the caller then publishes nothing,
+    which is the same signal a direct replace would have given.
+    """
+    if not os.path.lexists(target):
+        return None
+    if source_set_check is not None:
+        source_set_check()
+    artifact_store.ensure_outputs_do_not_alias_sources(
+        (target,), source_paths,
+        directory_destinations=(target,) if is_dir else (),
+        captured_sources=captured_sources, require_sources_current=True)
+    quarantine = _unique_dir_sibling(target, "old", keep_suffix=not is_dir)
+    _require_output_guard(commit_guard, target, f"evidence {label} quarantine")
+    _require_output_guard(commit_guard, quarantine,
+                          f"evidence {label} quarantine reservation")
+    if os.path.lexists(quarantine):
+        raise FileExistsError(
+            f"Evidence quarantine path appeared before use: {quarantine}")
+    os.replace(target, quarantine)
+    return quarantine
+
+
+def _restore_member(quarantine, target, label, commit_guard):
+    """Put a quarantined member back. Rollback only, and loud when it fails —
+    a lost quarantine is the one state that leaves nothing at the canonical
+    name, so it may never be swallowed."""
+    if quarantine is None:
+        return
+    if not os.path.lexists(quarantine):
+        raise OSError(f"Evidence rollback lost its {label} quarantine: {quarantine}")
+    if os.path.lexists(target):
+        raise FileExistsError(
+            f"Evidence rollback refused to replace a newly appeared path: {target}")
+    _require_output_guard(commit_guard, target, f"evidence {label} rollback")
+    os.replace(quarantine, target)
+
+
+def _discard_quarantine(quarantine, label, is_dir, commit_guard):
+    """Delete a superseded quarantine — never a path that replaced it."""
+    if quarantine is None or not os.path.lexists(quarantine):
+        return
+    try:
+        _require_output_guard(commit_guard, quarantine,
+                              f"prior evidence {label} cleanup")
+        if is_dir:
+            fs_identity = owned_dir.directory_identity(quarantine)
+            if not owned_dir.is_plain_directory_tree(quarantine, fs_identity):
+                raise ValueError(
+                    "the prior evidence quarantine contains a linked or replaced path")
+            shutil.rmtree(quarantine)
+        else:
+            Path(quarantine).unlink(missing_ok=True)
+    except (OSError, ValueError, owned_dir.OwnershipError) as e:
+        log.warning("evidence: retained prior %s quarantine %s (%s: %s)",
+                    label, quarantine, type(e).__name__, e)
+
+
+def _withdraw_workbook(wb_path, commit_guard):
+    """Take back a workbook committed into an emptied slot so the SET can roll
+    back as a whole. It moves to a .new sibling rather than being deleted — the
+    user still gets the freshly built workbook, just not at the canonical name."""
+    alt = _unique_dir_sibling(wb_path, "new", keep_suffix=True)
+    _require_output_guard(commit_guard, wb_path, "evidence workbook withdrawal")
+    _require_output_guard(commit_guard, alt, "withdrawn evidence-workbook reservation")
+    if os.path.lexists(alt):
+        raise FileExistsError(f"Evidence withdrawal path appeared before use: {alt}")
+    os.replace(wb_path, alt)
+    return alt.name
+
+
+def _commit_manifest(man_path, manifest, source_paths, captured_sources,
+                     source_set_check, commit_guard):
+    """Write the generation record into its EMPTIED slot — the last rename of
+    the publication, so the manifest's presence means the whole set landed."""
+    if source_set_check is not None:
+        source_set_check()
+    artifact_store.ensure_outputs_do_not_alias_sources(
+        (man_path,), source_paths, captured_sources=captured_sources,
+        require_sources_current=True)
+    _require_output_guard(commit_guard, man_path.parent,
+                          "evidence manifest-folder creation")
+    man_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", newline="",
+                prefix=f".{man_path.stem}.tmp-", suffix=man_path.suffix,
+                dir=man_path.parent, delete=False) as handle:
+            tmp = Path(handle.name)
+            _require_output_guard(commit_guard, tmp,
+                                  "temporary evidence-manifest write")
+            handle.write(evidence_manifest.dumps(manifest))
+        _require_output_guard(commit_guard, man_path,
+                              "evidence manifest publication")
+        os.replace(tmp, man_path)
+        return None
+    except (OSError, ValueError, owned_dir.OwnershipError) as e:
+        if tmp is not None:
+            Path(tmp).unlink(missing_ok=True)
+        log.error("evidence: could not write the generation manifest %s: %s: %s",
+                  man_path, type(e).__name__, e)
+        return (f"the evidence generation record {man_path.name} could not be "
+                "written — the published set is not durably identified")
+
+
 def _publish_evidence_set(wb_path, img_dir, tmp_dir, entries, misses, info,
                           layout, source_paths, captured_sources,
-                          source_set_check, commit_guard, tmp_dir_fs_identity):
-    """Publish the workbook + image folder as ONE set (CMP-AUD-109). The workbook
-    commits first; if it can't reach its canonical name (locked open — the common
-    case, the user reading the previous evidence in Excel), the images are
-    diverted too, so BOTH old artifacts stay at canonical and BOTH new ones land
-    in .new siblings — never a new-workbook / old-images mix. Returns
-    {status, workbook, folder, note}: 'promoted' (both at canonical) or 'diverted'
-    (see note). `workbook`/`folder` are the ACTUAL committed canonical paths, or
-    None when nothing reached canonical — the caller reports them honestly instead
-    of always claiming success at the canonical names.
+                          source_set_check, commit_guard, tmp_dir_fs_identity,
+                          man_path=None, manifest_for=None):
+    """Publish the workbook + image folder + manifest as ONE set (CMP-AUD-109).
 
-    Residual: if the workbook DOES commit but the image folder is separately
-    locked, the images still divert (new workbook beside old images); the result
-    then honestly reports 'diverted' with an out-of-sync note. Fully closing that
-    rarer case needs a quarantine-based two-phase commit of both artifacts (the
-    workbook commit is not yet rollback-able) — tracked in the ledger."""
-    wb_note = _write_workbook(
-        wb_path, tmp_dir, entries, misses, info, layout=layout,
-        source_paths=source_paths, captured_sources=captured_sources,
-        source_set_check=source_set_check, commit_guard=commit_guard)
-    if wb_note is not None:
-        # The workbook could not reach canonical — keep the OLD images at
-        # canonical too by diverting the new set, so the two never disagree.
+    Two-phase: every canonical member is QUARANTINED first, so each slot is
+    empty and each replacement is undoable. Only then is the workbook written and
+    the image folder swapped. If either fails — the common case is one of them
+    locked open in Excel — the whole set rolls back to the prior generation and
+    the new members divert to .new siblings. The canonical folder therefore never
+    shows a new workbook beside old images, which the previous divert-both path
+    could not guarantee because a committed workbook could not be taken back.
+
+    The manifest commits last, into the slot emptied at the start, so its
+    presence means the whole set landed and its absence never certifies a
+    half-published one. A rollback restores the PRIOR manifest, which still
+    describes the prior workbook and images exactly — the diverted state stays
+    internally consistent.
+
+    Returns {status, workbook, folder, manifest, note}: 'promoted' (all at
+    canonical) or 'diverted' (see note). `workbook`/`folder` are the ACTUAL
+    committed canonical paths, or None when nothing reached canonical.
+    """
+    man_quarantine = wb_quarantine = None
+    images_handled = False
+    try:
+        if man_path is not None:
+            man_quarantine = _quarantine_member(
+                man_path, "manifest", False, source_paths, captured_sources,
+                source_set_check, commit_guard)
+        wb_quarantine = _quarantine_member(
+            wb_path, "workbook", False, source_paths, captured_sources,
+            source_set_check, commit_guard)
+        wb_note = _write_workbook(
+            wb_path, tmp_dir, entries, misses, info, layout=layout,
+            source_paths=source_paths, captured_sources=captured_sources,
+            source_set_check=source_set_check, commit_guard=commit_guard)
+        if wb_note is None:
+            dir_note = _swap_dir(
+                tmp_dir, img_dir, source_paths=source_paths,
+                captured_sources=captured_sources,
+                source_set_check=source_set_check, commit_guard=commit_guard,
+                tmp_directory_identity=tmp_dir_fs_identity)
+            if dir_note is None:
+                _discard_quarantine(wb_quarantine, "workbook", False, commit_guard)
+                _discard_quarantine(man_quarantine, "manifest", False, commit_guard)
+                note = None
+                if man_path is not None and manifest_for is not None:
+                    note = _commit_manifest(
+                        man_path, manifest_for(wb_path, img_dir), source_paths,
+                        captured_sources, source_set_check, commit_guard)
+                return {"status": "promoted", "workbook": str(wb_path),
+                        "folder": str(img_dir),
+                        "manifest": str(man_path) if man_path else None,
+                        "note": note}
+            # The images are locked: take the workbook back so the canonical
+            # pair stays the PRIOR consistent generation. `_swap_dir` has
+            # already parked or dropped the new images, so they are not
+            # diverted a second time.
+            diverted_wb = _withdraw_workbook(wb_path, commit_guard)
+            wb_note = (f"{dir_note}; the new workbook was withdrawn to "
+                       f"{diverted_wb} so it cannot sit beside the old images")
+            images_handled = True
+    except BaseException:
+        _restore_member(wb_quarantine, wb_path, "workbook", commit_guard)
+        _restore_member(man_quarantine, man_path, "manifest", commit_guard)
+        raise
+    # Roll the whole set back to the prior generation and park the new one. The
+    # restored manifest still describes the restored workbook and images
+    # exactly, so the canonical set stays internally consistent.
+    _restore_member(wb_quarantine, wb_path, "workbook", commit_guard)
+    _restore_member(man_quarantine, man_path, "manifest", commit_guard)
+    note = wb_note
+    if not images_handled:
         dir_alt = _divert_images(tmp_dir, img_dir, source_paths,
                                  captured_sources, source_set_check,
                                  commit_guard, tmp_dir_fs_identity)
-        note = wb_note + (f"; new images saved to {dir_alt}" if dir_alt
-                          else "; new images not saved")
-        return {"status": "diverted", "workbook": None, "folder": None,
-                "note": note}
-    dir_note = _swap_dir(
-        tmp_dir, img_dir, source_paths=source_paths,
-        captured_sources=captured_sources, source_set_check=source_set_check,
-        commit_guard=commit_guard, tmp_directory_identity=tmp_dir_fs_identity)
-    if dir_note is None:
-        return {"status": "promoted", "workbook": str(wb_path),
-                "folder": str(img_dir), "note": None}
-    return {"status": "diverted", "workbook": str(wb_path), "folder": None,
-            "note": "the workbook updated but " + dir_note
-                    + " — close the images and re-run to resync"}
+        note += (f"; new images saved to {dir_alt}" if dir_alt
+                 else "; new images not saved")
+    return {"status": "diverted", "workbook": None, "folder": None,
+            "manifest": None, "note": note}

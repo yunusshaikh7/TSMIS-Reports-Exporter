@@ -434,42 +434,59 @@ try:
     check("a PDF added after evidence discovery fails the set-equality tripwire",
           _pdf_add_rejected)
 
-    # CMP-AUD-112: a source PDF whose BYTES change between parse-back
-    # verification and rasterization must abort the publish — even a
-    # metadata-preserving swap the (dev, inode, size, mtime) set-identity
-    # tripwire can't see. Parse the byte baseline, then swap same-length bytes
-    # and restore the mtime.
+    # CMP-AUD-098 + 112: the READ SET is a private snapshot, and the bytes the
+    # images illustrate come from that copy — not from a live path that anything
+    # else may still be writing to. Everything below drives the real snapshot.
     _cpdf = _alias_tmp / "content.pdf"
     _cpdf.write_bytes(b"%PDF-1.4 original bytes")
     _c_mtime = _cpdf.stat().st_mtime_ns
     _c_ids_before = ve.artifact_store.canonical_path_identities((_cpdf,))
-    _c_baseline = ve._pdf_content_digests([_cpdf])
-    check("content baseline digests the existing PDF",
-          _c_baseline.get(str(_cpdf.resolve())) is not None)
-    ve._ensure_pdf_content_unchanged(_c_baseline)          # unchanged -> no raise
-    _cpdf.write_bytes(b"%PDF-1.4 SWAPPED! bytes")           # same length (23)
-    os.utime(_cpdf, ns=(_c_mtime, _c_mtime))               # restore the mtime
-    check("the metadata tripwire alone MISSES a same-size same-mtime swap",
-          ve.artifact_store.canonical_path_identities((_cpdf,)) == _c_ids_before)
-    check("...but the content digest changes",
-          ve._pdf_content_digests([_cpdf])[str(_cpdf.resolve())]
-          != _c_baseline[str(_cpdf.resolve())])
+    _rs = ve._snapshot_read_set([_cpdf], [])
     try:
-        ve._ensure_pdf_content_unchanged(_c_baseline)
-        _content_rejected = False
-    except ValueError:
-        _content_rejected = True
-    check("a metadata-preserving content change aborts the evidence publish",
-          _content_rejected)
-    # a deleted/unreadable candidate also aborts (bytes no longer verifiable)
-    _cpdf.unlink()
-    try:
-        ve._ensure_pdf_content_unchanged(_c_baseline)
-        _gone_rejected = False
-    except ValueError:
-        _gone_rejected = True
-    check("a candidate PDF that vanished before publish also aborts",
-          _gone_rejected)
+        _snap = _rs.tsmis_dir / _cpdf.name
+        check("the snapshot copies the PDF under its own basename "
+              "(the adapters look files up by name)",
+              _snap.is_file() and _snap.read_bytes() == _cpdf.read_bytes())
+        check("the read set digests the COPY and names the ORIGINAL path",
+              len(_rs.members) == 1 and _rs.members[0].name == str(_cpdf)
+              and _rs.members[0].sha256
+              == _rs.digests[str(_cpdf.resolve())]
+              == ve._pdf_content_digests([_snap])[str(_snap.resolve())])
+        _rs.ensure_sources_unchanged()                     # unchanged -> no raise
+
+        # The A->B->A swap: digest A, parse B, restore A. A start/end digest of
+        # the LIVE file passes and certifies bytes nobody rendered from; reading
+        # the snapshot means the swap never reaches the render at all.
+        _cpdf.write_bytes(b"%PDF-1.4 SWAPPED! bytes")       # same length (23)
+        os.utime(_cpdf, ns=(_c_mtime, _c_mtime))           # restore the mtime
+        check("the metadata tripwire alone MISSES a same-size same-mtime swap",
+              ve.artifact_store.canonical_path_identities((_cpdf,)) == _c_ids_before)
+        check("...but the snapshot still holds the bytes evidence will read",
+              _snap.read_bytes() == b"%PDF-1.4 original bytes")
+        try:
+            _rs.ensure_sources_unchanged()
+            _content_rejected = False
+        except ValueError:
+            _content_rejected = True
+        check("a metadata-preserving content change aborts the evidence publish",
+              _content_rejected)
+        _cpdf.write_bytes(b"%PDF-1.4 original bytes")       # A restored
+        os.utime(_cpdf, ns=(_c_mtime, _c_mtime))
+        _rs.ensure_sources_unchanged()                      # A->B->A: back in sync
+        check("A->B->A leaves the rendered bytes untouched (CMP-AUD-098)",
+              _snap.read_bytes() == b"%PDF-1.4 original bytes")
+        # a deleted/unreadable source also aborts (provenance no longer current)
+        _cpdf.unlink()
+        try:
+            _rs.ensure_sources_unchanged()
+            _gone_rejected = False
+        except ValueError:
+            _gone_rejected = True
+        check("a source PDF that vanished before publish also aborts",
+              _gone_rejected)
+    finally:
+        _rs.discard()
+    check("discard removes the snapshot", not _rs.root.exists())
 finally:
     shutil.rmtree(_alias_tmp, ignore_errors=True)
 
