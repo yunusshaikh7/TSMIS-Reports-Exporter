@@ -22,7 +22,7 @@ from gui_worker import (ChromiumWorker, ConsolidateWorker, ResetWorker,
                         ValidationWorker, measure_targets, reset_targets)
 from logging_setup import active_log_file, set_debug_logging
 from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
-                   FAILURES_DIR, LOG_DIR, OUTPUT_ROOT, TSN_LIBRARY_ROOT,
+                   FAILURES_DIR, OUTPUT_ROOT, TSN_LIBRARY_ROOT,
                    is_frozen, list_output_days)
 from version import __version__
 
@@ -438,20 +438,20 @@ class GuiSettingsMixin:
 
     @_api_method
     def save_support_bundle(self):
-        """Zip the diagnostics a maintainer needs (rotating logs, run reports,
-        settings, a manifest) to a user-chosen location.
+        """Settings-tab action: save the diagnostics bundle to a user-chosen location.
 
-        What it does NOT contain: the saved login / browser profiles / failure
-        dumps (FAILURES_DIR) are never added. What it DOES contain, by design:
-        the rotating logs and the manifest, which include this PC's name in file
-        paths, the OS version, and an ALLOWLISTED subset of diagnostic settings
-        (settings.support_bundle_settings(), not all_settings() — so no site_urls /
-        batch_dest / future sensitive key leaks) — diagnostics need those. So it's
-        safe to send to the TSMIS maintainer, not "safe to post publicly"; the
-        user-facing wording below says so plainly."""
-        import io
-        import platform
-        import zipfile
+        This picks the destination and hands the SESSION facts the engine cannot know
+        (which site/browser this run is talking to, how it signed in) to
+        `evidence.collect` — the one bundle writer. It used to build its own zip, which
+        meant the button a user actually reaches for got neither the credential
+        redaction and final zip scan nor, later, the environment/inventory/state
+        members: the weakest bundle behind the most-used control, on a work PC where
+        the `--collect-evidence` command line is effectively unavailable.
+
+        `run_self_test=False` is REQUIRED here: this runs on the GUI thread, and the
+        self-test opens a second WebView2 window while the live GUI owns the
+        main-thread loop."""
+        import evidence
 
         default = f"tsmis_support_{time.strftime('%Y%m%d_%H%M%S')}.zip"
         picked = pick_path(self._window,
@@ -459,57 +459,26 @@ class GuiSettingsMixin:
             file_types=("Zip archive (*.zip)",))
         if not picked:
             return {"cancelled": True}
-        out = Path(picked)
 
-        manifest = io.StringIO()
         src, env = get_site()
-        manifest.write(f"TSMIS Exporter support bundle\n"
-                       f"NOTE: includes this PC's name in file paths, the OS\n"
-                       f"  version and selected diagnostic settings (diagnostics need them);\n"
-                       f"  NO saved login, browser profile, or failure dumps.\n"
-                       f"  Send it to the TSMIS maintainer, not a public forum.\n"
-                       f"created:    {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                       f"version:    {__version__}\n"
-                       f"build:      {'frozen' if is_frozen() else 'dev'}\n"
-                       f"python:     {platform.python_version()}\n"
-                       f"os:         {platform.platform()}\n"
-                       f"data_root:  {DATA_ROOT}\n"
-                       f"output:     {OUTPUT_ROOT}\n"
-                       f"site:       src={src} env={env}\n"
-                       f"browsers:   {list(BROWSER_CHANNELS)} (picked: {self._channel})\n"
-                       f"login:      {'saved file' if has_valid_auth() else 'none'}"
-                       f"{' + device sign-in' if self._device_ok else ''}\n"
-                       f"settings:   {settings.support_bundle_settings()}\n"
-                       f"run folders: {list_output_days() or '(none)'}\n")
-        added = 0
-        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("manifest.txt", manifest.getvalue())
-            for pattern, arc in (("tsmis.log*", "logs"), ("crash.log", "logs"),
-                                 ("update_helper.log", "logs")):
-                for f in sorted(LOG_DIR.glob(pattern)):
-                    try:
-                        zf.write(f, f"{arc}/{f.name}")
-                        added += 1
-                    except OSError as e:
-                        # one locked/unreadable log shouldn't sink the whole bundle —
-                        # skip it, but log which so a maintainer knows it's absent (P7a).
-                        ui_log.info("support bundle: skipped %s (%s: %s)",
-                                    f.name, type(e).__name__, e)
-            reports = sorted((OUTPUT_ROOT / "run_reports").glob("*.csv"),
-                             key=lambda p: p.stat().st_mtime, reverse=True)[:50]
-            for f in reports:
-                try:
-                    zf.write(f, f"run_reports/{f.name}")
-                    added += 1
-                except OSError as e:
-                    ui_log.info("support bundle: skipped run report %s (%s: %s)",
-                                f.name, type(e).__name__, e)
-        ui_log.info("support bundle saved: %s (%d files)", out, added)
-        self._emit_log(f"Support bundle saved ({added} files): {out}")
-        self._emit_log("  It has logs, run reports and selected diagnostic settings "
-                       "(and this PC's name in paths) — never your password or saved "
-                       "login. Send it to the TSMIS maintainer.")
-        return {"saved": str(out)}
+        session = {
+            "site": f"src={src} env={env}",
+            "browsers": f"{list(BROWSER_CHANNELS)} (picked: {self._channel})",
+            "sign-in": ("saved file" if has_valid_auth() else "none")
+                       + (" + device sign-in" if self._device_ok else ""),
+            "run folders": list_output_days() or "(none)",
+        }
+        res = evidence.collect(out_path=Path(picked), emit=self._emit_log,
+                               run_self_test=False, session=session)
+        if not res.get("ok"):
+            msg = res.get("message") or "the support bundle could not be written"
+            ui_log.warning("support bundle failed: %s", msg)
+            return {"error": msg}
+        ui_log.info("support bundle saved: %s (%d files)", res.get("path"),
+                    res.get("files", 0))
+        self._emit_log("  Send it to the TSMIS maintainer — it carries this PC's name "
+                       "in paths and selected diagnostic settings, never your login.")
+        return {"saved": str(res.get("path"))}
 
     @_api_method
     def clear_saved_login(self):

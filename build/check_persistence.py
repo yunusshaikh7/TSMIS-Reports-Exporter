@@ -210,11 +210,16 @@ def test_support_bundle_allowlist():
     # [neg] the import-time subset guard catches a bogus allowlist entry
     check("[neg] an allowlist key not in DEFAULTS fails the subset guard",
           not (set(settings._SUPPORT_BUNDLE_KEYS + ("bogus_key",)) <= set(settings.DEFAULTS)))
-    # the bundle manifest uses the allowlist, not all_settings()
-    src = (ROOT / "scripts" / "gui_settings_api.py").read_text(encoding="utf-8")  # S1 home
-    check("save_support_bundle's manifest line uses support_bundle_settings()",
-          "f\"settings:   {settings.support_bundle_settings()}\\n\"" in src
-          and "f\"settings:   {settings.all_settings()}\\n\"" not in src)
+    # The bundle manifest uses the allowlist, not all_settings(). Every trigger (the
+    # Settings button, validate-and-package, --collect-evidence) now writes its
+    # manifest in ONE place, so the property is asserted where it lives.
+    src = (ROOT / "scripts" / "evidence.py").read_text(encoding="utf-8")
+    check("the bundle manifest uses support_bundle_settings(), never all_settings()",
+          "settings.support_bundle_settings()" in src
+          and "settings.all_settings()" not in src)
+    gui = (ROOT / "scripts" / "gui_settings_api.py").read_text(encoding="utf-8")
+    check("...and the Settings button no longer writes a manifest of its own",
+          "manifest.txt" not in gui)
 
 
 def main():

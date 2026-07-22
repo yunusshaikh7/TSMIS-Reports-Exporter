@@ -3,6 +3,19 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.28.2 — 2026-07-22
+
+### Fixed
+- **"Save support bundle…" now produces the same bundle as everything else.**
+  The button built its own zip, so it quietly missed what the other two paths
+  had: the credential redaction and final scan, and — as of v0.28.1 — the
+  environment facts, the file inventory and the state records. It was the
+  weakest bundle sitting behind the control people actually use, which matters
+  most on a work PC where the command-line alternative isn't available. All
+  three ways of producing a bundle now run the same code, and the button still
+  records the things only a live session knows: which site and browser it was
+  using and how it signed in.
+
 ## v0.28.1 — 2026-07-22
 
 A diagnostics release, cut so the work-PC acceptance run on v0.28.0 produces a

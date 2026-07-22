@@ -369,7 +369,7 @@ def _allowlisted_entries(extra_dir, roots, emit):
     return entries, skipped_user
 
 
-def _manifest(contents, unreadable, skipped_user, roots):
+def _manifest(contents, unreadable, skipped_user, roots, session=None):
     """The manifest text: provenance + safety statement + the export-report live-verify
     set + a listing of every file ACTUALLY in the bundle (RM05 — 'the manifest lists
     every included file'), plus the evidence-folder files refused and any allowlisted
@@ -399,6 +399,13 @@ def _manifest(contents, unreadable, skipped_user, roots):
         f"output:      {paths.OUTPUT_ROOT}",
         f"login:       {'saved login file present on this PC — DELIBERATELY EXCLUDED' if auth_present else 'none'}",
         f"settings:    {settings.support_bundle_settings()}",
+    ]
+    # Facts only a LIVE GUI session knows (which site/browser it is talking to, how it
+    # signed in). The engine cannot read them, so the caller supplies them rather than
+    # keeping a second bundle writer alive just to record them.
+    for key, value in (session or {}).items():
+        lines.append(f"{(key + ':'):<13}{value}")
+    lines += [
         "",
         "LIVE-VERIFY SET (every export report — see docs/work-pc-validation.md):",
     ]
@@ -453,15 +460,25 @@ def _unlink_quiet(path):
 
 
 def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
-            validation=None):
+            validation=None, session=None):
     """Build the credential-safe evidence zip. Returns a result dict:
     `{ok, path, files, excluded, skipped_user, message}`.
+
+    **This is the ONE bundle writer.** Every trigger — the Settings button, the
+    validate-and-package flow, and `--collect-evidence` — comes through here, so the
+    allowlist, the credential redaction and the final zip scan can never apply to one
+    path and not another.
 
     `out_path` defaults to a timestamped zip in DATA_ROOT (a user-writable folder).
     `extra_dir` is the user's explicit evidence folder for real source PDFs/workbooks
     (each listed in the manifest; sensitive files there are refused). `run_self_test`
     runs the offline self-test and captures its output (the work-PC default); a caller
-    that can't launch a browser passes False (the bundle still ships, noting the skip).
+    that can't launch a browser passes False (the bundle still ships, noting the skip)
+    — **a caller on the GUI thread MUST pass False**, because the self-test opens a
+    second WebView2 window and that is unsafe while the live GUI owns the main-thread
+    loop. `session` is an optional {label: value} of facts only a live GUI session
+    knows (the site it is talking to, the browser channel, how it signed in), rendered
+    into the manifest so a GUI caller never needs a bundle writer of its own.
     Never raises for an expected failure — a locked log or a self-test crash is
     captured into the bundle, not propagated."""
     emit = emit or print
@@ -543,7 +560,7 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
             contents = (["manifest.txt", "self_test.txt", "environment.txt",
                          "inventory.txt"] + _val_files + written)
             manifest_text = credential_safety.redact_text(
-                _manifest(contents, unreadable, skipped_user, roots))
+                _manifest(contents, unreadable, skipped_user, roots, session))
             zf.writestr("manifest.txt", manifest_text)
 
         with zipfile.ZipFile(tmp_path, "r") as verify_zip:

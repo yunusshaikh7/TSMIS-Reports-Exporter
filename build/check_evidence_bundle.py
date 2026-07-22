@@ -17,6 +17,7 @@ inputs, plus the LEGITIMATE diagnostics (logs + run reports) — then asserts th
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_evidence_bundle.py
 """
+import shutil
 import sys
 import tempfile
 import types
@@ -462,11 +463,75 @@ def test_final_member_credential_scan():
         shutil.rmtree(user, ignore_errors=True)
 
 
+def test_every_trigger_uses_the_one_collector():
+    """Every bundle trigger must come through `evidence.collect`.
+
+    The Settings button used to build its OWN zip: no credential redaction, no final
+    scan, and later none of the environment/inventory/state members either — the
+    weakest bundle behind the control users actually reach for, on a work PC where the
+    command line is effectively unavailable. Source-level assertions, because the real
+    call needs a live GUI window."""
+    print("one collector behind every trigger:")
+    scripts = Path(__file__).resolve().parent.parent / "scripts"
+    settings_api = (scripts / "gui_settings_api.py").read_text(encoding="utf-8")
+    start = settings_api.index("def save_support_bundle")
+    body = settings_api[start:settings_api.index("def clear_saved_login")]
+    check("the Settings button calls evidence.collect", "evidence.collect(" in body)
+    check("...and does NOT hand-roll a zip", "zipfile.ZipFile" not in body)
+    check("...passing run_self_test=False (a 2nd WebView2 window would be unsafe "
+          "on the GUI thread)", "run_self_test=False" in body)
+    check("...and the session facts the engine cannot know",
+          "session=session" in body and "browsers" in body)
+
+    maint = (scripts / "gui_worker_maint.py").read_text(encoding="utf-8")
+    check("the validate-and-package flow calls evidence.collect too",
+          "evidence.collect(" in maint)
+    gui_main = (scripts / "gui_main.py").read_text(encoding="utf-8")
+    check("the --collect-evidence CLI calls evidence.collect too",
+          "evidence.collect(" in gui_main)
+    # No OTHER module may BUILD a bundle. (A save dialog may still suggest a default
+    # filename — that is the user picking a destination, not a second writer.)
+    check("the Settings module no longer touches zipfile at all",
+          "zipfile" not in settings_api)
+    # Reading a zip is fine (credential_safety SCANS the finished bundle); WRITING one
+    # is the thing that must live in exactly one place.
+    writers = sorted(f.name for f in scripts.glob("*.py")
+                     if 'ZipFile(' in (src := f.read_text(encoding="utf-8"))
+                     and '"w"' in src.split("ZipFile(", 1)[1][:40])
+    check("evidence.py is the ONLY module that writes a zip", writers == ["evidence.py"])
+
+
+def test_session_facts_reach_the_manifest():
+    print("caller-supplied session facts land in the manifest:")
+    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+             paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
+    root = Path(tempfile.mkdtemp(prefix="tsmis_ev_sess_"))
+    try:
+        _plant(root)
+        _point_paths_at(root, saved)
+        out = root / "sess.zip"
+        res = evidence.collect(out_path=out, emit=lambda *_: None, run_self_test=False,
+                               session={"site": "src=ssor env=prod",
+                                        "sign-in": "device sign-in"})
+        check("collect accepted the session facts", res.get("ok") is True)
+        with zipfile.ZipFile(out) as zf:
+            manifest = zf.read("manifest.txt").decode("utf-8")
+        check("the site the run was talking to is recorded",
+              "src=ssor env=prod" in manifest)
+        check("...and how it signed in", "device sign-in" in manifest)
+    finally:
+        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+         paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     test_credential_exclusion_and_manifest()
     test_self_test_capture_and_crash()
     test_unreadable_not_listed_as_bundled()
     test_final_member_credential_scan()
+    test_every_trigger_uses_the_one_collector()
+    test_session_facts_reach_the_manifest()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")
