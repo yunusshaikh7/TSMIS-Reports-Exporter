@@ -24,21 +24,25 @@ gui_worker drive it.
 # resolves its patchable collaborators through THIS module at call time — so
 # `matrix.<name>` stays the one true patch/monkeypatch point.
 from matrix_state import (                                       # noqa: F401
-    BASELINE_DEFAULT, COMPARISONS_DIRNAME, _MTIME_TOL_S,
-    _cell_input_fingerprint, _cmp_state, _inputs_changed, _mode_by_id,
-    _published_comparison_result,
+    ATTEMPT_OK, ATTEMPT_STATES, BASELINE_DEFAULT, COMPARISONS_DIRNAME,
+    _MTIME_TOL_S,
+    _cell_input_fingerprint, _cmp_state, _inputs_changed, _last_attempt_for,
+    _mode_by_id, _published_comparison_result,
     _pdf_self_comparator, _results_path, _row_defs, _row_modes, _safe_mtime,
     _staleness, _tsn_results_path, all_row_modes, apply_order,
-    cell_buildable, cell_unbuildable_reason, comparison_path,
+    attempts_path, cell_buildable, cell_unbuildable_reason, comparison_path,
     comparison_state, comparisons_common_root, comparisons_root,
-    default_env_label, env_keys,
+    default_env_label, env_keys, load_attempts, record_attempt,
     load_results, load_tsn_results, matrix_snapshot, mode_out_path,
     out_path_for_cell, producer_identity, read_counts, record_result,
     record_tsn_result, self_supported, tsn_capable, tsn_comparator_for,
     tsn_comparisons_root, tsn_input_dir_for, tsn_input_root, tsn_source,
     tsn_subdir_for, tsn_supported)
 from matrix_build import (                                       # noqa: F401
-    _FORMULAS_TWIN_MAX_ROWS, _comparison_row_count, _consolidate_store_folder,
+    _ATTEMPT_INFIX, _FORMULAS_TWIN_MAX_ROWS, _attempt_sibling,
+    _comparison_row_count, _consolidate_store_folder,
+    _discard_attempt_sidecar, _has_last_complete, _produce_consolidation,
+    _promote_or_keep_last_good,
     _consolidated_filename, _consolidated_stale, _ensure_consolidated,
     _fingerprint_for_record, _twin_inputs_unchanged,
     _formulas_sibling, _pdf_store_consolidator, _try_formulas,

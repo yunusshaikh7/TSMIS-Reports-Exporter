@@ -268,9 +268,30 @@ function evidenceRowBadge(rowKey) {
   return b;
 }
 
+// CMP-AUD-089: the durable last-attempt overlay. A refresh that crashed, was
+// stopped, or came back incomplete must not disappear the moment the grid
+// re-renders and leave the PREVIOUS result standing as if it answered the
+// rebuild the user just asked for. The prior result keeps its own class, number
+// and verdict — the attempt only adds a marker class and a trailing note.
+function mxAttemptNote(cmp) {
+  const a = cmp && cmp.last_attempt;
+  if (!a || !a.status) return null;
+  const what = a.status === "cancelled" ? "last refresh stopped"
+    : a.status === "partial" ? "last refresh incomplete"
+    : "last refresh failed";
+  return { warn: "mx-attempt", note: what, why: a.reason || "" };
+}
+
 function mxCellContent(cmp, tsnMeta) {
-  // Returns {cls, main, sub} for a non-baseline cell from its unified `cmp` state.
+  // Returns {cls, main, sub, warn?} for a non-baseline cell from its unified
+  // `cmp` state. `warn` is an ADDITIONAL class the caller adds beside `cls`.
   cmp = cmp || {};
+  const attempt = mxAttemptNote(cmp);
+  if (attempt) {
+    const inner = mxCellContent({ ...cmp, last_attempt: null }, tsnMeta);
+    return { cls: inner.cls, main: inner.main, warn: attempt.warn,
+             sub: inner.sub ? `${inner.sub} · ${attempt.note}` : attempt.note };
+  }
   if (cmp.supported === false) return { cls: "mx-na", main: "—", sub: "not available yet" };
   if (cmp.missing_side) {
     if (cmp.missing_side === "tsn") {
@@ -739,6 +760,7 @@ async function renderMatrix() {
       } else {
         const v = mxCellContent(cmp, tm);
         cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
+        if (v.warn) cell.classList.add(v.warn);
       }
       cell.title = `${snap.row_labels[rk]} — ${snap.env_labels[env] || env}\nExported: ${expWhen}`;
       cell.dataset.rk = rk; cell.dataset.env = env;
@@ -1017,6 +1039,7 @@ async function renderDayMatrix() {
       const sub = document.createElement("div"); sub.className = "mx-sub";
       const v = mxCellContent(cmp, tm);
       cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
+      if (v.warn) cell.classList.add(v.warn);
       const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "not exported";
       cell.title = `${rlabel} — ${d}\nExported: ${expWhen}`;
       cell.append(main, sub);
@@ -1388,6 +1411,7 @@ async function renderBaselineMatrix() {
       } else {
         const v = mxCellContent(cmp);
         cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
+        if (v.warn) cell.classList.add(v.warn);
       }
       cell.title = `${rlabel} — ${d} vs ${bl.label || "baseline"}\nExported: ${expWhen}`;
       cell.append(main, sub);

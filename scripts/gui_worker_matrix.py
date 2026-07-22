@@ -20,6 +20,72 @@ from gui_worker_export import ExportWorker
 
 log = logging.getLogger("tsmis.gui")
 
+
+# --------------------------------------------------------------------------- #
+# CMP-AUD-089: every compare worker reports attempted / succeeded / failed /
+# cancelled independently (they used to collapse into "done" + "errors", so a
+# cancelled cell read as "1 of 1 done"), and persists the terminal state of each
+# cell it touched into the durable last-attempt overlay. The overlay decorates
+# the last-good cell; it never replaces the artifact's own truth.
+# --------------------------------------------------------------------------- #
+class _AttemptTally:
+    """The per-run cell accounting shared by the three compare workers."""
+
+    def __init__(self, total):
+        self.total = total
+        self.done = self.errors = 0
+        self.attempted = self.succeeded = self.failed = 0
+        self.cancelled_cells = self.partial_cells = 0
+
+    def count(self, attempt_state):
+        """Tally one finished cell by its ATTEMPT state, so a cancelled cell is
+        never a success and an incomplete one is never a plain failure."""
+        self.attempted += 1
+        if attempt_state == matrix.ATTEMPT_OK:
+            self.succeeded += 1
+        elif attempt_state == "cancelled":
+            self.cancelled_cells += 1
+        elif attempt_state == "partial":
+            self.partial_cells += 1
+        else:
+            self.failed += 1
+
+    def payload(self, cancelled):
+        return {"done": self.done, "total": self.total, "errors": self.errors,
+                "cancelled": bool(cancelled), "attempted": self.attempted,
+                "succeeded": self.succeeded, "failed": self.failed,
+                "cancelled_cells": self.cancelled_cells,
+                "partial_cells": self.partial_cells}
+
+
+def _attempt_state(res, cancelled=False):
+    """(overlay status, reason) for one finished cell. A cancelled cell is
+    cancelled even though it surfaced as an exception; an ok-but-incomplete
+    result is a first-class `partial` attempt, not a success."""
+    if cancelled:
+        return "cancelled", "the rebuild was stopped before it finished"
+    if getattr(res, "status", None) != "ok":
+        return "error", getattr(res, "message", "") or "the rebuild did not finish"
+    if outcome.consolidate_completion_of(res) != outcome.COMPLETE:
+        return "partial", (getattr(res, "message", "")
+                           or "the rebuild compared incomplete inputs")
+    return matrix.ATTEMPT_OK, ""
+
+
+def _record_attempt(root, result_key, cell_key, status, reason,
+                    commit_guard=None):
+    """Persist one cell's attempt overlay. Best-effort by contract (matrix_state
+    logs the why) — diagnostic state must never fail a published artifact."""
+    if not root:
+        return
+    try:
+        matrix.record_attempt(root, result_key, cell_key, status, reason=reason,
+                              commit_guard=commit_guard)
+    except Exception as e:                       # noqa: BLE001 - diagnostic only
+        log.warning("matrix: attempt overlay for %s/%s not recorded (%s: %s)",
+                    result_key, cell_key, type(e).__name__, e)
+
+
 def _run_matrix_export_step(spec, src, env, dest, queue, cancel, skip, pause,
                             workers, on_worker=None, dated=False, day=None):
     """Export ONE report for ONE environment, WITHOUT a manifest (so a matrix
@@ -159,8 +225,10 @@ class MatrixCompareWorker(threading.Thread):
         self.evidence = evidence
 
     def run(self):
-        total = len(self.cells)
-        done = errors = 0
+        tally = _AttemptTally(len(self.cells))
+        total = tally.total
+        attempts_root = (matrix.comparisons_common_root(self.dest)
+                         if self.dest else None)
         comparisons_lease = None
         store_lease = None
         ownership_loss_reported = False
@@ -214,7 +282,7 @@ class MatrixCompareWorker(threading.Thread):
                     comparisons_lease.require_current(action="matrix build")
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
                                             "status": "running",
-                                            "done": done, "total": total}))
+                                            "done": tally.done, "total": total}))
                 try:
                     # Cross-environment cells only publish beneath comparisons.
                     # TSN/self cells also persist consolidation artifacts into the
@@ -230,26 +298,38 @@ class MatrixCompareWorker(threading.Thread):
                         also_formulas=self.also_formulas, evidence=self.evidence,
                         commit_guard=(_target_guard
                                       if comparisons_lease is not None else None))
+                    attempt, why = _attempt_state(res)
                     status = res.status
                     if status != "ok":
-                        errors += 1
+                        tally.errors += 1
                         self.q.put(("log", f"  {cell_key} {row_key}: {res.message}"))
                 except Exception as e:                   # noqa: BLE001
                     log.exception("matrix compare %s/%s/%s crashed", row_key, cell_key, mode_id)
-                    status, errors = "error", errors + 1
+                    # A cell that raised because the run was stopped is CANCELLED,
+                    # not failed — the distinction is the point of CMP-AUD-089.
+                    cancelled_cell = self.cancel.is_set()
+                    status = "cancelled" if cancelled_cell else "error"
+                    tally.errors += 1
+                    attempt, why = _attempt_state(None, cancelled=cancelled_cell)
+                    if not cancelled_cell:
+                        why = f"{type(e).__name__}: {e}"
                     self.q.put(("log", f"  {cell_key} {row_key}: "
                                        f"{type(e).__name__}: {e}"))
-                done += 1
+                tally.count(attempt)
+                _record_attempt(attempts_root, f"{row_key}|{mode_id}", cell_key,
+                                attempt, why,
+                                commit_guard=(_target_guard
+                                              if comparisons_lease is not None
+                                              else None))
+                tally.done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
                                             "status": status,
-                                            "done": done, "total": total}))
+                                            "done": tally.done, "total": total}))
         except owned_dir.OwnershipError as e:
-            errors = max(errors, total - done)
+            tally.errors = max(tally.errors, total - tally.done)
             self.q.put(("log", f"  Comparisons were not written: {e}"))
         finally:
-            self.q.put(("matrix_done", {"done": done, "total": total,
-                                        "errors": errors,
-                                        "cancelled": self.cancel.is_set()}))
+            self.q.put(("matrix_done", tally.payload(self.cancel.is_set())))
 
 
 class DayMatrixCompareWorker(threading.Thread):
@@ -280,38 +360,46 @@ class DayMatrixCompareWorker(threading.Thread):
                         on_log=lambda m: self.q.put(("log", m)))
         # Day outputs live under OUTPUT_ROOT/comparisons/tsn-by-day. ``dest`` is
         # only source/store context, so it must never be claimed as output.
-        total = len(self.cells)
-        done = errors = 0
+        tally = _AttemptTally(len(self.cells))
+        total = tally.total
+        attempts_root = day_matrix.byday_root()
         try:
             for date, row_key in self.cells:
                 if self.cancel.is_set():
                     break
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": "running",
-                                            "done": done, "total": total}))
+                                            "done": tally.done, "total": total}))
                 try:
                     res = day_matrix.build_day_cell(
                         self.source, date, row_key, self.dest, events,
                         tsn_files=self.tsn_files,
                         force_consolidate=self.force_consolidate,
                         also_formulas=self.also_formulas, evidence=self.evidence)
+                    attempt, why = _attempt_state(res)
                     status = res.status
                     if status != "ok":
-                        errors += 1
+                        tally.errors += 1
                         self.q.put(("log", f"  {date} {row_key}: {res.message}"))
                 except Exception as e:                   # noqa: BLE001
                     log.exception("day matrix compare %s/%s crashed", date, row_key)
-                    status, errors = "error", errors + 1
+                    cancelled_cell = self.cancel.is_set()
+                    status = "cancelled" if cancelled_cell else "error"
+                    tally.errors += 1
+                    attempt, why = _attempt_state(None, cancelled=cancelled_cell)
+                    if not cancelled_cell:
+                        why = f"{type(e).__name__}: {e}"
                     self.q.put(("log", f"  {date} {row_key}: "
                                        f"{type(e).__name__}: {e}"))
-                done += 1
+                tally.count(attempt)
+                _record_attempt(attempts_root, f"{row_key}|{self.source}", date,
+                                attempt, why)
+                tally.done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": status,
-                                            "done": done, "total": total}))
+                                            "done": tally.done, "total": total}))
         finally:
-            self.q.put(("matrix_done", {"done": done, "total": total,
-                                        "errors": errors,
-                                        "cancelled": self.cancel.is_set()}))
+            self.q.put(("matrix_done", tally.payload(self.cancel.is_set())))
 
 
 class BaselineMatrixCompareWorker(threading.Thread):
@@ -342,37 +430,46 @@ class BaselineMatrixCompareWorker(threading.Thread):
         # Baseline outputs live under the app's dedicated OUTPUT_ROOT and Reset
         # already scopes that root directly; user-destination ownership is neither
         # needed nor useful here.
-        total = len(self.cells)
-        done = errors = 0
+        tally = _AttemptTally(len(self.cells))
+        total = tally.total
+        attempts_root = baseline_matrix.byday_root()
         try:
             for date, row_key in self.cells:
                 if self.cancel.is_set():
                     break
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": "running",
-                                            "done": done, "total": total}))
+                                            "done": tally.done, "total": total}))
                 try:
                     res = baseline_matrix.build_baseline_cell(
                         self.source, date, row_key, self.baseline_id, self.dest,
                         events, also_formulas=self.also_formulas)
+                    attempt, why = _attempt_state(res)
                     status = res.status
                     if status != "ok":
-                        errors += 1
+                        tally.errors += 1
                         self.q.put(("log", f"  {date} {row_key}: {res.message}"))
                 except Exception as e:                   # noqa: BLE001
                     log.exception("baseline matrix compare %s/%s crashed",
                                   date, row_key)
-                    status, errors = "error", errors + 1
+                    cancelled_cell = self.cancel.is_set()
+                    status = "cancelled" if cancelled_cell else "error"
+                    tally.errors += 1
+                    attempt, why = _attempt_state(None, cancelled=cancelled_cell)
+                    if not cancelled_cell:
+                        why = f"{type(e).__name__}: {e}"
                     self.q.put(("log", f"  {date} {row_key}: "
                                        f"{type(e).__name__}: {e}"))
-                done += 1
+                tally.count(attempt)
+                _record_attempt(attempts_root,
+                                f"{row_key}|{self.source}|{self.baseline_id}",
+                                date, attempt, why)
+                tally.done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": status,
-                                            "done": done, "total": total}))
+                                            "done": tally.done, "total": total}))
         finally:
-            self.q.put(("matrix_done", {"done": done, "total": total,
-                                        "errors": errors,
-                                        "cancelled": self.cancel.is_set()}))
+            self.q.put(("matrix_done", tally.payload(self.cancel.is_set())))
 
 
 class MatrixEvidenceWorker(threading.Thread):
@@ -438,12 +535,17 @@ class MatrixEvidenceWorker(threading.Thread):
             msg = str(e).splitlines()[0] if str(e) else type(e).__name__
             self.q.put(("log", f"  evidence images — {msg}"))
         finally:
+            cancelled = self.cancel.is_set()
             self.q.put(("matrix_cell", {"row": self.row_key, "cell": self.cell_label,
                                         "status": "error" if errors else "ok",
                                         "done": 1, "total": 1}))
-            self.q.put(("matrix_done", {"done": 1 - errors, "total": 1,
-                                        "errors": errors,
-                                        "cancelled": self.cancel.is_set()}))
+            self.q.put(("matrix_done", {
+                "done": 1 - errors, "total": 1, "errors": errors,
+                "cancelled": cancelled, "attempted": 1,
+                "succeeded": 0 if errors else 1,
+                "failed": errors if not cancelled else 0,
+                "cancelled_cells": errors if cancelled else 0,
+                "partial_cells": 0}))
 
 
 class MatrixTsnConsolidateWorker(threading.Thread):
@@ -485,6 +587,11 @@ class MatrixTsnConsolidateWorker(threading.Thread):
             log.exception("matrix TSN consolidate (%s) crashed", self.subdir)
             self.q.put(("log", f"TSN consolidation failed ({type(e).__name__}): {e}"))
         finally:
-            self.q.put(("matrix_done", {"done": 1 - errors, "total": 1,
-                                        "errors": errors,
-                                        "cancelled": self.cancel.is_set()}))
+            cancelled = self.cancel.is_set()
+            self.q.put(("matrix_done", {
+                "done": 1 - errors, "total": 1, "errors": errors,
+                "cancelled": cancelled, "attempted": 1,
+                "succeeded": 0 if errors else 1,
+                "failed": errors if not cancelled else 0,
+                "cancelled_cells": errors if cancelled else 0,
+                "partial_cells": 0}))

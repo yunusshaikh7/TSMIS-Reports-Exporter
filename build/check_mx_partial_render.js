@@ -15,13 +15,18 @@ const src = fs.readFileSync(
   path.join(__dirname, "..", "scripts", "ui", "ui-matrix.js"), "utf8");
 const mxHi = (src.match(/const\s+MX_HI\s*=\s*(\d+)/) || [])[1];
 const fnSrc = (src.match(/function mxCellContent\(cmp, tsnMeta\) \{[\s\S]*?\n\}/) || [])[0];
-if (!mxHi || !fnSrc) {
-  console.error("FAIL: could not extract mxCellContent / MX_HI from ui-matrix.js");
+// CMP-AUD-089: mxCellContent delegates the last-attempt overlay to mxAttemptNote,
+// so the sandbox needs both halves or the renderer throws on every cell.
+const noteSrc = (src.match(/function mxAttemptNote\(cmp\) \{[\s\S]*?\n\}/) || [])[0];
+if (!mxHi || !fnSrc || !noteSrc) {
+  console.error("FAIL: could not extract mxCellContent / mxAttemptNote / MX_HI "
+                + "from ui-matrix.js");
   process.exit(1);
 }
 const sandbox = { MX_HI: Number(mxHi) };
 vm.createContext(sandbox);
-vm.runInContext(fnSrc + "\nglobalThis.mxCellContent = mxCellContent;", sandbox);
+vm.runInContext(noteSrc + "\n" + fnSrc
+                + "\nglobalThis.mxCellContent = mxCellContent;", sandbox);
 const mx = sandbox.mxCellContent;
 
 const fails = [];
@@ -61,6 +66,33 @@ const contradiction = mx({ ...base, diff_cells: 0, one_sided: 0,
                            completion: "complete", verdict: "diff" });
 check("complete verdict/count contradiction -> re-run, never green",
       contradiction.cls === "mx-stale" && /disagree/.test(contradiction.sub));
+
+// --- CMP-AUD-089: the durable last-attempt overlay -------------------------- //
+// A refresh that failed / was stopped / came back incomplete must be VISIBLE on
+// the cell without erasing the previous result it did not replace.
+const green = { ...base, diff_cells: 0, one_sided: 0,
+                completion: "complete", verdict: "match" };
+const failedRefresh = mx({ ...green,
+                           last_attempt: { status: "error", reason: "boom" } });
+check("failed refresh keeps the prior result's own class and number",
+      failedRefresh.cls === "mx-match" && failedRefresh.main === "✓ match");
+check("failed refresh marks the cell and says so in the sub",
+      failedRefresh.warn === "mx-attempt"
+      && /last refresh failed/.test(failedRefresh.sub)
+      && /identical/.test(failedRefresh.sub));
+const stopped = mx({ ...green, last_attempt: { status: "cancelled" } });
+check("a stopped refresh reads stopped, not failed",
+      stopped.warn === "mx-attempt" && /last refresh stopped/.test(stopped.sub));
+const incomplete = mx({ ...green, last_attempt: { status: "partial" } });
+check("an incomplete refresh reads incomplete",
+      incomplete.warn === "mx-attempt"
+      && /last refresh incomplete/.test(incomplete.sub));
+check("no attempt overlay -> no marker class at all", !mx(green).warn);
+const diffWithAttempt = mx({ ...base, diff_cells: 7, one_sided: 0,
+                             completion: "complete", verdict: "diff",
+                             last_attempt: { status: "error" } });
+check("a diff cell keeps its count under a failed refresh",
+      diffWithAttempt.main === "7 diffs" && diffWithAttempt.warn === "mx-attempt");
 
 if (fails.length) {
   console.log(`\nFAILED: ${fails.length} check(s): ${fails.join(", ")}`);

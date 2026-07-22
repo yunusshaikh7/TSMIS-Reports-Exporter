@@ -1736,7 +1736,26 @@ class GuiMatrixMixin:
     def _on_matrix_done(self, payload):
         done, total = payload.get("done", 0), payload.get("total", 0)
         errs = payload.get("errors", 0)
-        if payload.get("cancelled"):
+        # CMP-AUD-089: report what actually happened per cell. "N of M done" alone
+        # counted a cancelled or crashed cell as done; the worker now separates
+        # attempted / succeeded / failed / cancelled / partial and the terminal
+        # line names each non-zero bucket.
+        parts = []
+        for label, key in (("succeeded", "succeeded"), ("failed", "failed"),
+                           ("cancelled", "cancelled_cells"),
+                           ("incomplete", "partial_cells")):
+            n = payload.get(key)
+            if isinstance(n, int) and n:
+                parts.append(f"{n} {label}")
+        attempted = payload.get("attempted")
+        unclean = any(payload.get(k) for k in
+                      ("failed", "cancelled_cells", "partial_cells"))
+        if isinstance(attempted, int) and unclean:
+            stopped = ("Comparison run stopped" if payload.get("cancelled")
+                       else "Comparison run finished")
+            self._emit_log(f"{stopped} — {attempted} of {total} attempted: "
+                           + ", ".join(parts) + " (see the log).")
+        elif payload.get("cancelled"):
             self._emit_log(f"Comparison run stopped — {done} of {total} done.")
         elif errs:
             self._emit_log(f"Comparison run finished — {done} of {total} done; "

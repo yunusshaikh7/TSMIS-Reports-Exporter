@@ -296,8 +296,16 @@ function makeMockApi() {
     if (s === "notbuilt") return { supported: true, built: false, stale: true,
       reason: "missing", missing_side: null, verdict: null, diff_cells: null, one_sided: null };
     if (s === "stale") return { supported: true, built: true, stale: true,
-      reason: "cell_newer", missing_side: null, verdict: "diff", diff_cells: 18, one_sided: 2 };
+      reason: "cell_newer", missing_side: null, completion: "complete",
+      verdict: "diff", diff_cells: 18, one_sided: 2 };
+    // CMP-AUD-089: a cell whose LAST refresh failed — the previous result stands,
+    // marked, so the preview exercises the attempt overlay too.
+    if (s === "attempt") return { supported: true, built: true, stale: false,
+      reason: "fresh", missing_side: null, completion: "complete", verdict: "match",
+      diff_cells: 0, one_sided: 0,
+      last_attempt: { status: "error", reason: "the rebuild could not finish", at: 0 } };
     return { supported: true, built: true, stale: false, reason: "fresh", missing_side: null,
+             completion: "complete",
              verdict: (s[0] === 0 && s[1] === 0) ? "match" : "diff", diff_cells: s[0], one_sided: s[1] };
   }
   function mockApplyOrder(keys, order) {
@@ -384,7 +392,8 @@ function makeMockApi() {
         } else if (mode.kind === "tsn") {
           cmp = (srcKind === "pdfs" || srcKind === "none") ? mockCmp("needtsn")
             : mockCmp(["ssor-prod", "ssor-test"].indexOf(env) >= 0 ? [4, 1]
-                : env === "ars-prod" ? [0, 0] : env === "ars-dev" ? "stale" : [73, 9]);
+                : env === "ars-prod" ? [0, 0] : env === "ars-dev" ? "stale"
+                  : env === "ars-test" ? "attempt" : [73, 9]);
         } else {                               // self (PDF vs Excel) — per env
           cmp = mockCmp(env === baseline ? [11, 0] : i % 4 === 0 ? "notbuilt" : [11, 0]);
         }

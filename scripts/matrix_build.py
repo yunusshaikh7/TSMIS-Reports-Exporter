@@ -686,37 +686,113 @@ def _pdf_store_consolidator(subdir):
     return None
 
 
-def _consolidate_store_folder(subdir, env_dir, out_path, events,
-                              commit_guard=None):
-    """Consolidate one Export-Everything store folder (<env>/<subdir>/, per-route
-    files) into a single workbook via the report's existing consolidator (with its
-    additive input_dir/out_path override). Registry-driven via
-    reports.consolidator_for_subdir, so any consolidatable report works; the PDF
-    Highway Log is the one special case (needs a scratch converted_dir).
+# --------------------------------------------------------------------------- #
+# CMP-AUD-085 — the canonical consolidation is the LAST COMPLETE generation
+# (owner decision, 2026-07-21). A refresh that comes back partial/failed KEEPS
+# LAST-GOOD: the verified bytes and their outcome sidecar are never touched, the
+# attempt is published beside them under a distinct unpromoted name so it stays
+# inspectable, and the caller is refused with an actionable message. Refusing
+# (rather than continuing) is what stops the other half of the finding: a
+# comparison must never silently diff the STALE complete generation against
+# current inputs. A FIRST build with no complete predecessor is unchanged — it
+# persists the flagged partial, which the matrix renders amber and retryable.
+# --------------------------------------------------------------------------- #
+_ATTEMPT_INFIX = " (attempt)"
 
-    Returns the consolidator's ConsolidateResult (F3) so callers can honor its
-    completion — its `status`/`completion` decides whether the output is safe to
-    compare and cache as a fresh result."""
+
+def _attempt_sibling(out_path):
+    """The unpromoted pathname a diverted refresh builds into."""
     out_path = Path(out_path)
-    env_dir = Path(env_dir)
-    _require_commit_guard(commit_guard, "store consolidation", out_path)
-    _require_commit_guard(commit_guard, "store input read", env_dir)
-    # P2-A02: capture the inputs' identity BEFORE the build, so write_consolidated_fingerprint
-    # can refuse to certify the workbook "fresh" if an external writer changed the source folder
-    # mid-build (the GUI task lock already serializes our own writers).
-    fp_before = artifact_store.fingerprint(env_dir)
+    return out_path.with_name(f"{out_path.stem}{_ATTEMPT_INFIX}{out_path.suffix}")
+
+
+def _has_last_complete(out_path):
+    """True when `out_path` holds a trusted, current, COMPLETE generation — bytes
+    a partial refresh may not destroy. Never raises (an unreadable candidate is
+    not a last-good generation, so the ordinary direct build applies)."""
+    out_path = Path(out_path)
+    try:
+        if not out_path.exists():
+            return False
+    except OSError:  # silent-ok: an unstattable candidate is not a last-good generation — the ordinary direct build applies and the producer reports its own errors
+        return False
+    record = consolidation_meta.read_outcome(out_path)
+    return bool(record is not None and record.trusted and record.current
+                and record.completion == outcome.COMPLETE)
+
+
+def _promote_or_keep_last_good(subdir, out_path, attempt, res, commit_guard=None):
+    """Publish a COMPLETE attempt over the last-good canonical, or keep last-good
+    and RAISE. Only a status=ok + COMPLETE producer result is promotable (the same
+    `outcome.promotable` gate the export store uses)."""
+    completion = outcome.consolidate_completion_of(res)
+    promotable = (getattr(res, "status", None) == "ok"
+                  and outcome.promotable(completion) and attempt.exists())
+    if not promotable:
+        # Publish the attempt's own outcome so the retained file self-describes as
+        # the non-canonical generation it is (best-effort: a sidecar that cannot be
+        # written makes write_outcome remove the attempt, which is also safe — the
+        # canonical bytes are untouched either way).
+        consolidation_meta.write_outcome(
+            attempt, res, extra=getattr(res, "producer_extra", None),
+            commit_guard=commit_guard)
+        why = (getattr(res, "message", "") or "").splitlines()
+        detail = f" ({why[0]})" if why and why[0] else ""
+        kept = f'; the attempt was saved beside it as "{attempt.name}"' \
+               if attempt.exists() else ""
+        raise ValueError(
+            f"the {subdir} consolidation came back {completion}{detail}. The previous "
+            f"complete workbook was kept and nothing was compared against it{kept}. "
+            "Fix the flagged exports and rebuild.")
+    _require_commit_guard(commit_guard, "consolidation promotion", attempt)
+    _require_commit_guard(commit_guard, "consolidation promotion", out_path)
+    try:
+        os.replace(attempt, out_path)
+    except OSError as e:
+        raise ValueError(
+            f"the {subdir} consolidation completed but could not replace the previous "
+            f"workbook ({type(e).__name__}: {e}); the previous complete workbook was "
+            "kept — close it if it is open in Excel and rebuild") from e
+    # The promoted bytes now live at the canonical pathname; its sidecars are
+    # (re)written by the shared tail. Any sidecar left from an EARLIER kept attempt
+    # would otherwise sit beside a file that no longer exists.
+    _discard_attempt_sidecar(attempt, commit_guard)
+    if getattr(res, "output_path", None):
+        res.output_path = str(out_path)
+    return res
+
+
+def _discard_attempt_sidecar(attempt, commit_guard=None):
+    """Remove a retained attempt's outcome sidecar (best-effort, guard-checked)."""
+    sidecar = consolidation_meta.meta_path(attempt)
+    if not _guard_allows(commit_guard, sidecar):
+        return
+    try:
+        sidecar.unlink()
+    except FileNotFoundError:  # silent-ok: absence is the desired end state
+        return
+    except OSError as e:
+        log.warning("matrix: could not remove the attempt sidecar %s (%s: %s)",
+                    sidecar.name, type(e).__name__, e)
+
+
+def _produce_consolidation(subdir, env_dir, target, events, commit_guard=None,
+                           scratch_stem=None):
+    """Run the report's consolidator into `target`. `scratch_stem` names the PDF
+    conversion scratch directory (the CANONICAL stem, so a diverted attempt never
+    lengthens that path — CMP-AUD-242's MAX_PATH lesson)."""
     pdf_mod = _pdf_store_consolidator(subdir)
     if pdf_mod is not None:
         # Highway Log (PDF) / Intersection Detail (PDF): parse the per-route PDFs into
         # a scratch converted_dir first, then combine — they have no entry in
         # consolidator_for_subdir for exactly this reason.
         _require_commit_guard(
-            commit_guard, "PDF conversion scratch parent", out_path.parent)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
+            commit_guard, "PDF conversion scratch parent", target.parent)
+        target.parent.mkdir(parents=True, exist_ok=True)
         _require_commit_guard(
-            commit_guard, "PDF conversion scratch parent", out_path.parent)
+            commit_guard, "PDF conversion scratch parent", target.parent)
         conv = Path(tempfile.mkdtemp(
-            prefix=f".{out_path.stem}_conv-", dir=out_path.parent))
+            prefix=f".{scratch_stem or target.stem}_conv-", dir=target.parent))
         conv_identity = owned_dir.directory_identity(conv)
 
         def _pdf_guard(path):
@@ -732,7 +808,7 @@ def _consolidate_store_folder(subdir, env_dir, out_path, events,
                 "it was retained and the comparison was not built.")
         try:
             res = pdf_mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
-                                      input_dir=env_dir, out_path=out_path,
+                                      input_dir=env_dir, out_path=target,
                                       converted_dir=conv,
                                       commit_guard=_pdf_guard)
         finally:
@@ -752,8 +828,44 @@ def _consolidate_store_folder(subdir, env_dir, out_path, events,
         # F3: RETURN the ConsolidateResult so callers can honor its completion — a
         # failed / no-data consolidation must not be compared or cached as fresh.
         res = mod.consolidate(events=events, confirm_overwrite=lambda _p: True,
-                              input_dir=env_dir, out_path=out_path,
+                              input_dir=env_dir, out_path=target,
                               commit_guard=commit_guard)
+    return res
+
+
+def _consolidate_store_folder(subdir, env_dir, out_path, events,
+                              commit_guard=None):
+    """Consolidate one Export-Everything store folder (<env>/<subdir>/, per-route
+    files) into a single workbook via the report's existing consolidator (with its
+    additive input_dir/out_path override). Registry-driven via
+    reports.consolidator_for_subdir, so any consolidatable report works; the PDF
+    Highway Log is the one special case (needs a scratch converted_dir).
+
+    Returns the consolidator's ConsolidateResult (F3) so callers can honor its
+    completion — its `status`/`completion` decides whether the output is safe to
+    compare and cache as a fresh result.
+
+    CMP-AUD-085: when the canonical pathname already holds a trusted COMPLETE
+    generation, the producer builds into an unpromoted attempt sibling and only a
+    COMPLETE result is promoted over it; anything else keeps last-good and raises.
+    """
+    out_path = Path(out_path)
+    env_dir = Path(env_dir)
+    keep_last_good = _has_last_complete(out_path)
+    target = _attempt_sibling(out_path) if keep_last_good else out_path
+    _require_commit_guard(commit_guard, "store consolidation", target)
+    _require_commit_guard(commit_guard, "store input read", env_dir)
+    # P2-A02: capture the inputs' identity BEFORE the build, so write_consolidated_fingerprint
+    # can refuse to certify the workbook "fresh" if an external writer changed the source folder
+    # mid-build (the GUI task lock already serializes our own writers).
+    fp_before = artifact_store.fingerprint(env_dir)
+    res = _produce_consolidation(subdir, env_dir, target, events,
+                                 commit_guard=commit_guard,
+                                 scratch_stem=out_path.stem)
+    if keep_last_good:
+        # Raises unless the attempt was COMPLETE and is now the canonical file.
+        res = _promote_or_keep_last_good(subdir, out_path, target, res,
+                                         commit_guard=commit_guard)
     # P1-R01: persist the producer completion beside the consolidated workbook through
     # the shared boundary so a later REUSE (no fresh ConsolidateResult) still knows it
     # was built from partial inputs. No-op unless an output was produced (status ok). A

@@ -789,6 +789,113 @@ def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided
             "could not be safely published. Refresh the cell.") from e
 
 
+# --------------------------------------------------------------------------- #
+# CMP-AUD-089: the durable per-cell LAST-ATTEMPT overlay.
+#
+# A rebuild that crashed, was cancelled, or came back partial must not vanish
+# into transient log text and leave the previous green cell standing as if it
+# were the answer to the refresh the user just asked for. This is ONE file per
+# comparisons root, keyed "<row>|<mode>" -> cell, written by the compare workers'
+# terminals and living BESIDE the result caches: the artifact and its strict
+# generation still own truth, the overlay only says "the newest attempt to
+# refresh this cell did not land, and here is why".
+#
+# It is DIAGNOSTIC state by contract, so every write is best-effort: an overlay
+# that cannot be persisted is logged and skipped, never a reason to fail a run
+# whose artifact published correctly.
+# --------------------------------------------------------------------------- #
+_ATTEMPTS_FILE = "_attempts.json"
+ATTEMPT_OK = "ok"                      # clears the cell's overlay
+ATTEMPT_STATES = ("error", "partial", "cancelled")
+
+
+def attempts_path(root):
+    """The attempt overlay beside a comparisons root's result cache(s)."""
+    return Path(root) / _ATTEMPTS_FILE
+
+
+def load_attempts(root):
+    """{"<row>|<mode>": {cell_key: {status, reason, at}}}. Tolerant exactly like
+    the result caches: missing / corrupt / foreign / old-version reads as {} and
+    never raises — a lost overlay only costs a badge, never truth."""
+    p = attempts_path(root)
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+        return cache_envelope.unwrap(data, output_identity="attempts")
+    except OSError:  # silent-ok: no overlay yet is the normal first-run state, exactly like the result caches
+        return {}
+    except ValueError as e:                  # corrupt JSON: surface it, then degrade
+        log.warning("matrix: corrupt attempt overlay %s (%s: %s); treating as empty",
+                    p, type(e).__name__, e)
+        return {}
+
+
+def record_attempt(root, result_key, cell_key, status, reason=None, at=None,
+                   commit_guard=None):
+    """Persist (or clear) one cell's last attempt; returns True when the overlay
+    on disk reflects the call. ``status=ATTEMPT_OK`` CLEARS the entry — a
+    succeeded rebuild supersedes whatever failed before it. Unknown states are
+    refused rather than persisted as an uninterpretable badge."""
+    if status != ATTEMPT_OK and status not in ATTEMPT_STATES:
+        log.warning("matrix: refusing to record unknown attempt state %r", status)
+        return False
+    p = attempts_path(root)
+    tmp = p.with_name(p.name + ".tmp")
+    for path in (p.parent, p, tmp):
+        if not consolidation_meta.guard_allows(commit_guard, path):
+            log.warning("matrix: attempt overlay not recorded for %s/%s "
+                        "(destination ownership changed)", result_key, cell_key)
+            return False
+    data = load_attempts(root)
+    cells = data.get(result_key)
+    cells = dict(cells) if isinstance(cells, dict) else {}
+    if status == ATTEMPT_OK:
+        if cell_key not in cells:
+            return True                      # nothing to clear — already current
+        cells.pop(cell_key, None)
+    else:
+        cells[cell_key] = {
+            "status": status,
+            "reason": (str(reason).splitlines()[0] if reason else ""),
+            "at": float(at if at is not None else time.time()),
+        }
+    if cells:
+        data[result_key] = cells
+    else:
+        data.pop(result_key, None)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(cache_envelope.wrap(data, output_identity="attempts"), f)
+        os.replace(tmp, p)
+        return True
+    except OSError as e:
+        log.warning("matrix: could not record the attempt overlay %s (%s: %s)",
+                    p, type(e).__name__, e)
+        return False
+
+
+def _last_attempt_for(attempts, result_key, cell_key, cmp_state):
+    """The attempt overlay to SHOW for one cell, or None. An attempt older than
+    the comparison workbook itself is dropped: the artifact was refreshed after
+    that failure (by another path — the Compare tab, a by-day build), so the
+    failed attempt is no longer the newest thing that happened to this cell."""
+    rec = _nested_record(attempts, result_key, cell_key)
+    if not isinstance(rec, dict) or rec.get("status") not in ATTEMPT_STATES:
+        return None
+    try:
+        at = float(rec.get("at"))
+    except (TypeError, ValueError):  # silent-ok: a malformed stamp only drops the age filter — the attempt itself still shows
+        at = None
+    built = cmp_state.get("mtime") if isinstance(cmp_state, dict) else None
+    if at is not None and built is not None and built > at + _MTIME_TOL_S:
+        return None
+    return {"status": rec.get("status"),
+            "reason": str(rec.get("reason") or ""),
+            "at": at}
+
+
 # --- unified per-cell comparison state ------------------------------------- #
 # --------------------------------------------------------------------------- #
 # CMP-AUD-103: the ONE buildability predicate — a cell can be (re)built iff it is a
@@ -900,6 +1007,9 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
     ages = report_library.cell_ages(dest, [(sd, sd) for sd in needed], envs, now=now)
     results = load_results(dest, baseline_key)
     tsn_results = load_tsn_results(dest)
+    # CMP-AUD-089: the durable last-attempt overlay is read ONCE per snapshot and
+    # merged per cell below; it decorates the last-good state, never replaces it.
+    attempts = load_attempts(comparisons_common_root(dest))
     _absent = {"present": False, "mtime": None, "age_seconds": None}
 
     cells, modes_sel, modes_avail, tsn_meta = {}, {}, {}, {}
@@ -968,6 +1078,11 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                                  sources, rec,
                                  fp_folders=(dest / env / env_subdir,
                                              dest / env / mode["other_subdir"]))
+            if isinstance(cmp, dict) and cmp.get("supported"):
+                attempt = _last_attempt_for(
+                    attempts, f"{row_key}|{mode['id']}", env, cmp)
+                if attempt is not None:
+                    cmp["last_attempt"] = attempt
             cell = {"export": export, "is_baseline": is_baseline, "cmp": cmp}
             if mode["kind"] == "env":
                 cell["comparison"] = cmp     # back-compat alias for the Stage-A UI
