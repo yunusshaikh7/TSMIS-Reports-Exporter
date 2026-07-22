@@ -948,6 +948,54 @@ class GuiMatrixMixin:
         ConsolidateWorker(_run, self._gated_queue(), self.cancel_event, lambda _p: True).start()
         return {"ok": True}
 
+    @_api_method
+    def rebuild_stale_tsn_libraries(self):
+        """Rebuild EVERY imported TSN report whose consolidated workbook is out of
+        date, on the one shared task slot (the same ConsolidateWorker + per-report
+        builder the single-report Rebuild uses — no second code path).
+
+        A report is out of date when its raw files are imported but the consolidated
+        workbook is missing or built by a superseded normalizer (the D2 version bump
+        after an upgrade). Reports already current are skipped. Returns {ok, reports}
+        / {error}."""
+        import tsn_library                              # lazy
+        stale = [row["report"] for row in self._tsn_library_status()
+                 if row["raw_present"] and not row["current"]]
+        if not stale:
+            return {"error": "Every imported TSN report is already up to date."}
+        err = self._claim_task_error("consolidate")
+        if err:
+            return err
+        self.cancel_event.clear()
+        labels = ", ".join(tsn_library.get(r).label for r in stale)
+        headline = (f"Rebuilding {len(stale)} out-of-date TSN report"
+                    f"{'' if len(stale) == 1 else 's'}")
+        self._emit_log(f"{headline}: {labels}…")
+        self._set_dot("busy", f"{headline}…")
+        self._emit({"t": "run_started", "mode": "consolidate",
+                    "label": f"{headline}…"})
+        self._push_state()
+
+        def _run(events=None, confirm_overwrite=None, day=None):   # noqa: ARG001
+            # The FIRST failure is what gets reported: returning the last result
+            # would let an early failure hide behind a later success and read green.
+            first_bad = last = None
+            for report in stale:
+                if self.cancel_event.is_set():
+                    break
+                spec = tsn_library.get(report)
+                if events is not None:
+                    events.on_log(f"— {spec.label} —")
+                last = tsn_library.build_consolidated(
+                    report, events=events,
+                    confirm_overwrite=lambda _p: True, force=True)
+                if first_bad is None and getattr(last, "status", None) != "ok":
+                    first_bad = last
+            return first_bad or last
+
+        ConsolidateWorker(_run, self._gated_queue(), self.cancel_event, lambda _p: True).start()
+        return {"ok": True, "reports": len(stale)}
+
     def _tsn_library_status_for(self, report):
         import tsn_library                              # lazy
         return tsn_library.status(report)

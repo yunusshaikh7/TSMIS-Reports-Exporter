@@ -990,6 +990,23 @@ function makeMockApi() {
       }, 700);
       return { ok: true };
     },
+    rebuild_stale_tsn_libraries: async () => {
+      const stale = Object.keys(mockTsnLib)
+        .filter((k) => mockTsnLib[k].present && !mockTsnLib[k].current);
+      if (!stale.length) return { error: "Every imported TSN report is already up to date." };
+      const labels = stale.map((k) => mockTsnLib[k].label).join(", ");
+      const headline = `Rebuilding ${stale.length} out-of-date TSN report`
+        + (stale.length === 1 ? "" : "s");
+      st.task = "consolidate"; pushState();
+      push({ t: "log", text: `${headline}: ${labels}…` },
+           { t: "run_started", mode: "consolidate", label: `${headline}…` });
+      setTimeout(() => {
+        stale.forEach((k) => { mockTsnLib[k].cons = true; mockTsnLib[k].current = true; });
+        push({ t: "log", text: `${stale.length} TSN report(s) rebuilt.` }, { t: "run_ended" });
+        st.task = null; pushState();
+      }, 700);
+      return { ok: true, reports: stale.length };
+    },
     set_setting: async (key, value) => {
       const numeric = typeof mockSettings[key] === "number";
       const boolish = typeof mockSettings[key] === "boolean";

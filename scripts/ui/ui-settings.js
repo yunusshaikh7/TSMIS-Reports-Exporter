@@ -171,6 +171,23 @@ function renderTsnLibrary(reports) {
   if (!box) return;
   box.textContent = "";
   const rebuilding = S.st && S.st.task === "consolidate";
+  // "Rebuild all out of date" targets exactly the rows the per-report Rebuild
+  // would: raw imported, consolidated missing or superseded. Nothing to do (or a
+  // task already holding the slot) disables it rather than reporting an error.
+  const stale = (reports || []).filter((r) => r.raw_present && !r.current);
+  const all = $("setTsnRebuildStale");
+  if (all) {
+    all.disabled = !!rebuilding || stale.length === 0;
+    all.textContent = stale.length
+      ? `Rebuild all out of date (${stale.length})`
+      : "All up to date";
+    all.title = stale.length
+      ? `Rebuild: ${stale.map((r) => r.label).join(", ")}`
+      : "Every imported TSN report's consolidated workbook is current.";
+    // Assigned (not addEventListener): this renderer re-runs on every panel
+    // refresh, and assignment replaces the handler instead of stacking copies.
+    all.onclick = () => rebuildStaleTsnLibraries();
+  }
   // Folder location: WHERE the TSN files live on disk (each report has a
   // <root>\<report>\raw + \consolidated subfolder), with an Open-folder button.
   const root = (S.init.settings || {}).tsn_library_root;
@@ -254,6 +271,15 @@ async function rebuildTsnLibrary(report) {
   // (see the "state" handler, which clears _tsnRebuildPending when task goes idle).
   S._tsnRebuildPending = true;
   renderTsnLibrary(S.init.settings.tsn_library || []);   // reflect the busy/disabled state
+}
+
+async function rebuildStaleTsnLibraries() {
+  const res = await api.rebuild_stale_tsn_libraries();
+  if (res && res.error) { showMessage("error", "Can't rebuild", res.error); return; }
+  // Same shared task slot as the per-report Rebuild: the panel refreshes when the
+  // "state" handler sees the task go idle and clears _tsnRebuildPending.
+  S._tsnRebuildPending = true;
+  renderTsnLibrary(S.init.settings.tsn_library || []);
 }
 
 async function refreshTsnLibrary() {

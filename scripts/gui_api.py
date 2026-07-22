@@ -1071,6 +1071,12 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
             seq = self._active_check_seq
             self._active_check_supersede.clear()
         log.info("active env check: %s (%s-%s)", reason, src, env)
+        # The check itself stays quiet about FAILURES, but the fact that it is
+        # running must be visible: it holds the single-task gate, so a click
+        # during it is refused ("try again in a few seconds") with no on-screen
+        # reason for the wait. Naming it when it starts makes that wait legible.
+        self._emit_log("Checking the saved sign-in in the background — "
+                       "sign-in, verify and exports wait for this to finish.")
         ActiveEnvCheckWorker(self._q, src, env, seq,
                              supersede=self._active_check_supersede).start()
 
@@ -1087,6 +1093,9 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
             if payload.get("via_device"):
                 self._device_ok = True
                 via_device = True
+        # Close the loop on the "waiting for this" line above, so the gate is
+        # visibly released. Outcome detail stays in the log file (quiet by design).
+        self._emit_log("Background sign-in check finished.")
         if via_device:
             self._refresh_auth()
         self._push_state()
