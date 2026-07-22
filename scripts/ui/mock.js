@@ -340,7 +340,10 @@ function makeMockApi() {
       envLabels[e] = `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}`; });
     // env-mode samples (vs the baseline column).
     const envSample = {
-      ramp_summary: { "ssor-test": [42, 0], "ssor-dev": [42, 0], "ars-prod": [0, 0], "ars-test": [48, 0], "ars-dev": "stale" },
+      // CMP-AUD-089: ramp_summary/ars-prod carries a FAILED last refresh — the
+      // previous match stands, marked, so the preview shows the overlay in the
+      // default (cross-environment) mode too.
+      ramp_summary: { "ssor-test": [42, 0], "ssor-dev": [42, 0], "ars-prod": "attempt", "ars-test": [48, 0], "ars-dev": "stale" },
       ramp_detail: { "ssor-test": [25, 10], "ssor-dev": [25, 10], "ars-prod": [0, 0], "ars-test": [31, 10], "ars-dev": "missing" },
       highway_sequence: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
       highway_log: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
