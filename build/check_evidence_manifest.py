@@ -287,16 +287,20 @@ def run_generate(name, rows_a, rows_b, proposals, locate=None,
     events = Ev()
     if locate is not None:
         ve._locate_tsmis_sources = locate
-    elif cancel_at_locate:
-        # Cancel once the PDFs have been located — the render/commit boundary,
-        # where a late cancel must still leave the previous set untouched.
-        def cancel_then_locate(*_a, **_k):
+    saved_index = ehd.district_index
+    if cancel_at_locate:
+        # Cancel once the sources have been located — the render boundary, where
+        # a late cancel must still leave the previous set untouched. Hooked on
+        # district_index because BOTH source roles reach it (the Excel role
+        # never calls _locate_tsmis_sources).
+        def cancel_then_index(*_a, **_k):
             events.cancelled = True
-            return ({}, set())
-        ve._locate_tsmis_sources = cancel_then_locate
+            return {}
+        ehd.district_index = cancel_then_index
     try:
         res = ve.generate("highway_detail", cons, tsn, cmp_path, tdir, events)
     finally:
+        ehd.district_index = saved_index
         (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
          ve._locate_tsmis_sources) = saved
     return cmp_path, wb, img, man, res

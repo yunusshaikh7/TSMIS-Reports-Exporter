@@ -115,21 +115,24 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
     here == a red cell there (CMP-AUD-107 — the shared engine)."""
     sc = idt._SCHEMA
     a_route, b_route = defaultdict(list), defaultdict(list)
-    for r in tsmis_rows:
-        a_route[r[0]].append(r)
+    # The A-side row's position rides along so the engine can address the exact
+    # CONSOLIDATED-workbook cell an Excel-compared value came from (CMP-AUD-210).
+    for i, r in enumerate(tsmis_rows):
+        a_route[r[0]].append((i, r))
     for r in tsn_rows:
         b_route[r[0]].append(r)
     diffs = defaultdict(list)
     for route in sorted(set(a_route) & set(b_route)):
         a_ct, b_ct = defaultdict(int), defaultdict(int)
-        for r in a_route[route]:
+        for _i, r in a_route[route]:
             a_ct[r[_KEY_I]] += 1
         for r in b_route[route]:
             b_ct[r[_KEY_I]] += 1
-        a_by = {r[_KEY_I]: r for r in a_route[route] if a_ct[r[_KEY_I]] == 1}
+        a_by = {r[_KEY_I]: (i, r) for i, r in a_route[route]
+                if a_ct[r[_KEY_I]] == 1}
         b_by = {r[_KEY_I]: r for r in b_route[route] if b_ct[r[_KEY_I]] == 1}
         for key in set(a_by) & set(b_by):
-            ra, rb = a_by[key], b_by[key]
+            (ia, ra), rb = a_by[key], b_by[key]
             pub_key = published_key_text(sc, ra)
             for i, f in enumerate(idt.SHARED_HEADER):
                 if f == idt.KEY:
@@ -143,7 +146,7 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
                     diffs[f].append(dict(
                         route=route, key=str(key), field=f,
                         va=cell.display_a, vb=cell.display_b,
-                        dist=dist, cnty=cnty,
+                        dist=dist, cnty=cnty, row_index=ia,
                         pub_key=pub_key, display=cell.display))
     return diffs
 

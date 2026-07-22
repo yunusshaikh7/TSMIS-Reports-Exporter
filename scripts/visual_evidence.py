@@ -44,7 +44,7 @@ from pathlib import Path
 try:
     import pdfplumber
     from PIL import Image, ImageDraw, ImageFont
-    from openpyxl import Workbook
+    from openpyxl import Workbook, load_workbook
     from openpyxl.drawing.image import Image as XLImage
     from openpyxl.styles import Font
     _DEPS_OK = True
@@ -154,6 +154,19 @@ def _layout_keys(layout):
     if layout == "both":
         return ("stacked", "pair")
     return ("pair",)
+
+
+def tsmis_source_role(row_key):
+    """Which TSMIS export a row's comparison actually READ: 'pdf' or 'excel'.
+
+    CMP-AUD-210: both of a report's rows used to be evidenced from the
+    PDF-edition export, and a candidate was dropped whenever that print
+    disagreed with the compared value — so anything the Excel export has and the
+    print does not (Highway Sequence route 037's Description is the censused
+    case) could never be illustrated at all. An Excel row is now evidenced from
+    the workbook it was compared from.
+    """
+    return "pdf" if str(row_key).endswith("_pdf") else "excel"
 
 
 def capable(row_key):
@@ -279,10 +292,13 @@ class _ReadSet:
     """
 
     def __init__(self, root, tsmis_dir, tsn_dir, digests, members, identity,
-                 fs_identity):
+                 fs_identity, extra=()):
         self.root = root
         self.tsmis_dir = tsmis_dir
         self.tsn_dir = tsn_dir
+        # {original path -> its snapshot copy} for sources addressed by path
+        # rather than discovered in a folder (the compared Excel workbook).
+        self.extra = dict(extra)
         self.digests = digests          # {resolved ORIGINAL path: sha256 of copy}
         self.members = members          # manifest read set, stable order
         self._identity = identity
@@ -314,11 +330,13 @@ class _ReadSet:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
-def _snapshot_read_set(tsmis_paths, tsn_paths):
-    """Copy the PDFs this generation will read into a private snapshot and
+def _snapshot_read_set(tsmis_paths, tsn_paths, extra=()):
+    """Copy the sources this generation will READ into a private snapshot and
     digest the COPIES (CMP-AUD-098). Returns a `_ReadSet`; the caller must
     `discard()` it. A missing source is simply absent from the snapshot — the
-    locate step already treats an unreadable route PDF as a miss."""
+    locate step already treats an unreadable route PDF as a miss. `extra` holds
+    sources addressed by path rather than found in a folder (the compared Excel
+    workbook, CMP-AUD-210)."""
     root = Path(tempfile.mkdtemp(prefix=".tsmis-evidence-readset-"))
     fs_identity = owned_dir.directory_identity(root)
     if fs_identity is None:
@@ -327,9 +345,10 @@ def _snapshot_read_set(tsmis_paths, tsn_paths):
             "The evidence read-set snapshot has no stable local identity; it "
             "was not used.")
     identity = artifact_store.capture_source_identities((root,))
-    digests, members = {}, []
+    digests, members, extra_map = {}, [], {}
     try:
-        for label, sources in (("tsmis", tsmis_paths), ("tsn", tsn_paths)):
+        for label, sources in (("tsmis", tsmis_paths), ("tsn", tsn_paths),
+                               ("compared", extra)):
             side = root / label
             side.mkdir()
             for src in sources:
@@ -342,12 +361,14 @@ def _snapshot_read_set(tsmis_paths, tsn_paths):
                 digests[str(src.resolve())] = digest
                 members.append(evidence_manifest.Member(
                     name=str(src), size=copy.stat().st_size, sha256=digest))
+                if label == "compared":
+                    extra_map[str(src)] = copy
     except BaseException:
         shutil.rmtree(root, ignore_errors=True)
         raise
     members.sort(key=lambda m: m.name)
     return _ReadSet(root, root / "tsmis", root / "tsn", digests,
-                    tuple(members), identity, fs_identity)
+                    tuple(members), identity, fs_identity, extra_map)
 
 
 def _safe_sibling_paths(comparison_path, source_paths, captured_sources=(),
@@ -643,17 +664,38 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     # what the images illustrate cannot be changed by anything that happens to
     # the live files afterwards. Only the sampled TSMIS routes plus the (small)
     # TSN district-print set can be rendered, so only those are copied.
+    tsmis_role = tsmis_source_role(row_key)
+    # CMP-AUD-210: an Excel-compared row is evidenced from the workbook it was
+    # compared FROM, so that workbook joins the read set and only the TSN prints
+    # need copying on the PDF side.
     read_set = _snapshot_read_set(
-        [adapter.tsmis_pdf_path(tsmis_pdf_dir, r) for r in need_tsmis],
-        tsn_pdf_files)
+        ([adapter.tsmis_pdf_path(tsmis_pdf_dir, r) for r in need_tsmis]
+         if tsmis_role == "pdf" else []),
+        tsn_pdf_files,
+        extra=(consolidated,) if tsmis_role == "excel" else ())
     try:
-        events.on_log(f"  evidence: locating candidates in {len(need_tsmis)} TSMIS "
-                      f"PDF(s) and {len(need_tsn_keys)} TSN district print(s)…")
-        located = _locate_tsmis_sources(adapter, need_tsmis, read_set.tsmis_dir,
-                                        events)
-        if located is None:
-            return _cancelled()
-        tsmis_loc, missing_routes = located
+        tsmis_loc, missing_routes = {}, set()
+        excel_rows, excel_header = {}, []
+        if tsmis_role == "excel":
+            # CMP-AUD-210: address the compared cells in the workbook the
+            # comparison read, not in a companion print that may hold something
+            # else — or nothing — at that row.
+            wanted = {e["row_index"] for f in cand for e in cand[f]
+                      if e.get("row_index") is not None}
+            events.on_log(f"  evidence: addressing {len(wanted)} row(s) in the "
+                          "compared TSMIS workbook and locating candidates in "
+                          f"{len(need_tsn_keys)} TSN district print(s)…")
+            excel_rows, excel_header = _excel_rows_at(
+                read_set.extra.get(str(consolidated), consolidated), wanted)
+        else:
+            events.on_log(f"  evidence: locating candidates in {len(need_tsmis)} "
+                          f"TSMIS PDF(s) and {len(need_tsn_keys)} TSN district "
+                          "print(s)…")
+            located = _locate_tsmis_sources(adapter, need_tsmis,
+                                            read_set.tsmis_dir, events)
+            if located is None:
+                return _cancelled()
+            tsmis_loc, missing_routes = located
         if missing_routes:
             events.on_log(f"    note: no readable/confirmable TSMIS PDF for route(s) "
                           f"{', '.join(sorted(missing_routes))} — sampling around them")
@@ -709,12 +751,14 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                     _require_output_guard(
                         commit_guard, tmp_dir, "evidence image write",
                         directory_identity=tmp_dir_fs_identity)
-                    ok, reason = _try_example(adapter, ex, f, tsmis_loc, tsn_loc,
-                                              dist_index, read_set.tsmis_dir,
-                                              tmp_dir, got + 1, page_cache,
-                                              render_keys,
-                                              commit_guard=commit_guard,
-                                              out_dir_identity=tmp_dir_fs_identity)
+                    ok, reason = _try_example(
+                        adapter, ex, f, tsmis_loc, tsn_loc, dist_index,
+                        read_set.tsmis_dir, tmp_dir, got + 1, page_cache,
+                        render_keys, commit_guard=commit_guard,
+                        out_dir_identity=tmp_dir_fs_identity,
+                        tsmis_role=tsmis_role, excel_rows=excel_rows,
+                        excel_header=excel_header,
+                        consolidated_name=Path(consolidated).name)
                     if ok:
                         got += 1
                         rendered += 1
@@ -870,29 +914,57 @@ def _quote_note(va, vb):
             f"{_QUOTE_NAMES[pair[0]]} where TSN prints {_QUOTE_NAMES[pair[1]]}")
 
 
+def _tsmis_excel_side(adapter, ex, field, excel_rows, excel_header,
+                      consolidated_name):
+    """Render the TSMIS side from the WORKBOOK the comparison read (CMP-AUD-210).
+
+    Returns (image, label, verified_sub, None) or (None, None, None, reason).
+    The cell is only rendered once its own workbook value, put through the
+    adapter's projection, equals the value the comparison compared — the Excel
+    counterpart of the PDF side's parse-back check. A companion print's
+    disagreement is now irrelevant here, which is the point: an Excel value the
+    print never carried stays evidenceable as Excel truth.
+    """
+    index = ex.get("row_index")
+    located = excel_rows.get(index) if index is not None else None
+    if located is None:
+        return None, None, None, "row not found in the compared TSMIS workbook"
+    sheet, excel_row, values = located
+    # The consolidated export is a flat labelled table whose header is
+    # ['Route'] + the report's own columns, so the compared column is found by
+    # LABEL — never by a position that a schema change could silently shift.
+    if field not in excel_header:
+        return None, None, None, "the compared column is not in the workbook header"
+    col = excel_header.index(field)
+    if col >= len(values):
+        return None, None, None, "the workbook row is short of the compared column"
+    if adapter.project(field, values[col]) != adapter.project(field, ex["va"]):
+        return None, None, None, ("the compared TSMIS workbook cell no longer "
+                                  "holds the compared value")
+    key_cols = [0]
+    if adapter.KEY_LABEL in excel_header:
+        key_cols.append(excel_header.index(adapter.KEY_LABEL))
+    img = _excel_strip(excel_header, values, col, key_cols)
+    address = f"{sheet}!{_column_letter(col + 1)}{excel_row}"
+    label = f"TSMIS (Excel)  —  {consolidated_name} · {address}"
+    return img, label, address, None
+
+
 def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
                  tsmis_pdf_dir, out_dir, k, page_cache,
                  render_keys=("stacked", "pair"), commit_guard=None,
-                 out_dir_identity=None):
+                 out_dir_identity=None, tsmis_role="pdf", excel_rows=None,
+                 excel_header=(), consolidated_name=""):
     """Verify one candidate end-to-end and render the selected layout(s).
-    `render_keys` is the subset of ('stacked', 'pair') the user chose. Returns
+    `render_keys` is the subset of ('stacked', 'pair') the user chose.
+    `tsmis_role` says which TSMIS export the comparison actually read, so the
+    TSMIS side is evidenced from THAT source (CMP-AUD-210). Returns
     (entry_dict, None) on success, (None, reason) otherwise."""
-    trecs = tsmis_loc.get(ex["route"], {}).get(ex["key"], [])
-    if len(trecs) != 1:
-        return None, ("no readable TSMIS PDF for the route" if
-                      ex["route"] not in tsmis_loc
-                      else "row not found uniquely in the TSMIS PDF")
     nrecs = tsn_loc.get(ex["dist"], {}).get(
         (ex["cnty"], ex["route"], ex["key"]), [])
     if len(nrecs) != 1:
         return None, "row not found uniquely in the TSN district print"
-    trec, nrec = trecs[0], nrecs[0]
-    tb = adapter.tsmis_box(trec, field)
-    if tb is None:
-        return None, "record on an approximate-geometry page"
-    tv = adapter.tsmis_value(trec, field)
-    if tv != ex["va"]:
-        return None, "the TSMIS PDF prints a different value than the compared export"
+    nrec = nrecs[0]
     nv = adapter.tsn_value(nrec, field)
     if nv != ex["vb"]:
         return None, "the TSN print differs from the TSN workbook at this cell"
@@ -900,24 +972,47 @@ def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
     if nb is None:
         return None, "the TSN record's geometry isn't evidence-grade here"
     npage, nbox, nyspan, nxspan = nb
-    tpage, tbox, tyspan, txspan = tb
 
-    t_pdf = adapter.tsmis_pdf_path(tsmis_pdf_dir, ex["route"])
+    if tsmis_role == "excel":
+        t_img, t_label, address, reason = _tsmis_excel_side(
+            adapter, ex, field, excel_rows or {}, excel_header,
+            consolidated_name)
+        if reason is not None:
+            return None, reason
+        t_verified = f"the workbook cell {address}"
+    else:
+        trecs = tsmis_loc.get(ex["route"], {}).get(ex["key"], [])
+        if len(trecs) != 1:
+            return None, ("no readable TSMIS PDF for the route" if
+                          ex["route"] not in tsmis_loc
+                          else "row not found uniquely in the TSMIS PDF")
+        trec = trecs[0]
+        tb = adapter.tsmis_box(trec, field)
+        if tb is None:
+            return None, "record on an approximate-geometry page"
+        tv = adapter.tsmis_value(trec, field)
+        if tv != ex["va"]:
+            return None, ("the TSMIS PDF prints a different value than the "
+                          "compared export")
+        tpage, tbox, tyspan, txspan = tb
+        t_pdf = adapter.tsmis_pdf_path(tsmis_pdf_dir, ex["route"])
+        t_img = _strip(t_pdf, tpage, tbox, tyspan, txspan, page_cache)
+        t_label = f"TSMIS (PDF)  —  {t_pdf.name} · page {tpage}"
+        t_verified = "the TSMIS print"
+
     # A record that names its own source print (the Highway Log's per-print
     # routing) wins over the district index; likewise its district/county
     # provenance (learned from the print's own headers) enriches the captions.
     n_pdf = Path(nrec.get("src") or dist_index[ex["dist"]])
     dist = nrec.get("dist") or ex["dist"]
     cnty = nrec.get("cnty") or ex["cnty"]
-    t_img = _strip(t_pdf, tpage, tbox, tyspan, txspan, page_cache)
     n_img = _strip(n_pdf, npage, nbox, nyspan, nxspan, page_cache)
     title = (f"{field} — TSMIS '{ex['va'] or '(blank)'}'  vs  "
              f"TSN '{ex['vb'] or '(blank)'}'")
     note = _quote_note(ex["va"], ex["vb"])
     where = f" — TSN district D{dist} ({cnty})" if dist or cnty else ""
-    sub = (f"Route {ex['route']} @ {ex['key']} — both PDFs re-parsed and "
-           f"verified against the compared values{where}")
-    t_label = f"TSMIS (PDF)  —  {t_pdf.name} · page {tpage}"
+    sub = (f"Route {ex['route']} @ {ex['key']} — {t_verified} and the TSN "
+           f"print re-read and verified against the compared values{where}")
     n_label = (f"TSN  —  {n_pdf.name} · page {npage} · "
                f"{(cnty + '-') if cnty else ''}{ex['route']}")
     safe = re.sub(r"[^A-Za-z0-9]+", "_", field).strip("_")
@@ -995,6 +1090,107 @@ def _strip(path, page_no, cell_box, record_yspan, xspan, cache):
     d.rectangle([x0 * _SC, y0 * _SC, x1 * _SC, y1 * _SC],
                 outline=(220, 20, 20), width=4)
     return img.crop(_crop_window(img.width, img.height, cell_box, record_yspan))
+
+
+def _excel_rows_at(workbook_path, wanted):
+    """{data_index: (sheet, excel_row_no, [values])} for the wanted 0-based DATA
+    row indexes of a consolidated export (CMP-AUD-210).
+
+    The export is a flat labelled table — header on row 1, one data row after —
+    so the loader's row order IS the sheet's row order. Nothing downstream
+    trusts that: the caller renders a cell only once its own value matches what
+    the comparison compared, which is the Excel counterpart of the PDF side's
+    parse-back check.
+    """
+    if not wanted:
+        return {}, []
+    wb = load_workbook(workbook_path, read_only=True, data_only=True)
+    try:
+        ws = wb[wb.sheetnames[0]]
+        header, out = [], {}
+        last = max(wanted)
+        for excel_row, row in enumerate(
+                ws.iter_rows(min_row=1, max_row=last + 2, values_only=True), 1):
+            if excel_row == 1:
+                header = ["" if v is None else str(v) for v in row]
+                continue
+            index = excel_row - 2
+            if index in wanted:
+                out[index] = (ws.title, excel_row,
+                              ["" if v is None else str(v) for v in row])
+        return out, header
+    finally:
+        wb.close()
+
+
+def _column_letter(index):
+    """1-based column index -> its Excel letter, so the address is one a user
+    can type into the Name Box."""
+    letters = ""
+    while index > 0:
+        index, rem = divmod(index - 1, 26)
+        letters = chr(65 + rem) + letters
+    return letters
+
+
+# The cell strip's geometry, in pixels.
+_XL_PAD = 16
+_XL_ROW_H = 46
+_XL_HEAD_H = 34
+_XL_MIN_COL_W = 92
+_XL_CHAR_W = 13                # rough per-character width at the value font size
+_XL_CONTEXT_COLS = 3           # columns shown either side of the compared one
+
+
+def _excel_strip(header, values, target_index, key_indexes=(0,)):
+    """Render one CONSOLIDATED-workbook row as a boxed cell strip.
+
+    The Excel counterpart of `_strip`: same conventions, so the two sides of a
+    composed image read alike — gray box around the row that was compared, red
+    box around the compared cell. It is a rendering of the workbook's own
+    values, never a screenshot of Excel, and the caller's label says so.
+    """
+    show = sorted(set(key_indexes) | {
+        i for i in range(max(0, target_index - _XL_CONTEXT_COLS),
+                         min(len(values), target_index + _XL_CONTEXT_COLS + 1))})
+    widths = [max(_XL_MIN_COL_W,
+                  _XL_CHAR_W * max(len(str(header[i] if i < len(header) else "")),
+                                   len(str(values[i])), 1) + 18)
+              for i in show]
+    w = sum(widths) + 2 * _XL_PAD
+    h = _XL_HEAD_H + _XL_ROW_H + 2 * _XL_PAD
+    img = Image.new("RGB", (w, h), (255, 255, 255))
+    d = ImageDraw.Draw(img)
+    head_font, cell_font = _font(15, True), _font(19)
+    x = _XL_PAD
+    gap_after = None
+    for i, col in enumerate(show):
+        cw = widths[i]
+        top = _XL_PAD
+        d.rectangle([x, top, x + cw, top + _XL_HEAD_H], fill=(242, 242, 242),
+                    outline=(196, 196, 196))
+        label = str(header[col] if col < len(header) else "")
+        d.text((x + 8, top + 8), label[:24], font=head_font, fill=(70, 70, 70))
+        d.rectangle([x, top + _XL_HEAD_H, x + cw, top + _XL_HEAD_H + _XL_ROW_H],
+                    outline=(196, 196, 196))
+        text = str(values[col])
+        d.text((x + 8, top + _XL_HEAD_H + 12), text[:26], font=cell_font,
+               fill=(20, 20, 20))
+        if col == target_index:
+            d.rectangle([x, top + _XL_HEAD_H, x + cw,
+                         top + _XL_HEAD_H + _XL_ROW_H],
+                        outline=(220, 20, 20), width=4)
+        # A break in the shown columns is marked, so the strip never implies the
+        # key column sits next to the compared one when it does not.
+        if gap_after is not None and col != gap_after + 1:
+            d.line([x - 1, top, x - 1, top + _XL_HEAD_H + _XL_ROW_H],
+                   fill=(120, 120, 120), width=3)
+        gap_after = col
+        x += cw
+    d.rectangle([_XL_PAD, _XL_PAD + _XL_HEAD_H, w - _XL_PAD,
+                 _XL_PAD + _XL_HEAD_H + _XL_ROW_H],
+                outline=(150, 150, 150), width=2)
+    return img
 
 
 _FONT_WARNED = False

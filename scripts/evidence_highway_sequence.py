@@ -120,18 +120,20 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
     sc = chsl._SCHEMA
     key_field = chsl.KEY_FIELD
     a_route, b_route = defaultdict(list), defaultdict(list)
-    for r in tsmis_rows:
-        a_route[r[0]].append(r)
+    # The A-side row's position rides along so the engine can address the exact
+    # CONSOLIDATED-workbook cell an Excel-compared value came from (CMP-AUD-210).
+    for i, r in enumerate(tsmis_rows):
+        a_route[r[0]].append((i, r))
     for r in tsn_rows:
         b_route[r[0]].append(r)
     diffs = defaultdict(list)
     for route in sorted(set(a_route) & set(b_route)):
         a_ct, b_ct = defaultdict(int), defaultdict(int)
         a_by, b_by = {}, {}
-        for r in a_route[route]:
+        for i, r in a_route[route]:
             k = _row_key(r)
             a_ct[k] += 1
-            a_by[k] = r
+            a_by[k] = (i, r)
         for r in b_route[route]:
             k = _row_key(r)
             b_ct[k] += 1
@@ -139,7 +141,7 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
         for key in set(a_by) & set(b_by):
             if a_ct[key] != 1 or b_ct[key] != 1:
                 continue                       # duplicates -> the pairing's job
-            ra, rb = a_by[key], b_by[key]
+            (ia, ra), rb = a_by[key], b_by[key]
             pub_key = published_key_text(sc, ra)
             for f_idx, field in enumerate(chsl.SHARED_HEADER):
                 if f_idx == key_field:         # the key column itself
@@ -149,7 +151,7 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar):
                     diffs[field].append(dict(
                         route=route, key=key, field=field,
                         va=cell.display_a, vb=cell.display_b,
-                        dist="", cnty="",
+                        dist="", cnty="", row_index=ia,
                         pub_key=pub_key, display=cell.display))
     return diffs
 
