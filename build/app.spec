@@ -81,6 +81,9 @@ APP_MODULES = [
     "export_highway_sequence_pdf", "export_ramp_detail_pdf",   # PDF editions, v0.24.0
     "export_ramp_summary_excel", "export_intersection_summary_pdf",  # the last editions, v0.25.1
     "export_route_history",              # reserved-DISABLED SSRS placeholder, v0.25.1
+    "export_clean_road",                 # reserved-DISABLED Clean Road group, 2026-07-22
+    "tsn_load_clean_road",               # its staged TSN library slots (no normalizer yet)
+    "arcgis_layers",                     # the manually-stocked ArcGIS layer drop-zone
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
     "highway_detail_columns",                                # Highway Detail labels + legend (v0.20.0)

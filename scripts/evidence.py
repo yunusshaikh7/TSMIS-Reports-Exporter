@@ -109,7 +109,8 @@ def _sensitive_roots():
     allowlist below, so they can only enter via `extra_dir` — which this guards."""
     out = []
     for p in (paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR, paths.FAILURES_DIR,
-              paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT):
+              paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+              paths.ARCGIS_LAYERS_ROOT):
         try:
             out.append(Path(p).resolve())
         except OSError:
@@ -223,7 +224,7 @@ def _inventory_text():
     lines = ["File inventory — names, sizes and timestamps only. No file content.",
              ""]
     for root in (paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
-                 paths.LOG_DIR):
+                 paths.ARCGIS_LAYERS_ROOT, paths.LOG_DIR):
         root = Path(root)
         lines.append(f"[{root}]")
         if not root.is_dir():

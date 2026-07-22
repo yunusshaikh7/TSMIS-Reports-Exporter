@@ -80,6 +80,15 @@ INPUT_ROOT = DATA_ROOT / "input"
 # See scripts/tsn_library.py.
 TSN_LIBRARY_ROOT = DATA_ROOT / "tsn_library"
 
+# ArcGIS layer exports: the owner's own exports of the TSMIS ArcGIS layers, one
+# workbook per drop (each carrying an INDEX sheet + one worksheet per layer).
+# Every TSMIS report is ultimately these layers put into report form, so this is
+# the raw-layer counterpart to the report-shaped TSN library. Like tsn_library/
+# it is MANUALLY stocked and never written by an export run — the app only
+# creates the folder, seeds a README, and reads what is there.
+# See scripts/arcgis_layers.py.
+ARCGIS_LAYERS_ROOT = DATA_ROOT / "arcgis_layers"
+
 # Exports are grouped into RUN FOLDERS: output/<YYYY-MM-DD src-env>/<report>/
 # (e.g. "2026-06-11 ssor-prod"), so a new day's run never resumes over (or
 # mixes with) yesterday's files AND different data source / environment

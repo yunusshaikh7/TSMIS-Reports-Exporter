@@ -247,7 +247,16 @@ cares whether it's a dev script or the packaged exe. Resolved once at import tim
 
 Derived paths: `OUTPUT_ROOT = DATA_ROOT/output`, `INPUT_ROOT = DATA_ROOT/input`
 (user-supplied input — currently TSN district PDFs; TSMIS reports never read from
-here). App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
+here). Two MANUALLY-STOCKED libraries sit beside them, both git-ignored and never
+written by an export run: `TSN_LIBRARY_ROOT = DATA_ROOT/tsn_library` (the
+report-shaped TSN ground truth — §v0.17.0 below) and `ARCGIS_LAYERS_ROOT =
+DATA_ROOT/arcgis_layers` (`scripts/arcgis_layers.py`, 2026-07-22 — the owner's own
+exports of the TSMIS ArcGIS layers, which is what every TSMIS report is ultimately
+made of; one workbook per drop, each typically carrying an `INDEX` sheet mapping
+worksheet → ArcGIS layer + FeatureServer source, because Excel truncates sheet
+names at 31 chars). The ArcGIS library is **staging only** — `ensure_layout()`
+creates the folder + README at startup and `status()` reports what is there for the
+Settings panel; nothing parses the layers yet. App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
 `AUTH`, `LOG_DIR`, `FAILURES_DIR`, `CONFIG_FILE`, `UPDATE_DIR`,
 `EDGE_LOGIN_PROFILE_DIR`, `WEBVIEW_PROFILE_DIR`, `DOWNLOADED_BROWSERS_DIR`. The
 frozen auth file is `data/tsmis_auth.json`; the dev auth file is

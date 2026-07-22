@@ -63,6 +63,9 @@ from export_highway_detail import SPEC as _S_highway_detail
 from export_highway_summary import SPEC as _S_highway_summary
 from export_highway_detail_pdf import SPEC as _S_highway_detail_pdf
 from export_route_history import SPEC as _S_route_history
+from export_clean_road import HIGHWAY_SPEC as _S_clean_highway
+from export_clean_road import INTERSECTION_SPEC as _S_clean_intersection
+from export_clean_road import RAMP_SPEC as _S_clean_ramp
 import consolidate_ramp_summary as _con_ramp_summary
 import consolidate_ramp_detail as _con_ramp_detail
 import consolidate_highway_sequence as _con_highway_sequence
@@ -126,6 +129,11 @@ _EXPORT = [  # (key, label, fmt, expected ReportSpec)
     ("ramp_summary_excel", "TSAR: Ramp Summary (Excel)", "Excel", _S_ramp_summary_excel),
     ("intersection_summary_pdf", "Intersection Summary (PDF)", "PDF", _S_intersection_summary_pdf),
     ("route_history", "Route History Table", "SSRS", _S_route_history),
+    # 2026-07-22: the reserved-DISABLED Clean Road Files group at ids 16/17/18
+    # (append-only) — greyed `cs-disabled` options with no site report module.
+    ("clean_highway", "Clean Road: Highway", "Excel", _S_clean_highway),
+    ("clean_intersection", "Clean Road: Intersection", "Excel", _S_clean_intersection),
+    ("clean_ramp", "Clean Road: Ramp", "Excel", _S_clean_ramp),
 ]
 _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:ramp_summary", "TSAR: Ramp Summary", _con_ramp_summary),
@@ -203,6 +211,14 @@ _TSN = [
      "tsn_highway_sequence_normalized.xlsx", "consolidate_tsn_highway_sequence:build_into"),
     ("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
      "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into"),
+    # 2026-07-22: the STAGED Clean Road slots — raw/ folders + counting only; the
+    # builders deliberately refuse (no normalizer until a comparison needs one).
+    ("clean_highway", "TSN Clean Road Highway", "*.xlsx", "statewide_xlsx",
+     "tsn_clean_highway_normalized.xlsx", "tsn_load_clean_road:build_into_highway"),
+    ("clean_intersection", "TSN Clean Road Intersection", "*.xlsx", "statewide_xlsx",
+     "tsn_clean_intersection_normalized.xlsx", "tsn_load_clean_road:build_into_intersection"),
+    ("clean_ramp", "TSN Clean Road Ramp", "*.xlsx", "statewide_xlsx",
+     "tsn_clean_ramp_normalized.xlsx", "tsn_load_clean_road:build_into_ramp"),
 ]
 
 

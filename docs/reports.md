@@ -54,6 +54,9 @@ table in the same change.
 | 7b | Highway Detail (PDF) (`highway_detail_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 8 | Highway Summary (`highway_summary`) | XLSX ³ | — ³ | — ³ | — | — ³ | — ³ | — ³ |
 | — | Route History Table (`route_history`) | — ⁶ | — | — | — | — | — | — |
+| — | Clean Road: Highway (`clean_highway`) | — ⁷ | — | — | — | — | — | — |
+| — | Clean Road: Intersection (`clean_intersection`) | — ⁷ | — | — | — | — | — | — |
+| — | Clean Road: Ramp (`clean_ramp`) | — ⁷ | — | — | — | — | — | — |
 
 Plus one **consolidate-only source** (not an export type): **TSN Highway Log (PDF)**
 (`cons:tsn_highway_log`) — TSN district prints the user drops into
@@ -96,7 +99,24 @@ Plus one **consolidate-only source** (not an export type): **TSN Highway Log (PD
    pick parameters in the SSRS panel) with NO export control, so there is nothing
    for the engine to drive. It shows greyed in the picker
    (`reports.DISABLED_EXPORT_SUBDIRS`); if the site later gives it an export flow,
-   enabling it = write the real save + empty the gate.
+   enabling it = write the real save + drop its subdir from the gate.
+7. **The Clean Road Files group is wired-but-DISABLED groundwork** (stable ids
+   16/17/18, 2026-07-22 — the same reserved pattern): the dev site 7.21 capture
+   adds a `cs-header` "Clean Road Files" followed by three `cs-option cs-sub
+   cs-disabled` entries (`clean_highway` / `clean_intersection` / `clean_ramp`).
+   The capture ships **no `clean_*.js` report module** and nothing in the site's JS
+   references those values, so there is no Generate→Export flow and no export/print
+   function name to bind to — exactly where Highway Detail/Summary sat on the 6.26
+   capture. All three show greyed in the picker
+   (`reports.DISABLED_EXPORT_SUBDIRS`); each `save` in `export_clean_road.py`
+   refuses loudly if ever reached. Their **TSN sources are already staged** —
+   `report_catalog.TSN` carries `clean_highway` / `clean_intersection` /
+   `clean_ramp` library slots for the CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS
+   extracts, with `tsn_load_clean_road` deliberately holding NO normalizer (see
+   [comparison-engine.md](comparison-engine.md) and the module docstring).
+   Enabling one = write its real save off a fresh capture, write its TSN
+   projection, bump that slot's `normalization_version`, and drop its subdir from
+   the gate.
 
 **Cross-cutting engine capabilities** (all reports, unless noted): resume + retry +
 skip/cancel + fast-fail per route; **fast mode** (6 parallel browsers; no coalescing);
@@ -253,7 +273,7 @@ The site added two more TSAR reports, **Highway Detail** and **Highway Summary**
 
 - **Real modules** `export_highway_detail.py` / `export_highway_summary.py` — each a genuine `ReportSpec` modeled on the Excel siblings (`save = save_via_export_button`). Confirmed against the **7.7 dev capture** (`highway_detail.js` live, action bar wires `hd_exportToExcel()` + `hd_printAll()`): empty = `td.hl-empty` / "No results found in this segment.", matched loosely (`td.hl-empty` OR "No … found"). Highway Detail is un-greyed on 7.7; Highway Summary is still `cs-disabled` there, so its export fail-fasts (`ReportUnavailableError`) until the vendor turns it on.
 - **Highway Detail (PDF)** — `export_highway_detail_pdf.py`, `subdir="highway_detail_pdf"`, `data_value="highway_detail"` (same dropdown option), `save=save_highway_detail_pdf` (in `exporter.py`). The twin of `save_highway_log_pdf`: `hd_printAll()` builds the SAME `.hl-print-section` print layout; `window.print` is overridden to raise so the on-screen restore never runs, then `page.pdf()` captures it (Letter, **landscape**, 27 roadbed-grouped columns). Empty backstop counts `.hd-row1` data rows (HD's grouped columns put colspan on real rows, so Highway Log's non-colspan heuristic doesn't apply). **Appended LAST** — stable id **10** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`); `_PICKER_ORDER` places it next to its Excel sibling.
-- **The export gate holds only Route History** (`reports.DISABLED_EXPORT_SUBDIRS = {'route_history'}`): the reserved placeholder (stable id 15) has no export flow yet, so it's greyed; every OTHER report is pickable in the Export picker and ticked in Export Everything. Where the **live site** still `cs-disabled`s a report, `select_report` fails fast instead of stalling.
+- **The export gate holds the reserved placeholders** (`reports.DISABLED_EXPORT_SUBDIRS = {'route_history', 'clean_highway', 'clean_intersection', 'clean_ramp'}`): Route History (stable id 15) and the Clean Road Files group (ids 16/17/18) have no export flow yet, so they're greyed; every OTHER report is pickable in the Export picker and ticked in Export Everything. Where the **live site** still `cs-disabled`s a report, `select_report` fails fast instead of stalling.
 - **Highway Detail** consolidates + compares like every other report as of **v0.20.0** (the env matrix is 12 rows); **Highway Summary** has no consolidator / comparator / TSN entry yet (no real export exists to verify a schema against), so it alone stays absent from the matrices, Consolidate, and Compare. Locked by `check_intersection_gate` (empty gate), `check_report_recipe` (HD registered, HS absent), `check_stable_ids` (append-only 8/9/10), and `check_report_catalog`.
 
 To integrate Highway Summary later: add its consolidator + comparators + `tsn_library` entry per the same recipe (`build/check_report_recipe.py`), verified against a real statewide export first — exactly how Highway Detail was done (tracked in [roadmap.md](roadmap.md)).

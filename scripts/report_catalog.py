@@ -43,6 +43,12 @@ from export_highway_detail import SPEC as _HIGHWAY_DETAIL_SPEC
 from export_highway_summary import SPEC as _HIGHWAY_SUMMARY_SPEC
 from export_highway_detail_pdf import SPEC as _HIGHWAY_DETAIL_PDF_SPEC
 from export_route_history import SPEC as _ROUTE_HISTORY_SPEC
+# The "Clean Road Files" group (dev site 2026-07-21) — reserved DISABLED specs.
+from export_clean_road import (
+    HIGHWAY_SPEC as _CLEAN_HIGHWAY_SPEC,
+    INTERSECTION_SPEC as _CLEAN_INTERSECTION_SPEC,
+    RAMP_SPEC as _CLEAN_RAMP_SPEC,
+)
 
 import consolidate_ramp_summary as _c_ramp_summary
 import consolidate_ramp_detail as _c_ramp_detail
@@ -171,6 +177,19 @@ EXPORT = (
     # report is an embedded SSRS page with no export flow, so the picker shows
     # it greyed until the site gives it one (the v0.18.1 Highway-pair path).
     ExportEntry("route_history", "Route History Table", "SSRS", _ROUTE_HISTORY_SPEC),
+    # The "Clean Road Files" group (dev site, 2026-07-21) — RESERVED groundwork at
+    # stable ids 16/17/18, app-wide DISABLED (`reports.DISABLED_EXPORT_SUBDIRS`):
+    # the site added a `cs-header` + three `cs-disabled` options with NO report
+    # module behind them, so there is no export flow to drive yet. Appended LAST
+    # (stable-id append-only; batch positions 0–15 frozen). Their TSN sources ARE
+    # already staged — see the TSN block below. Enabling one = write its real save
+    # off a fresh capture + drop its subdir from the gate.
+    ExportEntry("clean_highway", "Clean Road: Highway", "Excel", _CLEAN_HIGHWAY_SPEC,
+                group="Clean Road", short_label="Highway"),
+    ExportEntry("clean_intersection", "Clean Road: Intersection", "Excel",
+                _CLEAN_INTERSECTION_SPEC, group="Clean Road", short_label="Intersection"),
+    ExportEntry("clean_ramp", "Clean Road: Ramp", "Excel", _CLEAN_RAMP_SPEC,
+                group="Clean Road", short_label="Ramp"),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -447,6 +466,22 @@ TSN = (
     TsnEntry("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
              "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into",
              normalization_version=3, evidence_pdfs=True),
+    # Clean Road (2026-07-22) — STAGED library slots for the three TSN clean-road
+    # extracts (CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS, the underlying tables
+    # rather than the TSAR projections; CA HIGHWAYS carries the SAME 60,083
+    # records as the Highway Detail extract but 74 columns instead of 56). These
+    # exist so the raw/ folders are created + hinted and the owner's drops are
+    # counted; `tsn_load_clean_road` deliberately has NO normalizer — the target
+    # shape is decided by the comparison these will feed, and the matching site
+    # reports are still greyed (see export_clean_road.py). No comparator, no
+    # matrix row. Version stays 1 until a real projection lands.
+    TsnEntry("clean_highway", "TSN Clean Road Highway", "*.xlsx", "statewide_xlsx",
+             "tsn_clean_highway_normalized.xlsx", "tsn_load_clean_road:build_into_highway"),
+    TsnEntry("clean_intersection", "TSN Clean Road Intersection", "*.xlsx", "statewide_xlsx",
+             "tsn_clean_intersection_normalized.xlsx",
+             "tsn_load_clean_road:build_into_intersection"),
+    TsnEntry("clean_ramp", "TSN Clean Road Ramp", "*.xlsx", "statewide_xlsx",
+             "tsn_clean_ramp_normalized.xlsx", "tsn_load_clean_road:build_into_ramp"),
 )
 
 
@@ -492,6 +527,10 @@ _PICKER_ORDER = (
     # sibling (like Intersection Detail + its PDF). Detail export enabled v0.19.1,
     # the PDF v0.19.2; Summary export-enabled but still site-greyed.
     "highway_detail", "highway_detail_pdf", "highway_summary",
+    # The Clean Road group, greyed until the site un-greys it. The SITE lists it
+    # ABOVE the TSAR groups (right after the flat options); it renders last here
+    # so the working reports stay at the top of the picker.
+    "clean_highway", "clean_intersection", "clean_ramp",
 )
 
 

@@ -47,6 +47,9 @@ _V017_EXPORT_ORDER = (
     # Intersection Summary's print edition) + the reserved-DISABLED Route History
     # placeholder at 15 (same rule: never insert/reorder).
     "ramp_summary_excel", "intersection_summary_pdf", "route_history",
+    # 2026-07-22 — the reserved-DISABLED Clean Road Files group at 16/17/18
+    # (same rule: never insert/reorder).
+    "clean_highway", "clean_intersection", "clean_ramp",
 )
 
 # Poison sentinel for a structurally-invalid saved entry. It is never a real export

@@ -32,10 +32,13 @@ _fail = []
 # DERIVED counts — adding a report flows through here without a literal edit.
 # The gate held ONLY the v0.18.1 reserved Highway pair until v0.19.1 enabled it;
 # as of v0.25.1 it holds the reserved Route History placeholder (the dev site's
-# embedded-SSRS report — no export flow yet, shown greyed).
+# embedded-SSRS report — no export flow yet, shown greyed), joined 2026-07-22 by
+# the dev site 7.21 "Clean Road Files" group (three `cs-disabled` options with no
+# report module behind them).
 N_REPORTS = len(reports.EXPORT_REPORTS)
-_RESERVED = {"route_history"}
-_RESERVED_LABELS = {"Route History Table"}
+_RESERVED = {"route_history", "clean_highway", "clean_intersection", "clean_ramp"}
+_RESERVED_LABELS = {"Route History Table", "Clean Road: Highway",
+                    "Clean Road: Intersection", "Clean Road: Ramp"}
 N_ENABLED = N_REPORTS - len(_RESERVED)
 
 

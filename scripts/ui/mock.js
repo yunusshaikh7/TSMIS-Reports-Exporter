@@ -48,6 +48,11 @@ function makeMockApi() {
     { key: "highway_detail", label: "Highway Detail", fmt: "Excel", group: "Highway", short: "Detail" },
     { key: "highway_detail_pdf", label: "Highway Detail (PDF)", fmt: "PDF", group: "Highway", short: "Detail (PDF)" },
     { key: "highway_summary", label: "Highway Summary", fmt: "Excel", group: "Highway", short: "Summary" },
+    // 2026-07-22: the dev site 7.21 "Clean Road Files" group (ids 16/17/18) —
+    // reserved, app-DISABLED (shown greyed) until the site un-greys them.
+    { key: "clean_highway", label: "Clean Road: Highway", fmt: "Excel", group: "Clean Road", short: "Highway", disabled: true },
+    { key: "clean_intersection", label: "Clean Road: Intersection", fmt: "Excel", group: "Clean Road", short: "Intersection", disabled: true },
+    { key: "clean_ramp", label: "Clean Road: Ramp", fmt: "Excel", group: "Clean Road", short: "Ramp", disabled: true },
   ];
   // The Consolidate radios carry each row's stable `cons:*` key (P3) — this list
   // matches reports.CONSOLIDATE_REPORTS (9 rows as of CR-002: both Intersection
@@ -194,6 +199,13 @@ function makeMockApi() {
     highway_log:         { label: "TSN Highway Log", raw_kind: "district_pdfs", raw_count: 0, present: false, cons: false, current: false },          // no raw
   };
   const MOCK_TSN_ROOT = "C:\\Tools\\TSMIS Exporter\\data\\tsn_library";
+  // The manually-stocked ArcGIS layer drop-zone (staged only — nothing reads it yet).
+  const MOCK_ARCGIS = {
+    root: "C:\\Tools\\TSMIS Exporter\\data\\arcgis_layers",
+    count: 2,
+    files: [{ name: "IMLayers.xlsx", size: 111634434 },
+            { name: "Layers7.20.xlsx", size: 355772572 }],
+  };
   // Evidence prints are the SECOND TSN asset (the images crop from them). Mixed
   // states again so every panel case is reachable in #mock: prints present, prints
   // MISSING, prints covered by the report's own raw, and no evidence support.
@@ -245,6 +257,7 @@ function makeMockApi() {
       values: { ...mockSettings }, defaults: { ...mockSettings },
       site_urls: mockSiteUrlRows(), chromium: { ...mockChromium },
       tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
+      arcgis_layers: { ...MOCK_ARCGIS },
       meta: {
         version: "0.26.2 (preview)", build: "portable app",
         variant: "system browser", update_support: "ok",
@@ -1000,6 +1013,7 @@ function makeMockApi() {
                                    chrome_ok: true, chromium_present: true,
                                    labels: { chromium: "Built-in Chromium", chrome: "Google Chrome" } },
                                  tsn_library: mockTsnLibraryRows(), tsn_library_root: MOCK_TSN_ROOT,
+                                 arcgis_layers: { ...MOCK_ARCGIS },
                                  meta: { update_support: "ok" } }),
     tsn_library_status: async () => ({ reports: mockTsnLibraryRows() }),
     open_tsn_library_folder: async () => { push({ t: "log", text: `(mock) open TSN library folder: ${MOCK_TSN_ROOT}` }); return { ok: true }; },

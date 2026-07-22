@@ -269,6 +269,13 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         except Exception as e:                                  # noqa: BLE001
             log.info("tsn_library.ensure_layout skipped: %s: %s",
                      type(e).__name__, (str(e).splitlines() or [""])[0])
+        # Same for the manually-stocked ArcGIS layer drop-zone (root + README).
+        try:
+            import arcgis_layers
+            arcgis_layers.ensure_layout()
+        except Exception as e:                                  # noqa: BLE001
+            log.info("arcgis_layers.ensure_layout skipped: %s: %s",
+                     type(e).__name__, (str(e).splitlines() or [""])[0])
         self._checks_running = False
         self._checks = {}
         for ch in BROWSER_CHANNELS:

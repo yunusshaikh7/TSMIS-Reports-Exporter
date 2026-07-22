@@ -115,7 +115,11 @@ def consolidator_for_subdir(subdir):
 # (v0.25.1) Route History Table is RESERVED groundwork (the same v0.18.1 path):
 # the dev site's new report is an embedded SSRS page with NO export flow, so it
 # shows greyed in the picker until the site gives it one.
-DISABLED_EXPORT_SUBDIRS = {"route_history"}
+# (2026-07-22) The three Clean Road Files reports are RESERVED the same way: the
+# dev site 7.21 capture adds them as `cs-disabled` options with no report module
+# behind them at all, so there is no export flow to drive. See export_clean_road.
+DISABLED_EXPORT_SUBDIRS = {"route_history",
+                           "clean_highway", "clean_intersection", "clean_ramp"}
 
 
 def is_export_disabled(spec):

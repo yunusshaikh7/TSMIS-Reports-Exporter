@@ -117,7 +117,9 @@ def test_v017_append_only_compat():
     check("PDF editions appended at 11-12 (v0.24.0): Highway Sequence + Ramp Detail",
           order[11:13] == ("highway_sequence_pdf", "ramp_detail_pdf"))
     check("v0.25.1 appended at 13-15: RS (Excel) + IS (PDF) + the Route History placeholder",
-          order[13:] == ("ramp_summary_excel", "intersection_summary_pdf", "route_history"))
+          order[13:16] == ("ramp_summary_excel", "intersection_summary_pdf", "route_history"))
+    check("Clean Road group appended at 16-18 (2026-07-22, reserved-DISABLED)",
+          order[16:] == ("clean_highway", "clean_intersection", "clean_ramp"))
     # A v1 (integer-index) manifest from the PRE-Intersection-PDF shape (v0.17.1: seven
     # reports, indices 0-6) still migrates to the seven original keys, 1:1.
     pre = {"version": 1, "reports": [0, 1, 2, 3, 4, 5, 6], "steps": []}

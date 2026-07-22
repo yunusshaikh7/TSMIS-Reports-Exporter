@@ -476,7 +476,70 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
 
 ---
 
+## Pending for the next release (fixed on main, unreleased — 2026-07-22)
+
+- **Stale explicit TSN selection self-heals after an install move** (work-PC field report,
+  2026-07-22): the matrix blocked a row with "The explicitly selected TSN workbook is
+  unavailable" pointing at the PREVIOUS install's `…\output\…\_tsn_input\highway_log\
+  tsn_highway_log_consolidated.xlsx` while the canonical library held the workbook. Now a
+  MISSING pick that provably named the app's OWN generated consolidated workbook (the legacy
+  `_tsn_input/<report>/` drop or an old install's `tsn_library/<report>/consolidated/`) resolves
+  to the canonical library with a visible "(old pick ignored)" note + Clear guidance; every other
+  explicit-selection failure (foreign path, changed/unreadable, still-existing file) keeps
+  failing closed. `tsn_library._heal_stale_app_owned`;
+  `check_matrix_tsn.test_stale_app_owned_selection_heals` (teeth-verified);
+  [comparison-engine.md](comparison-engine.md) §12c-adjacent note updated.
+- **TSN rebuild errors name their real cause again**: `tsn_library.build_consolidated` ran its
+  certification tail on BUILDER-refused results, replacing e.g. "Expected exactly one raw … found
+  2" and a declined overwrite with a bogus "durable certificate could not be verified" error (a
+  decline even reported as `error` instead of `cancelled`). Fixed same day;
+  `check_tsn_outcome.test_refusing_builder_keeps_its_own_terminal` (teeth-verified).
+
 ## Feature backlog
+
+- [ ] **Clean Road Files (Highway / Intersection / Ramp)** [L] — **STAGED 2026-07-22, blocked on
+  the site.** The dev site 7.21 capture (`site-captures/TSMIS Dev Site 7.21/`) adds a "Clean Road
+  Files" dropdown group: `clean_highway` / `clean_intersection` / `clean_ramp`, all `cs-disabled`,
+  with **no `clean_*.js` report module** and no reference to those values anywhere in the site's JS.
+  Wired as reserved-DISABLED groundwork exactly like the v0.18.1 Highway pair and v0.25.1 Route
+  History — stable ids **16/17/18** (`export_clean_road.py`, `reports.DISABLED_EXPORT_SUBDIRS`,
+  `batch_manifest` appended, greyed in every picker; each `save` refuses loudly if un-gated
+  without a real implementation).
+  **The TSN side is already delivered and staged:** `report_catalog.TSN` carries three library
+  slots for the owner's clean-road extracts (`CA HIGHWAYS 09.08.2025.xlsx` 60,083×74,
+  `CA INTERSECTIONS 09.03.2025.xlsx` 16,626×55, `CA RAMPS 09.08.2025.xlsx` 15,410×32 —
+  `THY_*`/`INX_*`/`RAM_*` database fields, i.e. the UNDERLYING tables rather than the TSAR
+  projections; measured: CA HIGHWAYS holds exactly the same 60,083 records as the Highway Detail
+  TSN extract but **74 columns instead of 56**). `tsn_load_clean_road` deliberately ships **no
+  normalizer** — the normalized shape is decided by the comparison it feeds, and no Clean Road
+  report exports from the site yet, so any projection written now would be a guess. Its builders
+  return a typed error naming that state; the raw is still counted and the folders are created.
+  **Unlock:** a statewide export of each report once the site un-greys them. Then per report:
+  write the real `save` off a fresh capture, write the TSN projection (the
+  `tsn_load_highway_detail` pattern), bump that slot's `normalization_version`, add the
+  comparator + matrix rows, and drop its subdir from the gate. See
+  [reports.md](reports.md) footnote 7.
+- [ ] **ArcGIS layer processing → build our own Clean Road CA HIGHWAYS** [L] — **COVERAGE
+  ASSESSMENT DONE 2026-07-22; the build is FEASIBLE and value-proven on route 001.** See
+  [docs/planning/cleanroad-highways.md](planning/cleanroad-highways.md) (the column map, the
+  minimal 24-layer export list, the gaps) — the plan: consolidate the owner's ArcGIS layer
+  exports (county+PM overlay of as-of LRS slices) into a THY-shaped CA HIGHWAYS workbook, then
+  compare it against the TSN clean-road extract like any other family. Proof numbers: 12
+  attribute checks 100.0% (502/502) on route 001, surface types 501/502 (one 0.001-mi boundary
+  sliver), `Total_Num_Lanes` is THY's lanes column, layer L/R == THY LT/RT, TOLL_FOREST mux
+  settled (1=toll / 2=forest, verified geographically). Hard-won traps: join on county+PM (THY
+  offsets are PM-continued; the layers' ODMeasure/ARMeasure are DIFFERENT calibrations — matching
+  on them silently scrambles fine-grained attributes), `LRSToDate` empty = current,
+  `InventoryItemStartDate` = domain eff date, `.` = none sentinel, City/County-Code layers are
+  all-roads (filter `RouteID LIKE 'SHS_%'`). **Blocked on the owner for:** a Traffic Volume
+  Segments export (the ADT gap), the MAINT_SVC_LVL / federal-aid / national-lands /
+  scenic-freeway questions (no TSMIS layer found — likely TSN-legacy), and a same-dated
+  TSN-extract + layer-export pair for acceptance. The app SPACE shipped earlier the same day:
+  `arcgis_layers/` beside `tsn_library/` (`paths.ARCGIS_LAYERS_ROOT`, `scripts/arcgis_layers.py`
+  — git-ignored, manually stocked, README at startup, path + count in Settings, excluded from
+  support bundles). **Read the INDEX sheet, never the worksheet name** — Excel truncates sheet
+  names at 31 characters, and the INDEX's FeatureServer URL + layer id is the audit-provenance
+  record the consolidator will stamp per column.
 
 - [x] **Ramp Summary vs TSN (AGGREGATE)** [M] — **DONE (v0.17.0).** The first AGGREGATE comparator
   + the shared `summary_layout.py` familiar-layout renderer. `consolidate_ramp_summary` completed to

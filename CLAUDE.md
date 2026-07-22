@@ -53,7 +53,16 @@ sibling (**1b**, v0.25.1 — the site's `rs_exportToExcel`, previously unwired).
 stay **export-only** by design (their siblings already consolidate + compare). The dev
 site's new **Route History Table** (an embedded SSRS
 report, no export flow) is wired as a **greyed reserved placeholder** (stable id 15,
-the v0.18.1 Highway-pair pattern). v0.17.0 brought
+the v0.18.1 Highway-pair pattern), joined 2026-07-22 by the dev site 7.21 capture's
+**Clean Road Files** group — `clean_highway` / `clean_intersection` / `clean_ramp` at
+**stable ids 16/17/18**, `cs-disabled` on the site with NO `clean_*.js` module behind
+them (`export_clean_road.py`; every `save` refuses loudly). Their **TSN sources are
+staged** as library slots for the CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS
+clean-road extracts — the underlying tables, not the TSAR projections (CA HIGHWAYS
+carries the SAME 60,083 records as the Highway Detail extract but 74 columns instead
+of 56) — with `tsn_load_clean_road` deliberately holding **no normalizer**: the
+target shape is decided by the comparison they will feed, and inventing one now would
+bake in a guess. v0.17.0 brought
 reports 1–6b to parity, **v0.20.0 added Highway Detail (7/7b)**, **v0.25.0 added
 Highway Sequence (PDF) (3b)**, and **v0.26.0 added Ramp Detail (PDF) (2b)**: the
 **12 fully-integrated export types consolidate AND
@@ -495,6 +504,7 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   matrix.py                  the matrix FACADE (patch matrix.<name>) over matrix_state.py + matrix_build.py
   matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary
   tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
+  arcgis_layers.py           the manually-stocked ArcGIS layer drop-zone (staging only, no parser)
   highway_log_columns.py intersection_detail_columns.py highway_detail_columns.py   the per-report column labels
   gui_main.py gui_api.py     GUI entry / the bridge core (state, pump, gate)
   gui_export_api.py gui_auth_api.py gui_compare_api.py gui_settings_api.py gui_update.py   the endpoint mixins (S1)
@@ -514,6 +524,7 @@ CHANGELOG.md                 user-facing changelog (one section per version; sou
 tools/                       dev utilities (not shipped) — screenshots.py regenerates the site/README shots
 docs/                        the knowledge library (start at docs/INDEX.md)
 output/ input/               generated/user data (git-ignored except .gitkeep stubs)
+tsn_library/ arcgis_layers/   manually-stocked source libraries (git-ignored, local-only)
 ```
 
 The **landing page** is on a separate **`gh-pages`** branch (GitHub Pages), not in

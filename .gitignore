@@ -102,6 +102,13 @@ spike/
 # the dev-root one. (ensure_layout() seeds folders/hints here on app start.)
 /tsn_library/
 
+# ArcGIS layer exports (paths.ARCGIS_LAYERS_ROOT; dev: repo root, packaged app:
+# data\arcgis_layers). The owner's manually-stocked exports of the TSMIS ArcGIS
+# layers -- LOCAL ONLY (Caltrans-internal) and often hundreds of MB, so never
+# committed. Same rule and reason as tsn_library/ above.
+# (arcgis_layers.ensure_layout() seeds the folder + README on app start.)
+/arcgis_layers/
+
 # The packaged app's data dir (profiles, caches, settings, manifests, downloaded
 # browser). All current contents are ignored individually above; this blanket
 # rule is defense-in-depth so a future data\ file can't be committed by accident.

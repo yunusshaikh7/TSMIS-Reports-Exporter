@@ -27,7 +27,15 @@ function fillSettings() {
   $("btnRevert").classList.toggle("hidden", meta.update_support !== "ok");
   const paths = $("setPaths");
   paths.textContent = "";
+  // The manually-stocked ArcGIS layer drop-zone: path + how many workbooks are
+  // staged. Nothing consumes them yet, so it lives here (a location you need to
+  // know) rather than in a panel of its own.
+  const ag = s.arcgis_layers || {};
+  const agLine = ag.root
+    ? `${ag.root}   (${ag.count || 0} staged)`
+    : null;
   [["Data folder", meta.data_root], ["Output folder", meta.output_root],
+   ["ArcGIS layers", agLine],
    ["Log file", meta.log_file], ["Failure shots", meta.failures_dir]]
     .forEach(([label, value]) => {
       const line = document.createElement("div");

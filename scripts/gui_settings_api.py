@@ -21,9 +21,9 @@ from gui_endpoint import _api_method, _task_endpoint, pick_path
 from gui_worker import (ChromiumWorker, ConsolidateWorker, ResetWorker,
                         ValidationWorker, measure_targets, reset_targets)
 from logging_setup import active_log_file, set_debug_logging
-from paths import (BUNDLED_BROWSERS_DIR, DATA_ROOT, DOWNLOADED_BROWSERS_DIR,
-                   FAILURES_DIR, OUTPUT_ROOT, TSN_LIBRARY_ROOT,
-                   is_frozen, list_output_days)
+from paths import (ARCGIS_LAYERS_ROOT, BUNDLED_BROWSERS_DIR, DATA_ROOT,
+                   DOWNLOADED_BROWSERS_DIR, FAILURES_DIR, OUTPUT_ROOT,
+                   TSN_LIBRARY_ROOT, is_frozen, list_output_days)
 from version import __version__
 
 log = logging.getLogger("tsmis.gui")
@@ -90,6 +90,19 @@ class GuiSettingsMixin:
             "dir": str(DOWNLOADED_BROWSERS_DIR),
         }
 
+    def _arcgis_layers_status(self):
+        """What the Settings tab's ArcGIS layers section shows: the drop-zone
+        path and what the owner has staged there. Best-effort — the section is
+        informational (nothing consumes the layers yet), so a probe failure
+        degrades to an empty listing rather than breaking the whole payload."""
+        try:
+            import arcgis_layers                # lazy: keeps get_settings cheap
+            return arcgis_layers.status()
+        except Exception as e:                  # noqa: BLE001
+            log.info("settings: couldn't inspect the ArcGIS layer folder (%s: %s)",
+                     type(e).__name__, e)
+            return {"root": str(ARCGIS_LAYERS_ROOT), "count": 0, "files": []}
+
     @_api_method
     def get_settings(self):
         """Everything the Settings tab shows: the saved knobs plus read-only
@@ -112,6 +125,10 @@ class GuiSettingsMixin:
             },
             "tsn_library": self._tsn_library_status(),
             "tsn_library_root": str(TSN_LIBRARY_ROOT),   # the on-disk TSN home
+            # The manually-stocked ArcGIS layer drop-zone (root + what's staged).
+            # Nothing consumes these yet; Settings shows the path so the owner
+            # can find where to put them. Never fails the payload.
+            "arcgis_layers": self._arcgis_layers_status(),
 
             "meta": {
                 "version": __version__,
