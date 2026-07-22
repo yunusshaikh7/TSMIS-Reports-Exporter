@@ -106,7 +106,43 @@ is a live false-green today. **ACTIVE ORDER: the three compressed marathons — 
 release).** The HD block resumes only when the owner delivers the official Highway Detail
 exports.
 
-> ### ▶ RESUME HERE (2026-07-22 — S0 CLOSED: 193 + 242 done; NEXT = M-A, the DUR marathon)
+> ### ▶ RESUME HERE (2026-07-22 — S0 CLOSED; marathons M-A → M-B → M-C remain, EACH STARTS ON THE OWNER'S GO)
+>
+> **⚠ MARATHON START GATE (owner, 2026-07-22): do NOT begin a marathon unprompted — the
+> owner starts each one explicitly (M-A was begun early once and stopped).** Everything a
+> fresh context needs to run M-A immediately on "go":
+> - **The 085/089 RED BASELINE IS ALREADY WRITTEN AND CONFIRMED** — parked UNTRACKED at
+>   `build/_wip_check_last_complete_085_089.py` (underscore-named so the run_checks glob
+>   and CI ignore it while red). On current code it fails 10 checks reproducing the
+>   findings exactly: the complete 2-route canonical IS overwritten by a 1-route partial
+>   (5230→5165 bytes), its sidecar flips to partial, the comparator runs over partial
+>   bytes, the worker reports errors:0 for it, and no durable attempt state exists; the
+>   three must-stay behaviors (first-build partial flagged amber · repaired rebuild
+>   replaces · crash keeps prior cache) are already green. **When M-A lands, rename it to
+>   `build/check_last_complete.py` so it joins the gate.**
+> - **The M-A implementation design (settled, recon done):** (1) divert-then-promote in
+>   `matrix_build._consolidate_store_folder` — when a trusted COMPLETE canonical exists,
+>   the producer builds an attempt SIBLING; only status=ok+COMPLETE promotes via
+>   os.replace, anything else discards the attempt and raises the actionable
+>   keep-last-good message (prior bytes + complete sidecar untouched; first-build-partial
+>   keeps today's flagged behavior); (2) the last-complete CACHE rule at
+>   `build_comparison`'s record step (+ the env-mode mirror): a non-complete result never
+>   replaces a COMPLETE cache record — it writes an attempt instead; (3) NEW
+>   `matrix_state.record_attempt/load_attempts` (ONE `comparisons/_attempts.json` per
+>   dest via cache_envelope, keyed `row|mode_id` → cell), written by all three matrix
+>   workers' terminals AND the record step (status ok supersedes); merged into `_cmp_state`
+>   as `last_attempt` for the UI overlay; (4) honest worker counts — matrix_done gains
+>   attempted/succeeded/failed/cancelled_cells (additive; an exception with cancel set
+>   counts cancelled, not failed); (5) ui-matrix.js overlay + mock parity + the
+>   check_gui_bridge pin updates that follow. Useful facts: the comparator seam is
+>   `matrix.tsn_comparator_for` (call-time facade); `consolidated_store_path` takes the
+>   SUBDIR store folder (`dest/cell/<subdir>`); read-only openpyxl max_row can be None.
+> - After 085/089: **080** (content identity; change-token manifest, stat-only
+>   memoization prohibited; evidence parse-cache keys; metadata-only→stale migration;
+>   statewide perf proof) → **115** (commit-boundary versioned artifact-schema gate +
+>   the 29-recipe census on the real corpus) → **187** (instrument perf) closes M-A.
+>
+> ### Prior status (2026-07-22 — S0 CLOSED: 193 + 242 done)
 >
 > **Gate 144/144 · released v0.27.4 (no interim tags — completion release only) ·
 > 225 closed / 17 open of 242 (full-parse-verified).**
