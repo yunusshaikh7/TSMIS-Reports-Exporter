@@ -55,8 +55,12 @@ its findings back-to-back, then update this roadmap.
 > 2026-07-21: **19 open** — NORM 4 · DUR 4 · EV-10 7 · PATH 1 · 187 · vendor-blocked 045/192.
 
 **Vendor-blocked / next-statewide-batch — NOT a marathon.** **045** (HD-Excel county — the
-report-family integration leg still red), **192** (HD route-005 stale 7.7 Excel beside a newer PDF),
-plus **HL raw county**. **Never infer these** — they need the vendor/site answer or a fresh source
+report-family integration leg still red) and **192** (HD route-005 stale 7.7 Excel beside a newer
+PDF). ~~HL raw county~~ is **NOT blocked and never was a vendor question** — resolved 2026-07-16 by
+census and SHIPPED 2026-07-17 with 045-HL: the TSMIS Highway Log export has **no county column**
+(only numeric "Cnty Odom"), so county cannot be a two-sided key; identity is (Route, canonical
+Location) + occurrence pairing under the source-identity objective, with district/county retained
+as TSN-side sidecar CLAIMS. **Never infer the two that remain** — they need the vendor/site answer or a fresh source
 pull; fold them into the next-batch re-verify (with the `evidence_highway_detail.py` doc-median
 follow-up). (**054** accept-amber is RESOLVED 2026-07-18 — owner accepts the HD-PDF PARTIAL; still
 re-check on the next statewide HD batch.)
