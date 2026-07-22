@@ -168,13 +168,13 @@
           <b>ONE marathon to done — M-B closed the evidence spine today.</b></div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="233 closed, 9 open of 242 findings">
-          <div class="seg done" style="width:96%">233 closed</div>
-          <div class="seg open" style="width:4%">9 open</div>
+        <div class="bar" role="img" aria-label="237 closed, 5 open of 242 findings">
+          <div class="seg done" style="width:98%">237 closed</div>
+          <div class="seg open" style="width:2%">5 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 233 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
-          <span><i class="dot open"></i> 9 open <span class="num" style="color:var(--ink-3)">(EV-10 4 · HD-deferred 5)</span></span>
+          <span><i class="dot done"></i> 237 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot open"></i> 5 open <span class="num" style="color:var(--ink-3)">(ALL of them HD-deferred)</span></span>
         </div>
       </div>
     </div>
@@ -188,7 +188,7 @@
       </div>
       <p class="sub">This is the reason the remaining work is a downhill grade: every
         correctness-critical layer is already proven and gated. Nothing below can silently regress —
-        the offline gate is <b class="num">150/150</b>, CI-green.</p>
+        the offline gate is <b class="num">152/152</b>, CI-green.</p>
       <div class="fgrid">
         <div class="fitem"><span class="chk">✓</span><div><div class="t">Shared comparison engine</div><div class="d">correctness-locked</div></div></div>
         <div class="fitem"><span class="chk">✓</span><div><div class="t">12 report families</div><div class="d">consolidate + compare · vs-TSN · PDF · cross-env · baseline</div></div></div>
@@ -256,7 +256,8 @@
       <div class="step done"><div class="n">01</div><div class="body"><div class="h">NORM — source normalization fidelity <span class="tag">actionable side COMPLETE</span></div><div class="m"><b>042 · 138 · 144 · 145 · 193 all ✅.</b> The last one, <b>193</b>, closed with the same-run 7.9 pair bound as current truth and a shipped-path replay reproducing every leg per-column exact. <b>HD 133 · 142 · 186 are DEFERRED</b> — Highway Detail is pre-release (the vendor accidentally enabled its exports); they reopen only when the owner delivers the official HD exports.</div></div></div>
       <div class="step done"><div class="n">02</div><div class="body"><div class="h">M-A — the DUR marathon <span class="tag">5 closed · CI-green</span></div><div class="m"><b>085</b> last-complete publication: when the canonical holds a trusted COMPLETE generation the producer builds an unpromoted <span class="mono">(attempt)</span> sibling and only a complete result is promoted — anything else keeps last-good, saves the attempt beside it, and <b>refuses</b>, so the stale complete workbook is never diffed against current inputs. <b>089</b> durable per-cell attempt overlay + honest attempted/succeeded/failed/cancelled counts; a failed refresh marks the cell without erasing the prior result. <b>080</b> v2 CONTENT fingerprint with a Windows-ChangeTime-validated digest memo — the same-size/timestamp-restored tamper is now caught, and the statewide store fingerprints in <b>0.27 s warm</b> (parity with the metadata-only walk it replaces) — with a racy-window rule so a rewrite inside one clock tick can never hide behind the cache either. <b>115</b> versioned comparison-artifact schema at the commit boundary, sharing its reader with the Matrix so it can only refuse what was already unreadable — census: <b>119 real production comparison commits accepted, 0 false rejections</b>. <b>187</b> indexed oracle grouping, proved equivalent over every fixture class (40,000 rows in 0.34 s).</div></div></div>
       <div class="step done"><div class="n">03</div><div class="body"><div class="h">M-B — the evidence spine <span class="tag">3 closed · CI-green</span></div><div class="m"><b>208</b> evidence now READS the comparison it claims to verify: <span class="mono">published_comparison.py</span> decodes a committed values workbook's own hidden per-column <span class="mono">E/D/N/U</span> state masks, its anchored Status/Diffs contract and its opaque row tokens, and <b>authenticates or refuses</b> (14 mutations, 14 refusals). The adapters' <span class="mono">enumerate_diffs</span> is demoted to a <i>proposer</i> — the published cell decides whether an image may be rendered — and every example names <span class="mono">Comparison!&lt;row&gt; · occurrence N · state D</span> plus both persisted source rows. <b>209</b> an EXHAUSTIVE hash-bound ledger is built before any sample and ships as a <b>Ledger</b> sheet: per column, differences split unique-row vs repeated-key, context, identical, one-sided, plus the row universe and duplicate inventory. <b>108</b> a duplicate-only column is a named miss, never a false “no differing columns”. <b>Acceptance:</b> the stdlib independent oracle agrees cell-for-cell over every class (with proven teeth), and statewide HSL recomputation gave <b>342,432 cell states / 0 disagreements</b>, all <b>439,356</b> cells classified.</div></div></div>
-      <div class="step now"><div class="n">04</div><div class="body"><div class="h">M-C — evidence completion + the RELEASE <span class="tag">210 · 106 · 109 · 098 → done</span></div><div class="m">Source-faithful Excel / PDF-vs-Excel evidence routes (210 — its scope question goes to the owner mid-run), the durable evidence manifest (106), the two-phase workbook+images transaction (109), the read-set snapshot gate (098), full statewide re-verify — then the final reconciliation and the <b>completion release</b>. 187 closed in M-A; 045/192 stay HD-deferred.</div></div></div>
+      <div class="step done"><div class="n">04</div><div class="body"><div class="h">M-C — the evidence completion batch <span class="tag">4 closed · CI-green</span></div><div class="m"><b>210</b> each side is evidenced from the source <i>that side was read from</i>: an Excel-compared row is drawn from the workbook it was compared from — sheet, cell address, neighbouring values, labelled <span class="mono">TSMIS (Excel)</span> — so a value the companion print never carried is finally shown instead of dropped for “disagreeing” with a print that took no part in the comparison; the <b>PDF-vs-Excel self check</b> is illustrated too. <b>106 · 109 · 098</b> the set is ONE published generation: a durable <span class="mono">(evidence).json</span> manifest binds the comparison’s content digest, the published ledger digest, the exact read set and a digest per member; publication is two-phase quarantine-and-promote so the canonical set is never a new workbook beside old images; and the candidate sources are copied into a <b>private snapshot</b> whose COPIES are digested, closing the A→B→A window a start/end digest of a live file cannot see. A latent header-index defect surfaced and was fixed — nothing wrong had been published, because M-B’s published-cell check refused all 766 candidates.</div></div></div>
+      <div class="step now"><div class="n">05</div><div class="body"><div class="h">The COMPLETION RELEASE <span class="tag">no marathon remains</span></div><div class="m">Version bump + the CHANGELOG section already sitting under “Unreleased”, the full release gate (152/152 + byte-compile + ruff + a local <span class="mono">build.ps1 -SelfTest</span>), notes dry-run, tag on <b>this branch</b> (main has no v0.27.x) pushed explicitly, CI + all 6 assets — then the owner’s work-PC acceptance run. Reminders for that run: the TSN libraries rebuild once, pre-marker PDF-sourced workbooks re-consolidate once, and comparison counts intentionally change vs v0.26.2 — never reconcile a new run against an old one.</div></div></div>
     </div>
     <div class="method">
       <span><b>Every fix, every time:</b></span>
@@ -271,6 +272,11 @@
       <div class="win"><div class="id">CMP-AUD-209</div><div class="w">Every difference class is accounted for BEFORE a picture is chosen</div><div class="c">a hash-bound Ledger sheet: 73,226 rows, 5,589 counted diffs, 16,154 one-sided, 4,618 repeated-key groups — nothing excluded silently</div></div>
       <div class="win"><div class="id">CMP-AUD-108</div><div class="w">1,169 real differences (20.9%) were invisible to evidence — all of them duplicate-keyed</div><div class="c">measured on the statewide HSL corpus; they are named per column now instead of reading as “no differences”</div></div>
       <div class="win"><div class="id">Acceptance</div><div class="w">An independent stdlib oracle recomputed 342,432 published cell states — 0 disagreements</div><div class="c">no product comparator/loader/normalizer in its path; the check proves it detects a single downgraded cell</div></div>
+
+      <div class="win"><div class="id">CMP-AUD-210</div><div class="w">Excel comparisons were illustrated from the PDF edition — and any value the print lacked was silently skipped</div><div class="c">the differences most worth seeing were exactly the ones that never got a picture; an Excel row now shows its own workbook cell, named to the sheet and cell reference</div></div>
+      <div class="win"><div class="id">CMP-AUD-109</div><div class="w">A new evidence workbook could land beside the previous run’s images</div><div class="c">two-phase quarantine-and-promote makes the workbook commit undoable; a locked image folder now rolls the whole set back to the prior generation</div></div>
+      <div class="win"><div class="id">CMP-AUD-098</div><div class="w">An A→B→A source swap could certify images rendered from bytes nobody checked</div><div class="c">the candidate sources are copied into a private snapshot and the COPIES digested — the swap never reaches the render at all</div></div>
+      <div class="win"><div class="id">Latent find</div><div class="w">A hardcoded header copy made the engine judge the wrong column under a wider schema</div><div class="c">surfaced only by proving the self-check flavor on the real corpus; nothing wrong was published — the published-cell guard refused all 766 candidates</div></div>
 
       <div class="win"><div class="id">M-A · 085 + 089</div><div class="w">Last-complete consolidation + the durable attempt overlay — a partial rebuild keeps the good workbook and a failed refresh stops disappearing</div><div class="c">check_last_complete drives the finding's own scenario through the real store/consolidator/worker · 10 checks red before, 26 green after</div></div>
       <div class="win"><div class="id">M-A · 080</div><div class="w">Content identity for every source, cache and evidence parse — a same-size, timestamp-restored replacement can no longer look unchanged</div><div class="c">change token carries Windows ChangeTime (measured to move where stat does not) · statewide 1.53 s cold / 0.27 s warm (parity) · a 1 s racy window closes the same-clock-tick write · v1→v2 bump IS the migration</div></div>
@@ -322,7 +328,7 @@
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · tip <b>154c034</b> (v0.27.4 released; next tag = the completion release) · gate <b>150/150</b> · CI-green · S0 + M-A + M-B closed 2026-07-22</span>
+    <span>Branch <b>comparison-perfection</b> · tip <b>1aa6c9b</b> (v0.27.4 released; next tag = the completion release) · gate <b>152/152</b> · CI-green · S0 + M-A + M-B + M-C ALL closed 2026-07-22</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 
