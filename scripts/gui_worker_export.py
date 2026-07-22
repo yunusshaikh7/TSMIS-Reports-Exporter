@@ -787,9 +787,17 @@ class ConsolidateWorker(threading.Thread):
             # as one transaction. A second generic write here would overwrite that richer
             # record beside only the legacy primary path, so typed comparison/generation
             # results deliberately bypass it.
+            # A producer that already published its own authoritative sidecar is
+            # equally off-limits: the TSN library build binds
+            # tsn_normalization_version + the raw manifest + the normalized-workbook
+            # identity + the artifact identity token, none of which this generic
+            # write can reconstruct. Overwriting it dropped all four, so status()
+            # read the library stale forever and every rebuild "succeeded" without
+            # ever clearing it.
             centrally_published = (
                 getattr(result, "comparison_outcome", None) is not None
-                or getattr(result, "artifact_generation", None) is not None)
+                or getattr(result, "artifact_generation", None) is not None
+                or getattr(result, "sidecar_published", False))
             if (not centrally_published
                     and not consolidation_meta.write_outcome(
                         result.output_path, result,

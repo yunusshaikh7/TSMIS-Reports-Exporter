@@ -46,9 +46,18 @@ def test_central_comparison_publication_is_not_overwritten():
     def must_not_write(*_args, **_kwargs):
         raise AssertionError("generic single-path writer must not run")
 
+    # sidecar_published belongs here for the same reason: the TSN library build
+    # writes an authoritative certificate (tsn_normalization_version + the raw
+    # manifest + both identity bindings) and VERIFIES it through the production
+    # status boundary. The worker's generic write reconstructs none of that, so
+    # overwriting it dropped the normalizer version and the library then read
+    # stale forever — every rebuild "succeeded" and never cleared it (field
+    # report: "its build record carries no normalizer version").
     for label, fields in (
             ("comparison_outcome", {"comparison_outcome": object()}),
             ("artifact_generation", {"artifact_generation": object()}),
+            ("sidecar_published (TSN library certificate)",
+             {"sidecar_published": True}),
             ("both typed fields", {"comparison_outcome": object(),
                                    "artifact_generation": object()})):
         result = ConsolidateResult(status="ok", output_path="comparison.xlsx",

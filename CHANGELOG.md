@@ -3,6 +3,24 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.27.4 — 2026-07-21
+
+### Fixed
+- **A rebuilt TSN report stayed "consolidated STALE" forever.** Rebuilding the
+  Highway Log library succeeded every time — 380 files, 60,083 rows, nothing
+  skipped or failed — and the report still read out of date one second later, so
+  "rebuild it" was advice that could never work. The library build writes an
+  authoritative build record holding the normalizer version, the raw-source
+  manifest and two identity bindings, and verifies it. The consolidation driver
+  then wrote its own generic build record **over** it, which cannot reconstruct
+  any of those four facts — so the normalizer version vanished and the freshness
+  check correctly refused a record that no longer had one. Comparisons were
+  already exempt from that second write; the TSN library build is now exempt on
+  the same basis. Any producer that publishes its own verified record keeps it.
+
+  After updating, rebuild each affected TSN report **once** — the stale reading
+  was the record, not the workbook, and this time it will clear and stay clear.
+
 ## v0.27.3 — 2026-07-21
 
 ### Fixed

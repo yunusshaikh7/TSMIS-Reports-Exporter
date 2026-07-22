@@ -1044,6 +1044,12 @@ def build_consolidated(report, events=None, confirm_overwrite=None, force=False)
                      "and will not be used; re-run after the destination is writable."))
     result.tsn_normalized_workbook_identity = workbook_identity
     result.tsn_artifact_identity_token = identity_token
+    # The certificate above is authoritative and was just verified through the
+    # production status boundary. Drivers must NOT write a generic outcome over
+    # it: doing so dropped tsn_normalization_version + the raw manifest + both
+    # identity bindings, so status() then read the library stale forever and no
+    # number of successful rebuilds could clear it.
+    result.sidecar_published = True
     return result
 
 

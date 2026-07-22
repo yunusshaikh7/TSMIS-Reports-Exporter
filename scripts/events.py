@@ -154,3 +154,11 @@ class ConsolidateResult:
     # Summary ordered route census, CMP-AUD-183) puts them here; the drivers
     # pass it through verbatim. None for every producer without such facts.
     producer_extra: dict = None
+    # True when the PRODUCER already published this artifact's authoritative
+    # outcome sidecar itself, with binding facts a generic re-write cannot
+    # reconstruct. A driver must then NOT write its own generic outcome over it:
+    # the TSN library build records tsn_normalization_version, the raw manifest,
+    # the normalized-workbook identity and the artifact identity token, and a
+    # second generic write beside the same path silently dropped all four --
+    # leaving the library permanently "stale" no matter how often it was rebuilt.
+    sidecar_published: bool = False
