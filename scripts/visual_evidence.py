@@ -1156,7 +1156,7 @@ def _write_ledger_sheet(wb, info, misses, fonts):
     rows = info.get("ledger")
     totals = info.get("ledger_totals")
     if not rows or totals is None:
-        return
+        return False
     bold, body, small = fonts
     ws = wb.create_sheet("Ledger")
     _safe_cell(ws, 1, 1, "Every difference the published comparison counts",
@@ -1188,6 +1188,7 @@ def _write_ledger_sheet(wb, info, misses, fonts):
     for col, width in (("A", 26), ("B", 20), ("C", 18), ("D", 26), ("E", 14),
                        ("F", 15), ("G", 15), ("H", 18), ("I", 70)):
         ws.column_dimensions[col].width = width
+    return True
 
 
 def _write_workbook(wb_path, img_dir, entries, misses, info,
@@ -1239,8 +1240,8 @@ def _write_workbook(wb_path, img_dir, entries, misses, info,
         ws.column_dimensions[col].width = width
 
     used_sheet_names = {"Summary"}
-    _write_ledger_sheet(wb, info, misses, (bold, body, small))
-    used_sheet_names.add("Ledger")
+    if _write_ledger_sheet(wb, info, misses, (bold, body, small)):
+        used_sheet_names.add("Ledger")
     for img_key in keys:
         embed_w, label, layout_suffix = _LAYOUT_SPEC[img_key]
         _column_image_sheets(wb, entries, img_dir, img_key, embed_w, label,

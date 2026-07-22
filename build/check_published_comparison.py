@@ -304,6 +304,55 @@ check("the ledger rows report the sampled count per column",
 
 
 # --------------------------------------------------------------------------- #
+print("the Ledger sheet is the completeness record, not a decoration")
+from openpyxl import Workbook                                    # noqa: E402
+from openpyxl.styles import Font                                 # noqa: E402
+
+_fonts = (Font(bold=True), Font(), Font(size=9))
+_info = dict(ledger=ve._ledger_rows(ledger, FIELDS,
+                                    Counter({"Description": 1})),
+             ledger_totals=ledger, ledger_digest=digest, reader_version=1)
+_wb = Workbook()
+_made = ve._write_ledger_sheet(_wb, _info, {"Description": "duplicate-only"},
+                               _fonts)
+check("the ledger sheet is created and reported", _made is True
+      and "Ledger" in _wb.sheetnames)
+_ws = _wb["Ledger"]
+_rows = [tuple(r) for r in _ws.iter_rows(min_row=6, values_only=True)]
+_by_name = {r[0]: r for r in _rows if r[0]}
+check("every displayed column has a ledger line",
+      all(name in _by_name for name in FIELDS))
+check("the ledger line carries the unique-row / repeated-key split",
+      _by_name["Description"][1] == 3 and _by_name["Description"][2] == 1
+      and _by_name["Description"][3] == 2)
+check("a context column's cells are on the record even though none count",
+      _by_name["Note"][1] == 0 and _by_name["Note"][4] == 5)
+check("one-sided cells are on the record",
+      all(row[6] == 2 for name, row in _by_name.items() if name in FIELDS))
+check("the sampled count is reported per column",
+      _by_name["Description"][7] == 1)
+check("a column with no renderable example carries its reason",
+      _by_name["Description"][8] == "duplicate-only")
+check("the digest and reader version are recorded in the sheet",
+      digest in str(_ws.cell(row=3, column=1).value)
+      and "reader v1" in str(_ws.cell(row=3, column=1).value))
+_empty = Workbook()
+check("a caller with no ledger writes no sheet, and says so",
+      ve._write_ledger_sheet(_empty, {}, {}, _fonts) is False
+      and "Ledger" not in _empty.sheetnames)
+
+_entry = {"field": "Description", "published_row": 7,
+          "published_occurrence": 2, "published_state": "D",
+          "source_rows": (("TSMIS", 11), ("TSN", 23))}
+check("a rendered item names its published cell",
+      ve._published_cell_text(_entry)
+      == "Comparison!7 · occurrence 2 · state D")
+check("a rendered item names both persisted source rows",
+      ve._source_rows_text(_entry) == "TSMIS!11  ·  TSN!23")
+check("an item with no published coordinates claims none",
+      ve._published_cell_text({}) == "" and ve._source_rows_text({}) == "")
+
+# --------------------------------------------------------------------------- #
 print("the mutation matrix — an unauthenticatable workbook is refused")
 
 
