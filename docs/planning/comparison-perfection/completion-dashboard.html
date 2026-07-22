@@ -162,18 +162,19 @@
 
     <div class="headline-row">
       <div>
-        <div class="bignum">91<span>%</span></div>
+        <div class="bignum">93<span>%</span></div>
         <div class="bignum-sub">of the audit's <b>242 findings</b> closed — and the ones that
-          remain are Phase-5/7 hardening + the evidence arc, not correctness.</div>
+          remain are Phase-5/7 hardening + the evidence arc, not correctness.
+          <b>Three marathons to done (owner-directed, target: tomorrow).</b></div>
       </div>
       <div style="flex:1;min-width:280px">
-        <div class="bar" role="img" aria-label="221 closed, 21 open of 242 findings">
-          <div class="seg done" style="width:91%">221 closed</div>
-          <div class="seg open" style="width:10%">25 open</div>
+        <div class="bar" role="img" aria-label="225 closed, 17 open of 242 findings">
+          <div class="seg done" style="width:93%">225 closed</div>
+          <div class="seg open" style="width:7%">17 open</div>
         </div>
         <div class="legend">
-          <span><i class="dot done"></i> 221 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
-          <span><i class="dot open"></i> ~25 open <span class="num" style="color:var(--ink-3)">(Phase-5/7 + evidence + instruments)</span></span>
+          <span><i class="dot done"></i> 225 closed <span class="num" style="color:var(--ink-3)">(Resolved / Remediated)</span></span>
+          <span><i class="dot open"></i> 17 open <span class="num" style="color:var(--ink-3)">(DUR 4 · EV-10 7 · 187 · HD-deferred 5)</span></span>
         </div>
       </div>
     </div>
@@ -251,10 +252,11 @@
           <div class="m">Bucket E (M6–M9) closed; and bucket F's tractable evidence findings — <b>107 · 110 · 112 closed</b>, <b>106 · 109 partial</b>, + the owner layout feature. What's left of evidence is the Stage-10 spine → EV-10 below.</div>
         </div>
       </div>
-      <div class="step now"><div class="n">00</div><div class="body"><div class="h">PATH — MAX_PATH: must ship before “done” <span class="tag">1 · field-confirmed</span></div><div class="m"><b>CMP-AUD-242.</b> The v3 payload sidecar basename (~148 chars) makes a <b>265-character</b> path at the real install depth — past Windows’ 260. The dev box has <span class="mono">LongPathsEnabled=1</span>; a managed Caltrans PC has <span class="mono">0</span> and cannot change it, so every by-day comparison built and then vanished from the matrix (8/8 runs, v0.27.0). The workbook commits — only the trust metadata fails, so the matrix correctly hides an uncertifiable result. <b>v0.27.1 shipped the diagnosis only</b>; shortening the basename is a persisted-format change and is still owed. The existing path gate skips its &gt;260 case on any long-path-aware dev box, so it must gain an <b>unconditional</b> deep-parent budget assertion. Workaround meanwhile: install to a short path.</div></div></div>
-      <div class="step"><div class="n">01</div><div class="body"><div class="h">NORM — source normalization fidelity <span class="tag">2 of 8 done</span></div><div class="m"><b>138 ✅</b> Length quantized from the exact decimal — census of the raw workbook's OOXML lexicals: 60,083 values, the binary64 path wrong on exactly one, and half-up/half-even agree on all of them. <b>042 ✅</b> the PS marker was erased on re-projection, turning a real difference into a clean match — an <i>invented match</i>, now idempotent across every blank/E × roadbed case. Remaining: HD 133 · 142 · <b>186</b> (a parser rewrite — continuation ledger, cross-page merging, exactly-once word reconciliation; give it its own session), IS 144 · 145, HSL 193.</div></div></div>
-      <div class="step"><div class="n">02</div><div class="body"><div class="h">DUR — Phase-5/7 durability &amp; policy <span class="tag">4 · owner-gated</span></div><div class="m">080/085/089/115. <b>085 needs the OWNER DECISION</b> (canonical artifact = last-complete or latest-attempt?) + a durable attempt overlay (089). Read <span class="mono">comparison-phase3-decision-gates.md</span> first. No live false-green — durability + defense-in-depth.</div></div></div>
-      <div class="step"><div class="n">03</div><div class="body"><div class="h">EV-10 — evidence Stage-10 published-cell rebuild <span class="tag">7 · deepest, last</span></div><div class="m">108/208/209/210 + the 098/106/109 residuals. Drive evidence from the PUBLISHED comparison (per-cell state masks + <span class="mono">pairing_trace</span> + counts) with an INDEPENDENT raw-source oracle — Stage-9/10, a dedicated effort, not a marathon slice. 187 (instrument) + 045/192 (vendor-blocked) sit outside the chunks.</div></div></div>
+      <div class="step done"><div class="n">00</div><div class="body"><div class="h">S0 CLOSED — 242 (MAX_PATH) + 193 (HSL same-run truth) <span class="tag">2 closed · CI-green</span></div><div class="m"><b>CMP-AUD-242 RESOLVED:</b> chunk basenames <b>167→71 chars</b> (16-hex name abbreviations; manifests keep + verify the FULL digests). Legacy names stay readable; two <b>unconditional</b> gates (field-depth arithmetic + a real publication with the OS refusing ≥260) were red on the old code for exactly the field failure; real-corpus proofs: legacy HSL publication reads trusted, RD shipped-path publication canary-exact (843/202), live-store short/legacy coexistence. Ships with the completion release — the short-path install workaround becomes unnecessary then. <b>CMP-AUD-193 RESOLVED:</b> the route-037 “Excel-dropped Description” was a cross-bundle artifact; the same-run 7.9 pair is bound truth, docs qualified, <span class="mono">HSL-PDF-79</span> retired to a historical fixture, and the shipped-path final replay reproduced all three legs per-column digit-exact (5,589 · 5,001 · 3,721).</div></div></div>
+      <div class="step done"><div class="n">01</div><div class="body"><div class="h">NORM — source normalization fidelity <span class="tag">actionable side COMPLETE</span></div><div class="m"><b>042 · 138 · 144 · 145 · 193 all ✅.</b> The last one, <b>193</b>, closed with the same-run 7.9 pair bound as current truth and a shipped-path replay reproducing every leg per-column exact. <b>HD 133 · 142 · 186 are DEFERRED</b> — Highway Detail is pre-release (the vendor accidentally enabled its exports); they reopen only when the owner delivers the official HD exports.</div></div></div>
+      <div class="step now"><div class="n">02</div><div class="body"><div class="h">M-A — the DUR marathon <span class="tag">5 in one run · NEXT</span></div><div class="m">080/085/089/115 + 187, one autonomous run. <b>085 is DECIDED (LAST-COMPLETE)</b>: a partial refresh keeps last-good — never overwrites a complete canonical, never promoted. 085-core + 089's durable attempt overlay share one design; then 080 content identity (change-token manifest, no stat-only memoization), then 115's commit-boundary schema gate + the 29-recipe census, 187 at the tail. The four "false-green under either policy" surfaces are already fixed — verified in code.</div></div></div>
+      <div class="step"><div class="n">03</div><div class="body"><div class="h">M-B — the evidence spine <span class="tag">208 · 108 · 209</span></div><div class="m">The published-comparison decoder (per-cell state masks + <span class="mono">pairing_trace</span> + typed counts read from the persisted generation — never a re-execution), proven on HSL then rolled to all five evidence families, with an INDEPENDENT raw-source oracle agreeing statewide as the acceptance bar.</div></div></div>
+      <div class="step"><div class="n">04</div><div class="body"><div class="h">M-C — evidence completion + the RELEASE <span class="tag">210 · 106 · 109 · 098 → done</span></div><div class="m">Source-faithful Excel / PDF-vs-Excel evidence routes (210 — its scope question goes to the owner mid-run), the durable evidence manifest (106), the two-phase workbook+images transaction (109), the read-set snapshot gate (098), full statewide re-verify — then the final reconciliation and the <b>completion release</b>. 187 closed in M-A; 045/192 stay HD-deferred.</div></div></div>
     </div>
     <div class="method">
       <span><b>Every fix, every time:</b></span>
@@ -265,6 +267,9 @@
   <section>
     <div class="sec-head"><h2>Shipped this session</h2><span class="kicker">all CI-green</span></div>
     <div class="wins">
+      <div class="win"><div class="id">CMP-AUD-242</div><div class="w">Payload chunk names 167→71 chars — comparisons publish from any install depth; legacy names stay readable</div><div class="c">two UNCONDITIONAL field-depth gates red→green · RD real-corpus canary-exact · live-store coexistence · rides the completion release</div></div>
+      <div class="win"><div class="id">CMP-AUD-193</div><div class="w">HSL same-run 7.9 pair bound as current truth; the route-037 "Excel-dropped Description" was a cross-bundle artifact</div><div class="c">shipped-path replay: all 3 legs per-column exact (5,589 · 5,001 · 3,721) · HSL-PDF-79 retired historical · docs qualified</div></div>
+      <div class="win"><div class="id">Reconciliation</div><div class="w">Ledger index table reconciled against per-entry statuses (042/138/144/145 were stale-open; 242 was missing)</div><div class="c">full-parse-verified: 225 closed / 17 open · the per-entry Status line + index row + roadmap now update together</div></div>
       <div class="win"><div class="id">Feature</div><div class="w">Evidence workbook: pick image layout (side-by-side / stacked / both) + a tab per comparison column</div><div class="c">Settings-backed · only the chosen layout renders · owner request</div></div>
       <div class="win"><div class="id">CMP-AUD-107</div><div class="w">Every evidence adapter enumerates via the comparison's own compared_cell verdict</div><div class="c">HD was raw _s (no TRIM / Med-Wid / context) · ID+RD unified · census 198,752 · BIG-1</div></div>
       <div class="win"><div class="id">CMP-AUD-112</div><div class="w">Evidence PDFs bound to a byte digest across parse→render</div><div class="c">catches a metadata-preserving swap the inode/size/mtime tripwire can't · BIG-1</div></div>
@@ -309,7 +314,7 @@
   </section>
 
   <footer>
-    <span>Branch <b>comparison-perfection</b> · code tip <b>06f2d85</b> (v0.27.2 released) · gate <b>144/144</b> · CI-green</span>
+    <span>Branch <b>comparison-perfection</b> · tip <b>c33075c</b> (v0.27.4 released; next tag = the completion release) · gate <b>144/144</b> · CI-green · S0 closed 2026-07-22</span>
     <span>Updated <b>2026-07-18</b></span>
   </footer>
 
