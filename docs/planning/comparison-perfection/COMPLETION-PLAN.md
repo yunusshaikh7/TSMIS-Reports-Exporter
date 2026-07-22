@@ -28,8 +28,9 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 
 ## Marathon roadmap to completion (2026-07-18)
 
-Buckets **A · B · C · D are COMPLETE; M6, M7 and M8 (bucket E) are COMPLETE; M9 is PARTIAL**
-(035/040/075 closed, 085/098/115 deferred). The remaining open findings carve into these
+Buckets **A · B · C · D are COMPLETE; M6, M7 and M8 (bucket E) are COMPLETE; M9 is 5/6**
+(035/040/075 closed, and M-A closed 085 + 115 on 2026-07-22 — only **098** remains, and it
+belongs to the EV-10 evidence spine). The remaining open findings carve into these
 marathon-sized chunks (M6–M13). Confirm each finding's detail + tractability at the marathon's
 start; **census-first + full old-vs-new proof on anything that touches real matrix/comparison
 data** (the HD-053 lesson: identical counts can still hide moved content). Pick a marathon, close
