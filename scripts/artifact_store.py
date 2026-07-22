@@ -618,7 +618,10 @@ def _publish_artifact_generation(result, commit_guard=None):
     message = (
         "The comparison workbook was created, but its generation metadata could "
         "not be safely published for every output member. The files remain marked "
-        "untrusted; close any open copies and run the comparison again.")
+        "untrusted; close any open copies and run the comparison again. If this "
+        "repeats for every comparison, the output folder path is probably too "
+        "long for Windows — move the app and its output to a shorter folder path "
+        "(the log names the exact file and its length).")
     result.artifact_generation = replace(generation, publication_state="partial")
     result.attempt_state = AttemptState(
         state="failed", message=message, generation_id=generation.generation_id)

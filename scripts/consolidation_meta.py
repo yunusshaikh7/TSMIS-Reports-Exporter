@@ -78,6 +78,10 @@ _MAX_COMPARISON_PAYLOAD_CHUNKS = (
     + _COMPARISON_PAYLOAD_DECODED_CHUNK_BYTES - 1
 ) // _COMPARISON_PAYLOAD_DECODED_CHUNK_BYTES
 _COMPARISON_PAYLOAD_SUFFIX = ".comparison-payload.zlib"
+# Classic Windows total-path limit. A process is only exempt when the OS policy
+# (LongPathsEnabled) allows it — which a locked-down managed PC does not, and
+# cannot without admin. Diagnostics only: nothing here changes what is written.
+_WINDOWS_MAX_PATH = 260
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _COMPARISON_PUBLICATION_LOCK_NAME = ".tsmis-comparison-publication.lock"
 _COMPARISON_PUBLICATION_LOCK_TIMEOUT_S = 60.0
@@ -846,7 +850,11 @@ def _bound_file_digest(path):
             if not chunk:
                 break
             digest.update(chunk)
-    except OSError:  # silent-ok: an incomplete digest is rejected by returning None
+    except OSError as e:  # an incomplete digest is rejected by returning None
+        # A workbook that cannot be re-read (locked by Excel, denied by a scanner)
+        # fails publication several gates later; naming it here says which file.
+        log.error("comparison member digest failed: %s: %s [path_len=%d] %s",
+                  type(e).__name__, e, len(str(path)), path)
         return None
     finally:
         try:
@@ -982,15 +990,31 @@ def _matches_canonical_json(payload, raw):
     return offset == len(view)
 
 
+def _metadata_write_failed(path, why, exc=None):
+    """Name a refused metadata write with the facts that identify an OS cause.
+
+    These leaves used to return False silently, so an environment-specific
+    failure (path length, ACL, lock, read-only volume) reached the user only as
+    "could not be safely published". Full path AND its length are logged because
+    a Windows MAX_PATH refusal looks identical to a permission refusal otherwise.
+    """
+    p = str(path)
+    log.error("comparison metadata write refused (%s): %s%s [path_len=%d] %s",
+              why, type(exc).__name__ + ": " if exc is not None else "",
+              exc if exc is not None else "", len(p), p)
+    return False
+
+
 def _atomic_write_bytes(path, raw, commit_guard=None, *, max_bytes,
                         short_comparison_temp=False):
     """Publish bounded bytes through an unpredictable, exclusively-created temp."""
     path = Path(path)
     if type(raw) is not bytes or len(raw) > max_bytes:
-        return False
+        return _metadata_write_failed(
+            path, f"payload is not bytes or exceeds {max_bytes} bytes")
     if (not guard_allows(commit_guard, path.parent)
             or not guard_allows(commit_guard, path)):
-        return False
+        return _metadata_write_failed(path, "the commit guard rejected the target")
 
     tmp = None
     expected = None
@@ -1001,15 +1025,16 @@ def _atomic_write_bytes(path, raw, commit_guard=None, *, max_bytes,
             if short_comparison_temp
             else f".{path.name}.tmp-{token}")
         if not guard_allows(commit_guard, candidate):
-            return False
+            return _metadata_write_failed(
+                candidate, "the commit guard rejected the temporary")
         flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL
                  | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOINHERIT", 0))
         try:
             fd = os.open(candidate, flags, 0o600)
         except FileExistsError:  # silent-ok: unpredictable collision retries
             continue
-        except OSError:  # silent-ok: inability to reserve denies publication
-            return False
+        except OSError as e:  # inability to reserve denies publication
+            return _metadata_write_failed(candidate, "could not create the temporary", e)
         try:
             opened = os.fstat(fd)
             if not _has_binding_identity(opened) or not stat.S_ISREG(opened.st_mode):
@@ -1018,7 +1043,7 @@ def _atomic_write_bytes(path, raw, commit_guard=None, *, max_bytes,
             with os.fdopen(fd, "wb", closefd=True) as stream:
                 stream.write(raw)
                 stream.flush()
-        except OSError:  # silent-ok: failed write enters identity-bound cleanup
+        except OSError as e:  # failed write enters identity-bound cleanup
             try:
                 os.close(fd)
             except OSError:  # silent-ok: descriptor may already be closed
@@ -1030,11 +1055,12 @@ def _atomic_write_bytes(path, raw, commit_guard=None, *, max_bytes,
                     candidate.unlink()
                 except OSError:  # silent-ok: non-authoritative temp residue
                     pass
-            return False
+            return _metadata_write_failed(candidate, "could not write the temporary", e)
         tmp = candidate
         break
     if tmp is None:
-        return False
+        return _metadata_write_failed(
+            path, "no unique temporary name could be reserved in 32 attempts")
 
     published = False
     try:
@@ -1044,11 +1070,17 @@ def _atomic_write_bytes(path, raw, commit_guard=None, *, max_bytes,
                 or not guard_allows(commit_guard, path.parent)
                 or not guard_allows(commit_guard, path)
                 or not guard_allows(commit_guard, tmp)):
-            return False
+            return _metadata_write_failed(
+                path, "the written temporary failed its identity/size/guard recheck")
         os.replace(tmp, path)
         published = True
         return True
-    except OSError:  # silent-ok: failed replacement remains observable
+    except OSError as e:  # failed replacement remains observable
+        # The rename onto the FINAL name is where a long content-addressed
+        # basename first touches the real path limit, so log both names.
+        log.error("comparison metadata replace failed: %s: %s "
+                  "[final_len=%d tmp_len=%d] %s <- %s",
+                  type(e).__name__, e, len(str(path)), len(str(tmp)), path, tmp)
         return False
     finally:
         if not published:
@@ -2020,6 +2052,23 @@ def write_comparison_outcomes(result, commit_guard=None):
     if prepared is None:
         return True
 
+    # One context line per attempt, BEFORE anything can fail: the payload chunk
+    # basenames are content-addressed and long, so the deepest planned path is
+    # what decides whether this install can publish at all. Logging it up front
+    # means a single field log answers "was this the path limit?" even if the
+    # failure surfaces somewhere unexpected.
+    try:
+        parent = str(prepared["payload_parent"])
+        planned = [len(os.path.join(parent, c["relative_path"]))
+                   for c in prepared["payload_manifest"]["chunks"]]
+        log.info("comparison publication: %d member(s), %d chunk(s), "
+                 "parent_len=%d, deepest_planned_path=%d, parent=%s",
+                 len(prepared["members"]), len(planned), len(parent),
+                 max(planned) if planned else len(parent), parent)
+    except Exception as e:                      # noqa: BLE001 - diagnostics only
+        log.warning("comparison publication: could not describe the attempt (%s): %s",
+                    type(e).__name__, e)
+
     try:
         with _comparison_publication_lease(
                 prepared["payload_parent"], commit_guard) as lease:
@@ -2086,10 +2135,20 @@ def _write_comparison_outcomes_prepared(prepared, commit_guard, lease):
             prepared["payload_manifest"]["decoded_sha256"],
             commit_guard)
         if published is None:
-            # all sentinels intentionally retained
+            # all sentinels intentionally retained. The chunk basename is
+            # content-addressed and long, so this is the FIRST place a deep
+            # install meets the Windows path limit — say so with the numbers
+            # rather than leaving a bare refusal.
+            full = os.path.join(str(prepared["payload_parent"]), relative)
+            hint = ""
+            if len(full) >= _WINDOWS_MAX_PATH:
+                hint = (f" — this path is {len(full)} characters, over the "
+                        f"{_WINDOWS_MAX_PATH}-character Windows limit; move the app "
+                        f"and its output to a shorter folder path")
             return _publication_stopped(
                 "phase 2 (chunk publish)",
-                f"chunk {index} could not be published ({relative!r})")
+                f"chunk {index} could not be published [path_len={len(full)}] "
+                f"{full}{hint}")
         published_descriptors.append(published)
     published_manifest = dict(prepared["payload_manifest"])
     published_manifest["chunks"] = published_descriptors

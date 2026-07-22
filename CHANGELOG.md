@@ -3,6 +3,66 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.27.1 — 2026-07-21
+
+Diagnoses the v0.27.0 field failure where **every comparison built but never
+appeared on the matrix**, and fixes four smaller things reported alongside it.
+
+### If your comparisons stopped appearing on the matrix — read this
+The comparison workbooks were built correctly and are still on disk; only the
+trust metadata beside them failed to publish, and the matrix refuses to show a
+comparison it cannot certify. You can open the workbooks directly under
+`output\comparisons\tsn-by-day\`.
+
+The likely cause is the **Windows 260-character path limit**. v0.27.0 writes a
+content-addressed sidecar whose file name is long, so on a deep install path —
+for example under `Downloads\Apps\…` — the full path can exceed 260 characters.
+A PC without long-path support (the default on managed machines, and not
+changeable without an administrator) refuses the write, and v0.27.0 reported that
+only as "could not be safely published".
+
+**The workaround is to move the app to a shorter folder path** — something like
+`C:\TSMIS\TSMIS Exporter\` — and re-run the comparison.
+
+This release does **not** yet shorten the sidecar name; that changes a persisted
+format and is being done separately with a full re-verification. What it does is
+make the failure name itself, so the log now says exactly which file failed, how
+long its path was, and what to do about it.
+
+### Fixed
+- **Comparison publication failures are diagnosable.** Every fail-closed gate in
+  the publication path — about seventeen of them — used to return silently, so a
+  field failure left nothing in the log. Each now names the gate it stopped at
+  and prints the values that decided it (which member, which phase, the
+  before/after sha256, size and mtime, and the full path with its length). A
+  refusal caused by the path limit says so and names the remedy. No gate changed
+  what it accepts or refuses; only the refusal became answerable.
+- **The TSN reports panel stayed STALE after a rebuild.** The panel refreshed
+  only when its own Rebuild button started the work. The comparison matrix
+  rebuilds an out-of-date TSN dataset on its own before comparing, and that path
+  never triggered the refresh — so Highway Log and Highway Sequence kept reading
+  STALE until the app was restarted. The refresh now follows the rebuild
+  finishing, whoever started it.
+
+### Added
+- **Rebuild all out of date** (Settings ▸ TSN reports). After an update moves a
+  normalizer version, every affected report reads out of date and had to be
+  rebuilt one at a time. The new button does them in a single run, targeting
+  exactly the reports the per-report Rebuild would, and reports the first failure
+  rather than the last result so an early failure cannot hide behind a later
+  success. Nothing out of date disables the button instead of reporting an error.
+- **The TSN panel reports evidence prints too.** A report can need two separate
+  things: the raw files its consolidated workbook is built from, and the TSN
+  prints the evidence images are cropped from. The panel only showed the first,
+  so "all green" said nothing about whether evidence could render. Each report
+  now also reports its prints — present, missing, or covered by the same raw it
+  already builds from (Highway Log and Highway Sequence, which never need a
+  second copy).
+- **The background sign-in check announces itself.** On startup the app quietly
+  checks the saved sign-in, and that check holds the single-task slot — so a
+  click during it was refused with "try again in a few seconds" and no visible
+  reason. It now says when it starts and when it finishes.
+
 ## v0.27.0 — 2026-07-19
 
 Evidence images become configurable, and the comparison engine lands the first
