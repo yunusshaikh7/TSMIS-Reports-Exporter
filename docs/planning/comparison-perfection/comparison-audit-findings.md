@@ -9157,8 +9157,9 @@ acceptance is still pending.
 Priority: P1  
 Status: **RESOLVED 2026-07-22** — the published-comparison spine shipped (`1cf791b` +
 `fe25f4e`); see "Remediation — 2026-07-22 (M-B)" at the end of the 108/208/209 cluster  
-Primary code: `scripts/published_comparison.py` (new), `scripts/visual_evidence.py`,
-the five `scripts/evidence_*.py` adapters, `scripts/compare_core.py`
+Primary code: `scripts/published_comparison.py` + `scripts/evidence_ledger.py` (both new),
+`scripts/visual_evidence.py`, the five `scripts/evidence_*.py` adapters,
+`scripts/compare_core.py`
 
 `visual_evidence.generate` captures `comparison_path` and later uses its basename, but
 never opens either the formula or value Comparison workbook. Candidate rows and values
@@ -9350,6 +9351,26 @@ bytes `b"comparison 2"`. It cannot any more — evidence opens the workbook. The
 publishes a REAL zero-difference comparison through `_checklib.build_published_comparison`.
 That is the [[test-the-shipped-path]] lesson landing in the suite: the old check passed
 because it exercised a cleaner path than production.
+
+**Where the truth lives now.** `scripts/evidence_ledger.py` holds the decision layer —
+`published_universe` (read + account), `reconcile`, `unrenderable_reason`,
+`attach_source_rows`, `ledger_rows`. `visual_evidence` keeps locating, rasterizing and
+publishing. The module that finds rows in PDFs can no longer decide what a comparison
+found, and no function in either new module exceeds 50 lines.
+
+**Family coverage.** The engine is shared, so all five families ride the spine; each
+adapter emits the published address and the engine's own composed cell text. The key
+addressing is pinned for all five against `keys_for`'s own derivation, and measured on
+real data for all three key mechanisms — typed PhysicalKey (HSL 49,874 addresses, RD
+15,211), the roadbed key normalizer (HL 47,161), every one with **0 misses**, plus
+180,000/180,000 (HL) and 72,000/72,000 (RD) state-and-display agreements against the
+published cells; RD's 843/202 canary is intact.
+
+**One behavior improvement fell out.** When no column has a photographable row (the
+duplicate-only shape, or the published cells refuse every proposal), the run reports the
+published counts and reasons without opening a single PDF — twelve district prints of
+avoided work on Highway Log for a result that was never going to contain an image. Driven
+end-to-end through the shipped `generate()` in `check_visual_evidence`.
 
 Cost on the largest corpus: decode 23.9 s + ledger 0.15 s + digest <1 ms, and 14.6 s to
 resolve source rows for the rendered items (one workbook open for both sides, down from
