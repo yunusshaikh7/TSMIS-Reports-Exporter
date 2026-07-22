@@ -4,6 +4,32 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
+> ### ⚠ NEXT UP — the "Save support bundle…" button does NOT use the evidence collector (found 2026-07-22)
+>
+> There are **three** bundle paths and they are not the same code:
+>
+> | Trigger | Implementation | Gets the v0.28.1 diagnostics? | Redacts credentials? |
+> |---|---|---|---|
+> | Settings ▸ **"Save support bundle…"** | `gui_settings_api.save_support_bundle` — a separate hand-rolled zip | **NO** | **NO** — logs are `zf.write`n raw |
+> | Settings ▸ **"Validate & package results"** | `gui_worker_maint` → `evidence.collect(run_self_test=False)` | yes | yes |
+> | `--collect-evidence` CLI | `evidence.collect(run_self_test=True)` | yes | yes |
+>
+> **Why this matters:** the button a user reaches for is the one that gets none of it —
+> no `environment.txt` (so no long-path policy, the single fact that explains the
+> v0.27.0 class of failure), no `inventory.txt`, no state sidecars. And it is the
+> *less safe* of the two: `evidence.collect` redacts every text member and runs a
+> final credential scan over the whole zip; `save_support_bundle` does neither. On the
+> work PC, where cmd and PowerShell are blocked, the CLI is close to unusable — so the
+> button is effectively the only path, and it is the weakest one.
+>
+> **The fix is small and mostly deletion:** point `save_support_bundle` at
+> `evidence.collect(out_path=picked, run_self_test=False)` and keep the save-dialog
+> path picking. Watch two things — the button runs on the GUI thread (that is *why*
+> the validate path passes `run_self_test=False`: the self-test opens a second WebView2
+> window, which is unsafe from a worker while the live GUI owns the main-thread loop),
+> and `check_evidence_bundle` should grow a case pinning the button to the shared
+> collector so the two cannot drift apart again.
+
 > ### ▶ WHERE THINGS STAND (2026-07-22)
 >
 > **The comparison-perfection project is DONE — shipped as v0.28.0, merged to `main`.**
