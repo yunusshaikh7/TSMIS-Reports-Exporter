@@ -7,10 +7,25 @@ candidate against the live TSMIS site, without ever leaving the user folder or
 collecting anything sensitive. (The acceptance itself is v0.18.1 — see
 docs/work-pc-validation.md; this mode only GATHERS the evidence.)
 
+The bundle has to be SELF-SUFFICIENT: a maintainer reads it once and knows why the
+field PC behaved differently, without a second round trip. So it carries everything a
+diagnosis needs — and, just as deliberately, none of the report data.
+
 ALLOWLIST, not denylist — the bundle contains ONLY:
   * `manifest.txt` — this PC's name in paths, OS/version/build, login STATUS (never
     the saved login itself), the allowlisted diagnostic settings, the run-folder
     list, the export-report live-verify set, and a listing of EVERY file in the bundle;
+  * `environment.txt` — the PC facts no log line carries: the **long-path policy**
+    (a managed PC has it off and cannot change it — that is the dev-vs-field
+    difference CMP-AUD-242 turned on), a PATH-LENGTH CENSUS against the 260-character
+    limit with the longest paths named, free disk, and the data-root length every
+    other path spends from;
+  * `inventory.txt` — NAME/SIZE/DATE for every file under the data roots, no content.
+    A name-shaped failure is invisible in a log and invisible in an artifact, but
+    obvious in a listing (the v0.27.0 field bug was a 148-character basename);
+  * `state/…` — the JSON sidecars that say what each artifact CLAIMS to be:
+    completion/trust outcomes, provenance (source paths + digests), content
+    fingerprints, evidence generation manifests, and the per-cell attempt overlay;
   * the rotating diagnostic logs (the "one log upload answers it" contract);
   * the recent run reports (per-route saved/empty/failed SUMMARIES — not report data);
   * `self_test.txt` — the offline self-test output (proves the EXACT frozen exe boots
@@ -21,10 +36,12 @@ ALLOWLIST, not denylist — the bundle contains ONLY:
 It NEVER collects (RM05): the saved login (`paths.AUTH` / tsmis_auth.json), the Edge
 sign-in profile (`paths.EDGE_LOGIN_PROFILE_DIR`), failure dumps (`paths.FAILURES_DIR`
 — screenshots / page HTML may carry report content), the exported report data
-(`output/<run>/…`), the TSN input PDFs (`input/`), or the TSN library. Nothing under
-DATA_ROOT is walked broadly — only the explicit allowlist above is added, and a
-user-placed evidence file that happens to BE one of those sensitive paths is skipped
-anyway (belt-and-suspenders).
+(`output/<run>/…`), the compressed comparison payloads (they carry compared ROWS —
+their names and sizes appear in the inventory, their bytes never do), the TSN input
+PDFs (`input/`), or the TSN library workbooks. The state sweep walks the same folders
+those artifacts live in, so it matches by EXACT sidecar suffix/name — a data workbook,
+a source PDF, or a payload chunk can never match — and a user-placed evidence file
+that happens to BE one of the sensitive paths is skipped anyway (belt-and-suspenders).
 
 Console-free-core note: a DIAGNOSTIC DRIVER (only `gui_main` imports it). It writes
 through the injected `emit` sink + returns a result dict — never print/input/sys.exit.
@@ -60,6 +77,29 @@ _PROFILE_BASENAMES = frozenset({
     "cookies", "login data", "web data", "local state", "history", "network",
     "preferences", "secure preferences", "trust tokens", "extension cookies",
 })
+
+
+# The METADATA sidecars a run leaves beside its artifacts. These carry completion
+# states, producer versions, generation ids, source paths and digests — never report
+# rows — and they are what a field report is usually actually about ("the comparison
+# built but the Matrix hides it"). Matched by EXACT suffix / name so a data workbook,
+# a source PDF, or a compressed comparison payload can never match.
+_STATE_SUFFIXES = (".outcome.json", ".provenance.json", ".fingerprint.json",
+                   " (evidence).json")
+_STATE_NAMES = frozenset({"_attempts.json"})
+# Cache/state JSON that lives directly in a `comparisons/` folder (the matrix caches
+# and the per-cell attempt overlay).
+_STATE_DIR_NAMES = frozenset({"comparisons"})
+# One cap for every sweep. These walks are stat-only (no bytes read), so the ceiling
+# exists to bound a pathological folder, not to save work — and the state sweep uses
+# the SAME ceiling as the inventory so the bundle can never list a file it then
+# silently declined to collect the sidecar for.
+_MAX_SCAN_FILES = 20000
+# Windows refuses a path at 260 unless long paths are enabled; 240 is the "getting
+# close" line worth flagging before it becomes a field failure (CMP-AUD-242).
+_PATH_WARN = 240
+_PATH_LIMIT = 260
+_LONGEST_PATHS_SHOWN = 15
 
 
 def _sensitive_roots():
@@ -121,6 +161,173 @@ def _refuse_reason(f, roots):
     return None
 
 
+def _is_state_sidecar(f):
+    """Whether `f` is one of the metadata sidecars the bundle may carry."""
+    name = f.name
+    if name in _STATE_NAMES and f.parent.name in _STATE_DIR_NAMES:
+        return True
+    return any(name.endswith(sfx) for sfx in _STATE_SUFFIXES)
+
+
+def _walk_files(root, cap):
+    """Every file under `root`, sorted, capped. Never reads a byte — `os.walk` +
+    `stat` only, so a huge export store costs a directory scan, not a copy."""
+    out, truncated = [], False
+    try:
+        for dirpath, _dirnames, filenames in os.walk(root):
+            for name in sorted(filenames):
+                out.append(Path(dirpath) / name)
+                if len(out) >= cap:
+                    truncated = True
+                    return sorted(out), truncated
+    except OSError as e:  # silent-ok: an unreadable store is reported, never fatal
+        log.info("evidence: could not walk %s (%s: %s)", root, type(e).__name__, e)
+    return sorted(out), truncated
+
+
+def _state_entries():
+    """(source, arcname) for every metadata sidecar under the data roots.
+
+    The artifacts themselves (workbooks, PDFs, the compressed comparison payloads)
+    stay OUT — only the JSON that says what they claim to be. This is the half of a
+    field report the logs cannot answer: which generation is published, whether it is
+    trusted, what the last attempt did, and which sources a comparison actually read.
+    """
+    entries, truncated = [], False
+    for root, label in ((paths.OUTPUT_ROOT, "output"),
+                        (paths.TSN_LIBRARY_ROOT, "tsn_library")):
+        root = Path(root)
+        if not root.is_dir():
+            continue
+        files, was_capped = _walk_files(root, _MAX_SCAN_FILES)
+        truncated = truncated or was_capped
+        for f in files:
+            if not _is_state_sidecar(f):
+                continue
+            try:
+                rel = f.relative_to(root).as_posix()
+            except ValueError:  # silent-ok: a walk result outside its own root is simply skipped
+                continue
+            entries.append((f, f"state/{label}/{rel}"))
+    return entries, truncated
+
+
+def _inventory_text():
+    """A NAME/SIZE/MTIME listing of the data roots — no bytes, no content.
+
+    Answers "what did this install actually produce" without shipping any of it, and
+    it is how a name-shaped failure becomes visible: the v0.27.0 field bug was a
+    148-character payload sidecar basename, which no log line and no artifact could
+    show, but a listing shows immediately.
+    """
+    lines = ["File inventory — names, sizes and timestamps only. No file content.",
+             ""]
+    for root in (paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+                 paths.LOG_DIR):
+        root = Path(root)
+        lines.append(f"[{root}]")
+        if not root.is_dir():
+            lines.append("  (absent)")
+            lines.append("")
+            continue
+        files, truncated = _walk_files(root, _MAX_SCAN_FILES)
+        total = 0
+        for f in files:
+            try:
+                st = f.stat()
+            except OSError:  # silent-ok: listed as unstattable rather than dropped
+                lines.append(f"  {'?':>12}  {'?':<19}  {f.name}  (unreadable)")
+                continue
+            total += st.st_size
+            when = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime))
+            try:
+                rel = f.relative_to(root).as_posix()
+            except ValueError:  # silent-ok: fall back to the full path in the listing
+                rel = str(f)
+            lines.append(f"  {st.st_size:>12,}  {when}  {rel}")
+        lines.append(f"  -- {len(files):,} file(s), {total:,} bytes"
+                     + ("  [TRUNCATED at the inventory cap]" if truncated else ""))
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def _long_path_policy():
+    """Whether this PC allows paths past MAX_PATH. On a managed work PC this is 0 and
+    cannot be changed by the user — and it is exactly the dev-vs-field difference that
+    made a path-length bug invisible in development."""
+    if os.name != "nt":
+        return "n/a (not Windows)"
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                            r"SYSTEM\CurrentControlSet\Control\FileSystem") as key:
+            value, _kind = winreg.QueryValueEx(key, "LongPathsEnabled")
+        return (f"{int(value)} — long paths ENABLED (paths may exceed "
+                f"{_PATH_LIMIT}); a managed PC usually has 0" if int(value)
+                else f"0 — long paths DISABLED (a path at or past {_PATH_LIMIT} "
+                     "will fail); this is the managed-PC default")
+    except FileNotFoundError:
+        return f"not set — treat as 0 (a path at or past {_PATH_LIMIT} will fail)"
+    except OSError as e:  # silent-ok: an unreadable policy is reported, never fatal
+        return f"unreadable ({type(e).__name__})"
+
+
+def _environment_text():
+    """The PC facts that decide whether the app can do what it was asked to.
+
+    Every one of these has been the answer to a field report at least once, and none
+    of them is visible in a log line.
+    """
+    import platform
+    import shutil as _shutil
+    lines = [
+        f"{version.APP_NAME} — environment facts",
+        "",
+        f"app version:        {version.__version__}",
+        f"build:              {'frozen exe' if paths.is_frozen() else 'dev checkout'}",
+        f"os:                 {platform.platform()}",
+        f"python:             {platform.python_version()}",
+        f"data root:          {paths.DATA_ROOT}",
+        f"long-path policy:   {_long_path_policy()}",
+    ]
+    try:
+        usage = _shutil.disk_usage(str(paths.DATA_ROOT))
+        lines.append(f"free space:         {usage.free:,} bytes of {usage.total:,}")
+    except OSError as e:  # silent-ok: disk stats are a nicety, not a gate
+        lines.append(f"free space:         unreadable ({type(e).__name__})")
+
+    root = str(paths.DATA_ROOT)
+    lines += [
+        f"data-root length:   {len(root)} chars"
+        f"  (every artifact path starts here, so this is the budget everything else"
+        f" spends from {_PATH_LIMIT})",
+        "",
+        f"PATH-LENGTH CENSUS (the {_PATH_LIMIT}-character Windows limit):",
+    ]
+    files, truncated = _walk_files(paths.DATA_ROOT, _MAX_SCAN_FILES)
+    if not files:
+        lines.append("  (no files under the data root yet)")
+        return "\n".join(lines) + "\n"
+    lengths = sorted(((len(str(f)), str(f)) for f in files), reverse=True)
+    over_limit = [p for n, p in lengths if n >= _PATH_LIMIT]
+    over_warn = [p for n, p in lengths if _PATH_WARN <= n < _PATH_LIMIT]
+    lines += [
+        f"  files scanned:      {len(files):,}"
+        + ("  [TRUNCATED at the inventory cap]" if truncated else ""),
+        f"  longest path:       {lengths[0][0]} chars",
+        f"  at or past {_PATH_LIMIT}:     {len(over_limit):,}"
+        + ("   <-- THESE WILL FAIL unless long paths are enabled" if over_limit else ""),
+        f"  within {_PATH_LIMIT - _PATH_WARN} of it:     {len(over_warn):,}"
+        + ("   <-- at risk if the install moves deeper" if over_warn else ""),
+        "",
+        f"  the {min(_LONGEST_PATHS_SHOWN, len(lengths))} longest:",
+    ]
+    for n, p in lengths[:_LONGEST_PATHS_SHOWN]:
+        flag = "  <-- OVER" if n >= _PATH_LIMIT else ("  <-- close" if n >= _PATH_WARN else "")
+        lines.append(f"    {n:>4}  {p}{flag}")
+    return "\n".join(lines) + "\n"
+
+
 def _allowlisted_entries(extra_dir, roots, emit):
     """The (source_path, arcname) pairs to add — logs + run reports + any user-placed
     evidence. Returns (entries, skipped_user): `skipped_user` is [(path, reason)] for
@@ -138,6 +345,11 @@ def _allowlisted_entries(extra_dir, roots, emit):
                          key=lambda p: p.stat().st_mtime, reverse=True)[:_MAX_RUN_REPORTS]
     for f in run_reports:
         entries.append((f, f"run_reports/{f.name}"))
+    state, state_truncated = _state_entries()
+    if state_truncated:
+        emit(f"  NOTE: more than {_MAX_SCAN_FILES:,} files under the data roots — "
+             "the state sweep stopped at the cap")
+    entries.extend(state)
 
     skipped_user = []
     if extra_dir:
@@ -170,12 +382,15 @@ def _manifest(contents, unreadable, skipped_user, roots):
         "",
         "SAFETY: this bundle is credential-safe. It contains the diagnostic logs, run",
         "  reports (per-route SUMMARIES, not report data), the offline self-test output,",
-        "  and ONLY the report/TSN source files (PDF/Excel) you explicitly placed in",
-        "  --evidence-dir — a copied cookie store, login DB, or page-source file there is",
-        "  REFUSED. It NEVER contains your saved login, the Edge sign-in profile, failure dumps, the",
-        "  exported report data, or the TSN inputs/library. It does include this PC's name",
-        "  in file paths + selected diagnostic settings (diagnostics need them), so send",
-        "  it to the TSMIS maintainer, not a public forum.",
+        "  this PC's environment facts, a NAME/SIZE/DATE-only file inventory, the JSON",
+        "  state sidecars that say what each artifact CLAIMS to be (completion, trust,",
+        "  generation, source digests — never report rows), and ONLY the report/TSN",
+        "  source files (PDF/Excel) you explicitly placed in --evidence-dir — a copied",
+        "  cookie store, login DB, or page-source file there is REFUSED. It NEVER contains",
+        "  your saved login, the Edge sign-in profile, failure dumps, the exported report",
+        "  data, the compressed comparison payloads, or the TSN inputs/library. It does",
+        "  include this PC's name in file paths + selected diagnostic settings",
+        "  (diagnostics need them), so send it to the TSMIS maintainer, not a public forum.",
         "",
         f"created:     {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"version:     {version.__version__}",
@@ -194,7 +409,9 @@ def _manifest(contents, unreadable, skipped_user, roots):
         "DELIBERATELY EXCLUDED (never collected — RM05):",
         "  - saved login (tsmis_auth.json)        - Edge sign-in profile",
         "  - failure dumps (failures/)            - exported report data (output/<run>/…)",
-        "  - TSN input PDFs (input/)              - TSN library",
+        "  - TSN input PDFs (input/)              - TSN library workbooks/prints",
+        "  - the compressed comparison payloads (.comparison-payload.zlib — they carry",
+        "    compared ROWS; their names and sizes are in inventory.txt, their bytes are not)",
     ]
     if skipped_user:
         lines.append("")
@@ -221,7 +438,7 @@ def _write_allowlisted_entry(zf, src, arc):
     User-provided PDF/Excel evidence is opaque and must remain byte-identical; the
     final ZIP scanner rejects publication if one of those members contains a hit.
     """
-    if arc.startswith("logs/") or arc.startswith("run_reports/"):
+    if arc.startswith(("logs/", "run_reports/", "state/")):
         text = Path(src).read_text(encoding="utf-8", errors="replace")
         zf.writestr(arc, credential_safety.redact_text(text))
     else:
@@ -305,6 +522,10 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
         tmp_path = Path(tmp_name)
         with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("self_test.txt", self_test_text)
+            zf.writestr("environment.txt",
+                        credential_safety.redact_text(_environment_text()))
+            zf.writestr("inventory.txt",
+                        credential_safety.redact_text(_inventory_text()))
             if validation_txt is not None:
                 zf.writestr("validation.txt", validation_txt)
             if validation_json is not None:
@@ -319,7 +540,8 @@ def collect(out_path=None, extra_dir=None, emit=None, run_self_test=True,
                     log.info("evidence: skipped %s (%s: %s)", src, type(e).__name__, e)
             _val_files = (["validation.txt"] if validation_txt is not None else []) \
                 + (["validation.json"] if validation_json is not None else [])
-            contents = ["manifest.txt", "self_test.txt"] + _val_files + written
+            contents = (["manifest.txt", "self_test.txt", "environment.txt",
+                         "inventory.txt"] + _val_files + written)
             manifest_text = credential_safety.redact_text(
                 _manifest(contents, unreadable, skipped_user, roots))
             zf.writestr("manifest.txt", manifest_text)

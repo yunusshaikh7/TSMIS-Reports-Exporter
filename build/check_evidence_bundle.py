@@ -38,6 +38,10 @@ _SECRET = "SECRET-COOKIE-do-not-leak-9f3a2b"
 _COOKIE_SECRET = "COOKIE-SECRET-123"
 _LOGIN_SECRET = "LOGIN-DB-SECRET-456"
 _HTML_SECRET = "HTML-PAGE-SECRET-789"
+# Stands in for compared REPORT ROWS. It is not a credential, so the credential
+# scanner will not catch it — only the allowlist keeps it out, which is exactly the
+# property worth testing when the allowlist grows.
+_ROW_DATA = "ROW-DATA-route-001-PM-1.000-do-not-leak"
 
 
 def check(name, cond):
@@ -64,6 +68,29 @@ def _plant(root):
     (root / "output" / "2026-06-26 ssor-prod" / "ramp_summary" / "r5.pdf").write_bytes(b"%PDF private")
     (root / "input" / "tsn_highway_log").mkdir(parents=True, exist_ok=True)
     (root / "input" / "tsn_highway_log" / "d07.pdf").write_bytes(b"%PDF tsn")
+    # A real comparison store: the artifacts (which must stay OUT) beside the JSON
+    # state sidecars that say what they claim to be (which must come IN).
+    cmp_dir = root / "output" / "2026-06-26 ssor-prod" / "comparisons"
+    cmp_dir.mkdir(parents=True, exist_ok=True)
+    (cmp_dir / "hsl_values.xlsx").write_bytes(b"PK\x03\x04 compared ROW DATA " + _ROW_DATA.encode())
+    (cmp_dir / "hsl_values.xlsx.outcome.json").write_text(
+        '{"completion":"complete","artifact":"promoted"}', encoding="utf-8")
+    (cmp_dir / "hsl_values.xlsx.provenance.json").write_text(
+        '{"side_a":"consolidated.xlsx","sha256":"' + "a" * 64 + '"}', encoding="utf-8")
+    (cmp_dir / "hsl_values (evidence).json").write_text(
+        '{"version":1,"state":"rendered","images":[]}', encoding="utf-8")
+    (cmp_dir / "_attempts.json").write_text(
+        '{"version":1,"cells":{"highway_log|tsn":"ok"}}', encoding="utf-8")
+    # The compressed comparison payload carries compared ROWS — its NAME may be
+    # listed, its BYTES may never be bundled.
+    (cmp_dir / (".cmpv3-" + "b" * 16 + "-000000-" + "c" * 16
+                + ".comparison-payload.zlib")).write_bytes(
+        b"\x78\x9c payload " + _ROW_DATA.encode())
+    (root / "tsn_library" / "highway_log").mkdir(parents=True, exist_ok=True)
+    (root / "tsn_library" / "highway_log" / "consolidated.xlsx").write_bytes(
+        b"PK\x03\x04 TSN LIBRARY " + _ROW_DATA.encode())
+    (root / "tsn_library" / "highway_log" / "consolidated.xlsx.fingerprint.json").write_text(
+        '{"v":2,"digest":"' + "d" * 32 + '"}', encoding="utf-8")
 
 
 def _point_paths_at(root, saved):
@@ -121,6 +148,8 @@ def test_credential_exclusion_and_manifest():
         with zipfile.ZipFile(out) as zf:
             names, blob = _zip_text(zf)
             manifest = zf.read("manifest.txt").decode("utf-8")
+            _env = zf.read("environment.txt").decode("utf-8")
+            _inv = zf.read("inventory.txt").decode("utf-8")
 
         # INCLUDES the allowlist.
         check("includes manifest + self_test", "manifest.txt" in names and "self_test.txt" in names)
@@ -129,6 +158,43 @@ def test_credential_exclusion_and_manifest():
               any(n.startswith("run_reports/") and n.endswith(".csv") for n in names))
         check("includes the user-placed real PDF under user_evidence/",
               "user_evidence/intersection_detail_route_005.pdf" in names)
+
+        # The collector must answer a field report on its own. Everything below is
+        # metadata a log line cannot carry — and the row data beside it must stay out.
+        check("includes the environment facts + the file inventory",
+              "environment.txt" in names and "inventory.txt" in names)
+        check("environment reports the long-path policy (the dev-vs-field difference)",
+              "long-path policy:" in _env)
+        check("...and a path-length census against the 260 limit",
+              "PATH-LENGTH CENSUS" in _env and "longest path:" in _env)
+        check("the inventory NAMES the compressed comparison payload "
+              "(the v0.27.0 field bug was a name that was too long)",
+              ".comparison-payload.zlib" in _inv)
+        check("...and names the artifacts without carrying them",
+              "hsl_values.xlsx" in _inv)
+        check("includes the comparison's state sidecars (what it CLAIMS to be)",
+              "state/output/2026-06-26 ssor-prod/comparisons/"
+              "hsl_values.xlsx.outcome.json" in names
+              and "state/output/2026-06-26 ssor-prod/comparisons/"
+                  "hsl_values.xlsx.provenance.json" in names)
+        check("includes the evidence generation manifest",
+              "state/output/2026-06-26 ssor-prod/comparisons/"
+              "hsl_values (evidence).json" in names)
+        check("includes the per-cell attempt overlay",
+              "state/output/2026-06-26 ssor-prod/comparisons/_attempts.json" in names)
+        check("includes the TSN library's fingerprint sidecar",
+              "state/tsn_library/highway_log/consolidated.xlsx.fingerprint.json" in names)
+        # THE BOUNDARY: the sweep walks the same folders the artifacts live in.
+        check("the compared ROW DATA appears in NO bundle file",
+              _ROW_DATA.encode() not in blob)
+        check("the comparison workbook itself is NOT bundled",
+              not any(n.endswith("hsl_values.xlsx") for n in names))
+        check("the compressed comparison PAYLOAD is NOT bundled",
+              not any(n.endswith(".comparison-payload.zlib") for n in names))
+        check("the TSN library workbook is NOT bundled",
+              not any(n.endswith("consolidated.xlsx") for n in names))
+        check("the manifest says the payloads are excluded but named",
+              ".comparison-payload.zlib" in manifest and "their bytes are not" in manifest)
         check("includes the user-placed real workbook (XLSX is an allowed format)",
               "user_evidence/tsn_statewide.xlsx" in names)
 
@@ -156,8 +222,17 @@ def test_credential_exclusion_and_manifest():
               not any("tsmis_auth.json" in n for n in names))
         check("the Edge profile is NOT in the bundle", not any("edge_login_profile" in n for n in names))
         check("failure dumps are NOT in the bundle", not any("failures" in n or n.endswith(".png") for n in names))
+        # The run folder is no longer wholly off-limits — its JSON state sidecars are
+        # collected deliberately — so this asserts what it always MEANT: no exported
+        # report artifact, and nothing at all from a run folder outside `state/`.
         check("exported report data is NOT in the bundle",
-              not any(n.endswith("r5.pdf") or "2026-06-26 ssor-prod" in n for n in names))
+              not any(n.endswith("r5.pdf") for n in names)
+              and b"%PDF private" not in blob
+              and not any("2026-06-26 ssor-prod" in n and not n.startswith("state/")
+                          for n in names))
+        check("everything bundled from a run folder is a JSON state sidecar",
+              all(n.endswith(".json")
+                  for n in names if n.startswith("state/")))
         check("TSN inputs are NOT in the bundle", not any("d07.pdf" in n for n in names))
         check("the SECRET string appears in NO bundle file (manifest included)",
               _SECRET.encode() not in blob)

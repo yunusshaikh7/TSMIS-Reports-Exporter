@@ -418,14 +418,30 @@ target the latest release).
 
 A GUI-only CLI flag that gathers a **credential-safe** diagnostics zip on a locked-down
 work PC (no admin/cmd needed — a desktop shortcut with the flag works). `gui_main.py`
-branches to `evidence.collect()` before any heavy init. The bundle is an **allowlist**
-— `manifest.txt`, the offline `self_test.txt`, rotating logs, recent run-report
-summaries, and any report/TSN source files placed via `--evidence-dir` (PDF/XLSX/XLS
-only; a positive allowlist that **refuses** copied cookie stores / login DBs / saved
-`.html` / any other type). It NEVER contains the saved login, the Edge profile, failure
-dumps, exported report data, or the TSN inputs. Packaged via the `evidence` module in
-`APP_MODULES`; locked by `build/check_evidence_bundle.py` (adversarial credential-leak
-fixtures). Full handoff: [work-pc-validation.md](work-pc-validation.md).
+branches to `evidence.collect()` before any heavy init. The bundle is an **allowlist**,
+and it is built to be SELF-SUFFICIENT — a maintainer reads it once and knows why the
+field PC behaved differently:
+
+| Member | Why it is there |
+|---|---|
+| `manifest.txt` | provenance, login STATUS, allowlisted settings, the live-verify set, and a listing of every file actually bundled |
+| `environment.txt` | the facts no log carries: the **long-path policy** (a managed PC has it off and can't change it — the dev-vs-field difference CMP-AUD-242 turned on), a **path-length census** against the 260-char limit with the longest paths named, free disk, and the data-root length everything else spends from |
+| `inventory.txt` | NAME/SIZE/DATE for every file under the data roots, **no content** — a name-shaped failure is invisible in a log and in an artifact, but obvious in a listing (v0.27.0's field bug was a 148-char basename) |
+| `state/…` | the JSON sidecars saying what each artifact CLAIMS to be — completion/trust outcomes, provenance (source paths + digests), fingerprints, evidence generation manifests, the per-cell attempt overlay |
+| `self_test.txt` | the offline self-test output (a FAILING one is the evidence) |
+| `logs/`, `run_reports/` | the rotating diagnostics + per-route saved/empty/failed summaries |
+| `user_evidence/` | report/TSN source files placed via `--evidence-dir` (PDF/XLSX/XLS only; a positive allowlist that **refuses** copied cookie stores / login DBs / saved `.html` / any other type) |
+
+It NEVER contains the saved login, the Edge profile, failure dumps, exported report
+data, the compressed comparison payloads (they carry compared ROWS — their names and
+sizes are in the inventory, their bytes are not), the TSN inputs, or the TSN library
+workbooks. The state sweep walks the same folders those artifacts live in, so it
+matches by **exact sidecar suffix/name** — a data workbook, a source PDF or a payload
+chunk cannot match. Packaged via the `evidence` module in `APP_MODULES`; locked by
+`build/check_evidence_bundle.py`, whose fixtures plant report ROW DATA beside the
+sidecars (not just credentials — the credential scanner would catch those; only the
+allowlist keeps report rows out). Full handoff:
+[work-pc-validation.md](work-pc-validation.md).
 
 ### Two-tier release (v0.18.0 candidate → v0.18.1 close-out → owed operational sign-off)
 

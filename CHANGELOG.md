@@ -3,6 +3,27 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## Unreleased
+
+### Changed
+- **The evidence bundle now answers a support question on its own.** "Collect
+  evidence" used to gather the logs, run summaries and self-test output — enough
+  to see that something failed, rarely enough to see why. It now also records
+  the PC facts that no log line carries (whether Windows allows long paths on
+  this machine, how much of the 260-character path limit your install has
+  already spent, and the longest paths it found), a name-and-size-only listing
+  of every file the app has produced, and the small JSON records that say what
+  each workbook claims to be — whether it finished, whether it's trusted, and
+  which files it was built from. That is the half of a problem report the logs
+  could never show.
+
+  What it still never contains is unchanged: your saved login, the sign-in
+  profile, failure screenshots, your exported report data, the TSN inputs and
+  library, or the compressed comparison data. Those files sit in the same
+  folders the new listing walks, so the bundle matches records by exact name —
+  a report workbook cannot be picked up by mistake, and the bundle's own
+  manifest spells out what was and wasn't included.
+
 ## v0.28.0 — 2026-07-22
 
 The comparison-perfection release. Every finding this project owns is closed;
