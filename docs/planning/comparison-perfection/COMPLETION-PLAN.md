@@ -71,7 +71,34 @@ vendor approval), or the owner-gated Phase-5/7 cluster — **none is a live fals
 dedicated effort, do LAST despite being "BIG-1 leftover"). Each is a multi-session chunk, not a
 single marathon.
 
-> ### ▶ RESUME HERE (2026-07-21 — NORM 2/8 done; next = 186, then 133/142/144/145/193)
+> ### ▶ RESUME HERE (2026-07-21 — NORM 2/8; field batch shipped through v0.27.4)
+>
+> **Gate 144/144 · code tip `4258416` · released v0.27.4 · ~221 closed + 21 open of 242.**
+>
+> **FIELD BATCH CLOSED (v0.27.1→v0.27.4, all CI-green).** The owner ran v0.27.0 on the work PC and
+> filed five observations; four are fixed and the fifth (MAX_PATH) is worked around and tracked:
+> - **Matrix hid every comparison** — CMP-AUD-242, the 260-char Windows path limit. **CONFIRMED FIXED
+>   in the field by moving the install to a short path.** The permanent basename fix is still owed —
+>   see the PATH row; it MUST ship before "done".
+> - **TSN report stayed STALE after every successful rebuild** — `ConsolidateWorker` wrote a generic
+>   outcome sidecar OVER the library's authoritative certificate, dropping `tsn_normalization_version`
+>   + the raw manifest + both identity bindings. Fixed by a producer claim
+>   (`ConsolidateResult.sidecar_published`), the same exemption comparisons already had (v0.27.4).
+> - Plus: bulk "Rebuild all out of date", evidence-print status per report, the panel refresh keyed to
+>   the consolidate task ending, the startup sign-in check made visible, and every fail-closed
+>   publication gate + stale verdict now naming itself with its deciding values.
+>
+> **⚠ METHOD — THE MOST IMPORTANT LESSON OF THIS BATCH.** Three field bugs were all locally
+> reproducible with data already on disk, and all three were MISSED because the test exercised a
+> CLEANER path than production, went green, and green was read as proof:
+> short temp dir vs the real install depth · `build_consolidated` directly vs through
+> `ConsolidateWorker` (the defect was in the DRIVER) · `write_outcome` patched out vs reading the
+> bytes back (asserted a decision, not the artifact). **Drive the shipped entry point, assert the
+> FILE, reproduce at the real environment's shape, prefer rebuild-over-existing to first-build, and
+> give every regression test teeth. A green suite that never runs the failing path is not
+> information — when the field disagrees with the suite, the SUITE is wrong.**
+>
+> ### ▶ NORM (2026-07-21 — 2 of 8 done; next = 186, then 133/142/144/145/193)
 >
 > **Gate 144/144 · code tip `06f2d85` · released v0.27.2 · ~221 closed + 242 open.**
 >
