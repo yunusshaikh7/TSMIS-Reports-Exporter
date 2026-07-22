@@ -3,6 +3,32 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.27.2 — 2026-07-21
+
+### Fixed
+- **A TSN report that isn't current now says why.** "consolidated STALE" was one
+  word covering eight independent conditions, so a library that had never been
+  built, one built by a superseded normalizer, one whose raw files had changed,
+  and one whose build record no longer matched its workbook all looked identical
+  — and none of them said what to do. Reported from the field: a Highway Log
+  rebuild that completed cleanly (380 files, 60,083 rows, nothing skipped or
+  failed) still read STALE afterwards, with no way to tell why from the panel.
+  The freshness check already decided every condition separately and simply
+  discarded the answer at the display boundary. Each report now reports the first
+  failing condition, in plain terms and with the action it implies, on the panel
+  and in the log. **No freshness logic changed** — exactly the same libraries are
+  current as before; only the explanation is new.
+
+### If the vs-TSN matrix shows no comparisons
+Unchanged from v0.27.1, repeated because it is the most likely thing you will
+hit: comparison workbooks build correctly but the matrix hides them when their
+trust metadata cannot be written, and the usual cause is the Windows
+260-character path limit. This is now confirmed from a real install
+(`path_len=265`). **Move the app to a shorter folder path** — for example
+`C:\TSMIS\TSMIS Exporter\` — and re-run. The comparison workbooks themselves are
+valid and readable under `output\comparisons\tsn-by-day\` in the meantime. A
+permanent fix that shortens the internal file name is in progress.
+
 ## v0.27.1 — 2026-07-21
 
 Diagnoses the v0.27.0 field failure where **every comparison built but never
