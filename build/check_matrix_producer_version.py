@@ -39,6 +39,8 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(_ROOT / "scripts"), str(_ROOT)]   # scripts + repo root (version.py)
 
+from _checklib import write_comparison_stub  # noqa: E402
+
 import artifact_store        # noqa: E402
 import consolidation_meta    # noqa: E402
 import matrix                # noqa: E402
@@ -84,7 +86,7 @@ def _comparison(path):
                               counts=counts, pairing_quality="exact")
 
     def produce(tmp):
-        _xlsx(tmp)
+        write_comparison_stub(tmp)
         return ConsolidateResult(
             status="ok", output_path=str(tmp), verdict="match",
             completion="complete", skipped_inputs=0, failed_inputs=0,

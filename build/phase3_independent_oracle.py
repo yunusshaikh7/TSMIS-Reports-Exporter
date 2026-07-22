@@ -562,11 +562,20 @@ def compare_rows(schema: OracleSchema, rows_a: Sequence[OracleRow],
     groups_a: dict[Tuple[NormalizedValue, ...], list[OracleRow]] = {}
     groups_b: dict[Tuple[NormalizedValue, ...], list[OracleRow]] = {}
     order: list[Tuple[NormalizedValue, ...]] = []
+    # CMP-AUD-187: `order` keeps deterministic ENCOUNTER order; `seen` answers
+    # first-seen membership in O(1). The old test was
+    # `key not in groups_a and key not in groups_b and key not in order`, whose
+    # three parts are equivalent: a key enters `order` only in the iteration that
+    # also files it into one of the group dicts, so at the top of every iteration
+    # set(order) == set(groups_a) | set(groups_b) == seen. Scanning the list made
+    # a 60,083-key Highway Detail leg quadratic (746s in comparison alone).
+    seen: set[Tuple[NormalizedValue, ...]] = set()
     for row, groups in tuple((row, groups_a) for row in rows_a) + tuple(
             (row, groups_b) for row in rows_b):
         _validate_row(row, schema)
         key = canonical_key(row, schema)
-        if key not in groups_a and key not in groups_b and key not in order:
+        if key not in seen:
+            seen.add(key)
             order.append(key)
         groups.setdefault(key, []).append(row)
 

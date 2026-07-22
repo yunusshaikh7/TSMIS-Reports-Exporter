@@ -35,6 +35,7 @@ import outcome  # noqa: E402
 import owned_dir  # noqa: E402
 import paths  # noqa: E402
 import tsn_library  # noqa: E402
+from _checklib import write_comparison_stub  # noqa: E402
 from comparison_contract import ComparisonCounts, ComparisonOutcome  # noqa: E402
 from events import ConsolidateResult  # noqa: E402
 from gui_worker_matrix import (BaselineMatrixCompareWorker,  # noqa: E402
@@ -101,11 +102,7 @@ class _StubComparator:
             raise RuntimeError("injected comparator crash (CMP-AUD-089)")
 
         def produce(path: Path) -> ConsolidateResult:
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Comparison"
-            ws["A1"] = "stub"
-            wb.save(path)
+            write_comparison_stub(path)
             typed = ComparisonOutcome(
                 status="ok", completion="complete", verdict="match",
                 counts=ComparisonCounts(known=True, paired_rows=1),

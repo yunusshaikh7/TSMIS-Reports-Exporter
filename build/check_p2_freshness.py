@@ -24,6 +24,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from _checklib import write_comparison_stub  # noqa: E402
+
 import artifact_store        # noqa: E402
 import consolidation_meta    # noqa: E402
 import matrix                # noqa: E402
@@ -69,7 +71,7 @@ def _comparison(path, diff_cells=0, one_sided=0):
         counts=counts, pairing_quality="exact")
 
     def produce(tmp):
-        _xlsx(tmp)
+        write_comparison_stub(tmp)
         return ConsolidateResult(
             status="ok", output_path=str(tmp), verdict=typed.verdict,
             completion="complete", skipped_inputs=0, failed_inputs=0,

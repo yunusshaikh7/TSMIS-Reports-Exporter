@@ -200,56 +200,14 @@ def read_counts(values_path, has_route=None):
     route or a flat aggregate whose identity field happens to be named Route.
     ``has_route`` is retained only for call compatibility and cannot authorize a
     positional fallback.
+
+    CMP-AUD-115: the reader itself lives in ``artifact_store`` so the commit
+    boundary's comparison-artifact schema and this diagnostic read enforce ONE
+    contract — a workbook the gate refuses is exactly one this would have read as
+    ``(None, None)``.
     """
-    try:
-        from openpyxl import load_workbook
-        wb = load_workbook(values_path, read_only=True, data_only=True)
-    except Exception as e:                       # noqa: BLE001 (best-effort read)
-        log.debug("read_counts: can't open %s (%s: %s)", values_path,
-                  type(e).__name__, e)
-        return (None, None)
-    try:
-        ws = wb["Comparison"]
-        rows_iter = ws.iter_rows(values_only=True)
-        header = next(rows_iter, None) or ()     # row 1 (header); data follows
-
-        def _col_of(label):                      # unique 1-based exact label
-            matches = [i + 1 for i, value in enumerate(header)
-                       if value == label]
-            return matches[0] if len(matches) == 1 else None
-
-        status_col = _col_of("Status")
-        diffs_col = _col_of("Diffs")
-        if status_col is None or diffs_col is None:
-            log.debug("read_counts: Comparison lacks unique Status/Diffs labels")
-            return (None, None)
-        one_sided = diff_cells = 0
-        for row in rows_iter:                     # data rows (header consumed above)
-            if row is None or all(v is None for v in row):
-                continue
-            status = row[status_col - 1] if len(row) >= status_col else None
-            diffs = row[diffs_col - 1] if len(row) >= diffs_col else None
-            if status == "Both":
-                if (isinstance(diffs, bool) or not isinstance(diffs, (int, float))
-                        or not float(diffs).is_integer() or diffs < 0):
-                    log.debug("read_counts: matched row has invalid Diffs value %r", diffs)
-                    return (None, None)
-                diff_cells += int(diffs)
-            elif isinstance(status, str) and status:
-                if diffs not in (None, ""):
-                    log.debug("read_counts: one-sided row unexpectedly carries Diffs %r", diffs)
-                    return (None, None)
-                one_sided += 1
-            else:
-                log.debug("read_counts: row has invalid Status value %r", status)
-                return (None, None)
-        return (diff_cells, one_sided)
-    except Exception as e:                       # noqa: BLE001
-        log.debug("read_counts: can't read %s (%s: %s)", values_path,
-                  type(e).__name__, e)
-        return (None, None)
-    finally:
-        wb.close()
+    diff_cells, one_sided, _rows = artifact_store.comparison_counts(values_path)
+    return (diff_cells, one_sided)
 
 
 # --------------------------------------------------------------------------- #

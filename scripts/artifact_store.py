@@ -45,7 +45,10 @@ log = logging.getLogger("tsmis.artifact_store")
 
 # Sidecar written beside a consolidated workbook recording its inputs' fingerprint.
 _FP_SUFFIX = ".fingerprint.json"
-_FP_SCHEMA = 1
+# v2 (CMP-AUD-080): the folder fingerprint hashes file CONTENT, not
+# (size, mtime_ns). Bumping the schema is what migrates every v1 record to stale
+# exactly once.
+_FP_SCHEMA = 2
 # fingerprint() sentinel: the folder (or a file in it) could not be read -> the caller
 # must treat freshness CONSERVATIVELY (rebuild), never as a silent match.
 _UNREADABLE = "unreadable"
@@ -637,6 +640,114 @@ def _publish_artifact_generation(result, commit_guard=None):
     return result
 
 
+# --------------------------------------------------------------------------- #
+# CMP-AUD-115 — the versioned COMPARISON-ARTIFACT SCHEMA gate.
+#
+# The transactional commit used to require only that openpyxl could open the
+# workbook and that a sheet named `Comparison` existed, so a header-only or
+# label-less Comparison sheet published with status=ok/verdict=match.
+#
+# The schema below is deliberately the SAME contract the Matrix count reader
+# already enforces (unique `Status`/`Diffs` labels, a valid status on every data
+# row, an integer `Diffs` on a matched row and none on a one-sided one), so the
+# gate's rejection domain is a SUBSET of the already-unreadable domain: a
+# workbook this refuses is one the Matrix would have read as `(None, None)`
+# anyway. It therefore cannot block a report that would otherwise have worked —
+# it converts a silently unreadable artifact into a loud, kept-last-good commit
+# failure. It applies ONLY to a typed comparison's VALUES artifact: the
+# live-formulas twin holds formulas rather than cached values by construction,
+# and a consolidation carries no Comparison sheet at all.
+# --------------------------------------------------------------------------- #
+COMPARISON_ARTIFACT_SCHEMA = 1
+
+
+def comparison_counts(values_path):
+    """``(diff_cells, one_sided, data_rows)`` from a VALUES comparison workbook,
+    or ``(None, None, None)``.
+
+    ``Status`` and ``Diffs`` are the structured truth columns emitted by every
+    current comparison layout, located by UNIQUE EXACT LABEL. Visible field text
+    is never inspected: the spaced not-equal glyph is legitimate source content
+    and cannot encode state. A missing, duplicate, or malformed count contract
+    returns the unknown triple instead of guessing a layout or silently
+    certifying zero differences."""
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(values_path, read_only=True, data_only=True)
+    except Exception as e:                       # noqa: BLE001 (best-effort read)
+        log.debug("comparison_counts: can't open %s (%s: %s)", values_path,
+                  type(e).__name__, e)
+        return (None, None, None)
+    try:
+        ws = wb["Comparison"]
+        rows_iter = ws.iter_rows(values_only=True)
+        header = next(rows_iter, None) or ()     # row 1 (header); data follows
+
+        def _col_of(label):                      # unique 1-based exact label
+            matches = [i + 1 for i, value in enumerate(header)
+                       if value == label]
+            return matches[0] if len(matches) == 1 else None
+
+        status_col = _col_of("Status")
+        diffs_col = _col_of("Diffs")
+        if status_col is None or diffs_col is None:
+            log.debug("comparison_counts: Comparison lacks unique Status/Diffs labels")
+            return (None, None, None)
+        one_sided = diff_cells = data_rows = 0
+        for row in rows_iter:                     # data rows (header consumed above)
+            if row is None or all(v is None for v in row):
+                continue
+            data_rows += 1
+            status = row[status_col - 1] if len(row) >= status_col else None
+            diffs = row[diffs_col - 1] if len(row) >= diffs_col else None
+            if status == "Both":
+                if (isinstance(diffs, bool) or not isinstance(diffs, (int, float))
+                        or not float(diffs).is_integer() or diffs < 0):
+                    log.debug("comparison_counts: matched row has invalid Diffs value %r", diffs)
+                    return (None, None, None)
+                diff_cells += int(diffs)
+            elif isinstance(status, str) and status:
+                if diffs not in (None, ""):
+                    log.debug("comparison_counts: one-sided row unexpectedly carries Diffs %r", diffs)
+                    return (None, None, None)
+                one_sided += 1
+            else:
+                log.debug("comparison_counts: row has invalid Status value %r", status)
+                return (None, None, None)
+        return (diff_cells, one_sided, data_rows)
+    except Exception as e:                       # noqa: BLE001
+        log.debug("comparison_counts: can't read %s (%s: %s)", values_path,
+                  type(e).__name__, e)
+        return (None, None, None)
+    finally:
+        wb.close()
+
+
+def _typed_row_claim(typed_outcome):
+    """How many rows the producer's typed outcome says the comparison covered."""
+    counts = getattr(typed_outcome, "counts", None)
+    if counts is None or not getattr(counts, "known", False):
+        return 0
+    try:
+        return (int(counts.paired_rows) + int(counts.side_a_only_rows)
+                + int(counts.side_b_only_rows))
+    except (TypeError, ValueError):  # silent-ok: an unusable claim simply asserts nothing here
+        return 0
+
+
+def comparison_artifact_problem(values_path, typed_outcome=None):
+    """None when `values_path` satisfies COMPARISON_ARTIFACT_SCHEMA, else a
+    one-line reason for the commit refusal."""
+    diff_cells, _one_sided, data_rows = comparison_counts(values_path)
+    if diff_cells is None:
+        return ("its Comparison sheet does not carry uniquely labelled Status and "
+                "Diffs columns with a valid status on every row")
+    if data_rows == 0 and _typed_row_claim(typed_outcome) > 0:
+        return ("its Comparison sheet has no rows although the comparison "
+                "reported paired or one-sided rows")
+    return None
+
+
 def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validate=None,
                      confirm_overwrite=None, source_paths=(), captured_sources=None,
                      commit_guard=None, requested_mode=None):
@@ -931,6 +1042,23 @@ def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validat
     # The VALUES workbook is the single transactional artifact (twin), else the lone file.
     primary_tmp, primary_final = (tmp_twin, final_twin) if twin else (tmp, final)
     alias_block = [None]
+    schema_block = [None]
+    # CMP-AUD-115: a typed comparison's VALUES artifact must also satisfy the
+    # versioned comparison-artifact schema before it can replace a good file.
+    primary_validate = validate
+    if typed_outcome is not None and (twin or requested_mode == "values"):
+        def primary_validate(path, _base=validate):
+            if not _base(path):
+                return False
+            problem = comparison_artifact_problem(path, typed_outcome)
+            if problem is None:
+                return True
+            schema_block[0] = (
+                f"Could not finalize {primary_final.name}: {problem}. The previous "
+                "file (if any) was left unchanged; re-run the comparison.")
+            log.error("artifact commit: comparison schema v%d rejected %s — %s",
+                      COMPARISON_ARTIFACT_SCHEMA, Path(path).name, problem)
+            return False
 
     def alias_safe(dest):
         def proceed():
@@ -959,15 +1087,16 @@ def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validat
         return ConsolidateResult(status="cancelled",
                                  message="Cancelled. Existing file kept.")
     if not _commit_one(
-            primary_tmp, primary_final, validate,
+            primary_tmp, primary_final, primary_validate,
             proceed=alias_safe(primary_final), discard=cleanup_temp,
             temp_current=lambda: temp_current(primary_tmp),
             final_current=lambda: target_current(primary_final)):
         cleanup_temp(tmp)
         cleanup_temp(tmp_twin)
-        if alias_block[0] or guard_error[0]:
+        if alias_block[0] or guard_error[0] or schema_block[0]:
             return ConsolidateResult(
-                status="error", message=alias_block[0] or guard_error[0])
+                status="error",
+                message=alias_block[0] or guard_error[0] or schema_block[0])
         return ConsolidateResult(
             status="error",
             message=(f"Could not finalize {primary_final.name} — the produced workbook "
@@ -1119,18 +1248,154 @@ def is_report_data_file(name):
     return name.lower().endswith(_REPORT_SUFFIXES) and not _is_excluded(name)
 
 
+# --------------------------------------------------------------------------- #
+# CMP-AUD-080 — CONTENT identity for every effective source.
+#
+# The v1 fingerprint hashed (name, size, mtime_ns), so replacing a file with
+# different same-length bytes and restoring its timestamp left the cached
+# "match / 0 differences" fresh. v2 hashes the BYTES.
+#
+# Re-reading a statewide store on every snapshot would be unaffordable, so each
+# file's digest is memoized against a CHANGE TOKEN — never against stat alone,
+# which is exactly the memoization the audit prohibits. On Windows the token
+# includes the filesystem's own ChangeTime (FILE_BASIC_INFO.ChangeTime), which
+# the OS advances on any write to the file's data or metadata and which
+# SetFileTime cannot restore: measured here, an in-place same-size rewrite with
+# the mtime put back leaves (size, mtime_ns, file id) byte-identical while
+# ChangeTime moves. A whole-file replacement moves the file id as well. Where no
+# change token can be obtained (a non-Windows filesystem, an unreadable handle),
+# the memo is refused and the file is re-hashed — fail-safe, never fail-fast.
+# --------------------------------------------------------------------------- #
+_HASH_BLOCK = 1 << 20
+_DIGEST_MEMO = {}
+_DIGEST_MEMO_MAX = 50_000          # ~6 statewide environments' worth of routes
+
+
+def _change_token(path, st):
+    """A tamper-visible identity for one file, or None when none is available."""
+    base = (int(st.st_size), int(getattr(st, "st_mtime_ns", 0)),
+            int(getattr(st, "st_dev", 0)), int(getattr(st, "st_ino", 0)))
+    if os.name != "nt":
+        return None                # no verified change signal -> never memoize
+    change_time = _windows_change_time(path)
+    return None if change_time is None else base + (change_time,)
+
+
+_WIN32_METADATA = None
+
+
+def _win32_metadata_api():
+    """``(ctypes, kernel32, FILE_BASIC_INFO, INVALID_HANDLE)`` or None. Built once,
+    lazily: ctypes stays off every non-Windows and non-fingerprint path."""
+    global _WIN32_METADATA
+    if _WIN32_METADATA is None:
+        _WIN32_METADATA = False
+        if os.name == "nt":
+            try:
+                import ctypes
+                from ctypes import wintypes
+                k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+                k32.CreateFileW.restype = wintypes.HANDLE
+                k32.CreateFileW.argtypes = [
+                    wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                    ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD,
+                    wintypes.HANDLE]
+                k32.GetFileInformationByHandleEx.restype = wintypes.BOOL
+                k32.GetFileInformationByHandleEx.argtypes = [
+                    wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+                k32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+                class FILE_BASIC_INFO(ctypes.Structure):
+                    _fields_ = [("CreationTime", ctypes.c_longlong),
+                                ("LastAccessTime", ctypes.c_longlong),
+                                ("LastWriteTime", ctypes.c_longlong),
+                                ("ChangeTime", ctypes.c_longlong),
+                                ("FileAttributes", wintypes.DWORD)]
+
+                invalid = ctypes.cast(wintypes.HANDLE(-1), ctypes.c_void_p).value
+                _WIN32_METADATA = (ctypes, k32, FILE_BASIC_INFO, invalid)
+            except (OSError, AttributeError, ValueError) as e:
+                log.warning("content identity: no Windows change token available "
+                            "(%s: %s); source digests will be recomputed",
+                            type(e).__name__, e)
+    return _WIN32_METADATA or None
+
+
+def _windows_change_time(path):
+    """FILE_BASIC_INFO.ChangeTime for `path` (None when it can't be read).
+
+    Measured cheaper than ``os.stat`` (one metadata handle, no path
+    re-resolution), so validating the memo costs nothing next to the v1 stat walk
+    it replaces."""
+    api = _win32_metadata_api()
+    if api is None:
+        return None
+    ctypes, k32, basic_info, invalid = api
+    # 0 access + share-all + FILE_FLAG_BACKUP_SEMANTICS: metadata only, never
+    # blocking a workbook another process has open.
+    handle = k32.CreateFileW(str(path), 0, 7, None, 3, 0x02000000, None)
+    if not handle or handle == invalid:
+        return None
+    try:
+        info = basic_info()
+        if not k32.GetFileInformationByHandleEx(
+                handle, 0, ctypes.byref(info), ctypes.sizeof(info)):
+            return None
+        return int(info.ChangeTime)
+    finally:
+        k32.CloseHandle(handle)
+
+
+def content_digest(path, st=None):
+    """The SHA-256 of `path`'s bytes, memoized against its change token.
+
+    Raises OSError when the file cannot be read — callers turn that into the
+    ``_UNREADABLE`` fingerprint rather than a silent match."""
+    path = Path(path)
+    st = path.stat() if st is None else st
+    token = _change_token(path, st)
+    key = os.path.normcase(str(path))
+    if token is not None:
+        cached = _DIGEST_MEMO.get(key)
+        if cached is not None and cached[0] == token:
+            return cached[1]
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            block = f.read(_HASH_BLOCK)
+            if not block:
+                break
+            digest.update(block)
+    value = digest.hexdigest()
+    if token is not None:
+        if len(_DIGEST_MEMO) >= _DIGEST_MEMO_MAX:
+            _DIGEST_MEMO.clear()   # bounded: a cleared memo only costs a re-hash
+        _DIGEST_MEMO[key] = (token, value)
+    return value
+
+
 def fingerprint(folder):
-    """A stable identity string over the DATA files directly inside `folder`: a hash of
-    the sorted ``(name, size, mtime_ns)`` tuples plus the file count. Catches a file
-    added / removed / resized / re-timed — unlike a newest-mtime signal, which misses a
-    DELETED (non-newest) file (F5). Excludes Excel lock files, our own sidecars
-    (``.fingerprint.json`` / ``.outcome.json``), and in-flight temp / ``.staging``
-    siblings; sub-directories are ignored (stores are flat per-route folders). An
-    unreadable folder or file yields the ``_UNREADABLE`` sentinel so the caller rebuilds
-    rather than silently matching. Never raises."""
+    """A stable CONTENT identity string over the DATA files directly inside
+    `folder`: a hash of the sorted ``(name, sha256-of-bytes)`` pairs plus the file
+    count. Catches a file added / removed / resized / re-timed AND a same-size,
+    same-timestamp replacement of its bytes (CMP-AUD-080) — the case the v1
+    ``(name, size, mtime_ns)`` fingerprint could not see. Excludes Excel lock
+    files, our own sidecars (``.fingerprint.json`` / ``.outcome.json``), and
+    in-flight temp / ``.staging`` siblings; sub-directories are ignored (stores
+    are flat per-route folders). An unreadable folder or file yields the
+    ``_UNREADABLE`` sentinel so the caller rebuilds rather than silently
+    matching. Never raises.
+
+    The v1 -> v2 schema change makes every fingerprint recorded by an older build
+    compare unequal, so each cell and consolidated workbook reads stale exactly
+    ONCE and rebuilds against content identity (the required metadata-only
+    migration)."""
     folder = Path(folder)
     try:
-        entries = sorted(folder.iterdir(), key=lambda p: p.name)
+        # scandir (not iterdir) so each entry's stat comes from the directory read
+        # already performed — the digest memo then validates without a second one.
+        with os.scandir(folder) as it:
+            entries = sorted(it, key=lambda e: e.name)
     except OSError:
         return _UNREADABLE
     parts = []
@@ -1147,10 +1412,9 @@ def fingerprint(folder):
         try:
             if not e.is_file():
                 continue
-            st = e.stat()
+            parts.append(f"{e.name}\0{content_digest(e.path, st=e.stat())}")
         except OSError:
             return _UNREADABLE
-        parts.append(f"{e.name}\0{st.st_size}\0{st.st_mtime_ns}")
     digest = hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:32]
     return f"v{_FP_SCHEMA}:{len(parts)}:{digest}"
 

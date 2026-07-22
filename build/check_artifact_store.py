@@ -93,7 +93,15 @@ def _xlsx(path, sheet=None, value="x"):
     wb = Workbook()
     if sheet:
         wb.active.title = sheet
-    wb.active["A1"] = value
+    if sheet == "Comparison":
+        # CMP-AUD-115: a typed comparison artifact has to satisfy the commit
+        # boundary's comparison-artifact schema (uniquely labelled Status/Diffs
+        # + a valid status on every row). `value` still varies the bytes so
+        # fixtures can tell two commits apart.
+        wb.active.append(["Route", "Status", "Diffs"])
+        wb.active.append([str(value), "Both", 0])
+    else:
+        wb.active["A1"] = value
     wb.save(str(path))
 
 

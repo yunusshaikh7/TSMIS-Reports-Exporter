@@ -23,6 +23,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
+from _checklib import write_comparison_stub  # noqa: E402
+
 import outcome as oc                  # noqa: E402
 import artifact_store                 # noqa: E402
 import consolidation_meta as cm       # noqa: E402
@@ -67,7 +69,7 @@ def _partial_comparison(path):
         warnings=("TSN source coverage was partial",), pairing_quality="exact")
 
     def produce(tmp):
-        wb = Workbook(); wb.active.title = "Comparison"; wb.save(tmp)
+        write_comparison_stub(tmp)
         return ConsolidateResult(
             status="ok", output_path=str(tmp), verdict="diff",
             completion="partial", skipped_inputs=1, failed_inputs=0,
@@ -84,7 +86,7 @@ def _complete_comparison(path):
         warnings=(), pairing_quality="exact")
 
     def produce(tmp):
-        wb = Workbook(); wb.active.title = "Comparison"; wb.save(tmp)
+        write_comparison_stub(tmp)
         return ConsolidateResult(
             status="ok", output_path=str(tmp), verdict="match",
             completion="complete", skipped_inputs=0, failed_inputs=0,

@@ -17,6 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
+from _checklib import write_comparison_stub  # noqa: E402
+
 import artifact_store  # noqa: E402
 import consolidation_meta as cm  # noqa: E402
 from comparison_contract import ComparisonCounts, ComparisonOutcome  # noqa: E402
@@ -84,15 +86,9 @@ def _producer(mode: str, calls: list[Path]):
     def produce(path: Path):
         path = Path(path)
         calls.append(path)
-        wb = Workbook()
-        wb.active.title = "Comparison"
-        wb.active["A1"] = mode
-        wb.save(path)
+        write_comparison_stub(path)
         if mode == "both":
-            values = Workbook()
-            values.active.title = "Comparison"
-            values.active["A1"] = "both-values"
-            values.save(artifact_store._values_twin(path))
+            write_comparison_stub(artifact_store._values_twin(path))
         return _typed_result(path)
 
     return produce

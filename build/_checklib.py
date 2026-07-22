@@ -85,3 +85,24 @@ class FakeEvents:
 
     def is_cancelled(self):
         return self.cancelled
+
+
+def write_comparison_stub(path, rows=1, diffs=0, sheet="Comparison"):
+    """Write the MINIMAL schema-valid comparison workbook (CMP-AUD-115).
+
+    A stub comparator in this suite stands in for a real one, so its output has
+    to satisfy the same commit-boundary comparison-artifact schema: a sheet named
+    `Comparison` whose header carries UNIQUE `Status` and `Diffs` labels, and
+    data rows whose status is valid (`Both` rows carry a non-negative integer
+    Diffs; one-sided rows carry none). Fixtures that need a deliberately INVALID
+    artifact should keep writing their own workbook."""
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws.append(["Route", "Status", "Diffs"])
+    for i in range(rows):
+        ws.append([f"{i + 1:03d}", "Both", diffs])
+    wb.save(str(path))
+    wb.close()
+    return path

@@ -46,6 +46,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import artifact_store
 import compare_ramp_detail_pdf as rdp
 import compare_ramp_detail_tsn as rd
 import consolidate_tsmis_ramp_detail_pdf as rdpdf
@@ -404,11 +405,13 @@ def _assign_win(words):
 
 def _print_index(path, events=None):
     """Parse one TSN Ramp Detail print into {(county, route, pm): [record]} +
-    the set of districts it covers. Cached on (size, mtime) — the statewide
-    file is indexed once, then every district's locate is a lookup."""
+    the set of districts it covers. Cached on the print's CONTENT identity — the
+    statewide file is indexed once, then every district's locate is a lookup."""
     path = Path(path)
-    st = path.stat()
-    sig = (st.st_size, st.st_mtime_ns)
+    # CMP-AUD-080: keyed on the print's CONTENT identity, not (size, mtime). A
+    # same-size, timestamp-restored replacement used to return the previous
+    # parse without reopening the file.
+    sig = artifact_store.content_digest(path)
     ent = _INDEX_CACHE.get(str(path))
     if ent and ent["sig"] == sig:
         return ent

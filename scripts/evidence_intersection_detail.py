@@ -14,7 +14,7 @@ a pair of highlighted PDF snippets:
   * the TSN locator — the STATEWIDE TASAS print (one file, every district;
     per-district files work too) parsed on its fixed monospace column template,
     with word positions kept so a field maps to a box even when the cell is
-    blank. The whole print is indexed ONCE per file (cached on size+mtime);
+    blank. The whole print is indexed ONCE per file (cached on content identity);
     the engine's per-district locate calls are then dictionary lookups.
   * VERIFICATION projections — a candidate is only usable when the value parsed
     back out of each PDF, run through the comparator's own projections, equals
@@ -40,6 +40,7 @@ try:
 except ImportError:
     _DEPS_OK = False
 
+import artifact_store
 import compare_intersection_detail_tsn as idt
 import consolidate_tsmis_intersection_detail_pdf as idpdf
 from compare_core import _xl_trim, compared_cell
@@ -424,11 +425,13 @@ def _line_rec(page_no, chars):
 
 def _print_index(path, events=None):
     """Parse one TSN Intersection Detail print into {(county, route, pm):
-    [record]} + the set of districts it covers. Cached on (size, mtime) — the
-    statewide file is indexed once, then every district's locate is a lookup."""
+    [record]} + the set of districts it covers. Cached on the print's CONTENT
+    identity — the statewide file is indexed once, then every district's locate is a lookup."""
     path = Path(path)
-    st = path.stat()
-    sig = (st.st_size, st.st_mtime_ns)
+    # CMP-AUD-080: keyed on the print's CONTENT identity, not (size, mtime). A
+    # same-size, timestamp-restored replacement used to return the previous
+    # parse without reopening the file.
+    sig = artifact_store.content_digest(path)
     ent = _INDEX_CACHE.get(str(path))
     if ent and ent["sig"] == sig:
         return ent

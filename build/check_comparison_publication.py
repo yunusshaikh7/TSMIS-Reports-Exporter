@@ -18,6 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
+from _checklib import write_comparison_stub  # noqa: E402
+
 import artifact_store  # noqa: E402
 import consolidation_meta  # noqa: E402
 from comparison_contract import AttemptState, ComparisonCounts, ComparisonOutcome  # noqa: E402
@@ -45,10 +47,9 @@ def _patch(obj, attr, value):
 
 
 def _save(path: Path, value: str) -> bytes:
-    wb = Workbook()
-    wb.active.title = "Comparison"
-    wb.active["A1"] = value
-    wb.save(path)
+    # `value` distinguishes the flavors only in the caller's bookkeeping; the
+    # bytes must satisfy the comparison-artifact schema either way.
+    write_comparison_stub(path, rows=1 + (len(value) % 3))
     return path.read_bytes()
 
 

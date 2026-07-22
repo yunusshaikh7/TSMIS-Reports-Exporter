@@ -13,6 +13,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
+from _checklib import write_comparison_stub  # noqa: E402
+
 import artifact_store  # noqa: E402
 import gui_api  # noqa: E402
 from comparison_contract import ComparisonCounts, ComparisonOutcome  # noqa: E402
@@ -32,10 +34,7 @@ def check(name, condition):
 
 def _producer(completion):
     def produce(path):
-        wb = Workbook()
-        wb.active.title = "Comparison"
-        wb.active["A1"] = "typed comparison"
-        wb.save(path)
+        write_comparison_stub(path)
         typed = ComparisonOutcome(
             status="ok",
             completion=completion,
