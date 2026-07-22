@@ -298,11 +298,15 @@ the 7.8 Excel exports; every residual class explained):
   to a producer-owned PARTIAL.
 - **`compare_highway_sequence_pdf.py`** — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, the
   `compare_highway_detail_pdf` parallel riding `compare_highway_sequence_tsn`'s loaders +
-  schema, each flavor with its OWN Notes sheet (the print's TSN-style equates make
-  PDF-vs-TSN pair BETTER than Excel-vs-TSN — both 57,505 vs 57,071, diff cells 4,930 vs
-  5,521 on the 7.8/7.9 sets — while PDF-vs-Excel documents the equate-representation
-  classes; identical 59,082 of 59,946 both, one-sided 547/547). The self-check caught the
-  Excel export DROPPING a Description the print carries (route 037 PM 003.809).
+  schema, each flavor with its OWN Notes sheet. The print's TSN-style equates make
+  PDF-vs-TSN pair BETTER than Excel-vs-TSN (current same-run 7.9 canary: both 57,505 /
+  asserted 4,916 rows / 5,001 cells vs Excel's 57,072 / 4,894 / 5,589), while PDF-vs-Excel
+  compares the two renders' representation classes directly — **60,493 paired / 0 PDF-only /
+  1 Excel-only; asserted 1,410 rows / 3,721 cells (Desc 1,133, FT 1,129, HG 910, PM Suffix
+  549)**. The v0.25.0 self-check's "route 037 dropped Description" was later proven a
+  CROSS-BUNDLE artifact (a 7.8 Excel read against a 7.9 print; the same-run Excel carries
+  it — CMP-AUD-193), and the same-run pair's real residual is five unrepresented
+  Description claims, kept visible. See [tsn-parsers.md](tsn-parsers.md).
 - **`evidence_highway_sequence.py`** (v0.25.0) — evidence images for BOTH Highway
   Sequence rows: the highway-log pattern (per-print SENTINEL routing — HSL rows carry no
   district; records carry their own src/dist/cnty from the prints' "DIST NN RTE NNN"

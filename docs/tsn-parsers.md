@@ -228,22 +228,26 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   2026-07-16):** TSN normalized **69,804 rows / 263 routes** (68,806 data + 998 equates; 46 blank-county;
   565 pointer tokens; 154 numeric-prefix Descriptions). Leg shapes (paired / TSMIS-only / TSN-only):
   Excel-vs-TSN **57,072 / 3,422 / 12,732**; PDF-vs-TSN **57,505 / 2,988 / 12,299**; PDF-vs-Excel
-  **60,493 / 0 / 1** with PM Suffix 549 · HG 910 · FT 1,129 compared cells exact. Live asserted cells:
-  Excel **5,582** / PDF **4,995** / PDF↔Excel **3,725** — each an EXACTLY-attributed distance from the
-  Stage-8 oracle's 5,589 / 5,001 / 3,721 (**CMP-AUD-220**'s assignment objective: −7 = −10 Desc + 3 FT and
-  −6 = −9 + 3, the finding's own arithmetic; **CMP-AUD-197**'s four `_x000d_` cells: +4). Re-pairing the
-  same loaded rows under the oracle's objective reproduces the oracle table exactly, so these numbers MOVE
-  when 220/197 land — never re-bless the live counts as source truth while those stay open.
+  **60,493 / 0 / 1** with PM Suffix 549 · HG 910 · FT 1,129 compared cells exact. Live asserted counts
+  (post-CMP-AUD-220/197, 2026-07-16 — the product engine lands on the Stage-8 oracle table EXACTLY;
+  replay-confirmed through the shipped matrix path on the current tip 2026-07-22, CMP-AUD-193):
+  Excel-vs-TSN **4,894 rows / 5,589 cells** {Description 4,894, FT 695}; PDF-vs-TSN **4,916 / 5,001**
+  {Description 4,916, FT 85}; PDF↔Excel **1,410 / 3,721** {Desc 1,133, FT 1,129, HG 910, PM Suffix
+  549}; zero literal `_x000d_` survives the vs-TSN loaders.
   *(Historical v3 canary, superseded: 6.19 set — 69,758 TSN rows, both 57,070, FT 699 / Description 4,839
   under the old symmetric-strip semantics; kept only to date the change.)*
-- **Stage-8 current-source correction (2026-07-13; product remediation pending):** the
-  7.8-Excel/first-7.9-PDF figures below are a historical cross-bundle fixture. The
-  freshest same-run pair contains **60,494 Excel / 60,493 PDF** rows; route 037
-  `003.809` is fixed, four paired PDF Descriptions are blank, and one described Excel
-  row is absent from PDF. Installed Excel decodes the four lowercase `_x000d_` cells
-  to CRLF. PDF↔Excel identity is Route + County + prefix + base PM + occurrence with
-  suffix asserted; vs-TSN retains full printed PM identity. The shipped comparator and
-  Notes remain red until remediation.
+- **Stage-8 current-source resolution (found 2026-07-13; product landed 2026-07-16;
+  CMP-AUD-193 closed 2026-07-22):** the 7.8-Excel/first-7.9-PDF figures below are a
+  historical CROSS-BUNDLE fixture — never current truth. The freshest same-run pair
+  contains **60,494 Excel / 60,493 PDF** rows; route 037 `003.809` is FIXED in the
+  same-run Excel (the July-9 Excel refresh added six Descriptions + one row on routes
+  002/010/037/101), four paired PDF Descriptions are blank, and one described Excel
+  row is absent from PDF — five unrepresented Description claims, preserved as visible
+  differences. Installed Excel decodes the four lowercase `_x000d_` cells to CRLF
+  (CMP-AUD-197). PDF↔Excel identity is Route + County + prefix + base PM + occurrence
+  with "PM Suffix" a COMPARED column (CMP-AUD-199); vs-TSN retains full printed PM
+  identity; duplicate assignment follows the CMP-AUD-220 source-identity objective.
+  The shipped comparator now matches the Stage-8 oracle exactly (the canary above).
 - **Historical — re-verified on the 7.8 statewide bundle (v0.24.0 audit; the July-2026 site update did NOT
   reshape HSL):** the per-route export format is UNCHANGED (positional map still exact, `SD.`
   trailing periods and `<route>/` description prefixes still present); rebuilding the library
@@ -270,13 +274,16 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
   TSN convention — annotation "EQUATES TO <label>" with HG/FT/Distance blank + `E` on the
   equated plain postmile — where Excel writes the label alone and seats `E` differently:
   blanked-FT 1,129 / blanked-HG 910 / anno-desc 716 / suffix-moved 549 / "PM EQUATION" 413)
-  plus 4 Excel `_x000D_` literal escapes and ONE genuine Excel defect (route 037 PM 003.809 —
-  the Excel export drops a Description the print carries). Flavor canaries (7.9 PDFs vs the
-  7.8 TSN/Excel): **PDF-vs-TSN both 57,505 / only 2,988+12,253 / diffs 4,930 / identical
+  plus 4 Excel `_x000D_` literal escapes and one row then read as an Excel-dropped
+  Description (route 037 PM 003.809 — **later proven a cross-bundle artifact, not an Excel
+  defect**: the pairing put a 7.8 Excel against a 7.9 print, and the same-run July-9 Excel
+  carries the Description; see the resolution bullet above / CMP-AUD-193). Historical
+  cross-bundle flavor canaries (7.9 PDFs vs the 7.8 TSN/Excel — the `HSL-PDF-79` fixture,
+  never current): **PDF-vs-TSN both 57,505 / only 2,988+12,253 / diffs 4,930 / identical
   52,659 / routes 242/10/21** (pairs BETTER than Excel-vs-TSN — the equates key-match);
   **PDF-vs-Excel both 59,946 / one-sided 547/547 / diffs 1,722 on 864 rows / identical
-  59,082** (== the independent positional verify, exactly). Scripts + expected numbers:
-  `ground-truth/HSL PDF + IS Bundle 7.9/_verification-scripts/`.
+  59,082** (== the independent positional verify of that historical pairing, exactly).
+  Scripts + expected numbers: `ground-truth/HSL PDF + IS Bundle 7.9/_verification-scripts/`.
 
 ### Intersection Summary — TSN  *(Stage-8 source-bound contract; current product has documented red paths)*
 - **TSMIS side:** current per-route XLSX ×217 (the older 6.19 edition has ×218), **sheet

@@ -806,16 +806,21 @@ in blue on the **"Report View"** replica (the printed two-line TASAS record, via
 
 ### 9g. TSMIS vs TSN Highway Sequence — `compare_highway_sequence_tsn.py` (FLAT, route+**county**+PM)
 
-> **Stage-8 current-source correction (2026-07-13; product remediation pending):**
-> the v0.24/v0.25 counts below bind the historical 7.8-Excel/first-7.9-PDF fixture,
-> not the freshest same-run pair. Current truth is 60,494 Excel / 60,493 PDF rows:
-> route 037 `003.809` is fixed, four paired PDF Description cells are blank, and one
-> described Excel row is absent from PDF. Installed Excel decodes the four lowercase
-> `_x000d_` strings to CRLF. For PDF↔Excel, identity must be Route + County + prefix +
-> base PM + occurrence and suffix must be asserted; the shipped glued-suffix behavior
-> cross-pairs route 152 and suppresses the 549 suffix-cell truth. Full printed PM remains
-> source-proven identity for vs-TSN. The historical canaries remain useful versioned
-> fixtures but must not be presented as current acceptance.
+> **Stage-8 current-source resolution (found 2026-07-13; product landed 2026-07-16;
+> CMP-AUD-193 closed 2026-07-22 with a shipped-path replay on the current tip):** the
+> v0.24/v0.25 counts bound the historical 7.8-Excel/first-7.9-PDF CROSS-BUNDLE fixture,
+> not same-run truth. Current truth is the same-run `All Reports 7.9` pair — 60,494
+> Excel / 60,493 PDF rows: route 037 `003.809` is FIXED in the same-run Excel (the
+> "Excel drops a Description" story was a cross-bundle artifact — a 7.8 Excel read
+> against a 7.9 print; the July-9 Excel refresh added six Descriptions + one row on
+> routes 002/010/037/101), four paired PDF Description cells are blank, and one
+> described Excel row is absent from PDF (five unrepresented Description claims, all
+> preserved as visible differences). Installed Excel proves the four lowercase
+> `_x000d_` cells are CRLF (CMP-AUD-197 decodes them). PDF↔Excel identity is Route +
+> County + prefix + base PM + occurrence with **"PM Suffix" a COMPARED column**
+> (CMP-AUD-199) and duplicate assignment under the CMP-AUD-220 source-identity
+> objective; full printed PM remains identity for vs-TSN. The historical canaries stay
+> named versioned fixtures (`HSL-78`, `HSL-PDF-79`) and are never current acceptance.
 
 The FLAT recipe with a **county-relative key** — the direct analog of the Highway Log comparison (a
 postmile-sequence listing with the same "TSN lists more segment breaks, TSMIS more realignment markers"
@@ -832,17 +837,20 @@ reconciliations: **(1)** County trailing-period strip (`LA.`→`LA` etc. — els
 `context_fields` = **HG** (TSMIS blanks it for whole counties), **City** (TSN tags it far more
 aggressively), **Distance To Next Point** (measured to each system's OWN next listed point — a listing-
 granularity artifact, not a disagreement) — shown, never counted; **FT + Description are compared**, with a
-**Notes sheet** (`legend_writer`) indicating all of this. Canary in [tsn-parsers.md](tsn-parsers.md):
-**57,070 both / 3,369 only-TSMIS / 12,688 only-TSN; 5,538 counted diffs (FT 699 + Description 4,839; 0 in
-context); 60,439 vs 69,758 rows; 242 routes both**. Live in both matrices — completing all 6 reports + HL-PDF.
+**Notes sheet** (`legend_writer`) indicating all of this. Current canary in
+[tsn-parsers.md](tsn-parsers.md) (same-run 7.9 pair + v4 TSN library, == the Stage-8 oracle exactly):
+**both 57,072 / only-TSMIS 3,422 / only-TSN 12,732; asserted 4,894 rows / 5,589 cells (Description
+4,894 + FT 695); 60,494 vs 69,804 rows**. Live in both matrices — completing all 6 reports + HL-PDF.
 `compare_highway_sequence_pdf` (v0.25.0) adds `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL` (the exact
 §9f-PDF parallel, riding this module's loaders + schema) — each flavor carries its OWN Notes sheet
 because the print represents EQUATES the TSN way (annotation row + `E` on the equated postmile), so
-PDF-vs-TSN pairs BETTER than Excel-vs-TSN (7.8/7.9 canary: both **57,505** / diffs **4,930** vs
-57,071 / 5,521) while PDF-vs-Excel surfaces the two renders' representation classes by design
-(both **59,946** / one-sided **547/547** / identical **59,082**; residual = 4 Excel `_x000D_`
-escapes + the route-037 Description the Excel export drops). Parser + canaries:
-`ground-truth/HSL PDF + IS Bundle 7.9/_verification-scripts/`.
+PDF-vs-TSN pairs BETTER than Excel-vs-TSN (current canary: both **57,505** / asserted **4,916 rows /
+5,001 cells** vs Excel's 57,072 / 4,894 / 5,589) while PDF-vs-Excel surfaces the two renders'
+representation classes as COMPARED truth (**60,493 paired / 0 PDF-only / 1 Excel-only; asserted
+1,410 rows / 3,721 cells — Description 1,133, FT 1,129, HG 910, PM Suffix 549**; the four Excel
+`_x000D_` escapes decode as same-source CRLF, and the once-reported route-037 "dropped Description"
+was the cross-bundle artifact — see the banner above). Historical cross-bundle figures are retired
+to `HSL-PDF-79`. Parser + scripts: `ground-truth/HSL PDF + IS Bundle 7.9/_verification-scripts/`.
 
 ### 9c. Cross-environment — `compare_env.py` (the `"folders"` family)
 

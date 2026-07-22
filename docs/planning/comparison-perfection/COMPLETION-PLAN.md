@@ -23,7 +23,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
 | **Gate** | **144/144** full-suite checks (Python + JS) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **242 total · 223 CLOSED (Resolved/Remediated) · 19 open** (92% closed; verified against every per-entry `Status:` line 2026-07-22). The 19: **193** (NORM, the only actionable normalization finding) · **242** (PATH ⛔ must-ship) · **80 85 89 115** (DUR — 085 decided LAST-COMPLETE) · **98 106 108 109 208 209 210** (EV-10, Stage-10 published-cell rebuild) · **187** (audit instrument, perf only) · **133 142 186 192 + 045-HD** (⛔ HD pre-release — deferred to the owner's official HD delivery; never infer). ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
+| **Findings** | **242 total · 225 CLOSED (Resolved/Remediated) · 17 open** (93% closed; verified against every per-entry `Status:` line 2026-07-22; S0 closed 193 + 242). The 17: **80 85 89 115** (DUR — 085 decided LAST-COMPLETE) · **98 106 108 109 208 209 210** (EV-10, Stage-10 published-cell rebuild) · **187** (audit instrument, perf only) · **133 142 186 192 + 045-HD** (⛔ HD pre-release — deferred to the owner's official HD delivery; never infer). ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
 | **Next action** | **See the ▶ RESUME HERE block below — it is the ONLY live next-action surface.** (The dated per-batch resolution notes that used to live in this cell are recorded where they belong: each finding's ledger entry, the dated resume blocks below, and git history. Keeping a second prose copy here is what caused the stale-directive incidents.) |
 
 ## Marathon roadmap to completion (2026-07-18)
@@ -43,7 +43,7 @@ its findings back-to-back, then update this roadmap.
 | **M9** ◑ | Completion / partial-artifact policy + transaction (bucket E) | ~~035 040 075~~ · 085 098 115 | **PARTIAL 2026-07-18 — 3 closed (035 040 075), 3 DEFERRED.** 035 direct-builder post-`os.replace` recheck; 040 folder run-root/subfolder aliasing; 075 closed-by-082. **DEFERRED:** 115 (deep commit-schema gate on the correctness-locked path — read half already fixed; needs exhaustive per-comparator census), 098 (evidence-gate half = Stage-10), 085 (owner-gated last-complete/latest-attempt policy + Phase-5/7 durable overlay — with 089). |
 | ~~**BIG-1**~~ ◑ | **Evidence arc — bucket F. DONE to the tractable line: 107/110/112 ✅ + 106/109 partial + the layout feature (2026-07-18/19).** The remainder is EV-10 below. | ~~106~~ ~~107~~ ~~109~~ ~~110~~ ~~112~~ + 108 · 208 209 210 · 098 | 107 (compared_cell equality), 110 (queued-evidence identity), 112 (parse↔render byte digest) CLOSED; 106 (retire-stale-on-clean) + 109 (workbook+images one set) PARTIAL. What's left is the Stage-10 published-cell spine → **EV-10**. |
 | **EV-10** | **Evidence — Stage-10 published-cell rebuild + transaction completion (7)** | 108 · 208 209 210 · 098 · 106↺ 109↺ | The coherent evidence remainder. **ONE spine:** drive evidence from the PUBLISHED comparison — its per-cell E/D/N/U state masks + the persisted `pairing_trace` + per-column counts — instead of re-executing `adapter.load_sides`/`enumerate_diffs` (**208**), so duplicate-only diffs stop vanishing (**108**) and no discrepancy class is excluded before sampling (**209**); each item names flavor/sheet/row/cell/state/source-indices/provenance and an INDEPENDENT raw-source oracle recomputes it (the acceptance bar). Then the source-faithful Excel / PDF-vs-Excel routes (**210**, own mini-plan) + the durable per-comparison generation MANIFEST that finishes **106** (no-example/toggle-off/restart) + the evidence-gate read-set snapshot (**098**). The **109** two-phase residual (a quarantine-based two-artifact atomic commit so the images-locked case rolls both back) rides here too. **The CLAUDE.md-flagged "HSL not yet an end-to-end verifier" gap.** Investigation (2026-07-19): the truth is persisted as Excel formulas/value caches → needs a state-mask/pairing-trace decoder + the raw-source oracle = **Stage-9/10, a dedicated multi-session effort, NOT a marathon slice.** Detail: the `#### Disposition — 2026-07-19` note at CMP-AUD-208. |
-| **NORM** ◑ | **Source normalization fidelity — bucket G — 1 actionable, 3 DEFERRED** | HD (⛔ pre-release, deferred): ~~042~~ 133◑ ~~138~~ 142 186 · IS/HSL: ~~144~~ ~~145~~ **193 ← the only actionable one** | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
+| ~~**NORM**~~ ✅ | **Source normalization fidelity — bucket G — ACTIONABLE SIDE COMPLETE 2026-07-22** | ~~042~~ ~~138~~ ~~144~~ ~~145~~ ~~193~~ · HD-deferred (⛔ pre-release): 133◑ 142 186 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
 | **DUR** | **Phase-5/7 durability & policy — the OWNER-GATED cluster (4)** | 080 085 089 115 | The deferred durable-attempt-overlay / policy / commit-schema family. **085 DECIDED 2026-07-21 — LAST-COMPLETE** (a partial refresh KEEPS LAST-GOOD: reported and retryable, never overwriting verified bytes, never promoted to canonical; the docs were the intended policy and the shipped replace-and-flag is the drift). DUR is unblocked. Its policy-independent false-green defects — a partial caching `partial` while its own Summary says `✓ EVERYTHING MATCHES`, a partial zero-diff cell rendering primary `✓ match`, no first-class retry state, evidence rendering off a partial with no warning — are wrong under EITHER policy and must be fixed regardless **+** a durable attempt overlay (Phase-5/7); **089** is that overlay (a crashed rebuild silently reverts to the old ✓); **080** source-fingerprint content identity (per-cell-per-snapshot perf-cache); **115** the commit-boundary schema gate + its exhaustive per-comparator census. **Read `comparison-phase3-decision-gates.md` + the Phase-5 policy notes FIRST; surface the 085 policy decision.** "Correct today, hardening tomorrow" — no live false-green; durability + defense-in-depth. |
 
 | ~~**PATH**~~ ✅ | **MAX_PATH — RESOLVED 2026-07-22 (rides the completion release)** | ~~242~~ | **Chunk basenames 167→71 chars** (16-hex name abbreviations; manifests keep + verify the FULL digests); legacy full-hex names stay readable in manifest validation, fingerprint exclusion, and reclamation. **Two UNCONDITIONAL gates** now in `check_comparison_path_limits` — field-depth arithmetic (was 270>260, now 174) and a real publication with the OS shimmed to refuse ≥260 — both red on the old code for exactly the field failure, green now; neither can be skipped by a long-path-aware dev box. Real-corpus: a legacy-named real HSL publication reads trusted under the new code (5,589/16,154 intact), and the shipped path over the real 126-route RD corpus publishes 71-char names canary-EXACT (843/202). Per the owner's 2026-07-22 policy the fix ships with the completion release (no interim tags); CHANGELOG section sits under "Unreleased". Full detail: CMP-AUD-242. |
@@ -53,9 +53,9 @@ its findings back-to-back, then update this roadmap.
 > they were resolved (2026-07-14/17/18); on 2026-07-22 the ledger's INDEX table itself was caught
 > stale (042/138/144/145 still "Verified" after their entries said Resolved; 242 missing) and was
 > reconciled. When a finding closes, update its entry Status line AND its index-table row AND this
-> roadmap together. Full-parse-verified count 2026-07-22: **19 open** — NORM 1 actionable (193) ·
-> PATH 1 (242) · DUR 4 (080/085/089/115) · EV-10 7 (098/106/108/109/208/209/210) · 187 ·
-> HD-pre-release-deferred 133/142/186/192 + 045-HD.
+> roadmap together. Full-parse-verified count 2026-07-22 (post-S0): **17 open** —
+> DUR 4 (080/085/089/115) · EV-10 7 (098/106/108/109/208/209/210) · 187 ·
+> HD-pre-release-deferred 133/142/186/192 + 045-HD. ~~193~~ and ~~242~~ closed in S0.
 
 > ### ⛔ HIGHWAY DETAIL IS PRE-RELEASE — OWNER, 2026-07-21
 >
@@ -99,16 +99,26 @@ re-check on the next statewide HD batch.)
 - **Owed small:** **061** evidence-locator per-page polling; **054** line-2-band recovery for
   `evidence_highway_detail.py` (17 fallback pages share the old doc-median → mis-aligned images).
 
-**REMAINING WORK TOTAL: 19 findings** (223/242 closed, 92%) — **193** (NORM's one actionable) ·
-**242** (PATH ⛔) · **DUR** (4) · **EV-10** (7) · 187 · HD-pre-release-deferred 133/142/186/192 +
-045-HD. The correctness-critical core AND the tractable evidence findings are done; nothing open
-is a live false-green today. **ACTIVE ORDER (owner, 2026-07-22): 193 → 242 → as much of DUR as
-possible**, then EV-10 (the deepest; Stage-9/10, a dedicated effort, LAST). The HD block resumes
-only when the owner delivers the official Highway Detail exports.
+**REMAINING WORK TOTAL: 17 findings** (225/242 closed, 93%) — **DUR** (4) · **EV-10** (7) ·
+187 · HD-pre-release-deferred 133/142/186/192 + 045-HD. S0 (193 + 242) is CLOSED. Nothing open
+is a live false-green today. **ACTIVE ORDER: the three compressed marathons — M-A (all of DUR
++ 187) → M-B (evidence spine 208/108/209) → M-C (210/106/109/098 + closeout + the completion
+release).** The HD block resumes only when the owner delivers the official Highway Detail
+exports.
 
-> ### ▶ RESUME HERE (2026-07-22 — ledger reconciled; ACTIVE ORDER: 193 → 242 → DUR)
+> ### ▶ RESUME HERE (2026-07-22 — S0 CLOSED: 193 + 242 done; NEXT = M-A, the DUR marathon)
 >
-> **Gate 144/144 · released v0.27.4 · 223 closed / 19 open of 242 (full-parse-verified).**
+> **Gate 144/144 · released v0.27.4 (no interim tags — completion release only) ·
+> 225 closed / 17 open of 242 (full-parse-verified).**
+>
+> **S0 CLOSED (2026-07-22).** CMP-AUD-242 resolved (`a0c53fb`, CI green): chunk names
+> 167→71, legacy readable, two unconditional field-depth gates red→green, RD real-corpus
+> canary-exact, live-store short/legacy coexistence proven. CMP-AUD-193 resolved: the
+> shipped-path final replay reproduced ALL THREE HSL legs per-column digit-exact
+> (5,589 {4,894+695} · 5,001 {4,916+85} · 3,721 {549+910+1,129+1,133}, shapes exact,
+> route-037 paired, five unrepresented Description claims visible); docs qualified;
+> HSL-PDF-79 bound historical. Replay note for future harnesses: matrix mode ids are
+> env/tsn/vs_pdf/vs_excel — `_mode_by_id` defaults unknown ids to env.
 >
 > **RECONCILIATION PASS DONE (owner-directed).** All 242 per-entry `Status:` lines were parsed
 > and diffed against the ledger index table and this plan. The index table itself had drifted
@@ -122,8 +132,8 @@ only when the owner delivers the official Highway Detail exports.
 >
 > **MARATHON SPLIT TO DONE (owner-directed COMPRESSION, 2026-07-22 — "we need this
 > done by tomorrow"): THREE autonomous marathons after S0, each as long as it takes.**
-> - **S0 (current, finishing)** — 193 (two legs canary-exact; leg 3 computing) +
->   **242 ✅ committed `a0c53fb`, CI green**.
+> - ~~**S0**~~ ✅ **CLOSED 2026-07-22** — 193 (all three legs per-column canary-exact
+>   through the shipped path) + 242 (`a0c53fb`, CI green, live-store coexistence proven).
 > - **M-A · THE DUR MARATHON — all of Phase-5/7 in one run: 085 + 089 + 080 + 115 + 187.**
 >   085-core last-complete/keep-last-good publication (divert-then-promote in
 >   `_consolidate_store_folder`; a partial NEVER overwrites a complete canonical) +

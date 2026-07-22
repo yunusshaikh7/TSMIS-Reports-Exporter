@@ -473,7 +473,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-190 | P2 | Remediated in accepted audit artifact | Highway Detail formula/value gate requires source-sheet counts both different and equal |
 | CMP-AUD-191 | P1 | Remediated in accepted Stage-8 oracle | Highway Detail can classify but still leave 298 County-less Excel rows physically unattributed |
 | CMP-AUD-192 | P1 | Verified source-export delta; version-separated in accepted oracle; DEFERRED — the 7.7/7.9 skew is inherent to HD's accidental pre-release window (owner 2026-07-21), resolves with the official HD delivery | Highway Detail route-005 Excel is a stale 7.7 payload beside a later PDF whose DCR owner changed on eight identical rows |
-| CMP-AUD-193 | P1 | Current source correction proved; product publication and final replay pending | Highway Sequence current parity can inherit a stale cross-bundle residual and omit six July-9 Excel updates |
+| CMP-AUD-193 | P1 | Resolved 2026-07-22 (same-run truth bound + HSL-PDF-79 historical binding completed + docs qualified + shipped-path final replay per-column exact on all three legs: 5,589 / 5,001 / 3,721) | Highway Sequence current parity can inherit a stale cross-bundle residual and omit six July-9 Excel updates |
 | CMP-AUD-194 | P2 | Remediated in independent source-oracle draft | Highway Sequence source oracle treats two visually composed legend labels as contiguous PDF text |
 | CMP-AUD-195 | P2 | Remediated in independent source-oracle draft | Highway Sequence source oracle confuses harmless header-label width movement with a changed data grid |
 | CMP-AUD-196 | P2 | Remediated and installed-Excel verified in source-oracle draft | Highway Sequence display projection recognizes only one case of the OOXML carriage-return escape |
@@ -8217,7 +8217,57 @@ not a product or audit defect erased by acceptance.
 ### CMP-AUD-193 — Highway Sequence current parity can inherit a stale cross-bundle residual and omit July-9 Excel updates
 
 Priority: P1  
-Status: Current source correction proved; product publication, permanent gate, and final replay pending  
+Status: **RESOLVED 2026-07-22** — all four correction/acceptance requirements met; the
+final replay through the SHIPPED path on the current tip reproduced all three product
+legs per-column digit-exact against the bound canaries (details in the remediation
+block below)
+
+**Remediation (2026-07-22).** The four correction/acceptance requirements, each met:
+
+1. *Stage 8 binds the complete same-run trees and establishes actual parity* — the
+   `HSL-79-current` census (60,494 Excel / 60,493 PDF rows; 60,493 semantic pairs /
+   0 PDF-only / 1 Excel-only; five unrepresented Description claims) and the
+   2026-07-14 final Stage-8 base binding (two byte-identical family replays).
+2. *The 7.8-Excel + first-7.9-PDF pair stays a separately named historical
+   cross-edition fixture* — `HSL-PDF-79` is now bound `historical` with its role
+   manifests (7.8 Excel tree `4bb04028…`, byte-identical first/current 7.9 PDF tree
+   `072e538e…`) and this entry's frozen route-037 exemplar hashes; never current.
+3. *The oracle freezes the six old→current Excel changes and classifies the 4+1
+   residual independently of equate representation* — frozen in this entry (routes
+   002/010/037/101), proven by the accepted Stage-8 oracle + the direct-source r2
+   checkpoint; `phase8_highway_sequence_comparison.py` pins the route-037
+   occurrence explicitly.
+4. *Unqualified documentation corrected only after the statewide proof* —
+   `docs/comparison-engine.md` §9g, `docs/tsn-parsers.md` (live counts → the
+   post-220 oracle-exact canaries; the "Excel drops a Description" story qualified
+   as a cross-bundle artifact), `docs/reports.md`, `docs/roadmap.md`. The old
+   source facts are preserved everywhere (this entry, the historical fixture rows,
+   the v0.25.0 changelog), never deleted; the historical canary was not re-blessed.
+
+**Final replay (2026-07-22, current tip `a0c53fb`-era tree, SHIPPED path only):**
+`ConsolidateWorker` + `tsn_library.build_consolidated` rebuilt the TSN library from
+the 12 bound raw district PDFs (v4 certificate verified on disk — all four identity
+keys), then `MatrixCompareWorker`/`matrix.build_comparison` over an app-owned store
+holding the real 252-Excel + 252-PDF `All Reports 7.9` same-run corpus produced all
+three legs with typed complete generations, cache records, and Summary sheets
+PER-COLUMN EXACT against the bound canaries:
+
+- Excel-vs-TSN: 60,494/69,804 rows · 57,072 both / 3,422 / 12,732 · 4,894 differing
+  rows / **5,589 cells {Description 4,894, FT 695}** · routes 242/10/21;
+- PDF-vs-TSN: 60,493/69,804 · 57,505 / 2,988 / 12,299 · 4,916 / **5,001
+  {Description 4,916, FT 85}** · routes 242/10/21;
+- PDF-vs-Excel (`vs_excel`): 60,493 pairs / 0 PDF-only / 1 Excel-only · routes
+  252/0/0 · 1,410 differing rows / **3,721 cells {PM Suffix 549, HG 910, FT 1,129,
+  Description 1,133}** · 59,083 fully identical — route 037 `003.809` pairs
+  identically (fixed in the same-run Excel), and the five unrepresented Description
+  claims remain visible differences.
+
+Replay harnesses (session artifacts): `hsl193_replay.py` / `hsl193_leg3.py`
+(scratchpad; drive only shipped entry points and assert cache records + workbook
+Summary label-located values). One harness-side note for future replays: matrix
+mode ids are `env`/`tsn`/`vs_pdf`/`vs_excel` — `_mode_by_id` silently defaults an
+unknown id to env mode (a harness passing "self" gets the env-mode baseline
+refusal, not an unknown-mode error).  
 Primary evidence: route 037 PM `003.809` in the HSL 7.8 Excel, first 7.9 PDF bundle,
 and current `All Reports 7.9` same-run Excel/PDF pair
 

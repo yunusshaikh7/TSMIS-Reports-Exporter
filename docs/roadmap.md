@@ -569,8 +569,9 @@ or accept as someday.**
   (`consolidate_tsmis_highway_sequence_pdf` — wrapped-desc hyphen-aware rejoin, PM-less rows, the
   diagnostics-trailer hard stop; 60,493/60,493 parse-back), `compare_highway_sequence_pdf`
   (PDF↔TSN pairs BETTER than Excel↔TSN — the print shares TSN's equate convention; PDF↔Excel
-  caught the route-037 Excel-dropped Description), both matrix rows + all special-case mirrors,
-  and the evidence adapter above.
+  flagged a route-037 "Excel-dropped" Description — later proven a cross-bundle artifact of
+  pairing a 7.8 Excel with a 7.9 print, not an Excel defect; CMP-AUD-193), both matrix rows +
+  all special-case mirrors, and the evidence adapter above.
 - [x] **Ramp Detail (PDF) integration — DONE (v0.26.0, unreleased).** Off the first real work-PC
   pair (`ground-truth/All Reports 7.9`, 126 routes): the census-first print parser
   (15,216/15,216 parse-back, 0 unclassified/strays), `consolidate_tsmis_ramp_detail_pdf` (the
