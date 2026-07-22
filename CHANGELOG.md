@@ -3,6 +3,21 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.27.3 — 2026-07-21
+
+### Fixed
+- **"Built by an older normalizer" now says which versions.** A Highway Log
+  rebuild that completed cleanly — 380 files, 60,083 rows, nothing skipped or
+  failed — still reported the report as out of date, in the same second, and
+  again after a restart. "Rebuild it" is useless advice when a rebuild has just
+  run. That verdict is a single yes/no built from two numbers that were never
+  shown: the normalizer version recorded when the library was built, and the
+  version this app expects. Both are reported now, and three cases that used to
+  read identically are distinguished — a genuinely older stamp ("built by
+  normalizer version 3, this app expects 5"), a build record carrying no version
+  at all, and a version stored in an unusable form. No freshness logic changed;
+  the same libraries are current as before.
+
 ## v0.27.2 — 2026-07-21
 
 ### Fixed
