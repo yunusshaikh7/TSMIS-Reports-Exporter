@@ -53,6 +53,7 @@ Console-free; engine in compare_core.
 import dataclasses
 import logging
 import re
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from pathlib import Path
 
@@ -209,13 +210,26 @@ def pm_suffix(token, e_ind=None):
 
 def _norm_len(v):
     """Length to the printed 3-decimal form ('000.011'): TSN stores raw DB
-    precision (0.01098) where TSMIS prints the fixed 3-decimal mile."""
+    precision (0.01098) where TSMIS prints the fixed 3-decimal mile.
+
+    Quantized from the EXACT decimal value, never through binary64 (CMP-AUD-138).
+    0.0135 has no exact float representation, so `float()` lands just below the
+    tie and formats 000.013 while the source value and the D01 print both say
+    000.014. Statewide census of the raw TSN workbook: 60,083 LENGTH values, the
+    binary64 path is wrong on exactly one (row 32565, lexical `1.35E-2`), and
+    half-up and half-even agree on every one of them — so the mode below is
+    documented rather than load-bearing. Half-up matches the report's own
+    round-half-away-from-zero rendering.
+    """
     s = _s(v)
     if not s:
         return ""
     try:
-        return f"{float(s):07.3f}"
-    except ValueError:
+        d = Decimal(s)
+        if not d.is_finite():
+            return s
+        return f"{d.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP):07.3f}"
+    except (InvalidOperation, ValueError):
         return s
 
 

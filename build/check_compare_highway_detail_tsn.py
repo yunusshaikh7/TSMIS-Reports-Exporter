@@ -144,6 +144,27 @@ def test_schema():
     check("length: raw DB precision -> the printed 3-decimal mile "
           "(0.01098 -> '000.011')",
           hdt._norm_len(0.01098) == "000.011" and hdt._norm_len("000.055") == "000.055")
+    # CMP-AUD-138: quantize the EXACT decimal, never through binary64. 0.0135 has
+    # no exact float form, so float() lands below the tie and yields 000.013 where
+    # the source value and the D01 print both say 000.014. Statewide census: this
+    # is the ONLY one of 60,083 LENGTH values the float path got wrong.
+    check("length: the exact decimal tie rounds up, not through binary64 "
+          "(row 32565, '1.35E-2' -> '000.014')",
+          hdt._norm_len("1.35E-2") == "000.014"
+          and hdt._norm_len(0.0135) == "000.014"
+          and hdt._norm_len("0.0135") == "000.014")
+    check("length: the OTHER accepted allowlist row does not move "
+          "(row 32564, '7.4999999999999997E-3' -> '000.007')",
+          hdt._norm_len("7.4999999999999997E-3") == "000.007")
+    check("length: tie neighbours, sign and carry boundaries hold",
+          hdt._norm_len("0.0134") == "000.013"
+          and hdt._norm_len("0.0136") == "000.014"
+          and hdt._norm_len("-1.35E-2") == "-00.014"
+          and hdt._norm_len("0.9995") == "001.000"
+          and hdt._norm_len("99.9995") == "100.000")
+    check("length: blank, non-numeric and non-finite pass through unchanged",
+          hdt._norm_len("") == "" and hdt._norm_len("n/a") == "n/a"
+          and hdt._norm_len("NaN") == "NaN" and hdt._norm_len(None) == "")
     check("Med WDA glue: TSN 14+'Z' == TSMIS '14Z'; '8V' pads to '08V'",
           hdt._norm_wda("14Z") == "14Z" and hdt._norm_wda("8V") == "08V")
     check("dates: a datetime cell renders to the printed YY-MM-DD text",
