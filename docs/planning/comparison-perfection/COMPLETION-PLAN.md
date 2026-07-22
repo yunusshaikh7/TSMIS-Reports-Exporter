@@ -120,44 +120,43 @@ only when the owner delivers the official Highway Detail exports.
 > (already implemented + red→green; its CHANGELOG section sits under "Unreleased") plus
 > everything below. Do not cut interim tags; version.py stays 0.27.4 until then.
 >
-> **MARATHON SPLIT TO DONE (owner-requested sizing, 2026-07-22).** Sessions after the
-> current one (each ≈ one long autonomous run):
-> - **S0 (current)** — finish 193 (replay running) + 242 (real-corpus republication +
->   full gate) + commit both. Remaining: ~1–2h active after ~1h background compute.
-> - **S1 · DUR-1** — **085-core + 089** together (they share the attempt-record design):
->   last-complete/keep-last-good publication (divert-then-promote in
->   `_consolidate_store_folder`; partial never overwrites a complete canonical) + the
->   last-complete comparison-cache rule + the durable per-cell last-attempt overlay +
->   honest attempted/succeeded/failed/cancelled counts + UI overlay. The four
->   "false-green under either policy" defects are ALREADY fixed (verified in code
->   2026-07-22: Summary flips to ✗ on partial, mx-partial primary, partial⇒stale⇒
->   refresh-included, evidence refuses non-certifying) — S1 is the publication core.
-> - **S2 · DUR-2** — **080**: durable content identity for sources + cached outputs
->   (change-token-validated manifest; stat-only memoization prohibited), evidence PDF
->   parse-cache keys, one-time migration of metadata-only records to stale, perf proof
->   on a real statewide store.
-> - **S3 · DUR-3** — **115**: the commit-boundary versioned artifact-schema gate +
->   the exhaustive per-comparator census (all 29 recipes on the real corpus). Fold in
->   **187** (oracle key-order perf — small) at the tail.
-> - **S4 · EV-1** — **208 spine**: the published-comparison decoder (E/D/N/U state
->   masks + `pairing_trace` + typed counts from the persisted generation — never a
->   re-execution), HSL first.
-> - **S5 · EV-2** — **108 + 209** on the spine across all five evidence families +
->   the independent raw-source oracle agreeing statewide (the acceptance bar).
-> - **S6 · EV-3** — **210** source-faithful Excel + PDF-vs-Excel evidence routes (has
->   a possible scope question for the owner — ask when concrete) + **106** durable
->   per-comparison evidence MANIFEST (no-example/toggle-off/restart).
-> - **S7 · EV-4** — **109** two-phase workbook+images transaction (quarantine
->   rollback) + **098** evidence read-set snapshot gate + full statewide evidence
->   re-verify.
-> - **S8 · Closeout** — final ledger/plan/docs/dashboard reconciliation, the
->   completion RELEASE (full gate + frozen self-test + notes + tag + CI), and the
->   owner's work-PC acceptance checklist.
+> **MARATHON SPLIT TO DONE (owner-directed COMPRESSION, 2026-07-22 — "we need this
+> done by tomorrow"): THREE autonomous marathons after S0, each as long as it takes.**
+> - **S0 (current, finishing)** — 193 (two legs canary-exact; leg 3 computing) +
+>   **242 ✅ committed `a0c53fb`, CI green**.
+> - **M-A · THE DUR MARATHON — all of Phase-5/7 in one run: 085 + 089 + 080 + 115 + 187.**
+>   085-core last-complete/keep-last-good publication (divert-then-promote in
+>   `_consolidate_store_folder`; a partial NEVER overwrites a complete canonical) +
+>   the last-complete comparison-cache rule + 089's durable per-cell last-attempt
+>   overlay with honest attempted/succeeded/failed/cancelled counts + UI overlay
+>   (085/089 share the attempt-record design — one change, two findings); then 080
+>   durable content identity for sources + cached outputs (change-token-validated
+>   manifest, stat-only memoization prohibited) + evidence parse-cache keys + the
+>   one-time metadata-only→stale migration + a perf proof on a real statewide store;
+>   then 115's commit-boundary versioned artifact-schema gate + the per-comparator
+>   census over all 29 recipes on the real corpus; 187 (instrument perf) at the tail.
+>   The four "false-green under either policy" defects are ALREADY fixed (verified in
+>   code 2026-07-22), so M-A is publication core + identity + schema, not UI triage.
+> - **M-B · THE EVIDENCE SPINE MARATHON — 208 + 108 + 209.** The published-comparison
+>   decoder (E/D/N/U state masks + `pairing_trace` + typed counts read from the
+>   persisted generation — never a re-execution), proven on HSL then rolled to ALL
+>   FIVE evidence families, with the independent raw-source oracle agreeing statewide
+>   as the acceptance bar. Duplicate-only diffs become enumerable (108); no
+>   discrepancy class is excluded before sampling (209).
+> - **M-C · EVIDENCE COMPLETION + CLOSEOUT — 210 + 106 + 109 + 098, then done.**
+>   Source-faithful Excel + PDF-vs-Excel evidence routes (210 — its scope question
+>   goes to the owner the moment it is concrete, mid-run), the durable per-comparison
+>   evidence MANIFEST finishing 106 (no-example/toggle-off/restart), the 109
+>   two-phase workbook+images transaction (quarantine rollback), the 098 evidence
+>   read-set snapshot gate, full statewide evidence re-verify — then the final
+>   ledger/plan/docs/dashboard reconciliation, the completion RELEASE (full gate +
+>   frozen self-test + notes + tag + CI), and the owner's work-PC checklist.
 >
-> EV-1..4 may compress to three sessions if the spine lands cleanly; 210's scope
-> answer is the main stretch risk. OUTSIDE the count (owner-gated, not blockers to
-> "done"): the work-PC acceptance run itself (~1–2h owner time), and the ⛔ HD-deferred
-> block (133/142/186/192 + 045-HD) which reopens only on the official HD delivery.
+> Target: **M-A today, M-B following immediately, M-C tomorrow → completion release
+> tomorrow.** The stretch valve is 210's owner answer (M-C splits only if the answer
+> expands scope). OUTSIDE the count (owner-gated, not blockers to "done"): the
+> work-PC acceptance run itself (~1–2h owner time), and the ⛔ HD-deferred block
+> (133/142/186/192 + 045-HD) which reopens only on the official HD delivery.
 >
 > **ACTIVE ORDER (owner, 2026-07-22): 193 → 242 → then as much of DUR as possible.**
 > - **193 (NORM/HSL)** — its Status: "Current source correction proved; product publication,
