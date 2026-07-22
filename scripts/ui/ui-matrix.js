@@ -414,6 +414,18 @@ function mxTsnPicker(tm, locked, rerender) {
     const full = tm.source_path || "";
     name.textContent = full.split(/[\\/]/).pop() || "(file)";
     name.title = "TSN file in use:\n" + (full || name.textContent);
+    // A dead pick from a previous install was ignored in favor of the canonical
+    // library — say so (and how to make it permanent) instead of hiding it.
+    const stale = tm.stale_selection_ignored;
+    if (stale && stale.path) {
+      const note = document.createElement("span");
+      note.className = "muted";
+      note.textContent = " (old pick ignored)";
+      name.appendChild(note);
+      name.title += "\n\nAn old picked file from a previous install no longer exists"
+        + " and is being ignored:\n" + stale.path
+        + "\nClear the selection to dismiss this note.";
+    }
   } else if (needsCons) {
     name.textContent = tm.pdf_count + " TSN PDF" + (tm.pdf_count === 1 ? "" : "s");
     name.title = tm.pdf_count + " TSN PDF(s) in:\n" + (tm.input_dir || "")

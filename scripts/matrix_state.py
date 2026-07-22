@@ -995,6 +995,10 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                                  "selected_path": src.get("selected_path"),
                                  "selection_missing": src.get("kind") == "missing_explicit",
                                  "selection_reason": src.get("selection_reason"),
+                                 # A dead app-owned pick from a previous install was
+                                 # ignored in favor of the canonical library (field
+                                 # fix 2026-07-22) — the picker surfaces the note.
+                                 "stale_selection_ignored": src.get("stale_selection_ignored"),
                                  # CMP-AUD-010: the REAL raw-PDF folder + its origin
                                  # (library vs legacy drop), so Consolidate routes right.
                                  "source_legacy": bool(src.get("legacy")),

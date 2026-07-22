@@ -215,6 +215,82 @@ def test_source_detection():
         shutil.rmtree(dest, ignore_errors=True)
 
 
+def test_stale_app_owned_selection_heals():
+    """Field fix (2026-07-22): a MISSING explicit selection that provably named
+    the app's OWN generated consolidated workbook in a previous install — the
+    legacy dest drop ``…/_tsn_input/<report>/<name>`` or an old install's
+    ``…/tsn_library/<report>/consolidated/<name>`` — resolves to the CURRENT
+    canonical library with a ``stale_selection_ignored`` note instead of
+    blocking the row. EVERYTHING ELSE keeps failing closed: foreign missing
+    paths, wrong basenames, app-owned files that still EXIST, and the
+    no-canonical-fallback state. Removing the heal branch turns the heal
+    assertions red; weakening fail-closed turns the closed assertions red."""
+    print("stale app-owned selection heals to the canonical library (field fix):")
+    dest = Path(tempfile.mkdtemp(prefix="tsmis_tsn_stale_"))
+    saved_roots = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT)
+    paths.TSN_LIBRARY_ROOT = dest / "_lib"
+    paths.OUTPUT_ROOT = dest / "_out"
+    paths.INPUT_ROOT = dest / "_in"
+    try:
+        sub = "highway_log"
+        name = "tsn_highway_log_consolidated.xlsx"
+        old_install = dest / "old" / "TSMIS Exporter"
+        stale_drop = old_install / "output" / "All Reports (current)" / "_tsn_input" / sub / name
+        stale_lib = old_install / "tsn_library" / sub / "consolidated" / name
+
+        def record(path):
+            return {"version": 1, "path": str(path),
+                    "identity": {"sha256": "0" * 64, "size": 1,
+                                 "mtime_ns": 1, "file_id": "1:1"}}
+
+        # No canonical library yet: nothing safe to fall back to — stays closed.
+        r = matrix.tsn_source(dest, sub, selected_file=record(stale_drop))
+        check("app-owned missing pick with NO canonical library stays closed",
+              r["kind"] == "missing_explicit" and r.get("selection_reason") == "missing")
+
+        lib_cons = paths.tsn_library_consolidated_path(sub, name)
+        _workbook(lib_cons)
+
+        # The field case: the previous install's legacy dest drop.
+        r = matrix.tsn_source(dest, sub, selected_file=record(stale_drop))
+        check("missing pick at a previous install's _tsn_input drop heals to the library",
+              r["kind"] == "consolidated" and Path(r["path"]) == lib_cons)
+        check("…and carries the stale_selection_ignored note (path + reason)",
+              (r.get("stale_selection_ignored") or {}).get("path") == str(stale_drop)
+              and (r.get("stale_selection_ignored") or {}).get("reason") == "missing")
+
+        # An old install's canonical library path heals the same way.
+        r = matrix.tsn_source(dest, sub, selected_file=record(stale_lib))
+        check("missing pick at a previous install's tsn_library heals too",
+              r["kind"] == "consolidated"
+              and (r.get("stale_selection_ignored") or {}).get("path") == str(stale_lib))
+
+        # A LEGACY v0 (path-string) record heals only when app-owned AND missing.
+        r = matrix.tsn_source(dest, sub, selected_file=str(stale_drop))
+        check("a legacy path-only record at the dead app-owned path heals",
+              r["kind"] == "consolidated"
+              and (r.get("stale_selection_ignored") or {}).get("reason") == "legacy_identity")
+
+        # Fail-closed is untouched everywhere else:
+        foreign = dest / "elsewhere" / "deleted.xlsx"
+        r = matrix.tsn_source(dest, sub, selected_file=record(foreign))
+        check("a foreign missing pick still fails closed",
+              r["kind"] == "missing_explicit" and r.get("selection_reason") == "missing")
+        odd = stale_drop.parent / "hand-edited-copy.xlsx"
+        r = matrix.tsn_source(dest, sub, selected_file=record(odd))
+        check("a missing pick under _tsn_input with a NON-canonical basename stays closed",
+              r["kind"] == "missing_explicit")
+        _workbook(stale_drop)          # the app-owned file EXISTS again…
+        r = matrix.tsn_source(dest, sub, selected_file=str(stale_drop))
+        check("an app-owned file that still EXISTS keeps requiring a re-pick "
+              "(no heal for present-but-untrusted)",
+              r["kind"] == "missing_explicit"
+              and r.get("selection_reason") == "legacy_identity")
+    finally:
+        paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT = saved_roots
+        shutil.rmtree(dest, ignore_errors=True)
+
+
 def test_canonical_selection_keys():
     print("canonical explicit-selection keys + all PDF siblings:")
     aliases = {
@@ -494,6 +570,7 @@ def test_support_derives_from_registry():
 def main():
     test_paths_and_modes()
     test_source_detection()
+    test_stale_app_owned_selection_heals()
     test_canonical_selection_keys()
     test_snapshot_modes()
     test_missing_side_both()

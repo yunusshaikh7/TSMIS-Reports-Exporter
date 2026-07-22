@@ -303,8 +303,66 @@ def test_library_and_matrix_end_to_end():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_refusing_builder_keeps_its_own_terminal():
+    """A builder that does NOT return "ok" wrote no workbook, so build_consolidated
+    must hand back the builder's OWN typed result.
+
+    Regression: the certification tail ran unconditionally, so every builder
+    refusal surfaced as `error` + "normalization finished but the durable TSN
+    source/workbook certificate could not be verified ... re-run after the
+    destination is writable" — naming the wrong cause, the wrong fix, and (for a
+    declined overwrite) the wrong STATUS. Both shapes below reach the builder:
+    build_consolidated's own early guard only covers "no raw files at all".
+    Driven through the SHIPPED entry point on a REAL registered report.
+    """
+    print("a refusing/cancelling builder keeps its own status + message:")
+    report = "ramp_detail"
+
+    def stub_xlsx(path):
+        wb = Workbook()
+        wb.active["A1"] = "stub"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        wb.save(path)
+        wb.close()
+
+    def build(raw_names, confirm, pre_existing_output):
+        tmp = Path(tempfile.mkdtemp(prefix="tsmis_tsn_refuse_"))
+        saved = paths.TSN_LIBRARY_ROOT
+        paths.TSN_LIBRARY_ROOT = tmp / "lib"
+        try:
+            for n in raw_names:
+                stub_xlsx(tsn_library.raw_dir(report) / n)
+            if pre_existing_output:
+                stub_xlsx(tsn_library.consolidated_path(report))
+            return tsn_library.build_consolidated(
+                report, events=Events(), confirm_overwrite=confirm)
+        finally:
+            paths.TSN_LIBRARY_ROOT = saved
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    # An ambiguous raw folder: the builder's message names the extra files and the
+    # fix, and must not be replaced by the certification text.
+    amb = build(["a.xlsx", "b.xlsx"], lambda _p: True, False)
+    check("ambiguous raw -> error", amb.status == "error")
+    check("ambiguous raw -> the builder's own 'expected exactly one' message",
+          "Expected exactly one raw" in amb.message
+          and "a.xlsx" in amb.message and "b.xlsx" in amb.message)
+    check("ambiguous raw -> NOT the certificate message",
+          "certificate could not be verified" not in amb.message)
+
+    # A DECLINED overwrite is a cancellation, not an error: the user said no and
+    # the existing workbook is kept.
+    dec = build(["a.xlsx"], lambda _p: False, True)
+    check("declined overwrite -> cancelled (not error)", dec.status == "cancelled")
+    check("declined overwrite -> 'Existing file kept'",
+          "Existing file kept" in dec.message)
+    check("declined overwrite -> NOT the certificate message",
+          "certificate could not be verified" not in dec.message)
+
+
 def main():
     test_producers()
+    test_refusing_builder_keeps_its_own_terminal()
     test_library_and_matrix_end_to_end()
     print()
     if _fail:

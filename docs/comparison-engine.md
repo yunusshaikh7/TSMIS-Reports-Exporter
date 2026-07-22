@@ -1094,7 +1094,15 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
   via `matrix.tsn_source` → `tsn_library.resolve`. Automatic mode uses the canonical library and
   legacy `<batch_dest>/_tsn_input/<subdir>/` fallbacks. A `settings.matrix_tsn_files` pick is a
   versioned explicit selection: a missing, replaced, or legacy path-only pick blocks the cell until
-  it is re-picked or cleared; it never silently falls through to another dataset. The
+  it is re-picked or cleared; it never silently falls through to another dataset — with ONE narrow
+  exception (field fix 2026-07-22): a pick whose file is GONE and whose path provably named the
+  app's OWN generated consolidated workbook in a previous install (`…/_tsn_input/<report>/<the
+  canonical consolidated filename>` or `…/tsn_library/<report>/consolidated/<name>`) resolves to
+  the current canonical library, the picker shows "(old pick ignored)" + the old path, and Clear
+  makes it permanent (`tsn_library._heal_stale_app_owned`; resolve stays side-effect-free — the
+  persisted record is never rewritten on a read). A file that still EXISTS, a foreign path, or a
+  changed/unreadable pick keeps failing closed exactly as before
+  (`check_matrix_tsn.test_stale_app_owned_selection_heals`). The
   by-day matrix shows a PER-ROW TSN picker (named by its report, like the Everything matrix);
   each cell resolves its own report's TSN.
 - **Store:** `output/comparisons/tsn-by-day/<date src-env>/<row>_vs_tsn.xlsx` (stable, dateless per

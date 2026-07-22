@@ -966,6 +966,17 @@ def build_consolidated(report, events=None, confirm_overwrite=None, force=False)
 
     result = builder(raw_dir(report), out, events=events,
                      confirm_overwrite=confirm_overwrite)
+    if result.status != "ok":
+        # The builder REFUSED or the user cancelled, so no workbook was produced
+        # (build_normalized writes temp + os.replace; a prior generation is
+        # untouched). There is nothing to certify — return the builder's own typed
+        # result. Falling through instead replaced every such reason with the
+        # certification message below: an ambiguous raw folder ("Found 2 matching
+        # files… remove the extras") and a DECLINED overwrite both surfaced as
+        # `error` + "normalization finished but the durable certificate could not
+        # be verified… re-run after the destination is writable", which named the
+        # wrong cause, the wrong fix, and — for the decline — the wrong status.
+        return result
     raw_manifest = None
     workbook_identity = None
     identity_token = None
@@ -1472,6 +1483,54 @@ def _missing_explicit(record, reason):
             "selection_reason": reason}
 
 
+def _heal_stale_app_owned(report, p, reason):
+    """Field fix (2026-07-22, work-PC report): a persisted explicit selection
+    whose file is GONE and whose path provably named THIS APP's own generated
+    consolidated workbook — the legacy dest drop ``…/_tsn_input/<report>/<name>``
+    or an old install's ``…/tsn_library/<report>/consolidated/<name>`` — can
+    never be honored again, and it never pointed at user-curated data in the
+    first place (the install moved and left the pointer behind; the field case
+    was exactly that after the CMP-AUD-242 short-path move). That ONE narrow
+    case resolves to the CURRENT canonical library, carrying a visible
+    ``stale_selection_ignored`` note. The persisted record is NOT touched —
+    resolve stays side-effect-free; the note tells the user Clear makes it
+    permanent.
+
+    Everything else keeps failing closed — a foreign path, a changed /
+    unreadable / not-a-workbook file, conflicting aliases, or an app-owned file
+    that still EXISTS (present-but-untrusted means re-pick, never swap): a
+    comparison must never silently substitute different bytes for a pick the
+    user could still mean."""
+    if not report or not is_registered(report):
+        return None
+    try:
+        if p.exists():
+            return None
+    except OSError:  # silent-ok: an unprobeable path is not PROVABLY gone — stay fail-closed
+        return None
+    if p.name.lower() != get(report).consolidated_name.lower():
+        return None
+    parts = [part.strip().lower() for part in p.parent.parts]
+    rep = report.lower()
+    legacy_drop = len(parts) >= 2 and parts[-2] == "_tsn_input" and parts[-1] == rep
+    old_library = (len(parts) >= 3 and parts[-3] == "tsn_library"
+                   and parts[-2] == rep and parts[-1] == "consolidated")
+    if not (legacy_drop or old_library):
+        return None
+    cons = consolidated_path(report)
+    try:
+        if not cons.is_file():
+            return None                    # nothing safe to fall back to: stay closed
+    except OSError:  # silent-ok: an unreadable library is "no safe fallback" — stay fail-closed
+        return None
+    certified = status(report)
+    log.info("tsn: stale app-owned selection for %s ignored (%s): %s -> canonical library",
+             report, reason, p)
+    return {"kind": "consolidated", "path": str(cons), "mtime": _safe_mtime(cons),
+            "identity_token": certified.get("identity_token"),
+            "stale_selection_ignored": {"path": str(p), "reason": reason}}
+
+
 def resolve(report, selected_file=None, legacy_dest=None):
     """Resolve the TSN dataset for `report` (the matrices' single entry point) and
     attach the persisted producer `completion` (P1-B05) to any path-bearing source —
@@ -1490,7 +1549,10 @@ def _resolve_source(report, selected_file=None, legacy_dest=None):
     pdf_count?, raw_count?}. Resolution order:
       1. an explicit user-picked `selected_file` — a real .xlsx wins; a missing or
          invalid pick returns ``missing_explicit`` and FAILS CLOSED (it never falls
-         through to a different canonical/legacy dataset);
+         through to a different canonical/legacy dataset). ONE narrow exception:
+         a MISSING pick that provably named the app's own generated consolidated
+         workbook in a previous install (see ``_heal_stale_app_owned``) resolves
+         to the canonical library with a ``stale_selection_ignored`` note;
       2. the library's generated consolidated workbook;
       3. the library's raw file(s) -> 'pdfs' (PDF raw) / 'raw' (xlsx raw): the
          'import is present but build the consolidated first' state;
@@ -1509,10 +1571,15 @@ def _resolve_source(report, selected_file=None, legacy_dest=None):
             return _missing_explicit(record, "not_xlsx")
         if record.get("version") != _SELECTION_VERSION or not isinstance(
                 record.get("identity"), dict):
-            return _missing_explicit(record, "legacy_identity")
+            return (_heal_stale_app_owned(report, p, "legacy_identity")
+                    or _missing_explicit(record, "legacy_identity"))
         try:
             current_identity = _inspect_explicit_workbook(p)
         except _SelectionInspectionError as e:
+            if e.reason == "missing":
+                healed = _heal_stale_app_owned(report, p, "missing")
+                if healed:
+                    return healed
             return _missing_explicit(record, e.reason)
         if current_identity != record["identity"]:
             return _missing_explicit(record, "changed")
