@@ -1224,16 +1224,56 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   the single statewide instance (both systems otherwise share the `''X''` convention — TSN 62
   rows / TSMIS 61, near-identical contexts). Every other pair renders without the line. Pinned
   in `check_visual_evidence`; the ID Notes sheet documents that quotes compare literally.
-- **Sampling:** for every differing column, up to N (user setting, 1–10, default 2) random
-  example rows across random routes, keys restricted to UNIQUE-per-route on both sides so a
-  highlight is THE row. Each run logs its sample seed.
-- **The trust contract:** an example is only used when the value parsed back OUT of each PDF —
-  normalized with the comparator's OWN projections — equals the value the comparison compared.
-  Under unchanged source files, each rendered pair therefore doubles as an end-to-end spot-check
-  of the comparison at that cell. CMP-AUD-112 remains open for Phase 7: parse-time records and the
-  later raster reopen are not yet bound to one immutable PDF generation. Failed candidates are
-  skipped with a per-column reason (recorded in the workbook), e.g. the TSMIS PDF/Excel
-  site-build skew or a TSN reference-date skew.
+- **The differences come from the PUBLISHED comparison** (v0.28.0, CMP-AUD-208/209/108).
+  `published_comparison.read()` opens the committed VALUES workbook and decodes its own cells:
+  the hidden versioned `__CMP_E1_STATE_V1_C###_P####_P####` chunks (one `E`/`D`/`N`/`U` per
+  displayed column, in display order), the anchored `Status`/`Diffs` pair located by unique
+  exact label, and the injective `__CMP_E2_KEY_V1_TOKEN`. It authenticates before reporting —
+  mask length, `Diffs` == the row's own `D` count, matched rows carry no `U`, one-sided rows are
+  all-`U` with no `Diffs`, unique tokens, contiguous single-version chunks — and REFUSES rather
+  than guessing (`PublishedComparisonError`; the caller treats it as a skipped decoration). State
+  is read from the masks only; the visible ` ≠ ` separator is never scanned.
+  - The adapters' `enumerate_diffs` is now a **proposer**, not the source of truth: it nominates
+    rows that can be photographed, and `_reconcile` requires the published cell to agree — one
+    row at that identity, state `D` at that column, published text equal to the engine's own
+    composition — before any image is rendered. Refusals are counted by reason.
+  - Rows are addressed with `compare_core.published_key_text`, which routes through `keys_for`'s
+    own single-row derivation (`_row_key_token`), so a schema key normalizer (the Highway Log
+    roadbed key) can never make evidence address a different row than the workbook did.
+  - Each rendered item names `Comparison!<row> · occurrence N · state D` and BOTH persisted
+    source rows, resolved through the row token against each side's literal "Key (helper)"
+    column — Comparison's own hyperlinks carry no cached value in a values workbook and read as
+    blank.
+- **The Ledger sheet — the exhaustive accounting, built before any sample** (CMP-AUD-209).
+  `PublishedComparison.ledger()` counts, per displayed column: counted differences split into
+  unique-row (photographable) and repeated-key, context cells, identical cells and one-sided
+  cells; plus the row universe, the matched/one-sided partition named per side, and the
+  repeated-key group inventory. It is hash-bound (`digest()`), written to the evidence
+  workbook's **Ledger** sheet with the reader version, and returned to the caller. A column with
+  published differences but no renderable candidate gets a NAMED reason there — so a
+  duplicate-only difference reads as "all N published difference(s) sit in repeated-key groups",
+  never as "no differing columns" (CMP-AUD-108).
+- **Sampling** happens strictly AFTER the ledger: for every differing column, up to N (user
+  setting, 1–10, default 2) random example rows across random routes, keys restricted to
+  UNIQUE-per-route on both sides so a highlight is THE row. Each run logs its sample seed.
+- **The trust contract** (three independent agreements since v0.28.0): the value parsed back OUT
+  of each PDF — normalized with the comparator's OWN projections — equals the value the
+  comparison compared, AND the published cell says that cell is a counted difference, AND its
+  published text equals the engine's composition of the two values. Under unchanged source
+  files, each rendered pair therefore doubles as an end-to-end spot-check of the comparison at
+  that cell. Failed candidates are skipped with a per-column reason (recorded in the workbook),
+  e.g. the TSMIS PDF/Excel site-build skew or a TSN reference-date skew.
+  - **Acceptance** is `build/check_evidence_oracle.py`: one raw corpus covering every class
+    (identical, counted difference, context-only, both one-sided shapes, an equal- and an
+    unequal-multiplicity duplicate group) runs through BOTH `build/phase3_independent_oracle.py`
+    (stdlib only — it touches no product comparator, loader, normalizer, or workbook) and
+    `compare_core.run_compare`, and the published workbook must agree cell for cell, column for
+    column, class for class. The check proves it can detect disagreement (downgrading one `D`
+    breaks it). Statewide on the HSL corpus the oracle recomputed 342,432 cell states with 0
+    disagreements and all 439,356 published cells classified.
+  - **Not claimed:** the loaders' per-field projections against the raw PDFs. That is the
+    separately-tracked direct-source acceptance. The verified layer is comparison + publication
+    (keying, pairing, equality, context, counting, classification, accounting).
 - **Sources:** TSMIS side = the per-route **(PDF)-edition** export of the report (the Everything
   matrix resolves the row's cell store, the by-day matrix that day's `*_pdf/` run folder);
   TSN side = the prints in the report's `tsn_library/<report>/pdf/` folder — Highway Detail

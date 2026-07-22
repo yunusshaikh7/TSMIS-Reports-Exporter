@@ -222,15 +222,24 @@ re-compare; freshness-gated). **Since v0.24.0 the toggle spells itself out per r
 matrix rows carry a camera badge. See
 [docs/comparison-engine.md](docs/comparison-engine.md) §13.
 
-**Comparison-perfection audit warning (2026-07-14): Highway Sequence imagery is not
-yet an end-to-end comparison verifier.** The current evidence adapter recomputes through
-the product loaders instead of reading the published Comparison cells, excludes whole
-difference and one-sided classes before sampling, routes Excel comparisons through a
-companion TSMIS PDF, and has no source-faithful PDF-vs-Excel mode. (Spot Check's
-row-matching half of this warning is REMEDIATED as of 2026-07-16 — CMP-AUD-218: it now
-key-token-MATCHes both source rows independently and its Row-integrity line flags any
-disagreement with Comparison's stored links/status — but a clean sample image set still
-cannot bless HSL on its own.) The live source-first status and exact findings are in
+**Evidence reads the PUBLISHED comparison since 2026-07-22** (CMP-AUD-208/209/108, marathon
+M-B). `published_comparison.py` decodes a committed values workbook's own cells — the hidden
+per-column `E`/`D`/`N`/`U` state masks, the anchored `Status`/`Diffs` contract, the opaque row
+tokens — and authenticates them or refuses. The adapters' `enumerate_diffs` is now only a
+PROPOSER of photographable rows; the published cell decides whether the image may be taken
+(one row at that identity, state `D`, published text equal to the engine's own composition),
+and every rendered item names `Comparison!<row> · occurrence N · state D` plus both persisted
+source rows. An EXHAUSTIVE hash-bound ledger — counted differences split unique-row vs
+repeated-key, context, identical, one-sided, per column — is built and written to the evidence
+workbook's **Ledger** sheet BEFORE any sample is drawn, so a duplicate-only difference is a
+named miss instead of a false "no differing columns". Acceptance is the independent stdlib
+oracle (`build/check_evidence_oracle.py`) agreeing cell-for-cell, plus a statewide HSL
+recomputation (342,432 cell states, 0 disagreements; 439,356 cells all classified).
+**Still open (CMP-AUD-210):** Excel comparisons route their imagery through a companion TSMIS
+PDF, and there is no source-faithful PDF-vs-Excel mode. **Not claimed:** the loaders' per-field
+projections against the raw PDFs — that is the separately-tracked direct-source acceptance.
+(Spot Check's row-matching half of the original warning was remediated 2026-07-16 —
+CMP-AUD-218.) The live source-first status and exact findings are in
 [docs/planning/comparison-perfection/archive/comparison-perfection-project.md](docs/planning/comparison-perfection/archive/comparison-perfection-project.md)
 and [docs/planning/comparison-perfection/comparison-audit-findings.md](docs/planning/comparison-perfection/comparison-audit-findings.md).
 

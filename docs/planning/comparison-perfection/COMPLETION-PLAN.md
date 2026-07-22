@@ -43,7 +43,7 @@ its findings back-to-back, then update this roadmap.
 | ~~**M8**~~ ✅ | Compare / matrix GUI dispatch (bucket E) | ~~007 010 016 079 101 102 103 104~~ | **DONE 2026-07-18 — all 8 closed** (ac63f10 / 2b1e516 / 86c8e76), CI-green. Open-comparisons common root, set-all authoritative catalog, shared buildability predicate, canonical TSN consolidate routing, Cancel visibility, queue-capable day export, recipe-bound classic inputs, validation coverage pin. |
 | **M9** ◑ | Completion / partial-artifact policy + transaction (bucket E) | ~~035 040 075~~ · 085 098 115 | **PARTIAL 2026-07-18 — 3 closed (035 040 075), 3 DEFERRED.** 035 direct-builder post-`os.replace` recheck; 040 folder run-root/subfolder aliasing; 075 closed-by-082. **DEFERRED:** 115 (deep commit-schema gate on the correctness-locked path — read half already fixed; needs exhaustive per-comparator census), 098 (evidence-gate half = Stage-10), 085 (owner-gated last-complete/latest-attempt policy + Phase-5/7 durable overlay — with 089). |
 | ~~**BIG-1**~~ ◑ | **Evidence arc — bucket F. DONE to the tractable line: 107/110/112 ✅ + 106/109 partial + the layout feature (2026-07-18/19).** The remainder is EV-10 below. | ~~106~~ ~~107~~ ~~109~~ ~~110~~ ~~112~~ + 108 · 208 209 210 · 098 | 107 (compared_cell equality), 110 (queued-evidence identity), 112 (parse↔render byte digest) CLOSED; 106 (retire-stale-on-clean) + 109 (workbook+images one set) PARTIAL. What's left is the Stage-10 published-cell spine → **EV-10**. |
-| **EV-10** | **Evidence — Stage-10 published-cell rebuild + transaction completion (7)** | 108 · 208 209 210 · 098 · 106↺ 109↺ | The coherent evidence remainder. **ONE spine:** drive evidence from the PUBLISHED comparison — its per-cell E/D/N/U state masks + the persisted `pairing_trace` + per-column counts — instead of re-executing `adapter.load_sides`/`enumerate_diffs` (**208**), so duplicate-only diffs stop vanishing (**108**) and no discrepancy class is excluded before sampling (**209**); each item names flavor/sheet/row/cell/state/source-indices/provenance and an INDEPENDENT raw-source oracle recomputes it (the acceptance bar). Then the source-faithful Excel / PDF-vs-Excel routes (**210**, own mini-plan) + the durable per-comparison generation MANIFEST that finishes **106** (no-example/toggle-off/restart) + the evidence-gate read-set snapshot (**098**). The **109** two-phase residual (a quarantine-based two-artifact atomic commit so the images-locked case rolls both back) rides here too. **The CLAUDE.md-flagged "HSL not yet an end-to-end verifier" gap.** Investigation (2026-07-19): the truth is persisted as Excel formulas/value caches → needs a state-mask/pairing-trace decoder + the raw-source oracle = **Stage-9/10, a dedicated multi-session effort, NOT a marathon slice.** Detail: the `#### Disposition — 2026-07-19` note at CMP-AUD-208. |
+| **EV-10** ◑ | **Evidence — Stage-10 published-cell rebuild + transaction completion** | ~~108~~ ~~208~~ ~~209~~ · 210 · 098 · 106↺ 109↺ | **SPINE DONE 2026-07-22 (marathon M-B, `1cf791b` + `fe25f4e`, CI-green, gate 150/150).** Evidence now drives off the PUBLISHED comparison — `published_comparison.py` decodes and authenticates the committed workbook's own per-cell E/D/N/U masks, anchored Status/Diffs, and opaque row tokens; `enumerate_diffs` is demoted to a PROPOSER and the published cell decides whether an image may be rendered (**208**); an exhaustive hash-bound ledger ships as a **Ledger** sheet before any sample is drawn (**209**); duplicate-only differences are a named per-column miss, never a false zero (**108**). Acceptance: the independent stdlib oracle agrees cell-for-cell at gate scale over every class, and statewide HSL recomputation gave 342,432 cell states / 0 disagreements with all 439,356 cells classified. **Still open here:** the source-faithful Excel / PDF-vs-Excel routes (**210**, own mini-plan), the durable per-comparison generation MANIFEST finishing **106**, the **109** two-phase quarantine-rollback transaction, and the evidence-gate read-set snapshot (**098**) — all M-C. NOT claimed by M-B: the loaders' per-field projections vs the raw PDFs (the separately-tracked direct-source acceptance).
 | ~~**NORM**~~ ✅ | **Source normalization fidelity — bucket G — ACTIONABLE SIDE COMPLETE 2026-07-22** | ~~042~~ ~~138~~ ~~144~~ ~~145~~ ~~193~~ · HD-deferred (⛔ pre-release): 133◑ 142 186 | HD normalizer drops/rounds source data: PS equation markers (042), source identity/print/RU (133), exact-decimal Length through binary64 rounding (138), two PDF snapshot dates (142), **multi-baseline line-two truncation = the HD analogue of the shipped ID-056 (186)**. IS: irreversibly folds six authoritative CONTROL categories (144), drops the TSN PDF's erroneous raw CONTROL **F** label (145). HSL: stale cross-bundle residual (193). **Source-first + HIGH correctness risk** — prove raw→normalized record/field conservation, re-prove comparison cells, re-bless with exact evidence. **HD is provisional** (vendor-approval caveat — see the vendor-blocked row). **Most tractable of the three (the source-conservation pattern is well-trodden from ID-056) — good candidate to do FIRST.** |
 | ~~**DUR**~~ ✅ | **Phase-5/7 durability & policy — CLOSED 2026-07-22 by marathon M-A** (`233e294` + `671dfaf`, both CI-green) | ~~080 085 089 115 187~~ | **DONE — all five.** 085 last-complete publication (divert-then-promote; a partial refresh keeps last-good, publishes an unpromoted attempt beside it, and REFUSES so the stale complete generation is never diffed against current inputs) + 089 durable per-cell attempt overlay with honest attempted/succeeded/failed/cancelled/partial counts and a grid marker that never erases the prior result + 080 v2 CONTENT fingerprint with a Windows-ChangeTime-validated digest memo (statewide: cold 1.53 s, warm 0.27 s — parity with the v1 stat walk, plus a racy-window rule so a same-clock-tick rewrite can never hide) and content-keyed evidence parse caches + 115 the versioned comparison-artifact schema at the commit boundary, whose rejection domain is provably a subset of the already-unreadable domain (census: 119 real production comparison commits accepted, 0 false rejections) + 187 indexed oracle grouping proved equivalent over every fixture class (40,000 rows in 0.34 s). Four new gate checks: `check_last_complete`, `check_content_identity`, `check_comparison_artifact_schema`, `check_oracle_grouping`. Gate **148/148**. |
 
@@ -54,9 +54,9 @@ its findings back-to-back, then update this roadmap.
 > they were resolved (2026-07-14/17/18); on 2026-07-22 the ledger's INDEX table itself was caught
 > stale (042/138/144/145 still "Verified" after their entries said Resolved; 242 missing) and was
 > reconciled. When a finding closes, update its entry Status line AND its index-table row AND this
-> roadmap together. Full-parse-verified count 2026-07-22 (post-S0, post-M-A): **12 open** —
-> EV-10 7 (098/106/108/109/208/209/210) · HD-pre-release-deferred 133/142/186/192 +
-> 045-HD. ~~193~~ and ~~242~~ closed in S0; ~~080/085/089/115/187~~ closed in M-A.
+> roadmap together. Full-parse-verified count 2026-07-22 (post-S0, post-M-A, post-M-B): **9 open**
+> — EV-10 4 (098/106/109/210) · HD-pre-release-deferred 133/142/186/192 +
+> 045-HD. ~~193~~ and ~~242~~ closed in S0; ~~080/085/089/115/187~~ in M-A; ~~108/208/209~~ in M-B.
 
 > ### ⛔ HIGHWAY DETAIL IS PRE-RELEASE — OWNER, 2026-07-21
 >
@@ -100,56 +100,66 @@ re-check on the next statewide HD batch.)
 - **Owed small:** **061** evidence-locator per-page polling; **054** line-2-band recovery for
   `evidence_highway_detail.py` (17 fallback pages share the old doc-median → mis-aligned images).
 
-**REMAINING WORK TOTAL: 12 findings** (230/242 closed, 95%) — **EV-10** (7) ·
-HD-pre-release-deferred 133/142/186/192 + 045-HD. S0 (193 + 242) and M-A (080/085/089/115/187,
-the whole DUR cluster) are CLOSED. Nothing open is a live false-green today. **ACTIVE ORDER:
-two marathons remain — M-B (evidence spine 208/108/209) → M-C (210/106/109/098 + closeout +
-the completion release).** The HD block resumes only when the owner delivers the official
+**REMAINING WORK TOTAL: 9 findings** (233/242 closed, 96%) — **EV-10** (4) ·
+HD-pre-release-deferred 133/142/186/192 + 045-HD. S0 (193 + 242), M-A (080/085/089/115/187,
+the whole DUR cluster) and M-B (108/208/209, the evidence spine) are CLOSED. Nothing open is a live false-green today. **ACTIVE ORDER: ONE marathon
+remains — M-C (210/106/109/098 + closeout + the completion release).** The HD block resumes only when the owner delivers the official
 Highway Detail exports.
 
-> ### ▶ RESUME HERE (2026-07-22 — S0 + M-A CLOSED; M-B then M-C remain, EACH STARTS ON THE OWNER'S GO)
+> ### ▶ RESUME HERE (2026-07-22 — S0 + M-A + M-B CLOSED; ONLY M-C REMAINS, AND IT STARTS ON THE OWNER'S GO)
 >
 > **⚠ MARATHON START GATE (owner, 2026-07-22): do NOT begin a marathon unprompted — the
 > owner starts each one explicitly.**
 >
-> **M-A IS DONE (2026-07-22).** The whole DUR cluster closed in one run — `233e294`
-> (085 + 089) and `671dfaf` (080 + 115 + 187), both CI-green, gate **148/148**, ruff
-> clean. What shipped, in one line each:
-> - **085** — `_consolidate_store_folder` diverts to an unpromoted attempt sibling
->   whenever the canonical holds a trusted COMPLETE generation; only status=ok+COMPLETE
->   promotes (os.replace), anything else keeps last-good, publishes the attempt beside it
->   with its own PARTIAL sidecar, and RAISES — so the stale complete generation is never
->   diffed against current inputs. First-build partial behavior is unchanged.
-> - **089** — `matrix_state.record_attempt/load_attempts` persist one versioned
->   `comparisons/_attempts.json` per root (`row|mode` → cell); all three compare workers
->   write their terminals, `ok` clears; the snapshot merges `cmp.last_attempt` and the
->   grid adds `mx-attempt` + "last refresh failed/stopped/incomplete" WITHOUT erasing the
->   prior result; `_AttemptTally` gives honest attempted/succeeded/failed/cancelled/partial.
-> - **080** — `artifact_store.fingerprint` is v2 CONTENT; `content_digest` memoizes
->   against a change token carrying Windows `FILE_BASIC_INFO.ChangeTime` (proven to move
->   under a same-size, mtime-restored rewrite, plus a 1 s racy window for same-tick
->   writes); statewide cold 1.53 s / warm 0.27 s;
->   evidence parse caches re-keyed; the v1→v2 bump IS the one-time migration.
-> - **115** — `COMPARISON_ARTIFACT_SCHEMA = 1` at `commit_workbook` for a typed
->   comparison's VALUES artifact; the reader is shared with `read_counts`, so the
->   rejection domain is a subset of the already-unreadable domain (cannot block a valid
->   report). Census: 119 real production commits accepted, 0 false rejections.
-> - **187** — indexed first-seen membership in the independent oracle, proved equivalent
->   to the list scan over every fixture class; 40,000 rows in 0.34 s.
+> **M-B IS DONE (2026-07-22).** The evidence spine closed in one run — `1cf791b` (the
+> spine) and `fe25f4e` (the independent-oracle acceptance), both CI-green, gate
+> **150/150**, ruff clean. Three findings, one change, because they were one defect:
+> evidence decided what was true by RE-RUNNING the loaders instead of reading what the
+> comparison published.
+> - **208** — new `scripts/published_comparison.py` decodes a committed VALUES workbook's
+>   own cells (hidden per-column `E`/`D`/`N`/`U` masks, the anchored `Status`/`Diffs`
+>   contract by unique label, the opaque row token) and AUTHENTICATES them — 14 mutations
+>   each produce a refusal. `visual_evidence.generate` opens the comparison it was handed;
+>   `adapter.enumerate_diffs` is demoted to a PROPOSER and `_reconcile` lets the published
+>   cell decide whether the image may be taken. Every rendered item names
+>   `Comparison!<row> · occurrence N · state D` plus BOTH persisted source rows, resolved
+>   through the row token (Comparison's hyperlinks carry no cached value — all 73,226 read
+>   blank). `compare_core.published_key_text` addresses through `keys_for`'s own
+>   `_row_key_token`, so the Highway Log's key normalizer can't misaddress a row.
+> - **209** — `PublishedComparison.ledger()` builds the EXHAUSTIVE accounting first
+>   (per column: counted differences split unique-row vs repeated-key, context, identical,
+>   one-sided; plus the row universe, the per-side one-sided partition, and the duplicate
+>   inventory), hash-binds it, and ships it as the evidence workbook's new **Ledger**
+>   sheet. Sampling happens strictly after; an unphotographable class still gets a line.
+> - **108** — `fields_with_diffs` comes from the published counts, so a duplicate-only
+>   column is a NAMED miss, never "no differing columns".
 >
-> New gate checks: `check_last_complete`, `check_content_identity`,
-> `check_comparison_artifact_schema`, `check_oracle_grouping` (+ the shared
-> `_checklib.write_comparison_stub` every comparator stub now uses).
+> Red baseline reproduced first: 2 counted differences inside one duplicate group →
+> the old path returned `fields_with_diffs = []`. Real corpus (HSL Excel vs normalized
+> TSN, 2026-07-09 ssor-prod, 242 routes): 73,226 published rows, 5,589 counted
+> differences, 16,154 one-sided, 4,618 repeated-key groups; the re-execution path saw
+> 4,420 and silently dropped **1,169 (20.92%)**, all duplicate-keyed, and the ledger's
+> split explains them field-for-field. Acceptance: `build/check_evidence_oracle.py` runs
+> one raw corpus through the stdlib oracle AND the product and requires agreement on
+> every class (with proven teeth — a downgraded `D` breaks it); statewide, the oracle
+> recomputed **342,432 cell states with 0 disagreements** and all **439,356** cells
+> classified. New gate checks: `check_published_comparison`, `check_evidence_oracle`.
 >
-> **NEXT ON "GO": M-B — the evidence spine (208 · 108 · 209).** Drive evidence from the
-> PUBLISHED comparison (per-cell E/D/N/U state masks + the persisted `pairing_trace` +
-> typed counts) instead of re-executing `adapter.load_sides`/`enumerate_diffs`, so
-> duplicate-only diffs stop vanishing (108) and no discrepancy class is excluded before
-> sampling (209). Prove on HSL first, then roll to all five evidence families, with an
-> INDEPENDENT raw-source oracle agreeing statewide as the acceptance bar. Start from the
-> `#### Disposition — 2026-07-19` note at CMP-AUD-208. Then **M-C** (210 · 106 · 109 ·
-> 098 + closeout + the completion release).
+> **NOT claimed by M-B** (say it plainly to the owner): the loaders' per-field
+> projections against the raw PDFs. M-B verified the comparison/publication layer —
+> keying, pairing, equality, context, counting, classification, accounting. Direct-source
+> acceptance stays open and separately tracked.
 >
+> **NEXT ON "GO": M-C — evidence completion + closeout.** **210** (source-faithful Excel
+> and PDF-vs-Excel evidence routes — the last two clauses of the old CLAUDE.md warning;
+> its scope question goes to the owner the moment it is concrete, mid-run) + **106** (the
+> durable per-comparison generation MANIFEST: no-example / toggle-off / restart) + **109**
+> (the two-phase workbook+images transaction with quarantine rollback) + **098** (the
+> evidence-gate read-set snapshot), then the full statewide evidence re-verify, the final
+> ledger/plan/docs/dashboard reconciliation, the **completion RELEASE** (full gate +
+> frozen self-test + notes + tag + CI), and the owner's work-PC checklist.
+>
+
 > ### Prior status (2026-07-22 — S0 CLOSED: 193 + 242 done)
 >
 > **Gate 144/144 · released v0.27.4 (no interim tags — completion release only) ·
@@ -191,12 +201,14 @@ Highway Detail exports.
 >   census over all 29 recipes on the real corpus; 187 (instrument perf) at the tail.
 >   The four "false-green under either policy" defects are ALREADY fixed (verified in
 >   code 2026-07-22), so M-A is publication core + identity + schema, not UI triage.
-> - **M-B · THE EVIDENCE SPINE MARATHON — 208 + 108 + 209.** The published-comparison
->   decoder (E/D/N/U state masks + `pairing_trace` + typed counts read from the
->   persisted generation — never a re-execution), proven on HSL then rolled to ALL
->   FIVE evidence families, with the independent raw-source oracle agreeing statewide
->   as the acceptance bar. Duplicate-only diffs become enumerable (108); no
->   discrepancy class is excluded before sampling (209).
+> - ~~**M-B · THE EVIDENCE SPINE MARATHON**~~ ✅ **CLOSED 2026-07-22** (`1cf791b` +
+>   `fe25f4e`, both CI-green, gate 150/150). Original scope, all met: 208 + 108 + 209.
+>   The published-comparison decoder (E/D/N/U state masks + anchored counts + opaque
+>   row tokens read from the persisted generation — never a re-execution), proven on
+>   HSL and applied to ALL FIVE evidence families through the shared engine, with the
+>   independent stdlib oracle agreeing cell-for-cell at gate scale and statewide.
+>   Duplicate-only diffs are named, not erased (108); the exhaustive hash-bound ledger
+>   precedes every sample (209).
 > - **M-C · EVIDENCE COMPLETION + CLOSEOUT — 210 + 106 + 109 + 098, then done.**
 >   Source-faithful Excel + PDF-vs-Excel evidence routes (210 — its scope question
 >   goes to the owner the moment it is concrete, mid-run), the durable per-comparison

@@ -5,7 +5,29 @@ release shows only its own section (see `build/gen_release_notes.py`).
 
 ## Unreleased — ships with the comparison-perfection completion release
 
+### Changed
+- **Evidence images now come with a complete difference ledger.** The evidence
+  workbook has a new **Ledger** sheet listing, for every compared column, how
+  many differences the comparison counted, how many of those sit on a row that
+  can be photographed on its own, how many sit inside a repeated postmile, plus
+  the context, identical and one-sided cell counts and the whole row universe.
+  The pictures illustrate that record — they no longer stand in for it. Each
+  example also names the exact Comparison row, occurrence and state it came
+  from, and the two source rows behind it, so a reviewer can jump straight from
+  an image to the cell it proves.
+
 ### Fixed
+- **Evidence no longer says "no differing columns" when there are some.** When
+  every difference in a column happened to sit at a postmile that repeats, the
+  images step reported nothing to illustrate — which read as "the two systems
+  agree". It now reports the column, the count, and why no single row could be
+  photographed for it.
+- **Evidence is checked against the comparison it illustrates.** Every candidate
+  image is matched to the published cell it claims to show and is dropped unless
+  the comparison independently agrees the cell differs and holds the same
+  values. Previously the images were produced by re-reading the two reports a
+  second time, so a reading mistake could show up identically in the comparison
+  and in its "proof".
 - **A broken export can no longer destroy a good consolidated workbook.** If a
   report had been consolidated successfully and you then re-ran it with one
   route's export damaged, the partial rebuild replaced the good workbook — the

@@ -388,7 +388,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-105 | P1 | Resolved | A missing explicit TSN source silently falls back to another dataset |
 | CMP-AUD-106 | P1 | Partially remediated 2026-07-18 | Old red evidence survives beside a newly clean comparison |
 | CMP-AUD-107 | P1 | Resolved 2026-07-18 | Highway Detail evidence invents differences the comparison treats as equal |
-| CMP-AUD-108 | P2 | Verified | Duplicate-only differences disappear from evidence accounting |
+| CMP-AUD-108 | P2 | **Resolved 2026-07-22** | Duplicate-only differences disappear from evidence accounting |
 | CMP-AUD-109 | P1 | Partially remediated 2026-07-19 | Evidence workbook and images are not one truthful transaction |
 | CMP-AUD-110 | P2 | Resolved 2026-07-18 | Queued evidence actions silently retarget to current settings |
 | CMP-AUD-111 | P1 | Resolved | Evidence summaries execute source values as Excel formulas |
@@ -488,8 +488,8 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-205 | P2 | Remediated in corrected draft and direct-source r2 checkpoint; final acceptance replay pending | Highway Sequence audit projection removes a valid TSMIS outer route label but leaves its separator space on three rows |
 | CMP-AUD-206 | P2 | Remediated in clean streaming-verified raw-TSN development twin | Highway Sequence raw-twin verifier requires optional worksheet dimensions from its own write-only XLSX |
 | CMP-AUD-207 | P2 | Remediated in corrected draft and direct-source r2 checkpoint; final acceptance replay pending | Highway Sequence duplicate-cost projection recognizes only current TSMIS source names and treats historical Excel as TSN |
-| CMP-AUD-208 | P1 | Verified in Highway Sequence evidence and Matrix publication path | Visual evidence never reads the Comparison cells it claims to verify |
-| CMP-AUD-209 | P1 | Verified and quantified on both current Highway Sequence vs-normalized-TSN legs | Highway Sequence evidence excludes whole discrepancy classes before sampling |
+| CMP-AUD-208 | P1 | **Resolved 2026-07-22** | Visual evidence never reads the Comparison cells it claims to verify |
+| CMP-AUD-209 | P1 | **Resolved 2026-07-22** | Highway Sequence evidence excludes whole discrepancy classes before sampling |
 | CMP-AUD-210 | P1 | Verified in Highway Sequence source routing, Matrix wiring, and current same-source truth | Highway Sequence Excel and PDF-vs-Excel comparisons have no source-faithful evidence path |
 | CMP-AUD-211 | P2 | Remediated and independently verified in the raw-product development witness | Raw-product witness hashes a payload chunk and then separately reads different bytes for decompression |
 | CMP-AUD-212 | P2 | Remediated and independently verified in the raw-product development witness | Raw-product witness accepts well-named comparison payload chunks that no sidecar references |
@@ -5623,7 +5623,9 @@ is pinned, and `_schema_for` is bound to the live RD comparator context sets. Ga
 ### CMP-AUD-108 — duplicate-only differences vanish from evidence accounting
 
 Priority: P2  
-Status: Verified against comparison pairing and all five adapter patterns  
+Status: **RESOLVED 2026-07-22** — `fields_with_diffs` comes from the published counts and a
+duplicate-only column is a NAMED miss (`1cf791b`); see "Remediation — 2026-07-22 (M-B)" at
+CMP-AUD-209  
 Primary code: `scripts/visual_evidence.py:225-231`,
 `scripts/evidence_highway_detail.py:156-184`,
 `scripts/evidence_intersection_detail.py:110-139`,
@@ -9153,9 +9155,10 @@ acceptance is still pending.
 ### CMP-AUD-208 — visual evidence never reads the Comparison cells it claims to verify
 
 Priority: P1  
-Status: Verified in the Highway Sequence evidence and Matrix publication path  
-Primary code: `scripts/visual_evidence.py`, `scripts/evidence_highway_sequence.py`,
-and `scripts/matrix_build.py`
+Status: **RESOLVED 2026-07-22** — the published-comparison spine shipped (`1cf791b` +
+`fe25f4e`); see "Remediation — 2026-07-22 (M-B)" at the end of the 108/208/209 cluster  
+Primary code: `scripts/published_comparison.py` (new), `scripts/visual_evidence.py`,
+the five `scripts/evidence_*.py` adapters, `scripts/compare_core.py`
 
 `visual_evidence.generate` captures `comparison_path` and later uses its basename, but
 never opens either the formula or value Comparison workbook. Candidate rows and values
@@ -9209,9 +9212,10 @@ feature with its own mini-plan.
 ### CMP-AUD-209 — Highway Sequence evidence excludes whole discrepancy classes before sampling
 
 Priority: P1  
-Status: Verified and quantified on both current vs-normalized-TSN product legs  
-Primary code: `scripts/evidence_highway_sequence.py`, candidate schema/enumerator;
-`scripts/visual_evidence.py`, sampling and no-difference behavior
+Status: **RESOLVED 2026-07-22** — the exhaustive hash-bound ledger ships before any sample
+(`1cf791b`); see "Remediation — 2026-07-22 (M-B)" below  
+Primary code: `scripts/published_comparison.py` (the ledger), `scripts/visual_evidence.py`
+(the Ledger sheet + the named per-column misses)
 
 The Highway Sequence evidence schema removes PM, intersects only common routes/keys,
 requires exactly one row on both sides, skips the key field, and applies the product's
@@ -9239,6 +9243,117 @@ row before selecting any display sample. Sampling may choose presentation exampl
 after the exhaustive ledger is complete and hash-bound. Mutation gates must target each
 excluded class and require an evidence locator even when no screenshot is appropriate.
 The final raw-source oracle—not current aggregate counts—sets the expected universe.
+
+#### Remediation — 2026-07-22 (M-B): the published-comparison spine (108 · 208 · 209)
+
+`1cf791b` (the spine) + `fe25f4e` (the independent-oracle acceptance), both CI-green,
+gate **150/150**, ruff clean. One change closes all three because all three were the
+same defect: evidence decided what was true by RE-RUNNING the loaders instead of reading
+what the comparison published.
+
+**The new source of truth — `scripts/published_comparison.py`.** A decoder for a
+committed VALUES workbook's own cells: the hidden versioned
+`__CMP_E1_STATE_V1_C###_P####_P####` chunks (one `E`/`D`/`N`/`U` per displayed column, in
+display order), the anchored `Status`/`Diffs` contract located by unique exact label (the
+same discipline `artifact_store.comparison_counts` uses), and the injective
+`__CMP_E2_KEY_V1_TOKEN`. It AUTHENTICATES before it reports: mask length equals the
+column count, a matched row's `Diffs` equals its own mask's `D` count, a matched row
+carries no `U`, a one-sided row is all-`U` with no `Diffs`, tokens are unique, chunks are
+contiguous and single-version. Fourteen mutations — short mask, unknown code, lying
+`Diffs`, mixed states, duplicated token, renamed/duplicated `Status`, removed chunks,
+non-integer occurrence, renamed sheet — each produce a refusal, not a guess. Discrepancy
+state is read from the masks ONLY; the visible ` ≠ ` separator is never scanned
+(`CLAUDE.md`).
+
+**208 — evidence consumes the published cells.** `visual_evidence.generate` now opens the
+comparison it was handed. `adapter.enumerate_diffs` is demoted from source-of-truth to
+PROPOSER: it nominates rows that can be photographed, and `_reconcile` lets the published
+cell decide whether the photograph may be taken — exactly one row at that identity, state
+`D` at that column, and published text equal to the engine's own composition of the two
+values. A proposal that fails any leg is refused and counted by reason. Every rendered
+item names its published coordinates in the workbook: `Comparison!<row> · occurrence N ·
+state D`, plus BOTH persisted source rows (`TSMIS!57774 · TSN!66802`) resolved through the
+comparison's own row token — never Comparison's hyperlinks, which carry no cached value in
+a values workbook and read as blank (measured: all 73,226).
+
+Addressing uses the engine's own identity: `compare_core.published_key_text` derives the
+published key through `keys_for`'s own single-row derivation (the extracted
+`_row_key_token`), so a schema's key normalizer — the Highway Log roadbed key — can never
+make evidence address a different row than the workbook did. Pinned for all five families.
+
+**209 — the exhaustive ledger, before any sample.** `PublishedComparison.ledger()` builds
+the complete accounting first: per column, counted differences split into unique-row and
+repeated-key, context cells, identical cells, one-sided cells; plus the row universe,
+the matched/one-sided partition named per side, and the repeated-key group inventory. It
+is hash-bound (`ComparisonLedger.digest()`), recorded in the evidence workbook's new
+**Ledger** sheet with the reader version, and returned to the caller. Sampling happens
+strictly after. A column with published differences but no renderable candidate gets a
+NAMED miss in the same sheet, so a class that cannot be photographed is still on the
+record.
+
+**108 — no more false zero.** `fields_with_diffs` comes from the published per-column
+counts, so a comparison whose only differences live inside duplicate groups reports those
+columns and says why no image exists ("all N published difference(s) sit in repeated-key
+groups — the comparison pairs them by identity, but no single row can be photographed
+unambiguously"). The old "the comparison has no differing columns to illustrate" is gone
+for that case; when nothing renders at all, the note now states the published difference
+count instead of implying zero.
+
+**Red baseline (reproduced before the fix).** A comparison with 2 counted differences,
+both inside one duplicate group: the pre-M-B enumeration returned `fields_with_diffs =
+[]` and evidence would have said "no differing columns to illustrate"; the published
+comparison counts 2. Now: `Description: 2 counted, 0 on a unique row, 2 inside repeated
+keys`, with the named miss.
+
+**Real corpus — Highway Sequence Excel vs normalized TSN, 2026-07-09 ssor-prod, statewide
+(242 routes), through the shipped path.** Published: 73,226 Comparison rows (57,072
+matched + 3,422 TSMIS-only + 12,732 TSN-only), 5,589 counted differences (Description
+4,894 + FT 695 — equal to `sum(Diffs)` and to the run summary), 171,216 context cells,
+4,618 repeated-key groups covering 9,892 rows. The re-execution path could see 4,420 of
+those difference cells; the **1,169 it dropped (20.92%) are every cell whose key repeats**
+— Description 1,058, FT 111. The ledger's unique-row split reproduces the adapter's
+visible set field-for-field (3,836 / 584 vs 3,836 / 584), so the gap is fully explained
+rather than merely measured. The 209 entry's original 21.01% was the same class on an
+older bundle.
+
+**Acceptance — the independent oracle (`build/check_evidence_oracle.py`).** One set of raw
+records goes through BOTH `phase3_independent_oracle` (stdlib only; it never touches a
+product comparator, loader, normalizer, or workbook) and `compare_core.run_compare`, over
+a corpus carrying every class: identical, counted difference, context-only difference,
+both one-sided shapes, an equal-multiplicity duplicate group, and an unequal-multiplicity
+triple. The published workbook must agree with the oracle on counted cells, per-column
+counts, matched rows, one-sided rows per side, context cells, asserted cells, the row
+universe, and every matched row's state mask; the ledger's unique-row set must equal the
+oracle's renderable set and its repeated-key set the oracle's remainder; and every
+oracle-derived renderable cell must reconcile to its published cell. The check proves it
+can detect disagreement: downgrading one published `D` to `E` breaks the agreement and
+changes the ledger digest, and a source edit moves both counts together.
+
+**Statewide acceptance.** Over the full HSL corpus, the independent oracle recomputed every
+matched cell from the workbook's OWN recorded source rows — read directly with openpyxl,
+no product loader or normalizer in the path, pairing taken from the opaque token:
+**342,432 cell states, 0 disagreements**; all 57,072 published `Diffs` agree; per-column
+counts agree (695 / 4,894); and all **439,356** published cells are classified with none
+left over.
+
+**Scope stated honestly.** This verifies the COMPARISON and PUBLICATION layer — keying,
+pairing, equality, context handling, counting, classification, accounting — against an
+independent implementation, at gate scale from raw records and at statewide scale from the
+workbook's own recorded sources. It does NOT verify the loaders' per-field projections
+against the raw PDFs; that is the separately-tracked direct-source acceptance
+(`CLAUDE.md`: "Direct-source acceptance must reproduce the same contracts before any
+product count is blessed"), which remains open and is not claimed here.
+
+**Fixture consequence worth keeping.** `check_visual_evidence` used to fake a clean
+comparison by stubbing `enumerate_diffs` and handing `generate` a file containing the
+bytes `b"comparison 2"`. It cannot any more — evidence opens the workbook. The fixture now
+publishes a REAL zero-difference comparison through `_checklib.build_published_comparison`.
+That is the [[test-the-shipped-path]] lesson landing in the suite: the old check passed
+because it exercised a cleaner path than production.
+
+Cost on the largest corpus: decode 23.9 s + ledger 0.15 s + digest <1 ms, and 14.6 s to
+resolve source rows for the rendered items (one workbook open for both sides, down from
+29.2 s), against an evidence run already measured in minutes of PDF parsing.
 
 ### CMP-AUD-210 — Highway Sequence Excel and PDF-vs-Excel comparisons have no source-faithful evidence path
 
