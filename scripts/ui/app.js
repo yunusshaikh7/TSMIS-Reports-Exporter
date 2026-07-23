@@ -1024,7 +1024,8 @@ function dispatch(events) {
       switch (ev.t) {
         case "state":
           S.st = ev.s; renderState(); updateMatrixProgress(); updateDayMatrixProgress();
-          updateBaselineMatrixProgress();
+          updateBaselineMatrixProgress(); updatePveMatrixProgress();
+          if (typeof syncArcgisLock === "function") syncArcgisLock();
           // env_access can change on a push (background active-env check / scan) —
           // re-overlay the matrix warnings without a full rebuild when one is visible.
           if ((S.tab === "everything" && S.everySub === "matrix")

@@ -83,6 +83,14 @@ def manual_comparisons_dir():
     wherever the user last browsed. The free 'Save elsewhere…' path stays."""
     return comparisons_root() / "manual"
 
+
+def arcgis_comparisons_dir():
+    """output/comparisons/arcgis/ — the canonical auto-save home for the ArcGIS
+    clean-road-vs-TSN comparison (M2-E), beside manual_comparisons_dir() so the
+    clean-road compares land in one predictable place instead of the build output
+    folder. The free 'Save elsewhere…' path stays."""
+    return comparisons_root() / "arcgis"
+
 # (v0.30.0 retired INPUT_ROOT / the input/ folder — user-supplied TSN district
 # PDFs now live in the canonical TSN library below, the SAME place the vs-TSN
 # comparison + evidence read them, so there is one drop location.)

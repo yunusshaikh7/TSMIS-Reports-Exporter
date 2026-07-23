@@ -785,8 +785,24 @@ def _provenance_rows(index):
     return out
 
 
+# M2-E: colour the Provenance sheet by tier so a glance shows which columns the
+# build could and couldn't fill from a layer — greyed for "no TSMIS source" (no
+# layer exists) + TSN-internal bookkeeping (left empty), a distinct blue for
+# "synthesized" (derived from the overlay, not a single layer), and plain white for
+# "sourced" (painted from a mapped layer). Presentation only — the VALUES are the
+# same _provenance_rows the audit already carried.
+_PROV_TIER_FILL = {
+    "no TSMIS source": "D9D9D9",   # grey — couldn't be sourced from any layer
+    "TSN-internal": "EDEDED",      # light grey — bookkeeping, deliberately empty
+    "synthesized": "DDEBF7",       # light blue — derived from the overlay structure
+    # "sourced" -> no fill (normal white)
+}
+
+
 def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings):
     from openpyxl import Workbook
+    from openpyxl.cell import WriteOnlyCell
+    from openpyxl.styles import PatternFill
 
     wb = Workbook(write_only=True)
     ws = wb.create_sheet(SHEET_NAME)
@@ -796,8 +812,19 @@ def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings):
     prov = wb.create_sheet("Provenance")
     prov.append(["THY column", "Tier", "Source layer", "Source column", "Note",
                  "FeatureServer Data Source (00_INDEX)"])
+    _fills = {tier: PatternFill("solid", fgColor=rgb)
+              for tier, rgb in _PROV_TIER_FILL.items()}
     for row in _provenance_rows(index):
-        prov.append(row)
+        fill = _fills.get(row[1])          # row[1] is the tier
+        if fill is None:
+            prov.append(row)
+        else:
+            cells = []
+            for v in row:
+                c = WriteOnlyCell(prov, value=v)
+                c.fill = fill
+                cells.append(c)
+            prov.append(cells)
     marker = wb.create_sheet(MARKER_SHEET)
     marker.append(["Build version", BUILD_VERSION])
     marker.append(["As-of date", asof_date.isoformat()])

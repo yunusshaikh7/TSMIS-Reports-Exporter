@@ -81,6 +81,27 @@ _AMOUNT_FIELDS = frozenset({
     "THY_SCENIC_FREEWAY_CODE",
 })
 
+def _provenance_table_lines():
+    """The owner's column-match table (M2-E): per THY column — the SAME name on
+    the TSN extract and our build (the build is THY-shaped to match) — the ArcGIS
+    layer + source column it is PAINTED FROM, and whether it is COUNTED or shown as
+    CONTEXT. So a reader sees exactly what matched what. Reads
+    clean_highway_columns.PROVENANCE + CONTEXT_FIELDS; no count/pairing effect."""
+    counted = set(chc.HEADER) - set(CONTEXT_FIELDS)
+    out = []
+    for name in chc.HEADER:
+        _tier, layer, column, _note = chc.PROVENANCE[name]
+        if layer and column:
+            src = f"{layer} ({column})"
+        elif layer:
+            src = layer
+        else:
+            src = "no ArcGIS source"
+        role = "counted" if name in counted else "context"
+        out.append(f"    {name}  ·  built from {src}  ·  {role}")
+    return tuple(out)
+
+
 _write_notes_sheet = ctc.make_notes_writer(
     "Clean Road Highway — ArcGIS build vs TSN: comparison notes",
     (
@@ -127,10 +148,12 @@ _write_notes_sheet = ctc.make_notes_writer(
         "One-sided rows are stretches one side carries at a physical "
         "location (route + county + prefix + begin PM + roadbed) the other "
         "doesn't — segmentation differences show up here.",
-        "Column provenance (the audit index — which ArcGIS layer each column "
-        "is built from; the built workbook's Provenance sheet adds each "
-        "layer's FeatureServer source):",
-    ) + tuple("    " + chc.provenance_line(name) for name in chc.HEADER))
+        "Column match table — each THY column (the SAME name on the TSN extract "
+        "and our build) · the ArcGIS layer (source column) it is painted from · "
+        "whether it is COUNTED or shown as CONTEXT. The built workbook's "
+        "Provenance sheet adds each layer's FeatureServer source + the per-column "
+        "note:",
+    ) + _provenance_table_lines())
 
 _SCHEMA = CompareSchema(
     report_name=REPORT_NAME,

@@ -62,11 +62,34 @@ async function renderArcgis() {
     $("agCompareHint").textContent =
       `Missing highway layers: ${hwy.missing.join(", ")}`;
   }
+  syncArcgisLock();      // final authority on the Build/Compare/Cancel button states
+}
+
+// M2-E: the ArcGIS build/compare hold the single task lock, so a running one must
+// disable Build+Compare and surface a Cancel button. Called on every state push (so
+// the Cancel appears/disappears live) and at the end of renderArcgis; reads the
+// cached `AG` status so it never needs an API call.
+function syncArcgisLock() {
+  const cancel = $("btnAgCancel");
+  if (!cancel) return;
+  const locked = !!(S.st && S.st.task);
+  cancel.classList.toggle("hidden", !locked);
+  cancel.disabled = !locked;
+  const hwy = (AG && AG.highway) || {};
+  const built = hwy.built || {};
+  const build = $("btnAgBuild");
+  if (build) build.disabled = locked || !hwy.layers_ok;
+  const compare = $("btnAgCompare");
+  if (compare) {
+    const canCompare = !!(built.exists && hwy.tsn_raw && hwy.layers_ok);
+    compare.disabled = locked || !canCompare;
+  }
 }
 
 function bindArcgis() {
   $("btnAgOpenLayers").onclick = () => api.open_arcgis_layers_folder();
   $("btnAgOpenOut").onclick = () => api.open_arcgis_output_folder();
+  $("btnAgCancel").onclick = () => api.cancel_run();
   $("btnAgBuild").onclick = async () => {
     const r = await api.start_arcgis_build($("agAsof").value.trim());
     if (r && r.error) showMessage("error", "Can't build", r.error);

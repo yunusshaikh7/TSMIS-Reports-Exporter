@@ -145,6 +145,7 @@ class GuiArcgisMixin:
         worker; the save dialog owns the destination + overwrite question."""
         import compare_clean_highway_tsn as cht
         import consolidate_clean_highway as cch
+        import paths
         import tsn_library
 
         built = cch.OUT_PATH
@@ -176,6 +177,8 @@ class GuiArcgisMixin:
                                confirm_overwrite=confirm_overwrite, mode=mode)
 
         sources = tuple(p for p in (built, tsn_path) if p.is_file())
+        # M2-E: auto-save to the standardized output/comparisons/arcgis/ (beside the
+        # manual folder) instead of the ArcGIS build output dir; "Save elsewhere…" stays.
         return self._begin_compare(
-            "Clean Road Highway — ArcGIS vs TSN", mode, cch.OUT_DIR,
+            "Clean Road Highway — ArcGIS vs TSN", mode, paths.arcgis_comparisons_dir(),
             lambda: cht.suggest_name(built), build, source_paths=sources)
