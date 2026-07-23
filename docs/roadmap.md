@@ -476,29 +476,6 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
 
 ---
 
-## Pending for the next release (fixed on main, unreleased — 2026-07-22)
-
-> **Both items below SHIPPED in v0.29.0** (with the ArcGIS clean-road tab) — kept
-> here until the release notes land on GitHub, then this section collapses into
-> the changelog as usual.
-
-- **Stale explicit TSN selection self-heals after an install move** (work-PC field report,
-  2026-07-22): the matrix blocked a row with "The explicitly selected TSN workbook is
-  unavailable" pointing at the PREVIOUS install's `…\output\…\_tsn_input\highway_log\
-  tsn_highway_log_consolidated.xlsx` while the canonical library held the workbook. Now a
-  MISSING pick that provably named the app's OWN generated consolidated workbook (the legacy
-  `_tsn_input/<report>/` drop or an old install's `tsn_library/<report>/consolidated/`) resolves
-  to the canonical library with a visible "(old pick ignored)" note + Clear guidance; every other
-  explicit-selection failure (foreign path, changed/unreadable, still-existing file) keeps
-  failing closed. `tsn_library._heal_stale_app_owned`;
-  `check_matrix_tsn.test_stale_app_owned_selection_heals` (teeth-verified);
-  [comparison-engine.md](comparison-engine.md) §12c-adjacent note updated.
-- **TSN rebuild errors name their real cause again**: `tsn_library.build_consolidated` ran its
-  certification tail on BUILDER-refused results, replacing e.g. "Expected exactly one raw … found
-  2" and a declined overwrite with a bogus "durable certificate could not be verified" error (a
-  decline even reported as `error` instead of `cancelled`). Fixed same day;
-  `check_tsn_outcome.test_refusing_builder_keeps_its_own_terminal` (teeth-verified).
-
 ## Feature backlog
 
 - [ ] **Clean Road Files (Highway / Intersection / Ramp)** [L] — **STAGED 2026-07-22, blocked on
