@@ -215,7 +215,8 @@ still greys a report, `select_report` fails fast rather than stalling.
 **Selecting both editions of one report (Excel + PDF, same `data_value`) coalesces** — the route
 is generated **once** and both files saved off it (`run_export_combined`, v0.19.2; standard path
 only, not fast mode). Consolidate-only sources exist too — **TSN**
-Highway Log district PDFs (dropped into `input/tsn_highway_log/`) and the app's own
+Highway Log district PDFs (dropped into `tsn_library/highway_log/raw/` — the
+`input/` folder was retired in v0.30.0, one drop location now) and the app's own
 **Highway Log (PDF)**, **Intersection Detail (PDF)**, **Highway Detail (PDF)**,
 **Highway Sequence (PDF)** and **Ramp Detail (PDF)** exports. The **Compare** tab diffs every report
 **TSMIS-vs-TSN** (the PDF-sourced
@@ -531,8 +532,9 @@ build/                       build.ps1, app.spec, prune_bundle.ps1, full_smoke.p
 CHANGELOG.md                 user-facing changelog (one section per version; source of release bodies)
 tools/                       dev utilities (not shipped) — screenshots.py regenerates the site/README shots
 docs/                        the knowledge library (start at docs/INDEX.md)
-output/ input/               generated/user data (git-ignored except .gitkeep stubs)
-tsn_library/ arcgis_layers/   manually-stocked source libraries (git-ignored, local-only)
+output/                      generated data (git-ignored except .gitkeep stubs)
+tsn_library/ arcgis_layers/   manually-stocked source libraries (git-ignored, local-only;
+                             TSN district PDFs live in tsn_library/<report>/raw/ — input/ retired v0.30.0)
 ```
 
 The **landing page** is on a separate **`gh-pages`** branch (GitHub Pages), not in

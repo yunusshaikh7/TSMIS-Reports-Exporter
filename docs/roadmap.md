@@ -59,6 +59,15 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > whole set is sequenced into **[the two-marathon plan](planning/v0.30-owner-backlog-plan.md)**
 > (owner directive 2026-07-22: TWO MARATHON RUNS — M1 → v0.30.0 the surfaces/diagnosis run,
 > M2 → v0.31.0 the structural run; sol-002 absorbed — the verified export-side residue is small).
+> **➡ MARATHON 1 SHIPPED as v0.30.0 (2026-07-22):** consolidate day filter, evidence
+> gating + open-evidence, day-column drag, detailed comparison logging + live ETAs, unique
+> comparison names + manual auto-save, the `input/` folder retired, and the Edge sign-on
+> diagnosis kit + Retry button (the offline sweep refuted DOM-drift — sign-in is Azure-gated
+> + intermittent). Deferred to M2: the manual consolidate-style day dropdown (item 15, overlaps
+> the by-day matrix). **Owed on the work PC:** validate the Edge Retry (dev PC can't reach the
+> intranet). **Marathon 2 (structural → v0.31.0) is next:** future-report readiness, the PDF-vs-Excel
+> by-day matrix, single-pass dual-format in fast mode + matrix, the date on every export filename,
+> and evidence going PDF-vs-PDF only.
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published

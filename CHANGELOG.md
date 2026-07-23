@@ -3,6 +3,55 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.30.0 — 2026-07-22
+
+Marathon 1 of the owner's app-consistency backlog: the existing surfaces made
+right, comparison observability, and the Edge sign-on diagnosis kit.
+
+### Added
+- **Comparison ETAs.** The matrices now show `Comparing 3/12 · 45s elapsed ·
+  ~2m15s left` — the estimate comes from recent per-report durations (their
+  median), refined by the current run; with no history yet it shows elapsed only
+  rather than inventing a number. The completion summary reports total elapsed.
+- **Detailed comparison logging.** Every matrix comparison logs a line per cell —
+  a `▸ comparing …` start and a `✓/⚠/✗/■ … — done in Ns` outcome (successes
+  included, not just failures) — so one log read reconstructs a whole run. A
+  failed cell's reason now shows on the cell's hover tooltip (it was stored but
+  never displayed), the durable attempt record gains the failing error type, and
+  a standalone comparison logs both compared input paths.
+- **Open the evidence images** for a built comparison straight from its matrix
+  cell (a new button beside "open comparison"), independent of the toggle.
+- **Draggable day columns** on the by-day and vs-Baseline matrices (rows and the
+  Everything matrix's environment columns already dragged).
+- **Retry Edge sign-in** button in the sign-in popover — re-runs the silent
+  device sign-in on demand, the remedy when the saved session expired (no full
+  sign-in needed). The Edge chip now also shows WHY a silent sign-in failed
+  instead of just going dark.
+
+### Changed
+- **The Consolidate day picker lists only the days the selected report was
+  actually exported** (it refilters as you change report), instead of every run
+  folder.
+- **The per-cell evidence camera is only offered when the Evidence images toggle
+  is on** (and the grid updates live when you flip it) — the "collect" action is
+  active exactly when the box is checked.
+- **Comparison workbooks have unique, self-identifying names.** The by-day and
+  vs-Baseline matrices embed the day + source (and baseline) in the filename, so
+  two days' comparisons of the same report can be open in Excel at once (it
+  refuses two workbooks with the same basename). Pre-v0.30 dateless cells read as
+  not-built once and rebuild under the new name; cell CONTENT is unchanged.
+- **Manual comparisons auto-save to `output/comparisons/manual/`** (a predictable
+  home) instead of beside whatever file you picked; you can still redirect.
+- **The `input/` folder is retired.** The TSN Highway Log combine feature reads
+  its district PDFs straight from `tsn_library/highway_log/raw/` — the same
+  folder the comparison and evidence already use — so there is ONE drop location.
+  A combine run that finds PDFs still in the old `input/` folder points you to
+  move them (never a silent fallback).
+- **Clearer sign-in diagnostics.** A not-signed-in navigate now names the cause
+  in the log (Microsoft interactive-auth stall vs off-site/network vs
+  on-TSMIS-not-in-group), and the CDP re-attach + signed-in checks no longer
+  swallow their errors silently.
+
 ## v0.29.1 — 2026-07-22
 
 Two same-evening corrections to the new clean-road comparison, both at the
