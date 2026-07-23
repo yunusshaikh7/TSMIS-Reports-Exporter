@@ -325,12 +325,24 @@ function renderState() {
     : "No saved login file. Sign in (Chrome / Built-in Chromium) to save one — required for fast mode.";
   const dev = lg.device || {};
   setDot($("loginEdge").querySelector(".dot"),
-         dev.ok ? "ok" : dev.primed ? "warn" : "unknown");
-  $("loginEdge").title = dev.ok
+         dev.ok ? "ok" : dev.reason ? "bad" : dev.primed ? "warn" : "unknown");
+  let edgeTitle = dev.ok
     ? "Edge one-click sign-in: working (proven this session). Exports can sign themselves in without a saved file."
     : dev.primed
       ? "Edge one-click sign-in: set up (the Edge sign-in profile exists) — it's verified the first time something signs in this session."
       : "Edge one-click sign-in: not set up. Sign in once with Microsoft Edge to enable hands-free sign-in on this PC.";
+  if (dev.reason && !dev.ok) edgeTitle += `\n\nLast attempt: ${dev.reason}`;
+  $("loginEdge").title = edgeTitle;
+  // M1-E/G6: the last device sign-in failure, shown in the popover so a dark chip
+  // explains itself; the Retry button re-runs the silent path.
+  const edgeReason = $("edgeReason");
+  if (edgeReason) {
+    const show = !!dev.reason && !dev.ok;
+    edgeReason.classList.toggle("hidden", !show);
+    edgeReason.textContent = show ? dev.reason : "";
+  }
+  const retry = $("btnRetryEdge");
+  if (retry) retry.disabled = st.task != null || st.login_phase != null;
 
   // Export-browser indicator: what will actually do the exporting right now.
   const eb = st.export_browser || {};
@@ -1255,6 +1267,10 @@ function bindEvents() {
     else api.start_login();
   };
   $("btnLoginCancel").onclick = () => api.cancel_login();
+  $("btnRetryEdge").onclick = async () => {
+    const r = await api.retry_edge_signin();
+    if (r && r.error) showMessage("info", "Retry Edge sign-in", r.error);
+  };
   $("btnUpdate").onclick = onUpdateClick;
   $("appVersion").onclick = () => api.check_updates();
 

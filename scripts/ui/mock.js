@@ -82,7 +82,8 @@ function makeMockApi() {
     task: null, fast_run: false,
     authed: false, device_ok: false,
     logins: { file: { valid: false, age_h: null },
-              device: { ok: false, primed: true } },
+              device: { ok: false, primed: true,
+                        reason: "Edge couldn't sign in silently — the saved device session likely expired or Microsoft is prompting for interactive sign-in. Try “Retry Edge sign-in”." } },
     export_browser: { normal: "sign in to export", fast: "Google Chrome ×3",
                       dot: "warn", cls_label: "Google Chrome" },
     auth_dot: "bad", auth_text: "No saved login — click Log in",
@@ -1563,6 +1564,16 @@ function makeMockApi() {
         st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Idle";
         pushState();
       }, 700);
+    },
+    retry_edge_signin: async () => {
+      push({ t: "log", text: "Retrying Edge sign-in…" });
+      setTimeout(() => {
+        // Simulate a successful silent refresh: chip goes green, reason clears.
+        st.logins = { ...st.logins, device: { ok: true, primed: true, reason: null } };
+        pushState();
+        push({ t: "log", text: "Background sign-in check finished." });
+      }, 800);
+      return { ok: true };
     },
     start_login: async () => {
       st.task = "login"; st.login_phase = "starting";

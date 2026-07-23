@@ -252,6 +252,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         self._fast_run = False       # running export is fast mode (Skip is off)
         self._authed = False
         self._device_ok = False      # silent device sign-in proven to work
+        self._device_signin_reason = None   # M1-E/G6: last device sign-in failure reason
         self._login_phase = None     # None|starting|open|saving|cancelling
         self._auth_dot = "unknown"
         self._auth_text = "Checking session…"
@@ -449,7 +450,11 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
             primed = False
         return {"file": {"valid": valid,
                          "age_h": round(age, 1) if age is not None else None},
-                "device": {"ok": self._device_ok, "primed": primed}}
+                # M1-E/G6: `reason` is the last device sign-in failure (or None),
+                # so the Edge one-click chip explains a dark chip instead of
+                # leaving the user guessing.
+                "device": {"ok": self._device_ok, "primed": primed,
+                           "reason": self._device_signin_reason}}
 
     def _export_browser_view(self):
         """What will actually do the exporting right now, for the title-bar
@@ -1088,6 +1093,30 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         ActiveEnvCheckWorker(self._q, src, env, seq,
                              supersede=self._active_check_supersede).start()
 
+    @_api_method
+    def retry_edge_signin(self):
+        """User-driven 'Retry Edge sign-in' (M1-E): re-run the SILENT device-SSO
+        check on demand — the same path the startup check uses. This is the remedy
+        when the saved device session expired: it refreshes the Azure session from
+        the still-primed Edge profile WITHOUT a headed sign-in. Needs the Edge
+        profile primed (a past headed Edge sign-in) or a saved login; otherwise it
+        points the user at 'Log in' first. The result updates the Edge chip."""
+        with self._lock:
+            if self._task or self._active_check:
+                return {"error": "A sign-in check is already running — "
+                                 "give it a moment."}
+        try:
+            primed = (EDGE_LOGIN_PROFILE_DIR.is_dir()
+                      and any(EDGE_LOGIN_PROFILE_DIR.iterdir()))
+        except OSError:  # silent-ok: an unreadable profile dir simply reads as not-primed (the retry then points the user at Log in)
+            primed = False
+        if not (primed or has_valid_auth()):
+            return {"error": "No Edge sign-in profile yet — click “Log in” once to "
+                             "sign in with Edge, then Retry refreshes it silently."}
+        self._emit_log("Retrying Edge sign-in…")
+        self._maybe_active_env_check("retry")
+        return {"ok": True}
+
     def _on_active_env_done(self, payload):
         """The quiet active-env check finished. Drop a stale result (a newer env
         switch bumped the seq and owns the flag); otherwise clear the flag, light
@@ -1101,6 +1130,11 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
             if payload.get("via_device"):
                 self._device_ok = True
                 via_device = True
+                self._device_signin_reason = None      # succeeded — clear any prior reason
+            elif not payload.get("signed_in") and not payload.get("had_file"):
+                # A device (no saved file) attempt that DIDN'T sign in — remember
+                # why so the Edge one-click chip can say so (M1-E/G6).
+                self._device_signin_reason = payload.get("reason")
         # Close the loop on the "waiting for this" line above, so the gate is
         # visibly released. Outcome detail stays in the log file (quiet by design).
         self._emit_log("Background sign-in check finished.")

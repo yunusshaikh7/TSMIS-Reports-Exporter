@@ -309,6 +309,36 @@ def navigate_with_auth(page, *, budget_s=60, should_cancel=None):
              int(time.monotonic() - start), auth_state(page).get("url"))
     if not signed:
         log.info("auth: signals after navigate: %s", auth_state(page).get("signals"))
+        log.info("auth: not signed in — %s", classify_signin_stall(page))
+
+
+# Common Microsoft / Azure AD interactive sign-in hosts. When a headless silent
+# navigate ends parked here, the saved device session has expired or Conditional
+# Access / MFA is demanding interactive auth — NOT a site or network fault.
+_IDP_HOSTS = ("login.microsoftonline.com", "login.microsoft.com",
+              "login.windows.net", "adfs")
+
+
+def classify_signin_stall(page):
+    """A one-line, human diagnosis of WHY a not-signed-in navigate stalled, so one
+    uploaded log distinguishes the common causes instead of leaving a raw signals
+    dump to interpret (M1-E/G2). Also drives the Edge sign-in chip's message.
+    Returns a short string; never raises."""
+    try:
+        host = (_page_host(page) or "").lower()
+        title = (page.title() or "")
+    except Exception:  # silent-ok: the classification is a best-effort diagnostic
+        return "could not read the stalled page"
+    if any(h in host for h in _IDP_HOSTS) or "sign in to your account" in title.lower():
+        return ("stalled at the Microsoft sign-in page — the saved device session "
+                "expired or Conditional Access/MFA is prompting for interactive "
+                "sign-in; use “Retry Edge sign-in” to refresh it")
+    if host and host != expected_host():
+        return (f"stalled off-site at {host} — not the TSMIS host; "
+                "check VPN / network reachability")
+    return ("on the TSMIS host but not signed in — the signals snapshot above says "
+            "which (accessDenied = not in the TSMIS group; all-absent = possible "
+            "page change)")
 
 
 # Signed-in detection for the report page. The page ships its whole form
@@ -345,7 +375,11 @@ def is_logged_in(page):
         if _page_host(page) != expected_host():
             return False
         return bool(page.evaluate(_SIGNED_IN_JS))
-    except Exception:
+    except Exception as e:
+        # M1-E/G1: a DOM-eval error (e.g. the site renamed the signed-in markers)
+        # used to read IDENTICALLY to a clean "not signed in". Record the class so a
+        # log reader can tell them apart; the navigate-level snapshot has the detail.
+        log.debug("auth: is_logged_in check errored (%s: %s)", type(e).__name__, e)
         return False
 
 

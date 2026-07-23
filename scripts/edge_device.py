@@ -204,6 +204,7 @@ def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000, should_ca
     log.info("auth: trying CDP re-attach to Edge at %s (up to %ds)",
              cdp_url, timeout_ms // 1000)
     deadline = time.monotonic() + (timeout_ms / 1000)
+    last_err = None                        # M1-E/G4: don't swallow every pass silently
     while time.monotonic() < deadline:
         if should_cancel is not None and should_cancel():
             log.info("auth: CDP re-attach stopped (cancelled)")
@@ -221,8 +222,10 @@ def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000, should_ca
                     ctx, navigate=True, should_cancel=should_cancel)
                 if state:
                     return state
-        except Exception:
-            pass
+        except Exception as e:
+            last_err = e
+            log.debug("auth: CDP re-attach pass failed (%s: %s)",
+                      type(e).__name__, str(e).splitlines()[0] if str(e) else "")
         finally:
             if browser:
                 try:
@@ -230,6 +233,10 @@ def capture_edge_login_state_over_cdp(p, cdp_url, *, timeout_ms=8_000, should_ca
                 except Exception:
                     pass
         time.sleep(0.5)
+    if last_err is not None:
+        log.info("auth: CDP re-attach gave up after %ds (last error %s: %s)",
+                 timeout_ms // 1000, type(last_err).__name__,
+                 str(last_err).splitlines()[0] if str(last_err) else "")
     return None
 
 

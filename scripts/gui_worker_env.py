@@ -412,6 +412,18 @@ class _Superseded(Exception):
     """Internal: the quiet env check yielded to a user task (B8)."""
 
 
+# M1-E/G6: human reasons for a failed background sign-in check, surfaced on the
+# Edge one-click chip so a work-PC user sees WHY instead of an unlit chip.
+_SIGNIN_REASONS = {
+    "no_signin": ("Edge couldn't sign in silently — the saved device session "
+                  "likely expired or Microsoft is prompting for interactive "
+                  "sign-in. Try “Retry Edge sign-in”."),
+    "denied": "Signed in, but this account isn't in the TSMIS access group.",
+    "unreachable": "The TSMIS site was unreachable — check the VPN / network.",
+    "error": "The sign-in check hit an error (see the log).",
+}
+
+
 class ActiveEnvCheckWorker(threading.Thread):
     """The QUIET, single-combo env check for the CURRENTLY selected site, run
     unprompted on app start and after an env switch. Where EnvScanWorker probes
@@ -451,6 +463,7 @@ class ActiveEnvCheckWorker(threading.Thread):
         key = f"{self.src}-{self.env}"
         had_file = has_valid_auth()        # classify device vs saved-file sign-in
         signed_in = False
+        reason = None                      # M1-E/G6: WHY a device sign-in failed
         set_thread_site(self.src, self.env)
         try:
             if self.supersede.is_set():
@@ -475,6 +488,10 @@ class ActiveEnvCheckWorker(threading.Thread):
                         self.q.put(("env_access", verdict))
                         signed_in = verdict["status"] not in (
                             "no_signin", "denied", "unreachable", "error")
+                        if not signed_in:
+                            reason = _SIGNIN_REASONS.get(
+                                verdict.get("status"),
+                                verdict.get("detail") or verdict.get("status"))
                 finally:
                     if browser is not None:
                         try:
@@ -486,15 +503,19 @@ class ActiveEnvCheckWorker(threading.Thread):
         except _Superseded:  # silent-ok: the yield point above already logged it
             pass
         except Exception as e:
+            reason = f"{type(e).__name__}: {str(e).splitlines()[0]}" if str(e) else type(e).__name__
             log.info("active env check: %s quiet failure (%s: %s)", key,
                      type(e).__name__, str(e).splitlines()[0] if str(e) else "")
         finally:
             set_thread_site(None, None)
         # via_device only when we signed in WITHOUT a saved file — that's the
-        # path that actually exercised (and so proves) Edge one-click.
+        # path that actually exercised (and so proves) Edge one-click. M1-E/G6: a
+        # FAILED device attempt carries its reason so the Edge chip can say why
+        # instead of just going dark.
         self.q.put(("active_env_done",
                     {"seq": self.seq, "key": key, "signed_in": signed_in,
-                     "via_device": signed_in and not had_file}))
+                     "via_device": signed_in and not had_file,
+                     "had_file": had_file, "reason": None if signed_in else reason}))
 
 
 class LoginWorker(threading.Thread):
