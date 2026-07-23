@@ -324,7 +324,7 @@ def pm_units(v):
         return None
     try:
         f = float(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # silent-ok: a non-numeric PM cell has no position; callers treat None as not-locatable and skip the slice
         return None
     return int(round(f * PM_SCALE))
 

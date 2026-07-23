@@ -155,7 +155,7 @@ class GuiArcgisMixin:
             raw_root = Path(tsn_library.raw_dir("clean_highway"))
             has_raw = any(p.is_file() and not p.name.startswith("~$")
                           for p in raw_root.glob("*.xlsx"))
-        except OSError:
+        except OSError:  # silent-ok: a pure presence probe — an unreadable raw folder reads as not-staged and the endpoint returns the stage-it-first message
             has_raw = False
         if not has_raw:
             return {"error": "Stage the TSN CA HIGHWAYS extract in the TSN "

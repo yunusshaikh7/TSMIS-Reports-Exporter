@@ -1645,3 +1645,46 @@ statewide long-dash census of the TSMIS Highway Log (PDF) export.
   routes untouched. Census/probe harnesses: this session's scratchpad
   `census_mer059_dashes.py` / `probe_059_mer.py` / `dump_hl_058U_059.py`; hermetic lock:
   `check_tsmis_pdf_parse.check_dashed_district_group_header`.
+
+## Clean Road Highway — ArcGIS build vs TSN (v0.29.0 first statewide bless)
+
+Canary ID: `CRH-SW-E1`
+Flavor: ArcGIS-built CA HIGHWAYS vs the TSN clean-road extract (normalized library)
+Stable recipe family: Clean Road Highway (the ArcGIS tab; `compare_clean_highway_tsn`)
+Binding state: `baseline-bound` (2026-07-22; the v0.29.0 acceptance run)
+Expected approved result: **52,647 paired / 5,081 ArcGIS-only / 7,436 TSN-only /
+42,129 differing rows / 223,473 differing cells / 10,518 fully identical;
+252 routes in both, 0 ArcGIS-only routes, 21 TSN-only routes** (the known
+unconstructed/suffixed TSN-only universe: 064, 081, 093, 100, 102, 122, 143, 148,
+179, 181, 228, 230, 234, 235, 239, …). Build side: 57,728 rows / 252 routes as of
+2025-09-08 (the TSN extract's own date), completion COMPLETE, 0 unplaced spans.
+TSN side: 60,083 rows / 273 route tokens, normalization marker v1.
+
+Top per-column differing-cell counts (46 compared columns; the 28 context columns
+contribute zero by design): MEDIAN_EFF 23,928 · LEFT_ROAD_EFF 22,588 ·
+RIGHT_ROAD_EFF 22,137 (the open composite-rule class) · MEDIAN_WIDTH 8,312 ·
+ACCESS_EFF 7,934 · LT_TRAV_WAY 6,810 · END_PM 6,797 · LENGTH 6,797 (the
+0.001-mi sliver class, shown once per sliver by design) · MEDIAN_TYPE 6,736.
+
+| Role | Exact file | Length | SHA-256 |
+|---|---|---:|---|
+| ArcGIS (built) | `output\arcgis_cleanroad\clean_highway_built.xlsx` (repo-relative; rebuilt from the library) | 10,672,050 | `0013F7DBF25C88160C1E97F2ED629B2C75A5E75D97398E32F6B78DA1EE56BB3F` |
+| TSN (normalized) | `tsn_library\clean_highway\consolidated\tsn_clean_highway_normalized.xlsx` | 14,864,389 | `664D31D1D7C2B1438FFAF3ACA68617D9C98637948E0A02B6521BCB5CF0AAB525` |
+| TSN (raw source) | `C:\Users\Yunus\Downloads\TSMIS\_inbox\Cleanroad\TSN_Cleanroad_files\CA HIGHWAYS 09.08.2025.xlsx` | 21,290,781 | `BBD1ACF9D4A8FEF86F96A0A2CF54BE1105E8C919600DBCD05A325B194F5C86E5` |
+| ArcGIS layer library (the whole 41-file drop, as delivered) | `C:\Users\Yunus\Downloads\TSMIS\_inbox\AllLayers7.22_ExcelFiles.zip` | 329,208,782 | `2F59FEA4224F8F232F3FA823B03A321D57B0ACBD4A2E03C9BE2B3A0E7EC9889A` |
+
+Acceptance evidence (all three legs PASSED 2026-07-22): the shipped-path E2E
+(`run_e2e.py`, ConsolidateWorker → tsn_library.build_consolidated → compare
+mode="both"), then `_inbox\Cleanroad\_analysis\audit_v0290.py` —
+(A) an INDEPENDENT recomputation from the two committed inputs (no scripts/
+arithmetic) reproduced the pairing and EVERY per-column differing-cell count
+exactly (223,473 / 42,129 / 52,647·5,081·7,436; 1 duplicate-key group,
+min-diff matched identically); (B) the values workbook's own visible
+Status/Diffs cells sum to the same totals and the Notes carry all 74
+provenance lines; (C) a real-Excel COM CalculateFullRebuild of the
+live-formulas edition equals the values twin CELL-FOR-CELL across all 65,164
+Comparison rows. Oracle JSON: `audit_v0290_oracle.json` beside the script.
+Known open classes feeding the counts (roadmap-tracked): the block eff-date
+composite rule, the 0.001 sliver policy, od-less multi-county coverage holes.
+The ADT trio + offset pair are CONTEXT pending the profile-continuation fit —
+they appear in no count above.

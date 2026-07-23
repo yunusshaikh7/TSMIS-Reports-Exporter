@@ -522,7 +522,7 @@ def _num(v):
         return None
     try:
         return float(v)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError):  # silent-ok: a non-numeric count cell contributes no ADT arithmetic; the painted cell stays empty and the comparison shows it
         return None
 
 
