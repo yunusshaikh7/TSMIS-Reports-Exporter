@@ -1688,3 +1688,30 @@ Known open classes feeding the counts (roadmap-tracked): the block eff-date
 composite rule, the 0.001 sliver policy, od-less multi-county coverage holes.
 The ADT trio + offset pair are CONTEXT pending the profile-continuation fit —
 they appear in no count above.
+
+### CRH-SW-E2 — the v0.29.1 re-bless (supersedes CRH-SW-E1's expected counts)
+
+Same recipe, two owner-directed semantic changes (2026-07-22 late): the ADT
+profile trio (Profile / ADT / Change-per-mile) is COMPARED AND COUNTED (the
+Notes name the two model-fit classes inside the count), and THY_CITY_CODE is
+COMPARED through the derived `scripts/city_codes.py` table (395 entries,
+99.92% co-location agreement). 50 columns compared / 24 context.
+
+Expected approved result: **52,647 paired / 5,081 ArcGIS-only / 7,436 TSN-only
+(UNCHANGED — the key structure did not move) / 50,012 differing rows /
+291,292 differing cells / 2,635 fully identical**. New counted columns:
+ADT 35,839 · CHANGE_PER_MILE 23,116 · CITY_CODE 6,760 (route-001 city
+agreement measured 96.2%; residuals are span coverage holes, not mapping
+errors). The ArcGIS side rebuilt with the city column painted:
+
+| Role | Exact file | Length | SHA-256 |
+|---|---|---:|---|
+| ArcGIS (built, v0.29.1) | `output\arcgis_cleanroad\clean_highway_built.xlsx` | 10,824,294 | `C457B2AA6860AAD18C36C0F4426286C7E4EAE7A9CEBE4A65BEE73EE34E96E5D2` |
+| TSN (normalized) | unchanged from CRH-SW-E1 | 14,864,389 | `664D31D1D7C2B1438FFAF3ACA68617D9C98637948E0A02B6521BCB5CF0AAB525` |
+
+Acceptance evidence (all three legs PASSED on this pair, 2026-07-22 late):
+the independent oracle reproduced the pairing and every per-column count
+exactly (291,292 / 50,012 / 52,647·5,081·7,436); the values workbook's own
+cells sum to the same; the real-Excel COM full rebuild of the formulas
+edition equals the values twin cell-for-cell across all 65,164 rows. Oracle
+JSON beside `audit_v0290.py`. Gate 153/153 + ruff clean at the tag.
