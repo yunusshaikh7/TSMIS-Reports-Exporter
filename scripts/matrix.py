@@ -35,7 +35,7 @@ from matrix_state import (                                       # noqa: F401
     default_env_label, env_keys, load_attempts, record_attempt,
     load_results, load_tsn_results, matrix_snapshot, mode_out_path,
     out_path_for_cell, producer_identity, read_counts, record_result,
-    record_tsn_result, self_supported, tsn_capable, tsn_comparator_for,
+    record_tsn_result, row_fmt, self_supported, tsn_capable, tsn_comparator_for,
     tsn_comparisons_root, tsn_input_dir_for, tsn_input_root, tsn_source,
     tsn_subdir_for, tsn_supported)
 from matrix_build import (                                       # noqa: F401

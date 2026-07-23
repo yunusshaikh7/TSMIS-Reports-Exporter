@@ -35,6 +35,25 @@ _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_summary_excel",
                        "tsmis_highway_sequence_pdf", "tsmis_ramp_detail_pdf",
                        "run_reports", "comparisons")
 
+# The consolidated-workbook files (name, human label) the Reset cleanup removes from
+# the OUTPUT_ROOT top level — the TSN Highway Log combine + every PDF-sourced
+# consolidator's `tsmis_<subdir>_consolidated.xlsx`. Named so `check_report_wiring`
+# can assert every wired PDF report's output is actually a Reset target (M2-A) — a
+# new report that forgets this line would otherwise leave an un-removable workbook.
+_LEGACY_CONSOLIDATED_FILES = (
+    ("tsn_highway_log_consolidated.xlsx", "TSN consolidated workbook"),
+    ("tsmis_highway_log_pdf_consolidated.xlsx",
+     "TSMIS Highway Log (PDF) consolidated workbook"),
+    ("tsmis_intersection_detail_pdf_consolidated.xlsx",
+     "TSMIS Intersection Detail (PDF) consolidated workbook"),
+    ("tsmis_highway_detail_pdf_consolidated.xlsx",
+     "TSMIS Highway Detail (PDF) consolidated workbook"),
+    ("tsmis_highway_sequence_pdf_consolidated.xlsx",
+     "TSMIS Highway Sequence (PDF) consolidated workbook"),
+    ("tsmis_ramp_detail_pdf_consolidated.xlsx",
+     "TSMIS Ramp Detail (PDF) consolidated workbook"),
+)
+
 
 def _entry_identity(path):
     """Replacement-sensitive identity for one directory entry.
@@ -138,17 +157,7 @@ def reset_targets(include_input=False, warnings=None):
         if p.is_dir():
             _append_target(targets, f"output folder '{name}'", p,
                            scope_root=OUTPUT_ROOT, warnings=warnings)
-    for fname, lbl in (("tsn_highway_log_consolidated.xlsx", "TSN consolidated workbook"),
-                       ("tsmis_highway_log_pdf_consolidated.xlsx",
-                        "TSMIS Highway Log (PDF) consolidated workbook"),
-                       ("tsmis_intersection_detail_pdf_consolidated.xlsx",
-                        "TSMIS Intersection Detail (PDF) consolidated workbook"),
-                       ("tsmis_highway_detail_pdf_consolidated.xlsx",
-                        "TSMIS Highway Detail (PDF) consolidated workbook"),
-                       ("tsmis_highway_sequence_pdf_consolidated.xlsx",
-                        "TSMIS Highway Sequence (PDF) consolidated workbook"),
-                       ("tsmis_ramp_detail_pdf_consolidated.xlsx",
-                        "TSMIS Ramp Detail (PDF) consolidated workbook")):
+    for fname, lbl in _LEGACY_CONSOLIDATED_FILES:
         p = OUTPUT_ROOT / fname
         if p.is_file():
             _append_target(targets, lbl, p, scope_root=OUTPUT_ROOT,

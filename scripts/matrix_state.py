@@ -16,6 +16,7 @@ import artifact_store
 import cache_envelope
 import consolidation_meta
 import outcome
+import report_catalog
 import report_library
 import reports
 from common import DATA_SOURCES, ENVIRONMENTS
@@ -468,74 +469,42 @@ def tsn_source(dest, subdir, selected_file=None):
 
 # --- per-row comparison MODE registry -------------------------------------- #
 # A row's "env" (cross-environment) mode is supported only when it has a
-# compare_env folder adapter. Highway Log is TWO rows (Excel + PDF), each with its
-# own TSN + cross-format modes; the other reports get one greyed "tsn" placeholder
-# (no comparison code yet). A mode dict: id, label, kind ("env"|"tsn"|"self"),
-# supported, env_subdir, plus tsn_subdir+fmt (tsn) or other_subdir (self).
+# compare_env folder adapter. The 'tsn' + 'self' modes and the by-day format tag
+# DERIVE from the `report_catalog.MATRIX` table (M2-A) — one declaration per row,
+# no parallel if-chain per PDF report. A mode dict: id, label, kind
+# ("env"|"tsn"|"self"), supported, env_subdir, plus tsn_subdir+fmt (tsn) or
+# other_subdir (self). Every mode's `supported` DERIVES from the comparison registry
+# (CMP-AUD-013): the 'tsn' modes from tsn_supported(row_key), the 'self' modes from
+# self_supported(<pdf subdir>) — patching the registry (tsn_comparator_for /
+# _pdf_self_comparator) flips these rows here too, instead of a hand-written True
+# shadowing it. Production identities are unchanged (all True today).
+_SELF_LABELS = {"vs_pdf": "vs TSMIS PDF", "vs_excel": "vs TSMIS Excel"}
+
+
 def _row_modes(row_key, subdir, adapter):
     env = {"id": "env", "label": "Cross-environment", "kind": "env",
            "supported": adapter is not None, "env_subdir": subdir}
-    # Every mode's `supported` DERIVES from the comparison registry (CMP-AUD-013):
-    # the 'tsn' modes from tsn_supported(row_key) and the 'self' modes from
-    # self_supported(<pdf subdir>) — patching the registry (tsn_comparator_for /
-    # _pdf_self_comparator) now flips these rows here too, instead of a hand-written
-    # True shadowing it. Production identities are unchanged (all True today).
-    if row_key == "highway_log":            # TSMIS Excel
-        return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
-                 "supported": tsn_supported(row_key),
-                 "env_subdir": "highway_log", "tsn_subdir": "highway_log", "fmt": "excel"},
-                {"id": "vs_pdf", "label": "vs TSMIS PDF", "kind": "self",
-                 "supported": self_supported("highway_log_pdf"),
-                 "env_subdir": "highway_log", "other_subdir": "highway_log_pdf"}]
-    if row_key == "highway_log_pdf":        # TSMIS PDF
-        return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
-                 "supported": tsn_supported(row_key),
-                 "env_subdir": "highway_log_pdf", "tsn_subdir": "highway_log", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
-                 "supported": self_supported("highway_log_pdf"),
-                 "env_subdir": "highway_log_pdf", "other_subdir": "highway_log"}]
-    if row_key == "intersection_detail_pdf":   # the exact parallel of highway_log_pdf
-        return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
-                 "supported": tsn_supported(row_key),
-                 "env_subdir": "intersection_detail_pdf",
-                 "tsn_subdir": "intersection_detail", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
-                 "supported": self_supported("intersection_detail_pdf"),
-                 "env_subdir": "intersection_detail_pdf", "other_subdir": "intersection_detail"}]
-    if row_key == "highway_detail_pdf":        # the exact parallel of intersection_detail_pdf
-        return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
-                 "supported": tsn_supported(row_key),
-                 "env_subdir": "highway_detail_pdf",
-                 "tsn_subdir": "highway_detail", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
-                 "supported": self_supported("highway_detail_pdf"),
-                 "env_subdir": "highway_detail_pdf", "other_subdir": "highway_detail"}]
-    if row_key == "highway_sequence_pdf":      # the exact parallel of highway_detail_pdf
-        return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
-                 "supported": tsn_supported(row_key),
-                 "env_subdir": "highway_sequence_pdf",
-                 "tsn_subdir": "highway_sequence", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
-                 "supported": self_supported("highway_sequence_pdf"),
-                 "env_subdir": "highway_sequence_pdf", "other_subdir": "highway_sequence"}]
-    if row_key == "ramp_detail_pdf":           # the exact parallel of highway_sequence_pdf
-        return [env,
-                {"id": "tsn", "label": "vs TSN", "kind": "tsn",
-                 "supported": tsn_supported(row_key),
-                 "env_subdir": "ramp_detail_pdf",
-                 "tsn_subdir": "ramp_detail", "fmt": "pdf"},
-                {"id": "vs_excel", "label": "vs TSMIS Excel", "kind": "self",
-                 "supported": self_supported("ramp_detail_pdf"),
-                 "env_subdir": "ramp_detail_pdf", "other_subdir": "ramp_detail"}]
-    return [env,
-            {"id": "tsn", "label": "vs TSN", "kind": "tsn",
-             "supported": tsn_supported(row_key),
-             "env_subdir": subdir, "tsn_subdir": subdir, "fmt": None}]
+    modes = [env]
+    entry = report_catalog.matrix_entry(row_key)
+    if entry is None:
+        # A row not declared in the MATRIX table (a future export-only report added
+        # to matrix_rows before its wiring lands): env + a greyed-until-coded tsn
+        # placeholder, the old default branch. check_report_wiring names the gap.
+        modes.append({"id": "tsn", "label": "vs TSN", "kind": "tsn",
+                      "supported": tsn_supported(row_key),
+                      "env_subdir": subdir, "tsn_subdir": subdir, "fmt": None})
+        return modes
+    if entry.tsn_key is not None:
+        modes.append({"id": "tsn", "label": "vs TSN", "kind": "tsn",
+                      "supported": tsn_supported(row_key),
+                      "env_subdir": subdir,
+                      "tsn_subdir": entry.tsn_subdir or subdir, "fmt": entry.fmt})
+    if entry.self_id is not None:
+        modes.append({"id": entry.self_id, "label": _SELF_LABELS[entry.self_id],
+                      "kind": "self",
+                      "supported": self_supported(entry.self_pdf),
+                      "env_subdir": subdir, "other_subdir": entry.self_other})
+    return modes
 
 
 def _mode_by_id(modes, mode_id):
@@ -560,68 +529,30 @@ def all_row_modes():
 def tsn_comparator_for(row_key):
     """The vs-TSN comparison adapter for a report row (a `"files"` module/instance
     exposing compare(path_a, path_b, out_path, …)), or None when the report has no
-    TSN comparator yet. The single registry of which reports support vs-TSN — adding
-    a report here (+ its CompareSchema module) flips it on in BOTH matrices."""
-    if row_key == "highway_log":
-        import compare_highway_log as _m            # lazy
-        return _m
-    if row_key == "highway_log_pdf":
-        import compare_highway_log_pdf as _m
-        return _m.TSMIS_PDF_VS_TSN
-    if row_key == "intersection_detail_pdf":
-        import compare_intersection_detail_pdf as _m
-        return _m.TSMIS_PDF_VS_TSN
-    if row_key == "ramp_detail":
-        import compare_ramp_detail_tsn as _m
-        return _m
-    if row_key == "ramp_summary":
-        import compare_ramp_summary_tsn as _m       # AGGREGATE recipe
-        return _m
-    if row_key == "intersection_summary":
-        import compare_intersection_summary_tsn as _m   # AGGREGATE
-        return _m
-    if row_key == "intersection_detail":
-        import compare_intersection_detail_tsn as _m    # FLAT
-        return _m
-    if row_key == "highway_sequence":
-        import compare_highway_sequence_tsn as _m       # FLAT (county+PM key)
-        return _m
-    if row_key == "highway_detail":
-        import compare_highway_detail_tsn as _m         # FLAT (route+canonical PM)
-        return _m
-    if row_key == "highway_detail_pdf":
-        import compare_highway_detail_pdf as _m
-        return _m.TSMIS_PDF_VS_TSN
-    if row_key == "highway_sequence_pdf":
-        import compare_highway_sequence_pdf as _m
-        return _m.TSMIS_PDF_VS_TSN
-    if row_key == "ramp_detail_pdf":
-        import compare_ramp_detail_pdf as _m
-        return _m.TSMIS_PDF_VS_TSN
-    return None
+    TSN comparator yet. Delegates to `report_catalog.MATRIX` (M2-A) — the single
+    registry of which reports support vs-TSN — so adding a report's `cmp:*:tsn`
+    recipe + its MATRIX row flips it on in BOTH matrices. Kept as a module-level
+    function so checks can patch it to simulate an unwired report."""
+    return report_catalog.matrix_tsn_comparator(row_key)
 
 
 def _pdf_self_comparator(pdf_subdir):
     """The PDF-vs-Excel self-comparison adapter for a PDF report subdir (the internal
-    TSMIS PDF↔Excel consistency check). Generalizes the self mode so a second PDF
-    report (Intersection Detail) resolves the same way Highway Log does, instead of a
-    literal `compare_highway_log_pdf` reference."""
-    if pdf_subdir == "highway_log_pdf":
-        import compare_highway_log_pdf as _m
-        return _m.TSMIS_PDF_VS_EXCEL
-    if pdf_subdir == "intersection_detail_pdf":
-        import compare_intersection_detail_pdf as _m
-        return _m.TSMIS_PDF_VS_EXCEL
-    if pdf_subdir == "highway_detail_pdf":
-        import compare_highway_detail_pdf as _m
-        return _m.TSMIS_PDF_VS_EXCEL
-    if pdf_subdir == "highway_sequence_pdf":
-        import compare_highway_sequence_pdf as _m
-        return _m.TSMIS_PDF_VS_EXCEL
-    if pdf_subdir == "ramp_detail_pdf":
-        import compare_ramp_detail_pdf as _m
-        return _m.TSMIS_PDF_VS_EXCEL
-    raise ValueError(f"no PDF-vs-Excel comparator for {pdf_subdir}")
+    TSMIS PDF↔Excel consistency check), from `report_catalog.MATRIX` (M2-A). Raises
+    ValueError when the subdir has no registered self comparator — the signal
+    `self_supported` turns into False."""
+    adapter = report_catalog.matrix_self_comparator(pdf_subdir)
+    if adapter is None:
+        raise ValueError(f"no PDF-vs-Excel comparator for {pdf_subdir}")
+    return adapter
+
+
+def row_fmt(row_key):
+    """The export FORMAT tag a matrix row carries ("excel"/"pdf"/None), from
+    `report_catalog.MATRIX`. The single source `day_matrix._day_rows` reads so its
+    by-day format tag can't drift from `_row_modes`' tsn-mode fmt (both read the
+    catalog)."""
+    return report_catalog.matrix_row_fmt(row_key)
 
 
 def self_supported(pdf_subdir):

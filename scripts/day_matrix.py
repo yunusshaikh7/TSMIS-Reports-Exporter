@@ -69,22 +69,15 @@ def _day_rows():
     out = []
     for row_key, label, subdir, _idx, adapter in reports.matrix_rows():
         tsn_subdir = matrix.tsn_subdir_for(row_key, subdir, adapter)
-        # `supported` ALWAYS derives from the single tsn_supported registry
-        # (CMP-AUD-013) — the two Highway Log rows + the five PDF rows differ only
-        # in their explicit fmt, never in whether support is hardcoded. Patching
-        # tsn_comparator_for now flips every row here; no hand-written True shadows
-        # it. Every report has a coded comparator today, so all rows stay live.
-        if row_key == "highway_log":
-            out.append((row_key, label, subdir, "excel",
-                        matrix.tsn_supported(row_key), tsn_subdir))
-        elif row_key in ("highway_log_pdf", "intersection_detail_pdf",
-                         "highway_detail_pdf", "highway_sequence_pdf",
-                         "ramp_detail_pdf"):
-            out.append((row_key, label, subdir, "pdf",
-                        matrix.tsn_supported(row_key), tsn_subdir))
-        else:
-            out.append((row_key, label, subdir, None,
-                        matrix.tsn_supported(row_key), tsn_subdir))
+        # `fmt` and `supported` both derive from the single `report_catalog.MATRIX`
+        # table (M2-A) via the matrix facade — no per-report if-chain here. The
+        # dual-edition families carry an explicit fmt tag ("excel"/"pdf") so the two
+        # rows are distinguishable; every other row is None. `supported` derives from
+        # the tsn_supported registry (CMP-AUD-013), so patching tsn_comparator_for
+        # flips the row. `fmt` matches `_row_modes`' tsn-mode fmt by construction
+        # (both read the catalog), closing the drift the old parallel lists risked.
+        out.append((row_key, label, subdir, matrix.row_fmt(row_key),
+                    matrix.tsn_supported(row_key), tsn_subdir))
     # Reports with no cross-env adapter (absent from matrix_rows) still get a
     # by-day vs-TSN row here. EMPTY today — every report has an env adapter —
     # kept as the documented extension point for a future export-only report.

@@ -274,7 +274,7 @@ def main():
               r2.completion == oc.PARTIAL)
 
         print("P1-R01 (round 2) self-comparison propagates a partial side:")
-        import compare_highway_log_pdf as _chp
+        import matrix_build
 
         class _SelfCmp:
             def compare(self, pdf_c, excel_c, out_path, events=None,
@@ -297,8 +297,12 @@ def main():
                 failed_inputs=0))
             return path, completion
 
+        # M2-A: the self comparator resolves through the catalog-derived
+        # `_pdf_self_comparator` (matrix_build's own binding), the seam matrix_build
+        # calls — so patch there, not the comparator's module attribute (early-bound
+        # in report_catalog.COMPARE like every other adapter).
         with _patch(matrix, "_ensure_consolidated", _sides), \
-             _patch(_chp, "TSMIS_PDF_VS_EXCEL", _SelfCmp()):
+             _patch(matrix_build, "_pdf_self_comparator", lambda _sub: _SelfCmp()):
             rself = matrix.build_comparison(tmp / "self_dest", "highway_log", "ars-prod",
                                             "vs_pdf", "ssor-prod", events=None)
         check("self comparison with ONE partial side -> result.completion=partial",

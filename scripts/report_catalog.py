@@ -350,6 +350,72 @@ COMPARE = (
                  _cmp_ramp_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "self"),
 )
 
+# ----------------------------------------------------------------------------- #
+# Matrix-row comparison wiring (M2-A, v0.31.0). ONE declaration per MATRIX row (a
+# report that has a cross-environment adapter, i.e. a `cmp:<family>:env` entry) of
+# the vs-TSN + self-check comparators it surfaces and the export FORMAT tag the
+# by-day matrix shows. `matrix_state._row_modes` / `tsn_comparator_for` /
+# `_pdf_self_comparator` and `day_matrix._day_rows` DERIVE from this table instead of
+# parallel per-report `if`-chains — the v0.17.3 "forgot one mirror" field-crash class
+# (a matrix cell dispatching to a comparator the author forgot to register). Adding a
+# report's comparators to COMPARE + a row here flips it on in BOTH matrices at once;
+# `build/check_report_wiring.py` proves every row here resolves to real COMPARE
+# entries (and that every dual-edition family is fully wired both ways).
+#
+#   fmt        the format tag the 'tsn' mode + by-day row carry ("excel"/"pdf"/None) —
+#              non-None only for the dual-edition families (an Excel row AND a PDF row
+#              for one report; the tag disambiguates the two rows in the by-day view).
+#   tsn_key    the COMPARE key of this row's vs-TSN comparator (every wired row has one).
+#   tsn_subdir the row's TSN dataset key — defaults to `row_key`; a PDF row shares its
+#              Excel sibling's dataset (e.g. highway_log_pdf -> highway_log).
+#   self_id    the self-check mode id shown on this row ("vs_pdf"/"vs_excel"), or None.
+#   self_key   the COMPARE key of the shared PDF-vs-Excel self comparator (BOTH editions
+#              of a family name the same one), or None.
+#   self_other the sibling subdir the self-check compares this row against.
+#   self_pdf   the PDF subdir the self comparator is registered under (drives
+#              `_pdf_self_comparator` / `self_supported`), or None.
+MatrixEntry = namedtuple(
+    "MatrixEntry",
+    "row_key fmt tsn_key tsn_subdir self_id self_key self_other self_pdf",
+    defaults=(None, None, None, None, None, None, None))
+MATRIX = (
+    MatrixEntry("ramp_summary", tsn_key="cmp:ramp_summary:tsn"),
+    MatrixEntry("ramp_detail", tsn_key="cmp:ramp_detail:tsn"),
+    MatrixEntry("highway_sequence", tsn_key="cmp:highway_sequence:tsn"),
+    # Highway Log is the one Excel row that ALSO surfaces the self-check (its
+    # `vs_pdf` mode) — the pattern the later dual-edition families put on the PDF row
+    # only. Preserved exactly (the self comparator is the shared PDF-vs-Excel adapter).
+    MatrixEntry("highway_log", fmt="excel", tsn_key="cmp:highway_log:tsn",
+                self_id="vs_pdf", self_key="cmp:highway_log:pdf_vs_excel",
+                self_other="highway_log_pdf", self_pdf="highway_log_pdf"),
+    MatrixEntry("intersection_summary", tsn_key="cmp:intersection_summary:tsn"),
+    MatrixEntry("intersection_detail", tsn_key="cmp:intersection_detail:tsn"),
+    MatrixEntry("highway_log_pdf", fmt="pdf", tsn_key="cmp:highway_log:pdf_vs_tsn",
+                tsn_subdir="highway_log", self_id="vs_excel",
+                self_key="cmp:highway_log:pdf_vs_excel", self_other="highway_log",
+                self_pdf="highway_log_pdf"),
+    MatrixEntry("intersection_detail_pdf", fmt="pdf",
+                tsn_key="cmp:intersection_detail:pdf_vs_tsn",
+                tsn_subdir="intersection_detail", self_id="vs_excel",
+                self_key="cmp:intersection_detail:pdf_vs_excel",
+                self_other="intersection_detail", self_pdf="intersection_detail_pdf"),
+    MatrixEntry("highway_detail", tsn_key="cmp:highway_detail:tsn"),
+    MatrixEntry("highway_detail_pdf", fmt="pdf",
+                tsn_key="cmp:highway_detail:pdf_vs_tsn",
+                tsn_subdir="highway_detail", self_id="vs_excel",
+                self_key="cmp:highway_detail:pdf_vs_excel",
+                self_other="highway_detail", self_pdf="highway_detail_pdf"),
+    MatrixEntry("highway_sequence_pdf", fmt="pdf",
+                tsn_key="cmp:highway_sequence:pdf_vs_tsn",
+                tsn_subdir="highway_sequence", self_id="vs_excel",
+                self_key="cmp:highway_sequence:pdf_vs_excel",
+                self_other="highway_sequence", self_pdf="highway_sequence_pdf"),
+    MatrixEntry("ramp_detail_pdf", fmt="pdf", tsn_key="cmp:ramp_detail:pdf_vs_tsn",
+                tsn_subdir="ramp_detail", self_id="vs_excel",
+                self_key="cmp:ramp_detail:pdf_vs_excel", self_other="ramp_detail",
+                self_pdf="ramp_detail_pdf"),
+)
+
 # B2 auto-consolidate: which consolidate module handles each EXPORTABLE report,
 # keyed by the export ReportSpec's output subdir. Every exportable report EXCEPT
 # Highway Log (PDF) (it needs a scratch converted_dir, handled specially by the
@@ -680,6 +746,54 @@ _INPUT_PROFILE_BY_KEY = {
 
 _COMPARE_BY_KEY = {c.key: c for c in COMPARE}
 
+# --------------------------------------------------------------------------- #
+# Matrix-row wiring derivations (M2-A). The single resolver the matrix engine and
+# the by-day matrix share, so a report's comparator dispatch + format tag live in
+# exactly one place (the MATRIX table above) instead of parallel if-chains.
+# --------------------------------------------------------------------------- #
+_MATRIX_BY_ROW = {m.row_key: m for m in MATRIX}
+
+
+def matrix_entry(row_key):
+    """The MatrixEntry for a matrix row_key, or None (a row not declared here —
+    a future report added to matrix_rows before its wiring lands; the engine greys
+    its comparison modes, and check_report_wiring names the gap)."""
+    return _MATRIX_BY_ROW.get(row_key)
+
+
+def matrix_tsn_comparator(row_key):
+    """The vs-TSN comparison adapter for a matrix row (resolved from the row's
+    declared COMPARE key), or None when the row has no vs-TSN comparator yet — the
+    single registry `matrix_state.tsn_comparator_for` delegates to."""
+    m = _MATRIX_BY_ROW.get(row_key)
+    if m is None or m.tsn_key is None:
+        return None
+    return _COMPARE_BY_KEY[m.tsn_key].adapter
+
+
+def matrix_self_comparator(pdf_subdir):
+    """The PDF-vs-Excel self-comparison adapter registered under a PDF subdir, or
+    None when none exists (the caller `matrix_state._pdf_self_comparator` raises).
+    Both editions of a family register the SAME comparator under the PDF subdir, so
+    the first match is authoritative."""
+    for m in MATRIX:
+        if m.self_pdf == pdf_subdir and m.self_key is not None:
+            return _COMPARE_BY_KEY[m.self_key].adapter
+    return None
+
+
+def matrix_row_fmt(row_key):
+    """The export FORMAT tag a matrix row carries ("excel"/"pdf"/None) — non-None
+    only for the dual-edition families. The single source both `_row_modes`' tsn
+    mode and `day_matrix._day_rows` read, so the two can't drift."""
+    m = _MATRIX_BY_ROW.get(row_key)
+    return m.fmt if m is not None else None
+
+
+def matrix_rows_meta():
+    """The MATRIX table (for `build/check_report_wiring.py`)."""
+    return MATRIX
+
 
 def _side_index(side):
     """0 for the first picker (side A / "tsmis"), 1 for the second (side B /
@@ -782,3 +896,18 @@ assert set(_INPUT_PROFILE_BY_KEY) <= {c.key for c in COMPARE if c.kind == "files
     "_INPUT_PROFILE_BY_KEY names a non-files or unknown compare key"
 assert set(_INPUT_PROFILE_BY_KEY.values()) <= set(_INPUT_PROFILES), \
     "_INPUT_PROFILE_BY_KEY references an undefined profile name"
+# M2-A matrix wiring: unique rows; every row_key + self_pdf is a real export subdir;
+# every declared tsn_key/self_key resolves to a real COMPARE entry (so a matrix row
+# can never dispatch to a comparator that doesn't exist — the v0.17.3 crash class).
+_assert_unique("MATRIX", tuple(m.row_key for m in MATRIX), len(MATRIX))
+assert {m.row_key for m in MATRIX} <= set(export_keys()), "MATRIX row_key is not an export key"
+assert {m.self_pdf for m in MATRIX if m.self_pdf} <= set(export_keys()), \
+    "MATRIX self_pdf is not an export key"
+_compare_keys = {c.key for c in COMPARE}
+assert {m.tsn_key for m in MATRIX if m.tsn_key} <= _compare_keys, \
+    "MATRIX tsn_key names an unknown COMPARE recipe"
+assert {m.self_key for m in MATRIX if m.self_key} <= _compare_keys, \
+    "MATRIX self_key names an unknown COMPARE recipe"
+# A self-check row must name BOTH the mode id and its comparator, or neither.
+assert all((m.self_id is None) == (m.self_key is None) for m in MATRIX), \
+    "MATRIX self_id/self_key must be set together"
