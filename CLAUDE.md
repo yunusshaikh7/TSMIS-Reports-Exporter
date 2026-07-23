@@ -221,7 +221,10 @@ Highway Log district PDFs (dropped into `tsn_library/highway_log/raw/` — the
 **Highway Sequence (PDF)** and **Ramp Detail (PDF)** exports. The **Compare** tab diffs every report
 **TSMIS-vs-TSN** (the PDF-sourced
 editions among them, each also offering a **PDF-vs-Excel** self-check), runs
-cross-environment comparisons, and (v0.26.0) hosts the **vs Baseline Matrix** — any
+cross-environment comparisons, hosts the **PDF vs Excel Matrix** (v0.31.0, M2-B — the
+5 dual-edition families × exported days, each cell that day's PDF export self-checked
+against its Excel export from the SAME run folder; `pdf_excel_matrix.py` rides the shared
+self primitives, store `output/comparisons/pdf-vs-excel-by-day/`), and (v0.26.0) hosts the **vs Baseline Matrix** — any
 exported day of a report diffed against an EARLIER pull of the same report (a prior
 day's run folder or the Everything store; same format on both sides by construction;
 `baseline_matrix.py` over `compare_env`, see
@@ -452,7 +455,11 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   reserved Route History placeholder, id 15). Highway Detail now consolidates and participates in the
   Matrix, cross-environment, vs-TSN, and PDF-vs-Excel comparisons; Highway Summary
   remains export-only until a real enabled-site schema can be verified. Add a report by editing the catalog;
-  `check_report_catalog` proves the derivation. See [docs/reports.md](docs/reports.md).
+  `check_report_catalog` proves the derivation, and **`check_report_wiring` (v0.31.0)
+  derives from `report_catalog.MATRIX` what every registered report MUST have —
+  dispatchable vs-TSN/self comparators, dual-edition completeness, a by-day row, Reset
+  coverage — and FAILS naming the missing touchpoint** (the v0.17.3 "forgot one mirror"
+  field-crash class). See [docs/reports.md](docs/reports.md).
 - **Select reports by stable `data_value`, not visible text** (v0.18.1). `select_report`
   and the env-scan probe match the `#customReport` option by its `data-value` (the site's
   stable id) and reveal the `cs-submenu` flyout for a leaf, falling back to exact text/
@@ -501,7 +508,10 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   exporter.py exporter_parallel.py export_multi.py run_report.py cli.py events.py settings.py paths.py
   outcome.py comparison_contract.py cache_envelope.py consolidation_meta.py artifact_store.py owned_dir.py
                               outcome/typed comparison/transaction/ownership
-  report_catalog.py          the report-metadata source of truth (P4); reports.py derives from it
+  report_catalog.py          the report-metadata source of truth (P4); reports.py derives from it.
+                             Its MATRIX table (v0.31.0, M2-A) is the ONE per-row comparison
+                             wiring (vs-TSN + PDF-vs-Excel comparators + the format tag) that
+                             matrix_state/day_matrix/pdf_excel_matrix all derive from
   reports.py                 the report/consolidate/compare registry view + stable-ID lookups
   export_*.py                one thin ReportSpec per report type (incl. *_pdf editions)
   consolidate_*.py           per-route exports → one workbook (+ TSN / TSMIS-PDF parsers)
@@ -523,6 +533,7 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   validation.py credential_safety.py     one-click validation + diagnostic credential guard
   site_capture.py            the Settings website-source capture (v0.26.0, local-only)
   baseline_matrix.py         the Compare-tab "vs Baseline" day-vs-baseline matrix (v0.26.0)
+  pdf_excel_matrix.py        the Compare-tab "PDF vs Excel" by-day self-check matrix (v0.31.0, M2-B)
   ui/                        index.html app.css app.js + ui-export/-batch/-compare/-matrix/-settings/-dom.js + mock.js + contract.js
   published_comparison.py evidence_ledger.py evidence_manifest.py   the evidence TRUTH layer: decode+authenticate the published comparison / the exhaustive ledger / the durable generation record
   self_test.py evidence.py pdf_row_oracle.py owned_dir.py safe_delete.py   self-test / the work-PC diagnostic bundle (--collect-evidence) / safety

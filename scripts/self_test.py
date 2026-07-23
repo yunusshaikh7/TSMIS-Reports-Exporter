@@ -54,7 +54,8 @@ HTML = """
 # (v0.22.0: the Intersection Detail adapter joins; v0.24.0: Highway Log;
 # v0.25.0: Highway Sequence + its lazily-resolved PDF consolidator/comparisons;
 # v0.26.0: the Ramp Detail trio).
-_DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "report_library",
+_DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "pdf_excel_matrix",
+                           "report_library",
                            "visual_evidence", "evidence_highway_detail",
                            "evidence_intersection_detail",
                            "evidence_highway_log",

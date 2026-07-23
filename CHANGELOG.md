@@ -3,6 +3,54 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.31.0 — 2026-07-23
+
+Marathon 2 (first part): a new PDF-vs-Excel matrix, the report-wiring made
+future-proof, and the Clean Road comparison polish.
+
+### Added
+- **A "PDF vs Excel Matrix" tab** under Compare — rows are the five reports that
+  export in both formats, columns are the export days you add, and each cell
+  self-checks that day's PDF export against its Excel export (both consolidated
+  from the same run folder, so the two sides are same-day by construction). Same
+  controls as the other matrices: drag the rows and day columns, show/hide
+  reports, build a cell or a whole row/column, open the workbook, live progress
+  and ETAs. Comparisons land in `output/comparisons/pdf-vs-excel-by-day/`, named
+  so two days can be open in Excel at once. A day needs BOTH editions exported;
+  when only one is there the cell says so instead of guessing.
+- **A Cancel button on the ArcGIS tab** — the clean-road build could already be
+  stopped internally, but there was no way to ask; Build and Compare now also
+  grey out while one is running.
+- **The clean-road comparison Notes gain a column-match table** — for every
+  column: the name (the same on the TSN extract and our build), the ArcGIS layer
+  and source column it is built from, and whether it is counted as a difference
+  or shown as context. So you can see what matched what.
+
+### Changed
+- **The clean-road build's Provenance sheet is colour-coded** — greyed for the
+  columns no ArcGIS layer can fill (and the TSN bookkeeping ones left empty),
+  blue for the ones derived from the overlay, plain for the ones painted from a
+  layer.
+- **The ArcGIS clean-road comparison auto-saves to `output/comparisons/arcgis/`**
+  (beside the manual comparisons folder) instead of the build output folder;
+  "Save elsewhere…" still works.
+
+### Internal
+- The per-report matrix wiring (which comparator each row uses, which format tag
+  it carries) moved from four parallel hand-maintained lists into one table in
+  the report catalog, and a new `check_report_wiring` gate fails by NAME when a
+  report is missing a touchpoint — the "added a report, forgot one mirror" class
+  that caused a field crash in v0.17.3. Behaviour is unchanged (proved
+  cell-for-cell against the old lists).
+
+### Known / owed
+- Deferred to a follow-up, deliberately: single-pass dual-format export in fast
+  mode + the date on every per-route filename (they change export/resume
+  behaviour that can only be verified on the work PC), the Excel-side evidence
+  column fix (root cause pinned — see the plan doc), and colouring the
+  non-compared columns inside the clean-road comparison sheet (those columns are
+  already all present).
+
 ## v0.30.0 — 2026-07-22
 
 Marathon 1 of the owner's app-consistency backlog: the existing surfaces made

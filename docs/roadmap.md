@@ -65,12 +65,28 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > diagnosis kit + Retry button (the offline sweep refuted DOM-drift — sign-in is Azure-gated
 > + intermittent). Deferred to M2: the manual consolidate-style day dropdown (item 15, overlaps
 > the by-day matrix). **Owed on the work PC:** validate the Edge Retry (dev PC can't reach the
-> intranet). **Marathon 2 (structural → v0.31.0) is next:** future-report readiness, the PDF-vs-Excel
-> by-day matrix, single-pass dual-format in fast mode + matrix, the date on every export filename,
-> evidence going PDF-vs-PDF only, **and a Clean Road / ArcGIS comparison-polish wave (M2-E, 5 owner
-> items 2026-07-22: build cancel button; Summary naming each column's layer + the TSN↔ArcGIS matched
-> names; the full 74-column file in the comparison table with non-compared columns distinguished; a
-> standardized `output/comparisons/arcgis/` location; a colour-coded/greyed Provenance summary).**
+> intranet). **➡ MARATHON 2, first part, SHIPPED as v0.31.0 (2026-07-23):** **M2-A** the
+> per-report matrix wiring collapsed into one `report_catalog.MATRIX` table + the new
+> `check_report_wiring` gate that fails BY NAME on a missing touchpoint (the v0.17.3
+> forgot-one-mirror class); **M2-B** the **PDF vs Excel Matrix** Compare sub-tab (the 5
+> dual-edition families × exported days, each cell that day's PDF export self-checked
+> against its Excel export from the same run folder, own store + naming + ETAs);
+> **M2-E** 4 of 5 Clean Road items (ArcGIS build **Cancel** button, the comparison Notes'
+> **column-match table** [column · ArcGIS layer (source column) · counted/context], the
+> standardized **`output/comparisons/arcgis/`** auto-save, and the build's **Provenance
+> sheet colour-coded** by tier).
+> **Deliberately deferred to a follow-up** (owner-agreed 2026-07-23, each for a stated
+> reason — detail in [the plan](planning/v0.30-owner-backlog-plan.md)): **M2-C** the
+> export engine (single-pass dual-format in fast mode + the date on every per-route
+> filename) — it changes export/resume behaviour that verifies only on the work PC, and
+> a resume that doesn't recognize BOTH names would leave one route with two files, which
+> the consolidator refuses as duplicate identity; **M2-D**, now RE-SCOPED by the owner to
+> **fix, not remove** — the Excel-side evidence stays and its column-resolution defect
+> gets fixed (root cause pinned: the compared field is the comparison's shared-schema
+> label while the workbook carries the site's label; positional/alias shortcuts are UNSAFE
+> because they'd crop the WRONG cell); and **M2-E item 10** (colouring the non-compared
+> columns INSIDE the clean-road comparison sheet — those columns are already all present;
+> only the cosmetic distinction remains, and it touches `compare_core`'s locked renderer).
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published
