@@ -987,19 +987,39 @@ def _tsmis_excel_side(adapter, ex, field, excel_rows, excel_header,
     if located is None:
         return None, None, None, "row not found in the compared TSMIS workbook"
     sheet, excel_row, values = located
-    # The consolidated export is a flat labelled table whose header is
-    # ['Route'] + the report's own columns, so the compared column is found by
-    # LABEL — never by a position that a schema change could silently shift.
-    if field not in excel_header:
+    # The compared column is resolved through the COMPARATOR'S OWN column
+    # resolution when the adapter exposes it (excel_column_for — the same
+    # position map its loader reads the workbook with, under the loader's own
+    # exact-header gate), because the compared labels are the COMPARISON's
+    # shared names while the workbook carries the SITE's labels — Intersection
+    # Detail compares 'PM'/'PR'/'HG' where the workbook says 'Post Mile'/'PP'/
+    # 'H/G', so the old exact-label lookup silently dropped those columns'
+    # Excel-side evidence, and Ramp Detail's label-shifted header could box a
+    # NEIGHBOURING blank cell. Adapters without the hook keep the exact-label
+    # default; a None from the hook is the honest refusal (a derived column
+    # with no single workbook cell, or a workbook the comparator would refuse).
+    resolve = getattr(adapter, "excel_column_for", None)
+    if resolve is not None:
+        col = resolve(field, excel_header)
+        if col is None:
+            return None, None, None, (
+                "the compared column has no single cell in this workbook "
+                "(a derived column, or a header the comparison would refuse)")
+    elif field in excel_header:
+        col = excel_header.index(field)
+    else:
         return None, None, None, "the compared column is not in the workbook header"
-    col = excel_header.index(field)
     if col >= len(values):
         return None, None, None, "the workbook row is short of the compared column"
     if adapter.project(field, values[col]) != adapter.project(field, ex[value_key]):
         return None, None, None, ("the compared TSMIS workbook cell no longer "
                                   "holds the compared value")
     key_cols = [0]
-    if adapter.KEY_LABEL in excel_header:
+    if resolve is not None:
+        key_col = resolve(adapter.KEY_LABEL, excel_header)
+        if key_col is not None:
+            key_cols.append(key_col)
+    elif adapter.KEY_LABEL in excel_header:
         key_cols.append(excel_header.index(adapter.KEY_LABEL))
     img = _excel_strip(excel_header, values, col, key_cols)
     address = f"{sheet}!{_column_letter(col + 1)}{excel_row}"

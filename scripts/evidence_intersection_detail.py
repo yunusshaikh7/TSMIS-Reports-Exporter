@@ -183,6 +183,22 @@ def project(field, raw):
     return _xl_trim(idt._project(field, raw))
 
 
+def excel_column_for(field, excel_header):
+    """The COMPARATOR'S OWN column resolution for the consolidated workbook
+    (v0.32.0, the M2-D fix; both flavors ride idt's loader family): the exact
+    header gate first (current or legacy site labels — anything else the
+    comparison itself would refuse), then the value POSITION the loaders read
+    (idt._TSMIS_POS). The compared labels are the comparison's shared names
+    (PM / PR / HG / Post Mile-free), while the workbook carries the SITE's
+    labels (Post Mile / PP / H/G), so the old exact-label lookup silently
+    dropped 26 of the 35 compared columns' Excel-side evidence. Route Suffix /
+    District / County are Location-DERIVED — no single workbook cell holds
+    them — and stay honestly unevidenced from the workbook."""
+    if not idt._header_ok(list(excel_header)):
+        return None
+    return idt._TSMIS_POS.get(field)
+
+
 # --------------------------------------------------------------------------- #
 # TSMIS side — the per-route "Intersection Detail (PDF)" export
 # --------------------------------------------------------------------------- #

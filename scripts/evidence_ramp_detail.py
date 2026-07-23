@@ -51,6 +51,7 @@ except ImportError:
 import artifact_store
 import compare_ramp_detail_pdf as rdp
 import compare_ramp_detail_tsn as rd
+import compare_tsn_common as ctc
 import consolidate_tsmis_ramp_detail_pdf as rdpdf
 from compare_core import _xl_trim, compared_cell, published_key_text
 from pdf_table_lib import cluster_by_top, norm_route, require_document_route
@@ -248,6 +249,26 @@ def project(field, raw):
         if field == "On/Off" and v == "N":
             v = "O"
     return _xl_trim(v)
+
+
+_EXCEL_HEADER_OK = ctc.exact_consolidated_header_ok(rd._TSMIS_HEADER)
+
+
+def excel_column_for(field, excel_header):
+    """The comparator's own column resolution (v0.32.0, the M2-D fix): the
+    loader's exact-header gate, then its value positions (rd._TSMIS_POS). The
+    export's header LABELS sit shifted right of City Code / R/U / Description,
+    so the old exact-label lookup pointed one cell PAST each of those values —
+    normally refused by the parse-back check, but able to box the NEIGHBOURING
+    cell when both were blank. District is read out of the Location cell
+    exactly as the loader derives it (project() extracts it for the check);
+    the TSN-only context columns (Ramp Name / On/Off / Ramp Type / ADT) have
+    no workbook cell and stay honestly unevidenced from Excel."""
+    if not _EXCEL_HEADER_OK(list(excel_header)):
+        return None
+    if field == "District":
+        return rd._TSMIS_POS["Location"]
+    return rd._TSMIS_POS.get(field)
 
 
 # --------------------------------------------------------------------------- #

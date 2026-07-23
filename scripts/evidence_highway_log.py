@@ -173,6 +173,25 @@ def project(field, raw):
     return _xl_trim(chl._hl_normalize(raw))
 
 
+def excel_column_for(field, excel_header):
+    """The comparator's own column resolution (v0.32.0, the M2-D fix): the
+    loader's acceptance (hlc.recognize after the same trailing-blank trim —
+    corrected OR legacy vendor labels, positions authoritative) and the label
+    position in the canonical header. Highway Log's compared labels equal the
+    canonical workbook labels, so this mostly matches the old exact-label
+    lookup — the gate closes the drift risk, and the self flavor's
+    'Location (raw)' resolves to the Location cell it verbatim-projects."""
+    header = list(excel_header)
+    while header and header[-1] in (None, ""):
+        header.pop()
+    if hlc.recognize(header) is not True:
+        return None
+    name = "Location" if field == "Location (raw)" else field
+    if name in hlc.HEADER:
+        return 1 + hlc.HEADER.index(name)
+    return None
+
+
 # --------------------------------------------------------------------------- #
 # TSMIS side — the per-route "Highway Log (PDF)" export (zebra-rect windows)
 # --------------------------------------------------------------------------- #

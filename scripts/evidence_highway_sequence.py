@@ -50,6 +50,7 @@ except ImportError:
 
 import compare_highway_sequence_pdf as chslpdf
 import compare_highway_sequence_tsn as chsl
+import compare_tsn_common as ctc
 import consolidate_tsmis_highway_sequence_pdf as chslp
 import consolidate_tsn_highway_sequence as ctnsl
 from compare_core import _xl_trim, compared_cell, published_key_text
@@ -193,6 +194,26 @@ def project(field, raw, side="tsmis", route=None):
     if field == "County":
         return _xl_trim(chsl._norm_county(raw))
     return _xl_trim(chsl._v(raw))
+
+
+_EXCEL_HEADER_OK = ctc.exact_consolidated_header_ok(chsl._TSMIS_HEADER)
+
+
+def excel_column_for(field, excel_header):
+    """The comparator's own column resolution (v0.32.0, the M2-D fix): the
+    loader's exact-header gate, then its named value positions (chsl._TSMIS).
+    The workbook's postmile prefix/suffix columns are UNLABELLED in the site
+    export, so the self flavor's 'PM Suffix' — its own compared column since
+    CMP-AUD-199 — could never resolve by label; it reads the suffix cell the
+    loaders read."""
+    if not _EXCEL_HEADER_OK(list(excel_header)):
+        return None
+    pos = {"County": chsl._TSMIS["county"], "PM": chsl._TSMIS["pm"],
+           "PM Suffix": chsl._TSMIS["suffix"], "City": chsl._TSMIS["city"],
+           "HG": chsl._TSMIS["hg"], "FT": chsl._TSMIS["ft"],
+           "Distance To Next Point": chsl._TSMIS["dist"],
+           "Description": chsl._TSMIS["desc"]}
+    return pos.get(field)
 
 
 # --------------------------------------------------------------------------- #

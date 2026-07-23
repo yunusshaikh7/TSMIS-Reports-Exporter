@@ -349,21 +349,30 @@ def _load_tsn(path):
 # Consolidated value positions (Route prepended): Route0 Location1 PR2 PM3 Date4
 # suffix5 HG6 Area4 7 City8 R/U9 Description10 (blank11). The header LABELS shift
 # right of City Code/R/U/Description, so position — not name — is authoritative.
+# ONE table, read by _tsmis_row AND exposed through the evidence adapter
+# (evidence_ramp_detail.excel_column_for), so the comparison and its Excel-side
+# evidence can never resolve a column differently.
+_TSMIS_POS = {"Location": 1, "PR": 2, "PM": 3, "Date of Record": 4, "PS": 5,
+              "HG": 6, "Area 4": 7, "City Code": 8, "R/U": 9, "Description": 10}
+
+
 def _tsmis_row(r):
     def at(i):
         return r[i] if i < len(r) else None
     route = _norm_route(at(0))
-    loc = _raw_text(at(1)).strip()
+    loc = _raw_text(at(_TSMIS_POS["Location"])).strip()
     district, county = _dist_cnty(loc)
-    key = _physical_pm_key(route, county, at(3), (
+    key = _physical_pm_key(route, county, at(_TSMIS_POS["PM"]), (
         ("route", route), ("location", loc),
-        ("postmile_prefix", _raw_text(at(2))),
-        ("postmile", _raw_text(at(3))),
-        ("postmile_suffix", _raw_text(at(5)))), f"Location {loc!r}")
+        ("postmile_prefix", _raw_text(at(_TSMIS_POS["PR"]))),
+        ("postmile", _raw_text(at(_TSMIS_POS["PM"]))),
+        ("postmile_suffix", _raw_text(at(_TSMIS_POS["PS"])))), f"Location {loc!r}")
     return [route,
-            _v(at(2)), key, district, _iso_date(at(4)),
-            _v(at(6)), _v(at(7)), _v(at(8)), _v(at(9)),
-            _strip_desc_prefix(at(10), route),               # the export-added prefix
+            _v(at(_TSMIS_POS["PR"])), key, district,
+            _iso_date(at(_TSMIS_POS["Date of Record"])),
+            _v(at(_TSMIS_POS["HG"])), _v(at(_TSMIS_POS["Area 4"])),
+            _v(at(_TSMIS_POS["City Code"])), _v(at(_TSMIS_POS["R/U"])),
+            _strip_desc_prefix(at(_TSMIS_POS["Description"]), route),   # the export-added prefix
             "", "", "", ""]                                  # TSN-only context: blank here
 
 
