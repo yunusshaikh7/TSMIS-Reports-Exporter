@@ -22,7 +22,7 @@ comparisons that consume their output, are covered in
 |---|---|---|
 | Module | `scripts/consolidate_tsn_highway_log.py` | `scripts/consolidate_tsmis_highway_log_pdf.py` |
 | Source | TSN district PDFs, report **OTM52010** ("California State Highway Log") | This app's OWN export — report **4b** "Highway Log (PDF)", `highway_log_route_<ROUTE>.pdf` |
-| Where inputs come from | Vendor snapshots the user **drops** into `input/tsn_highway_log/` | The exporter produces them into `output/<run>/highway_log_pdf/` |
+| Where inputs come from | Vendor snapshots the user **drops** into `tsn_library/highway_log/raw/` (the one drop location since v0.30.0 retired `input/`) | The exporter produces them into `output/<run>/highway_log_pdf/` |
 | Input format | One PDF per **district** (12 districts D01–D12) | One PDF per **route** (252 production routes) |
 | Day-awareness | `day` **ignored** (snapshots aren't dated exports) | **day-aware** — reads the export folder like the Excel consolidator; "Export day" picker applies |
 | Parsing strategy | **x-position CHARACTER-WINDOW** (fixed layout, proportional Helvetica) | **CELL-RECT** (bordered HTML table; per-page column windows from cell rects) |
@@ -55,11 +55,11 @@ proved them correct.
   workbooks `tsn_highway_log_d<NN>_route_<ROUTE>.xlsx`.
 - `OUT_PATH = OUTPUT_ROOT / "tsn_highway_log_consolidated.xlsx"` — combined.
 - `input_dir_for(day)` / `out_path_for(day)` both **ignore `day`** (interface
-  compatibility only); `INPUT_NOTE` = "Drop the TSN district Highway Log PDFs
-  into the input folder first." — the GUI shows this and (since v0.14.2) hides
-  the Export-day picker because `input_note` is set. **This is now the ONLY
-  report keeping a dropped input folder** (district PDFs are external to the
-  app).
+  compatibility only); the input note tells the user to drop the TSN district
+  Highway Log PDFs into `tsn_library/highway_log/raw/` — the GUI shows this and
+  (since v0.14.2) hides the Export-day picker because `input_note` is set.
+  **Since v0.30.0 the TSN library IS the drop location** (the separate `input/`
+  folder was retired; district PDFs remain external to the app).
 
 ### Why character windows (not word extraction)
 The PDF is proportional Helvetica, **not** monospaced. Adjacent columns can

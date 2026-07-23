@@ -143,6 +143,7 @@ types override the data-shape fields and side names.
 | `ditto_resolver` | `None` | DISPLAY-only resolver: tint + comment each ditto cell with its paired value (HL only) |
 | `key_normalizer` | `None` | `callable(row, off, key_field)->str` canonical identity token IN PLACE OF the raw key (HL roadbed key) — [§6](#6-roadbed-aware-key-normalizer-tsmis-vs-tsn-only) |
 | `context_fields` | `()` | field NAMES shown but NON-ASSERTING — never count as a diff, never get the ≠ mark; the cell coalesces to whichever side has a value (v0.17.0; Ramp Detail's TSN-only DB columns) |
+| `context_header_fill` | `""` | presentation-only (v0.32.0, the clean-road 74-column ask): a solid-fill hex tinting every `context_fields` column HEADER on the Comparison/data/Only-in sheets, with a hover note ("shown for reference, never counted"); values/states/counts and the veryHidden snapshots untouched. Default `""` → headers byte-identical everywhere |
 | `extra_sheet_writer` | `None` | `callable(wb, ctx)` run after the sheets, before save — appends a custom sheet: the familiar-layout rollup (v0.17.0; the Summary reports) and the Intersection Detail **"Report View"** replica (v0.17.8 / §9f). `ctx = {rows_a, rows_b, has_route, sc, side_a, side_b}` |
 | `report_view_diff_check` | `()` | optional `(sheet, Diffs-column, physical-row-repeat)` aggregate Summary invariant for typed two-line Report Views; requires `extra_sheet_writer`. It detects total-count drift, not same-count value changes. |
 
@@ -924,7 +925,11 @@ flags, the no-TSMIS-source columns (maintenance level, federal-aid trio, nationa
 lands, scenic freeway), `THY_EXTRACT_DATE`, and the two SYNTHESIZED offset columns
 (each side's offsets are its own derived cumulative; ours diverges from TSN's line
 at every segmentation sliver — the sliver already shows once on END PM/LENGTH) —
-all PRESENT with both sides' values shown and never counted. **50 columns are
+all PRESENT with both sides' values shown and never counted, and **since v0.32.0
+their column HEADERS are tinted grey with a hover note** (M2-E item 10 —
+`context_header_fill="808080"`, the opt-in `CompareSchema` field above; visibly
+distinct from the counted columns the way one-sided ROWS are tinted, presentation
+only, CRH-SW-E2 counts unchanged). **50 columns are
 compared and counted** (v0.29.1, owner decisions): the ADT profile trio counts
 like any other column (the Notes name the two known model-fit classes inside that
 count — cross-county profile continuations, the non-latest-year overlap vintage
@@ -1327,13 +1332,25 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
 - **Each side is drawn from the source THAT SIDE was read from** (CMP-AUD-210, 2026-07-22).
   `visual_evidence.tsmis_source_role(row_key)` is `pdf` for a `…_pdf` row and `excel` for the
   other. An **Excel** row is illustrated from the consolidated workbook it was compared from —
-  `_excel_rows_at` addresses the row, the compared column is found by LABEL in the export's own
-  header, and `_excel_strip` renders a boxed cell strip labelled `TSMIS (Excel) — <workbook> ·
+  `_excel_rows_at` addresses the row, and the compared column is resolved through the
+  **comparator's own column resolution** (v0.32.0, the M2-D fix): each adapter's
+  `excel_column_for(field, excel_header)` delegates to its loader's exact-header gate + value
+  position table, because the compared labels are the COMPARISON's shared names while the
+  workbook carries the SITE's labels — Intersection Detail compares `PM`/`PR`/`HG` where the
+  workbook says `Post Mile`/`PP`/`H/G` (the old exact-label lookup silently dropped 26 of its 35
+  columns' Excel-side evidence), and Ramp Detail's export labels sit shifted one RIGHT of the
+  City Code/R/U/Description values (exact-label could box the neighbouring blank cell). A
+  derived column with no single workbook cell (ID's Location-derived Route Suffix/District/
+  County, RD's TSN-only context columns) refuses honestly; an adapter without the hook keeps
+  the exact-label default. Verified per family against real 7.9/7.17 consolidated workbooks
+  (26,320 sampled projected-value round-trips, 0 mismatches; HD's real leg stays
+  vendor-blocked) and pinned by `build/check_evidence_excel_columns.py`.
+  `_excel_strip` renders a boxed cell strip labelled `TSMIS (Excel) — <workbook> ·
   <sheet>!<cell>`. The cell renders only once its own workbook value, through the adapter's
   `project`, equals the compared value: the Excel counterpart of the PDF side's parse-back
-  check. Before this, BOTH rows were drawn from the PDF edition and a candidate was dropped
-  whenever that print disagreed — so a value the Excel export holds and the print does not
-  could never be shown. `generate(flavor=…)` also serves the **PDF-vs-Excel self check**
+  check. Before CMP-AUD-210, BOTH rows were drawn from the PDF edition and a candidate was
+  dropped whenever that print disagreed — so a value the Excel export holds and the print does
+  not could never be shown. `generate(flavor=…)` also serves the **PDF-vs-Excel self check**
   (`FLAVOR_SELF`): side A the print, side B the Excel cell, loaded through each adapter's
   `load_sides_self`, which delegates to the SELF comparator's own loader pair and schema.
   `enumerate_diffs` walks the SCHEMA's header, never a hardcoded copy — a self schema can carry

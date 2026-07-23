@@ -268,7 +268,7 @@ The trailing equation `E` marker and the leading alignment prefix are **PRESERVE
 ## 5. End-to-end data flow (both PDF parsers)
 
 ```
-output/<run>/highway_log_pdf/*.pdf   (or  input/tsn_highway_log/*.pdf)
+output/<run>/highway_log_pdf/*.pdf   (or  tsn_library/highway_log/raw/*.pdf)
         │  consolidate()  — clears stale scratch, loops PDFs
         ▼
 parse_pdf(path) ── per page ──> _cluster_lines / _lines

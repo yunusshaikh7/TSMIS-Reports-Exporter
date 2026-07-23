@@ -39,250 +39,109 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
 | 8 | Highway Summary | XLSX | `output/<run>/highway_summary/` |
 
-`<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`).
-**Every enabled report exports from the production site since the 2026-07-09 prod
-rollout** (it un-greyed Intersection Summary/Detail + Highway Detail — verified on
-both data sources; the dev site, Settings ▸ "Use development site", is only needed
-for Route History testing now). **Since v0.25.1 every enabled on-site report exports
-in BOTH formats the site offers**: the five Excel reports each have a print-layout
-**PDF** edition (2b / 4b / 5b / 6b / 7b — **3b graduated in v0.25.0**, **2b in
-v0.26.0**, each off its first real work-PC print set —
-parser/consolidator/comparisons/matrix row; **5b joined in
-v0.25.1** via `ints_printAll`), and the natively-PDF Ramp Summary gained its **Excel**
-sibling (**1b**, v0.25.1 — the site's `rs_exportToExcel`, previously unwired). 1b/5b
-stay **export-only** by design (their siblings already consolidate + compare). The dev
-site's new **Route History Table** (an embedded SSRS
-report, no export flow) is wired as a **greyed reserved placeholder** (stable id 15,
-the v0.18.1 Highway-pair pattern), joined 2026-07-22 by the dev site 7.21 capture's
-**Clean Road Files** group — `clean_highway` / `clean_intersection` / `clean_ramp` at
-**stable ids 16/17/18**, `cs-disabled` on the site with NO `clean_*.js` module behind
-them (`export_clean_road.py`; every `save` refuses loudly). Their **TSN sources are
-staged** as library slots for the CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS
-clean-road extracts — the underlying tables, not the TSAR projections (CA HIGHWAYS
-carries the SAME 60,083 records as the Highway Detail extract but 74 columns instead
-of 56). **Since v0.29.0 the HIGHWAY clean-road file is LIVE without the site — the
-ArcGIS tab** builds OUR own 74-column CA HIGHWAYS table from the owner's per-layer
-ArcGIS exports in `arcgis_layers/` (the agreed 40-layer library; county+PM overlay
-as-of the TSN extract's own date) and compares it vs the TSN extract in BOTH flavors
-with every column indexed back to its source layer (`consolidate_clean_highway` /
-`compare_clean_highway_tsn`; the measured build rules + provenance tiers live in
-[docs/planning/cleanroad-highways.md](docs/planning/cleanroad-highways.md), the
-family in [docs/comparison-engine.md](docs/comparison-engine.md) §9j).
-`tsn_load_clean_road` normalizes CA HIGHWAYS verbatim (marker v1); the
-Intersection/Ramp slots stay deliberately normalizer-less until their builds land
-on the same pattern. v0.17.0 brought
-reports 1–6b to parity, **v0.20.0 added Highway Detail (7/7b)**, **v0.25.0 added
-Highway Sequence (PDF) (3b)**, and **v0.26.0 added Ramp Detail (PDF) (2b)**: the
-**12 fully-integrated export types consolidate AND
-compare vs TSN** — each has a vs-TSN comparator and lives in both the Everything and
-by-day matrices (see
-[docs/roadmap.md](docs/roadmap.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md)
-for the per-report schema + locked canaries; Highway Detail's schema was verified against
-the full statewide bundle — 252 routes vs the 60k-row TSN extract — and its comparison
-carries an Intersection-Detail-style **Report View** replica). **⛔ Highway Detail (7/7b) is PRE-RELEASE (owner, 2026-07-21): the vendor ACCIDENTALLY
-enabled its exports, they are GREYED OUT again, and the report is in ACTIVE DEVELOPMENT.**
-Every HD artifact on disk came from that accidental window — treat none of it as ground
-truth, do not re-bless HD canaries as stable, and do NOT fix the HD parser/normalizer
-against it (CMP-AUD-133/142/186 are deferred). 045's HD-Excel county cannot be answered
-yet — the report is unfinished; never infer it. The owner will supply NEW HD exports on
+`<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`);
+**since v0.32.0 each per-route file inside it carries that run identity
+front-anchored in its NAME** (`2026-07-23 ssor-prod highway_log_route_3.xlsx` —
+`paths.resolve_route_file`; legacy dateless names are honored on resume so an old
+partial run never leaves one route with two files, and the end-anchored
+`_route_<token>.<ext>` contract is untouched).
+
+**Current export state.** Every enabled report exports from the **production** site
+(the 2026-07-09 prod rollout; the dev site — Settings ▸ "Use development site" — is
+only needed for Route History testing), and every enabled on-site report exports in
+**BOTH formats** the site offers. **1b/5b are export-only by design** (their siblings
+already consolidate + compare); **8 (Highway Summary) is export-only** until the site
+un-greys it and a schema can be verified. **Selecting both editions of one report
+coalesces** — the route is generated ONCE and both files saved off that render — on
+the standard path (v0.19.2), in fast mode, and for matrix-queued edition steps (both
+v0.32.0). Where the live site greys a report, `select_report` fails fast rather than
+stalling. The dev site's **Route History Table** is a greyed reserved placeholder
+(stable id 15), and the **Clean Road Files** group (`clean_highway` /
+`clean_intersection` / `clean_ramp`, stable ids 16/17/18) is `cs-disabled` on the
+site with refusing placeholder specs (`export_clean_road.py`).
+
+**The 12 fully-integrated export types consolidate AND compare vs TSN** — each has a
+vs-TSN comparator and lives in the Everything, by-day, and (for the 5 dual-edition
+families) PDF-vs-Excel matrices. Per-report schemas + locked canaries:
+[docs/reports.md](docs/reports.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md);
+exact counts and hashes:
+[comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
+Format-change precedents are absorbed and gate-guarded: Intersection Detail follows
+the site's July-2026 35-column overhaul (pre-update files are refused with re-export
+hints), and Intersection Summary's `MASTARM`→`MASTERARM` rename rides a parse-only
+alias + a section-partition tripwire so the next silent reshape fails loudly.
+
+**⛔ Highway Detail (7/7b) is PRE-RELEASE (owner, 2026-07-21): the vendor ACCIDENTALLY
+enabled its exports, they are GREYED OUT again, and the report is in ACTIVE
+DEVELOPMENT.** Every HD artifact on disk came from that accidental window — treat none
+of it as ground truth, do not re-bless HD canaries as stable, and do NOT fix the HD
+parser/normalizer against it (CMP-AUD-133/142/186 are deferred). 045's HD-Excel county
+cannot be answered yet — never infer it. The owner will supply NEW HD exports on
 official integration; that delivery is the trigger to re-verify the schema and resume.
 
-Report **8 (Highway
-Summary)** is **export-only** (export-enabled app-side but still site-greyed); its
-integration waits for a verifiable schema. **Intersection Detail follows the site's
-July-2026 report overhaul since v0.22.0** (35-column export, re-verified statewide on the
-7.8 bundle; pre-update workbooks/PDFs are refused with re-export hints; canary
-163,310 → 21,675). **Intersection Summary absorbed the July rename in v0.25.0**
-(`MAINLINE MASTARM` → `MASTERARM`: a parsing-only alias + a section-partition tripwire —
-every block but the site-under-counted Highway Group must sum to the route total, so the
-next silent reshape fails loudly). **The Highway Sequence historical 7.8-Excel/
-first-7.9-PDF fixture remains retained** (60,493/60,493 rows), but it is not current
-same-run truth. The current July-9 pair is 60,494 Excel / 60,493 PDF rows: route 037
-`003.809` is fixed in Excel, four paired PDF Descriptions are blank, and one described
-Excel row is absent from PDF. Installed Excel also proves the four lowercase `_x000d_`
-values are CRLF, not substantive differences. The Stage-8 audit further proves
-PDF↔Excel must pair on route/county/prefix/base PM with suffix asserted — and **since
-the 2026-07-16 Wave-4 batch the product does exactly that** (CMP-AUD-199: "PM Suffix"
-is a compared column; 60,493 / 0 PDF-only / 1 Excel-only corpus-exact). The same batch
-removed the symmetric Description rule (CMP-AUD-204 — TSN text verbatim incl. its 154
-numeric prefixes; TSMIS strips only its own-route label), rebuilt the TSN normalizer
-source-exact at v4 (CMP-AUD-155/156/158/159 — 69,804 rows incl. the 46 blank-county
-equates, the 565 pointer tokens, no invented comma, sidecar identity/direction/policy
-claims), and put typed physical identity on every HSL path (the CMP-AUD-045 gate is
-**11 green / 0 known-red since 2026-07-17** — RD, ID, HSL, and HL integrated; only
-HD-Excel stays vendor-blocked). **The 2026-07-17 HL batch closed CMP-AUD-157 +
-045-HL with TSN Highway Log normalizer v5**: detached suffixed-route group headers
-("07 LA 005 S") key their rows as the suffixed TSMIS route (005S… — 317 rows
-statewide un-misattributed, exactly TSMIS's ten suffixed routes), asterisk-leading
-printed Descriptions are conserved (four rows statewide — 065's "**** CODE
-ACCIDENTS TO" + three bare "*" — each a manufactured false diff, TSMIS prints the
-same text on the same rows), and district/county/route
-ownership + the three ADT claims + typed totals + report provenance ride the
-sidecar with reconciliation gates (TOTAL=CONST+UNCONST exact; suffixed sections
-all-zero; zero-residue line accounting refuses unclassified content); the vs-TSN
-loaders refuse pre-v5 files with a rebuild hint (marker sheet + D2 catalog bump
-4→5) and the comparison Notes expose the claims; HL Route-1 re-blessed EXACT
-(299/18/69/221/969). The
-2026-07-16 CMP-AUD-220 batch then landed the owner-approved assignment/verdict split
-(duplicate ASSIGNMENT minimizes the source-identity tuple — all-compared-field diffs,
-char edit distance, position gap — while verdicts/counts stay asserted-only) plus the
-HSL `_x000d_` decode (197's HSL half), so **the live HSL vs-TSN aggregate counts now
-equal the Stage-8 oracle's exactly** (Excel 4,894/5,589; PDF 4,916/5,001; same-source
-1,410/3,721); RD/ID re-blessed byte-identical, HL Route-1 969 intact, HD statewide
-re-measured EXACT (48,644/2,599/11,439/208,596, RU Eff 48,211 — the objective change
-moved nothing). The same day, **CMP-AUD-218 made Spot Check's row matching
-independent** (a hidden Comparison key-token column MATCHed into the data sheets +
-a Row-integrity line; forged row links/status now say CHECK — COM-mutation-gated),
-and **CMP-AUD-197 closed for every current family**: RD's vs-TSN loader decodes the
-Excel export's OOXML escapes too (the four Cactus City `_x000d_` cells were export
-encoding — the raw TSN extract carries none), amending RD's Excel-vs-TSN canary to
-737 rows / 843 cells {Desc 181} with the PDF legs unchanged. The cache-backed residual classifier
-reproduces those persisted maps and aggregate arithmetic. Its original zero-unexplained claim was
-withdrawn after CMP-AUD-221 through 223 exposed unconditional attribution, post-resolve
-link checks, and an output/input alias hazard. The hardened classifier now proves every
-assignment objective, rejects an arbitrary swap and real Windows link/alias probes, and
-replays byte-identically; it is still cache-backed non-acceptance evidence. Direct-source
-acceptance must reproduce the same contracts before any product count is blessed.
-Stage-8 base-family audits are complete: **7/7**. Highway Log closed on exact 252-member
-Excel/PDF source witnesses, its accepted-red Stage-6 chain, an independent projection
-oracle, two clean seven-file product-leg universes, and two byte-identical final-gate
-result/acceptance pairs. The gate accepts only the base audit: product, full-physical,
-workbook-evidence, and end-to-end perfection remain false. Every owned
-provenance/projection finding is now closed (047/048 shipped 2026-07-16;
-157 + 045-HL + 050 + all three CMP-AUD-049 halves + 066 + 067 shipped
-2026-07-17 — 050: the shared PDF-conversion driver and Ramp Summary REFUSE
-duplicate or blank route claims with both source PDFs named; 049: the
-DOCUMENT's own route claim — page banners (HSL/RD/HD), the ID cover's
-"ROUTE : NNN" parameter, the HL cover line — is the authoritative per-route
-identity in all five PDF converters AND the evidence adapters
-(`reconcile_route_identity` / `RouteIdentityError`), proven refusal-free on
-all 1,099 statewide 7.9 per-route documents; 066: every PDF-sourced workbook
-carries a very-hidden `TSMIS PDF Conversion` marker — the TSMIS (PDF)
-comparison role requires it, the TSMIS (Excel) role rejects it, pre-marker
-PDF workbooks re-consolidate once; 067: the PDF-vs-Excel self-check flavors
-project SAME-SOURCE values verbatim on the shared physical pairing keys —
-ID's J→S fold and display rewrite are gone, HD surfaces "PM (raw)" + verbatim
-NA, HL surfaces "Location (raw)" with the §7b roadbed key + ditto conventions
-untouched, all guarded by the `check_compare_same_source` mutation matrix,
-with statewide re-verifies: ID 16,459/0/0 + only the real 108/TUO HG cell,
-HD topology exactly the v0.26.0 reference, HL measured
-51,884/51,261/623/624; 045's HD-Excel leg stays blocked on the vendor county
-answer — never infer it), and no product code changed during the bounded
-closeout itself. The 067 sweep surfaced one follow-up, now SHIPPED: the
-TSMIS-PDF Highway Log parser dropped asterisk-leading printed Descriptions
-(the mirror of the TSN v5 star-recovery) — the star-guard is positional now
-(left-margin totals stars close the row; description-band stars attach), all
-four real rows recovered, statewide Description class 5→1. The 2026-07-17
-unowned-findings triage then bucketed the 112 remaining findings A–I and
-closed bucket A: CMP-AUD-065 (already fixed by 199), the 040 file half (066),
-CMP-AUD-006 (the RD physical-identity postmile is Decimal-canonical now —
-`decimal_pm` shared with Intersection Detail; `9.6`/`9.600`/`009.600` are one
-ramp; the statewide coincidence census proved ZERO pairing changes, only
-1,755 canonical-key display texts), and CMP-AUD-037 (the last direct-path
-freshness gap — the three XLSX-sourced vs-TSN families now stamp an in-workbook
-"TSN Normalization" marker and their `_load_tsn` refuses a pre-current library:
-RD v5 / ID v5 / HD v3, HD's loader had none before; the shared
-`compare_tsn_common` marker helpers, the catalog-mirror invariant gated by
-`check_tsn_normalization_marker`; marker-only bumps proven row-identical on the
-real statewide corpus). Exact
-counts and hashes live in
-[docs/planning/comparison-perfection/comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
-**The comparison-perfection project is COMPLETE (2026-07-22, shipped as v0.28.0).**
-237 of 242 findings are closed; the branch fast-forwarded into `main`, so **`main` is
-the completion state** and new work branches from it. The 5 still open are ALL the ⛔
-Highway Detail pre-release block (133 · 142 · 186 · 192 + 045-HD) and they reopen only
-when the vendor delivers official HD exports — never infer an HD answer.
-[COMPLETION-PLAN.md](docs/planning/comparison-perfection/COMPLETION-PLAN.md) and the
-finding ledger are now the PROJECT RECORD rather than a live worklist; read them for
-why a comparison behaves as it does, and start at
-[README.md](docs/planning/comparison-perfection/README.md).
-**Owed, and only the owner can do it: the work-PC acceptance run on v0.28.0** — the
-dev box cannot reach the TSMIS intranet, comparison and evidence output intentionally
-differ from v0.26.2/v0.27.x (re-run both sides, never reconcile old against new), the
-TSN libraries rebuild once, PDF-sourced workbooks re-consolidate once, and the
-short-path install workaround is no longer needed.
-**Ramp Detail (PDF) was
-blessed the same way in v0.26.0 on the `All Reports 7.9` pair** (15,216/15,216 rows parse
-back vs the same-day Excel; PDF↔Excel now identical 15,216/15,216 — the 4 `_x000d_`
-residuals were the Excel export's encoded CRs, ruled render artifacts by the owner on
-2026-07-16 and decoded by the same-source rule (`compare_tsn_common
-.same_source_render_text`, which also ignores edge tab padding — the Intersection
-Detail PDF↔Excel false-positive class — in every PDF-vs-Excel flavor, never the
-vs-TSN legs); the print carries the On/Off + Ramp Type
-columns the Excel export DROPS, so the PDF-vs-TSN flavor compares two MORE columns than
-Excel-vs-TSN can — +151 diff cells of new coverage statewide). Where the live site
-still greys a report, `select_report` fails fast rather than stalling.
-**Selecting both editions of one report (Excel + PDF, same `data_value`) coalesces** — the route
-is generated **once** and both files saved off it (`run_export_combined`, v0.19.2; standard path
-only, not fast mode). Consolidate-only sources exist too — **TSN**
-Highway Log district PDFs (dropped into `tsn_library/highway_log/raw/` — the
-`input/` folder was retired in v0.30.0, one drop location now) and the app's own
-**Highway Log (PDF)**, **Intersection Detail (PDF)**, **Highway Detail (PDF)**,
-**Highway Sequence (PDF)** and **Ramp Detail (PDF)** exports. The **Compare** tab diffs every report
-**TSMIS-vs-TSN** (the PDF-sourced
-editions among them, each also offering a **PDF-vs-Excel** self-check), runs
-cross-environment comparisons, hosts the **PDF vs Excel Matrix** (v0.31.0, M2-B — the
-5 dual-edition families × exported days, each cell that day's PDF export self-checked
-against its Excel export from the SAME run folder; `pdf_excel_matrix.py` rides the shared
-self primitives, store `output/comparisons/pdf-vs-excel-by-day/`), and (v0.26.0) hosts the **vs Baseline Matrix** — any
-exported day of a report diffed against an EARLIER pull of the same report (a prior
-day's run folder or the Everything store; same format on both sides by construction;
-`baseline_matrix.py` over `compare_env`, see
-[docs/comparison-engine.md](docs/comparison-engine.md) §12c). **Visual evidence (v0.21.0; + Intersection Detail in
-v0.22.0; + Highway Log in v0.24.0; + Highway Sequence in v0.25.0; + Ramp Detail in
-v0.26.0):** Highway Detail,
-Intersection Detail, Highway Log, Highway Sequence and Ramp Detail vs-TSN comparisons
-can also render sampled diffs as highlighted snippets from BOTH
-PDFs (parse-back-verified; ditto-aware for HL; context-field-aware for HSL;
-dual-row-aware for RD — its PDF row compares two print-only columns the Excel row
-can't; `… (evidence).xlsx` with stacked +
-side-by-side image tabs, plus the loose image folder, beside the comparison) — one
-shared toggle+count on both matrix pages, enabled per report once its TSN prints are in
-place (HD: district PDFs in `tsn_library/highway_detail/pdf/`; ID + RD: each one
-statewide print in `…/intersection_detail/pdf/` / `…/ramp_detail/pdf/`; **HL + HSL: the
-SAME district prints their TSN
-libraries build from, read from `…/highway_log/raw/` and `…/highway_sequence/raw/` — no
-duplicate drop**), and since v0.23.0 a
-per-cell **camera action** regenerates a BUILT comparison's evidence on demand (no
-re-compare; freshness-gated). **Since v0.24.0 the toggle spells itself out per report**
-(✓ will generate / ○ needs prints → folder / a named no-support list) and supported
-matrix rows carry a camera badge. See
+**The ArcGIS tab (v0.29.0) builds the HIGHWAY clean-road file WITHOUT the site**: our
+own 74-column CA HIGHWAYS table from the owner's per-layer ArcGIS exports in
+`arcgis_layers/` (the 40-layer library; county+PM overlay as-of the TSN extract's own
+date; per-column Provenance colour-coded by tier), compared vs the TSN extract in both
+flavors with every column indexed to its source layer and the 24 context columns
+tinted grey in the values sheet (v0.32.0). Blessed statewide canary `CRH-SW-E2`;
+measured build rules + provenance tiers in
+[docs/planning/cleanroad-highways.md](docs/planning/cleanroad-highways.md), the family
+in [docs/comparison-engine.md](docs/comparison-engine.md) §9j. `tsn_load_clean_road`
+normalizes CA HIGHWAYS verbatim (marker v1); the Intersection/Ramp slots stay
+deliberately normalizer-less until their builds land on the same pattern.
+
+**Consolidate-only sources**: TSN Highway Log district PDFs (dropped into
+`tsn_library/highway_log/raw/` — the one drop location since v0.30.0 retired
+`input/`) and the app's own five PDF editions. The **Compare** tab diffs every report
+TSMIS-vs-TSN (each PDF edition also offers a PDF-vs-Excel self-check), runs
+cross-environment comparisons, and hosts three matrices beyond the Everything one:
+the **by-day** vs-TSN matrix, the **vs Baseline Matrix** (any exported day vs an
+EARLIER pull of the same report; `baseline_matrix.py`, §12c), and the **PDF vs Excel
+Matrix** (v0.31.0 — the 5 dual-edition families × exported days, each cell that day's
+PDF export self-checked against its Excel export from the SAME run folder;
+`pdf_excel_matrix.py`).
+
+**Visual evidence** (HD, ID, HL, HSL, RD vs-TSN + the self checks): sampled diffs
+render as highlighted snippets from both sources — parse-back-verified, ditto-aware
+for HL, context-field-aware for HSL, dual-row-aware for RD — as an
+`… (evidence).xlsx` + image folder beside the comparison. One shared toggle+count on
+the matrix pages (per-report readiness spelled out; camera badges; a per-cell camera
+regenerates a BUILT comparison's evidence, freshness-gated). TSN prints live in
+`tsn_library/<report>/pdf/` (HD/ID/RD) or ARE the library's own `raw/` district
+prints (HL/HSL — no duplicate drop). See
 [docs/comparison-engine.md](docs/comparison-engine.md) §13.
 
-**Evidence reads the PUBLISHED comparison since 2026-07-22** (CMP-AUD-208/209/108, marathon
-M-B). `published_comparison.py` decodes a committed values workbook's own cells — the hidden
-per-column `E`/`D`/`N`/`U` state masks, the anchored `Status`/`Diffs` contract, the opaque row
-tokens — and authenticates them or refuses. The adapters' `enumerate_diffs` is now only a
-PROPOSER of photographable rows; the published cell decides whether the image may be taken
-(one row at that identity, state `D`, published text equal to the engine's own composition),
-and every rendered item names `Comparison!<row> · occurrence N · state D` plus both persisted
-source rows. An EXHAUSTIVE hash-bound ledger — counted differences split unique-row vs
-repeated-key, context, identical, one-sided, per column — is built and written to the evidence
-workbook's **Ledger** sheet BEFORE any sample is drawn, so a duplicate-only difference is a
-named miss instead of a false "no differing columns". Acceptance is the independent stdlib
-oracle (`build/check_evidence_oracle.py`) agreeing cell-for-cell, plus a statewide HSL
-recomputation (342,432 cell states, 0 disagreements; 439,356 cells all classified).
-**Each side is evidenced from the source THAT SIDE was read from since 2026-07-22**
-(CMP-AUD-210). An Excel-compared row is drawn from the workbook it was compared from — sheet,
-cell address and the row's own neighbouring values, boxed like a PDF crop and labelled
-`TSMIS (Excel)` — so a value the companion print never carried (Highway Sequence route 037's
-Description) is evidenceable instead of dropped for "disagreeing" with a print that took no
-part in the comparison. The **PDF-vs-Excel self check** is illustrated too, side A from the
-per-route print and side B from the Excel cell, through the SELF comparator's own loader pair
-and schema. The evidence set is also ONE published generation (CMP-AUD-098/106/109):
-`evidence_manifest.py` binds the comparison's CONTENT digest, the published ledger digest, the
-exact READ SET (path/size/SHA-256 of a PRIVATE snapshot every locate and render reads — an
-A→B→A swap of a live source can no longer reach an image), and a digest per published member;
-publication is two-phase quarantine-and-promote, so the canonical set is never a new workbook
-beside old images; and a run that publishes nothing still records `no_differences` /
-`no_examples`, which `describe()` reads back with no in-memory state. Remaining convenience
-gap: the per-cell on-demand camera stays TSN-only — a self comparison gets its evidence when
-it is built with the toggle on. **Not claimed:** the loaders' per-field
-projections against the raw PDFs — that is the separately-tracked direct-source acceptance.
-(Spot Check's row-matching half of the original warning was remediated 2026-07-16 —
-CMP-AUD-218.) The live source-first status and exact findings are in
-[docs/planning/comparison-perfection/archive/comparison-perfection-project.md](docs/planning/comparison-perfection/archive/comparison-perfection-project.md)
-and [docs/planning/comparison-perfection/comparison-audit-findings.md](docs/planning/comparison-perfection/comparison-audit-findings.md).
+**The evidence truth layer** (shipped with the comparison-perfection completion):
+`published_comparison.py` decodes and authenticates the committed values workbook's
+own cells (the hidden `E`/`D`/`N`/`U` state masks, the anchored Status/Diffs
+contract, opaque row tokens) — the published cell, not the adapters, decides whether
+an image may be taken. An EXHAUSTIVE hash-bound **Ledger** sheet is written before
+any sample is drawn; each side is evidenced **from the source that side was read
+from** (an Excel-compared row renders from the workbook itself, and since v0.32.0
+its column is resolved the COMPARATOR'S OWN way via each adapter's
+`excel_column_for` — the M2-D fix); the whole set is ONE published generation
+(`evidence_manifest.py`: content digest + ledger digest + a private read-set
+snapshot + two-phase quarantine-and-promote). **Not claimed:** the loaders'
+per-field projections against the raw PDFs — the separately-tracked direct-source
+acceptance. Details + acceptance oracles: §13 and the
+[finding ledger](docs/planning/comparison-perfection/comparison-audit-findings.md).
+
+**The comparison-perfection project is COMPLETE (2026-07-22, v0.28.0).** 237 of 242
+findings closed; `main` is the completion state. The 5 still open are ALL the ⛔
+Highway Detail pre-release block (133 · 142 · 186 · 192 + 045-HD) and reopen only when
+the vendor delivers official HD exports. The
+[COMPLETION-PLAN](docs/planning/comparison-perfection/COMPLETION-PLAN.md) + finding
+ledger are the PROJECT RECORD of why each comparison behaves as it does (start at
+[README.md](docs/planning/comparison-perfection/README.md)).
+**Owed, and only the owner can do it: the work-PC acceptance run — now targeting
+v0.32.0** (the dev box cannot reach the TSMIS intranet): comparison + evidence output
+intentionally differ from v0.26.2/v0.27.x (re-run both sides, never reconcile old
+against new), TSN libraries rebuild once, PDF-sourced workbooks re-consolidate once,
+plus the v0.30–v0.32 items in
+[the backlog plan §4](docs/planning/v0.30-owner-backlog-plan.md) (Edge Retry, the
+PDF-vs-Excel matrix, fast-mode dual-format, the mixed-name resume, an Excel-row
+evidence run).
 
 → Per-report behavior + the "add a report/consolidator/comparison" recipes:
 [docs/reports.md](docs/reports.md). Highway Log columns / PDF parsing / comparisons:

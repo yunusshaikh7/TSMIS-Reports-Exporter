@@ -70,6 +70,11 @@ that rewrote the design.
 | `v0.26.2` | Jul 10 | **Hotfix** (work-PC field report, same day) — every Highway Log (PDF) matrix day read amber "inputs incomplete" although nothing was missing: since v0.19.0 any print page parsed with carried-forward column geometry (the routine zebra-parity case — a page whose only data rows are unshaded has no cell-rect band; ~280 pages per statewide set) blanket-escalated the consolidation to partial. The carry is now VALIDATED per page (`_carried_line_misfits`: no printed token split across column windows + the Location cell still a clean postmile token); validated pages are ordinary output, and only a genuinely unfit page — a changed table layout — keeps the ⚠ + partial. Closes the v0.18.1 "stale-geometry emit" roadmap item. Statewide proof on two full sets: 551 carried pages all validated, emitted rows byte-identical to the old parser on all 111 affected routes, both end-to-end consolidations COMPLETE; drift/foreign-layout negative controls fire the validator, with the honest sensitivity bounds recorded in the bundle README |
 | `v0.27.0`–`v0.27.4` | Jul 19–21 | **The audit batch, then three field hotfixes** — 219 findings' worth of comparison/matrix/TSN-normalization/PDF-identity corrections ship, followed by the v0.27.0 field report whose root cause was **Windows MAX_PATH**: a content-addressed payload sidecar with a ~148-character basename made a 265-character path at the real install depth. The dev box had `LongPathsEnabled=1`; a managed work PC has 0 and cannot change it — that single registry value WAS the dev-vs-field difference, and it is why a green suite had nothing to say about a real failure |
 | `v0.28.0` | Jul 22 | **The comparison-perfection completion release** — 237 of 242 findings closed, the branch merged to `main`. Four marathons in one day: the durability cluster (last-complete publication, the attempt overlay, content identity, the schema gate), the **evidence spine** (evidence stopped grading its own homework — it now decodes and authenticates the published comparison's own per-cell state masks, and ships an exhaustive hash-bound ledger BEFORE any sample is drawn), and the **evidence completion batch** (one published generation bound by a durable manifest; two-phase quarantine-and-promote; a private read-set snapshot closing the A→B→A window; and each side evidenced from the source THAT SIDE was read from). The 5 findings left open are all vendor-blocked on Highway Detail |
+| `v0.28.1`–`v0.28.2` | Jul 22 | **The diagnostics releases** — the work-PC support bundle grows the richer evidence collection (`evidence.collect`), and the Settings support-bundle button delegates to that ONE collector instead of a second, weaker writer |
+| `v0.29.0`–`v0.29.1` | Jul 22–23 | **The ArcGIS tab: the first report that needs no site** — our own 74-column CA HIGHWAYS clean-road table is BUILT from the owner's 40-layer ArcGIS library (county+PM overlay as-of the TSN extract's own date, per-column Provenance) and compared vs the TSN extract in both flavors, every column indexed to its source layer. Blessed statewide canary `CRH-SW-E2` (52,647 paired · 291,292 differing cells) with a three-leg self-audit (independent oracle, values-sum, real-Excel COM rebuild). v0.29.1 folded the owner's corrections: the ADT trio is compared AND counted, city names normalize through a derived 395-entry TASAS-code table |
+| `v0.30.0` | Jul 22 | **Marathon 1 of the owner's 20-comment backlog: the existing surfaces, made right** — the consolidate day picker filters per report; per-cell evidence cameras gate on the toggle + an open-evidence button; day columns drag on the by-day/baseline matrices; per-cell comparison logging with error types + input paths; comparison **ETAs** off a persisted timings store; self-identifying comparison FILENAMES (two days open in Excel at once); manual comparisons auto-save to `output/comparisons/manual/`; the `input/` folder RETIRED (`tsn_library/highway_log/raw/` is the one drop location); and the **Edge sign-on diagnosis kit** — the offline capture sweep REFUTED detector drift (sign-in is Azure-gated and intermittent, 44 successes vs 16 failures the same evening), so the release ships classification + surfaced reasons + a "Retry Edge sign-in" button that re-runs the silent device path, not a detector fix |
+| `v0.31.0` | Jul 23 | **Marathon 2, part 1: the structural run** — the four parallel per-report matrix if-chains collapse into ONE `report_catalog.MATRIX` table with `check_report_wiring` deriving what every registered report MUST have (the v0.17.3 "forgot one mirror" field-crash class, now a named failure); the **PDF vs Excel Matrix** Compare sub-tab (the 5 dual-edition families × exported days, each cell that day's PDF export self-checked against its Excel export from the SAME run folder); and 4 of the 5 Clean Road polish items (ArcGIS build Cancel, the Notes' column-match table, `output/comparisons/arcgis/`, the Provenance sheet colour-coded by tier) |
+| `v0.32.0` | Jul 23 | **Marathon 2 close-out** — fast mode coalesces dual editions (`run_export_parallel_combined`: each route generated ONCE across N browsers, every edition saved off that render; matrix-queued edition steps group the same way); every per-route file in a dated run folder carries the **run identity in its name** (legacy names honored on resume, so an old partial run never leaves one route with two files); the **Excel-side evidence column fix** (owner: "fix it rather than remove it" — adapters resolve columns the comparator's own way, regaining 26 of Intersection Detail's 35 columns, verified on real statewide workbooks); and the clean-road comparison's 24 context columns tint grey with a hover note (counts proven unchanged) |
 
 ---
 
@@ -505,6 +510,42 @@ code.
 The release shipped 237 of 242 closed. The 5 left are vendor-blocked on a report the
 vendor un-shipped mid-audit — and the honest thing was to defer them, not to infer
 answers from artifacts that were never ground truth.
+
+## Chapter 16 — Beyond the site, then the owner's list (July 22 → 23) · `v0.29.0` → `v0.32.0`
+
+Two days, six releases, two very different kinds of work.
+
+**The ArcGIS tab (v0.29.x) crossed a line the app had never crossed:** its first
+report that owes the TSMIS site nothing. The owner dropped forty per-layer ArcGIS
+exports into a library folder, and the app *built* the 74-column CA HIGHWAYS
+clean-road table itself — a county+postmile overlay dated to the TSN extract's own
+day, every column indexed to the layer it came from — then compared its own work
+against the vendor's extract, both flavors, with the same typed rigor as every
+site-sourced family. The blessed statewide canary (`CRH-SW-E2`, 291,292 differing
+cells) went through the full three-leg self-audit before anyone trusted it. The
+pattern is deliberately reusable: the Intersection and Ramp clean-road builds are
+next, on the same machinery.
+
+**Then the owner's twenty comments** — a couple of weeks of accumulated field notes —
+ran as two marathons plus a close-out. Marathon 1 (v0.30.0) was "the existing
+surfaces, made right": filtered day pickers, draggable day columns, comparison ETAs,
+self-identifying filenames, one folder for manual comparisons, one drop location for
+TSN prints. Its centerpiece was a *diagnosis*, not a feature: the "Edge sign-in is
+broken" report died under an offline sweep of five archived site captures — every
+selector stable for a month, 44 successes and 16 failures the same evening. Sign-in
+was never dead; Azure is intermittent. So the release shipped classification, a
+surfaced reason, and a Retry button instead of a detector "fix" for a detector that
+was never wrong. Marathon 2 (v0.31.0) was structural — the per-report matrix wiring
+collapsed into one catalog table with a check that FAILS NAMING the missing
+touchpoint (the exact class of the v0.17.3 field crash), and the new PDF-vs-Excel
+by-day matrix was built ON that wiring the same day, proving it. The close-out
+(v0.32.0) finished the engine work: fast mode generates each route once and saves
+both formats off the same render; per-route files name their own run (with the
+resume path honoring old names, so an upgrade can never duplicate a route); and the
+Excel-side evidence gap — 26 of Intersection Detail's 35 columns silently
+unphotographable because the comparison and the workbook spell their labels
+differently — closed by making evidence resolve columns the comparator's OWN way,
+per the owner's re-scope: "fix it rather than remove it."
 
 ---
 

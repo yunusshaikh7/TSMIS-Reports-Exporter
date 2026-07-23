@@ -110,7 +110,7 @@ consolidates AND compares (Highway Detail joined in v0.20.0):
 | `Highway Summary` | Excel | **Export-enabled (v0.19.1); consolidate/compare pending.** Append-only stable id **9**; the `export_highway_summary` parallel of the above (still `cs-disabled` on the site, so it fail-fasts until the vendor enables it — its integration waits for a real export to verify a schema against). |
 | `Highway Detail (PDF)` | PDF | **v0.19.2.** Same "Highway Detail" dropdown option saved via Print layout (`hd_printAll`, the `.hl-print-section` twin of Highway Log (PDF)); `save_highway_detail_pdf`. Append-only stable id **10**; since v0.20.0 it has its own PDF-sourced consolidator + PDF-vs-TSN / PDF-vs-Excel compares (like the other PDF editions, matrix-handled via a scratch convert dir). |
 
-**Coalescing (v0.19.2):** selecting both editions of one on-site report (Excel + its PDF, same `data_value`) generates the report ONCE per route and saves both — `ExportWorker._run_specs` groups by `data_value` and runs the pair through `exporter.run_export_combined` (Export-button save first, DOM-rebuilding PDF save last). Single-report `run_export` + the parallel engine are untouched; fast mode isn't coalesced yet. See [reports.md](reports.md).
+**Coalescing (v0.19.2; fast mode + matrix since v0.32.0):** selecting both editions of one on-site report (Excel + its PDF, same `data_value`) generates the report ONCE per route and saves both — `ExportWorker._run_specs` groups by `data_value` and runs the pair through `exporter.run_export_combined` sequentially or `exporter_parallel.run_export_parallel_combined` in fast mode (Export-button save first, DOM-rebuilding PDF save last; N browsers over routes in fast mode). Matrix-queued export steps coalesce the same way per environment (`MatrixBatchExportWorker._grouped_steps`), so one pass fills both cells. See [reports.md](reports.md) and [engine-and-reliability.md](engine-and-reliability.md).
 
 **`CONSOLIDATE_REPORTS`** — `(menu label, module)`. Each module exposes
 `consolidate(events, confirm_overwrite, day=None)` plus `input_dir_for(day)` /
@@ -129,7 +129,7 @@ Highway Log consolidators are TSMIS-before-TSN with source-explicit labels:
 | `TSMIS Intersection Detail (PDF)` | `consolidate_tsmis_intersection_detail_pdf` | this app's own "Intersection Detail (PDF)" export, parsed into the same 35-column July-2026 format as the Excel export (pre-update prints are refused with a re-export hint). |
 | `TSMIS Highway Log (Excel)` | `consolidate_highway_log` | TSMIS "Highway Log" Excel export, `output/<run>/highway_log/` (day-aware). |
 | `TSMIS Highway Log (PDF)` | `consolidate_tsmis_highway_log_pdf` | TSMIS "Highway Log (PDF)" export, `output/<run>/highway_log_pdf/` (day-aware, this app's own export). |
-| `TSN Highway Log (PDF)` | `consolidate_tsn_highway_log` | TSN district PDFs dropped in `input/tsn_highway_log/` (from outside the app, so this one keeps an input folder + `day` ignored). |
+| `TSN Highway Log (PDF)` | `consolidate_tsn_highway_log` | TSN district PDFs dropped in `tsn_library/highway_log/raw/` (from outside the app — the one drop location since v0.30.0 retired `input/`; `day` ignored). |
 
 See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for the
 PDF parsers.
@@ -428,9 +428,9 @@ raw|none, …}` contract as before.
 
 `matrix.tsn_source` now **delegates to `tsn_library.resolve`**. In automatic mode the
 canonical library wins, followed by the legacy fallbacks (`<dest>/_tsn_input/<report>/`,
-then the global console-flow
-`input/tsn_highway_log/` + `output/tsn_highway_log_consolidated.xlsx`) so existing installs
-keep working until imported. An explicit user pick (`settings.matrix_tsn_files`, keyed
+then the old global consolidated `output/tsn_highway_log_consolidated.xlsx`) so existing
+installs keep working until imported — the raw `input/tsn_highway_log/` drop itself was
+retired in v0.30.0 (`tsn_library/highway_log/raw/` is the one drop location). An explicit user pick (`settings.matrix_tsn_files`, keyed
 by report) is a versioned, identity-bound selection: it wins while current, and a
 missing/replaced/legacy path-only selection blocks dependent comparisons until the user
 re-picks or clears it—it never silently falls through to another dataset. The report key IS the per-row **`tsn_subdir`**

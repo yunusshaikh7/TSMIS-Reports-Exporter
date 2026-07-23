@@ -6,6 +6,16 @@ and comparison write the **same way, in standardized, self-identifying, date-sta
 locations**, from a single `paths.py` SoT — so any surface (Export tab, Consolidate, manual
 Compare, the matrices) produces files any other feature can consume.
 
+**Status (2026-07-23): RESOLVED IN EFFECT — kept as the design record.** The
+[v0.30 owner-backlog plan](v0.30-owner-backlog-plan.md)'s Step-0 verification showed much
+of this spec was already true (exports were already dated/unified), and the rest shipped
+across v0.30.0–v0.32.0 (comparison trees under `paths.py` — `comparisons_root` /
+`manual_comparisons_dir` / `arcgis_comparisons_dir`, self-identifying comparison
+filenames, dated per-route export names via `resolve_route_file`, single-pass
+dual-format everywhere). No separate "spine" project remains; the one open UX item
+(15, the manual-compare day dropdown) lives in [docs/roadmap.md](../roadmap.md).
+Original status line follows for the record.
+
 **Status:** design (Claude owns the decisions). Implementation is **staged** and **split**
 (§5) because the comparison engine READS these locations — see the invariants (§3), which the
 migration must not break without a coordinated re-bless.

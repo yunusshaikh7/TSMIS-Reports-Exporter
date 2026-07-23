@@ -4,89 +4,43 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
-> ### ✅ RESOLVED in v0.28.2 — every bundle trigger uses the one collector
+> ### ▶ WHERE THINGS STAND (2026-07-23, after v0.32.0)
 >
-> The Settings ▸ **"Save support bundle…"** button used to build its own zip: no
-> credential redaction, no final scan, and none of the v0.28.1 environment/inventory/
-> state members. The weakest bundle behind the control users actually reach for — and
-> on a work PC, where cmd and PowerShell are blocked, effectively the only one. It now
-> delegates to `evidence.collect`, passing a `session` mapping for the facts only a
-> live GUI knows (site + environment, browser channel, sign-in mode, run folders).
-> `check_evidence_bundle` pins all three triggers to the shared collector and asserts
-> `evidence.py` is the only module that opens a zip for WRITE, so they cannot drift
-> apart again.
-
-> ### ▶ WHERE THINGS STAND (2026-07-22)
+> **The owner's 20-comment backlog is COMPLETE.** It ran as two marathons plus a
+> close-out — v0.30.0 (the surfaces/diagnosis run: day filters, day-column drag,
+> comparison logging + ETAs, unique names, manual auto-save, `input/` retired, the
+> Edge sign-on diagnosis kit + Retry), v0.31.0 (the structural run: the
+> `report_catalog.MATRIX` wiring + `check_report_wiring`, the PDF vs Excel Matrix,
+> 4/5 Clean Road polish items), and v0.32.0 (the close-out: fast-mode dual-format
+> coalescing, dated per-route filenames with legacy-resume safety, the Excel-side
+> evidence column fix per the owner's "fix it rather than remove it", and the
+> clean-road context-column tinting). The
+> [plan](planning/v0.30-owner-backlog-plan.md) is now a PROJECT RECORD; the 13-item
+> app-consistency list and the output-model spec were absorbed into it. The one
+> carried UX item is **item 15** (a consolidate-style day dropdown for manual
+> compares — owner-ranked "very rare use"), tracked below.
 >
-> **The comparison-perfection project is DONE — shipped as v0.28.0, merged to `main`.**
-> 237 of 242 findings closed. `main` is the completion state; branch new work from it.
-> The 5 open findings are ALL the ⛔ Highway Detail pre-release block (133 · 142 · 186 ·
-> 192 + 045-HD): the vendor accidentally enabled HD's exports, they are greyed out
-> again, and every HD artifact on disk came from that window. **Never infer an HD
-> answer** — those findings reopen on the owner's official HD delivery, which is also
-> the trigger to re-verify the HD schema.
+> **The comparison-perfection project is DONE — v0.28.0; `main` is the completion
+> state.** 237 of 242 findings closed. The 5 open are ALL the ⛔ Highway Detail
+> pre-release block (133 · 142 · 186 · 192 + 045-HD): the vendor accidentally
+> enabled HD's exports, they are greyed out again, and every HD artifact on disk
+> came from that window. **Never infer an HD answer** — those findings reopen on the
+> owner's official HD delivery, which is also the trigger to re-verify the HD schema.
 >
-> **Owed by the owner, blocking nothing else:** the **work-PC acceptance run** on
-> v0.28.0. The dev box cannot reach the TSMIS intranet, so this is the only way the
-> release gets field-confirmed. Expect comparison counts AND evidence output to change
-> vs v0.26.2/v0.27.x (re-run both sides; never reconcile a new run against an old one),
-> the TSN libraries to rebuild once, PDF-sourced workbooks to re-consolidate once, and
-> the short-path install workaround to be unnecessary now.
+> **Owed by the owner, blocking nothing else: the work-PC acceptance run — now
+> targeting v0.32.0** (the dev box cannot reach the TSMIS intranet). Comparison AND
+> evidence output intentionally differ from v0.26.2/v0.27.x (re-run both sides;
+> never reconcile a new run against an old one); TSN libraries rebuild once;
+> PDF-sourced workbooks re-consolidate once; then the v0.30–v0.32 items in
+> [the plan §4](planning/v0.30-owner-backlog-plan.md): press **Retry Edge sign-in**,
+> sanity-check the **PDF vs Excel Matrix**, verify a fast-mode dual-format run
+> generates once per route, resume a pre-v0.32 partial run (no route may end with
+> two files), and run one Excel-row evidence generation.
 >
-> **Unreleased on `main`:** the work-PC evidence collector now bundles `environment.txt`
-> (long-path policy + a 260-char path census), `inventory.txt` (names/sizes/dates only)
-> and the `state/` JSON sidecars. It rides the next tag.
->
-> **What's actually next**, in the order the backlog implies: the owner's 13-item
-> app-consistency list (verify-first — see below), the output-model spine, and Highway
+> **What's actually next:** the CA INTERSECTIONS + CA RAMPS clean-road builds on the
+> v0.29.0 pattern (mappings censused in
+> [planning/cleanroad-highways.md](planning/cleanroad-highways.md)), and Highway
 > Summary whenever the site un-greys it.
-
-> **▶ Owner app-consistency & output-model backlog (13 notes, 2026-07-17) — captured + tracked;
-> VERIFY-FIRST.** A 13-item owner list (comparison logging, an Excel-vs-PDF matrix, the
-> new/edited-report workflow, matrix date-rearrange, unique comparison names, present-only day
-> pickers, manual-Compare autosave + dropdown, unified date-stamped export folders, cross-surface
-> export consistency, output-folder standardization, single-pass dual-format export,
-> date-on-every-export) is captured + triaged by lane/risk/sequencing in
-> **[docs/planning/app-consistency-backlog.md](planning/app-consistency-backlog.md)**. **These are
-> owner OBSERVATIONS, not confirmed defects — Step 0 of each is a code-verification pass (some may
-> already be correct or only partially true).** The output-model spine (items 9/10/11/13 +
-> 5/6/7/8/12) has a design spec:
-> **[docs/planning/output-model-unification.md](planning/output-model-unification.md)** (its
-> current-state map is verify-first too). **Priority: this list is now the FRONT of the queue —
-> comparison-perfection closed in v0.28.0.** ➡ **UPDATE 2026-07-22:** the owner expanded the list
-> to 20 comments; every item has been Step-0 code-verified (some were already implemented — e.g.
-> export-tab exports ALREADY write dated run folders — and some refuted-as-described) and the
-> whole set is sequenced into **[the two-marathon plan](planning/v0.30-owner-backlog-plan.md)**
-> (owner directive 2026-07-22: TWO MARATHON RUNS — M1 → v0.30.0 the surfaces/diagnosis run,
-> M2 → v0.31.0 the structural run; sol-002 absorbed — the verified export-side residue is small).
-> **➡ MARATHON 1 SHIPPED as v0.30.0 (2026-07-22):** consolidate day filter, evidence
-> gating + open-evidence, day-column drag, detailed comparison logging + live ETAs, unique
-> comparison names + manual auto-save, the `input/` folder retired, and the Edge sign-on
-> diagnosis kit + Retry button (the offline sweep refuted DOM-drift — sign-in is Azure-gated
-> + intermittent). Deferred to M2: the manual consolidate-style day dropdown (item 15, overlaps
-> the by-day matrix). **Owed on the work PC:** validate the Edge Retry (dev PC can't reach the
-> intranet). **➡ MARATHON 2, first part, SHIPPED as v0.31.0 (2026-07-23):** **M2-A** the
-> per-report matrix wiring collapsed into one `report_catalog.MATRIX` table + the new
-> `check_report_wiring` gate that fails BY NAME on a missing touchpoint (the v0.17.3
-> forgot-one-mirror class); **M2-B** the **PDF vs Excel Matrix** Compare sub-tab (the 5
-> dual-edition families × exported days, each cell that day's PDF export self-checked
-> against its Excel export from the same run folder, own store + naming + ETAs);
-> **M2-E** 4 of 5 Clean Road items (ArcGIS build **Cancel** button, the comparison Notes'
-> **column-match table** [column · ArcGIS layer (source column) · counted/context], the
-> standardized **`output/comparisons/arcgis/`** auto-save, and the build's **Provenance
-> sheet colour-coded** by tier).
-> **Deliberately deferred to a follow-up** (owner-agreed 2026-07-23, each for a stated
-> reason — detail in [the plan](planning/v0.30-owner-backlog-plan.md)): **M2-C** the
-> export engine (single-pass dual-format in fast mode + the date on every per-route
-> filename) — it changes export/resume behaviour that verifies only on the work PC, and
-> a resume that doesn't recognize BOTH names would leave one route with two files, which
-> the consolidator refuses as duplicate identity; **M2-D**, now RE-SCOPED by the owner to
-> **fix, not remove** — the Excel-side evidence stays and its column-resolution defect
-> gets fixed (root cause pinned: the compared field is the comparison's shared-schema
-> label while the workbook carries the site's label; positional/alias shortcuts are UNSAFE
-> because they'd crop the WRONG cell); and **M2-E item 10** (colouring the non-compared
-> columns INSIDE the clean-road comparison sheet — those columns are already all present;
-> only the cosmetic distinction remains, and it touches `compare_core`'s locked renderer).
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published
@@ -198,6 +152,13 @@ criteria: [work-pc-validation.md](work-pc-validation.md) §3.
 - [ ] **narrow-mode** [S] — (<980 CSS px, e.g. 1366×768 @150% DPI) matrix-tab polish: the card-hide /
   height-fill / config-uncap rules live in `@media (min-width:980px)`, so a small/high-DPI laptop shows stray
   idle cards + a cramped Matrix-options panel on the matrix sub-tabs. *(v0.17.1 follow-up.)*
+- [ ] **Manual Compare: consolidate-style day dropdowns** [M] — the vs-TSN/self manual compare kinds
+  still use raw pick-any-file dialogs; the owner's item 15 asked for present-only day dropdowns like the
+  consolidate tab. Deferred from the v0.30 marathons (owner-ranked the current file-pick "very rare use";
+  the flow overlaps the by-day matrix, which already covers the common case).
+- [ ] **Console `run_cli_multi` coalescing** [S] — the `.bat` multi-export doesn't coalesce dual-edition
+  pairs; share `_coalesce_groups` (move it off `gui_worker_export` to a neutral module) so the CLI groups
+  too. (GUI standard path v0.19.2; fast mode + matrix steps v0.32.0.)
 
 **Site-gated (not on our schedule):** **Highway Summary enablement** — export shipped app-side (v0.19.1)
 but the report is still `cs-disabled` on the site; consolidate/compare integration follows the Highway
@@ -654,12 +615,12 @@ or accept as someday.**
   (v0.19.1) but the report is still `cs-disabled` on the site (no real export to verify a schema
   against); integrate via the same recipe when the site turns it on and a statewide sample exists.
   Live-export verification of the Highway reports against the site is owed (the dev PC can't reach it).
-- [ ] **Coalescing — extend to fast mode + the console CLI** [S] — v0.19.2 coalesces dual-edition exports
-  (Excel + PDF of one report → generated once, both saved) in the **standard sequential** GUI path
-  (`run_export_combined`). **Fast mode** still runs each edition as its own parallel pass (route-parallel
-  double-generation), and the console `run_cli_multi` (`.bat` multi-export) isn't coalesced. Extend the
-  parallel engine to save both editions per route, and share `_coalesce_groups` (move it off
-  `gui_worker_export` to a neutral module) so the CLI can group too.
+- [x] **Coalescing — fast mode + matrix steps SHIPPED (v0.32.0)** — `run_export_parallel_combined`
+  generates each route once across N browsers and saves every edition off that render;
+  `ExportWorker._run_specs` dispatches coalesced groups to it in fast mode, and
+  `MatrixBatchExportWorker._grouped_steps` coalesces queued edition steps per environment
+  (one pass fills both matrix cells). The console `run_cli_multi` residue is its own
+  bullet in the active backlog above.
 - [x] **Visual evidence — SHIPPED (v0.21.0)** for Highway Detail vs-TSN (both matrix toggles; see
   [comparison-engine.md](comparison-engine.md) §13). **v0.22.0 added Intersection Detail** —
   `evidence_intersection_detail` locates the TSN side on the STATEWIDE print's fixed monospace

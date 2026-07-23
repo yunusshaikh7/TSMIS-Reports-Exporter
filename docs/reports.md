@@ -60,7 +60,8 @@ table in the same change.
 
 Plus one **consolidate-only source** (not an export type): **TSN Highway Log (PDF)**
 (`cons:tsn_highway_log`) — TSN district prints the user drops into
-`input/tsn_highway_log/` (the only consolidator with an input drop folder).
+`tsn_library/highway_log/raw/` (the library IS the drop location; v0.30.0
+retired the separate `input/` folder).
 
 **Footnotes — the current gaps, each with its unlock:**
 
@@ -123,9 +124,13 @@ Plus one **consolidate-only source** (not an export type): **TSN Highway Log (PD
    drop its subdir from the gate, as before.
 
 **Cross-cutting engine capabilities** (all reports, unless noted): resume + retry +
-skip/cancel + fast-fail per route; **fast mode** (6 parallel browsers; no coalescing);
-**coalescing** (standard path: selecting both editions of one report generates each
-route once — HL, ID, HD, HSL, RD pairs); **auto-consolidate on export finish** (the
+skip/cancel + fast-fail per route; **fast mode** (N parallel browsers);
+**coalescing** (selecting both editions of one report generates each route once —
+HL, ID, HD, HSL, RD pairs — on the standard path since v0.19.2, in fast mode and
+for matrix-queued edition steps since v0.32.0); **dated per-route filenames**
+(v0.32.0 — run-folder identity front-anchored, legacy names honored on resume;
+see [engine-and-reliability.md](engine-and-reliability.md));
+**auto-consolidate on export finish** (the
 seven `_AUTO_CONSOLIDATOR` families — the PDF editions consolidate via the matrix
 instead, needing a scratch convert dir); the **Everything matrix** + **Compare by-day
 matrix** (one row per comparison-integrated family; env / vs-TSN / vs-Excel modes per
@@ -543,7 +548,7 @@ Then add the `__main__` -> `run_consolidate_cli`, wire `4. consolidate...bat` (t
 `CONSOLIDATE_REPORTS` (`reports.py`) is `(menu label, module)`. The three Highway Log consolidators are grouped with SOURCE-explicit, parallel labels -- `"<system> Highway Log (<format>)"` -- so the bare "Highway Log" can't be mistaken for one of the others:
 - `"TSMIS Highway Log (Excel)"` (`consolidate_highway_log`) -- reads the TSMIS "Highway Log" Excel export, day-aware.
 - `"TSMIS Highway Log (PDF)"` (`consolidate_tsmis_highway_log_pdf`) -- reads the app's own "Highway Log (PDF)" export, day-aware (NOT a dropped folder); parsed into the SAME 31-column format as the Excel export, the accurate substitute for the buggy vendor Excel.
-- `"TSN Highway Log (PDF)"` (`consolidate_tsn_highway_log`) -- TSN district PDFs the user drops into `input/tsn_highway_log/` (from OUTSIDE the app, so this one keeps an input folder + `day` ignored).
+- `"TSN Highway Log (PDF)"` (`consolidate_tsn_highway_log`) -- TSN district PDFs the user drops into `tsn_library/highway_log/raw/` (from OUTSIDE the app; the library is the one drop location since v0.30.0 retired `input/`, and `day` is ignored).
 - `"Intersection Detail"` (`consolidate_intersection_detail`, v0.17.0) -- a thin `consolidate_xlsx` wrapper (sheet "Intersection Detail"; 35 cols since the July-2026 site update — the wrapper passes the files' own header through), day-aware; also in `_CONSOLIDATOR_BY_SUBDIR` so it auto-consolidates on export finish and the matrix can build its vs-TSN cell. (Intersection Summary's consolidator — `consolidate_intersection_summary`, a category-count summer — is registered too.)
 
 See [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) for the Highway Log consolidator internals.

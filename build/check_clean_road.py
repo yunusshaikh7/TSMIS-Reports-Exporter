@@ -589,6 +589,32 @@ def test_normalizer_and_comparator():
         check("exactly the ONE real difference is counted (context never "
               f"counts) — got {diffs}", diffs == 1)
 
+        # M2-E item 10 (v0.32.0): the 24 context (shown-only) column HEADERS
+        # are tinted grey with a hover note on the Comparison sheet, visibly
+        # distinct from the counted columns — presentation only (the count
+        # assertions above are the same run).
+        vwb = load_workbook(values_twin)
+        try:
+            cws = vwb["Comparison"]
+            hdr = {c.value: c for c in cws[1] if c.value is not None}
+            ctx_field = chc.CONTEXT_COLUMNS[0]
+            cmp_field = next(f for f in cht.SHARED_HEADER
+                             if f not in chc.CONTEXT_COLUMNS and f != cht.KEY)
+            ctx_cell, cmp_cell = hdr.get(ctx_field), hdr.get(cmp_field)
+            check("context header present on the Comparison sheet",
+                  ctx_cell is not None and cmp_cell is not None)
+            check("context header tinted with the schema's fill",
+                  ctx_cell is not None
+                  and str(ctx_cell.fill.start_color.rgb).endswith("808080"))
+            check("compared header keeps the standard band",
+                  cmp_cell is not None
+                  and str(cmp_cell.fill.start_color.rgb).endswith("1F3864"))
+            check("context header carries the hover note",
+                  ctx_cell is not None and ctx_cell.comment is not None
+                  and "never" in ctx_cell.comment.text)
+        finally:
+            vwb.close()
+
 
 def main():
     test_dialects_and_algebra()

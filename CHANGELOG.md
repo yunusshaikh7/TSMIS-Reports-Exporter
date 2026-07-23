@@ -3,6 +3,43 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.32.0 — 2026-07-23
+
+Marathon 2 (close-out): fast mode saves both formats in one pass, every
+per-route file names its own run, and the Excel-side evidence gap is fixed.
+
+### Added
+- **Every per-route export file now carries its run identity in the name** —
+  `2026-07-23 ssor-prod highway_log_route_3.xlsx` instead of the bare
+  `highway_log_route_3.xlsx` — so a file copied out of its folder still says
+  which day and which site produced it. Old exports keep working: a resumed run
+  recognizes the old dateless names and skips those finished routes instead of
+  downloading a second copy (which the consolidators would refuse as a
+  duplicate). The Everything store keeps its environment-tag names, and file
+  CONTENTS are untouched — the workbooks and PDFs stay exactly what the site
+  produced.
+- **Context columns are visibly distinct in the clean-road comparison** — the
+  24 shown-but-never-counted columns now have grey headers with a hover note,
+  so the full 74-column file reads at a glance which columns are counted and
+  which are reference-only. Counts are unchanged (re-proven statewide against
+  the blessed canary).
+
+### Fixed
+- **Fast mode no longer generates a report twice when both formats are
+  selected** — picking a report's Excel AND PDF editions in fast mode now
+  generates each route once and saves both files off that single render, the
+  way the standard path has since v0.19.2 (roughly halving those runs). Matrix
+  export buttons queueing both editions of a report for the same day get the
+  same single pass.
+- **Evidence images from the Excel side work for every compared column now.**
+  The comparison names columns its own way (PM, PR, HG…) while the workbook
+  uses the site's labels (Post Mile, PP, H/G…), so evidence silently skipped
+  those columns — Intersection Detail lost 26 of its 35. Each report's evidence
+  now resolves columns exactly the way its own comparison reads the workbook
+  (and refuses honestly where no single cell holds the value, like derived
+  columns). Verified against real statewide workbooks: 26,320 sampled cells,
+  every one matching what the comparison compared.
+
 ## v0.31.0 — 2026-07-23
 
 Marathon 2 (first part): a new PDF-vs-Excel matrix, the report-wiring made

@@ -204,6 +204,14 @@ class CompareSchema:
     # is always False, so every existing comparison (and the regression-locked
     # Route-1=969 Highway Log canary) is byte-identical.
     context_fields: tuple = ()
+    # Optional CONTEXT-column HEADER treatment (presentation only, v0.32.0 —
+    # the clean-road "full 74-column file" ask): a solid-fill hex for the
+    # header cell of every context_fields column on the Comparison, data and
+    # Only-in sheets, so a shown-but-never-counted column is visibly distinct
+    # (its hover comment says so too). Cell VALUES, states, counts and the
+    # veryHidden snapshot sheets are untouched. Default "" -> every existing
+    # comparison's headers are byte-identical.
+    context_header_fill: str = ""
     # Optional EXTRA sheet writer: callable(wb, ctx) run after the standard sheets,
     # before save — like legend_writer but with a context dict ({rows_a, rows_b,
     # has_route, sc, side_a, side_b}) so a report can append a FAMILIAR-LAYOUT sheet
@@ -1915,17 +1923,55 @@ def _styled(ws, value, font, fill=None, align=None, guard=False,
     return c
 
 
-def _header_row(ws, values, comment_fn=None):
+def _header_row(ws, values, comment_fn=None, fill_fn=None):
     font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill = PatternFill("solid", start_color=_DARK)
     align = Alignment(horizontal="center", vertical="bottom", wrap_text=True)
-    cells = [_styled(ws, v, font, fill, align) for v in values]
+    # fill_fn (opt-in, context_header_fill) may override a single header cell's
+    # fill; None from it keeps the standard band, so default schemas are
+    # byte-identical.
+    cells = [_styled(ws, v, font,
+                     (fill_fn(v) if fill_fn is not None else None) or fill,
+                     align)
+             for v in values]
     if comment_fn is not None:                # attach hover tooltips (HL columns)
         for c in cells:
             cm = comment_fn(c.value)
             if cm is not None:
                 c.comment = cm
     return cells
+
+
+def _context_header_fill_fn(sc):
+    """The per-label header-fill override for schemas that opt in: context
+    columns (shown, never counted) get `sc.context_header_fill`; every other
+    label — and every schema with the default "" — gets None (the standard
+    band). Returns None when the schema doesn't opt in, so _header_row's
+    default path stays byte-identical."""
+    if not (sc.context_header_fill and sc.context_fields):
+        return None
+    tint = PatternFill("solid", start_color=sc.context_header_fill)
+    ctx = frozenset(sc.context_fields)
+    return lambda label: tint if label in ctx else None
+
+
+def _context_header_comment_fn(sc, base_comment_fn):
+    """Compose the schema's own header_comment with the context-column note,
+    so a tinted header explains itself on hover. Only built when the schema
+    opts into context_header_fill; base comments win when both apply to a
+    label (no schema does today)."""
+    ctx = frozenset(sc.context_fields)
+
+    def fn(label):
+        if base_comment_fn is not None:
+            cm = base_comment_fn(label)
+            if cm is not None:
+                return cm
+        if label in ctx:
+            return Comment("Context column — shown for reference, never "
+                           "counted as a difference.", "TSMIS Exporter")
+        return None
+    return fn
 
 
 def _apply_field_widths(ws, widths, col_for, lay):
@@ -1981,7 +2027,9 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         ws,
         (["Comparison row"] + lay.data_header + ["Key (helper)"]
          + lay.medwid_helper_headers + lay.build_fresh_headers),
-        lay.sc.header_comment))
+        _context_header_comment_fn(lay.sc, lay.sc.header_comment)
+        if _context_header_fill_fn(lay.sc) else lay.sc.header_comment,
+        fill_fn=_context_header_fill_fn(lay.sc)))
     # DISPLAY-only ditto resolution (Highway Log): {row_index: {col_in_row:
     # resolved}} — keeps the raw `++` in the cell (the non-asserting diff needs
     # it) but tints it and shows the paired-roadbed value on hover. None elsewhere.
@@ -2158,7 +2206,9 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None):
                           + [sc.header[i] for i in lay.field_indices]
                           + [chunk["header"] for chunk in lay.state_chunks]
                           + [lay.c_token_header],
-                          lay.sc.header_comment))
+                          _context_header_comment_fn(sc, lay.sc.header_comment)
+                          if _context_header_fill_fn(sc) else lay.sc.header_comment,
+                          fill_fn=_context_header_fill_fn(sc)))
     if not isinstance(helper_tokens, dict) or set(helper_tokens) != set(union):
         raise ValueError(
             "Comparison helper-token map must cover the union exactly")
@@ -2664,7 +2714,9 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         other_routes = vals["routes_n"] if side == sc.side_a else vals["routes_t"]
     ws.append(_header_row(ws, id_headers
                           + [sc.header[i] for i in lay.field_indices],
-                          lay.sc.header_comment))
+                          _context_header_comment_fn(sc, lay.sc.header_comment)
+                          if _context_header_fill_fn(sc) else lay.sc.header_comment,
+                          fill_fn=_context_header_fill_fn(sc)))
     if not isinstance(helper_tokens, dict) or any(
             key not in helper_tokens for key in keys):
         raise ValueError("Only-in helper-token map does not cover every row")

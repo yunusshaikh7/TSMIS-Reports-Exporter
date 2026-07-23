@@ -171,6 +171,12 @@ _SCHEMA = CompareSchema(
                           "location the other doesn't)"),
     key_field=KEY_FIELD,
     context_fields=CONTEXT_FIELDS,
+    # M2-E item 10 (owner, 2026-07-22): the full 74-column file is in the
+    # sheet, so the 24 context (shown-only) column HEADERS are tinted grey
+    # with a hover note — visibly distinct from the 50 counted columns, the
+    # way one-sided ROWS are tinted. Presentation only; CRH-SW-E2 counts are
+    # unchanged (re-proven on the real corpus 2026-07-23).
+    context_header_fill="808080",
     legend_writer=_write_notes_sheet,
 )
 

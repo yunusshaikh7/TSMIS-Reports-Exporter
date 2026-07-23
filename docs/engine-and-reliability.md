@@ -11,7 +11,9 @@ Two engines share one per-route loop:
 | File | Entry | Role |
 |---|---|---|
 | `scripts/exporter.py` | `run_export(spec, events, *, routes, timeout_ms, retry_timeout_ms, out_dir)` | Sequential engine (default). Owns the per-route loop, recovery, retry pass, save strategies. |
+| `scripts/exporter.py` | `run_export_combined(specs, events, *, routes, …, out_dirs)` | Dual-edition coalescing (v0.19.2): one on-site report generated ONCE per route, every edition saved off that render (page-rebuilding PDF save last). |
 | `scripts/exporter_parallel.py` | `run_export_parallel(spec, events, *, workers, routes, …)` | EXPERIMENTAL fast mode. N browsers off a shared queue; **reuses** `exporter.py`'s `_process_route`, `_record`, `_capture_failure`, `_retry_failed_routes`, `_wait_while_paused`, `_can_resume`, `_file_looks_complete`. Only concurrency is new. |
+| `scripts/exporter_parallel.py` | `run_export_parallel_combined(specs, events, *, workers, routes, …, out_dirs)` | Fast mode for a coalesced pair (v0.32.0): N browsers off one queue, each route generated once with every edition saved off that render (`_process_route_combined` per worker); serial combined retry in one fresh browser. `ExportWorker._run_specs` dispatches coalesced groups here in fast mode, and `MatrixBatchExportWorker._grouped_steps` coalesces queued edition steps per environment so one pass fills both matrix cells. |
 
 `cli.py`'s `run_cli`/`run_cli_multi` route to the parallel engine when `workers > 1`.
 
@@ -49,6 +51,10 @@ Every save ends with `_verify_saved_file(out_path)` (integrity check, below).
 ## Resume / idempotency
 
 `run_export` skips a route whose output file already **exists and passes an integrity check** in today's run folder **for the active src/env** — recorded as `exists`. Delete a file to force a re-download; a new day, or a different environment, always starts a fresh folder (yesterday's files never block today's run). Run folders are `output/<YYYY-MM-DD src-env>/<report>/` via `paths.output_run_dir` (see [architecture.md](architecture.md) for the run-folder model).
+
+### Dated per-route filenames (v0.32.0, owner item 20)
+
+Per-route files written into a dated run folder carry the **run folder's own name front-anchored** — `2026-07-23 ssor-prod highway_log_route_3.xlsx` — so a file lifted out of its folder still says which day + site produced it (the `env_tagged_filename` pattern; the load-bearing end-anchored `_route_<token>.<ext>` contract is untouched, so consolidator globs and route extraction keep working). `paths.resolve_route_file(dir, name)` is the ONE resolver every engine save site, the parallel reconcile, and the evidence adapters use: it prefers the file that already exists — **dated first, then the legacy dateless name** — so a pre-v0.32 partial run RESUMES onto its own files instead of writing a second file for the same route, which the consolidators would refuse as a duplicate route identity (CMP-AUD-050). The Everything store keeps its env-tag-only names (the store is deliberately dateless), and content is never stamped — exported workbooks/PDFs stay the site's own bytes. Locked by `build/check_route_file_naming.py`, which drives the shipped `run_export` / `run_export_parallel_combined` against real files including the mixed legacy+dated resume.
 
 ### Integrity gate (v0.11.0)
 
