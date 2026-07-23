@@ -12,7 +12,8 @@ import webview
 import artifact_store
 from gui_endpoint import _api_method, pick_path   # + the dialog unwrap
 from gui_worker import ConsolidateWorker
-from paths import OUTPUT_ROOT, list_output_days, list_output_days_for_report
+from paths import (OUTPUT_ROOT, list_output_days, list_output_days_for_report,
+                   manual_comparisons_dir)
 from reports import (COMPARE_REPORTS, CONSOLIDATE_REPORTS,
                      compare_index_for_key, compare_input_accepts_suffix,
                      compare_input_extensions,
@@ -372,8 +373,14 @@ class GuiCompareMixin:
         mode = self._compare_mode(want_formulas, want_values)
         if mode is None:
             return {"error": "Tick at least one output (values and/or live formulas)."}
+        # c14: a manual comparison auto-defaults into output/comparisons/manual/
+        # (self-identifying name via suggest_name), so ad-hoc comparisons land in
+        # one predictable place instead of beside whatever file was picked. The
+        # native dialog still lets the user redirect ("Save elsewhere…").
+        save_dir = manual_comparisons_dir()
+        save_dir.mkdir(parents=True, exist_ok=True)
         return self._begin_compare(
-            label, mode, Path(tsmis_path).parent,
+            label, mode, save_dir,
             lambda: mod.suggest_name(tsmis_path),
             lambda out_path, events=None, confirm_overwrite=None, day=None:
                 mod.compare(tsmis_path, tsn_path, out_path, events=events,
@@ -436,10 +443,12 @@ class GuiCompareMixin:
         mode = self._compare_mode(want_formulas, want_values)
         if mode is None:
             return {"error": "Tick at least one output (values and/or live formulas)."}
-        import compare_env
-        compare_env.DEFAULT_OUT_DIR.mkdir(parents=True, exist_ok=True)
+        # c14: cross-env manual comparisons also auto-default into
+        # output/comparisons/manual/ (was the shared comparisons/ root).
+        save_dir = manual_comparisons_dir()
+        save_dir.mkdir(parents=True, exist_ok=True)
         return self._begin_compare(
-            label, mode, compare_env.DEFAULT_OUT_DIR,
+            label, mode, save_dir,
             lambda: adapter.suggest_name(pa, pb),
             lambda out_path, events=None, confirm_overwrite=None, day=None:
                 adapter.compare_folders(pa, pb, out_path, events=events,

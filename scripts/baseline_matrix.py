@@ -125,12 +125,16 @@ def day_folder_name(date, source):
 
 def out_path(date, source, row_key, baseline_id):
     """The comparison VALUES workbook for one (day, report) vs one baseline.
-    The baseline token is part of the name — each baseline's comparisons are
-    distinct artifacts (switching baselines never clobbers the other's); the
-    mtime is the freshness signal per named target."""
+
+    The name carries the day + source + baseline token, so it is unique both
+    across baselines (switching baselines never clobbers the other's) AND across
+    day columns — two days' comparisons of the same report open in Excel together
+    (which refuses duplicate basenames; M1-B/c12). Still stable per cell (`date`
+    is the cell's column, not today), so mtime freshness is unchanged. (Pre-v0.30
+    cells used `<row>_vs_<token>.xlsx`; they rebuild once under the new name.)"""
     token = baseline_token(baseline_id)
     return (byday_root() / day_folder_name(date, source)
-            / f"{row_key}_vs_{token}.xlsx")
+            / f"{row_key}_vs_{token} {date} {source}.xlsx")
 
 
 def _results_path():

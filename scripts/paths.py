@@ -64,6 +64,25 @@ DATA_ROOT = _resolve_data_root()
 # Exported reports: each report writes into its own subfolder under here.
 OUTPUT_ROOT = DATA_ROOT / "output"
 
+# The one root under which every app-written comparison tree lives — the vs-TSN
+# (comparisons/tsn), by-day (tsn-by-day), baseline (baseline-by-day) subtrees the
+# matrices compose, and the manual/ folder a manual Compare auto-saves into. The
+# SoT anchor; the matrices name their own subtrees, this owns the shared root +
+# the manual destination (M1-C).
+COMPARISONS_DIRNAME = "comparisons"
+
+
+def comparisons_root():
+    """output/comparisons/ — the shared root for every comparison artifact."""
+    return OUTPUT_ROOT / COMPARISONS_DIRNAME
+
+
+def manual_comparisons_dir():
+    """output/comparisons/manual/ — the canonical auto-save home for a manual
+    Compare (c14), so ad-hoc comparisons land in one predictable place instead of
+    wherever the user last browsed. The free 'Save elsewhere…' path stays."""
+    return comparisons_root() / "manual"
+
 # User-supplied input files (currently: TSN district Highway Log PDFs). The
 # TSMIS reports never read from here -- this exists for the report types whose
 # source data is NOT produced by this app's exports.

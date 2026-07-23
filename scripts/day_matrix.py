@@ -111,9 +111,17 @@ def day_folder_name(date, source):
 
 
 def day_out_path(date, source, row_key):
-    """The comparison VALUES workbook for one (day, report) vs TSN. Stable,
-    dateless filename per cell (mtime is the freshness signal)."""
-    return byday_root() / day_folder_name(date, source) / f"{row_key}_vs_tsn.xlsx"
+    """The comparison VALUES workbook for one (day, report) vs TSN.
+
+    The basename embeds the day + source — not just the parent folder — so two
+    days' comparisons of the SAME report can be open in Excel at once (Excel
+    refuses two workbooks with the same basename, even from different folders;
+    M1-B/c12). The name is still STABLE per cell: `date` is the cell's own column,
+    never today, so the overwrite-in-place + mtime-freshness model is unchanged.
+    (Pre-v0.30 cells used the dateless `<row>_vs_tsn.xlsx`; they read as
+    not-built once and rebuild under the new name.)"""
+    return (byday_root() / day_folder_name(date, source)
+            / f"{row_key}_vs_tsn {date} {source}.xlsx")
 
 
 def _results_path():

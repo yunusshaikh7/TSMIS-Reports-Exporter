@@ -153,10 +153,36 @@ def test_093_badge_actionable():
         shutil.rmtree(dest, ignore_errors=True)
 
 
+def test_unique_self_identifying_names():
+    """c12: two days' comparisons of the SAME report must have DISTINCT basenames
+    (Excel refuses two workbooks with the same basename open at once), yet be
+    STABLE per cell (the date is the cell's own column, not today) so the
+    overwrite-in-place + mtime freshness model holds. Also covers the baseline
+    matrix and the manual-Compare canonical folder."""
+    print("c12: unique, self-identifying comparison basenames:")
+    import baseline_matrix
+    a = day_matrix.day_out_path("2026-06-11", "ssor-prod", "highway_log").name
+    b = day_matrix.day_out_path("2026-06-10", "ssor-prod", "highway_log").name
+    check("by-day: two days of one report get DISTINCT basenames", a != b)
+    check("by-day: the basename is self-identifying (day + source in the name)",
+          "2026-06-11" in a and "ssor-prod" in a and "highway_log" in a)
+    check("by-day: the name is stable per cell (idempotent)",
+          a == day_matrix.day_out_path("2026-06-11", "ssor-prod", "highway_log").name)
+    c = baseline_matrix.out_path("2026-06-11", "ssor-prod", "highway_log", "store").name
+    d = baseline_matrix.out_path("2026-06-10", "ssor-prod", "highway_log", "store").name
+    check("baseline: two days of one report get DISTINCT basenames", c != d)
+    check("baseline: name carries day + source + baseline token",
+          "2026-06-11" in c and "ssor-prod" in c and "store" in c)
+    check("manual comparisons resolve to output/comparisons/manual/",
+          paths.manual_comparisons_dir().name == "manual"
+          and paths.manual_comparisons_dir().parent == paths.comparisons_root())
+
+
 def main():
     test_newest_mtime_survives_a_bad_entry()
     test_092_folder_identity_and_calendar()
     test_093_badge_actionable()
+    test_unique_self_identifying_names()
     out = Path(tempfile.mkdtemp(prefix="tsmis_day_out_"))
     dest = Path(tempfile.mkdtemp(prefix="tsmis_day_dest_"))
     cfgdir = Path(tempfile.mkdtemp(prefix="tsmis_day_cfg_"))
