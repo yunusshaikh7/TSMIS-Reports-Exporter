@@ -1791,7 +1791,10 @@ class GuiMatrixMixin:
                                 "row": payload.get("row"),
                                 "cell": payload.get("cell"),
                                 "done": payload.get("done", 0),
-                                "total": payload.get("total", 0)}
+                                "total": payload.get("total", 0),
+                                # M1-B: raw seconds; the UI formats elapsed·~ETA.
+                                "elapsed_s": payload.get("elapsed_s"),
+                                "eta_s": payload.get("eta_s")}
         self._push_state()
 
     def _on_matrix_done(self, payload):
@@ -1811,18 +1814,25 @@ class GuiMatrixMixin:
         attempted = payload.get("attempted")
         unclean = any(payload.get(k) for k in
                       ("failed", "cancelled_cells", "partial_cells"))
+        # M1-B: how long the whole run took (blank for a sub-second/absent value).
+        el = payload.get("elapsed_s")
+        if isinstance(el, (int, float)) and el >= 1:
+            m, s = divmod(int(round(el)), 60)
+            took = f" in {m}m{s}s" if m else f" in {s}s"
+        else:
+            took = ""
         if isinstance(attempted, int) and unclean:
             stopped = ("Comparison run stopped" if payload.get("cancelled")
                        else "Comparison run finished")
-            self._emit_log(f"{stopped} — {attempted} of {total} attempted: "
+            self._emit_log(f"{stopped}{took} — {attempted} of {total} attempted: "
                            + ", ".join(parts) + " (see the log).")
         elif payload.get("cancelled"):
-            self._emit_log(f"Comparison run stopped — {done} of {total} done.")
+            self._emit_log(f"Comparison run stopped{took} — {done} of {total} done.")
         elif errs:
-            self._emit_log(f"Comparison run finished — {done} of {total} done; "
+            self._emit_log(f"Comparison run finished{took} — {done} of {total} done; "
                            f"{errs} could not be built (see the log).")
         else:
-            self._emit_log(f"Comparison run finished — {done} of {total} done.")
+            self._emit_log(f"Comparison run finished{took} — {done} of {total} done.")
         # Nudge only when the WHOLE queue has drained (not after every auto-
         # advancing job), matching exports/consolidations honoring notify_on_finish.
         if not self._queue:

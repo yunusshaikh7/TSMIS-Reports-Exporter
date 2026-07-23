@@ -790,11 +790,13 @@ def load_attempts(root):
 
 
 def record_attempt(root, result_key, cell_key, status, reason=None, at=None,
-                   commit_guard=None):
+                   commit_guard=None, error_type=None):
     """Persist (or clear) one cell's last attempt; returns True when the overlay
     on disk reflects the call. ``status=ATTEMPT_OK`` CLEARS the entry — a
     succeeded rebuild supersedes whatever failed before it. Unknown states are
-    refused rather than persisted as an uninterpretable badge."""
+    refused rather than persisted as an uninterpretable badge. ``error_type`` is
+    the failing exception class (M1-B) when a crash caused the attempt, so a log
+    reader can filter/aggregate by error kind."""
     if status != ATTEMPT_OK and status not in ATTEMPT_STATES:
         log.warning("matrix: refusing to record unknown attempt state %r", status)
         return False
@@ -817,6 +819,7 @@ def record_attempt(root, result_key, cell_key, status, reason=None, at=None,
             "status": status,
             "reason": (str(reason).splitlines()[0] if reason else ""),
             "at": float(at if at is not None else time.time()),
+            "error_type": (str(error_type) if error_type else ""),
         }
     if cells:
         data[result_key] = cells
@@ -851,6 +854,7 @@ def _last_attempt_for(attempts, result_key, cell_key, cmp_state):
         return None
     return {"status": rec.get("status"),
             "reason": str(rec.get("reason") or ""),
+            "error_type": str(rec.get("error_type") or ""),
             "at": at}
 
 

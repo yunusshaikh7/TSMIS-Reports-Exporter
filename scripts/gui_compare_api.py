@@ -184,6 +184,11 @@ class GuiCompareMixin:
                  "values": "values"}[mode]
         self._emit_log(f"Starting comparison: {label} ({kinds})")
         ui_log.info("compare: %s mode=%s out=%s", label, mode, out)
+        # Name both compared inputs in the log (M1-B) — "one log upload answers
+        # it": a standalone comparison used to record only its output path, so a
+        # bad result couldn't be traced back to which files it read.
+        for i, path in enumerate(source_paths, start=1):
+            ui_log.info("compare:   input %d: %s", i, path)
         self._set_dot("busy", "Comparing…")
         self._emit({"t": "run_started", "mode": "consolidate",
                     "label": f"Comparing — {label}…"})

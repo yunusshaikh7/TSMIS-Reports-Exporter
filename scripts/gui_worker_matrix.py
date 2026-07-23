@@ -7,10 +7,12 @@ MatrixTsnConsolidateWorker. Verbatim moves; gui_worker re-exports.
 """
 import logging
 import threading
+import time
 from pathlib import Path
 
 import owned_dir
 import baseline_matrix
+import compare_timings
 import day_matrix
 import matrix
 import outcome
@@ -19,6 +21,65 @@ from events import Events
 from gui_worker_export import ExportWorker
 
 log = logging.getLogger("tsmis.gui")
+
+
+def _fmt_dur(seconds):
+    """Compact human duration for a log/ETA line: '4s', '1m20s', '2m'."""
+    s = int(round(seconds or 0))
+    if s < 60:
+        return f"{s}s"
+    m, sec = divmod(s, 60)
+    return f"{m}m{sec}s" if sec else f"{m}m"
+
+
+def _cell_done_line(row_key, cell_key, mode_id, attempt, why, dur):
+    """The one structured per-cell outcome line (M1-B): a glyph, the cell's full
+    identity, how long it took, and — on anything but a clean success — exactly
+    what went wrong. One log read reconstructs a whole run."""
+    where = f"{row_key} · {cell_key} ({mode_id})"
+    took = _fmt_dur(dur)
+    if attempt == matrix.ATTEMPT_OK:
+        return f"  ✓ {where} — done in {took}"
+    if attempt == "cancelled":
+        return f"  ■ {where} — stopped after {took}"
+    verb = "incomplete" if attempt == "partial" else "failed"
+    glyph = "⚠" if attempt == "partial" else "✗"
+    tail = f": {why}" if why else ""
+    return f"  {glyph} {where} — {verb} in {took}{tail}"
+
+
+class _RunClock:
+    """Per-run cell timing + a best-effort ETA over an ordered timing-key list
+    (M1-B). `keys[i]` is the "<row>|<mode>" of the i-th cell; each finished cell
+    feeds the durable history so later runs (and the rest of THIS run, via the
+    running-average fallback) estimate better. Diagnostic — never gates output."""
+
+    def __init__(self, keys):
+        self.keys = list(keys)
+        self.done = 0
+        self.elapsed = 0.0
+
+    def start(self):
+        return time.perf_counter()
+
+    def finish(self, key, started):
+        dur = max(0.0, time.perf_counter() - started)
+        self.elapsed += dur
+        self.done += 1
+        compare_timings.record(key, dur)
+        return dur
+
+    def eta_seconds(self):
+        avg = self.elapsed / self.done if self.done else None
+        return compare_timings.estimate_seconds(self.keys[self.done:], fallback=avg)
+
+    def progress_extra(self):
+        """The {elapsed_s, eta_s?} the UI shows beside 'Comparing done/total'."""
+        out = {"elapsed_s": round(self.elapsed, 1)}
+        eta = self.eta_seconds()
+        if eta is not None:
+            out["eta_s"] = round(eta, 1)
+        return out
 
 
 # --------------------------------------------------------------------------- #
@@ -73,14 +134,14 @@ def _attempt_state(res, cancelled=False):
 
 
 def _record_attempt(root, result_key, cell_key, status, reason,
-                    commit_guard=None):
+                    commit_guard=None, error_type=None):
     """Persist one cell's attempt overlay. Best-effort by contract (matrix_state
     logs the why) — diagnostic state must never fail a published artifact."""
     if not root:
         return
     try:
         matrix.record_attempt(root, result_key, cell_key, status, reason=reason,
-                              commit_guard=commit_guard)
+                              commit_guard=commit_guard, error_type=error_type)
     except Exception as e:                       # noqa: BLE001 - diagnostic only
         log.warning("matrix: attempt overlay for %s/%s not recorded (%s: %s)",
                     result_key, cell_key, type(e).__name__, e)
@@ -227,6 +288,7 @@ class MatrixCompareWorker(threading.Thread):
     def run(self):
         tally = _AttemptTally(len(self.cells))
         total = tally.total
+        clock = _RunClock([f"{row}|{mode}" for row, _cell, mode in self.cells])
         attempts_root = (matrix.comparisons_common_root(self.dest)
                          if self.dest else None)
         comparisons_lease = None
@@ -282,7 +344,11 @@ class MatrixCompareWorker(threading.Thread):
                     comparisons_lease.require_current(action="matrix build")
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
                                             "status": "running",
-                                            "done": tally.done, "total": total}))
+                                            "done": tally.done, "total": total,
+                                            **clock.progress_extra()}))
+                self.q.put(("log", f"  ▸ comparing {row_key} · {cell_key} ({mode_id})…"))
+                error_type = None
+                started = clock.start()
                 try:
                     # Cross-environment cells only publish beneath comparisons.
                     # TSN/self cells also persist consolidation artifacts into the
@@ -302,7 +368,6 @@ class MatrixCompareWorker(threading.Thread):
                     status = res.status
                     if status != "ok":
                         tally.errors += 1
-                        self.q.put(("log", f"  {cell_key} {row_key}: {res.message}"))
                 except Exception as e:                   # noqa: BLE001
                     log.exception("matrix compare %s/%s/%s crashed", row_key, cell_key, mode_id)
                     # A cell that raised because the run was stopped is CANCELLED,
@@ -313,23 +378,27 @@ class MatrixCompareWorker(threading.Thread):
                     attempt, why = _attempt_state(None, cancelled=cancelled_cell)
                     if not cancelled_cell:
                         why = f"{type(e).__name__}: {e}"
-                    self.q.put(("log", f"  {cell_key} {row_key}: "
-                                       f"{type(e).__name__}: {e}"))
+                        error_type = type(e).__name__
+                dur = clock.finish(f"{row_key}|{mode_id}", started)
+                self.q.put(("log", _cell_done_line(row_key, cell_key, mode_id,
+                                                   attempt, why, dur)))
                 tally.count(attempt)
                 _record_attempt(attempts_root, f"{row_key}|{mode_id}", cell_key,
-                                attempt, why,
+                                attempt, why, error_type=error_type,
                                 commit_guard=(_target_guard
                                               if comparisons_lease is not None
                                               else None))
                 tally.done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": cell_key,
                                             "status": status,
-                                            "done": tally.done, "total": total}))
+                                            "done": tally.done, "total": total,
+                                            **clock.progress_extra()}))
         except owned_dir.OwnershipError as e:
             tally.errors = max(tally.errors, total - tally.done)
             self.q.put(("log", f"  Comparisons were not written: {e}"))
         finally:
-            self.q.put(("matrix_done", tally.payload(self.cancel.is_set())))
+            self.q.put(("matrix_done", {**tally.payload(self.cancel.is_set()),
+                                        "elapsed_s": round(clock.elapsed, 1)}))
 
 
 class DayMatrixCompareWorker(threading.Thread):
@@ -362,6 +431,7 @@ class DayMatrixCompareWorker(threading.Thread):
         # only source/store context, so it must never be claimed as output.
         tally = _AttemptTally(len(self.cells))
         total = tally.total
+        clock = _RunClock([f"{row}|tsn" for _date, row in self.cells])
         attempts_root = day_matrix.byday_root()
         try:
             for date, row_key in self.cells:
@@ -369,7 +439,11 @@ class DayMatrixCompareWorker(threading.Thread):
                     break
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": "running",
-                                            "done": tally.done, "total": total}))
+                                            "done": tally.done, "total": total,
+                                            **clock.progress_extra()}))
+                self.q.put(("log", f"  ▸ comparing {row_key} · {date} vs TSN…"))
+                error_type = None
+                started = clock.start()
                 try:
                     res = day_matrix.build_day_cell(
                         self.source, date, row_key, self.dest, events,
@@ -380,7 +454,6 @@ class DayMatrixCompareWorker(threading.Thread):
                     status = res.status
                     if status != "ok":
                         tally.errors += 1
-                        self.q.put(("log", f"  {date} {row_key}: {res.message}"))
                 except Exception as e:                   # noqa: BLE001
                     log.exception("day matrix compare %s/%s crashed", date, row_key)
                     cancelled_cell = self.cancel.is_set()
@@ -389,17 +462,21 @@ class DayMatrixCompareWorker(threading.Thread):
                     attempt, why = _attempt_state(None, cancelled=cancelled_cell)
                     if not cancelled_cell:
                         why = f"{type(e).__name__}: {e}"
-                    self.q.put(("log", f"  {date} {row_key}: "
-                                       f"{type(e).__name__}: {e}"))
+                        error_type = type(e).__name__
+                dur = clock.finish(f"{row_key}|tsn", started)
+                self.q.put(("log", _cell_done_line(row_key, date, "tsn",
+                                                   attempt, why, dur)))
                 tally.count(attempt)
                 _record_attempt(attempts_root, f"{row_key}|{self.source}", date,
-                                attempt, why)
+                                attempt, why, error_type=error_type)
                 tally.done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": status,
-                                            "done": tally.done, "total": total}))
+                                            "done": tally.done, "total": total,
+                                            **clock.progress_extra()}))
         finally:
-            self.q.put(("matrix_done", tally.payload(self.cancel.is_set())))
+            self.q.put(("matrix_done", {**tally.payload(self.cancel.is_set()),
+                                        "elapsed_s": round(clock.elapsed, 1)}))
 
 
 class BaselineMatrixCompareWorker(threading.Thread):
@@ -432,6 +509,7 @@ class BaselineMatrixCompareWorker(threading.Thread):
         # needed nor useful here.
         tally = _AttemptTally(len(self.cells))
         total = tally.total
+        clock = _RunClock([f"{row}|baseline" for _date, row in self.cells])
         attempts_root = baseline_matrix.byday_root()
         try:
             for date, row_key in self.cells:
@@ -439,7 +517,11 @@ class BaselineMatrixCompareWorker(threading.Thread):
                     break
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": "running",
-                                            "done": tally.done, "total": total}))
+                                            "done": tally.done, "total": total,
+                                            **clock.progress_extra()}))
+                self.q.put(("log", f"  ▸ comparing {row_key} · {date} vs baseline…"))
+                error_type = None
+                started = clock.start()
                 try:
                     res = baseline_matrix.build_baseline_cell(
                         self.source, date, row_key, self.baseline_id, self.dest,
@@ -448,7 +530,6 @@ class BaselineMatrixCompareWorker(threading.Thread):
                     status = res.status
                     if status != "ok":
                         tally.errors += 1
-                        self.q.put(("log", f"  {date} {row_key}: {res.message}"))
                 except Exception as e:                   # noqa: BLE001
                     log.exception("baseline matrix compare %s/%s crashed",
                                   date, row_key)
@@ -458,18 +539,22 @@ class BaselineMatrixCompareWorker(threading.Thread):
                     attempt, why = _attempt_state(None, cancelled=cancelled_cell)
                     if not cancelled_cell:
                         why = f"{type(e).__name__}: {e}"
-                    self.q.put(("log", f"  {date} {row_key}: "
-                                       f"{type(e).__name__}: {e}"))
+                        error_type = type(e).__name__
+                dur = clock.finish(f"{row_key}|baseline", started)
+                self.q.put(("log", _cell_done_line(row_key, date, "baseline",
+                                                   attempt, why, dur)))
                 tally.count(attempt)
                 _record_attempt(attempts_root,
                                 f"{row_key}|{self.source}|{self.baseline_id}",
-                                date, attempt, why)
+                                date, attempt, why, error_type=error_type)
                 tally.done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": status,
-                                            "done": tally.done, "total": total}))
+                                            "done": tally.done, "total": total,
+                                            **clock.progress_extra()}))
         finally:
-            self.q.put(("matrix_done", tally.payload(self.cancel.is_set())))
+            self.q.put(("matrix_done", {**tally.payload(self.cancel.is_set()),
+                                        "elapsed_s": round(clock.elapsed, 1)}))
 
 
 class MatrixEvidenceWorker(threading.Thread):

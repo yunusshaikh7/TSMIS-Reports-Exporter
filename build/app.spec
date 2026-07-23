@@ -141,6 +141,8 @@ APP_MODULES = [
     # and the frozen `--self-test` gate now enforce that every flat scripts/ module
     # is declared here.
     "matrix", "day_matrix", "baseline_matrix", "report_library",
+    # v0.30.0 (M1-B): best-effort per-comparison durations for the live ETA.
+    "compare_timings",
     # W1 (v0.19.0): the one-click Settings validation — processes the on-disk
     # samples through the real pipeline; its manifest ships in the evidence zip.
     "validation",

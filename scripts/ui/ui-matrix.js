@@ -8,13 +8,31 @@
 // ---- environment comparison matrix --------------------------------------
 const MX_HI = 50;   // >= this many discrepancies reads as "many" (red); tunable
 
+// M1-B: compact duration + the "Comparing done/total · Ns elapsed · ~Ns left"
+// progress text shared by all three matrix progress lines. elapsed/ETA come from
+// the worker (compare_timings); when there's no history yet, ETA is simply absent
+// (elapsed still shows) rather than a made-up number.
+function fmtDur(sec) {
+  if (typeof sec !== "number" || sec < 0) return "";
+  const s = Math.round(sec);
+  if (s < 60) return `${s}s`;
+  const mm = Math.floor(s / 60), r = s % 60;
+  return r ? `${mm}m${r}s` : `${mm}m`;
+}
+function mxProgressText(m) {
+  const bits = [];
+  if (typeof m.elapsed_s === "number" && m.elapsed_s >= 1) bits.push(`${fmtDur(m.elapsed_s)} elapsed`);
+  if (typeof m.eta_s === "number" && m.eta_s >= 1) bits.push(`~${fmtDur(m.eta_s)} left`);
+  return `Comparing ${m.done}/${m.total}` + (bits.length ? ` · ${bits.join(" · ")}…` : "…");
+}
+
 function updateMatrixProgress() {
   const el = $("matrixProgress");
   if (!el) return;
   const m = S.st && S.st.matrix;
   if (m && m.total) {
     el.hidden = false;
-    el.textContent = `Comparing ${m.done}/${m.total}…`;
+    el.textContent = mxProgressText(m);
   } else {
     el.hidden = true;
   }
@@ -298,7 +316,10 @@ function mxCellContent(cmp, tsnMeta) {
   if (attempt) {
     const inner = mxCellContent({ ...cmp, last_attempt: null }, tsnMeta);
     return { cls: inner.cls, main: inner.main, warn: attempt.warn,
-             sub: inner.sub ? `${inner.sub} · ${attempt.note}` : attempt.note };
+             sub: inner.sub ? `${inner.sub} · ${attempt.note}` : attempt.note,
+             // M1-B: the stored reason (never rendered before) → the cell tooltip,
+             // so a failed/incomplete refresh says WHY on hover, not just "failed".
+             title: attempt.why || undefined };
   }
   if (cmp.supported === false) return { cls: "mx-na", main: "—", sub: "not available yet" };
   if (cmp.missing_side) {
@@ -775,14 +796,16 @@ async function renderMatrix() {
       const main = document.createElement("div"); main.className = "mx-num";
       const sub = document.createElement("div"); sub.className = "mx-sub";
       const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "never exported";
+      let why = "";
       if (cmp === null) {                 // env-mode baseline column
         main.textContent = "baseline"; sub.textContent = expWhen;
       } else {
         const v = mxCellContent(cmp, tm);
         cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
         if (v.warn) cell.classList.add(v.warn);
+        if (v.title) why = `\n⚠ ${v.title}`;
       }
-      cell.title = `${snap.row_labels[rk]} — ${snap.env_labels[env] || env}\nExported: ${expWhen}`;
+      cell.title = `${snap.row_labels[rk]} — ${snap.env_labels[env] || env}\nExported: ${expWhen}${why}`;
       cell.dataset.rk = rk; cell.dataset.env = env;
       cell.dataset.label = snap.row_labels[rk] || rk;
       cell.dataset.baseTitle = cell.title;             // env flag appends to this base
@@ -1073,7 +1096,7 @@ async function renderDayMatrix() {
       cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
       if (v.warn) cell.classList.add(v.warn);
       const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "not exported";
-      cell.title = `${rlabel} — ${d}\nExported: ${expWhen}`;
+      cell.title = `${rlabel} — ${d}\nExported: ${expWhen}` + (v.title ? `\n⚠ ${v.title}` : "");
       cell.append(main, sub);
       if (supported) {
         const acts = document.createElement("div"); acts.className = "mx-actions";
@@ -1204,7 +1227,7 @@ function updateDayMatrixProgress() {
   const el = $("dayMatrixProgress");
   if (el) {
     const m = S.st && S.st.matrix;
-    if (m && m.total) { el.hidden = false; el.textContent = `Comparing ${m.done}/${m.total}…`; }
+    if (m && m.total) { el.hidden = false; el.textContent = mxProgressText(m); }
     else el.hidden = true;
   }
   const locked = !!(S.st && S.st.task);
@@ -1448,6 +1471,7 @@ async function renderBaselineMatrix() {
       const main = document.createElement("div"); main.className = "mx-num";
       const sub = document.createElement("div"); sub.className = "mx-sub";
       const expWhen = c.export.present ? fmtAge(c.export.age_seconds) : "not exported";
+      let why = "";
       if (!bl.id) {                        // no baseline picked yet
         cell.classList.add("mx-na"); main.textContent = "—"; sub.textContent = "pick a baseline";
       } else if (cmp && cmp.is_baseline) {  // the baseline's own column
@@ -1457,8 +1481,9 @@ async function renderBaselineMatrix() {
         const v = mxCellContent(cmp);
         cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
         if (v.warn) cell.classList.add(v.warn);
+        if (v.title) why = `\n⚠ ${v.title}`;
       }
-      cell.title = `${rlabel} — ${d} vs ${bl.label || "baseline"}\nExported: ${expWhen}`;
+      cell.title = `${rlabel} — ${d} vs ${bl.label || "baseline"}\nExported: ${expWhen}${why}`;
       cell.append(main, sub);
       if (supported && bl.id && cmp && !cmp.is_baseline) {
         const acts = document.createElement("div"); acts.className = "mx-actions";
@@ -1513,7 +1538,7 @@ function updateBaselineMatrixProgress() {
   const el = $("baselineMatrixProgress");
   if (el) {
     const m = S.st && S.st.matrix;
-    if (m && m.total) { el.hidden = false; el.textContent = `Comparing ${m.done}/${m.total}…`; }
+    if (m && m.total) { el.hidden = false; el.textContent = mxProgressText(m); }
     else el.hidden = true;
   }
   const locked = !!(S.st && S.st.task);
