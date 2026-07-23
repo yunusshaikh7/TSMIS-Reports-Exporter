@@ -27,9 +27,13 @@ $versions = Select-String -Path "CHANGELOG.md" -Pattern '^##\s+(v\S+)' |
 Write-Host "Found $($versions.Count) versions in CHANGELOG.md."
 
 foreach ($tag in $versions) {
-    $tmp = New-TemporaryFile
+    # [IO.Path]::GetTempFileName() rather than New-TemporaryFile: the latter is
+    # itself ShouldProcess-aware, so under -WhatIf it does NOT create the file
+    # and the generate step below got an empty -o path (the preview errored
+    # instead of previewing). Only `gh release edit` should be gated by -WhatIf.
+    $tmp = [System.IO.Path]::GetTempFileName()
     try {
-        python build\gen_release_notes.py $tag -o $tmp.FullName
+        python build\gen_release_notes.py $tag -o $tmp
         # $ErrorActionPreference = "Stop" does NOT stop on a native command's
         # nonzero exit in PS 5.1 -- without this check a generation failure
         # would blank the release's notes.
@@ -37,7 +41,7 @@ foreach ($tag in $versions) {
             throw "gen_release_notes.py failed for $tag (exit $LASTEXITCODE); notes NOT updated."
         }
         if ($PSCmdlet.ShouldProcess($tag, "update release notes")) {
-            gh release edit $tag --notes-file $tmp.FullName
+            gh release edit $tag --notes-file $tmp
             Write-Host "  updated $tag"
         }
         else {
@@ -45,7 +49,8 @@ foreach ($tag in $versions) {
         }
     }
     finally {
-        Remove-Item $tmp.FullName -ErrorAction SilentlyContinue
+        # -WhatIf:$false so the temp file is cleaned up even during a preview.
+        Remove-Item $tmp -Force -WhatIf:$false -ErrorAction SilentlyContinue
     }
 }
 
