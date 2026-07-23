@@ -208,19 +208,48 @@ def stamped_consolidated_filename(filename, day):
 
 
 def env_tagged_filename(filename, tag):
-    """Prefix an Export-Everything output filename with its source-environment
-    tag (the always-current store's '<dest>/<src-env>/…' subfolder name), so a
-    file lifted out of the store still says, by name, which environment produced
-    it: 'ssor-prod' + 'tsar_ramp_detail_route_5.xlsx' ->
-    'ssor-prod tsar_ramp_detail_route_5.xlsx'. The tag goes in FRONT, NOT before
-    the extension, on purpose: the consolidators discover inputs with a '*.xlsx'/
-    '*.pdf' glob and pull the route out with '_route_(\\w+)\\.xlsx$' anchored at
-    the end — a trailing tag would break that match, a leading one can't. An
-    empty/None tag returns the name unchanged (the normal dated run folders are
-    already self-labeling by their path, so only the Everything store stamps)."""
+    """Prefix an output filename with its provenance tag, so a file lifted out
+    of its folder still says, by name, where it came from: the Everything
+    store's '<src-env>' subfolder name ('ssor-prod tsar_ramp_detail_route_5
+    .xlsx'), or — since v0.32.0 (owner item 20) — a dated run folder's own
+    name ('2026-07-23 ssor-prod highway_log_route_3.xlsx', via
+    resolve_route_file). The tag goes in FRONT, NOT before the extension, on
+    purpose: the consolidators discover inputs with a '*.xlsx'/'*.pdf' glob and
+    pull the route out with '_route_(\\w+)\\.xlsx$' anchored at the end — a
+    trailing tag would break that match, a leading one can't. An empty/None tag
+    returns the name unchanged."""
     if not tag:
         return filename
     return f"{tag} {filename}"
+
+
+def resolve_route_file(dir_path, name):
+    """The on-disk path for ONE per-route export file `name` under `dir_path`.
+
+    Since v0.32.0, per-route files written into a DATED run folder
+    (output/<YYYY-MM-DD src-env>/<subdir>/) carry the run folder's name
+    front-anchored — '2026-07-23 ssor-prod highway_log_route_3.xlsx' — so a
+    file lifted out of its folder still says which day + site produced it
+    (the exact env_tagged_filename pattern; the load-bearing end-anchored
+    '_route_<token>.<ext>' contract is untouched, so consolidator globs and
+    route extraction keep working). Anywhere else (the Everything store's
+    env-tagged staging, arbitrary folders) the name passes through as-is.
+
+    Resolution prefers the file that already EXISTS — the dated spelling
+    first, then the legacy dateless one — so a pre-v0.32 partial run RESUMES
+    onto its own files instead of writing a second file for the same route,
+    which the consolidators would refuse as a duplicate route identity
+    (CMP-AUD-050). A fresh route gets the dated name. Read-side callers
+    (evidence locate, reconcile) get the same preference, so both
+    generations of exports stay readable."""
+    d = Path(dir_path)
+    bare = d / name
+    if parse_run_folder(d.parent.name) is None:
+        return bare
+    dated = d / env_tagged_filename(name, d.parent.name)
+    if not dated.exists() and bare.exists():
+        return bare
+    return dated
 
 
 def tsn_library_dir(report):

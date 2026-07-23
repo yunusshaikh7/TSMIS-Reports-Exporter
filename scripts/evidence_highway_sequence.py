@@ -40,6 +40,8 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
+import paths
+
 try:
     import pdfplumber
     _DEPS_OK = True
@@ -197,7 +199,11 @@ def project(field, raw, side="tsmis", route=None):
 # TSMIS side — the per-route "Highway Sequence Listing (PDF)" export
 # --------------------------------------------------------------------------- #
 def tsmis_pdf_path(pdf_dir, route):
-    return Path(pdf_dir) / f"highway_sequence_route_{route}.pdf"
+    # v0.32.0: dated run folders front-stamp the run identity onto the
+    # per-route filename; resolve_route_file prefers whichever spelling
+    # exists (dated first, legacy dateless second) so both generations
+    # of exports stay evidenceable.
+    return paths.resolve_route_file(pdf_dir, f"highway_sequence_route_{route}.pdf")
 
 
 def _classify_line_words(line_words, b):

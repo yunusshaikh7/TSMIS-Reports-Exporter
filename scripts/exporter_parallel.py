@@ -62,14 +62,19 @@ from events import Events, RunResult
 # sequential engine, so a per-report fix benefits both.
 from exporter import (
     _can_resume,
+    _combined_output_dirs,
     _process_route,
+    _process_route_combined,
     _record,
     _require_safe_destination,
+    _retry_failed_combined,
     _retry_failed_routes,
+    _save_rebuilds_page,
+    _tally_all,
     _wait_while_paused,
 )
 from pathlib import Path
-from paths import output_run_dir
+from paths import output_run_dir, resolve_route_file
 from run_report import auto_report_path, write_run_report
 
 log = logging.getLogger("tsmis.export.parallel")
@@ -188,7 +193,7 @@ def _reconcile_unaccounted(routes, result, out_dir, spec, events, *,
     accounted = {r for r, _ in result.per_route}
     missing = [r for r in routes
                if r not in accounted
-               and not _can_resume(out_dir / spec.filename(r))]
+               and not _can_resume(resolve_route_file(out_dir, spec.filename(r)))]
     if missing:
         log.warning("parallel: %d route(s) had no recorded outcome "
                     "(worker_crashed=%s, cancelled=%s); marking failed: %s",
@@ -322,7 +327,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
                         except queue.Empty:
                             break                            # no work left -> done
                         prefix = f"{tag} Route {route}:"
-                        out_path = out_dir / spec.filename(route)
+                        out_path = resolve_route_file(out_dir, spec.filename(route))
                         _require_safe_destination(wevents, out_path)
                         if _can_resume(out_path):
                             wevents.on_log(f"{prefix} already exists, skip")
@@ -413,3 +418,263 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
             log.warning("could not write run report: %s", e)
 
     return result
+
+
+# --------------------------------------------------------------------------- #
+# combined (dual-edition) fast mode — v0.32.0, owner item 1/19
+# --------------------------------------------------------------------------- #
+def _reconcile_unaccounted_combined(routes, ordered_results, targets_for, events, *,
+                                    cancelled, worker_crashed):
+    """The combined-run twin of _reconcile_unaccounted: a route a crashed/stopped
+    worker left with NO recorded outcome — and whose editions are not all already
+    on disk — is marked failed in EVERY edition (one shared unit, _tally_all), so
+    the serial retry / a later resume re-pulls it. Same cancel/crash gating and
+    the same lock-tolerant _can_resume as the single-edition reconcile."""
+    if cancelled and not worker_crashed:
+        return []
+    accounted = {r for r, _ in ordered_results[0].per_route}
+    missing = [r for r in routes
+               if r not in accounted
+               and not all(_can_resume(p) for _s, p in targets_for(r))]
+    if missing:
+        log.warning("parallel combined: %d route(s) had no recorded outcome "
+                    "(worker_crashed=%s, cancelled=%s); marking failed: %s",
+                    len(missing), worker_crashed, cancelled, missing)
+        if worker_crashed:
+            events.on_log(f"{len(missing)} route(s) weren't completed because a "
+                          "browser stopped unexpectedly -- marking them failed so "
+                          "they're retried / picked up on the next run.")
+        for r in missing:
+            _tally_all(ordered_results, events, r, "failed")
+    return missing
+
+
+def _retry_failed_combined_sequential(base, targets_for, ordered_results, events,
+                                      timeout_ms):
+    """Serial second-chance pass for a combined fast run: ONE fresh browser, armed
+    once, then the shared combined retry helper re-runs each failed route (generate
+    once, save every edition) with the generous timeout. Mirrors
+    _retry_failed_sequential; the fresh page must be armed here because the
+    combined retry helper assumes an already-armed form."""
+    with sync_playwright() as p:
+        browser, _ctx, page = new_authed_browser(p, parallel=True)
+        try:
+            navigate_with_auth(page, should_cancel=events.is_cancelled)
+            if events.is_cancelled():
+                return
+            require_signed_in(
+                page,
+                "Sign-in didn't complete - the session may have expired. "
+                "Please log in.",
+            )
+            select_report(page, base.label, base.data_value)
+            _retry_failed_combined(page, base, targets_for, ordered_results,
+                                   events, timeout_ms)
+        finally:
+            browser.close()
+
+
+def run_export_parallel_combined(specs, events=None, *, workers=None, routes=ROUTES,
+                                 timeout_ms=None, retry_timeout_ms=None,
+                                 out_dirs=None):
+    """Fast mode for a COALESCED dual-edition pair: N concurrent browsers pull
+    routes off one shared queue, and each route is GENERATED ONCE with every
+    edition saved off that single render (exporter._process_route_combined — the
+    page-rebuilding PDF save last), instead of running each edition as its own
+    full parallel pass. The single-edition fast engine above is untouched.
+
+    Contract mirrors run_export_combined: all `specs` share one on-site report
+    (data_value), `out_dirs` optionally overrides each spec's dated run folder
+    (parallel to `specs`; a None entry keeps the dated folder), results return in
+    `specs` order, and AuthError / PreflightError raise the same way. Concurrency
+    mirrors run_export_parallel: device sign-in caps to one browser, a shared
+    stop flag winds workers down, a crashed worker's in-flight route is
+    reconciled as failed, and failures get one serial single-browser retry."""
+    events = events or Events()
+    if len(specs) < 2:
+        raise ValueError("run_export_parallel_combined needs 2+ editions; "
+                         "use run_export_parallel for one report")
+    base = specs[0]
+    if any(s.data_value != base.data_value for s in specs):
+        raise ValueError("run_export_parallel_combined: all editions must share the "
+                         f"same on-site report (data_value); got "
+                         f"{[s.data_value for s in specs]}")
+    n = resolve_worker_count(workers)
+    if not has_valid_auth():
+        events.on_log("No saved session - will try signing in automatically "
+                      "using this PC's work account (Microsoft Edge).")
+        if n > 1:
+            events.on_log("Automatic sign-in supports one browser at a time - "
+                          "running with 1 browser. Save a login to use fast mode.")
+            log.info("parallel combined: device sign-in mode caps workers %d -> 1", n)
+            n = 1
+    timeout_ms = timeout_ms or fast_report_timeout_ms()
+    retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
+    src, env = get_site()
+    save_order = sorted(range(len(specs)), key=lambda i: _save_rebuilds_page(specs[i]))
+    dirs, results = [], []
+    for d in _combined_output_dirs(specs, out_dirs, src, env):
+        _require_safe_destination(events, d)
+        d.mkdir(parents=True, exist_ok=True)
+        _require_safe_destination(events, d)
+        dirs.append(d)
+        results.append(RunResult(output_dir=str(d)))
+    total = len(routes)
+    n = min(n, total) or 1
+    run_t0 = time.monotonic()
+    subdirs = ", ".join(specs[i].subdir for i in save_order)
+    log.info("parallel combined export start: %s [%s] (%d routes, %d workers)",
+             base.label, subdirs, total, n)
+    log.info("parallel combined export config: site=%s auth_file=%s timeout=%ds "
+             "retry_timeout=%ds", get_url(), has_valid_auth(),
+             timeout_ms // 1000, retry_timeout_ms // 1000)
+    events.on_log(f"Fast mode (experimental): {n} browsers in parallel, "
+                  f"{total} routes — {len(specs)} editions saved per route.")
+    if has_valid_auth():
+        events.on_log("Fast mode runs its browsers in the Built-in Chromium / "
+                      "Google Chrome (Microsoft Edge only if neither is "
+                      "available; it keeps the one-click sign-in).")
+
+    def targets_for(route):
+        """Ordered (spec, out_path) per edition — page-rebuilding saves last;
+        dated names with the legacy-resume fallback (resolve_route_file)."""
+        return [(specs[i], resolve_route_file(dirs[i], specs[i].filename(route)))
+                for i in save_order]
+
+    ordered_results = [results[i] for i in save_order]
+
+    _preflight_once(base, events)
+    if events.is_cancelled():
+        events.on_log("Cancelled by user.")
+        return results
+    events.on_log(f"Ready. Exporting {len(specs)} editions together "
+                  f"({subdirs}) — each route is generated once.")
+
+    work = queue.Queue()
+    for r in routes:
+        work.put(r)
+
+    stop = threading.Event()
+    auth_failed = threading.Event()
+    worker_crashed = threading.Event()
+    # Each worker records into its OWN per-edition results (specs order), merged
+    # after the join — same no-locking-on-the-hot-path model as the single engine.
+    worker_results = [None] * n
+
+    def worker(idx):
+        wrs = [RunResult(output_dir=str(d)) for d in dirs]
+        worker_results[idx] = wrs
+        wordered = [wrs[i] for i in save_order]
+        wevents = _worker_events(events, stop, idx + 1)
+        tag = f"[browser {idx + 1}]"
+        log.info("%s starting (combined)", tag)
+        try:
+            wevents.on_status(wevents.worker_no, "Starting browser…")
+            with sync_playwright() as p:
+                browser, _ctx, page = new_authed_browser(p, parallel=True)
+                try:
+                    wevents.on_status(wevents.worker_no, "Opening TSMIS + signing in…")
+                    navigate_with_auth(page, should_cancel=wevents.is_cancelled)
+                    if wevents.is_cancelled():
+                        raise RunCancelled()
+                    require_signed_in(
+                        page,
+                        "Sign-in didn't complete - the session may have "
+                        "expired. Please log in.",
+                    )
+                    select_report(page, base.label, base.data_value)
+                    while not stop.is_set():
+                        _wait_while_paused(events)
+                        if events.is_cancelled():
+                            stop.set()
+                            break
+                        try:
+                            route = work.get_nowait()
+                        except queue.Empty:  # silent-ok: an empty queue IS "no work left"
+                            break
+                        prefix = f"{tag} Route {route}:"
+                        targets = targets_for(route)
+                        for _s, target in targets:
+                            _require_safe_destination(wevents, target)
+                        # Route-level resume: skip only when EVERY edition is
+                        # already on disk (matches run_export_combined).
+                        if all(_can_resume(p) for _s, p in targets):
+                            wevents.on_log(f"{prefix} all editions exist, skip")
+                            _tally_all(wordered, wevents, route, "exists")
+                            continue
+                        if not _process_route_combined(page, base, route, prefix,
+                                                       targets, wevents, wordered,
+                                                       timeout_ms):
+                            stop.set()
+                            break
+                finally:
+                    browser.close()
+            wevents.on_status(wevents.worker_no, "Done")
+            log.info("%s done: %d route(s) handled", tag, len(wrs[0].per_route))
+        except AuthError as e:
+            log.warning("%s lost the session: %s", tag, e)
+            auth_failed.set()
+            stop.set()
+        except RunCancelled:
+            log.info("%s cancelled mid-route", tag)
+            stop.set()
+        except Exception:
+            log.exception("%s crashed", tag)
+            events.on_log(f"{tag} stopped unexpectedly; the other browsers keep going "
+                          "(details in the log).")
+            worker_crashed.set()
+
+    threads = [
+        threading.Thread(target=worker, args=(i,), daemon=True,
+                         name=f"export-cw{i + 1}")
+        for i in range(n)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    if auth_failed.is_set():
+        raise AuthError("The saved session expired or became invalid during the run.")
+
+    for wrs in worker_results:
+        if not wrs:
+            continue
+        for merged, wr in zip(results, wrs):
+            merged.saved += wr.saved
+            merged.empty.extend(wr.empty)
+            merged.user_skipped.extend(wr.user_skipped)
+            merged.failed.extend(wr.failed)
+            merged.exists.extend(wr.exists)
+            merged.per_route.extend(wr.per_route)
+
+    _reconcile_unaccounted_combined(routes, ordered_results, targets_for, events,
+                                    cancelled=events.is_cancelled(),
+                                    worker_crashed=worker_crashed.is_set())
+
+    log.info("parallel combined export done in %ds: saved=%d empty=%d skipped=%d "
+             "failed=%d exists=%d%s", int(time.monotonic() - run_t0),
+             results[0].saved, len(results[0].empty), len(results[0].user_skipped),
+             len(results[0].failed), len(results[0].exists),
+             f" failed_routes={results[0].failed}" if results[0].failed else "")
+
+    if results[0].failed and not events.is_cancelled():
+        try:
+            _retry_failed_combined_sequential(base, targets_for, ordered_results,
+                                              events, retry_timeout_ms)
+        except AuthError:
+            raise
+        except Exception:
+            log.exception("parallel combined retry pass failed")
+            events.on_log("Retry pass stopped unexpectedly (details in the log).")
+
+    for spec, result in zip(specs, results):
+        if result.per_route:
+            try:
+                report_path = write_run_report(
+                    result, spec.label, auto_report_path(spec.subdir, f"{src}-{env}"))
+                result.report_path = str(report_path)
+            except Exception as e:
+                log.warning("could not write run report for %s: %s", spec.subdir, e)
+
+    return results

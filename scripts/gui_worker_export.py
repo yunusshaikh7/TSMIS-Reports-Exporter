@@ -285,15 +285,14 @@ class ExportWorker(threading.Thread):
         B3). Appends as it goes so a mid-run exception still leaves partials.
 
         When BOTH editions of one on-site report are selected (same data_value,
-        e.g. Highway Log Excel + Highway Log PDF), the standard (sequential) path
-        COALESCES them — the report is generated once per route and both files are
-        saved off that single render (run_export_combined) instead of generating it
-        twice. Fast mode keeps each edition its own PARALLEL pass (its route
-        parallelism is the speed lever there; coalescing it is a follow-up)."""
+        e.g. Highway Log Excel + Highway Log PDF), the run COALESCES them — the
+        report is generated once per route and both files are saved off that
+        single render — on BOTH paths: sequentially via run_export_combined
+        (v0.19.2) and in fast mode via run_export_parallel_combined (v0.32.0,
+        owner item 1/19 — N browsers over routes exactly as before, each route
+        generated once with every edition saved off the same page)."""
         fast = bool(self.workers and self.workers > 1)
-        # Coalesce dual-edition pairs in the sequential path (a clear ~2x win); in
-        # fast mode every group is a singleton so behavior is unchanged.
-        groups = [[s] for s in self.specs] if fast else _coalesce_groups(self.specs)
+        groups = _coalesce_groups(self.specs)
         # Ownership is deletion authority, so claim the store only when this
         # invocation has real work and only through create-and-mark semantics.
         # A pre-existing untrusted folder blocks before staging/report writes.
@@ -346,6 +345,13 @@ class ExportWorker(threading.Thread):
                     _o, _s, run_spec, run_dir = preps[0]
                     edition_results = [run_export(
                         run_spec, events, routes=self.routes, out_dir=run_dir)]
+                elif fast:
+                    # Coalesced fast mode (v0.32.0): N browsers, each route
+                    # generated once with every edition saved off that render.
+                    from exporter_parallel import run_export_parallel_combined  # lazy
+                    edition_results = run_export_parallel_combined(
+                        [p[2] for p in preps], events, workers=self.workers,
+                        routes=self.routes, out_dirs=[p[3] for p in preps])
                 else:
                     # Coalesced: generate each route once, save every edition.
                     edition_results = run_export_combined(

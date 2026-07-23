@@ -29,6 +29,8 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
+import paths
+
 try:
     import pdfplumber
     from openpyxl import load_workbook
@@ -232,7 +234,11 @@ def project(field, raw):
 # TSMIS side — the per-route "Highway Detail (PDF)" export
 # --------------------------------------------------------------------------- #
 def tsmis_pdf_path(pdf_dir, route):
-    return Path(pdf_dir) / f"highway_detail_route_{route}.pdf"
+    # v0.32.0: dated run folders front-stamp the run identity onto the
+    # per-route filename; resolve_route_file prefers whichever spelling
+    # exists (dated first, legacy dateless second) so both generations
+    # of exports stay evidenceable.
+    return paths.resolve_route_file(pdf_dir, f"highway_detail_route_{route}.pdf")
 
 
 def _page_edges(page):

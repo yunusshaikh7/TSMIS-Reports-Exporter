@@ -47,7 +47,7 @@ from common import (
     wait_with_skip_option,
 )
 from events import Events, RunResult
-from paths import FAILURES_DIR, output_run_dir
+from paths import FAILURES_DIR, output_run_dir, resolve_route_file
 from run_report import auto_report_path, write_run_report
 
 log = logging.getLogger("tsmis.export")
@@ -956,7 +956,7 @@ def _retry_failed_routes(page, spec, events, result, out_dir, timeout_ms):
             if events.is_cancelled():
                 break
             prefix = f"[retry {i + 1}/{total}] Route {route}:"
-            out_path = out_dir / spec.filename(route)
+            out_path = resolve_route_file(out_dir, spec.filename(route))
             _require_safe_destination(events, out_path)
             if _can_resume(out_path):
                 result.exists.append(route)
@@ -1076,7 +1076,11 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
                     break
 
                 prefix = f"[{i:>3}/{total}] Route {route}:"
-                out_path = out_dir / spec.filename(route)
+                # v0.32.0 (owner item 20): dated run folders front-stamp the run
+                # identity onto every per-route filename; resolve_route_file
+                # prefers an existing legacy dateless file so an old partial run
+                # resumes instead of duplicating the route (CMP-AUD-050).
+                out_path = resolve_route_file(out_dir, spec.filename(route))
                 # Between-route poll point so a Preview click during a long
                 # stretch of already-exists skips still gets answered.
                 maybe_screenshot(page, events, note=f"Route {route}")
@@ -1328,7 +1332,8 @@ def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
              get_url(), has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
 
     def targets_for(route):
-        return [(specs[i], dirs[i] / specs[i].filename(route)) for i in save_order]
+        return [(specs[i], resolve_route_file(dirs[i], specs[i].filename(route)))
+                for i in save_order]
 
     ordered_results = [results[i] for i in save_order]
 

@@ -19,7 +19,7 @@ import outcome
 import pdf_excel_matrix
 from common import AuthError, BrowserNotFoundError, get_site, set_site
 from events import Events
-from gui_worker_export import ExportWorker
+from gui_worker_export import ExportWorker, _coalesce_groups, _group_label
 
 log = logging.getLogger("tsmis.gui")
 
@@ -148,26 +148,31 @@ def _record_attempt(root, result_key, cell_key, status, reason,
                     result_key, cell_key, type(e).__name__, e)
 
 
-def _run_matrix_export_step(spec, src, env, dest, queue, cancel, skip, pause,
+def _run_matrix_export_step(specs, src, env, dest, queue, cancel, skip, pause,
                             workers, on_worker=None, dated=False, day=None):
-    """Export ONE report for ONE environment, WITHOUT a manifest (so a matrix
-    refresh can never clobber a paused Export-Everything batch — BatchWorker alone
-    persists batch_job.json). Runs the SAME per-environment body BatchWorker uses
-    (set_site + an ExportWorker); fast mode runs N browsers. The caller
-    sets/restores the process-global site. Auth / browser failures raise up to the
-    batch loop, which stops the run. `on_worker(ew|None)` exposes the live
-    ExportWorker to the bridge for the duration of the step (so live screenshot
-    previews work, just like a normal export).
+    """Export one or more reports for ONE environment, WITHOUT a manifest (so a
+    matrix refresh can never clobber a paused Export-Everything batch —
+    BatchWorker alone persists batch_job.json). Runs the SAME per-environment
+    body BatchWorker uses (set_site + an ExportWorker); fast mode runs N
+    browsers. The caller sets/restores the process-global site. Auth / browser
+    failures raise up to the batch loop, which stops the run. `on_worker(ew|None)`
+    exposes the live ExportWorker to the bridge for the duration of the step (so
+    live screenshot previews work, just like a normal export).
+
+    `specs` is usually one report, but a v0.32.0 coalesced step passes BOTH
+    editions of one on-site report (same data_value) so the ExportWorker
+    generates each route once and saves both files off that single render —
+    one pass satisfies both matrix cells.
 
     `dated=False` -> the Everything store (`<dest>/<src-env>/<subdir>`, env-tagged
     names). `dated=True` (the Compare by-day matrix) -> out_base=None, so the
     ExportWorker writes a normal DATED run folder `output/<today> <src-env>/
-    <subdir>/` with plain route names — the immutable per-day pull the by-day
-    matrix consolidates + compares vs TSN. Only today can be exported (run_export
-    always names the folder for today)."""
+    <subdir>/` — the immutable per-day pull the by-day matrix consolidates +
+    compares vs TSN. Only today can be exported (run_export always names the
+    folder for today)."""
     set_site(src, env)
     out_base = None if dated else Path(dest) / f"{src}-{env}"
-    ew = ExportWorker([spec], queue, cancel, skip, workers=workers, routes=None,
+    ew = ExportWorker(list(specs), queue, cancel, skip, workers=workers, routes=None,
                       pause_event=pause, auto_consolidate=False, out_base=out_base,
                       day=day)          # CMP-AUD-091: captured run date for dated writes
     if on_worker:
@@ -219,20 +224,40 @@ class MatrixBatchExportWorker(threading.Thread):
         self.dated = bool(dated)
         self.day = day or None
 
+    def _grouped_steps(self):
+        """[(specs, src, env)] with both edition rows of one on-site report for
+        the SAME environment coalesced into one step (v0.32.0, owner item 1/19):
+        the ExportWorker then generates each route once and saves both files,
+        satisfying both matrix cells in a single pass. Preserves first-occurrence
+        order; single-edition steps pass through as groups of one."""
+        by_env = {}
+        order = []
+        for spec, src, env in self.steps:
+            key = (src, env)
+            if key not in by_env:
+                by_env[key] = []
+                order.append(key)
+            by_env[key].append(spec)
+        return [(group, src, env)
+                for src, env in order
+                for group in _coalesce_groups(by_env[(src, env)])]
+
     def run(self):
         original = get_site()
-        total = len(self.steps)
+        steps = self._grouped_steps()
+        total = len(steps)
         done = ok = 0
         posted = False           # an AuthError already drove the terminal transition
         try:
-            for spec, src, env in self.steps:
+            for specs, src, env in steps:
                 if self.cancel.is_set():
                     break
+                label = _group_label(specs)
                 if total > 1:
-                    self.q.put(("log", f"Re-exporting {spec.label} — {src}-{env} "
+                    self.q.put(("log", f"Re-exporting {label} — {src}-{env} "
                                        f"({done + 1} of {total})…"))
                 try:
-                    if _run_matrix_export_step(spec, src, env, self.dest, self.q,
+                    if _run_matrix_export_step(specs, src, env, self.dest, self.q,
                                                self.cancel, self.skip, self.pause,
                                                self.workers, on_worker=self.on_worker,
                                                dated=self.dated, day=self.day):
@@ -247,7 +272,7 @@ class MatrixBatchExportWorker(threading.Thread):
                     return                       # stop the batch (terminal via _on_error)
                 except Exception as e:           # noqa: BLE001
                     log.exception("matrix export %s-%s crashed", src, env)
-                    self.q.put(("log", f"  {spec.label} / {src}-{env}: "
+                    self.q.put(("log", f"  {label} / {src}-{env}: "
                                        f"{type(e).__name__}: {e}"))
                 done += 1
         finally:
