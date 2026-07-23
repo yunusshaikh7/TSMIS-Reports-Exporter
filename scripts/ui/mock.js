@@ -1257,6 +1257,12 @@ function makeMockApi() {
       st.day_matrix_row_order = (keys || []).filter((k) => typeof k === "string");
       return { ok: true, order: st.day_matrix_row_order };
     },
+    set_day_matrix_day_order: async (days) => {
+      const cur = st.day_matrix_days || [];
+      const clean = (days || []).filter((d) => cur.includes(d));
+      st.day_matrix_days = [...clean, ...cur.filter((d) => !clean.includes(d))];
+      pushState(); return { ok: true, days: st.day_matrix_days };
+    },
     set_matrix_env: async (env, visible) => {
       const hidden = new Set(st.matrix_hidden_envs || []);
       if (visible) hidden.delete(env); else hidden.add(env);
@@ -1393,6 +1399,10 @@ function makeMockApi() {
       push({ t: "log", text: `(mock) open comparison workbook: ${env}_${rk}.xlsx` });
       return { ok: true };
     },
+    open_cell_evidence: async (rk, env) => {
+      push({ t: "log", text: `(mock) open evidence workbook: ${env}_${rk} (evidence).xlsx` });
+      return { ok: true };
+    },
     open_comparisons_folder: async () => {
       push({ t: "log", text: "(mock) open comparisons folder" });
       return { ok: true };
@@ -1434,6 +1444,10 @@ function makeMockApi() {
     },
     open_day_cell_comparison: async (rk, d) => {
       push({ t: "log", text: `(mock) open by-day comparison: ${d} ${rk}_vs_tsn.xlsx` });
+      return { ok: true };
+    },
+    open_day_cell_evidence: async (rk, d) => {
+      push({ t: "log", text: `(mock) open by-day evidence: ${d} ${rk}_vs_tsn (evidence).xlsx` });
       return { ok: true };
     },
     export_day_column: async () => {
@@ -1495,6 +1509,12 @@ function makeMockApi() {
     set_baseline_matrix_row_order: async (keys) => {
       st.baseline_matrix_row_order = keys || [];
       pushState(); return { ok: true, order: st.baseline_matrix_row_order };
+    },
+    set_baseline_matrix_day_order: async (days) => {
+      const cur = st.baseline_matrix_days || [];
+      const clean = (days || []).filter((d) => cur.includes(d));
+      st.baseline_matrix_days = [...clean, ...cur.filter((d) => !clean.includes(d))];
+      pushState(); return { ok: true, days: st.baseline_matrix_days };
     },
     set_baseline_matrix_formulas: async (on) => {
       st.baseline_matrix_formulas = !!on;
@@ -1595,10 +1615,18 @@ function makeMockApi() {
         input_note: dropped.note,
         input_dir: dropped.dir,
       };
+      // Days where THIS report was actually exported (mirrors the real
+      // list_output_days_for_report filter) — varied per report so the preview
+      // shows the picker narrowing as the report selection changes.
+      const daysFor = {
+        "cons:ramp_summary": st.days,
+        "cons:intersection_detail": st.days.slice(0, 2),
+      }[key] || st.days.slice(0, 3);
       return {
         dest_dir: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated`,
         out_path: `C:\\Tools\\TSMIS Exporter\\output\\${day || "(legacy)"}\\consolidated\\${consByKey(key).label.replace(/[:\s]+/g, "_")}.xlsx`,
         exists: key === "cons:ramp_summary" && day === "2026-06-10",
+        days: daysFor,
       };
     },
     open_consolidate_input: async () => push({ t: "log", text: "(mock) would open the input folder" }),

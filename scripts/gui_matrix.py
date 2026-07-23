@@ -733,6 +733,28 @@ class GuiMatrixMixin:
         return {"ok": True}
 
     @_api_method
+    def open_cell_evidence(self, row_key, env_key):
+        """Open ONE cell's evidence workbook — the '(evidence).xlsx' sibling of its
+        vs-TSN comparison — when it exists. Independent of the Evidence images
+        toggle: this opens PREVIOUSLY generated evidence (the camera generates it)."""
+        base = self._current_baseline()
+        if row_key not in {r[0] for r in matrix_rows()}:
+            return {"error": "Unknown report for the matrix."}
+        if not self._parse_env_keys([env_key]):
+            return {"error": "Unknown environment."}
+        mode = settings.get_matrix_row_modes().get(row_key, "env")
+        dest = settings.get_batch_dest()
+        path = matrix.out_path_for_cell(dest, base, row_key, env_key, mode)
+        if path is None:
+            return {"error": "No comparison for this cell."}
+        import visual_evidence                       # lazy: pulls PIL/pdfium
+        ev_wb = visual_evidence.sibling_paths(path)[0]
+        if not ev_wb.exists():
+            return {"error": "No evidence images yet — use the camera to generate them."}
+        self._open_file(ev_wb)
+        return {"ok": True}
+
+    @_api_method
     def set_matrix_env(self, env_key, visible):
         """Show/hide an environment COLUMN on the matrix (hidden columns aren't
         rendered or refreshed). At least one column must stay on."""
@@ -1341,6 +1363,18 @@ class GuiMatrixMixin:
         self._push_state()
         return {"ok": True, "order": clean}
 
+    @_api_method
+    def set_day_matrix_day_order(self, days):
+        """Persist the drag-to-reorder DAY-column order for the by-day matrix. Any
+        current day the client omitted is appended in its existing order, so a
+        reorder can never silently drop a column."""
+        current = settings.get_day_matrix_days()
+        clean = [d for d in (days or []) if isinstance(d, str) and d in current]
+        clean += [d for d in current if d not in clean]
+        settings.set_day_matrix_days(clean)
+        self._push_state()
+        return {"ok": True, "days": clean}
+
     def _ensure_day_column(self, date):
         """Make sure `date` is a day column, so an export's results show AND the
         chained compare can target it. Idempotent."""
@@ -1493,6 +1527,21 @@ class GuiMatrixMixin:
         return {"ok": True}
 
     @_api_method
+    def open_day_cell_evidence(self, row_key, date):
+        """Open ONE by-day cell's evidence workbook when it exists (independent of
+        the Evidence images toggle: opens PREVIOUSLY generated evidence)."""
+        snap = self._day_matrix_snapshot()
+        if date not in snap["days"] or row_key not in snap["rows"]:
+            return {"error": "Unknown cell."}
+        path = day_matrix.day_out_path(date, snap["source"], row_key)
+        import visual_evidence                       # lazy: pulls PIL/pdfium
+        ev_wb = visual_evidence.sibling_paths(path)[0]
+        if not ev_wb.exists():
+            return {"error": "No evidence images yet — use the camera to generate them."}
+        self._open_file(ev_wb)
+        return {"ok": True}
+
+    @_api_method
     def open_day_comparisons_folder(self):
         """Open the by-day comparison store (output/comparisons/tsn-by-day/)."""
         self._open_folder(day_matrix.byday_root())
@@ -1635,6 +1684,18 @@ class GuiMatrixMixin:
         settings.set_baseline_matrix_row_order(clean)
         self._push_state()
         return {"ok": True, "order": clean}
+
+    @_api_method
+    def set_baseline_matrix_day_order(self, days):
+        """Persist the drag-to-reorder DAY-column order for the vs-Baseline matrix.
+        Any current day the client omitted is appended in its existing order, so a
+        reorder can never silently drop a column."""
+        current = settings.get_baseline_matrix_days()
+        clean = [d for d in (days or []) if isinstance(d, str) and d in current]
+        clean += [d for d in current if d not in clean]
+        settings.set_baseline_matrix_days(clean)
+        self._push_state()
+        return {"ok": True, "days": clean}
 
     @_api_method
     def set_baseline_matrix_formulas(self, on):

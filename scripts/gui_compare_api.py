@@ -74,6 +74,12 @@ class GuiCompareMixin:
         if note:
             info["input_note"] = note
             info["input_dir"] = str(mod.input_dir_for(day or None))
+        else:
+            # Offer only the run-folder days where THIS report was actually
+            # exported, so the picker never lists a day the report is absent from.
+            subdir = getattr(mod, "SUBDIR", None)
+            if subdir:
+                info["days"] = list_output_days_for_report(subdir)
         return info
 
     @_api_method

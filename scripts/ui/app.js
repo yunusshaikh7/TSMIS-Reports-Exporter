@@ -760,6 +760,16 @@ function renderDays(days) {
   const key = days.join("|");
   if (key === lastDaysKey) return;
   lastDaysKey = key;
+  // selDay (the consolidate day picker) is populated by refreshConsDest from the
+  // PER-REPORT filtered list (days where that report was actually exported); a
+  // global day-set change just re-triggers it.
+  refreshConsDest();
+  if (compareKind() === "folders") renderCompareDirs();
+}
+
+// Fill the consolidate day dropdown from `days`, preserving the current pick when
+// it survives the new list. Returns true when the selected value changed.
+function populateDayPicker(days) {
   const sel = $("selDay");
   const prev = sel.value;
   sel.textContent = "";
@@ -770,15 +780,21 @@ function renderDays(days) {
     sel.appendChild(o);
   });
   sel.value = [...sel.options].some((o) => o.value === prev) ? prev : values[0];
-  refreshConsDest();
-  if (compareKind() === "folders") renderCompareDirs();
+  return sel.value !== prev;
 }
 
 let consDestSeq = 0;
 async function refreshConsDest() {
   const seq = ++consDestSeq;
-  const info = await api.consolidate_info(consChoice(), selectedDay());
+  const day = selectedDay();
+  const info = await api.consolidate_info(consChoice(), day);
   if (seq !== consDestSeq) return;          // a newer request superseded this one
+  // Repopulate the day picker from the report-filtered list. If the prior pick
+  // isn't valid for this report the selected day changes, so re-resolve dest.
+  if (Array.isArray(info.days)) {
+    const changed = populateDayPicker(info.days);
+    if (changed && selectedDay() !== day) { refreshConsDest(); return; }
+  }
   $("consDest").textContent = info.dest_dir;
   $("consDest").title = info.dest_dir;
   // The one dropped-input report (TSN Highway Log (PDF), whose district PDFs come
@@ -1153,9 +1169,13 @@ function bindEvents() {
   });
   // Evidence images — ONE shared persisted setting, surfaced on both matrix
   // pages (the checkboxes/counts are mirrors, resynced from each state push).
+  // The per-cell camera (generate evidence) is gated on this toggle, so flipping
+  // it must re-render the visible grid for the cameras to appear/disappear live.
   for (const [cbId, countId, layoutId, resync] of [
-    ["matrixEvidence", "matrixEvidenceCount", "matrixEvidenceLayout", () => syncMatrixEvidence()],
-    ["dayMatrixEvidence", "dayMatrixEvidenceCount", "dayMatrixEvidenceLayout", () => syncDayMatrixEvidence()],
+    ["matrixEvidence", "matrixEvidenceCount", "matrixEvidenceLayout",
+     () => { syncMatrixEvidence(); if (typeof renderMatrix === "function") renderMatrix(); }],
+    ["dayMatrixEvidence", "dayMatrixEvidenceCount", "dayMatrixEvidenceLayout",
+     () => { syncDayMatrixEvidence(); if (typeof renderDayMatrix === "function") renderDayMatrix(); }],
   ]) {
     $(cbId)?.addEventListener("change", async (e) => {
       const r = await api.set_evidence_images(e.target.checked);

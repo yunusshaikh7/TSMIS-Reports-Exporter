@@ -249,6 +249,14 @@ function evidenceActionInfo(rowKey) {
   return rep && rep.tsn_pdfs ? rep : null;
 }
 
+// Whether the Evidence images toggle is ON. The per-cell CAMERA (which GENERATES
+// images) is only offered when it is — so the collect action is active exactly
+// when the checkbox is checked. Opening ALREADY-generated evidence is not gated
+// on it (you may open an earlier set with the toggle since turned off).
+function evidenceOn() {
+  return !!(S.st && S.st.evidence && S.st.evidence.on);
+}
+
 // A small camera badge on an evidence-SUPPORTED row's header (both matrices):
 // lit when its TSN prints are in place (images will render for its vs-TSN
 // comparisons), dimmed with the drop-folder in the tooltip when not. Rows with
@@ -801,17 +809,25 @@ async function renderMatrix() {
               if (r && r.error) showMessage("error", "Can't open", r.error);
             });
           ob.classList.add("mx-open"); acts.appendChild(ob);
-          // On-demand evidence images for the EXISTING vs-TSN comparison (no
-          // re-compare; works with the Evidence images toggle off). Fresh
-          // tsn-mode cells of evidence-capable rows only — a stale cell needs
-          // a comparison rebuild first (which regenerates evidence itself
-          // when the toggle is on).
-          if (snap.modes[rk] === "tsn" && !cmp.stale && evidenceActionInfo(rk)) {
-            acts.appendChild(mxActBtn("i-camera",
-              "Generate/refresh the evidence images for this comparison (no re-compare)",
+          // Evidence images for the EXISTING vs-TSN comparison. The CAMERA
+          // generates/refreshes them (no re-compare) and is offered only with
+          // the Evidence images toggle ON and a FRESH cell (a stale cell needs a
+          // comparison rebuild first, which regenerates evidence itself). The
+          // IMAGE button OPENS an already-generated set — toggle-agnostic.
+          if (snap.modes[rk] === "tsn" && evidenceActionInfo(rk)) {
+            if (evidenceOn() && !cmp.stale) {
+              acts.appendChild(mxActBtn("i-camera",
+                "Generate/refresh the evidence images for this comparison (no re-compare)",
+                false, async () => {
+                  const r = await api.matrix_evidence_cell(rk, env);
+                  if (r && r.error) showMessage("error", "Can't run evidence", r.error);
+                }));
+            }
+            acts.appendChild(mxActBtn("i-image",
+              "Open the evidence images for this comparison",
               false, async () => {
-                const r = await api.matrix_evidence_cell(rk, env);
-                if (r && r.error) showMessage("error", "Can't run evidence", r.error);
+                const r = await api.open_cell_evidence(rk, env);
+                if (r && r.error) showMessage("error", "No evidence", r.error);
               }));
           }
         }
@@ -1006,6 +1022,10 @@ async function renderDayMatrix() {
         await api.remove_day_matrix_day(d); await renderDayMatrix();
       }));
     h.appendChild(btns);
+    dndAttach(h, h, d, "dm-day", "x", () => days.slice(), async (order) => {
+      const r = await api.set_day_matrix_day_order(order);
+      if (r && r.error) showMessage("error", "Can't reorder", r.error);
+    });
     grid.appendChild(h);
   });
 
@@ -1083,14 +1103,23 @@ async function renderDayMatrix() {
               if (r && r.error) showMessage("error", "Can't open", r.error);
             });
           ob.classList.add("mx-open"); acts.appendChild(ob);
-          // On-demand evidence for the EXISTING comparison (by-day cells are
-          // always vs-TSN). Fresh cells of evidence-capable rows only.
-          if (!cmp.stale && evidenceActionInfo(rk)) {
-            acts.appendChild(mxActBtn("i-camera",
-              "Generate/refresh the evidence images for this comparison (no re-compare)",
+          // Evidence for the EXISTING comparison (by-day cells are always
+          // vs-TSN). The CAMERA generates (toggle ON + fresh cell only); the
+          // IMAGE button opens an already-generated set (toggle-agnostic).
+          if (evidenceActionInfo(rk)) {
+            if (evidenceOn() && !cmp.stale) {
+              acts.appendChild(mxActBtn("i-camera",
+                "Generate/refresh the evidence images for this comparison (no re-compare)",
+                false, async () => {
+                  const r = await api.day_matrix_evidence_cell(rk, d);
+                  if (r && r.error) showMessage("error", "Can't run evidence", r.error);
+                }));
+            }
+            acts.appendChild(mxActBtn("i-image",
+              "Open the evidence images for this comparison",
               false, async () => {
-                const r = await api.day_matrix_evidence_cell(rk, d);
-                if (r && r.error) showMessage("error", "Can't run evidence", r.error);
+                const r = await api.open_day_cell_evidence(rk, d);
+                if (r && r.error) showMessage("error", "No evidence", r.error);
               }));
           }
         }
@@ -1382,6 +1411,10 @@ async function renderBaselineMatrix() {
         await api.remove_baseline_matrix_day(d); await renderBaselineMatrix();
       }));
     h.appendChild(btns);
+    dndAttach(h, h, d, "bl-day", "x", () => days.slice(), async (order) => {
+      const r = await api.set_baseline_matrix_day_order(order);
+      if (r && r.error) showMessage("error", "Can't reorder", r.error);
+    });
     grid.appendChild(h);
   });
 

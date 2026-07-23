@@ -4,9 +4,11 @@ endpoints share one claim->dialog->launch tail.
 
 Two halves:
   * SURFACE IDENTITY (RM08) — GuiApi's public method set (the methods pywebview exposes
-    to JS) equals a FROZEN list of 102 names (U3 deleted the dead set_batch_dest;
+    to JS) equals a FROZEN list of names (U3 deleted the dead set_batch_dest;
     v0.21.0 added the two evidence-toggle endpoints; v0.23.0 the two on-demand
-    per-cell evidence endpoints). A moved/renamed/dropped/added endpoint fails
+    per-cell evidence endpoints; v0.29.0 the five ArcGIS endpoints; v0.30.0 the
+    two open-evidence-workbook endpoints + the two day-column-order endpoints).
+    A moved/renamed/dropped/added endpoint fails
     here; this is the invariant the mechanical move must preserve. The two touched
     endpoints (start_compare / start_compare_env) additionally have their exact source
     `def` signature asserted (the @_api_method wrapper hides arity from inspect, so the
@@ -53,7 +55,7 @@ FROZEN_API = {
     "rebuild_baseline_matrix", "remove_baseline_matrix_day",
     "set_baseline_matrix_baseline", "set_baseline_matrix_formulas",
     "set_baseline_matrix_report", "set_baseline_matrix_row_order",
-    "set_baseline_matrix_source",
+    "set_baseline_matrix_day_order", "set_baseline_matrix_source",
     "add_day_matrix_day", "apply_site_preset", "attach", "build_day_cell", "cancel_login",
     "cancel_run", "capture_site_source", "check_environments", "check_updates",
     "clear_saved_login", "open_site_captures_folder",
@@ -65,7 +67,8 @@ FROZEN_API = {
     "get_initial_state", "get_settings", "import_tsn_raw", "log_js_error", "matrix_evidence_cell",
     "matrix_info",
     "matrix_queue_clear", "matrix_queue_move", "matrix_queue_remove", "matrix_stop_all",
-    "open_cell_comparison", "open_comparisons_folder", "open_consolidate_input",
+    "open_cell_comparison", "open_cell_evidence", "open_comparisons_folder",
+    "open_consolidate_input", "open_day_cell_evidence",
     "open_consolidated_folder", "open_day_cell_comparison", "open_day_comparisons_folder",
     "open_failures_folder", "open_logs_folder", "open_output_folder", "open_release_page",
     "open_run_folder", "open_tsn_library_folder", "parse_routes_preview", "pause_or_resume",
@@ -76,7 +79,8 @@ FROZEN_API = {
     "report_library_info", "request_preview", "reset_preview", "resume_batch", "retry_failed",
     "revert_to_previous", "run_validation", "save_run_report", "save_support_bundle", "set_all_matrix_modes",
     "set_day_matrix_formulas", "set_day_matrix_report",
-    "set_day_matrix_row_order", "set_day_matrix_source", "set_evidence_examples",
+    "set_day_matrix_row_order", "set_day_matrix_day_order",
+    "set_day_matrix_source", "set_evidence_examples",
     "set_evidence_images", "set_evidence_layout", "set_export_browser",
     "set_matrix_baseline", "set_matrix_env", "set_matrix_env_order", "set_matrix_fast",
     "set_matrix_formulas", "set_matrix_report", "set_matrix_row_mode", "set_matrix_row_order",
