@@ -67,7 +67,10 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > the by-day matrix). **Owed on the work PC:** validate the Edge Retry (dev PC can't reach the
 > intranet). **Marathon 2 (structural → v0.31.0) is next:** future-report readiness, the PDF-vs-Excel
 > by-day matrix, single-pass dual-format in fast mode + matrix, the date on every export filename,
-> and evidence going PDF-vs-PDF only.
+> evidence going PDF-vs-PDF only, **and a Clean Road / ArcGIS comparison-polish wave (M2-E, 5 owner
+> items 2026-07-22: build cancel button; Summary naming each column's layer + the TSN↔ArcGIS matched
+> names; the full 74-column file in the comparison table with non-compared columns distinguished; a
+> standardized `output/comparisons/arcgis/` location; a colour-coded/greyed Provenance summary).**
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published
